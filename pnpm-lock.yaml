@@ -209,6 +209,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0(@noble/hashes@2.4.0)(supports-color@10.2.2))(supports-color@10.2.2)
 
+  apps/formulario-geral: {}
+
   apps/gerar-pagantes:
     dependencies:
       '@betinhos-executive-service/ui':

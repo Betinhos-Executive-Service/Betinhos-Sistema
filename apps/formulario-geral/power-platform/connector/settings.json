@@ -1,0 +1,8 @@
+{
+  "connectorId": null,
+  "environment": "https://org23b93544.crm2.dynamics.com",
+  "apiProperties": "apiProperties.json",
+  "apiDefinition": "deepseek-api-definition.json",
+  "icon": null,
+  "script": null
+}

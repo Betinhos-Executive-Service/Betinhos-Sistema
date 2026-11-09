@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 //  - "plugin": só o código de plugin que já existe no PROD. Copia para o PROD o assembly que o DEV já usa (decisão do Renan,
 //    05/11/2026: sem TEST nem backup, como a tela). Publicar a versão anterior resolve em minutos. Registrador, step e Custom
 //    API novos não entram aqui: mudam mais que o código. Tela e plugin juntos: "front-plugin", os dois caminhos rápidos.
-//  - "solucoes": schema, flows, step, Custom APIs, outros WebResources... Vai pelas soluções: export do DEV, ensaio no
+//  - "solucoes": schema, flows, step, Custom APIs, outros WebResources (inclui o Formulário Geral, apps/formulario-geral)... Vai pelas soluções: export do DEV, ensaio no
 //    TEST e PROD com aprovação (publicar.yml). Um import que quebra no meio deixa o PROD pela metade e não tem volta.
 //  - "nada": só documentação, CI, skills e scripts de publicação; o PROD não muda.
 // Arquivo que não está em nenhuma lista vai pelas soluções: na dúvida, o caminho mais seguro.
@@ -38,8 +38,10 @@ export const NEUTRO = [
   /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
   /^apps\/gerar-pagantes\/.+\.test\.[^/]+$/,
+  // Formulário Geral: o que vai ao WebResource muda o PROD (soluções); teste, fixture, documentação e a pasta docs/ não.
+  /^apps\/formulario-geral\/(docs\/.+|.+\.(test|fixtures)\.[^/]+|.+\.md)$/,
   /^packages\/deploy\/solucoes\//,
-  /^packages\/deploy\/(push-dev|push-webresources-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
+  /^packages\/deploy\/(push-dev|push-webresources-dev|push-formulario-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
   /^packages\/plugins\/Betinhos\.ExpenseUpload\//,

@@ -12,6 +12,24 @@ test('teste da Tela Gerar Pagantes não muda o PROD; o código dela vai pelas so
   assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.ts'), 'solucoes')
 })
 
+test('Formulário Geral: código vai pelas soluções; teste, fixture, .md e docs do app e o script do DEV não mudam o PROD', () => {
+  for (const arquivo of ['apps/formulario-geral/app.js', 'apps/formulario-geral/index.html', 'apps/formulario-geral/scripts/xlsx_import_core.js', 'apps/formulario-geral/vendor/xlsx.full.min.js', 'apps/formulario-geral/version.json']) {
+    assert.equal(caminhoDoArquivo(arquivo), 'solucoes', arquivo)
+  }
+  for (const arquivo of [
+    'apps/formulario-geral/scripts/xlsx_import_parser.test.js',
+    'apps/formulario-geral/scripts/ai_schedule_conversation.test.mjs',
+    'apps/formulario-geral/scripts/ai_schedule_conversation.fixtures.mjs',
+    'apps/formulario-geral/IMPORTACAO_SERVICOS.md',
+    'apps/formulario-geral/docs/power-platform/AI_AGENDAR_POR_IA_DEV_FLOW_CONTRACT.json',
+    'packages/deploy/push-formulario-dev.ps1',
+  ]) {
+    assert.equal(caminhoDoArquivo(arquivo), 'nada', arquivo)
+  }
+  assert.equal(caminhoDaPublicacao(['apps/formulario-geral/app.js']).caminho, 'solucoes')
+  assert.equal(caminhoDaPublicacao(['apps/formulario-geral/scripts/search_matching.test.js', 'apps/formulario-geral/CONTEXTO_PROJETO.md']).caminho, 'nada')
+})
+
 test('tela com documentação continua front', () => {
   assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'docs/auto/01.md', '.claude/skills/x/SKILL.md']).caminho, 'front')
 })

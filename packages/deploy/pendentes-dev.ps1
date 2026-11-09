@@ -2,13 +2,14 @@ param(
   # Commit de referencia: no Deploy, o HEAD da develop; na trava do publicar.yml, o commit levado ao PROD.
   [string] $Ate = 'HEAD',
   [string] $EnvironmentUrl = $env:DV_ENVIRONMENT_URL,
-  # Linhas tela=..., webresources=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
+  # Linhas tela=..., webresources=..., formulario=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
   [switch] $GitHub
 )
 
 # Diz o que no DEV nao corresponde ao commit $Ate, pelo commit que o proprio DEV registra:
 #  - tela: descricao do cr40f_SistemaBetinhos.html ("vX.Y.Z <sha>", push-dev.ps1);
 #  - webresources: descricao de Tela_GerarPagantes/index.html ("vX.Y.Z <sha>", push-webresources-dev.ps1);
+#  - formulario: descricao de new_formulario_geral.html ("vX.Y.Z <sha>", push-formulario-dev.ps1);
 #  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin e do Betinhos.DriverRecordSharing (<sha>, gravada no CI).
 # Pendente = sem commit registrado, assembly ausente no DEV, ou git diff <registrado> $Ate tocando a peca
 # (regras em mudancas-dev.mjs). Comparar com o que o DEV tem, e nao com o push anterior, faz um deploy cancelado na fila
@@ -69,6 +70,7 @@ function Test-WebResourcePendente([string] $Nome, [string] $Peca) {
 
 $tela = Test-WebResourcePendente 'cr40f_SistemaBetinhos.html' 'tela'
 $webresources = Test-WebResourcePendente 'Tela_GerarPagantes/index.html' 'webresources'
+$formulario = Test-WebResourcePendente 'new_formulario_geral.html' 'formulario'
 
 $plugins = New-Object System.Collections.Generic.List[string]
 $assemblies = @{}
@@ -87,5 +89,5 @@ foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | S
 }
 
 foreach ($linha in $motivos) { [Console]::Error.WriteLine("[pendentes] $linha") }
-if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
-else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }
+if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "formulario=$($formulario.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
+else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; formulario = $formulario; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }
