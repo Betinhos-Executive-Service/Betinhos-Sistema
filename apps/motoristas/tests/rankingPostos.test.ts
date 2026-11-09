@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/features/despesas/rankingPostos.ts";
+import { aplicarMinhaAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
+import { enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/features/despesas/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
-const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
+const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ postoId: nome, avaliacoes: SEM_AVALIACOES, nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
 
 test("parseRankingPostos lê a resposta da Custom API", () => {
   const ranking = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [posto("A", 6.19, -23)] }));
@@ -70,10 +71,10 @@ test("nomePosto mantém siglas em caixa alta", () => {
   assert.equal(nomePosto("POSTO BR-116 JK"), "Posto BR-116 JK");
 });
 
-test("urlMaps pesquisa pelo nome e pelo endereço", () => {
+test("urlMaps pesquisa como posto de gasolina, com nome e endereço", () => {
   const url = new URL(urlMaps({ nome: "Posto A", endereco: "RUA A, 10 - TAUBATE/SP", lat: -23, lon: -45 }));
   assert.equal(url.searchParams.get("api"), "1");
-  assert.equal(url.searchParams.get("query"), "Posto A RUA A, 10 - TAUBATE/SP");
+  assert.equal(url.searchParams.get("query"), "Posto de gasolina Posto A RUA A, 10 - TAUBATE/SP");
 });
 
 test("urlMaps usa a coordenada quando o posto não tem endereço", () => {
@@ -86,4 +87,47 @@ test("parseRankingPostos aceita a resposta do plugin sem endereço e histórico"
   const ranking = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [antigo] }));
   assert.equal(ranking.postos[0].endereco, "");
   assert.deepEqual(ranking.postos[0].historico, []);
+});
+
+test("parseRankingPostos aceita o plugin anterior, sem id nem avaliações, para a ficha seguir abrindo", () => {
+  const { postoId: _id, avaliacoes: _avaliacoes, ...antigo } = posto("A", 6.19, -23);
+  const [lido] = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [antigo] })).postos;
+  assert.equal(lido.postoId, "");
+  assert.deepEqual(lido.avaliacoes, SEM_AVALIACOES);
+});
+
+test("rotuloRecomendacoes concorda com o total e some sem avaliações", () => {
+  assert.equal(rotuloRecomendacoes({ total: 0, recomendam: 0 }), "");
+  assert.equal(rotuloRecomendacoes({ total: 1, recomendam: 1 }), "1 de 1 recomenda");
+  assert.equal(rotuloRecomendacoes({ total: 5, recomendam: 4 }), "4 de 5 recomendam");
+});
+
+test("percentualRecomenda arredonda e não divide por zero", () => {
+  assert.equal(percentualRecomenda({ total: 0, recomendam: 0 }), 0);
+  assert.equal(percentualRecomenda({ total: 3, recomendam: 2 }), 67);
+});
+
+test("nomeCurto fica com o primeiro e o último nome", () => {
+  assert.equal(nomeCurto("Maria Aparecida da Silva"), "Maria Silva");
+  assert.equal(nomeCurto("Maria Silva"), "Maria Silva");
+  assert.equal(nomeCurto("  Renan "), "Renan");
+});
+
+test("enderecoLegivel tira a caixa alta e mantém a UF", () => {
+  assert.equal(enderecoLegivel("AVENIDA BENEDITO DE MATARAZZO, 9183 - SAO JOSE DOS CAMPOS/SP"), "Avenida Benedito de Matarazzo, 9183 - Sao Jose dos Campos/SP");
+  assert.equal(enderecoLegivel("Rua Já Escrita, 10"), "Rua Já Escrita, 10");
+});
+
+test("motivos têm rótulo e sentido próprios", () => {
+  assert.equal(rotuloMotivo("fila_grande"), "Fila grande");
+  assert.equal(motivoPositivo("sem_fila"), true);
+  assert.equal(motivoPositivo("fila_grande"), false);
+});
+
+test("avaliar de novo no mock substitui a avaliação em vez de contar em dobro", () => {
+  const primeira = aplicarMinhaAvaliacao({ ...SEM_AVALIACOES, total: 2, recomendam: 1 }, { recomenda: true, motivos: ["sem_fila"], comentario: "Boa" }, "Eu", "2026-11-06");
+  assert.deepEqual([primeira.total, primeira.recomendam, primeira.comentarios.length], [3, 2, 1]);
+  const segunda = aplicarMinhaAvaliacao(primeira, { recomenda: false, motivos: ["fila_grande"], comentario: "" }, "Eu", "2026-11-06");
+  assert.deepEqual([segunda.total, segunda.recomendam, segunda.comentarios.length], [3, 1, 0]);
+  assert.deepEqual(segunda.motivos, ["fila_grande"]);
 });
