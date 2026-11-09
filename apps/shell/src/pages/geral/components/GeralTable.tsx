@@ -61,7 +61,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const BOOLEAN_WIDTH = 96
   // Durante o arraste a largura vem de `live`; ao soltar ela é gravada nas preferências e `live` zera.
   const [live, setLive] = useState<Record<string, number>>({})
-  const drag = useRef<{ key: string; startX: number; start: number; width: number } | null>(null)
+  const drag = useRef<{ key: string; start: number; width: number } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -102,12 +102,15 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     e.stopPropagation()
     pressing.current = true
     e.currentTarget.setPointerCapture?.(e.pointerId)
-    drag.current = { key: column.key, startX: e.clientX, start: column.width, width: column.width }
+    drag.current = { key: column.key, start: column.width, width: column.width }
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
-    if (!d || e.buttons === 0) return
-    d.width = clampW(d.start + e.clientX - d.startX)
+    const cell = e.currentTarget.parentElement
+    if (!d || !cell || e.buttons === 0) return
+    // Mede a borda desenhada: trilhas `fr` ficam mais largas que a largura declarada, e partir dela fazia a coluna encolher e a borda fugir do cursor.
+    const rect = cell.getBoundingClientRect()
+    d.width = clampW(rect.width + e.clientX - rect.right)
     setLive((l) => ({ ...l, [d.key]: d.width }))
   }
   const resizeEnd = (e: PointerEvent<HTMLDivElement>) => {
