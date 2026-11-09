@@ -1,0 +1,20 @@
+{
+  "properties": {
+    "connectionParameters": {
+      "api_key": {
+        "type": "securestring",
+        "uiDefinition": {
+          "displayName": "DeepSeek API key",
+          "description": "Chave da API DeepSeek. Armazenada somente na conexão Power Platform.",
+          "tooltip": "Bearer sk-...",
+          "constraints": { "tabIndex": 1, "clearText": false, "required": "true" }
+        }
+      }
+    },
+    "iconBrandColor": "#111827",
+    "capabilities": [],
+    "scriptOperations": null,
+    "publisher": "Betinhos Executive Service",
+    "stackOwner": "Betinhos Executive Service"
+  }
+}

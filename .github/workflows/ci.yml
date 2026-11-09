@@ -88,6 +88,7 @@ jobs:
         run: pnpm -r --if-present typecheck
       - name: Sintaxe do cadastro-passageiro
         run: pnpm --filter @betinhos/cadastro-passageiro check
+      # Inclui @betinhos/formulario-geral (build do webresource + 19 testes do app).
       - name: Testes (exceto shell)
         run: pnpm -r --filter '!@betinhos/shell' test
 

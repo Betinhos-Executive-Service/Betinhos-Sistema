@@ -29,3 +29,14 @@ test('backup de flow versionado é achado sem ler o arquivo; lock, binário e o 
   assert.match(saida[0], /backup de flow versionado/)
   assert.deepEqual(lidos, ['src/ok.ts'])
 })
+
+test('planilha em apps/formulario-geral é achado sem ler o arquivo; fora dele passa', () => {
+  const lidos = []
+  const saida = verificar(
+    ['apps/formulario-geral/Relatorio.xlsx', 'apps/formulario-geral/dados/x.CSV', 'apps/formulario-geral/a.xls', 'apps/gerar-pagantes/exemplo.csv', 'apps/formulario-geral/app.js'],
+    (f) => { lidos.push(f); return 'nada aqui' },
+  )
+  assert.equal(saida.length, 3)
+  assert.match(saida[0], /planilha no Formulário Geral/)
+  assert.deepEqual(lidos, ['apps/gerar-pagantes/exemplo.csv', 'apps/formulario-geral/app.js'])
+})

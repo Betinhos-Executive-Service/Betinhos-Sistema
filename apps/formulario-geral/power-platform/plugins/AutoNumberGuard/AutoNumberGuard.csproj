@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Betinhos.AutoNumberGuard</AssemblyName>
+    <RootNamespace>Betinhos.AutoNumberGuard</RootNamespace>
+    <Version>1.0.4.0</Version>
+    <Deterministic>true</Deterministic>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>AutoNumberGuard.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <Target Name="ValidateStrongNameKey" BeforeTargets="BeforeBuild">
+    <Error
+      Condition="!Exists('$(MSBuildProjectDirectory)\AutoNumberGuard.snk')"
+      Text="Strong-name key not found. Run .\generate-strong-name-key.ps1 inside plugins\AutoNumberGuard before building." />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CrmSdk.CoreAssemblies" Version="9.0.2.59" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net462" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

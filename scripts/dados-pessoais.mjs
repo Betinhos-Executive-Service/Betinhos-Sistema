@@ -1,5 +1,5 @@
 // Trava do CI contra dado pessoal real no repositório: CPF válido, e-mail de pessoa no domínio da empresa
-// ou em provedor pessoal, e backup de flow versionado. Dado de teste usa os valores fictícios listados abaixo.
+// ou em provedor pessoal, backup de flow versionado e planilha (.xlsx/.xls/.csv) em apps/formulario-geral. Dado de teste usa os valores fictícios listados abaixo.
 // Uso: node scripts/dados-pessoais.mjs (lê os arquivos do git ls-files; sai 1 com achados mascarados).
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -12,6 +12,8 @@ const EMAILS_PERMITIDOS = new Set(['financeiro', 'noreply', 'deborah.keila', 'ju
 const DOMINIOS = /@(betinhos\.com\.br|gmail\.com|hotmail\.com|outlook\.com|yahoo\.com(?:\.br)?)\b/i
 const IGNORAR = /(^|\/)(pnpm-lock\.yaml|package-lock\.json)$|\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|xlsx)$/i
 const BACKUP = /^packages\/deploy\/flows\/backup\//
+// Planilha real (relatório de passageiros) já vazou uma vez; o fixture dos testes é gerado no código.
+const PLANILHA_DO_FORMULARIO = /^apps\/formulario-geral\/.*\.(xlsx?|csv)$/i
 // O teste da trava traz exemplos fictícios de propósito.
 const PROPRIO_TESTE = 'scripts/dados-pessoais.test.mjs'
 
@@ -47,6 +49,7 @@ export function verificar(arquivos, ler) {
   const saida = []
   for (const arquivo of arquivos) {
     if (BACKUP.test(arquivo)) { saida.push(`${arquivo}: backup de flow versionado (fica só na máquina; está no .gitignore)`); continue }
+    if (PLANILHA_DO_FORMULARIO.test(arquivo)) { saida.push(`${arquivo}: planilha no Formulário Geral (gere o fixture no teste, sem dado real)`); continue }
     if (IGNORAR.test(arquivo) || arquivo === PROPRIO_TESTE) continue
     let texto
     try { texto = ler(arquivo) } catch { continue }
