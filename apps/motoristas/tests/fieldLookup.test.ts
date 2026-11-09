@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getFieldValue, isBlankOrNotInformed } from "../src/lib/fieldLookup.ts";
+import { getFieldValue, isBlankOrNotInformed } from "../src/features/detalhe/fieldLookup.ts";
 
 test("getFieldValue resolves accented and unaccented labels", () => {
   assert.equal(getFieldValue({ "Horario Inicial": "08:00" }, "Hor\u00e1rio Inicial", "Horario Inicial"), "08:00");

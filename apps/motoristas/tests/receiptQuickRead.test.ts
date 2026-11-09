@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseQuickReadResponse } from "../src/lib/receiptQuickRead.ts";
+import { parseQuickReadResponse } from "../src/features/despesas/receiptQuickRead.ts";
 
 const leitura = { legivel: true, valor: 85.4, data: "2026-10-12", hora: "14:32", estabelecimento: "Posto X", cnpj: null, litros: 32.5, categoria_sugerida: "Abastecimento", forma_pagamento_sugerida: null, motivo_ilegivel: null };
 
@@ -16,8 +16,8 @@ test("parseQuickReadResponse trata ok:false e corpo inválido como falha", () =>
   assert.equal(parseQuickReadResponse({ ok: true, leitura: { legivel: "sim" } }).kind, "falha");
 });
 
-import { applyQuickReadToDraft } from "../src/lib/receiptQuickRead.ts";
-import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft } from "../src/lib/expenses.ts";
+import { applyQuickReadToDraft } from "../src/features/despesas/receiptQuickRead.ts";
+import { DEFAULT_EXPENSE_REFERENCE_DATA, type ExpenseDraft } from "../src/features/despesas/expenses.ts";
 
 const vazio: ExpenseDraft = { categoriaId: "", veiculoId: "", valor: "", dataGasto: "", formaPagamentoId: "", cidadeId: "", estabelecimento: "", descricao: "", kmInformado: "", litros: "" };
 
@@ -39,7 +39,7 @@ test("applyQuickReadToDraft ignora sugestão fora da lista", () => {
   assert.equal(applyQuickReadToDraft(vazio, { ...leitura, categoria_sugerida: "Bebida" }, DEFAULT_EXPENSE_REFERENCE_DATA).categoriaId, "");
 });
 
-import { INITIAL_QUICK_READ, nextQuickReadState, shouldRunQuickRead } from "../src/lib/receiptQuickRead.ts";
+import { INITIAL_QUICK_READ, nextQuickReadState, shouldRunQuickRead } from "../src/features/despesas/receiptQuickRead.ts";
 
 test("terceira foto ilegível libera manual e para de ler", () => {
   let s = nextQuickReadState(INITIAL_QUICK_READ, { kind: "ilegivel" });
@@ -59,7 +59,7 @@ test("shouldRunQuickRead só em idle ou ilegivel", () => {
   assert.equal(shouldRunQuickRead({ status: "preenchido", tentativas: 1 }), false);
 });
 
-import { quickReadTargetSize } from "../src/lib/receiptQuickRead.ts";
+import { quickReadTargetSize } from "../src/features/despesas/receiptQuickRead.ts";
 
 test("quickReadTargetSize limita o maior lado a 1600 mantendo proporção", () => {
   assert.deepEqual(quickReadTargetSize(4000, 3000), { width: 1600, height: 1200 });
@@ -72,8 +72,8 @@ test("applyQuickReadToDraft troca a data automática (hoje) quando o motorista n
   assert.equal(applyQuickReadToDraft(comHoje, leitura, DEFAULT_EXPENSE_REFERENCE_DATA, { replaceAutoDate: true, today: "2026-10-15" }).dataGasto, "2026-10-12");
 });
 
-import { buildQuickReadDescription, matchQuickReadCity, QUICK_READ_DESCRIPTION_MAX } from "../src/lib/receiptQuickRead.ts";
-import type { ExpenseCityOption, ExpenseReferenceData } from "../src/lib/expenses.ts";
+import { buildQuickReadDescription, matchQuickReadCity, QUICK_READ_DESCRIPTION_MAX } from "../src/features/despesas/receiptQuickRead.ts";
+import type { ExpenseCityOption, ExpenseReferenceData } from "../src/features/despesas/expenses.ts";
 
 const cidade = (id: string, nome: string, uf: string): ExpenseCityOption => ({ id, name: `${nome} - ${uf}`, order: 0, uf, pais: "Brasil", codigoIbge: "" });
 const cidades = [cidade("tbt", "Taubaté", "SP"), cidade("bj-pi", "Bom Jesus", "PI"), cidade("bj-rn", "Bom Jesus", "RN"), cidade("cps", "Campinas", "SP"), cidade("sp", "São Paulo", "SP")];
@@ -117,7 +117,7 @@ test("applyQuickReadToDraft preenche a descrição só quando vazia", () => {
   assert.equal(applyQuickReadToDraft({ ...vazio, descricao: "minha nota" }, lido, comCidades).descricao, "minha nota");
 });
 
-import { applyQuickRead, resolveQuickReadDate, todayInSaoPaulo } from "../src/lib/receiptQuickRead.ts";
+import { applyQuickRead, resolveQuickReadDate, todayInSaoPaulo } from "../src/features/despesas/receiptQuickRead.ts";
 
 test("data lida: aceita só de hoje até 3 dias atrás (hoje em America/Sao_Paulo)", () => {
   const hoje = "2026-10-15";

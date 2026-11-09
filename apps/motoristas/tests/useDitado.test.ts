@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendDitado, formatDitadoTimer, createDitado, getDitadoCtor, DITADO_IDLE, type DitadoRecognition, type DitadoState } from "../src/lib/useDitado.ts";
+import { appendDitado, formatDitadoTimer, createDitado, getDitadoCtor, DITADO_IDLE, type DitadoRecognition, type DitadoState } from "../src/shared/useDitado.ts";
 
 class FakeRecognition implements DitadoRecognition {
   static last: FakeRecognition | null = null;

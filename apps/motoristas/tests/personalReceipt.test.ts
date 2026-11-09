@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPersonalReceiptDraft, buildPersonalReceiptModel } from "../src/lib/personalReceipt.ts";
+import { buildPersonalReceiptDraft, buildPersonalReceiptModel } from "../src/features/recibo/personalReceipt.ts";
 import type { DetailData } from "../src/types.ts";
 
 const nbsp = (s: string) => s.replace(/ /g, " ");

@@ -25,7 +25,7 @@ import {
   saveDraft,
   validateDraft,
   validateSignature
-} from "../src/lib/comunicados.ts";
+} from "../src/features/comunicados/comunicados.ts";
 
 const driverId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 

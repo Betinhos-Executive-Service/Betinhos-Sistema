@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aplicarMinhaAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/lib/avaliacaoPostos.ts";
-import { enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/lib/rankingPostos.ts";
+import { aplicarMinhaAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
+import { enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/features/despesas/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
 const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ postoId: nome, avaliacoes: SEM_AVALIACOES, nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });

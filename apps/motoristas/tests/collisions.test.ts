@@ -8,7 +8,7 @@ import {
   validateCollisionDraft,
   type CollisionDraft,
   type CollisionPhoto
-} from "../src/lib/collisions.ts";
+} from "../src/features/colisao/collisions.ts";
 
 const photos: CollisionPhoto[] = [
   { id: "photo-1", kind: "cena", dataUrl: "data:image/jpeg;base64,aaa" },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../src/lib/expenses.defaults.ts";
+import { DEFAULT_EXPENSE_REFERENCE_DATA } from "../src/features/despesas/expenses.defaults.ts";
 import {
   findExpenseCategoryByName,
   findExpensePaymentMethodByName,
@@ -13,8 +13,8 @@ import {
   parseIntegerInput,
   shouldUploadMaintenanceExpenseInvoices,
   validateExpenseDraft
-} from "../src/lib/expenses.reference.ts";
-import type { ExpenseCityOption, ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/lib/expenses.types.ts";
+} from "../src/features/despesas/expenses.reference.ts";
+import type { ExpenseCityOption, ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/features/despesas/expenses.types.ts";
 
 const city: ExpenseCityOption = { id: "c1", name: "São José dos Campos - SP", order: 1, uf: "SP", pais: "Brasil", codigoIbge: "3549904" };
 const reference: ExpenseReferenceData = { ...DEFAULT_EXPENSE_REFERENCE_DATA, cities: [city] };

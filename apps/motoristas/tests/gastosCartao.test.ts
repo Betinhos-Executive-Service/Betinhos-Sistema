@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getInitialDespesaId, getInitialGastosCartaoLink } from "../src/app/bootstrap.ts";
-import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/lib/expenses.ts";
+import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/features/despesas/expenses.ts";
 import {
   acharGastoCartaoDuplicado,
   buildGastoCartaoCompletarPayload,
@@ -13,7 +13,7 @@ import {
   mesclarRascunho,
   validarDescricao,
   type GastoCartao
-} from "../src/lib/gastosCartao.ts";
+} from "../src/features/despesas/gastosCartao.ts";
 
 const MOTORISTA = "11111111-2222-4333-8444-555555555555";
 const ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";

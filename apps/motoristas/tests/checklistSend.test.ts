@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHECKLIST_SEND_ERROR_FALLBACK, describeChecklistSend, holdChecklistSend } from "../src/lib/checklistSend.ts";
-import { mockChecklistFailure } from "../src/lib/checklists.ts";
+import { CHECKLIST_SEND_ERROR_FALLBACK, describeChecklistSend, holdChecklistSend } from "../src/features/checklist/checklistSend.ts";
+import { mockChecklistFailure } from "../src/features/checklist/checklists.ts";
 
 test("envio do checklist mostra a foto atual de M e o registro pendente", () => {
   const view = describeChecklistSend({ phase: "uploading", current: 2, total: 3 });

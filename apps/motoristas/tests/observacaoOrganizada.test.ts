@@ -8,7 +8,7 @@ import {
   parseOrganizeResult,
   summaryFinalValue,
   topicKind
-} from "../src/lib/observacaoOrganizada.ts";
+} from "../src/features/finalizar/observacaoOrganizada.ts";
 
 const okJson = (topicos: string[]) => JSON.stringify({ ok: true, topicos, motivo: null, ms: 900, input_tokens: 200, output_tokens: 40 });
 

@@ -25,7 +25,7 @@ import {
   trechos,
   type Participacao,
   type Treinamento
-} from "../src/lib/treinamentos.ts";
+} from "../src/features/treinamentos/treinamentos.ts";
 
 const QUIZ = { perguntas: [
   { id: "q1", texto: "P1", alternativas: [{ id: "a", texto: "A" }, { id: "b", texto: "B" }], corretaId: "a" },

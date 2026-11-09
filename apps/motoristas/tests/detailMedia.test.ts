@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildOneDrivePreviewCandidates, extractMaintenancePhotoUrls, isMaintenancePhotoPreviewField } from "../src/lib/detailMedia.ts";
+import { buildOneDrivePreviewCandidates, extractMaintenancePhotoUrls, isMaintenancePhotoPreviewField } from "../src/features/detalhe/detailMedia.ts";
 
 test("detecta campos de foto de manutencao para preview", () => {
   assert.equal(isMaintenancePhotoPreviewField("Link Foto Solicitação 1", "https://contoso/image.jpg"), true);

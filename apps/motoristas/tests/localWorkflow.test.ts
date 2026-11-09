@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agendaMock, historyMock } from "../src/data/mockData.ts";
+import { agendaMock, historyMock } from "../src/data/mock/mockData.ts";
 import {
   cancelDetailLocally,
   buildWhatsAppUrl,

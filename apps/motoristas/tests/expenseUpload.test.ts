@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "../src/lib/expenseUploadState.ts";
-import { resumeExpenseSubmission, type ExpenseSubmissionDependencies } from "../src/lib/expenseSubmission.ts";
+import { describeExpenseSubmission, normalizeStoredExpenseSubmissions, summarizeExpenseUploads, type ExpenseSubmission, type ExpenseUploadRow } from "../src/features/despesas/expenseUploadState.ts";
+import { resumeExpenseSubmission, type ExpenseSubmissionDependencies } from "../src/features/despesas/expenseSubmission.ts";
 
 function harness() {
   const submission: ExpenseSubmission = {

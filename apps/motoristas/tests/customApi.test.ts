@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { executeCustomApi } from "../src/lib/customApi.ts";
+import { executeCustomApi } from "../src/data/dataverse/customApi.ts";
 
 type G = typeof globalThis & { window?: unknown; fetch?: unknown };
 

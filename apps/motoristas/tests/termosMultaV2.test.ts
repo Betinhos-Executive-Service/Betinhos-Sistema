@@ -11,7 +11,7 @@ import {
   separarTermos,
   termoFlowReducer,
   TERMO_STATUS
-} from "../src/lib/termosMulta.ts";
+} from "../src/features/termos/termosMulta.ts";
 
 const row = (id: string, status: number, enviadoEm: string) => mapTermo({ new_termomultaid: id, new_status: status, new_enviadoem: enviadoEm });
 

@@ -10,7 +10,7 @@ import {
   getReceiptDisplayClient,
   getReceiptDisplayPaymentMethod,
   normalizeReceiptLanguage
-} from "../src/lib/receiptLanguage.ts";
+} from "../src/features/recibo/receiptLanguage.ts";
 
 test("normalizeReceiptLanguage cai em português para valor ausente ou desconhecido", () => {
   assert.equal(normalizeReceiptLanguage("en-US"), "en-US");

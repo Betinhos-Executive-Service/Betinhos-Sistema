@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { setTorch, stopStreamTracks, supportsTorch } from "../src/lib/cameraTorch.ts";
+import { setTorch, stopStreamTracks, supportsTorch } from "../src/shared/camera/cameraTorch.ts";
 
 type FakeTrack = { calls: unknown[]; stopped: boolean; caps?: Record<string, unknown> | (() => never); fail?: boolean };
 

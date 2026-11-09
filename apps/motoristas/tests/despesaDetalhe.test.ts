@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { corpoConsultaArquivo, mapAnexos, mapDespesaDetalhe, mimeDoArquivo } from "../src/lib/despesaDetalhe.ts";
+import { corpoConsultaArquivo, mapAnexos, mapDespesaDetalhe, mimeDoArquivo } from "../src/features/despesas/despesaDetalhe.ts";
 
 const FV = "@OData.Community.Display.V1.FormattedValue";
 

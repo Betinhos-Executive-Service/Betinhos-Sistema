@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createReceiptPdfCache } from "../src/lib/receiptPdfCache.ts";
+import { createReceiptPdfCache } from "../src/features/recibo/receiptPdfCache.ts";
 
 test("clique durante antecipacao reutiliza a mesma geracao de PDF", async () => {
   let resolveFirst!: (blob: Blob) => void;

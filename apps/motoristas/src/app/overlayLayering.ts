@@ -1,4 +1,4 @@
-import type { LoadingOverlayState } from "../components/common/LoadingOverlay";
+import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 
 // O aviso de erro crítico precisa ficar legível e clicável: com erro na tela, o overlay de carga some.
 export function getVisibleLoadingOverlay(

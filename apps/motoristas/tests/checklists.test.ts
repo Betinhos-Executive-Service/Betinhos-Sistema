@@ -24,7 +24,7 @@ import {
   type ChecklistDraft,
   type ChecklistItem,
   type ChecklistVeiculo
-} from "../src/lib/checklists.ts";
+} from "../src/features/checklist/checklists.ts";
 
 const driverId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const itens: ChecklistItem[] = [
