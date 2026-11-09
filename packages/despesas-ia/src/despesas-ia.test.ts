@@ -3,7 +3,7 @@ import { EFFORT, MAX_TOKENS, MODELO, RESPOSTA_SCHEMA, SYSTEM_PROMPT, analisarMen
 import { constantesDoFlow } from './constantes.ts'
 
 const ctx: ContextoDespesa = {
-  despesa: { id: 'd1', valor: 85.4, dataGasto: '2026-10-12', categoria: 'Combustível', formaPagamento: 'Cartão corporativo', estabelecimento: 'Posto X', litros: 32.5, km: 120345, observacao: null },
+  despesa: { id: 'd1', valor: 85.4, dataGasto: '2026-10-12', categoria: 'Combustível', formaPagamento: 'Cartão corporativo', estabelecimento: 'Posto X', litros: 32.5, km: 120345, observacao: null, valorDoExtratoCartao: false },
   reservas: [{ id: 'r1', saida: '2026-10-12T13:00:00Z', cliente: 'Embraer', status: 'Concluído' }],
   duplicatas: [],
   referencia: { categoria: 'Combustível', mediana: 180, maximo: 420, amostras: 210 },
@@ -52,6 +52,9 @@ describe('prompt', () => {
     ['Nome fantasia x razão social, abreviações e maiúsculas/minúsculas no estabelecimento não são divergência'],
     ['Com poucos itens no histórico não há padrão a inferir'],
     ['Nome de estabelecimento diferente, sozinho, nunca é motivo para "precisa_corrigir"'],
+    ['valorDoExtratoCartao = true: o valor da despesa veio do extrato do banco e está correto'],
+    ['o comprovante é de outra compra: decida "precisa_corrigir" e peça nos motivos o comprovante certo desta compra'],
+    ['Nesse caso, nunca peça para corrigir o valor da despesa'],
     ['CTF, Tag CTF, cartão frota, débito e crédito são formas de pagamento compatíveis'],
   ])('fixa a regra "%s"', (trecho) => {
     expect(SYSTEM_PROMPT).toContain(trecho)

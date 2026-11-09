@@ -1,7 +1,8 @@
 ﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Despesas | Análise IA" e a variável de ambiente new_AnthropicKeyDespesasAnalise
 # (só a definição, sem valor) na solução AppBetinhos, e ativa o flow.
 #
-# O flow roda quando a despesa do App Motoristas fica com o comprovante completo (cr40f_statusanexo = Completo):
+# O flow roda quando a despesa do App Motoristas, ou a nascida da conciliação do cartão (origem 100000002 e
+# cr40f_conciliadacartao = Sim), fica com o comprovante completo (cr40f_statusanexo = Completo):
 # marca a análise como Processando, monta o contexto (até 3 comprovantes do SharePoint, OS do motorista no dia,
 # possíveis duplicatas por valor e data, referência de valores da categoria, veículo da despesa e histórico antifraude
 # de 7 dias do motorista e do veículo), chama a API do Claude com saída
@@ -33,7 +34,7 @@ $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'
 $sharePointFlow = 'Flow - Consultar Arquivos Sharepoint'
 $siteUrl = 'https://betinhos.sharepoint.com/sites/BetinhosGestoInterna'
 $libraryId = '0e524da8-15af-47ff-9b34-7116ac32763f'
-$triggerFilter = 'cr40f_statusanexo eq 100000002 and cr40f_origem eq 100000000 and (cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000)'
+$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and ((cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or (cr40f_iastatusanalise eq 100000002 and cr40f_statusoperacional eq 100000001)))'
 $constantesPath = Join-Path $PSScriptRoot '../despesas-ia/dist/constantes.json'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
@@ -431,7 +432,8 @@ $definitionText = @'
               "estabelecimento": "@triggerOutputs()?['body/cr40f_estabelecimento']",
               "litros": "@triggerOutputs()?['body/cr40f_litros']",
               "km": "@triggerOutputs()?['body/cr40f_kminformado']",
-              "observacao": "@triggerOutputs()?['body/cr40f_observacao']"
+              "observacao": "@triggerOutputs()?['body/cr40f_observacao']",
+              "valorDoExtratoCartao": "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))"
             },
             "reservas": "@body('Reservas_contexto')",
             "duplicatas": "@body('Duplicatas_contexto')",
@@ -738,6 +740,7 @@ function Conferir($lido, [string] $texto) {
     'Selects no formato de ItemHistorico' = ((@($a.Historico_motorista_contexto.inputs.select.PSObject.Properties.Name) -join ',') -ceq $itemCampos) -and ((@($a.Historico_veiculo_contexto.inputs.select.PSObject.Properties.Name) -join ',') -ceq $itemCampos) -and ($a.Historico_motorista_contexto.inputs.select.mesmoMotorista -eq $true) -and ($a.Historico_veiculo_contexto.inputs.select.mesmoMotorista -like '@and(*')
     'Status_despesa com rótulos da metadata' = @($a.Status_despesa.inputs.PSObject.Properties).Count -gt 0
     'Contexto com veiculo e historico' = ($ctx.veiculo -ceq "@outputs('Veiculo_contexto')") -and ($ctx.historico.motorista -ceq "@body('Historico_motorista_contexto')") -and ($ctx.historico.veiculo -ceq "@body('Historico_veiculo_contexto')")
+    'Contexto com valorDoExtratoCartao' = $ctx.despesa.valorDoExtratoCartao -ceq "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))"
     'histórico antes dos comprovantes' = (@($a.Comprovantes.runAfter.Veiculo_contexto) -join ',') -eq 'Succeeded'
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
