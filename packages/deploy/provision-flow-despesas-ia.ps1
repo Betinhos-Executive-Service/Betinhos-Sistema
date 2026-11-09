@@ -3,7 +3,7 @@
 #
 # O flow roda quando a despesa do App Motoristas, ou a nascida da conciliação do cartão (origem 100000002 e
 # cr40f_conciliadacartao = Sim), fica com o comprovante completo (cr40f_statusanexo = Completo):
-# marca a análise como Processando, monta o contexto (até 3 comprovantes do SharePoint, OS do motorista no dia,
+# marca a análise como Processando, monta o contexto (até 3 comprovantes do último envio, no SharePoint, OS do motorista no dia,
 # possíveis duplicatas por valor e data, referência de valores da categoria, veículo da despesa e histórico antifraude
 # de 7 dias do motorista e do veículo), chama a API do Claude com saída
 # estruturada e grava a decisão. As travas técnicas são as mesmas de analisarMensagem (packages/despesas-ia/src/resposta.ts),
@@ -34,7 +34,7 @@ $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'
 $sharePointFlow = 'Flow - Consultar Arquivos Sharepoint'
 $siteUrl = 'https://betinhos.sharepoint.com/sites/BetinhosGestoInterna'
 $libraryId = '0e524da8-15af-47ff-9b34-7116ac32763f'
-$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and ((cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or (cr40f_iastatusanalise eq 100000002 and cr40f_statusoperacional eq 100000001)))'
+$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and (cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or cr40f_iastatusanalise eq 100000003 or (cr40f_iastatusanalise eq 100000002 and (cr40f_statusoperacional eq 100000000 or cr40f_statusoperacional eq 100000001)))'
 $constantesPath = Join-Path $PSScriptRoot '../despesas-ia/dist/constantes.json'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
@@ -269,8 +269,8 @@ $definitionText = @'
               "entityName": "cr40f_anexodespesaoperacionals",
               "$select": "cr40f_anexodespesaoperacionalid,cr40f_driveitemid,cr40f_mimetype,cr40f_nomearquivo,cr40f_urlsharepoint,cr40f_sharelink,cr40f_ordem",
               "$filter": "_cr40f_despesa_value eq @{triggerOutputs()?['body/cr40f_despesaoperacionalid']} and cr40f_tipo eq 100000000 and cr40f_status eq 100000001",
-              "$orderby": "cr40f_ordem asc",
-              "$top": 3
+              "$orderby": "createdon desc,cr40f_ordem desc",
+              "$top": "@min(3, max(1, coalesce(triggerOutputs()?['body/new_uploadexpectedcount'], 3)))"
             },
             "authentication": "@parameters('$authentication')"
           }
@@ -286,7 +286,7 @@ $definitionText = @'
         },
         "Arquivos": {
           "type": "Foreach", "runAfter": { "Sem_comprovante": ["Succeeded"] },
-          "foreach": "@outputs('Comprovantes')?['body/value']",
+          "foreach": "@reverse(outputs('Comprovantes')?['body/value'])",
           "runtimeConfiguration": { "concurrency": { "repetitions": 1 } },
           "actions": {
             "Erro_anterior": {
@@ -741,6 +741,7 @@ function Conferir($lido, [string] $texto) {
     'Status_despesa com rótulos da metadata' = @($a.Status_despesa.inputs.PSObject.Properties).Count -gt 0
     'Contexto com veiculo e historico' = ($ctx.veiculo -ceq "@outputs('Veiculo_contexto')") -and ($ctx.historico.motorista -ceq "@body('Historico_motorista_contexto')") -and ($ctx.historico.veiculo -ceq "@body('Historico_veiculo_contexto')")
     'Contexto com valorDoExtratoCartao' = $ctx.despesa.valorDoExtratoCartao -ceq "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))"
+    'comprovantes do último envio' = ($a.Comprovantes.inputs.parameters.'$orderby' -ceq 'createdon desc,cr40f_ordem desc') -and ($a.Arquivos.foreach -ceq "@reverse(outputs('Comprovantes')?['body/value'])") -and ($a.Comprovantes.inputs.parameters.'$top' -ceq "@min(3, max(1, coalesce(triggerOutputs()?['body/new_uploadexpectedcount'], 3)))")
     'histórico antes dos comprovantes' = (@($a.Comprovantes.runAfter.Veiculo_contexto) -join ',') -eq 'Succeeded'
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
