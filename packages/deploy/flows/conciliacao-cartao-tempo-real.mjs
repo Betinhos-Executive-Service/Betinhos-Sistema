@@ -1,7 +1,8 @@
 // Flows em tempo real da conciliação do cartão, gerados a partir do diário (conciliacao-cartao-diario.json):
 // - reprocessada: transação de compra que volta a Pendente com cartão e motorista e sem despesa (Reprocessar/Reabrir)
 //   roda na hora o mesmo corpo de `Cada_reaberta` do diário (casa, marca divergência ou cria a despesa).
-// - despesa: despesa do cartão que sai de "Precisa corrigir" tira a transação de "Aguardando motorista";
+// - despesa: despesa do cartão que sai de "Precisa corrigir" tira a transação de "Aguardando motorista"
+//   (ou da Divergência por prazo do diário, `MOTIVO_PRAZO`);
 //   despesa recusada ou cancelada depois de conciliada leva a transação já conciliada para Divergência.
 // O diário segue lendo o banco, mandando o push e reprocessando o que o tempo real não pegou.
 // Uso: node conciliacao-cartao-tempo-real.mjs <reprocessada|despesa>  -> JSON da definição com os tokens __X__ do diário.
@@ -15,6 +16,12 @@ const STATUS = { compra: 100000000, corrigir: 100000001, recusado: 100000003, ca
 /** Mesma condição do `$filter` de `Reabertas` no diário. */
 export const FILTRO_REPROCESSADA =
   `cr40f_situacao eq ${SITUACAO.pendente} and cr40f_tipo eq ${STATUS.compra} and _cr40f_cartao_value ne null and _cr40f_motorista_value ne null and _cr40f_despesa_value eq null`
+
+/** Motivo gravado pelo diário (`Atrasar`) quando a compra passa 3 dias sem comprovante válido. */
+export const MOTIVO_PRAZO = 'Sem comprovante válido do motorista no prazo de 3 dias; confira com o motorista.'
+/** Transação à espera do motorista: Aguardando, ou já escalada ao gestor por prazo (volta sozinha quando ele envia). */
+export const AGUARDANDO_MOTORISTA =
+  `(cr40f_situacao eq ${SITUACAO.aguardando} or (cr40f_situacao eq ${SITUACAO.divergencia} and cr40f_motivo eq '${MOTIVO_PRAZO}'))`
 
 const gatilho = (entityname, filteringattributes, filterexpression) => ({
   type: 'OpenApiConnectionWebhook',
@@ -68,7 +75,7 @@ export function despesa(diario) {
   return base(diario, {
     Quando_despesa_muda: gatilho('cr40f_despesaoperacional', 'cr40f_statusoperacional', `cr40f_conciliadacartao eq true and cr40f_statusoperacional ne ${STATUS.corrigir}`),
   }, {
-    ...ligadas('Aguardando', 'Cada_aguardando', 'Concluir', `cr40f_situacao eq ${SITUACAO.aguardando}`, {
+    ...ligadas('Aguardando', 'Cada_aguardando', 'Concluir', AGUARDANDO_MOTORISTA, {
       'item/cr40f_situacao': `@if(${fora}, ${SITUACAO.divergencia}, ${SITUACAO.automatica})`,
       'item/cr40f_motivo': `@if(${fora}, 'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança.', 'O motorista completou a despesa criada pelo cartão.')`,
     }),
