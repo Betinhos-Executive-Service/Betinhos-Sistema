@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { despesa, FILTRO_REPROCESSADA, reprocessada } from './conciliacao-cartao-tempo-real.mjs'
+import { AGUARDANDO_MOTORISTA, despesa, FILTRO_REPROCESSADA, reprocessada } from './conciliacao-cartao-tempo-real.mjs'
 
 const diario = JSON.parse(readFileSync(new URL('./conciliacao-cartao-diario.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''))
 const refs = (o) => new Set([...JSON.stringify(o).matchAll(/(?:outputs|body|actions)\('([^']+)'\)/g)].map((m) => m[1]))
@@ -40,7 +40,7 @@ test('despesa: só despesa do cartão que saiu de Precisa corrigir; completada c
   assert.equal(p['subscriptionRequest/entityname'], 'cr40f_despesaoperacional')
   assert.equal(p['subscriptionRequest/filteringattributes'], 'cr40f_statusoperacional')
   assert.equal(p['subscriptionRequest/filterexpression'], 'cr40f_conciliadacartao eq true and cr40f_statusoperacional ne 100000001')
-  assert.match(f.actions.Aguardando.inputs.parameters.$filter, /cr40f_situacao eq 100000003$/)
+  assert.ok(f.actions.Aguardando.inputs.parameters.$filter.endsWith(` and ${AGUARDANDO_MOTORISTA}`))
   const item = f.actions.Cada_aguardando.actions.Concluir.inputs.parameters
   assert.match(item['item/cr40f_situacao'], /100000003\), equals\(.*100000004\)\), 100000005, 100000001\)$/)
   for (const r of refs(f.actions)) assert.ok(nomes(f.actions).has(r), r)
@@ -61,9 +61,8 @@ test('despesa: recusada ou cancelada depois de conciliar leva a transação conc
   for (const r of refs(f.actions)) assert.ok(existentes.has(r), r)
 })
 
-test('despesa: o comportamento de Aguardando não mudou e a varredura de excluída do diário não vaza para os flows tempo real', () => {
+test('despesa: o motivo de recusa do Aguardando segue o mesmo e a varredura de excluída do diário não vaza para os flows tempo real', () => {
   const f = despesa(diario)
-  assert.match(f.actions.Aguardando.inputs.parameters.$filter, /cr40f_situacao eq 100000003$/)
   assert.match(f.actions.Cada_aguardando.actions.Concluir.inputs.parameters['item/cr40f_motivo'], /'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança\.'/)
   for (const flow of [f, reprocessada(diario)]) {
     assert.ok(!nomes(flow.actions).has('Excluidas') && !nomes(flow.actions).has('Cada_excluida'))

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { despesa } from './conciliacao-cartao-tempo-real.mjs'
+import { despesa, AGUARDANDO_MOTORISTA, MOTIVO_PRAZO } from './conciliacao-cartao-tempo-real.mjs'
 
 const raw = readFileSync(new URL('./conciliacao-cartao-diario.json', import.meta.url), 'utf8')
 const flow = JSON.parse(raw)
@@ -179,7 +179,7 @@ test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de ca
   const ordem = Object.keys(flow.actions)
   assert.ok(ordem.indexOf('Cada_transacao') < ordem.indexOf('Reabertas') && ordem.indexOf('Cada_reaberta') < ordem.indexOf('Pendentes'))
   assert.deepEqual(acao('Paradas').runAfter, { Cada_reaberta: ['Succeeded', 'Failed', 'Skipped'] })
-  assert.deepEqual(acao('Pendentes').runAfter, { Cada_excluida: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Pendentes').runAfter, { Cada_atrasada: ['Succeeded', 'Failed', 'Skipped'] })
   const filtro = acao('Reabertas').inputs.parameters.$filter
   for (const parte of ['cr40f_situacao eq 100000000', 'cr40f_tipo eq 100000000', '_cr40f_cartao_value ne null', '_cr40f_motorista_value ne null', '_cr40f_despesa_value eq null']) assert.ok(filtro.includes(parte), parte)
   const loop = acao('Cada_reaberta')
@@ -238,7 +238,7 @@ test('varre compra conciliada ou aguardando cuja despesa foi excluída (RemoveLi
   assert.deepEqual(acao('Cada_excluida').runAfter, { Excluidas: ['Succeeded'] })
   const p = acao('Excluidas').inputs.parameters
   assert.equal(p.entityName, '__SET_TRANS__')
-  assert.equal(p.$filter, "statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or cr40f_situacao eq 100000003) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}")
+  assert.equal(p.$filter, `statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or ${AGUARDANDO_MOTORISTA}) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}`)
   const g = acao('Divergir_excluida').inputs.parameters
   assert.equal(g.recordId, "@items('Cada_excluida')?['cr40f_transacaocartaoid']")
   assert.equal(g['item/cr40f_situacao'], 100000005)
@@ -248,4 +248,27 @@ test('varre compra conciliada ou aguardando cuja despesa foi excluída (RemoveLi
   const erro = JSON.stringify(acao('Houve_erro').expression)
   assert.match(erro, /Excluidas/)
   assert.match(erro, /Cada_excluida/)
+})
+
+test('compra do cartão 3 dias corridos sem comprovante válido vai ao gestor (Divergência) e volta sozinha quando o motorista envia', () => {
+  assert.deepEqual(acao('Atrasadas').runAfter, { Cada_excluida: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Cada_atrasada').runAfter, { Atrasadas: ['Succeeded'] })
+  const f = acao('Atrasadas').inputs.parameters.$filter
+  for (const parte of ['(cr40f_situacao eq 100000001 or cr40f_situacao eq 100000003)', '__NAV_T_DESPESA__/cr40f_origem eq 100000002', '__NAV_T_DESPESA__/cr40f_statusoperacional eq 100000001']) assert.ok(f.includes(parte), parte)
+  // Criada no dia D (São Paulo) -> escalada no run de D+3; 03:00Z = meia-noite de São Paulo.
+  // Também 3 dias depois da última análise da IA: foto devolvida tarde ganha prazo para corrigir.
+  const corte = "@{addDays(outputs('Hoje'), -2, 'yyyy-MM-dd')}T03:00:00Z"
+  assert.ok(f.endsWith(`__NAV_T_DESPESA__/createdon lt ${corte} and (__NAV_T_DESPESA__/cr40f_iadataanalise eq null or __NAV_T_DESPESA__/cr40f_iadataanalise lt ${corte})`))
+  // Despesa excluída depois da escalada: Excluidas troca o motivo.
+  assert.ok(acao('Excluidas').inputs.parameters.$filter.includes(`or ${AGUARDANDO_MOTORISTA})`))
+  const g = acao('Atrasar').inputs.parameters
+  assert.equal(g.recordId, "@items('Cada_atrasada')?['cr40f_transacaocartaoid']")
+  assert.equal(g['item/cr40f_situacao'], 100000005)
+  assert.equal(g['item/cr40f_motivo'], MOTIVO_PRAZO)
+  assert.doesNotMatch(MOTIVO_PRAZO, /'/)
+  // Volta pelo Paradas (o tempo real é coberto em conciliacao-cartao-tempo-real.test.mjs).
+  assert.ok(acao('Paradas').inputs.parameters.$filter.includes(` and ${AGUARDANDO_MOTORISTA} and `))
+  const erro = JSON.stringify(acao('Houve_erro').expression)
+  assert.match(erro, /'Atrasadas'/)
+  assert.match(erro, /'Cada_atrasada'/)
 })
