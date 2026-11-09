@@ -179,7 +179,7 @@ test('transação reaberta pelo Reprocessar da tela passa pela mesma regra de ca
   const ordem = Object.keys(flow.actions)
   assert.ok(ordem.indexOf('Cada_transacao') < ordem.indexOf('Reabertas') && ordem.indexOf('Cada_reaberta') < ordem.indexOf('Pendentes'))
   assert.deepEqual(acao('Paradas').runAfter, { Cada_reaberta: ['Succeeded', 'Failed', 'Skipped'] })
-  assert.deepEqual(acao('Pendentes').runAfter, { Cada_parada: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Pendentes').runAfter, { Cada_excluida: ['Succeeded', 'Failed', 'Skipped'] })
   const filtro = acao('Reabertas').inputs.parameters.$filter
   for (const parte of ['cr40f_situacao eq 100000000', 'cr40f_tipo eq 100000000', '_cr40f_cartao_value ne null', '_cr40f_motorista_value ne null', '_cr40f_despesa_value eq null']) assert.ok(filtro.includes(parte), parte)
   const loop = acao('Cada_reaberta')
@@ -231,4 +231,21 @@ test('conexão que falha na leitura não impede gravar as contas lidas por intei
   assert.equal(acao('Conta_lida').inputs.name, 'Transacoes')
   // Conta e Pagina são compartilhadas: os dois laços precisam ser sequenciais.
   for (const n of ['Cada_conexao', 'Cada_conta']) assert.equal(acao(n).runtimeConfiguration.concurrency.repetitions, 1, n)
+})
+
+test('varre compra conciliada ou aguardando cuja despesa foi excluída (RemoveLink zera o lookup) e marca Divergência, antes do push', () => {
+  assert.deepEqual(acao('Excluidas').runAfter, { Cada_parada: ['Succeeded', 'Failed', 'Skipped'] })
+  assert.deepEqual(acao('Cada_excluida').runAfter, { Excluidas: ['Succeeded'] })
+  const p = acao('Excluidas').inputs.parameters
+  assert.equal(p.entityName, '__SET_TRANS__')
+  assert.equal(p.$filter, "statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or cr40f_situacao eq 100000003) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}")
+  const g = acao('Divergir_excluida').inputs.parameters
+  assert.equal(g.recordId, "@items('Cada_excluida')?['cr40f_transacaocartaoid']")
+  assert.equal(g['item/cr40f_situacao'], 100000005)
+  assert.equal(g['item/cr40f_motivo'], 'A compra está sem despesa ativa ligada (excluída, desativada ou o vínculo falhou); confira a cobrança.')
+  const ordem = Object.keys(flow.actions)
+  assert.ok(ordem.indexOf('Cada_transacao') < ordem.indexOf('Cada_reaberta') && ordem.indexOf('Cada_reaberta') < ordem.indexOf('Excluidas') && ordem.indexOf('Cada_excluida') < ordem.indexOf('Pendentes'))
+  const erro = JSON.stringify(acao('Houve_erro').expression)
+  assert.match(erro, /Excluidas/)
+  assert.match(erro, /Cada_excluida/)
 })
