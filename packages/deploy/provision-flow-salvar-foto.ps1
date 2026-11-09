@@ -10,10 +10,10 @@
 # (webUrl, driveItemId, fileName, uploadedAt) e o catch (e-mail + Terminate) não mudam. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
-#   powershell -File packages/deploy/patch-flow-salvar-foto-sharepoint.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
+#   powershell -File packages/deploy/provision-flow-salvar-foto.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
 # PROD exige -Apply e -ConfirmarProd. Requer `az login` com acesso ao ambiente.
 param(
-  [Parameter(Mandatory = $true)][ValidateSet('DEV', 'PROD')][string] $Ambiente,
+  [ValidateSet('DEV', 'PROD')][string] $Ambiente = 'DEV',
   [switch] $Apply,
   [switch] $ConfirmarProd,
   [string] $Restaurar = ''

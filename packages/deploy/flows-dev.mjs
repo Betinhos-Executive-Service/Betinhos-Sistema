@@ -35,6 +35,7 @@ export const ENTRADAS = [
     flows: ['Conciliação do cartão | Diário', 'Conciliação do cartão | Reprocessada', 'Conciliação do cartão | Despesa atualizada'],
     arquivos: [script('conciliacao-cartao'), flowsDir('conciliacao-cartao-diario\\.json', 'conciliacao-cartao-tempo-real\\.mjs')],
   },
+  { nome: 'salvar-foto', script: 'provision-flow-salvar-foto.ps1', flows: ['Flow Salvar Foto BD - Onedrive'], apply: true, arquivos: [script('salvar-foto')] },
   { nome: 'consultar-onedrive', script: 'provision-flow-consultar-onedrive.ps1', flows: ['Flow - Consultar Arquivo OneDrive'], arquivos: [script('consultar-onedrive')] },
   {
     nome: 'despesas-conferencia-envio', script: 'provision-flow-despesas-conferencia-envio.ps1', flows: ['Flow Despesas | Conferência no envio'], preparo: 'despesas-ia',
