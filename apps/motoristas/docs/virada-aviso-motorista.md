@@ -56,11 +56,13 @@ No DEV, "Novo Serviço" e "Retirado" já estão em rascunho (06/11/2026); só "R
 
 `scripts/virada-aviso-motorista.ps1 -Reverter -Apply` religa os antigos que estavam ligados e desliga os novos, nessa ordem. Exige o snapshot em `backup/aviso-motorista/` do mesmo checkout em que a virada rodou. Os steps seguem ativos; para tirar o plugin de cena, desative os três steps `DriverRecordSharing - Aviso motorista ...`.
 
-A proteção provisória dos flows antigos (`scripts/patch-flow-troca-motorista.ps1`, em PR próprio) perde o efeito com esta virada; depois dela, o script pode ser removido.
+A proteção provisória dos flows antigos (`scripts/patch-flow-troca-motorista.ps1`) foi removida depois da virada no PROD (09/11/2026): os flows antigos ficaram desligados e o script só valia para eles.
 
 ## PROD
 
-**Não executado.** Estado lido em 06/11/2026, só leitura: BetinhosCore, Automacao, Interface e Motoristas instaladas (03/11) sobre a AppBetinhos 1.0.0.268; "Novo Serviço", "Retirado" e "Resetar" ligados; tabela e flows novos ausentes; 3 operadores; 26 serviços Programado futuros.
+**Executado em 09/11/2026.** Publicação 42665223806 do Sistema Betinhos (Core 1.0.0.20, Automacao 1.0.0.19, Interface 1.0.0.18); referência `new_webpushmotoristas` vinculada depois do import pelo dono da conexão (`WEBPUSH_VINCULAR_DEPOIS`, Sistema #342); virada às 16:21 (Brasília): `Enviar` e `Vigia` ligados, "Novo Serviço", "Retirado" e "Resetar" desligados. Teste real na OS-11965: Novo e Retirado enviados, motorista sem app como Sem app.
+
+Estado antes, lido em 06/11/2026, só leitura: BetinhosCore, Automacao, Interface e Motoristas instaladas (03/11) sobre a AppBetinhos 1.0.0.268; "Novo Serviço", "Retirado" e "Resetar" ligados; tabela e flows novos ausentes; 3 operadores; 26 serviços Programado futuros.
 
 ### Caminho
 
