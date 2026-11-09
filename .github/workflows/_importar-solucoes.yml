@@ -46,6 +46,9 @@ jobs:
       TAG_PUBLICADAS: solucoes-${{ inputs.alvo }}
       # Id da conexão do Web Push neste ambiente. Obrigatória no PROD quando a BetinhosAutomacao vai junto (importar-solucoes.ps1).
       CONEXAO_WEBPUSH: ${{ vars.CONEXAO_WEBPUSH }}
+      # Primeiro vínculo do Web Push num ambiente: true pula o --settings-file, e o dono da conexão vincula depois do import.
+      # Apague a variável depois do vínculo (solucoes.ps1, Get-ConexaoWebPushDoImport).
+      WEBPUSH_VINCULAR_DEPOIS: ${{ vars.WEBPUSH_VINCULAR_DEPOIS }}
     steps:
       - name: Alvo válido
         shell: bash
