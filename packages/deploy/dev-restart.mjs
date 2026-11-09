@@ -6,7 +6,11 @@ import { resolve } from 'node:path'
 const port = Number(process.argv[2])
 const appDir = resolve(process.argv[3] ?? '.')
 const projectRoot = resolve(appDir, '../..').toLowerCase()
-if (!port) throw new Error('Uso: node dev-restart.mjs <porta> [diretorio-do-app]')
+if (!port) throw new Error('Uso: node dev-restart.mjs <porta> [diretorio-do-app] [--servidor <arquivo.js> [--watch]]')
+// Apps sem Vite (Formulário Geral) sobem o próprio servidor Node: --servidor <arquivo> recebe --port e os demais argumentos.
+const extras = process.argv.slice(4)
+const servidor = extras[0] === '--servidor' ? extras[1] : null
+if (extras.length && !servidor) throw new Error(`Argumento desconhecido: ${extras[0]}`)
 
 function pidsOnPort() {
   // netstat -ano, PowerShell e taskkill só existem no Windows. Fora dele (VM cloud, WSL) não há o que encerrar:
@@ -44,5 +48,6 @@ for (const pid of pidsOnPort()) {
 
 for (let i = 0; i < 20 && pidsOnPort().length; i++) await new Promise((r) => setTimeout(r, 250))
 
-const child = spawn(process.execPath, [resolve(appDir, 'node_modules/vite/bin/vite.js'), '--port', String(port), '--strictPort'], { cwd: appDir, stdio: 'inherit' })
+const args = servidor ? [resolve(appDir, servidor), '--port', String(port), ...extras.slice(2)] : [resolve(appDir, 'node_modules/vite/bin/vite.js'), '--port', String(port), '--strictPort']
+const child = spawn(process.execPath, args, { cwd: appDir, stdio: 'inherit' })
 child.on('exit', (code) => process.exit(code ?? 0))

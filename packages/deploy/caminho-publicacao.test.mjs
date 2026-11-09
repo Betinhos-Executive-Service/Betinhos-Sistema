@@ -12,6 +12,14 @@ test('teste da Tela Gerar Pagantes não muda o PROD; o código dela vai pelas so
   assert.equal(caminhoDoArquivo('apps/gerar-pagantes/src/money.ts'), 'solucoes')
 })
 
+test('Formulário Geral vai pelas soluções; teste e script de publicação dele não mudam o PROD', () => {
+  assert.equal(caminhoDoArquivo('apps/formulario-geral/app.js'), 'solucoes')
+  assert.equal(caminhoDoArquivo('apps/formulario-geral/scripts/search_matching.test.js'), 'nada')
+  assert.equal(caminhoDoArquivo('apps/formulario-geral/IMPORTACAO_SERVICOS.md'), 'nada')
+  assert.equal(caminhoDoArquivo('packages/deploy/push-formulario-dev.ps1'), 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'apps/formulario-geral/styles.css']).caminho, 'solucoes')
+})
+
 test('tela com documentação continua front', () => {
   assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'docs/auto/01.md', '.claude/skills/x/SKILL.md']).caminho, 'front')
 })

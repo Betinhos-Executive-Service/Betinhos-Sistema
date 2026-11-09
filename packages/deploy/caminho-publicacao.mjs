@@ -38,8 +38,9 @@ export const NEUTRO = [
   /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
   /^apps\/gerar-pagantes\/.+\.test\.[^/]+$/,
+  /^apps\/formulario-geral\/.+\.test\.[^/]+$/,
   /^packages\/deploy\/solucoes\//,
-  /^packages\/deploy\/(push-dev|push-webresources-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
+  /^packages\/deploy\/(push-dev|push-webresources-dev|push-formulario-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
   /^packages\/plugins\/Betinhos\.ExpenseUpload\//,
