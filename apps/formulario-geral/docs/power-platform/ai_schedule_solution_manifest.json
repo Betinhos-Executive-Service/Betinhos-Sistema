@@ -1,0 +1,59 @@
+{
+  "solution": {
+    "name": "AppBetinhos",
+    "publisher": "PREENCHER_PUBLISHER",
+    "environment": "DEV",
+    "status": "requires_metadata_resolution"
+  },
+  "sessionTable": {
+    "logicalName": "cr40f_conversaiaagendamento",
+    "entitySetName": "cr40f_conversaiaagendamentos",
+    "primaryNameAttribute": "cr40f_name",
+    "retentionDays": 90,
+    "columns": [
+      { "logicalName": "cr40f_status", "type": "Choice", "resolveFrom": "DEV metadata" },
+      { "logicalName": "cr40f_versaoentrada", "type": "WholeNumber" },
+      { "logicalName": "cr40f_versaoprocessada", "type": "WholeNumber" },
+      { "logicalName": "cr40f_versaoconfirmada", "type": "WholeNumber" },
+      { "logicalName": "cr40f_confirmacaosolicitada", "type": "YesNo" },
+      { "logicalName": "cr40f_textooriginal", "type": "MultilineText" },
+      { "logicalName": "cr40f_mensagensjson", "type": "MultilineText" },
+      { "logicalName": "cr40f_propostajson", "type": "MultilineText" },
+      { "logicalName": "cr40f_camposfaltantes", "type": "MultilineText" },
+      { "logicalName": "cr40f_alertas", "type": "MultilineText" },
+      { "logicalName": "cr40f_modelo", "type": "Text" },
+      { "logicalName": "cr40f_tentativas", "type": "WholeNumber" },
+      { "logicalName": "cr40f_inputtokens", "type": "WholeNumber" },
+      { "logicalName": "cr40f_outputtokens", "type": "WholeNumber" },
+      { "logicalName": "cr40f_erro", "type": "MultilineText" },
+      { "logicalName": "cr40f_reservascriadas", "type": "MultilineText" },
+      { "logicalName": "cr40f_expiraem", "type": "DateTime" }
+    ]
+  },
+  "reservationTable": {
+    "logicalName": "cr40f_reservadeveculos",
+    "entitySetName": "cr40f_reservadeveculoses",
+    "primaryNameAttribute": "cr40f_id",
+    "metadataEvidence": {
+      "source": "metadata-AppBetinhos-2026-09-14T19-18-58-216Z.json",
+      "serviceTypeOptionSet": "cr40f_tipodoservico",
+      "vehicleTypeOptionSet": "cr40f_carrotipodeveiculo"
+    },
+    "requiredAdditions": [
+      { "logicalName": "cr40f_conversaoiaagendamento", "type": "Lookup", "target": "cr40f_conversaiaagendamento" },
+      { "logicalName": "cr40f_iaordinalservico", "type": "WholeNumber" },
+      { "logicalName": "cr40f_iachaveidempotencia", "type": "Text", "maxLength": 180 }
+    ],
+    "alternateKey": {
+      "name": "cr40f_ak_conversaia_ordinal",
+      "columns": ["cr40f_conversaoiaagendamento", "cr40f_iaordinalservico"],
+      "status": "create_after_metadata_review"
+    }
+  },
+  "connector": {
+    "name": "Betinhos DeepSeek",
+    "connectionReference": "PREENCHER_CONNECTION_REFERENCE",
+    "operation": "POST https://api.deepseek.com/responses",
+    "secretStorage": "connection_secret_only"
+  }
+}

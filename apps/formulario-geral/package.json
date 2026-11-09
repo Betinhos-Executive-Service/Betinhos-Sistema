@@ -1,0 +1,10 @@
+{
+  "name": "@betinhos/formulario-geral",
+  "private": true,
+  "scripts": {
+    "dev": "node ../../packages/deploy/dev-restart.mjs 36501 . scripts/dev_server.js",
+    "build": "node scripts/build_webresource.js",
+    "wr": "node scripts/build_webresource.js --no-version",
+    "test": "node scripts/build_webresource.js --no-version && node scripts/run_tests.mjs"
+  }
+}

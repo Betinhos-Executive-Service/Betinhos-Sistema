@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { despesa, FILTRO_REPROCESSADA, reprocessada } from './conciliacao-cartao-tempo-real.mjs'
+import { AGUARDANDO_MOTORISTA, despesa, FILTRO_REPROCESSADA, reprocessada } from './conciliacao-cartao-tempo-real.mjs'
 
 const diario = JSON.parse(readFileSync(new URL('./conciliacao-cartao-diario.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''))
 const refs = (o) => new Set([...JSON.stringify(o).matchAll(/(?:outputs|body|actions)\('([^']+)'\)/g)].map((m) => m[1]))
@@ -34,14 +34,15 @@ test('reprocessada: mesmo corpo de Cada_reaberta, lendo a linha do gatilho, sem 
   assert.ok(existentes.has('Criar_despesa_R') && existentes.has('Gravar_reaberta'))
 })
 
-test('despesa: só despesa do cartão que saiu de Precisa corrigir; completada concilia, recusada ou cancelada diverge', () => {
+test('despesa: só despesa do cartão (inclui Precisa corrigir); completada concilia, recusada ou cancelada diverge', () => {
   const f = despesa(diario)
   const p = f.triggers.Quando_despesa_muda.inputs.parameters
   assert.equal(p['subscriptionRequest/entityname'], 'cr40f_despesaoperacional')
   assert.equal(p['subscriptionRequest/filteringattributes'], 'cr40f_statusoperacional')
-  assert.equal(p['subscriptionRequest/filterexpression'], 'cr40f_conciliadacartao eq true and cr40f_statusoperacional ne 100000001')
-  assert.match(f.actions.Aguardando.inputs.parameters.$filter, /cr40f_situacao eq 100000003$/)
-  const item = f.actions.Cada_aguardando.actions.Concluir.inputs.parameters
+  assert.equal(p['subscriptionRequest/filterexpression'], 'cr40f_conciliadacartao eq true')
+  assert.doesNotMatch(p['subscriptionRequest/filterexpression'], /100000001/, 'o gatilho aceita Precisa corrigir')
+  assert.ok(f.actions.Se_concluir.actions.Aguardando.inputs.parameters.$filter.endsWith(` and ${AGUARDANDO_MOTORISTA}`))
+  const item = f.actions.Se_concluir.actions.Cada_aguardando.actions.Concluir.inputs.parameters
   assert.match(item['item/cr40f_situacao'], /100000003\), equals\(.*100000004\)\), 100000005, 100000001\)$/)
   for (const r of refs(f.actions)) assert.ok(nomes(f.actions).has(r), r)
 })
@@ -61,10 +62,34 @@ test('despesa: recusada ou cancelada depois de conciliar leva a transação conc
   for (const r of refs(f.actions)) assert.ok(existentes.has(r), r)
 })
 
-test('despesa: o comportamento de Aguardando não mudou e a varredura de excluída do diário não vaza para os flows tempo real', () => {
+test('despesa: o ramo que conclui só roda se o status não for Precisa corrigir', () => {
+  const se = despesa(diario).actions.Se_concluir
+  assert.equal(se.expression.equals[0], "@equals(triggerOutputs()?['body/cr40f_statusoperacional'], 100000001)")
+  assert.equal(se.expression.equals[1], false)
+  assert.deepEqual(se.else, { actions: {} })
+  assert.ok(se.actions.Aguardando && se.actions.Cada_aguardando)
+})
+
+test('despesa: Precisa corrigir devolve a Aguardando só a conciliada automática, nunca a manual', () => {
   const f = despesa(diario)
-  assert.match(f.actions.Aguardando.inputs.parameters.$filter, /cr40f_situacao eq 100000003$/)
-  assert.match(f.actions.Cada_aguardando.actions.Concluir.inputs.parameters['item/cr40f_motivo'], /'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança\.'/)
+  const se = f.actions.Se_corrigir
+  assert.equal(se.expression.equals[0], "@equals(triggerOutputs()?['body/cr40f_statusoperacional'], 100000001)")
+  assert.equal(se.expression.equals[1], true)
+  assert.deepEqual(se.else, { actions: {} })
+  assert.deepEqual(se.runAfter, {})
+  const filtro = se.actions.Automaticas.inputs.parameters.$filter
+  assert.match(filtro, /^_cr40f_despesa_value eq @\{triggerOutputs\(\)\?\['body\/cr40f_despesaoperacionalid'\]\} and cr40f_situacao eq 100000001$/)
+  assert.doesNotMatch(filtro, /100000002/)
+  const item = se.actions.Cada_automatica.actions.Devolver.inputs.parameters
+  assert.equal(item['item/cr40f_situacao'], 100000003)
+  assert.equal(item['item/cr40f_motivo'], 'A despesa voltou ao motorista para corrigir o comprovante.')
+  const existentes = nomes(f.actions)
+  for (const r of refs(f.actions)) assert.ok(existentes.has(r), r)
+})
+
+test('despesa: o motivo de recusa do Aguardando segue o mesmo e a varredura de excluída do diário não vaza para os flows tempo real', () => {
+  const f = despesa(diario)
+  assert.match(f.actions.Se_concluir.actions.Cada_aguardando.actions.Concluir.inputs.parameters['item/cr40f_motivo'], /'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança\.'/)
   for (const flow of [f, reprocessada(diario)]) {
     assert.ok(!nomes(flow.actions).has('Excluidas') && !nomes(flow.actions).has('Cada_excluida'))
     assert.doesNotMatch(JSON.stringify(flow), /sem despesa ativa ligada/)

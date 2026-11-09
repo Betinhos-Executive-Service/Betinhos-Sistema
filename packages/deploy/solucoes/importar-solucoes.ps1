@@ -12,6 +12,8 @@ param(
 # so aceita o host dele. Fotos e comparacao ficam no workflow.
 # Pula a solucao cujo conteudo e igual ao da ultima publicacao que passou no ambiente (Test-PodePular): reinstalar as 4 custa
 # ~24 min por ambiente, e em geral so uma mudou. Grava publicadas.json em $Pasta para o workflow registrar depois da comparacao.
+# Entrada "pulada" do manifesto (exportar-do-dev.ps1 viu pela impressao digital que nada mudou e nao exportou) nao tem ZIP: so
+# passa se Test-PodePular confirmar a versao e o hash registrados neste ambiente; senao falha e pede importar_tudo.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
 if ($PSVersionTable.PSEdition -eq "Core") {
@@ -27,6 +29,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
+. (Join-Path $PSScriptRoot "impressao.ps1")
 
 $Pasta = (Resolve-Path -LiteralPath $Pasta).Path
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostsAlvo[$Alvo])
@@ -46,21 +49,25 @@ if ($Publicadas -and -not $ImportarTudo -and (Test-Path -LiteralPath $Publicadas
   catch { Write-Step "registro da ultima publicacao ilegivel ($($_.Exception.Message)); importa tudo" }
 }
 $resultado = @()
-$registro = @($anteriores | Where-Object { $_ -and $nomes -notcontains $_.solucao } | ForEach-Object { [ordered]@{ solucao = $_.solucao; versao = $_.versao; hash = $_.hash } })
+$registro = @($anteriores | Where-Object { $_ -and $nomes -notcontains $_.solucao } | ForEach-Object { New-RegistroPublicado $_ ([string] $_.versao) })
 foreach ($nome in $ordem) {
   $item = @($manifesto | Where-Object { $_.solucao -eq $nome })[0]
   $antes = Get-VersaoInstalada (Update-DvToken $dv) $nome
+  $semPacote = ((Get-Campo $item 'origem') -eq "pulada")
+  if ($semPacote -and -not (Test-PodePular $item $antes $anteriores)) {
+    throw "$nome veio sem pacote (pulada no export), mas $Alvo nao esta na versao e no conteudo da ultima publicacao registrada (instalada: $antes). Rode o Publicar solucoes com importar_tudo."
+  }
   if (Test-PodePular $item $antes $anteriores) {
     Write-Step "pulando $nome em ${Alvo}: conteudo igual ao da versao instalada ($antes)"
     $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $antes; minutos = 0; pacPerdeuConexao = $false; pulada = $true }
-    $registro += [ordered]@{ solucao = $nome; versao = $antes; hash = $item.hash }
+    $registro += New-RegistroPublicado $item $antes
     continue
   }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
   $inicio = Get-Date
   $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush)
   $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
-  $registro += [ordered]@{ solucao = $nome; versao = $r.Versao; hash = $item.hash }
+  $registro += New-RegistroPublicado $item $r.Versao
 }
 Write-JsonFile (Join-Path $Pasta "importados.json") @($resultado)
 Write-JsonFile (Join-Path $Pasta "publicadas.json") @($registro)

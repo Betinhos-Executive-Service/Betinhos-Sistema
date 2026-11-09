@@ -12,6 +12,8 @@ param(
 # Sem a remocao, o import da solucao nao altera o que o ambiente serve nesses componentes.
 # Pula o que o repositorio app-motoristas-v2 publica (Get-IdsDoApp), mesmo quando o componente tambem esta na AppBetinhos.
 # Guarda antes o JSON da camada Active de cada componente em -Backup. Sem -Aplicar, so lista.
+# Leituras de camadas e remocoes rodam 8 por vez (Invoke-EmParalelo); a remocao que falhar tem uma segunda tentativa, uma por
+# vez (conflito de customizacao simultanea no servidor), antes de contar como falha.
 # PROD so com -PermitirProd (workflow publicar.yml, depois do import das 4, com a main ja contendo todos os hotfixes):
 # a camada Active do PROD guarda os hotfixes publicados direto la, e remove-la devolve o componente a versao gerenciada.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
@@ -20,6 +22,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
+. (Join-Path $PSScriptRoot "impressao.ps1")
 
 $hostAlvo = ([Uri] $EnvironmentUrl).Host
 # Prefixo: o mesmo ambiente responde tambem por outros hosts (ex.: orgf261ae8e.api.crm2.dynamics.com).
@@ -44,7 +47,7 @@ $Backup = (New-Item -ItemType Directory -Force (Join-Path $Backup (Get-Date -For
 
 # componenttype -> nome em msdyn_componentlayers; o nome logico da entidade (RemoveActiveCustomization) e o mesmo em minusculas.
 $tipos = [ordered]@{ 61 = "WebResource"; 29 = "Workflow"; 91 = "PluginAssembly"; 92 = "SdkMessageProcessingStep"; 60 = "SystemForm"; 80 = "AppModule"; 62 = "SiteMap" }
-$alvos = @(); $vistos = @{}; $doApp = Get-IdsDoApp $dv; $pulados = 0
+$pares = @(); $vistos = @{}; $doApp = Get-IdsDoApp $dv; $pulados = 0
 foreach ($t in $tipos.GetEnumerator()) {
   $componentes = @(foreach ($solutionId in $ids) { Read-DvAll $dv "solutioncomponents?`$select=objectid&`$filter=_solutionid_value eq $solutionId and componenttype eq $($t.Key)" })
   foreach ($c in $componentes) {
@@ -52,28 +55,38 @@ foreach ($t in $tipos.GetEnumerator()) {
     if ($vistos.ContainsKey([string] $c.objectid)) { continue }
     $vistos[[string] $c.objectid] = $true
     if ($doApp.ContainsKey(([string] $c.objectid).ToLowerInvariant())) { $pulados++; continue }
-    $camadas = @(Read-DvAll $dv "msdyn_componentlayers?`$filter=(msdyn_componentid eq '$($c.objectid)' and msdyn_solutioncomponentname eq '$($t.Value)')&`$select=msdyn_name,msdyn_order,msdyn_solutionname,msdyn_componentjson" | Sort-Object msdyn_order)
-    if ($camadas.Count -lt 2 -or $camadas[-1].msdyn_solutionname -ne "Active") { continue }
-    $alvos += [pscustomobject]@{ Tipo = $t.Value; Nome = $camadas[-1].msdyn_name; Id = [string] $c.objectid; Json = $camadas[-1].msdyn_componentjson }
+    $pares += [pscustomobject]@{ Tipo = $t.Value; Id = [string] $c.objectid }
   }
 }
+$carregar = @((Join-Path $PSScriptRoot "dataverse.ps1"), (Join-Path $PSScriptRoot "solucoes.ps1"), (Join-Path $PSScriptRoot "impressao.ps1"))
+$lidas = Invoke-EmParalelo -Itens $pares -Argumentos @($dv) -Carregar $carregar -Bloco {
+  param($Par, $Dv)
+  $topo = Get-CamadaActiveNoTopo @(Read-DvAll $Dv "msdyn_componentlayers?`$filter=(msdyn_componentid eq '$($Par.Id)' and msdyn_solutioncomponentname eq '$($Par.Tipo)')&`$select=msdyn_name,msdyn_order,msdyn_solutionname,msdyn_componentjson")
+  if ($topo) { [pscustomobject]@{ Tipo = $Par.Tipo; Nome = $topo.msdyn_name; Id = $Par.Id; Json = $topo.msdyn_componentjson } }
+}
+# Leitura que falha derruba a rodada, como antes: sem saber as camadas, nada e removido.
+$errosLeitura = @($lidas | Where-Object { $_.Erro })
+if ($errosLeitura.Count) { throw "Leitura de camadas falhou em $($errosLeitura.Count) componente(s): $(@($errosLeitura | Select-Object -First 3 | ForEach-Object { "$($_.Item.Tipo) $($_.Item.Id): $($_.Erro)" }) -join ' | ')" }
+$alvos = @($lidas | Where-Object { $_.Resultado } | ForEach-Object { $_.Resultado })
 Write-Step "$Pedido em ${hostAlvo}: $($alvos.Count) componentes com camada Active no topo; $pulados do app-motoristas-v2 pulados"
 $alvos | Group-Object Tipo | ForEach-Object { Write-Step ("  {0,3} {1}" -f $_.Count, $_.Name) }
 if (-not $Aplicar) { Write-Step "simulacao: use -Aplicar para remover."; return }
 
-$falhas = @()
 foreach ($a in $alvos) {
   $arquivo = Join-Path $Backup (("{0}-{1}" -f $a.Tipo, $a.Id) + ".json")
   [IO.File]::WriteAllText($arquivo, [string] $a.Json, (New-Object Text.UTF8Encoding $false))
-  try {
-    Invoke-DvAction $dv "RemoveActiveCustomization" @{ LogicalName = $a.Tipo.ToLowerInvariant(); Id = $a.Id } | Out-Null
-  }
-  catch {
-    # O erro da Web API traz a pilha .NET inteira; basta o comeco.
-    $msg = "$($a.Tipo) $($a.Nome): $(Get-ErroDv $_)"
-    $falhas += $msg.Substring(0, [Math]::Min(300, $msg.Length))
-  }
 }
+# Devolve a mensagem de erro (ate 300 caracteres; a da Web API traz a pilha .NET inteira) ou nada.
+$remover = {
+  param($A, $Dv)
+  try { Invoke-DvAction $Dv "RemoveActiveCustomization" @{ LogicalName = $A.Tipo.ToLowerInvariant(); Id = $A.Id } | Out-Null }
+  catch { $msg = "$($A.Tipo) $($A.Nome): $(Get-ErroDv $_)"; $msg.Substring(0, [Math]::Min(300, $msg.Length)) }
+}
+$falhou = { param($R) [bool] ($R.Erro -or $R.Resultado) }
+$primeira = @(Invoke-EmParalelo -Itens $alvos -Argumentos @($dv) -Carregar $carregar -Bloco $remover | Where-Object { & $falhou $_ })
+$segunda = @(Invoke-EmParalelo -Itens @($primeira | ForEach-Object { $_.Item }) -Argumentos @($dv) -Carregar $carregar -Bloco $remover -Limite 1 | Where-Object { & $falhou $_ })
+if ($primeira.Count) { Write-Step "segunda tentativa: $($primeira.Count) componente(s); $($segunda.Count) falharam de novo" }
+$falhas = @($segunda | ForEach-Object { if ($_.Erro) { "$($_.Item.Tipo) $($_.Item.Nome): $($_.Erro)" } else { [string] $_.Resultado } })
 $removidas = $alvos.Count - $falhas.Count
 if ($removidas) { Invoke-DvAction $dv "PublishAllXml" @{} | Out-Null }
 Write-Step "removidas: $removidas; falhas: $($falhas.Count); backup em $Backup"

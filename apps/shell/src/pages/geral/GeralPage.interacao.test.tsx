@@ -46,7 +46,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
     fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
-    expect(px(track(/Trajeto/))).toBe(before + 60)
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)

@@ -1769,7 +1769,7 @@
           "entityName": "__SET_TRANS__",
           "$select": "cr40f_transacaocartaoid",
           "$expand": "__NAV_T_DESPESA__($select=cr40f_statusoperacional)",
-          "$filter": "statecode eq 0 and cr40f_situacao eq 100000003 and _cr40f_despesa_value ne null and __NAV_T_DESPESA__/cr40f_statusoperacional ne 100000001"
+          "$filter": "statecode eq 0 and (cr40f_situacao eq 100000003 or (cr40f_situacao eq 100000005 and cr40f_motivo eq 'Sem comprovante válido do motorista no prazo de 3 dias; confira com o motorista.')) and _cr40f_despesa_value ne null and __NAV_T_DESPESA__/cr40f_statusoperacional ne 100000001"
         },
         "authentication": "@parameters('$authentication')"
       }
@@ -1821,7 +1821,7 @@
         "parameters": {
           "entityName": "__SET_TRANS__",
           "$select": "cr40f_transacaocartaoid",
-          "$filter": "statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or cr40f_situacao eq 100000003) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}"
+          "$filter": "statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or (cr40f_situacao eq 100000003 or (cr40f_situacao eq 100000005 and cr40f_motivo eq 'Sem comprovante válido do motorista no prazo de 3 dias; confira com o motorista.'))) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}"
         },
         "authentication": "@parameters('$authentication')"
       }
@@ -1855,10 +1855,62 @@
         }
       }
     },
-    "Pendentes": {
+    "Atrasadas": {
       "type": "OpenApiConnection",
       "runAfter": {
         "Cada_excluida": [
+          "Succeeded",
+          "Failed",
+          "Skipped"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "apiId": "__DV__",
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords"
+        },
+        "parameters": {
+          "entityName": "__SET_TRANS__",
+          "$select": "cr40f_transacaocartaoid",
+          "$filter": "statecode eq 0 and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000003) and __NAV_T_DESPESA__/statecode eq 0 and __NAV_T_DESPESA__/cr40f_origem eq 100000002 and __NAV_T_DESPESA__/cr40f_statusoperacional eq 100000001 and __NAV_T_DESPESA__/createdon lt @{addDays(outputs('Hoje'), -2, 'yyyy-MM-dd')}T03:00:00Z and (__NAV_T_DESPESA__/cr40f_iadataanalise eq null or __NAV_T_DESPESA__/cr40f_iadataanalise lt @{addDays(outputs('Hoje'), -2, 'yyyy-MM-dd')}T03:00:00Z)"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Cada_atrasada": {
+      "type": "Foreach",
+      "runAfter": {
+        "Atrasadas": [
+          "Succeeded"
+        ]
+      },
+      "foreach": "@coalesce(outputs('Atrasadas')?['body/value'], json('[]'))",
+      "actions": {
+        "Atrasar": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "apiId": "__DV__",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateRecord"
+            },
+            "parameters": {
+              "entityName": "__SET_TRANS__",
+              "recordId": "@items('Cada_atrasada')?['cr40f_transacaocartaoid']",
+              "item/cr40f_situacao": 100000005,
+              "item/cr40f_motivo": "Sem comprovante válido do motorista no prazo de 3 dias; confira com o motorista."
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
+    "Pendentes": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Cada_atrasada": [
           "Succeeded",
           "Failed",
           "Skipped"
@@ -2121,6 +2173,18 @@
           {
             "equals": [
               "@actions('Cada_excluida')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Atrasadas')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Cada_atrasada')?['status']",
               "Failed"
             ]
           }

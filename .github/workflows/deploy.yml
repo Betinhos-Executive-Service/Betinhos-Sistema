@@ -11,7 +11,7 @@ name: Deploy
 # resto usa az login e conexões do usuário. Se um flow falha, os outros seguem, a distribuição roda, o Deploy termina
 # vermelho com as causas no resumo e a tag não anda (o próximo Deploy tenta de novo).
 # Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
-#  - só roda quando muda a tela, um plugin ou os scripts deste deploy; documentação e skills não disparam;
+#  - só roda quando muda a tela, o Formulário Geral, um plugin ou os scripts deste deploy; documentação e skills não disparam;
 #  - um job só (um setup de runner); cada passo pesado roda só se a sua peça está pendente;
 #  - não repete o CI (typecheck e testes do shell e dos plugins já passaram no PR que entrou na develop);
 #  - instala só os pacotes pendentes (shell, gerar-pagantes) e suas dependências; cache do pnpm e do NuGet;
@@ -26,6 +26,14 @@ on:
       - 'apps/gerar-pagantes/**'
       - '!apps/gerar-pagantes/**/*.test.*'
       - 'packages/deploy/push-webresources-dev.ps1'
+      - 'apps/formulario-geral/**'
+      - '!apps/formulario-geral/**/*.test.*'
+      - '!apps/formulario-geral/**/*.fixtures.*'
+      - '!apps/formulario-geral/**/*.md'
+      - '!apps/formulario-geral/docs/**'
+      - '!apps/formulario-geral/power-platform/**'
+      - '!apps/formulario-geral/scripts/provision-*'
+      - 'packages/deploy/push-formulario-dev.ps1'
       - 'packages/dataverse/**'
       - 'pnpm-lock.yaml'
       - 'packages/deploy/push-dev.ps1'
@@ -59,6 +67,10 @@ on:
         default: false
       forcar_webresources:
         description: 'Publicar a Tela Gerar Pagantes e o gerador de recibo mesmo sem mudança'
+        type: boolean
+        default: false
+      forcar_formulario:
+        description: 'Publicar o Formulário Geral mesmo sem mudança'
         type: boolean
         default: false
       forcar_plugins:
@@ -109,21 +121,24 @@ jobs:
         env:
           FORCAR_TELA: ${{ inputs.forcar_tela }}
           FORCAR_WEBRESOURCES: ${{ inputs.forcar_webresources }}
+          FORCAR_FORMULARIO: ${{ inputs.forcar_formulario }}
           FORCAR_PLUGINS: ${{ inputs.forcar_plugins }}
         run: |
           $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -GitHub)
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
           $tela = ($saida -contains 'tela=true') -or ($env:FORCAR_TELA -eq 'true')
           $webresources = ($saida -contains 'webresources=true') -or ($env:FORCAR_WEBRESOURCES -eq 'true')
+          $formulario = ($saida -contains 'formulario=true') -or ($env:FORCAR_FORMULARIO -eq 'true')
           $plugins = (($saida | Where-Object { $_ -like 'plugins=*' }) -replace '^plugins=', '')
           if ($env:FORCAR_PLUGINS) { $plugins = (@($plugins.Split(',') + $env:FORCAR_PLUGINS.Split(',')) | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ } | Sort-Object -Unique) -join ',' }
           if (($env:FORCAR_PLUGINS -split ',' | ForEach-Object { $_.Trim() }) -contains 'todos') { $plugins = 'todos' }
           "tela=$($tela.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "webresources=$($webresources.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }) -join ' '
+          "formulario=$($formulario.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }; if ($formulario) { '--filter @betinhos/formulario-geral...' }) -join ' '
           "instalar=$instalar" >> $env:GITHUB_OUTPUT
           "plugins=$plugins" >> $env:GITHUB_OUTPUT
-          Write-Host "tela: $tela; webresources: $webresources; plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
+          Write-Host "tela: $tela; webresources: $webresources; formulario: $formulario; plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
 
       # Flows. A base é a tag flows-dev-publicado (mesmo padrão da prod-publicado do producao.yml); sem tag nada fica pendente
       # e o job final cria a tag no HEAD. O diff compara só as árvores dos dois commits, então basta buscar a tag com depth=1.
@@ -182,6 +197,11 @@ jobs:
       - name: Publicar os WebResources
         if: steps.pendentes.outputs.webresources == 'true'
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-webresources-dev.ps1
+
+      # Formulário Geral (o webresource.html nasce no build; schema, connector e flows da agenda IA continuam à mão)
+      - name: Publicar o Formulário Geral
+        if: steps.pendentes.outputs.formulario == 'true'
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-formulario-dev.ps1
 
       # Plugins
       - if: steps.pendentes.outputs.plugins != ''
@@ -246,7 +266,7 @@ jobs:
       # export para TEST/PROD fica barrado até corrigir (skill verificar-solucoes).
       - name: Distribuir nas 4 soluções
         id: distribuir
-        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.webresources == 'true' || steps.pendentes.outputs.plugins != '' || steps.flowspend.outputs.flows != ''
+        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.webresources == 'true' || steps.pendentes.outputs.formulario == 'true' || steps.pendentes.outputs.plugins != '' || steps.flowspend.outputs.flows != ''
         run: |
           $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/distribuir-apos-push.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -CaixaDeEntrada AppBetinhos 2>&1 | ForEach-Object { "$_" })
           $saida | ForEach-Object { Write-Host $_ }
@@ -267,11 +287,57 @@ jobs:
           {
             if [ "${{ steps.pendentes.outputs.tela }}" = "true" ]; then echo "Tela publicada no DEV - v$(node -p "require('./apps/shell/package.json').version")"; fi
             if [ "${{ steps.pendentes.outputs.webresources }}" = "true" ]; then echo; echo "Tela Gerar Pagantes publicada no DEV - v$(node -p "require('./apps/gerar-pagantes/package.json').version")"; fi
+            if [ "${{ steps.pendentes.outputs.formulario }}" = "true" ]; then echo; echo "Formulário Geral publicado no DEV - v$(node -p "require('./apps/formulario-geral/version.json').version")"; fi
             if [ -n "${{ steps.pendentes.outputs.plugins }}" ]; then echo; echo "Plugins publicados no DEV: ${{ steps.pendentes.outputs.plugins }}"; fi
             if [ -n "${{ steps.flowspend.outputs.flows }}" ]; then echo; echo "Flows no DEV (${{ steps.flows.outcome }}): ${{ steps.flowspend.outputs.flows }}"; fi
-            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
+            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ "${{ steps.pendentes.outputs.formulario }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
             if [ "${{ steps.distribuir.outputs.zerou }}" = "false" ]; then echo; echo "**ATENÇÃO:** a distribuição nas 4 soluções não zerou."; fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Pacote das soluções para o publicar.yml (export da BetinhosCore leva ~23 min; o publicar reaproveita este se a impressão
+  # digital do DEV não mudou). Só com SOLUCOES_IMPRESSAO=confiar (variável do repositório) e com o job dev verde. Roda dentro do
+  # grupo dataverse-dev do workflow, então o DEV não muda no meio. Exporta só a solução que mudou desde o pacote anterior (sobe a
+  # versão no DEV só nesse caso; o "pular igual" da tag solucoes-<alvo> compara hash do conteúdo, sem a versão, e a versão
+  # instalada no alvo, então não é afetado). Nunca deixa o Deploy vermelho: sem pacote, o publicar exporta como antes.
+  # Cache do GitHub: some após 7 dias sem uso; cada Deploy restaura e grava um novo, então o mais recente fica.
+  pacotes:
+    needs: dev
+    if: needs.dev.result == 'success' && github.ref == 'refs/heads/develop' && vars.SOLUCOES_IMPRESSAO == 'confiar'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    environment: dev
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache-solucoes
+          key: solucoes-dev-${{ github.sha }}
+          restore-keys: solucoes-dev-
+      - name: Instalar pac
+        run: |
+          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+          pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
+      - name: Conferir e exportar o que mudou
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-do-dev.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes-novos -Cache cache-solucoes -Confiar
+          if ($LASTEXITCODE -ne 0) { throw "exportar-do-dev.ps1 falhou ($LASTEXITCODE)." }
+          if (Test-Path cache-solucoes) { Remove-Item -Recurse -Force cache-solucoes }
+          Move-Item pacotes-novos cache-solucoes
+      - uses: actions/cache/save@v4
+        with:
+          path: cache-solucoes
+          key: solucoes-dev-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Resumo
+        if: always()
+        shell: bash
+        run: |
+          { echo "## Pacote das soluções para o publicar"; echo '```json'; cat cache-solucoes/manifesto.json 2>/dev/null || echo "sem pacote"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   # A tag só anda quando o Deploy inteiro passou (tela, plugins, flows e Resumo). Job à parte para que `contents: write`
   # fique só aqui: o job dev, com o segredo do Dataverse, mantém as permissões padrão. Nunca anda para trás. Execução com
