@@ -102,7 +102,17 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS -Publicadas publicadas-antes.json @extra
           if ($LASTEXITCODE -ne 0) { throw "importar-solucoes.ps1 falhou ($LASTEXITCODE)." }
       - name: Remover camadas Active (hotfixes já na main)
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd
+        # Publicação parcial (input solucoes) só mexe nas camadas das soluções importadas. Sem isso, publicar só a BetinhosCore
+        # apagaria no PROD a camada Active de tela, flows e plugins da Automação e da Interface, e o PROD voltaria à versão
+        # gerenciada antiga até a publicação seguinte. Com as 3 do Sistema, segue o padrão do script (inclui a AppBetinhos).
+        run: |
+          $nomes = @((Get-Content -Raw pacotes/manifesto.json | ConvertFrom-Json) | ForEach-Object { $_.solucao })
+          $todas = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosInterface')
+          $extra = @()
+          if (@($todas | Where-Object { $nomes -notcontains $_ }).Count) { $extra = @('-Solucoes', ($nomes -join ',')) }
+          Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 3 do Sistema' })"
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd @extra
+          if ($LASTEXITCODE -ne 0) { throw "remover-camadas-active.ps1 falhou ($LASTEXITCODE)." }
       - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json -Restaurar
       - name: Restaurar estados ligado/desligado
