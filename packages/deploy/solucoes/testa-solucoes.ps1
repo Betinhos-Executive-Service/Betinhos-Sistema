@@ -407,6 +407,8 @@ Confere ((Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore') 'Prod' '' })) 'PROD so com Core passa sem conexao'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' 'abc' })) 'PROD com conexao passa'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosAutomacao') 'Test' '' })) 'TEST sem conexao passa'
+Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' 'true' })) 'PROD sem conexao passa com WEBPUSH_VINCULAR_DEPOIS'
+Confere ((Get-ConexaoWebPushDoImport 'abc' 'true') -eq '' -and (Get-ConexaoWebPushDoImport 'abc' '') -eq 'abc' -and (Get-ConexaoWebPushDoImport 'abc' 'false') -eq 'abc') 'WEBPUSH_VINCULAR_DEPOIS=true pula o --settings-file'
 $pastaCfg = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N')); [void] [IO.Directory]::CreateDirectory($pastaCfg)
 $cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc'
 $lido = Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json

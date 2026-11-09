@@ -537,10 +537,20 @@ function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minu
 $script:ReferenciaWebPush = "new_webpushmotoristas"
 $script:ConectorWebPush = "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
 
+# O vinculo por --settings-file exige que a conta do CI possa usar a conexao (ConnectionAuthorizationFailed no ensaio de
+# 09/11/2026), e o Power Platform nao deixa compartilhar a conexao com service principal. Mas a permissao so e cobrada quando o
+# vinculo muda: com a referencia ja ligada a mesma conexao, o import passa. Por isso o primeiro vinculo de um ambiente e feito
+# por quem e dono da conexao, depois do import, e a variavel WEBPUSH_VINCULAR_DEPOIS=true do environment pula o --settings-file
+# nessa publicacao. Depois do vinculo, apague a variavel: as publicacoes seguintes voltam a mandar o mesmo vinculo.
+function Get-ConexaoWebPushDoImport([string] $Conexao, [string] $VincularDepois) {
+  if ($VincularDepois -eq "true") { return "" }
+  return $Conexao
+}
+
 # PROD sem a conexao nao comeca: recusa antes do primeiro import, para nao deixar a publicacao pela metade.
-function Assert-ConexaoWebPush([string[]] $Solucoes, [string] $Alvo, [string] $Conexao) {
-  if ($Alvo -eq "Prod" -and $Solucoes -contains "BetinhosAutomacao" -and -not $Conexao) {
-    throw "BetinhosAutomacao no PROD exige a variavel CONEXAO_WEBPUSH do environment prod. Publique so a BetinhosCore, crie a conexao e grave o id dela."
+function Assert-ConexaoWebPush([string[]] $Solucoes, [string] $Alvo, [string] $Conexao, [string] $VincularDepois = "") {
+  if ($Alvo -eq "Prod" -and $Solucoes -contains "BetinhosAutomacao" -and -not $Conexao -and $VincularDepois -ne "true") {
+    throw "BetinhosAutomacao no PROD exige a variavel CONEXAO_WEBPUSH do environment prod (ou WEBPUSH_VINCULAR_DEPOIS=true no primeiro vinculo). Publique so a BetinhosCore, crie a conexao e grave o id dela."
   }
 }
 

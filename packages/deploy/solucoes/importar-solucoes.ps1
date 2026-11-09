@@ -37,7 +37,9 @@ $permitidas = @($script:Solucoes) + @("AppBetinhos")
 $estranhas = @($nomes | Where-Object { $permitidas -notcontains $_ })
 if ($estranhas.Count) { throw "Manifesto com solucao fora do permitido: $($estranhas -join ', ')." }
 $ordem = @($permitidas | Where-Object { $nomes -contains $_ })
-Assert-ConexaoWebPush $nomes $Alvo $env:CONEXAO_WEBPUSH
+Assert-ConexaoWebPush $nomes $Alvo $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
+$conexaoWebPush = Get-ConexaoWebPushDoImport $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
+if ($env:WEBPUSH_VINCULAR_DEPOIS -eq "true") { Write-Step "WEBPUSH_VINCULAR_DEPOIS: import sem --settings-file; vincule $($script:ReferenciaWebPush) e religue os flows dele em seguida" }
 $anteriores = @()
 if ($Publicadas -and -not $ImportarTudo -and (Test-Path -LiteralPath $Publicadas -PathType Leaf)) {
   try { $anteriores = @(Read-JsonFile $Publicadas) }
@@ -56,7 +58,7 @@ foreach ($nome in $ordem) {
   }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
   $inicio = Get-Date
-  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $env:CONEXAO_WEBPUSH)
+  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush)
   $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
   $registro += [ordered]@{ solucao = $nome; versao = $r.Versao; hash = $item.hash }
 }
