@@ -17,7 +17,7 @@ import {
   STORAGE_KEY
 } from "./app/bootstrap";
 import { useHardwareBackGuard } from "./app/backGuard";
-import { clearAllChaptersSeen, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./app/tour";
+import { clearAllChaptersSeen, closesWhenReadingEnds, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./app/tour";
 import { tourChaptersForScreen } from "./app/tourChapters";
 import { findTourTarget, hasTourProbe } from "./app/tourDom";
 import { BuildStamp } from "./components/layout/BuildStamp";
@@ -93,6 +93,7 @@ import {
   expenseFlowView,
   hasRemoteReferenceData,
   nextQuickReadState,
+  quickReadFilledFields,
   runQuickReadPipeline,
   shouldRunQuickRead,
   startQuickReadState,
@@ -161,7 +162,7 @@ import { ChecklistsScreen } from "./screens/ChecklistsScreen";
 import { ButtonPreviewScreen } from "./screens/ButtonPreviewScreen";
 import { CollisionStartScreen } from "./screens/CollisionStartScreen";
 import { DetailsScreen } from "./screens/DetailsScreen";
-import { ExpenseScreen } from "./screens/ExpenseScreen";
+import { DESCRICAO_ID, ExpenseScreen } from "./screens/ExpenseScreen";
 import { FinalizeScreen, type MaintenanceFinalizeDraft } from "./screens/FinalizeScreen";
 import { HistoryDetailsScreen } from "./screens/HistoryDetailsScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
@@ -213,16 +214,20 @@ import { GastosRelatorioScreen, type GastosRelatorioLoadStatus } from "./screens
 import { RankingPostosScreen } from "./screens/RankingPostosScreen";
 import { carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./lib/gastosRelatorio";
 import { GastoCartaoDuplicadoDialog } from "./components/common/GastoCartaoDuplicadoDialog";
+import { LeituraCartaoSheet } from "./components/common/LeituraCartaoSheet";
 import {
   MOCK_CIDADES,
   STATUS_OPERACIONAL,
   acharGastoCartaoDuplicado,
+  aplicarLeituraNoGastoCartao,
   buildGastoCartaoCompletarPayload,
+  conferirLeituraComCartao,
   concluirGastoCartaoMock,
   gastoCartaoParaRascunho,
   isMockGastosCartao,
   listarGastosCartao,
   mesclarRascunho,
+  type ConferenciaCartao,
   type GastoCartao,
   type GastosCartaoLoadStatus
 } from "./lib/gastosCartao";
@@ -551,6 +556,7 @@ function App() {
   const [expenseQuickReadPhoto, setExpenseQuickReadPhoto] = useState("");
   const [expenseQuickReadFilling, setExpenseQuickReadFilling] = useState(false);
   const [expenseQuickReadFilled, setExpenseQuickReadFilled] = useState<QuickReadFilledFields>({});
+  const [conferenciaCartao, setConferenciaCartao] = useState<ConferenciaCartao | null>(null);
   const expenseDraftRef = useRef(expenseDraft);
   expenseDraftRef.current = expenseDraft;
   const expenseRetakeTargetIdRef = useRef("");
@@ -1643,6 +1649,12 @@ function App() {
     return () => window.clearTimeout(timer);
     // screen/comunicadoOpen/checklistOpen/termoOpen/treinamentoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
   }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
+
+  // Terminou a leitura do comprovante: o tour dela some sozinho, sem virar "visto" (volta se a leitura rodar de novo sem ele ter sido visto).
+  const expenseReading = screen === "gastos" && expenseFlowView(expenseQuickRead) === "leitura";
+  useEffect(() => {
+    if (closesWhenReadingEnds(tourChapter?.id, expenseReading)) setTourChapter(null);
+  }, [tourChapter, expenseReading]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
@@ -3098,6 +3110,7 @@ function App() {
     setExpenseQuickReadPhoto("");
     setExpenseQuickReadFilling(false);
     setExpenseQuickReadFilled({});
+    setConferenciaCartao(null);
   }
 
   // Conferência do comprovante de recebimento pela mesma leitura rápida dos gastos: só o valor importa.
@@ -3115,8 +3128,6 @@ function App() {
   };
 
   const runExpenseQuickRead = async (dataUrl: string) => {
-    // Gasto do cartão: valor, data e forma vêm do banco; a leitura do comprovante não pode sobrescrevê-los.
-    if (gastoCartaoAtualRef.current) return;
     const mockMode = remoteMode ? null : getQuickReadMockMode();
     if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
     const online = typeof navigator === "undefined" || navigator.onLine !== false;
@@ -3124,6 +3135,8 @@ function App() {
     setExpenseQuickRead(started);
     if (started.status !== "lendo") return;
     const seq = ++expenseQuickReadSeqRef.current;
+    const gastoCartao = gastoCartaoAtualRef.current;
+    setConferenciaCartao(null);
     setExpenseQuickReadPhoto(dataUrl);
     setExpenseQuickReadFilling(false);
     const { outcome, referenceData } = await runQuickReadPipeline({
@@ -3140,10 +3153,18 @@ function App() {
       await new Promise((resolve) => window.setTimeout(resolve, QUICK_READ_FILL_STEP_MS));
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
-      const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
-      expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
-      setExpenseDraft(after);
-      setExpenseQuickReadFilled(filled);
+      if (gastoCartao) {
+        // Valor, data e forma vêm do banco: a leitura só confere e completa categoria, cidade e litros vazios.
+        const after = aplicarLeituraNoGastoCartao(before, outcome.leitura, referenceData);
+        setExpenseDraft(after);
+        setExpenseQuickReadFilled(quickReadFilledFields(before, after));
+        setConferenciaCartao(conferirLeituraComCartao(gastoCartao, outcome.leitura));
+      } else {
+        const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+        expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
+        setExpenseDraft(after);
+        setExpenseQuickReadFilled(filled);
+      }
     }
     setExpenseQuickReadFilling(false);
     setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
@@ -3813,8 +3834,24 @@ function App() {
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
-        cartaoGasto={gastoCartaoAtual ? { cartaoFinal: gastoCartaoAtual.cartaoFinal, estabelecimento: gastoCartaoAtual.estabelecimento } : undefined}
+        cartaoGasto={Boolean(gastoCartaoAtual)}
       />
+      {gastoCartaoAtual && conferenciaCartao ? (
+        <LeituraCartaoSheet
+          conferencia={conferenciaCartao}
+          estabelecimento={gastoCartaoAtual.estabelecimento}
+          photoUrl={expenseQuickReadPhoto}
+          onClose={() => setConferenciaCartao(null)}
+          onRetake={() => {
+            setConferenciaCartao(null);
+            retakeQuickReadPhoto();
+          }}
+          onExplain={() => {
+            document.getElementById(DESCRICAO_ID)?.focus();
+            setConferenciaCartao(null);
+          }}
+        />
+      ) : null}
       {duplicidadeCartao ? (
         <GastoCartaoDuplicadoDialog
           gasto={duplicidadeCartao}

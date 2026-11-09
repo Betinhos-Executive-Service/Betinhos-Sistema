@@ -1,6 +1,7 @@
 import { cleanGuid, GUID_PATTERN } from "./comunicados.ts";
 import { DATAVERSE, retrieveMultiple } from "./dataverse.ts";
 import { normalizeExpenseFields } from "./expenses.reference.ts";
+import { applyQuickReadToDraft, type QuickReadLeitura } from "./receiptQuickRead.ts";
 import type { ExpenseCityOption, ExpenseDraft, ExpenseLookupNavigationNames, ExpensePhoto, ExpenseReferenceData } from "./expenses.types.ts";
 
 // Gastos do cartão corporativo que o flow diário cria no lugar do motorista (Banco MCP -> cr40f_despesaoperacional).
@@ -226,3 +227,36 @@ export const formatDiaMes = (dataGasto: string) => {
   const [, mes, dia] = dataGasto.split("-");
   return dia && mes ? `${dia}/${mes}` : dataGasto;
 };
+
+// ---------------- Leitura do recibo x cobrança do cartão ----------------
+
+/** Um campo do recibo lido contra o cartão, já formatado para a folha de conferência. */
+export type CampoConferido = { recibo: string; cartao: string; confere: boolean };
+export type ConferenciaCartao = { valor?: CampoConferido; data?: CampoConferido };
+
+const TOLERANCIA_VALOR = 0.05;
+const brl = (valor: number) => `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Compara o recibo lido com o que o cartão cobrou. Valor com tolerância de R$ 0,05; data pelo dia (AAAA-MM-DD).
+ * Campo que a leitura não trouxe não entra na comparação; sem nenhum dos dois, não há o que dizer (null).
+ */
+export function conferirLeituraComCartao(gasto: Pick<GastoCartao, "valor" | "dataGasto">, leitura: Pick<QuickReadLeitura, "valor" | "data">): ConferenciaCartao | null {
+  const valorLido = leitura.valor !== null && leitura.valor > 0 ? leitura.valor : null;
+  const dataLida = /^\d{4}-\d{2}-\d{2}/.test(leitura.data ?? "") ? leitura.data!.slice(0, 10) : null;
+  if (valorLido === null && dataLida === null) return null;
+  const conferencia: ConferenciaCartao = {};
+  if (valorLido !== null) {
+    conferencia.valor = { recibo: brl(valorLido), cartao: brl(gasto.valor), confere: Math.abs(valorLido - gasto.valor) <= TOLERANCIA_VALOR + 1e-9 };
+  }
+  if (dataLida !== null) {
+    conferencia.data = { recibo: formatDiaMes(dataLida), cartao: formatDiaMes(gasto.dataGasto), confere: dataLida === gasto.dataGasto };
+  }
+  return conferencia;
+}
+
+/** Leitura no modo cartão: valor, data, forma, estabelecimento e descrição ficam como estão; só categoria, cidade e litros vazios são preenchidos. */
+export function aplicarLeituraNoGastoCartao(draft: ExpenseDraft, leitura: QuickReadLeitura, referenceData: ExpenseReferenceData): ExpenseDraft {
+  const { categoriaId, cidadeId, litros } = applyQuickReadToDraft(draft, leitura, referenceData);
+  return { ...draft, categoriaId, cidadeId, litros };
+}
