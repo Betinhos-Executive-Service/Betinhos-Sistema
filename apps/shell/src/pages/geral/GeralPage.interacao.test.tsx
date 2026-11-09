@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GeralPage } from './GeralPage'
 import { cellOf, columnMenu, dataRows, openColumnFilter, PAGE1, usarAmbienteGeral, viewTrigger } from './testUtils'
 
@@ -16,6 +16,16 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     return grid.style.getPropertyValue('--gr-columns').split(/ (?![^(]*\))/)[index]
   }
   const px = (t: string) => Number(/minmax\((\d+)px/.exec(t)?.[1])
+  // jsdom não desenha: o cabeçalho mede a largura da própria trilha e a borda direita fica em x = 100.
+  let rect: { mockRestore: () => void }
+  beforeEach(() => {
+    rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const title = this.getAttribute('role') === 'columnheader' ? this.getAttribute('title') : null
+      const width = title ? px(track(new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`))) : 0
+      return { x: 100 - width, y: 0, width, height: 32, top: 0, left: 100 - width, right: 100, bottom: 32, toJSON: () => ({}) } as DOMRect
+    })
+  })
+  afterEach(() => rect.mockRestore())
 
   it('setas na alça mudam 16 px e persistem; Enter volta ao padrão', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
