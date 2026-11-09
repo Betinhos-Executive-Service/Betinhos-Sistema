@@ -11,7 +11,8 @@ Leitura:
 - valor_lido é o total pago. data_lida no formato AAAA-MM-DD. Em combustível, leia os litros.
 
 Contexto enviado (JSON):
-- despesa: o lançamento do motorista (valor, dataGasto, categoria, estabelecimento, litros, km, observacao).
+- despesa: o lançamento do motorista (valor, dataGasto, categoria, estabelecimento, litros, km, observacao, valorDoExtratoCartao).
+- valorDoExtratoCartao = true: o valor da despesa veio do extrato do banco e está correto; o motorista não o edita. Se o valor_lido do comprovante diferir do valor da despesa (além da tolerância), o comprovante é de outra compra: decida "precisa_corrigir" e peça nos motivos o comprovante certo desta compra. Nesse caso, nunca peça para corrigir o valor da despesa.
 - veiculo: placa, modelo e capacidadeTanque em litros (null quando o cadastro não informa). O próprio veiculo é null quando a despesa não tem veículo.
 - historico.motorista: outras despesas do mesmo motorista nos 7 dias anteriores ao gasto e no mesmo dia, das mais recentes para as mais antigas.
 - historico.veiculo: outras despesas do mesmo veículo no mesmo período; mesmoMotorista indica se foram lançadas pelo mesmo motorista.

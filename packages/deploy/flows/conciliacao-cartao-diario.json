@@ -1803,10 +1803,62 @@
         }
       }
     },
-    "Pendentes": {
+    "Excluidas": {
       "type": "OpenApiConnection",
       "runAfter": {
         "Cada_parada": [
+          "Succeeded",
+          "Failed",
+          "Skipped"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "apiId": "__DV__",
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords"
+        },
+        "parameters": {
+          "entityName": "__SET_TRANS__",
+          "$select": "cr40f_transacaocartaoid",
+          "$filter": "statecode eq 0 and cr40f_tipo eq 100000000 and (_cr40f_despesa_value eq null or __NAV_T_DESPESA__/statecode eq 1) and (cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002 or cr40f_situacao eq 100000003) and modifiedon lt @{formatDateTime(trigger()?['startTime'], 'yyyy-MM-ddTHH:mm:ssZ')}"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Cada_excluida": {
+      "type": "Foreach",
+      "runAfter": {
+        "Excluidas": [
+          "Succeeded"
+        ]
+      },
+      "foreach": "@coalesce(outputs('Excluidas')?['body/value'], json('[]'))",
+      "actions": {
+        "Divergir_excluida": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "apiId": "__DV__",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateRecord"
+            },
+            "parameters": {
+              "entityName": "__SET_TRANS__",
+              "recordId": "@items('Cada_excluida')?['cr40f_transacaocartaoid']",
+              "item/cr40f_situacao": 100000005,
+              "item/cr40f_motivo": "A compra está sem despesa ativa ligada (excluída, desativada ou o vínculo falhou); confira a cobrança."
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
+    "Pendentes": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Cada_excluida": [
           "Succeeded",
           "Failed",
           "Skipped"
@@ -2057,6 +2109,18 @@
           {
             "equals": [
               "@actions('Cada_parada')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Excluidas')?['status']",
+              "Failed"
+            ]
+          },
+          {
+            "equals": [
+              "@actions('Cada_excluida')?['status']",
               "Failed"
             ]
           }

@@ -23,6 +23,8 @@ export type ContextoDespesa = {
     litros: number | null
     km: number | null
     observacao: string | null
+    /** true quando a despesa nasceu da conciliação do cartão: o valor veio do extrato do banco e o motorista não o edita. */
+    valorDoExtratoCartao: boolean
   }
   reservas: { id: string; saida: string; cliente: string; status: string }[]
   duplicatas: { id: string; valor: number; dataGasto: string; motivo: 'mesmo_arquivo' | 'mesmo_valor_data' }[]
