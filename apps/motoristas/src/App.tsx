@@ -94,6 +94,7 @@ import {
   hasRemoteReferenceData,
   nextQuickReadState,
   quickReadFilledFields,
+  reabrirLeitura,
   runQuickReadPipeline,
   shouldRunQuickRead,
   startQuickReadState,
@@ -3844,6 +3845,7 @@ function App() {
           onClose={() => setConferenciaCartao(null)}
           onRetake={() => {
             setConferenciaCartao(null);
+            setExpenseQuickRead(reabrirLeitura);
             retakeQuickReadPhoto();
           }}
           onExplain={() => {
