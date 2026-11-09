@@ -45,3 +45,28 @@ test('despesa: só despesa do cartão que saiu de Precisa corrigir; completada c
   assert.match(item['item/cr40f_situacao'], /100000003\), equals\(.*100000004\)\), 100000005, 100000001\)$/)
   for (const r of refs(f.actions)) assert.ok(nomes(f.actions).has(r), r)
 })
+
+test('despesa: recusada ou cancelada depois de conciliar leva a transação conciliada (automática ou manual) para Divergência; outro status não mexe', () => {
+  const f = despesa(diario)
+  const se = f.actions.Se_fora
+  assert.match(se.expression.equals[0], /^@or\(equals\(triggerOutputs\(\)\?\['body\/cr40f_statusoperacional'\], 100000003\), equals\(.*, 100000004\)\)$/)
+  assert.equal(se.expression.equals[1], true)
+  assert.deepEqual(se.else, { actions: {} })
+  assert.match(se.actions.Conciliadas.inputs.parameters.$filter, /^_cr40f_despesa_value eq @\{triggerOutputs\(\)\?\['body\/cr40f_despesaoperacionalid'\]\} and \(cr40f_situacao eq 100000001 or cr40f_situacao eq 100000002\)$/)
+  const item = se.actions.Cada_conciliada.actions.Divergir.inputs.parameters
+  assert.equal(item['item/cr40f_situacao'], 100000005)
+  assert.equal(item['item/cr40f_motivo'], 'A despesa ligada a esta compra foi recusada ou cancelada depois de conciliada; confira a cobrança.')
+  assert.deepEqual(se.runAfter, {}, 'em paralelo com Aguardando: falha de um ramo não fica escondida')
+  const existentes = nomes(f.actions)
+  for (const r of refs(f.actions)) assert.ok(existentes.has(r), r)
+})
+
+test('despesa: o comportamento de Aguardando não mudou e a varredura de excluída do diário não vaza para os flows tempo real', () => {
+  const f = despesa(diario)
+  assert.match(f.actions.Aguardando.inputs.parameters.$filter, /cr40f_situacao eq 100000003$/)
+  assert.match(f.actions.Cada_aguardando.actions.Concluir.inputs.parameters['item/cr40f_motivo'], /'A despesa criada pelo cartão foi recusada ou cancelada; confira a cobrança\.'/)
+  for (const flow of [f, reprocessada(diario)]) {
+    assert.ok(!nomes(flow.actions).has('Excluidas') && !nomes(flow.actions).has('Cada_excluida'))
+    assert.doesNotMatch(JSON.stringify(flow), /sem despesa ativa ligada/)
+  }
+})
