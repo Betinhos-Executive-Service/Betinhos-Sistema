@@ -26,6 +26,10 @@ export type TourChapter = {
   steps: readonly TourStep[];
 };
 
+/** O capítulo "comprovante" só faz sentido durante a leitura: ao sair dela, fecha sem marcar como visto. */
+export const READING_TOUR_ID = "comprovante";
+export const closesWhenReadingEnds = (chapterId: string | undefined, reading: boolean) => chapterId === READING_TOUR_ID && !reading;
+
 export type TourCloseReason = "concluido" | "pulado" | "indisponivel";
 
 const TOUR_STORAGE_PREFIX = "app-motoristas-tour-v2";

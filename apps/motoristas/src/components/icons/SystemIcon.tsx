@@ -16,7 +16,8 @@ export type SystemIconName =
   | "flash"
   | "sync"
   | "rotate"
-  | "help";
+  | "help"
+  | "lock";
 
 export function SystemIcon({ name }: { name: SystemIconName }) {
   if (name === "arrowLeft") {
@@ -113,6 +114,15 @@ export function SystemIcon({ name }: { name: SystemIconName }) {
     return (
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <path d="M8 23 24 9l16 14v17H29V28H19v12H8V23Z" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (name === "lock") {
+    return (
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <rect x="9" y="21" width="30" height="21" rx="4" fill="none" stroke="currentColor" strokeWidth="3.2" />
+        <path d="M16 21v-6a8 8 0 0 1 16 0v6" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
       </svg>
     );
   }

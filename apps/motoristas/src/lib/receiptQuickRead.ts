@@ -159,6 +159,11 @@ export function shouldRunQuickRead(state: QuickReadState) {
   return state.status === "idle" || state.status === "ilegivel";
 }
 
+/** "Trocar foto" depois de uma leitura bem-sucedida: libera uma nova leitura, até o limite de tentativas. */
+export function reabrirLeitura(state: QuickReadState): QuickReadState {
+  return state.status === "preenchido" && state.tentativas < QUICK_READ_MAX_TENTATIVAS ? { ...state, status: "idle" } : state;
+}
+
 /** Começa uma leitura. Sem internet não tenta: vai direto para o preenchimento manual. */
 export function startQuickReadState(state: QuickReadState, env: { online: boolean }): QuickReadState {
   return { ...state, status: env.online ? "lendo" : "manual" };

@@ -17,6 +17,7 @@ import {
   tourStorageKey,
   type TourChapter
 } from "../src/app/tour.ts";
+import { closesWhenReadingEnds } from "../src/app/tour.ts";
 import { TOUR_CHAPTERS, tourChaptersForScreen, tourScreensWithChapters } from "../src/app/tourChapters.ts";
 
 function memoryStorage() {
@@ -188,4 +189,11 @@ test("sameBox compara por valor", () => {
 test("rótulo de progresso em pt-BR", () => {
   assert.equal(tourProgressLabel(0, 7), "Passo 1 de 7");
   assert.equal(tourProgressLabel(6, 7), "Passo 7 de 7");
+});
+
+test("o tour do comprovante fecha ao sair da leitura e só ele", () => {
+  assert.equal(closesWhenReadingEnds("comprovante", false), true);
+  assert.equal(closesWhenReadingEnds("comprovante", true), false);
+  assert.equal(closesWhenReadingEnds("gastos", false), false);
+  assert.equal(closesWhenReadingEnds(undefined, false), false);
 });

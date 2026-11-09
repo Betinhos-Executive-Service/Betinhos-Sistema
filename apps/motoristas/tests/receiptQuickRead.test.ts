@@ -161,3 +161,10 @@ test("data só fica destacada quando veio da leitura (inclusive quando é a mesm
   assert.equal(digitada.filled.dataGasto, undefined);
   assert.equal(digitada.filled.valor, "85,40");
 });
+
+import { reabrirLeitura } from "../src/lib/receiptQuickRead.ts";
+test("reabrirLeitura libera nova leitura após preenchido, até o limite de tentativas", () => {
+  assert.equal(shouldRunQuickRead(reabrirLeitura({ status: "preenchido", tentativas: 1 })), true);
+  assert.deepEqual(reabrirLeitura({ status: "preenchido", tentativas: 3 }), { status: "preenchido", tentativas: 3 });
+  assert.deepEqual(reabrirLeitura({ status: "manual", tentativas: 1 }), { status: "manual", tentativas: 1 });
+});

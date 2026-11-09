@@ -19,7 +19,7 @@ import {
 import type { MaintenanceRequestVehicleOption } from "../lib/dataverse";
 import { parseCurrencyInput } from "../lib/expenses";
 import type { ExpenseSubmissionStatus } from "../lib/expenseUploadState";
-import { validarDescricao, formatDiaMes } from "../lib/gastosCartao";
+import { validarDescricao } from "../lib/gastosCartao";
 import { SystemIcon, type SystemIconName } from "../components/icons/SystemIcon";
 
 export type ExpenseUploadListItem = {
@@ -62,27 +62,12 @@ type ExpenseScreenProps = {
   quickRead?: QuickReadState;
   /** Campos preenchidos pela leitura rápida (destacados até o motorista alterar). */
   quickReadFilled?: QuickReadFilledFields;
-  /** Completar gasto do cartão: valor, data, forma e estabelecimento ficam somente leitura. */
-  cartaoGasto?: { cartaoFinal: string; estabelecimento: string };
+  /** Completar gasto do cartão: data, valor, forma de pagamento e estabelecimento ficam travados (vêm do banco). */
+  cartaoGasto?: boolean;
 };
 
-function CartaoResumo({ gasto, valor, dataGasto }: { gasto: { cartaoFinal: string; estabelecimento: string }; valor: string; dataGasto: string }) {
-  return (
-    <section className="expense-card-summary" aria-label="Dados do cartão">
-      <div className="expense-card-summary-row">
-        <span className="expense-card-summary-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5" /><path d="M2.5 10h19" /></svg>
-        </span>
-        <span className="expense-card-summary-text">
-          <strong>{gasto.estabelecimento || "Estabelecimento não informado"}</strong>
-          <span>{formatDiaMes(dataGasto)} · {gasto.cartaoFinal ? `final ${gasto.cartaoFinal}` : "cartão corporativo"}</span>
-        </span>
-        <strong className="expense-card-summary-value">{BRL.format(parseCurrencyInput(valor) || 0)}</strong>
-      </div>
-      <p className="expense-card-summary-note">Dados do banco, não editáveis. Complete os campos abaixo.</p>
-    </section>
-  );
-}
+/** A folha de conferência do cartão leva o foco para este campo. */
+export const DESCRICAO_ID = "gasto-descricao";
 
 function focusInvalidField(element: HTMLElement | null) {
   element?.focus({ preventScroll: false });
@@ -115,6 +100,10 @@ export function ExpenseScreen({
   const cameraScroll = useCameraScroll("gastos");
   const quickReadClass = (key: keyof ExpenseDraft) =>
     isQuickReadFieldHighlighted(draft, quickReadFilled, key) ? "finalize-input-block is-quick-read-filled" : undefined;
+  // No modo cartão os campos do banco ficam travados (cadeado no rótulo).
+  const travado = (texto: string) => cartaoGasto ? <>{texto}<span className="form-field-lock"><SystemIcon name="lock" /></span></> : texto;
+  const campoClass = (key: keyof ExpenseDraft) =>
+    [quickReadClass(key) ?? "finalize-input-block", cartaoGasto && "is-locked"].filter(Boolean).join(" ");
   const categoryRef = useRef<HTMLButtonElement | null>(null);
   const vehicleRef = useRef<HTMLButtonElement | null>(null);
   const valueRef = useRef<HTMLInputElement | null>(null);
@@ -178,7 +167,7 @@ export function ExpenseScreen({
   const submit = () => {
     if (isSubmitting || submitDisabled) return;
     const validated = validateExpenseDraft(draft, photos, referenceData);
-    // Valor, data e forma vêm do banco e ficam ocultos no modo cartão: não podem travar o envio.
+    // Valor, data e forma vêm do banco e ficam travados no modo cartão: não podem travar o envio.
     const nextErrors = cartaoGasto ? { ...validated, valor: undefined, dataGasto: undefined, formaPagamentoId: undefined } : validated;
     setErrors(nextErrors);
     const nextDescricaoError = cartaoGasto ? validarDescricao(draft) : "";
@@ -203,7 +192,6 @@ export function ExpenseScreen({
     onAddPhoto();
   };
 
-  const labels = cartaoGasto ? ["ENVIAR", "ENVIANDO", "ENVIADO"] : ["REGISTRAR", "REGISTRANDO", "REGISTRADO"];
   const errorCount = Object.values(errors).filter(Boolean).length + (descricaoError ? 1 : 0);
   const isVideo = (photo: ExpensePhoto) => photo.mediaType === "video" || Boolean(photo.rawBlob) || photo.dataUrl.startsWith("data:video/");
   const uploadTitle = (item: ExpenseUploadListItem) => {
@@ -214,7 +202,7 @@ export function ExpenseScreen({
 
   return (
     <AppShell screenLabel="TelaGastos">
-      <FormMenu title={cartaoGasto ? "Completar gasto do cartão" : "Registrar gasto"} onBack={isSubmitting ? undefined : onBack} />
+      <FormMenu title="Registrar gasto" onBack={isSubmitting ? undefined : onBack} />
       <section className="main-panel maintenance-request-main">
         <article className="finalize-card maintenance-request-card">
           <div className="finalize-scroll" ref={cameraScroll.ref}>
@@ -252,16 +240,12 @@ export function ExpenseScreen({
                 <div className="form-error-summary is-info" role="status">Preencha os dados do comprovante.</div>
               ) : null}
 
-              {cartaoGasto ? (
-                <CartaoResumo gasto={cartaoGasto} valor={draft.valor} dataGasto={draft.dataGasto} />
-              ) : null}
-
-              {!cartaoGasto ? (
               <TextInputField
                 ref={dateRef}
                 required
-                label="Data do gasto"
-                fieldClassName={quickReadClass("dataGasto")}
+                label={travado("Data do gasto")}
+                fieldClassName={campoClass("dataGasto")}
+                disabled={cartaoGasto}
                 error={errors.dataGasto}
                 type="date"
                 value={draft.dataGasto}
@@ -270,7 +254,6 @@ export function ExpenseScreen({
                   clearError("dataGasto");
                 }}
               />
-              ) : null}
 
               <SelectField
                 ref={categoryRef}
@@ -296,13 +279,12 @@ export function ExpenseScreen({
                 }}
               />
 
-              {!cartaoGasto ? (
-              <>
               <MoneyInputField
                 ref={valueRef}
                 required
-                label="Valor"
-                fieldClassName={quickReadClass("valor")}
+                label={travado("Valor")}
+                fieldClassName={campoClass("valor")}
+                disabled={cartaoGasto}
                 error={errors.valor}
                 inputMode="decimal"
                 pattern="[0-9.,]*"
@@ -317,21 +299,19 @@ export function ExpenseScreen({
               <SelectField
                 ref={paymentRef}
                 required
-                label="Forma de pagamento"
-                fieldClassName={quickReadClass("formaPagamentoId")}
+                label={travado("Forma de pagamento")}
+                fieldClassName={campoClass("formaPagamentoId")}
                 error={errors.formaPagamentoId}
                 value={draft.formaPagamentoId}
                 options={paymentOptions}
                 placeholder="Selecione"
                 ariaLabel="Selecionar forma de pagamento"
-                disabled={isSubmitting || referenceLoading}
+                disabled={isSubmitting || referenceLoading || cartaoGasto}
                 onChange={(value) => {
                   updateDraft({ formaPagamentoId: value });
                   clearError("formaPagamentoId");
                 }}
               />
-              </>
-              ) : null}
 
               <SelectField
                 ref={cityRef}
@@ -407,18 +387,18 @@ export function ExpenseScreen({
                 />
               ) : null}
 
-              {!cartaoGasto ? (
               <TextInputField
-                label="Estabelecimento"
-                fieldClassName={quickReadClass("estabelecimento")}
+                label={travado("Estabelecimento")}
+                fieldClassName={campoClass("estabelecimento")}
+                disabled={cartaoGasto}
                 placeholder="Ex.: Posto, estacionamento, hotel"
                 value={draft.estabelecimento}
                 onChange={(event) => updateDraft({ estabelecimento: event.target.value })}
               />
-              ) : null}
 
               <TextAreaField
                 ref={descricaoRef}
+                id={DESCRICAO_ID}
                 label="Descrição"
                 required={Boolean(cartaoGasto)}
                 error={descricaoError}
@@ -464,10 +444,10 @@ export function ExpenseScreen({
             <ActionButton
               className="finalize-primary"
               variant="primary"
-              idleLabel={labels[0]}
+              idleLabel="REGISTRAR"
               disabled={submitDisabled}
-              loadingLabel={labels[1]}
-              successLabel={labels[2]}
+              loadingLabel="REGISTRANDO"
+              successLabel="REGISTRADO"
               state={submitState}
               onClick={submit}
             />
