@@ -246,9 +246,13 @@
 /* Redimensionar e reordenar colunas */
 .gr-table .bt-table__head .bt-table__cell { position: relative; }
 .gr-table .bt-table__head .gr-cell--first { position: sticky; }
-.gr-resize { position: absolute; top: 0; right: 0; bottom: 0; width: 6px; cursor: col-resize; touch-action: none; z-index: 2; }
-.gr-resize:focus-visible { outline: 0; box-shadow: inset -2px 0 0 var(--bt-focus-border); }
-@media (hover: hover) { .gr-resize:hover { box-shadow: inset -2px 0 0 var(--bt-color-action); } }
+/* Alça centrada na linha da borda (6 px de cada lado): só à esquerda, o clique na linha caía no cabeçalho vizinho e virava menu ou reordenação. */
+.gr-resize { position: absolute; top: 0; right: -7px; bottom: 0; width: 13px; cursor: col-resize; touch-action: none; z-index: 3; }
+.gr-table .bt-table__head .bt-table__cell:last-child > .gr-resize, .gr-table .bt-table__head .bt-table__cell:last-child > .gr-resize::after { right: 0; }
+.gr-resize::after { content: ""; position: absolute; top: 0; bottom: 0; right: 6px; width: 2px; background-color: transparent; }
+.gr-resize:focus-visible { outline: 0; }
+.gr-resize:focus-visible::after { background-color: var(--bt-focus-border); }
+@media (hover: hover) { .gr-resize:hover::after { background-color: var(--bt-color-action); } }
 .gr-drop--before { box-shadow: inset 2px 0 0 var(--bt-color-action); }
 .gr-drop--after { box-shadow: inset -2px 0 0 var(--bt-color-action); }
 
