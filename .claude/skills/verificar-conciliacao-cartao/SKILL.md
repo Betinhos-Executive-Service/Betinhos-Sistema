@@ -62,6 +62,7 @@ A suíte inteira (`npx vitest run` em `apps/shell`) também deve ficar verde: o 
 2. Cadastrar um cartão de teste e reprocessar uma transação "Sem motorista": conferir no registro `_cr40f_cartao_value`, `_cr40f_motorista_value` e `cr40f_situacao = 100000000`.
 3. Casar uma Pendente: despesa com `cr40f_conciliadacartao = true` e transação com `_cr40f_despesa_value` e situação 100000002.
 4. Privilégios: usuário sem escrita em `cr40f_transacaocartao`/`cr40f_cartaocorporativo`/`cr40f_despesaoperacional` recebe toast de erro e nada muda na lista.
+5. IA valida a despesa do cartão (flow "Despesas | Análise IA", depois de `pnpm --filter @betinhos/despesas-ia constantes` e `provision-flow-despesas-ia.ps1 -SomenteValidar`; valor R$ 1,23, nome 'TESTE CONCILIAÇÃO', apague no fim): (a) despesa com `cr40f_origem = 100000002`, `cr40f_conciliadacartao = true`, comprovante anexado e `cr40f_statusanexo = 100000002` (Completo): em até ~2 min `cr40f_iastatusanalise` sai de vazio/100000000 para Concluída e o run do flow mostra `valorDoExtratoCartao: true` no `Contexto`. (b) Mesma despesa com comprovante de outro valor: decisão `precisa_corrigir`, motivos pedem o comprovante certo e não pedem para corrigir o valor. (c) Despesa com origem 100000002 sem `cr40f_conciliadacartao`, ou com a IA já em andamento/concluída: o flow não dispara. (d) Despesa do App (origem 100000000): continua disparando, com `valorDoExtratoCartao: false`.
 
 ## Não verificável na nuvem
 Tudo que toca Dataverse, conector ou API: só local, com o DEV.
