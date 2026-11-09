@@ -141,6 +141,19 @@ $script:respostas = @((Novo-Erro 'AggregateQueryRecordLimit exceeded.' ''), (Nov
 $msg = Falha-Com { Get-ContagemRegistros $dv $ent }
 Confere ($msg -like 'Contagem paginada de cr40f_x falhou:*' -and $msg -like '*boom*') 'contagem: erro durante a paginacao falha alto com tabela e corpo'
 
+# Tabela recem-criada pelo import: 404 0x80060888 espera e tenta de novo; persistindo, falha alto
+$script:SegundosTabelaNova = 0; $script:TentativasTabelaNova = 3
+$nova = { Novo-Erro 'O servidor remoto retornou um erro: (404) Nao Localizado.' '{"error":{"code":"0x80060888","message":"Resource not found for the segment ''cr40f_xs''."}}' }
+$script:respostas = @((& $nova), [pscustomobject]@{ value = @([pscustomobject]@{ n = 0 }) }); $script:chamadas = @()
+$c = Get-ContagemRegistros $dv $ent
+Confere ($c.Total -eq 0 -and -not $c.Paginada -and $script:chamadas.Count -eq 2) 'contagem: tabela recem-criada (404 0x80060888) tenta de novo e conta'
+$script:respostas = @((& $nova), (& $nova), (& $nova), [pscustomobject]@{ value = @([pscustomobject]@{ n = 0 }) }); $script:chamadas = @()
+$msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+Confere ($msg -like 'Contagem de cr40f_x falhou:*0x80060888*' -and $script:chamadas.Count -eq 3) 'contagem: 404 de tabela persistente falha alto depois das tentativas'
+$script:respostas = @((Novo-Erro 'O servidor remoto retornou um erro: (404) Nao Localizado.' '{"error":{"code":"0x80040217","message":"Entity Not Found"}}'), [pscustomobject]@{ value = @(1) }); $script:chamadas = @()
+$msg = Falha-Com { Get-ContagemRegistros $dv $ent }
+Confere ($msg -like 'Contagem de cr40f_x falhou:*' -and $script:chamadas.Count -eq 1) 'contagem: outro 404 nao espera'
+
 # Escritas em solucao so no DEV: com outro host, recusa antes de qualquer chamada
 foreach ($escrita in @(
     @{ nome = 'incluir'; bloco = { Add-ComponenteNaSolucao $dvTest @{ id = 'abc'; tipo = 1; comportamento = 0 } 'BetinhosCore' } },

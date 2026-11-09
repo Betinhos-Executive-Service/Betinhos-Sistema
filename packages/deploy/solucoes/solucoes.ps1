@@ -311,12 +311,28 @@ function Assert-CoberturaDaFoto($Foto, [hashtable] $FluxoIds, [hashtable] $StepI
 # FetchXML agregado; so o erro de limite de agregacao do Dataverse (50.000: AggregateQueryRecordLimit / 0x8004E023) cai na
 # contagem paginada de ids, que tambem e exata. Qualquer outro erro (401/403, 429, 5xx, timeout) sobe com a tabela e o corpo
 # da resposta: contagem aproximada escondida desligaria a deteccao de perda do comparar-fotos. Devolve @{ Total; Paginada }.
+# Excecao: tabela recem-criada pelo import responde 404 "Resource not found for the segment" (0x80060888) por alguns minutos,
+# ate a Web API conhecer o EntitySetName (PROD, 09/11/2026, new_inscricaopushmotorista). Espera e tenta de novo; persistindo,
+# falha alto como os outros erros.
+$script:TentativasTabelaNova = 10
+$script:SegundosTabelaNova = 30
 function Get-ContagemRegistros($Dv, $Entidade) {
   $nome = [string] $Entidade.LogicalName
   $fetch = "<fetch aggregate='true'><entity name='$nome'><attribute name='$($Entidade.PrimaryIdAttribute)' alias='n' aggregate='count'/></entity></fetch>"
-  try { $resposta = Invoke-RestMethod -Method Get -Uri "$($Dv.Api)/$($Entidade.EntitySetName)?fetchXml=$([uri]::EscapeDataString($fetch))" -Headers $Dv.Headers }
-  catch {
-    $erro = Get-ErroDv $_
+  $tentativa = 0
+  do {
+    $tentativa++
+    $erro = $null
+    try { $resposta = Invoke-RestMethod -Method Get -Uri "$($Dv.Api)/$($Entidade.EntitySetName)?fetchXml=$([uri]::EscapeDataString($fetch))" -Headers $Dv.Headers }
+    catch { $erro = Get-ErroDv $_ }
+    if ($erro -and $erro -match '0x80060888|Resource not found for the segment' -and $tentativa -lt $script:TentativasTabelaNova) {
+      Write-Step "contagem de ${nome}: tabela ainda desconhecida pela Web API (tentativa $tentativa); de novo em $($script:SegundosTabelaNova) s"
+      Start-Sleep -Seconds $script:SegundosTabelaNova
+      continue
+    }
+    break
+  } while ($true)
+  if ($erro) {
     if ($erro -notmatch 'AggregateQueryRecordLimit|0x8004E023') { throw "Contagem de $nome falhou: $erro" }
     try { return @{ Total = @(Read-DvAll $Dv "$($Entidade.EntitySetName)?`$select=$($Entidade.PrimaryIdAttribute)").Count; Paginada = $true } }
     catch { throw "Contagem paginada de $nome falhou: $(Get-ErroDv $_)" }
