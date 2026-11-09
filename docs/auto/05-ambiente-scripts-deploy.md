@@ -323,7 +323,7 @@ Todos os de DEV recusam o host de PROD; os `provision-*` sem `-Apply` rodam em d
 | Script | O que faz |
 |---|---|
 | `patch-flow-comprovantes-sharepoint.ps1` | troca a gravação no OneDrive do noreply por SharePoint (site BetinhosGestoInterna, pasta `Despesas/<ambiente>/AAAA/MM`) e o link por `CreateSharingLink` |
-| `patch-flow-salvar-foto-sharepoint.ps1` | idem para a foto do passageiro (`Passageiros/Fotos/<DEV|PROD>/<id>.<ext>`), sem link de compartilhamento |
+| `patch-flow-salvar-foto-sharepoint.ps1` | idem para a foto do passageiro (`Passageiros/Fotos/<DEV|PROD>/<id>.<ext>`, pasta pela variável `new_PastaFotosPassageiros`), sem link de compartilhamento |
 | `patch-flow-servico-editado.ps1` | corrige `filteringattributes` do gatilho de "Notificação Serviço Editado" (disparava em qualquer update) e a coluna informada |
 | `patch-flow-tenaris-contatos.ps1` | impede que a sincronização Tenaris apague telefone/e-mail/departamento do passageiro (`cr40f_bancodedados`) |
 | `prod/_prod.ps1` | helpers comuns dos scripts de PROD (confere a organização antes de gravar; nunca imprime segredo nem `sig=`) |
