@@ -47,13 +47,13 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
 
 export function DespesasTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Despesa>[] = [
-    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 280, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
-    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 130, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
-    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
-    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 170, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
-    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 190, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
-    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 220, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
+    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 220, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
+    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 100, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 110, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
+    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
+    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
+    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
+    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
