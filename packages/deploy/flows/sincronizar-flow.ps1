@@ -2,6 +2,7 @@
 # packages/deploy/flows/ (definição exportada do DEV). Dot-source: . (Join-Path $PSScriptRoot 'flows\sincronizar-flow.ps1')
 # - O JSON guarda só a definição. Connection references e o "subscriptionRequest/name" dos gatilhos Dataverse
 #   (gerado pela plataforma por flow) vêm do flow existente em tempo de execução.
+# - String igual a '<preservado do DEV>' no JSON (e-mail, nome de pessoa) também vem do flow existente.
 # - Comparação semântica (ordem das propriedades não importa). Igual = nada gravado.
 # - Gravação: desliga, grava, restaura a definição anterior se falhar e devolve o estado ligado/desligado de antes.
 
@@ -76,10 +77,33 @@ function Get-FlowExistente($Sessao, [string] $Nome) {
   return $linhas[0]
 }
 
-# clientdata nova: definição do JSON + connection references e nome de assinatura dos gatilhos do flow existente.
+# Valor que não pode ir ao repositório público (e-mail, nome de pessoa): no JSON fica esta marca e o script usa a
+# string que o flow existente tem no mesmo caminho. Sem valor lá, falha em vez de gravar a marca.
+$script:ValorDoDev = '<preservado do DEV>'
+function Resolve-ValoresDoDev($Repo, $Vivo, [string] $Caminho) {
+  if ($Repo -is [Collections.IList]) {
+    for ($i = 0; $i -lt $Repo.Count; $i++) {
+      # Atribuição direta: "$v = if (...) {...}" desenrolaria array de um elemento.
+      $v = $null; if ($Vivo -is [Collections.IList] -and $i -lt $Vivo.Count) { $v = $Vivo[$i] }
+      Resolve-ValoresDoDev $Repo[$i] $v "$Caminho/$i"
+    }
+    return
+  }
+  if ($Repo -isnot [Management.Automation.PSCustomObject]) { return }
+  foreach ($p in $Repo.PSObject.Properties) {
+    $v = $null; if ($Vivo -is [Management.Automation.PSCustomObject] -and $Vivo.PSObject.Properties[$p.Name]) { $v = $Vivo.($p.Name) }
+    if ($p.Value -is [string] -and $p.Value -eq $script:ValorDoDev) {
+      if ($v -isnot [string] -or -not $v -or $v -eq $script:ValorDoDev) { throw "$Caminho/$($p.Name): valor a preservar ausente no flow existente." }
+      $p.Value = $v
+    } else { Resolve-ValoresDoDev $p.Value $v "$Caminho/$($p.Name)" }
+  }
+}
+
+# clientdata nova: definição do JSON + connection references, nome de assinatura dos gatilhos e valores marcados do flow existente.
 function New-ClientDataDoJson([string] $ClientDataAtual, [string] $CaminhoJson) {
   $atual = $ClientDataAtual | ConvertFrom-Json
   $definicao = [IO.File]::ReadAllText($CaminhoJson, [Text.Encoding]::UTF8) | ConvertFrom-Json
+  Resolve-ValoresDoDev $definicao $atual.properties.definition ''
   foreach ($gatilho in $definicao.triggers.PSObject.Properties) {
     $vivo = $atual.properties.definition.triggers.PSObject.Properties[$gatilho.Name]
     $inputs = if ($vivo) { $vivo.Value.PSObject.Properties['inputs'] } else { $null }

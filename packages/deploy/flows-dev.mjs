@@ -46,6 +46,22 @@ export const ENTRADAS = [
     arquivos: [script('checklists'), flowsDir('checklists-rotina-diaria\\.json', 'checklist-push\\.json', SINCRONIZAR)],
   },
   {
+    nome: 'carro-atual', script: 'provision-flow-carro-atual.ps1', flows: ['Infleet - Sincronizar carro atual dos motoristas'], apply: true,
+    arquivos: [script('carro-atual'), flowsDir('carro-atual\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'checklist-planner', script: 'provision-flow-checklist-planner.ps1', flows: ['Flow Checklist Não OK | Planner'], apply: true,
+    arquivos: [script('checklist-planner'), flowsDir('checklist-planner\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'cobranca-qr-webhook', script: 'provision-flow-cobranca-qr-webhook.ps1', flows: ['Flow Webhook Stripe | Cobrança QR'], apply: true,
+    arquivos: [script('cobranca-qr-webhook'), flowsDir('cobranca-qr-webhook\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'combustivel-insights', script: 'provision-flow-combustivel-insights.ps1', flows: ['Combustível — insights noturnos'], apply: true,
+    arquivos: [script('combustivel-insights'), flowsDir('combustivel-insights\\.json', SINCRONIZAR)],
+  },
+  {
     nome: 'comunicados-push', script: 'provision-flow-comunicados-push.ps1', flows: ['Flow Push Comunicados | Motoristas'], apply: true,
     arquivos: [script('comunicados-push'), flowsDir('comunicados-push\\.json', SINCRONIZAR)],
   },

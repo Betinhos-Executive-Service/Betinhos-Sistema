@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "Recorrencia": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "schedule": {
+          "hours": [
+            "2"
+          ],
+          "minutes": [
+            0
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Iniciar_ultimo": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "ultimo",
+            "type": "string",
+            "value": "{\"pendentes\":1}"
+          }
+        ]
+      }
+    },
+    "Ate_zerar": {
+      "type": "Until",
+      "runAfter": {
+        "Iniciar_ultimo": [
+          "Succeeded"
+        ]
+      },
+      "expression": "@equals(int(coalesce(json(variables('ultimo'))?['pendentes'], 1)), 0)",
+      "limit": {
+        "count": 12,
+        "timeout": "PT1H"
+      },
+      "actions": {
+        "Gerar": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "PerformUnboundAction",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "actionName": "new_GerarInsightsCombustivel"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Guardar": {
+          "type": "SetVariable",
+          "runAfter": {
+            "Gerar": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "name": "ultimo",
+            "value": "@{outputs('Gerar')?['body/new_ResultadoJson']}"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}
