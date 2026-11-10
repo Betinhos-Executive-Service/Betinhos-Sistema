@@ -25,7 +25,7 @@ export type Source = {
 const ENTITIES = { comunicado: 'new_comunicadomotorista', destinatario: 'new_comunicadodestinatario', funcionario: 'cr40f_funcionarios', usuario: 'systemuser' } as const
 type Sets = Record<keyof typeof ENTITIES, string>
 
-const DESTINATARIO_SELECT = '$select=new_comunicadodestinatarioid,_new_comunicado_value,_new_motorista_value,new_enviadoem,new_abertoem,new_lidoem,new_cienteem,new_nomeassinante,new_observacao,new_assinaturajson,new_pushstatus,new_pusherro'
+const DESTINATARIO_SELECT = '$select=new_comunicadodestinatarioid,_new_comunicado_value,_new_motorista_value,new_enviadoem,new_abertoem,new_lidoem,new_cienteem,new_nomeassinante,new_observacao,new_assinaturajson,new_evidenciaaberturajson,new_evidenciacienciajson,new_pushstatus,new_pusherro'
 
 export function createSource(host: Host): Source {
   if (host.mode === 'mock') return createMockSource()
