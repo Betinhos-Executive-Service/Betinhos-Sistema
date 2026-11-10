@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
-import type { AcessoSource } from '../data/acesso'
+import { AcessoError, type AcessoSource } from '../data/acesso'
 import { createMockSource as createMockComunicados } from '../../comunicados/data/mock'
 import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
@@ -303,10 +303,12 @@ describe('Ficha', () => {
   })
 
   it('encerra pela ficha sem recarregar nem salvar o funcionário e passa a oferecer Reativar', async () => {
-    const encerrar = vi.fn(async () => [{ etapa: 'conta', estado: 'feita' as const, detalhe: 'desativada' }])
+    let ativo = true
+    const encerrar = vi.fn(async () => { ativo = false; return [{ etapa: 'conta', estado: 'feita' as const, detalhe: 'desativada' }] })
     const save = vi.fn(async () => 'f1')
     const get = vi.fn(async () => structuredClone(comEmail))
-    render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp: async () => ({ id: 'su1', ativo: true }) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    const usuarioDoApp = vi.fn(async () => ({ id: 'su1', ativo }))
+    render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
     await abrirAcesso()
     await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
@@ -319,6 +321,64 @@ describe('Ficha', () => {
     expect(screen.getByRole('button', { name: /^Reativar acesso$/ })).toBeTruthy()
     expect(save).not.toHaveBeenCalled()
     expect(get).toHaveBeenCalledTimes(1)
+    // Relê o systemuser depois de encerrar: o que o bloco mostra é o que a ficha mostra ao abrir de novo.
+    expect(usuarioDoApp).toHaveBeenCalledTimes(2)
+  })
+
+  it('encerrar que deixa o systemuser habilitado continua ativo e explica, sem dizer encerrado', async () => {
+    const encerrar = vi.fn(async () => [
+      { etapa: 'grupo', estado: 'feita' as const, detalhe: 'removido' },
+      { etapa: 'bloqueio', estado: 'pulada' as const, detalhe: 'já bloqueado' },
+    ])
+    render(<ToastProvider><Ficha source={comUsuario(true)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await abrirAcesso()
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
+    expect((await screen.findAllByText('O acesso não foi retirado por completo')).length).toBeGreaterThan(0)
+    expect(screen.getByText(/ainda aparece habilitado no Dataverse \(bloqueio: já bloqueado\)/)).toBeTruthy()
+    expect(screen.getByText('Acesso ativo')).toBeTruthy()
+    expect(screen.queryByText('Acesso encerrado')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
+  })
+
+  it('encerrar cuja conferência acha acesso restante mostra o que sobrou no bloco e deixa tentar de novo', async () => {
+    // O bloqueio no Dataverse pegou (a ficha relê "encerrado"), mas a licença ficou: o Encerrar continua disponível para a nova tentativa.
+    let ativo = true
+    const encerrar = vi.fn(async () => { ativo = false; return [
+      { etapa: 'licenca', estado: 'feita' as const, detalhe: 'removida' },
+      { etapa: 'bloqueio', estado: 'feita' as const, detalhe: 'bloqueado no Dataverse' },
+      { etapa: 'conferencia', estado: 'erro' as const, detalhe: 'licença ainda atribuída' },
+    ] })
+    render(<ToastProvider><Ficha source={comUsuario(null, { usuarioDoApp: async () => ({ id: 'su1', ativo }) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await abrirAcesso()
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
+    expect(await screen.findByText(/conferência achou acesso restante: licença ainda atribuída/)).toBeTruthy()
+    expect(screen.getAllByText('O acesso não foi retirado por completo').length).toBeGreaterThan(0)
+    expect(screen.getByText('Conferindo se o acesso saiu')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Encerrar agora$/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Reativar acesso$/ })).toBeNull()
+  })
+
+  it('conta ativa fora do grupo: fecha o diálogo e explica no bloco, sem dizer encerrado', async () => {
+    const encerrar = vi.fn(async (): Promise<never> => { throw new AcessoError('CONTA_FORA_DO_GRUPO', 'A conta Microsoft está ativa, mas fora do grupo de motoristas.', [{ etapa: 'grupo', estado: 'erro', detalhe: 'fora do grupo' }]) })
+    render(<ToastProvider><Ficha source={comUsuario(true)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await abrirAcesso()
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
+    expect(await screen.findByText(/fora do grupo de motoristas/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Encerrar agora$/ })).toBeNull()
+    expect(screen.getByText('Acesso ativo')).toBeTruthy()
   })
 
   it('reativa com confirmação, mostra a senha nova e o link do WhatsApp, e pede confirmação ao fechar', async () => {

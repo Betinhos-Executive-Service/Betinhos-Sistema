@@ -27,8 +27,8 @@ namespace Betinhos.DriverRecordSharing
 
             var texto = context.InputParameters.Contains(TextParameter) ? context.InputParameters[TextParameter] as string : null;
             string apiKey = null;
-            // Tabela cr40f_segredo e, como fallback, variável de ambiente, lidas como sistema: o motorista não precisa de privilégio nela.
-            try { apiKey = ObservationApiKey.Resolve(_secureConfig, () => SecretReader.Read(factory.CreateOrganizationService(null), EnvApiKey, tracing)); }
+            // Tabela cr40f_segredo, depois configuração segura do step e variável de ambiente, lidas como sistema: o motorista não precisa de privilégio nela.
+            try { apiKey = SecretReader.Read(factory.CreateOrganizationService(null), EnvApiKey, tracing, _secureConfig); }
             catch (Exception error) { tracing?.Trace("OrganizarObservacao: variável de ambiente ilegível ({0})", error.GetType().Name); }
 
             var result = ObservationOrganizer.Organize(apiKey, texto, ObservationOrganizer.HttpPost, tracing);

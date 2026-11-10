@@ -37,6 +37,7 @@ export const MENSAGENS: Record<string, string> = {
   CONTA_NAO_EXISTE: 'A conta Microsoft não existe mais; cadastre o acesso de novo.',
   SEM_PERMISSAO_SENHA: 'Falta a permissão User-PasswordProfile.ReadWrite.All no app do Graph.',
   HOMONIMO_ENCONTRADO: 'Já existe funcionário parecido; confirme na tela se é a mesma pessoa.',
+  CONTA_FORA_DO_GRUPO: 'A conta Microsoft está ativa, mas fora do grupo de motoristas. Por segurança nada foi alterado: confira com a TI o e-mail da ficha.',
   USUARIO_DATAVERSE_PENDENTE: 'A conta foi criada, mas o Dataverse ainda não a reconhece. Tente de novo em alguns minutos.',
 }
 
@@ -44,14 +45,14 @@ export const MENSAGENS: Record<string, string> = {
 export const ETAPAS: Record<Fluxo, Record<string, string>> = {
   cadastro: { usuario: 'Criando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', funcionario: 'Vinculando à ficha' },
   reativar: { usuario: 'Encontrando a conta', conta: 'Desbloqueando a conta', licenca: 'Liberando a licença', grupo: 'Incluindo no grupo de motoristas', systemuser: 'Liberando no Dataverse', senha: 'Gerando a senha nova' },
-  encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas', bloqueio: 'Bloqueando no Dataverse' },
+  encerrar: { licenca: 'Removendo a licença', conta: 'Bloqueando a conta Microsoft', grupo: 'Tirando do grupo de motoristas', bloqueio: 'Bloqueando no Dataverse', conferencia: 'Conferindo se o acesso saiu' },
 }
 
 /** Resumo depois de concluído: particípio ("Licença removida"); o gerúndio fica só no progresso. */
 export const ETAPAS_FEITAS: Record<Fluxo, Record<string, string>> = {
   cadastro: { usuario: 'Conta criada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', funcionario: 'Vinculado à ficha' },
   reativar: { usuario: 'Conta encontrada', conta: 'Conta desbloqueada', licenca: 'Licença liberada', grupo: 'Incluído no grupo de motoristas', systemuser: 'Liberado no Dataverse', senha: 'Senha nova gerada' },
-  encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas', bloqueio: 'Bloqueado no Dataverse' },
+  encerrar: { licenca: 'Licença removida', conta: 'Conta bloqueada', grupo: 'Retirado do grupo de motoristas', bloqueio: 'Bloqueado no Dataverse', conferencia: 'Acesso conferido' },
 }
 
 export const ESTADO_ETAPA: Record<Etapa['estado'], string> = { feita: '', pulada: 'já estava pronto', pendente: 'em andamento', erro: 'não concluído' }
@@ -64,7 +65,7 @@ export const MSG_PENDENTE = "Conta criada. O Dataverse ainda está liberando o a
 export const MSG_PENDENTE_DEMORADA = "Conta criada. O Dataverse está demorando para liberar o acesso. Abra a ficha e use 'Concluir liberação' em alguns minutos."
 
 /** Erros que nova tentativa não resolve: a retentativa automática para e mostra a mensagem. */
-export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL', 'NOME_INVALIDO', 'CELULAR_INVALIDO', 'FUNCIONARIO_NAO_ENCONTRADO', 'EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO', 'HOMONIMO_ENCONTRADO'])
+export const ERROS_PERMANENTES = new Set(['SEM_PERMISSAO', 'SEM_PERMISSAO_SENHA', 'CONFIG_AUSENTE', 'CONTA_NAO_EXISTE', 'ACESSO_ENCERRADO', 'SEM_LICENCA_DISPONIVEL', 'NOME_INVALIDO', 'CELULAR_INVALIDO', 'FUNCIONARIO_NAO_ENCONTRADO', 'EMAIL_EM_USO_POR_OUTRO_FUNCIONARIO', 'HOMONIMO_ENCONTRADO', 'CONTA_FORA_DO_GRUPO'])
 
 export class AcessoError extends Error {
   constructor(public codigo: string, message: string, public etapas: Etapa[]) { super(message); this.name = 'AcessoError' }

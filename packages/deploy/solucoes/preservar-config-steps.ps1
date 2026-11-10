@@ -45,5 +45,16 @@ foreach ($s in $atuais) {
 $novos = @($atuais | Where-Object { -not $antes.PSObject.Properties[[string] $_.sdkmessageprocessingstepid] } | ForEach-Object { $_.name })
 Write-Step "configuracoes restauradas: $restaurados; falhas: $($falhas.Count); steps novos com a configuracao do DEV (conferir): $($novos.Count)"
 $novos | ForEach-Object { Write-Step "  novo: $_" }
+# O groupId do plugin de acesso tem de ser o grupo do Entra de uma equipe do alvo: com o do DEV, "Encerrar acesso" pula tudo
+# ("conta fora do grupo") e o cadastro poe o motorista num grupo sem acesso. Caso real: PROD de 03/11 a 10/11/2026.
+$grupos = @(Read-DvAll $dv "teams?`$select=azureactivedirectoryobjectid&`$filter=teamtype eq 2" | ForEach-Object { ([string] $_.azureactivedirectoryobjectid).ToLowerInvariant() })
+foreach ($s in @(Read-DvAll $dv "sdkmessageprocessingsteps?`$select=name,configuration&`$filter=startswith(name,'Cr40f.Acesso') and configuration ne null")) {
+  $grupo = ''
+  try { $grupo = ([string] (ConvertFrom-Json $s.configuration).groupId).ToLowerInvariant() } catch { }
+  if ($grupos -contains $grupo) { continue }
+  $msg = "$($s.name): groupId nao e o grupo de nenhuma equipe do alvo (Team-Betinhos-Canvas no PROD)"
+  # No TEST so avisa: ele nasce da copia do PROD e o step novo vem com a configuracao do DEV; nao trava o ensaio.
+  if ($Alvo -eq 'Prod') { $falhas += $msg } else { Write-Warning $msg }
+}
 $falhas | ForEach-Object { Write-Warning $_ }
 if ($falhas.Count) { exit 1 }

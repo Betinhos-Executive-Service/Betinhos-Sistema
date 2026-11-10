@@ -358,6 +358,32 @@ $script:respostas = @(
 $r = Restore-Estados $dvProd 'Prod' $fotoEstados
 Confere ($r.Mudancas.Count -eq 0 -and $r.Falhas.Count -eq 1 -and $r.Falhas[0] -like 'fluxo F1*recusado*') 'restaura: falha do Dataverse vira item em Falhas, nao excecao'
 
+# Fluxo aposentado: desliga depois de restaurar so com o substituto ligado; sem substituto ligado fica como estava
+$fotoAposentado = [pscustomobject]@{ fluxos = [pscustomobject]@{ 'a1' = [pscustomobject]@{ nome = 'Antigo'; estado = 1 }; 'v1' = [pscustomobject]@{ nome = 'Vigia'; estado = 1 } }; steps = [pscustomobject]@{} }
+$aposentados = @([pscustomobject]@{ nome = 'Antigo'; substituto = 'Vigia' })
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 1 -and $r.Mudancas[0].tipo -eq 'fluxo aposentado' -and $patches.Count -eq 1 -and $patches[0].Uri -like '*workflows(a1)' -and ($patches[0].Body | ConvertFrom-Json).statecode -eq 0) 'aposentado: desliga com o substituto ligado'
+$vigiaDesligada = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 0; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}, [pscustomobject]@{}
+)
+$script:respostas = $vigiaDesligada; $script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 2 -and $r.Mudancas[0].nome -eq 'Vigia' -and $r.Mudancas[1].tipo -eq 'fluxo aposentado' -and $patches[0].Uri -like '*workflows(v1)' -and $patches[1].Uri -like '*workflows(a1)') 'aposentado: restaura o substituto antes e so entao desliga o antigo'
+$fotoVigiaDesligada = [pscustomobject]@{ fluxos = [pscustomobject]@{ 'a1' = [pscustomobject]@{ nome = 'Antigo'; estado = 1 }; 'v1' = [pscustomobject]@{ nome = 'Vigia'; estado = 0 } }; steps = [pscustomobject]@{} }
+$script:respostas = $vigiaDesligada; $script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoVigiaDesligada -Aposentados $aposentados
+Confere ($r.Mudancas.Count -eq 0 -and @($script:chamadas | Where-Object { $_.Method -eq 'Patch' }).Count -eq 0) 'aposentado: sem substituto ligado fica como estava'
+
 # -DesligarNovos le as 6 solucoes rastreadas (so BetinhosCore existe aqui, com n1 e n3); n4 e n5 estao fora delas e ficam como estao
 $script:respostas = @(
   [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'f2'; name = 'F2'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n1'; name = 'Novo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n2'; name = 'Regra'; statecode = 1; category = 2 }, [pscustomobject]@{ workflowid = 'n4'; name = 'Fora das solucoes'; statecode = 1; category = 5 }) },

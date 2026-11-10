@@ -23,7 +23,7 @@ Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secre
 - Onde ficam: tabela `cr40f_segredo` (BetinhosCore), uma linha por segredo; `cr40f_name` é o nome (chave alternativa), `cr40f_valor` tem segurança de coluna (perfil "Segredos – automação", sem membros; Administrador do Sistema lê, plugin lê como SYSTEM) e não é auditado. Nenhum papel tem privilégio na tabela. Registros nunca entram em solução: cada ambiente grava os seus.
 - Schema: `packages/deploy/provision-tabela-segredos.ps1` (à mão, só DEV, regras de schema acima). Conta de flow que não seja administradora entra no perfil com `-Membros` (detalhes no cabeçalho do script).
 - Gravar ou trocar: `packages/deploy/gravar-segredo.ps1 -EnvironmentUrl <url> -Nome <nome> -ArquivoValor <arquivo>` (valor em arquivo salvo por campo seguro, nunca no comando; confere por hash, nunca imprime). `-LimparVariavel <schemaname>` esvazia a variável legada; só depois que todos os consumidores lerem a tabela.
-- Leitura nos plugins: tabela primeiro, variável de ambiente como fallback durante a migração; trace nunca leva o valor.
+- Leitura nos plugins: tabela primeiro; sem linha (ou valor vazio, ou tabela ilegível), configuração segura do step e depois variável de ambiente, como fallback durante a migração (`SecretReader`; `PluginSettings` do Gerar Pagantes não usa configuração segura); trace nunca leva o valor.
 
 | Segredo | Variável legada | Consumidor |
 |---|---|---|
@@ -31,6 +31,7 @@ Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secre
 | `anthropic.observacao-motorista` | `new_AnthropicKeyObservacaoMotorista` | `Betinhos.DriverRecordSharing` (`OrganizeObservationPlugin`, via `SecretReader`) |
 | `cielo.client-secret` | `cr40f_GerarPagantesCieloClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
 | `graph.gerar-pagantes.client-secret` | `cr40f_GerarPagantesGraphClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
+| `comunicados.ip-stamp` | — (configuração segura do step, fallback) | `Betinhos.DriverRecordSharing` (`ComunicadoCommandPlugin`); mesmo valor do secret `IP_STAMP_SECRET` do Worker `app-motoristas-web-push`, que atende DEV e PROD |
 
 Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta tabela e leitura pela tabela no consumidor. As chaves Anthropic dos flows migram no PR seguinte (flows).
 

@@ -106,7 +106,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
 
   const emailFicha = String(original?.values.cr40f_emailmicrosoft ?? '')
   // Sem o módulo de acesso (ex.: ficha aberta pela Central de Documentos) não consulta o usuário do app.
-  const [conta, setConta] = useContaApp(acesso ? emailFicha : '', source.usuarioDoApp)
+  const [conta, setConta, reconferirConta] = useContaApp(acesso ? emailFicha : '', source.usuarioDoApp)
   const estadoAcesso: EstadoAcesso = emailFicha ? conta : emailPendente ? 'liberando' : 'sem'
 
   async function recarregarAposLiberacao() {
@@ -309,6 +309,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   acesso={acesso}
                   estado={estadoAcesso}
                   setConta={setConta}
+                  reconferir={reconferirConta}
                   emailPendente={emailPendente}
                   onAtualizado={() => void recarregarAposLiberacao()}
                   onAlterado={() => onSaved(original.id, false)}

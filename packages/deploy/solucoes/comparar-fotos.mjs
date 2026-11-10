@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { lerJson, rodandoComoCli } from './arquivo.mjs'
 
 const ordenado = (lista) => [...lista].sort()
@@ -10,7 +11,7 @@ export const PERDA = [
 export const INFORMATIVO = [
   'registrosMudaram', 'fluxosMudaramEstado', 'stepsMudaramEstado', 'donosMudaram', 'versoes',
   'stepsSensiveisJaSemSeguro', 'tabelasVaziasSumiram', 'tabelasAceitasSumiram', 'chunksObsoletos', 'fluxosNovosDesligados', 'variaveisSemValor',
-  'componentesDaCaixaSumiram', 'fluxosDaCaixaSumiram', 'variaveisDaCaixaSumiram',
+  'componentesDaCaixaSumiram', 'fluxosDaCaixaSumiram', 'variaveisDaCaixaSumiram', 'fluxosAposentados',
 ]
 
 // Soluções da caixa de entrada que a retirada desinstala (mesma lista de conferir-retirada.mjs).
@@ -34,7 +35,8 @@ export const CATEGORIAS_LIGADAS_NO_TRAVADO = [2, 4]
 // retirada: o upgrade da AppBetinhos apaga o que saiu dela no DEV. Componente ou fluxo que sumiu e cujos donos na foto de antes
 // eram só AppBetinhos/gerarpagantes, e variável que sumiu, viram informativos: a conferência do DEV (barreira do export) garante
 // que tudo que importa está nas 4. Queda de registros e tabela com registros continuam perda.
-export function compararFotos(antes, depois, { travado = false, aceitarTabelas = [], retirada = false } = {}) {
+// aposentados: nomes de fluxos-aposentados.json; o restaurar-estados os desliga por decisao registrada, então desligar não é perda.
+export function compararFotos(antes, depois, { travado = false, aceitarTabelas = [], retirada = false, aposentados = [] } = {}) {
   const d = Object.fromEntries([...PERDA, ...INFORMATIVO].map((lista) => [lista, []]))
   const soDaCaixa = (id) => retirada && (antes.componentes[id] ?? []).length > 0 && (antes.componentes[id] ?? []).every((s) => CAIXAS.includes(s))
   for (const [tabela, n] of Object.entries(antes.registros)) {
@@ -55,7 +57,7 @@ export function compararFotos(antes, depois, { travado = false, aceitarTabelas =
     else if (g.estado !== f.estado) {
       const item = { id, nome: f.nome, antes: f.estado, depois: g.estado }
       d.fluxosMudaramEstado.push(item)
-      if (f.estado === 1) d.fluxosDesligados.push(item)
+      if (f.estado === 1) (aposentados.includes(f.nome) ? d.fluxosAposentados : d.fluxosDesligados).push(item)
     }
   }
   for (const [id, s] of Object.entries(antes.steps)) {
@@ -132,7 +134,8 @@ if (rodandoComoCli(import.meta.url)) {
     arquivos.push(args[i])
   }
   if (arquivos.length !== 2) throw new Error('Uso: node comparar-fotos.mjs [--travado] [--retirada] [--aceitar-tabelas a,b] <antes.json> <depois.json>')
-  const d = compararFotos(await lerJson(arquivos[0]), await lerJson(arquivos[1]), { travado, aceitarTabelas, retirada })
+  const aposentados = (await lerJson(fileURLToPath(new URL('./fluxos-aposentados.json', import.meta.url)))).map((a) => a.nome)
+  const d = compararFotos(await lerJson(arquivos[0]), await lerJson(arquivos[1]), { travado, aceitarTabelas, retirada, aposentados })
   process.stdout.write(JSON.stringify(d, null, 2))
   process.exitCode = temPerda(d) ? 1 : 0
 }
