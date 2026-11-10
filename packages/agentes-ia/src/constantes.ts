@@ -7,7 +7,7 @@ import { RESPOSTA_SCHEMA } from './schema.ts'
 import { ACOES_POR_AGENTE, TIPOS_POR_AGENTE, TODOS_OS_TIPOS } from './tipos.ts'
 
 export const MODELO = 'claude-opus-5-5'
-export const MAX_TOKENS = 8000
+export const MAX_TOKENS = 12000
 export const EFFORT = 'medium'
 
 export function constantesDoFlow() {
