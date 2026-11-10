@@ -26,6 +26,10 @@ export const ENTRADAS = [
   },
   { nome: 'avaliacao', script: 'provision-flow-avaliacao.ps1', flows: ['Link | Registrar avaliação'], args: [['EmailOperacao', 'FLOW_AVALIACAO_EMAIL_OPERACAO']], arquivos: [script('avaliacao')] },
   {
+    nome: 'aviso-motorista', script: 'provision-flow-aviso-motorista.ps1', flows: ['Flow Aviso Motorista | Enviar', 'Flow Aviso Motorista | Vigia'], apply: true,
+    arquivos: [script('aviso-motorista')],
+  },
+  {
     nome: 'cadastro-passageiro', script: 'provision-flow-cadastro-passageiro.ps1', flows: ['Cadastro do passageiro | Link'], apply: true,
     args: [['SiteUrl', 'FLOW_SHAREPOINT_SITE_URL'], ['BibliotecaId', 'FLOW_CADASTRO_BIBLIOTECA_ID'], ['Pasta', 'FLOW_CADASTRO_PASTA']],
     arquivos: [script('cadastro-passageiro'), flowsDir('cadastro-passageiro-link\\.json')],
