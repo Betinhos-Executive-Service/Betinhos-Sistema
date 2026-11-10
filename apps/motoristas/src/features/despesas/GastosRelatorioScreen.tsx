@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
 import postoCombustivel from "../../assets/images/posto-combustivel.png";
+import { ConvitePosto } from "./ConvitePosto";
 import { DespesaDetalheDialog, STATUS_BADGE } from "./DespesaDetalheDialog";
 import { GraficoMedias } from "./GastosCharts";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
@@ -45,6 +46,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
         onRefresh={onReload}
       />
       <section className="termo-screen gr-screen" aria-label="Relatório de gastos">
+        <ConvitePosto />
         <div className="gr-periodos" role="group" aria-label="Período">
           {PERIODOS.map((periodo) => (
             <button key={periodo.id} type="button" className="gr-chip" aria-pressed={periodo.id === periodoId} onClick={() => onPeriodo(periodo.id)}>{periodo.rotulo}</button>

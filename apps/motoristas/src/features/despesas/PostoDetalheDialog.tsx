@@ -10,7 +10,7 @@ import { MAX_COMENTARIO, MOTIVOS, enviarAvaliacao, motivoPositivo, nomeCurto, pe
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { formatDiaMes } from "./gastosCartao";
 import { formatBRL } from "./gastosRelatorio";
-import { RECOMENDACAO, ROTULO_META, enderecoLegivel, rotuloDistancia, urlMaps, type PostoProximo } from "./rankingPostos";
+import { RECOMENDACAO, enderecoLegivel, rotuloDistancia, urlMaps, type PostoProximo } from "./rankingPostos";
 import { appendDitado } from "../../shared/useDitado";
 
 const mesmoRascunho = (a: MinhaAvaliacao, b: MinhaAvaliacao) => JSON.stringify([a.recomenda, a.motivos, a.comentario]) === JSON.stringify([b.recomenda, b.motivos, b.comentario]);
@@ -85,7 +85,7 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
             <h3 id="rp-custa">Quanto custa</h3>
             <div className="rp-bloco-linha">
               <strong className="rp-bloco-valor">{formatBRL(posto.precoLitro)}<small>/L</small></strong>
-              <span className="termo-badge" data-tone={RECOMENDACAO[posto.cor].tom}>{ROTULO_META[posto.cor]}</span>
+              <span className="termo-badge" data-tone={RECOMENDACAO[posto.cor].tom}>{RECOMENDACAO[posto.cor].rotulo}</span>
             </div>
             <p className="rp-bloco-texto">{posto.abastecimentos === 1 ? "Preço de 1 abastecimento" : `Média de ${posto.abastecimentos} abastecimentos em ${dias} dias`}. Última vez em {formatDiaMes(posto.ultimoAbastecimento)}.</p>
             {posto.historico.length ? (

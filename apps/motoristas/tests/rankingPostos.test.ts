@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aplicarMinhaAvaliacao, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
-import { enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/features/despesas/rankingPostos.ts";
+import { aplicarMinhaAvaliacao, maioriaNaoRecomenda, motivoPositivo, nomeCurto, percentualRecomenda, rotuloMotivo, rotuloRecomendacoes, SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
+import { comLimite, enderecoLegivel, nomePosto, parseRankingPostos, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps } from "../src/features/despesas/rankingPostos.ts";
 
 const origem = { lat: -23, lon: -45 };
 const posto = (nome: string, precoLitro: number, lat: number, lon = -45, aproximada = false) => ({ postoId: nome, avaliacoes: SEM_AVALIACOES, nome, precoLitro, abastecimentos: 2, ultimoAbastecimento: "2026-11-03", lat, lon, aproximada, endereco: "RUA A, 10 - TAUBATE/SP", historico: [] });
@@ -49,6 +49,7 @@ test("separarMelhor destaca o menor preço e, no empate, o mais perto", () => {
 test("rotuloMelhor só chama de melhor opção quem está dentro da meta", () => {
   assert.equal(rotuloMelhor("verde"), "Melhor opção perto de você");
   assert.equal(rotuloMelhor("vermelho"), "Menor preço perto de você");
+  assert.equal(rotuloMelhor("verde", true), "Menor preço perto de você");
 });
 
 test("parseRankingPostos entrega o nome já limpo", () => {
@@ -130,4 +131,22 @@ test("avaliar de novo no mock substitui a avaliação em vez de contar em dobro"
   const segunda = aplicarMinhaAvaliacao(primeira, { recomenda: false, motivos: ["fila_grande"], comentario: "" }, "Eu", "2026-11-06");
   assert.deepEqual([segunda.total, segunda.recomendam, segunda.comentarios.length], [3, 1, 0]);
   assert.deepEqual(segunda.motivos, ["fila_grande"]);
+});
+
+test("maioriaNaoRecomenda só alerta com duas opiniões ou mais e menos da metade recomendando", () => {
+  assert.equal(maioriaNaoRecomenda({ total: 1, recomendam: 0 }), false);
+  assert.equal(maioriaNaoRecomenda({ total: 2, recomendam: 1 }), false);
+  assert.equal(maioriaNaoRecomenda({ total: 3, recomendam: 1 }), true);
+  assert.equal(maioriaNaoRecomenda({ total: 2, recomendam: 0 }), true);
+});
+
+test("parseRankingPostos lê o convite e limpa o nome, e aceita plugin sem convite", () => {
+  const comConvite = parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [], convite: { postoId: "1", nome: "POSTO A LTDA", data: "2026-11-04" } }));
+  assert.equal(comConvite.convite?.nome, "Posto A");
+  assert.equal(parseRankingPostos(JSON.stringify({ ok: true, dias: 30, postos: [] })).convite, null);
+});
+
+test("comLimite recusa quando a resposta passa do tempo e devolve quando chega antes", async () => {
+  await assert.rejects(comLimite(new Promise(() => {}), 5), /Tempo esgotado/);
+  assert.equal(await comLimite(Promise.resolve("ok"), 50), "ok");
 });

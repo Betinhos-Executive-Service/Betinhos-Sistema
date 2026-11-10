@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { proximaVersao } = require("./versao-build.cjs");
 
 async function run() {
   const esbuild = require("esbuild");
@@ -9,18 +10,8 @@ async function run() {
   const packageLockPath = path.join(root, "package-lock.json");
   const shouldBumpVersion = !process.argv.includes("--no-version");
 
-  function bumpPatchVersion(version) {
-    const parts = String(version).split(".").map((part) => Number(part));
-    if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part) || part < 0)) {
-      throw new Error(`Versao invalida no package.json: ${version}`);
-    }
-
-    parts[2] += 1;
-    return parts.join(".");
-  }
-
   const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-  const buildVersion = shouldBumpVersion ? bumpPatchVersion(packageJson.version) : packageJson.version;
+  const buildVersion = shouldBumpVersion ? proximaVersao(packageJson.version, process.env.PUBLISHED_VERSION) : packageJson.version;
 
   fs.rmSync(distDir, { recursive: true, force: true });
   fs.mkdirSync(distDir, { recursive: true });

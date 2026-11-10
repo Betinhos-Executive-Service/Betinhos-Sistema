@@ -4,8 +4,10 @@ import { getInitialDespesaId, getInitialGastosCartaoLink } from "../src/app/boot
 import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/features/despesas/expenses.ts";
 import {
   acharGastoCartaoDuplicado,
+  aplicarLeituraNoGastoCartao,
   buildGastoCartaoCompletarPayload,
   cartaoFinalDoNome,
+  conferirLeituraComCartao,
   filtroGastosCartaoPendentes,
   gastoCartaoParaRascunho,
   isGastoCartaoPendenteRow,
@@ -168,4 +170,50 @@ test("deep links: despesaId (direto, com chaves ou dentro de data) e gastosCarta
   assert.equal(getInitialGastosCartaoLink("?gastosCartao=true"), true);
   assert.equal(getInitialGastosCartaoLink("?gastosCartao=0"), false);
   assert.equal(getInitialGastosCartaoLink(""), false);
+});
+
+test("leitura do recibo confere com o cartão: valor dentro de R$ 0,05 e mesmo dia", () => {
+  assert.deepEqual(conferirLeituraComCartao(gasto(), { valor: 120.55, data: "2026-11-03" }), {
+    valor: { recibo: "R$ 120,55", cartao: "R$ 120,50", confere: true },
+    data: { recibo: "03/11", cartao: "03/11", confere: true }
+  });
+  assert.deepEqual(Object.keys(conferirLeituraComCartao(gasto(), { valor: 120.5, data: null }) ?? {}), ["valor"]);
+  assert.deepEqual(Object.keys(conferirLeituraComCartao(gasto(), { valor: null, data: "2026-11-03" }) ?? {}), ["data"]);
+});
+
+test("leitura com valor diferente traz recibo e cartão do valor; a data que bate segue como confere", () => {
+  const conferencia = conferirLeituraComCartao(gasto({ valor: 58 }), { valor: 99.9, data: "2026-11-03" });
+  assert.deepEqual(conferencia?.valor, { recibo: "R$ 99,90", cartao: "R$ 58,00", confere: false });
+  assert.equal(conferencia?.data?.confere, true);
+  assert.equal(conferirLeituraComCartao(gasto({ valor: 51.9 }), { valor: 51.96, data: null })?.valor?.confere, false);
+});
+
+test("leitura com data diferente traz dd/mm do recibo e do cartão; valor e data divergem por campo", () => {
+  assert.deepEqual(conferirLeituraComCartao(gasto(), { valor: 120.5, data: "2026-10-10" })?.data, { recibo: "10/10", cartao: "03/11", confere: false });
+  const ambos = conferirLeituraComCartao(gasto({ valor: 51.9 }), { valor: 99.9, data: "2026-10-10" });
+  assert.deepEqual([ambos?.valor?.confere, ambos?.data?.confere], [false, false]);
+});
+
+test("leitura sem valor nem data válidos não diz nada", () => {
+  assert.equal(conferirLeituraComCartao(gasto(), { valor: null, data: null }), null);
+  assert.equal(conferirLeituraComCartao(gasto(), { valor: 0, data: "lixo" }), null);
+});
+
+test("leitura no modo cartão nunca muda valor, data, forma, estabelecimento nem descrição", () => {
+  const leitura = {
+    legivel: true, valor: 99.9, data: "2026-10-10", hora: null, estabelecimento: "Outro Lugar", cnpj: null, litros: 40,
+    cidade: "São Paulo", uf: "SP", categoria_sugerida: "Abastecimento", forma_pagamento_sugerida: "Particular (Reembolso)", motivo_ilegivel: null
+  };
+  const base = draft({ categoriaId: "", cidadeId: "", descricao: "", litros: "" });
+  const depois = aplicarLeituraNoGastoCartao(base, leitura, referenceData);
+  assert.deepEqual(
+    { valor: depois.valor, dataGasto: depois.dataGasto, formaPagamentoId: depois.formaPagamentoId, estabelecimento: depois.estabelecimento, descricao: depois.descricao },
+    { valor: base.valor, dataGasto: base.dataGasto, formaPagamentoId: base.formaPagamentoId, estabelecimento: base.estabelecimento, descricao: "" }
+  );
+  assert.equal(depois.categoriaId, "cat-abast");
+  assert.equal(depois.cidadeId, "city-sp");
+  assert.equal(depois.litros, "40");
+  const preenchido = aplicarLeituraNoGastoCartao(draft({ litros: "10" }), leitura, referenceData);
+  assert.equal(preenchido.categoriaId, "cat-almoco");
+  assert.equal(preenchido.litros, "10");
 });

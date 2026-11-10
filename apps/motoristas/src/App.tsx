@@ -29,6 +29,7 @@ import { rotasRecebimento } from "./features/recebimento/rotas";
 import { rotasManutencao } from "./features/manutencao/rotas";
 import { rotasColisao } from "./features/colisao/rotas";
 import { rotasDespesas } from "./features/despesas/rotas";
+import { expenseFlowView } from "./features/despesas/receiptQuickRead";
 import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
 import { useFilaServicos } from "./features/servicos/useFilaServicos";
@@ -286,6 +287,7 @@ function App() {
     criticalError: avisos.criticalError,
     dataLoading: avisos.dataLoading,
     driverContextId: driverContext?.id,
+    expenseReading: screen === "gastos" && expenseFlowView(despesas.expenseQuickRead) === "leitura",
     screen,
     selectedChecklistId: checklistsLista.selectedChecklistId,
     selectedComunicadoId: comunicadosLista.selectedComunicadoId,

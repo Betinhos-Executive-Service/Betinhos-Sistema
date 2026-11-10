@@ -8,7 +8,8 @@ export const RAIO_KM = 10;
 
 type AbastecimentoPosto = { data: string; precoLitro: number };
 type PostoRanking = { postoId: string; nome: string; precoLitro: number; abastecimentos: number; ultimoAbastecimento: string; lat: number; lon: number; aproximada: boolean; endereco: string; historico: AbastecimentoPosto[]; avaliacoes: ResumoAvaliacoes };
-export type RankingPostos = { dias: number; postos: PostoRanking[] };
+export type ConviteAvaliacao = { postoId: string; nome: string; data: string };
+export type RankingPostos = { dias: number; postos: PostoRanking[]; convite: ConviteAvaliacao | null };
 export type Posicao = { lat: number; lon: number };
 export type PostoProximo = PostoRanking & { distanciaKm: number; cor: Semaforo };
 
@@ -16,7 +17,7 @@ export function parseRankingPostos(json: string): RankingPostos {
   const body = JSON.parse(json || "{}") as Partial<RankingPostos> & { ok?: boolean };
   if (body.ok !== true || typeof body.dias !== "number" || !Array.isArray(body.postos)) throw new Error("Postos indisponíveis.");
   // Plugin e web resource publicam em momentos diferentes: o plugin anterior não manda endereço, histórico nem avaliações.
-  return comNomesLimpos({ dias: body.dias, postos: body.postos.map((posto) => ({ ...posto, postoId: posto.postoId ?? "", endereco: posto.endereco ?? "", historico: posto.historico ?? [], avaliacoes: { ...SEM_AVALIACOES, ...posto.avaliacoes } })) });
+  return comNomesLimpos({ dias: body.dias, convite: body.convite ?? null, postos: body.postos.map((posto) => ({ ...posto, postoId: posto.postoId ?? "", endereco: posto.endereco ?? "", historico: posto.historico ?? [], avaliacoes: { ...SEM_AVALIACOES, ...posto.avaliacoes } })) });
 }
 
 function distanciaKm(a: Posicao, b: Posicao) {
@@ -32,14 +33,12 @@ export function postosProximos(postos: PostoRanking[], origem: Posicao): PostoPr
     .sort((a, b) => a.distanciaKm - b.distanciaKm);
 }
 
+// O selo fala só de preço: "Recomendado" se confundiria com a recomendação dos motoristas.
 export const RECOMENDACAO: Record<Semaforo, { rotulo: string; tom: string }> = {
-  verde: { rotulo: "Recomendado", tom: "sucesso" },
-  amarelo: { rotulo: "Atenção", tom: "atencao" },
-  vermelho: { rotulo: "Evitar", tom: "erro" }
+  verde: { rotulo: "Dentro da meta", tom: "sucesso" },
+  amarelo: { rotulo: "Pouco acima da meta", tom: "atencao" },
+  vermelho: { rotulo: "Acima da meta", tom: "erro" }
 };
-
-// Na ficha o selo fala só de preço: "Recomendado" se confundiria com a recomendação dos motoristas.
-export const ROTULO_META: Record<Semaforo, string> = { verde: "Dentro da meta", amarelo: "Pouco acima da meta", vermelho: "Acima da meta" };
 
 // O destaque é o menor preço do raio; no empate, o mais perto, que já vem primeiro.
 export function separarMelhor(proximos: PostoProximo[]) {
@@ -47,7 +46,7 @@ export function separarMelhor(proximos: PostoProximo[]) {
   return { melhor, outros: proximos.filter((posto) => posto !== melhor) };
 }
 
-export const rotuloMelhor = (cor: Semaforo) => (cor === "verde" ? "Melhor opção perto de você" : "Menor preço perto de você");
+export const rotuloMelhor = (cor: Semaforo, alerta = false) => (cor === "verde" && !alerta ? "Melhor opção perto de você" : "Menor preço perto de você");
 
 const MINUSCULAS = new Set(["de", "da", "do", "das", "dos", "e"]);
 const SUFIXO_SOCIAL = /(?:[\s.,-]+(?:LTDA\.?|EIRELI|S\.?\/?A\.?|ME|EPP))+[\s.,-]*$/i;
@@ -71,7 +70,7 @@ export function enderecoLegivel(endereco: string) {
   return endereco.toLowerCase().split(/\s+/).map(capitalizar).join(" ").replace(/\/[a-z]{2}$/, (uf) => uf.toUpperCase());
 }
 
-const comNomesLimpos = (ranking: RankingPostos): RankingPostos => ({ ...ranking, postos: ranking.postos.map((posto) => ({ ...posto, nome: nomePosto(posto.nome) })) });
+const comNomesLimpos = (ranking: RankingPostos): RankingPostos => ({ ...ranking, convite: ranking.convite && { ...ranking.convite, nome: nomePosto(ranking.convite.nome) }, postos: ranking.postos.map((posto) => ({ ...posto, nome: nomePosto(posto.nome) })) });
 
 // Sem endereço, só o nome levaria a outro posto da mesma rede: vale a coordenada.
 export const urlMaps = ({ nome, endereco, lat, lon }: Pick<PostoRanking, "nome" | "endereco" | "lat" | "lon">) => mapsSearchUrl(endereco ? `Posto de gasolina ${nome} ${endereco}` : `${lat},${lon}`);
@@ -90,6 +89,7 @@ const MOCK_POSICAO: Posicao = { lat: -22.9246, lon: -45.4613 };
 const historicoMock = (...itens: [string, number][]) => itens.map(([data, precoLitro]) => ({ data, precoLitro }));
 const MOCK: RankingPostos = {
   dias: 30,
+  convite: { postoId: "mock-3", nome: "Auto Posto Exemplo Centro", data: "2026-11-04" },
   postos: [
     { postoId: "mock-1", avaliacoes: { total: 5, recomendam: 4, motivos: ["combustivel_bom", "sem_fila", "banheiro_ruim"], contagemMotivos: { combustivel_bom: 3, sem_fila: 3, banheiro_ruim: 1 }, comentarios: [{ autor: "Motorista Exemplo Um", data: "2026-11-02", recomenda: true, texto: "Rende bem e quase nunca tem fila. O banheiro é que deixa a desejar." }, { autor: "Motorista Exemplo Dois", data: "2026-10-29", recomenda: true, texto: "Atendimento rápido, bom para parar antes da Dutra." }], minha: null }, nome: "Posto Exemplo Dutra", precoLitro: 6.09, abastecimentos: 5, ultimoAbastecimento: "2026-11-03", lat: -22.9301, lon: -45.4502, aproximada: false, endereco: "RODOVIA PRESIDENTE DUTRA, 100 - PINDAMONHANGABA/SP", historico: historicoMock(["2026-11-03", 6.09], ["2026-11-01", 6.09], ["2026-10-30", 6.05], ["2026-10-27", 6.12], ["2026-10-24", 6.09]) },
     { postoId: "mock-2", avaliacoes: { total: 3, recomendam: 1, motivos: ["fila_grande", "mau_atendimento"], contagemMotivos: { fila_grande: 2, mau_atendimento: 1 }, comentarios: [{ autor: "Motorista Exemplo Três", data: "2026-10-30", recomenda: false, texto: "Barato, mas a fila passa de meia hora no fim da tarde." }], minha: null }, nome: "POSTO EXEMPLO RODOVIA LTDA", precoLitro: 6.19, abastecimentos: 2, ultimoAbastecimento: "2026-11-01", lat: -22.9105, lon: -45.4801, aproximada: true, endereco: "AVENIDA EXEMPLO, 500 - PINDAMONHANGABA/SP", historico: historicoMock(["2026-11-01", 6.19], ["2026-10-22", 6.19]) },
@@ -100,14 +100,37 @@ const MOCK: RankingPostos = {
 
 const mockModo = () => new URLSearchParams(window.location.search).get("mockRankingPostos");
 
+// A resposta do plugin pode demorar com sinal ruim: sem limite, a tela de carga não terminaria nunca.
+const LIMITE_RANKING_MS = 30000;
+
+export function comLimite<T>(promessa: Promise<T>, ms: number): Promise<T> {
+  let relogio: ReturnType<typeof setTimeout>;
+  const limite = new Promise<never>((_, rejeitar) => { relogio = setTimeout(() => rejeitar(new Error("Tempo esgotado ao carregar os postos.")), ms); });
+  return Promise.race([promessa, limite]).finally(() => clearTimeout(relogio));
+}
+
+const chaveConvite = ({ postoId, data }: ConviteAvaliacao) => `app-motoristas-convite-posto:${postoId}:${data}`;
+
+export function conviteDispensado(convite: ConviteAvaliacao) {
+  try { return localStorage.getItem(chaveConvite(convite)) !== null; } catch { return false; }
+}
+
+export function dispensarConvite(convite: ConviteAvaliacao) {
+  try { localStorage.setItem(chaveConvite(convite), "1"); } catch { /* Sem armazenamento, o convite volta na próxima abertura. */ }
+}
+
 export async function carregarRankingPostos(): Promise<RankingPostos> {
   if (isMockGastosCartao()) {
     const modo = mockModo();
     await new Promise((resolve) => setTimeout(resolve, modo === "lento" ? 4000 : 300));
     if (modo === "erro") throw new Error("Falha simulada ao carregar os postos.");
-    return modo === "vazio" ? { ...MOCK, postos: [] } : comNomesLimpos(MOCK);
+    if (modo === "baratoruim") {
+      const [barato, ...resto] = MOCK.postos;
+      return comNomesLimpos({ ...MOCK, postos: [{ ...barato, avaliacoes: { ...barato.avaliacoes, total: 4, recomendam: 1 } }, ...resto] });
+    }
+    return modo === "vazio" ? { ...MOCK, postos: [], convite: null } : comNomesLimpos(MOCK);
   }
-  const resposta = await executeCustomApi("new_ObterRankingPostos", {});
+  const resposta = await comLimite(executeCustomApi("new_ObterRankingPostos", {}), LIMITE_RANKING_MS);
   return parseRankingPostos(String(resposta.new_RankingJson ?? ""));
 }
 

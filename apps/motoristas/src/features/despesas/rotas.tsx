@@ -1,7 +1,7 @@
 import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
 import { expenseFlowView } from "./receiptQuickRead";
 import type { ToastTone } from "../../shared/ui/LocalToast";
-import { ExpenseScreen } from "./ExpenseScreen";
+import { DESCRICAO_ID, ExpenseScreen } from "./ExpenseScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
 import { ReceiptReadingScreen } from "./ReceiptReadingScreen";
 import { ReceiptIllegibleScreen } from "./ReceiptIllegibleScreen";
@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import type { useExpenseFlow } from "./useExpenseFlow";
 import type { useGastosCartao } from "./useGastosCartao";
 import { GastoCartaoDuplicadoDialog } from "./GastoCartaoDuplicadoDialog";
+import { LeituraCartaoSheet } from "./LeituraCartaoSheet";
 import { GastosCartaoScreen } from "./GastosCartaoScreen";
 import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
 import { RankingPostosScreen } from "./RankingPostosScreen";
@@ -48,6 +49,7 @@ export function rotasDespesas(screen: Screen, {
   submitExpenseChecked,
   cancelExpenseQuickRead,
   clearExpensePhotoDraftState,
+  conferenciaCartao,
   confirmExpensePhoto,
   deleteExpensePhoto,
   expenseDateTouchedRef,
@@ -77,7 +79,9 @@ export function rotasDespesas(screen: Screen, {
   openExpenseVideoPreview,
   remoteMode,
   remoteOperation,
+  refazerLeituraCartao,
   retakeQuickReadPhoto,
+  setConferenciaCartao,
   setExpenseDraft,
   setExpensePhotoDraft,
   setExpensePhotoDurationLabel,
@@ -178,8 +182,21 @@ export function rotasDespesas(screen: Screen, {
         currentVehicleId={maintenanceCurrentVehicleId}
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
-        cartaoGasto={gastoCartaoAtual ? { cartaoFinal: gastoCartaoAtual.cartaoFinal, estabelecimento: gastoCartaoAtual.estabelecimento } : undefined}
+        cartaoGasto={Boolean(gastoCartaoAtual)}
       />
+      {gastoCartaoAtual && conferenciaCartao ? (
+        <LeituraCartaoSheet
+          conferencia={conferenciaCartao}
+          estabelecimento={gastoCartaoAtual.estabelecimento}
+          photoUrl={expenseQuickReadPhoto}
+          onClose={() => setConferenciaCartao(null)}
+          onRetake={refazerLeituraCartao}
+          onExplain={() => {
+            document.getElementById(DESCRICAO_ID)?.focus();
+            setConferenciaCartao(null);
+          }}
+        />
+      ) : null}
       {duplicidadeCartao ? (
         <GastoCartaoDuplicadoDialog
           gasto={duplicidadeCartao}

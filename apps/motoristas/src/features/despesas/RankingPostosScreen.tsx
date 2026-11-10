@@ -1,10 +1,10 @@
-import { MapPin } from "lucide-react";
+import { MapPin, ThumbsDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { PostoDetalheDialog } from "./PostoDetalheDialog";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
-import { rotuloRecomendacoes, type ResumoAvaliacoes } from "./avaliacaoPostos";
+import { maioriaNaoRecomenda, rotuloRecomendacoes, type ResumoAvaliacoes } from "./avaliacaoPostos";
 import { formatDiaMes, isMockGastosCartao } from "./gastosCartao";
 import { formatBRL } from "./gastosRelatorio";
 import { RAIO_KM, RECOMENDACAO, carregarRankingPostos, obterPosicao, postosProximos, rotuloAbastecimentos, rotuloDistancia, rotuloMelhor, separarMelhor, urlMaps, type Posicao, type PostoProximo, type RankingPostos } from "./rankingPostos";
@@ -136,18 +136,19 @@ function ListaCarregando({ etapa }: { etapa: Etapa }) {
 
 function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; dias: number; onAbrir: (posto: PostoProximo) => void }) {
   const { melhor, outros } = separarMelhor(proximos);
+  const alerta = maioriaNaoRecomenda(melhor.avaliacoes);
   return (
     <>
       <section className="rp-hero rp-entrada" data-semaforo={melhor.cor}>
         <button type="button" className="rp-hero-abrir" onClick={() => onAbrir(melhor)}>
-          <span className="rp-hero-tag">{rotuloMelhor(melhor.cor)}</span>
+          <span className="rp-hero-tag">{rotuloMelhor(melhor.cor, alerta)}</span>
           <strong className="rp-hero-nome">{melhor.nome}</strong>
           <span className="rp-hero-linha">
             <span className="rp-hero-preco">{formatBRL(melhor.precoLitro)}<small>/L</small></span>
             <span className="rp-hero-distancia">{rotuloDistancia(melhor)}</span>
           </span>
           <span className="rp-hero-detalhe">{RECOMENDACAO[melhor.cor].rotulo} · {rotuloAbastecimentos(melhor.abastecimentos)} · último em {formatDiaMes(melhor.ultimoAbastecimento)}</span>
-          {melhor.avaliacoes.total ? <span className="rp-hero-avaliacao">{rotuloRecomendacoes(melhor.avaliacoes)}</span> : null}
+          {melhor.avaliacoes.total ? <span className="rp-hero-avaliacao" data-alerta={alerta}>{alerta ? <ThumbsDown aria-hidden="true" /> : null}{alerta ? `Atenção: só ${rotuloRecomendacoes(melhor.avaliacoes)}` : rotuloRecomendacoes(melhor.avaliacoes)}</span> : null}
         </button>
         <a className="rp-maps" href={urlMaps(melhor)} target="_blank" rel="noreferrer"><MapPin aria-hidden="true" />Abrir no Maps</a>
       </section>
@@ -162,7 +163,7 @@ function ListaPostos({ proximos, dias, onAbrir }: { proximos: PostoProximo[]; di
                   <span className="rp-posto-texto">
                     <strong>{posto.nome}</strong>
                     <span>{rotuloDistancia(posto)} · {rotuloAbastecimentos(posto.abastecimentos)}</span>
-                    {posto.avaliacoes.total ? <span className="rp-posto-avaliacao">{rotuloRecomendacoes(posto.avaliacoes)}</span> : null}
+                    {posto.avaliacoes.total ? <span className="rp-posto-avaliacao" data-alerta={maioriaNaoRecomenda(posto.avaliacoes)}>{rotuloRecomendacoes(posto.avaliacoes)}</span> : null}
                   </span>
                   <span className="rp-posto-preco">
                     <strong>{formatBRL(posto.precoLitro)}</strong>

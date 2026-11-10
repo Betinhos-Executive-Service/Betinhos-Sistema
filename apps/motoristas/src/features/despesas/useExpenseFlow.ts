@@ -21,6 +21,8 @@ import {
   downscaleForQuickRead,
   hasRemoteReferenceData,
   nextQuickReadState,
+  quickReadFilledFields,
+  reabrirLeitura,
   runQuickReadPipeline,
   shouldRunQuickRead,
   startQuickReadState,
@@ -31,7 +33,7 @@ import { getQuickReadMockMode, readReceiptQuickMock } from "./receiptQuickReadMo
 import { EMPTY_EXPENSE_DRAFT } from "./rascunho";
 import { useExpenseUploads } from "./useExpenseUploads";
 import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./conferenciaEnvio";
-import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, isMockGastosCartao, type GastoCartao } from "./gastosCartao";
+import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, aplicarLeituraNoGastoCartao, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, conferirLeituraComCartao, isMockGastosCartao, type ConferenciaCartao, type GastoCartao } from "./gastosCartao";
 import { carregarDespesasRelatorio, type DespesaRelatorio } from "./gastosRelatorio";
 
 type Options = {
@@ -61,6 +63,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   const [expenseQuickReadPhoto, setExpenseQuickReadPhoto] = useState("");
   const [expenseQuickReadFilling, setExpenseQuickReadFilling] = useState(false);
   const [expenseQuickReadFilled, setExpenseQuickReadFilled] = useState<QuickReadFilledFields>({});
+  const [conferenciaCartao, setConferenciaCartao] = useState<ConferenciaCartao | null>(null);
   const expenseDraftRef = useRef(expenseDraft);
   expenseDraftRef.current = expenseDraft;
   const expenseRetakeTargetIdRef = useRef("");
@@ -508,6 +511,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     setExpenseQuickReadPhoto("");
     setExpenseQuickReadFilling(false);
     setExpenseQuickReadFilled({});
+    setConferenciaCartao(null);
   }
 
   // Conferência do comprovante de recebimento pela mesma leitura rápida dos gastos: só o valor importa.
@@ -525,8 +529,6 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   };
 
   const runExpenseQuickRead = async (dataUrl: string) => {
-    // Gasto do cartão: valor, data e forma vêm do banco; a leitura do comprovante não pode sobrescrevê-los.
-    if (gastoCartaoAtualRef.current) return;
     const mockMode = remoteMode ? null : getQuickReadMockMode();
     if ((!remoteMode && !mockMode) || !shouldRunQuickRead(expenseQuickRead)) return;
     const online = typeof navigator === "undefined" || navigator.onLine !== false;
@@ -534,6 +536,8 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     setExpenseQuickRead(started);
     if (started.status !== "lendo") return;
     const seq = ++expenseQuickReadSeqRef.current;
+    const gastoCartao = gastoCartaoAtualRef.current;
+    setConferenciaCartao(null);
     setExpenseQuickReadPhoto(dataUrl);
     setExpenseQuickReadFilling(false);
     const { outcome, referenceData } = await runQuickReadPipeline({
@@ -550,10 +554,18 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       await new Promise((resolve) => window.setTimeout(resolve, QUICK_READ_FILL_STEP_MS));
       if (seq !== expenseQuickReadSeqRef.current) return;
       const before = expenseDraftRef.current;
-      const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
-      expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
-      setExpenseDraft(after);
-      setExpenseQuickReadFilled(filled);
+      if (gastoCartao) {
+        // Valor, data e forma vêm do banco: a leitura só confere e completa categoria, cidade e litros vazios.
+        const after = aplicarLeituraNoGastoCartao(before, outcome.leitura, referenceData);
+        setExpenseDraft(after);
+        setExpenseQuickReadFilled(quickReadFilledFields(before, after));
+        setConferenciaCartao(conferirLeituraComCartao(gastoCartao, outcome.leitura));
+      } else {
+        const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
+        expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
+        setExpenseDraft(after);
+        setExpenseQuickReadFilled(filled);
+      }
     }
     setExpenseQuickReadFilling(false);
     setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
@@ -570,6 +582,13 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     const targetId = expensePhotos[0]?.id ?? "";
     openExpenseCamera();
     expenseRetakeTargetIdRef.current = targetId;
+  };
+
+  /** "Trocar foto" na folha de conferência do cartão: a foto nova é lida de novo. */
+  const refazerLeituraCartao = () => {
+    setConferenciaCartao(null);
+    setExpenseQuickRead(reabrirLeitura);
+    retakeQuickReadPhoto();
   };
 
   const isExpenseIdle = () => !expenseUploadStatuses.length && expensePhotos.length === 0 && isExpenseDraftBlank(expenseDraft);
@@ -691,6 +710,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     checkReceiveProof,
     clearExpensePhotoDraftState,
     closeExpenseSendError,
+    conferenciaCartao,
     confirmExpensePhoto,
     deleteExpensePhoto,
     duvidaConferencia,
@@ -720,8 +740,10 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     openExpenseCamera,
     openExpensePreview,
     openExpenseVideoPreview,
+    refazerLeituraCartao,
     resetExpenseQuickRead,
     retakeQuickReadPhoto,
+    setConferenciaCartao,
     setExpenseDraft,
     setExpensePhotoDraft,
     setExpensePhotoDurationLabel,

@@ -147,6 +147,7 @@
     "getInitialScreenFromHashRoute"
   ],
   "src/app/tour.ts": [
+    "READING_TOUR_ID",
     "TOUR_ALL_CHAPTERS",
     "TourBox",
     "TourCardPlacement",
@@ -154,6 +155,7 @@
     "TourCloseReason",
     "TourStep",
     "clearAllChaptersSeen",
+    "closesWhenReadingEnds",
     "fitSpotlight",
     "hasSeenChapter",
     "markChapterSeen",

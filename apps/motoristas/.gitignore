@@ -1,4 +1,5 @@
 node_modules
+dist/
 scripts/.driver-record-sharing-runners/
 outputs/service-vehicle-tracker-*.json
 outputs/service-vehicle-tracker-*.csv

@@ -29,6 +29,9 @@ export const SEM_AVALIACOES: ResumoAvaliacoes = { total: 0, recomendam: 0, motiv
 export const motivoPositivo = (id: string) => MOTIVOS.recomenda.some((motivo) => motivo.id === id);
 export const rotuloMotivo = (id: string) => [...MOTIVOS.recomenda, ...MOTIVOS.naoRecomenda].find((motivo) => motivo.id === id)?.rotulo ?? "";
 
+// Uma opinião só não basta para alertar: pode ser um dia ruim ou um toque errado.
+export const maioriaNaoRecomenda = ({ total, recomendam }: Pick<ResumoAvaliacoes, "total" | "recomendam">) => total >= 2 && recomendam * 2 < total;
+
 export function rotuloRecomendacoes({ total, recomendam }: Pick<ResumoAvaliacoes, "total" | "recomendam">) {
   if (total === 0) return "";
   return total === 1 ? `${recomendam} de 1 recomenda` : `${recomendam} de ${total} recomendam`;

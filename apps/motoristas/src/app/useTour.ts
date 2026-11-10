@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { clearAllChaptersSeen, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./tour";
+import { clearAllChaptersSeen, closesWhenReadingEnds, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./tour";
 import { tourChaptersForScreen } from "./tourChapters";
 import { findTourTarget, hasTourProbe } from "./tourDom";
 import { hasDataverseRuntime, LOCAL_DRIVER_ID } from "../data/dataverse/cliente";
@@ -13,6 +13,8 @@ type Options = {
   criticalError: string;
   dataLoading: LoadingOverlayState | null;
   driverContextId: string | undefined;
+  // Tela de leitura do comprovante do gasto aberta: o capítulo dela fecha sozinho quando a leitura termina.
+  expenseReading: boolean;
   screen: Screen;
   selectedChecklistId: string;
   selectedComunicadoId: string;
@@ -21,7 +23,7 @@ type Options = {
 };
 
 // Tour guiado por capítulos: um por tela, aberto na primeira visita e pelo botão "?" do cabeçalho.
-export function useTour({ blocked, criticalError, dataLoading, driverContextId, screen, selectedChecklistId, selectedComunicadoId, selectedTreinamentoId, setToast }: Options) {
+export function useTour({ blocked, criticalError, dataLoading, driverContextId, expenseReading, screen, selectedChecklistId, selectedComunicadoId, selectedTreinamentoId, setToast }: Options) {
   const [tourChapter, setTourChapter] = useState<TourChapter | null>(null);
 
   // Chave da preferência do tour: id real do motorista; em modo mock (sem Xrm) o contexto não é carregado,
@@ -70,6 +72,11 @@ export function useTour({ blocked, criticalError, dataLoading, driverContextId, 
     return () => window.clearTimeout(timer);
     // screen/comunicadoOpen/checklistOpen/termoOpen/treinamentoOpen não são lidos aqui: reiniciam o atraso quando a visão muda.
   }, [screen, comunicadoOpen, checklistOpen, termoOpen, treinamentoOpen, tourChapter, tourBlocked, tourDriverId, dataLoading, criticalError, tourCandidates]);
+
+  // Terminou a leitura do comprovante: o tour dela some sozinho, sem virar "visto" (volta se a leitura rodar de novo sem ele ter sido visto).
+  useEffect(() => {
+    if (closesWhenReadingEnds(tourChapter?.id, expenseReading)) setTourChapter(null);
+  }, [tourChapter, expenseReading]);
 
   const closeTour = (reason: TourCloseReason) => {
     const closing = tourChapter;
