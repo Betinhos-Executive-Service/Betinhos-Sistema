@@ -438,6 +438,9 @@
 :where(.planner-page, .planner-portal) .quote-v3-metrics:has(.quote-v3-metric-unassigned) { grid-template-columns: .85fr .85fr .9fr 1.1fr 1.3fr; }
 :where(.planner-page, .planner-portal) .quote-v3-metrics button { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 54px; padding: 8px 11px; border: 1px solid #dce5eb; border-radius: 11px; background: #fff; color: var(--navy); text-align: left; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
 :where(.planner-page, .planner-portal) .quote-v3-metrics button:hover { border-color: #b8cbd8; background: #fbfdff; }
+:where(.planner-page, .planner-portal) .quote-v3-metrics button[aria-pressed="true"] { border-color: var(--metric-color); background: var(--metric-soft); box-shadow: inset 0 0 0 1px var(--metric-color); }
+:where(.planner-page, .planner-portal) .quote-v3-metrics button[aria-pressed="true"] .quote-v3-metric-icon { background: #fff; }
+:where(.planner-page, .planner-portal) .quote-v3-metrics button[aria-pressed="true"] .quote-v3-metric-label { color: var(--navy); }
 :where(.planner-page, .planner-portal) .quote-v3-metrics button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 :where(.planner-page, .planner-portal) .quote-v3-metric-icon { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 9px; color: var(--metric-color); background: var(--metric-soft); }
 :where(.planner-page, .planner-portal) .quote-v3-metric-label { overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
@@ -455,7 +458,10 @@
 :where(.planner-page, .planner-portal) .quote-v3-filter-controls { display: contents; }
 :where(.planner-page, .planner-portal) .quote-v3-filter-toggle { display: none; }
 :where(.planner-page, .planner-portal) .quote-v3-toolbar > select { min-width: 0; }
-:where(.planner-page, .planner-portal) .quote-history-navigation { align-self: flex-start; }
+:where(.planner-page, .planner-portal) .quote-history-navigation { width: fit-content; margin-bottom: 12px; }
+:where(.planner-page, .planner-portal) .quote-history-navigation button { padding: 0 12px; font-size: 13px; font-weight: 600; }
+:where(.planner-page, .planner-portal) .quote-history-navigation b { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: rgba(12, 46, 63, .08); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
+:where(.planner-page, .planner-portal) .quote-history-navigation button.active b { background: var(--navy); color: #fff; }
 :where(.planner-page, .planner-portal) .quote-history-panel { padding: 0; min-width: 0; max-width: 100%; container-type: inline-size; container-name: quote-history; overflow: hidden; }
 :where(.planner-page, .planner-portal) .quote-history-toolbar { display: grid; grid-template-areas: "search period filters"; grid-template-columns: minmax(0, 1fr) 220px auto; align-items: center; gap: 12px; padding: 18px 20px 12px; }
 :where(.planner-page, .planner-portal) .quote-history-toolbar > * { min-width: 0; }
@@ -670,6 +676,7 @@
   :where(.planner-page, .planner-portal) .quote-v3-filter-controls { display: none; }
   :where(.planner-page, .planner-portal) .quote-v3-toolbar.is-expanded .quote-v3-filter-controls { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   :where(.planner-page, .planner-portal) .quote-v3-view-toggle { justify-self: stretch; }
+  :where(.planner-page, .planner-portal) .quote-history-navigation { width: auto; }
   :where(.planner-page, .planner-portal) .quote-v3-view-toggle button { flex: 1; justify-content: center; }
 }
 

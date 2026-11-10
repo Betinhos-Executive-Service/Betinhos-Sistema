@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ComunicadosPage } from './ComunicadosPage'
 
@@ -11,7 +11,7 @@ beforeEach(() => {
   window.location.hash = '#/comunicados'
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('Comunicados', () => {
   it('lista e abre o relatório com assinatura, observação e reenvio do push que falhou', async () => {
@@ -41,5 +41,55 @@ describe('Comunicados', () => {
     expect(await screen.findByText('Comunicado disparado. Acompanhe a entrega do push.')).toBeTruthy()
     expect(await screen.findByRole('heading', { name: 'Teste de envio' })).toBeTruthy()
     expect(await screen.findByRole('button', { name: 'Lembrar Carlos Andrade' })).toBeTruthy()
+  })
+
+  it('relatório: marca concluídos e baixa o PDF só deles; sem marcação inclui todos os concluídos', async () => {
+    const baixados: string[] = []
+    Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { baixados.push(this.download) })
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Novo procedimento de embarque/ }))
+    const botao = await screen.findByRole('button', { name: 'Gerar PDF (2)' })
+    // Pendente não tem caixa; os dois concluídos têm.
+    expect(screen.queryByRole('checkbox', { name: 'Selecionar Rafael Souza' })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Carlos Andrade' }))
+    expect(await screen.findByRole('button', { name: 'Gerar PDF (1)' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar PDF (1)' }))
+    await waitFor(() => expect(baixados).toEqual(['comprovante-novo-procedimento-de-embarque-no-gru-carlos-andrade.pdf']))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Carlos Andrade' }))
+    expect(botao.textContent).toContain('(2)')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar todos os concluídos' }))
+    expect((screen.getByRole('checkbox', { name: 'Selecionar Márcio Lima' }) as HTMLInputElement).checked).toBe(true)
+  })
+  it('relatório: marcado escondido pela busca não entra no PDF e a marcação volta ao limpar a busca', async () => {
+    const baixados: string[] = []
+    Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { baixados.push(this.download) })
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Novo procedimento de embarque/ }))
+    await screen.findByRole('button', { name: 'Gerar PDF (2)' })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Carlos Andrade' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar motorista nos resultados' }), { target: { value: 'Márcio' } })
+    // Carlos está marcado, mas escondido: vale a regra de "nenhum marcado" sobre os visíveis.
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar PDF (1)' }))
+    await waitFor(() => expect(baixados).toEqual(['comprovante-novo-procedimento-de-embarque-no-gru-marcio-lima.pdf']))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar motorista nos resultados' }), { target: { value: '' } })
+    expect((await screen.findByRole('checkbox', { name: 'Selecionar Carlos Andrade' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole('button', { name: 'Gerar PDF (1)' })).toBeTruthy()
+  })
+  it('PDF por motorista: lista os concluídos marcados e baixa só o que ficar marcado', async () => {
+    const baixados: string[] = []
+    Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { baixados.push(this.download) })
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('button', { name: /Novo procedimento de embarque/ })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar PDF por motorista' }))
+    const dialogo = await screen.findByRole('dialog')
+    fireEvent.click(within(dialogo).getByRole('button', { name: /Carlos Andrade/ }))
+    expect(await within(dialogo).findByRole('button', { name: 'Gerar PDF (2)' })).toBeTruthy()
+    fireEvent.click(within(dialogo).getAllByRole('checkbox')[0])
+    fireEvent.click(await within(dialogo).findByRole('button', { name: 'Gerar PDF (1)' }))
+    await waitFor(() => expect(baixados).toHaveLength(1))
+    expect(baixados[0]).toContain('carlos-andrade')
   })
 })

@@ -17,13 +17,13 @@ Before any Codex file or code change, query the existing `graphify-out/graph.jso
 
 ## Build, Test, and Development Commands
 
-- `npm run dev` starts the local dev wrapper on the port reserved for this checkout in `~/.codex/dev-ports.json` (or `PORT`). If the port is held by this checkout's dev server it restarts it; if another service holds it, it fails with PID and command (no fallback port).
-- `npm test` runs all tests with Node's built-in test runner and TypeScript stripping.
-- `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` runs the strict type gate.
-- `npm run build` builds the single-file webresource into `dist/`.
-- `npm run preview` serves the built output locally.
-- `npm run push -- -DeviceCode` deploys to Dataverse when normal auth is blocked.
-- `npm run demo:capture` regenerates screenshots in `public/screens/`.
+- `pnpm dev` starts the local dev wrapper on the port reserved for this checkout in `~/.codex/dev-ports.json` (or `PORT`). If the port is held by this checkout's dev server it restarts it; if another service holds it, it fails with PID and command (no fallback port).
+- `pnpm test` runs all tests with Node's built-in test runner and TypeScript stripping.
+- `pnpm exec tsc --noEmit --noUnusedLocals --noUnusedParameters` runs the strict type gate.
+- `pnpm build` builds the single-file webresource into `dist/`.
+- `pnpm preview` serves the built output locally.
+- `pnpm push -DeviceCode` runs the old manual DEV push (plugins and schema now belong to Betinhos-Sistema; the app is published by the Deploy workflow).
+- `pnpm demo:capture` regenerates screenshots in `public/screens/`.
 
 ## Coding Style & Naming Conventions
 
@@ -33,7 +33,7 @@ Keep Dataverse logical names, Flow payload keys, and choice values exact. Verify
 
 ## Testing Guidelines
 
-Tests use `node --test` and live in `tests/*.test.ts`. Name tests after protected behavior, for example `expenses.test.ts` or `media.test.ts`. Add focused coverage for validation rules, Dataverse payload builders, workflow transitions, and camera/media helpers. Before handoff, run `npm test` plus the strict `tsc` command.
+Tests use `node --test` and live in `tests/*.test.ts`. Name tests after protected behavior, for example `expenses.test.ts` or `media.test.ts`. Add focused coverage for validation rules, Dataverse payload builders, workflow transitions, and camera/media helpers. Before handoff, run `pnpm test` plus the strict `tsc` command.
 
 ## Commit & Pull Request Guidelines
 
@@ -41,13 +41,14 @@ Recent history uses concise imperative messages, often with `feat:`, `fix:`, or 
 
 Pull requests should include the user-facing change, validation commands, Dataverse/Flow impact, and screenshots for UI changes. Call out generated `dist/` or `public/screens/` updates.
 
-### Branches and publishing (since 2026-11-05)
+### Branches and publishing (since the move to Betinhos-Sistema)
 
-- PRs go to `develop`. `main` only receives the whole `develop` through a PR merged by Renan (`origem-main` check). Before opening a PR, merge the latest `origin/develop` into the branch.
-- Push to `develop` runs the `Deploy` workflow: it publishes to DEV only `new_app-motoristas-v2` and `new_app-motoristas-v2-sw` when pending (`scripts/pendentes-dev.ps1` compares the commit recorded in each web resource description). Never run a manual publish alongside it.
-- `BetinhosMotoristas` is published only from this repository. `BetinhosCore` and `BetinhosAutomacao` are published only from Betinhos-Sistema: new columns or Custom APIs reach PROD there first, then the app that uses them. The schema only grows.
-- The plugins (`plugins/`) and `provision-*` scripts land in `BetinhosAutomacao` and are moving to Betinhos-Sistema. Until then they stay manual through `npm run push`, which no longer publishes the app.
-- The `main` to PROD path is not active yet: it depends on changes in Betinhos-Sistema. PROD stays on `scripts/deploy-prod.ps1` until then.
+- The app lives in the Betinhos-Sistema monorepo at `apps/motoristas` (package `@betinhos/motoristas`, pnpm workspace). The old repository `app-motoristas-v2` is frozen (tag `pre-monorepo`) and no longer publishes.
+- PRs go to the Betinhos-Sistema `develop`, following its rules. `main` only receives the whole `develop` through a PR merged by Renan.
+- Push to `develop` runs the Betinhos-Sistema `Deploy` workflow: it publishes to DEV `new_app-motoristas-v2` (piece `motoristas`) and `new_app-motoristas-v2-sw` (piece `motoristasSw`) when pending (`packages/deploy/pendentes-dev.ps1` compares the commit recorded in each web resource description; rules in `packages/deploy/mudancas-dev.mjs`) through `apps/motoristas/scripts/push-front-dev.ps1`. Never run a manual publish alongside it.
+- Plugins (`packages/plugins/Betinhos.DriverRecordSharing`), Custom APIs, schema and flows are Betinhos-Sistema code like any other.
+- PROD: `BetinhosMotoristas` is the 4th solution of the Betinhos-Sistema `publicar.yml` (import order Core, Automacao, Motoristas, Interface). A merge of `develop` into `main` that touches the app's build or service worker goes through the solutions path (`packages/deploy/caminho-publicacao.mjs`): export from DEV with the commit lock, rehearsal in TEST, PROD backup and Renan's approval. Tests, docs, skills and QA scripts do not change PROD. The old `scripts/deploy-prod.ps1` is gone: never publish the app to PROD by hand.
+- Run commands from `apps/motoristas` with pnpm (test, typecheck and build scripts of `package.json`); npm and the old `package-lock.json` are gone.
 
 ## Security & Configuration Tips
 

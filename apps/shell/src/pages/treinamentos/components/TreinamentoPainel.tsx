@@ -92,16 +92,9 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
     setGerando(true)
     try {
       // Import dinâmico: o pdf-lib só entra no bundle quando alguém baixa o comprovante.
-      const [{ dadosComprovante }, { gerarComprovantePdf }] = await Promise.all([import('../domain/comprovante'), import('../data/comprovantePdf')])
+      const [{ dadosComprovante }, { gerarComprovantePdf }, { baixarPdf }] = await Promise.all([import('../domain/comprovante'), import('../data/comprovantePdf'), import('../../../lib/pdf/baixar')])
       const dados = dadosComprovante(item, p, nome(p))
-      const url = URL.createObjectURL(new Blob([new Uint8Array(await gerarComprovantePdf(dados))], { type: 'application/pdf' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = dados.arquivo
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      baixarPdf(await gerarComprovantePdf(dados), dados.arquivo)
     } catch (reason) {
       toast({ tone: 'danger', message: erroTexto(reason, 'Não foi possível gerar o comprovante.') })
     } finally {

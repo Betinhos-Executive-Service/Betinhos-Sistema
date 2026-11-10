@@ -32,6 +32,10 @@ describe('consultas de despesas', () => {
     })
     expect(d.data?.toISOString()).toBe('2026-10-02T13:00:00.000Z')
     expect(mapDespesa({}).possivelDuplicidade).toBe(false)
+    expect(mapDespesa({}).aguardandoGestor).toBe(false)
+    expect(mapDespesa({ new_motivodevolucao: 'Valor diferente.', new_justificativamotorista: 'O posto errou.', new_aguardandogestor: true })).toMatchObject({
+      motivoDevolucao: 'Valor diferente.', justificativaMotorista: 'O posto errou.', aguardandoGestor: true,
+    })
   })
 
   it('anexo usa o link de compartilhamento e só aceita http(s)', () => {

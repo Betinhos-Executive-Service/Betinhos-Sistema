@@ -13,7 +13,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.location.hash = '' })
 
 describe('Despesas operacionais', () => {
-  it('abre a ficha com vínculos e comprovantes, sem ações de escrita', async () => {
+  it('abre a ficha com vínculos e comprovantes', async () => {
     render(<DespesasPage host={{ mode: 'mock' }} />)
     const linhas = await screen.findAllByText('Posto Shell Faria Lima')
     fireEvent.click(linhas[0].closest('button')!)
@@ -23,7 +23,7 @@ describe('Despesas operacionais', () => {
     expect(within(ficha).getAllByRole('link', { name: /Abrir/ }).length).toBeGreaterThan(0)
     expect(within(ficha).getByText('Análise da IA')).toBeTruthy()
     expect(within(ficha).getByText('Processando: a IA está lendo o comprovante.')).toBeTruthy()
-    expect(within(ficha).queryByRole('button', { name: /Validar|Pagar|Cancelar|Salvar/ })).toBeNull()
+    expect(within(ficha).queryByRole('button', { name: /Pagar|Salvar/ })).toBeNull()
   })
 
   it('abre o comprovante no visualizador e navega entre os arquivos', async () => {
@@ -54,6 +54,36 @@ describe('Despesas operacionais', () => {
     fireEvent.click(opcao)
     await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
     expect(screen.getByRole('button', { name: /^Visão: Possível duplicidade/ })).toBeTruthy()
+  })
+
+  it('o cartão de total abre a visão pronta e, clicado de novo, volta à padrão', async () => {
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText('Posto Shell Faria Lima')
+    const cartao = (await screen.findByText('Possível duplicidade', { selector: '.dp-kpi *' })).closest('button')!
+    fireEvent.click(cartao)
+    await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
+    expect(cartao.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /^Visão: Possível duplicidade/ })).toBeTruthy()
+    fireEvent.click(cartao)
+    await waitFor(() => expect(cartao.getAttribute('aria-pressed')).toBe('false'))
+    expect(document.querySelectorAll('.pg-open').length).toBeGreaterThan(2)
+  })
+
+  it('com a visão alterada, o cartão de total pergunta antes de trocar', async () => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.removeAttribute('open') }
+    // O filtro vindo do link deixa a visão padrão alterada (não salva).
+    window.location.hash = '#/despesas?alertas=duplicidade'
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
+    const cartao = (await screen.findByText('Sem comprovante', { selector: '.dp-kpi *' })).closest('button')!
+    fireEvent.click(cartao)
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Continuar editando' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull())
+    expect(cartao.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(cartao)
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+    await waitFor(() => expect(cartao.getAttribute('aria-pressed')).toBe('true'))
   })
 
   it('link antigo com alertas na URL abre filtrado e passa a usar f=', async () => {

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   COMUNICADO_ESCOPO, COMUNICADO_PUSH, COMUNICADO_TIPO, buildResultadosCsv, canResendPush, draftPayload, duplicateComunicado, emptyDraft,
-  mapMotoristas, matchResultado, parseTargetIds, statusLabel, validateDraft, type Destinatario,
+  mapDestinatario, mapMotoristas, matchResultado, parseEvidencia, parseTargetIds, statusLabel, validateDraft, type Destinatario,
 } from './comunicados'
 
 const GUID = 'b4f87f6c-a6ec-f011-8406-7ced8da7f336'
 const row = (extra: Partial<Destinatario> = {}): Destinatario => ({
   id: '1', comunicadoId: 'c', motoristaId: 'm', enviadoEm: '2026-10-16T12:00:00Z', abertoEm: null, lidoEm: null, cienteEm: null,
-  nomeAssinante: '', observacao: '', assinaturaJson: '', pushStatus: COMUNICADO_PUSH.enviado, pushErro: '', ...extra,
+  nomeAssinante: '', observacao: '', assinaturaJson: '', evidenciaAbertura: null, evidenciaCiencia: null, pushStatus: COMUNICADO_PUSH.enviado, pushErro: '', ...extra,
 })
 
 describe('comunicados', () => {
@@ -72,5 +72,44 @@ describe('comunicados', () => {
     const csv = buildResultadosCsv([row({ observacao: 'ok; "certo"' })], () => 'Ana')
     expect(csv.startsWith('﻿Motorista;Status')).toBe(true)
     expect(csv).toContain('"ok; ""certo"""')
+  })
+})
+
+describe('evidência do aparelho', () => {
+  const completa = JSON.stringify({
+    v: 1, appVersion: '2.1.860', userAgent: 'Mozilla/5.0', platform: 'Android', model: 'SM-A546',
+    ipStamp: { ip: '203.0.113.7', ts: '2026-11-10T13:40:00.000Z', sig: 'x' }, ipVerificado: true,
+    geo: { status: 'ok', lat: -23.18, lon: -45.88, accuracy: 30, ts: '2026-11-10T13:40:00.000Z' }, servidorEm: '2026-11-10T13:40:01.000Z',
+  })
+
+  it('lê a evidência completa', () => {
+    expect(parseEvidencia(completa)).toEqual({
+      invalida: false, appVersion: '2.1.860', userAgent: 'Mozilla/5.0', platform: 'Android', model: 'SM-A546', ip: '203.0.113.7', ipVerificado: true,
+      geo: { status: 'ok', lat: -23.18, lon: -45.88, accuracy: 30 },
+    })
+  })
+
+  it('vazio, nulo e JSON que não é objeto viram null', () => {
+    for (const value of [undefined, null, '', '  ', 'não é json', '[1]', '"x"', '42']) expect(parseEvidencia(value)).toBeNull()
+  })
+
+  it('marca de erro do plugin vira evidência inválida', () => {
+    expect(parseEvidencia('{"v":1,"erro":"formato","servidorEm":"2026-11-10T13:40:01.000Z"}')).toMatchObject({ invalida: true, ip: '', geo: null })
+  })
+
+  it('sem carimbo o IP não conta como verificado; GPS negado não traz coordenadas', () => {
+    const evidence = parseEvidencia('{"v":1,"ipStamp":null,"ipVerificado":true,"geo":{"status":"negada"}}')
+    expect(evidence).toMatchObject({ ip: '', ipVerificado: false, geo: { status: 'negada', lat: null, lon: null, accuracy: null } })
+  })
+
+  it('status de geo desconhecido e números inválidos são descartados', () => {
+    expect(parseEvidencia('{"geo":{"status":"qualquer"}}')?.geo).toBeNull()
+    expect(parseEvidencia('{"geo":{"status":"ok","lat":"x","lon":null}}')?.geo).toEqual({ status: 'ok', lat: null, lon: null, accuracy: null })
+  })
+
+  it('mapDestinatario interpreta as duas colunas e deixa null as vazias', () => {
+    const mapped = mapDestinatario({ new_comunicadodestinatarioid: 'd', new_evidenciaaberturajson: completa, new_evidenciacienciajson: null })
+    expect(mapped.evidenciaAbertura?.ip).toBe('203.0.113.7')
+    expect(mapped.evidenciaCiencia).toBeNull()
   })
 })

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Web.Script.Serialization;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
@@ -21,6 +23,19 @@ namespace Betinhos.DriverRecordSharing
         private const int PushPendente = 100000000;
         private const int PushEnviado = 100000001;
         private const int PushFalhou = 100000002;
+        private const int EvidenciaMaxChars = 4000;
+        private static readonly TimeSpan CarimboJanela = TimeSpan.FromMinutes(5);
+        private static readonly string[] GeoStatus = { "ok", "negada", "indisponivel", "tempo-esgotado" };
+
+        // IP_STAMP_SECRET (configuração segura do step). Vazio: nenhum IP é verificado.
+        private readonly string ipStampSecret;
+
+        public ComunicadoCommandPlugin() : this(null, null) { }
+
+        public ComunicadoCommandPlugin(string unsecureConfig, string secureConfig)
+        {
+            ipStampSecret = (secureConfig ?? "").Trim();
+        }
 
         public void Execute(IServiceProvider serviceProvider)
         {
@@ -98,7 +113,7 @@ namespace Betinhos.DriverRecordSharing
         private static Entity RecipientForCaller(IPluginExecutionContext context, IOrganizationService system)
         {
             var recipient = system.Retrieve(RecipientTable, InputGuid(context, "new_DestinatarioId"), new ColumnSet(
-                "ownerid", "new_motorista", "new_tipo", "new_abertoem", "new_lidoem", "new_cienteem", "new_pushstatus"));
+                "ownerid", "new_motorista", "new_tipo", "new_abertoem", "new_lidoem", "new_cienteem", "new_pushstatus", "new_evidenciaaberturajson"));
             var owner = recipient.GetAttributeValue<EntityReference>("ownerid");
             if (owner == null || owner.LogicalName != "systemuser" || owner.Id != context.InitiatingUserId)
                 throw new InvalidPluginExecutionException("Este comunicado não pertence ao motorista autenticado.");
@@ -117,17 +132,23 @@ namespace Betinhos.DriverRecordSharing
             return recipient;
         }
 
-        private static void Open(IPluginExecutionContext context, IOrganizationService system)
+        private void Open(IPluginExecutionContext context, IOrganizationService system)
         {
             var recipient = RecipientForCaller(context, system);
             var update = new Entity(RecipientTable, recipient.Id);
             if (!recipient.Contains("new_abertoem")) update["new_abertoem"] = DateTime.UtcNow;
             if (Choice(recipient, "new_tipo") == Informativo && !recipient.Contains("new_lidoem"))
                 update["new_lidoem"] = DateTime.UtcNow;
+            // A evidência é a da primeira abertura (ou leitura): só entra junto com a marca de tempo e só se a coluna está vazia.
+            if (!recipient.Contains("new_abertoem") && string.IsNullOrEmpty(recipient.GetAttributeValue<string>("new_evidenciaaberturajson")))
+            {
+                var evidence = BuildEvidence(InputString(context, "new_EvidenciaJson"), ipStampSecret, DateTime.UtcNow);
+                if (evidence != null) update["new_evidenciaaberturajson"] = evidence;
+            }
             if (update.Attributes.Count > 0) system.Update(update);
         }
 
-        private static void Acknowledge(IPluginExecutionContext context, IOrganizationService system)
+        private void Acknowledge(IPluginExecutionContext context, IOrganizationService system)
         {
             var recipient = RecipientForCaller(context, system);
             if (Choice(recipient, "new_tipo") != Ciencia)
@@ -149,7 +170,126 @@ namespace Betinhos.DriverRecordSharing
             update["new_nomeassinante"] = employee.GetAttributeValue<string>("cr40f_nomecompleto") ?? "";
             update["new_observacao"] = observation;
             update["new_assinaturajson"] = signature;
+            var evidence = BuildEvidence(InputString(context, "new_EvidenciaJson"), ipStampSecret, DateTime.UtcNow);
+            if (evidence != null) update["new_evidenciacienciajson"] = evidence;
             system.Update(update);
+        }
+
+        // Normaliza a evidência do aparelho enviada pelo App. Vazio: null (nada a gravar). Inválido ou grande: marca de erro,
+        // sem travar a ação. Só ficam os campos do contrato; o plugin acrescenta ipVerificado e servidorEm.
+        public static string BuildEvidence(string raw, string secret, DateTime nowUtc)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var serializer = new JavaScriptSerializer { MaxJsonLength = EvidenciaMaxChars };
+            var stamp = nowUtc.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
+            Dictionary<string, object> input = null;
+            if (raw.Length <= EvidenciaMaxChars)
+            {
+                try { input = serializer.DeserializeObject(raw) as Dictionary<string, object>; }
+                catch { input = null; }
+            }
+            if (input == null) return FormatError(stamp);
+
+            var ipStamp = Field(input, "ipStamp") as Dictionary<string, object>;
+            var ip = ipStamp == null ? "" : Text(Field(ipStamp, "ip"), 100);
+            var ts = ipStamp == null ? "" : Text(Field(ipStamp, "ts"), 100);
+            var sig = ipStamp == null ? "" : Text(Field(ipStamp, "sig"), 100);
+            var result = new Dictionary<string, object>
+            {
+                { "v", 1 },
+                { "appVersion", Text(Field(input, "appVersion"), 100) },
+                { "userAgent", Text(Field(input, "userAgent"), 400) },
+                { "platform", Text(Field(input, "platform"), 100) },
+                { "model", Text(Field(input, "model"), 100) },
+                { "ipStamp", ipStamp == null ? null : new Dictionary<string, object> { { "ip", ip }, { "ts", ts }, { "sig", sig } } },
+                { "ipVerificado", ipStamp != null && StampIsValid(ip, ts, sig, secret, nowUtc) },
+                { "geo", NormalizeGeo(Field(input, "geo") as Dictionary<string, object>) },
+                { "servidorEm", stamp }
+            };
+            // Campos truncados + caracteres escapados (", <, >) podem passar do limite do desserializador: serializa sem o limite e,
+            // se a coluna não comportar, grava a marca de erro em vez de derrubar a abertura ou a ciência.
+            var json = new JavaScriptSerializer().Serialize(result);
+            return json.Length <= EvidenciaMaxChars ? json : FormatError(stamp);
+        }
+
+        private static string FormatError(string stamp)
+        {
+            return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "v", 1 }, { "erro", "formato" }, { "servidorEm", stamp } });
+        }
+
+        private static object Field(Dictionary<string, object> source, string name)
+        {
+            object value;
+            return source.TryGetValue(name, out value) ? value : null;
+        }
+
+        private static string Text(object value, int max)
+        {
+            var text = (value as string ?? "").Trim();
+            return text.Length > max ? text.Substring(0, max) : text;
+        }
+
+        private static bool TryNumber(object value, out double number)
+        {
+            number = 0;
+            if (value == null || value is string || value is bool) return false;
+            try { number = Convert.ToDouble(value, CultureInfo.InvariantCulture); }
+            catch { return false; }
+            return !double.IsNaN(number) && !double.IsInfinity(number);
+        }
+
+        private static Dictionary<string, object> NormalizeGeo(Dictionary<string, object> geo)
+        {
+            if (geo == null) return null;
+            var status = Text(Field(geo, "status"), 100);
+            if (Array.IndexOf(GeoStatus, status) < 0) return null;
+            var result = new Dictionary<string, object> { { "status", status } };
+            if (status != "ok") return result;
+            double lat, lon, accuracy;
+            if (!TryNumber(Field(geo, "lat"), out lat) || lat < -90 || lat > 90
+                || !TryNumber(Field(geo, "lon"), out lon) || lon < -180 || lon > 180
+                || !TryNumber(Field(geo, "accuracy"), out accuracy) || accuracy < 0)
+                return new Dictionary<string, object> { { "status", "indisponivel" } };
+            result["lat"] = lat;
+            result["lon"] = lon;
+            result["accuracy"] = accuracy;
+            result["ts"] = Text(Field(geo, "ts"), 100);
+            return result;
+        }
+
+        private static bool StampIsValid(string ip, string ts, string sig, string secret, DateTime nowUtc)
+        {
+            if (string.IsNullOrEmpty(secret) || ip.Length == 0 || ts.Length == 0 || sig.Length == 0) return false;
+            DateTime stampedAt;
+            if (!DateTime.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out stampedAt)) return false;
+            if ((nowUtc.ToUniversalTime() - stampedAt).Duration() > CarimboJanela) return false;
+            byte[] given;
+            try { given = Base64UrlDecode(sig); }
+            catch { return false; }
+            using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
+            {
+                var expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(ip + "|" + ts));
+                return ConstantTimeEquals(expected, given);
+            }
+        }
+
+        private static byte[] Base64UrlDecode(string value)
+        {
+            var text = value.Replace('-', '+').Replace('_', '/');
+            switch (text.Length % 4)
+            {
+                case 2: text += "=="; break;
+                case 3: text += "="; break;
+            }
+            return Convert.FromBase64String(text);
+        }
+
+        private static bool ConstantTimeEquals(byte[] left, byte[] right)
+        {
+            if (left.Length != right.Length) return false;
+            var diff = 0;
+            for (var index = 0; index < left.Length; index++) diff |= left[index] ^ right[index];
+            return diff == 0;
         }
 
         private static void ValidateSignature(string json)

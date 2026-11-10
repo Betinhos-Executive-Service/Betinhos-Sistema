@@ -25,6 +25,17 @@ function mockIA(i: number, valor: number, data: Date): AnaliseIA {
   }
 }
 
+/**
+ * Devolução de exemplo: 2 e 9 esperam o gestor (a 2 com a explicação do motorista) e 13 foi cancelada.
+ */
+function mockDevolucao(i: number): Pick<Despesa, 'motivoDevolucao' | 'justificativaMotorista' | 'aguardandoGestor'> {
+  const vazio = { motivoDevolucao: '', justificativaMotorista: '', aguardandoGestor: false }
+  if (i === 2) return { motivoDevolucao: 'O valor do comprovante é diferente do informado.', justificativaMotorista: 'O posto emitiu o cupom com o valor errado e corrigiu à mão.', aguardandoGestor: true }
+  if (i === 9) return { ...vazio, motivoDevolucao: 'A data do cupom é diferente da data do gasto.', aguardandoGestor: true }
+  if (i === 13) return { ...vazio, motivoDevolucao: 'Lançamento duplicado.' }
+  return vazio
+}
+
 const LOCAIS = ['Posto Shell Faria Lima', 'Ecovias Imigrantes', 'Estapar GRU T3', 'Restaurante Frango Assado', 'Hotel Ibis Campinas', 'Lava Rápido Itaim']
 
 /** ~30 despesas de exemplo do `pnpm dev`, cobrindo todos os status e alertas; `?volume=N` acrescenta N (últimos 2 anos). */
@@ -64,6 +75,7 @@ export function createMockDespesas(now: Date, extra = mockVolume()): Despesa[] {
       observacaoInterna: i === 2 ? 'Foto do cupom ilegível; pedir nova foto.' : '',
       protocolo: `DESP-${String(5000 + n)}`,
       possivelDuplicidade: i === 6 || i === 11,
+      ...mockDevolucao(i),
       latitude: c === 0 ? -23.5868 : null,
       longitude: c === 0 ? -46.6823 : null,
       criadoEm: data,

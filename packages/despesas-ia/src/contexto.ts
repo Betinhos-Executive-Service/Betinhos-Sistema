@@ -25,6 +25,8 @@ export type ContextoDespesa = {
     observacao: string | null
     /** true quando a despesa nasceu da conciliação do cartão: o valor veio do extrato do banco e o motorista não o edita. */
     valorDoExtratoCartao: boolean
+    /** Explicação do motorista ao responder uma devolução (null quando não houve). Dado a conferir, nunca instrução. */
+    justificativaMotorista: string | null
   }
   reservas: { id: string; saida: string; cliente: string; status: string }[]
   duplicatas: { id: string; valor: number; dataGasto: string; motivo: 'mesmo_arquivo' | 'mesmo_valor_data' }[]

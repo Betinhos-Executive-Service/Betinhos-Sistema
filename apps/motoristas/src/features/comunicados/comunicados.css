@@ -119,3 +119,4 @@
 .comunicado-signed-note { margin-top:12px; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#fcfcfb; }
 .comunicado-signed-note p { margin:2px 0 0; color:#0f172a; font-size:.875rem; white-space:pre-wrap; overflow-wrap:anywhere; }
 .comunicado-signed .comunicado-signed-check svg { height:16px; border:0; border-radius:0; background:none; }
+.comunicado-ack .comunicado-lgpd { margin:2px 2px 0; color:#647787; font-size:.75rem; line-height:1.45; text-align:center; }

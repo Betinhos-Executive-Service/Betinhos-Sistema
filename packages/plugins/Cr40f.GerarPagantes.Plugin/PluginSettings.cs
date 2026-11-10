@@ -18,6 +18,14 @@ public sealed class PluginSettings
     public const string InternalRecipientsVariable = "cr40f_GerarPagantesInternalRecipients";
     public const string EmailAssetPrefixVariable = "cr40f_GerarPagantesEmailAssetPrefix";
 
+    // Segredos na tabela cr40f_segredo (coluna com segurança de campo). A tabela vence; vazia, ausente ou ilegível,
+    // vale a variável de ambiente (legado, a esvaziar depois da migração). Nunca registra o valor em trace.
+    public const string SecretTable = "cr40f_segredo";
+    public const string SecretNameColumn = "cr40f_name";
+    public const string SecretValueColumn = "cr40f_valor";
+    public const string CieloClientSecretName = "cielo.client-secret";
+    public const string GraphClientSecretName = "graph.gerar-pagantes.client-secret";
+
     public string CieloClientId { get; private set; } = string.Empty;
     public string CieloClientSecret { get; private set; } = string.Empty;
     public string GraphTenantId { get; private set; } = string.Empty;
@@ -28,8 +36,9 @@ public sealed class PluginSettings
     public List<string> InternalRecipients { get; private set; } = new();
     public string EmailAssetPrefix { get; private set; } = "cr40f_/GerarPagantes/email/";
 
-    public static PluginSettings Load(IOrganizationService service)
+    public static PluginSettings Load(IOrganizationService service, ITracingService? tracing = null)
     {
+        var secrets = LoadSecrets(service, new[] { CieloClientSecretName, GraphClientSecretName }, tracing);
         var values = LoadTextValues(service, new[]
         {
             CieloClientIdVariable,
@@ -46,10 +55,10 @@ public sealed class PluginSettings
         return new PluginSettings
         {
             CieloClientId = Get(values, CieloClientIdVariable),
-            CieloClientSecret = Get(values, CieloClientSecretVariable),
+            CieloClientSecret = Get(secrets, CieloClientSecretName) is { Length: > 0 } cielo ? cielo : Get(values, CieloClientSecretVariable),
             GraphTenantId = Get(values, GraphTenantIdVariable),
             GraphClientId = Get(values, GraphClientIdVariable),
-            GraphClientSecret = Get(values, GraphClientSecretVariable),
+            GraphClientSecret = Get(secrets, GraphClientSecretName) is { Length: > 0 } graph ? graph : Get(values, GraphClientSecretVariable),
             SenderEmail = Get(values, SenderEmailVariable),
             ReplyToEmail = Get(values, ReplyToEmailVariable),
             InternalRecipients = Get(values, InternalRecipientsVariable)
@@ -68,13 +77,38 @@ public sealed class PluginSettings
     {
         if (requiresCielo &&
             (string.IsNullOrWhiteSpace(CieloClientId) || string.IsNullOrWhiteSpace(CieloClientSecret)))
-            throw new InvalidOperationException("Configuração Cielo ausente nas variáveis de ambiente da solução.");
+            throw new InvalidOperationException("Configuração Cielo ausente (tabela de segredos ou variáveis de ambiente da solução).");
 
         if (!request.Pagantes.Any(payer => payer.SendEmail)) return;
         if (new[] { GraphTenantId, GraphClientId, GraphClientSecret, SenderEmail }.Any(string.IsNullOrWhiteSpace))
-            throw new InvalidOperationException("Configuração Microsoft Graph incompleta nas variáveis de ambiente da solução.");
+            throw new InvalidOperationException("Configuração Microsoft Graph incompleta (tabela de segredos ou variáveis de ambiente da solução).");
         if (!IsEmail(SenderEmail) || !string.IsNullOrWhiteSpace(ReplyToEmail) && !IsEmail(ReplyToEmail))
             throw new InvalidOperationException("Configuração de remetente ou Reply-To inválida nas variáveis de ambiente da solução.");
+    }
+
+    // Lida com o serviço de SYSTEM (o usuário não tem privilégio na tabela nem no perfil de campo).
+    private static Dictionary<string, string> LoadSecrets(IOrganizationService service, IReadOnlyCollection<string> names, ITracingService? tracing)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var query = new QueryExpression(SecretTable) { ColumnSet = new ColumnSet(SecretNameColumn, SecretValueColumn) };
+            query.Criteria.AddCondition(SecretNameColumn, ConditionOperator.In, names.Cast<object>().ToArray());
+            foreach (var row in service.RetrieveMultiple(query).Entities)
+            {
+                var name = row.GetAttributeValue<string>(SecretNameColumn);
+                var value = row.GetAttributeValue<string>(SecretValueColumn)?.Trim();
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(value)) result[name!] = value!;
+            }
+        }
+        catch (Exception error)
+        {
+            tracing?.Trace("cr40f_GerarPagantes: tabela de segredos ilegível ({0}), usando as variáveis de ambiente", error.GetType().Name);
+            return result;
+        }
+        foreach (var name in names.Where(name => !result.ContainsKey(name)))
+            tracing?.Trace("cr40f_GerarPagantes: segredo {0} sem valor na tabela, usando a variável de ambiente", name);
+        return result;
     }
 
     private static Dictionary<string, string> LoadTextValues(IOrganizationService service, IReadOnlyCollection<string> schemaNames)

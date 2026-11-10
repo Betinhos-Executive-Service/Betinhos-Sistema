@@ -107,7 +107,7 @@
 .frota-foto-drop__aviso { position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background-color: rgba(0, 26, 61, var(--bt-opacity-backdrop)); color: var(--bt-color-white); font-weight: var(--bt-font-weight-bold); pointer-events: none; }
 .frota-foto-dica { margin-top: calc(var(--bt-space-3) * -1); }
 
-/* Classificação da manutenção (IA JEV) */
+/* Classificação da manutenção */
 .frota-classif { display: grid; gap: var(--bt-space-3); }
 .frota-classif__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bt-space-3) var(--bt-space-4); }
 .frota-classif__cat { display: grid; align-content: start; gap: var(--bt-space-1-5); margin: 0; padding: var(--bt-space-2) var(--bt-space-3) var(--bt-space-2-5); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }

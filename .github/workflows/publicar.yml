@@ -1,8 +1,8 @@
 name: Publicar soluções
 
-# Leva as 3 soluções gerenciadas do Sistema (BetinhosCore, BetinhosAutomacao, BetinhosInterface) do DEV para o
-# TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
-# A BetinhosMotoristas é publicada só pelo repositório app-motoristas-v2.
+# Leva as 4 soluções gerenciadas (BetinhosCore, BetinhosAutomacao, BetinhosMotoristas, BetinhosInterface, nesta ordem de import)
+# do DEV para o TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, apps e sitemaps. Dados não vão
+# por solução. A BetinhosMotoristas é o App Motoristas (apps/motoristas), publicado daqui desde a fase 3 da migração do app-motoristas-v2.
 # Caminho normal: o workflow Produção (producao.yml) chama este com alvo test-e-prod quando a main recebe mudança fora da tela.
 # À mão (Actions › Run workflow) continua valendo para refazer um ensaio ou repetir um alvo.
 #  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 soluções no DEV
@@ -26,7 +26,7 @@ on:
         default: test
         options: [test, test-e-prod, prod]
       solucoes:
-        description: 'Soluções separadas por vírgula (vazio = as 3 do Sistema)'
+        description: 'Soluções separadas por vírgula (vazio = as 4)'
         required: false
         default: ''
       backup:
@@ -92,13 +92,14 @@ jobs:
         with:
           node-version: 24
       - name: Trava do commit (tela e plugins do DEV são os deste commit)
-        # O export sai do DEV, que recebe a develop. Se a develop já tem tela ou plugin novo que não está neste commit, o PROD
-        # o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1) e de cada
-        # assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing (no workflow Deploy); pendentes-dev.ps1 compara com este commit.
+        # O export sai do DEV, que recebe a develop. Se a develop já tem tela, App Motoristas ou plugin novo que não está neste commit,
+        # o PROD o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1), do app e do
+        # service worker do App Motoristas (push-front-dev.ps1) e de cada assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing (no
+        # workflow Deploy); pendentes-dev.ps1 compara com este commit.
         run: |
           $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
-          if ($r.tela -or $r.webresources -or $r.formulario -or @($r.plugins).Count) {
+          if ($r.tela -or $r.webresources -or $r.formulario -or $r.motoristas -or $r.motoristasSw -or @($r.plugins).Count) {
             $r.motivos | ForEach-Object { Write-Host $_ }
             throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
           }

@@ -66,7 +66,7 @@ Regras:
 
 ## Copy (pt-BR, tom Betinhos: claro, sem culpa)
 
-- Motivo da IA vem dos `cr40f_iamotivos`, reescrito para o motorista em frase direta ("O valor do comprovante (R$ 82,00) é diferente do informado (R$ 92,00)."). Nada de "Erro" ou "Inválido".
+- Motivo da IA vem dos `cr40f_iamotivos`, reescrito para o motorista em frase direta ("O valor do comprovante (R$ 82,00) é diferente do informado (R$ 92,00)."). Nada de "Erro" ou "Inválido". Formato: no máximo 2 frases curtas (~140 caracteres; o Flow corta em 200): 1ª o problema, 2ª o que fazer. Sem mediana, km, comparação com outros lançamentos, contagem de despesas ou nomes de regras antifraude; esses detalhes ficam em `cr40f_iamotivos`, só para o gestor.
 - Placeholder de Explicar: "Ex.: o posto emitiu o cupom com o valor errado e corrigiu à mão."
 - Gestor ao devolver: placeholder "O que o motorista precisa fazer?".
 

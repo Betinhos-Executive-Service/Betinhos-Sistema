@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createDecipheriv, createECDH, createPublicKey, createVerify, hkdfSync } from "node:crypto";
+import { createDecipheriv, createECDH, createHmac, createPublicKey, createVerify, hkdfSync } from "node:crypto";
 import test from "node:test";
 import { handleRequest, type Env } from "../workers/web-push/src/index.ts";
 import { encryptPayload, fromBase64Url, sendPush, toBase64Url, vapidAuthorization, type VapidKeys } from "../workers/web-push/src/webpush.ts";
@@ -105,4 +105,34 @@ test("o Worker exige o segredo, valida o pedido e devolve o resultado por aparel
   const ok = await call({ auth: "Bearer segredo", body: valid });
   assert.equal(ok.status, 200);
   assert.deepEqual(await ok.json(), { results: [{ endpoint: device.subscription.endpoint, status: 201, gone: false }] });
+});
+
+test("carimbo do IP: HMAC de ip|ts conferido por outro caminho, CORS só do Dataverse e 503 sem segredo", async () => {
+  const base: Env = { SHARED_SECRET: "x", VAPID_PUBLIC_KEY: "", VAPID_PRIVATE_JWK: "{}", VAPID_SUBJECT: "mailto:a@b.c" };
+  const now = new Date("2026-11-10T13:40:00.000Z");
+  const call = (env: Env, init: { method?: string; origin?: string; ip?: string } = {}) => handleRequest(
+    new Request("https://w.example/carimbo-ip", { method: init.method ?? "POST", headers: { ...(init.origin ? { Origin: init.origin } : {}), ...(init.ip ? { "CF-Connecting-IP": init.ip } : {}) } }),
+    env, undefined, now
+  );
+  const origin = "https://org23b93544.crm2.dynamics.com";
+
+  const ok = await call({ ...base, IP_STAMP_SECRET: "segredo-ip" }, { origin, ip: "203.0.113.7" });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("Access-Control-Allow-Origin"), origin);
+  const stamp = await ok.json() as { ip: string; ts: string; sig: string };
+  assert.deepEqual({ ip: stamp.ip, ts: stamp.ts }, { ip: "203.0.113.7", ts: "2026-11-10T13:40:00.000Z" });
+  assert.equal(stamp.sig, createHmac("sha256", "segredo-ip").update("203.0.113.7|2026-11-10T13:40:00.000Z").digest("base64url"));
+
+  const preflight = await call({ ...base, IP_STAMP_SECRET: "segredo-ip" }, { method: "OPTIONS", origin });
+  assert.equal(preflight.status, 204);
+  assert.match(preflight.headers.get("Access-Control-Allow-Methods") ?? "", /POST/);
+
+  for (const bad of ["https://evil.example", "https://dynamics.com.evil.example", "http://org.crm2.dynamics.com", "https://evil.example/.dynamics.com"]) {
+    const denied = await call({ ...base, IP_STAMP_SECRET: "segredo-ip" }, { origin: bad, ip: "203.0.113.7" });
+    assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null, bad);
+  }
+
+  assert.equal((await call(base, { origin, ip: "203.0.113.7" })).status, 503);
+  assert.equal((await call({ ...base, IP_STAMP_SECRET: "segredo-ip" }, { origin })).status, 400);
+  assert.equal((await call({ ...base, IP_STAMP_SECRET: "segredo-ip" }, { method: "GET", origin })).status, 404);
 });

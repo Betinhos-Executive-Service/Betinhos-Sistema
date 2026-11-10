@@ -7,7 +7,7 @@ description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar 
 ## Cobre
 - Código: `plugins/DriverRecordSharing/DriverNoticePlugin.cs`, `DriverNoticeRules.cs`, `DriverNoticeWriter.cs`.
 - Testes: `plugins/DriverRecordSharing.Tests/DriverNoticePluginTests.cs`.
-- Scripts: `scripts/provision-aviso-motorista.ps1`, `scripts/provision-aviso-motorista-flows.ps1`, `scripts/virada-aviso-motorista.ps1`.
+- Scripts: `packages/deploy/provision-aviso-motorista.ps1`, `packages/deploy/provision-flow-aviso-motorista.ps1`, `scripts/virada-aviso-motorista.ps1`.
 - Contrato e ordem de publicação: `docs/virada-aviso-motorista.md`.
 
 ## Regras que não podem quebrar
@@ -16,6 +16,8 @@ description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar 
 - Falha ao criar o aviso derruba a gravação (`[DRIVER_NOTICE_FAILED]`). Não troque por try/catch silencioso.
 - O aviso nasce com o serviço de sistema (`CreateOrganizationService(null)`), nunca com o usuário que salvou.
 - A Vigia reenvia voltando o aviso para Pendente: o texto do push mora só no Enviar.
+- Janela da saída (`docs/vigia-janela-saida.md`): reenvio só ao motorista 4 h antes (grava `new_reenviadoem`), alerta à operação 3 h antes; nunca antes de `new_prazovisualizacao`; horário entre 22h e 6h vai para 20h/21h da véspera. Falhou e Sem app de aviso Novo esperam a hora do alerta; Retirado e Pendente parado (por `modifiedon`) alertam na hora.
+- O `-Apply` dos flows recusa sem a coluna `new_reenviadoem` e só desliga o flow antigo "Flow Notificação Serviço Não Visualizado | Interno e Motoristas" com a Vigia ligada.
 - A tabela vem antes dos steps: `push-dev.ps1` provisiona antes de publicar o plugin, e o registro recusa sem ela.
 - Virada: novo liga antes de antigo desligar; reversão no sentido inverso. Flows antigos ficam desligados, nunca excluídos (sete scripts leem "Novo Serviço" como modelo).
 
@@ -37,7 +39,10 @@ Use uma reserva sem cliente, OT ou manutenção, com saída no futuro (OS-1929 s
 | Limpar motorista saindo de Programado (na mesma gravação) | Visualização vazia; só Retirado; o Novo vira Cancelado na próxima rodada da Vigia |
 | Trocar em Confirmado | Visualização vazia; `new_foiprogramado` false; nenhum aviso |
 | Confirmado → Programado | Só Novo |
-| Motorista sem `cr40f_emailmicrosoft` | Aviso Sem app; a Vigia alerta a operação uma vez |
+| Motorista sem `cr40f_emailmicrosoft` | Aviso Sem app; a Vigia alerta a operação uma vez, na hora do alerta (3 h antes da saída) |
+| Saída daqui a 6 h, não visualizado | Nada até 4 h antes; aí `new_reenviadoem` preenchido e Enviado de novo; alerta só 3 h antes |
+| Saída às 2h, não visualizado | Reenvio às 20h e alerta às 21h da véspera |
+| Saída daqui a 1 h, não visualizado | Reenvio e alerta juntos no prazo (aviso + 30 min) |
 | Trocar duas vezes antes de o primeiro ver | Novo do primeiro vira Cancelado |
 | Prazo vencido sem visualizar | Operação alertada, push reenviado, `new_alertadoem` preenchido, um único alerta |
 | Motorista abre o serviço | Próxima rodada da Vigia: Visto com `new_vistoem` |

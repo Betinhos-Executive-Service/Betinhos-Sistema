@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { Copy, Paperclip, Sparkles } from 'lucide-react'
+import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'
+import { decidivel } from '../domain/decisao'
 import { financeiroTone, operacionalTone, semComprovante } from '../domain/status'
 import type { Despesa, DespesaChoices } from '../domain/types'
 
@@ -14,7 +15,9 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 
 export const titulo = (d: Despesa) => d.estabelecimento || d.nome || 'Despesa sem nome'
 
+/** Esperando o gestor substitui o status (Precisa corrigir): um selo só, que diz com quem a despesa está. */
 export function OperacionalBadge({ d, choices }: { d: Despesa; choices: DespesaChoices }) {
+  if (d.aguardandoGestor && decidivel(d)) return <StatusBadge tone="warning" icon={<UserCheck size={12} />}>Esperando gestor</StatusBadge>
   return <StatusBadge tone={operacionalTone(d.statusOperacional)} dot>{label(choices.operacional, d.statusOperacional, 'Sem status')}</StatusBadge>
 }
 
@@ -44,13 +47,13 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
 
 export function DespesasTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Despesa>[] = [
-    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 280, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
-    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 130, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
-    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
-    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 170, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
-    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 190, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
-    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 220, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
+    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 220, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
+    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 100, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 110, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
+    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
+    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
+    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
+    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>

@@ -1,10 +1,11 @@
 // Porte de Tela Planner/src/quotes/QuoteKanban.jsx (sem mudança de comportamento).
 import React, { memo, useCallback, useMemo } from "react";
 import { BadgeDollarSign, CalendarDays, CircleHelp, ClipboardList, Clock3, FileText, GripVertical, ScanSearch, Send } from "lucide-react";
-import { formatMoney, getQuoteNextAction, QUOTE_OPEN_STATUSES, QUOTE_PRIORITIES, sentLabel } from '../../domain/quoteDomain';
+import { formatMoney, getQuoteNextAction, QUOTE_OPEN_STATUSES, QUOTE_PRIORITIES, quoteCreatorName, sentLabel } from '../../domain/quoteDomain';
 import { canRegisterWaitingReturn, formatDate, waitingContextSummary } from '../../domain/domain';
 import { localDateKey } from '../../domain/management';
 import { normalizeQuoteOptions } from '../../domain/quoteScenarios';
+import AssigneeDisplay from '../AssigneeDisplay';
 import KanbanBoard from '../KanbanBoard';
 
 const STATUS_META = {
@@ -17,7 +18,7 @@ const STATUS_META = {
 
 const PRIORITY_TONES = { low: "neutral", medium: "action", high: "warning", urgent: "danger" };
 
-const QuoteCard = memo(function QuoteCard({ quote, task, today, currentEmployee, teams = [], isDragging, draggable, onOpen, onAction, onDragStart, onDragEnd }: any) {
+const QuoteCard = memo(function QuoteCard({ quote, task, creatorName, today, currentEmployee, teams = [], isDragging, draggable, onOpen, onAction, onDragStart, onDragEnd }: any) {
   const priority = QUOTE_PRIORITIES.find((item) => item.id === quote.priority) || QUOTE_PRIORITIES[1];
   const sent = quote.status === "Respondida ao cliente";
   // Depois do envio o prazo interno já foi cumprido: o card passa a contar os dias sem retorno.
@@ -44,13 +45,13 @@ const QuoteCard = memo(function QuoteCard({ quote, task, today, currentEmployee,
     {quote.value !== null && quote.value !== undefined && String(quote.value).trim() && <div className="quote-kanban-value" aria-label={`Valor da cotação: ${formatMoney(quote.value)}`}><span className="quote-kanban-value-icon" aria-hidden="true"><BadgeDollarSign size={14} /></span><span className="quote-kanban-value-content"><small>Valor</small><strong>{formatMoney(quote.value)}</strong></span></div>}
     {waitingSummary && <div className="task-waiting-summary" title={waitingSummary}><Clock3 size={13} /><span>{waitingSummary}</span></div>}
     {quote.passengerProfile && <p className="task-description">{quote.passengerProfile}</p>}
-    {showAction && <div className="task-card-footer quote-kanban-card-footer"><button className="task-quick-action task-return-action" type="button" onClick={(event) => { event.stopPropagation(); onAction?.(quote, action); }} onKeyDown={(event) => event.stopPropagation()}>{action.label}</button></div>}
+    {(creatorName || showAction) && <div className="task-card-footer quote-kanban-card-footer">{creatorName && <AssigneeDisplay value={creatorName} small caption="Criado por" />}{showAction && <button className="task-quick-action task-return-action" type="button" onClick={(event) => { event.stopPropagation(); onAction?.(quote, action); }} onKeyDown={(event) => event.stopPropagation()}>{action.label}</button>}</div>}
   </article>;
 });
 
 const COLUMNS = QUOTE_OPEN_STATUSES.map((status) => ({ id: status, label: status, tone: (STATUS_META as any)[status]?.tone || "neutral" }));
 
-export default function QuoteKanban({ quotes, tasksByQuote, currentEmployee, teams = [], onOpen, onAction, onMove }: any) {
+export default function QuoteKanban({ quotes, tasksByQuote, currentEmployee, teams = [], employees = [], onOpen, onAction, onMove }: any) {
   const today = localDateKey();
   const quotesByColumn = useMemo(() => Object.fromEntries(QUOTE_OPEN_STATUSES.map((status) => [status, quotes.filter((quote: any) => quote.status === status)])), [quotes]);
   const getSourceColumnId = useCallback((quote: any) => quote?.status || "", []);
@@ -77,6 +78,6 @@ export default function QuoteKanban({ quotes, tasksByQuote, currentEmployee, tea
     itemLabelPlural="cotações"
     transferType="text/quote-id"
     renderColumnIcon={(column: any) => { const Icon = (STATUS_META as any)[column.id]?.Icon || ClipboardList; return <Icon className={`status-column-icon status-column-icon-${column.tone}`} size={17} strokeWidth={2.2} aria-hidden="true" />; }}
-    renderCard={(quote: any, dragProps: any) => <QuoteCard key={quote.id} quote={quote} task={tasksByQuote.get(quote.id)} today={today} currentEmployee={currentEmployee} teams={teams} onOpen={onOpen} onAction={onAction} {...dragProps} draggable={QUOTE_OPEN_STATUSES.includes(quote.status)} />}
+    renderCard={(quote: any, dragProps: any) => <QuoteCard key={quote.id} quote={quote} task={tasksByQuote.get(quote.id)} creatorName={quoteCreatorName(quote, employees)} today={today} currentEmployee={currentEmployee} teams={teams} onOpen={onOpen} onAction={onAction} {...dragProps} draggable={QUOTE_OPEN_STATUSES.includes(quote.status)} />}
   /></div>;
 }

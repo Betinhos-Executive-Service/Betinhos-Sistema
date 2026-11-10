@@ -90,7 +90,7 @@ function Get-MissingPrerequisites {
     if ($steps.Count -ne $expectedSteps) { $missing += "steps ativos do DriverNoticePlugin: $($steps.Count) de $expectedSteps" }
   }
   $newFlows = Get-NewFlows
-  if ($newFlows.Count -ne $newFlowNames.Count) { $missing += "flows novos: $($newFlows.Count) de $($newFlowNames.Count) (rode provision-aviso-motorista-flows.ps1 -Apply)" }
+  if ($newFlows.Count -ne $newFlowNames.Count) { $missing += "flows novos: $($newFlows.Count) de $($newFlowNames.Count) (rode packages/deploy/provision-flow-aviso-motorista.ps1 -Apply)" }
   return ,$missing
 }
 

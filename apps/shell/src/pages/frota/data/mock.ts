@@ -146,22 +146,6 @@ export function createMockSource(): DataSource {
         else if (FIELD_TO_PROP[key]) record[FIELD_TO_PROP[key]] = value
         else if (MULTI_TO_PROP[key]) record[MULTI_TO_PROP[key]] = lerMulti(value)
       }
-      // Simula o flow do JEV: devolver o registro à IA classifica alguns segundos depois.
-      if (kind === 'manutencao' && CAMPO.origem in patch && patch[CAMPO.origem] === null) {
-        setTimeout(() => Object.assign(record, { servicos: [100000006], categorias: [100000000], origemClassificacao: ORIGEM.IA, confiancaIa: 0.82 }), 4000)
-      }
-    },
-    async classificarAgora(id) {
-      await delay()
-      const item = data.manutencoes.find((row) => row.id === id)
-      if (!item) throw new Error('Registro não encontrado no mock.')
-      Object.assign(item, { servicos: [100000006], categorias: [100000000], origemClassificacao: ORIGEM.IA, confiancaIa: 0.82 })
-      return { servicos: item.servicos, categorias: item.categorias, origem: item.origemClassificacao, confianca: item.confiancaIa }
-    },
-    async classificacao(id) {
-      const item = data.manutencoes.find((row) => row.id === id)
-      if (!item) throw new Error('Registro não encontrado no mock.')
-      return { servicos: item.servicos, categorias: item.categorias, origem: item.origemClassificacao, confianca: item.confiancaIa }
     },
     async openForm(kind, id) {
       window.alert(`Mock: abriria o formulário nativo de ${kind}${id ? ` (${id})` : ' (novo)'}.`)

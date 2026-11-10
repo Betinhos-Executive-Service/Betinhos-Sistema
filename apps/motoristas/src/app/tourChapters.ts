@@ -756,7 +756,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("convite", "Como foi no posto", ["Depois de abastecer, quando a nota é lida e você ainda não avaliou aquele posto, o app pergunta como foi. Um toque em Recomendo ou Não recomendo já salva. O X dispensa a pergunta."], { target: ".gr-convite", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
-      step("completar", "Completar", ["Quando há gastos do cartão para completar, o botão da esquerda abre a lista deles."], { target: ".gr-actions .action-button--secondary", optional: true }),
+      step("completar", "Pendentes", ["O botão Pendentes leva à lista do que precisa da sua ação: gastos do cartão para completar e despesas devolvidas para corrigir."], { target: ".gr-actions .action-button--secondary", optional: true }),
       step("anexar", "Anexar despesa", ["Abre a câmera para fotografar o comprovante e lançar um gasto novo."], { target: ".gr-actions .action-button--primary" }),
       helpStep()
     ]

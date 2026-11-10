@@ -1,6 +1,51 @@
 /* Despesas operacionais: reaproveita lista e ficha de Pagantes (pagantes.css). Só tokens do Design System. */
 .dp-alertas { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
 .dp-page .pg-card__foot { justify-content: flex-start; }
+/* Barra numa linha só, pela largura dela mesma (container query, já sem o menu lateral):
+   título ~220 + Colunas/Filtros/Auditoria ~310 + busca 150 + período 140 + Atualizar 40 ~= 1040 px.
+   Abaixo disso os três comandos ficam só com ícone (o nome segue para leitor de tela) e o selo do mock sai (o menu já avisa);
+   só em largura bem estreita os comandos descem para a linha de baixo. */
+.dp-barra { container-type: inline-size; }
+.dp-page .pg-filters__search { flex: 1 1 150px; min-width: 150px; }
+.dp-page .pg-filters__select { flex: 0 0 140px; min-width: 0; }
+@container (min-width: 720px) {
+  .dp-barra .bt-viewbar, .dp-barra .bt-viewbar__end { flex-wrap: nowrap; }
+  /* Em uma linha os botões não encolhem abaixo do próprio tamanho (crescem para a busca ocupar o espaço livre) e o nome
+     da visão encolhe com reticências; com a base 0 do shell eles transbordavam para a esquerda, por cima do selo "Alterada". */
+  .dp-barra .bt-viewbar__end { flex: 1 0 auto; }
+  .dp-barra .bt-viewbar__start > .bt-menu { min-width: 0; }
+}
+@container (max-width: 1059px) {
+  .dp-barra .bt-viewbar__end > .bt-button .bt-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@container (max-width: 869px) { .dp-barra .bt-viewbar__end > .bt-badge { display: none; } }
+
+/* Cartões compactos (como na Frota): são atalho para a lista, não o assunto da tela; espaço antes da tabela.
+   Uma fileira de 5 a partir de 560 px do próprio bloco; abaixo de 900 px saem ícone e dica para o rótulo caber. */
+.dp-kpis { container-type: inline-size; margin-bottom: var(--bt-space-3); }
+.dp-kpis__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2); }
+.dp-kpis__grid > :last-child { grid-column: 1 / -1; }
+@container (min-width: 560px) {
+  .dp-kpis__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dp-kpis__grid > :last-child { grid-column: auto; }
+}
+@container (max-width: 899px) { .dp-kpis .bt-metric__icon { display: none; } }
+@container (min-width: 560px) and (max-width: 899px) { .dp-kpis .bt-metric__hint { display: none; } }
+.dp-page .bt-metric { min-height: 0; padding: var(--bt-space-2-5) var(--bt-space-3); gap: var(--bt-space-2-5); box-shadow: none; }
+.dp-page .bt-metric__icon { width: 32px; height: 32px; border-radius: var(--bt-radius-sm); }
+.dp-page .bt-metric__icon > svg { width: 16px; height: 16px; }
+.dp-page .bt-metric__value { font-size: var(--bt-font-size-20); }
+/* Depois das regras acima: mesma especificidade, então a ordem decide. */
+@container (min-width: 560px) and (max-width: 699px) { .dp-kpis .bt-metric { padding-inline: var(--bt-space-2-5); } .dp-kpis .bt-metric__value { font-size: var(--bt-font-size-17); } }
+
+.dp-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Cartões de total que abrem a visão pronta (mesmo padrão de Documentos): o cartão inteiro é um alternador. */
+.dp-kpi { display: block; padding: 0; border: 0; border-radius: var(--bt-radius-lg); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.dp-kpi > * { height: 100%; }
+.dp-kpi:active { transform: scale(0.98); }
+.dp-kpi:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.dp-kpi[aria-pressed="true"] > * { border-color: var(--bt-color-action); }
 
 .dp-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-decoration: none; }
 .dp-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
@@ -19,7 +64,9 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 @media (hover: hover) and (pointer: fine) { button.dp-comprovante__previa:hover { background-color: var(--bt-color-surface-soft); } }
 .dp-comprovante__info { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-1) var(--bt-space-2) var(--bt-space-2-5); font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
 .dp-comprovante__nome { grid-column: 1 / -1; overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
-.dp-comprovante__meta { overflow: hidden; font-size: var(--bt-font-size-12); text-overflow: ellipsis; white-space: nowrap; }
+/* Tipo e data numa linha própria, sem cortar: a data é o que diferencia dois anexos. Status e link ficam na linha de baixo. */
+.dp-comprovante__meta { grid-column: 1 / -1; font-size: var(--bt-font-size-12); overflow-wrap: anywhere; }
+.dp-comprovante__info > .bt-badge { justify-self: start; }
 .dp-comprovante__info .dp-link { display: grid; place-items: center; min-width: var(--bt-control-height-compact); min-height: var(--bt-control-height-compact); }
 
 .dp-previa__img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
@@ -61,3 +108,38 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 .dp-ia__valor { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-1) var(--bt-space-2); }
 .dp-ia__diff { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-warning); }
 .dp-ia__meta { margin: 0; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+
+/* Decisão do gestor: bloco acima da ficha. Movimento do design: opacidade + 4 px, sem animar altura. */
+.dp-decisao { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-warning); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.dp-decisao__titulo { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.dp-historia { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.dp-historia__linha { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: var(--bt-space-2); }
+.dp-historia__icone { display: grid; place-items: center; height: 20px; color: var(--bt-color-text-secondary); }
+.dp-historia__citacao { font-style: italic; white-space: pre-wrap; }
+.dp-historia__valores { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-1) var(--bt-space-4); padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.dp-historia__valores strong { color: var(--bt-color-text-primary); }
+.dp-decisao__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.dp-decisao__cancelar { margin-left: auto; color: var(--bt-color-danger); }
+/* Botão que abriu o campo de motivo fica marcado, para o gestor ver qual saída está preenchendo. O :active vem do DS. */
+.dp-decisao__acoes .bt-button[aria-expanded="true"] { background-color: var(--bt-color-surface-soft); box-shadow: inset 0 0 0 var(--bt-border-width-default) currentColor; }
+.dp-motivo__prontos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin-top: calc(var(--bt-space-1) * -1); }
+.dp-pronto { padding: var(--bt-space-1) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: 999px; background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out), background-color var(--bt-duration-fast) ease, border-color var(--bt-duration-fast) ease; }
+.dp-pronto:active:not(:disabled) { transform: scale(.97); }
+.dp-pronto[aria-pressed="true"] { border-color: var(--bt-color-action); background-color: var(--bt-color-surface-soft); }
+.dp-pronto:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+.dp-pronto:disabled { opacity: .5; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .dp-pronto:not(:disabled):hover { background-color: var(--bt-color-surface-soft); } }
+@media (max-width: 560px) { .dp-decisao__cancelar { margin-left: 0; } }
+.dp-motivo { display: grid; gap: var(--bt-space-3); animation: dp-motivo-in 180ms var(--bt-ease-out); }
+.dp-motivo--saindo { opacity: 0; transform: translateY(4px); transition: opacity 120ms var(--bt-ease-out), transform 120ms var(--bt-ease-out); pointer-events: none; }
+.dp-motivo__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); }
+@keyframes dp-motivo-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* Avançar para a próxima despesa: só crossfade, sem slide. */
+.dp-troca { animation: dp-troca-in 120ms var(--bt-ease-out); }
+@keyframes dp-troca-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dp-motivo { animation-name: dp-troca-in; animation-duration: 120ms; }
+  .dp-motivo--saindo { transform: none; }
+  .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
+  .dp-kpi, .dp-kpi:active { transition: none; transform: none; }
+}

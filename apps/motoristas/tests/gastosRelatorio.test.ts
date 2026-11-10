@@ -24,7 +24,8 @@ import {
 let seq = 0;
 const d = (parcial: Partial<DespesaRelatorio>): DespesaRelatorio => ({
   id: `d${++seq}`, valor: 10, data: "2026-11-10", categoria: "Outros", formaPagamentoId: "", status: STATUS_DESPESA.enviado,
-  statusAnexo: 100000002, litros: null, km: null, veiculoId: "", estabelecimento: "", conciliadaCartao: false, ...parcial
+  statusAnexo: 100000002, litros: null, km: null, veiculoId: "", estabelecimento: "", conciliadaCartao: false,
+  motivoDevolucao: "", iaMotivos: "", justificativa: "", aguardandoGestor: false, ...parcial
 });
 const HOJE = "2026-11-20";
 
