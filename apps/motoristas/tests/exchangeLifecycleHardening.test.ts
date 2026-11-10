@@ -22,7 +22,7 @@ test("app motorista não oferece cancelamento para troca", () => {
 });
 
 test("handler de atualização não aceita mudança estrutural", () => {
-  const handler = read("../plugins/DriverRecordSharing/ExchangeLifecycleCommandHandler.cs");
+  const handler = read("../../../packages/plugins/Betinhos.DriverRecordSharing/ExchangeLifecycleCommandHandler.cs");
   const update = handler.slice(handler.indexOf("private void UpdateExchange"), handler.indexOf("private void Register"));
   assert.doesNotMatch(update, /new_Tipo|new_Motorista|new_Veiculo/);
   assert.match(update, /ExchangeObservation/);
