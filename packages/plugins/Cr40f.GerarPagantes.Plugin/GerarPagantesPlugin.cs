@@ -59,7 +59,7 @@ public sealed class GerarPagantesPluginV2 : IPlugin
             ValidateExistingPayload(request, existing);
             var needsCielo = request.Pagantes.Any(payer => payer.GenerateLink) ||
                 existing.Values.Any(row => !string.IsNullOrWhiteSpace(row.GetAttributeValue<string>("cr40f_cielolinkid")));
-            var settings = PluginSettings.Load(configurationService);
+            var settings = PluginSettings.Load(configurationService, tracing);
             settings.ValidateFor(request, needsCielo);
             var cielo = needsCielo ? new CieloClient(settings.CieloClientId, settings.CieloClientSecret) : null;
             var graph = request.Pagantes.Any(payer => payer.SendEmail) ? new GraphEmailClient(settings) : null;
