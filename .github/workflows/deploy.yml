@@ -201,31 +201,10 @@ jobs:
           echo "$saida" >> "$GITHUB_OUTPUT"
           echo "$saida"
 
-      # Conta de serviço: schema e flows usam o mesmo az login. Antes da tela e dos plugins, porque a migration roda primeiro.
-      - name: Entrar no DEV como conta de serviço
-        id: azlogin
-        if: steps.flowspend.outputs.flows != '' || steps.schemapend.outputs.migrations != ''
-        continue-on-error: true
-        run: az login --service-principal -u $env:DV_CLIENT_ID -p $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --allow-no-subscriptions --output none
-      # Em ordem de nome, com -Apply; a primeira falha interrompe as migrations (as seguintes podem depender dela), não o resto do Deploy.
-      - name: Aplicar migrations
-        id: migrations
-        if: steps.schemapend.outputs.migrations != '' && steps.azlogin.outcome != 'failure'
-        continue-on-error: true
-        env:
-          MIGRATIONS: ${{ steps.schemapend.outputs.migrations }}
-        run: |
-          foreach ($m in $env:MIGRATIONS.Split(',')) {
-            Write-Host "::group::migration $m"
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "packages/deploy/migrations/$m" -Apply
-            $rc = $LASTEXITCODE
-            Write-Host '::endgroup::'
-            if ($rc -ne 0) { Write-Host "::error title=Schema no DEV::A migration $m falhou ($rc); as seguintes não rodaram."; exit 1 }
-          }
-
       # Flows. A base é a tag flows-dev-publicado (mesmo padrão da prod-publicado do producao.yml); sem tag nada fica pendente
       # e o job final cria a tag no HEAD. O diff compara só as árvores dos dois commits, então basta buscar a tag com depth=1.
       # Roda antes da tela e dos plugins: uma falha aqui não deixa peça publicada sem distribuir. Flow só sai da develop.
+      # Fica antes do az login, que decide pelo output deste passo.
       - name: Quais flows publicar
         id: flowspend
         shell: bash
@@ -253,6 +232,28 @@ jobs:
           fi
           echo "$saida" >> "$GITHUB_OUTPUT"
           echo "$saida"
+
+      # Conta de serviço: schema e flows usam o mesmo az login. Antes da tela e dos plugins, porque a migration roda primeiro.
+      - name: Entrar no DEV como conta de serviço
+        id: azlogin
+        if: steps.flowspend.outputs.flows != '' || steps.schemapend.outputs.migrations != ''
+        continue-on-error: true
+        run: az login --service-principal -u $env:DV_CLIENT_ID -p $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --allow-no-subscriptions --output none
+      # Em ordem de nome, com -Apply; a primeira falha interrompe as migrations (as seguintes podem depender dela), não o resto do Deploy.
+      - name: Aplicar migrations
+        id: migrations
+        if: steps.schemapend.outputs.migrations != '' && steps.azlogin.outcome != 'failure'
+        continue-on-error: true
+        env:
+          MIGRATIONS: ${{ steps.schemapend.outputs.migrations }}
+        run: |
+          foreach ($m in $env:MIGRATIONS.Split(',')) {
+            Write-Host "::group::migration $m"
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "packages/deploy/migrations/$m" -Apply
+            $rc = $LASTEXITCODE
+            Write-Host '::endgroup::'
+            if ($rc -ne 0) { Write-Host "::error title=Schema no DEV::A migration $m falhou ($rc); as seguintes não rodaram."; exit 1 }
+          }
 
       # Tela
       - if: steps.pendentes.outputs.instalar != '' || steps.pendentes.outputs.motoristas_app == 'true'
