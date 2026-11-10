@@ -12,7 +12,7 @@ function normalizeProfiles(value: any) {
   return unique.length ? unique : [{ id: "unassigned", name: "Não atribuído" }];
 }
 
-export default function AssigneeDisplay({ value, small = false, team = null, teamName = "", primaryName = "", consultantNames = [] }: any) {
+export default function AssigneeDisplay({ value, small = false, team = null, teamName = "", primaryName = "", consultantNames = [], caption = "Responsáveis" }: any) {
   if (team || teamName) {
     const label = team?.name || teamName || "Equipe responsável";
     return <span className="assignee-display assignee-display-team" title={`Equipe responsável: ${label}`} aria-label={`Equipe responsável: ${label}`}>
@@ -26,7 +26,7 @@ export default function AssigneeDisplay({ value, small = false, team = null, tea
   const displayNames = responsibilityNames.map((name) => String(name || "").trim().split(/\s+/)[0]).filter(Boolean);
   const label = displayNames.join(" | ") || "Não atribuído";
 
-  return <span className="assignee-display" title={label} aria-label={`Responsáveis: ${label}`}>
+  return <span className="assignee-display" title={`${caption}: ${label}`} aria-label={`${caption}: ${label}`}>
     <span className={`team-assignee-icon ${small ? "team-assignee-icon-small" : ""}`} aria-hidden="true"><TeamIcon name="users" size={small ? 14 : 16} /></span>
     <span className="assignee-name">
       {displayNames.length ? displayNames.map((name, index) => (

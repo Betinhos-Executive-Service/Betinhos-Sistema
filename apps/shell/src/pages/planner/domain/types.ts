@@ -194,6 +194,8 @@ export interface Quote {
   lossReason?: string
   /** Funcionário que criou a cotação (V2: recebe preço pronto e lembrete). */
   creatorEmployeeId?: string
+  /** Nome da lookup no Dataverse: vale quando o criador saiu da lista de funcionários ativos. */
+  creatorName?: string
   history?: TaskHistoryItem[]
   [extra: string]: unknown
 }

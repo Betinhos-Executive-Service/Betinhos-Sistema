@@ -991,6 +991,7 @@ function normalizeQuote(row: Row): LiveQuote {
     value: row.cr40f_valorcotado == null ? "" : String(row.cr40f_valorcotado),
     plannerTaskId: s(row.cr40f_plannertaskid),
     creatorEmployeeId: s(row._cr40f_criador_value),
+    creatorName: formatLookup(row, "cr40f_criador", ""),
     plannerLink: s(row.cr40f_linktarefaplanner),
     teamsLink: s(row.cr40f_linkmensagemteams),
   };
