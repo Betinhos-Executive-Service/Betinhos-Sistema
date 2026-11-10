@@ -28,13 +28,49 @@ Confere ($r.Count -eq 0) 'paralelo: lista vazia'
 $script:ParaleloSequencial = $true
 $script:rotas = [ordered]@{}
 $script:textos = [ordered]@{}
+# Colunas que existem no DEV (EntityDefinitions(LogicalName=...)/Attributes, lidas em 09/11/2026), por conjunto. Toda leitura
+# simulada confere o $select e o $filter contra este mapa: systemform, fieldpermission, attributeimageconfig, entityimageconfig,
+# canvasapp e appaction_appactionrule_classicrules nao tem modifiedon (o 400 do primeiro uso real); versionnumber existe em todas.
+# Conjunto novo na impressao pede linha nova aqui, conferida no DEV.
+$script:ColunasConhecidas = @{
+  solutions = 'solutionid uniquename'; solutioncomponents = 'objectid componenttype rootcomponentbehavior solutionid'
+  solutioncomponentdefinitions = 'solutioncomponenttype primaryentityname'
+  roles = 'roleid modifiedon versionnumber'; savedqueries = 'savedqueryid returnedtypecode modifiedon versionnumber'
+  workflows = 'workflowid primaryentity category modifiedon versionnumber'
+  savedqueryvisualizations = 'savedqueryvisualizationid primaryentitytypecode modifiedon versionnumber'
+  systemforms = 'formid objecttypecode publishedon versionnumber'; webresourceset = 'webresourceid modifiedon versionnumber'
+  sitemaps = 'sitemapid modifiedon versionnumber'; fieldsecurityprofiles = 'fieldsecurityprofileid modifiedon versionnumber'
+  fieldpermissions = 'fieldpermissionid fieldsecurityprofileid versionnumber'; appmodules = 'appmoduleid modifiedon publishedon versionnumber'
+  plugintypes = 'plugintypeid modifiedon versionnumber'; pluginassemblies = 'pluginassemblyid modifiedon versionnumber'
+  sdkmessageprocessingsteps = 'sdkmessageprocessingstepid modifiedon versionnumber'; canvasapps = 'canvasappid versionnumber'
+  connectors = 'connectorid modifiedon versionnumber'; environmentvariabledefinitions = 'environmentvariabledefinitionid modifiedon versionnumber'
+  attributeimageconfigs = 'attributeimageconfigid versionnumber'; entityimageconfigs = 'entityimageconfigid versionnumber'
+  customapis = 'customapiid modifiedon versionnumber'
+  appaction_appactionrule_classicrulesset = 'appaction_appactionrule_classicrulesid versionnumber'
+}
+$script:colunasInvalidas = New-Object Collections.Generic.List[string]
+function Test-ColunasDaLeitura([string] $Uri) {
+  $caminho = $Uri.Substring($dv.Api.Length + 1)
+  $conjunto = ($caminho -split '[?(/]')[0]
+  if (@('EntityDefinitions', 'GlobalOptionSetDefinitions', 'RetrieveRolePrivilegesRole') -contains $conjunto) { return }
+  if (-not $script:ColunasConhecidas.ContainsKey($conjunto)) { $script:colunasInvalidas.Add("$conjunto (conjunto sem colunas conhecidas)"); return }
+  $conhecidas = @($script:ColunasConhecidas[$conjunto] -split ' ')
+  $usadas = @()
+  if ($caminho -match '\$select=([^&]+)') { $usadas += $Matches[1] -split ',' }
+  if ($caminho -match '\$filter=([^&]+)') { $usadas += @([regex]::Matches($Matches[1], '(\w+) (?:eq|ne|ge|gt|le|lt) ') | ForEach-Object { $_.Groups[1].Value }) }
+  foreach ($c in $usadas) {
+    if ($conhecidas -notcontains ($c -replace '^_(.+)_value$', '$1')) { $script:colunasInvalidas.Add("$conjunto.$c") }
+  }
+}
 function Invoke-RestMethod {
   param($Method, $Uri, $Headers, $Body, $ContentType)
+  Test-ColunasDaLeitura $Uri
   foreach ($k in $script:rotas.Keys) { if ($Uri -like $k) { $v = $script:rotas[$k]; if ($v -is [Exception]) { throw $v }; return [pscustomobject]@{ value = @($v) } } }
   throw "sem rota: $Uri"
 }
 function Invoke-WebRequest {
   param($Method, $Uri, $Headers, [switch] $UseBasicParsing)
+  Test-ColunasDaLeitura $Uri
   foreach ($k in $script:textos.Keys) { if ($Uri -like $k) { $v = $script:textos[$k]; if ($v -is [Exception]) { throw $v }; return [pscustomobject]@{ Content = $v } } }
   throw "sem texto: $Uri"
 }
@@ -43,18 +79,23 @@ function Linha($o) { return [pscustomobject] $o }
 function Cenario {
   $script:rotas = [ordered]@{
     "*/solutions*uniquename eq 'BetinhosCore'*" = @(Linha @{ solutionid = 'sid' })
-    '*/solutioncomponentdefinitions*'           = @(Linha @{ solutioncomponenttype = 10050; primaryentityname = 'customapi' })
+    '*/solutioncomponentdefinitions*'           = @((Linha @{ solutioncomponenttype = 10050; primaryentityname = 'customapi' }), (Linha @{ solutioncomponenttype = 10051; primaryentityname = 'appaction_appactionrule_classicrules' }))
+    # Mapa do site de app (isappaware) some da listagem de sitemaps: so aparece filtrando pelo id (DEV, 09/11/2026).
+    '*/sitemaps*sitemapid eq s1*'               = @(Linha @{ sitemapid = 's1'; versionnumber = '101' })
+    '*/sitemaps*'                               = @(Linha @{ sitemapid = 's9'; versionnumber = '101' })
+    '*/appaction_appactionrule_classicrulesset*' = @(Linha @{ appaction_appactionrule_classicrulesid = 'a1'; versionnumber = '101' })
     '*/solutioncomponents*sid*'                 = @(
       (Linha @{ objectid = 'T1'; componenttype = 1; rootcomponentbehavior = 0 }), (Linha @{ objectid = 'w1'; componenttype = 61; rootcomponentbehavior = 0 }),
       (Linha @{ objectid = 'r1'; componenttype = 20; rootcomponentbehavior = 0 }), (Linha @{ objectid = 'o1'; componenttype = 9; rootcomponentbehavior = 0 }),
-      (Linha @{ objectid = 'c1'; componenttype = 10050; rootcomponentbehavior = 0 }))
-    '*/customapis*'                             = @(Linha @{ customapiid = 'c1'; modifiedon = '2026-11-01T10:00:00Z' })
-    '*/webresourceset*'                         = @((Linha @{ webresourceid = 'w1'; modifiedon = '2026-11-01T10:00:00Z' }), (Linha @{ webresourceid = 'w9'; modifiedon = '2026-11-02T10:00:00Z' }))
-    '*/roles*'                                  = @(Linha @{ roleid = 'r1'; modifiedon = '2026-11-01T10:00:00Z' })
-    '*/EntityDefinitions*'                      = @((Linha @{ MetadataId = 't1'; LogicalName = 'cr40f_x'; EntitySetName = 'cr40f_xs'; PrimaryIdAttribute = 'cr40f_xid' }), (Linha @{ MetadataId = 't2'; LogicalName = 'cr40f_y'; EntitySetName = 'cr40f_ys'; PrimaryIdAttribute = 'cr40f_yid' }), (Linha @{ MetadataId = 't3'; LogicalName = 'customapi'; EntitySetName = 'customapis'; PrimaryIdAttribute = 'customapiid' }))
-    '*/systemforms*'                            = @((Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; modifiedon = '2026-11-01T10:00:00Z' }), (Linha @{ formid = 'f2'; objecttypecode = 'cr40f_y'; modifiedon = '2026-11-01T10:00:00Z' }))
+      (Linha @{ objectid = 'c1'; componenttype = 10050; rootcomponentbehavior = 0 }), (Linha @{ objectid = 's1'; componenttype = 62; rootcomponentbehavior = 0 }),
+      (Linha @{ objectid = 'a1'; componenttype = 10051; rootcomponentbehavior = 0 }))
+    '*/customapis*'                             = @(Linha @{ customapiid = 'c1'; versionnumber = '101' })
+    '*/webresourceset*'                         = @((Linha @{ webresourceid = 'w1'; versionnumber = '101' }), (Linha @{ webresourceid = 'w9'; versionnumber = '102' }))
+    '*/roles*'                                  = @(Linha @{ roleid = 'r1'; versionnumber = '101' })
+    '*/EntityDefinitions*'                      = @((Linha @{ MetadataId = 't1'; LogicalName = 'cr40f_x'; EntitySetName = 'cr40f_xs'; PrimaryIdAttribute = 'cr40f_xid' }), (Linha @{ MetadataId = 't2'; LogicalName = 'cr40f_y'; EntitySetName = 'cr40f_ys'; PrimaryIdAttribute = 'cr40f_yid' }), (Linha @{ MetadataId = 't3'; LogicalName = 'customapi'; EntitySetName = 'customapis'; PrimaryIdAttribute = 'customapiid' }), (Linha @{ MetadataId = 't4'; LogicalName = 'appaction_appactionrule_classicrules'; EntitySetName = 'appaction_appactionrule_classicrulesset'; PrimaryIdAttribute = 'appaction_appactionrule_classicrulesid' }))
+    '*/systemforms*'                            = @((Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; versionnumber = '101' }), (Linha @{ formid = 'f2'; objecttypecode = 'cr40f_y'; versionnumber = '101' }))
     '*/savedqueryvisualizations*'               = @()
-    '*/savedqueries*'                           = @(Linha @{ savedqueryid = 'v1'; returnedtypecode = 'cr40f_x'; modifiedon = '2026-11-01T10:00:00Z' })
+    '*/savedqueries*'                           = @(Linha @{ savedqueryid = 'v1'; returnedtypecode = 'cr40f_x'; versionnumber = '101' })
     '*/workflows*'                              = @()
   }
   $script:textos = [ordered]@{
@@ -69,21 +110,28 @@ $base = Get-ImpressaoDigital $dv 'BetinhosCore'
 Confere (-not $base.incerto -and $base.valor -match '^[0-9a-f]{64}$') "impressao: certa e com hash ($(@($base.motivos) -join '; '))"
 Cenario
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -eq $base.valor) 'impressao: mesma entrada, mesmo valor'
-Cenario; $script:rotas['*/webresourceset*'] = @(Linha @{ webresourceid = 'w1'; modifiedon = '2026-11-03T10:00:00Z' })
+Cenario; $script:rotas['*/sitemaps*sitemapid eq s1*'] = @(Linha @{ sitemapid = 's1'; versionnumber = '102' })
+Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: mapa do site fora da listagem e lido pelo id e muda o valor'
+Cenario; $script:rotas['*/sitemaps*sitemapid eq s1*'] = @()
+$i = Get-ImpressaoDigital $dv 'BetinhosCore'
+Confere ($i.incerto -and (@($i.motivos) -join ' ') -like '*s1 sem registro*') 'impressao: componente que nem pelo id aparece fica incerto'
+Cenario; $script:rotas['*/appaction_appactionrule_classicrulesset*'] = @(Linha @{ appaction_appactionrule_classicrulesid = 'a1'; versionnumber = '102' })
+Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: componente de tabela sem modifiedon muda o valor pela versionnumber'
+Cenario; $script:rotas['*/webresourceset*'] = @(Linha @{ webresourceid = 'w1'; versionnumber = '103' })
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: WebResource alterado muda o valor'
 Cenario; $script:textos['*/EntityDefinitions(t1)*'] = 'meta-t1-coluna-nova'
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: metadata da tabela (coluna, opcao, relacionamento) muda o valor'
-Cenario; $script:rotas['*/systemforms*'] = @(Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; modifiedon = '2026-11-04T10:00:00Z' })
+Cenario; $script:rotas['*/systemforms*'] = @(Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; versionnumber = '104' })
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: formulario da tabela alterado muda o valor'
 Cenario; $script:textos['*RetrieveRolePrivilegesRole*'] = 'privilegios-r1-mais-um'
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: privilegio do papel muda o valor'
 Cenario; $script:textos['*/GlobalOptionSetDefinitions(o1)*'] = 'opcoes-o1-nova'
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: escolha global muda o valor'
-Cenario; $script:rotas['*/customapis*'] = @(Linha @{ customapiid = 'c1'; modifiedon = '2026-11-05T10:00:00Z' })
+Cenario; $script:rotas['*/customapis*'] = @(Linha @{ customapiid = 'c1'; versionnumber = '105' })
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: componente de tabela (>= 10000) alterado muda o valor'
 Cenario; $script:rotas['*/solutioncomponents*sid*'] = @($script:rotas['*/solutioncomponents*sid*'] | Select-Object -Skip 1)
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -ne $base.valor) 'impressao: componente a menos na solucao muda o valor'
-Cenario; $script:rotas['*/systemforms*'] = @((Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; modifiedon = '2026-11-01T10:00:00Z' }), (Linha @{ formid = 'f2'; objecttypecode = 'cr40f_y'; modifiedon = '2026-11-09T10:00:00Z' }))
+Cenario; $script:rotas['*/systemforms*'] = @((Linha @{ formid = 'f1'; objecttypecode = 'cr40f_x'; versionnumber = '101' }), (Linha @{ formid = 'f2'; objecttypecode = 'cr40f_y'; versionnumber = '109' }))
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').valor -eq $base.valor) 'impressao: formulario de tabela fora da solucao nao conta'
 
 Cenario; $script:rotas['*/solutioncomponents*sid*'] = @($script:rotas['*/solutioncomponents*sid*']) + @(Linha @{ objectid = 'z1'; componenttype = 999; rootcomponentbehavior = 0 })
@@ -100,6 +148,9 @@ $i = Get-ImpressaoDigital $dv 'BetinhosCore'
 Confere ($i.incerto -and (@($i.motivos) -join ' ') -like '*sem permissao*') 'impressao: consulta em lote que falha fica incerta'
 Cenario; $script:rotas['*/solutioncomponents*sid*'] = @(Linha @{ objectid = 'a1'; componenttype = 2; rootcomponentbehavior = 0 })
 Confere ((Get-ImpressaoDigital $dv 'BetinhosCore').incerto) 'impressao: coluna solta (tipo 2) fica incerta'
+Confere ($script:colunasInvalidas.Count -eq 0) "leituras: so pedem colunas que existem no DEV ($(@($script:colunasInvalidas | Select-Object -Unique) -join ', '))"
+$semMapa = @(@($script:LeitoresPorTipo.Values | ForEach-Object { $_[0] }) + @($script:SubcomponentesDaTabela | ForEach-Object { $_[0] }) | Where-Object { -not $script:ColunasConhecidas.ContainsKey($_) })
+Confere ($semMapa.Count -eq 0) "leituras: todo conjunto lido tem colunas conhecidas ($($semMapa -join ', '))"
 $script:ParaleloSequencial = $false
 
 # --- Get-DecisaoDeExport: so pula ou reaproveita com impressao certa e igual; na duvida, exporta ---
