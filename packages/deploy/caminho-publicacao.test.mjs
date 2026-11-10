@@ -85,6 +85,11 @@ test('teste de plugin não muda o PROD', () => {
   assert.equal(caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin.Tests/A.cs']).caminho, 'nada')
 })
 
+test('App Motoristas ainda é publicado pelo app-motoristas-v2 e não muda o PROD por aqui', () => {
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/src/App.tsx', 'apps/motoristas/package.json']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/src/App.tsx', 'apps/shell/src/main.tsx']).caminho, 'front')
+})
+
 test('arquivo desconhecido vai pelo caminho seguro', () => {
   assert.equal(caminhoDoArquivo('pasta-nova/qualquer.txt'), 'solucoes')
 })

@@ -92,6 +92,9 @@ jobs:
       # Inclui @betinhos/formulario-geral (build do webresource + 19 testes do app).
       - name: Testes (exceto shell)
         run: pnpm -r --filter '!@betinhos/shell' test
+      # O WebResource do App Motoristas é um HTML só; sem número de versão novo (quem sobe a versão é a publicação).
+      - name: Build do App Motoristas
+        run: pnpm --filter @betinhos/motoristas exec node scripts/build-react-singlefile.cjs --no-version
 
   shell:
     needs: mudancas

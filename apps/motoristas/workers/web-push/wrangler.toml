@@ -1,0 +1,9 @@
+name = "app-motoristas-web-push"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# Segredos (nunca no repositório), um por comando: npx wrangler secret put <NOME>
+#   SHARED_SECRET      texto longo e aleatório; o Flow manda como "Authorization: Bearer ..."
+#   VAPID_PRIVATE_JWK  JSON gerado por scripts/generate-vapid-keys.mjs
+#   VAPID_PUBLIC_KEY   chave pública impressa pelo mesmo script (a mesma de WEB_PUSH_PUBLIC_KEY no app)
+#   VAPID_SUBJECT      contato da Betinhos no formato mailto:email (os serviços de push exigem)
