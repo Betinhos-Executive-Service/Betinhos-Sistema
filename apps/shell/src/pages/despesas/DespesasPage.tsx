@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -126,11 +126,13 @@ function Despesas({ host }: { host: Host }) {
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />, [refresh, reloading])
   useShellHeader({ title: 'Despesas operacionais', actions: headerActions })
   const clearAll = () => { clearFilters(); setQuery('') }
-  // Cada cartão de total abre a visão pronta correspondente; clicar de novo volta à visão padrão.
+  // Cada cartão de total abre a visão pronta correspondente; clicar de novo volta à visão padrão. Com a visão atual
+  // alterada e não salva, pergunta antes de trocar.
+  const [trocaPendente, setTrocaPendente] = useState<string | null>(null)
+  const trocar = (pronta: string) => (view.active.id === pronta ? view.restore() : view.select(pronta))
   const kpi = (id: string) => {
     const pronta = `pronta:${id}`
-    const ativa = view.active.id === pronta
-    return { 'aria-pressed': ativa, onClick: () => (ativa ? view.restore() : view.select(pronta)) }
+    return { 'aria-pressed': view.active.id === pronta, onClick: () => (view.dirty ? setTrocaPendente(pronta) : trocar(pronta)) }
   }
   const kpiLoading = loadingFirst || pending
   let body
@@ -182,6 +184,13 @@ function Despesas({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {body}
+      <Dialog open={trocaPendente != null} onClose={() => setTrocaPendente(null)} title="Descartar alterações?"
+        actions={<>
+          <Button variant="secondary" onClick={() => setTrocaPendente(null)}>Continuar editando</Button>
+          <Button variant="danger" onClick={() => { if (trocaPendente) trocar(trocaPendente); setTrocaPendente(null) }}>Descartar</Button>
+        </>}>
+        As colunas, filtros ou ordenação da visão “{view.active.name}” foram alterados e ainda não foram salvos.
+      </Dialog>
       {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} onDecidir={decidir} /> : null}
     </div>
   )
