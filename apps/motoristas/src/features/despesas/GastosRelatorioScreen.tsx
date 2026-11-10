@@ -164,6 +164,9 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
   const { status, tendencia, periodo } = modelo;
   const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
   const fecharDetalhe = useCallback(() => setAberta(null), []);
+  // Devolvida reenviada sai de Pendentes: o aviso explica para onde ela foi.
+  const [reenviou, setReenviou] = useState(false);
+  const devolucaoEnviada = useCallback((id: string, explicacao: string) => { setReenviou(true); onDevolucaoEnviada(id, explicacao); }, [onDevolucaoEnviada]);
   // Toque no push: abre o detalhe da despesa assim que ela aparece na lista.
   useEffect(() => {
     if (!abrirDespesaId) return;
@@ -245,6 +248,12 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
             <button type="button" className="gr-aba" aria-pressed={filtro === "todas"} onClick={() => onFiltro("todas")}>Todas ({modelo.despesas.length})</button>
           </div>
         </div>
+        {reenviou && filtro === "pendentes" ? (
+          <p className="dv-sucesso gr-reenviada" role="status">
+            Enviado para nova conferência. O gasto agora está em{" "}
+            <button type="button" className="termo-text-button" onClick={() => onFiltro("todas")}>Todas</button>.
+          </p>
+        ) : null}
         {lista.length ? (
           <ul className="gr-lista">
             {lista.map((item) => {
@@ -277,7 +286,7 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
           </div>
         )}
       </section>
-      {aberta ? <DespesaDetalheDialog despesa={aberta} onClose={fecharDetalhe} motoristaId={motoristaId} onDevolucaoEnviada={onDevolucaoEnviada} /> : null}
+      {aberta ? <DespesaDetalheDialog despesa={aberta} onClose={fecharDetalhe} motoristaId={motoristaId} onDevolucaoEnviada={devolucaoEnviada} /> : null}
     </div>
   );
 }
