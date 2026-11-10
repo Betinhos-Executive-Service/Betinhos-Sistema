@@ -7,9 +7,9 @@ description: Verifica os plugins do link de acompanhamento do cliente (GenerateT
 
 ## 1. Testes unitários (sempre)
 ```powershell
-cd plugins/DriverRecordSharing.Tests; dotnet test --nologo -v q --filter "FullyQualifiedName~TrackingLink"
+cd packages/plugins/Betinhos.DriverRecordSharing.Tests; dotnet test --nologo -v q --filter "FullyQualifiedName~TrackingLink"
 ```
-Em worktree, copie antes `plugins/DriverRecordSharing/DriverRecordSharing.snk` do checkout principal (é ignorado; não gere chave nova). No Linux sem `mono` só dá para compilar (`dotnet build -p:SignAssembly=false`); os testes rodam no Windows.
+A chave de assinatura fica em `%USERPROFILE%\.codex\keys\Betinhos.DriverRecordSharing.snk`, fora do repositório (vale para todo worktree); não gere chave nova (mudaria a identidade do assembly). No Linux sem `mono` só dá para compilar (`dotnet build -p:SignAssembly=false`); os testes rodam no Windows.
 Cobrem em `TrackingLinkRevocationTests`: concluir/revogar por status, `ShouldRefresh` (só status ativo e link no formato), `BuildLinkUrl` só https.
 
 ## 2. Plano dos steps (somente leitura, DEV)

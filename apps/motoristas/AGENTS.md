@@ -22,7 +22,6 @@ Before any Codex file or code change, query the existing `graphify-out/graph.jso
 - `pnpm exec tsc --noEmit --noUnusedLocals --noUnusedParameters` runs the strict type gate.
 - `pnpm build` builds the single-file webresource into `dist/`.
 - `pnpm preview` serves the built output locally.
-- `pnpm push -DeviceCode` runs the old manual DEV push (plugins and schema now belong to Betinhos-Sistema; the app is published by the Deploy workflow).
 - `pnpm demo:capture` regenerates screenshots in `public/screens/`.
 
 ## Coding Style & Naming Conventions

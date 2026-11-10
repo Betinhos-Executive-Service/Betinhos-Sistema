@@ -1,5 +1,5 @@
 ---
-name: verificar-comunicados
+name: verificar-app-comunicados
 description: "Verifica o módulo Comunicados do App Motoristas: lista de pendentes e já cientes, comunicado informativo e ciência obrigatória com assinatura. Use após mudar src/features/comunicados/ComunicadosScreen.tsx, src/features/comunicados/**, src/shared/ui/SignaturePad.tsx ou src/features/comunicados/comunicados.css, ou quando pedirem para testar comunicados."
 ---
 # Verificar comunicados
