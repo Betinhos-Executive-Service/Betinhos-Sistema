@@ -190,3 +190,11 @@ test('travado: step desabilitado que volta habilitado é perda', () => {
   const d = compararFotos(foto(travadoAntes), foto({ ...travadoAntes, steps: { s1: { nome: 'Step 1', estado: 0, seguro: true } } }), { travado: true })
   assert.deepEqual(d.stepsHabilitadosNoTravado, [{ id: 's1', nome: 'Step 1', antes: 1 }])
 })
+
+test('fluxo aposentado desligado não é perda, mas aparece; outro fluxo desligado continua perda', () => {
+  const antes = foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 1 }, f2: { nome: 'Antigo', estado: 1 } } })
+  const d = compararFotos(antes, foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 1 }, f2: { nome: 'Antigo', estado: 0 } } }), { aposentados: ['Antigo'] })
+  assert.deepEqual(d.fluxosAposentados, [{ id: 'f2', nome: 'Antigo', antes: 1, depois: 0 }])
+  assert.equal(temPerda(d), false)
+  assert.equal(temPerda(compararFotos(antes, foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 }, f2: { nome: 'Antigo', estado: 0 } } }), { aposentados: ['Antigo'] })), true)
+})
