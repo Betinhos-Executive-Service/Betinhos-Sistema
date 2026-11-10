@@ -73,25 +73,25 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 .dp-historia__valores strong { color: var(--bt-color-text-primary); }
 .dp-decisao__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
 .dp-decisao__cancelar { margin-left: auto; color: var(--bt-color-danger); }
-.dp-decisao__acoes button:active, .dp-motivo__acoes button:active, .dp-pronto:active { transform: scale(.97); }
-.dp-decisao__acoes button, .dp-motivo__acoes button { transition: transform 140ms ease-out, background-color var(--bt-duration-fast) var(--bt-ease-out); }
+/* Botão que abriu o campo de motivo fica marcado, para o gestor ver qual saída está preenchendo. O :active vem do DS. */
+.dp-decisao__acoes .bt-button[aria-expanded="true"] { background-color: var(--bt-color-surface-soft); box-shadow: inset 0 0 0 var(--bt-border-width-default) currentColor; }
 .dp-motivo__prontos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin-top: calc(var(--bt-space-1) * -1); }
-.dp-pronto { padding: var(--bt-space-1) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: 999px; background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); cursor: pointer; transition: transform 140ms ease-out, background-color var(--bt-duration-fast) var(--bt-ease-out), border-color var(--bt-duration-fast) var(--bt-ease-out); }
+.dp-pronto { padding: var(--bt-space-1) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: 999px; background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out), background-color var(--bt-duration-fast) ease, border-color var(--bt-duration-fast) ease; }
+.dp-pronto:active:not(:disabled) { transform: scale(.97); }
 .dp-pronto[aria-pressed="true"] { border-color: var(--bt-color-action); background-color: var(--bt-color-surface-soft); }
 .dp-pronto:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
 .dp-pronto:disabled { opacity: .5; cursor: default; }
 @media (hover: hover) and (pointer: fine) { .dp-pronto:not(:disabled):hover { background-color: var(--bt-color-surface-soft); } }
 @media (max-width: 560px) { .dp-decisao__cancelar { margin-left: 0; } }
-.dp-citacao { margin: 0; padding-left: var(--bt-space-3); border-left: 3px solid var(--bt-color-border); color: var(--bt-color-text-primary); font-style: italic; white-space: pre-wrap; }
-.dp-motivo { display: grid; gap: var(--bt-space-3); animation: dp-motivo-in 180ms cubic-bezier(0.23, 1, 0.32, 1); }
-.dp-motivo--saindo { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; pointer-events: none; }
+.dp-motivo { display: grid; gap: var(--bt-space-3); animation: dp-motivo-in 180ms var(--bt-ease-out); }
+.dp-motivo--saindo { opacity: 0; transform: translateY(4px); transition: opacity 120ms var(--bt-ease-out), transform 120ms var(--bt-ease-out); pointer-events: none; }
 .dp-motivo__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); }
 @keyframes dp-motivo-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 /* Avançar para a próxima despesa: só crossfade, sem slide. */
-.dp-troca { animation: dp-troca-in 120ms ease-out; }
+.dp-troca { animation: dp-troca-in 120ms var(--bt-ease-out); }
 @keyframes dp-troca-in { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .dp-motivo { animation-name: dp-troca-in; animation-duration: 120ms; }
   .dp-motivo--saindo { transform: none; }
-  .dp-decisao__acoes button:active, .dp-motivo__acoes button:active, .dp-pronto:active { transform: none; }
+  .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
 }
