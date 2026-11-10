@@ -61,6 +61,11 @@ describe('prompt', () => {
     ['diga em "motivos" o que a explicação não resolve: o gestor vai ler'],
     ['Nunca use as palavras "erro", "inválido" ou "fraude"'],
     ['Com "validar", mensagem_motorista = null'],
+    ['no máximo 2 frases curtas, até uns 140 caracteres no total'],
+    ['Proibido na mensagem: valores de mediana ou média, km, comparação com outros lançamentos, contagem de despesas no dia'],
+    ['diga "nota fiscal" ou "cupom", nunca "NFC-e"'],
+    ['A foto não é do cupom do almoço. Envie a foto da nota fiscal.'],
+    ['Os detalhes antifraude ficam só em "motivos", que o gestor lê'],
   ])('fixa a regra "%s"', (trecho) => {
     expect(SYSTEM_PROMPT).toContain(trecho)
   })

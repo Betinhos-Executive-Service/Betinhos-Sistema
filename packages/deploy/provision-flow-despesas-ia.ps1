@@ -11,7 +11,7 @@
 # cr40f_iamotivos, sem tocar em cr40f_statusoperacional.
 #
 # Devolução (design 2026-11-10-despesa-devolucao-design.md): na primeira dúvida a IA grava em new_motivodevolucao a
-# mensagem_motorista (frase direta para o motorista; sem ela, uma frase genérica, nunca os motivos antifraude) e envia à IA a
+# mensagem_motorista (até 2 frases curtas, ~140 caracteres, cortada em 200 por segurança; sem ela, uma frase genérica, nunca os motivos antifraude) e envia à IA a
 # new_justificativamotorista. Segunda dúvida (já havia justificativa ou motivo de devolução) não volta ao motorista:
 # new_aguardandogestor = Sim e o motivo existente fica. Validar zera new_aguardandogestor e também preserva o motivo.
 #
@@ -628,7 +628,7 @@ $gravarText = @'
       "item/cr40f_possivelduplicidade": "@equals(outputs('Resposta')?['possivel_duplicidade'], true)",
       "item/cr40f_iadecisao": "@if(equals(outputs('Resposta')?['decisao'], 'validar'), 100000000, 100000001)",
       "item/cr40f_iamotivos": "@{join(outputs('Resposta')?['motivos'], decodeUriComponent('%0A'))}",
-      "item/new_motivodevolucao": "@if(or(equals(outputs('Resposta')?['decisao'], 'validar'), not(empty(trim(coalesce(triggerOutputs()?['body/new_motivodevolucao'], ''))))), triggerOutputs()?['body/new_motivodevolucao'], if(empty(trim(coalesce(outputs('Resposta')?['mensagem_motorista'], ''))), 'Precisamos conferir esta despesa. Troque o comprovante ou explique o que aconteceu.', trim(outputs('Resposta')?['mensagem_motorista'])))",
+      "item/new_motivodevolucao": "@if(or(equals(outputs('Resposta')?['decisao'], 'validar'), not(empty(trim(coalesce(triggerOutputs()?['body/new_motivodevolucao'], ''))))), triggerOutputs()?['body/new_motivodevolucao'], if(empty(trim(coalesce(outputs('Resposta')?['mensagem_motorista'], ''))), 'Precisamos conferir esta despesa. Troque o comprovante ou explique o que aconteceu.', substring(trim(outputs('Resposta')?['mensagem_motorista']), 0, min(length(trim(outputs('Resposta')?['mensagem_motorista'])), 200))))",
       "item/new_aguardandogestor": "@and(not(equals(outputs('Resposta')?['decisao'], 'validar')), or(not(empty(trim(coalesce(triggerOutputs()?['body/new_justificativamotorista'], '')))), not(empty(trim(coalesce(triggerOutputs()?['body/new_motivodevolucao'], ''))))))",
       "item/cr40f_iavalorlido": "@outputs('Resposta')?['valor_lido']",
       "item/cr40f_iadatalida": "@outputs('Resposta')?['data_lida']",

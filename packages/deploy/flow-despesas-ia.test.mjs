@@ -43,6 +43,9 @@ function avaliar(expr, { gatilho, resposta }) {
     or: (...a) => a.some(Boolean),
     empty: (a) => a == null || a.length === 0,
     trim: (a) => String(a).trim(),
+    length: (a) => a.length,
+    min: (...a) => Math.min(...a),
+    substring: (s, i, n) => s.substring(i, i + n),
     coalesce: (...a) => a.find((x) => x != null) ?? null,
     join: (arr, sep) => arr.join(sep),
     decodeUriComponent: (x) => decodeURIComponent(x),
@@ -67,6 +70,13 @@ test('devolução da IA grava a mensagem ao motorista em new_motivodevolucao, se
   const motivo = avaliar(gravar['item/new_motivodevolucao'], { gatilho: primeira, resposta: corrigir })
   assert.equal(motivo, corrigir.mensagem_motorista)
   assert.doesNotMatch(motivo, /erro|inv[áa]lid/i)
+})
+
+test('mensagem da IA acima de 200 caracteres é cortada em 200; abaixo disso segue inteira', () => {
+  const longa = 'a'.repeat(350)
+  const motivo = avaliar(gravar['item/new_motivodevolucao'], { gatilho: primeira, resposta: { ...corrigir, mensagem_motorista: longa } })
+  assert.equal(motivo.length, 200)
+  assert.equal(avaliar(gravar['item/new_motivodevolucao'], { gatilho: primeira, resposta: corrigir }), corrigir.mensagem_motorista)
 })
 
 test('mensagem vazia da IA cai numa frase genérica, nunca nos motivos antifraude', () => {
