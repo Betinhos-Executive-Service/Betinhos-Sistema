@@ -60,7 +60,7 @@
             "parameters": {
               "entityName": "__SET_DESPESA__",
               "$select": "cr40f_despesaoperacionalid",
-              "$filter": "statecode eq 0 and cr40f_statusoperacional eq 100000001 and (new_aguardandogestor eq false or new_aguardandogestor eq null) and modifiedon lt @{outputs('Limite')}",
+              "$filter": "statecode eq 0 and cr40f_statusoperacional eq 100000001 and (new_aguardandogestor eq false or new_aguardandogestor eq null) and createdon ge 2026-11-10T03:00:00Z and modifiedon lt @{outputs('Limite')}",
               "$orderby": "modifiedon asc",
               "$top": 500
             },
