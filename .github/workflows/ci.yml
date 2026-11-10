@@ -96,6 +96,20 @@ jobs:
       - name: Build do App Motoristas
         run: pnpm --filter @betinhos/motoristas exec node scripts/build-react-singlefile.cjs --no-version
 
+  # Schema por migration (packages/deploy/migrations/README.md): migration publicada é imutável e schema novo não entra por provision-*.
+  schema:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Migrations
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/migrations-ci.mjs
+
   shell:
     needs: mudancas
     if: needs.mudancas.outputs.shell == 'true'
@@ -165,7 +179,7 @@ jobs:
   ok:
     name: CI ok
     if: always()
-    needs: [mudancas, checagens, shell, plugins]
+    needs: [mudancas, checagens, schema, shell, plugins]
     runs-on: ubuntu-latest
     steps:
       # shell "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
@@ -173,5 +187,6 @@ jobs:
           echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }}"
           test "${{ needs.mudancas.result }}" = success
           test "${{ needs.checagens.result }}" = success
+          if [ "${{ github.event_name }}" = pull_request ]; then test "${{ needs.schema.result }}" = success; fi
           if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
           if [ -n "${{ needs.mudancas.outputs.plugins }}" ]; then test "${{ needs.plugins.result }}" = success; fi

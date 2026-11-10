@@ -11,7 +11,7 @@ export const PERDA = [
 export const INFORMATIVO = [
   'registrosMudaram', 'fluxosMudaramEstado', 'stepsMudaramEstado', 'donosMudaram', 'versoes',
   'stepsSensiveisJaSemSeguro', 'tabelasVaziasSumiram', 'tabelasAceitasSumiram', 'chunksObsoletos', 'fluxosNovosDesligados', 'variaveisSemValor',
-  'componentesDaCaixaSumiram', 'fluxosDaCaixaSumiram', 'variaveisDaCaixaSumiram', 'fluxosAposentados',
+  'componentesDaCaixaSumiram', 'fluxosDaCaixaSumiram', 'variaveisDaCaixaSumiram', 'fluxosAposentados', 'remocoesDeclaradas',
 ]
 
 // Soluções da caixa de entrada que a retirada desinstala (mesma lista de conferir-retirada.mjs).
@@ -36,12 +36,17 @@ export const CATEGORIAS_LIGADAS_NO_TRAVADO = [2, 4]
 // eram só AppBetinhos/gerarpagantes, e variável que sumiu, viram informativos: a conferência do DEV (barreira do export) garante
 // que tudo que importa está nas 4. Queda de registros e tabela com registros continuam perda.
 // aposentados: nomes de fluxos-aposentados.json; o restaurar-estados os desliga por decisao registrada, então desligar não é perda.
-export function compararFotos(antes, depois, { travado = false, aceitarTabelas = [], retirada = false, aposentados = [] } = {}) {
+// remocoes: alvos de migrations/remocoes.json ("tabela" ou "tabela.coluna"). Tabela declarada que some (ela e o componente dela, com os
+// registros) vai para remocoesDeclaradas, informativo. Tabela não declarada que some continua perda. A foto não guarda nome de coluna,
+// então alvo "tabela.coluna" não casa com nada aqui (limite documentado em migrations/README.md).
+export function compararFotos(antes, depois, { travado = false, aceitarTabelas = [], retirada = false, aposentados = [], remocoes = [] } = {}) {
+  const tabelasDeclaradas = remocoes.filter((a) => !a.includes('.'))
   const d = Object.fromEntries([...PERDA, ...INFORMATIVO].map((lista) => [lista, []]))
   const soDaCaixa = (id) => retirada && (antes.componentes[id] ?? []).length > 0 && (antes.componentes[id] ?? []).every((s) => CAIXAS.includes(s))
   for (const [tabela, n] of Object.entries(antes.registros)) {
     if (!(tabela in depois.registros)) {
-      if (aceitarTabelas.includes(tabela)) d.tabelasAceitasSumiram.push({ tabela, registros: n })
+      if (tabelasDeclaradas.includes(tabela)) d.remocoesDeclaradas.push({ alvo: tabela, registros: n })
+      else if (aceitarTabelas.includes(tabela)) d.tabelasAceitasSumiram.push({ tabela, registros: n })
       else if (n === 0) d.tabelasVaziasSumiram.push(tabela)
       else d.tabelasSumiram.push(tabela)
     }
@@ -100,6 +105,7 @@ export function compararFotos(antes, depois, { travado = false, aceitarTabelas =
     const novos = depois.componentes[id]
     if (!novos || !novos.length) {
       if (antes.tipos?.[id] === 61 && CHUNK_DA_TELA.test(antes.nomes?.[id] ?? '')) d.chunksObsoletos.push(antes.nomes[id])
+      else if (tabelasDeclaradas.includes(antes.nomes?.[id])) d.remocoesDeclaradas.push({ alvo: antes.nomes[id], componente: id })
       else if (soDaCaixa(id)) d.componentesDaCaixaSumiram.push(id)
       else d.componentesSumiram.push(id)
     }
@@ -135,7 +141,8 @@ if (rodandoComoCli(import.meta.url)) {
   }
   if (arquivos.length !== 2) throw new Error('Uso: node comparar-fotos.mjs [--travado] [--retirada] [--aceitar-tabelas a,b] <antes.json> <depois.json>')
   const aposentados = (await lerJson(fileURLToPath(new URL('./fluxos-aposentados.json', import.meta.url)))).map((a) => a.nome)
-  const d = compararFotos(await lerJson(arquivos[0]), await lerJson(arquivos[1]), { travado, aceitarTabelas, retirada, aposentados })
+  const remocoes = (await lerJson(fileURLToPath(new URL('../migrations/remocoes.json', import.meta.url)))).map((r) => r.alvo)
+  const d = compararFotos(await lerJson(arquivos[0]), await lerJson(arquivos[1]), { travado, aceitarTabelas, retirada, aposentados, remocoes })
   process.stdout.write(JSON.stringify(d, null, 2))
   process.exitCode = temPerda(d) ? 1 : 0
 }

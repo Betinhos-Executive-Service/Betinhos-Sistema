@@ -198,3 +198,18 @@ test('fluxo aposentado desligado não é perda, mas aparece; outro fluxo desliga
   assert.equal(temPerda(d), false)
   assert.equal(temPerda(compararFotos(antes, foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 0 }, f2: { nome: 'Antigo', estado: 0 } } }), { aposentados: ['Antigo'] })), true)
 })
+
+test('remoção declarada: tabela com registros e o componente dela viram informativo; sem declarar, é perda', () => {
+  const antes = foto({ componentes: { c1: ['AppBetinhos'], t1: ['BetinhosCore'] }, nomes: { t1: 'cr40f_b' } })
+  const depois = foto({ registros: { cr40f_a: 10 }, componentes: { c1: ['AppBetinhos'] } })
+  const d = compararFotos(antes, depois, { remocoes: ['cr40f_b'] })
+  assert.deepEqual(d.remocoesDeclaradas, [{ alvo: 'cr40f_b', registros: 5 }, { alvo: 'cr40f_b', componente: 't1' }])
+  assert.deepEqual([d.tabelasSumiram, d.componentesSumiram], [[], []])
+  assert.equal(temPerda(d), false)
+  assert.equal(temPerda(compararFotos(antes, depois)), true)
+  assert.equal(temPerda(compararFotos(antes, depois, { remocoes: ['cr40f_a'] })), true)
+})
+test('remoção declarada não perdoa queda de registros de outra tabela nem alvo de coluna', () => {
+  assert.equal(temPerda(compararFotos(foto(), foto({ registros: { cr40f_a: 9, cr40f_b: 5 } }), { remocoes: ['cr40f_b'] })), true)
+  assert.equal(temPerda(compararFotos(foto(), foto({ registros: { cr40f_a: 10 } }), { remocoes: ['cr40f_b.coluna'] })), true)
+})

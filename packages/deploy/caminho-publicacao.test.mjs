@@ -118,3 +118,11 @@ test('sem base conhecida: soluções', () => {
 test('README dentro de pasta de plugin não muda o PROD', () => {
   assert.equal(caminhoDoArquivo('packages/plugins/README.md'), 'nada')
 })
+
+test('migration de schema vai pelas soluções; o script que decide e testa as migrations não muda o PROD', () => {
+  for (const a of ['packages/deploy/migrations/20261110-1600-postos-aceita-ctf.ps1', 'packages/deploy/migrations/_dv.ps1', 'packages/deploy/migrations/remocoes.json']) {
+    assert.equal(caminhoDoArquivo(a), 'solucoes', a)
+  }
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/20261110-1600-postos-aceita-ctf.ps1', 'apps/shell/src/x.ts']).caminho, 'solucoes')
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/README.md', 'packages/deploy/migrations-dev.mjs', 'packages/deploy/migrations-ci.test.mjs']).caminho, 'nada')
+})
