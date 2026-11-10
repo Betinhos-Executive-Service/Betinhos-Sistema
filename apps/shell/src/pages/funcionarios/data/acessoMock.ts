@@ -51,7 +51,7 @@ export function createAcessoMock(): AcessoSource {
       const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
       if (semAcentos(confirmacao.trim()) !== semAcentos(f.nome.split(/\s+/)[0])) throw new AcessoError('CONFIRMACAO_INVALIDA', MENSAGENS.CONFIRMACAO_INVALIDA, [])
-      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }]
+      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }, { etapa: 'conferencia', estado: 'feita', detalhe: 'acesso retirado' }]
       const r = await delay(etapas)
       if (f.email in usuariosAppMock) usuariosAppMock[f.email] = false
       return r
