@@ -535,7 +535,14 @@ function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minu
 # "Novo Servico" e "Retirado" usam a referencia do Web Push (BetinhosAutomacao). Sem conexao, o flow nao religa (0x80060467, ensaio
 # de 06/11/2026) e o PROD ficaria sem aviso ao motorista. A referencia so existe depois do import, entao a conexao entra por ele.
 $script:ReferenciaWebPush = "new_webpushmotoristas"
-$script:ConectorWebPush = "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+# O conector personalizado tem o mesmo nome em todo ambiente, mas o id interno ganha um sufixo por ambiente (DEV ...5f30e351431b40001e,
+# PROD ...5f10c3aafe51dca724). Por isso o id do --settings-file e lido no ambiente de destino, na hora do import.
+$script:NomeConectorWebPush = "new_app-20motoristas-20web-20push"
+function Get-ConectorWebPush($Dv) {
+  $linhas = @(Read-DvAll $Dv "connectors?`$select=connectorinternalid&`$filter=name eq '$($script:NomeConectorWebPush)'" | Where-Object { $_.connectorinternalid })
+  if ($linhas.Count -ne 1) { throw "Conector $($script:NomeConectorWebPush) nao encontrado (ou repetido: $($linhas.Count)) no ambiente de destino; sem ele o vinculo do Web Push nao pode ser montado." }
+  return "/providers/Microsoft.PowerApps/apis/$($linhas[0].connectorinternalid)"
+}
 
 # O vinculo por --settings-file exige que a conta do CI possa usar a conexao (ConnectionAuthorizationFailed no ensaio de
 # 09/11/2026), e o Power Platform nao deixa compartilhar a conexao com service principal. Mas a permissao so e cobrada quando o
@@ -555,10 +562,11 @@ function Assert-ConexaoWebPush([string[]] $Solucoes, [string] $Alvo, [string] $C
 }
 
 # Grava o arquivo de --settings-file da BetinhosAutomacao. Sem conexao (TEST sem Web Push), nao ha arquivo.
-function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $Conexao) {
+function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $Conexao, [string] $Conector) {
   if ($Solucao -ne "BetinhosAutomacao" -or -not $Conexao) { return "" }
+  if (-not $Conector) { throw "Vinculo do Web Push sem o id do conector do ambiente de destino (Get-ConectorWebPush)." }
   $caminho = Join-Path $Pasta "configuracao-$Solucao.json"
-  $corpo = [ordered]@{ EnvironmentVariables = @(); ConnectionReferences = @([ordered]@{ LogicalName = $script:ReferenciaWebPush; ConnectionId = $Conexao; ConnectorId = $script:ConectorWebPush }) }
+  $corpo = [ordered]@{ EnvironmentVariables = @(); ConnectionReferences = @([ordered]@{ LogicalName = $script:ReferenciaWebPush; ConnectionId = $Conexao; ConnectorId = $Conector }) }
   [IO.File]::WriteAllText($caminho, (ConvertTo-Json $corpo -Depth 4), (New-Object Text.UTF8Encoding $false))
   return $caminho
 }

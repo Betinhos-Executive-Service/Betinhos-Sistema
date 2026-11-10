@@ -42,6 +42,8 @@ if ($estranhas.Count) { throw "Manifesto com solucao fora do permitido: $($estra
 $ordem = @($permitidas | Where-Object { $nomes -contains $_ })
 Assert-ConexaoWebPush $nomes $Alvo $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
 $conexaoWebPush = Get-ConexaoWebPushDoImport $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
+$conectorWebPush = if ($conexaoWebPush -and $nomes -contains "BetinhosAutomacao") { Get-ConectorWebPush $dv } else { "" }
+if ($conectorWebPush) { Write-Step "Web Push: conector do ambiente $conectorWebPush" }
 if ($env:WEBPUSH_VINCULAR_DEPOIS -eq "true") { Write-Step "WEBPUSH_VINCULAR_DEPOIS: import sem --settings-file; vincule $($script:ReferenciaWebPush) e religue os flows dele em seguida" }
 $anteriores = @()
 if ($Publicadas -and -not $ImportarTudo -and (Test-Path -LiteralPath $Publicadas -PathType Leaf)) {
@@ -65,7 +67,7 @@ foreach ($nome in $ordem) {
   }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
   $inicio = Get-Date
-  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush)
+  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush)
   $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
   $registro += New-RegistroPublicado $item $r.Versao
 }

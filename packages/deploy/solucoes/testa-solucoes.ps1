@@ -410,11 +410,20 @@ Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosAutomacao') 'Te
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' 'true' })) 'PROD sem conexao passa com WEBPUSH_VINCULAR_DEPOIS'
 Confere ((Get-ConexaoWebPushDoImport 'abc' 'true') -eq '' -and (Get-ConexaoWebPushDoImport 'abc' '') -eq 'abc' -and (Get-ConexaoWebPushDoImport 'abc' 'false') -eq 'abc') 'WEBPUSH_VINCULAR_DEPOIS=true pula o --settings-file'
 $pastaCfg = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N')); [void] [IO.Directory]::CreateDirectory($pastaCfg)
-$cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc'
+$cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc' '/providers/Microsoft.PowerApps/apis/shared_x-5fprod'
 $lido = Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json
 Confere (@($lido.ConnectionReferences).Count -eq 1 -and @($lido.ConnectionReferences)[0].LogicalName -eq 'new_webpushmotoristas' -and @($lido.ConnectionReferences)[0].ConnectionId -eq 'abc') 'configuracao traz a referencia do Web Push'
-Confere (-not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosCore' 'abc') -and -not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' '')) 'sem configuracao fora da Automacao ou sem conexao'
+Confere (@($lido.ConnectionReferences)[0].ConnectorId -eq '/providers/Microsoft.PowerApps/apis/shared_x-5fprod') 'configuracao usa o conector lido no ambiente de destino'
+Confere ((Falha-Com { New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc' '' }) -like '*conector*') 'vinculo sem o conector do ambiente recusa'
+Confere (-not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosCore' 'abc' 'c') -and -not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' '' 'c')) 'sem configuracao fora da Automacao ou sem conexao'
 Remove-Item -LiteralPath $pastaCfg -Recurse -Force
+$script:conectoresDv = @(@{ connectorinternalid = 'shared_new-5fapp-20motoristas-20web-20push-5f10c3aafe51dca724' })
+$readDvAllReal = ${function:Read-DvAll}
+function Read-DvAll($Dv, [string] $Path) { $script:caminhoConector = $Path; return $script:conectoresDv }
+Confere ((Get-ConectorWebPush @{}) -eq '/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f10c3aafe51dca724' -and $script:caminhoConector -like "*name eq 'new_app-20motoristas-20web-20push'*") 'conector do Web Push vem do ambiente de destino pelo nome'
+$script:conectoresDv = @()
+Confere ((Falha-Com { Get-ConectorWebPush @{} }) -like '*nao encontrado*') 'ambiente sem o conector do Web Push recusa'
+Set-Item function:Read-DvAll $readDvAllReal
 function Invoke-Pac([string] $Url, [string[]] $Argumentos) { $script:pacChamadas++; if ($script:pacChamadas -eq 1) { throw "pac solution import falhou: Connection State is closed." }; return @() }
 function Get-ManifestoDoPacote([string] $ZipPath) { return @{ UniqueName = 'BetinhosCore'; Version = '1.0.0.9'; Managed = $true } }
 # versao instalada: antes (1.0.0.8) nas consultas da 1a tentativa e da checagem, depois 1.0.0.9 na prova final
