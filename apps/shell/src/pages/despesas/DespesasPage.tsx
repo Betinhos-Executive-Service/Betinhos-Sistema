@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, EmptyState, Grid, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
-import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, Wallet } from 'lucide-react'
+import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { listCache } from '../../app/listCache'
@@ -14,6 +14,7 @@ import { createSource } from './data/source'
 import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, opcoes, periodoStart, type Periodo } from './domain/filters'
 import { DESPESA_COLUMNS, TELA, builtinViews, despesaFields, despesaKeywordText, fromLegacyFilters, legacyViewConfig, readDespesa, sortDespesas } from './domain/lista'
 import { despesasQuery } from './domain/query'
+import { MENSAGEM_DECISAO, aplicarDecisao, proximaEsperando, type Decisao } from './domain/decisao'
 import { resumo } from './domain/resumo'
 import { useDespesas } from './useDespesas'
 import { DespesasCards, DespesasTable } from './components/DespesasList'
@@ -89,12 +90,32 @@ function Despesas({ host }: { host: Host }) {
     return words.length ? filtered.filter((d) => index.matches(d, words)) : filtered
   }, [filtered, index, q, choices])
   const totais = useMemo(() => resumo(visible), [visible])
+  const visibleRef = useRef(visible)
+  useEffect(() => { visibleRef.current = visible }, [visible])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   // Os cartões de totais só valem com o período inteiro: até lá ficam carregando.
   const pending = !despesas.complete && despesas.loading
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+
+  // Grava a decisão, reflete na lista e, na revisão em lote, abre a próxima despesa esperando o gestor.
+  const decidir = useCallback(async (d: Despesa, tipo: Decisao, motivo: string): Promise<boolean> => {
+    try {
+      await source.decidir(d.id, tipo, motivo)
+    } catch (e) {
+      const detalhe = e instanceof Error ? ` ${e.message}` : ''
+      toast({ tone: 'danger', message: `Não foi possível gravar a decisão.${detalhe}${tipo === 'validar' ? '' : ' O motivo digitado foi mantido.'}` })
+      return false
+    }
+    despesas.mutate((data) => ({ ...data, list: data.list.map((x) => (x.id === d.id ? aplicarDecisao(x, tipo, motivo) : x)) }))
+    // Revisão em lote: a próxima da lista que se está vendo (visão e filtros valem), lida na hora para o callback não mudar a cada decisão.
+    const lote = d.aguardandoGestor
+    const proxima = lote ? proximaEsperando(visibleRef.current, d.id) : null
+    toast({ tone: 'success', message: lote && !proxima ? `${MENSAGEM_DECISAO[tipo]} Nenhuma outra espera o gestor nesta lista.` : MENSAGEM_DECISAO[tipo] })
+    if (lote) setSelectedId(proxima)
+    return true
+  }, [source, despesas.mutate, toast, setSelectedId])
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload() }, [despesas.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" onClick={refresh} />, [refresh])
@@ -136,6 +157,7 @@ function Despesas({ host }: { host: Host }) {
       </div>
       {despesas.error && !choices ? null : (
         <Grid min={190}>
+          <MetricCard icon={<UserCheck size={20} />} tone="warning" label="Esperando gestor" value={totais.esperandoGestor} hint="abra para validar ou devolver" loading={loadingFirst || pending} />
           <MetricCard icon={<Wallet size={20} />} label="Total filtrado" value={formatMoney(totais.total)} hint={plural(totais.qtd, 'lançamento', 'lançamentos')} loading={loadingFirst || pending} />
           <MetricCard icon={<Clock size={20} />} tone="warning" label="Aguardando pagamento" value={formatMoney(totais.aguardandoValor)} hint={plural(totais.aguardandoQtd, 'despesa', 'despesas')} loading={loadingFirst || pending} />
           <MetricCard icon={<Paperclip size={20} />} tone="warning" label="Sem comprovante" value={totais.semComprovante} hint="sem anexo completo" loading={loadingFirst || pending} />
@@ -148,7 +170,7 @@ function Despesas({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {body}
-      {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} /> : null}
+      {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} onDecidir={decidir} /> : null}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { getAllWithFirstPage, searchRows } from '../../../app/pagedLoad'
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
+import { aplicarDecisao, patchDecisao, type Decisao } from '../domain/decisao'
 import { withFallback } from '../domain/status'
 import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
 import { createArquivos } from './arquivo'
@@ -11,7 +12,7 @@ import { createMockAnexos, createMockArquivo, createMockDespesas } from './mock'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
 
-/** Tudo que a tela precisa do mundo externo. Só leitura: a tela não grava nada. */
+/** Tudo que a tela precisa do mundo externo. A única gravação é a decisão do gestor sobre a despesa. */
 export type Source = {
   mock: boolean
   /** Despesas do período; `onFirstPage` recebe a primeira página antes (lista grande). */
@@ -22,6 +23,8 @@ export type Source = {
   /** Conteúdo do comprovante para a prévia (imagem ou PDF). */
   arquivo: (anexo: Anexo) => Promise<Arquivo>
   choices: () => Promise<DespesaChoices>
+  /** Decisão do gestor num único PATCH; falha (permissão, rede) propaga e nada muda. */
+  decidir: (id: string, tipo: Decisao, motivo: string) => Promise<void>
   /** Ficha do registro no model-driven; null fora do Dataverse. */
   recordUrl: (entity: string, id: string) => string | null
   kv: KV
@@ -41,6 +44,11 @@ function createMockSource(): Source {
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
     async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
     choices: async () => withFallback({}),
+    async decidir(id, tipo, motivo) {
+      await wait(400)
+      const i = rows.findIndex((d) => d.id === id)
+      if (i >= 0) rows[i] = aplicarDecisao(rows[i], tipo, motivo)
+    },
     recordUrl: () => null,
     kv: browserKV(),
   }
@@ -79,6 +87,7 @@ export function createSource(host: Host): Source {
       ])
       return withFallback({ operacional, financeiro, anexo, origem, anexoTipo, anexoStatus })
     },
+    async decidir(id, tipo, motivo) { await host.client.update(await entitySet(ENTITY_DESPESA), id, patchDecisao(tipo, motivo)) },
     recordUrl: (entity, id) => `${host.clientUrl}/main.aspx?pagetype=entityrecord&etn=${entity}&id=${id}`,
     kv: browserKV(),
   }

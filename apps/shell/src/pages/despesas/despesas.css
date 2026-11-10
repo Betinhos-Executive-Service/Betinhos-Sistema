@@ -61,3 +61,37 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 .dp-ia__valor { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-1) var(--bt-space-2); }
 .dp-ia__diff { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-warning); }
 .dp-ia__meta { margin: 0; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+
+/* Decisão do gestor: bloco acima da ficha. Movimento do design: opacidade + 4 px, sem animar altura. */
+.dp-decisao { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-warning); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.dp-decisao__titulo { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.dp-historia { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.dp-historia__linha { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: var(--bt-space-2); }
+.dp-historia__icone { display: grid; place-items: center; height: 20px; color: var(--bt-color-text-secondary); }
+.dp-historia__citacao { font-style: italic; white-space: pre-wrap; }
+.dp-historia__valores { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-1) var(--bt-space-4); padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.dp-historia__valores strong { color: var(--bt-color-text-primary); }
+.dp-decisao__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.dp-decisao__cancelar { margin-left: auto; color: var(--bt-color-danger); }
+/* Botão que abriu o campo de motivo fica marcado, para o gestor ver qual saída está preenchendo. O :active vem do DS. */
+.dp-decisao__acoes .bt-button[aria-expanded="true"] { background-color: var(--bt-color-surface-soft); box-shadow: inset 0 0 0 var(--bt-border-width-default) currentColor; }
+.dp-motivo__prontos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin-top: calc(var(--bt-space-1) * -1); }
+.dp-pronto { padding: var(--bt-space-1) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: 999px; background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out), background-color var(--bt-duration-fast) ease, border-color var(--bt-duration-fast) ease; }
+.dp-pronto:active:not(:disabled) { transform: scale(.97); }
+.dp-pronto[aria-pressed="true"] { border-color: var(--bt-color-action); background-color: var(--bt-color-surface-soft); }
+.dp-pronto:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+.dp-pronto:disabled { opacity: .5; cursor: default; }
+@media (hover: hover) and (pointer: fine) { .dp-pronto:not(:disabled):hover { background-color: var(--bt-color-surface-soft); } }
+@media (max-width: 560px) { .dp-decisao__cancelar { margin-left: 0; } }
+.dp-motivo { display: grid; gap: var(--bt-space-3); animation: dp-motivo-in 180ms var(--bt-ease-out); }
+.dp-motivo--saindo { opacity: 0; transform: translateY(4px); transition: opacity 120ms var(--bt-ease-out), transform 120ms var(--bt-ease-out); pointer-events: none; }
+.dp-motivo__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); }
+@keyframes dp-motivo-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* Avançar para a próxima despesa: só crossfade, sem slide. */
+.dp-troca { animation: dp-troca-in 120ms var(--bt-ease-out); }
+@keyframes dp-troca-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dp-motivo { animation-name: dp-troca-in; animation-duration: 120ms; }
+  .dp-motivo--saindo { transform: none; }
+  .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
+}

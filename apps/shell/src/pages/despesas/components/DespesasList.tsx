@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { Copy, Paperclip, Sparkles } from 'lucide-react'
+import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'
+import { decidivel } from '../domain/decisao'
 import { financeiroTone, operacionalTone, semComprovante } from '../domain/status'
 import type { Despesa, DespesaChoices } from '../domain/types'
 
@@ -14,7 +15,9 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 
 export const titulo = (d: Despesa) => d.estabelecimento || d.nome || 'Despesa sem nome'
 
+/** Esperando o gestor substitui o status (Precisa corrigir): um selo só, que diz com quem a despesa está. */
 export function OperacionalBadge({ d, choices }: { d: Despesa; choices: DespesaChoices }) {
+  if (d.aguardandoGestor && decidivel(d)) return <StatusBadge tone="warning" icon={<UserCheck size={12} />}>Esperando gestor</StatusBadge>
   return <StatusBadge tone={operacionalTone(d.statusOperacional)} dot>{label(choices.operacional, d.statusOperacional, 'Sem status')}</StatusBadge>
 }
 

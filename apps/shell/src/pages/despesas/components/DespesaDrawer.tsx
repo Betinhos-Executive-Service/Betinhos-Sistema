@@ -1,24 +1,31 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Drawer, Skeleton } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, Skeleton } from '@betinhos/ui'
 import { ExternalLink, MapPin } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import type { Source } from '../data/source'
 import { LINKED } from '../data/queries'
 import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
+import { decidivel, type Decisao } from '../domain/decisao'
 import { AnaliseIA } from './AnaliseIA'
+import { DecisaoBloco, type EstadoDecisao } from './DecisaoBloco'
+import { Item } from './Ficha'
 import { ComprovantesGaleria } from './Comprovantes'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
-type Props = { despesa: Despesa | null; onClose: () => void; choices: DespesaChoices; source: Source; version: number }
+type Props = {
+  despesa: Despesa | null
+  onClose: () => void
+  choices: DespesaChoices
+  source: Source
+  version: number
+  /** Grava a decisão e avisa o resultado; true = gravou (a ficha pode já ter avançado para outra despesa). */
+  onDecidir: (d: Despesa, tipo: Decisao, motivo: string) => Promise<boolean>
+}
 type Anexos = Anexo[] | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const numero = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
-
-function Item({ label: name, children }: { label: string; children: ReactNode }) {
-  return <div className="pg-ficha__item"><dt>{name}</dt><dd>{children || '—'}</dd></div>
-}
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
@@ -49,20 +56,38 @@ function useAnexos(source: Source, id: string | null, version: number) {
   return data
 }
 
-export function DespesaDrawer({ despesa: d, onClose, choices, source, version }: Props) {
+export function DespesaDrawer({ despesa: d, onClose, choices, source, version, onDecidir }: Props) {
   const anexos = useAnexos(source, d?.id ?? null, version)
+  const [estadoBloco, setDecisao] = useState<EstadoDecisao>('livre')
+  const [descartando, setDescartando] = useState(false)
+  const podeDecidir = d != null && decidivel(d)
+  // O bloco some sem avisar ao desmontar: sem ele, o último estado dele não vale.
+  const decisao = podeDecidir ? estadoBloco : 'livre'
+
+  // X, Esc e clique fora passam por aqui: gravando não fecha; motivo digitado pede confirmação.
+  function pedirFechar() {
+    if (decisao === 'enviando') return
+    if (decisao === 'sujo') { setDescartando(true); return }
+    onClose()
+  }
+
   const url = (entity: string, id: string) => (id ? source.recordUrl(entity, id) : null)
   const mapa = d && d.latitude != null && d.longitude != null ? `https://www.google.com/maps?q=${d.latitude},${d.longitude}` : null
 
   return (
-    <Drawer actions={<BotaoAuditoria entity="cr40f_despesaoperacional" ids={[d?.id]} name={d ? titulo(d) : undefined} />} open={d != null} onClose={onClose} size="wide" eyebrow="Despesa operacional" title={d ? titulo(d) : ''}>
+    <>
+    <Drawer actions={<BotaoAuditoria entity="cr40f_despesaoperacional" ids={[d?.id]} name={d ? titulo(d) : undefined} />} open={d != null} onClose={pedirFechar} size="wide" eyebrow="Despesa operacional" title={d ? titulo(d) : ''}>
       {d ? (
-        <div className="pg-ficha">
+        <div className="pg-ficha dp-troca" key={d.id}>
           <div className="pg-ficha__hero">
             <span className="pg-badges"><OperacionalBadge d={d} choices={choices} /><FinanceiroBadge d={d} choices={choices} /><Alertas d={d} /></span>
             <strong className="pg-ficha__value pg-num">{formatMoney(d.valor)}</strong>
             <span className="pg-muted">{[formatDateTime(d.data), d.motorista || 'Sem motorista'].join(' · ')}</span>
           </div>
+
+          {podeDecidir ? <DecisaoBloco d={d} onDecidir={onDecidir} onEstado={setDecisao} /> : null}
+          {/* Para decidir, o comprovante vem logo abaixo da decisão, antes da análise detalhada. */}
+          {podeDecidir ? <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} /> : null}
 
           {d.possivelDuplicidade ? <Alert tone="warning" title="Possível duplicidade">O App Motoristas marcou esta despesa como parecida com outra já lançada. Confira antes de pagar.</Alert> : null}
 
@@ -90,16 +115,18 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
             </dl>
           </Section>
 
-          {d.observacao || d.observacaoInterna ? (
+          {d.observacao || d.observacaoInterna || (!podeDecidir && (d.motivoDevolucao || d.justificativaMotorista)) ? (
             <Section title="Observações">
               <dl className="pg-ficha__grid dp-ficha__full">
+                {!podeDecidir && d.motivoDevolucao ? <Item label="Motivo da devolução ou cancelamento"><span className="dp-texto">{d.motivoDevolucao}</span></Item> : null}
+                {!podeDecidir && d.justificativaMotorista ? <Item label="Justificativa do motorista"><span className="dp-texto">{d.justificativaMotorista}</span></Item> : null}
                 {d.observacao ? <Item label="Do motorista"><span className="dp-texto">{d.observacao}</span></Item> : null}
                 {d.observacaoInterna ? <Item label="Interna"><span className="dp-texto">{d.observacaoInterna}</span></Item> : null}
               </dl>
             </Section>
           ) : null}
 
-          <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} />
+          {podeDecidir ? null : <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} />}
 
           <Section title="Origem e registro">
             <dl className="pg-ficha__grid">
@@ -113,6 +140,14 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version }:
         </div>
       ) : null}
     </Drawer>
+    <Dialog open={descartando} onClose={() => setDescartando(false)} title="Descartar alterações?"
+      actions={<>
+        <Button variant="secondary" onClick={() => setDescartando(false)}>Continuar editando</Button>
+        <Button variant="danger" onClick={() => { setDescartando(false); onClose() }}>Descartar</Button>
+      </>}>
+      O motivo digitado ainda não foi enviado.
+    </Dialog>
+    </>
   )
 }
 

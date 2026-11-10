@@ -13,7 +13,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.location.hash = '' })
 
 describe('Despesas operacionais', () => {
-  it('abre a ficha com vínculos e comprovantes, sem ações de escrita', async () => {
+  it('abre a ficha com vínculos e comprovantes', async () => {
     render(<DespesasPage host={{ mode: 'mock' }} />)
     const linhas = await screen.findAllByText('Posto Shell Faria Lima')
     fireEvent.click(linhas[0].closest('button')!)
@@ -23,7 +23,7 @@ describe('Despesas operacionais', () => {
     expect(within(ficha).getAllByRole('link', { name: /Abrir/ }).length).toBeGreaterThan(0)
     expect(within(ficha).getByText('Análise da IA')).toBeTruthy()
     expect(within(ficha).getByText('Processando: a IA está lendo o comprovante.')).toBeTruthy()
-    expect(within(ficha).queryByRole('button', { name: /Validar|Pagar|Cancelar|Salvar/ })).toBeNull()
+    expect(within(ficha).queryByRole('button', { name: /Pagar|Salvar/ })).toBeNull()
   })
 
   it('abre o comprovante no visualizador e navega entre os arquivos', async () => {

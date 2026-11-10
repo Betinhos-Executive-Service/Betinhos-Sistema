@@ -53,9 +53,10 @@ describe('filtros de despesas', () => {
 
 describe('visões', () => {
   it('visões prontas filtram como antes', () => {
-    expect(builtinViews(FALLBACK_CHOICES).map((v) => v.name)).toEqual(['Aguardando pagamento', 'Precisa corrigir', 'Sem comprovante', 'Possível duplicidade', 'Suspeitas da IA'])
+    expect(builtinViews(FALLBACK_CHOICES).map((v) => v.name)).toEqual(['Esperando gestor', 'Aguardando pagamento', 'Precisa corrigir', 'Sem comprovante', 'Possível duplicidade', 'Suspeitas da IA'])
     expect(apply(viewFilters('aguardando')).every((d) => d.statusFinanceiro === FINANCEIRO.aguardando)).toBe(true)
     expect(apply(viewFilters('duplicidade')).map((d) => d.id)).toEqual(['mock-desp-7', 'mock-desp-12'])
+    expect(apply(viewFilters('esperando-gestor')).map((d) => d.id)).toEqual(['mock-desp-3', 'mock-desp-10'])
   })
 
   it('importação: lê as visões do navegador, descarta inválidas e converte sem o período', () => {
@@ -78,7 +79,8 @@ describe('resumo e status', () => {
       d({ valor: 100, statusFinanceiro: FINANCEIRO.aguardando }),
       d({ valor: 50.5, statusAnexo: ANEXO.sem, possivelDuplicidade: true }),
       d({ valor: null, statusAnexo: null }),
-    ])).toEqual({ qtd: 3, total: 150.5, aguardandoQtd: 1, aguardandoValor: 100, semComprovante: 2, duplicidade: 1 })
+    ])).toEqual({ qtd: 3, total: 150.5, aguardandoQtd: 1, aguardandoValor: 100, semComprovante: 2, duplicidade: 1, esperandoGestor: 0 })
+    expect(resumo([d({ aguardandoGestor: true }), d({ aguardandoGestor: true }), d({})]).esperandoGestor).toBe(2)
   })
 
   it('choices da metadata vencem; vazios caem nos rótulos de DEV', () => {
