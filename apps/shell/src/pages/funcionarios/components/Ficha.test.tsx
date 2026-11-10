@@ -303,10 +303,12 @@ describe('Ficha', () => {
   })
 
   it('encerra pela ficha sem recarregar nem salvar o funcionário e passa a oferecer Reativar', async () => {
-    const encerrar = vi.fn(async () => [{ etapa: 'conta', estado: 'feita' as const, detalhe: 'desativada' }])
+    let ativo = true
+    const encerrar = vi.fn(async () => { ativo = false; return [{ etapa: 'conta', estado: 'feita' as const, detalhe: 'desativada' }] })
     const save = vi.fn(async () => 'f1')
     const get = vi.fn(async () => structuredClone(comEmail))
-    render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp: async () => ({ id: 'su1', ativo: true }) })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    const usuarioDoApp = vi.fn(async () => ({ id: 'su1', ativo }))
+    render(<ToastProvider><Ficha source={fakeSource(save, { get, usuarioDoApp })} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
     await abrirAcesso()
     await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
     fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
@@ -319,6 +321,27 @@ describe('Ficha', () => {
     expect(screen.getByRole('button', { name: /^Reativar acesso$/ })).toBeTruthy()
     expect(save).not.toHaveBeenCalled()
     expect(get).toHaveBeenCalledTimes(1)
+    // Relê o systemuser depois de encerrar: o que o bloco mostra é o que a ficha mostra ao abrir de novo.
+    expect(usuarioDoApp).toHaveBeenCalledTimes(2)
+  })
+
+  it('encerrar que deixa o systemuser habilitado continua ativo e explica, sem dizer encerrado', async () => {
+    const encerrar = vi.fn(async () => [
+      { etapa: 'grupo', estado: 'pulada' as const, detalhe: 'conta fora do grupo de motoristas' },
+      { etapa: 'bloqueio', estado: 'pulada' as const, detalhe: 'conta fora do grupo de motoristas' },
+    ])
+    render(<ToastProvider><Ficha source={comUsuario(true)} id="f1" onClose={() => {}} onSaved={() => {}} acesso={acessoFake({ encerrar })} /></ToastProvider>)
+    await abrirAcesso()
+    await screen.findByText('Acesso ativo', undefined, { timeout: 5000 })
+    fireEvent.click(screen.getByRole('button', { name: /^Encerrar acesso$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/ }))
+    fireEvent.change(screen.getByLabelText(/primeiro nome/i), { target: { value: 'Ana' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Encerrar agora$/ })) })
+    expect(await screen.findByText('O acesso continua ativo no Dataverse')).toBeTruthy()
+    expect(screen.getByText(/não está no grupo de motoristas/)).toBeTruthy()
+    expect(screen.getByText('Acesso ativo')).toBeTruthy()
+    expect(screen.queryByText('Acesso encerrado')).toBeNull()
+    expect(screen.getByRole('button', { name: /^Encerrar acesso$/ })).toBeTruthy()
   })
 
   it('reativa com confirmação, mostra a senha nova e o link do WhatsApp, e pede confirmação ao fechar', async () => {

@@ -35,6 +35,22 @@ public sealed class UsuarioDataverseRepository
         return _svc.RetrieveMultiple(consulta).Entities.FirstOrDefault();
     }
 
+    /// <summary>
+    /// Todos os systemusers da conta: pelo objectId do Entra e pelo e-mail (internalemailaddress, como a ficha consulta).
+    /// O e-mail cobre systemuser sem objectId ou duplicado; sem ele a ficha continuava "ativo" depois de encerrar.
+    /// </summary>
+    public System.Collections.Generic.List<Entity> DaConta(Guid objectId, string email)
+    {
+        Entity[] Buscar(string atributo, object valor)
+        {
+            var consulta = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("systemuserid", "isdisabled") };
+            consulta.Criteria.AddCondition(atributo, ConditionOperator.Equal, valor);
+            return _svc.RetrieveMultiple(consulta).Entities.ToArray();
+        }
+        var porEmail = string.IsNullOrWhiteSpace(email) ? Array.Empty<Entity>() : Buscar("internalemailaddress", email.Trim().ToLowerInvariant());
+        return Buscar("azureactivedirectoryobjectid", objectId).Concat(porEmail).GroupBy(e => e.Id).Select(g => g.First()).ToList();
+    }
+
     /// <summary>Desabilita o systemuser (estado 1, status padrão).</summary>
     public void Bloquear(Guid systemuserId) => _svc.Execute(new SetStateRequest
     {

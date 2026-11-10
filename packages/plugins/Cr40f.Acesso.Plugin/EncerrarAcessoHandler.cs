@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 
 namespace Cr40f.Acesso.Plugin;
 
@@ -32,10 +33,16 @@ public sealed class EncerrarAcessoHandler
                 // O Dataverse só desabilita o systemuser ao sincronizar com o Entra (horas); bloqueia já para a ficha refletir o encerramento.
                 void Bloquear() => etapas.Executar("bloqueio", () =>
                 {
-                    var s = _usuarios.PorObjectId(Guid.Parse(u.Id));
-                    if (s is null) etapas.Pulada("bloqueio", "sem usuário no Dataverse");
-                    else if (s.GetAttributeValue<bool>("isdisabled")) etapas.Pulada("bloqueio", "já bloqueado");
-                    else { _usuarios.Bloquear(s.Id); etapas.Feita("bloqueio", "bloqueado no Dataverse"); }
+                    // Por objectId e por e-mail: a ficha lê o systemuser pelo e-mail, então todos com ele precisam ficar bloqueados.
+                    var daConta = _usuarios.DaConta(Guid.Parse(u.Id), email);
+                    var habilitados = daConta.Where(s => !s.GetAttributeValue<bool>("isdisabled")).ToList();
+                    if (daConta.Count == 0) etapas.Pulada("bloqueio", "sem usuário no Dataverse");
+                    else if (habilitados.Count == 0) etapas.Pulada("bloqueio", "já bloqueado");
+                    else
+                    {
+                        foreach (var s in habilitados) _usuarios.Bloquear(s.Id);
+                        etapas.Feita("bloqueio", habilitados.Count == 1 ? "bloqueado no Dataverse" : habilitados.Count + " usuários bloqueados no Dataverse");
+                    }
                 });
                 if (!membro)
                 {

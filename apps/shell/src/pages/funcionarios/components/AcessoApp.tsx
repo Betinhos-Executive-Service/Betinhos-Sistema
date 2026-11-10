@@ -1,6 +1,6 @@
 import { Alert, Button, StatusBadge as DsStatusBadge } from '@betinhos/ui'
 import { KeyRound, RefreshCw, RotateCcw, UserX } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { type AcessoSource, ERROS_PERMANENTES, type Etapa, type Fluxo, liberacaoPendente, parseAcessoError } from '../data/acesso'
 import type { UsuarioApp } from '../data/source'
 import type { Funcionario } from '../data/types'
@@ -25,7 +25,9 @@ export function useContaApp(email: string, usuarioDoApp: (email: string) => Prom
     usuarioDoApp(email).then((u) => { if (vivo) setConta(u?.ativo ? 'ativo' : 'encerrado') }, () => { if (vivo) setConta('falha') })
     return () => { vivo = false }
   }, [email, usuarioDoApp])
-  return [conta, setConta] as const
+  /** Relê o systemuser (ex.: depois de encerrar), para o bloco mostrar o que a ficha vai mostrar ao abrir de novo. */
+  const reconferir = useCallback(async (): Promise<EstadoConta> => ((await usuarioDoApp(email))?.ativo ? 'ativo' : 'encerrado'), [email, usuarioDoApp])
+  return [conta, setConta, reconferir] as const
 }
 
 const SELO: Partial<Record<EstadoAcesso, { tone: 'success' | 'neutral' | 'info'; texto: string }>> = {
@@ -42,6 +44,15 @@ const TITULO: Record<EstadoAcesso, string> = {
   sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado',
   liberando: 'Liberando no app', falha: 'Não foi possível conferir o acesso',
 }
+const TITULO_ERRO: Record<Fluxo, string> = { cadastro: 'Não foi possível concluir a liberação', reativar: 'Não foi possível concluir a reativação', encerrar: 'O acesso continua ativo no Dataverse' }
+
+/** Encerrar terminou, mas o systemuser lido pela ficha segue habilitado: explica pela etapa de bloqueio. */
+export function motivoAindaAtivo(etapas: Etapa[]) {
+  const bloqueio = etapas.find((e) => e.etapa === 'bloqueio')
+  if (bloqueio?.detalhe === 'conta fora do grupo de motoristas') return 'A conta Microsoft não está no grupo de motoristas e, por segurança, não foi bloqueada. Confira com a TI se o e-mail da ficha é mesmo deste motorista.'
+  return `O encerramento terminou, mas o usuário deste e-mail ainda aparece habilitado no Dataverse${bloqueio ? ` (bloqueio: ${bloqueio.detalhe})` : ''}. Tente encerrar de novo; se continuar, avise a TI.`
+}
+
 const RESUMO: Record<Fluxo, string> = { cadastro: 'Liberação concluída.', encerrar: 'Acesso encerrado. A ficha não mudou.', reativar: 'Acesso reativado.' }
 
 type Props = {
@@ -56,10 +67,12 @@ type Props = {
   onAtualizado: () => void
   /** Acesso encerrado ou reativado: a lista relê a linha para o selo "Sem app" acompanhar. */
   onAlterado?: () => void
+  /** Relê o estado real do systemuser (useContaApp); sem ele, o bloco confia no resultado da API. */
+  reconferir?: () => Promise<EstadoConta>
 }
 
 /** Bloco "Acesso ao app" da aba Acesso: cadastrar, concluir liberação, encerrar e reativar. */
-export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente, onCadastrar, onAtualizado, onAlterado }: Props) {
+export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente, onCadastrar, onAtualizado, onAlterado, reconferir }: Props) {
   const notify = useNotify()
   const [encerrando, setEncerrando] = useState(false)
   const [reativando, setReativando] = useState(false)
@@ -76,8 +89,14 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
   async function encerrar(confirmacao: string) {
     try {
       const etapas = await acesso.encerrar(funcionario.id, confirmacao)
-      // O plugin já bloqueia o systemuser; o bloco segue o resultado da API e a lista relê a linha.
-      setUltimo({ fluxo: 'encerrar', etapas }); setEncerrando(false); setConta('encerrado'); notify('success', 'Acesso encerrado.'); onAlterado?.()
+      setEncerrando(false); onAlterado?.()
+      // O plugin bloqueia o systemuser; relê o mesmo dado que a ficha lê ao abrir, para não dizer "encerrado" e voltar "ativo".
+      const real = reconferir ? await reconferir().catch((): EstadoConta => 'encerrado') : 'encerrado'
+      if (real === 'ativo') {
+        setConta('ativo'); setUltimo({ fluxo: 'encerrar', etapas, erro: motivoAindaAtivo(etapas), permanente: true }); notify('error', 'O acesso continua ativo no Dataverse.')
+        return
+      }
+      setUltimo({ fluxo: 'encerrar', etapas }); setConta('encerrado'); notify('success', 'Acesso encerrado.')
     } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setEncerrando(false); semPermissaoDeGerir(); return }
@@ -153,7 +172,7 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
         {pode && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
       </div>
       {ultimo && (ultimo.erro
-        ? <Alert tone="danger" title="Não foi possível concluir a liberação">{ultimo.erro}{!ultimo.permanente && ' Use "Concluir liberação" de novo em instantes.'}<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
+        ? <Alert tone="danger" title={TITULO_ERRO[ultimo.fluxo]}>{ultimo.erro}{!ultimo.permanente && ' Use "Concluir liberação" de novo em instantes.'}<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>
         : <div className="acesso-resumo" role="status"><p>{liberacaoPendente(ultimo.etapas) ? textoPendente : faltouSenha && ultimo.fluxo === 'reativar' ? 'Conta reativada sem senha nova.' : RESUMO[ultimo.fluxo]}</p><ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></div>)}
       {semPermissao && <Alert tone="warning">Você não tem permissão para gerir acessos.</Alert>}
       <EncerrarAcessoDialog open={encerrando} nome={nome} onCancel={() => setEncerrando(false)} onConfirmar={encerrar} />

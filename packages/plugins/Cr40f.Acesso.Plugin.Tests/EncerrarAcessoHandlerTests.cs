@@ -160,6 +160,29 @@ public sealed class EncerrarAcessoHandlerTests
     }
 
     [Fact]
+    public void Bloqueia_systemuser_achado_so_pelo_email()
+    {
+        // A ficha lê o systemuser por internalemailaddress; sem objectId ele ficava habilitado e a ficha voltava "ativo".
+        ComFuncionario(); ComUsuarioCompleto();
+        var s = new Entity("systemuser", Guid.NewGuid()) { ["internalemailaddress"] = "Ana.Lima@betinhos.onmicrosoft.com", ["isdisabled"] = false }; _svc.Com(s);
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"feita\",\"detalhe\":\"bloqueado no Dataverse\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.True(s.GetAttributeValue<bool>("isdisabled"));
+    }
+
+    [Fact]
+    public void Bloqueia_todos_os_systemusers_da_conta_sem_repetir()
+    {
+        ComFuncionario(); ComUsuarioCompleto();
+        var porId = ComSystemuser(); porId["internalemailaddress"] = "ana.lima@betinhos.onmicrosoft.com";
+        var duplicado = new Entity("systemuser", Guid.NewGuid()) { ["internalemailaddress"] = "ana.lima@betinhos.onmicrosoft.com", ["isdisabled"] = false }; _svc.Com(duplicado);
+        var outro = new Entity("systemuser", Guid.NewGuid()) { ["internalemailaddress"] = "bia@betinhos.onmicrosoft.com", ["isdisabled"] = false }; _svc.Com(outro);
+        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"feita\",\"detalhe\":\"2 usuários bloqueados no Dataverse\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.True(porId.GetAttributeValue<bool>("isdisabled")); Assert.True(duplicado.GetAttributeValue<bool>("isdisabled"));
+        Assert.False(outro.GetAttributeValue<bool>("isdisabled"));
+        Assert.Equal(2, _svc.Executados.Count);
+    }
+
+    [Fact]
     public void Fora_do_grupo_nao_bloqueia_systemuser()
     {
         ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear(); var s = ComSystemuser();

@@ -1,4 +1,5 @@
 import { mockProgressive, mockVolume } from '../../../app/mockVolume'
+import { reiniciarUsuariosAppMock, USUARIOS_APP_INICIAL, usuariosAppMock } from './usuariosAppMock'
 import { createMockEquipamentos } from '../../equipamentos/data/mock'
 import { STATUS } from '../../equipamentos/domain/choices'
 import { addMonths, todaySP } from './dates'
@@ -59,7 +60,6 @@ const ROWS0: Funcionario[] = [
   person('m9', 'Joana Encerrada Teste', 'Joana', { cr40f_emailmicrosoft: 'joana.teste@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' }),
 ]
 /** systemuser por e-mail no mock: Carlos ativo, Joana desabilitada (acesso encerrado). */
-const USUARIOS_APP: Record<string, boolean> = { 'carlos.teste@betinhos.onmicrosoft.com': true, 'joana.teste@betinhos.onmicrosoft.com': false }
 /** `?volume=N` do pnpm dev: N colaboradores a mais (desempenho com listas grandes). */
 const volume = (total: number) => Array.from({ length: total }, (_, i) => person(`mv${i + 1}`, `Colaborador Exemplo ${i + 1}`, `Colab ${i + 1}`, {
   cr40f_status: i % 9 === 0 ? 2 : 0, cr40f_funcao: i % 4 ? 202410000 : 202410001, cr40f_validadedacnh: offset((i % 500) - 30), cr40f_numerodocpf: `${String(100_000_000 + i).slice(0, 9)}-${String(i % 100).padStart(2, '0')}`,
@@ -110,12 +110,13 @@ const documentos: DocumentStore = {
   },
 }
 
-const ATIVOS_APP = new Set(Object.keys(USUARIOS_APP).filter((email) => USUARIOS_APP[email]))
+const ATIVOS_APP = new Set(Object.keys(USUARIOS_APP_INICIAL).filter((email) => USUARIOS_APP_INICIAL[email]))
 const comSelo = (row: Funcionario): Funcionario => ({ ...row, semApp: semApp(row.values, ATIVOS_APP) })
 
 export function createMockSource(): DataSource {
   // Cada fonte começa do zero (testes e recarga da página não herdam alterações).
   rows = [...structuredClone(ROWS0), ...volume(mockVolume())]
+  reiniciarUsuariosAppMock()
   notes = structuredClone(NOTES0)
   docs = structuredClone(DOCS0)
   blobs.clear()
@@ -187,7 +188,7 @@ export function createMockSource(): DataSource {
       return blob ? { nome: (blob as File).name ?? 'anexo', blob } : { nome: 'toxicologico-2026.txt', blob: new Blob(['Arquivo fictício do modo mock.'], { type: 'text/plain' }) }
     },
     documentos,
-    usuarioDoApp: (email) => delay(email.toLowerCase() in USUARIOS_APP ? { id: `su-${email}`, ativo: USUARIOS_APP[email.toLowerCase()] } : null),
+    usuarioDoApp: (email) => delay(email.toLowerCase() in usuariosAppMock ? { id: `su-${email}`, ativo: usuariosAppMock[email.toLowerCase()] } : null),
     searchVeiculos: (query) => delay(veiculos.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()))),
     openForm: (entityName, id) => console.info('[mock] openForm', entityName, id),
   }
