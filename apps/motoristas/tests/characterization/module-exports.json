@@ -58,6 +58,7 @@
     "resolveMockServiceVehicle"
   ],
   "src/lib/webPush.ts": [
+    "IP_STAMP_URL",
     "WEB_PUSH_PUBLIC_KEY",
     "WebPushEnv",
     "WebPushState",
