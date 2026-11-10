@@ -154,8 +154,10 @@ jobs:
           "tela=$($tela.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "webresources=$($webresources.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "formulario=$($formulario.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }; if ($formulario) { '--filter @betinhos/formulario-geral...' }; if ($motoristas -split ',' -contains 'app') { '--filter @betinhos/motoristas...' }) -join ' '
+          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }; if ($formulario) { '--filter @betinhos/formulario-geral...' }) -join ' '
           "instalar=$instalar" >> $env:GITHUB_OUTPUT
+          # O Motoristas (React 18) instala depois da tela: junto com o shell (React 19), o @types/react 18 sobe e a tela não compila.
+          "motoristas_app=$(($motoristas -split ',' -contains 'app').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "plugins=$plugins" >> $env:GITHUB_OUTPUT
           "motoristas=$motoristas" >> $env:GITHUB_OUTPUT
           Write-Host "tela: $tela; webresources: $webresources; formulario: $formulario; motoristas: $(if ($motoristas) { $motoristas } else { 'nada' }); plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
@@ -192,9 +194,9 @@ jobs:
           echo "$saida"
 
       # Tela
-      - if: steps.pendentes.outputs.instalar != ''
+      - if: steps.pendentes.outputs.instalar != '' || steps.pendentes.outputs.motoristas_app == 'true'
         uses: pnpm/action-setup@v4
-      - if: steps.pendentes.outputs.instalar != ''
+      - if: steps.pendentes.outputs.instalar != '' || steps.pendentes.outputs.motoristas_app == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -224,6 +226,10 @@ jobs:
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-formulario-dev.ps1
 
       # App Motoristas: só atualiza o web resource que já existe (não mexe em solução, então fica fora da distribuição).
+      - if: steps.pendentes.outputs.motoristas_app == 'true'
+        run: pnpm install --frozen-lockfile --filter '@betinhos/motoristas...'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Publicar o App Motoristas
         id: motoristas
         if: steps.pendentes.outputs.motoristas != ''
@@ -262,7 +268,7 @@ jobs:
           ACESSO_ENVIRONMENT_ID: ${{ vars.ACESSO_ENVIRONMENT_ID }}
           ACESSO_DOMINIO: ${{ vars.ACESSO_DOMINIO }}
 
-      - if: steps.flowspend.outputs.preparos != '' && steps.pendentes.outputs.instalar == ''
+      - if: steps.flowspend.outputs.preparos != '' && steps.pendentes.outputs.instalar == '' && steps.pendentes.outputs.motoristas_app != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 24
