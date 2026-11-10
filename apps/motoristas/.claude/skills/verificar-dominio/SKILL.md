@@ -8,14 +8,14 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - Código: `src/lib/**`, `src/types.ts`, `src/*.d.ts`, `tests/**`, `scripts/*.cjs`, `scripts/*.ps1`, `package.json`.
 
 ## Preparar ambiente
-- `npm ci` (lockfile `package-lock.json`). Node 24.
+- Na raiz do monorepo: `pnpm install --filter @betinhos/motoristas...` (lockfile `pnpm-lock.yaml` da raiz). Node 24. Os comandos abaixo rodam em `apps/motoristas`.
 
 ## Roteiro
-1. `npm test` → `ℹ fail 0` (304 testes em 22/10/2026; o número só deve crescer).
-2. `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` → sem saída e exit 0.
-2b. `npm run check:hygiene` (roda `tests/repositoryHygiene.test.ts`, também incluído no `npm test`): nenhum arquivo versionado com URL/assinatura de credencial (`sig=`, `code=`, `token=`…) nem artefato local (`tmp/`, `bin/`, `obj/`, `.herenow/`, `*.zip`). Prova negativa: crie um arquivo com `sig=` de 20+ caracteres, `git add -N`, o teste tem de listá-lo; depois `git reset` e apague.
+1. `pnpm test` → `ℹ fail 0` (304 testes em 22/10/2026; o número só deve crescer).
+2. `pnpm typecheck` → sem saída e exit 0.
+2b. `pnpm check:hygiene` (roda `tests/repositoryHygiene.test.ts`, também incluído no `pnpm test`): nenhum arquivo versionado com URL/assinatura de credencial (`sig=`, `code=`, `token=`…) nem artefato local (`tmp/`, `bin/`, `obj/`, `.herenow/`, `*.zip`). Prova negativa: crie um arquivo com `sig=` de 20+ caracteres, `git add -N`, o teste tem de listá-lo; depois `git reset` e apague.
 3. Mudou payload do Dataverse (`src/features/*/remoto.ts`, `src/features/servicos/agendaRemota.ts`/`trocas.ts` ou `src/data/dataverse/`)? Confira nomes lógicos na metadata real do DEV (MCP `Dataverse_DEV`, somente leitura) antes de concluir. Ex.: `cr40f_observacoes` do recibo recebe "-" quando vazio.
-4. Mudou o build (`scripts/build-react-singlefile.cjs`)? `npm run build` gera `dist/webresource-app-motoristas.html` com `window.__APP_BUILD_INFO` e sobe o PATCH; confira o carimbo `v… · dd/mm/aaaa HH:mm` na Início (ver `verificar-servicos`). Não versione `dist/` de builds de teste.
+4. Mudou o build (`scripts/build-react-singlefile.cjs`)? `pnpm build` gera `dist/webresource-app-motoristas.html` com `window.__APP_BUILD_INFO` e sobe o PATCH; confira o carimbo `v… · dd/mm/aaaa HH:mm` na Início (ver `verificar-servicos`). Não versione `dist/` de builds de teste.
 
 ## Casos de borda
 - `sanitizeCurrencyInput`: letras descartadas, "1.250" = milhar, 2 casas no máximo (`tests/currencyInput.test.ts`).
@@ -28,7 +28,7 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - CSS com chaves balanceadas (`tests/stylesSyntax.test.ts`): o esbuild só avisa e engole as regras seguintes; acontece em resolução de merge de `src/styles.css`.
 
 ## Evidência obrigatória
-- Saída de `npm test` e do `tsc` salva em `.verificacao/<data>-<branch>/`.
+- Saída de `pnpm test` e do `tsc` salva em `.verificacao/<data>-<branch>/`.
 
 ## Limites
-- Integração autenticada (Xrm, Flow, SharePoint) só em DEV com `npm run push`; PROD só pelo `publicar.yml` do Betinhos-Sistema (merge `develop → main`, ensaio no TEST e aprovação do Renan).
+- Integração autenticada (Xrm, Flow, SharePoint) só em DEV, publicado pelo Deploy ao entrar na `develop`; PROD só pelo `publicar.yml` do Betinhos-Sistema (merge `develop → main`, ensaio no TEST e aprovação do Renan).

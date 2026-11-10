@@ -10,8 +10,8 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 - Rotas: `#inicio` (tile Checklist), `#servicos` (seção "Checklist do veículo"), `#checklists`.
 
 ## Preparar ambiente
-- Worktree sem `node_modules`: crie uma junção para o `node_modules` do checkout principal (mesmas dependências) — `New-Item -ItemType Junction -Path node_modules -Target "<checkout principal>\node_modules"`.
-- Gates: `npm test` e `node node_modules/typescript/bin/tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+- Worktree sem `node_modules`: na raiz do monorepo, `pnpm install --filter @betinhos/motoristas...`.
+- Gates: `pnpm test` e `node node_modules/typescript/bin/tsc --noEmit --noUnusedLocals --noUnusedParameters`.
 - Servidor: `.claude/launch.json` (local, ignorado) com `node scripts/dev-server.cjs` e `PORT=44961` (reservada em `C:\Users\mendo\.codex\dev-ports.json`). `preview_start` → `http://localhost:44961`. Em localhost o checklist roda em mock: 1 pendente de troca (origem Troca, entregue por Carlos Andrade; ABC1D23, KM 45210; 9 itens, o último é "Pneus", OK / Não OK com Murcho, Careca, Furado, Outro) e 1 enviado. O mock é em memória: recarregar volta ao pendente; o rascunho fica no IndexedDB (`app-motoristas-media-drafts`, chave `checklist:<id>`).
 - O dev server reescreve `dist/`; ao terminar, `git checkout -- dist/index.html dist/webresource-app-motoristas.html` (não commitar build local).
 - No DEV autenticado, o modelo padrão é o "Vistoria rápida" do seed (`seed-checklist-modelo-teste.ps1 -SubstituirPadrao`, área `verificar-checklists-backend`): 14 itens, 4 fotos, 9 OK / Não OK com opções próprias (Pneus: Murcho, Careca, Furado, Outro; Estepe: Faltando, Estepe murcho, Outro...) e Observações. A "Quilometragem" e o "Combustível" numéricos só existem no mock local.
@@ -49,7 +49,7 @@ description: "Verifica a tela do checklist de vistoria no App Motoristas: tile d
 - Erro da Custom API mostra a mensagem do plugin e mantém o rascunho; fotos já enviadas não são reenviadas (links guardados em `enviadas`).
 
 ## Evidência obrigatória
-- Saída de `npm test` e do `tsc`, screenshots do formulário, do envio e do enviado, leitura do console (só o 404 do `favicon.ico` do servidor local é esperado).
+- Saída de `pnpm test` e do `tsc`, screenshots do formulário, do envio e do enviado, leitura do console (só o 404 do `favicon.ico` do servidor local é esperado).
 
 ## Limites
 - No painel do navegador, clique por coordenada às vezes não chega ao `.agenda-hit` dos cards; use `find`/`read_page` (ref) ou `document.querySelector(".agenda-hit").click()`. Screenshots podem expirar com o painel oculto: repita.

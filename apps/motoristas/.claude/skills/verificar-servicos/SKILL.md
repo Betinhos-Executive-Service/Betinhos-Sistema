@@ -34,7 +34,7 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 9. `#finalizar?serviceId=76&type=MANUTENCAO` → sem ícone de apagar até haver foto; "VALOR (R$)" ignora letras ("1.250,9abc" → "1250,90"); com foto, o ícone "Apagar fotos" pede "Apagar 1 foto?" e mantém os textos.
 10. `#cancelado-local?serviceId=10241&type=SERVICO` → "Limpar texto" desabilitado vazio; com texto pede "Apagar o texto?". "Cliquei errado" volta ao detalhe.
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
-12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-comunicados` e `verificar-checklists-app`.
+12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-app-comunicados` e `verificar-checklists-app`.
 
 ## Confirmação depois de finalizar (modo Dataverse, 28/10/2026)
 - Depois de gravar a finalização, `finalizeSelected` recarrega a agenda (`loadRemoteStore`, 8 s por tentativa) e tenta de novo uma vez. A finalização já está salva: tempo esgotado **nunca** devolve o serviço à galeria. Depois de 2 falhas o motorista vê "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir." e o log `confirm-agenda-after-finalize` sai com `attempts: 2, restoredToAgenda: false`.
@@ -72,7 +72,7 @@ Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em local
       - O mock só vale em `localhost`: fora dele, sem `Xrm.WebApi`, a cobrança falha com erro, nunca simula "pago".
 - Cliques por script não contam como gesto: o console mostra "Blocked call to navigator.vibrate" — esperado (o roteiro ignora); em toque real vibra.
 - O navegador interno do Claude com o painel oculto pode tirar print desalinhado (layout cortado à direita) desta tela; confira pelo DOM (`getBoundingClientRect`) ou use o roteiro headless.
-- Lógica pura: `tests/qrCharge.test.ts` e `tests/qrChargeSummary.test.ts` (resumo, reidratação, rota pós-pagamento, passos, horário, mock). Plugin (`QrChargePlugin`, ações `criar`/`resumo`/`consultar`/`cancelar`/`sincronizar`): `plugins/DriverRecordSharing.Tests/QrChargePluginTests.cs` (`dotnet test --filter "FullyQualifiedName~QrCharge"`). Stripe real, webhook (Flow "Flow Webhook Stripe | Cobrança QR"), `resumo` no Dataverse e Apple/Google Pay não são verificáveis no mock.
+- Lógica pura: `tests/qrCharge.test.ts` e `tests/qrChargeSummary.test.ts` (resumo, reidratação, rota pós-pagamento, passos, horário, mock). Plugin (`QrChargePlugin`, ações `criar`/`resumo`/`consultar`/`cancelar`/`sincronizar`): `packages/plugins/Betinhos.DriverRecordSharing.Tests/QrChargePluginTests.cs` (`dotnet test --filter "FullyQualifiedName~QrCharge"`). Stripe real, webhook (Flow "Flow Webhook Stripe | Cobrança QR"), `resumo` no Dataverse e Apple/Google Pay não são verificáveis no mock.
 
 ## Quadro de valores e conferência do comprovante por IA (22/10/2026)
 Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica pura em `src/features/recebimento/receiveProofCheck.ts`).
@@ -98,7 +98,7 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 - Console sem erros/avisos e rede sem 4xx/5xx (o 404 de `/favicon.ico` do servidor local é ruído conhecido).
 
 ## Limites
-- Gravação real no Dataverse/Flow, upload ao SharePoint e envio de voucher só em DEV autenticado (`npm run push`), nunca em PROD.
+- Gravação real no Dataverse/Flow, upload ao SharePoint e envio de voucher só em DEV autenticado (publicado pelo Deploy ao entrar na `develop`), nunca em PROD.
 - O Voltar físico do Android dentro do Power Apps precisa ser conferido no aparelho; o headless só prova o comportamento do histórico do navegador.
 - Abrir discador/WhatsApp (`tel:`/`wa.me`) não é exercitado; o roteiro para no diálogo de escolha.
 
