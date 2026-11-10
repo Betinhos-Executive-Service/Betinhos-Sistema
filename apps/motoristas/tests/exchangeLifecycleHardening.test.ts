@@ -15,7 +15,7 @@ test("manifestos registram bloqueio PreValidation para Create de troca", () => {
 });
 
 test("app motorista não oferece cancelamento para troca", () => {
-  const dataverse = read("../src/lib/dataverse.ts");
+  const dataverse = read("../src/features/servicos/agendaRemota.ts");
   const exchangeMapper = dataverse.slice(dataverse.indexOf("function mapExchange"), dataverse.indexOf("function compareAgenda"));
   assert.match(exchangeMapper, /actions:\s*\["finalizar"\]/);
   assert.doesNotMatch(exchangeMapper, /actions:\s*\["cancel"/);

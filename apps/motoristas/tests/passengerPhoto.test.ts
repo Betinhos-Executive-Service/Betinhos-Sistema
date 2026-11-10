@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canRequestPassengerPhoto, createPassengerPhotoStore, parseFotoJson, passengerInitial, PROGRAMADO_STATUS } from "../src/lib/passengerPhoto.ts";
+import { canRequestPassengerPhoto, createPassengerPhotoStore, parseFotoJson, passengerInitial, PROGRAMADO_STATUS } from "../src/features/detalhe/passengerPhoto.ts";
 
 test("parseFotoJson aceita ok com imagem", () => {
   assert.deepEqual(parseFotoJson(JSON.stringify({ ok: true, mimeType: "image/jpeg", conteudoBase64: "AAAA" })), { mimeType: "image/jpeg", base64: "AAAA" });
@@ -58,7 +58,7 @@ test("store memoriza por (reserva, passageiro), limita a 2 simultâneas e revoga
 });
 
 test("mock só devolve foto para o primeiro passageiro", async () => {
-  const { fetchFotoJsonMock } = await import("../src/lib/passengerPhoto.ts");
+  const { fetchFotoJsonMock } = await import("../src/features/detalhe/passengerPhoto.ts");
   assert.ok(parseFotoJson(await fetchFotoJsonMock("r1", "mock-pax-1")));
   assert.equal(parseFotoJson(await fetchFotoJsonMock("r1", "mock-pax-2")), null);
 });

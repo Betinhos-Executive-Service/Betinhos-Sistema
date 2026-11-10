@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizePhoneDigits, passengerContactLinks } from "../src/lib/passengerContact.ts";
+import { normalizePhoneDigits, passengerContactLinks } from "../src/features/detalhe/passengerContact.ts";
 
 test("monta tel: e WhatsApp a partir do telefone", () => {
   assert.deepEqual(passengerContactLinks("+55 (11) 90000-0010"), { tel: "tel:5511900000010", whatsapp: "https://wa.me/5511900000010" });
@@ -21,7 +21,7 @@ test("linha sem telefone não tem atalhos", () => {
 });
 
 test("bandeira pelo rótulo do idioma", async () => {
-  const { languageFlagCode } = await import("../src/lib/passengerContact.ts");
+  const { languageFlagCode } = await import("../src/features/detalhe/passengerContact.ts");
   assert.equal(languageFlagCode("Português"), "BR");
   assert.equal(languageFlagCode("Inglês"), "US");
   assert.equal(languageFlagCode("Espanhol"), "ES");

@@ -1,7 +1,7 @@
 ﻿import type { AgendaItem, DetailData, DetailField, MaintenancePhotoKind } from "../types";
 
-import { getFieldValue, isBlankOrNotInformed } from "./fieldLookup.ts";
-import { reportAppError } from "./appErrorLogger.ts";
+import { getFieldValue, isBlankOrNotInformed } from "../features/detalhe/fieldLookup.ts";
+import { reportAppError } from "../shared/appErrorLogger.ts";
 
 export type LocalStore = {
   agenda: AgendaItem[];

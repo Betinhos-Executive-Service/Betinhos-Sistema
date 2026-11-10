@@ -10,7 +10,7 @@ test("mudança só no service worker publica só a peça sw", () => {
 });
 
 test("mudança só no código do app publica só a peça app", () => {
-  assert.deepEqual(mudancasDev(["src/screens/AgendaScreen.tsx"]), { app: true, sw: false });
+  assert.deepEqual(mudancasDev(["src/features/servicos/InitialScreen.tsx"]), { app: true, sw: false });
 });
 
 test("mudança nas duas peças publica as duas", () => {

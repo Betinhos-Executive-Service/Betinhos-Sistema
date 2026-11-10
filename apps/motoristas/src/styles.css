@@ -1,9 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900;1000&family=Montserrat:wght@400;500;600;700;800&display=swap");
-@import "./comunicados.css";
-@import "./checklists.css";
-@import "./termos.css";
-@import "./treinamentos.css";
-@import "./tour.css";
+@import "./features/comunicados/comunicados.css";
+@import "./features/checklist/checklists.css";
+@import "./features/termos/termos.css";
+@import "./features/treinamentos/treinamentos.css";
+@import "./app/tour.css";
 @font-face {
   font-family: "Centabel Book Embedded";
   src: url("./assets/fonts/Centabel-Book.ttf") format("truetype");

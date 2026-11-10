@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { describeCameraError } from "../src/lib/cameraErrors.ts";
+import { describeCameraError } from "../src/shared/camera/cameraErrors.ts";
 
 function namedError(name: string) {
   const error = new Error("Permission denied");

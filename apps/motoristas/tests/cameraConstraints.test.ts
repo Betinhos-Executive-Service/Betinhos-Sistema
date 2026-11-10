@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DOCUMENT_PHOTO_ASPECT, getDocumentStreamConstraints, getDocumentTrackConstraints, describeStreamSize } from "../src/lib/cameraConstraints.ts";
+import { DOCUMENT_PHOTO_ASPECT, getDocumentStreamConstraints, getDocumentTrackConstraints, describeStreamSize } from "../src/shared/camera/cameraConstraints.ts";
 
 test("comprovante pede stream 4:3 em alta resolução com a câmera traseira", () => {
   assert.equal(DOCUMENT_PHOTO_ASPECT, 4 / 3);
@@ -30,6 +30,6 @@ test("descreve o tamanho real do stream e a proporção", () => {
 
 test("toda foto da câmera ao vivo é o quadro do vídeo em JPEG 0,85 (sem takePhoto)", async () => {
   // Celular do Renan (15/10, v2.1.716): takePhoto devolveu outro enquadramento e custava segundos.
-  const { LIVE_PHOTO_JPEG_QUALITY } = await import("../src/lib/cameraConstraints.ts");
+  const { LIVE_PHOTO_JPEG_QUALITY } = await import("../src/shared/camera/cameraConstraints.ts");
   assert.equal(LIVE_PHOTO_JPEG_QUALITY, 0.85);
 });

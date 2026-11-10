@@ -1,4 +1,4 @@
-import type { ExpensePhoto } from "../lib/expenses";
+import type { ExpensePhoto } from "../features/despesas/expenses";
 import type { DetailData, Screen } from "../types";
 
 function getDetailFieldValue(detail: DetailData, label: string) {

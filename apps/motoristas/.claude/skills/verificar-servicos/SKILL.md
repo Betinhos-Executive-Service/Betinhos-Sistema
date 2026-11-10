@@ -1,16 +1,16 @@
 ---
 name: verificar-servicos
-description: "Verifica o fluxo principal do motorista no App Motoristas: Início, Serviços, detalhe, Receber (câmera e comprovante), Finalizar, Voucher, Cancelado no local, Histórico e o Voltar do celular. Use após mudar src/App.tsx, src/app/**, src/components/**, src/screens das telas de serviço ou src/styles.css, ou quando pedirem para testar o fluxo de serviço."
+description: "Verifica o fluxo principal do motorista no App Motoristas: Início, Serviços, detalhe, Receber (câmera e comprovante), Finalizar, Voucher, Cancelado no local, Histórico e o Voltar do celular. Use após mudar src/App.tsx, src/app/**, src/shared/**, as telas de serviço em src/features/ ou src/styles.css, ou quando pedirem para testar o fluxo de serviço."
 ---
 # Verificar fluxo de serviços
 
 ## Cobre
-- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/components/**`, `src/data/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
+- Código: `src/App.tsx`, `src/app/**` (navegação, `backGuard.ts`, `cameraScroll.ts`), `src/shared/**`, `src/data/mock/mockData.ts`, `src/styles.css`, telas `Initial`, `Services`, `Details`, `History*`, `Receive`, `Finalize`, `Voucher`, `Signature`, `LocalCancel`, `MediaCapture`, `MaintenancePhotoPreview`.
 - Rotas (hash): `#inicio`, `#servicos`, `#detalhes?serviceId=…&type=…`, `#receber`, `#foto-receber`, `#preview-foto-receber`, `#finalizar`, `#voucher`, `#assinatura`, `#cancelado-local`, `#historico`.
 
 ## Preparar ambiente
 - Dev server: `node scripts/dev-server.cjs` com `PORT=31877` (configuração `app-motoristas-ux-audit` em `.claude/launch.json`; no navegador interno use `preview_start`). O servidor recompila `dist/` a cada mudança em `src/` (~15 s).
-- URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mockData.ts`); nada é gravado no Dataverse.
+- URL: `http://localhost:31877/webresource-app-motoristas.html#inicio`. Sem `Xrm` o app entra em modo mock (`src/data/mock/mockData.ts`); nada é gravado no Dataverse.
 - Antes de começar: `localStorage.clear()` e recarregar, para não herdar serviços finalizados em testes anteriores.
 - Depois de `localStorage.clear()` o tour de primeiro acesso reabre sozinho no Início e bloqueia os toques: marque `localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto")` logo em seguida (os roteiros `scripts/qa/verify-*.cjs` já fazem isso; ver `verificar-tour`).
 - Sem Google Chrome instalado, os roteiros aceitam `CHROME_PATH=<binário Chromium/Brave>` (e `NODE_PATH` com `playwright-core`). Exceção: `verify-checklist-send.cjs` ainda exige o `@playwright/cli` global do Windows.
@@ -43,14 +43,14 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 - Falha já existente no roteiro automatizado (na `main` também, 28/10/2026): "Finalizar: confirma a observação já escrita".
 
 ## Passageiros no detalhe (lista com foto e ficha, 26/10/2026)
-`src/components/details/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).
-- `#detalhes?serviceId=10241&type=SERVICO` (Programado no mock; apague `app-motoristas-local-v1` do localStorage se o mock salvo atrapalhar), 375×812: nenhum `.passenger-avatars`; seção com 2 `.passenger-row`: Ana Paula (foto de retrato em canvas, `naturalWidth` 320) e Roberto (inicial "R"); cada linha com bandeira SVG do idioma ao lado do nome (`aria-label` "Idioma: …"; `languageFlagCode` em `src/lib/passengerContact.ts`, SVGs em `LanguageFlag.tsx`; DEV só tem Português/Inglês/Espanhol), telefone e botões 44×44 Ligar/WhatsApp; `document.documentElement.scrollWidth - innerWidth` = 0.
+`src/features/detalhe/PassengerContacts.tsx` substitui a antiga faixa de avatares do topo (`PassengerAvatars`). Só aparece quando `detail.passengers` vem preenchido; senão a seção "Passageiros e Telefones de Contato" continua no HTML antigo (`DetailsField`).
+- `#detalhes?serviceId=10241&type=SERVICO` (Programado no mock; apague `app-motoristas-local-v1` do localStorage se o mock salvo atrapalhar), 375×812: nenhum `.passenger-avatars`; seção com 2 `.passenger-row`: Ana Paula (foto de retrato em canvas, `naturalWidth` 320) e Roberto (inicial "R"); cada linha com bandeira SVG do idioma ao lado do nome (`aria-label` "Idioma: …"; `languageFlagCode` em `src/features/detalhe/passengerContact.ts`, SVGs em `LanguageFlag.tsx`; DEV só tem Português/Inglês/Espanhol), telefone e botões 44×44 Ligar/WhatsApp; `document.documentElement.scrollWidth - innerWidth` = 0.
 - Tocar na linha abre `.passenger-sheet` (sheet de baixo): foto grande ou inicial 120 px, bandeira + nome, Telefone, botões "Ligar" e "WhatsApp". Fecha com X, Esc e toque fora.
-- Regra da foto e privacidade em `src/lib/passengerPhoto.ts` (só Programado, `new_ObterFotoPassageiro`, 2 chamadas simultâneas, blob URL revogado no `dispose`). Links em `src/lib/passengerContact.ts` (WhatsApp com mensagem vindo do Dataverse tem prioridade). Testes: `tests/passengerContact.test.ts`, `tests/passengerPhoto.test.ts`.
+- Regra da foto e privacidade em `src/features/detalhe/passengerPhoto.ts` (só Programado, `new_ObterFotoPassageiro`, 2 chamadas simultâneas, blob URL revogado no `dispose`). Links em `src/features/detalhe/passengerContact.ts` (WhatsApp com mensagem vindo do Dataverse tem prioridade). Testes: `tests/passengerContact.test.ts`, `tests/passengerPhoto.test.ts`.
 - `cr40f_bancodedados` não tem campo de nacionalidade (metadata DEV 26/10/2026: só `cr40f_idioma`); a ficha mostra o Idioma. Foto real só no DEV com serviço Programado.
 
 ## Cobrança por QR code (Stripe, modo mock)
-Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/lib/qrChargeMock.ts`) paga 5 s depois de gerar (`?mockPagaEm=<s>` muda), simula recusa com `?mockRecusa=1` e guarda as cobranças no `sessionStorage` (recarregar mantém o pago para o `resumo`).
+Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em localhost o botão aparece sempre; o mock (`src/features/recebimento/qrChargeMock.ts`) paga 5 s depois de gerar (`?mockPagaEm=<s>` muda), simula recusa com `?mockRecusa=1` e guarda as cobranças no `sessionStorage` (recarregar mantém o pago para o `resumo`).
 - **Roteiro automatizado (preferido):** `node scripts/qa/verify-qr-charge.cjs .verificacao/<data>-qr` com o dev server no ar (375×812, Chrome headless). Todas as linhas `OK` (35 em 22/10/2026); prints dos 5 passos, QR, confirmação, finalizar, recarregado, retomar e parcial na pasta.
 - Roteiro manual equivalente:
   1. `#receber?serviceId=10240&type=SERVICO` → "Cobrar por QR code" (some no 10241, R$ 0,00). Enquanto o resumo carrega, o botão mostra "Conferindo cobranças".
@@ -68,14 +68,14 @@ Spec: `docs/superpowers/specs/2026-10-21-cobranca-stripe-qr-design.md`. Em local
       - `?mockExpira=3&mockPagaEm=999` (ou com `mockOffline=4`, que segura o pagamento): ao zerar a contagem o texto do `.qr-charge-help` vira "Prazo encerrando; conferindo com o Stripe." e o polling continua (não mostra "expirou" pelo relógio do celular); só 2 min após o prazo sem resposta do plugin (`EXPIRY_GRACE_MS`) a tela encerra com "O QR code expirou… Se o passageiro chegou a pagar antes do prazo, a confirmação aparece em Recebimento."
       - `?mockOffline=4`: após 3 consultas seguidas sem rede (~9 s) aparece `.qr-charge-alert.is-warning` "Sem conexão: o app não consegue conferir o pagamento desde HH:mm:ss…"; na consulta que volta, o aviso some e vira pago (`navigator.vibrate([120,80,120])` 1 vez).
       - Segundo plano: `Object.defineProperty(document,'hidden',{configurable:true,get:()=>true}); document.dispatchEvent(new Event('visibilitychange'))` → não vira pago enquanto escondido; `hidden=false` + evento → "Pagamento confirmado" em < 0,5 s (consulta imediata, sem esperar 3 s).
-      - Erro de negócio do plugin na consulta (`{erro}`, ex.: pagamento em processamento no banco) aparece como mensagem (`.qr-charge-alert.is-danger`) e não conta como "sem conexão" (`QrChargeRefusal` em `src/lib/qrCharge.ts`); resposta de outra sessão é descartada; consulta pendurada por mais de 10 s conta como falha (`POLL_TIMEOUT_MS`).
+      - Erro de negócio do plugin na consulta (`{erro}`, ex.: pagamento em processamento no banco) aparece como mensagem (`.qr-charge-alert.is-danger`) e não conta como "sem conexão" (`QrChargeRefusal` em `src/features/recebimento/qrCharge.ts`); resposta de outra sessão é descartada; consulta pendurada por mais de 10 s conta como falha (`POLL_TIMEOUT_MS`).
       - O mock só vale em `localhost`: fora dele, sem `Xrm.WebApi`, a cobrança falha com erro, nunca simula "pago".
 - Cliques por script não contam como gesto: o console mostra "Blocked call to navigator.vibrate" — esperado (o roteiro ignora); em toque real vibra.
 - O navegador interno do Claude com o painel oculto pode tirar print desalinhado (layout cortado à direita) desta tela; confira pelo DOM (`getBoundingClientRect`) ou use o roteiro headless.
 - Lógica pura: `tests/qrCharge.test.ts` e `tests/qrChargeSummary.test.ts` (resumo, reidratação, rota pós-pagamento, passos, horário, mock). Plugin (`QrChargePlugin`, ações `criar`/`resumo`/`consultar`/`cancelar`/`sincronizar`): `plugins/DriverRecordSharing.Tests/QrChargePluginTests.cs` (`dotnet test --filter "FullyQualifiedName~QrCharge"`). Stripe real, webhook (Flow "Flow Webhook Stripe | Cobrança QR"), `resumo` no Dataverse e Apple/Google Pay não são verificáveis no mock.
 
 ## Quadro de valores e conferência do comprovante por IA (22/10/2026)
-Tela "Enviar comprovante" (`src/screens/ReceiveScreen.tsx`, lógica pura em `src/lib/receiveProofCheck.ts`).
+Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica pura em `src/features/recebimento/receiveProofCheck.ts`).
 - O total vem de `getReceivableCents(detail)` (`cr40f_valor_a_receber` do registro). No Dataverse o campo do detalhe se chama "Receber" ("Sim - R$ 180,00"), não "Valor a receber": por isso o bloco antigo, que procurava esse rótulo, nunca aparecia fora do mock.
 - Estados: sem QR pago → só "Valor a receber R$ X"; parcial → quadro "Total do serviço / Já pago por QR + nome do pagante (sem horário) / Falta receber" em destaque, aviso amarelo "Envie o comprovante do restante" e foto obrigatória; quitado → "Tudo recebido" verde `#147A4B` e "Comprovante opcional" (sem asterisco).
 - Conferência por IA: cada foto anexada vai para a leitura rápida dos gastos (`runQuickReadPipeline` → Flow `new_FlowURLDespesaLeituraRapida`, só o `valor` é usado). No FINALIZAR o botão mostra "CONFERINDO"; se a soma lida cobre o que falta, segue direto; valor menor, ilegível, falha ou sem internet → popup "Você recebeu os R$ X que faltavam?" com "Ainda não" (fecha, foco inicial) e "Sim, recebi tudo" (finaliza). Nunca bloqueia.
@@ -90,7 +90,7 @@ Tela "Enviar comprovante" (`src/screens/ReceiveScreen.tsx`, lógica pura em `src
 
 ## Casos de borda
 - Fila: finalizar fora de ordem mostra "Conclua os itens anteriores da fila antes de prosseguir." (modo remoto).
-- Câmera negada, ocupada (NotReadableError) e ausente têm mensagens próprias (`src/lib/cameraErrors.ts`, coberto por `tests/cameraErrors.test.ts`).
+- Câmera negada, ocupada (NotReadableError) e ausente têm mensagens próprias (`src/shared/camera/cameraErrors.ts`, coberto por `tests/cameraErrors.test.ts`).
 - Durante envio (`submitState` ≠ idle) os botões Voltar e Limpar ficam desabilitados e o Voltar do celular não navega.
 
 ## Evidência obrigatória
@@ -103,7 +103,7 @@ Tela "Enviar comprovante" (`src/screens/ReceiveScreen.tsx`, lógica pura em `src
 - Abrir discador/WhatsApp (`tel:`/`wa.me`) não é exercitado; o roteiro para no diálogo de escolha.
 
 ## Foto do passageiro no detalhe (26/10/2026)
-- Código: `src/lib/passengerPhoto.ts`, `src/components/details/PassengerAvatars.tsx`; teste `tests/passengerPhoto.test.ts`.
+- Código: `src/features/detalhe/passengerPhoto.ts`, `src/features/detalhe/PassengerContacts.tsx`; teste `tests/passengerPhoto.test.ts`.
 - A foto só é pedida com o serviço Programado (`cr40f_status` 202410005), pela Custom API `new_ObterFotoPassageiro` (`executeCustomApi`, `{new_ReservaId, new_PassageiroId}` → `new_FotoJson`). Se a API negar, falhar ou devolver JSON inválido, aparece só a inicial, sem mensagem de erro. A imagem fica em memória como blob URL, revogada ao sair da tela; são no máximo 2 chamadas simultâneas.
 - Mock (375 px): o serviço 10241 mostra a foto da Ana e o "R" do Roberto; tocar no avatar amplia a foto, e X, Esc ou toque fora fecham. Se a agenda mock antiga aparecer, apague `app-motoristas-local-v1` do localStorage.
 - DEV: entre como o motorista de um serviço Programado com passageiro com foto e veja a foto. Mude o status para Em Execução e reabra: só a inicial.

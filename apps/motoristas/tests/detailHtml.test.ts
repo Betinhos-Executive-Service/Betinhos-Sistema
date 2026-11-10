@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSafeDetailHtml } from "../src/lib/detailHtml.ts";
+import { parseSafeDetailHtml } from "../src/features/detalhe/detailHtml.ts";
 
 test("parseSafeDetailHtml keeps text, breaks and safe http links", () => {
   const parts = parseSafeDetailHtml("Ana<br><a href=\"https://wa.me/5511900000001\">WhatsApp</a>");

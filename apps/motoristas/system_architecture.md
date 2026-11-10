@@ -1,25 +1,27 @@
 # System Architecture
 
-## App shell
+## Organização por funcionalidade
 
-- `src/App.tsx` is the orchestration layer only: state wiring, remote/local side effects, and screen selection.
-- `src/app/bootstrap.ts` owns local bootstrap concerns: mock-backed initial store, deep-link params, draft key generation, and pending-detail resolution.
-- `src/app/navigation.ts` owns screen depth, motion presets, and auto-refresh eligibility rules.
-- `src/app/detailFlow.ts` owns service receive/voucher/finalize routing rules and receive-proof checks.
+- `src/main.tsx` escolhe o adaptador de dados e monta o `DataProvider` (`src/app/DataProvider.tsx`); as telas pedem dados por `useDados()`.
+- `src/App.tsx` é só composição: chama os hooks de cada feature na ordem fixa dos efeitos e passa a tela da vez para `src/app/AppShell.tsx` (animação de troca, toast, carregamento, progresso de envio, escolha do carro, erro crítico e selo de build).
+- `src/app/` guarda o que atravessa as features: abertura (`bootstrap.ts`, `useEstadoInicial.ts`, `rotaInicial.ts`), navegação hash e Voltar do celular (`navigation.ts`, `useNavegacao.ts`, `backGuard.ts`), avisos (`useAvisos.ts`, `useAvisosGlobais.ts`), rascunhos de mídia e voucher (`usePersistenciaRascunhos.ts`, `useCarregarRascunhoMidia.ts`), dados dos formulários (`useDadosFormularios.ts`), `resetDadosLocais.ts`, modo de execução (`modo.ts`) e registro de features (`features.ts`).
+- `src/features/<x>/` reúne telas, componentes, regras puras, hooks de fluxo (`useXFlow`), rotas (`rotas.tsx`, `rotasX(screen, props)`) e o `manifesto.ts` de cada funcionalidade (serviços, detalhe, fotos, checklist, finalizar, voucher, recibo, recebimento, despesas, colisão, manutenção, termos, comunicados, ideias, meu carro, histórico).
+- `src/data/porta.ts` é o contrato das operações que o modo link usa; `src/data/dataverse/` tem o cliente HTTP (`cliente.ts`), entidades, Custom APIs e o adaptador da porta; `src/data/mock/` tem o mock de localhost.
+- As chamadas do Dataverse de cada feature ficam em `src/features/<x>/remoto.ts` (agenda e trocas em `features/servicos/agendaRemota.ts` e `trocas.ts`). O que várias features usam fica em `src/data/dataverse/`: `flow.ts` (URLs dos Flows e chamada HTTP), `arquivos.ts` (data URLs e upload de fotos), `metadados.ts` (atributos e nomes de navegação de lookups) e `registros.ts` (leitura de registros e constantes comuns). Módulos de `data/dataverse` não importam features. As operações liberadas ao terceiro passam pela porta.
+- `src/shared/` tem a UI comum (`shared/ui`, inclusive `icons/`, `layout/` e `navigation/`), câmera e mídia (`shared/camera`) e utilitários (`appErrorLogger`, `buildStamp`, `currencyInput`, `useDitado`).
+- `src/styles.css` é a folha de estilos de entrada do build e importa o CSS das features.
 
-## Expenses domain
+## Despesas
 
-- `src/lib/expenses.ts` is a barrel only. Keep feature consumers importing from it.
-- `src/lib/expenses.types.ts` owns the domain contracts.
-- `src/lib/expenses.defaults.ts` owns local fallback catalogs used before Dataverse reference data loads.
-- `src/lib/expenses.reference.ts` owns lookup, search, parsing, validation, and field normalization.
-- `src/lib/expenses.payload.ts` owns Dataverse payload assembly only.
+- `src/features/despesas/expenses.ts` é só barrel; consumidores importam dele.
+- `expenses.types.ts` tem os contratos; `expenses.defaults.ts` os catálogos locais usados antes de carregar a referência do Dataverse; `expenses.reference.ts` busca, parse, validação e normalização; `expenses.payload.ts` só monta o payload do Dataverse.
 
-## Refactor guardrails
+## Regras de refatoração
 
-- When `src/App.tsx` grows, extract pure rules/helpers into `src/app/*` first instead of adding more top-level utilities there.
-- When expense behavior changes, prefer updating `expenses.reference.ts` or `expenses.payload.ts` instead of branching logic inside screens.
-- Run `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`, `npm test`, and `npm run build` after structural changes.
+- Estado e efeitos novos entram num hook da feature, não no `App.tsx`; o hook é chamado na posição que mantém a ordem dos efeitos.
+- Mudança de despesa vai para `expenses.reference.ts` ou `expenses.payload.ts`, não para condicionais nas telas.
+- Mover ou remover export de `src/lib`, `src/app`, `src/data` ou `src/shared` exige atualizar de propósito `tests/characterization/module-exports.json` (`UPDATE_SNAPSHOT=1 npm test`).
+- Rode `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`, `npm test` e `npm run build` depois de mudança estrutural.
 
 ## Trocas e posse de veiculos
 

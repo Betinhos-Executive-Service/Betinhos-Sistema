@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadRemoteStore } from "../src/lib/dataverse.ts";
+import { loadRemoteStore } from "../src/features/servicos/agendaRemota.ts";
 
 const SERVICE_COUNT = 9;
 

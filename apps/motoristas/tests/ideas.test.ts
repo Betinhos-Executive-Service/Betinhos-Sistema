@@ -7,7 +7,7 @@ import {
   getIdeaStatusOption,
   normalizeIdeaRecord,
   validateIdeaDraft
-} from "../src/lib/ideas.ts";
+} from "../src/features/ideias/ideas.ts";
 
 test("validateIdeaDraft exige título e respeita limites da tabela cr40f_boasideias", () => {
   assert.deepEqual(validateIdeaDraft({ title: "   ", details: "" }), { title: "Informe o título da ideia." });

@@ -177,7 +177,8 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     await main().getByRole("button", { name: "FINALIZAR" }).click();
     await page.waitForTimeout(900);
     const finalizeText = await main().innerText();
-    check("Finalizar: confirma a observação já escrita", /Confira sua observação/i.test(finalizeText) && /Enviar sem observação/.test(finalizeText));
+    // Desde o resumo na própria tela (8172ed2), serviço tem "Não tenho observação" e "Gerar resumo" fixos; o título muda com o texto já escrito.
+    check("Finalizar: confirma a observação já escrita", /Confira sua observação/i.test(finalizeText) && /Não tenho observação/.test(finalizeText) && /Gerar resumo/.test(finalizeText));
     await shot("servicos-finalizar");
 
     // Voucher: sem atalho de horário agendado (removido em 22/10/2026), rótulos, formatação e limpar com confirmação.

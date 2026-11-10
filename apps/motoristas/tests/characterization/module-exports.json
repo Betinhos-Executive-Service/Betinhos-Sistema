@@ -1,0 +1,266 @@
+{
+  "src/lib/localWorkflow.ts": [
+    "LocalStore",
+    "VoucherValidationField",
+    "VoucherValidationResult",
+    "buildWhatsAppUrl",
+    "cancelDetailLocally",
+    "clearMaintenancePhotos",
+    "deleteMaintenancePhoto",
+    "detailsToClipboardText",
+    "finalizeDetailLocally",
+    "findDetailByParams",
+    "getVoucherValidationResult",
+    "makeHistoryItem",
+    "openExternalUrl",
+    "removeAgendaDetail",
+    "saveMaintenancePhoto",
+    "saveSignatureLocally",
+    "upsertField",
+    "validateMaintenanceFields",
+    "validateVoucherFields",
+    "withFields"
+  ],
+  "src/lib/pwa.ts": [
+    "installPwa"
+  ],
+  "src/lib/pwaManifest.ts": [
+    "PWA_SW_NAME",
+    "THEME_COLOR",
+    "buildManifest",
+    "isPwaContext",
+    "stableAppPath"
+  ],
+  "src/lib/serviceVehicleInfleet.ts": [
+    "DriverVehicleChoice",
+    "FleetVehicle",
+    "InfleetVehicleCandidate",
+    "InfleetVehicleDecision",
+    "InfleetVehicleResolution",
+    "SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN",
+    "SERVICE_VEHICLE_ORIGIN_INFLEET",
+    "buildInfleetServiceVehiclePatch",
+    "describeVehicle",
+    "needsDriverChoice",
+    "needsFleetChoice",
+    "parseInfleetVehicleResolution",
+    "selectableCandidates",
+    "thirdPartyResolution",
+    "unavailableResolution"
+  ],
+  "src/lib/serviceVehicleInfleetMock.ts": [
+    "MOCK_FLEET",
+    "MOCK_INFLEET_SCENARIOS",
+    "MockInfleetScenario",
+    "buildMockInfleetResolution",
+    "createMockFleetLoader",
+    "pickMockInfleetScenario",
+    "resolveMockServiceVehicle"
+  ],
+  "src/lib/webPush.ts": [
+    "WEB_PUSH_PUBLIC_KEY",
+    "WebPushEnv",
+    "WebPushState",
+    "buildSubscriptionRecord",
+    "enableWebPush",
+    "getWebPushState",
+    "resolveWebPushState",
+    "urlBase64ToUint8Array"
+  ],
+  "src/app/agendaVisibility.ts": [
+    "filterAgendaGalleryItems",
+    "getAgendaItemStartDate",
+    "shouldShowAgendaItemInGallery"
+  ],
+  "src/app/backGuard.ts": [
+    "findVisibleBackButton",
+    "useHardwareBackGuard"
+  ],
+  "src/app/bootstrap.ts": [
+    "STORAGE_KEY",
+    "findFirstPendingDetail",
+    "findFirstPendingServiceDetail",
+    "getInitialChecklistId",
+    "getInitialComunicadoId",
+    "getInitialDespesaId",
+    "getInitialDetail",
+    "getInitialGastosCartaoLink",
+    "getInitialParams",
+    "getInitialTermoMultaId",
+    "getInitialTreinamentoParticipacaoId",
+    "getVoucherDraftKey",
+    "initialStore",
+    "isSameDetail",
+    "loadStore"
+  ],
+  "src/app/cameraScroll.ts": [
+    "FrameScheduler",
+    "SCROLL_SNAPSHOT_TTL_MS",
+    "ScrollContainer",
+    "ScrollSnapshot",
+    "createCameraScroll",
+    "createScrollMemory",
+    "isLayoutSettled",
+    "nearestScrollTop",
+    "restoreScroll",
+    "useCameraScroll"
+  ],
+  "src/app/detailFlow.ts": [
+    "getScreenAfterQrPayment",
+    "getServiceTaskBackScreen",
+    "hasReceiveProofs",
+    "hasUploadedReceiveProofs",
+    "isReceiveStepPending",
+    "shouldRequireReceiveStep",
+    "shouldRouteServiceToVoucher"
+  ],
+  "src/app/features.ts": [
+    "FEATURES",
+    "Feature",
+    "featuresDoModo",
+    "telasDoModo"
+  ],
+  "src/app/modo.ts": [
+    "Modo",
+    "detectarModo"
+  ],
+  "src/app/navigation.ts": [
+    "AUTO_REFRESH_INTERVAL_MS",
+    "HashRoute",
+    "buildHashRoute",
+    "getHashRouteFallbackScreen",
+    "getHashRouteRestoreScreen",
+    "getScreenMotion",
+    "isHashRoutingEnabled",
+    "parseHashRoute",
+    "screenNeedsHashDetail",
+    "shouldAutoRefreshScreen"
+  ],
+  "src/app/overlayLayering.ts": [
+    "getVisibleLoadingOverlay"
+  ],
+  "src/app/resetDadosLocais.ts": [
+    "resetDadosLocais"
+  ],
+  "src/app/rotaInicial.ts": [
+    "findDetailFromHashRoute",
+    "getInitialScreenFromHashRoute"
+  ],
+  "src/app/tour.ts": [
+    "READING_TOUR_ID",
+    "TOUR_ALL_CHAPTERS",
+    "TourBox",
+    "TourCardPlacement",
+    "TourChapter",
+    "TourCloseReason",
+    "TourStep",
+    "clearAllChaptersSeen",
+    "closesWhenReadingEnds",
+    "fitSpotlight",
+    "hasSeenChapter",
+    "markChapterSeen",
+    "missingRequiredSteps",
+    "pickChapter",
+    "placeTourCard",
+    "resolveTourSteps",
+    "sameBox",
+    "spotlightBox",
+    "tourProgressLabel",
+    "tourStorageKey"
+  ],
+  "src/app/tourChapters.ts": [
+    "TOUR_CHAPTERS",
+    "tourChaptersForScreen",
+    "tourScreensWithChapters"
+  ],
+  "src/app/tourDom.ts": [
+    "findTourTarget",
+    "hasTourProbe"
+  ],
+  "src/app/useAvisos.ts": [
+    "useAvisos"
+  ],
+  "src/app/useAvisosGlobais.ts": [
+    "useAvisosGlobais"
+  ],
+  "src/app/useCarregarRascunhoMidia.ts": [
+    "useCarregarRascunhoMidia"
+  ],
+  "src/app/useDadosFormularios.ts": [
+    "useDadosFormularios"
+  ],
+  "src/app/useEstadoInicial.ts": [
+    "useEstadoInicial"
+  ],
+  "src/app/useNavegacao.ts": [
+    "useNavegacao"
+  ],
+  "src/app/usePersistenciaRascunhos.ts": [
+    "usePersistenciaRascunhos"
+  ],
+  "src/app/useTour.ts": [
+    "useTour"
+  ],
+  "src/data/porta.ts": [
+    "PortaDados"
+  ],
+  "src/shared/appErrorLogger.ts": [
+    "APP_CONNECTION_LOST_MESSAGE",
+    "APP_OPERATION_ERROR_MESSAGE",
+    "AppErrorLogContext",
+    "AppErrorNotice",
+    "flushAppErrorLogQueue",
+    "flushRepeatedErrorSummaries",
+    "installGlobalAppErrorLogger",
+    "redactSensitiveLogValue",
+    "reportAppError"
+  ],
+  "src/shared/buildStamp.ts": [
+    "BuildInfo",
+    "formatBuildStamp",
+    "getBuildInfo"
+  ],
+  "src/shared/currencyInput.ts": [
+    "formatCurrencyInputOnBlur",
+    "sanitizeCurrencyInput"
+  ],
+  "src/shared/errorLogGrouping.ts": [
+    "ErrorCause",
+    "ErrorCauseKind",
+    "ErrorHop",
+    "MAX_LOG_MESSAGE_CHARS",
+    "MAX_LOG_STACK_CHARS",
+    "MAX_PAYLOAD_CHARS",
+    "REPEAT_QUIET_MS",
+    "RepeatGroup",
+    "buildRepeatSignature",
+    "classifyErrorCause",
+    "clip",
+    "compactErrorChain",
+    "createRepeatTracker",
+    "dropRepeatedError",
+    "isNetworkCause",
+    "limitPayload",
+    "withCauseLabel"
+  ],
+  "src/shared/isTrueLike.ts": [
+    "isTrueLike"
+  ],
+  "src/shared/useDitado.ts": [
+    "DITADO_IDLE",
+    "DitadoCtor",
+    "DitadoRecognition",
+    "DitadoResultEvent",
+    "DitadoState",
+    "appendDitado",
+    "createDitado",
+    "ditadoErrorMessage",
+    "ditadoNovo",
+    "formatDitadoTimer",
+    "getDitadoCtor",
+    "useDitado"
+  ],
+  "src/shared/wait.ts": [
+    "wait"
+  ]
+}

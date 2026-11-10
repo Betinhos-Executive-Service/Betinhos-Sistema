@@ -15,8 +15,8 @@ import {
   termoFlowReducer,
   TERMO_STATUS,
   validarMotivo
-} from "../src/lib/termosMulta.ts";
-import { executeCustomApi } from "../src/lib/customApi.ts";
+} from "../src/features/termos/termosMulta.ts";
+import { executeCustomApi } from "../src/data/dataverse/customApi.ts";
 
 const termoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const strokes: [number, number][][] = [[[0.1, 0.1], [0.5, 0.5]]];
