@@ -3,8 +3,8 @@ import { Alert, Avatar, Button, Checkbox, Dialog, SearchBox, Skeleton, useToast 
 import { ArrowLeft, FileText } from 'lucide-react'
 import { baixarComprovantes, textoErroPdf } from '../data/baixarComprovantes'
 import type { Source } from '../data/source'
-import { paresDoMotorista } from '../domain/comprovante'
-import { COMUNICADO_TIPO, formatDate, plural, type Comunicado, type Destinatario, type Motorista } from '../domain/comunicados'
+import { descricaoConclusao, paresDoMotorista } from '../domain/comprovante'
+import { plural, type Comunicado, type Destinatario, type Motorista } from '../domain/comunicados'
 
 type Props = { motoristas: Motorista[]; comunicados: Comunicado[]; source: Source; onClose: () => void }
 
@@ -15,7 +15,7 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
   const [motorista, setMotorista] = useState<Motorista | null>(null)
   const [rows, setRows] = useState<Destinatario[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set())
+  const [desmarcados, setDesmarcados] = useState<ReadonlySet<string>>(new Set())
   const [gerando, setGerando] = useState(false)
   const [tentativa, setTentativa] = useState(0)
 
@@ -25,8 +25,9 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
     let vale = true
     setRows(null)
     setErro(null)
+    setDesmarcados(new Set())
     source.destinatariosDoMotorista(motorista.id).then(
-      (lista) => { if (vale) { setRows(lista); setMarcados(new Set(paresDoMotorista(motorista.nome, comunicados, lista, new Set()).map((par) => par.destinatario.id))) } },
+      (lista) => { if (vale) setRows(lista) },
       (reason: unknown) => { if (vale) setErro(reason instanceof Error ? reason.message : String(reason)) },
     )
     return () => { vale = false }
@@ -35,9 +36,9 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
   const termo = busca.trim().toLowerCase()
   const lista = motoristas.filter((m) => !termo || m.nome.toLowerCase().includes(termo))
   const concluidos = useMemo(() => (motorista && rows ? paresDoMotorista(motorista.nome, comunicados, rows, new Set()) : []), [motorista, rows, comunicados])
-  const escolhidos = concluidos.filter((par) => marcados.has(par.destinatario.id))
+  const escolhidos = concluidos.filter((par) => !desmarcados.has(par.destinatario.id))
 
-  const alternar = (id: string) => setMarcados((atual) => { const next = new Set(atual); if (!next.delete(id)) next.add(id); return next })
+  const alternar = (id: string) => setDesmarcados((atual) => { const next = new Set(atual); if (!next.delete(id)) next.add(id); return next })
   const fechar = () => { if (!gerando) onClose() }
   const gerar = async () => {
     if (!motorista || gerando || !escolhidos.length) return
@@ -80,10 +81,10 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
             <>
               <p>{concluidos.length} {plural(concluidos.length, 'comunicado concluído', 'comunicados concluídos')}. Desmarque o que não deve entrar no PDF.</p>
               <ul className="cm-pdfdlg__list">
-                {concluidos.map(({ comunicado, destinatario }) => (
-                  <li key={destinatario.id} className={marcados.has(destinatario.id) ? 'is-checked' : undefined}>
-                    <Checkbox label={comunicado.titulo} description={`${comunicado.tipo === COMUNICADO_TIPO.ciencia ? 'Ciência assinada' : 'Leitura confirmada'} em ${formatDate(destinatario.cienteEm || destinatario.lidoEm)}`}
-                      checked={marcados.has(destinatario.id)} disabled={gerando} onChange={() => alternar(destinatario.id)} />
+                {concluidos.map((par) => (
+                  <li key={par.destinatario.id} className={desmarcados.has(par.destinatario.id) ? undefined : 'is-checked'}>
+                    <Checkbox label={par.comunicado.titulo} description={descricaoConclusao(par)}
+                      checked={!desmarcados.has(par.destinatario.id)} disabled={gerando} onChange={() => alternar(par.destinatario.id)} />
                   </li>
                 ))}
               </ul>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
-import { gerarComprovantePdf, paraWinAnsi } from './comprovantePdf'
+import { paraWinAnsi } from '../../../lib/pdf/texto'
+import { gerarComprovantePdf } from './comprovantePdf'
 import type { DadosComprovante } from '../domain/comprovante'
 
 const dados: DadosComprovante = {

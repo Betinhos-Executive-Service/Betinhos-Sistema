@@ -3,8 +3,6 @@ import type { DadosComprovante } from '../domain/comprovante'
 import { blocosDoConteudo } from '../domain/treinamentos'
 import { desenharAssinatura, paraWinAnsi, quebrar } from '../../../lib/pdf/texto'
 
-export { paraWinAnsi }
-
 const A4: [number, number] = [595.28, 841.89]
 const MARGEM = 56
 const LARGURA = A4[0] - MARGEM * 2

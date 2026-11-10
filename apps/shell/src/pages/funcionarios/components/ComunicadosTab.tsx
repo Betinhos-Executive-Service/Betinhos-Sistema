@@ -3,8 +3,8 @@ import { Button, Checkbox } from '@betinhos/ui'
 import { FileText } from 'lucide-react'
 import { baixarComprovantes, textoErroPdf } from '../../comunicados/data/baixarComprovantes'
 import type { Source as ComunicadosSource } from '../../comunicados/data/source'
-import { paresDoMotorista } from '../../comunicados/domain/comprovante'
-import { COMUNICADO_TIPO, formatDate, plural } from '../../comunicados/domain/comunicados'
+import { descricaoConclusao, paresDoMotorista } from '../../comunicados/domain/comprovante'
+import { plural } from '../../comunicados/domain/comunicados'
 import { Status, useLoad } from './RelatedTabs'
 import { useNotify } from './Toasts'
 
@@ -31,10 +31,10 @@ export function ComunicadosTab({ source, id, nome }: { source: ComunicadosSource
       {pares.length ? (
         <>
           <ul className="cards">
-            {pares.map(({ comunicado, destinatario }) => (
-              <li key={destinatario.id} className="card">
-                <Checkbox label={comunicado.titulo} description={`${comunicado.tipo === COMUNICADO_TIPO.ciencia ? 'Ciência assinada' : 'Leitura confirmada'} em ${formatDate(destinatario.cienteEm || destinatario.lidoEm)}`}
-                  checked={!desmarcados.has(destinatario.id)} disabled={gerando} onChange={() => alternar(destinatario.id)} />
+            {pares.map((par) => (
+              <li key={par.destinatario.id} className="card">
+                <Checkbox label={par.comunicado.titulo} description={descricaoConclusao(par)}
+                  checked={!desmarcados.has(par.destinatario.id)} disabled={gerando} onChange={() => alternar(par.destinatario.id)} />
               </li>
             ))}
           </ul>

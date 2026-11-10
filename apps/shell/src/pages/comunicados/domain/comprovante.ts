@@ -1,4 +1,4 @@
-import { COMUNICADO_TIPO, fileSlug, isDisparado, isPendente, type Comunicado, type Destinatario } from './comunicados'
+import { COMUNICADO_TIPO, fileSlug, formatDate, isDisparado, isPendente, type Comunicado, type Destinatario } from './comunicados'
 
 /** Um comprovante: o motorista que concluiu × o comunicado. */
 export type Par = { comunicado: Comunicado; destinatario: Destinatario; motorista: string }
@@ -39,5 +39,9 @@ export function nomeArquivo(modo: ModoPdf, alvo: string, pares: Par[]) {
   if (pares.length === 1) return `comprovante-${fileSlug(pares[0].comunicado.titulo)}-${fileSlug(pares[0].motorista)}.pdf`
   return modo === 'comunicado' ? `comunicado-${fileSlug(alvo)}-${pares.length}-comprovantes.pdf` : `comunicados-${fileSlug(alvo)}-${pares.length}.pdf`
 }
+
+/** Linha de apoio de um comunicado concluído nas listas de seleção. */
+export const descricaoConclusao = ({ comunicado, destinatario }: Pick<Par, 'comunicado' | 'destinatario'>) =>
+  `${comunicado.tipo === COMUNICADO_TIPO.ciencia ? 'Ciência assinada' : 'Leitura confirmada'} em ${formatDate(destinatario.cienteEm || destinatario.lidoEm)}`
 
 export const tituloComprovante = (tipo: number) => (tipo === COMUNICADO_TIPO.ciencia ? 'Comprovante de ciência' : 'Comprovante de leitura')
