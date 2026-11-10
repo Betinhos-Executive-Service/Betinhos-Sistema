@@ -37,7 +37,7 @@ description: "Verifica os postos perto do motorista e as avaliações: Custom AP
 
 ## Dataverse (só local, nunca na nuvem)
 - Provisionar com `scripts/provision-relatorio-combustivel.ps1` depois de publicar o assembly a partir da `main` atualizada.
-- No DEV, `cr40f_iacnpjlido` estava vazio em 05/11/2026: a tela fica vazia até haver despesa com CNPJ lido. O PROD tem os dados, mas exige `scripts/deploy-prod.ps1`.
+- No DEV, `cr40f_iacnpjlido` estava vazio em 05/11/2026: a tela fica vazia até haver despesa com CNPJ lido. O PROD tem os dados, mas o app chega lá só pelo `publicar.yml` do Betinhos-Sistema.
 - Confira uma chamada autenticada de motorista: a resposta deve ter `ok`, `dias` e `postos`, sem nome de motorista fora dos comentários.
 - Confira `new_AvaliarPosto` com dois motoristas: a segunda avaliação do mesmo motorista substitui a primeira, e marcar `new_oculta` tira o comentário da resposta sem mudar a contagem.
 - Confira a permissão de localização no celular, na URL direta e dentro do Power Apps.

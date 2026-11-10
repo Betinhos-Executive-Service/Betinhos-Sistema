@@ -21,4 +21,4 @@ description: "Verifica o organizador de observação do motorista: plugin Organi
 - `-ConfigurarChaveSegura` sem `-Apply` lança erro.
 
 ## Limites
-- Passos 3 a 5 só com login no DEV (o 4 exige PowerShell) com login no DEV. O PROD só por `scripts/deploy-prod.ps1`, e o step ainda não está em `$secureSteps` de lá.
+- Passos 3 a 5 só com login no DEV (o 4 exige PowerShell) com login no DEV. O PROD só pelo `publicar.yml` do Betinhos-Sistema (o `preservar-config-steps.ps1` guarda a configuração do step).

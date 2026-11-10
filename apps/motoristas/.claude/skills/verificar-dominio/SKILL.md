@@ -31,4 +31,4 @@ description: "Verifica a camada de domínio e integração do App Motoristas: re
 - Saída de `npm test` e do `tsc` salva em `.verificacao/<data>-<branch>/`.
 
 ## Limites
-- Integração autenticada (Xrm, Flow, SharePoint) só em DEV com `npm run push`; PROD só por `scripts/deploy-prod.ps1` e com pedido explícito.
+- Integração autenticada (Xrm, Flow, SharePoint) só em DEV com `npm run push`; PROD só pelo `publicar.yml` do Betinhos-Sistema (merge `develop → main`, ensaio no TEST e aprovação do Renan).

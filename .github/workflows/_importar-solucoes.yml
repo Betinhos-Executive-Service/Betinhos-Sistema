@@ -114,13 +114,13 @@ jobs:
       - name: Remover camadas Active (hotfixes já na main)
         # Publicação parcial (input solucoes) só mexe nas camadas das soluções importadas. Sem isso, publicar só a BetinhosCore
         # apagaria no PROD a camada Active de tela, flows e plugins da Automação e da Interface, e o PROD voltaria à versão
-        # gerenciada antiga até a publicação seguinte. Com as 3 do Sistema, segue o padrão do script (inclui a AppBetinhos).
+        # gerenciada antiga até a publicação seguinte. Com as 4, segue o padrão do script (inclui a AppBetinhos).
         run: |
           $nomes = @((Get-Content -Raw pacotes/manifesto.json | ConvertFrom-Json) | ForEach-Object { $_.solucao })
-          $todas = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosInterface')
+          $todas = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosMotoristas', 'BetinhosInterface')
           $extra = @()
           if (@($todas | Where-Object { $nomes -notcontains $_ }).Count) { $extra = @('-Solucoes', ($nomes -join ',')) }
-          Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 3 do Sistema' })"
+          Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 4 soluções' })"
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd @extra
           if ($LASTEXITCODE -ne 0) { throw "remover-camadas-active.ps1 falhou ($LASTEXITCODE)." }
       - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)

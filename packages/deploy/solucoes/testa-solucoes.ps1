@@ -310,24 +310,11 @@ Confere (-not (Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas.Count -eq
 # Publicacao no TEST: versao seguinte, solucoes escolhidas na ordem de import e import so no TEST
 Confere ((Get-VersaoSeguinte '1.0.0.4') -eq '1.0.0.5' -and (Get-VersaoSeguinte '2.1.0.99') -eq '2.1.0.100') 'versao seguinte sobe a revisao'
 Confere ((Falha-Com { Get-VersaoSeguinte '1.0' }) -like '*fora do formato*') 'versao fora do formato falha'
-Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosInterface') 'lista vazia = as 3 do Sistema na ordem'
-Confere ((@(Get-SolucoesEscolhidas ' BetinhosInterface, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosInterface') 'lista escolhida volta na ordem de import'
+Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosMotoristas,BetinhosInterface') 'lista vazia = as 4, com a Motoristas antes da Interface'
+Confere ((@(Get-SolucoesEscolhidas ' BetinhosMotoristas, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosMotoristas') 'lista escolhida volta na ordem de import'
+Confere ((Falha-Com { Get-SolucoesEscolhidas 'BetinhosCore,BetinhosInterface' }) -like '*service worker*') 'Interface sem a Motoristas falha (transicao do service worker)'
+Confere ((@(Get-SolucoesEscolhidas 'BetinhosInterface,BetinhosMotoristas') -join ',') -eq 'BetinhosMotoristas,BetinhosInterface') 'Motoristas importa antes da Interface (service worker nunca apagado)'
 Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora do Sistema*AppBetinhos*') 'solucao fora do Sistema falha'
-Confere ((Falha-Com { Get-SolucoesEscolhidas 'BetinhosCore,BetinhosMotoristas' }) -like '*app-motoristas-v2*') 'BetinhosMotoristas nao sai por aqui'
-$script:respostas = @(
-  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }, [pscustomobject]@{ objectid = 'bbb'; componenttype = 80; rootcomponentbehavior = 0 }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ webresourceid = 'CCC' }) })
-$doApp = Get-IdsDoApp $dv
-Confere ($doApp.Count -eq 3 -and $doApp.ContainsKey('aaa') -and $doApp.ContainsKey('bbb') -and $doApp.ContainsKey('ccc')) 'app: componentes de uma solucao com varios e o service worker'
-$script:respostas = @(
-  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }) },
-  [pscustomobject]@{ value = @() })
-$doApp = Get-IdsDoApp $dv
-Confere ($doApp.Count -eq 1 -and $doApp.ContainsKey('aaa')) 'app: um componente so e sem service worker'
-$script:respostas = @([pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() })
-Confere ((Get-IdsDoApp $dv).Count -eq 0) 'app: solucao ausente nao falha'
 Confere ($null -eq (Falha-Com { Assert-HostTest $dvTest })) 'import: host do TEST passa'
 Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*alvo Test*') 'import: PROD recusado'
 Confere ((Falha-Com { Assert-HostTest $dv }) -like '*alvo Test*') 'import: DEV recusado'

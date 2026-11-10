@@ -47,7 +47,7 @@ Pull requests should include the user-facing change, validation commands, Datave
 - PRs go to the Betinhos-Sistema `develop`, following its rules. `main` only receives the whole `develop` through a PR merged by Renan.
 - Push to `develop` runs the Betinhos-Sistema `Deploy` workflow: it publishes to DEV `new_app-motoristas-v2` (piece `motoristas`) and `new_app-motoristas-v2-sw` (piece `motoristasSw`) when pending (`packages/deploy/pendentes-dev.ps1` compares the commit recorded in each web resource description; rules in `packages/deploy/mudancas-dev.mjs`) through `apps/motoristas/scripts/push-front-dev.ps1`. Never run a manual publish alongside it.
 - Plugins (`packages/plugins/Betinhos.DriverRecordSharing`), Custom APIs, schema and flows are Betinhos-Sistema code like any other.
-- The PROD path for the app is not active yet (phase 3 of the migration): `packages/deploy/caminho-publicacao.mjs` treats `apps/motoristas/` as "does not change PROD", and PROD stays on `scripts/deploy-prod.ps1` until then.
+- PROD: `BetinhosMotoristas` is the 4th solution of the Betinhos-Sistema `publicar.yml` (import order Core, Automacao, Motoristas, Interface). A merge of `develop` into `main` that touches the app's build or service worker goes through the solutions path (`packages/deploy/caminho-publicacao.mjs`): export from DEV with the commit lock, rehearsal in TEST, PROD backup and Renan's approval. Tests, docs, skills and QA scripts do not change PROD. The old `scripts/deploy-prod.ps1` is gone: never publish the app to PROD by hand.
 - Run commands from `apps/motoristas` with pnpm (test, typecheck and build scripts of `package.json`); npm and the old `package-lock.json` are gone.
 
 ## Security & Configuration Tips

@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory = $true)] [string] $EnvironmentUrl,
   # Nao se chama $Solucoes: solucoes.ps1 atribui $script:Solucoes no mesmo escopo (ver exportar-do-dev.ps1).
-  [Alias("Solucoes")] [string] $Pedido = "AppBetinhos,BetinhosCore,BetinhosAutomacao,BetinhosInterface",
+  [Alias("Solucoes")] [string] $Pedido = "AppBetinhos,BetinhosCore,BetinhosAutomacao,BetinhosMotoristas,BetinhosInterface",
   [string] $Backup = "",
   [switch] $Aplicar,
   [switch] $PermitirProd
@@ -10,7 +10,8 @@ param(
 # Remove a camada "Active" (nao gerenciada) de todo componente da solucao gerenciada que a tenha no topo:
 # WebResource, Workflow, SdkMessageProcessingStep, PluginAssembly, SystemForm, AppModule e SiteMap.
 # Sem a remocao, o import da solucao nao altera o que o ambiente serve nesses componentes.
-# Pula o que o repositorio app-motoristas-v2 publica (Get-IdsDoApp), mesmo quando o componente tambem esta na AppBetinhos.
+# Inclui o App Motoristas (BetinhosMotoristas e o service worker): desde a fase 3 da migracao ele sai deste repositorio, e a camada
+# Active dele no PROD e a do caminho rapido, que a versao importada substitui.
 # Guarda antes o JSON da camada Active de cada componente em -Backup. Sem -Aplicar, so lista.
 # Leituras de camadas e remocoes rodam 8 por vez (Invoke-EmParalelo); a remocao que falhar tem uma segunda tentativa, uma por
 # vez (conflito de customizacao simultanea no servidor), antes de contar como falha.
@@ -47,14 +48,13 @@ $Backup = (New-Item -ItemType Directory -Force (Join-Path $Backup (Get-Date -For
 
 # componenttype -> nome em msdyn_componentlayers; o nome logico da entidade (RemoveActiveCustomization) e o mesmo em minusculas.
 $tipos = [ordered]@{ 61 = "WebResource"; 29 = "Workflow"; 91 = "PluginAssembly"; 92 = "SdkMessageProcessingStep"; 60 = "SystemForm"; 80 = "AppModule"; 62 = "SiteMap" }
-$pares = @(); $vistos = @{}; $doApp = Get-IdsDoApp $dv; $pulados = 0
+$pares = @(); $vistos = @{}
 foreach ($t in $tipos.GetEnumerator()) {
   $componentes = @(foreach ($solutionId in $ids) { Read-DvAll $dv "solutioncomponents?`$select=objectid&`$filter=_solutionid_value eq $solutionId and componenttype eq $($t.Key)" })
   foreach ($c in $componentes) {
     # O mesmo componente esta na AppBetinhos e numa das 4: uma consulta de camadas por componente.
     if ($vistos.ContainsKey([string] $c.objectid)) { continue }
     $vistos[[string] $c.objectid] = $true
-    if ($doApp.ContainsKey(([string] $c.objectid).ToLowerInvariant())) { $pulados++; continue }
     $pares += [pscustomobject]@{ Tipo = $t.Value; Id = [string] $c.objectid }
   }
 }
@@ -68,7 +68,7 @@ $lidas = Invoke-EmParalelo -Itens $pares -Argumentos @($dv) -Carregar $carregar 
 $errosLeitura = @($lidas | Where-Object { $_.Erro })
 if ($errosLeitura.Count) { throw "Leitura de camadas falhou em $($errosLeitura.Count) componente(s): $(@($errosLeitura | Select-Object -First 3 | ForEach-Object { "$($_.Item.Tipo) $($_.Item.Id): $($_.Erro)" }) -join ' | ')" }
 $alvos = @($lidas | Where-Object { $_.Resultado } | ForEach-Object { $_.Resultado })
-Write-Step "$Pedido em ${hostAlvo}: $($alvos.Count) componentes com camada Active no topo; $pulados do app-motoristas-v2 pulados"
+Write-Step "$Pedido em ${hostAlvo}: $($alvos.Count) componentes com camada Active no topo"
 $alvos | Group-Object Tipo | ForEach-Object { Write-Step ("  {0,3} {1}" -f $_.Count, $_.Name) }
 if (-not $Aplicar) { Write-Step "simulacao: use -Aplicar para remover."; return }
 
