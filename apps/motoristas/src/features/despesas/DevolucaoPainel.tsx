@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
 import { readFileAsDataUrl } from "../../shared/camera/photoOrientation";
 import { reportAppError } from "../../shared/appErrorLogger";
 import {
@@ -14,12 +14,30 @@ const SAIDA_MS = 120;
 /** Estado do guarda quando não há painel de devolução ativo. */
 export const GUARDA_VAZIA: GuardaDevolucao = { sujo: false, enviando: false, descartar: () => {} };
 
-/** Motivo da devolução em destaque, no topo do detalhe. */
+/** Motivo da devolução em destaque, no topo do detalhe. Passou de 3 linhas: recolhe e oferece "Ver mais". */
 export function MotivoDevolucao({ despesa }: { despesa: Pick<DespesaRelatorio, "motivoDevolucao" | "iaMotivos"> }) {
+  const texto = motivoParaMotorista(despesa) || MOTIVO_PADRAO;
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [aberto, setAberto] = useState(false);
+  const [longo, setLongo] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || aberto) return;
+    const medir = () => setLongo(el.scrollHeight > el.clientHeight + 1);
+    medir();
+    const obs = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
+    obs?.observe(el);
+    return () => obs?.disconnect();
+  }, [texto, aberto]);
   return (
     <section className="dv-motivo" role="note" aria-labelledby="dv-motivo-titulo">
       <h3 id="dv-motivo-titulo">Por que voltou</h3>
-      <p>{motivoParaMotorista(despesa) || MOTIVO_PADRAO}</p>
+      <p id="dv-motivo-texto" ref={ref} data-recolhido={!aberto}>{texto}</p>
+      {longo || aberto ? (
+        <button type="button" className="dv-motivo-mais" aria-expanded={aberto} aria-controls="dv-motivo-texto" onClick={() => setAberto((v) => !v)}>
+          {aberto ? "Ver menos" : "Ver mais"}
+        </button>
+      ) : null}
     </section>
   );
 }
