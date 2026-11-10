@@ -61,6 +61,22 @@ describe('Comunicados', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar todos os concluídos' }))
     expect((screen.getByRole('checkbox', { name: 'Selecionar Márcio Lima' }) as HTMLInputElement).checked).toBe(true)
   })
+  it('relatório: marcado escondido pela busca não entra no PDF e a marcação volta ao limpar a busca', async () => {
+    const baixados: string[] = []
+    Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { baixados.push(this.download) })
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Novo procedimento de embarque/ }))
+    await screen.findByRole('button', { name: 'Gerar PDF (2)' })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Carlos Andrade' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar motorista nos resultados' }), { target: { value: 'Márcio' } })
+    // Carlos está marcado, mas escondido: vale a regra de "nenhum marcado" sobre os visíveis.
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar PDF (1)' }))
+    await waitFor(() => expect(baixados).toEqual(['comprovante-novo-procedimento-de-embarque-no-gru-marcio-lima.pdf']))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar motorista nos resultados' }), { target: { value: '' } })
+    expect((await screen.findByRole('checkbox', { name: 'Selecionar Carlos Andrade' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole('button', { name: 'Gerar PDF (1)' })).toBeTruthy()
+  })
   it('PDF por motorista: lista os concluídos marcados e baixa só o que ficar marcado', async () => {
     const baixados: string[] = []
     Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })

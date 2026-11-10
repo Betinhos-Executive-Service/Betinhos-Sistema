@@ -74,8 +74,10 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
   const semAcesso = motoristas.filter((m) => m.problema).length
   const pct = (n: number) => (rows.length ? Math.round((n / rows.length) * 100) : 0)
 
-  const pares = useMemo(() => paresDoComunicado(item, rows, nome, marcados), [item, rows, nome, marcados])
   const concluidosVisiveis = visiveis.filter((row) => !isPendente(row, tipo))
+  // Só os marcados visíveis valem; marcados escondidos pela busca/filtro ficam guardados, mas fora do PDF (sem nenhum visível marcado = todos os visíveis).
+  const marcadosVisiveis = concluidosVisiveis.filter((row) => marcados.has(row.id))
+  const pares = paresDoComunicado(item, visiveis, nome, new Set(marcadosVisiveis.map((row) => row.id)))
   const todosMarcados = concluidosVisiveis.length > 0 && concluidosVisiveis.every((row) => marcados.has(row.id))
   const alternar = (id: string) => setMarcados((atual) => { const next = new Set(atual); if (!next.delete(id)) next.add(id); return next })
   const alternarTodos = () => setMarcados((atual) => {
@@ -167,7 +169,7 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
           <div className="cm-list__toolbar">
             <SearchBox className="cm-search" value={busca} onChange={setBusca} placeholder="Buscar motorista" aria-label="Buscar motorista nos resultados" />
             <div className="cm-actions">
-              <Button variant="secondary" size="compact" icon={<FileText size={14} />} disabled={!concluidos} loading={gerando} onClick={() => void gerarPdf()}>Gerar PDF ({pares.length})</Button>
+              <Button variant="secondary" size="compact" icon={<FileText size={14} />} disabled={!pares.length} loading={gerando} onClick={() => void gerarPdf()}>Gerar PDF ({pares.length})</Button>
               <Button variant="secondary" size="compact" icon={<Download size={14} />} disabled={!visiveis.length} onClick={exportar}>Exportar CSV</Button>
               <Button variant="secondary" size="compact" icon={<Bell size={14} />} disabled={!lembretes.length || lembrando} onClick={() => setLembrar(true)}>Lembrar pendentes ({lembretes.length})</Button>
             </div>
@@ -175,7 +177,7 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
           {concluidosVisiveis.length ? (
             <div className="cm-selectall">
               <Checkbox label="Selecionar todos os concluídos" checked={todosMarcados} onChange={alternarTodos} />
-              <span className="cm-selectall__count" aria-live="polite">{marcados.size ? `${pares.length} ${plural(pares.length, 'marcado', 'marcados')} para o PDF` : 'Sem marcação, o PDF inclui todos os concluídos'}</span>
+              <span className="cm-selectall__count" aria-live="polite">{marcadosVisiveis.length ? `${pares.length} ${plural(pares.length, 'marcado', 'marcados')} para o PDF` : 'Sem marcação, o PDF inclui todos os concluídos'}</span>
             </div>
           ) : null}
           <ul className="cm-results__body" aria-busy={!loaded}>

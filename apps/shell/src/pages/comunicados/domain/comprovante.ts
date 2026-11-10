@@ -7,11 +7,10 @@ export type ModoPdf = 'comunicado' | 'motorista'
 /** Concluído = Ciência com `cienteEm`, Informativo com `lidoEm`; pendente não vira comprovante. */
 export const concluido = (par: Pick<Par, 'comunicado' | 'destinatario'>) => !isPendente(par.destinatario, par.comunicado.tipo)
 
-/** Sem seleção, vale todo o conjunto de concluídos; com seleção, só os concluídos marcados (ids de destinatário). */
+/** Sem seleção, vale todo o conjunto de concluídos; com seleção, só os concluídos marcados (ids de destinatário). Seleção que não casa com nenhum concluído gera vazio. */
 const aplicarSelecao = (pares: Par[], selecionados: ReadonlySet<string>) => {
   const feitos = pares.filter(concluido)
-  const marcados = feitos.filter((par) => selecionados.has(par.destinatario.id))
-  return marcados.length ? marcados : feitos
+  return selecionados.size ? feitos.filter((par) => selecionados.has(par.destinatario.id)) : feitos
 }
 
 export function paresDoComunicado(comunicado: Comunicado, rows: Destinatario[], nome: (row: Destinatario) => string, selecionados: ReadonlySet<string>): Par[] {

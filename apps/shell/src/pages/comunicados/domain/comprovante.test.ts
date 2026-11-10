@@ -25,7 +25,11 @@ describe('paresDoComunicado', () => {
   })
   it('com seleção usa só os marcados e ignora pendente marcado', () => {
     expect(paresDoComunicado(ciencia, rows, nome, new Set(['b'])).map((p) => p.destinatario.id)).toEqual(['b'])
-    expect(paresDoComunicado(ciencia, rows, nome, new Set(['c'])).map((p) => p.destinatario.id)).toEqual(['a', 'b'])
+  })
+  it('seleção que não casa com nenhum concluído (pendente ou id desconhecido) não gera PDF', () => {
+    expect(paresDoComunicado(ciencia, rows, nome, new Set(['c']))).toEqual([])
+    expect(paresDoComunicado(ciencia, rows, nome, new Set(['zz']))).toEqual([])
+    expect(paresDoComunicado(ciencia, rows, nome, new Set(['c', 'a'])).map((p) => p.destinatario.id)).toEqual(['a'])
   })
   it('Informativo conclui pelo lidoEm', () => {
     expect(paresDoComunicado(info, [dest('a', 'i1', { lidoEm: 'x' }), dest('b', 'i1')], nome, new Set()).map((p) => p.destinatario.id)).toEqual(['a'])
@@ -40,6 +44,9 @@ describe('paresDoMotorista', () => {
   })
   it('respeita a seleção', () => {
     expect(paresDoMotorista('Márcio Lima', comunicados, rows, new Set(['b'])).map((p) => p.destinatario.id)).toEqual(['b'])
+  })
+  it('seleção que não casa com nenhum concluído não gera PDF', () => {
+    expect(paresDoMotorista('Márcio Lima', comunicados, rows, new Set(['c', 'e', 'zz']))).toEqual([])
   })
 })
 
