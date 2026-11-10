@@ -14,6 +14,7 @@ const properties = {
   litros_lidos: anulavel({ type: 'number' }),
   decisao: { type: 'string', enum: [...DECISOES] },
   motivos: { type: 'array', items: { type: 'string' } },
+  mensagem_motorista: anulavel({ type: 'string' }),
   reserva_id: anulavel({ type: 'string' }),
   possivel_duplicidade: { type: 'boolean' },
   confianca: { type: 'number' },
@@ -39,6 +40,8 @@ export type RespostaIA = {
   litros_lidos: number | null
   decisao: Decisao
   motivos: string[]
+  /** Texto que o motorista lê ao receber a despesa de volta (null quando a decisão é validar). */
+  mensagem_motorista: string | null
   reserva_id: string | null
   possivel_duplicidade: boolean
   confianca: number
