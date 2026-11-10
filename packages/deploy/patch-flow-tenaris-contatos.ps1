@@ -8,16 +8,24 @@
 # Também garante a ordem do union (passageiros antes do Responsável) e o $select do cadastro com telefone, e-mail e
 # departamento, e tira do Upsert_Geral a gravação de cr40f_passageirosetelefonedecontato (dono único: plugin
 # DriverRecordSharing, que monta o campo a partir dos vínculos; antes os dois alternavam o formato a cada sync).
+# Issue #350 (falhas sem detalhe em 06/11 e 09/11/2026):
+#   - Compose_PaxDoServico deixa de montar o JSON com json(concat(...)), que quebrava com aspas, barra ou quebra de
+#     linha no nome do passageiro; passa a ser um array de objetos com os mesmos campos (guid, nome, ordem);
+#   - o e-mail de erro (Scope_1_1) passa a trazer o link da execução e as ações que falharam com a mensagem
+#     (Filter_Falhas + Select_Falhas sobre result() da condição e dos dois loops).
 # O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/patch-flow-tenaris-contatos.ps1 -Ambiente DEV -Apply -Restaurar <arquivo>
 # PROD exige -Apply e -ConfirmarProd. Requer `az login` com acesso ao ambiente.
+# Sem Dataverse (teste local): -Arquivo <clientdata.json> -Saida <resultado.json> só transforma o arquivo.
 param(
   [Parameter(Mandatory = $true)][ValidateSet('DEV', 'PROD')][string] $Ambiente,
   [switch] $Apply,
   [switch] $ConfirmarProd,
-  [string] $Restaurar = ''
+  [string] $Restaurar = '',
+  [string] $Arquivo = '',
+  [string] $Saida = ''
 )
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = 'Stop'
@@ -29,10 +37,13 @@ $flowName = 'Flow Novo Sistema Tenaris -> Dataverse'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if ($Ambiente -eq 'PROD' -and $Apply -and -not $ConfirmarProd) { throw 'PROD exige -ConfirmarProd junto com -Apply.' }
 if ($Restaurar -and -not $Apply) { throw '-Restaurar grava no flow; use junto com -Apply.' }
+if ($Arquivo -and ($Apply -or $Restaurar -or -not $Saida)) { throw '-Arquivo é só local: use com -Saida, sem -Apply nem -Restaurar.' }
 
-$dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
-if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw "Token do Dataverse $Ambiente indisponível (rode az login)." }
-$headers = @{ Authorization = "Bearer $dvToken"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0' }
+if (-not $Arquivo) {
+  $dvToken = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
+  if ($LASTEXITCODE -ne 0 -or -not $dvToken) { throw "Token do Dataverse $Ambiente indisponível (rode az login)." }
+  $headers = @{ Authorization = "Bearer $dvToken"; Accept = 'application/json'; 'OData-Version' = '4.0'; 'OData-MaxVersion' = '4.0' }
+}
 
 function Dv([string] $Method, [string] $Path, $Body = $null) {
   Write-Host "[tenaris-contatos] $Method $($Path.Split('?')[0])"
@@ -76,10 +87,14 @@ function Query([string] $from, [string] $where, $runAfter) {
 }
 function After([string] $name) { return [pscustomobject]@{ $name = @('Succeeded') } }
 
-$who = Dv GET WhoAmI
-if (-not $who.OrganizationId) { throw "A API não respondeu pela organização $Ambiente." }
-$flow = Dv GET "workflows($flowId)?`$select=workflowid,name,statecode,clientdata"
-if ($flow.name -ne $flowName) { throw "O workflow $flowId não é '$flowName' no $Ambiente." }
+if ($Arquivo) {
+  $flow = [pscustomobject]@{ statecode = 'arquivo'; clientdata = [IO.File]::ReadAllText((Resolve-Path $Arquivo), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF) }
+} else {
+  $who = Dv GET WhoAmI
+  if (-not $who.OrganizationId) { throw "A API não respondeu pela organização $Ambiente." }
+  $flow = Dv GET "workflows($flowId)?`$select=workflowid,name,statecode,clientdata"
+  if ($flow.name -ne $flowName) { throw "O workflow $flowId não é '$flowName' no $Ambiente." }
+}
 
 if ($Restaurar) {
   $text = [IO.File]::ReadAllText((Resolve-Path $Restaurar), [Text.Encoding]::UTF8).TrimStart([char]0xFEFF)
@@ -106,11 +121,50 @@ $upsert = $cond.Loop_Servicos.actions.Upsert_Geral.inputs.parameters
 $campoPax = 'item/cr40f_passageirosetelefonedecontato'
 $temOcorrencias = @($loop.PSObject.Properties.Name) -contains 'Filter_Ocorrencias'
 $gravaPax = @($upsert.PSObject.Properties.Name) -contains $campoPax
-if ($temOcorrencias -and -not $gravaPax) {
-  Write-Output "${Ambiente}: '$flowName' já junta as ocorrências, não grava contato vazio nem o campo de passageiros; nada a alterar."
+$paxDoServico = $cond.Loop_Servicos.actions.Compose_PaxDoServico
+$scopeErro = $clientData.properties.definition.actions.Scope.actions.Scope_1_1.actions
+if (-not $paxDoServico -or -not $scopeErro -or @($scopeErro.PSObject.Properties.Name) -notcontains 'Send_an_email_(V2)_2') {
+  throw 'O flow não está no formato esperado: Compose_PaxDoServico ou Scope_1_1/Send_an_email_(V2)_2 ausente.'
+}
+$paxJsonConcat = $paxDoServico.inputs -is [string]
+$temFalhas = @($scopeErro.PSObject.Properties.Name) -contains 'Select_Falhas'
+if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas) {
+  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas); nada a alterar."
   return
 }
 Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
+
+# #350: o JSON montado por concatenação quebrava com aspas, barra ou quebra de linha no nome. O array de objetos
+# tem os mesmos campos; "@{...}" de valor nulo vira '' como no concat, então Filter_PaxValidos não muda.
+if ($paxJsonConcat) {
+  $paxDoServico.inputs = @(1..4 | ForEach-Object {
+      [pscustomobject]@{
+        guid = "@{items('Loop_Servicos')?['Passageiro $_ - GUID']}"
+        nome = "@{items('Loop_Servicos')?['Passageiro $_ - Nome']}"
+        ordem = $_
+      } })
+  Write-Output '  Compose_PaxDoServico: json(concat(...)) -> array de 4 objetos (guid, nome, ordem)'
+} else { Write-Output '  Compose_PaxDoServico: já é array; sem mudança.' }
+
+# #350: o e-mail de erro ia sem detalhe. result() traz as ações de primeiro nível da condição e de cada iteração
+# dos loops; o e-mail sai mesmo se o filtro falhar (runAfter com todos os estados).
+if (-not $temFalhas) {
+  $email = $scopeErro.'Send_an_email_(V2)_2'
+  $todos = @('Succeeded', 'Failed', 'Skipped', 'TimedOut')
+  $scopeErro | Add-Member -NotePropertyName Filter_Falhas -NotePropertyValue (Query "@union(result('Condition_linhas_mais_que_0'), result('Loop_UpsertBD'), result('Loop_Servicos'))" "@equals(item()?['status'], 'Failed')" ([pscustomobject]@{}))
+  $scopeErro | Add-Member -NotePropertyName Select_Falhas -NotePropertyValue ([pscustomobject]@{
+      type = 'Select'; runAfter = (After 'Filter_Falhas')
+      inputs = [pscustomobject]@{
+        from = "@body('Filter_Falhas')"
+        select = [pscustomobject]@{ acao = "@item()?['name']"; codigo = "@item()?['code']"; mensagem = "@take(coalesce(item()?['error']?['message'], ''), 500)" }
+      } })
+  $email | Add-Member -NotePropertyName runAfter -NotePropertyValue ([pscustomobject]@{ Select_Falhas = $todos }) -Force
+  $run = "workflow()?['run']?['name']"
+  $email.inputs.parameters.'emailMessage/Body' = '<p class="editor-paragraph">ERRO NO FLOW - Novo Sistema Tenaris -&gt; Dataverse</p>' +
+    "<p>Execução: <a href=""https://make.powerautomate.com/environments/@{workflow()?['tags']?['environmentName']}/flows/@{workflow()?['name']}/runs/@{$run}"">@{$run}</a></p>" +
+    "<p>Ações que falharam:</p><pre>@{replace(replace(string(body('Select_Falhas')), '&', '&amp;'), '<', '&lt;')}</pre>"
+  Write-Output '  Scope_1_1: + Filter_Falhas, Select_Falhas; e-mail com o link da execução e as ações que falharam'
+} else { Write-Output '  Scope_1_1: e-mail já traz as falhas; sem mudança.' }
 
 # cr40f_passageirosetelefonedecontato é derivado de cr40f_servicosporpassageiro + cr40f_bancodedados e tem um dono
 # só: o plugin DriverRecordSharing (ServicePassengerViewSynchronizer). O texto da planilha continua no snapshot.
@@ -152,13 +206,21 @@ Write-Output "  Loop_UpsertBD: + Filter_Ocorrencias, Filter_Ocorr_*/Compose_* (T
 }
 
 $novo = $clientData | ConvertTo-Json -Depth 90 -Compress
+if ($Arquivo) {
+  AssertSemMojibake $novo 'resultado'
+  [IO.File]::WriteAllText($Saida, $novo, (New-Object Text.UTF8Encoding $false))
+  Write-Output "ARQUIVO: resultado em $Saida (nada foi gravado no Dataverse)."
+  return
+}
 if (-not $Apply) { Write-Output 'DRY RUN: nada foi gravado. Rode com -Apply para aplicar.'; return }
 Backup $flow
 Save $flow $novo
 $conf = (Dv GET "workflows($flowId)?`$select=clientdata,statecode")
 $condSalvo = ($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Condition_linhas_mais_que_0.actions
 if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'Filter_Ocorrencias' -or
-  @($condSalvo.Loop_Servicos.actions.Upsert_Geral.inputs.parameters.PSObject.Properties.Name) -contains $campoPax) {
-  throw 'A gravação não persistiu: Filter_Ocorrencias ausente ou Upsert_Geral ainda grava o campo de passageiros.'
+  @($condSalvo.Loop_Servicos.actions.Upsert_Geral.inputs.parameters.PSObject.Properties.Name) -contains $campoPax -or
+  $condSalvo.Loop_Servicos.actions.Compose_PaxDoServico.inputs -is [string] -or
+  @(($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Scope_1_1.actions.PSObject.Properties.Name) -notcontains 'Select_Falhas') {
+  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array ou Select_Falhas ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
 }
 Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($conf.statecode))."
