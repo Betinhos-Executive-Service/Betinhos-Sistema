@@ -8,6 +8,7 @@ param(
 
 # Depois do import: devolve a cada fluxo e step o estado (ligado/desligado) que a foto de antes registrou. O import com
 # --activate-plugins liga o que o ambiente tinha desligado de proposito (ex.: fluxos desativados no PROD por erro conhecido).
+# Fluxo aposentado (fluxos-aposentados.json) desliga se o substituto estiver ligado.
 # Fluxo ou step novo (sem registro na foto) fica como o import deixou; com -DesligarNovos (TEST travado) e desligado. Grava em $Saida o que mudou; falha se algo nao pode ser mudado.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
@@ -29,7 +30,9 @@ $Saida = Initialize-ArquivoDeSaida $Saida
 $fotoAntes = Read-JsonFile $Foto
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostsAlvo[$Alvo])
 if (([string] $fotoAntes.ambiente).TrimEnd("/") -ne $dv.Url) { throw "A foto e de $($fotoAntes.ambiente), nao de $($dv.Url)." }
-$r = Restore-Estados $dv $Alvo $fotoAntes -DesligarNovos:$DesligarNovos
+# Fluxos aposentados por decisao registrada: desligam aqui, depois da restauracao, e o comparador nao os conta como perda.
+$aposentados = @(Read-JsonFile (Join-Path $PSScriptRoot "fluxos-aposentados.json"))
+$r = Restore-Estados $dv $Alvo $fotoAntes -DesligarNovos:$DesligarNovos -Aposentados $aposentados
 Write-JsonFile $Saida ([ordered]@{ mudancas = @($r.Mudancas); falhas = @($r.Falhas) })
 Write-Step "estados restaurados em ${Alvo}: $($r.Mudancas.Count) mudanca(s), $($r.Falhas.Count) falha(s); detalhes em $Saida"
 $r.Mudancas | ForEach-Object { Write-Step ("  {0} {1}: {2} -> {3}" -f $_.tipo, $_.nome, $_.de, $_.para) }

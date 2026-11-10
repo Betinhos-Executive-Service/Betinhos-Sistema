@@ -376,7 +376,7 @@ function Set-EstadoDv($Dv, [string] $Alvo, [string] $Conjunto, [string] $Id, [in
 # ligados sao desligados, para o ensaio nao mandar e-mail, WhatsApp nem cobranca a clientes reais (regra de negocio e BPF,
 # categorias 2 e 4, ficam). O que esta fora dessas solucoes (AutoNumberGuard, acoes do sistema...) nao e "novo" e fica como esta.
 # Devolve a lista das mudancas feitas e das falhas.
-function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
+function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos, $Aposentados = @()) {
   Assert-HostAlvo $Dv $Alvo
   $mudancas = @(); $falhas = @()
   $fluxosAgora = @{}; $categorias = @{}; $nomes = @{}
@@ -393,7 +393,7 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
   foreach ($p in $Foto.fluxos.PSObject.Properties) {
     $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
     if (-not $fluxosAgora.ContainsKey($id) -or $fluxosAgora[$id] -eq $antes) { continue }
-    try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes } }
+    try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes }; $fluxosAgora[$id] = $antes }
     catch { $falhas += "fluxo $($p.Value.nome) ($id): $(Get-ErroDv $_)" }
   }
   foreach ($p in $Foto.steps.PSObject.Properties) {
@@ -417,6 +417,16 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
     foreach ($id in @($stepsAgora.Keys | Where-Object { $rastreados.ContainsKey($_) -and -not $naFoto.ContainsKey($_) -and $stepsAgora[$_] -eq 0 })) {
       try { Set-EstadoDv $Dv $Alvo "sdkmessageprocessingsteps" $id 1; $mudancas += [ordered]@{ tipo = "step novo"; id = $id; nome = $nomes[$id]; de = 0; para = 1 } }
       catch { $falhas += "step novo $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
+    }
+  }
+  # Fluxo aposentado (fluxos-aposentados.json, decisao registrada): desliga depois de restaurar, so com o substituto ligado,
+  # para o ambiente nunca ficar sem nenhum dos dois. Sem substituto ligado fica como estava.
+  foreach ($a in @($Aposentados)) {
+    $substitutoLigado = @($fluxosAgora.Keys | Where-Object { $nomes[$_] -eq [string] $a.substituto -and $fluxosAgora[$_] -eq 1 }).Count -gt 0
+    if (-not $substitutoLigado) { continue }
+    foreach ($id in @($fluxosAgora.Keys | Where-Object { $nomes[$_] -eq [string] $a.nome -and $fluxosAgora[$_] -eq 1 })) {
+      try { Set-EstadoDv $Dv $Alvo "workflows" $id 0; $mudancas += [ordered]@{ tipo = "fluxo aposentado"; id = $id; nome = $nomes[$id]; de = 1; para = 0 }; $fluxosAgora[$id] = 0 }
+      catch { $falhas += "fluxo aposentado $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
     }
   }
   return @{ Mudancas = $mudancas; Falhas = $falhas }
