@@ -90,8 +90,9 @@ function Get-ApiPlan($Spec, $State, [bool] $Migrate) {
     }
   }
 
-  $kinds = @(@{ Kind = 'parametro'; Spec = $Spec.Request; Current = $State.Request; IdField = 'customapirequestparameterid' },
-             @{ Kind = 'resposta'; Spec = $Spec.Response; Current = $State.Response; IdField = 'customapiresponsepropertyid' })
+  # O estado lido vem $null quando a API nao tem parametros ou respostas; em StrictMode, $_.uniquename sobre $null quebra.
+  $kinds = @(@{ Kind = 'parametro'; Spec = $Spec.Request; Current = @($State.Request | Where-Object { $_ }); IdField = 'customapirequestparameterid' },
+             @{ Kind = 'resposta'; Spec = $Spec.Response; Current = @($State.Response | Where-Object { $_ }); IdField = 'customapiresponsepropertyid' })
   foreach ($k in $kinds) {
     foreach ($p in @($k.Spec)) {
       $cur = if ($recreate) { $null } else { @($k.Current | Where-Object { $_.uniquename -eq $p.Name }) | Select-Object -First 1 }

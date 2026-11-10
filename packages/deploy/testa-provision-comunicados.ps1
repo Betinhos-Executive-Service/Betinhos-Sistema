@@ -25,6 +25,9 @@ function InSolutions([string] $Id) { @("AppBetinhos|$Id", "BetinhosAutomacao|$Id
 $state = @{ Api = (ApiRow $abrir.Id); Request = @($abrir.Request | ForEach-Object { Req $_ }); Response = @(); Steps = @(); Solutions = (InSolutions $abrir.Id) }
 $plan = @(Get-ApiPlan $abrir $state $false)
 Check 'desenho completo: plano vazio' ($plan.Count -eq 0) (Kinds $plan)
+$state.Response = $null
+$plan = @(Get-ApiPlan $abrir $state $false)
+Check 'desenho completo sem respostas ($null, como lido do DEV): plano vazio' ($plan.Count -eq 0) (Kinds $plan)
 
 # 2. Id certo sem o new_EvidenciaJson (TEST/PROD hoje): so cria o parametro e reinclui nas solucoes; nunca exclui.
 $state = @{ Api = (ApiRow $ciencia.Id); Request = @($ciencia.Request | Where-Object { $_.Name -ne 'new_EvidenciaJson' } | ForEach-Object { Req $_ }); Response = @(); Steps = @(); Solutions = (InSolutions $ciencia.Id) }
