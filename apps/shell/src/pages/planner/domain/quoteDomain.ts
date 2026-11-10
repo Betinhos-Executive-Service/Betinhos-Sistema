@@ -2,7 +2,7 @@
 import { normalizeText } from './domain'
 import { localDateKey } from './management'
 import { addBusinessDays, QUOTE_STATUS_FLOW, QUOTE_TERMINAL_STATUSES } from './quoteTaskFlow'
-import type { QuoteInput, QuoteOptionData, Task } from './types'
+import type { Employee, QuoteInput, QuoteOptionData, Task } from './types'
 
 export { QUOTE_TERMINAL_STATUSES }
 export const QUOTE_STATUSES: string[] = [...QUOTE_STATUS_FLOW, ...QUOTE_TERMINAL_STATUSES]
@@ -192,6 +192,19 @@ export function quoteSearchText(quote: QuoteInput, assigneeNames: readonly strin
 /** Palavras da busca, sem acento; todas precisam aparecer, em qualquer ordem. */
 export const quoteSearchTerms = (query: unknown): string[] => normalizeText(query).split(/\s+/).filter(Boolean)
 
+type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds' | 'assigneeNames'> & { id?: string }
+type QuotePerson = Pick<Employee, 'id' | 'name'>
+
+export const quoteCreatorName = (quote: QuoteInput, employees: readonly QuotePerson[] = []): string =>
+  (quote.creatorEmployeeId && employees.find((employee) => employee.id === quote.creatorEmployeeId)?.name) || quote.creatorName || ''
+
+export const quotePeopleNames = (quote: QuoteInput, task: QuoteTask | undefined, employees: readonly QuotePerson[] = []): string[] =>
+  [...(task?.assigneeNames || []), quoteCreatorName(quote, employees)]
+
+export function primaryTaskByQuote<T extends QuoteTask>(tasks: readonly T[]): Map<string, T> {
+  return new Map(tasks.filter((task) => task.quoteId && !task.parentTaskId).map((task) => [String(task.quoteId), task]))
+}
+
 export function matchesQuoteSearch(quote: QuoteInput, terms: readonly string[], assigneeNames?: readonly string[]): boolean {
   if (!terms.length) return true
   const text = quoteSearchText(quote, assigneeNames)
@@ -206,18 +219,12 @@ export interface QuoteFilters {
   deadline?: string | string[]
 }
 
-type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds' | 'assigneeNames'> & { id?: string }
-
-function primaryTaskByQuote(tasks: QuoteTask[]): Map<string, QuoteTask> {
-  return new Map(tasks.filter((task) => task.quoteId && !task.parentTaskId).map((task) => [String(task.quoteId), task]))
-}
-
-export function filterQuotes<Q extends QuoteInput>(quotes: Q[] = [], tasks: QuoteTask[] = [], filters: QuoteFilters = {}, today: string = localDateKey()): Q[] {
+export function filterQuotes<Q extends QuoteInput>(quotes: Q[] = [], tasks: QuoteTask[] = [], filters: QuoteFilters = {}, today: string = localDateKey(), employees: readonly QuotePerson[] = []): Q[] {
   const taskByQuote = primaryTaskByQuote(tasks)
   const terms = quoteSearchTerms(filters.query)
   return quotes.filter((quote) => {
     const task = taskByQuote.get(String(quote.id))
-    if (!matchesQuoteSearch(quote, terms, task?.assigneeNames)) return false
+    if (terms.length && !matchesQuoteSearch(quote, terms, quotePeopleNames(quote, task, employees))) return false
     const selected = (value: string | string[] | undefined): string[] => Array.isArray(value) ? value : value ? [value] : []
     if (selected(filters.status).length && !selected(filters.status).includes(String(quote.status))) return false
     if (selected(filters.priority).length && !selected(filters.priority).includes(String(quote.priority))) return false

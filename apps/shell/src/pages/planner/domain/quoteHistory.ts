@@ -1,7 +1,7 @@
 // Porte de Tela Planner/src/quotes/quoteHistory.js (busca ampliada em quoteDomain).
-import { matchesQuoteSearch, QUOTE_TERMINAL_STATUSES, quoteSearchTerms } from './quoteDomain'
+import { matchesQuoteSearch, primaryTaskByQuote, quotePeopleNames, QUOTE_TERMINAL_STATUSES, quoteSearchTerms } from './quoteDomain'
 import { chosenQuoteOption } from './quoteScenarios'
-import type { QuoteInput, QuoteOptionData, QuoteProposalVersion } from './types'
+import type { Employee, QuoteInput, QuoteOptionData, QuoteProposalVersion, Task } from './types'
 
 export const quoteResultLabel = (status: string | undefined): string | undefined => status === 'Perdida' ? 'Negada' : status === 'Aceita pelo cliente' ? 'Aceita' : status
 export function acceptedHistoryOption(quote: QuoteInput): QuoteOptionData | null {
@@ -21,14 +21,18 @@ export interface QuoteHistoryFilters {
   status?: string
   from?: string
   to?: string
+  /** Tarefas e funcionários: a busca também acha responsável e quem criou. */
+  tasks?: readonly Task[]
+  employees?: readonly Pick<Employee, 'id' | 'name'>[]
 }
 
-export function filterQuoteHistory<Q extends QuoteInput>(quotes: readonly Q[], { query = '', status = '', from = '', to = '' }: QuoteHistoryFilters = {}): Q[] {
+export function filterQuoteHistory<Q extends QuoteInput>(quotes: readonly Q[], { query = '', status = '', from = '', to = '', tasks = [], employees = [] }: QuoteHistoryFilters = {}): Q[] {
   const terms = quoteSearchTerms(query)
+  const taskByQuote = primaryTaskByQuote(tasks)
   return quotes.filter((quote) => {
     if (!QUOTE_TERMINAL_STATUSES.includes(quote.status as string)) return false
     if (status && quote.status !== status) return false
-    if (!matchesQuoteSearch(quote, terms)) return false
+    if (terms.length && !matchesQuoteSearch(quote, terms, quotePeopleNames(quote, taskByQuote.get(String(quote.id)), employees))) return false
     const date = quoteHistoryDate(quote.finalizationAt)
     return !(from && (!date || date < from)) && !(to && (!date || date > to))
   }).sort((a, b) => (Date.parse(b.finalizationAt as string) || 0) - (Date.parse(a.finalizationAt as string) || 0))
@@ -75,8 +79,8 @@ export interface QuoteHistoryPage<Q> {
 
 const RESULT_KEYS: Record<string, 'accepted' | 'rejected' | 'cancelled'> = { 'Aceita pelo cliente': 'accepted', Perdida: 'rejected', Cancelada: 'cancelled' }
 
-export function selectQuoteHistory<Q extends QuoteInput>(quotes: readonly Q[], { query = '', status = '', from = '', to = '', direction = 'desc', page = 1, pageSize = 20 }: QuoteHistorySelection = {}): QuoteHistoryPage<Q> {
-  const matches = filterQuoteHistory(quotes, { query, from, to })
+export function selectQuoteHistory<Q extends QuoteInput>(quotes: readonly Q[], { query = '', status = '', from = '', to = '', tasks, employees, direction = 'desc', page = 1, pageSize = 20 }: QuoteHistorySelection = {}): QuoteHistoryPage<Q> {
+  const matches = filterQuoteHistory(quotes, { query, from, to, tasks, employees })
   const counts: QuoteHistoryCounts = { all: matches.length, accepted: 0, rejected: 0, cancelled: 0 }
   for (const quote of matches) {
     const key = RESULT_KEYS[quote.status as string]

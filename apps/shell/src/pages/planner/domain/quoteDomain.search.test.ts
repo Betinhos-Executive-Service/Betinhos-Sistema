@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { filterQuotes, matchesQuoteSearch, quoteSearchTerms } from './quoteDomain'
+import { filterQuotes, matchesQuoteSearch, quoteCreatorName, quoteSearchTerms } from './quoteDomain'
 import { filterQuoteHistory } from './quoteHistory'
 import type { QuoteInput } from './types'
 
@@ -33,6 +33,17 @@ test('pendentes e histórico usam a mesma busca', () => {
   const tasks = [{ id: 't1', quoteId: 'q1', assigneeIds: ['e1'], assigneeNames: ['Marina Souza'] }]
   assert.deepEqual(filterQuotes([quote], tasks, { query: 'marina guarulhos' }).map((item) => item.id), ['q1'])
   assert.deepEqual(filterQuoteHistory([{ ...quote, status: 'Perdida', lossReason: 'Preço acima' }], { query: 'preco' }).map((item) => item.id), ['q1'])
+})
+
+test('pendentes e histórico acham responsável e quem criou', () => {
+  const tasks = [{ id: 't1', quoteId: 'q1', assigneeIds: ['e1'], assigneeNames: ['Marina Souza'] }]
+  const employees = [{ id: 'e2', name: 'Carla Dias' }]
+  const created = { ...quote, creatorEmployeeId: 'e2' }
+  assert.deepEqual(filterQuotes([created], tasks, { query: 'carla' }, undefined, employees).map((item) => item.id), ['q1'])
+  const closed = { ...created, status: 'Perdida' }
+  for (const query of ['marina', 'carla dias']) assert.deepEqual(filterQuoteHistory([closed], { query, tasks, employees }).map((item) => item.id), ['q1'], query)
+  assert.deepEqual(filterQuoteHistory([closed], { query: 'carla' }), [])
+  assert.equal(quoteCreatorName({ ...created, creatorName: 'Carla D.' }, []), 'Carla D.')
 })
 
 test('busca acha valor cru do Dataverse no formato em reais e data e hora no fuso de São Paulo', () => {
