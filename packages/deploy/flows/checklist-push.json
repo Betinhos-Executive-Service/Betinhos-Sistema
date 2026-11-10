@@ -1,0 +1,308 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "When_checklist_needs_push": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/filterexpression": "new_pushstatus eq 100000000 and new_estado eq 100000001",
+          "subscriptionRequest/filteringattributes": "new_pushstatus",
+          "subscriptionRequest/entityname": "new_checklistveiculo",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "actions": {
+    "Get_owner": {
+      "runAfter": {},
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "recordId": "@triggerOutputs()?['body/_ownerid_value']",
+          "entityName": "systemusers"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_owner_failed": {
+      "runAfter": {
+        "Get_owner": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "new_checklistveiculos",
+          "item/new_pusherro": "Nao foi possivel localizar o usuario do motorista.",
+          "item/new_pushstatus": 100000002,
+          "recordId": "@triggerOutputs()?['body/new_checklistveiculoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_failed": {
+      "runAfter": {
+        "Send_push": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "new_checklistveiculos",
+          "item/new_pusherro": "Falha no conector. Consulte o historico do Flow.",
+          "item/new_pushstatus": 100000002,
+          "recordId": "@triggerOutputs()?['body/new_checklistveiculoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_sent": {
+      "runAfter": {
+        "Send_push": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "new_checklistveiculos",
+          "item/new_pusherro": "",
+          "item/new_pushstatus": 100000001,
+          "recordId": "@triggerOutputs()?['body/new_checklistveiculoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Send_push": {
+      "runAfter": {
+        "Get_owner": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "SendPushNotificationV2",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_powerappsnotificationv2",
+          "connectionName": "shared_powerappsnotificationv2-1"
+        },
+        "parameters": {
+          "payload/dynamicParams/entityLogicalName": "new_checklistveiculo",
+          "payload/message": "@{if(equals(triggerOutputs()?['body/new_origem'], 100000002), concat('Você recebeu o carro ', coalesce(triggerOutputs()?['body/_new_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), '. Faça o checklist de recebimento.'), concat('Checklist do veículo pendente: ', triggerOutputs()?['body/new_name']))}",
+          "payload/playerType": "PowerApps",
+          "payload/app": "{\"type\":\"AppModule\",\"displayName\":\"App Motoristas v2\",\"appIdentifier\":\"new_AppMotoristasv2\"}",
+          "payload/dynamicParams/recordId": "@triggerOutputs()?['body/new_checklistveiculoid']",
+          "payload/openApp": true,
+          "payload/recipients": [
+            "@outputs('Get_owner')?['body/internalemailaddress']"
+          ]
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Web_Push_Send_push": {
+      "actions": {
+        "List_func_Send_push": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "operationId": "ListRecords",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "cr40f_funcionarioses",
+              "$top": 1,
+              "$filter": "cr40f_emailmicrosoft eq '@{first(createArray(outputs('Get_owner')?['body/internalemailaddress']))}'",
+              "$select": "cr40f_funcionariosid"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Has_func_Send_push": {
+          "actions": {
+            "List_subs_Send_push": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "new_inscricaopushmotoristas",
+                  "$top": 50,
+                  "$filter": "_new_funcionario_value eq @{first(outputs('List_func_Send_push')?['body/value'])?['cr40f_funcionariosid']}",
+                  "$select": "new_inscricaopushmotoristaid,new_endpoint,new_chavep256dh,new_chaveauth"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Has_subs_Send_push": {
+              "actions": {
+                "Worker_Send_push": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "EnviarPush",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e",
+                      "connectionName": "shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+                    },
+                    "parameters": {
+                      "body/payload/tag": "new_checklistveiculo-@{triggerOutputs()?['body/new_checklistveiculoid']}",
+                      "body/payload/body": "@{if(equals(triggerOutputs()?['body/new_origem'], 100000002), concat('Você recebeu o carro ', coalesce(triggerOutputs()?['body/_new_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), '. Faça o checklist de recebimento.'), concat('Checklist do veículo pendente: ', triggerOutputs()?['body/new_name']))}",
+                      "body/payload/title": "App Motoristas",
+                      "body/subscriptions": "@select(outputs('List_subs_Send_push')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))",
+                      "body/payload/url": "/WebResources/new_app-motoristas-v2?checklistId=@{triggerOutputs()?['body/new_checklistveiculoid']}"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Filter_gone_Send_push": {
+                  "runAfter": {
+                    "Worker_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@equals(item()?['gone'], true)",
+                    "from": "@outputs('Worker_Send_push')?['body/results']"
+                  }
+                },
+                "Select_gone_Send_push": {
+                  "runAfter": {
+                    "Filter_gone_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Select",
+                  "inputs": {
+                    "select": "@item()?['endpoint']",
+                    "from": "@body('Filter_gone_Send_push')"
+                  }
+                },
+                "Filter_subs_Send_push": {
+                  "runAfter": {
+                    "Select_gone_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@contains(body('Select_gone_Send_push'), item()?['new_endpoint'])",
+                    "from": "@outputs('List_subs_Send_push')?['body/value']"
+                  }
+                },
+                "Delete_each_Send_push": {
+                  "foreach": "@body('Filter_subs_Send_push')",
+                  "actions": {
+                    "Delete_row_Send_push": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "DeleteRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                          "connectionName": "shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "recordId": "@items('Delete_each_Send_push')?['new_inscricaopushmotoristaid']",
+                          "entityName": "new_inscricaopushmotoristas"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Filter_subs_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Foreach"
+                }
+              },
+              "runAfter": {
+                "List_subs_Send_push": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "greater": [
+                  "@length(outputs('List_subs_Send_push')?['body/value'])",
+                  0
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "List_func_Send_push": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "greater": [
+              "@length(outputs('List_func_Send_push')?['body/value'])",
+              0
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "runAfter": {
+        "Get_owner": [
+          "Succeeded"
+        ]
+      },
+      "type": "Scope"
+    }
+  },
+  "outputs": {}
+}

@@ -65,6 +65,25 @@ test('mudança no script ou no JSON publica só aquele flow', () => {
   assert.deepEqual(nomes(['packages/deploy/flows/conciliacao-cartao-tempo-real.mjs']), ['conciliacao-cartao'])
 })
 
+test('flows do App Motoristas: o JSON publica o próprio flow e as funções comuns publicam todos que as usam', () => {
+  assert.deepEqual(nomes(['packages/deploy/flows/termo-multa-push.json']), ['termo-multa'])
+  assert.deepEqual(nomes(['packages/deploy/flows/comunicados-push.json']), ['comunicados-push'])
+  assert.deepEqual(nomes(['packages/deploy/flows/treinamentos-push.json']), ['treinamentos-push'])
+  assert.deepEqual(nomes(['packages/deploy/flows/checklist-push.json', 'packages/deploy/flows/checklists-rotina-diaria.json']), ['checklists'])
+  assert.deepEqual(nomes(['packages/deploy/flows/sincronizar-flow.ps1']).sort(), ['checklists', 'comunicados-push', 'termo-multa', 'treinamentos-push'])
+  for (const n of ['checklists', 'comunicados-push', 'treinamentos-push']) assert.equal(descrever([n])[0].apply, true, n)
+  assert.ok(descrever(['termo-multa'])[0].flows.includes('Termo de multa | Push ao motorista'))
+})
+
+test('JSON exportado do DEV não leva assinatura dos gatilhos, connection references nem URL assinada (vêm do flow existente)', () => {
+  for (const f of ['termo-multa-push', 'comunicados-push', 'treinamentos-push', 'checklists-rotina-diaria', 'checklist-push']) {
+    const texto = readFileSync(join(aqui, 'flows', `${f}.json`), 'utf8')
+    const definicao = JSON.parse(texto)
+    assert.ok(definicao.triggers && definicao.actions, f)
+    assert.doesNotMatch(texto, /subscriptionRequest\/name|connectionReferenceLogicalName|sig=/, f)
+  }
+})
+
 test('teste, backup, documentação e outros scripts não publicam flow', () => {
   assert.deepEqual(nomes(['packages/deploy/flows/aniversariantes-diario.test.mjs', 'packages/deploy/flows-dev.mjs', 'packages/deploy/flows-dev.test.mjs', 'packages/deploy/push-flows-dev.ps1']), [])
   assert.deepEqual(nomes(['packages/deploy/flows/backup/x.json', 'CLAUDE.md', 'apps/shell/src/App.tsx', 'packages/deploy/provision-acesso.ps1']), [])
