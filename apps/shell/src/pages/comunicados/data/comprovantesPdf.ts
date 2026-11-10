@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFPage } from 'pdf-lib'
 import { desenharAssinatura, paraWinAnsi, quebrar } from '../../../lib/pdf/texto'
-import { hashConteudo, tituloComprovante, type ModoPdf, type Par } from '../domain/comprovante'
-import { COMUNICADO_TIPO, formatDate, parseSignature, plural } from '../domain/comunicados'
+import { hashConteudo, linhasEvidencia, tituloComprovante, type ModoPdf, type Par } from '../domain/comprovante'
+import { COMUNICADO_TIPO, formatDate, parseSignature, plural, type Evidencia } from '../domain/comunicados'
 
 const A4: [number, number] = [595.28, 841.89]
 const MARGEM = 56
@@ -11,7 +11,7 @@ const SUAVE = rgb(0.42, 0.42, 0.46)
 
 export type DadosPdf = { modo: ModoPdf; alvo: string; pares: Par[]; geradoPor: string; geradoEm: Date; versao: string }
 
-const NOTA = 'Assinatura registrada pelo App Motoristas com a conta Microsoft do motorista; datas do servidor.'
+const NOTA = 'Assinatura registrada pelo App Motoristas com a conta Microsoft do motorista; datas do servidor. IP carimbado pelo servidor da Betinhos; aparelho e localização informados pelo aparelho do motorista.'
 const AVISO_HASH = 'O identificador é calculado na geração deste PDF a partir do título e do texto do comunicado; não é prova de integridade nem de autoria.'
 
 /** PDF de evidência: capa com o resumo e um comprovante por par (motorista × comunicado), cada um em página nova. */
@@ -85,6 +85,15 @@ export async function gerarComprovantesPdf({ modo, alvo, pares, geradoPor, gerad
     campo('Lido', formatDate(d.lidoEm))
     if (ciencia) campo('Ciência', formatDate(d.cienteEm))
     y -= 6
+
+    texto('Aparelho e local', { size: 11, negrito: true, depois: 2 })
+    const momentos: [string, Evidencia | null][] = ciencia ? [['Abertura', d.evidenciaAbertura], ['Ciência', d.evidenciaCiencia]] : [['Leitura', d.evidenciaAbertura]]
+    for (const [momento, evidencia] of momentos) {
+      texto(momento, { negrito: true })
+      for (const [rotulo, valor] of linhasEvidencia(evidencia)) texto(rotulo ? `${rotulo}: ${valor}` : valor, rotulo ? {} : { cor: SUAVE })
+      y -= 4
+    }
+    y -= 2
 
     if (ciencia) {
       const traces = parseSignature(d.assinaturaJson)
