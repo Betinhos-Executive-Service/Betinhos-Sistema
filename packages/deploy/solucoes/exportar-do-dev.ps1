@@ -20,7 +20,7 @@ param(
 #  - pular: sem mudanca desde a ultima publicacao em todos os alvos; vai ao manifesto como "pulada", sem ZIP e sem subir versao;
 #  - cache: copia o ZIP do ultimo Deploy, conferido (hash, UniqueName, versao atual do DEV e Managed);
 #  - exportar: versao seguinte (pac solution online-version) e export gerenciado conferido.
-# Grava os ZIPs e manifesto.json (solucao, versao, arquivo, hash, impressao, origem, decisao, observacao, commit) em $Pasta.
+# Varre os ZIPs (segredos.ps1) e falha se houver segredo; so entao grava manifesto.json. Grava os ZIPs e manifesto.json (solucao, versao, arquivo, hash, impressao, origem, decisao, observacao, commit) em $Pasta.
 # -Caixa: exporta a AppBetinhos (upgrade que antecede a retirada) em vez das 4; a conferencia e a mesma; sem impressao.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
@@ -39,6 +39,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 . (Join-Path $PSScriptRoot "impressao.ps1")
+. (Join-Path $PSScriptRoot "segredos.ps1")
 
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostDev)
 $escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Pedido) }
@@ -112,5 +113,7 @@ foreach ($nome in $escolhidas) {
   }
   $manifesto += $entrada
 }
+# Trava de segredos (segredos.ps1) antes de qualquer artefato ou cache: inclui os ZIPs vindos do cache do Deploy.
+Assert-PacotesSemSegredo $Pasta
 Write-JsonFile (Join-Path $Pasta "manifesto.json") @($manifesto)
 Write-Step "export concluido: $(@($manifesto | Where-Object { $_.origem -eq 'exportado' }).Count) exportada(s), $(@($manifesto | Where-Object { $_.origem -eq 'cache' }).Count) do Deploy, $(@($manifesto | Where-Object { $_.origem -eq 'pulada' }).Count) pulada(s)"
