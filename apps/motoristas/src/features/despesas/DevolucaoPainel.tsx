@@ -46,6 +46,9 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
   const [enviando, setEnviando] = useState(false);
   const [falhou, setFalhou] = useState(false);
   const [erroFoto, setErroFoto] = useState("");
+  /** Erro de tamanho só aparece depois de tentar enviar; antes, contador neutro. */
+  const [tentou, setTentou] = useState(false);
+  const textoRef = useRef<HTMLTextAreaElement>(null);
   const progresso = useRef<ProgressoEnvio>({ anexado: false });
   /** Foto já enviada e depois trocada/removida: a próxima sobe numa ordem nova, sem repetir a do comprovante descartado. */
   const deslocamento = useRef(0);
@@ -59,6 +62,9 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
   const validacao = validarEnvio({ explicacao, temFoto: Boolean(foto) });
   // Foto nova só sobe depois de saber quantos comprovantes já existem (senão repete a ordem 1 e a pasta errada).
   const aguardandoAnexos = Boolean(foto) && !anexosProntos;
+  const semAcao = !foto && !explicacao.trim();
+  const mostraErro = tentou && Boolean(validacao.erro);
+  const caracteres = explicacao.trim().length;
   const sujo = Boolean(foto) || (explicacao.trim() !== "" && explicacao !== rascunhoInicial);
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
@@ -99,7 +105,8 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
   };
 
   const enviar = async () => {
-    if (!validacao.pode || enviando || aguardandoAnexos) return;
+    if (enviando || aguardandoAnexos) return;
+    if (!validacao.pode) { setTentou(true); textoRef.current?.focus(); return; }
     setEnviando(true);
     setFalhou(false);
     try {
@@ -142,17 +149,18 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
         <div id="dv-explicar" className="dv-explicar" data-estado={saindo ? "saindo" : "entrando"}>
           <label htmlFor="dv-explicar-texto">Sua explicação</label>
           <textarea
+            ref={textoRef}
             id="dv-explicar-texto"
             rows={4}
             value={explicacao}
             disabled={enviando}
             placeholder="Ex.: o posto emitiu o cupom com o valor errado e corrigiu à mão."
             aria-describedby="dv-explicar-ajuda"
-            aria-invalid={Boolean(validacao.erro)}
+            aria-invalid={mostraErro}
             onChange={(event) => mudarTexto(event.target.value)}
           />
-          <small id="dv-explicar-ajuda" data-erro={Boolean(validacao.erro)}>
-            {validacao.erro || (explicacao.trim().length < MIN_EXPLICACAO ? `Mínimo de ${MIN_EXPLICACAO} caracteres.` : "Pronto para enviar.")}
+          <small id="dv-explicar-ajuda" data-erro={mostraErro} aria-live="polite">
+            {mostraErro ? validacao.erro : caracteres < MIN_EXPLICACAO ? `${caracteres}/${MIN_EXPLICACAO} caracteres` : "Pronto para enviar."}
           </small>
         </div>
       ) : null}
@@ -161,7 +169,7 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
       {falhou ? (
         <p className="dv-aviso" role="alert">Não deu para enviar agora. {explicacao.trim() ? "Seu texto está guardado. " : ""}Tente de novo quando o sinal melhorar.</p>
       ) : null}
-      <button type="button" className="dv-enviar" disabled={!validacao.pode || enviando || aguardandoAnexos} aria-busy={enviando} onClick={() => { void enviar(); }}>
+      <button type="button" className="dv-enviar" disabled={semAcao || enviando || aguardandoAnexos} aria-busy={enviando} onClick={() => { void enviar(); }}>
         {enviando ? "Enviando…" : aguardandoAnexos ? "Carregando comprovantes…" : falhou ? "Tentar de novo" : "Enviar para nova conferência"}
       </button>
     </section>

@@ -147,15 +147,7 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
             </p>
           ) : null}
 
-          <section aria-labelledby="gr-detalhe-comprovantes">
-            <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">{estado === "acao" ? "Comprovante atual" : "Comprovante"}</h3>
-            {carga.tipo === "carregando" ? <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" /> : null}
-            {carga.tipo === "pronto" && anexos.length ? (
-              <div className="gr-comprovantes">{anexos.map((anexo, i) => <Comprovante key={anexo.id} anexo={anexo} indice={i} />)}</div>
-            ) : null}
-            {carga.tipo === "pronto" && !anexos.length ? <p className="gr-legenda">{semComprovante ? "Gasto enviado sem comprovante." : "O comprovante ainda não está disponível."}</p> : null}
-          </section>
-
+          {/* Ações logo após o motivo: o motorista vê o que fazer sem rolar o comprovante. */}
           {comAcoes ? (
             <DevolucaoPainel
               despesa={despesa}
@@ -167,6 +159,15 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
               onEnviada={(explicacao) => { setEnviada(true); onDevolucaoEnviada?.(despesa.id, explicacao); }}
             />
           ) : null}
+
+          <section aria-labelledby="gr-detalhe-comprovantes">
+            <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">{estado === "acao" ? "Comprovante atual" : "Comprovante"}</h3>
+            {carga.tipo === "carregando" ? <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" /> : null}
+            {carga.tipo === "pronto" && anexos.length ? (
+              <div className="gr-comprovantes">{anexos.map((anexo, i) => <Comprovante key={anexo.id} anexo={anexo} indice={i} />)}</div>
+            ) : null}
+            {carga.tipo === "pronto" && !anexos.length ? <p className="gr-legenda">{semComprovante ? "Gasto enviado sem comprovante." : "O comprovante ainda não está disponível."}</p> : null}
+          </section>
 
           <section aria-labelledby="gr-detalhe-dados">
             <h3 className="gr-subtitulo" id="gr-detalhe-dados">Dados do gasto</h3>

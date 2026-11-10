@@ -234,7 +234,6 @@ export function rotasDespesas(screen: Screen, {
         modelo={relatorioModelo}
         periodoId={relatorioPeriodo}
         loadStatus={relatorioStatus}
-        pendentesCartao={gastosCartaoPendentes.length}
         idsCompletar={new Set(gastosCartaoPendentes.map((gasto) => gasto.id))}
         onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
         motoristaId={motoristaIdRelatorio}
@@ -244,7 +243,6 @@ export function rotasDespesas(screen: Screen, {
         onPeriodo={setRelatorioPeriodo}
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}
-        onCompletar={() => setScreen("gastosCartao")}
         onAttach={anexarDespesa}
         onPrecoPostos={() => setScreen("rankingPostos")}
       />

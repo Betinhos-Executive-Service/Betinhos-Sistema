@@ -14247,7 +14247,7 @@ select,
 @keyframes gr-detalhe-entrada { from { transform:translateY(100%); } }
 /* Despesa devolvida: motivo, ações (trocar comprovante / explicar) e envio. Movimento do spec de 10/11/2026. */
 .gr-linha-main .gr-linha-motivo { display:block; overflow:hidden; color:#856000; font-weight:700; text-overflow:ellipsis; white-space:nowrap; overflow-wrap:normal; }
-.dv-motivo { display:grid; gap:4px; padding:12px 14px; border-left:4px solid #d99a00; border-radius:10px; background:#fff7df; color:#5c4200; }
+.dv-motivo { display:grid; gap:4px; padding:12px 14px; border:1px solid #f1d58a; border-radius:12px; background:#fff7df; color:#5c4200; }
 .dv-motivo h3 { margin:0; font-size:.75rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
 .dv-motivo p { margin:0; font-size:.95rem; font-weight:700; line-height:1.45; overflow-wrap:anywhere; }
 .dv-sucesso { margin:0; padding:10px 12px; border-radius:10px; background:#e8f7ee; color:#1c6b3c; font-size:.9rem; font-weight:800; }
