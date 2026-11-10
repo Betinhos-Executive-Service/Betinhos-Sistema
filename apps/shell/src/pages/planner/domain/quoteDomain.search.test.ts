@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { filterQuotes } from './quoteDomain'
+import { filterQuotes, matchesQuoteSearch, quoteSearchTerms } from './quoteDomain'
 import { filterQuoteHistory } from './quoteHistory'
-import { matchesQuoteSearch, quoteSearchTerms } from './quoteSearch'
 import type { QuoteInput } from './types'
 
 const quote: QuoteInput = {
@@ -34,4 +33,10 @@ test('pendentes e histórico usam a mesma busca', () => {
   const tasks = [{ id: 't1', quoteId: 'q1', assigneeIds: ['e1'], assigneeNames: ['Marina Souza'] }]
   assert.deepEqual(filterQuotes([quote], tasks, { query: 'marina guarulhos' }).map((item) => item.id), ['q1'])
   assert.deepEqual(filterQuoteHistory([{ ...quote, status: 'Perdida', lossReason: 'Preço acima' }], { query: 'preco' }).map((item) => item.id), ['q1'])
+})
+
+test('busca acha valor cru do Dataverse no formato em reais e data e hora no fuso de São Paulo', () => {
+  const live = { ...quote, value: '1250.5', serviceDate: '2026-11-19T01:30:00Z', options: null as unknown as QuoteInput['options'] }
+  for (const query of ['1.250,50', '1250', '18/11/2026', '22:30']) assert.ok(matchesQuoteSearch(live, quoteSearchTerms(query)), query)
+  assert.ok(!matchesQuoteSearch(live, quoteSearchTerms('19/11')))
 })

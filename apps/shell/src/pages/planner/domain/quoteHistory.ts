@@ -1,7 +1,6 @@
-// Porte de Tela Planner/src/quotes/quoteHistory.js; a busca usa quoteSearch.ts.
-import { QUOTE_TERMINAL_STATUSES } from './quoteDomain'
+// Porte de Tela Planner/src/quotes/quoteHistory.js (busca ampliada em quoteDomain).
+import { matchesQuoteSearch, QUOTE_TERMINAL_STATUSES, quoteSearchTerms } from './quoteDomain'
 import { chosenQuoteOption } from './quoteScenarios'
-import { matchesQuoteSearch, quoteSearchTerms } from './quoteSearch'
 import type { QuoteInput, QuoteOptionData, QuoteProposalVersion } from './types'
 
 export const quoteResultLabel = (status: string | undefined): string | undefined => status === 'Perdida' ? 'Negada' : status === 'Aceita pelo cliente' ? 'Aceita' : status
