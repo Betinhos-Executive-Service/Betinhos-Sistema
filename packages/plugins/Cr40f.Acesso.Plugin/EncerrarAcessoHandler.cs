@@ -1,13 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Cr40f.Acesso.Plugin;
 
 public sealed class EncerrarAcessoHandler
 {
-    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly AcessoConfig _cfg; private readonly Action<string> _trace;
-    public EncerrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, AcessoConfig cfg, Action<string> trace)
-    { _graph = graph; _repo = repo; _usuarios = usuarios; _cfg = cfg; _trace = trace; }
+    private readonly IGraphGateway _graph; private readonly FuncionarioRepository _repo; private readonly UsuarioDataverseRepository _usuarios; private readonly AcessoConfig _cfg; private readonly Action<string> _trace; private readonly Action<int> _esperar;
+    public EncerrarAcessoHandler(IGraphGateway graph, FuncionarioRepository repo, UsuarioDataverseRepository usuarios, AcessoConfig cfg, Action<string> trace, Action<int>? esperar = null)
+    { _graph = graph; _repo = repo; _usuarios = usuarios; _cfg = cfg; _trace = trace; _esperar = esperar ?? System.Threading.Thread.Sleep; }
+
+    // O Graph demora a refletir as mudanças: até 3 leituras em ~6 s antes de acusar o que sobrou.
+    private const int Conferencias = 3, IntervaloMs = 3000;
 
     private static readonly string[] EtapasDeConta = { "grupo", "licenca", "conta", "bloqueio" };
 
@@ -46,10 +50,16 @@ public sealed class EncerrarAcessoHandler
                 });
                 if (!membro)
                 {
-                    foreach (var nome in new[] { "grupo", "licenca", "conta" }) etapas.Pulada(nome, "conta fora do grupo de motoristas");
+                    // Conta ativa fora do grupo continua intocada (R11), mas é erro: o motorista seguiria com acesso (caso Bruno, PROD 10/11/2026).
+                    if (u.Ativo)
+                    {
+                        const string msg = "A conta Microsoft está ativa, mas fora do grupo de motoristas configurado. Nada foi alterado: confira com a TI o e-mail da ficha e o grupo do plugin.";
+                        etapas.Erro("grupo", msg);
+                        throw new AcessoException("CONTA_FORA_DO_GRUPO", msg);
+                    }
                     // Conta já desativada no Entra (ex.: tentativa anterior parou no SetState depois de sair do grupo): conclui o bloqueio.
-                    // Conta ativa fora do grupo continua intocada (R11).
-                    if (u.Ativo) etapas.Pulada("bloqueio", "conta fora do grupo de motoristas"); else Bloquear();
+                    foreach (var nome in new[] { "grupo", "licenca", "conta" }) etapas.Pulada(nome, "conta fora do grupo de motoristas");
+                    Bloquear();
                 }
                 else
                 {
@@ -60,11 +70,43 @@ public sealed class EncerrarAcessoHandler
                     // Depois do grupo: se o SetState falhar, a nova tentativa cai no ramo "fora do grupo" acima e conclui o bloqueio.
                     Bloquear();
                 }
+                Conferir(etapas, email, Guid.Parse(u.Id), membro);
             }
             // Só acesso ao app: status e demissão do funcionário são do RH e não mudam aqui (decisão de 23/10/2026).
             _trace("acesso encerrado para " + email);
             return etapas;
         }
         catch (AcessoException erro) { erro.Data["Etapas"] = etapas.ToJson(); throw; }
+    }
+
+    /// <summary>Relê a conta depois de encerrar. O que sobrou vira a etapa "conferencia" em erro, sem exceção:
+    /// exceção desfaria o bloqueio do systemuser (transação do Dataverse), e o Entra não volta junto.</summary>
+    private void Conferir(Etapas etapas, string email, Guid objectId, bool estavaNoGrupo)
+    {
+        var faltas = new List<string>();
+        for (var tentativa = 1; tentativa <= Conferencias; tentativa++)
+        {
+            if (tentativa > 1) _esperar(IntervaloMs);
+            try { faltas = Restante(email, objectId, estavaNoGrupo); }
+            catch (Exception erro) { faltas = new List<string> { "não foi possível conferir (" + erro.Message + ")" }; }
+            if (faltas.Count == 0) { etapas.Feita("conferencia", "acesso retirado"); return; }
+            _trace("conferencia " + tentativa + ": " + string.Join(", ", faltas));
+        }
+        etapas.Erro("conferencia", string.Join(", ", faltas));
+    }
+
+    private List<string> Restante(string email, Guid objectId, bool estavaNoGrupo)
+    {
+        var achados = new List<string>();
+        var u = _graph.UsuarioPorUpn(email);
+        if (u is not null)
+        {
+            if (u.Ativo) achados.Add("conta Microsoft ainda ativa");
+            // Licença só é retirada de quem estava no grupo; conta desativada fora dele pode manter a dela.
+            if (estavaNoGrupo && AcessoRules.TemLicenca(u, _cfg.LicenseSkuId)) achados.Add("licença ainda atribuída");
+            if (_graph.EhMembro(_cfg.GroupId, u.Id)) achados.Add("ainda no grupo de motoristas");
+        }
+        if (_usuarios.DaConta(objectId, email).Any(s => !s.GetAttributeValue<bool>("isdisabled"))) achados.Add("usuário ainda habilitado no Dataverse");
+        return achados;
     }
 }

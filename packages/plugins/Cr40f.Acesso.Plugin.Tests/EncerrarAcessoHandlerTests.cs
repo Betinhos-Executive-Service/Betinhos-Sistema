@@ -12,7 +12,8 @@ public sealed class EncerrarAcessoHandlerTests
     private readonly FakeService _svc = new();
     private readonly Guid _id = Guid.NewGuid();
 
-    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), new UsuarioDataverseRepository(_svc, _ => { }), Cfg, _ => { });
+    private EncerrarAcessoHandler Handler() => new(_graph, new FuncionarioRepository(_svc), new UsuarioDataverseRepository(_svc, _ => { }), Cfg, _ => { }, ms => Esperas.Add(ms));
+    private readonly System.Collections.Generic.List<int> Esperas = new();
     private Entity ComSystemuser(bool desabilitado = false) { var s = new Entity("systemuser", Guid.NewGuid()) { ["azureactivedirectoryobjectid"] = Guid.Parse("00000000-0000-0000-0000-0000000000a1"), ["isdisabled"] = desabilitado, ["islicensed"] = true }; _svc.Com(s); return s; }
     private void ComFuncionario(string? email = "ana.lima@betinhos.onmicrosoft.com") => _svc.Com(new Entity("cr40f_funcionarios", _id) { ["cr40f_nomecompleto"] = "Ana Lima", ["cr40f_emailmicrosoft"] = email, ["cr40f_status"] = new OptionSetValue(0) });
     private void ComUsuarioCompleto()
@@ -83,12 +84,12 @@ public sealed class EncerrarAcessoHandlerTests
     }
 
     [Fact]
-    public void Usuario_fora_do_grupo_nao_perde_conta_nem_licenca()
+    public void Usuario_ativo_fora_do_grupo_da_erro_sem_mexer_em_nada()
     {
         ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear();
-        var etapas = Handler().Executar(_id, "Ana").ToJson();
-        foreach (var e in new[] { "grupo", "licenca", "conta" })
-            Assert.Contains("\"etapa\":\"" + e + "\",\"estado\":\"pulada\",\"detalhe\":\"conta fora do grupo de motoristas\"", etapas);
+        var erro = Assert.Throws<AcessoException>(() => Handler().Executar(_id, "Ana"));
+        Assert.Equal("CONTA_FORA_DO_GRUPO", erro.Codigo);
+        Assert.Contains("\"etapa\":\"grupo\",\"estado\":\"erro\"", (string) erro.Data["Etapas"]!);
         Assert.True(_graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].Ativo);
         Assert.Contains("sku", _graph.Usuarios["ana.lima@betinhos.onmicrosoft.com"].SkuIds);
         Assert.DoesNotContain("DefinirAtivo", _graph.Chamadas); Assert.DoesNotContain("RemoverLicenca", _graph.Chamadas);
@@ -186,7 +187,42 @@ public sealed class EncerrarAcessoHandlerTests
     public void Fora_do_grupo_nao_bloqueia_systemuser()
     {
         ComFuncionario(); ComUsuarioCompleto(); _graph.Membros.Clear(); var s = ComSystemuser();
-        Assert.Contains("\"etapa\":\"bloqueio\",\"estado\":\"pulada\",\"detalhe\":\"conta fora do grupo de motoristas\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.Equal("CONTA_FORA_DO_GRUPO", Assert.Throws<AcessoException>(() => Handler().Executar(_id, "Ana")).Codigo);
         Assert.False(s.GetAttributeValue<bool>("isdisabled")); Assert.Empty(_svc.Executados);
+    }
+
+    [Fact]
+    public void Confere_no_fim_que_o_acesso_saiu()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); ComSystemuser();
+        Assert.Contains("\"etapa\":\"conferencia\",\"estado\":\"feita\",\"detalhe\":\"acesso retirado\"", Handler().Executar(_id, "Ana").ToJson());
+        Assert.Empty(Esperas);
+    }
+
+    [Fact]
+    public void Acesso_que_continua_vira_etapa_de_erro_com_o_que_sobrou()
+    {
+        // Simula o Graph aceitando as escritas sem efeito: a conta segue ativa, com licença e no grupo.
+        ComFuncionario(); ComUsuarioCompleto(); _graph.IgnorarMudancas = true;
+        var json = Handler().Executar(_id, "Ana").ToJson();
+        Assert.Contains("\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"conta Microsoft ainda ativa, licença ainda atribuída, ainda no grupo de motoristas\"", json);
+        Assert.Equal(new[] { 3000, 3000 }, Esperas);
+    }
+
+    [Fact]
+    public void Systemuser_habilitado_depois_do_bloqueio_vira_etapa_de_erro()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); ComSystemuser(); _svc.IgnorarExecute = true;
+        Assert.Contains("\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"usuário ainda habilitado no Dataverse\"", Handler().Executar(_id, "Ana").ToJson());
+    }
+
+    [Fact]
+    public void Falha_ao_conferir_nao_desfaz_o_encerramento()
+    {
+        ComFuncionario(); ComUsuarioCompleto(); var s = ComSystemuser();
+        var handler = Handler(); var chamadas = 0;
+        _graph.AoLerUsuario = () => { if (++chamadas > 1) throw new System.InvalidOperationException("503"); };
+        Assert.Contains("\"etapa\":\"conferencia\",\"estado\":\"erro\",\"detalhe\":\"não foi possível conferir (503)\"", handler.Executar(_id, "Ana").ToJson());
+        Assert.True(s.GetAttributeValue<bool>("isdisabled"));
     }
 }

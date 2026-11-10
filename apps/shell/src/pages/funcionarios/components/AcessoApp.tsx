@@ -44,12 +44,14 @@ const TITULO: Record<EstadoAcesso, string> = {
   sem: 'Sem acesso ao app', verificando: 'Conferindo acesso…', ativo: 'Acesso ativo', encerrado: 'Acesso encerrado',
   liberando: 'Liberando no app', falha: 'Não foi possível conferir o acesso',
 }
-const TITULO_ERRO: Record<Fluxo, string> = { cadastro: 'Não foi possível concluir a liberação', reativar: 'Não foi possível concluir a reativação', encerrar: 'O acesso continua ativo no Dataverse' }
+const TITULO_ERRO: Record<Fluxo, string> = { cadastro: 'Não foi possível concluir a liberação', reativar: 'Não foi possível concluir a reativação', encerrar: 'O acesso não foi retirado por completo' }
+
+/** A conferência do plugin achou acesso restante (etapa "conferencia" em erro). */
+export const acessoRestante = (detalhe: string) => `O encerramento terminou, mas a conferência achou acesso restante: ${detalhe}. Tente encerrar de novo; se continuar, avise a TI.`
 
 /** Encerrar terminou, mas o systemuser lido pela ficha segue habilitado: explica pela etapa de bloqueio. */
 export function motivoAindaAtivo(etapas: Etapa[]) {
   const bloqueio = etapas.find((e) => e.etapa === 'bloqueio')
-  if (bloqueio?.detalhe === 'conta fora do grupo de motoristas') return 'A conta Microsoft não está no grupo de motoristas e, por segurança, não foi bloqueada. Confira com a TI se o e-mail da ficha é mesmo deste motorista.'
   return `O encerramento terminou, mas o usuário deste e-mail ainda aparece habilitado no Dataverse${bloqueio ? ` (bloqueio: ${bloqueio.detalhe})` : ''}. Tente encerrar de novo; se continuar, avise a TI.`
 }
 
@@ -92,14 +94,17 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       setEncerrando(false); onAlterado?.()
       // O plugin bloqueia o systemuser; relê o mesmo dado que a ficha lê ao abrir, para não dizer "encerrado" e voltar "ativo".
       const real = reconferir ? await reconferir().catch((): EstadoConta => 'encerrado') : 'encerrado'
-      if (real === 'ativo') {
-        setConta('ativo'); setUltimo({ fluxo: 'encerrar', etapas, erro: motivoAindaAtivo(etapas), permanente: true }); notify('error', 'O acesso continua ativo no Dataverse.')
+      const sobra = etapas.find((e) => e.etapa === 'conferencia' && e.estado === 'erro')
+      if (sobra || real === 'ativo') {
+        setConta(real); setUltimo({ fluxo: 'encerrar', etapas, erro: sobra ? acessoRestante(sobra.detalhe) : motivoAindaAtivo(etapas), permanente: true }); notify('error', TITULO_ERRO.encerrar)
         return
       }
       setUltimo({ fluxo: 'encerrar', etapas }); setConta('encerrado'); notify('success', 'Acesso encerrado.')
     } catch (reason) {
       const erro = parseAcessoError(reason)
       if (erro.codigo === 'SEM_PERMISSAO') { setEncerrando(false); semPermissaoDeGerir(); return }
+      // Conta ativa fora do grupo: o plugin não mexeu em nada; o aviso fica no bloco, não no diálogo.
+      if (erro.codigo === 'CONTA_FORA_DO_GRUPO') { setEncerrando(false); setUltimo({ fluxo: 'encerrar', etapas: erro.etapas, erro: erro.message, permanente: true }); notify('error', TITULO_ERRO.encerrar); return }
       throw erro
     }
   }
@@ -152,6 +157,8 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
   }
 
   const pode = !semPermissao && !concluindo
+  // Encerrar que deixou acesso para trás: oferece só nova tentativa, mesmo com o systemuser já bloqueado.
+  const encerrarIncompleto = ultimo?.fluxo === 'encerrar' && !!ultimo.erro
   return (
     <section className="group acesso-bloco" aria-labelledby="acesso-bloco-titulo" onKeyDown={(event) => { if (event.key === 'Escape' && (event.target as HTMLElement).closest('dialog')) event.stopPropagation() }}>
       <h3 id="acesso-bloco-titulo" className="acesso-bloco__titulo">Acesso ao app</h3>
@@ -168,8 +175,8 @@ export function AcessoApp({ funcionario, acesso, estado, setConta, emailPendente
       <div className="cluster">
         {pode && estado === 'sem' && <Button variant="secondary" size="compact" icon={<KeyRound size={16} />} onClick={onCadastrar}>Cadastrar acesso</Button>}
         {pode && estado === 'liberando' && <Button size="compact" icon={<RefreshCw size={16} />} disabled={tentando} onClick={() => void concluirLiberacao()}>Concluir liberação</Button>}
-        {pode && estado === 'ativo' && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
-        {pode && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
+        {pode && (estado === 'ativo' || encerrarIncompleto) && <Button variant="secondary" size="compact" icon={<UserX size={16} />} onClick={() => setEncerrando(true)}>Encerrar acesso</Button>}
+        {pode && !encerrarIncompleto && (estado === 'encerrado' || (estado === 'ativo' && faltouSenha)) && <Button variant="secondary" size="compact" icon={<RotateCcw size={16} />} onClick={() => setReativando(true)}>Reativar acesso</Button>}
       </div>
       {ultimo && (ultimo.erro
         ? <Alert tone="danger" title={TITULO_ERRO[ultimo.fluxo]}>{ultimo.erro}{!ultimo.permanente && ' Use "Concluir liberação" de novo em instantes.'}<ListaEtapas etapas={ultimo.etapas} fluxo={ultimo.fluxo} /></Alert>

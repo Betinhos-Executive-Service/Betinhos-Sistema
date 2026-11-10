@@ -53,12 +53,14 @@ public sealed class FakeService : IOrganizationService
     public List<OrganizationRequest> Executados { get; } = new();
     /// <summary>Execute falha (simula SetState recusado pelo Dataverse).</summary>
     public bool FalharExecute { get; set; }
+    /// <summary>Execute aceito sem efeito (simula systemuser que continua habilitado).</summary>
+    public bool IgnorarExecute { get; set; }
     public OrganizationResponse Execute(OrganizationRequest request)
     {
         Executados.Add(request);
         if (FalharExecute) throw new InvalidOperationException("Execute recusado: " + request.RequestName);
         // SetState de systemuser: estado 1 = desabilitado.
-        if (request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
+        if (!IgnorarExecute && request is Microsoft.Crm.Sdk.Messages.SetStateRequest { EntityMoniker.LogicalName: "systemuser" } estado)
             _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
         return new OrganizationResponse();
     }
