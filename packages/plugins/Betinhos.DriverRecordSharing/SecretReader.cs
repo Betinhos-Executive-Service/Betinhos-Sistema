@@ -5,8 +5,8 @@ using Microsoft.Xrm.Sdk.Query;
 
 namespace Betinhos.DriverRecordSharing
 {
-    // Ordem: tabela cr40f_segredo (coluna com segurança de campo, lida como SYSTEM) → variável de ambiente (legado,
-    // a esvaziar depois da migração; tipo Secret ou String). Nunca registra o valor em trace.
+    // Ordem: tabela cr40f_segredo (coluna com segurança de campo, lida como SYSTEM) → configuração segura do step (legado)
+    // → variável de ambiente (legado, a esvaziar depois da migração; tipo Secret ou String). Nunca registra o valor em trace.
     public static class SecretReader
     {
         public const string Table = "cr40f_segredo";
@@ -20,13 +20,14 @@ namespace Betinhos.DriverRecordSharing
             [OrganizeObservationPlugin.EnvApiKey] = "anthropic.observacao-motorista"
         };
 
-        public static string Read(IOrganizationService system, string schemaName, ITracingService tracing = null)
+        public static string Read(IOrganizationService system, string schemaName, ITracingService tracing = null, string secureConfig = null)
         {
             if (SecretNames.TryGetValue(schemaName, out var name))
             {
                 var fromTable = ReadTable(system, name, tracing);
                 if (fromTable != null) return fromTable;
             }
+            if (!string.IsNullOrWhiteSpace(secureConfig)) return secureConfig.Trim();
             try
             {
                 var request = new OrganizationRequest("RetrieveEnvironmentVariableSecretValue");
@@ -47,12 +48,12 @@ namespace Betinhos.DriverRecordSharing
                 query.Criteria.AddCondition(NameColumn, ConditionOperator.Equal, name);
                 var rows = system.RetrieveMultiple(query).Entities;
                 var value = rows.Count > 0 ? rows[0].GetAttributeValue<string>(ValueColumn)?.Trim() : null;
-                if (string.IsNullOrEmpty(value)) { tracing?.Trace("Segredo {0}: sem valor na tabela, usando a variável de ambiente", name); return null; }
+                if (string.IsNullOrEmpty(value)) { tracing?.Trace("Segredo {0}: sem valor na tabela, usando a próxima fonte", name); return null; }
                 return value;
             }
             catch (Exception error)
             {
-                tracing?.Trace("Segredo {0}: tabela ilegível ({1}), usando a variável de ambiente", name, error.GetType().Name);
+                tracing?.Trace("Segredo {0}: tabela ilegível ({1}), usando a próxima fonte", name, error.GetType().Name);
                 return null;
             }
         }

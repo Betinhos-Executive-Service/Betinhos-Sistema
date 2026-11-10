@@ -110,6 +110,42 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Null(svc.LastTableName);
         }
 
+        [Theory]
+        [InlineData("new_AnthropicKeyCombustivel")]
+        [InlineData("new_AnthropicKeyObservacaoMotorista")]
+        public void Read_TableWinsOverSecureConfig(string variable)
+        {
+            var svc = new Svc { SecretWorks = true, StringVariable = "sk-string", TableRow = TableValue };
+            Assert.Equal(TableValue, SecretReader.Read(svc, variable, null, "sk-secure"));
+            Assert.Null(svc.LastRequest);
+        }
+
+        [Fact]
+        public void Read_WithoutTableRowSecureConfigWinsOverEnvironmentVariable()
+        {
+            var svc = new Svc { SecretWorks = true, StringVariable = "sk-string" };
+            Assert.Equal("sk-secure", SecretReader.Read(svc, "new_AnthropicKeyCombustivel", null, "  sk-secure\n"));
+            Assert.NotNull(svc.LastTableName);
+            Assert.Null(svc.LastRequest);
+        }
+
+        [Fact]
+        public void Read_UnreadableTableFallsBackToSecureConfig()
+        {
+            var svc = new Svc { TableThrows = true, StringVariable = "sk-string" };
+            Assert.Equal("sk-secure", SecretReader.Read(svc, "new_AnthropicKeyObservacaoMotorista", null, "sk-secure"));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("   ")]
+        public void Read_BlankSecureConfigFallsBackToEnvironmentVariable(string secure)
+        {
+            var svc = new Svc { TableRow = "  ", StringVariable = "sk-string" };
+            Assert.Equal("sk-string", SecretReader.Read(svc, "new_AnthropicKeyCombustivel", null, secure));
+        }
+
         [Fact]
         public void Read_FallsBackToNullWhenNothingConfigured()
         {
