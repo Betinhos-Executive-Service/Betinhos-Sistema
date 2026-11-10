@@ -49,7 +49,7 @@ export const NEUTRO = [
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
   /^packages\/plugins\/Betinhos\.ExpenseUpload\//,
-  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
+  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|migrations-dev|migrations-ci|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
   /^packages\/deploy\/flows\/backup\//,
   /^packages\/deploy\/package\.json$/,
   /(^|\/)[^/]+\.md$/,

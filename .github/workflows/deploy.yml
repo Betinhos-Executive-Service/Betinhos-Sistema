@@ -7,9 +7,12 @@ name: Deploy
 # e o publicar.yml usa os mesmos registros para nunca levar ao PROD tela ou plugin que ainda não entrou na main.
 # App Motoristas (apps/motoristas, desde a fase 2 da migração do app-motoristas-v2): o app e o service worker pendentes saem
 # por apps/motoristas/scripts/push-front-dev.ps1, que só atualiza web resource que já existe (sem distribuição).
+# Schema: cada migration nova em packages/deploy/migrations/ (migrations-dev.mjs, tag schema-dev-publicado) roda com -Apply na conta
+# de serviço, em ordem de nome, antes de publicar a tela e os plugins. Na primeira falha as seguintes não rodam; o resto do Deploy
+# segue, o job termina vermelho com a causa no resumo e a tag não anda. O PROD recebe o schema pelas soluções (publicar.yml).
 # Flows: cada packages/deploy/provision-flow-*.ps1 cujos arquivos mudaram desde a tag flows-dev-publicado (flows-dev.mjs) roda
-# na conta de serviço (az login do service principal) e só atualiza flow que já existe no DEV (push-flows-dev.ps1). Flow novo,
-# schema (provision-* sem flow) e sitemap:* continuam à mão: o flow novo nasce com dono na conta de serviço e não liga, e o
+# na conta de serviço (az login do service principal) e só atualiza flow que já existe no DEV (push-flows-dev.ps1). Flow novo
+# e sitemap:* continuam à mão: o flow novo nasce com dono na conta de serviço e não liga, e o
 # resto usa az login e conexões do usuário. Se um flow falha, os outros seguem, a distribuição roda, o Deploy termina
 # vermelho com as causas no resumo e a tag não anda (o próximo Deploy tenta de novo).
 # Feito para gastar poucos minutos de CI (repo privado, runner Windows conta em dobro):
@@ -50,6 +53,8 @@ on:
       - 'packages/deploy/push-flows-dev.ps1'
       - 'packages/deploy/flows-dev.mjs'
       - 'packages/deploy/provision-flow-*.ps1'
+      - 'packages/deploy/migrations/**'
+      - 'packages/deploy/migrations-dev.mjs'
       - 'packages/deploy/flows/**'
       - '!packages/deploy/flows/**/*.test.mjs'
       - 'packages/agentes-ia/src/**'
@@ -87,6 +92,10 @@ on:
         default: ''
       forcar_plugins:
         description: 'Plugins a publicar mesmo sem mudança (frota,acesso,driverrecordsharing ou todos); vazio = só os pendentes'
+        type: string
+        default: ''
+      forcar_migrations:
+        description: 'Migrations de schema a aplicar mesmo sem mudança (nomes de packages/deploy/migrations separados por vírgula, ou todas); vazio = só as pendentes'
         type: string
         default: ''
       forcar_flows:
@@ -161,6 +170,58 @@ jobs:
           "plugins=$plugins" >> $env:GITHUB_OUTPUT
           "motoristas=$motoristas" >> $env:GITHUB_OUTPUT
           Write-Host "tela: $tela; webresources: $webresources; formulario: $formulario; motoristas: $(if ($motoristas) { $motoristas } else { 'nada' }); plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
+
+      # Schema. Mesma base por tag (schema-dev-publicado): sem tag nada fica pendente e o job final cria a tag no HEAD. Só entram
+      # migrations adicionadas ou alteradas (--diff-filter=AM). Roda antes de tudo: a tela e os plugins podem depender da coluna.
+      - name: Quais migrations aplicar
+        id: schemapend
+        shell: bash
+        env:
+          FORCAR_MIGRATIONS: ${{ inputs.forcar_migrations }}
+        run: |
+          if [ "$GITHUB_REF" != 'refs/heads/develop' ]; then
+            echo "::warning title=Schema no DEV::Fora da develop ($GITHUB_REF): nenhuma migration aplicada."
+            echo "migrations=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$FORCAR_MIGRATIONS" ]; then
+            saida=$(node packages/deploy/migrations-dev.mjs --forcar "$FORCAR_MIGRATIONS" --github)
+          else
+            rc=0; git ls-remote --exit-code origin refs/tags/schema-dev-publicado > /dev/null || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              git fetch --quiet --no-tags --depth=1 origin 'refs/tags/schema-dev-publicado:refs/tags/schema-dev-publicado'
+              saida=$(git diff --name-only --diff-filter=AM 'refs/tags/schema-dev-publicado^{commit}' HEAD | node packages/deploy/migrations-dev.mjs --github)
+            elif [ "$rc" -eq 2 ]; then
+              echo "Tag schema-dev-publicado ausente: nada pendente; ela é criada no HEAD ao fim."
+              saida=$(node packages/deploy/migrations-dev.mjs --sem-base --github)
+            else
+              exit "$rc"
+            fi
+          fi
+          echo "$saida" >> "$GITHUB_OUTPUT"
+          echo "$saida"
+
+      # Conta de serviço: schema e flows usam o mesmo az login. Antes da tela e dos plugins, porque a migration roda primeiro.
+      - name: Entrar no DEV como conta de serviço
+        id: azlogin
+        if: steps.flowspend.outputs.flows != '' || steps.schemapend.outputs.migrations != ''
+        continue-on-error: true
+        run: az login --service-principal -u $env:DV_CLIENT_ID -p $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --allow-no-subscriptions --output none
+      # Em ordem de nome, com -Apply; a primeira falha interrompe as migrations (as seguintes podem depender dela), não o resto do Deploy.
+      - name: Aplicar migrations
+        id: migrations
+        if: steps.schemapend.outputs.migrations != '' && steps.azlogin.outcome != 'failure'
+        continue-on-error: true
+        env:
+          MIGRATIONS: ${{ steps.schemapend.outputs.migrations }}
+        run: |
+          foreach ($m in $env:MIGRATIONS.Split(',')) {
+            Write-Host "::group::migration $m"
+            powershell.exe -NoProfile -ExecutionPolicy Bypass -File "packages/deploy/migrations/$m" -Apply
+            $rc = $LASTEXITCODE
+            Write-Host '::endgroup::'
+            if ($rc -ne 0) { Write-Host "::error title=Schema no DEV::A migration $m falhou ($rc); as seguintes não rodaram."; exit 1 }
+          }
 
       # Flows. A base é a tag flows-dev-publicado (mesmo padrão da prod-publicado do producao.yml); sem tag nada fica pendente
       # e o job final cria a tag no HEAD. O diff compara só as árvores dos dois commits, então basta buscar a tag com depth=1.
@@ -272,8 +333,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      # Flows. continue-on-error nos três passos: uma falha não pode impedir a distribuição nem o resumo; o passo "Falha nos
-      # flows" deixa o job vermelho.
+      # Flows. continue-on-error nos passos: uma falha não pode impedir a distribuição nem o resumo; o passo "Falha nos
+      # flows" deixa o job vermelho (o az login já foi feito antes da tela, junto com o das migrations).
       # Constantes dos flows de IA (dist/ não é versionado): só quando algum flow pendente as usa. Sem dependências instaladas.
       - name: Gerar as constantes dos flows de IA
         id: constantes
@@ -285,11 +346,6 @@ jobs:
         run: |
           case ",$PREPAROS," in *,agentes-ia,*) node packages/agentes-ia/scripts/gerar-constantes.ts ;; esac
           case ",$PREPAROS," in *,despesas-ia,*) node packages/despesas-ia/scripts/gerar-constantes.ts ;; esac
-      - name: Entrar no DEV como conta de serviço
-        id: azlogin
-        if: steps.flowspend.outputs.flows != ''
-        continue-on-error: true
-        run: az login --service-principal -u $env:DV_CLIENT_ID -p $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --allow-no-subscriptions --output none
       - name: Publicar os flows
         id: flows
         if: steps.flowspend.outputs.flows != '' && steps.constantes.outcome != 'failure' && steps.azlogin.outcome != 'failure'
@@ -300,15 +356,22 @@ jobs:
       # export para TEST/PROD fica barrado até corrigir (skill verificar-solucoes).
       - name: Distribuir nas 4 soluções
         id: distribuir
-        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.webresources == 'true' || steps.pendentes.outputs.formulario == 'true' || steps.pendentes.outputs.plugins != '' || steps.flowspend.outputs.flows != ''
+        if: steps.pendentes.outputs.tela == 'true' || steps.pendentes.outputs.webresources == 'true' || steps.pendentes.outputs.formulario == 'true' || steps.pendentes.outputs.plugins != '' || steps.flowspend.outputs.flows != '' || steps.schemapend.outputs.migrations != ''
         run: |
           $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/distribuir-apos-push.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -CaixaDeEntrada AppBetinhos 2>&1 | ForEach-Object { "$_" })
           $saida | ForEach-Object { Write-Host $_ }
           if ($saida -match 'ATENCAO') { Write-Host '::warning title=Distribuição nas 4 soluções::Não zerou. O export para TEST/PROD fica barrado; veja a skill verificar-solucoes.'; 'zerou=false' >> $env:GITHUB_OUTPUT }
           else { 'zerou=true' >> $env:GITHUB_OUTPUT }
 
+      - name: Falha nas migrations
+        if: steps.migrations.outcome == 'failure' || (steps.schemapend.outputs.migrations != '' && steps.azlogin.outcome == 'failure')
+        shell: bash
+        run: |
+          echo "::error title=Schema no DEV::Uma migration falhou (causa no passo Aplicar migrations). A tag schema-dev-publicado não anda."
+          exit 1
+
       - name: Falha nos flows
-        if: steps.flows.outcome == 'failure' || steps.constantes.outcome == 'failure' || steps.azlogin.outcome == 'failure'
+        if: steps.flows.outcome == 'failure' || steps.constantes.outcome == 'failure' || (steps.flowspend.outputs.flows != '' && steps.azlogin.outcome == 'failure')
         shell: bash
         run: |
           echo "::error title=Flows no DEV::Algum flow falhou (causas no resumo ou nos passos anteriores). A tag flows-dev-publicado não anda."
@@ -323,9 +386,10 @@ jobs:
             if [ "${{ steps.pendentes.outputs.webresources }}" = "true" ]; then echo; echo "Tela Gerar Pagantes publicada no DEV - v$(node -p "require('./apps/gerar-pagantes/package.json').version")"; fi
             if [ "${{ steps.pendentes.outputs.formulario }}" = "true" ]; then echo; echo "Formulário Geral publicado no DEV - v$(node -p "require('./apps/formulario-geral/version.json').version")"; fi
             if [ -n "${{ steps.pendentes.outputs.motoristas }}" ]; then echo; echo "App Motoristas no DEV (${{ steps.motoristas.outcome }}): ${{ steps.pendentes.outputs.motoristas }} - v${{ steps.motoristas.outputs.versao }}"; fi
+            if [ -n "${{ steps.schemapend.outputs.migrations }}" ]; then echo; echo "Migrations de schema no DEV (${{ steps.migrations.outcome }}): ${{ steps.schemapend.outputs.migrations }}"; fi
             if [ -n "${{ steps.pendentes.outputs.plugins }}" ]; then echo; echo "Plugins publicados no DEV: ${{ steps.pendentes.outputs.plugins }}"; fi
             if [ -n "${{ steps.flowspend.outputs.flows }}" ]; then echo; echo "Flows no DEV (${{ steps.flows.outcome }}): ${{ steps.flowspend.outputs.flows }}"; fi
-            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ "${{ steps.pendentes.outputs.formulario }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.motoristas }}" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
+            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ "${{ steps.pendentes.outputs.formulario }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.motoristas }}" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ] && [ -z "${{ steps.schemapend.outputs.migrations }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins, o schema e os flows deste commit."; fi
             if [ "${{ steps.distribuir.outputs.zerou }}" = "false" ]; then echo; echo "**ATENÇÃO:** a distribuição nas 4 soluções não zerou."; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -394,12 +458,13 @@ jobs:
         run: |
           { echo "## Pacote das soluções para o publicar"; echo '```json'; cat cache-solucoes/manifesto.json 2>/dev/null || echo "sem pacote"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
-  # A tag só anda quando o Deploy inteiro passou (tela, plugins, flows e Resumo). Job à parte para que `contents: write`
-  # fique só aqui: o job dev, com o segredo do Dataverse, mantém as permissões padrão. Nunca anda para trás. Execução com
-  # forcar_flows não move: ela publica só os pedidos, e andar a tag apagaria os pendentes.
+  # As tags flows-dev-publicado e schema-dev-publicado só andam quando o Deploy inteiro passou (tela, plugins, migrations, flows e
+  # Resumo). Job à parte para que `contents: write` fique só aqui: o job dev, com o segredo do Dataverse, mantém as permissões
+  # padrão. Nunca andam para trás. Execução com forcar_flows (ou forcar_migrations) não move a tag respectiva: ela publica só os
+  # pedidos, e andar a tag apagaria os pendentes.
   tag-flows:
     needs: dev
-    if: needs.dev.result == 'success' && github.ref == 'refs/heads/develop' && inputs.forcar_flows == ''
+    if: needs.dev.result == 'success' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -409,6 +474,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Mover a tag flows-dev-publicado
+        if: inputs.forcar_flows == ''
         run: |
           if base=$(git rev-parse -q --verify 'refs/tags/flows-dev-publicado^{commit}') && ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
             echo "A tag está à frente deste commit; não anda para trás."
@@ -416,3 +482,12 @@ jobs:
           fi
           git tag -f flows-dev-publicado "$GITHUB_SHA"
           git push -f origin refs/tags/flows-dev-publicado
+      - name: Mover a tag schema-dev-publicado
+        if: inputs.forcar_migrations == ''
+        run: |
+          if base=$(git rev-parse -q --verify 'refs/tags/schema-dev-publicado^{commit}') && ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
+            echo "A tag está à frente deste commit; não anda para trás."
+            exit 0
+          fi
+          git tag -f schema-dev-publicado "$GITHUB_SHA"
+          git push -f origin refs/tags/schema-dev-publicado
