@@ -25,10 +25,9 @@ async function abrir() {
 describe('decisão do gestor no drawer', () => {
   it('mostra o motivo, a justificativa do motorista e as três ações', async () => {
     const ficha = await abrir()
-    const bloco = within(ficha).getByRole('region', { name: 'Decisão' })
+    const bloco = within(ficha).getByRole('region', { name: 'Esperando sua decisão' })
     expect(within(bloco).getByText('O posto emitiu o cupom com o valor errado e corrigiu à mão.')).toBeTruthy()
-    expect(within(bloco).getByText('Motivo da devolução')).toBeTruthy()
-    for (const nome of ['Validar', 'Devolver', 'Cancelar']) expect(within(bloco).getByRole('button', { name: nome })).toBeTruthy()
+    for (const nome of ['Validar', 'Devolver ao motorista', 'Cancelar despesa']) expect(within(bloco).getByRole('button', { name: nome })).toBeTruthy()
   })
 
   it('validar grava direto, avisa e avança para a próxima da fila', async () => {
@@ -40,13 +39,13 @@ describe('decisão do gestor no drawer', () => {
 
   it('devolver exige motivo de 10 caracteres e confirma pelo botão que diz o efeito', async () => {
     const ficha = await abrir()
-    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver' }))
-    const confirmar = within(ficha).getByRole('button', { name: 'Devolver ao motorista' }) as HTMLButtonElement
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver ao motorista' }))
+    const confirmar = within(ficha).getByRole('button', { name: 'Enviar ao motorista' }) as HTMLButtonElement
     expect(confirmar.disabled).toBe(true)
-    const campo = within(ficha).getByPlaceholderText('O que o motorista precisa fazer?')
+    const campo = within(ficha).getByPlaceholderText('Ex.: envie uma foto legível do cupom.')
     fireEvent.change(campo, { target: { value: 'curto' } })
     expect(confirmar.disabled).toBe(true)
-    expect(within(ficha).getByText(/faltam 5/)).toBeTruthy()
+    expect(within(ficha).getByText(/Escreva mais 5/)).toBeTruthy()
     fireEvent.change(campo, { target: { value: 'Envie o cupom fiscal original.' } })
     expect(confirmar.disabled).toBe(false)
     fireEvent.click(confirmar)
@@ -56,32 +55,40 @@ describe('decisão do gestor no drawer', () => {
 
   it('cancelar avisa da Divergência do cartão e exige motivo', async () => {
     const ficha = await abrir()
-    fireEvent.click(within(ficha).getByRole('button', { name: 'Cancelar' }))
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Cancelar despesa' }))
     expect(within(ficha).getByText(/Divergência na conciliação/)).toBeTruthy()
-    const confirmar = within(ficha).getByRole('button', { name: 'Cancelar despesa' }) as HTMLButtonElement
+    const confirmar = within(ficha).getByRole('button', { name: 'Confirmar cancelamento' }) as HTMLButtonElement
     expect(confirmar.disabled).toBe(true)
-    fireEvent.change(within(ficha).getByPlaceholderText(/Por que esta despesa é indevida/), { target: { value: 'Lançamento duplicado.' } })
+    fireEvent.change(within(ficha).getByPlaceholderText('Ex.: lançamento duplicado.'), { target: { value: 'Lançamento duplicado.' } })
     fireEvent.click(confirmar)
     expect(await screen.findByText('Despesa cancelada.')).toBeTruthy()
   })
 
+  it('motivo pronto preenche o campo e libera o envio', async () => {
+    const ficha = await abrir()
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver ao motorista' }))
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Explique a diferença de valor.' }))
+    expect((within(ficha).getByPlaceholderText('Ex.: envie uma foto legível do cupom.') as HTMLTextAreaElement).value).toBe('Explique a diferença de valor.')
+    expect((within(ficha).getByRole('button', { name: 'Enviar ao motorista' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('o texto de uma devolução não vira motivo de cancelamento', async () => {
     const ficha = await abrir()
-    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver' }))
-    fireEvent.change(within(ficha).getByPlaceholderText('O que o motorista precisa fazer?'), { target: { value: 'Envie o cupom fiscal original.' } })
-    fireEvent.click(within(ficha).getByRole('button', { name: 'Cancelar' }))
-    expect((within(ficha).getByPlaceholderText(/Por que esta despesa é indevida/) as HTMLTextAreaElement).value).toBe('')
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver ao motorista' }))
+    fireEvent.change(within(ficha).getByPlaceholderText('Ex.: envie uma foto legível do cupom.'), { target: { value: 'Envie o cupom fiscal original.' } })
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Cancelar despesa' }))
+    expect((within(ficha).getByPlaceholderText('Ex.: lançamento duplicado.') as HTMLTextAreaElement).value).toBe('')
   })
 
   it('com motivo digitado, fechar pergunta "Descartar alterações?"', async () => {
     const ficha = await abrir()
-    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver' }))
-    fireEvent.change(within(ficha).getByPlaceholderText('O que o motorista precisa fazer?'), { target: { value: 'Envie o cupom fiscal original.' } })
+    fireEvent.click(within(ficha).getByRole('button', { name: 'Devolver ao motorista' }))
+    fireEvent.change(within(ficha).getByPlaceholderText('Ex.: envie uma foto legível do cupom.'), { target: { value: 'Envie o cupom fiscal original.' } })
     fireEvent.click(within(ficha).getByRole('button', { name: 'Fechar painel' }))
     const confirma = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
     fireEvent.click(within(confirma).getByRole('button', { name: 'Continuar editando' }))
     expect(screen.getByRole('dialog', { name: PRIMEIRA })).toBeTruthy()
-    expect((within(ficha).getByPlaceholderText('O que o motorista precisa fazer?') as HTMLTextAreaElement).value).toBe('Envie o cupom fiscal original.')
+    expect((within(ficha).getByPlaceholderText('Ex.: envie uma foto legível do cupom.') as HTMLTextAreaElement).value).toBe('Envie o cupom fiscal original.')
 
     fireEvent.click(within(ficha).getByRole('button', { name: 'Fechar painel' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))

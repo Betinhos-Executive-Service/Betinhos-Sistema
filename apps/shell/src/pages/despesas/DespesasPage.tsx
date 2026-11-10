@@ -157,7 +157,7 @@ function Despesas({ host }: { host: Host }) {
       </div>
       {despesas.error && !choices ? null : (
         <Grid min={190}>
-          <MetricCard icon={<UserCheck size={20} />} tone="warning" label="Esperando gestor" value={totais.esperandoGestor} hint="decidir: validar, devolver ou cancelar" loading={loadingFirst || pending} />
+          <MetricCard icon={<UserCheck size={20} />} tone="warning" label="Esperando gestor" value={totais.esperandoGestor} hint="abra para validar ou devolver" loading={loadingFirst || pending} />
           <MetricCard icon={<Wallet size={20} />} label="Total filtrado" value={formatMoney(totais.total)} hint={plural(totais.qtd, 'lançamento', 'lançamentos')} loading={loadingFirst || pending} />
           <MetricCard icon={<Clock size={20} />} tone="warning" label="Aguardando pagamento" value={formatMoney(totais.aguardandoValor)} hint={plural(totais.aguardandoQtd, 'despesa', 'despesas')} loading={loadingFirst || pending} />
           <MetricCard icon={<Paperclip size={20} />} tone="warning" label="Sem comprovante" value={totais.semComprovante} hint="sem anexo completo" loading={loadingFirst || pending} />

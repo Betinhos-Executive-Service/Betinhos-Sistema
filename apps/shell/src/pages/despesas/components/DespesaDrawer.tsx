@@ -86,6 +86,8 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version, o
           </div>
 
           {podeDecidir ? <DecisaoBloco d={d} onDecidir={onDecidir} onEstado={setDecisao} /> : null}
+          {/* Para decidir, o comprovante vem logo abaixo da decisão, antes da análise detalhada. */}
+          {podeDecidir ? <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} /> : null}
 
           {d.possivelDuplicidade ? <Alert tone="warning" title="Possível duplicidade">O App Motoristas marcou esta despesa como parecida com outra já lançada. Confira antes de pagar.</Alert> : null}
 
@@ -124,7 +126,7 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version, o
             </Section>
           ) : null}
 
-          <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} />
+          {podeDecidir ? null : <Comprovantes anexos={anexos} choices={choices} statusAnexo={label(choices.anexo, d.statusAnexo, 'Sem status')} source={source} />}
 
           <Section title="Origem e registro">
             <dl className="pg-ficha__grid">

@@ -6,6 +6,7 @@ import { openFromRow, openRowActions } from '../../pagantes/components/PagantesL
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'
+import { decidivel } from '../domain/decisao'
 import { financeiroTone, operacionalTone, semComprovante } from '../domain/status'
 import type { Despesa, DespesaChoices } from '../domain/types'
 
@@ -14,7 +15,9 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 
 export const titulo = (d: Despesa) => d.estabelecimento || d.nome || 'Despesa sem nome'
 
+/** Esperando o gestor substitui o status (Precisa corrigir): um selo só, que diz com quem a despesa está. */
 export function OperacionalBadge({ d, choices }: { d: Despesa; choices: DespesaChoices }) {
+  if (d.aguardandoGestor && decidivel(d)) return <StatusBadge tone="warning" icon={<UserCheck size={12} />}>Esperando gestor</StatusBadge>
   return <StatusBadge tone={operacionalTone(d.statusOperacional)} dot>{label(choices.operacional, d.statusOperacional, 'Sem status')}</StatusBadge>
 }
 
@@ -24,10 +27,9 @@ export function FinanceiroBadge({ d, choices }: { d: Despesa; choices: DespesaCh
 
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
 export function Alertas({ d }: { d: Despesa }) {
-  if (!d.aguardandoGestor && !d.possivelDuplicidade && !semComprovante(d)) return null
+  if (!d.possivelDuplicidade && !semComprovante(d)) return null
   return (
     <span className="dp-alertas">
-      {d.aguardandoGestor ? <StatusBadge tone="warning" icon={<UserCheck size={12} />}>Esperando gestor</StatusBadge> : null}
       {d.possivelDuplicidade ? <StatusBadge tone="warning" icon={<Copy size={12} />}>Possível duplicidade</StatusBadge> : null}
       {semComprovante(d) ? <StatusBadge tone="neutral" icon={<Paperclip size={12} />}>Sem comprovante</StatusBadge> : null}
     </span>
