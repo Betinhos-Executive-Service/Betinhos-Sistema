@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { Copy, Paperclip, Sparkles } from 'lucide-react'
+import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
@@ -24,9 +24,10 @@ export function FinanceiroBadge({ d, choices }: { d: Despesa; choices: DespesaCh
 
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
 export function Alertas({ d }: { d: Despesa }) {
-  if (!d.possivelDuplicidade && !semComprovante(d)) return null
+  if (!d.aguardandoGestor && !d.possivelDuplicidade && !semComprovante(d)) return null
   return (
     <span className="dp-alertas">
+      {d.aguardandoGestor ? <StatusBadge tone="warning" icon={<UserCheck size={12} />}>Esperando gestor</StatusBadge> : null}
       {d.possivelDuplicidade ? <StatusBadge tone="warning" icon={<Copy size={12} />}>Possível duplicidade</StatusBadge> : null}
       {semComprovante(d) ? <StatusBadge tone="neutral" icon={<Paperclip size={12} />}>Sem comprovante</StatusBadge> : null}
     </span>

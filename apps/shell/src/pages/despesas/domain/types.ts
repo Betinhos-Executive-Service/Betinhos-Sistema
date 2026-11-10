@@ -31,6 +31,12 @@ export type Despesa = {
   observacaoInterna: string
   protocolo: string
   possivelDuplicidade: boolean
+  /** Por que a despesa voltou ao motorista (IA ou gestor) ou foi cancelada: `new_motivodevolucao`. */
+  motivoDevolucao: string
+  /** O que o motorista explicou ao reenviar: `new_justificativamotorista`. */
+  justificativaMotorista: string
+  /** A IA ainda duvida depois da explicação, ou o motorista não respondeu: a decisão é do gestor (`new_aguardandogestor`). */
+  aguardandoGestor: boolean
   latitude: number | null
   longitude: number | null
   criadoEm: Date | null

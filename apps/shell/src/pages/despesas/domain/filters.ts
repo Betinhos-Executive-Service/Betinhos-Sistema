@@ -3,8 +3,9 @@ import type { Despesa } from './types'
 
 export { PERIODOS, periodoStart, type KV, type Periodo } from '../../pagantes/domain/filters'
 
-export type Alerta = 'sem-comprovante' | 'duplicidade' | 'ia-suspeita'
+export type Alerta = 'esperando-gestor' | 'sem-comprovante' | 'duplicidade' | 'ia-suspeita'
 export const ALERTAS: { value: Alerta; label: string }[] = [
+  { value: 'esperando-gestor', label: 'Esperando gestor' },
   { value: 'sem-comprovante', label: 'Sem comprovante' },
   { value: 'duplicidade', label: 'Possível duplicidade' },
   { value: 'ia-suspeita', label: 'Suspeita da IA' },
@@ -39,7 +40,7 @@ type Saved = Omit<Filters, 'query'>
 export type View = { id: string; nome: string; filters: Saved }
 
 export const VIEWS_KEY = 'betinhos.despesas.visoes.v1'
-const BUILTIN_IDS = ['todas', 'aguardando', 'corrigir', 'sem-comprovante', 'duplicidade', 'ia-suspeita']
+const BUILTIN_IDS = ['esperando-gestor', 'todas', 'aguardando', 'corrigir', 'sem-comprovante', 'duplicidade', 'ia-suspeita']
 const PERIODO_VALUES = new Set<string>(PERIODOS.map((p) => p.value))
 const ALERTA_VALUES = new Set<string>(ALERTAS.map((a) => a.value))
 

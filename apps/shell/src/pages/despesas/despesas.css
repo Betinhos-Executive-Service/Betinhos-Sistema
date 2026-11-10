@@ -61,3 +61,24 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 .dp-ia__valor { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--bt-space-1) var(--bt-space-2); }
 .dp-ia__diff { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-warning); }
 .dp-ia__meta { margin: 0; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+
+/* Decisão do gestor: bloco acima da ficha. Movimento do design: opacidade + 4 px, sem animar altura. */
+.dp-decisao { padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.dp-decisao__ia { display: grid; gap: var(--bt-space-2); justify-items: start; }
+.dp-decisao__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.dp-decisao__cancelar { margin-left: auto; color: var(--bt-color-danger); }
+.dp-decisao__acoes button:active, .dp-motivo__acoes button:active { transform: scale(.97); }
+.dp-decisao__acoes button, .dp-motivo__acoes button { transition: transform 140ms ease-out, background-color var(--bt-duration-fast) var(--bt-ease-out); }
+.dp-citacao { margin: 0; padding-left: var(--bt-space-3); border-left: 3px solid var(--bt-color-border); color: var(--bt-color-text-primary); font-style: italic; white-space: pre-wrap; }
+.dp-motivo { display: grid; gap: var(--bt-space-3); margin-top: var(--bt-space-3); animation: dp-motivo-in 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+.dp-motivo--saindo { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease-out, transform 120ms ease-out; pointer-events: none; }
+.dp-motivo__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); }
+@keyframes dp-motivo-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+/* Avançar para a próxima despesa: só crossfade, sem slide. */
+.dp-troca { animation: dp-troca-in 120ms ease-out; }
+@keyframes dp-troca-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dp-motivo { animation-name: dp-troca-in; animation-duration: 120ms; }
+  .dp-motivo--saindo { transform: none; }
+  .dp-decisao__acoes button:active, .dp-motivo__acoes button:active { transform: none; }
+}

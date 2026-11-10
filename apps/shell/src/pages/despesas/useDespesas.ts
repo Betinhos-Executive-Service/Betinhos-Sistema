@@ -15,6 +15,6 @@ export function useDespesas(source: Source, since: Date | null, cache: ListCache
     const list = await source.load(sinceKey == null ? null : new Date(sinceKey), (first) => { choices.then((c) => partial({ list: first, choices: c }), () => undefined) })
     return { list, choices: await choices }
   }, [source, sinceKey])
-  const { data, complete, loading, error, reload } = useProgressiveData<Data>({ cache, key: `despesas:${sinceKey ?? 'all'}`, group: 'despesas:', load })
-  return { list: data?.list ?? EMPTY, choices: data?.choices ?? null, complete, loading, error, reload }
+  const { data, complete, loading, error, reload, mutate } = useProgressiveData<Data>({ cache, key: `despesas:${sinceKey ?? 'all'}`, group: 'despesas:', load })
+  return { list: data?.list ?? EMPTY, choices: data?.choices ?? null, complete, loading, error, reload, mutate }
 }

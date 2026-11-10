@@ -1,17 +1,14 @@
-import { useId, type ReactNode } from 'react'
+import { useId } from 'react'
 import { Alert, StatusBadge } from '@betinhos/ui'
 import { Sparkles } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
+import { Item } from './Ficha'
 import { IA_DECISAO_LABEL, IA_STATUS, decisaoTone, diferencaValor, formatDataLida, type AnaliseIA as Analise } from '../domain/ia'
 
 const STATUS_LABEL: Record<number, string> = {
   [IA_STATUS.pendente]: 'Pendente', [IA_STATUS.processando]: 'Processando', [IA_STATUS.concluida]: 'Concluída', [IA_STATUS.erro]: 'Erro',
 }
 const pct = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 0 })
-
-function Item({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="pg-ficha__item"><dt>{label}</dt><dd>{children || '—'}</dd></div>
-}
 
 /** Badge da decisão da IA (Validar / Precisa corrigir), com ícone além da cor (DS §3.6). */
 export function DecisaoIABadge({ decisao }: { decisao: number | null }) {
