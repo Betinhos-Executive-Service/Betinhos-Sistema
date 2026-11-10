@@ -28,3 +28,95 @@ test('script mantém o BOM', () => {
   const bruto = readFileSync(new URL('./provision-flow-despesas-ia.ps1', import.meta.url))
   assert.deepEqual([...bruto.subarray(0, 3)], [0xef, 0xbb, 0xbf])
 })
+
+// Trecho do script entre `$gravarText = @'` e `'@`: a ação UpdateRecord que grava a decisão.
+const gravar = JSON.parse(ps1.match(/\$gravarText = @'\r?\n([\s\S]*?)\r?\n'@/)[1]).inputs.parameters
+const contexto = ps1.match(/"justificativaMotorista": "(.*)"\r?\n/)?.[1]
+
+// Avalia só as expressões deste flow (funções usadas aqui), sobre o gatilho e a resposta da IA, para provar o resultado.
+function avaliar(expr, { gatilho, resposta }) {
+  const fns = {
+    if_: (c, a, b) => (c ? a : b),
+    equals: (a, b) => a === b,
+    not: (a) => !a,
+    and: (...a) => a.every(Boolean),
+    or: (...a) => a.some(Boolean),
+    empty: (a) => a == null || a.length === 0,
+    trim: (a) => String(a).trim(),
+    coalesce: (...a) => a.find((x) => x != null) ?? null,
+    join: (arr, sep) => arr.join(sep),
+    decodeUriComponent: (x) => decodeURIComponent(x),
+    triggerOutputs: () => ({ body: gatilho }),
+    outputs: () => ({ ...resposta }),
+  }
+  const js = expr
+    .replace(/^@\{?/, '')
+    .replace(/\}$/, '')
+    .replace(/\?\['body\/([a-z0-9_]+)'\]/g, (_, c) => `.body.${c}`)
+    .replace(/outputs\('Resposta'\)\?\['([a-z_]+)'\]/g, (_, c) => `outputs().${c}`)
+    .replace(/\bif\(/g, 'if_(')
+    .replace(/'/g, '"')
+  return new Function(...Object.keys(fns), `return ${js}`)(...Object.values(fns))
+}
+
+const corrigir = { decisao: 'precisa_corrigir', motivos: ['Valor lido R$ 82,00; lançado R$ 92,00.'], mensagem_motorista: 'O valor do comprovante (R$ 82,00) é diferente do informado (R$ 92,00). Troque o comprovante ou explique.' }
+const validar = { decisao: 'validar', motivos: [], mensagem_motorista: null }
+const primeira = { new_justificativamotorista: null, new_motivodevolucao: null }
+
+test('devolução da IA grava a mensagem ao motorista em new_motivodevolucao, sem as palavras erro ou inválido', () => {
+  const motivo = avaliar(gravar['item/new_motivodevolucao'], { gatilho: primeira, resposta: corrigir })
+  assert.equal(motivo, corrigir.mensagem_motorista)
+  assert.doesNotMatch(motivo, /erro|inv[áa]lid/i)
+})
+
+test('mensagem vazia da IA cai numa frase genérica, nunca nos motivos antifraude', () => {
+  const motivo = avaliar(gravar['item/new_motivodevolucao'], { gatilho: primeira, resposta: { ...corrigir, mensagem_motorista: '  ' } })
+  assert.match(motivo, /^Precisamos conferir esta despesa\./)
+  assert.ok(!motivo.includes(corrigir.motivos[0]))
+})
+
+test('segunda dúvida (vai ao gestor) preserva o motivo que já existia em vez de trocá-lo', () => {
+  const gatilho = { new_justificativamotorista: 'Cupom corrigido à mão.', new_motivodevolucao: 'Motivo da primeira devolução' }
+  assert.equal(avaliar(gravar['item/new_motivodevolucao'], { gatilho, resposta: corrigir }), 'Motivo da primeira devolução')
+})
+
+test('validar preserva o motivo anterior da devolução', () => {
+  const motivo = avaliar(gravar['item/new_motivodevolucao'], { gatilho: { ...primeira, new_motivodevolucao: 'Motivo antigo' }, resposta: validar })
+  assert.equal(motivo, 'Motivo antigo')
+})
+
+test('a justificativa do motorista vai no contexto enviado à IA (só quando preenchida)', () => {
+  assert.ok(contexto)
+  assert.equal(avaliar(contexto, { gatilho: { new_justificativamotorista: '  Cupom corrigido à mão  ' }, resposta: {} }), 'Cupom corrigido à mão')
+  assert.equal(avaliar(contexto, { gatilho: { new_justificativamotorista: '   ' }, resposta: {} }), null)
+  assert.equal(avaliar(contexto, { gatilho: { new_justificativamotorista: null }, resposta: {} }), null)
+})
+
+test('primeira dúvida volta ao motorista (aguardandogestor = Não)', () => {
+  assert.equal(avaliar(gravar['item/new_aguardandogestor'], { gatilho: primeira, resposta: corrigir }), false)
+})
+
+test('segunda dúvida com justificativa preenchida vai ao gestor (aguardandogestor = Sim), com status Precisa corrigir', () => {
+  const gatilho = { new_justificativamotorista: 'O posto corrigiu o cupom à mão.', new_motivodevolucao: 'Valor diferente.' }
+  assert.equal(avaliar(gravar['item/new_aguardandogestor'], { gatilho, resposta: corrigir }), true)
+  assert.match(gravar['item/cr40f_statusoperacional'], /validar'\), 100000002, 100000001\)/)
+})
+
+test('segunda dúvida só com troca de comprovante (motivo de devolução anterior, sem justificativa) também vai ao gestor', () => {
+  const gatilho = { new_justificativamotorista: null, new_motivodevolucao: 'Valor diferente.' }
+  assert.equal(avaliar(gravar['item/new_aguardandogestor'], { gatilho, resposta: corrigir }), true)
+})
+
+test('IA valida: aguardandogestor = Não, mesmo com justificativa', () => {
+  const gatilho = { new_justificativamotorista: 'O posto corrigiu o cupom à mão.', new_motivodevolucao: 'Valor diferente.' }
+  assert.equal(avaliar(gravar['item/new_aguardandogestor'], { gatilho, resposta: validar }), false)
+})
+
+test('Conferir exige no DEV os campos novos nos dois ramos de gravação', () => {
+  assert.ok(ps1.includes("'Gravar_resultado grava motivo da devolução e aguardandogestor nos dois ramos'"))
+  assert.ok(ps1.includes("'Contexto com justificativaMotorista (só texto preenchido)'"))
+})
+
+test('o gatilho continua filtrando só cr40f_statusanexo: update com o mesmo valor também dispara (o filtro vale pela presença da coluna no PATCH)', () => {
+  assert.match(ps1, /"subscriptionRequest\/filteringattributes": "cr40f_statusanexo"/)
+})
