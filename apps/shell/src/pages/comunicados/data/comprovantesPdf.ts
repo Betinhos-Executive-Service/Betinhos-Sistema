@@ -46,7 +46,10 @@ export async function gerarComprovantesPdf({ modo, alvo, pares, geradoPor, gerad
   texto(modo === 'comunicado' ? 'Geração por comunicado' : 'Geração por motorista', { cor: SUAVE, depois: 8 })
   campo(modo === 'comunicado' ? 'Comunicado' : 'Motorista', alvo)
   campo('Comprovantes neste arquivo', String(pares.length))
-  if (datas.length) campo('Período das conclusões', datas.length > 1 && formatDate(datas[0]) !== formatDate(datas[datas.length - 1]) ? `${formatDate(datas[0])} a ${formatDate(datas[datas.length - 1])}` : formatDate(datas[0]))
+  if (datas.length) {
+    const [inicio, fim] = [formatDate(datas[0]), formatDate(datas[datas.length - 1])]
+    campo('Período das conclusões', inicio === fim ? inicio : `${inicio} a ${fim}`)
+  }
   campo('Gerado por', geradoPor)
   campo('Gerado em', geracao)
   y -= 8
