@@ -27,6 +27,7 @@ export function createMockSource(): Source {
   const comunicados: Comunicado[] = [
     { id: id(10), titulo: 'Novo procedimento de embarque no GRU', corpo: 'A partir de segunda, o ponto de encontro no Terminal 3 passa a ser a porta 4. Confirme a ciência assinando abaixo.', tipo: COMUNICADO_TIPO.ciencia, escopo: COMUNICADO_ESCOPO.todos, alvoIds: [], estado: COMUNICADO_ESTADO.disparado, disparadoEm: hoje },
     { id: id(11), titulo: 'Feriado: escala do fim de semana', corpo: 'A escala do feriado já está no app. Confira seus horários.', tipo: COMUNICADO_TIPO.informativo, escopo: COMUNICADO_ESCOPO.selecionados, alvoIds: [id(1), id(2)], estado: COMUNICADO_ESTADO.disparado, disparadoEm: ontem },
+    { id: id(13), titulo: 'Uso obrigatório do crachá', corpo: 'O crachá deve ficar visível durante todo o atendimento. Assine para confirmar a ciência.', tipo: COMUNICADO_TIPO.ciencia, escopo: COMUNICADO_ESCOPO.selecionados, alvoIds: [id(1)], estado: COMUNICADO_ESTADO.disparado, disparadoEm: ontem },
     { id: id(12), titulo: 'Revisão dos veículos', corpo: 'Traga o veículo para a revisão trimestral até sexta.', tipo: COMUNICADO_TIPO.informativo, escopo: COMUNICADO_ESCOPO.todos, alvoIds: [], estado: COMUNICADO_ESTADO.rascunho, disparadoEm: null },
   ]
   const destinatarios: Destinatario[] = [
@@ -35,6 +36,7 @@ export function createMockSource(): Source {
     destinatario(3, id(10), id(3), hoje, { pushStatus: COMUNICADO_PUSH.falhou, pushErro: 'Dispositivo não registrado' }),
     destinatario(4, id(11), id(1), ontem, { abertoEm: ontem, lidoEm: ontem }),
     destinatario(5, id(11), id(2), ontem),
+    destinatario(6, id(13), id(1), ontem, { abertoEm: ontem }),
   ]
   let seq = 200
 
@@ -42,6 +44,8 @@ export function createMockSource(): Source {
     mock: true,
     async comunicados() { await wait(300); return clone(comunicados) },
     async destinatarios(comunicadoId) { await wait(300); return clone(destinatarios.filter((row) => row.comunicadoId === comunicadoId)) },
+    async destinatariosDoMotorista(motoristaId) { await wait(300); return clone(destinatarios.filter((row) => row.motoristaId === motoristaId)) },
+    async quemSou() { await wait(100); return 'Usuário de teste' },
     async motoristas() { await wait(200); return clone(MOTORISTAS) },
     async salvar(draft) {
       await wait(300)
