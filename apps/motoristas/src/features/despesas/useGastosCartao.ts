@@ -5,7 +5,8 @@ import { reportAppError } from "../../shared/appErrorLogger";
 import { revokePhotoPreviewUrls } from "../fotos/envioMidia";
 import { EMPTY_EXPENSE_DRAFT } from "./rascunho";
 import { MOCK_CIDADES, gastoCartaoParaRascunho, isMockGastosCartao, listarGastosCartao, mesclarRascunho, type GastoCartao, type GastosCartaoLoadStatus } from "./gastosCartao";
-import { carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./gastosRelatorio";
+import { ANEXO_COMPLETO } from "./devolucao";
+import { STATUS_DESPESA, carregarDespesasRelatorio, hojeSaoPaulo, montarRelatorio, type DespesaRelatorio, type PeriodoId } from "./gastosRelatorio";
 import type { GastosRelatorioLoadStatus } from "./GastosRelatorioScreen";
 import type { ExpenseDraft, ExpensePhoto } from "./expenses";
 import type { useExpenseFlow } from "./useExpenseFlow";
@@ -113,6 +114,16 @@ export function useGastosCartao({ comunicadosDriverIdRef, despesas, driverContex
     if (!isMockGastosCartao() && !driverContextId) return;
     void reloadRelatorio();
   }, [screen, driverContextId, reloadRelatorio]);
+  // Devolvida reenviada: a lista já mostra "Em conferência", sem depender de nova consulta (o sinal pode estar ruim).
+  const marcarDevolucaoEnviada = useCallback((id: string, explicacao: string) => {
+    setRelatorioDespesas((atual) => atual && atual.map((item) => item.id === id
+      ? { ...item, status: STATUS_DESPESA.enviado, statusAnexo: ANEXO_COMPLETO, justificativa: explicacao || item.justificativa }
+      : item));
+  }, []);
+  // Toque no push de devolução: abre o detalhe da despesa na lista do relatório (some ao sair da tela).
+  const [abrirDespesaId, setAbrirDespesaId] = useState("");
+  const limparAbrirDespesa = useCallback(() => setAbrirDespesaId(""), []);
+  useEffect(() => { if (screen !== "gastosRelatorio") setAbrirDespesaId(""); }, [screen]);
   const relatorioModelo = useMemo(
     () => relatorioDespesas ? montarRelatorio(relatorioDespesas, relatorioPeriodo, hojeSaoPaulo()) : null,
     [relatorioDespesas, relatorioPeriodo]
@@ -174,16 +185,23 @@ export function useGastosCartao({ comunicadosDriverIdRef, despesas, driverContex
     pendingGastoCartaoDeepLinkRef.current = "";
     const gasto = gastosCartao.find((item) => item.id === despesaId);
     // O motorista pode ter saído da lista enquanto carregava: não puxa ele de volta.
-    if (gasto && screen === "gastosCartao") abrirGastoCartao(gasto);
+    if (screen !== "gastosCartao") return;
+    if (gasto) abrirGastoCartao(gasto);
+    // Não é gasto do cartão a completar: é uma despesa devolvida (push "Uma despesa precisa da sua ação"), aberta no relatório.
+    else if (gastosCartaoStatus === "ready") { setAbrirDespesaId(despesaId); setScreen("gastosRelatorio"); }
   }, [gastosCartao, gastosCartaoStatus]);
 
   return {
+    abrirDespesaId,
     abrirGastoCartao,
     concluirGastoCartao,
     duplicidadeCartao,
     gastoCartaoAtual,
     gastosCartaoPendentes,
     gastosCartaoStatus,
+    limparAbrirDespesa,
+    marcarDevolucaoEnviada,
+    motoristaIdRelatorio: comunicadosDriverIdRef.current,
     relatorioDespesas,
     relatorioModelo,
     relatorioPeriodo,

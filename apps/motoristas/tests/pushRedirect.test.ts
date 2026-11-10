@@ -63,6 +63,13 @@ test("treinamento abre o App Motoristas no treinamento da participação", async
   assert.equal(plain(calls[0].page).data, `treinamentoParticipacaoId=${ID}`);
 });
 
+test("despesa devolvida abre o App Motoristas na despesa (relatório de gastos)", async () => {
+  const { api, calls } = loadRedirect();
+  await api.onLoad(ctx("cr40f_despesaoperacional", `{${ID.toUpperCase()}}`));
+  assert.equal(calls.length, 1);
+  assert.deepEqual(plain(calls[0].page), { pageType: "webresource", webresourceName: "new_app-motoristas-v2", data: `despesaId=${ID}` });
+});
+
 test("fora do App Motoristas (ex.: app Interno) não redireciona", async () => {
   const interno = loadRedirect({ appName: "cr40f_ModelDrivenBetinhos" });
   await interno.api.onLoad(ctx("cr40f_reservadeveculos", ID));

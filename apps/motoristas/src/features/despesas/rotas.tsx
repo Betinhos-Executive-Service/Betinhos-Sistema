@@ -30,6 +30,7 @@ type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCart
 
 // Telas de gastos: relatório, gastos do cartão a completar, postos perto, e "Registrar gasto" (câmera e prévia do comprovante, leitura rápida, ilegível e formulário).
 export function rotasDespesas(screen: Screen, {
+  abrirDespesaId,
   abrirGastoCartao,
   anexarDespesa,
   duplicidadeCartao,
@@ -37,6 +38,9 @@ export function rotasDespesas(screen: Screen, {
   gastoCartaoAtual,
   gastosCartaoPendentes,
   gastosCartaoStatus,
+  limparAbrirDespesa,
+  marcarDevolucaoEnviada,
+  motoristaIdRelatorio,
   isExpenseIdle,
   relatorioModelo,
   relatorioPeriodo,
@@ -233,6 +237,10 @@ export function rotasDespesas(screen: Screen, {
         pendentesCartao={gastosCartaoPendentes.length}
         idsCompletar={new Set(gastosCartaoPendentes.map((gasto) => gasto.id))}
         onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
+        motoristaId={motoristaIdRelatorio}
+        onDevolucaoEnviada={marcarDevolucaoEnviada}
+        abrirDespesaId={abrirDespesaId}
+        onDespesaAberta={limparAbrirDespesa}
         onPeriodo={setRelatorioPeriodo}
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}

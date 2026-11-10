@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
 import postoCombustivel from "../../assets/images/posto-combustivel.png";
 import { ConvitePosto } from "./ConvitePosto";
@@ -7,6 +7,7 @@ import { GraficoMedias } from "./GastosCharts";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
+import { SELO_DEVOLUCAO, estadoDevolucao, motivoParaMotorista, MOTIVO_PADRAO } from "./devolucao";
 import { formatDiaMes, isMockGastosCartao } from "./gastosCartao";
 import { METAS_GASTOS, PERIODOS, ehPendente, formatBRL, plural, semaforo, type DespesaRelatorio, type PeriodoId, type RelatorioModelo, type Semaforo } from "./gastosRelatorio";
 
@@ -21,6 +22,13 @@ type GastosRelatorioScreenProps = {
   /** Ids dos gastos do cartão que ainda faltam completar: tocar neles abre o formulário de completar. */
   idsCompletar: ReadonlySet<string>;
   onCompletarGasto: (id: string) => void;
+  /** Id do motorista, para anexar o comprovante novo de uma devolvida. */
+  motoristaId: string;
+  /** Devolvida reenviada: o selo muda na hora. */
+  onDevolucaoEnviada: (id: string, explicacao: string) => void;
+  /** Despesa a abrir assim que a lista carregar (toque no push de devolução). */
+  abrirDespesaId: string;
+  onDespesaAberta: () => void;
   onPeriodo: (id: PeriodoId) => void;
   onBack: () => void;
   onReload: () => void;
@@ -29,7 +37,7 @@ type GastosRelatorioScreenProps = {
   onPrecoPostos: () => void;
 };
 
-export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, idsCompletar, onCompletarGasto, onPeriodo, onBack, onReload, onCompletar, onAttach, onPrecoPostos }: GastosRelatorioScreenProps) {
+export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentesCartao, idsCompletar, onCompletarGasto, motoristaId, onDevolucaoEnviada, abrirDespesaId, onDespesaAberta, onPeriodo, onBack, onReload, onCompletar, onAttach, onPrecoPostos }: GastosRelatorioScreenProps) {
   const carregando = loadStatus === "loading" && !modelo;
   const erro = loadStatus === "error" && !modelo;
   // Ficam aqui (fora do Relatorio, que remonta a cada período) para a aba do gráfico e o filtro sobreviverem à troca de período.
@@ -59,12 +67,12 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, pendentes
             <p>Não foi possível carregar o relatório de gastos.</p>
             <button type="button" className="termo-text-button" onClick={onReload}>Tentar de novo</button>
           </div>
-        ) : modelo && modelo.quantidade === 0 ? (
+        ) : modelo && modelo.despesas.length === 0 ? (
           <p className="termo-empty">Nenhum gasto neste período. Para lançar um gasto, toque em Anexar despesa.</p>
         ) : modelo ? (
-          <Relatorio key={periodoId} onPrecoPostos={onPrecoPostos} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} />
+          <Relatorio key={periodoId} onPrecoPostos={onPrecoPostos} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} motoristaId={motoristaId} onDevolucaoEnviada={onDevolucaoEnviada} abrirDespesaId={abrirDespesaId} onDespesaAberta={onDespesaAberta} />
         ) : null}
-        {modelo?.quantidade ? null : <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos perto de mim</button>}
+        {modelo?.despesas.length ? null : <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos perto de mim</button>}
       </section>
       <ActionBar className="finalize-actions gr-actions">
         {pendentesCartao > 0 ? <ActionButton variant="secondary" label={`Completar (${pendentesCartao})`} onClick={onCompletar} /> : null}
@@ -145,12 +153,21 @@ function CartaoMedia({ cartao, rotuloAnterior, i }: { cartao: Cartao; rotuloAnte
   );
 }
 
-type RelatorioProps = { onPrecoPostos: () => void; modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; idsCompletar: ReadonlySet<string>; onCompletarGasto: (id: string) => void };
+type RelatorioProps = { onPrecoPostos: () => void; modelo: RelatorioModelo; grafico: Grafico; onGrafico: (id: Grafico) => void; filtro: Filtro; onFiltro: (id: Filtro) => void; idsCompletar: ReadonlySet<string>; onCompletarGasto: (id: string) => void; motoristaId: string; onDevolucaoEnviada: (id: string, explicacao: string) => void; abrirDespesaId: string; onDespesaAberta: () => void };
 
-function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar, onCompletarGasto }: RelatorioProps) {
+function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro, idsCompletar, onCompletarGasto, motoristaId, onDevolucaoEnviada, abrirDespesaId, onDespesaAberta }: RelatorioProps) {
   const { status, tendencia, periodo } = modelo;
   const [aberta, setAberta] = useState<DespesaRelatorio | null>(null);
   const fecharDetalhe = useCallback(() => setAberta(null), []);
+  // Toque no push: abre o detalhe da despesa assim que ela aparece na lista.
+  useEffect(() => {
+    if (!abrirDespesaId) return;
+    const alvo = modelo.despesas.find((item) => item.id === abrirDespesaId);
+    // Sem a despesa na lista (dados antigos, releitura em curso) mantém o pedido: abre quando a lista nova chegar.
+    if (!alvo) return;
+    setAberta(alvo);
+    onDespesaAberta();
+  }, [abrirDespesaId, modelo, onDespesaAberta]);
   const despesasRef = useRef<HTMLElement>(null);
   const outrasMedias = modelo.cartoes.filter((cartao) => !DESTAQUES.some((destaque) => destaque.id === cartao.id));
   const pendentes = modelo.despesas.filter(ehPendente);
@@ -233,7 +250,9 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
           <ul className="gr-lista">
             {lista.map((item) => {
               const completar = idsCompletar.has(item.id);
-              const badge = completar ? { rotulo: "Completar", tom: "atencao" } : STATUS_BADGE[item.status];
+              const estado = estadoDevolucao(item);
+              const badge = completar ? { rotulo: "Completar", tom: "atencao" } : estado ? SELO_DEVOLUCAO[estado] : STATUS_BADGE[item.status];
+              const mostrarMotivo = !completar && estado === "acao";
               return (
                 <li key={item.id}>
                   <button type="button" className="gr-linha" onClick={() => (completar ? onCompletarGasto(item.id) : setAberta(item))}>
@@ -241,6 +260,7 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
                       <strong>{item.categoria}</strong>
                       <span>{item.estabelecimento || "Sem estabelecimento"}</span>
                       <small>{formatDiaMes(item.data)}</small>
+                      {mostrarMotivo ? <span className="gr-linha-motivo">{motivoParaMotorista(item) || MOTIVO_PADRAO}</span> : null}
                     </span>
                     <span className="gr-linha-side">
                       <strong>{formatBRL(item.valor)}</strong>
@@ -258,7 +278,7 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
           </div>
         )}
       </section>
-      {aberta ? <DespesaDetalheDialog despesa={aberta} onClose={fecharDetalhe} /> : null}
+      {aberta ? <DespesaDetalheDialog despesa={aberta} onClose={fecharDetalhe} motoristaId={motoristaId} onDevolucaoEnviada={onDevolucaoEnviada} /> : null}
     </div>
   );
 }

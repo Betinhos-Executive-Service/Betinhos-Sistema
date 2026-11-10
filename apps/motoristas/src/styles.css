@@ -14245,6 +14245,43 @@ select,
 @media (prefers-reduced-motion:no-preference) { .gr-comprovante--carregando { animation:gr-pulse 1.2s ease-in-out infinite alternate; } }
 @media (prefers-reduced-motion:reduce) { .gr-detalhe,.gr-detalhe-overlay { animation:none; } }
 @keyframes gr-detalhe-entrada { from { transform:translateY(100%); } }
+/* Despesa devolvida: motivo, ações (trocar comprovante / explicar) e envio. Movimento do spec de 10/11/2026. */
+.gr-linha-main .gr-linha-motivo { display:block; overflow:hidden; color:#856000; font-weight:700; text-overflow:ellipsis; white-space:nowrap; overflow-wrap:normal; }
+.dv-motivo { display:grid; gap:4px; padding:12px 14px; border-left:4px solid #d99a00; border-radius:10px; background:#fff7df; color:#5c4200; }
+.dv-motivo h3 { margin:0; font-size:.75rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.dv-motivo p { margin:0; font-size:.95rem; font-weight:700; line-height:1.45; overflow-wrap:anywhere; }
+.dv-sucesso { margin:0; padding:10px 12px; border-radius:10px; background:#e8f7ee; color:#1c6b3c; font-size:.9rem; font-weight:800; }
+.dv-painel { display:grid; gap:10px; }
+.dv-acoes,.dv-confirmar-acoes { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.dv-acao { min-height:48px; padding:10px 12px; border:1.5px solid #001a3d; border-radius:12px; background:#fff; color:#001a3d; font:inherit; font-size:.92rem; font-weight:800; cursor:pointer; transition:transform 140ms ease-out, background-color 140ms ease-out; }
+.dv-acao[aria-pressed="true"],.dv-acao[aria-expanded="true"] { background:#eef3fb; }
+.dv-acao:active:not(:disabled) { transform:scale(.97); }
+.dv-acao:focus-visible,.dv-enviar:focus-visible,.dv-explicar textarea:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+.dv-acao:disabled,.dv-enviar:disabled { opacity:.5; cursor:not-allowed; }
+.dv-foto { display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px; border:1px solid #e2e8f0; border-radius:12px; font-size:.82rem; font-weight:700; color:#475569; }
+.dv-foto img { width:56px; height:56px; border-radius:8px; object-fit:cover; }
+.dv-explicar { display:grid; gap:6px; }
+.dv-explicar label { font-size:.82rem; font-weight:800; }
+.dv-explicar textarea { width:100%; min-height:96px; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:12px; font:inherit; font-size:1rem; line-height:1.4; resize:vertical; box-sizing:border-box; }
+.dv-explicar small { color:#64748b; font-size:.75rem; font-weight:700; }
+.dv-explicar small[data-erro="true"] { color:#9a5b00; }
+.dv-explicar[data-estado="entrando"] { animation:dv-explicar-entra 180ms cubic-bezier(.23,1,.32,1) both; }
+.dv-explicar[data-estado="saindo"] { animation:dv-explicar-sai 120ms cubic-bezier(.23,1,.32,1) both; }
+@keyframes dv-explicar-entra { from { opacity:0; transform:translateY(4px); } }
+@keyframes dv-explicar-sai { to { opacity:0; transform:translateY(4px); } }
+.dv-aviso { margin:0; padding:10px 12px; border-radius:10px; background:#fff7df; color:#5c4200; font-size:.85rem; font-weight:700; line-height:1.4; }
+.dv-enviar { min-height:52px; padding:12px 16px; border:0; border-radius:12px; background:#001a3d; color:#fff; font:inherit; font-size:1rem; font-weight:800; cursor:pointer; transition:transform 140ms ease-out, opacity 140ms ease-out; }
+.dv-enviar:active:not(:disabled) { transform:scale(.97); }
+.dv-confirmar { display:grid; gap:8px; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid #e2e8f0; background:#fff; box-shadow:0 -8px 24px rgba(0,14,35,.12); }
+.dv-confirmar p { margin:0; color:#475569; font-size:.85rem; }
+@media (prefers-reduced-motion:reduce) {
+  .dv-acao,.dv-enviar { transition:opacity 140ms ease-out; }
+  .dv-acao:active:not(:disabled),.dv-enviar:active:not(:disabled) { transform:none; }
+  .dv-explicar[data-estado="entrando"] { animation-name:dv-explicar-entra-opacidade; }
+  .dv-explicar[data-estado="saindo"] { animation-name:dv-explicar-sai-opacidade; }
+}
+@keyframes dv-explicar-entra-opacidade { from { opacity:0; } }
+@keyframes dv-explicar-sai-opacidade { to { opacity:0; } }
 .rp-loader { display:grid; justify-items:center; align-content:center; gap:14px; min-height:min(56dvh,420px); }
 .rp-painel { width:min(68vw,250px); height:auto; filter:drop-shadow(0 10px 18px rgba(0,26,61,.28)); }
 .rp-painel-trilho,.rp-painel-nivel { fill:none; stroke-linecap:round; stroke-width:9; }

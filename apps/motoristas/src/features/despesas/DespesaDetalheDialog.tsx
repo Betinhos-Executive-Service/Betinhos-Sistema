@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { useDetalheDialog } from "./useDetalheDialog";
 import { carregarArquivoComprovante, carregarDetalheDespesa, type AnexoDespesa, type ArquivoComprovante, type DespesaDetalhe } from "./despesaDetalhe";
 import { formatDataHora } from "../termos/termosMulta";
+import { DevolucaoPainel, GUARDA_VAZIA, MotivoDevolucao, type GuardaDevolucao } from "./DevolucaoPainel";
+import { SELO_DEVOLUCAO, estadoDevolucao } from "./devolucao";
 import { ANEXO_SEM_COMPROVANTE, STATUS_DESPESA, ehPendente, formatBRL, type DespesaRelatorio } from "./gastosRelatorio";
 
 export const STATUS_BADGE: Record<number, { rotulo: string; tom: string }> = {
@@ -64,9 +66,30 @@ function Comprovante({ anexo, indice }: { anexo: AnexoDespesa; indice: number })
   );
 }
 
-/** Detalhe de leitura de uma despesa, em painel de quase tela cheia. Fecha no X, no Esc e tocando fora. Nada é editável. */
-export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRelatorio; onClose: () => void }) {
-  const fecharRef = useDetalheDialog(onClose);
+type DialogProps = {
+  despesa: DespesaRelatorio;
+  onClose: () => void;
+  /** Id do motorista, usado ao anexar o comprovante novo de uma despesa devolvida. */
+  motoristaId?: string;
+  /** Devolvida reenviada: a lista troca o selo na hora, sem esperar a releitura. */
+  onDevolucaoEnviada?: (id: string, explicacao: string) => void;
+};
+
+/**
+ * Detalhe de uma despesa, em painel de quase tela cheia. Fecha no X, no Esc e tocando fora.
+ * Só a despesa devolvida (Precisa corrigir) tem ações: trocar o comprovante e/ou explicar. O valor nunca é editável.
+ */
+export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDevolucaoEnviada }: DialogProps) {
+  const guardaRef = useRef<GuardaDevolucao>(GUARDA_VAZIA);
+  const [confirmando, setConfirmando] = useState(false);
+  const [enviada, setEnviada] = useState(false);
+  // Durante o envio não fecha; com algo digitado ou escolhido pergunta antes de descartar.
+  const tentarFechar = useCallback(() => {
+    if (guardaRef.current.enviando) return;
+    if (guardaRef.current.sujo) { setConfirmando(true); return; }
+    onClose();
+  }, [onClose]);
+  const fecharRef = useDetalheDialog(tentarFechar);
   const [carga, setCarga] = useState<Estado<{ detalhe: DespesaDetalhe; anexos: AnexoDespesa[] }>>({ tipo: "carregando" });
   const [tentativa, setTentativa] = useState(0);
 
@@ -79,10 +102,13 @@ export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRel
     return () => { vivo = false; };
   }, [despesa.id, tentativa]);
 
-  const badge = STATUS_BADGE[despesa.status];
+  const estado = enviada ? "conferencia" : estadoDevolucao(despesa);
+  const comAcoes = estado === "acao";
+  const badge = estado ? SELO_DEVOLUCAO[estado] : STATUS_BADGE[despesa.status];
   const semComprovante = despesa.statusAnexo != null && ANEXO_SEM_COMPROVANTE.includes(despesa.statusAnexo);
   const detalhe = carga.tipo === "pronto" ? carga.valor.detalhe : null;
   const anexos = carga.tipo === "pronto" ? carga.valor.anexos : [];
+  const proximaOrdem = Math.max(0, ...anexos.map((anexo) => anexo.ordem)) + 1;
   const campos: [string, string][] = [
     ["Data do gasto", DATA_LONGA.format(new Date(`${despesa.data}T00:00:00Z`))],
     ["Categoria", despesa.categoria],
@@ -101,7 +127,7 @@ export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRel
   const visiveis = campos.filter(([, valor]) => valor);
 
   return createPortal(
-    <div className="gr-detalhe-overlay" role="dialog" aria-modal="true" aria-labelledby="gr-detalhe-titulo" onClick={onClose}>
+    <div className="gr-detalhe-overlay" role="dialog" aria-modal="true" aria-labelledby="gr-detalhe-titulo" onClick={tentarFechar}>
       <div className="gr-detalhe" onClick={(event) => event.stopPropagation()}>
         <header className="gr-detalhe-topo">
           <div className="gr-detalhe-titulos">
@@ -109,23 +135,38 @@ export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRel
             <strong className="gr-detalhe-valor">{formatBRL(despesa.valor)}</strong>
           </div>
           {badge ? <span className="termo-badge" data-tone={badge.tom}>{badge.rotulo}</span> : null}
-          <button ref={fecharRef} type="button" className="gr-detalhe-fechar" aria-label="Fechar" onClick={onClose}><SystemIcon name="dismiss" /></button>
+          <button ref={fecharRef} type="button" className="gr-detalhe-fechar" aria-label="Fechar" onClick={tentarFechar}><SystemIcon name="dismiss" /></button>
         </header>
         <div className="gr-detalhe-corpo">
-          {ehPendente(despesa) ? (
+          {estado === "acao" || estado === "gestor" ? <MotivoDevolucao despesa={despesa} /> : null}
+          {estado === "gestor" ? <p className="gr-detalhe-aviso" role="status">Seu gestor está olhando este gasto. Você não precisa fazer nada agora.</p> : null}
+          {estado === "conferencia" ? <p className="dv-sucesso" role="status">Enviado para nova conferência.</p> : null}
+          {estado === null && ehPendente(despesa) ? (
             <p className="gr-detalhe-aviso">
               {despesa.status === STATUS_DESPESA.recusado ? "Este gasto foi recusado." : "O financeiro pediu correção neste gasto."} Fale com o financeiro para resolver.
             </p>
           ) : null}
 
           <section aria-labelledby="gr-detalhe-comprovantes">
-            <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">Comprovante</h3>
+            <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">{estado === "acao" ? "Comprovante atual" : "Comprovante"}</h3>
             {carga.tipo === "carregando" ? <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" /> : null}
             {carga.tipo === "pronto" && anexos.length ? (
               <div className="gr-comprovantes">{anexos.map((anexo, i) => <Comprovante key={anexo.id} anexo={anexo} indice={i} />)}</div>
             ) : null}
             {carga.tipo === "pronto" && !anexos.length ? <p className="gr-legenda">{semComprovante ? "Gasto enviado sem comprovante." : "O comprovante ainda não está disponível."}</p> : null}
           </section>
+
+          {comAcoes ? (
+            <DevolucaoPainel
+              despesa={despesa}
+              nome={detalhe?.nome ?? ""}
+              ordem={proximaOrdem}
+              motoristaId={motoristaId}
+              guardaRef={guardaRef}
+              anexosProntos={carga.tipo === "pronto"}
+              onEnviada={(explicacao) => { setEnviada(true); onDevolucaoEnviada?.(despesa.id, explicacao); }}
+            />
+          ) : null}
 
           <section aria-labelledby="gr-detalhe-dados">
             <h3 className="gr-subtitulo" id="gr-detalhe-dados">Dados do gasto</h3>
@@ -143,6 +184,16 @@ export function DespesaDetalheDialog({ despesa, onClose }: { despesa: DespesaRel
             ) : null}
           </section>
         </div>
+        {confirmando ? (
+          <div className="dv-confirmar" role="alertdialog" aria-labelledby="dv-confirmar-titulo">
+            <strong id="dv-confirmar-titulo">Descartar alterações?</strong>
+            <p>A foto escolhida e o texto novo ficam de fora.</p>
+            <div className="dv-confirmar-acoes">
+              <button type="button" className="dv-acao" onClick={() => setConfirmando(false)}>Continuar editando</button>
+              <button type="button" className="dv-acao" onClick={() => { guardaRef.current.descartar(); onClose(); }}>Descartar</button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body

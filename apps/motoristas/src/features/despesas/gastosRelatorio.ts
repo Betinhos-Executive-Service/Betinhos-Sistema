@@ -34,6 +34,14 @@ export type DespesaRelatorio = {
   veiculoId: string;
   estabelecimento: string;
   conciliadaCartao: boolean;
+  /** Motivo escrito pelo gestor ou pela IA ao devolver (`new_motivodevolucao`). */
+  motivoDevolucao: string;
+  /** Motivos da análise da IA (`cr40f_iamotivos`); reserva quando `motivoDevolucao` vem vazio. */
+  iaMotivos: string;
+  /** Explicação do motorista (`new_justificativamotorista`). */
+  justificativa: string;
+  /** A dúvida do motorista foi para o gestor (`new_aguardandogestor`): sem ação do motorista. */
+  aguardandoGestor: boolean;
 };
 
 type Periodo = {
@@ -102,9 +110,14 @@ export const formatBRL = (valor: number) => BRL.format(valor);
 
 type Row = Record<string, unknown>;
 const numberOrNull = (value: unknown) => (value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value));
+const texto = (value: unknown) => (value == null ? "" : String(value).trim());
 const lookup = (value: unknown) => (value == null ? "" : cleanGuid(String(value)).toLowerCase());
 
-const DESPESA_SELECT = "$select=cr40f_despesaoperacionalid,cr40f_valor,cr40f_datagasto,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_veiculo_value,cr40f_statusoperacional,cr40f_statusanexo,cr40f_litros,cr40f_kminformado,cr40f_estabelecimento,cr40f_conciliadacartao";
+const DESPESA_COLUNAS = "cr40f_despesaoperacionalid,cr40f_valor,cr40f_datagasto,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_veiculo_value,cr40f_statusoperacional,cr40f_statusanexo,cr40f_litros,cr40f_kminformado,cr40f_estabelecimento,cr40f_conciliadacartao";
+/** Colunas da devolução (spec de 10/11/2026). Se o ambiente ainda não as tem, a consulta cai para `DESPESA_COLUNAS`. */
+const DESPESA_COLUNAS_DEVOLUCAO = "cr40f_iamotivos,new_motivodevolucao,new_justificativamotorista,new_aguardandogestor";
+
+const selectDespesas = (comDevolucao: boolean) => `$select=${DESPESA_COLUNAS}${comDevolucao ? `,${DESPESA_COLUNAS_DEVOLUCAO}` : ""}`;
 
 export function mapDespesaRelatorio(row: Row, nomesCategoria: Map<string, string>): DespesaRelatorio {
   const categoriaId = lookup(row._cr40f_categoria_value);
@@ -120,7 +133,11 @@ export function mapDespesaRelatorio(row: Row, nomesCategoria: Map<string, string
     km: numberOrNull(row.cr40f_kminformado),
     veiculoId: lookup(row._cr40f_veiculo_value),
     estabelecimento: row.cr40f_estabelecimento == null ? "" : String(row.cr40f_estabelecimento),
-    conciliadaCartao: row.cr40f_conciliadacartao === true
+    conciliadaCartao: row.cr40f_conciliadacartao === true,
+    motivoDevolucao: texto(row.new_motivodevolucao),
+    iaMotivos: texto(row.cr40f_iamotivos),
+    justificativa: texto(row.new_justificativamotorista),
+    aguardandoGestor: row.new_aguardandogestor === true
   };
 }
 
@@ -221,13 +238,13 @@ export function semaforo(valor: number, { meta, tolerancia }: { meta: number; to
   return milesimos(valor) <= milesimos(meta * (1 + tolerancia)) ? "amarelo" : "vermelho";
 }
 
-/** O que exige ação do motorista: precisa corrigir ou recusado. */
-export const ehPendente = (d: Pick<DespesaRelatorio, "status">) => d.status === STATUS_DESPESA.precisaCorrigir || d.status === STATUS_DESPESA.recusado;
+/** O que exige ação do motorista: precisa corrigir ou recusado. Com o gestor (`aguardandoGestor`) não há o que o motorista faça. */
+export const ehPendente = (d: Pick<DespesaRelatorio, "status" | "aguardandoGestor">) => !d.aguardandoGestor && (d.status === STATUS_DESPESA.precisaCorrigir || d.status === STATUS_DESPESA.recusado);
 
 type ContagemStatus = { enviado: number; validado: number; precisaCorrigir: number; recusado: number };
 
 function contarStatus(despesas: DespesaRelatorio[]): ContagemStatus {
-  const conta = (status: number) => despesas.filter((d) => d.status === status).length;
+  const conta = (status: number) => despesas.filter((d) => d.status === status && !d.aguardandoGestor).length;
   return { enviado: conta(STATUS_DESPESA.enviado), validado: conta(STATUS_DESPESA.validado), precisaCorrigir: conta(STATUS_DESPESA.precisaCorrigir), recusado: conta(STATUS_DESPESA.recusado) };
 }
 
@@ -267,7 +284,7 @@ export type RelatorioModelo = {
   status: ContagemStatus;
   semComprovante: number;
   tendencia: ReturnType<typeof tendenciaMensal>;
-  /** Todas as despesas do período, da mais recente para a mais antiga. */
+  /** Despesas do período, da mais recente para a mais antiga, com as devolvidas (que pedem ação) primeiro, mesmo de outro mês. */
   despesas: DespesaRelatorio[];
 };
 
@@ -275,7 +292,8 @@ export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: Periodo
   const periodo = periodoDe(periodoId, hoje);
   const doPeriodo = despesasDoPeriodo(despesas, periodo.inicio, periodo.fim);
   const cartoes = montarCartoes(calcularMedias(despesas, periodo.inicio, periodo.fim), calcularMedias(despesas, periodo.anteriorInicio, periodo.anteriorFim));
-  const status = contarStatus(doPeriodo);
+  const lista = ordenarComDevolvidasNoTopo(doPeriodo, despesas);
+  const status = contarStatus(lista);
   const semComprovante = contarSemComprovante(doPeriodo);
   return {
     periodo,
@@ -285,8 +303,18 @@ export function montarRelatorio(despesas: DespesaRelatorio[], periodoId: Periodo
     status,
     semComprovante,
     tendencia: tendenciaMensal(despesas, periodo, hoje),
-    despesas: [...doPeriodo].sort((a, b) => b.data.localeCompare(a.data))
+    despesas: lista
   };
+}
+
+/** Devolvida que pede ação do motorista: Precisa corrigir sem estar com o gestor. */
+export const ehDevolvidaParaAcao = (d: Pick<DespesaRelatorio, "status" | "aguardandoGestor">) => d.status === STATUS_DESPESA.precisaCorrigir && !d.aguardandoGestor;
+
+/** Devolvidas primeiro (de qualquer mês da janela carregada, para não ficarem escondidas), depois o resto por data desc. */
+function ordenarComDevolvidasNoTopo(doPeriodo: DespesaRelatorio[], todas: DespesaRelatorio[]) {
+  const ids = new Set(doPeriodo.map((d) => d.id));
+  const foraDoPeriodo = todas.filter((d) => ehDevolvidaParaAcao(d) && !ids.has(d.id));
+  return [...doPeriodo, ...foraDoPeriodo].sort((a, b) => Number(ehDevolvidaParaAcao(b)) - Number(ehDevolvidaParaAcao(a)) || b.data.localeCompare(a.data));
 }
 
 // ---------------- Loader e mock ----------------
@@ -338,11 +366,21 @@ const MOCK_CARTAO: [string, string, number, string, string][] = [
   ["a3333333-3333-4333-8333-333333333333", "Outros", 132.4, "2026-11-03", "Restaurante Fogo de Chão"]
 ];
 
+/** Devolução nos itens do mock, por posição em `MOCK_ITENS`: devolvida, com o gestor e em nova conferência. */
+const MOCK_DEVOLUCAO: Partial<Record<number, Pick<DespesaRelatorio, "motivoDevolucao" | "justificativa" | "aguardandoGestor">>> = {
+  5: { motivoDevolucao: "O valor do cupom não bate com o valor lançado.", justificativa: "O posto emitiu o cupom com o valor errado e corrigiu à mão.", aguardandoGestor: false },
+  8: { motivoDevolucao: "O comprovante está cortado e não dá para ler o total. Troque a foto ou explique o que aconteceu.", justificativa: "", aguardandoGestor: false },
+  13: { motivoDevolucao: "A data do cupom é diferente da data do gasto.", justificativa: "O cupom foi emitido na saída do estacionamento, no dia seguinte.", aguardandoGestor: true }
+};
+
+const devolucaoMock = (indice: number) => ({ motivoDevolucao: "", justificativa: "", aguardandoGestor: false, ...MOCK_DEVOLUCAO[indice] });
+
 export function despesasMock(hoje: string): DespesaRelatorio[] {
   const nomes = new Map(DEFAULT_EXPENSE_REFERENCE_DATA.categories.map((c) => [norm(c.name), c.name]));
   const doCartao: DespesaRelatorio[] = MOCK_CARTAO.filter(([, , , data]) => data <= hoje).map(([id, categoria, valor, data, estabelecimento]) => ({
     id, valor, data, categoria: nomes.get(norm(categoria)) ?? categoria, formaPagamentoId: "local-cartao-credito", status: STATUS_DESPESA.precisaCorrigir,
-    statusAnexo: 100000000, litros: null, km: null, veiculoId: "", estabelecimento, conciliadaCartao: true
+    statusAnexo: 100000000, litros: null, km: null, veiculoId: "", estabelecimento, conciliadaCartao: true,
+    motivoDevolucao: "", iaMotivos: "", justificativa: "", aguardandoGestor: false
   }));
   return [...doCartao, ...MOCK_ITENS.map(([mes, posicao, categoria, valor, status, anexo, litros, km, estabelecimento, cartao], i) => {
     const inicio = inicioDoMes(hoje, mes);
@@ -351,7 +389,8 @@ export function despesasMock(hoje: string): DespesaRelatorio[] {
     return {
       id: `mock-despesa-${i + 1}`, valor, data: `${inicio.slice(0, 8)}${pad(dia)}`, categoria: nomes.get(norm(categoria)) ?? categoria,
       formaPagamentoId: cartao ? "local-cartao-credito" : "local-particular-reembolso", status, statusAnexo: anexo,
-      litros: litros ?? null, km: km ?? null, veiculoId: litros ? MOCK_VEICULO : "", estabelecimento: estabelecimento ?? "", conciliadaCartao: Boolean(cartao)
+      litros: litros ?? null, km: km ?? null, veiculoId: litros ? MOCK_VEICULO : "", estabelecimento: estabelecimento ?? "", conciliadaCartao: Boolean(cartao),
+      iaMotivos: "", ...devolucaoMock(i)
     };
   })];
 }
@@ -368,9 +407,11 @@ export async function carregarDespesasRelatorio(motoristaId: string, hoje = hoje
     return despesasMock(hoje);
   }
   const filtro = filtroDespesasRelatorio(motoristaId, hoje);
+  const consultar = (comDevolucao: boolean) => retrieveMultipleAll(DATAVERSE.despesasOperacionais, `${selectDespesas(comDevolucao)}&$filter=${filtro}&$orderby=cr40f_datagasto desc`);
+  // Ambiente sem as colunas da devolução (ainda não publicadas): o relatório segue sem elas em vez de quebrar.
   const [referencia, resultado] = await Promise.all([
     loadExpenseReferenceDataRemote(),
-    retrieveMultipleAll(DATAVERSE.despesasOperacionais, `${DESPESA_SELECT}&$filter=${filtro}&$orderby=cr40f_datagasto desc`)
+    consultar(true).catch(() => consultar(false))
   ]);
   const nomes = new Map(referencia.categories.map((c) => [cleanGuid(c.id).toLowerCase(), c.name]));
   return resultado.entities.map((row) => mapDespesaRelatorio(row, nomes));
