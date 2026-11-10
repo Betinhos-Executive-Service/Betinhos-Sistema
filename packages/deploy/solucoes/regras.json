@@ -40,7 +40,7 @@
     "mcpserver": "BetinhosMotoristas"
   },
   "excecoes": [
-    { "tipo": "61", "nomes": ["new_app-motoristas-v2", "new_comunicadodestinatario_redirect.js"], "solucao": "BetinhosMotoristas" },
+    { "tipo": "61", "nomes": ["new_app-motoristas-v2", "new_app-motoristas-v2-sw", "new_comunicadodestinatario_redirect.js"], "solucao": "BetinhosMotoristas" },
     { "tipo": "61", "nomes": ["new_troca_operacional_commands", "new_model_driven_formulario_geral_command.js"], "solucao": "BetinhosCore" },
     { "tipo": "61", "nomes": ["new_moneyreceivesvgrepocom", "new_judgesvgrepocom", "cr40f_megaphonesvgrepocom"], "solucao": "BetinhosCore" },
     { "tipo": "61", "nomes": ["new_appmotoristas_push_redirect.js"], "solucao": "BetinhosCore" },
