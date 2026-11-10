@@ -2,6 +2,8 @@
 
 ## Ambiente cloud (sessões cloud do Claude Code)
 
+- Desde a migração para o monorepo, a sessão cloud abre na raiz do Betinhos-Sistema e usa o preparo dele (`pnpm install` do workspace). O hook e o `scripts/cloud-setup.sh` abaixo são do repositório antigo e não rodam aqui; nos comandos, troque `npm` por `pnpm` dentro de `apps/motoristas`.
+
 - Sessão cloud usa o ambiente "Padrão" de claude.ai/code, com setup script vazio. O preparo da VM roda no hook SessionStart do repo (`.claude/hooks/session-start.sh`, registrado em `.claude/settings.json`), só quando `CLAUDE_CODE_REMOTE=true`: executa `scripts/cloud-setup.sh` (Node 24, `npm ci` pelo `package-lock.json`, Chromium, `tsc` estrito e `npm test`), grava o PATH do Node no `$CLAUDE_ENV_FILE` e põe no contexto a última linha (`[cloud-setup] Pronto. ...` ou `[cloud-setup] FALHOU ...`). Log completo em `/tmp/cloud-setup.log`. Exige a variável `NODE_AUTH_TOKEN` no ambiente cloud (token GitHub com `read:packages`, o mesmo do Sistema Betinhos), porque o logger de erros vem de `@betinhos-executive-service/ui` no GitHub Packages; o `.npmrc` do repo lê essa variável. Sem ela o setup para com `ERRO: defina NODE_AUTH_TOKEN`. Nada de credenciais do Dataverse.
 - Se a sessão abrir com `FALHOU`, leia `/tmp/cloud-setup.log`, corrija e rode `bash scripts/cloud-setup.sh` antes de codar.
 - Chromium já vem na imagem em `$PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` (build 1194) e o CDN do Playwright é bloqueado: para screenshot na VM use `npx playwright@1.56.1` (casa com esse build) e não baixe outro navegador.

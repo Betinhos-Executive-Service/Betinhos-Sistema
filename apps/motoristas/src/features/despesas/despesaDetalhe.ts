@@ -13,6 +13,8 @@ const texto = (valor: unknown) => (valor == null ? "" : String(valor).trim());
 const formatado = (row: Row, campo: string) => texto(row[`${campo}${FV}`]);
 
 export type DespesaDetalhe = {
+  /** `cr40f_nome`: dá nome à pasta do comprovante novo. */
+  nome: string;
   formaPagamento: string;
   cidade: string;
   veiculo: string;
@@ -24,13 +26,14 @@ export type DespesaDetalhe = {
   criadoEm: string;
 };
 
-export type AnexoDespesa = { id: string; nome: string; driveItemId: string; url: string };
+export type AnexoDespesa = { id: string; nome: string; driveItemId: string; url: string; ordem: number };
 
-const DETALHE_SELECT = "$select=cr40f_despesaoperacionalid,_cr40f_formapagamento_value,_cr40f_cidade_value,_cr40f_veiculo_value,_cr40f_reserva_value,cr40f_observacao,cr40f_statusfinanceiro,cr40f_origem,createdon";
+const DETALHE_SELECT = "$select=cr40f_despesaoperacionalid,cr40f_nome,_cr40f_formapagamento_value,_cr40f_cidade_value,_cr40f_veiculo_value,_cr40f_reserva_value,cr40f_observacao,cr40f_statusfinanceiro,cr40f_origem,createdon";
 const ANEXO_SELECT = "$select=cr40f_anexodespesaoperacionalid,cr40f_nome,cr40f_nomearquivo,cr40f_sharelink,cr40f_urlsharepoint,cr40f_driveitemid,cr40f_ordem";
 
 export function mapDespesaDetalhe(row: Row): DespesaDetalhe {
   return {
+    nome: texto(row.cr40f_nome),
     formaPagamento: formatado(row, "_cr40f_formapagamento_value"),
     cidade: formatado(row, "_cr40f_cidade_value"),
     veiculo: formatado(row, "_cr40f_veiculo_value"),
@@ -51,7 +54,8 @@ export function mapAnexos(rows: Row[]): AnexoDespesa[] {
       id: cleanGuid(texto(row.cr40f_anexodespesaoperacionalid)).toLowerCase(),
       nome: texto(row.cr40f_nomearquivo) || texto(row.cr40f_nome) || "comprovante",
       driveItemId: texto(row.cr40f_driveitemid),
-      url: httpUrl(row.cr40f_sharelink) || httpUrl(row.cr40f_urlsharepoint)
+      url: httpUrl(row.cr40f_sharelink) || httpUrl(row.cr40f_urlsharepoint),
+      ordem: Number(row.cr40f_ordem) || 0
     }))
     .filter((anexo) => anexo.driveItemId || anexo.url);
 }
@@ -79,8 +83,8 @@ export async function carregarDetalheDespesa(id: string): Promise<{ detalhe: Des
   if (isMockGastosCartao()) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     return {
-      detalhe: { formaPagamento: "Cartão corporativo", cidade: "São Paulo", veiculo: "TST1A11 · Corolla", reserva: "", observacao: "Comprovante do posto na Marginal.", statusFinanceiro: "Pendente", origem: "App Motoristas", criadoEm: "2026-11-05T13:20:00Z" },
-      anexos: [{ id: `${id}-a1`, nome: "comprovante.jpg", driveItemId: "mock", url: "" }]
+      detalhe: { nome: "Despesa mock", formaPagamento: "Cartão corporativo", cidade: "São Paulo", veiculo: "TST1A11 · Corolla", reserva: "", observacao: "Comprovante do posto na Marginal.", statusFinanceiro: "Pendente", origem: "App Motoristas", criadoEm: "2026-11-05T13:20:00Z" },
+      anexos: [{ id: `${id}-a1`, nome: "comprovante.jpg", driveItemId: "mock", url: "", ordem: 1 }]
     };
   }
   const limpo = cleanGuid(id);
