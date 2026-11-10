@@ -17,6 +17,9 @@ import {
   parseStrokes,
   validateSignature
 } from "./comunicados";
+import { montarEvidencia } from "./evidencia";
+
+const LGPD_AVISO = "Ao confirmar, registramos data, hora, aparelho, endereço de internet e localização (se você permitir) como comprovante desta ciência.";
 
 export type ComunicadosLoadStatus = "loading" | "ready" | "error";
 
@@ -56,7 +59,8 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
   useEffect(() => {
     if (!selected || selected.tipo !== COMUNICADO_TIPO.ciencia || selected.abertoEm) return;
     let active = true;
-    abrirComunicado(selected.id)
+    montarEvidencia()
+      .then((evidencia) => abrirComunicado(selected.id, evidencia))
       .then(async () => {
         if (!active) return;
         try { await onReload(); }
@@ -80,7 +84,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
     setError("");
     let recorded = false;
     try {
-      await abrirComunicado(selected.id);
+      await abrirComunicado(selected.id, await montarEvidencia());
       recorded = true;
       setBusy(false);
       setPhase("success");
@@ -116,7 +120,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
     setError("");
     let signed = false;
     try {
-      await assinarComunicado(selected.id, strokes, observacao);
+      await assinarComunicado(selected.id, strokes, observacao, await montarEvidencia());
       signed = true;
       setBusy(false);
       setPhase("success");
@@ -179,7 +183,8 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
                   <SignaturePad value={strokes} onChange={(next) => { setStrokes(next); if (signatureError) setSignatureError(""); }} />
                   {signatureError ? <p className="comunicado-error" role="alert">{signatureError}</p> : null}
                 </div>
-                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Salvando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void sign()} />
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Registrando…" successLabel="Ciência registrada" state={buttonState} onClick={() => void sign()} />
+                <p className="comunicado-lgpd">{LGPD_AVISO}</p>
               </section>
             ) : selected.cienteEm ? (
               <section className={`comunicado-signed${justSigned ? " is-fresh" : ""}`}>
@@ -194,7 +199,8 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
             ) : selected.lidoEm ? <p className="comunicado-read-state">Ciência registrada em {formatDate(selected.lidoEm)}.</p> : (
               <section className="comunicado-ack comunicado-ack-simple" aria-label="Confirmar ciência">
                 <p>Ao continuar, sua ciência deste informativo será registrada.</p>
-                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Seguinte" loadingLabel="Registrando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void acknowledge()} />
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Seguinte" loadingLabel="Registrando…" successLabel="Ciência registrada" state={buttonState} onClick={() => void acknowledge()} />
+                <p className="comunicado-lgpd">{LGPD_AVISO}</p>
               </section>
             )}
           </article>

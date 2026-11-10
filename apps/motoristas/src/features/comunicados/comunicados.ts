@@ -415,17 +415,20 @@ export async function executeComunicadoAction(operationName: string, parameters:
   await executeCustomApi(operationName, parameters);
 }
 
-export const abrirComunicado = (id: string) => executeComunicadoAction("new_AbrirComunicadoMotorista", { new_DestinatarioId: cleanGuid(id) });
-export const assinarComunicado = (id: string, strokes: SignatureStrokes, observacao: string) => {
+// evidenciaJson (montarEvidencia) é opcional: vazio não envia o parâmetro, como no App antigo.
+const withEvidencia = (parameters: Record<string, string>, evidenciaJson: string) => (evidenciaJson ? { ...parameters, new_EvidenciaJson: evidenciaJson } : parameters);
+
+export const abrirComunicado = (id: string, evidenciaJson = "") => executeComunicadoAction("new_AbrirComunicadoMotorista", withEvidencia({ new_DestinatarioId: cleanGuid(id) }, evidenciaJson));
+export const assinarComunicado = (id: string, strokes: SignatureStrokes, observacao: string, evidenciaJson = "") => {
   if (!validateSignature(strokes)) throw new Error("Desenhe sua assinatura antes de confirmar.");
   if (observacao.length > 1000) throw new Error("A observação deve ter até 1.000 caracteres.");
   const assinaturaJson = JSON.stringify(strokes);
   if (assinaturaJson.length > 100000) throw new Error("A assinatura ficou grande demais. Limpe e assine novamente.");
-  return executeComunicadoAction("new_RegistrarCienciaComunicado", {
+  return executeComunicadoAction("new_RegistrarCienciaComunicado", withEvidencia({
     new_DestinatarioId: cleanGuid(id),
     new_AssinaturaJson: assinaturaJson,
     new_Observacao: observacao.trim()
-  });
+  }, evidenciaJson));
 };
 
 export const dispararComunicado = (id: string) => executeComunicadoAction("new_DispararComunicadoMotorista", { new_ComunicadoId: cleanGuid(id) });
