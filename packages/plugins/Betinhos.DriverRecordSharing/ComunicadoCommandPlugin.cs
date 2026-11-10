@@ -27,14 +27,25 @@ namespace Betinhos.DriverRecordSharing
         private static readonly TimeSpan CarimboJanela = TimeSpan.FromMinutes(5);
         private static readonly string[] GeoStatus = { "ok", "negada", "indisponivel", "tempo-esgotado" };
 
-        // IP_STAMP_SECRET (configuração segura do step). Vazio: nenhum IP é verificado.
-        private readonly string ipStampSecret;
+        // Segredo do carimbo do IP (IP_STAMP_SECRET do Worker web-push): tabela cr40f_segredo primeiro; a configuração segura
+        // do step fica como fallback. Sem nenhum dos dois, nenhum IP é verificado.
+        public const string IpStampSecretName = "comunicados.ip-stamp";
+        private readonly string secureConfigIpStampSecret;
 
         public ComunicadoCommandPlugin() : this(null, null) { }
 
         public ComunicadoCommandPlugin(string unsecureConfig, string secureConfig)
         {
-            ipStampSecret = (secureConfig ?? "").Trim();
+            secureConfigIpStampSecret = (secureConfig ?? "").Trim();
+        }
+
+        // Evidência normalizada; o segredo só é lido quando o App mandou evidência.
+        private string Evidence(IPluginExecutionContext context, IOrganizationService system)
+        {
+            var raw = InputString(context, "new_EvidenciaJson");
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var secret = SecretReader.ReadTable(system, IpStampSecretName) ?? secureConfigIpStampSecret;
+            return BuildEvidence(raw, secret, DateTime.UtcNow);
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -142,7 +153,7 @@ namespace Betinhos.DriverRecordSharing
             // A evidência é a da primeira abertura (ou leitura): só entra junto com a marca de tempo e só se a coluna está vazia.
             if (!recipient.Contains("new_abertoem") && string.IsNullOrEmpty(recipient.GetAttributeValue<string>("new_evidenciaaberturajson")))
             {
-                var evidence = BuildEvidence(InputString(context, "new_EvidenciaJson"), ipStampSecret, DateTime.UtcNow);
+                var evidence = Evidence(context, system);
                 if (evidence != null) update["new_evidenciaaberturajson"] = evidence;
             }
             if (update.Attributes.Count > 0) system.Update(update);
@@ -170,7 +181,7 @@ namespace Betinhos.DriverRecordSharing
             update["new_nomeassinante"] = employee.GetAttributeValue<string>("cr40f_nomecompleto") ?? "";
             update["new_observacao"] = observation;
             update["new_assinaturajson"] = signature;
-            var evidence = BuildEvidence(InputString(context, "new_EvidenciaJson"), ipStampSecret, DateTime.UtcNow);
+            var evidence = Evidence(context, system);
             if (evidence != null) update["new_evidenciacienciajson"] = evidence;
             system.Update(update);
         }

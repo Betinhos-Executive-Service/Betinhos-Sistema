@@ -31,6 +31,7 @@ Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secre
 | `anthropic.observacao-motorista` | `new_AnthropicKeyObservacaoMotorista` | `Betinhos.DriverRecordSharing` (`OrganizeObservationPlugin`, via `SecretReader`) |
 | `cielo.client-secret` | `cr40f_GerarPagantesCieloClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
 | `graph.gerar-pagantes.client-secret` | `cr40f_GerarPagantesGraphClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
+| `comunicados.ip-stamp` | — (configuração segura do step, fallback) | `Betinhos.DriverRecordSharing` (`ComunicadoCommandPlugin`); mesmo valor do secret `IP_STAMP_SECRET` do Worker `app-motoristas-web-push`, que atende DEV e PROD |
 
 Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta tabela e leitura pela tabela no consumidor. As chaves Anthropic dos flows migram no PR seguinte (flows).
 

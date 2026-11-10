@@ -297,6 +297,47 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.False(service.Recipient.Contains("new_evidenciaaberturajson"));
         }
 
+        [Theory]
+        [InlineData("segredo-de-teste", "", true)]           // só a tabela
+        [InlineData("segredo-de-teste", "outro-segredo", true)] // a tabela vence a configuração segura
+        [InlineData(null, "segredo-de-teste", true)]         // sem linha na tabela: configuração segura
+        [InlineData("", "segredo-de-teste", true)]           // linha vazia: configuração segura
+        [InlineData(null, "", false)]                         // nenhum dos dois: IP não verificado
+        public void SegredoDoCarimboVemDaTabelaDepoisDaConfiguracaoSegura(string tableValue, string secureConfig, bool verified)
+        {
+            var service = DriverService(Ciencia);
+            if (tableValue != null) service.Secrets[ComunicadoCommandPlugin.IpStampSecretName] = tableValue;
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            context.InputParameters["new_EvidenciaJson"] = Evidence();
+
+            InvokeWith(secureConfig, "Open", context, service);
+
+            Assert.Equal(verified, Parse(service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson"))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void TabelaIlegivelUsaConfiguracaoSegura()
+        {
+            var service = DriverService(Ciencia);
+            service.SecretsThrow = true;
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            context.InputParameters["new_EvidenciaJson"] = Evidence();
+
+            InvokeWith(Secret, "Open", context, service);
+
+            Assert.Equal(true, Parse(service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson"))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void SemEvidenciaNaoConsultaOSegredo()
+        {
+            var service = DriverService(Informativo);
+
+            Invoke("Open", Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id), service);
+
+            Assert.Equal(0, service.SecretQueries);
+        }
+
         [Fact]
         public void AbrirGravaEvidenciaSoNaPrimeiraVez()
         {
@@ -586,9 +627,22 @@ namespace Betinhos.DriverRecordSharing.Tests
                 if (entityName == "cr40f_funcionarios") return Drivers.Single(driver => driver.Id == id);
                 throw new InvalidOperationException("Registro inesperado: " + entityName);
             }
+            public readonly Dictionary<string, string> Secrets = new Dictionary<string, string>();
+            public bool SecretsThrow;
+            public int SecretQueries;
+
             public EntityCollection RetrieveMultiple(QueryBase query)
             {
                 var expression = (QueryExpression)query;
+                if (expression.EntityName == SecretReader.Table)
+                {
+                    SecretQueries++;
+                    if (SecretsThrow) throw new InvalidOperationException("tabela ausente");
+                    var name = Convert.ToString(expression.Criteria.Conditions.Single(condition => condition.AttributeName == SecretReader.NameColumn).Values[0]);
+                    return new EntityCollection(Secrets.TryGetValue(name, out var value)
+                        ? new List<Entity> { new Entity(SecretReader.Table) { [SecretReader.ValueColumn] = value } }
+                        : new List<Entity>());
+                }
                 IEnumerable<Entity> records;
                 if (expression.EntityName == "cr40f_funcionarios") records = Drivers;
                 else if (expression.EntityName == "systemuser") records = Users;
