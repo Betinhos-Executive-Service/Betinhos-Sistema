@@ -37,6 +37,8 @@ export const NEUTRO = [
   /^scripts\//,
   /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
+  // App Motoristas: migrando do repositório app-motoristas-v2, que ainda publica o app no DEV e no PROD (fases 2 e 3).
+  /^apps\/motoristas\//,
   /^apps\/gerar-pagantes\/.+\.test\.[^/]+$/,
   // Formulário Geral: o que vai ao WebResource muda o PROD (soluções); teste, fixture, documentação e a pasta docs/ não.
   /^apps\/formulario-geral\/(docs\/.+|.+\.(test|fixtures)\.[^/]+|.+\.md)$/,

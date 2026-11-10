@@ -1,0 +1,226 @@
+import { useEffect, useState } from "react";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ActionButton } from "../../shared/ui/ActionButton";
+import { TextAreaControl } from "../../shared/ui/FormFields";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
+import { SignatureDrawing, SignaturePad } from "../../shared/ui/SignaturePad";
+import { ComunicadoAgendaCard } from "./ComunicadoAgendaCard";
+import {
+  abrirComunicado,
+  assinarComunicado,
+  COMUNICADO_TIPO,
+  isComunicadoPending,
+  isMockComunicados,
+  type ComunicadoDestinatario,
+  type SignatureStrokes,
+  parseStrokes,
+  validateSignature
+} from "./comunicados";
+
+export type ComunicadosLoadStatus = "loading" | "ready" | "error";
+
+type Props = {
+  items: ComunicadoDestinatario[];
+  loadStatus?: ComunicadosLoadStatus;
+  selectedId: string;
+  onSelectedIdChange: (id: string) => void;
+  onBack: () => void;
+  /** Quando definido, o Voltar no detalhe chama isto em vez de voltar para a lista. */
+  onCloseDetail?: () => void;
+  onReload: () => Promise<void>;
+  driverName: string;
+};
+
+function formatDate(value: string | null) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(value));
+}
+
+export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload, driverName }: Props) {
+  const [strokes, setStrokes] = useState<SignatureStrokes>([]);
+  const [observacao, setObservacao] = useState("");
+  const [busy, setBusy] = useState(false);
+  // "success" segura o botão em estado de sucesso antes de trocar a tela, para o motorista ver a confirmação.
+  const [phase, setPhase] = useState<"idle" | "success">("idle");
+  const [justSigned, setJustSigned] = useState(false);
+  const locked = busy || phase === "success";
+  const buttonState = busy ? "loading" : phase === "success" ? "success" : "idle";
+  const [error, setError] = useState("");
+  // Falta de assinatura aparece junto do campo e do botão, não no topo da tela.
+  const [signatureError, setSignatureError] = useState("");
+  const selected = items.find((item) => item.id === selectedId);
+  const pending = items.filter(isComunicadoPending);
+  const completed = items.filter((item) => !isComunicadoPending(item));
+
+  useEffect(() => {
+    if (!selected || selected.tipo !== COMUNICADO_TIPO.ciencia || selected.abertoEm) return;
+    let active = true;
+    abrirComunicado(selected.id)
+      .then(async () => {
+        if (!active) return;
+        try { await onReload(); }
+        catch (cause) {
+          reportAppError(cause, { source: "comunicados", action: "abrirComunicado", phase: "reload-after-open", screen: "Comunicados", detailId: selected.id, detailType: "COMUNICADO", notifyUser: false });
+          if (active) setError("Visualização registrada, mas não foi possível atualizar a lista. Tente novamente.");
+        }
+      })
+      .catch((cause) => {
+        reportAppError(cause, { source: "comunicados", action: "abrirComunicado", phase: "execute", screen: "Comunicados", detailId: selected.id, detailType: "COMUNICADO", notifyUser: false });
+        if (active) setError("Não foi possível registrar a visualização. Tente atualizar.");
+      });
+    return () => { active = false; };
+  }, [selected?.id, selected?.tipo, selected?.abertoEm]);
+
+  const holdSuccess = () => new Promise((resolve) => window.setTimeout(resolve, 700));
+
+  const acknowledge = async () => {
+    if (!selected || selected.tipo !== COMUNICADO_TIPO.informativo || locked) return;
+    setBusy(true);
+    setError("");
+    let recorded = false;
+    try {
+      await abrirComunicado(selected.id);
+      recorded = true;
+      setBusy(false);
+      setPhase("success");
+      await holdSuccess();
+      await onReload();
+      onSelectedIdChange("");
+    } catch (cause) {
+      reportAppError(cause, { source: "comunicados", action: "acknowledge", phase: recorded ? "reload-after-acknowledge" : "execute", screen: "Comunicados", detailId: selected.id, detailType: "COMUNICADO", payload: { recorded }, notifyUser: false });
+      setError(recorded ? "Ciência registrada, mas não foi possível atualizar a lista. Tente atualizar." : cause instanceof Error ? cause.message : "Não foi possível registrar a ciência. Tente novamente.");
+    } finally {
+      setBusy(false);
+      setPhase("idle");
+    }
+  };
+
+  const openItem = (id: string) => {
+    setStrokes([]);
+    setObservacao("");
+    setError("");
+    setPhase("idle");
+    setJustSigned(false);
+    onSelectedIdChange(id);
+  };
+
+  const sign = async () => {
+    if (!selected || locked) return;
+    if (!validateSignature(strokes)) {
+      setSignatureError("Desenhe sua assinatura antes de confirmar.");
+      return;
+    }
+    setSignatureError("");
+    setBusy(true);
+    setError("");
+    let signed = false;
+    try {
+      await assinarComunicado(selected.id, strokes, observacao);
+      signed = true;
+      setBusy(false);
+      setPhase("success");
+      await holdSuccess();
+      setJustSigned(true);
+      await onReload();
+    } catch (cause) {
+      reportAppError(cause, { source: "comunicados", action: "assinarComunicado", phase: signed ? "reload-after-sign" : "execute-or-validation", screen: "Comunicados", detailId: selected.id, detailType: "COMUNICADO", payload: { signed, strokeCount: strokes.length, observationLength: observacao.length }, notifyUser: false });
+      setError(signed ? "Ciência registrada, mas não foi possível atualizar a lista. Tente novamente." : cause instanceof Error ? cause.message : "Não foi possível salvar a ciência.");
+    } finally {
+      setBusy(false);
+      setPhase("idle");
+    }
+  };
+
+  const refresh = async () => {
+    setError("");
+    try { await onReload(); }
+    catch (cause) {
+      reportAppError(cause, { source: "comunicados", action: "refresh", phase: "reload", screen: "Comunicados", detailId: selectedId, detailType: "COMUNICADO", notifyUser: false });
+      setError("Não foi possível atualizar os comunicados. Tente novamente.");
+    }
+  };
+
+  return (
+    <AppShell screenLabel="Comunicados">
+      <ServicesMenu
+        title="Comunicados"
+        eyebrow={isMockComunicados() ? "Operação · Mock local" : "Operação"}
+        homeLabel="Voltar"
+        homeIcon="arrowLeft"
+        onHome={selected ? (onCloseDetail ?? (() => openItem(""))) : onBack}
+        onRefresh={refresh}
+      />
+      <section className="comunicado-screen" aria-label={selected ? "Detalhes do comunicado" : "Lista de comunicados"}>
+        {error ? <p className="comunicado-error comunicado-page-error" role="alert">{error}</p> : null}
+
+        {selected ? (
+          <article className="comunicado-detail">
+            <div className="comunicado-message">
+              <div className="comunicado-detail-meta" data-comunicado-tipo={selected.tipo === COMUNICADO_TIPO.ciencia ? "assinatura" : "informativo"}>
+                <span>{selected.tipo === COMUNICADO_TIPO.ciencia ? "Assinatura obrigatória" : "Informativo"}</span>
+                <time>{formatDate(selected.enviadoEm)}</time>
+              </div>
+              <h2 className="comunicado-detail-title">{selected.titulo}</h2>
+              <p className="comunicado-body">{selected.corpo}</p>
+            </div>
+            {selected.tipo === COMUNICADO_TIPO.ciencia && !selected.cienteEm ? (
+              <section className="comunicado-ack" aria-label="Registro de ciência" aria-busy={locked} data-locked={locked || undefined}>
+                <div className="comunicado-ack-intro">
+                  <h2>Registrar ciência</h2>
+                  <p>A assinatura será registrada em seu nome: <strong>{driverName}</strong>.</p>
+                </div>
+                <div className="comunicado-field">
+                  <label htmlFor="comunicado-observacao">Observação <span>(opcional)</span></label>
+                  <TextAreaControl id="comunicado-observacao" disabled={locked} value={observacao} maxLength={1000} onChange={(event) => setObservacao(event.target.value)} placeholder="Escreva aqui se precisar acrescentar algo." />
+                </div>
+                <div className="comunicado-field comunicado-field-signature">
+                  <label>Assine abaixo</label>
+                  <SignaturePad value={strokes} onChange={(next) => { setStrokes(next); if (signatureError) setSignatureError(""); }} />
+                  {signatureError ? <p className="comunicado-error" role="alert">{signatureError}</p> : null}
+                </div>
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Assinar ciência" loadingLabel="Salvando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void sign()} />
+              </section>
+            ) : selected.cienteEm ? (
+              <section className={`comunicado-signed${justSigned ? " is-fresh" : ""}`}>
+                <h2><span className="comunicado-signed-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>Ciência registrada</h2>
+                <dl className="comunicado-signed-meta">
+                  <div><dt>Assinado por</dt><dd>{selected.nomeAssinante}</dd></div>
+                  <div><dt>Data</dt><dd>{formatDate(selected.cienteEm)}</dd></div>
+                </dl>
+                <SignatureDrawing value={parseStrokes(selected.assinaturaJson)} />
+                {selected.observacao ? <div className="comunicado-signed-note"><span>Observação</span><p>{selected.observacao}</p></div> : null}
+              </section>
+            ) : selected.lidoEm ? <p className="comunicado-read-state">Ciência registrada em {formatDate(selected.lidoEm)}.</p> : (
+              <section className="comunicado-ack comunicado-ack-simple" aria-label="Confirmar ciência">
+                <p>Ao continuar, sua ciência deste informativo será registrada.</p>
+                <ActionButton className="comunicado-primary" variant="primary" idleLabel="Seguinte" loadingLabel="Registrando ciência" successLabel="Ciência registrada" state={buttonState} onClick={() => void acknowledge()} />
+              </section>
+            )}
+          </article>
+        ) : (
+          <div className="comunicado-list services-panel">
+            {loadStatus === "loading" && !items.length ? (
+              <div className="comunicado-skeleton" role="status" aria-busy="true" aria-label="Carregando comunicados">
+                <span /><span /><span />
+              </div>
+            ) : loadStatus === "error" && !items.length ? (
+              <div className="comunicado-load-error" role="alert">
+                <p>Não foi possível carregar os comunicados. Verifique a conexão e tente novamente.</p>
+                <ActionButton variant="secondary" idleLabel="Tentar novamente" loadingLabel="Carregando" state={busy ? "loading" : "idle"} onClick={() => { setBusy(true); void refresh().finally(() => setBusy(false)); }} />
+              </div>
+            ) : <>
+            <h2>Aguardando sua ciência <span>{pending.length}</span></h2>
+            {pending.length ? pending.map((item) => (
+              <ComunicadoAgendaCard key={item.id} item={item} onOpen={openItem} />
+            )) : <p className="comunicado-empty">Tudo em dia. Nenhum comunicado aguardando sua ciência.</p>}
+            </>}
+            {completed.length ? <><h2>Já cientes</h2>{completed.map((item) => (
+              <ComunicadoAgendaCard key={item.id} item={item} onOpen={openItem} />
+            ))}</> : null}
+          </div>
+        )}
+      </section>
+    </AppShell>
+  );
+}

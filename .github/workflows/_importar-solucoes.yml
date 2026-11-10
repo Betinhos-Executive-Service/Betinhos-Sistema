@@ -1,6 +1,8 @@
 name: Importar soluções (reutilizável)
 
-# Importa no TEST ou no PROD os pacotes que o job "exportar" do publicar.yml deixou no artefato "pacotes" (mesma execução):
+# Importa no TEST ou no PROD os pacotes que o job "exportar" do publicar.yml deixou no artefato "pacotes" (mesma execução,
+# cifrado com o secret PACOTES_SENHA e decifrado aqui). Os backups das camadas Active e das Custom APIs (JSON com o conteúdo
+# de WebResource, flow e step) sobem cifrados no artefato backups-<alvo>; fotos-<alvo> fica em claro (só hashes e nomes):
 # foto antes, backup (só PROD), exclusão das Custom APIs cr40f_AI*V2 não gerenciadas (legado que trava o upgrade), import com
 # upgrade, remoção das camadas Active (hotfixes e telas publicadas direto no ambiente; a main já contém todos), estados
 # ligado/desligado devolvidos ao que a foto registrou, foto depois e comparação. Qualquer perda reprova.
@@ -61,7 +63,12 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: pacotes
-          path: pacotes
+          path: pacotes-cifrado
+      - name: Decifrar os pacotes
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh decifrar pacotes-cifrado/pacotes.tar.enc pacotes
       - name: Instalar pac
         run: |
           dotnet tool install --global Microsoft.PowerApps.CLI.Tool
@@ -166,6 +173,22 @@ jobs:
           path: |
             fotos/
             pacotes/importados.json
-            camadas-active/
-            custom-apis-legado/
+          retention-days: 90
+      - name: Cifrar os backups
+        # msdyn_componentjson da camada Active traz o conteúdo do componente (WebResource, clientdata do flow, configuração
+        # do step) e pode ter URL assinada. Para restaurar: PACOTES_SENHA=... bash artefato-cifrado.sh decifrar backups.tar.enc <pasta>.
+        if: always()
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          mkdir -p backups
+          for d in camadas-active custom-apis-legado; do if [ -d "$d" ]; then cp -r "$d" backups/; fi; done
+          bash packages/deploy/solucoes/artefato-cifrado.sh cifrar backups backups-cifrado/backups.tar.enc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backups-${{ inputs.alvo }}
+          path: backups-cifrado/
+          if-no-files-found: ignore
           retention-days: 90

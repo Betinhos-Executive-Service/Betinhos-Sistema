@@ -1,0 +1,152 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import test from "node:test";
+
+const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const mediaCaptureScreen = readFileSync(new URL("../src/features/fotos/MediaCaptureScreen.tsx", import.meta.url), "utf8");
+
+function getBlocksContaining(selectorFragment: string) {
+  return styles
+    .split("}")
+    .map((block) => `${block}}`)
+    .filter((block) => block.includes(selectorFragment));
+}
+
+function assertMediaUsesContain(selectorFragment: string) {
+  const blocks = getBlocksContaining(selectorFragment);
+
+  assert.ok(blocks.length > 0, `Nenhum bloco CSS encontrado para ${selectorFragment}.`);
+  assert.equal(
+    blocks.some((block) => /object-fit:\s*contain\b/i.test(block)),
+    true,
+    `${selectorFragment} deveria usar object-fit: contain.`
+  );
+  assert.equal(
+    blocks.some((block) => /object-fit:\s*cover\b/i.test(block)),
+    false,
+    `${selectorFragment} nao deveria usar object-fit: cover.`
+  );
+}
+
+test("camera e previews principais sempre exibem a midia inteira", () => {
+  assertMediaUsesContain(".real-camera-video");
+  assertMediaUsesContain(".maintenance-preview-real-image");
+  assertMediaUsesContain(".maintenance-photo-thumb img");
+  assertMediaUsesContain(".maintenance-photo-thumb video");
+  assertMediaUsesContain(".collision-evidence-thumb img");
+  assertMediaUsesContain(".collision-evidence-thumb video");
+  assertMediaUsesContain(".collision-video-thumb img");
+  assertMediaUsesContain(".collision-video-thumb video");
+});
+
+test("controles mobile da camera preservam obturador circular", () => {
+  assert.match(styles, /@media\s*\(max-width:\s*520px\)\s*{[\s\S]*?\.camera-actions-pro\s*{[\s\S]*?grid-template-columns:\s*56px\s+minmax\(0,\s*1fr\)\s+72px\s+minmax\(0,\s*1fr\)\s+56px;/);
+  assert.match(styles, /\.camera-actions-pro\s+\.camera-primary-action\s*{[\s\S]*?width:\s*72px\s*!important;[\s\S]*?height:\s*72px\s*!important;/);
+  assert.match(styles, /\.camera-actions-pro\s+\.camera-secondary-action\s*{[\s\S]*?width:\s*56px\s*!important;[\s\S]*?height:\s*56px\s*!important;/);
+  assert.match(styles, /\.camera-side-action-left\s*{[\s\S]*?grid-column:\s*2;/);
+  assert.match(styles, /\.camera-primary-action\s*{[\s\S]*?grid-column:\s*3;/);
+  assert.match(styles, /\.camera-side-action-right\s*{[\s\S]*?grid-column:\s*5;/);
+  assert.doesNotMatch(styles, /@media\s*\(max-width:\s*520px\)\s*{[\s\S]*?\.camera-actions-pro\s+button\s*{[\s\S]*?height:\s*54px\s*!important;/);
+  assert.doesNotMatch(styles, /grid-template-columns:\s*66px\s+104px\s+66px;/);
+  assert.doesNotMatch(styles, /grid-template-columns:\s*48px\s+72px\s+48px;/);
+});
+
+test("controles da camera seguem visual minimalista do app", () => {
+  const cameraControls = getBlocksContaining(".camera-actions-pro");
+  const shutterShell = getBlocksContaining(".camera-shutter-shell");
+  const shutterCore = getBlocksContaining(".camera-shutter-core");
+  const recordButton = getBlocksContaining(".photo-record");
+
+  assert.equal(cameraControls.some((block) => /background:\s*rgba\(255,\s*255,\s*255,\s*0\.94\)/i.test(block)), true);
+  assert.equal(shutterShell.some((block) => /background:\s*#ffffff\b/i.test(block)), true);
+  assert.equal(shutterCore.some((block) => /background:\s*#000e23\b/i.test(block)), true);
+  assert.equal(recordButton.some((block) => /background:\s*#c0272d\b/i.test(block)), true);
+  assert.equal(recordButton.some((block) => /color:\s*#ffffff\b/i.test(block)), true);
+  assert.equal([...cameraControls, ...shutterShell, ...shutterCore, ...recordButton].some((block) => /linear-gradient|radial-gradient/i.test(block)), false);
+});
+
+test("tela de captura usa titulo no topo e preview em fit com fundo neutro", () => {
+  const cameraView = getBlocksContaining(".camera-capture-card .camera-view");
+  const realCameraVideo = getBlocksContaining(".camera-capture-card .real-camera-video");
+
+  assert.match(mediaCaptureScreen, /<FormMenu title={title \?\? getTitleByKind\(kind\)} onBack={onBack} \/>/);
+  assert.doesNotMatch(mediaCaptureScreen, /camera-capture-title/);
+  assert.doesNotMatch(mediaCaptureScreen, /Camera nativa/i);
+  assert.equal(cameraView.some((block) => /background:\s*transparent\s*!important/i.test(block)), true);
+  assert.equal(realCameraVideo.some((block) => /object-fit:\s*contain\s*!important/i.test(block)), true);
+  assert.equal(realCameraVideo.some((block) => /background:\s*#fcfcfb\s*!important/i.test(block)), true);
+});
+
+test("toda camera ao vivo pede stream 4:3 em alta resolucao (quadro inteiro), sem modo especial por tela", () => {
+  // As telas saem do App.tsx para as rotas de cada feature (src/features/*/rotas.tsx).
+  const app = ["../src/App.tsx", ...readdirSync(new URL("../src/features/", import.meta.url)).map((dir) => `../src/features/${dir}/rotas.tsx`)]
+    .filter((file) => existsSync(new URL(file, import.meta.url)))
+    .map((file) => readFileSync(new URL(file, import.meta.url), "utf8"))
+    .join("\n");
+  assert.match(mediaCaptureScreen, /video: getDocumentStreamConstraints\(mode\),/);
+  assert.match(mediaCaptureScreen, /buildTrackConstraints[\s\S]*getDocumentTrackConstraints\(mode, profile\.frameRate, continuousFocus\)/);
+  assert.doesNotMatch(mediaCaptureScreen, /documentFraming/);
+  assert.doesNotMatch(app, /documentFraming/);
+  // Pontos de entrada: comprovante de gastos, recibo, colisão, manutenção do serviço e solicitação de manutenção.
+  assert.equal(app.match(/<MediaCaptureScreen\b/g)?.length, 5);
+  assert.match(mediaCaptureScreen, /frameRate:\s*{\s*ideal:\s*30,\s*max:\s*30\s*}/);
+  assert.match(mediaCaptureScreen, /iPhone\|iPad\|iPod/);
+});
+
+test("lanterna: botao so com suporte, rotulo e aria-pressed, desligada ao parar a camera", () => {
+  assert.match(mediaCaptureScreen, /supportsTorch\(videoTrack\)/);
+  assert.match(mediaCaptureScreen, /\{torchSupported \? \(/);
+  assert.match(mediaCaptureScreen, /aria-pressed=\{torchOn\}/);
+  assert.match(mediaCaptureScreen, /aria-label=\{torchOn \? "Desligar lanterna" : "Ligar lanterna"\}/);
+  assert.match(mediaCaptureScreen, /stopStreamTracks\(streamRef\.current, torchOnRef\.current\)/);
+  assert.match(styles, /\.camera-torch-toggle\s*\{/);
+});
+
+test("camera usa foco continuo somente quando o aparelho declara suporte", () => {
+  assert.match(mediaCaptureScreen, /focusMode\?\: string\[\]/);
+  assert.match(mediaCaptureScreen, /focusMode\?\.includes\("continuous"\)/);
+  assert.match(readFileSync(new URL("../src/shared/camera/cameraConstraints.ts", import.meta.url), "utf8"), /constraints\.focusMode = \{ ideal: "continuous" \}/);
+  assert.match(mediaCaptureScreen, /applyProfile\(preferredProfile, false\)/);
+});
+
+test("iphone usa captura nativa limpa para evitar fullscreen ao gravar video", () => {
+  assert.match(mediaCaptureScreen, /configureInlineCameraVideo\(videoRef\.current\)/);
+  assert.match(mediaCaptureScreen, /isAppleMobileDevice/);
+  assert.match(mediaCaptureScreen, /const useLiveRecording = useLiveCamera && !useAppleMobile;/);
+  assert.match(mediaCaptureScreen, /const useLivePreview = useLiveRecording;/);
+  assert.match(mediaCaptureScreen, /const nativeVideoAccept = useAppleMobile \? "video\/\*" : "video\/\*,\.mov,video\/quicktime";/);
+  assert.match(mediaCaptureScreen, /accept={nativeVideoAccept}/);
+  assert.match(mediaCaptureScreen, /onClick={useLiveRecording \? \(recording \? stopLiveRecording : startLiveRecording\) : openNativeVideoCamera}/);
+  assert.match(mediaCaptureScreen, /if \(videoRef\.current && useLivePreview\)/);
+  assert.match(mediaCaptureScreen, /onClick={useLivePreview \? captureLivePhoto : openNativePhotoCamera}/);
+  assert.match(mediaCaptureScreen, /disabled={processing \|\| starting \|\| \(useLivePreview && !ready && !recording\)}/);
+  assert.match(mediaCaptureScreen, /setAttribute\("webkit-playsinline",\s*""\)/);
+  assert.match(mediaCaptureScreen, /setAttribute\("playsinline",\s*""\)/);
+  assert.match(mediaCaptureScreen, /controls={false}/);
+  assert.match(mediaCaptureScreen, /disablePictureInPicture/);
+  assert.doesNotMatch(mediaCaptureScreen, /real-camera-canvas/);
+});
+
+test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
+  const photoOrientation = readFileSync(new URL("../src/shared/camera/photoOrientation.ts", import.meta.url), "utf8");
+
+  assert.match(mediaCaptureScreen, /ImageCapture\?: BrowserImageCaptureConstructor/);
+  assert.match(mediaCaptureScreen, /captureTrackPhotoDataUrl\(stream\)/);
+  assert.match(mediaCaptureScreen, /imageCapture\.takePhoto\(settings\)/);
+  assert.match(mediaCaptureScreen, /readBlobAsDataUrl\(photoBlob\)/);
+  assert.match(mediaCaptureScreen, /if \(!photoDataUrl && video\) photoDataUrl = await captureVideoFrameDataUrlAsync\(video\);/);
+  assert.match(photoOrientation, /const PHOTO_OUTPUT_QUALITY = 0\.98;/);
+  // Comprovante: não espera o takePhoto; vai direto ao quadro do vídeo com a qualidade do plano.
+  assert.match(mediaCaptureScreen, /if \(video\) \{\s*photoDataUrl = captureVideoFrameDataUrl\(video, undefined, LIVE_PHOTO_JPEG_QUALITY\);/);
+  // toBlob agenda a codificação em períodos ociosos e demora segundos com a câmera ao vivo; toDataURL é direto.
+  assert.match(photoOrientation, /export function captureVideoFrameDataUrl\(video: HTMLVideoElement, orientationAngle = getViewportOrientationAngle\(\), quality = PHOTO_OUTPUT_QUALITY\)/);
+  assert.match(mediaCaptureScreen, /\} else if \(stream\) \{/);
+});
+
+test("camera pendente mostra suporte apos um segundo", () => {
+  assert.match(mediaCaptureScreen, /const CAMERA_SUPPORT_MESSAGE_DELAY_MS = 1000;/);
+  assert.match(mediaCaptureScreen, /setShowSupportMessage\(true\)/);
+  assert.match(mediaCaptureScreen, /A câmera não respondeu\. Fale com o suporte de TI da Betinhos\./);
+  assert.doesNotMatch(mediaCaptureScreen, /Liberar Câmera/);
+  assert.doesNotMatch(styles, /camera-permission-action/);
+});
