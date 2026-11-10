@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataSource } from '../data/source'
 import type { AcessoSource } from '../data/acesso'
+import { createMockSource as createMockComunicados } from '../../comunicados/data/mock'
 import { createMockDocsSource } from '../../documentos/data/source'
 import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
@@ -426,5 +427,20 @@ describe('Ficha', () => {
     await screen.findByText('Sem acesso ao app')
     fireEvent.click(screen.getByRole('button', { name: /Cadastrar acesso/ }))
     expect(onCadastrarAcesso).toHaveBeenCalledWith({ funcionarioId: 'f1', nomeCompleto: 'Ana Souza', celular: '' })
+  })
+  it('aba Comunicados lista só os concluídos, marcados, e gera o PDF do que ficar marcado', async () => {
+    const baixados: string[] = []
+    Object.assign(URL, { createObjectURL: () => 'blob:pdf', revokeObjectURL: () => undefined })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { baixados.push(this.download) })
+    const abaixoDe = (abas: (string | null)[]) => abas.slice(abas.indexOf('Equipamentos'), abas.indexOf('Equipamentos') + 3)
+    render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'm1'), { get: async () => ({ ...structuredClone(record), id: 'm1' }) })} comunicados={createMockComunicados()} id="m1" onClose={() => {}} onSaved={() => {}} /></ToastProvider>)
+    await screen.findByDisplayValue('Ana Souza')
+    expect(abaixoDe(screen.getAllByRole('tab').map((tab) => tab.textContent))).toEqual(['Equipamentos', 'Comunicados', 'Anotações'])
+    fireEvent.click(screen.getByRole('tab', { name: 'Comunicados' }))
+    expect(await screen.findByText('Novo procedimento de embarque no GRU')).toBeTruthy()
+    expect(screen.queryByText('Uso obrigatório do crachá')).toBeNull()
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar PDF (1)' }))
+    await waitFor(() => expect(baixados).toHaveLength(1))
   })
 })

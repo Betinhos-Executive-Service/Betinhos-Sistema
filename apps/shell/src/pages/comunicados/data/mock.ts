@@ -44,7 +44,8 @@ export function createMockSource(): Source {
     mock: true,
     async comunicados() { await wait(300); return clone(comunicados) },
     async destinatarios(comunicadoId) { await wait(300); return clone(destinatarios.filter((row) => row.comunicadoId === comunicadoId)) },
-    async destinatariosDoMotorista(motoristaId) { await wait(300); return clone(destinatarios.filter((row) => row.motoristaId === motoristaId)) },
+    // 'm1' é o Carlos Alberto Teste do mock de Funcionários; aqui ele é o Carlos Andrade.
+    async destinatariosDoMotorista(motoristaId) { await wait(300); const alvo = motoristaId === 'm1' ? id(1) : motoristaId; return clone(destinatarios.filter((row) => row.motoristaId === alvo)) },
     async quemSou() { await wait(100); return 'Usuário de teste' },
     async motoristas() { await wait(200); return clone(MOTORISTAS) },
     async salvar(draft) {
