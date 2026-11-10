@@ -15,6 +15,7 @@
 #     (Filter_Falhas + Select_Falhas sobre result() da condição e dos dois loops);
 #   - o cadastro de passageiros é lido só da Tenaris e o dedup/busca comparam o nome sem
 #     maiúsculas nem espaços nas pontas (duplicados criados no mesmo lote e homônimo de outro cliente).
+# Solicitante do serviço = Responsável da linha (era o passageiro 1) e passageiro reconhecido também pelo e-mail.
 # O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
@@ -137,8 +138,13 @@ if (-not $condUnico.actions.Append_to_array_variable_varNomesVistos -or -not $cr
   throw 'O flow não está no formato esperado: Condition_unico, Filter_FindGUID ou Filter_FindGUID_PorNome ausente.'
 }
 $temIdentificacao = @($listaBD.inputs.parameters.PSObject.Properties.Name) -contains '$filter'
-if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao) {
-  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris); nada a alterar."
+$solicitante = $cond.Loop_Servicos.actions.Filter_array_Solicitante_First
+$mapaUpdate = $loop.Condition_nome_nao_existe_ainda.else.actions.Append_to_array_variable_varGUIDMap_2
+if (-not $solicitante -or -not $mapaUpdate) { throw 'O flow não está no formato esperado: Filter_array_Solicitante_First ou Append_to_array_variable_varGUIDMap_2 ausente.' }
+$temSolicitante = $solicitante.inputs.where -like "*Responsável - Nome*"
+$temEmail = $loop.Filter_BDLocal.inputs.where -like "*cr40f_email*"
+if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao -and $temSolicitante -and $temEmail) {
+  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris, solicitante = responsável, passageiro reconhecido pelo e-mail); nada a alterar."
   return
 }
 Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
@@ -195,6 +201,30 @@ if (-not $temIdentificacao) {
   Write-Output '  List_rows_BancodeDados_Completo: só cliente Tenaris; Filter_BDLocal, Condition_unico e Filter_FindGUID*: nome sem maiúsculas/espaços'
 } else { Write-Output '  Identificação: cadastro já filtrado pela Tenaris; sem mudança.' }
 
+# Solicitante do serviço: era o passageiro 1 (first(Filter_PaxValidos)); passa a ser o Responsável da linha, pelo GUID
+# Tenaris ou pelo nome sem maiúsculas/espaços. Linha sem Responsável continua com o passageiro 1.
+if (-not $temSolicitante) {
+  $norm = { param($x) "toLower(trim(coalesce($x, '')))" }
+  $respGuid = "trim(coalesce(items('Loop_Servicos')?['Responsável - GUID'], ''))"
+  $respNome = & $norm "items('Loop_Servicos')?['Responsável - Nome']"
+  $guidNome = & $norm "item()?['guidNome']"
+  $pax1 = "if(empty(body('Filter_PaxValidos')), false, equals($guidNome, $(& $norm "first(body('Filter_PaxValidos'))?['nome']")))"
+  $solicitante.inputs.where = "@if(and(empty($respGuid), empty($respNome)), $pax1, or(and(not(empty($respGuid)), equals(item()?['guidTenaris'], $respGuid)), and(not(empty($respNome)), equals($guidNome, $respNome))))"
+  Write-Output '  Filter_array_Solicitante_First: Responsável da linha (GUID ou nome); sem Responsável, passageiro 1'
+} else { Write-Output '  Solicitante: já é o Responsável; sem mudança.' }
+
+# Mesma pessoa com o nome escrito de outro jeito ("Rodrigo G. Lucca" e "Rodrigo Galves de Lucca") virava cadastro novo:
+# Filter_BDLocal passa a achar também pelo e-mail (consolidado em Compose_Email). O Update mantém o nome do cadastro,
+# para os dois jeitos não se alternarem, e o mapa guarda o nome do lote, que é o que o vínculo e o solicitante procuram.
+if (-not $temEmail) {
+  $norm = { param($x) "toLower(trim(coalesce($x, '')))" }
+  $mesmoNome = "equals($(& $norm "item()?['cr40f_nomedopassageiro']"), $(& $norm "items('Loop_UpsertBD')?['nome']"))"
+  $loop.Filter_BDLocal.inputs.where = "@or($mesmoNome, and(not(empty(outputs('Compose_Email'))), equals($(& $norm "item()?['cr40f_email']"), toLower(outputs('Compose_Email')))))"
+  $update.'item/cr40f_nomedopassageiro' = "@coalesce(first(body('Filter_BDLocal'))?['cr40f_nomedopassageiro'], items('Loop_UpsertBD')?['nome'])"
+  $mapaUpdate.inputs.value.guidNome = "@{items('Loop_UpsertBD')?['nome']}"
+  Write-Output '  Filter_BDLocal: nome ou e-mail; Update_BD_Existente mantém o nome do cadastro; varGUIDMap guarda o nome do lote'
+} else { Write-Output '  Reconhecimento por e-mail: já aplicado; sem mudança.' }
+
 # cr40f_passageirosetelefonedecontato é derivado de cr40f_servicosporpassageiro + cr40f_bancodedados e tem um dono
 # só: o plugin DriverRecordSharing (ServicePassengerViewSynchronizer). O texto da planilha continua no snapshot.
 if ($gravaPax) {
@@ -250,7 +280,9 @@ if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'F
   @($condSalvo.Loop_Servicos.actions.Upsert_Geral.inputs.parameters.PSObject.Properties.Name) -contains $campoPax -or
   $condSalvo.Loop_Servicos.actions.Compose_PaxDoServico.inputs -is [string] -or
   @(($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Scope_1_1.actions.PSObject.Properties.Name) -notcontains 'Select_Falhas' -or
-  @($condSalvo.List_rows_BancodeDados_Completo.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter') {
-  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas ou filtro da Tenaris ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
+  @($condSalvo.List_rows_BancodeDados_Completo.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter' -or
+  $condSalvo.Loop_Servicos.actions.Filter_array_Solicitante_First.inputs.where -notlike "*Responsável - Nome*" -or
+  $condSalvo.Loop_UpsertBD.actions.Filter_BDLocal.inputs.where -notlike "*cr40f_email*") {
+  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas, filtro da Tenaris, solicitante pelo Responsável ou busca por e-mail ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
 }
 Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($conf.statecode))."
