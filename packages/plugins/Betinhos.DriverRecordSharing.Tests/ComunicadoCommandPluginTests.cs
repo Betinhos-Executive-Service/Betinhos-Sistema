@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 using Xunit;
@@ -174,6 +176,211 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void EvidenciaComCarimboValidoEhVerificadaEGuardaSoOContrato()
+        {
+            var stored = Parse(Build(Evidence().Replace("\"v\":1,", "\"v\":1,\"extra\":\"x\",")));
+
+            Assert.Equal(true, stored["ipVerificado"]);
+            Assert.False(stored.ContainsKey("extra"));
+            Assert.Equal("2.1.860", stored["appVersion"]);
+            Assert.Equal("203.0.113.7", ((Dictionary<string, object>)stored["ipStamp"])["ip"]);
+            var geo = (Dictionary<string, object>)stored["geo"];
+            Assert.Equal("ok", geo["status"]);
+            Assert.Equal(-23.18, Convert.ToDouble(geo["lat"]));
+            Assert.True(stored.ContainsKey("servidorEm"));
+        }
+
+        [Fact]
+        public void EvidenciaComAssinaturaInvalidaNaoEhVerificada()
+        {
+            Assert.Equal(false, Parse(Build(Evidence(secret: "outro-segredo")))["ipVerificado"]);
+            Assert.Equal(false, Parse(Build(Evidence(sig: "AAAA")))["ipVerificado"]);
+            Assert.Equal(false, Parse(Build(Evidence(sig: "!!!não-base64")))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void IpAdulteradoDepoisDeAssinarNaoEhVerificado()
+        {
+            var raw = Evidence(ip: "203.0.113.7").Replace("\"ip\":\"203.0.113.7\"", "\"ip\":\"198.51.100.9\"");
+
+            Assert.Equal(false, Parse(Build(raw))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void CarimboVencidoOuDoFuturoNaoEhVerificado()
+        {
+            var now = DateTime.UtcNow;
+
+            Assert.Equal(false, Parse(Build(Evidence(at: now.AddMinutes(-6)), now: now))["ipVerificado"]);
+            Assert.Equal(false, Parse(Build(Evidence(at: now.AddMinutes(6)), now: now))["ipVerificado"]);
+            Assert.Equal(true, Parse(Build(Evidence(at: now.AddMinutes(-4)), now: now))["ipVerificado"]);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData(null)]
+        public void SemSegredoNaoVerificaIp(string secret)
+        {
+            Assert.Equal(false, Parse(Build(Evidence(), secret))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void SemCarimboGravaIpNuloENaoVerificado()
+        {
+            var stored = Parse(Build("{\"v\":1,\"appVersion\":\"2.1.860\",\"ipStamp\":null,\"geo\":{\"status\":\"negada\"}}"));
+
+            Assert.Null(stored["ipStamp"]);
+            Assert.Equal(false, stored["ipVerificado"]);
+            var geo = (Dictionary<string, object>)stored["geo"];
+            Assert.Equal("negada", geo["status"]);
+            Assert.False(geo.ContainsKey("lat"));
+        }
+
+        [Fact]
+        public void GeoInvalidaOuDesconhecidaNaoGravaCoordenadas()
+        {
+            var outOfRange = Parse(Build(Evidence(geo: "{\"status\":\"ok\",\"lat\":91,\"lon\":0,\"accuracy\":5}")));
+            var negative = Parse(Build(Evidence(geo: "{\"status\":\"ok\",\"lat\":1,\"lon\":0,\"accuracy\":-1}")));
+            var unknown = Parse(Build(Evidence(geo: "{\"status\":\"qualquer\"}")));
+
+            Assert.Equal("indisponivel", ((Dictionary<string, object>)outOfRange["geo"])["status"]);
+            Assert.False(((Dictionary<string, object>)outOfRange["geo"]).ContainsKey("lat"));
+            Assert.Equal("indisponivel", ((Dictionary<string, object>)negative["geo"])["status"]);
+            Assert.Null(unknown["geo"]);
+        }
+
+        [Fact]
+        public void TextosLongosSaoTruncados()
+        {
+            var raw = Evidence().Replace("Mozilla/5.0 (Linux; Android 14)", new string('u', 900)).Replace("\"Android\"", "\"" + new string('p', 300) + "\"");
+            var stored = Parse(Build(raw));
+
+            Assert.Equal(400, ((string)stored["userAgent"]).Length);
+            Assert.Equal(100, ((string)stored["platform"]).Length);
+        }
+
+        [Theory]
+        [InlineData("isto não é json")]
+        [InlineData("[1,2]")]
+        public void JsonInvalidoGravaMarcaDeErroSemTravar(string raw)
+        {
+            var stored = Parse(Build(raw));
+
+            Assert.Equal("formato", stored["erro"]);
+            Assert.True(stored.ContainsKey("servidorEm"));
+            Assert.False(stored.ContainsKey("ipVerificado"));
+        }
+
+        [Fact]
+        public void JsonAcimaDeQuatroMilCaracteresGravaMarcaDeErro()
+        {
+            var raw = Evidence().Replace("Mozilla/5.0 (Linux; Android 14)", new string('u', 4100));
+
+            Assert.Equal("formato", Parse(Build(raw))["erro"]);
+        }
+
+        [Fact]
+        public void SemEvidenciaNaoHaNadaParaGravar()
+        {
+            Assert.Null(Build(null));
+            Assert.Null(Build("   "));
+        }
+
+        [Fact]
+        public void AbrirSemEvidenciaMantemCompatibilidade()
+        {
+            var service = DriverService(Informativo);
+
+            Invoke("Open", Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id), service);
+
+            Assert.NotEqual(default(DateTime), service.Recipient.GetAttributeValue<DateTime>("new_abertoem"));
+            Assert.False(service.Recipient.Contains("new_evidenciaaberturajson"));
+        }
+
+        [Fact]
+        public void AbrirGravaEvidenciaSoNaPrimeiraVez()
+        {
+            var service = DriverService(Ciencia);
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            context.InputParameters["new_EvidenciaJson"] = Evidence();
+
+            Invoke("Open", context, service);
+            var first = service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson");
+            context.InputParameters["new_EvidenciaJson"] = Evidence(ip: "198.51.100.9");
+            Invoke("Open", context, service);
+
+            Assert.Equal(true, Parse(first)["ipVerificado"]);
+            Assert.Equal(first, service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson"));
+            Assert.Single(service.Updated);
+        }
+
+        [Fact]
+        public void AbrirInformativoGravaEvidenciaNaLeitura()
+        {
+            var service = DriverService(Informativo);
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            context.InputParameters["new_EvidenciaJson"] = Evidence();
+
+            Invoke("Open", context, service);
+
+            Assert.True(service.Recipient.Contains("new_lidoem"));
+            Assert.Equal(true, Parse(service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson"))["ipVerificado"]);
+        }
+
+        [Fact]
+        public void AbrirComEvidenciaInvalidaAindaMarcaAbertura()
+        {
+            var service = DriverService(Ciencia);
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            context.InputParameters["new_EvidenciaJson"] = "{quebrado";
+
+            Invoke("Open", context, service);
+
+            Assert.True(service.Recipient.Contains("new_abertoem"));
+            Assert.Equal("formato", Parse(service.Recipient.GetAttributeValue<string>("new_evidenciaaberturajson"))["erro"]);
+        }
+
+        [Fact]
+        public void CienciaGravaEvidenciaJuntoComAAssinatura()
+        {
+            var service = DriverService(Ciencia);
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            Invoke("Open", context, service);
+            context.InputParameters["new_AssinaturaJson"] = "[[[0.1,0.2],[0.4,0.5]]]";
+            context.InputParameters["new_EvidenciaJson"] = Evidence();
+
+            Invoke("Acknowledge", context, service);
+            var stored = service.Recipient.GetAttributeValue<string>("new_evidenciacienciajson");
+            context.InputParameters["new_EvidenciaJson"] = Evidence(ip: "198.51.100.9");
+            Invoke("Acknowledge", context, service);
+
+            Assert.Equal(true, Parse(stored)["ipVerificado"]);
+            Assert.Equal(stored, service.Recipient.GetAttributeValue<string>("new_evidenciacienciajson"));
+            Assert.False(service.Recipient.Contains("new_evidenciaaberturajson"));
+        }
+
+        [Fact]
+        public void CienciaSemEvidenciaMantemCompatibilidade()
+        {
+            var service = DriverService(Ciencia);
+            var context = Context("new_DestinatarioId", service.Recipient.Id, service.Users[0].Id);
+            Invoke("Open", context, service);
+            context.InputParameters["new_AssinaturaJson"] = "[[[0.1,0.2],[0.4,0.5]]]";
+
+            Invoke("Acknowledge", context, service);
+
+            Assert.True(service.Recipient.Contains("new_cienteem"));
+            Assert.False(service.Recipient.Contains("new_evidenciacienciajson"));
+        }
+
+        [Fact]
+        public void ConstrutoresAceitamConfiguracaoSegura()
+        {
+            Assert.NotNull(new ComunicadoCommandPlugin());
+            Assert.NotNull(new ComunicadoCommandPlugin(null, null));
+        }
+
+        [Fact]
         public void ReenvioAlteraSomentePushFalho()
         {
             var service = DriverService(Informativo);
@@ -272,10 +479,37 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Null(error);
         }
 
-        private static void Invoke(string method, params object[] args)
+        private const string Secret = "segredo-de-teste";
+
+        private static void Invoke(string method, params object[] args) => InvokeWith(Secret, method, args);
+
+        private static void InvokeWith(string secret, string method, params object[] args)
         {
-            typeof(ComunicadoCommandPlugin).GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, args);
+            var target = typeof(ComunicadoCommandPlugin).GetMethod(method, BindingFlags.Static | BindingFlags.Instance | BindingFlags.NonPublic);
+            target.Invoke(target.IsStatic ? null : new ComunicadoCommandPlugin(null, secret), args);
         }
+
+        private static string Sign(string ip, string ts, string secret = Secret)
+        {
+            using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret)))
+                return Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(ip + "|" + ts))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }
+
+        private static string Stamp(DateTime moment) => moment.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'");
+
+        private static string Evidence(string ip = "203.0.113.7", DateTime? at = null, string secret = Secret, string sig = null, string geo = null)
+        {
+            var ts = Stamp(at ?? DateTime.UtcNow);
+            return "{\"v\":1,\"appVersion\":\"2.1.860\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 14)\",\"platform\":\"Android\",\"model\":\"SM-A546\","
+                + "\"ipStamp\":{\"ip\":\"" + ip + "\",\"ts\":\"" + ts + "\",\"sig\":\"" + (sig ?? Sign(ip, ts, secret)) + "\"},"
+                + "\"geo\":" + (geo ?? "{\"status\":\"ok\",\"lat\":-23.18,\"lon\":-45.88,\"accuracy\":30,\"ts\":\"2026-11-10T13:40:00.000Z\"}") + "}";
+        }
+
+        private static Dictionary<string, object> Parse(string json) =>
+            (Dictionary<string, object>)new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(json);
+
+        private static string Build(string raw, string secret = Secret, DateTime? now = null) =>
+            ComunicadoCommandPlugin.BuildEvidence(raw, secret, now ?? DateTime.UtcNow);
 
         private static RemoteExecutionContext Context(string key, Guid id, Guid? userId = null)
         {
