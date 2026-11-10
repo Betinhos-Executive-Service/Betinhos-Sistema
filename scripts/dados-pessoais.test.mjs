@@ -15,6 +15,8 @@ test('CPF: dígito verificador, sequência repetida e CPFs de teste', () => {
 
 test('e-mail: caixas funcionais e nomes de teste passam; pessoa real e provedor pessoal não', () => {
   assert.deepEqual(achadosNoTexto('financeiro@betinhos.com.br ana@betinhos.com.br joao@gmail.com fulano@exemplo.com.br'), [])
+  assert.deepEqual(achadosNoTexto('pessoa.ficticia1@betinhos.com.br pessoa.ficticia12@betinhos.com.br'), [])
+  assert.equal(achadosNoTexto('pessoa.ficticia.real@betinhos.com.br').length, 1)
   const tipos = achadosNoTexto('fulano.real@betinhos.com.br e Carla.Mendes@Gmail.com').map((a) => a.valor)
   assert.deepEqual(tipos, ['fu***al@betinhos.com.br', 'Ca***es@gmail.com'])
 })

@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url'
 const CPFS_DE_TESTE = new Set(['11144477735', '52998224725', '12345678909'])
 /** Caixas funcionais da empresa e nomes genéricos usados nos testes. Pessoa real fica fora (vem de parâmetro ou variável). */
 const EMAILS_PERMITIDOS = new Set(['financeiro', 'noreply', 'deborah.keila', 'junior', 'ana', 'bia', 'joao', 'maria', 'pessoa', 'joao.silva', 'joao.motorista', 'x', 'ao'])
+// Fictícios numerados que a limpeza do histórico do App Motoristas (apps/motoristas) pôs no lugar dos e-mails reais.
+const EMAIL_FICTICIO = /^pessoa\.ficticia\d+$/
 const DOMINIOS = /@(betinhos\.com\.br|gmail\.com|hotmail\.com|outlook\.com|yahoo\.com(?:\.br)?)\b/i
 const IGNORAR = /(^|\/)(pnpm-lock\.yaml|package-lock\.json)$|\.(png|jpe?g|gif|ico|webp|woff2?|ttf|pdf|zip|xlsx)$/i
 const BACKUP = /^packages\/deploy\/flows\/backup\//
@@ -39,7 +41,7 @@ export function achadosNoTexto(texto) {
       if (cpfValido(digits) && !CPFS_DE_TESTE.has(digits)) achados.push({ linha: i + 1, tipo: 'CPF válido', valor: mascarar(digits) })
     }
     for (const m of conteudo.matchAll(/([A-Za-z0-9._%+-]+)(@[A-Za-z0-9.-]+)/g)) {
-      if (DOMINIOS.test(m[2]) && !EMAILS_PERMITIDOS.has(m[1].toLowerCase())) achados.push({ linha: i + 1, tipo: 'e-mail de pessoa', valor: `${mascarar(m[1])}${m[2].toLowerCase()}` })
+      if (DOMINIOS.test(m[2]) && !EMAILS_PERMITIDOS.has(m[1].toLowerCase()) && !EMAIL_FICTICIO.test(m[1].toLowerCase())) achados.push({ linha: i + 1, tipo: 'e-mail de pessoa', valor: `${mascarar(m[1])}${m[2].toLowerCase()}` })
     }
   })
   return achados
