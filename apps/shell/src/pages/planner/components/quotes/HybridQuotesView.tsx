@@ -57,6 +57,7 @@ export default function HybridQuotesView({ state, currentEmployee, quoteAttachme
   const metrics = useMemo(() => getQuoteMetrics(quotes, tasks), [quotes, tasks]);
   const selectedQuote = allQuotes.find((quote: any) => quote.id === selectedQuoteId);
   const selectedTask = selectedQuote ? tasksByQuote.get(selectedQuote.id) : null;
+  const onlyFilter = (key: string, value: string) => filters[key].length === 1 && filters[key][0] === value;
   const setFilter = (key: any, value: any) => setFilters((current: any) => ({ ...current, [key]: value }));
   const changeView = (next: any) => { setView(next); saveQuoteViewPreference(next); };
   // V2 ("Enviei"): registra o envio direto, só com a data; sem diálogo de canal.
@@ -84,11 +85,11 @@ export default function HybridQuotesView({ state, currentEmployee, quoteAttachme
   return <div className="page-content quotes-page quote-v3-page" data-view="quotes"><div className="page-header"><div><span className="eyebrow">ACOMPANHAMENTO COMERCIAL</span><h1>Cotações</h1><p>Cadastre, priorize e acompanhe a resposta sem sair da gestão.</p></div><button className="button button-primary" type="button" onClick={() => setCreating(true)}><Plus size={15} />Nova cotação</button></div>
     <div className="quote-v3-view-toggle quote-history-navigation" aria-label="Seção de cotações"><button type="button" className={section === "pending" ? "active" : ""} aria-pressed={section === "pending"} onClick={() => setSection("pending")}>Pendentes <b>{quotes.length}</b></button><button type="button" className={section === "history" ? "active" : ""} aria-pressed={section === "history"} onClick={() => setSection("history")}>Histórico <b>{allQuotes.filter((quote: any) => QUOTE_TERMINAL_STATUSES.includes(quote.status)).length}</b></button></div>
     {section === "pending" && <><div className="quote-v3-metrics" aria-label="Indicadores de cotações">{[
-      ["Ativas", metrics.active, FileText, "active", () => setFilters((current: any) => ({ ...current, status: [], deadline: [] }))],
-      ["Atrasadas", metrics.overdue, AlarmClock, "overdue", () => setFilter("deadline", ["overdue"])],
-      ["Vencem hoje", metrics.dueToday, CalendarDays, "today", () => setFilter("deadline", ["today"])],
-      ["Aguardando", metrics.waiting, CircleHelp, "waiting", () => setFilter("status", ["Aguardando informação"])],
-    ].map(([label, value, Icon, tone, action]: any) => <button className={`quote-v3-metric quote-v3-metric-${tone}`} key={label} type="button" onClick={action}><span className="quote-v3-metric-icon" aria-hidden="true"><Icon size={17} strokeWidth={2} /></span><span className="quote-v3-metric-label">{label}</span><strong>{value}</strong></button>)}</div>
+      ["Ativas", metrics.active, FileText, "active", () => setFilters((current: any) => ({ ...current, status: [], deadline: [] })), !filters.status.length && !filters.deadline.length],
+      ["Atrasadas", metrics.overdue, AlarmClock, "overdue", () => setFilter("deadline", ["overdue"]), onlyFilter("deadline", "overdue")],
+      ["Vencem hoje", metrics.dueToday, CalendarDays, "today", () => setFilter("deadline", ["today"]), onlyFilter("deadline", "today")],
+      ["Aguardando", metrics.waiting, CircleHelp, "waiting", () => setFilter("status", ["Aguardando informação"]), onlyFilter("status", "Aguardando informação")],
+    ].map(([label, value, Icon, tone, action, pressed]: any) => <button className={`quote-v3-metric quote-v3-metric-${tone}`} key={label} type="button" aria-pressed={pressed} onClick={action}><span className="quote-v3-metric-icon" aria-hidden="true"><Icon size={17} strokeWidth={2} /></span><span className="quote-v3-metric-label">{label}</span><strong>{value}</strong></button>)}</div>
     <section className="panel quote-v3-panel"><div className={`quote-v3-toolbar${filtersExpanded ? " is-expanded" : ""}`}>
       <div className="search-field"><Search size={16} /><FormTextInput id="quotes-search" aria-label="Buscar cotações" value={filters.query} onChange={(event: any) => setFilter("query", event.target.value)} placeholder="Buscar por número, cliente, contato, rota, data, veículo, valor…" />{filters.query && <button className="search-field-clear" type="button" aria-label="Limpar busca" onClick={() => setFilter("query", "")}><X size={14} /></button>}</div>
       <button className="quote-v3-filter-toggle" type="button" aria-expanded={filtersExpanded} onClick={() => setFiltersExpanded((value: any) => !value)}><ListFilter size={15} />Filtros<ChevronDown size={15} /></button>
