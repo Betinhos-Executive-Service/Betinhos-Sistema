@@ -1,11 +1,11 @@
 ---
 name: verificar-tour
-description: "Verifica o tour guiado por capítulos do App Motoristas: abertura automática na primeira visita de cada tela, botão '?' nos cabeçalhos, 'Ver tour de novo' no Início, spotlight no elemento real, 360 px e teclado, e textos fiéis ao app. Use após mudar src/app/tour*.ts, src/components/common/TourOverlay.tsx, TourHelp.tsx, src/tour.css, os cabeçalhos (FormMenu, ServicesMenu, DetailsMenu), o link do rodapé do Início ou a integração do tour em src/App.tsx."
+description: "Verifica o tour guiado por capítulos do App Motoristas: abertura automática na primeira visita de cada tela, botão '?' nos cabeçalhos, 'Ver tour de novo' no Início, spotlight no elemento real, 360 px e teclado, e textos fiéis ao app. Use após mudar src/app/tour*.ts, src/app/TourOverlay.tsx, TourHelp.tsx, src/app/tour.css, os cabeçalhos (FormMenu, ServicesMenu, DetailsMenu), o link do rodapé do Início ou a integração do tour (src/app/useTour.ts, src/app/AppShell.tsx)."
 ---
 # Verificar tour guiado
 
 ## Cobre
-- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 30 capítulos e ~220 passos), `src/app/tourDom.ts` (busca do elemento), `src/components/common/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/App.tsx`, `tests/tour.test.ts`.
+- Código: `src/app/tour.ts` (tipos, preferência, posicionamento), `src/app/tourChapters.ts` (conteúdo: 1 capítulo por tela, 30 capítulos e ~220 passos), `src/app/tourDom.ts` (busca do elemento), `src/app/TourOverlay.tsx`, `TourHelp.tsx` (contexto e botão "?"), `src/app/tour.css`, botão "?" em `FormMenu`/`ServicesMenu`/`DetailsMenu`, link "Ver tour de novo" em `InitialScreen.tsx`, estado do tour em `src/app/useTour.ts` (overlay e contexto do "?" em `src/app/AppShell.tsx`), `tests/tour.test.ts`.
 - Persistência: `localStorage["app-motoristas-tour-v2:<id do motorista>:<capítulo>"] = "visto"`; o capítulo coringa `*` marca todos como vistos. Só local: trocar de aparelho ou limpar o navegador faz o tour voltar (não há coluna de preferências do motorista no Dataverse).
 
 ## Como o tour escolhe o capítulo

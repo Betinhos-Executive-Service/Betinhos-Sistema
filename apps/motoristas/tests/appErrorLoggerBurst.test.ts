@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { pendingErrorLogs } from "@betinhos-executive-service/ui/error-logger.js";
-import { flushAppErrorLogQueue, flushRepeatedErrorSummaries, installGlobalAppErrorLogger, reportAppError } from "../src/lib/appErrorLogger.ts";
+import { flushAppErrorLogQueue, flushRepeatedErrorSummaries, installGlobalAppErrorLogger, reportAppError } from "../src/shared/appErrorLogger.ts";
 
 test("rajada de falhas iguais grava 1 log completo e 1 resumo; causas e limites continuam valendo", async () => {
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");

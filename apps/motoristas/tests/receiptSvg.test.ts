@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildReceiptSvgDataUrlFromMarkup, buildReceiptSvgMarkup } from "../src/lib/receiptSvg.ts";
-import type { PersonalReceiptModel } from "../src/lib/personalReceipt.ts";
+import { buildReceiptSvgDataUrlFromMarkup, buildReceiptSvgMarkup } from "../src/features/recibo/receiptSvg.ts";
+import type { PersonalReceiptModel } from "../src/features/recibo/personalReceipt.ts";
 
 const model: PersonalReceiptModel = {
   idOp: "OP-999",

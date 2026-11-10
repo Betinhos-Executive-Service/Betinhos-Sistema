@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildGoogleMapsSearchUrl, isConfidentMapAddress } from "../src/lib/mapLinks.ts";
+import { buildGoogleMapsSearchUrl, isConfidentMapAddress } from "../src/features/detalhe/mapLinks.ts";
 
 test("gera Google Maps para campos de endereço confiáveis", () => {
   const address = "Rua Vitório Fasano, 88 - Jardins, São Paulo - SP";

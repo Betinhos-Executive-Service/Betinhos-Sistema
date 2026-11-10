@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calcularSinais, servicoTocaODia, type GastoConferido, type GastoRecente, type ServicoConferido } from "../src/lib/conferenciaEnvio.ts";
-import { STATUS_DESPESA } from "../src/lib/gastosRelatorio.ts";
+import { calcularSinais, servicoTocaODia, type GastoConferido, type GastoRecente, type ServicoConferido } from "../src/features/despesas/conferenciaEnvio.ts";
+import { STATUS_DESPESA } from "../src/features/despesas/gastosRelatorio.ts";
 
 let seq = 0;
 const recente = (p: Partial<GastoRecente>): GastoRecente => ({
@@ -78,7 +78,7 @@ test("detalhe cita valores e datas", () => {
 });
 
 test("serviços para a conferência: janela de véspera a dia seguinte em SP, horário convertido e cancelado marcado", async () => {
-  const { filtroServicosConferencia, mapServicoConferencia, paraHorarioSaoPaulo, STATUS_SERVICO_CANCELADO } = await import("../src/lib/conferenciaEnvio.ts");
+  const { filtroServicosConferencia, mapServicoConferencia, paraHorarioSaoPaulo, STATUS_SERVICO_CANCELADO } = await import("../src/features/despesas/conferenciaEnvio.ts");
   const filtro = filtroServicosConferencia("{B4F87F6C-A6EC-F011-8406-7CED8DA7F336}", "2026-11-05");
   assert.match(filtro, /_cr40f_motorista_value eq b4f87f6c-a6ec-f011-8406-7ced8da7f336/i);
   assert.match(filtro, /cr40f_dataehorriodesada ge 2026-11-04T03:00:00Z and cr40f_dataehorriodesada lt 2026-11-07T03:00:00Z/);
@@ -90,7 +90,7 @@ test("serviços para a conferência: janela de véspera a dia seguinte em SP, ho
 });
 
 test("campos da conferência para o payload: choice, motivos, textos aparados e hora só HH:mm válida", async () => {
-  const { camposConferencia, CONFERENCIA_OPCAO } = await import("../src/lib/conferenciaEnvio.ts");
+  const { camposConferencia, CONFERENCIA_OPCAO } = await import("../src/features/despesas/conferenciaEnvio.ts");
   assert.deepEqual(camposConferencia({ resultado: "duvida_respondida", motivos: ["acima_politica", "refeicao_proxima"], pergunta: " Por quê? ", justificativa: " almoço com o cliente ", hora: "12:40" }), {
     new_conferenciaenvio: CONFERENCIA_OPCAO.duvida_respondida, new_conferenciamotivos: "acima_politica,refeicao_proxima",
     new_conferenciapergunta: "Por quê?", new_conferenciajustificativa: "almoço com o cliente", new_horagasto: "12:40"
@@ -99,7 +99,7 @@ test("campos da conferência para o payload: choice, motivos, textos aparados e 
 });
 
 test("resposta do flow: dúvida exige pergunta; fora do contrato vira null (indisponível)", async () => {
-  const { lerRespostaConferencia } = await import("../src/lib/conferenciaEnvio.ts");
+  const { lerRespostaConferencia } = await import("../src/features/despesas/conferenciaEnvio.ts");
   assert.deepEqual(lerRespostaConferencia({ ok: true, resultado: "duvida", pergunta: " O almoço ficou acima. O que houve? ", motivos: ["acima_politica"] }), { resultado: "duvida", pergunta: "O almoço ficou acima. O que houve?", motivos: ["acima_politica"] });
   assert.deepEqual(lerRespostaConferencia({ ok: true, resultado: "sem_duvida", pergunta: null }), { resultado: "sem_duvida" });
   assert.equal(lerRespostaConferencia({ ok: true, resultado: "duvida", pergunta: "curta" }), null);
@@ -112,7 +112,7 @@ test("sem a lista de serviços (consulta falhou) não pergunta de refeição sem
 });
 
 test("corpo do flow leva só 7 dias de recentes, sem o próprio gasto, e corta a descrição", async () => {
-  const { montarCorpoConferencia } = await import("../src/lib/conferenciaEnvio.ts");
+  const { montarCorpoConferencia } = await import("../src/features/despesas/conferenciaEnvio.ts");
   const g = gasto({ id: "atual", categoria: "Almoço", valor: 58, data: "2026-11-10" });
   const corpo = montarCorpoConferencia({ gasto: g, descricao: "x".repeat(1500), leituraData: null, sinais: [], servicoDiaVizinho: null,
     recentes: [recente({ id: "atual", data: "2026-11-10" }), recente({ data: "2026-11-03" }), recente({ data: "2026-11-02" })] });

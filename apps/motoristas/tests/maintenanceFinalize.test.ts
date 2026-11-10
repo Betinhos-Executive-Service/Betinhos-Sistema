@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateMaintenanceFinalizeFields } from "../src/lib/maintenanceFinalize.ts";
+import { validateMaintenanceFinalizeFields } from "../src/features/finalizar/maintenanceFinalize.ts";
 
 test("finalizacao de manutencao exige cidade alem de campos e fotos", () => {
   const errors = validateMaintenanceFinalizeFields({

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-const mediaCaptureScreen = readFileSync(new URL("../src/screens/MediaCaptureScreen.tsx", import.meta.url), "utf8");
+const mediaCaptureScreen = readFileSync(new URL("../src/features/fotos/MediaCaptureScreen.tsx", import.meta.url), "utf8");
 
 function getBlocksContaining(selectorFragment: string) {
   return styles
@@ -78,7 +78,11 @@ test("tela de captura usa titulo no topo e preview em fit com fundo neutro", () 
 });
 
 test("toda camera ao vivo pede stream 4:3 em alta resolucao (quadro inteiro), sem modo especial por tela", () => {
-  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  // As telas saem do App.tsx para as rotas de cada feature (src/features/*/rotas.tsx).
+  const app = ["../src/App.tsx", ...readdirSync(new URL("../src/features/", import.meta.url)).map((dir) => `../src/features/${dir}/rotas.tsx`)]
+    .filter((file) => existsSync(new URL(file, import.meta.url)))
+    .map((file) => readFileSync(new URL(file, import.meta.url), "utf8"))
+    .join("\n");
   assert.match(mediaCaptureScreen, /video: getDocumentStreamConstraints\(mode\),/);
   assert.match(mediaCaptureScreen, /buildTrackConstraints[\s\S]*getDocumentTrackConstraints\(mode, profile\.frameRate, continuousFocus\)/);
   assert.doesNotMatch(mediaCaptureScreen, /documentFraming/);
@@ -101,7 +105,7 @@ test("lanterna: botao so com suporte, rotulo e aria-pressed, desligada ao parar 
 test("camera usa foco continuo somente quando o aparelho declara suporte", () => {
   assert.match(mediaCaptureScreen, /focusMode\?\: string\[\]/);
   assert.match(mediaCaptureScreen, /focusMode\?\.includes\("continuous"\)/);
-  assert.match(readFileSync(new URL("../src/lib/cameraConstraints.ts", import.meta.url), "utf8"), /constraints\.focusMode = \{ ideal: "continuous" \}/);
+  assert.match(readFileSync(new URL("../src/shared/camera/cameraConstraints.ts", import.meta.url), "utf8"), /constraints\.focusMode = \{ ideal: "continuous" \}/);
   assert.match(mediaCaptureScreen, /applyProfile\(preferredProfile, false\)/);
 });
 
@@ -124,7 +128,7 @@ test("iphone usa captura nativa limpa para evitar fullscreen ao gravar video", (
 });
 
 test("foto android prioriza ImageCapture e jpeg com baixa compressao", () => {
-  const photoOrientation = readFileSync(new URL("../src/lib/photoOrientation.ts", import.meta.url), "utf8");
+  const photoOrientation = readFileSync(new URL("../src/shared/camera/photoOrientation.ts", import.meta.url), "utf8");
 
   assert.match(mediaCaptureScreen, /ImageCapture\?: BrowserImageCaptureConstructor/);
   assert.match(mediaCaptureScreen, /captureTrackPhotoDataUrl\(stream\)/);

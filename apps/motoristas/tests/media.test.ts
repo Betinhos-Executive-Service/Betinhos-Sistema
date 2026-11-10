@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dataUrlToBase64, formatVideoDuration, getDeviceOrientationAngle, readBlobAsDataUrl } from "../src/lib/photoOrientation.ts";
+import { dataUrlToBase64, formatVideoDuration, getDeviceOrientationAngle, readBlobAsDataUrl } from "../src/shared/camera/photoOrientation.ts";
 
 test("readBlobAsDataUrl gera Data URL de video com base64 decodificavel", async () => {
   const dataUrl = await readBlobAsDataUrl(new Blob([new Uint8Array([0, 1, 2, 253, 254, 255])], { type: "video/webm" }));

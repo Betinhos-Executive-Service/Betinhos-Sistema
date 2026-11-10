@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRemoteReadBatch } from "../src/lib/remoteReadBatch.ts";
+import { createRemoteReadBatch } from "../src/data/dataverse/remoteReadBatch.ts";
 
 test("limita leituras simultaneas a quatro sem alterar a ordem dos resultados", async () => {
   const batch = createRemoteReadBatch();
@@ -35,7 +35,7 @@ test("reutiliza leitura identica apenas na mesma carga e tenta de novo apos erro
 });
 
 test("mapWithLimit respeita o limite e mantém a ordem dos resultados", async () => {
-  const { mapWithLimit } = await import("../src/lib/remoteReadBatch.ts");
+  const { mapWithLimit } = await import("../src/data/dataverse/remoteReadBatch.ts");
   let active = 0;
   let maximum = 0;
   const results = await mapWithLimit(Array.from({ length: 10 }, (_, index) => index), 3, async (item) => {

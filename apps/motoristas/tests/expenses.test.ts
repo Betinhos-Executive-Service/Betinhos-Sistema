@@ -12,7 +12,7 @@ import {
   type ExpenseDraft,
   type ExpensePhoto,
   type ExpenseReferenceData
-} from "../src/lib/expenses.ts";
+} from "../src/features/despesas/expenses.ts";
 
 const referenceData: ExpenseReferenceData = {
   categories: [

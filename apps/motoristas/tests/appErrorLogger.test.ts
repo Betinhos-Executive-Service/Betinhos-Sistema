@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, installGlobalAppErrorLogger, reportAppError, redactSensitiveLogValue, type AppErrorNotice } from "../src/lib/appErrorLogger.ts";
+import { APP_CONNECTION_LOST_MESSAGE, APP_OPERATION_ERROR_MESSAGE, installGlobalAppErrorLogger, reportAppError, redactSensitiveLogValue, type AppErrorNotice } from "../src/shared/appErrorLogger.ts";
 
 test("mensagem de erro operacional orienta fechar e reabrir o aplicativo", () => {
   assert.match(APP_OPERATION_ERROR_MESSAGE, /Feche e reabra o aplicativo/);

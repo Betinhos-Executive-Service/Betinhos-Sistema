@@ -19,7 +19,7 @@ import {
   tendenciaMensal,
   variacaoPercentual,
   type DespesaRelatorio
-} from "../src/lib/gastosRelatorio.ts";
+} from "../src/features/despesas/gastosRelatorio.ts";
 
 let seq = 0;
 const d = (parcial: Partial<DespesaRelatorio>): DespesaRelatorio => ({

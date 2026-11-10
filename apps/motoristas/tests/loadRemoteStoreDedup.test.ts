@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadRemoteStore } from "../src/lib/dataverse.ts";
+import { loadRemoteStore } from "../src/features/servicos/agendaRemota.ts";
 
 test("passageiro compartilhado entre agenda e historico e consultado uma vez por carga", async () => {
   const previousWindow = (globalThis as any).window;

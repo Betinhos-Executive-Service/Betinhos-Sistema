@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { saveVoucherRemote } from "../src/lib/dataverse.ts";
+import { saveVoucherRemote } from "../src/features/voucher/remoto.ts";
 
 const id = "11111111-1111-1111-1111-111111111111";
 const pending = { cr40f_status: 202410006, new_linkdovoucher: null };

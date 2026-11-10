@@ -1,6 +1,9 @@
 const fs = require("fs");
 
-const source = fs.readFileSync("src/lib/dataverse.ts", "utf8");
+// Os $select ficam nos módulos de agenda, trocas e registros (lib/dataverse.ts foi dividido por funcionalidade).
+const source = ["src/features/servicos/agendaRemota.ts", "src/features/servicos/trocas.ts", "src/data/dataverse/registros.ts"]
+  .map((file) => fs.readFileSync(file, "utf8"))
+  .join("\n");
 const metadata = JSON.parse(fs.readFileSync("dataverse-metadata-prefix-2026-06-01T11-28-09-842Z.json", "utf8"));
 const entities = Array.isArray(metadata) ? metadata : metadata.entities || metadata.EntityMetadata || metadata.value || [];
 

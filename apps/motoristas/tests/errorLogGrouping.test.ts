@@ -8,7 +8,7 @@ import {
   dropRepeatedError,
   limitPayload,
   withCauseLabel
-} from "../src/lib/errorLogGrouping.ts";
+} from "../src/shared/errorLogGrouping.ts";
 
 const entry = (message: string, error: unknown, action = "agenda") => {
   const cause = classifyErrorCause(error);
