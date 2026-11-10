@@ -14261,8 +14261,8 @@ select,
 .dv-foto { display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px; border:1px solid #e2e8f0; border-radius:12px; font-size:.82rem; font-weight:700; color:#475569; }
 .dv-foto img { width:56px; height:56px; border-radius:8px; object-fit:cover; }
 .dv-explicar { display:grid; gap:6px; }
-.dv-explicar label { font-size:.82rem; font-weight:800; }
-.dv-explicar textarea { width:100%; min-height:96px; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:12px; font:inherit; font-size:1rem; line-height:1.4; resize:vertical; box-sizing:border-box; }
+.dv-explicar small:empty { display:none; }
+.dv-explicar textarea { width:100%; min-height:84px; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:12px; font:inherit; font-size:1rem; line-height:1.4; resize:vertical; box-sizing:border-box; }
 .dv-explicar small { color:#64748b; font-size:.75rem; font-weight:700; }
 .dv-explicar small[data-erro="true"] { color:#9a5b00; }
 .dv-explicar[data-estado="entrando"] { animation:dv-explicar-entra 180ms cubic-bezier(.23,1,.32,1) both; }

@@ -36,7 +36,7 @@ type PainelProps = {
   onEnviada: (explicacao: string) => void;
 };
 
-/** Duas ações de mesmo peso (Trocar comprovante e Explicar, juntas ou separadas) e um envio único. O valor fica travado. */
+/** Duas ações de mesmo peso (Nova foto e Explicar, juntas ou separadas) e um envio único. O valor fica travado. */
 export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, anexosProntos, onEnviada }: PainelProps) {
   const [rascunhoInicial] = useState(() => lerRascunho(despesa.id));
   const [explicacao, setExplicacao] = useState(rascunhoInicial);
@@ -125,10 +125,9 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
   return (
     <section className="dv-painel" aria-labelledby="dv-resolver">
       <h3 className="gr-subtitulo" id="dv-resolver">Como resolver</h3>
-      <p className="gr-legenda">Escolha uma ou as duas opções.</p>
       <div className="dv-acoes">
         <button type="button" className="dv-acao" aria-pressed={Boolean(foto)} disabled={enviando} onClick={() => arquivoRef.current?.click()}>
-          {foto ? "Trocar a foto" : "Trocar comprovante"}
+          Nova foto
         </button>
         <button type="button" className="dv-acao" aria-expanded={explicarAberto && !saindo} aria-controls="dv-explicar" disabled={enviando} onClick={alternarExplicar}>
           Explicar
@@ -147,31 +146,33 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
 
       {explicarAberto ? (
         <div id="dv-explicar" className="dv-explicar" data-estado={saindo ? "saindo" : "entrando"}>
-          <label htmlFor="dv-explicar-texto">Sua explicação</label>
           <textarea
             ref={textoRef}
             id="dv-explicar-texto"
-            rows={4}
+            aria-label="Sua explicação"
+            rows={3}
             value={explicacao}
             disabled={enviando}
-            placeholder="Ex.: o posto emitiu o cupom com o valor errado e corrigiu à mão."
+            placeholder="O que aconteceu? Ex.: o posto emitiu o cupom com o valor errado."
             aria-describedby="dv-explicar-ajuda"
             aria-invalid={mostraErro}
             onChange={(event) => mudarTexto(event.target.value)}
           />
           <small id="dv-explicar-ajuda" data-erro={mostraErro} aria-live="polite">
-            {mostraErro ? validacao.erro : caracteres < MIN_EXPLICACAO ? `${caracteres}/${MIN_EXPLICACAO} caracteres` : "Pronto para enviar."}
+            {mostraErro ? validacao.erro : caracteres > 0 && caracteres < MIN_EXPLICACAO ? `${caracteres}/${MIN_EXPLICACAO} caracteres` : ""}
           </small>
         </div>
       ) : null}
 
-      <p className="gr-legenda">O valor do gasto não pode ser alterado aqui.</p>
       {falhou ? (
         <p className="dv-aviso" role="alert">Não deu para enviar agora. {explicacao.trim() ? "Seu texto está guardado. " : ""}Tente de novo quando o sinal melhorar.</p>
       ) : null}
-      <button type="button" className="dv-enviar" disabled={semAcao || enviando || aguardandoAnexos} aria-busy={enviando} onClick={() => { void enviar(); }}>
-        {enviando ? "Enviando…" : aguardandoAnexos ? "Carregando comprovantes…" : falhou ? "Tentar de novo" : "Enviar para nova conferência"}
-      </button>
+      {/* Envio só aparece quando há o que enviar: nada de botão cinza desabilitado antes da escolha. */}
+      {semAcao ? null : (
+        <button type="button" className="dv-enviar" disabled={enviando || aguardandoAnexos} aria-busy={enviando} onClick={() => { void enviar(); }}>
+          {enviando ? "Enviando…" : aguardandoAnexos ? "Carregando comprovantes…" : falhou ? "Tentar de novo" : "Enviar para nova conferência"}
+        </button>
+      )}
     </section>
   );
 }
