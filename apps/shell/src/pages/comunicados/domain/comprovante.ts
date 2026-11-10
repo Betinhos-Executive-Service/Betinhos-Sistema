@@ -56,15 +56,14 @@ export function linhasEvidencia(evidencia: Evidencia | null): Linha[] {
   const aparelho = [evidencia.platform, evidencia.model].filter(Boolean).join(' ')
   const agente = evidencia.userAgent.length > USER_AGENT_MAX ? `${evidencia.userAgent.slice(0, USER_AGENT_MAX)}...` : evidencia.userAgent
   const geo = evidencia.geo
-  const mapa = geo?.status === 'ok' && geo.lat != null && geo.lon != null
   const linhas: Linha[] = [
-    ['Aparelho', [aparelho, agente].filter(Boolean).join(' · ')],
-    ['Versão do App', evidencia.appVersion],
+    ['Aparelho', [aparelho, agente].filter(Boolean).join(' · ') || 'não informado'],
+    ['Versão do App', evidencia.appVersion || 'não informada'],
     ['Endereço de internet (IP)', evidencia.ip ? `${evidencia.ip} (${evidencia.ipVerificado ? 'verificado' : 'não verificado'})` : 'não registrado'],
   ]
   if (!geo) linhas.push(['Localização', 'não registrada'])
-  else if (mapa) {
-    const [lat, lon] = [geo.lat!.toFixed(5), geo.lon!.toFixed(5)]
+  else if (geo.status === 'ok' && geo.lat != null && geo.lon != null) {
+    const [lat, lon] = [geo.lat.toFixed(5), geo.lon.toFixed(5)]
     linhas.push(['Localização', `${lat}, ${lon}${geo.accuracy != null ? ` (±${Math.round(geo.accuracy)} m)` : ''}`], ['Mapa', `https://www.google.com/maps?q=${lat},${lon}`])
   } else linhas.push(['Localização', GEO_ROTULO[geo.status] ?? 'indisponível'])
   return linhas

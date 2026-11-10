@@ -140,7 +140,7 @@ namespace Betinhos.DriverRecordSharing
             if (Choice(recipient, "new_tipo") == Informativo && !recipient.Contains("new_lidoem"))
                 update["new_lidoem"] = DateTime.UtcNow;
             // A evidência é a da primeira abertura (ou leitura): só entra junto com a marca de tempo e só se a coluna está vazia.
-            if (update.Attributes.Count > 0 && string.IsNullOrEmpty(recipient.GetAttributeValue<string>("new_evidenciaaberturajson")))
+            if (!recipient.Contains("new_abertoem") && string.IsNullOrEmpty(recipient.GetAttributeValue<string>("new_evidenciaaberturajson")))
             {
                 var evidence = BuildEvidence(InputString(context, "new_EvidenciaJson"), ipStampSecret, DateTime.UtcNow);
                 if (evidence != null) update["new_evidenciaaberturajson"] = evidence;
@@ -207,7 +207,12 @@ namespace Betinhos.DriverRecordSharing
                 { "geo", NormalizeGeo(Field(input, "geo") as Dictionary<string, object>) },
                 { "servidorEm", stamp }
             };
-            return serializer.Serialize(result);
+            // Campos truncados + caracteres escapados (", <, >) podem passar do limite do desserializador: serializa sem o limite e,
+            // se a coluna não comportar, grava a marca de erro em vez de derrubar a abertura ou a ciência.
+            var json = new JavaScriptSerializer().Serialize(result);
+            return json.Length <= EvidenciaMaxChars
+                ? json
+                : serializer.Serialize(new Dictionary<string, object> { { "v", 1 }, { "erro", "formato" }, { "servidorEm", stamp } });
         }
 
         private static object Field(Dictionary<string, object> source, string name)
