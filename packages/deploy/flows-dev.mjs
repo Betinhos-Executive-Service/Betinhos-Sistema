@@ -41,6 +41,10 @@ export const ENTRADAS = [
     nome: 'despesas-conferencia-envio', script: 'provision-flow-despesas-conferencia-envio.ps1', flows: ['Flow Despesas | Conferência no envio'], preparo: 'despesas-ia',
     arquivos: [script('despesas-conferencia-envio'), despesasIa('conferencia-envio')],
   },
+  {
+    nome: 'despesas-escalada', script: 'provision-flow-despesas-escalada.ps1', flows: ['Flow Despesas | Escalada ao gestor'],
+    arquivos: [script('despesas-escalada'), flowsDir('despesas-escalada\\.json')],
+  },
   { nome: 'despesas-ia', script: 'provision-flow-despesas-ia.ps1', flows: ['Flow Despesas | Análise IA'], preparo: 'despesas-ia', arquivos: [script('despesas-ia'), despesasIa()] },
   {
     nome: 'despesas-leitura-rapida', script: 'provision-flow-despesas-leitura-rapida.ps1', flows: ['Flow Despesas | Leitura rápida'], preparo: 'despesas-ia',
