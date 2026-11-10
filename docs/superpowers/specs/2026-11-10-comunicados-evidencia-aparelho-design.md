@@ -72,12 +72,12 @@ O PDF da Fase 1 passa a mostrar esses dados.
 ## Ordem de implantação no DEV (dependências)
 
 1. Schema: as 2 colunas e o parâmetro opcional nas 2 Custom APIs (`scripts/provision-comunicados.ps1` do App).
-2. Worker: `wrangler deploy` e `wrangler secret put IP_STAMP_SECRET`.
-3. Plugin: merge do PR do Sistema → Deploy, mais a configuração segura nos 2 steps (Abrir e Registrar ciência) com o mesmo segredo.
-4. App: merge do PR do App → Deploy do App.
-5. Shell: vai junto no Deploy do passo 3.
+2. Worker: `wrangler deploy` e `wrangler secret put IP_STAMP_SECRET`. O segredo é **único**: o Worker atende DEV e PROD.
+3. Plugin: merge do PR do Sistema → Deploy (o shell vai junto).
+4. Steps: o provision do App, com `-IpStampSecretFile`, recria `new_AbrirComunicadoMotorista` e `new_RegistrarCienciaComunicado` sem `PluginTypeId` (padrão do Termo) e registra um step stage 40 em cada uma, com o segredo na configuração segura. Com `PluginTypeId` a API não tem step e não há onde guardar o segredo.
+5. App: merge do PR do App → Deploy do App.
 
-O plugin novo sem as colunas falha ao gravar, por isso o passo 1 vem antes do 3. O App novo sem o parâmetro na API recebe erro de parâmetro desconhecido, por isso o passo 1 vem antes do 4.
+O plugin novo sem as colunas falha ao gravar, por isso o passo 1 vem antes do 3. O App novo sem o parâmetro na API recebe erro de parâmetro desconhecido, por isso o passo 1 vem antes do 5. Recriar as APIs gera um `customapiid` novo e as deixa fora do ar por alguns segundos; nunca rodar junto com um Deploy.
 
 ## Verificação
 
@@ -86,4 +86,4 @@ O plugin novo sem as colunas falha ao gravar, por isso o passo 1 vem antes do 3.
 - App: teste do montador da evidência (GPS negado, tempo esgotado e Worker fora) e do envio do parâmetro.
 - Shell: teste do domínio e do PDF com e sem evidência.
 - DEV: assinar com o App real (aceitando e negando o GPS), conferir as colunas no Dataverse e gerar o PDF.
-- PROD: os passos 1 a 4 ficam documentados no PR. O segredo de PROD é diferente do de DEV.
+- PROD: os passos ficam documentados no PR. O segredo é o mesmo do DEV. A troca das 2 APIs por step stage 40 entra no mesmo roteiro de secureSteps do Termo (o import pelas soluções pode conflitar com o `customapiid` novo).
