@@ -6,7 +6,7 @@ description: "Verifica o flow agendado 'Flow Despesas | Escalada ao gestor' (des
 
 ## Cobre
 - `packages/deploy/provision-flow-despesas-escalada.ps1` e `packages/deploy/flows/despesas-escalada.json` (entrega E de `docs/superpowers/specs/2026-11-10-despesa-devolucao-design.md`).
-- Regra: todo dia às 07:30 (Brasília), despesa com `cr40f_statusoperacional` = Precisa corrigir (100000001), `new_aguardandogestor` ≠ Sim e `modifiedon` há mais de 3 dias recebe `new_aguardandogestor` = Sim. Nada mais é gravado (status e motivo ficam).
+- Regra: todo dia às 07:30 (Brasília), despesa com `cr40f_statusoperacional` = Precisa corrigir (100000001), `new_aguardandogestor` ≠ Sim, criada a partir de 10/11/2026 (`createdon` ≥ 2026-11-10T03:00:00Z; decisão do Renan: as antigas ficam de fora) e `modifiedon` há mais de 3 dias recebe `new_aguardandogestor` = Sim. Nada mais é gravado (status e motivo ficam).
 
 ## Sem DEV (qualquer ambiente, inclusive cloud)
 1. `node --test packages/deploy/flows/despesas-escalada.test.mjs packages/deploy/flows-dev.test.mjs` → gatilho, limite de 3 dias em UTC, filtro, campo gravado, Terminate em falha, BOM e entrada na tabela do Deploy.
