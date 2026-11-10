@@ -1,0 +1,68 @@
+/* Checklist de vistoria do veículo. Reaproveita o formulário da colisão e a lista de comunicados;
+   aqui ficam só os acréscimos, com valores do Design System Betinhos. */
+.checklist-form { gap: 12px; }
+.checklist-summary { flex-wrap: wrap; }
+.checklist-summary small { flex-basis: 100%; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.42; }
+.checklist-instruction { margin: 2px 0 0; color: #64748b; font-size: 12px; font-weight: 500; line-height: 1.42; }
+.checklist-field-instruction { margin: -4px 0 8px; }
+.checklist-photo-item:focus { outline: 0; }
+.checklist-photo-item:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-number { display: flex; align-items: center; gap: 8px; }
+.checklist-number input { flex: 1 1 auto; min-width: 0; font-variant-numeric: tabular-nums; }
+.checklist-unit { flex: 0 0 auto; min-width: 28px; color: #64748b; font-size: 13px; font-weight: 700; }
+.checklist-loading { margin: 0; padding: 16px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f7f9fc; color: #64748b; font-size: 13px; }
+.checklist-notice { margin: 8px 0 0; padding: 10px 12px; border: 1px solid #147a4b; border-radius: 10px; background: #eaf8f1; color: #147a4b; font-size: 13px; font-weight: 700; }
+
+/* Checklist enviado: respostas em blocos neutros. */
+.comunicado-detail-meta[data-checklist-state="concluido"] span { background: #eaf8f1; color: #147a4b; }
+.checklist-answers { display: grid; gap: 8px; margin: 14px 0 0; }
+.checklist-answers > div { min-width: 0; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfb; }
+.checklist-answers dt { color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.checklist-answers dd { margin: 2px 0 0; color: #0f172a; font-size: 14px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.checklist-answer-links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.checklist-answer-links a { display: inline-flex; align-items: center; min-height: 44px; color: #2159d2; font-weight: 700; }
+
+/* Destaque em Serviços e na lista: mesmo par semântico do comunicado (atenção = pendente, sucesso = enviado). */
+.services-panel .checklist-service-item { margin-bottom: 12px; }
+.services-panel .checklist-service-item[data-checklist-state="pendente"] .agenda-label { background: #fff7df !important; color: #856000 !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-card { background: #fcfcfb !important; box-shadow: none !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-label { background: #eaf8f1 !important; color: #147a4b !important; }
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-time strong,
+.services-panel .checklist-service-item[data-checklist-state="concluido"] .agenda-trajectory strong { color: #64748b !important; }
+
+/* Item OK / Não OK. Valores do Design System: sucesso #147a4b/#eaf8f1, erro #c12f45/#fff0f3 (texto #9f2940),
+   seleção azul #2159d2/#edf3ff só no problema escolhido; campos neutros em #fcfcfb. */
+.checklist-oknok:focus { outline: 0; }
+.checklist-oknok:focus-visible { border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-oknok.is-ok { border-color: #147a4b; }
+.checklist-oknok-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.checklist-oknok-choice button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfb; color: #0f172a; font: 700 14px/1 "Manrope", "Segoe UI", sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.checklist-oknok-choice button svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.checklist-oknok-choice button:active:not(:disabled) { transform: scale(.97); }
+.checklist-oknok-choice .is-ok[aria-pressed="true"] { border-color: #147a4b; background: #eaf8f1; color: #147a4b; }
+.checklist-oknok-choice .is-nok[aria-pressed="true"] { border-color: #c12f45; background: #fff0f3; color: #9f2940; }
+.checklist-oknok-detail { display: grid; gap: 10px; }
+.checklist-oknok-label { margin: 0; color: #64748b; font-size: 12px; font-weight: 800; }
+.checklist-oknok-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.checklist-oknok-chips button { min-height: 44px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fcfcfb; color: #0f172a; font: 600 13px/1 "Manrope", "Segoe UI", sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(.23, 1, .32, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.checklist-oknok-chips button:active:not(:disabled) { transform: scale(.97); }
+.checklist-oknok-chips button[aria-pressed="true"] { border-color: #2159d2; background: #edf3ff; color: #2159d2; font-weight: 800; }
+.checklist-oknok-choice button:focus-visible,
+.checklist-oknok-chips button:focus-visible { outline: 0; border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-oknok-choice button:disabled,
+.checklist-oknok-chips button:disabled { opacity: .55; cursor: not-allowed; }
+/* Observação do Não OK: fica fora do .finalize-input-block, então repete aqui o campo de texto dos formulários
+   (Gastos, Solicitar manutenção) com o foco azul do Design System. Tipografia e placeholder vêm de .form-control-textarea. */
+.checklist-oknok-note { width: 100%; min-height: 76px; padding: 9px 11px; border: 1px solid rgba(0, 26, 61, .07); border-radius: 12px; background: #fcfcfb; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65); resize: vertical; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.checklist-oknok-note:focus { outline: 0; border-color: #6c91e8; box-shadow: 0 0 0 3px rgba(33, 89, 210, .11); }
+.checklist-oknok-note:disabled { opacity: .55; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .checklist-oknok-choice button:not(:disabled):not([aria-pressed="true"]):hover,
+  .checklist-oknok-chips button:not(:disabled):not([aria-pressed="true"]):hover { border-color: #c7d2e2; background: #f7f9fc; }
+}
+
+/* Checklist enviado: Não OK no topo, com selo e problemas. */
+.checklist-answers > div.is-nok { border-color: #f2c2cc; }
+.checklist-answer-nok { display: grid; justify-items: start; gap: 4px; }
+.checklist-answer-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff0f3; color: #9f2940; font-size: 11px; font-weight: 800; }
+.checklist-answer-note { color: #475569; font-weight: 500; }

@@ -1,0 +1,44 @@
+node_modules
+dist/
+scripts/.driver-record-sharing-runners/
+outputs/service-vehicle-tracker-*.json
+outputs/service-vehicle-tracker-*.csv
+scripts/update-service-vehicles-from-tracker.console.js
+backup/exchange-lifecycle/
+backup/comunicados/
+tmp/
+.tmp/
+.dev-backups/
+**/bin/
+**/obj/
+**/graphify-out/cache/
+**/graphify-out/20??-??-??/
+*.zip
+plugins/ExpenseUpload/ExpenseUpload.snk
+.playwright-cli/
+
+# Memória local de sessões (Memsearch)
+.memsearch/
+
+.verificacao/
+.worktrees/
+backup/prod-deploy/
+backup/prod-active-layers/
+.verificacao/
+.audit/
+
+# graphify (grafo gerado localmente)
+graphify-out/
+
+# Claude Code: versiona só skills, hooks e settings do projeto (valem também nas VMs cloud)
+.claude/*
+!.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
+
+# Estado local da skill here.now (contém token de reivindicação)
+.herenow/
+
+# Snapshot local da virada do aviso ao motorista
+backup/aviso-motorista/
+backup/flow-troca-motorista/

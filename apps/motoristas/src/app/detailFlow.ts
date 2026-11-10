@@ -1,0 +1,67 @@
+import type { ExpensePhoto } from "../features/despesas/expenses";
+import type { DetailData, Screen } from "../types";
+
+function getDetailFieldValue(detail: DetailData, label: string) {
+  return detail.fields.find((field) => field.label.toLowerCase() === label.toLowerCase())?.value ?? "";
+}
+
+function isTrueLike(value: unknown) {
+  return value === true || value === 1 || value === "true";
+}
+
+export function shouldRequireReceiveStep(detail: DetailData) {
+  return (
+    detail.type === "SERVICO" &&
+    (
+      detail.actions.includes("receber") ||
+      isTrueLike(detail.dataverse?.record?.cr40f_receber) ||
+      getDetailFieldValue(detail, "Receber").trim().toLowerCase() === "sim"
+    )
+  );
+}
+
+export function shouldRouteServiceToVoucher(detail: DetailData) {
+  return detail.type === "SERVICO" && /tenn?aris/i.test(getDetailFieldValue(detail, "Cliente"));
+}
+
+export function getServiceTaskBackScreen(detail: DetailData): Screen {
+  return shouldRequireReceiveStep(detail) ? "receber" : "servicos";
+}
+
+export function hasReceiveProofs(detail: DetailData, receiveProofs: Record<string, ExpensePhoto[]>) {
+  return (receiveProofs[detail.id]?.length ?? 0) > 0;
+}
+
+type ReceiveProofState = {
+  receiveProofs: Record<string, ExpensePhoto[]>;
+  receiveUploadedCounts: Record<string, number>;
+  remoteMode: boolean;
+  // Comprovante dispensado (ex.: cobrança por QR paga no valor total).
+  proofWaived: boolean;
+};
+
+// O serviço ainda precisa passar pela tela Receber antes de finalizar ou abrir o voucher.
+export function isReceiveStepPending(detail: DetailData, state: ReceiveProofState) {
+  return (
+    shouldRequireReceiveStep(detail) &&
+    !state.proofWaived &&
+    (!hasReceiveProofs(detail, state.receiveProofs) ||
+      (state.remoteMode && !hasUploadedReceiveProofs(detail, state.receiveProofs, state.receiveUploadedCounts)))
+  );
+}
+
+export function hasUploadedReceiveProofs(
+  detail: DetailData,
+  receiveProofs: Record<string, ExpensePhoto[]>,
+  receiveUploadedCounts: Record<string, number>
+) {
+  const proofCount = receiveProofs[detail.id]?.length ?? 0;
+  return proofCount > 0 && receiveUploadedCounts[detail.id] === proofCount;
+}
+
+// Depois de um QR pago: no valor total segue a mesma rota do FINALIZAR do Recebimento (voucher ou finalizar);
+// em parte volta ao Recebimento para a foto do restante.
+export function getScreenAfterQrPayment(detail: DetailData, coversReceivable: boolean): Screen {
+  if (!coversReceivable) return "receber";
+  return shouldRouteServiceToVoucher(detail) ? "voucher" : "finalizar";
+}

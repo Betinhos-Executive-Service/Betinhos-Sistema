@@ -1,0 +1,620 @@
+import { useEffect, useRef, useState } from "react";
+import { useDados } from "../../app/DataProvider";
+import { createPortal } from "react-dom";
+import { reportAppError } from "../../shared/appErrorLogger";
+import { AppShell } from "../../shared/ui/layout/AppShell";
+import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
+import { FieldError, FormField, TextAreaControl, TextInputControl } from "../../shared/ui/FormFields";
+import { PhotoAddButton } from "../../shared/ui/PhotoAddButton";
+import { FormMenu } from "../../shared/ui/navigation/FormMenu";
+import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
+import { ChecklistAgendaCard } from "./ChecklistAgendaCard";
+import { ChecklistOkNokField } from "./ChecklistOkNokField";
+import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
+import { SendStepsOverlay } from "../../shared/ui/SendStepsOverlay";
+import { useCameraScroll } from "../../app/cameraScroll";
+import { describeChecklistSend, holdChecklistSend, type ChecklistSendState } from "./checklistSend";
+import { clearMediaDraft, loadMediaDraft, saveMediaDraft } from "../fotos/mediaDraftStore";
+
+import {
+  buildChecklistRespostasJson,
+  CHECKLIST_MAX_FOTOS_POR_ITEM,
+  CHECKLIST_MAX_TEXTO,
+  checklistDraftKey,
+  checklistPhotoItems,
+  countChecklistProgress,
+  createChecklistDraft,
+  setChecklistOkNok,
+  setChecklistValor,
+  isChecklistPending,
+  isMockChecklists,
+  uploadChecklistPhotoMock,
+  toggleChecklistProblema,
+  validateChecklistDraft,
+  type ChecklistDraft,
+  type ChecklistFotoEnviada,
+  type ChecklistItem,
+  type ChecklistResposta,
+  type ChecklistVeiculo
+} from "./checklists";
+
+export type ChecklistsLoadStatus = "loading" | "ready" | "error";
+
+type Props = {
+  items: ChecklistVeiculo[];
+  loadStatus?: ChecklistsLoadStatus;
+  selectedId: string;
+  onSelectedIdChange: (id: string) => void;
+  onBack: () => void;
+  /** Quando definido, o Voltar no detalhe chama isto em vez de voltar para a lista (ex.: aberto pela aba Serviços). */
+  onCloseDetail?: () => void;
+  onReload: () => Promise<void>;
+};
+
+type PhotoView = { chave: string; dataUrl: string; photoId: string };
+
+const PHOTO_MAX_SIDE = 1600;
+const PHOTO_QUALITY = 0.8;
+
+// Reduz a foto antes de guardar no aparelho e enviar: 8+ fotos em resolução cheia passam do limite do rascunho.
+function shrinkPhotoDataUrl(dataUrl: string) {
+  return new Promise<string>((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
+      if (scale >= 1 && dataUrl.startsWith("data:image/jpeg")) return resolve(dataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return resolve(dataUrl);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(date);
+}
+
+function formatNumber(value: string, unidade: string) {
+  const number = Number(value);
+  if (!value || !Number.isFinite(number)) return value || "—";
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number)}${unidade ? ` ${unidade}` : ""}`;
+}
+
+// No checklist enviado, os itens Não OK aparecem primeiro; o resto mantém a ordem do modelo.
+const orderChecklistAnswers = (answers: ChecklistResposta[]) => [
+  ...answers.filter((answer) => answer.tipo === "okNok" && answer.valor === "nok"),
+  ...answers.filter((answer) => !(answer.tipo === "okNok" && answer.valor === "nok"))
+];
+
+const newPhotoId = () => globalThis.crypto?.randomUUID?.() ?? `foto-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const itemDomId = (chave: string) => `checklist-item-${chave}`;
+
+export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload }: Props) {
+  const dados = useDados();
+  const selected = items.find((item) => item.id === selectedId);
+  const pending = items.filter(isChecklistPending);
+  const completed = items.filter((item) => !isChecklistPending(item));
+
+  const [draft, setDraft] = useState<ChecklistDraft | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [pageError, setPageError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [send, setSend] = useState<ChecklistSendState | null>(null);
+  const [capturingChave, setCapturingChave] = useState("");
+  const [photoView, setPhotoView] = useState<PhotoView | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const saveTimerRef = useRef(0);
+  const sendingRef = useRef(false);
+  const cameraScroll = useCameraScroll(`checklist:${selectedId}`);
+  // Durante o envio (e no erro, até o motorista escolher) o formulário fica travado atrás do carregamento.
+  const locked = send !== null;
+  const sendView = send ? describeChecklistSend(send) : null;
+  const formPanelRef = useRef<HTMLElement | null>(null);
+  const focusSubmitRef = useRef(false);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
+
+  // Com o carregamento aberto, o formulário fica inerte: sem toque, foco ou leitura por trás do diálogo.
+  // Em "Voltar e revisar", o foco volta para "Enviar checklist".
+  useEffect(() => {
+    const panel = formPanelRef.current;
+    panel?.toggleAttribute("inert", locked);
+    if (!locked && focusSubmitRef.current) {
+      focusSubmitRef.current = false;
+      panel?.querySelector<HTMLButtonElement>(".finalize-primary")?.focus();
+    }
+  }, [locked]);
+
+  // Abre o rascunho salvo no aparelho; sem rascunho, começa com o KM sugerido pela Infleet.
+  useEffect(() => {
+    setErrors({});
+    setPageError("");
+    setCapturingChave("");
+    setPhotoView(null);
+    if (!selected || !isChecklistPending(selected)) { setDraft(null); return; }
+    let alive = true;
+    const fresh = createChecklistDraft(selected);
+    setDraft(fresh);
+    loadMediaDraft<ChecklistDraft>(checklistDraftKey(selected.id))
+      .then((saved) => { if (alive && saved?.checklistId === selected.id) setDraft(saved); })
+      .catch((cause) => reportAppError(cause, { severity: "warning", source: "checklists", action: "loadDraft", screen: "Checklists", detailId: selected.id, detailType: "CHECKLIST", notifyUser: false }));
+    return () => { alive = false; };
+  }, [selected?.id, selected?.estado]);
+
+  const persist = (next: ChecklistDraft) => {
+    window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      saveMediaDraft(next, checklistDraftKey(next.checklistId)).catch((cause) => {
+        reportAppError(cause, { severity: "warning", source: "checklists", action: "saveDraft", screen: "Checklists", detailId: next.checklistId, detailType: "CHECKLIST", notifyUser: false });
+        setPageError("Não foi possível guardar o progresso neste aparelho. Envie o checklist antes de fechar o app.");
+      });
+    }, 400);
+  };
+
+  useEffect(() => () => window.clearTimeout(saveTimerRef.current), []);
+
+  const updateDraft = (change: (current: ChecklistDraft) => ChecklistDraft) => {
+    setDraft((current) => {
+      if (!current) return current;
+      const next = { ...change(current), updatedAt: new Date().toISOString() };
+      persist(next);
+      return next;
+    });
+  };
+
+  const clearError = (chave: string) => setErrors((current) => {
+    if (!current[chave]) return current;
+    const next = { ...current };
+    delete next[chave];
+    return next;
+  });
+
+  const openItem = (id: string) => {
+    setNotice("");
+    onSelectedIdChange(id);
+  };
+
+  const closeDetail = () => {
+    if (locked) return;
+    if (onCloseDetail) onCloseDetail();
+    else onSelectedIdChange("");
+  };
+
+  const refresh = async () => {
+    setPageError("");
+    try { await onReload(); }
+    catch (cause) {
+      reportAppError(cause, { source: "checklists", action: "refresh", phase: "reload", screen: "Checklists", detailId: selectedId, detailType: "CHECKLIST", notifyUser: false });
+      setPageError("Não foi possível atualizar os checklists. Tente novamente.");
+    }
+  };
+
+  const confirmPhoto = () => {
+    if (!photoView) return;
+    const { chave, dataUrl, photoId } = photoView;
+    if (!photoId) {
+      updateDraft((current) => ({ ...current, fotos: { ...current.fotos, [chave]: [...(current.fotos[chave] ?? []), { id: newPhotoId(), dataUrl }] } }));
+      clearError(chave);
+    }
+    setPhotoView(null);
+  };
+
+  const deletePhoto = () => {
+    if (!photoView?.photoId) return;
+    const { chave, photoId } = photoView;
+    updateDraft((current) => {
+      const enviadas = { ...(current.enviadas ?? {}) };
+      delete enviadas[photoId];
+      return { ...current, enviadas, fotos: { ...current.fotos, [chave]: (current.fotos[chave] ?? []).filter((photo) => photo.id !== photoId) } };
+    });
+    setPhotoView(null);
+  };
+
+  const submit = async () => {
+    if (!selected || !draft || sendingRef.current) return;
+    // O envio grava o rascunho a cada foto; um salvamento atrasado do formulário não pode sobrescrevê-lo.
+    window.clearTimeout(saveTimerRef.current);
+    setNotice("");
+    setPageError("");
+    const found = validateChecklistDraft(selected.itens, draft);
+    setErrors(found);
+    const firstInvalid = selected.itens.find((item) => found[item.chave]);
+    if (firstInvalid) {
+      setSend(null);
+      const count = Object.keys(found).length;
+      setPageError(`Revise ${count} ${count === 1 ? "item destacado" : "itens destacados"}.`);
+      document.getElementById(itemDomId(firstInvalid.chave))?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    sendingRef.current = true;
+    const checklistId = selected.id;
+    const draftKey = checklistDraftKey(checklistId);
+    let working = draft;
+    // Envio foto a foto; o link de cada uma fica no rascunho, então uma nova tentativa continua de onde parou.
+    // Fotos puras e fotos do Não OK sobem pela mesma fila.
+    const queue = checklistPhotoItems(selected.itens, working)
+      .flatMap((item) => (working.fotos[item.chave] ?? []).map((photo, index) => ({ item, photo, order: index + 1 })));
+    const total = queue.length;
+    const sentCount = () => queue.filter(({ photo }) => working.enviadas?.[photo.id]).length;
+    setSend({ phase: "uploading", current: sentCount() + 1, total });
+    const release = holdChecklistSend(checklistId);
+    try {
+      // Se a tela saiu no meio de um envio e voltou, espera o anterior e continua dos links que ele gravou.
+      if (await release.previous) {
+        const saved = await loadMediaDraft<ChecklistDraft>(draftKey).catch(() => null);
+        if (saved?.checklistId === working.checklistId) working = { ...working, enviadas: { ...(saved.enviadas ?? {}), ...(working.enviadas ?? {}) } };
+      }
+      if (!aliveRef.current) return;
+      await saveMediaDraft(working, draftKey).catch(() => undefined);
+      for (const { item, photo, order } of queue) {
+        if (working.enviadas?.[photo.id]) continue;
+        if (!aliveRef.current) return;
+        setSend({ phase: "uploading", current: sentCount() + 1, total });
+        const fileLabel = `${item.rotulo}-${order}`;
+        const sent: ChecklistFotoEnviada = isMockChecklists()
+          ? await uploadChecklistPhotoMock(`${fileLabel}.jpg`)
+          : await dados.enviarFotoChecklist({ checklistId, placa: selected.placa, solicitadoEm: selected.solicitadoEm, itemLabel: item.rotulo, order, dataUrl: photo.dataUrl });
+        working = { ...working, enviadas: { ...(working.enviadas ?? {}), [photo.id]: sent }, updatedAt: new Date().toISOString() };
+        // Grava o link antes de qualquer outra coisa: mesmo com a tela fechada, a foto não sobe de novo.
+        await saveMediaDraft(working, draftKey).catch(() => undefined);
+        if (!aliveRef.current) return;
+        setDraft(working);
+      }
+
+      if (!aliveRef.current) return;
+      setSend({ phase: "registering", total });
+      const uploaded: Record<string, ChecklistFotoEnviada[]> = {};
+      for (const { item, photo } of queue) {
+        const sent = working.enviadas?.[photo.id];
+        if (sent) uploaded[item.chave] = [...(uploaded[item.chave] ?? []), sent];
+      }
+      await dados.concluirChecklist(checklistId, buildChecklistRespostasJson(selected.itens, working, uploaded));
+      await clearMediaDraft(draftKey).catch(() => undefined);
+    } catch (cause) {
+      reportAppError(cause, {
+        source: "checklists",
+        action: "concluirChecklist",
+        phase: "upload-or-conclude",
+        screen: "Checklists",
+        detailId: checklistId,
+        detailType: "CHECKLIST",
+        payload: { fotosEnviadas: Object.keys(working.enviadas ?? {}).length },
+        notifyUser: false
+      });
+      if (!aliveRef.current) return;
+      setSend({ phase: "error", total, message: cause instanceof Error ? cause.message : "" });
+      sendingRef.current = false;
+      return;
+    } finally {
+      release.done();
+    }
+    if (!aliveRef.current) return;
+
+    // Registrado: mostra o sucesso enquanto a lista atualiza e só então volta.
+    setSend({ phase: "done", total });
+    const reloaded = onReload().then(() => true, (cause) => {
+      reportAppError(cause, { source: "checklists", action: "concluirChecklist", phase: "reload-after-conclude", screen: "Checklists", detailId: checklistId, detailType: "CHECKLIST", notifyUser: false });
+      return false;
+    });
+    const [listUpdated] = await Promise.all([reloaded, new Promise((resolve) => window.setTimeout(resolve, 1100))]);
+    if (!aliveRef.current) return;
+    setNotice("Checklist enviado. Obrigado pela vistoria.");
+    if (!listUpdated) setPageError("Checklist enviado, mas não foi possível atualizar a lista. Toque em Atualizar.");
+    setSend(null);
+    sendingRef.current = false;
+    if (onCloseDetail) onCloseDetail(); else onSelectedIdChange("");
+  };
+
+  const reviewAfterError = () => {
+    focusSubmitRef.current = true;
+    setSend(null);
+  };
+
+  // Fora do .screen-motion (que tem transform) e no mesmo lugar em todos os ramos, para não remontar.
+  const sendOverlay = send && sendView ? createPortal(
+    <SendStepsOverlay
+      status={sendView.status}
+      phaseClass={send.phase}
+      titleId="checklist-send-title"
+      title={sendView.title}
+      description={sendView.description}
+      progress={sendView.progress}
+      steps={sendView.steps}
+      liveText={sendView.statusText}
+      focusOnOpen
+      actions={[
+        { label: "Tentar de novo", onClick: () => void submit() },
+        { label: "Voltar e revisar", variant: "secondary", onClick: reviewAfterError }
+      ]}
+    />,
+    document.body
+  ) : null;
+
+  // A rolagem do formulário é guardada antes de abrir a câmera ou a prévia e volta junto com ele.
+  const openCamera = (chave: string) => {
+    cameraScroll.remember(chave);
+    setCapturingChave(chave);
+  };
+
+  const openPhoto = (chave: string, photoId: string, dataUrl: string) => {
+    cameraScroll.remember(chave);
+    setPhotoView({ chave, dataUrl, photoId });
+  };
+
+  // ---------- Câmera e prévia (telas cheias, como na colisão) ----------
+
+  const capturingItem = selected?.itens.find((item) => item.chave === capturingChave);
+  if (selected && capturingItem) {
+    return (
+      <MediaCaptureScreen
+        kind="NOTAFISCAL"
+        title={`Foto: ${capturingItem.rotulo}`}
+        onBack={() => setCapturingChave("")}
+        onCapture={(dataUrl) => {
+          const chave = capturingItem.chave;
+          // A câmera fica na tela até a foto reduzida ficar pronta: sem isso o formulário aparece por um
+          // instante entre a câmera e a prévia e a rolagem guardada se perde.
+          void shrinkPhotoDataUrl(dataUrl).then((small) => {
+            setCapturingChave("");
+            setPhotoView({ chave, dataUrl: small, photoId: "" });
+          });
+        }}
+        onSwitchCamera={() => undefined}
+      />
+    );
+  }
+
+  const viewingItem = selected?.itens.find((item) => item.chave === photoView?.chave);
+  if (selected && photoView && viewingItem) {
+    return (
+      <MaintenancePhotoPreviewScreen
+        kind="NOTAFISCAL"
+        title={viewingItem.rotulo}
+        prompt={photoView.photoId ? "Foto deste item." : "A foto está legível?"}
+        photoDataUrl={photoView.dataUrl}
+        onBack={() => setPhotoView(null)}
+        onRetake={() => { setPhotoView(null); setCapturingChave(viewingItem.chave); }}
+        onConfirm={photoView.photoId ? () => setPhotoView(null) : confirmPhoto}
+        onDelete={photoView.photoId ? deletePhoto : undefined}
+        confirmLabel={photoView.photoId ? "Voltar" : "Confirmar"}
+        deleteOnly={Boolean(photoView.photoId)}
+      />
+    );
+  }
+
+  // ---------- Detalhe pendente: formulário ----------
+
+  if (selected && isChecklistPending(selected)) {
+    const progressCount = draft ? countChecklistProgress(selected.itens, draft) : { done: 0, total: selected.itens.length };
+    return (
+      <>
+      <AppShell screenLabel="TelaChecklist">
+        <FormMenu title="Checklist do veículo" onBack={locked ? undefined : closeDetail} />
+        <section ref={formPanelRef} className="main-panel maintenance-request-main checklist-main">
+          <article className="finalize-card maintenance-request-card checklist-card">
+            <div className="finalize-scroll" ref={cameraScroll.ref}>
+              <div className="finalize-form maintenance maintenance-request-form checklist-form" aria-busy={sendView?.status === "busy"}>
+                <div className="collision-summary checklist-summary">
+                  <span>Veículo</span>
+                  <strong>{selected.placa || "Veículo da Betinhos"}</strong>
+                  <small>{progressCount.done} de {progressCount.total} itens preenchidos · progresso salvo neste aparelho</small>
+                </div>
+                {pageError ? <div className="form-error-summary" role="alert">{pageError}</div> : null}
+                {!draft ? <p className="checklist-loading" role="status">Carregando checklist…</p> : selected.itens.map((item) => item.tipo === "okNok" ? (
+                  <ChecklistOkNokField
+                    key={item.chave}
+                    item={item}
+                    draft={draft}
+                    domId={itemDomId(item.chave)}
+                    error={errors[item.chave]}
+                    disabled={locked}
+                    onChoose={(valor) => { updateDraft((current) => setChecklistOkNok(current, item.chave, valor)); clearError(item.chave); }}
+                    onToggleProblem={(problema) => {
+                      const { erro } = toggleChecklistProblema(draft, item.chave, problema);
+                      if (erro) { setErrors((current) => ({ ...current, [item.chave]: erro })); return; }
+                      updateDraft((current) => toggleChecklistProblema(current, item.chave, problema).draft);
+                      clearError(item.chave);
+                    }}
+                    onObservation={(texto) => updateDraft((current) => ({ ...current, observacoes: { ...(current.observacoes ?? {}), [item.chave]: texto } }))}
+                    onAddPhoto={() => openCamera(item.chave)}
+                    onOpenPhoto={(photoId, dataUrl) => openPhoto(item.chave, photoId, dataUrl)}
+                  />
+                ) : (
+                  <ChecklistField
+                    key={item.chave}
+                    item={item}
+                    draft={draft}
+                    error={errors[item.chave]}
+                    disabled={locked}
+                    onValue={(value) => { updateDraft((current) => setChecklistValor(current, item.chave, value)); clearError(item.chave); }}
+                    onAddPhoto={() => openCamera(item.chave)}
+                    onOpenPhoto={(photoId, dataUrl) => openPhoto(item.chave, photoId, dataUrl)}
+                  />
+                ))}
+              </div>
+            </div>
+            <ActionBar className="finalize-actions maintenance-actions">
+              <ActionButton className="finalize-primary" variant="primary" idleLabel="Enviar checklist" loadingLabel="Enviando checklist" successLabel="Checklist enviado" state={send?.phase === "done" ? "success" : send && send.phase !== "error" ? "loading" : "idle"} disabled={!draft} onClick={() => void submit()} />
+            </ActionBar>
+          </article>
+        </section>
+      </AppShell>
+      {sendOverlay}
+      </>
+    );
+  }
+
+  // ---------- Detalhe concluído e lista ----------
+
+  return (
+    <>
+    <AppShell screenLabel="Checklists">
+      <ServicesMenu
+        title="Checklist"
+        eyebrow={isMockChecklists() ? "Vistoria do veículo · Mock" : "Vistoria do veículo"}
+        homeLabel="Voltar"
+        homeIcon="arrowLeft"
+        onHome={selected ? closeDetail : onBack}
+        onRefresh={refresh}
+      />
+      <section className="comunicado-screen checklist-screen" aria-label={selected ? "Checklist enviado" : "Lista de checklists"}>
+        {pageError ? <p className="comunicado-error comunicado-page-error" role="alert">{pageError}</p> : null}
+        {selected ? (
+          <article className="comunicado-detail checklist-done">
+            <div className="comunicado-message">
+              <div className="comunicado-detail-meta" data-checklist-state="concluido">
+                <span>Checklist enviado</span>
+                <time>{formatDate(selected.concluidoEm)}</time>
+              </div>
+              <h2 className="comunicado-detail-title">{selected.placa ? `Veículo ${selected.placa}` : "Vistoria do veículo"}</h2>
+              <dl className="checklist-answers">
+                {orderChecklistAnswers(selected.respostas.length ? selected.respostas : selected.itens.map((item) => ({ chave: item.chave, rotulo: item.rotulo, tipo: item.tipo, valor: "", problemas: [], observacao: "", fotos: [] }))).map((answer) => {
+                  const item = selected.itens.find((entry) => entry.chave === answer.chave);
+                  const isNok = answer.tipo === "okNok" && answer.valor === "nok";
+                  return (
+                    <div key={answer.chave} className={isNok ? "is-nok" : undefined}>
+                      <dt>{answer.rotulo}</dt>
+                      <dd>
+                        {answer.tipo === "okNok" ? (isNok ? (
+                          <span className="checklist-answer-nok">
+                            <span className="checklist-answer-badge">Não OK</span>
+                            {answer.problemas.length ? <span>{answer.problemas.join(" · ")}</span> : null}
+                            {answer.observacao ? <span className="checklist-answer-note">{answer.observacao}</span> : null}
+                            {answer.fotos.length ? (
+                              <span className="checklist-answer-links">
+                                {answer.fotos.map((foto, index) => <a key={foto.link} href={foto.link} target="_blank" rel="noreferrer">Ver foto {index + 1}</a>)}
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : answer.valor === "ok" ? "OK" : "—")
+                        : answer.tipo === "foto" ? (answer.fotos.length ? (
+                          <span className="checklist-answer-links">
+                            {answer.fotos.map((foto, index) => <a key={foto.link} href={foto.link} target="_blank" rel="noreferrer">Ver foto {index + 1}</a>)}
+                          </span>
+                        ) : "Sem foto") : answer.tipo === "numero" ? formatNumber(answer.valor, item?.unidade ?? "") : answer.valor || "—"}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </div>
+          </article>
+        ) : (
+          <div className="comunicado-list services-panel checklist-list">
+            {notice ? <p className="checklist-notice" role="status">{notice}</p> : null}
+            {loadStatus === "loading" && !items.length ? (
+              <div className="comunicado-skeleton" role="status" aria-busy="true" aria-label="Carregando checklists">
+                <span /><span />
+              </div>
+            ) : loadStatus === "error" && !items.length ? (
+              <div className="comunicado-load-error" role="alert">
+                <p>Não foi possível carregar os checklists. Verifique a conexão e tente novamente.</p>
+                <ActionButton variant="secondary" idleLabel="Tentar novamente" loadingLabel="Carregando" state={retrying ? "loading" : "idle"} onClick={() => { setRetrying(true); void refresh().finally(() => setRetrying(false)); }} />
+              </div>
+            ) : <>
+              <h2>Para fazer <span>{pending.length}</span></h2>
+              {pending.length ? pending.map((item) => <ChecklistAgendaCard key={item.id} item={item} onOpen={openItem} />)
+                : <p className="comunicado-empty">Tudo em dia. A operação pede uma vistoria do seu carro a cada 15 dias e avisa por notificação.</p>}
+              {completed.length ? <><h2>Enviados</h2>{completed.map((item) => <ChecklistAgendaCard key={item.id} item={item} onOpen={openItem} />)}</> : null}
+            </>}
+          </div>
+        )}
+      </section>
+    </AppShell>
+    {sendOverlay}
+    </>
+  );
+}
+
+type FieldProps = {
+  item: ChecklistItem;
+  draft: ChecklistDraft;
+  error?: string;
+  disabled: boolean;
+  onValue: (value: string) => void;
+  onAddPhoto: () => void;
+  onOpenPhoto: (photoId: string, dataUrl: string) => void;
+};
+
+function ChecklistField({ item, draft, error, disabled, onValue, onAddPhoto, onOpenPhoto }: FieldProps) {
+  const inputId = `checklist-input-${item.chave}`;
+  if (item.tipo === "foto") {
+    const photos = draft.fotos[item.chave] ?? [];
+    const isComplete = photos.length > 0;
+    return (
+      <section id={itemDomId(item.chave)} tabIndex={-1} data-scroll-anchor={item.chave} className={`collision-evidence-group checklist-photo-item ${error ? "is-invalid" : ""} ${isComplete ? "is-complete" : ""}`}>
+        <div className="collision-evidence-group-head">
+          <div>
+            <strong>{item.rotulo}{item.obrigatorio ? <span className="form-field-required" aria-hidden="true"> *</span> : null}</strong>
+            {item.instrucao ? <p className="checklist-instruction">{item.instrucao}</p> : null}
+          </div>
+          <small>{photos.length ? `${photos.length} foto${photos.length === 1 ? "" : "s"}` : item.obrigatorio ? "Obrigatória" : "Opcional"}</small>
+        </div>
+        <div className="collision-evidence-strip">
+          {photos.map((photo, index) => (
+            <button type="button" className="collision-evidence-thumb" key={photo.id} disabled={disabled} onClick={() => onOpenPhoto(photo.id, photo.dataUrl)} aria-label={`Ver ${item.rotulo} ${index + 1}`}>
+              <img src={photo.dataUrl} alt={`${item.rotulo} ${index + 1}`} />
+              <small>{index + 1}</small>
+            </button>
+          ))}
+          {photos.length < CHECKLIST_MAX_FOTOS_POR_ITEM ? (
+            <PhotoAddButton disabled={disabled} onClick={onAddPhoto} ariaLabel={`Tirar foto: ${item.rotulo}`} label={isComplete ? "Adicionar" : "Tirar foto"} />
+          ) : null}
+        </div>
+        <FieldError error={error} />
+      </section>
+    );
+  }
+
+  const value = draft.valores[item.chave] ?? "";
+  return (
+    <div id={itemDomId(item.chave)} className="checklist-value-item">
+      <FormField label={item.rotulo} error={error} required={item.obrigatorio}>
+        {item.instrucao ? <p className="checklist-instruction checklist-field-instruction">{item.instrucao}</p> : null}
+        {item.tipo === "numero" ? (
+          <div className="checklist-number">
+            <TextInputControl
+              id={inputId}
+              inputMode="decimal"
+              autoComplete="off"
+              aria-label={item.rotulo}
+              aria-invalid={Boolean(error)}
+              placeholder={item.unidade === "km" ? "Ex.: 45210" : "Ex.: 75"}
+              value={value}
+              disabled={disabled}
+              onChange={(event) => onValue(event.target.value)}
+            />
+            {item.unidade ? <span className="checklist-unit" aria-hidden="true">{item.unidade}</span> : null}
+          </div>
+        ) : (
+          <TextAreaControl
+            id={inputId}
+            aria-label={item.rotulo}
+            aria-invalid={Boolean(error)}
+            rows={3}
+            maxLength={CHECKLIST_MAX_TEXTO}
+            placeholder="Escreva aqui, se precisar."
+            value={value}
+            disabled={disabled}
+            onChange={(event) => onValue(event.target.value)}
+          />
+        )}
+      </FormField>
+    </div>
+  );
+}
