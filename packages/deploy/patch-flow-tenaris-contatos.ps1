@@ -16,6 +16,8 @@
 #   - o cadastro de passageiros é lido só da Tenaris e o dedup/busca comparam o nome sem
 #     maiúsculas nem espaços nas pontas (duplicados criados no mesmo lote e homônimo de outro cliente).
 # Solicitante do serviço = Responsável da linha (era o passageiro 1) e passageiro reconhecido também pelo e-mail.
+# Desempenho: Update_BD_Existente só roda quando algo muda no cadastro (Condition_BD_Mudou) e List_rows_Cliente
+# lê só a Tenaris.
 # O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
@@ -115,7 +117,9 @@ foreach ($n in 'Compose_TodasPessoas', 'Filter_SemVazios', 'List_rows_BancodeDad
   if (@($cond.PSObject.Properties.Name) -notcontains $n) { throw "O flow não está no formato esperado: ação '$n' ausente." }
 }
 $loop = $cond.Loop_UpsertBD.actions
-$update = $loop.Condition_nome_nao_existe_ainda.else.actions.Update_BD_Existente.inputs.parameters
+$elseBD = $loop.Condition_nome_nao_existe_ainda.else.actions
+$temSoMudou = @($elseBD.PSObject.Properties.Name) -contains 'Condition_BD_Mudou'
+$update = $(if ($temSoMudou) { $elseBD.Condition_BD_Mudou.actions.Update_BD_Existente } else { $elseBD.Update_BD_Existente }).inputs.parameters
 $create = $loop.Condition_nome_nao_existe_ainda.actions.Add_a_new_row_BD_1.inputs.parameters
 if (@($loop.PSObject.Properties.Name) -notcontains 'Filter_BDLocal' -or -not $update -or -not $create) {
   throw 'O flow não está no formato esperado: Filter_BDLocal, Update_BD_Existente ou Add_a_new_row_BD_1 ausente no Loop_UpsertBD.'
@@ -139,12 +143,15 @@ if (-not $condUnico.actions.Append_to_array_variable_varNomesVistos -or -not $cr
 }
 $temIdentificacao = @($listaBD.inputs.parameters.PSObject.Properties.Name) -contains '$filter'
 $solicitante = $cond.Loop_Servicos.actions.Filter_array_Solicitante_First
-$mapaUpdate = $loop.Condition_nome_nao_existe_ainda.else.actions.Append_to_array_variable_varGUIDMap_2
+$mapaUpdate = $elseBD.Append_to_array_variable_varGUIDMap_2
+$listaCliente = $cond.List_rows_Cliente
+if (-not $listaCliente) { throw 'O flow não está no formato esperado: List_rows_Cliente ausente.' }
+$temClienteFiltro = @($listaCliente.inputs.parameters.PSObject.Properties.Name) -contains '$filter'
 if (-not $solicitante -or -not $mapaUpdate) { throw 'O flow não está no formato esperado: Filter_array_Solicitante_First ou Append_to_array_variable_varGUIDMap_2 ausente.' }
 $temSolicitante = $solicitante.inputs.where -like "*Responsável - Nome*"
 $temEmail = $loop.Filter_BDLocal.inputs.where -like "*cr40f_email*"
-if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao -and $temSolicitante -and $temEmail) {
-  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris, solicitante = responsável, passageiro reconhecido pelo e-mail); nada a alterar."
+if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao -and $temSolicitante -and $temEmail -and $temSoMudou -and $temClienteFiltro) {
+  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris, solicitante = responsável, passageiro reconhecido pelo e-mail, update só quando muda); nada a alterar."
   return
 }
 Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
@@ -225,6 +232,34 @@ if (-not $temEmail) {
   Write-Output '  Filter_BDLocal: nome ou e-mail; Update_BD_Existente mantém o nome do cadastro; varGUIDMap guarda o nome do lote'
 } else { Write-Output '  Reconhecimento por e-mail: já aplicado; sem mudança.' }
 
+# Desempenho: o Loop_UpsertBD (sequencial) regravava todo passageiro já cadastrado a cada sync. Update_BD_Existente
+# passa a rodar só quando o que ele gravaria difere do cadastro (telefone, e-mail, departamento preenchidos no lote,
+# classificação ou nome vazio); o mapa usa o id do Filter_BDLocal, que existe com ou sem update.
+if (-not $temSoMudou) {
+  $bd = "first(body('Filter_BDLocal'))"
+  $difere = foreach ($c in @(@('Telefone', 'cr40f_telefone'), @('Email', 'cr40f_email'), @('Departamento', 'cr40f_departamento'))) {
+    "and(not(empty(outputs('Compose_$($c[0])'))), not(equals(outputs('Compose_$($c[0])'), coalesce(${bd}?['$($c[1])'], ''))))"
+  }
+  $mudou = "@or($($difere -join ', '), not(equals(${bd}?['cr40f_classificacao'], 202410000)), empty(coalesce(${bd}?['cr40f_nomedopassageiro'], '')))"
+  $updAcao = $elseBD.Update_BD_Existente
+  $elseBD.PSObject.Properties.Remove('Update_BD_Existente')
+  $elseBD | Add-Member -NotePropertyName Condition_BD_Mudou -NotePropertyValue ([pscustomobject]@{
+      type = 'If'; expression = $mudou; runAfter = [pscustomobject]@{}
+      actions = [pscustomobject]@{ Update_BD_Existente = $updAcao }; else = [pscustomobject]@{ actions = [pscustomobject]@{} } })
+  $mapaUpdate.runAfter = After 'Condition_BD_Mudou'
+  $mapaUpdate.inputs.value.guidNativo = "@{${bd}?['cr40f_bancodedadosid']}"
+  $selBD = $listaBD.inputs.parameters
+  if ($selBD.'$select' -notlike '*cr40f_classificacao*') { $selBD.'$select' += ',cr40f_classificacao' }
+  Write-Output '  Loop_UpsertBD: Update_BD_Existente só quando muda (Condition_BD_Mudou); varGUIDMap usa o id do Filter_BDLocal; $select + cr40f_classificacao'
+} else { Write-Output '  Update só quando muda: já aplicado; sem mudança.' }
+
+# Desempenho: List_rows_Cliente lia a tabela inteira de clientes, com todas as colunas, para achar a Tenaris.
+if (-not $temClienteFiltro) {
+  $listaCliente.inputs.parameters | Add-Member -NotePropertyName '$select' -NotePropertyValue 'cr40f_clientes1id,cr40f_nomedocliente' -Force
+  $listaCliente.inputs.parameters | Add-Member -NotePropertyName '$filter' -NotePropertyValue "contains(cr40f_nomedocliente,'Tenaris')"
+  Write-Output "  List_rows_Cliente: `$filter contains(cr40f_nomedocliente,'Tenaris') e `$select do id e do nome"
+} else { Write-Output '  List_rows_Cliente: já filtrado; sem mudança.' }
+
 # cr40f_passageirosetelefonedecontato é derivado de cr40f_servicosporpassageiro + cr40f_bancodedados e tem um dono
 # só: o plugin DriverRecordSharing (ServicePassengerViewSynchronizer). O texto da planilha continua no snapshot.
 if ($gravaPax) {
@@ -282,7 +317,9 @@ if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'F
   @(($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Scope_1_1.actions.PSObject.Properties.Name) -notcontains 'Select_Falhas' -or
   @($condSalvo.List_rows_BancodeDados_Completo.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter' -or
   $condSalvo.Loop_Servicos.actions.Filter_array_Solicitante_First.inputs.where -notlike "*Responsável - Nome*" -or
-  $condSalvo.Loop_UpsertBD.actions.Filter_BDLocal.inputs.where -notlike "*cr40f_email*") {
-  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas, filtro da Tenaris, solicitante pelo Responsável ou busca por e-mail ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
+  $condSalvo.Loop_UpsertBD.actions.Filter_BDLocal.inputs.where -notlike "*cr40f_email*" -or
+  -not $condSalvo.Loop_UpsertBD.actions.Condition_nome_nao_existe_ainda.else.actions.Condition_BD_Mudou -or
+  @($condSalvo.List_rows_Cliente.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter') {
+  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas, filtro da Tenaris, solicitante pelo Responsável, busca por e-mail, Condition_BD_Mudou ou filtro do List_rows_Cliente ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
 }
 Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($conf.statecode))."
