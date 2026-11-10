@@ -2,7 +2,7 @@ param(
   # Commit de referencia: no Deploy, o HEAD da develop; na trava do publicar.yml, o commit levado ao PROD.
   [string] $Ate = 'HEAD',
   [string] $EnvironmentUrl = $env:DV_ENVIRONMENT_URL,
-  # Linhas tela=..., webresources=..., formulario=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
+  # Linhas tela=..., webresources=..., formulario=..., motoristas=..., motoristas_sw=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
   [switch] $GitHub
 )
 
@@ -10,6 +10,8 @@ param(
 #  - tela: descricao do cr40f_SistemaBetinhos.html ("vX.Y.Z <sha>", push-dev.ps1);
 #  - webresources: descricao de Tela_GerarPagantes/index.html ("vX.Y.Z <sha>", push-webresources-dev.ps1);
 #  - formulario: descricao de new_formulario_geral.html ("vX.Y.Z <sha>", push-formulario-dev.ps1);
+#  - motoristas e motoristasSw: descricao de new_app-motoristas-v2 e new_app-motoristas-v2-sw ("vX.Y.Z <sha>",
+#    apps/motoristas/scripts/push-front-dev.ps1). O commit gravado pelo repositorio antigo (app-motoristas-v2) nao existe aqui: conta como pendente;
 #  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin e do Betinhos.DriverRecordSharing (<sha>, gravada no CI).
 # Pendente = sem commit registrado, assembly ausente no DEV, ou git diff <registrado> $Ate tocando a peca
 # (regras em mudancas-dev.mjs). Comparar com o que o DEV tem, e nao com o push anterior, faz um deploy cancelado na fila
@@ -71,6 +73,8 @@ function Test-WebResourcePendente([string] $Nome, [string] $Peca) {
 $tela = Test-WebResourcePendente 'cr40f_SistemaBetinhos.html' 'tela'
 $webresources = Test-WebResourcePendente 'Tela_GerarPagantes/index.html' 'webresources'
 $formulario = Test-WebResourcePendente 'new_formulario_geral.html' 'formulario'
+$motoristas = Test-WebResourcePendente 'new_app-motoristas-v2' 'motoristas'
+$motoristasSw = Test-WebResourcePendente 'new_app-motoristas-v2-sw' 'motoristasSw'
 
 $plugins = New-Object System.Collections.Generic.List[string]
 $assemblies = @{}
@@ -89,5 +93,5 @@ foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | S
 }
 
 foreach ($linha in $motivos) { [Console]::Error.WriteLine("[pendentes] $linha") }
-if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "formulario=$($formulario.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
-else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; formulario = $formulario; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }
+if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "formulario=$($formulario.ToString().ToLowerInvariant())"; "motoristas=$($motoristas.ToString().ToLowerInvariant())"; "motoristas_sw=$($motoristasSw.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
+else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; formulario = $formulario; motoristas = $motoristas; motoristasSw = $motoristasSw; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }

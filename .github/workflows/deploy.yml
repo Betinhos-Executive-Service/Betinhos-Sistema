@@ -5,6 +5,8 @@ name: Deploy
 # O que publicar sai de pendentes-dev.ps1: compara o commit que o DEV registra em cada peça (descrição da tela e de cada
 # assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing) com o HEAD. Assim um deploy cancelado na fila ou uma publicação local nunca deixa peça para trás,
 # e o publicar.yml usa os mesmos registros para nunca levar ao PROD tela ou plugin que ainda não entrou na main.
+# App Motoristas (apps/motoristas, desde a fase 2 da migração do app-motoristas-v2): o app e o service worker pendentes saem
+# por apps/motoristas/scripts/push-front-dev.ps1, que só atualiza web resource que já existe (sem distribuição).
 # Flows: cada packages/deploy/provision-flow-*.ps1 cujos arquivos mudaram desde a tag flows-dev-publicado (flows-dev.mjs) roda
 # na conta de serviço (az login do service principal) e só atualiza flow que já existe no DEV (push-flows-dev.ps1). Flow novo,
 # schema (provision-* sem flow) e sitemap:* continuam à mão: o flow novo nasce com dono na conta de serviço e não liga, e o
@@ -34,6 +36,12 @@ on:
       - '!apps/formulario-geral/power-platform/**'
       - '!apps/formulario-geral/scripts/provision-*'
       - 'packages/deploy/push-formulario-dev.ps1'
+      # App Motoristas (decisão de mudanças em mudancas-dev.mjs: teste, documentação e script que não entra no build não publicam).
+      - 'apps/motoristas/**'
+      - '!apps/motoristas/tests/**'
+      - '!apps/motoristas/docs/**'
+      - '!apps/motoristas/**/*.md'
+      - '!apps/motoristas/.claude/**'
       - 'packages/dataverse/**'
       - 'pnpm-lock.yaml'
       - 'packages/deploy/push-dev.ps1'
@@ -73,6 +81,10 @@ on:
         description: 'Publicar o Formulário Geral mesmo sem mudança'
         type: boolean
         default: false
+      forcar_motoristas:
+        description: 'App Motoristas a publicar mesmo sem mudança: app, sw ou app,sw; vazio = só o que está pendente'
+        type: string
+        default: ''
       forcar_plugins:
         description: 'Plugins a publicar mesmo sem mudança (frota,acesso,driverrecordsharing ou todos); vazio = só os pendentes'
         type: string
@@ -123,6 +135,7 @@ jobs:
           FORCAR_WEBRESOURCES: ${{ inputs.forcar_webresources }}
           FORCAR_FORMULARIO: ${{ inputs.forcar_formulario }}
           FORCAR_PLUGINS: ${{ inputs.forcar_plugins }}
+          FORCAR_MOTORISTAS: ${{ inputs.forcar_motoristas }}
         run: |
           $saida = @(powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -GitHub)
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
@@ -130,15 +143,22 @@ jobs:
           $webresources = ($saida -contains 'webresources=true') -or ($env:FORCAR_WEBRESOURCES -eq 'true')
           $formulario = ($saida -contains 'formulario=true') -or ($env:FORCAR_FORMULARIO -eq 'true')
           $plugins = (($saida | Where-Object { $_ -like 'plugins=*' }) -replace '^plugins=', '')
+          # App Motoristas: peças app (HTML, precisa de build) e sw (cópia da fonte), na lista que push-front-dev.ps1 recebe.
+          $motoristas = @()
+          if ($saida -contains 'motoristas=true') { $motoristas += 'app' }
+          if ($saida -contains 'motoristas_sw=true') { $motoristas += 'sw' }
+          if ($env:FORCAR_MOTORISTAS) { $motoristas += @($env:FORCAR_MOTORISTAS.Split(',') | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ }) }
+          $motoristas = (@($motoristas | Sort-Object -Unique) -join ',')
           if ($env:FORCAR_PLUGINS) { $plugins = (@($plugins.Split(',') + $env:FORCAR_PLUGINS.Split(',')) | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ } | Sort-Object -Unique) -join ',' }
           if (($env:FORCAR_PLUGINS -split ',' | ForEach-Object { $_.Trim() }) -contains 'todos') { $plugins = 'todos' }
           "tela=$($tela.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "webresources=$($webresources.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "formulario=$($formulario.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }; if ($formulario) { '--filter @betinhos/formulario-geral...' }) -join ' '
+          $instalar = @(if ($tela) { '--filter @betinhos/shell...' }; if ($webresources) { '--filter @betinhos/gerar-pagantes...' }; if ($formulario) { '--filter @betinhos/formulario-geral...' }; if ($motoristas -split ',' -contains 'app') { '--filter @betinhos/motoristas...' }) -join ' '
           "instalar=$instalar" >> $env:GITHUB_OUTPUT
           "plugins=$plugins" >> $env:GITHUB_OUTPUT
-          Write-Host "tela: $tela; webresources: $webresources; formulario: $formulario; plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
+          "motoristas=$motoristas" >> $env:GITHUB_OUTPUT
+          Write-Host "tela: $tela; webresources: $webresources; formulario: $formulario; motoristas: $(if ($motoristas) { $motoristas } else { 'nada' }); plugins: $(if ($plugins) { $plugins } else { 'nenhum' })"
 
       # Flows. A base é a tag flows-dev-publicado (mesmo padrão da prod-publicado do producao.yml); sem tag nada fica pendente
       # e o job final cria a tag no HEAD. O diff compara só as árvores dos dois commits, então basta buscar a tag com depth=1.
@@ -202,6 +222,14 @@ jobs:
       - name: Publicar o Formulário Geral
         if: steps.pendentes.outputs.formulario == 'true'
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-formulario-dev.ps1
+
+      # App Motoristas: só atualiza o web resource que já existe (não mexe em solução, então fica fora da distribuição).
+      - name: Publicar o App Motoristas
+        id: motoristas
+        if: steps.pendentes.outputs.motoristas != ''
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File apps/motoristas/scripts/push-front-dev.ps1 -Pecas "${{ steps.pendentes.outputs.motoristas }}"
+          if ($LASTEXITCODE -ne 0) { throw 'push-front-dev.ps1 do App Motoristas falhou.' }
 
       # Plugins
       - if: steps.pendentes.outputs.plugins != ''
@@ -288,9 +316,10 @@ jobs:
             if [ "${{ steps.pendentes.outputs.tela }}" = "true" ]; then echo "Tela publicada no DEV - v$(node -p "require('./apps/shell/package.json').version")"; fi
             if [ "${{ steps.pendentes.outputs.webresources }}" = "true" ]; then echo; echo "Tela Gerar Pagantes publicada no DEV - v$(node -p "require('./apps/gerar-pagantes/package.json').version")"; fi
             if [ "${{ steps.pendentes.outputs.formulario }}" = "true" ]; then echo; echo "Formulário Geral publicado no DEV - v$(node -p "require('./apps/formulario-geral/version.json').version")"; fi
+            if [ -n "${{ steps.pendentes.outputs.motoristas }}" ]; then echo; echo "App Motoristas no DEV (${{ steps.motoristas.outcome }}): ${{ steps.pendentes.outputs.motoristas }} - v${{ steps.motoristas.outputs.versao }}"; fi
             if [ -n "${{ steps.pendentes.outputs.plugins }}" ]; then echo; echo "Plugins publicados no DEV: ${{ steps.pendentes.outputs.plugins }}"; fi
             if [ -n "${{ steps.flowspend.outputs.flows }}" ]; then echo; echo "Flows no DEV (${{ steps.flows.outcome }}): ${{ steps.flowspend.outputs.flows }}"; fi
-            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ "${{ steps.pendentes.outputs.formulario }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
+            if [ "${{ steps.pendentes.outputs.tela }}" != "true" ] && [ "${{ steps.pendentes.outputs.webresources }}" != "true" ] && [ "${{ steps.pendentes.outputs.formulario }}" != "true" ] && [ -z "${{ steps.pendentes.outputs.motoristas }}" ] && [ -z "${{ steps.pendentes.outputs.plugins }}" ] && [ -z "${{ steps.flowspend.outputs.flows }}" ]; then echo "Nada pendente: o DEV já tem a tela, os plugins e os flows deste commit."; fi
             if [ "${{ steps.distribuir.outputs.zerou }}" = "false" ]; then echo; echo "**ATENÇÃO:** a distribuição nas 4 soluções não zerou."; fi
           } >> "$GITHUB_STEP_SUMMARY"
 

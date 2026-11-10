@@ -85,7 +85,7 @@ Write-Step "versao publicada no DEV: $(if ($versaoPublicada) { "v$versaoPublicad
 if ($comApp) {
   $env:PUBLISHED_VERSION = $versaoPublicada
   Push-Location $root
-  try { & npm run build; if ($LASTEXITCODE -ne 0) { throw "npm run build falhou ($LASTEXITCODE)." } }
+  try { & pnpm build; if ($LASTEXITCODE -ne 0) { throw "pnpm build falhou ($LASTEXITCODE)." } }
   finally { Pop-Location; Remove-Item Env:PUBLISHED_VERSION -ErrorAction SilentlyContinue }
   $versao = ([IO.File]::ReadAllText((Join-Path $root 'package.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json).version
 }
