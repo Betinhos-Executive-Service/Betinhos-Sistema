@@ -9,7 +9,7 @@ const aqui = fileURLToPath(new URL('.', import.meta.url))
 const P = 'packages/deploy/migrations/'
 const existentes = ['20261110-1600-postos-aceita-ctf.ps1', '20261111-0900-b.ps1', '20261109-2300-a.ps1']
 
-test('tag ausente (sem base): nada pendente', () => assert.deepEqual(migrationsPendentes(null, existentes), []))
+test('tag ausente (sem base): todas, em ordem', () => assert.deepEqual(migrationsPendentes(null, existentes), [...existentes].sort()))
 test('nada mudou em migrations: nada pendente', () => {
   assert.deepEqual(migrationsPendentes(['', 'apps/shell/src/x.ts', `${P}README.md`, `${P}remocoes.json`], existentes), [])
 })

@@ -192,7 +192,7 @@ jobs:
               git fetch --quiet --no-tags --depth=1 origin 'refs/tags/schema-dev-publicado:refs/tags/schema-dev-publicado'
               saida=$(git diff --name-only --diff-filter=AM 'refs/tags/schema-dev-publicado^{commit}' HEAD | node packages/deploy/migrations-dev.mjs --github)
             elif [ "$rc" -eq 2 ]; then
-              echo "Tag schema-dev-publicado ausente: nada pendente; ela é criada no HEAD ao fim."
+              echo "Tag schema-dev-publicado ausente: aplica todas (idempotentes); ela é criada no HEAD ao fim."
               saida=$(node packages/deploy/migrations-dev.mjs --sem-base --github)
             else
               exit "$rc"
