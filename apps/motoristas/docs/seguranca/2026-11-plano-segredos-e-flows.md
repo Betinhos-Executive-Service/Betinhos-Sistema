@@ -18,7 +18,7 @@ O app lê as URLs dos Flows com a sessão do motorista (`src/lib/dataverse.ts:36
 | `new_AnthropicKeyDespesasAnalise`, `new_AnthropicKeyDespesasLeitura` | valor padrão | Flows "Flow Despesas \| Análise IA" e "Flow Despesas \| Leitura rápida" | variável tipo Segredo |
 | `new_AnthropicKeyAgentes`, `new_AnthropicKeyFinanceiro`, `new_AnthropicKeyLogistica`, `new_AnthropicKeyPessoas`, `new_AnthropicKeyFrota` | valor padrão | "Flow Agentes \| Executar" referencia Agentes e Financeiro; Logistica, Pessoas e Frota sem referência no código | variável tipo Segredo; confirmar se as três últimas estão em uso |
 | `new_AnthropicApiKey` | valor | a confirmar entre os Flows acima | variável tipo Segredo |
-| `new_JevApiKey` | valor | Flows "Tela Frota - Classificar manutenção (JEV)" e "... agora (JEV)" | variável tipo Segredo |
+| `new_JevApiKey` | valor | Flows "Tela Frota - Classificar manutenção (JEV)" e "... agora (JEV)" | **aposentar** (decisão de 10/11/2026: Jev sem uso; a tela não chama mais a classificação; retirada dos flows e da variável à mão no DEV, roteiro no PR de remoção) |
 | `new_RDStationClientSecret`, `new_RDStationRefreshToken` | valor | "Flow API RD Station BD para Leads" | variável tipo Segredo; o refresh token é regravado pelo Flow, então o Flow precisa gravar no cofre |
 | `cr40f_GerarPagantesCieloClientSecret`, `cr40f_GerarPagantesGraphClientSecret` | valor | nenhum Flow do DEV os referencia; consumidor não achado no código | confirmar o consumidor (talvez só PROD) antes de migrar |
 
