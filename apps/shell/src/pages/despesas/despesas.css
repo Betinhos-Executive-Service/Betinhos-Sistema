@@ -1,6 +1,14 @@
 /* Despesas operacionais: reaproveita lista e ficha de Pagantes (pagantes.css). Só tokens do Design System. */
 .dp-alertas { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
 .dp-page .pg-card__foot { justify-content: flex-start; }
+.dp-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Cartões de total que abrem a visão pronta (mesmo padrão de Documentos): o cartão inteiro é um alternador. */
+.dp-kpi { display: block; padding: 0; border: 0; border-radius: var(--bt-radius-lg); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.dp-kpi > * { height: 100%; }
+.dp-kpi:active { transform: scale(0.98); }
+.dp-kpi:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.dp-kpi[aria-pressed="true"] > * { border-color: var(--bt-color-action); }
 
 .dp-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-decoration: none; }
 .dp-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
@@ -19,7 +27,9 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
 @media (hover: hover) and (pointer: fine) { button.dp-comprovante__previa:hover { background-color: var(--bt-color-surface-soft); } }
 .dp-comprovante__info { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-1) var(--bt-space-2) var(--bt-space-2-5); font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
 .dp-comprovante__nome { grid-column: 1 / -1; overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
-.dp-comprovante__meta { overflow: hidden; font-size: var(--bt-font-size-12); text-overflow: ellipsis; white-space: nowrap; }
+/* Tipo e data numa linha própria, sem cortar: a data é o que diferencia dois anexos. Status e link ficam na linha de baixo. */
+.dp-comprovante__meta { grid-column: 1 / -1; font-size: var(--bt-font-size-12); overflow-wrap: anywhere; }
+.dp-comprovante__info > .bt-badge { justify-self: start; }
 .dp-comprovante__info .dp-link { display: grid; place-items: center; min-width: var(--bt-control-height-compact); min-height: var(--bt-control-height-compact); }
 
 .dp-previa__img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
@@ -94,4 +104,5 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
   .dp-motivo { animation-name: dp-troca-in; animation-duration: 120ms; }
   .dp-motivo--saindo { transform: none; }
   .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
+  .dp-kpi, .dp-kpi:active { transition: none; transform: none; }
 }
