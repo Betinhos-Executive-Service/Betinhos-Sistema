@@ -8,6 +8,10 @@ export type Source = {
   mock: boolean
   comunicados: () => Promise<Comunicado[]>
   destinatarios: (comunicadoId: string) => Promise<Destinatario[]>
+  /** Destinatários de um motorista (id do cadastro em `cr40f_funcionarios`), do mais recente ao mais antigo. */
+  destinatariosDoMotorista: (motoristaId: string) => Promise<Destinatario[]>
+  /** Nome de quem está no sistema, para o rodapé do PDF de evidência. Sem nome (ou falha de leitura) vira `null`; nunca bloqueia o PDF. */
+  quemSou: () => Promise<string | null>
   motoristas: () => Promise<Motorista[]>
   /** Cria ou atualiza o rascunho; devolve o id. */
   salvar: (draft: Comunicado) => Promise<string>
@@ -36,6 +40,8 @@ export function createSource(host: Host): Source {
     return { comunicado: get(ENTITIES.comunicado), destinatario: get(ENTITIES.destinatario), funcionario: get(ENTITIES.funcionario), usuario: get(ENTITIES.usuario) }
   }).catch((error) => { sets = null; throw error }))
 
+  let nomeUsuario: Promise<string | null> | null = null
+
   const action = (name: string, body: Record<string, string>) => client.request(name, { method: 'POST', body: JSON.stringify(body) }).then(() => undefined)
 
   return {
@@ -49,6 +55,20 @@ export function createSource(host: Host): Source {
       const s = await entitySets()
       const rows = await client.getAll(`${s.destinatario}?${DESTINATARIO_SELECT}&$filter=_new_comunicado_value eq ${cleanId(comunicadoId)}&$orderby=new_enviadoem desc`)
       return rows.map(mapDestinatario)
+    },
+    async destinatariosDoMotorista(motoristaId) {
+      const s = await entitySets()
+      const rows = await client.getAll(`${s.destinatario}?${DESTINATARIO_SELECT}&$filter=_new_motorista_value eq ${cleanId(motoristaId)}&$orderby=new_enviadoem desc`)
+      return rows.map(mapDestinatario)
+    },
+    // Cache do que deu certo; em erro, a próxima chamada tenta de novo.
+    quemSou() {
+      return (nomeUsuario ??= (async () => {
+        const s = await entitySets()
+        const me = await client.request<{ UserId: string }>('WhoAmI')
+        const user = await client.request<{ fullname?: string | null; internalemailaddress?: string | null }>(`${s.usuario}(${cleanId(me.UserId)})?$select=fullname,internalemailaddress`)
+        return user.fullname?.trim() || user.internalemailaddress?.trim() || null
+      })().catch(() => { nomeUsuario = null; return null }))
     },
     async motoristas() {
       const s = await entitySets()

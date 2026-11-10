@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
-import { AlertTriangle, ArrowLeft, Bell, Check, Clock, Copy, Download, Eye, MessageSquare, PenLine, RefreshCw, SearchX, Users } from 'lucide-react'
+import { Alert, Avatar, Breadcrumb, Button, Checkbox, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
+import { AlertTriangle, ArrowLeft, Bell, Check, Clock, Copy, Download, Eye, FileText, MessageSquare, PenLine, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Source } from '../data/source'
 import {
   COMUNICADO_ESCOPO, COMUNICADO_PUSH, COMUNICADO_TIPO, buildResultadosCsv, canResendPush, duplicateComunicado, fileSlug, formatDate, isAberto, isPendente,
   matchResultado, parseSignature, plural, pushLabel, statusLabel, statusTone, type Comunicado, type Destinatario, type Motorista, type ResultadoFiltro,
 } from '../domain/comunicados'
+import { baixarComprovantes, textoErroPdf } from '../data/baixarComprovantes'
+import { paresDoComunicado } from '../domain/comprovante'
 import { Assinatura } from './Assinatura'
 
 type Props = {
@@ -35,6 +37,9 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
   const [reenviando, setReenviando] = useState('')
   const [lembrar, setLembrar] = useState(false)
   const [lembrando, setLembrando] = useState(false)
+  // Destinatários marcados para o PDF (só concluídos têm caixa); vazio = todos os concluídos.
+  const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set())
+  const [gerando, setGerando] = useState(false)
   const token = useRef(0)
 
   const tipo = item.tipo
@@ -68,6 +73,30 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
   const lembretes = rows.filter((row) => isPendente(row, tipo) && canResendPush(row, tipo))
   const semAcesso = motoristas.filter((m) => m.problema).length
   const pct = (n: number) => (rows.length ? Math.round((n / rows.length) * 100) : 0)
+
+  const concluidosVisiveis = visiveis.filter((row) => !isPendente(row, tipo))
+  // Só os marcados visíveis valem; marcados escondidos pela busca/filtro ficam guardados, mas fora do PDF (sem nenhum visível marcado = todos os visíveis).
+  const marcadosVisiveis = concluidosVisiveis.filter((row) => marcados.has(row.id))
+  const pares = paresDoComunicado(item, visiveis, nome, new Set(marcadosVisiveis.map((row) => row.id)))
+  const todosMarcados = concluidosVisiveis.length > 0 && concluidosVisiveis.every((row) => marcados.has(row.id))
+  const alternar = (id: string) => setMarcados((atual) => { const next = new Set(atual); if (!next.delete(id)) next.add(id); return next })
+  const alternarTodos = () => setMarcados((atual) => {
+    const next = new Set(atual)
+    for (const row of concluidosVisiveis) { if (todosMarcados) next.delete(row.id); else next.add(row.id) }
+    return next
+  })
+
+  const gerarPdf = async () => {
+    if (gerando || !pares.length) return
+    setGerando(true)
+    try {
+      await baixarComprovantes(source, 'comunicado', item.titulo, pares)
+    } catch (reason) {
+      toast({ tone: 'danger', message: textoErroPdf(reason) })
+    } finally {
+      setGerando(false)
+    }
+  }
 
   const reenviar = async (row: Destinatario) => {
     setReenviando(row.id)
@@ -140,17 +169,29 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
           <div className="cm-list__toolbar">
             <SearchBox className="cm-search" value={busca} onChange={setBusca} placeholder="Buscar motorista" aria-label="Buscar motorista nos resultados" />
             <div className="cm-actions">
+              <Button variant="secondary" size="compact" icon={<FileText size={14} />} disabled={!pares.length} loading={gerando} onClick={() => void gerarPdf()}>Gerar PDF ({pares.length})</Button>
               <Button variant="secondary" size="compact" icon={<Download size={14} />} disabled={!visiveis.length} onClick={exportar}>Exportar CSV</Button>
               <Button variant="secondary" size="compact" icon={<Bell size={14} />} disabled={!lembretes.length || lembrando} onClick={() => setLembrar(true)}>Lembrar pendentes ({lembretes.length})</Button>
             </div>
           </div>
+          {concluidosVisiveis.length ? (
+            <div className="cm-selectall">
+              <Checkbox label="Selecionar todos os concluídos" checked={todosMarcados} onChange={alternarTodos} />
+              <span className="cm-selectall__count" aria-live="polite">{marcadosVisiveis.length ? `${pares.length} ${plural(pares.length, 'marcado', 'marcados')} para o PDF` : 'Sem marcação, o PDF inclui todos os concluídos'}</span>
+            </div>
+          ) : null}
           <ul className="cm-results__body" aria-busy={!loaded}>
             {!loaded && loading ? [0, 1, 2].map((i) => <li key={i} className="cm-list__skeleton"><Skeleton shape="rect" height={44} /></li>) : null}
             {visiveis.map((row) => {
               const falhou = row.pushStatus === COMUNICADO_PUSH.falhou
               const ativo = selected?.id === row.id
+              const pronto = !isPendente(row, tipo)
+              const marcado = pronto && marcados.has(row.id)
               return (
-                <li key={row.id} className={`cm-recipient${ativo ? ' is-selected' : ''}`}>
+                <li key={row.id} className={`cm-recipient${ativo ? ' is-selected' : ''}${marcado ? ' is-checked' : ''}`}>
+                  <span className="cm-recipient__check">
+                    {pronto ? <Checkbox label={<span className="cm-sr">Selecionar {nome(row)}</span>} checked={marcado} onChange={() => alternar(row.id)} /> : null}
+                  </span>
                   <button type="button" className="cm-recipient__main" aria-pressed={ativo} onClick={() => setSelectedId(row.id)}>
                     <Avatar name={nome(row)} size="sm" />
                     <span className="cm-recipient__text">
