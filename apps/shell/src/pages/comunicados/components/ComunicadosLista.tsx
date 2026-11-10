@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Alert, Button, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, useToast } from '@betinhos/ui'
-import { ChevronRight, Clock, FileEdit, Megaphone, Plus, RefreshCw, SearchX, Send, Trash2 } from 'lucide-react'
+import { ChevronRight, Clock, FileEdit, FileText, Megaphone, Plus, RefreshCw, SearchX, Send, Trash2 } from 'lucide-react'
 import type { Source } from '../data/source'
 import { COMUNICADO_ESCOPO, COMUNICADO_TIPO, formatDate, isDisparado, matchLista, plural, type Comunicado, type ListaFiltro } from '../domain/comunicados'
 import type { useComunicados } from '../useComunicados'
+import { PdfMotoristaDialog } from './PdfMotoristaDialog'
 
 type Props = {
   data: ReturnType<typeof useComunicados>
@@ -25,6 +26,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
   const [busca, setBusca] = useState('')
   const [excluir, setExcluir] = useState<Comunicado | null>(null)
   const [excluindo, setExcluindo] = useState(false)
+  const [pdfMotorista, setPdfMotorista] = useState(false)
 
   const { items, loaded } = data
   const termo = busca.trim().toLowerCase()
@@ -59,6 +61,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
         actions={(
           <div className="cm-actions">
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={data.loading && loaded} disabled={!loaded} onClick={onRefresh}>Atualizar</Button>
+            <Button variant="secondary" icon={<FileText size={16} />} disabled={!loaded || !items.some(isDisparado)} onClick={() => setPdfMotorista(true)}>Gerar PDF por motorista</Button>
             <Button icon={<Plus size={16} />} disabled={!loaded} onClick={onNew}>Novo comunicado</Button>
           </div>
         )}
@@ -110,6 +113,8 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
         {loaded && !items.length ? <EmptyState icon={<Megaphone size={36} />} title="Nenhum comunicado ainda" action={<Button icon={<Plus size={16} />} onClick={onNew}>Novo comunicado</Button>}>Crie o primeiro aviso para os motoristas.</EmptyState> : null}
         {loaded && items.length > 0 && !visiveis.length ? <EmptyState icon={<SearchX size={36} />} title="Nenhum comunicado encontrado" action={<Button variant="secondary" onClick={() => { setBusca(''); setFiltro('todos') }}>Limpar filtros</Button>}>Troque o filtro ou limpe a busca.</EmptyState> : null}
       </Surface>
+
+      {pdfMotorista ? <PdfMotoristaDialog motoristas={data.motoristas} comunicados={items} source={source} onClose={() => setPdfMotorista(false)} /> : null}
 
       <Dialog open={excluir !== null} tone="danger" title="Excluir este rascunho?" onClose={() => { if (!excluindo) setExcluir(null) }}
         actions={<>

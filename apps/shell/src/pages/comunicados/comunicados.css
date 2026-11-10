@@ -127,3 +127,18 @@
   .cm-recipient__main { grid-template-columns: auto minmax(0, 1fr); }
   .cm-recipient__main > .bt-status-badge, .cm-push { grid-column: 2; justify-self: start; }
 }
+
+/* Diálogo "PDF por motorista" */
+.cm-pdfdlg { display: grid; gap: var(--bt-space-2); }
+.cm-pdfdlg > p { margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .cm-pdfdlg { animation: cm-step-in var(--bt-duration-fast) var(--bt-ease-out); } }
+@keyframes cm-step-in { from { opacity: 0; transform: translateY(4px); } }
+.cm-pdfdlg__list { display: grid; margin: 0; padding: 0; list-style: none; max-height: 260px; overflow-y: auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.cm-pdfdlg__list > li + li { border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.cm-pdfdlg__list > li:not(.cm-pdfdlg__empty) { padding: var(--bt-space-2) var(--bt-space-3); transition: background-color var(--bt-duration-fast) var(--bt-ease-out); }
+.cm-pdfdlg__list > li.is-checked { background-color: var(--bt-color-action-soft); }
+.cm-pdfdlg__list .bt-choice { width: 100%; }
+.cm-pdfdlg__pick { display: flex; align-items: center; gap: var(--bt-space-3); width: 100%; margin: calc(var(--bt-space-2) * -1) calc(var(--bt-space-3) * -1); padding: var(--bt-space-2) var(--bt-space-3); width: calc(100% + var(--bt-space-3) * 2); border: 0; background: transparent; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); text-align: left; cursor: pointer; }
+.cm-pdfdlg__pick:focus-visible { outline: 0; box-shadow: inset var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .cm-pdfdlg__pick:hover { background-color: var(--bt-color-surface-soft); } }
+.cm-pdfdlg__empty { margin: 0; padding: var(--bt-space-3); color: var(--bt-color-text-secondary); }
