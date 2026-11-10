@@ -21,3 +21,11 @@ packageExtensions:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+  # O ui não declara @types/react: os .d.ts dele achavam o @types/react içado em node_modules/.pnpm/node_modules,
+  # que no install filtrado (shell + motoristas) é o 18.3.30 do app. Como peer opcional, cada consumidor liga o seu.
+  '@betinhos-executive-service/ui':
+    peerDependencies:
+      '@types/react': '*'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
