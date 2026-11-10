@@ -32,7 +32,7 @@ namespace Betinhos.DriverRecordSharing
 
             var system = factory.CreateOrganizationService(null);
             string apiKey = null;
-            try { apiKey = ObservationApiKey.Resolve(_secureConfig, () => SecretReader.Read(system, FuelSchema.EnvApiKey)); }
+            try { apiKey = ObservationApiKey.Resolve(_secureConfig, () => SecretReader.Read(system, FuelSchema.EnvApiKey, tracing)); }
             catch (Exception error) { tracing?.Trace("InsightsCombustivel: variável de ambiente ilegível ({0})", error.GetType().Name); }
 
             context.OutputParameters[ResultParameter] = Process(system, apiKey, ObservationOrganizer.HttpPost, tracing);

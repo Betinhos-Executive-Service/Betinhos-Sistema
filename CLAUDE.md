@@ -14,7 +14,25 @@ Decisão do Renan, 05/11/2026: o GitHub é o único caminho de publicação. Nin
   - só documentação/CI/skills → nada; a tag anda.
   A tag só anda quando a publicação passa.
 - "Publicar soluções" à mão continua valendo (`test`, `test-e-prod` ou `prod`) para refazer um ensaio. "Retirar AppBetinhos" (`retirar-caixa.yml`) é a segunda janela da promoção. Para zerar o TEST, `pac admin copy` do PROD (como no ensaio de 22/10/2026).
-- Nada que mude o PROD fica fora do repositório: valor que difere por ambiente vai em variável de ambiente ou connection reference, nunca fixo no flow. Nunca publicar no PROD por outro caminho.
+- Nada que mude o PROD fica fora do repositório: valor que difere por ambiente vai em variável de ambiente ou connection reference, nunca fixo no flow (segredo vai na tabela `cr40f_segredo`, seção abaixo). Nunca publicar no PROD por outro caminho.
+
+## Segredos (tabela `cr40f_segredo`)
+
+Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secret). Variável de ambiente é legível por qualquer Basic User pela Web API, então **chave, token ou client secret nunca vai em variável de ambiente nova**, nem em código, flow ou solução.
+
+- Onde ficam: tabela `cr40f_segredo` (BetinhosCore), uma linha por segredo; `cr40f_name` é o nome (chave alternativa), `cr40f_valor` tem segurança de coluna (perfil "Segredos – automação", sem membros; Administrador do Sistema lê, plugin lê como SYSTEM) e não é auditado. Nenhum papel tem privilégio na tabela. Registros nunca entram em solução: cada ambiente grava os seus.
+- Schema: `packages/deploy/provision-tabela-segredos.ps1` (à mão, só DEV, regras de schema acima). Conta de flow que não seja administradora entra no perfil com `-Membros` (detalhes no cabeçalho do script).
+- Gravar ou trocar: `packages/deploy/gravar-segredo.ps1 -EnvironmentUrl <url> -Nome <nome> -ArquivoValor <arquivo>` (valor em arquivo salvo por campo seguro, nunca no comando; confere por hash, nunca imprime). `-LimparVariavel <schemaname>` esvazia a variável legada; só depois que todos os consumidores lerem a tabela.
+- Leitura nos plugins: tabela primeiro, variável de ambiente como fallback durante a migração; trace nunca leva o valor.
+
+| Segredo | Variável legada | Consumidor |
+|---|---|---|
+| `anthropic.combustivel` | `new_AnthropicKeyCombustivel` | `Betinhos.DriverRecordSharing` (`FuelInsightsPlugin`, via `SecretReader`) |
+| `anthropic.observacao-motorista` | `new_AnthropicKeyObservacaoMotorista` | `Betinhos.DriverRecordSharing` (`OrganizeObservationPlugin`, via `SecretReader`) |
+| `cielo.client-secret` | `cr40f_GerarPagantesCieloClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
+| `graph.gerar-pagantes.client-secret` | `cr40f_GerarPagantesGraphClientSecret` | `Cr40f.GerarPagantes.Plugin` (`PluginSettings`) |
+
+Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta tabela e leitura pela tabela no consumidor. As chaves Anthropic dos flows migram no PR seguinte (flows).
 
 ## Ambiente cloud (sessões cloud do Claude Code)
 
