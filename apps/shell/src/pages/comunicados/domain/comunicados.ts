@@ -21,6 +21,21 @@ export type Comunicado = {
   disparadoEm: string | null
 }
 
+export type GeoStatus = 'ok' | 'negada' | 'indisponivel' | 'tempo-esgotado'
+export type EvidenciaGeo = { status: GeoStatus; lat: number | null; lon: number | null; accuracy: number | null }
+
+/** Evidência do aparelho gravada pelo plugin na abertura e na ciência. `invalida`: o App enviou algo ilegível (`erro: "formato"`). */
+export type Evidencia = {
+  invalida: boolean
+  appVersion: string
+  userAgent: string
+  platform: string
+  model: string
+  ip: string
+  ipVerificado: boolean
+  geo: EvidenciaGeo | null
+}
+
 export type Destinatario = {
   id: string
   comunicadoId: string
@@ -32,6 +47,8 @@ export type Destinatario = {
   nomeAssinante: string
   observacao: string
   assinaturaJson: string
+  evidenciaAbertura: Evidencia | null
+  evidenciaCiencia: Evidencia | null
   pushStatus: number
   pushErro: string
 }
@@ -166,6 +183,35 @@ export function mapComunicado(row: Row): Comunicado {
   }
 }
 
+const GEO_STATUS: readonly string[] = ['ok', 'negada', 'indisponivel', 'tempo-esgotado']
+const text = (value: unknown) => (typeof value === 'string' ? value : '')
+const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
+
+/** Lê `new_evidencia*json`; vazio ou que não é objeto vira `null` ("não registrado"). */
+export function parseEvidencia(value: unknown): Evidencia | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  let parsed: unknown
+  try { parsed = JSON.parse(value) } catch { return null }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  const raw = parsed as Record<string, unknown>
+  const vazia: Evidencia = { invalida: false, appVersion: '', userAgent: '', platform: '', model: '', ip: '', ipVerificado: false, geo: null }
+  if (raw.erro) return { ...vazia, invalida: true }
+  const stamp = raw.ipStamp && typeof raw.ipStamp === 'object' ? (raw.ipStamp as Record<string, unknown>) : null
+  const geoRaw = raw.geo && typeof raw.geo === 'object' ? (raw.geo as Record<string, unknown>) : null
+  const status = geoRaw && GEO_STATUS.includes(text(geoRaw.status)) ? (text(geoRaw.status) as GeoStatus) : null
+  const ip = stamp ? text(stamp.ip) : ''
+  return {
+    ...vazia,
+    appVersion: text(raw.appVersion),
+    userAgent: text(raw.userAgent),
+    platform: text(raw.platform),
+    model: text(raw.model),
+    ip,
+    ipVerificado: Boolean(ip) && raw.ipVerificado === true,
+    geo: geoRaw && status ? { status, lat: num(geoRaw.lat), lon: num(geoRaw.lon), accuracy: num(geoRaw.accuracy) } : null,
+  }
+}
+
 export function mapDestinatario(row: Row): Destinatario {
   return {
     id: String(row.new_comunicadodestinatarioid ?? ''),
@@ -178,6 +224,8 @@ export function mapDestinatario(row: Row): Destinatario {
     nomeAssinante: String(row.new_nomeassinante ?? ''),
     observacao: String(row.new_observacao ?? ''),
     assinaturaJson: String(row.new_assinaturajson ?? ''),
+    evidenciaAbertura: parseEvidencia(row.new_evidenciaaberturajson),
+    evidenciaCiencia: parseEvidencia(row.new_evidenciacienciajson),
     pushStatus: Number(row.new_pushstatus ?? COMUNICADO_PUSH.pendente),
     pushErro: String(row.new_pusherro ?? ''),
   }

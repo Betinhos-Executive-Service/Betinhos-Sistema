@@ -1,4 +1,4 @@
-import { COMUNICADO_ESCOPO, COMUNICADO_ESTADO, COMUNICADO_PUSH, COMUNICADO_TIPO, isDisparado, validateDraft, type Comunicado, type Destinatario, type Motorista } from '../domain/comunicados'
+import { COMUNICADO_ESCOPO, COMUNICADO_ESTADO, COMUNICADO_PUSH, COMUNICADO_TIPO, isDisparado, validateDraft, type Comunicado, type Destinatario, type Evidencia, type Motorista } from '../domain/comunicados'
 import type { Source } from './source'
 import { latenciaMock } from '../../../app/latenciaMock'
 
@@ -16,8 +16,12 @@ const MOTORISTAS: Motorista[] = [
 // Assinatura curta em coordenadas 0–1, só para o relatório mostrar o desenho.
 const ASSINATURA = JSON.stringify([[[0.1, 0.6], [0.2, 0.3], [0.3, 0.7], [0.45, 0.35], [0.6, 0.65], [0.75, 0.4], [0.9, 0.55]]])
 
+// Evidência completa (IP verificado, GPS ok) e outra com GPS negado e IP não verificado; os demais destinatários são "antigos", sem evidência.
+const EVIDENCIA_COMPLETA: Evidencia = { invalida: false, appVersion: '2.1.860', userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36', platform: 'Android', model: 'SM-A546B', ip: '203.0.113.42', ipVerificado: true, geo: { status: 'ok', lat: -23.43556, lon: -46.47306, accuracy: 28 } }
+const EVIDENCIA_SEM_GPS: Evidencia = { ...EVIDENCIA_COMPLETA, platform: 'iOS', model: '', userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148', ip: '198.51.100.9', ipVerificado: false, geo: { status: 'negada', lat: null, lon: null, accuracy: null } }
+
 function destinatario(n: number, comunicadoId: string, motoristaId: string, enviadoEm: string, extra: Partial<Destinatario> = {}): Destinatario {
-  return { id: id(100 + n), comunicadoId, motoristaId, enviadoEm, abertoEm: null, lidoEm: null, cienteEm: null, nomeAssinante: '', observacao: '', assinaturaJson: '', pushStatus: COMUNICADO_PUSH.enviado, pushErro: '', ...extra }
+  return { id: id(100 + n), comunicadoId, motoristaId, enviadoEm, abertoEm: null, lidoEm: null, cienteEm: null, nomeAssinante: '', observacao: '', assinaturaJson: '', evidenciaAbertura: null, evidenciaCiencia: null, pushStatus: COMUNICADO_PUSH.enviado, pushErro: '', ...extra }
 }
 
 /** Dados de exemplo do `pnpm dev`: um com assinatura (com falha de push e observação), um informativo e um rascunho. */
@@ -31,8 +35,8 @@ export function createMockSource(): Source {
     { id: id(12), titulo: 'Revisão dos veículos', corpo: 'Traga o veículo para a revisão trimestral até sexta.', tipo: COMUNICADO_TIPO.informativo, escopo: COMUNICADO_ESCOPO.todos, alvoIds: [], estado: COMUNICADO_ESTADO.rascunho, disparadoEm: null },
   ]
   const destinatarios: Destinatario[] = [
-    destinatario(1, id(10), id(1), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Carlos Andrade', assinaturaJson: ASSINATURA, observacao: 'Combinado, mas a porta 4 fica fechada depois das 23h.' }),
-    destinatario(2, id(10), id(2), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Márcio Lima', assinaturaJson: ASSINATURA }),
+    destinatario(1, id(10), id(1), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Carlos Andrade', assinaturaJson: ASSINATURA, evidenciaAbertura: EVIDENCIA_COMPLETA, evidenciaCiencia: EVIDENCIA_COMPLETA, observacao: 'Combinado, mas a porta 4 fica fechada depois das 23h.' }),
+    destinatario(2, id(10), id(2), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Márcio Lima', assinaturaJson: ASSINATURA, evidenciaAbertura: EVIDENCIA_SEM_GPS, evidenciaCiencia: EVIDENCIA_SEM_GPS }),
     destinatario(3, id(10), id(3), hoje, { pushStatus: COMUNICADO_PUSH.falhou, pushErro: 'Dispositivo não registrado' }),
     destinatario(4, id(11), id(1), ontem, { abertoEm: ontem, lidoEm: ontem }),
     destinatario(5, id(11), id(2), ontem),

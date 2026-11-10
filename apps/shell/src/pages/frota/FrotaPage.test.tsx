@@ -15,8 +15,6 @@ function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
     update: async () => {},
     openForm: async () => {},
     prepareFlow: async () => {},
-    classificacao: async () => ({ servicos: [], categorias: [], origem: null, confianca: null }),
-    classificarAgora: async () => { throw new Error('indisponível') },
     fotoVeiculo: async () => null,
     enviarFotoVeiculo: async () => {},
     runFlow: async () => ({ message: null, shareUrl: null }),

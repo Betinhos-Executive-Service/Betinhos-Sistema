@@ -24,6 +24,7 @@ $solutionName = 'AppBetinhos'
 $perfilNome = 'Segredos – automação'
 $perfilDescricao = 'Leitura e gravação do valor dos segredos (cr40f_segredo.cr40f_valor). Sem membros: administradores e plugins (SYSTEM) já leem.'
 $adminTemplate = '627090ff-40a3-4053-8790-584edc5be201'  # roletemplateid do Administrador do Sistema
+$supportTemplate = '2d101bb3-5ced-4122-83f1-94d5efde4e3b'  # Usuário de Suporte (a plataforma recusa alterar)
 function Write-Step([string] $m) { Write-Host "[segredos-schema] $m" }
 
 $token = & az account get-access-token --resource "$environmentUrl/" --query accessToken -o tsv
@@ -60,7 +61,11 @@ function Atributo([string] $logical) {
 function NaSolucao([string] $id, [int] $tipo) { return @(Rows "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $solutionId and objectid eq $id and componenttype eq $tipo") }
 function PapeisComPrivilegio($privs) {
   return @(foreach ($pv in $privs) {
-    foreach ($r in @(Rows "privileges($($pv.privilegeid))/roleprivileges_association?`$select=roleid,name,_roletemplateid_value")) {
+    foreach ($r in @(Rows "privileges($($pv.privilegeid))/roleprivileges_association?`$select=roleid,name,_roletemplateid_value,iscustomizable")) {
+      # Papéis de plataforma (Leitor/Gravador/Exclusão de Serviço, da AuthorizationCore) não aceitam alteração e só têm
+      # usuários de aplicação da Microsoft; o Usuário de Suporte (só leitura, conta de suporte da Microsoft) também é
+      # imutável. Ficam, e a coluna cr40f_valor continua protegida pela segurança de campo.
+      if (-not $r.iscustomizable.Value -or "$($r._roletemplateid_value)" -eq $supportTemplate) { continue }
       if ("$($r._roletemplateid_value)" -ne $adminTemplate) { [pscustomobject]@{ privilegio = $pv; papel = $r } }
     }
   })
@@ -111,7 +116,7 @@ if ($SomenteValidar) {
 if (-not $temChave) {
   Dv POST "EntityDefinitions(LogicalName='$entidade')/Keys" @{ '@odata.type' = 'Microsoft.Dynamics.CRM.EntityKeyMetadata'; SchemaName = 'cr40f_SegredoUnico'; DisplayName = (Label 'Nome único'); KeyAttributes = @('cr40f_name') } | Out-Null
 }
-if (-not (NaSolucao $tabela.MetadataId 1).Count) {
+if (-not @(NaSolucao $tabela.MetadataId 1).Count) {
   Dv POST AddSolutionComponent @{ ComponentId = $tabela.MetadataId; ComponentType = 1; SolutionUniqueName = $solutionName; AddRequiredComponents = $false; DoNotIncludeSubcomponents = $false } | Out-Null
 }
 Dv POST PublishXml @{ ParameterXml = "<importexportxml><entities><entity>$entidade</entity></entities></importexportxml>" } | Out-Null
@@ -126,7 +131,7 @@ if ($fp.Count -gt 1) { throw "Perfil tem $($fp.Count) permissões para cr40f_val
 $permissao = @{ canread = 4; cancreate = 4; canupdate = 4 }
 if ($fp.Count -eq 0) { Dv POST fieldpermissions ($permissao + @{ 'fieldsecurityprofileid@odata.bind' = "/fieldsecurityprofiles($perfilId)"; entityname = $entidade; attributelogicalname = 'cr40f_valor' }) | Out-Null }
 elseif ($fp[0].canread -ne 4 -or $fp[0].cancreate -ne 4 -or $fp[0].canupdate -ne 4) { Dv PATCH "fieldpermissions($($fp[0].fieldpermissionid))" $permissao | Out-Null }
-if (-not (NaSolucao $perfilId 70).Count) {
+if (-not @(NaSolucao $perfilId 70).Count) {
   Dv POST AddSolutionComponent @{ ComponentId = $perfilId; ComponentType = 70; SolutionUniqueName = $solutionName; AddRequiredComponents = $false } | Out-Null
 }
 foreach ($upn in $Membros) {
@@ -141,7 +146,7 @@ foreach ($upn in $Membros) {
 # 4. Só o Administrador do Sistema com privilégio na tabela
 $privs = @(Rows "privileges?`$select=privilegeid,name&`$filter=endswith(name,'cr40f_segredo')")
 foreach ($x in (PapeisComPrivilegio $privs)) {
-  Dv POST "roles($($x.papel.roleid))/Microsoft.Dynamics.CRM.RemovePrivilegeRole" @{ PrivilegeId = $x.privilegio.privilegeid } | Out-Null
+  Dv POST "roles($($x.papel.roleid))/Microsoft.Dynamics.CRM.RemovePrivilegeRole" @{ Privilege = @{ '@odata.type' = 'Microsoft.Dynamics.CRM.privilege'; privilegeid = $x.privilegio.privilegeid } } | Out-Null
   Write-Step "$($x.privilegio.name) retirado do papel $($x.papel.name)"
 }
 
@@ -159,8 +164,8 @@ for ($i = 1; $i -le 20; $i++) {
   Start-Sleep -Seconds 15
 }
 if ($status -ne 'Active') { throw "Chave $chave com índice $status (esperado Active)." }
-if ((NaSolucao $tabela.MetadataId 1).Count -ne 1) { throw "Tabela $entidade não está na $solutionName." }
-if ((NaSolucao $perfilId 70).Count -ne 1) { throw "Perfil '$perfilNome' não está na $solutionName." }
+if (@(NaSolucao $tabela.MetadataId 1).Count -ne 1) { throw "Tabela $entidade não está na $solutionName." }
+if (@(NaSolucao $perfilId 70).Count -ne 1) { throw "Perfil '$perfilNome' não está na $solutionName." }
 if (-not $privs.Count) { throw "Privilégios de $entidade não encontrados (a tabela foi publicada?)." }
 $sobra = @(PapeisComPrivilegio $privs)
 if ($sobra.Count) { throw "Papéis ainda com privilégio em ${entidade}: $(@($sobra | ForEach-Object { $_.papel.name } | Sort-Object -Unique) -join ', ')" }

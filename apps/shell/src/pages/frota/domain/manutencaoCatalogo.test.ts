@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CATEGORIAS_MANUT, categoriasDe, lerMulti, ORIGEM, patchManual, patchReclassificar, SERVICOS_MANUT } from './manutencaoCatalogo'
+import { CATEGORIAS_MANUT, categoriasDe, lerMulti, ORIGEM, patchManual, SERVICOS_MANUT } from './manutencaoCatalogo'
 
 describe('catálogo de manutenção', () => {
   it('tem valores únicos e todo serviço aponta para uma categoria existente', () => {
@@ -21,8 +21,7 @@ describe('catálogo de manutenção', () => {
     expect(lerMulti('')).toEqual([])
   })
 
-  it('monta os patches de correção manual e de reclassificação', () => {
+  it('monta o patch de correção manual', () => {
     expect(patchManual([100000012, 100000014])).toEqual({ new_servicosmanutencao: '100000012,100000014', new_categoriasmanutencao: '100000002', new_classificacaoorigem: ORIGEM.MANUAL, new_confiancaia: null })
-    expect(patchReclassificar('Pneu careca')).toEqual({ new_classificacaoorigem: null, cr40f_descricao: 'Pneu careca' })
   })
 })

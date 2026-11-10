@@ -1,4 +1,4 @@
-import { COMUNICADO_TIPO, fileSlug, formatDate, isDisparado, isPendente, type Comunicado, type Destinatario } from './comunicados'
+import { COMUNICADO_TIPO, fileSlug, formatDate, isDisparado, isPendente, type Comunicado, type Destinatario, type Evidencia } from './comunicados'
 
 /** Um comprovante: o motorista que concluiu × o comunicado. */
 export type Par = { comunicado: Comunicado; destinatario: Destinatario; motorista: string }
@@ -44,3 +44,27 @@ export const descricaoConclusao = ({ comunicado, destinatario }: Pick<Par, 'comu
   `${comunicado.tipo === COMUNICADO_TIPO.ciencia ? 'Ciência assinada' : 'Leitura confirmada'} em ${formatDate(destinatario.cienteEm || destinatario.lidoEm)}`
 
 export const tituloComprovante = (tipo: number) => (tipo === COMUNICADO_TIPO.ciencia ? 'Comprovante de ciência' : 'Comprovante de leitura')
+
+type Linha = [rotulo: string, valor: string]
+const USER_AGENT_MAX = 50
+const GEO_ROTULO: Record<string, string> = { negada: 'não autorizada', indisponivel: 'indisponível', 'tempo-esgotado': 'tempo esgotado' }
+
+/** Linhas "rótulo: valor" da seção "Aparelho e local" de um momento (abertura, leitura ou ciência). */
+export function linhasEvidencia(evidencia: Evidencia | null): Linha[] {
+  if (!evidencia) return [['', 'Não registrado (registro anterior à captura do aparelho).']]
+  if (evidencia.invalida) return [['', 'Registro do aparelho ilegível (formato inválido).']]
+  const aparelho = [evidencia.platform, evidencia.model].filter(Boolean).join(' ')
+  const agente = evidencia.userAgent.length > USER_AGENT_MAX ? `${evidencia.userAgent.slice(0, USER_AGENT_MAX)}...` : evidencia.userAgent
+  const geo = evidencia.geo
+  const linhas: Linha[] = [
+    ['Aparelho', [aparelho, agente].filter(Boolean).join(' · ') || 'não informado'],
+    ['Versão do App', evidencia.appVersion || 'não informada'],
+    ['Endereço de internet (IP)', evidencia.ip ? `${evidencia.ip} (${evidencia.ipVerificado ? 'verificado' : 'não verificado'})` : 'não registrado'],
+  ]
+  if (!geo) linhas.push(['Localização', 'não registrada'])
+  else if (geo.status === 'ok' && geo.lat != null && geo.lon != null) {
+    const [lat, lon] = [geo.lat.toFixed(5), geo.lon.toFixed(5)]
+    linhas.push(['Localização', `${lat}, ${lon}${geo.accuracy != null ? ` (±${Math.round(geo.accuracy)} m)` : ''}`], ['Mapa', `https://www.google.com/maps?q=${lat},${lon}`])
+  } else linhas.push(['Localização', GEO_ROTULO[geo.status] ?? 'indisponível'])
+  return linhas
+}

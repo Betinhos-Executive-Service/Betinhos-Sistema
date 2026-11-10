@@ -1,7 +1,7 @@
 import type { Option } from '../data/schema'
 import catalogo from './manutencaoCatalogo.json'
 
-/** Catálogo único de categorias e serviços. O mesmo JSON gera as opções no Dataverse e o flow do JEV (scripts/). */
+/** Catálogo único de categorias e serviços. O mesmo JSON gera as opções no Dataverse e o catálogo do plugin de frota. */
 export type Servico = Option & { categoria: number }
 
 export const CATEGORIAS_MANUT: Option[] = catalogo.categorias
@@ -22,12 +22,7 @@ export function lerMulti(value: unknown): number[] {
 }
 export const gravarMulti = (values: number[]) => (values.length ? values.join(',') : null)
 
-/** Patch da correção manual: a IA deixa de sobrescrever este registro. */
+/** Patch da classificação manual. */
 export function patchManual(servicos: number[]) {
   return { [CAMPO.servicos]: gravarMulti(servicos), [CAMPO.categorias]: gravarMulti(categoriasDe(servicos)), [CAMPO.origem]: ORIGEM.MANUAL, [CAMPO.confianca]: null }
-}
-
-/** Patch que devolve o registro à IA: limpa a origem e regrava a descrição para disparar o flow. */
-export function patchReclassificar(descricao: string) {
-  return { [CAMPO.origem]: null, [CAMPO.descricao]: descricao }
 }
