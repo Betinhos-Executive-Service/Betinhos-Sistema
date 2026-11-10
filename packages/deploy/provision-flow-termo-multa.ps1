@@ -22,6 +22,7 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
+. (Join-Path $PSScriptRoot 'flows\sincronizar-flow.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 function Write-Step([string] $Message) { Write-Host "[flow-termo-multa] $Message" }
 
@@ -337,21 +338,33 @@ function Include([string] $id) {
 
 # $ligado = $true liga o flow; $false mantém o estado anterior (desligado só quando o flow é criado agora).
 function Ensure-Flow([string] $nome, [string] $descricao, [string] $clientData, [bool] $ligado) {
-  $flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$nome' and category eq 5").value)
+  $flows = @((Dv GET "workflows?`$select=workflowid,statecode,ismanaged,clientdata&`$filter=name eq '$nome' and category eq 5").value)
   if ($flows.Count -gt 1) { throw "Flow '$nome' duplicado no DEV." }
+  if ($flows.Count -and $flows[0].ismanaged) { throw "Flow '$nome' é gerenciado no DEV: recusado." }
   $anterior = if ($flows.Count) { [int]$flows[0].statecode } else { 0 }
   $alvo = if ($ligado) { 1 } else { $anterior }
   # No CI (Deploy), flow existente desligado no DEV continua desligado: quem desliga é decisão de operação.
   if (($env:GITHUB_ACTIONS -eq 'true') -and $flows.Count) { $alvo = $anterior }
-  if (-not $Apply) { Write-Output "DRY RUN: '$nome' seria $(if ($flows.Count) { 'atualizado' } else { 'criado' }) $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (rascunho)' })."; return }
+  # Comparação semântica (ordem das propriedades não importa) de definição e connection references.
+  $diferencas = @(if ($flows.Count) { Get-Diferencas ($clientData | ConvertFrom-Json).properties ($flows[0].clientdata | ConvertFrom-Json).properties })
+  $mudou = $flows.Count -and $diferencas.Count
+  if ($mudou) { Write-Output "'$nome': $($diferencas.Count) diferença(s) com o DEV:"; $diferencas | ForEach-Object { Write-Output "  $_" } }
+  if (-not $Apply) {
+    $acao = if (-not $flows.Count) { 'criado' } elseif ($mudou) { 'atualizado' } else { 'mantido (sem mudança na definição)' }
+    Write-Output "DRY RUN: '$nome' seria $acao $(if ($alvo -eq 1) { 'LIGADO' } else { 'DESLIGADO (rascunho)' })."; return
+  }
   if ($flows.Count) {
     $flowId = $flows[0].workflowid
-    $norm = { param($o) ($o | ConvertTo-Json -Depth 90 -Compress | ConvertFrom-Json | ConvertTo-Json -Depth 90 -Compress) }
-    $g = $flows[0].clientdata | ConvertFrom-Json; $n = $clientData | ConvertFrom-Json
-    $mudou = (& $norm $g.properties.definition) -ne (& $norm $n.properties.definition) -or (& $norm $g.properties.connectionReferences) -ne (& $norm $n.properties.connectionReferences)
     if ($mudou) {
       if ($flows[0].statecode -eq 1) { Dv PATCH "workflows($flowId)" @{ statecode = 0 } | Out-Null }
-      Dv PATCH "workflows($flowId)" @{ clientdata = $clientData; description = $descricao } | Out-Null
+      try { Dv PATCH "workflows($flowId)" @{ clientdata = $clientData; description = $descricao } | Out-Null }
+      catch {
+        # Gravação falhou: devolve a definição e o estado de antes.
+        $erro = $_
+        Dv PATCH "workflows($flowId)" @{ clientdata = $flows[0].clientdata } | Out-Null
+        if ($anterior -eq 1) { Dv PATCH "workflows($flowId)" @{ statecode = 1 } | Out-Null }
+        throw "'$nome': gravação falhou e a definição anterior foi restaurada. $erro"
+      }
     }
     Write-Output "'$nome': definição $(if ($mudou) { 'atualizada' } else { 'já igual' })."
   } else {
@@ -374,3 +387,12 @@ if (-not $temCustomApi) { Write-Output "ATENÇÃO: '$customApi' ainda não exist
 Ensure-Flow 'Termo de multa | Lembrete diário' 'Todo dia às 07:00 lembra, pela Custom API new_LembrarTermoMulta, os termos Pendentes enviados há 3 dias ou mais e ainda sem lembrete. Criado desligado; o script liga quando a Custom API existir.' (ClientData $lembrar @('shared_commondataserviceforapps')) $temLembrar
 if (-not $temLembrar) { Write-Output "ATENÇÃO: 'new_LembrarTermoMulta' ainda não existe no DEV. Depois de criá-la, rode este script de novo para ligar 'Termo de multa | Lembrete diário'." }
 Ensure-Flow 'Termo de multa | Aviso ao gestor' 'Quando o termo de multa fica Assinado ou Contestado, envia e-mail a quem enviou o termo (new_enviadopor) com placa, motorista, desfecho, data e link da multa no Sistema Betinhos.' (ClientData $aviso @('shared_commondataserviceforapps', 'shared_office365')) $true
+
+# "Termo de multa | Push ao motorista" (veio do app-motoristas-v2): push ao motorista quando o termo é enviado ou lembrado.
+# Só atualiza o flow que já existe no DEV (criar é à mão), com as connection references dele e a definição exportada do
+# DEV em flows/termo-multa-push.json (inclui o escopo Web_Push_*). Mantém o estado ligado/desligado; nunca liga à força.
+$pushNome = 'Termo de multa | Push ao motorista'
+Assert-SomenteDev $environmentUrl
+$pushAtual = @((Dv GET "workflows?`$select=clientdata&`$filter=name eq '$pushNome' and category eq 5").value)
+if ($pushAtual.Count -ne 1) { throw "Flow '$pushNome' ausente ou duplicado no DEV: a criação é manual." }
+Ensure-Flow $pushNome 'Push ao motorista quando o gestor envia um termo de multa; o toque abre o App Motoristas na tela Multas.' (New-ClientDataDoJson $pushAtual[0].clientdata (Join-Path $PSScriptRoot 'flows\termo-multa-push.json')) $false

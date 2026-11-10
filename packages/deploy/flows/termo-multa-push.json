@@ -1,0 +1,254 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "When_termo_is_sent": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/filterexpression": "new_status eq 100000000",
+          "subscriptionRequest/entityname": "new_termomulta",
+          "subscriptionRequest/filteringattributes": "new_ultimolembreteem",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "actions": {
+    "Has_email": {
+      "actions": {
+        "Send_push": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "operationId": "SendPushNotificationV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_powerappsnotificationv2",
+              "connectionName": "shared_powerappsnotificationv2-1"
+            },
+            "parameters": {
+              "payload/dynamicParams/entityLogicalName": "new_termomulta",
+              "payload/message": "@{if(empty(triggerOutputs()?['body/new_ultimolembreteem']), 'Multa para assinar', if(empty(triggerOutputs()?['body/new_enviadoem']), 'Lembrete: multa para assinar', concat('Lembrete: multa para assinar até ', formatDateTime(convertFromUtc(addDays(triggerOutputs()?['body/new_enviadoem'], 7), 'E. South America Standard Time'), 'dd/MM'))))}\nToque para ver o termo e assinar.",
+              "payload/playerType": "PowerApps",
+              "payload/app": "{\"type\":\"AppModule\",\"displayName\":\"App Motoristas v2\",\"appIdentifier\":\"new_AppMotoristasv2\"}",
+              "payload/dynamicParams/recordId": "@triggerOutputs()?['body/new_termomultaid']",
+              "payload/openApp": true,
+              "payload/recipients": [
+                "@outputs('Get_driver')?['body/cr40f_emailmicrosoft']"
+              ]
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Web_Push_Send_push": {
+          "actions": {
+            "List_func_Send_push": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "cr40f_funcionarioses",
+                  "$top": 1,
+                  "$filter": "cr40f_emailmicrosoft eq '@{first(createArray(outputs('Get_driver')?['body/cr40f_emailmicrosoft']))}'",
+                  "$select": "cr40f_funcionariosid"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Has_func_Send_push": {
+              "actions": {
+                "List_subs_Send_push": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_inscricaopushmotoristas",
+                      "$top": 50,
+                      "$filter": "_new_funcionario_value eq @{first(outputs('List_func_Send_push')?['body/value'])?['cr40f_funcionariosid']}",
+                      "$select": "new_inscricaopushmotoristaid,new_endpoint,new_chavep256dh,new_chaveauth"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Has_subs_Send_push": {
+                  "actions": {
+                    "Worker_Send_push": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "EnviarPush",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e",
+                          "connectionName": "shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+                        },
+                        "parameters": {
+                          "body/payload/tag": "new_termomulta-@{triggerOutputs()?['body/new_termomultaid']}",
+                          "body/payload/body": "@{if(empty(triggerOutputs()?['body/new_ultimolembreteem']), 'Multa para assinar', if(empty(triggerOutputs()?['body/new_enviadoem']), 'Lembrete: multa para assinar', concat('Lembrete: multa para assinar até ', formatDateTime(convertFromUtc(addDays(triggerOutputs()?['body/new_enviadoem'], 7), 'E. South America Standard Time'), 'dd/MM'))))}\nToque para ver o termo e assinar.",
+                          "body/payload/title": "App Motoristas",
+                          "body/subscriptions": "@select(outputs('List_subs_Send_push')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))",
+                          "body/payload/url": "/WebResources/new_app-motoristas-v2?termoMultaId=@{triggerOutputs()?['body/new_termomultaid']}"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Filter_gone_Send_push": {
+                      "runAfter": {
+                        "Worker_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Query",
+                      "inputs": {
+                        "where": "@equals(item()?['gone'], true)",
+                        "from": "@outputs('Worker_Send_push')?['body/results']"
+                      }
+                    },
+                    "Select_gone_Send_push": {
+                      "runAfter": {
+                        "Filter_gone_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Select",
+                      "inputs": {
+                        "select": "@item()?['endpoint']",
+                        "from": "@body('Filter_gone_Send_push')"
+                      }
+                    },
+                    "Filter_subs_Send_push": {
+                      "runAfter": {
+                        "Select_gone_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Query",
+                      "inputs": {
+                        "where": "@contains(body('Select_gone_Send_push'), item()?['new_endpoint'])",
+                        "from": "@outputs('List_subs_Send_push')?['body/value']"
+                      }
+                    },
+                    "Delete_each_Send_push": {
+                      "foreach": "@body('Filter_subs_Send_push')",
+                      "actions": {
+                        "Delete_row_Send_push": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "DeleteRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "recordId": "@items('Delete_each_Send_push')?['new_inscricaopushmotoristaid']",
+                              "entityName": "new_inscricaopushmotoristas"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Filter_subs_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Foreach"
+                    }
+                  },
+                  "runAfter": {
+                    "List_subs_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(outputs('List_subs_Send_push')?['body/value'])",
+                      0
+                    ]
+                  },
+                  "type": "If"
+                }
+              },
+              "runAfter": {
+                "List_func_Send_push": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "greater": [
+                  "@length(outputs('List_func_Send_push')?['body/value'])",
+                  0
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {},
+          "type": "Scope"
+        }
+      },
+      "runAfter": {
+        "Get_driver": [
+          "Succeeded"
+        ]
+      },
+      "else": {
+        "actions": {}
+      },
+      "expression": {
+        "not": {
+          "equals": [
+            "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
+            true
+          ]
+        }
+      },
+      "type": "If"
+    },
+    "Get_driver": {
+      "runAfter": {},
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_funcionarioses",
+          "$select": "cr40f_emailmicrosoft",
+          "recordId": "@triggerOutputs()?['body/_new_motorista_value']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "outputs": {}
+}

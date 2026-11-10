@@ -1,0 +1,50 @@
+{
+  "triggers": {
+    "Todo_dia_0630": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "schedule": {
+          "hours": [
+            "6"
+          ],
+          "minutes": [
+            30
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Processar_checklists": {
+      "runAfter": {},
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "PerformUnboundAction",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "actionName": "new_ProcessarChecklistsVeiculos"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "contentVersion": "1.0.0.0",
+  "outputs": {},
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
+}
