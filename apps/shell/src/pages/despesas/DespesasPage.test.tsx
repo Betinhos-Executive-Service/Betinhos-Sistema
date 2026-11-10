@@ -56,6 +56,19 @@ describe('Despesas operacionais', () => {
     expect(screen.getByRole('button', { name: /^Visão: Possível duplicidade/ })).toBeTruthy()
   })
 
+  it('o cartão de total abre a visão pronta e, clicado de novo, volta à padrão', async () => {
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText('Posto Shell Faria Lima')
+    const cartao = (await screen.findByText('Possível duplicidade', { selector: '.dp-kpi *' })).closest('button')!
+    fireEvent.click(cartao)
+    await waitFor(() => expect(document.querySelectorAll('.pg-open')).toHaveLength(2))
+    expect(cartao.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: /^Visão: Possível duplicidade/ })).toBeTruthy()
+    fireEvent.click(cartao)
+    await waitFor(() => expect(cartao.getAttribute('aria-pressed')).toBe('false'))
+    expect(document.querySelectorAll('.pg-open').length).toBeGreaterThan(2)
+  })
+
   it('link antigo com alertas na URL abre filtrado e passa a usar f=', async () => {
     window.location.hash = '#/despesas?alertas=duplicidade'
     render(<DespesasPage host={{ mode: 'mock' }} />)

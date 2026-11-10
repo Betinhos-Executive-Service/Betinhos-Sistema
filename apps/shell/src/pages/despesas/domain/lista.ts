@@ -13,13 +13,14 @@ import type { Despesa, DespesaChoices } from './types'
 export const TELA = 'despesas'
 
 /** Colunas na ordem padrão; a primeira (Despesa) é fixa. */
+// Valor e status logo depois da data: em 1024–1280px é o que o gestor procura e precisa caber sem rolar de lado.
 export const DESPESA_COLUMNS: ViewColumnDef[] = [
   { key: 'despesa', label: 'Despesa' },
   { key: 'data', label: 'Data' },
-  { key: 'motorista', label: 'Motorista' },
   { key: 'valor', label: 'Valor' },
   { key: 'operacional', label: 'Operacional' },
   { key: 'financeiro', label: 'Financeiro' },
+  { key: 'motorista', label: 'Motorista' },
   { key: 'alertas', label: 'Alertas' },
 ]
 

@@ -33,7 +33,8 @@ describe('decisão do gestor no drawer', () => {
   it('validar grava direto, avisa e avança para a próxima da fila', async () => {
     const ficha = await abrir()
     fireEvent.click(within(ficha).getByRole('button', { name: 'Validar' }))
-    expect(await screen.findByText('Despesa validada.')).toBeTruthy()
+    // O toast nomeia a próxima: ele cobre o título do drawer bem quando a despesa troca.
+    expect(await screen.findByText(`Despesa validada. Agora: ${SEGUNDA}.`)).toBeTruthy()
     expect(await screen.findByRole('dialog', { name: SEGUNDA })).toBeTruthy()
   })
 
@@ -49,7 +50,7 @@ describe('decisão do gestor no drawer', () => {
     fireEvent.change(campo, { target: { value: 'Envie o cupom fiscal original.' } })
     expect(confirmar.disabled).toBe(false)
     fireEvent.click(confirmar)
-    expect(await screen.findByText('Despesa devolvida ao motorista.')).toBeTruthy()
+    expect(await screen.findByText(/^Despesa devolvida ao motorista\./)).toBeTruthy()
     expect(await screen.findByRole('dialog', { name: SEGUNDA })).toBeTruthy()
   })
 
@@ -61,7 +62,7 @@ describe('decisão do gestor no drawer', () => {
     expect(confirmar.disabled).toBe(true)
     fireEvent.change(within(ficha).getByPlaceholderText('Ex.: lançamento duplicado.'), { target: { value: 'Lançamento duplicado.' } })
     fireEvent.click(confirmar)
-    expect(await screen.findByText('Despesa cancelada.')).toBeTruthy()
+    expect(await screen.findByText(/^Despesa cancelada\./)).toBeTruthy()
   })
 
   it('motivo pronto preenche o campo e libera o envio', async () => {
@@ -100,7 +101,7 @@ describe('decisão do gestor no drawer', () => {
     fireEvent.click(within(ficha).getByRole('button', { name: 'Validar' }))
     fireEvent.click(within(ficha).getByRole('button', { name: 'Fechar painel' }))
     expect(screen.getByRole('dialog', { name: PRIMEIRA })).toBeTruthy()
-    expect(await screen.findByText('Despesa validada.')).toBeTruthy()
+    expect(await screen.findByText(/^Despesa validada\./)).toBeTruthy()
   })
 
   it('a visão Esperando gestor lista só as duas', async () => {
