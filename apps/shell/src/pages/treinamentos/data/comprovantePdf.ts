@@ -1,36 +1,15 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFPage } from 'pdf-lib'
 import type { DadosComprovante } from '../domain/comprovante'
 import { blocosDoConteudo } from '../domain/treinamentos'
+import { desenharAssinatura, paraWinAnsi, quebrar } from '../../../lib/pdf/texto'
+
+export { paraWinAnsi }
 
 const A4: [number, number] = [595.28, 841.89]
 const MARGEM = 56
 const LARGURA = A4[0] - MARGEM * 2
 const COR = rgb(0.12, 0.12, 0.14)
 const SUAVE = rgb(0.42, 0.42, 0.46)
-// WinAnsi (Helvetica padrão): ASCII + Latin-1 (sem os controles C1) + aspas e travessões tipográficos. O resto (emoji etc.) sai.
-const EXTRAS = new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ'])
-const codificavel = (c: string) => c === '\n' || (c >= ' ' && c <= '~') || (c >= ' ' && c <= 'ÿ') || EXTRAS.has(c)
-export const paraWinAnsi = (texto: string) => [...texto].filter(codificavel).join('')
-
-function quebrar(texto: string, font: PDFFont, size: number, max: number) {
-  const linhas: string[] = []
-  for (const paragrafo of texto.split('\n')) {
-    let atual = ''
-    for (const palavra of paragrafo.split(/\s+/).filter(Boolean)) {
-      const tentativa = atual ? `${atual} ${palavra}` : palavra
-      if (font.widthOfTextAtSize(tentativa, size) <= max) { atual = tentativa; continue }
-      if (atual) linhas.push(atual)
-      atual = ''
-      // Palavra maior que a linha (URL longa): corta por caracteres.
-      for (const c of palavra) {
-        if (atual && font.widthOfTextAtSize(atual + c, size) > max) { linhas.push(atual); atual = '' }
-        atual += c
-      }
-    }
-    linhas.push(atual)
-  }
-  return linhas
-}
 
 /** Comprovante individual do treinamento concluído: dados, linha do tempo, versão lida (texto), identificador e assinatura. */
 export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Array> {
@@ -73,16 +52,8 @@ export async function gerarComprovantePdf(d: DadosComprovante): Promise<Uint8Arr
     const h = 100
     espaco(h + 24)
     texto(`Assinatura${d.nomeAssinante ? ` de ${d.nomeAssinante}` : ''}`, { negrito: true })
-    const bx = MARGEM
     const by = y - h
-    page.drawRectangle({ x: bx, y: by, width: w, height: h, borderColor: SUAVE, borderWidth: 0.5 })
-    for (const traco of d.assinatura) {
-      for (let i = 1; i < traco.length; i += 1) {
-        const [x0, y0] = traco[i - 1]
-        const [x1, y1] = traco[i]
-        page.drawLine({ start: { x: bx + x0 * w, y: by + (1 - y0) * h }, end: { x: bx + x1 * w, y: by + (1 - y1) * h }, thickness: 1.2, color: COR })
-      }
-    }
+    desenharAssinatura(page, d.assinatura, MARGEM, by, w, h, COR, SUAVE)
     y = by - 12
   }
 
