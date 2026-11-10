@@ -12,7 +12,9 @@
 #   - Compose_PaxDoServico deixa de montar o JSON com json(concat(...)), que quebrava com aspas, barra ou quebra de
 #     linha no nome do passageiro; passa a ser um array de objetos com os mesmos campos (guid, nome, ordem);
 #   - o e-mail de erro (Scope_1_1) passa a trazer o link da execução e as ações que falharam com a mensagem
-#     (Filter_Falhas + Select_Falhas sobre result() da condição e dos dois loops).
+#     (Filter_Falhas + Select_Falhas sobre result() da condição e dos dois loops);
+#   - o cadastro de passageiros é lido só da Tenaris e o dedup/busca comparam o nome sem
+#     maiúsculas nem espaços nas pontas (duplicados criados no mesmo lote e homônimo de outro cliente).
 # O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
@@ -128,8 +130,15 @@ if (-not $paxDoServico -or -not $scopeErro -or @($scopeErro.PSObject.Properties.
 }
 $paxJsonConcat = $paxDoServico.inputs -is [string]
 $temFalhas = @($scopeErro.PSObject.Properties.Name) -contains 'Select_Falhas'
-if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas) {
-  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas); nada a alterar."
+$listaBD = $cond.List_rows_BancodeDados_Completo
+$condUnico = $cond.Loop_Dedup.actions.Condition_unico
+$criaPax = $cond.Loop_Servicos.actions.Loop_Create_Pax.actions.Condition_TemGUID
+if (-not $condUnico.actions.Append_to_array_variable_varNomesVistos -or -not $criaPax.actions.Filter_FindGUID -or -not $criaPax.else.actions.Filter_FindGUID_PorNome) {
+  throw 'O flow não está no formato esperado: Condition_unico, Filter_FindGUID ou Filter_FindGUID_PorNome ausente.'
+}
+$temIdentificacao = @($listaBD.inputs.parameters.PSObject.Properties.Name) -contains '$filter'
+if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao) {
+  Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris); nada a alterar."
   return
 }
 Write-Output "${Ambiente}: '$flowName' (statecode $($flow.statecode)) - mudanças:"
@@ -165,6 +174,26 @@ if (-not $temFalhas) {
     "<p>Ações que falharam:</p><pre>@{replace(replace(string(body('Select_Falhas')), '&', '&amp;'), '<', '&lt;')}</pre>"
   Write-Output '  Scope_1_1: + Filter_Falhas, Select_Falhas; e-mail com o link da execução e as ações que falharam'
 } else { Write-Output '  Scope_1_1: e-mail já traz as falhas; sem mudança.' }
+
+# Identificação do passageiro (18/08/2026: Maria Gabrielly Silva e Vitoria Maria Coelho Pereira criadas em dobro):
+#   - a busca olhava o cadastro de todos os clientes e o update grava Cliente = Tenaris, então um homônimo de outro
+#     cliente mudava de dono; passa a ler só o cadastro da Tenaris (688 em 11/2026; o List rows sem paginação para em
+#     5.000 e a licença do dono do flow não aceita paginação acima disso);
+#   - a mesma pessoa com GUIDs diferentes (ou com e sem GUID) passava duas vezes pelo dedup e, como a lista é lida
+#     antes do loop, era criada duas vezes; o dedup passa a barrar também o nome já visto (sem maiúsculas/espaços);
+#   - o vínculo do serviço procura a pessoa pelo GUID ou pelo nome, já que o GUID repetido não entra no mapa.
+if (-not $temIdentificacao) {
+  $nome = { param($x) "toLower(trim(coalesce($x, '')))" }
+  $listaBD.inputs.parameters | Add-Member -NotePropertyName '$filter' -NotePropertyValue "_cr40f_cliente_value eq @{first(body('Filter_array_Tenaris'))?['cr40f_clientes1id']}"
+  $loop.Filter_BDLocal.inputs.where = "@equals($(& $nome "item()?['cr40f_nomedopassageiro']"), $(& $nome "items('Loop_UpsertBD')?['nome']"))"
+  $nomeDedup = & $nome "items('Loop_Dedup')?['nome']"
+  $condUnico.expression.and[0].equals[0] = "@and(or(empty(trim(coalesce(items('Loop_Dedup')?['nome'], ''))), not(contains(variables('varNomesVistos'), $nomeDedup))), or(empty(items('Loop_Dedup')?['guid']), not(contains(variables('varGUIDsVistos'), items('Loop_Dedup')?['guid']))))"
+  $condUnico.actions.Append_to_array_variable_varNomesVistos.inputs.value = "@$nomeDedup"
+  $mesmoNome = "equals($(& $nome "item()?['guidNome']"), $(& $nome "items('Loop_Create_Pax')?['nome']"))"
+  $criaPax.actions.Filter_FindGUID.inputs.where = "@or(equals(item()?['guidTenaris'], items('Loop_Create_Pax')?['guid']), $mesmoNome)"
+  $criaPax.else.actions.Filter_FindGUID_PorNome.inputs.where = "@$mesmoNome"
+  Write-Output '  List_rows_BancodeDados_Completo: só cliente Tenaris; Filter_BDLocal, Condition_unico e Filter_FindGUID*: nome sem maiúsculas/espaços'
+} else { Write-Output '  Identificação: cadastro já filtrado pela Tenaris; sem mudança.' }
 
 # cr40f_passageirosetelefonedecontato é derivado de cr40f_servicosporpassageiro + cr40f_bancodedados e tem um dono
 # só: o plugin DriverRecordSharing (ServicePassengerViewSynchronizer). O texto da planilha continua no snapshot.
@@ -220,7 +249,8 @@ $condSalvo = ($conf.clientdata | ConvertFrom-Json).properties.definition.actions
 if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'Filter_Ocorrencias' -or
   @($condSalvo.Loop_Servicos.actions.Upsert_Geral.inputs.parameters.PSObject.Properties.Name) -contains $campoPax -or
   $condSalvo.Loop_Servicos.actions.Compose_PaxDoServico.inputs -is [string] -or
-  @(($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Scope_1_1.actions.PSObject.Properties.Name) -notcontains 'Select_Falhas') {
-  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array ou Select_Falhas ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
+  @(($conf.clientdata | ConvertFrom-Json).properties.definition.actions.Scope.actions.Scope_1_1.actions.PSObject.Properties.Name) -notcontains 'Select_Falhas' -or
+  @($condSalvo.List_rows_BancodeDados_Completo.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter') {
+  throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas ou filtro da Tenaris ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
 }
 Write-Output "${Ambiente}: '$flowName' atualizado (statecode $($conf.statecode))."
