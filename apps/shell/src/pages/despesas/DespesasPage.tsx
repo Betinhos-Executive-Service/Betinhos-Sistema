@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, Grid, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -158,7 +158,7 @@ function Despesas({ host }: { host: Host }) {
   return (
     <div className="page dp-page">
       <h1 className="dp-sr-only">Despesas operacionais</h1>
-      <div role="toolbar" aria-label="Comandos de despesas">
+      <div role="toolbar" aria-label="Comandos de despesas" className="dp-barra">
         <ViewBar onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
@@ -168,13 +168,13 @@ function Despesas({ host }: { host: Host }) {
         </ViewBar>
       </div>
       {despesas.error && !choices ? null : (
-        <Grid min={190}>
+        <div className="dp-kpis"><div className="dp-kpis__grid">
           <button type="button" className="dp-kpi" {...kpi('esperando-gestor')}><MetricCard icon={<UserCheck size={20} />} tone="warning" label="Esperando gestor" value={totais.esperandoGestor} hint="validar ou devolver" loading={kpiLoading} /></button>
           <MetricCard icon={<Wallet size={20} />} label="Total filtrado" value={formatMoney(totais.total)} hint={plural(totais.qtd, 'lançamento', 'lançamentos')} loading={kpiLoading} />
-          <button type="button" className="dp-kpi" {...kpi('aguardando')}><MetricCard icon={<Clock size={20} />} tone="warning" label="Aguardando pagamento" value={formatMoney(totais.aguardandoValor)} hint={plural(totais.aguardandoQtd, 'despesa', 'despesas')} loading={kpiLoading} /></button>
+          <button type="button" className="dp-kpi" {...kpi('aguardando')}><MetricCard icon={<Clock size={20} />} tone="warning" label="A pagar" value={formatMoney(totais.aguardandoValor)} hint={plural(totais.aguardandoQtd, 'despesa', 'despesas')} loading={kpiLoading} /></button>
           <button type="button" className="dp-kpi" {...kpi('sem-comprovante')}><MetricCard icon={<Paperclip size={20} />} tone="warning" label="Sem comprovante" value={totais.semComprovante} hint="sem anexo completo" loading={kpiLoading} /></button>
           <button type="button" className="dp-kpi" {...kpi('duplicidade')}><MetricCard icon={<Copy size={20} />} tone="danger" label="Possível duplicidade" value={totais.duplicidade} hint="conferir antes de pagar" loading={kpiLoading} /></button>
-        </Grid>
+        </div></div>
       )}
       {despesas.error && choices ? (
         <Alert tone="danger" title={despesas.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
