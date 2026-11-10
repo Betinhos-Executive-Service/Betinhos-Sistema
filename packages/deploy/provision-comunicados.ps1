@@ -162,10 +162,10 @@ function Invoke-Main {
     $state = @{ Api = $api; Request = @(); Response = @(); Steps = @(); Solutions = @() }
     if ($api) {
       $id = $api.customapiid
-      $state.Request = Rows "customapirequestparameters?`$select=customapirequestparameterid,uniquename,type,isoptional&`$filter=_customapiid_value eq $id"
-      $state.Response = Rows "customapiresponseproperties?`$select=customapiresponsepropertyid,uniquename,type&`$filter=_customapiid_value eq $id"
+      $state.Request = @(Rows "customapirequestparameters?`$select=customapirequestparameterid,uniquename,type,isoptional&`$filter=_customapiid_value eq $id")
+      $state.Response = @(Rows "customapiresponseproperties?`$select=customapiresponsepropertyid,uniquename,type&`$filter=_customapiid_value eq $id")
       if ($api._sdkmessageid_value) {
-        $state.Steps = Rows "sdkmessageprocessingsteps?`$select=sdkmessageprocessingstepid,name,stage,_sdkmessageprocessingstepsecureconfigid_value&`$filter=_sdkmessageid_value eq $($api._sdkmessageid_value)"
+        $state.Steps = @(Rows "sdkmessageprocessingsteps?`$select=sdkmessageprocessingstepid,name,stage,_sdkmessageprocessingstepsecureconfigid_value&`$filter=_sdkmessageid_value eq $($api._sdkmessageid_value)")
       }
       foreach ($sol in $script:Solucoes) {
         if (@(Rows "solutioncomponents?`$select=solutioncomponentid&`$filter=_solutionid_value eq $($solutionRows[$sol]) and objectid eq $id").Count) { $state.Solutions += "$sol|$id" }
