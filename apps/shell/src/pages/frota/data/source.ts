@@ -6,7 +6,7 @@ export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, str
 
 export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: [], infracoes: [], colisoes: [], posses: [], planoPreventivo: [], baselines: [], despesasCombustivel: [], telemetriaKm: [] }
 
-/** Classificação atual da manutenção no servidor (para acompanhar o flow do JEV sem recarregar tudo). */
+/** Classificação da manutenção, aplicada na tela sem recarregar tudo. */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
 
 export type FlowId = 'aprovarManutencao' | 'notificarCondutor' | 'gerarContrato'
@@ -32,9 +32,6 @@ export interface DataSource {
   /** Comportamento das colunas de data da tabela. Rejeita se a metadata não estiver disponível. */
   dateBehaviors(kind: Kind): Promise<Record<string, DateBehavior>>
   update(kind: Kind, id: string, patch: Record<string, unknown>): Promise<void>
-  classificacao(id: string): Promise<Classificacao>
-  /** Classifica agora pelo flow HTTP do JEV e devolve o resultado já gravado (síncrono, ~1-2 s). */
-  classificarAgora(id: string): Promise<Classificacao>
   /** Abre o formulário nativo. Resolve quando o usuário fecha o formulário. */
   openForm(kind: Kind | 'veiculo', id?: string): Promise<void>
   /** Garante que o Flow pode ser chamado (URL configurada e legível). Não chama o Flow. */
