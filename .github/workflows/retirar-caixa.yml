@@ -7,6 +7,8 @@ name: Retirar AppBetinhos
 #     existem na AppBetinhos e somem com ela; decisão registrada no input); conferir-retirada --dev (o que está só na caixa tem
 #     de estar ausente do DEV; tabela com registros só se aceita); desinstalação das duas; foto depois e comparação --retirada
 #     (o que era só da caixa e sumiu é informativo; queda de registros e qualquer outra perda reprovam).
+# Artefatos: foto-dev e retirada-<alvo> (fotos: só hashes e nomes) em claro; os registros exportados sobem cifrados com o
+# secret PACOTES_SENHA (registros-<alvo>; repositório público). Nenhum job deste workflow exporta ZIP de solução.
 # Não faz upgrade da AppBetinhos antes de desinstalar: no TEST (30/10/2026) ele caiu duas vezes com erro de transporte SQL do
 # servidor aos 30-50 min; a desinstalação direta apaga o mesmo conjunto, e a barreira com a foto do DEV prova que é o esperado.
 on:
@@ -108,6 +110,17 @@ jobs:
           name: retirada-${{ inputs.alvo }}
           path: |
             fotos/
-            registros/
             foto-dev/
+          retention-days: 90
+      - name: Cifrar os registros exportados
+        if: always() && hashFiles('registros/**') != ''
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh cifrar registros registros-cifrado/registros.tar.enc
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('registros/**') != ''
+        with:
+          name: registros-${{ inputs.alvo }}
+          path: registros-cifrado/
           retention-days: 90

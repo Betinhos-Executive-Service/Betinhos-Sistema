@@ -13,6 +13,9 @@ name: Publicar soluções
 #  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
 #    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão. Solução com o mesmo
 #    conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada; importar_tudo força o import.
+# Repositório público: qualquer conta do GitHub baixa artefatos. O export passa pela trava de segredos (segredos.ps1, dentro
+# do exportar-do-dev.ps1) e o artefato "pacotes" sobe só cifrado (artefato-cifrado.sh, AES-256 com o secret PACOTES_SENHA
+# do repositório). Sem o secret, o job falha antes do export.
 on:
   workflow_dispatch:
     inputs:
@@ -76,6 +79,12 @@ jobs:
         shell: bash
         run: |
           case "${{ inputs.alvo }}" in test|prod|test-e-prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
+      - name: Secret PACOTES_SENHA
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          if [ -z "$PACOTES_SENHA" ]; then echo "::error::Secret PACOTES_SENHA ausente (repository secret). Sem ele os pacotes não podem subir cifrados; nada foi exportado."; exit 1; fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -117,9 +126,20 @@ jobs:
       - name: Pacote do último Deploy
         uses: actions/cache/restore@v4
         with:
-          path: cache-solucoes
-          key: solucoes-dev-${{ github.sha }}
-          restore-keys: solucoes-dev-
+          path: cache-cifrado
+          key: solucoes-dev-cifrado-${{ github.sha }}
+          restore-keys: solucoes-dev-cifrado-
+      - name: Decifrar o pacote do último Deploy
+        # Cache cifrado (PR de fork lê caches da branch padrão). Sem cache, ou se não decifrar, segue sem reaproveitamento.
+        if: hashFiles('cache-cifrado/pacotes.tar.enc') != ''
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          if ! bash packages/deploy/solucoes/artefato-cifrado.sh decifrar cache-cifrado/pacotes.tar.enc cache-solucoes; then
+            echo "::warning::Pacote do último Deploy não decifrou (PACOTES_SENHA trocado?); exporta sem reaproveitar."
+            rm -rf cache-solucoes
+          fi
       - name: Conferir, decidir por solução e exportar
         # SOLUCOES_IMPRESSAO (variável do repositório): vazia = modo observar (exporta tudo e só registra o que teria decidido);
         # confiar = pula a solução sem mudança e reaproveita o pacote do Deploy. importar_tudo nunca pula.
@@ -143,10 +163,16 @@ jobs:
             echo '```'
             echo 'origem: exportado, cache (pacote do Deploy) ou pulada (sem mudança). observacao "erro" = a impressão digital falhou; não ligue o modo confiar.'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Cifrar os pacotes
+        # Só depois da trava de segredos (o export falha antes daqui se achar segredo).
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh cifrar pacotes pacotes-cifrado/pacotes.tar.enc
       - uses: actions/upload-artifact@v4
         with:
           name: pacotes
-          path: pacotes/
+          path: pacotes-cifrado/
           retention-days: 7
 
   importar-test:
