@@ -38,7 +38,15 @@ export async function gerarComprovantesPdf({ modo, alvo, pares, geradoPor, gerad
   }
   const campo = (rotulo: string, valor: string) => { if (valor) texto(`${rotulo}: ${valor}`) }
 
-  const datas = pares.flatMap((p) => [p.destinatario.cienteEm, p.destinatario.lidoEm]).filter((v): v is string => Boolean(v)).sort()
+  // Data da conclusão: ciência assinada (Ciência) ou leitura confirmada (Informativo); a leitura anterior à assinatura não conta.
+  const datas = pares.map((p) => (p.comunicado.tipo === COMUNICADO_TIPO.ciencia ? p.destinatario.cienteEm : p.destinatario.lidoEm)).filter((v): v is string => Boolean(v)).sort((a, b) => Date.parse(a) - Date.parse(b))
+  // Em "por comunicado" todos os comprovantes têm o mesmo conteúdo: calcula o SHA-256 uma vez.
+  const hashes = new Map<string, Promise<string>>()
+  const hashDe = ({ titulo, corpo }: { titulo: string; corpo: string }) => {
+    const chave = `${titulo}\n${corpo}`
+    if (!hashes.has(chave)) hashes.set(chave, hashConteudo(titulo, corpo))
+    return hashes.get(chave)
+  }
   const geracao = formatDate(geradoEm.toISOString())
 
   novaPagina()
@@ -102,7 +110,7 @@ export async function gerarComprovantesPdf({ modo, alvo, pares, geradoPor, gerad
     texto('Identificação', { size: 11, negrito: true, depois: 2 })
     campo('ID do comunicado', comunicado.id)
     campo('ID do destinatário', d.id)
-    texto(`Identificador do conteúdo disparado (SHA-256): ${await hashConteudo(comunicado.titulo, comunicado.corpo)}`, { size: 8, cor: SUAVE })
+    texto(`Identificador do conteúdo disparado (SHA-256): ${await hashDe(comunicado)}`, { size: 8, cor: SUAVE })
     texto(AVISO_HASH, { size: 7, cor: SUAVE, depois: 6 })
     texto(NOTA, { size: 8, cor: SUAVE })
   }

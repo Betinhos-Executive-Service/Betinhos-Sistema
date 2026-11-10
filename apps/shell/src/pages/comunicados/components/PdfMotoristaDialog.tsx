@@ -31,7 +31,7 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
       (reason: unknown) => { if (vale) setErro(reason instanceof Error ? reason.message : String(reason)) },
     )
     return () => { vale = false }
-  }, [motorista, source, comunicados, tentativa])
+  }, [motorista, source, tentativa])
 
   const termo = busca.trim().toLowerCase()
   const lista = motoristas.filter((m) => !termo || m.nome.toLowerCase().includes(termo))

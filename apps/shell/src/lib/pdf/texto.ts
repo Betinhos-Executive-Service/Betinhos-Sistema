@@ -2,7 +2,7 @@ import type { PDFFont, PDFPage, RGB } from 'pdf-lib'
 
 // WinAnsi (Helvetica padrão): ASCII + Latin-1 (sem os controles C1) + aspas e travessões tipográficos. O resto (emoji etc.) sai.
 const EXTRAS = new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ'])
-const codificavel = (c: string) => c === '\n' || (c >= ' ' && c <= '~') || (c >= ' ' && c <= 'ÿ') || EXTRAS.has(c)
+const codificavel = (c: string) => c === '\n' || (c >= ' ' && c <= '~') || (c >= '\u00a0' && c <= 'ÿ') || EXTRAS.has(c)
 export const paraWinAnsi = (texto: string) => [...texto].filter(codificavel).join('')
 
 export function quebrar(texto: string, font: PDFFont, size: number, max: number) {

@@ -138,7 +138,7 @@
 .cm-pdfdlg__list > li:not(.cm-pdfdlg__empty) { padding: var(--bt-space-2) var(--bt-space-3); transition: background-color var(--bt-duration-fast) var(--bt-ease-out); }
 .cm-pdfdlg__list > li.is-checked { background-color: var(--bt-color-action-soft); }
 .cm-pdfdlg__list .bt-choice { width: 100%; }
-.cm-pdfdlg__pick { display: flex; align-items: center; gap: var(--bt-space-3); width: 100%; margin: calc(var(--bt-space-2) * -1) calc(var(--bt-space-3) * -1); padding: var(--bt-space-2) var(--bt-space-3); width: calc(100% + var(--bt-space-3) * 2); border: 0; background: transparent; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); text-align: left; cursor: pointer; }
+.cm-pdfdlg__pick { display: flex; align-items: center; gap: var(--bt-space-3); margin: calc(var(--bt-space-2) * -1) calc(var(--bt-space-3) * -1); padding: var(--bt-space-2) var(--bt-space-3); width: calc(100% + var(--bt-space-3) * 2); border: 0; background: transparent; font: inherit; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); text-align: left; cursor: pointer; }
 .cm-pdfdlg__pick:focus-visible { outline: 0; box-shadow: inset var(--bt-focus-ring); }
 @media (hover: hover) and (pointer: fine) { .cm-pdfdlg__pick:hover { background-color: var(--bt-color-surface-soft); } }
 .cm-pdfdlg__empty { margin: 0; padding: var(--bt-space-3); color: var(--bt-color-text-secondary); }
