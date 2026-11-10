@@ -13,8 +13,15 @@ minimumReleaseAgeExclude:
 overrides:
   motion@12.40.0>framer-motion: 12.40.0
   framer-motion@12.40.0>motion-dom: 12.40.0
-# lucide-react 0.468 não declara @types/react como peer; sem isso o pnpm ligava o @types/react 19 do workspace.
+# lucide-react 0.468 e o @betinhos ui não declaram @types/react como peer; sem isso o pnpm liga o @types/react
+# içado (18 do App Motoristas ou 19 do resto) e o build quebra com ReactNode de outra versão.
 packageExtensions:
+  '@betinhos-executive-service/ui':
+    peerDependencies:
+      '@types/react': '*'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
   lucide-react@0.468.0:
     peerDependencies:
       '@types/react': '*'
