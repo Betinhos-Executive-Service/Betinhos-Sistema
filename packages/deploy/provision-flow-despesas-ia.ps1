@@ -625,6 +625,7 @@ $gravarText = @'
       "item/cr40f_iavalorlido": "@outputs('Resposta')?['valor_lido']",
       "item/cr40f_iadatalida": "@outputs('Resposta')?['data_lida']",
       "item/cr40f_iacnpjlido": "@if(equals(outputs('Resposta')?['cnpj_lido'], null), null, substring(outputs('Resposta')?['cnpj_lido'], 0, min(length(outputs('Resposta')?['cnpj_lido']), 20)))",
+      "item/new_cnpjposto": "@if(equals(length(replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', '')), 14), replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', ''), triggerOutputs()?['body/new_cnpjposto'])",
       "item/cr40f_iaestabelecimentolido": "@if(equals(outputs('Resposta')?['estabelecimento_lido'], null), null, substring(outputs('Resposta')?['estabelecimento_lido'], 0, min(length(outputs('Resposta')?['estabelecimento_lido']), 200)))",
       "item/cr40f_iaconfianca": "@float(formatNumber(outputs('Resposta')?['confianca'], '0.00', 'en-US'))",
       "item/cr40f_iajson": "@{outputs('Texto_resposta')}",

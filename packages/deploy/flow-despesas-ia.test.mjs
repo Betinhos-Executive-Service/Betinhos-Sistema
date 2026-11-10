@@ -28,3 +28,8 @@ test('script mantém o BOM', () => {
   const bruto = readFileSync(new URL('./provision-flow-despesas-ia.ps1', import.meta.url))
   assert.deepEqual([...bruto.subarray(0, 3)], [0xef, 0xbb, 0xbf])
 })
+
+test('grava o CNPJ lido (só dígitos, 14) em new_cnpjposto, que dispara a comparação de postos; inválido mantém o valor atual', () => {
+  const digitos = "replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', '')"
+  assert.ok(ps1.includes(`"item/new_cnpjposto": "@if(equals(length(${digitos}), 14), ${digitos}, triggerOutputs()?['body/new_cnpjposto'])",`))
+})
