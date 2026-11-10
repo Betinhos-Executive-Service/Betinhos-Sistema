@@ -31,9 +31,11 @@ Em fórmula, com `prazo` = `new_prazovisualizacao`:
 
 ## Implementação
 
-- A regra muda só na Vigia (`provision-aviso-motorista-flows.ps1`). O plugin não muda.
+- A regra muda só na Vigia (`packages/deploy/provision-flow-aviso-motorista.ps1`). O plugin não muda.
 - O reenvio deixa de depender do alerta e ganha marca própria: coluna `new_reenviadoem` em `new_avisomotorista` (schema à mão no DEV, PROD pelas soluções).
-- O script dos flows hoje só existe nas worktrees do repositório antigo do App. Ele vem para `apps/motoristas/scripts` e entra no mapa `packages/deploy/flows-dev.mjs`, para a Vigia publicar sozinha no Deploy.
+- Os scripts vieram da tag `pre-monorepo` do repositório antigo: schema em `packages/deploy/provision-aviso-motorista.ps1` (coluna `new_reenviadoem`, à mão, antes do primeiro Deploy) e flows em `packages/deploy/provision-flow-aviso-motorista.ps1`, no mapa `packages/deploy/flows-dev.mjs` (o Deploy publica Enviar e Vigia sozinho e recusa se a coluna faltar).
+- O reenvio regrava o aviso como Pendente; o alerta de "Pendente parado" passa a contar de `modifiedon`, para não alertar no mesmo minuto do reenvio.
+- Com a Vigia ligada, o `-Apply` desliga o flow antigo no DEV; o PROD recebe o estado pelas soluções.
 - "Falhou" e "Sem app" seguem o mesmo horário do alerta (assumido; hoje alertam na hora).
 
 ## Verificação no DEV

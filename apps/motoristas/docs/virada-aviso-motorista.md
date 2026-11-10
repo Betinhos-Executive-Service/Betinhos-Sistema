@@ -10,10 +10,10 @@ Na troca de motorista, "Novo Serviço", "Retirado da Agenda" e "Resetar" liam a 
 
 | Peça | Onde | Papel |
 | --- | --- | --- |
-| `new_avisomotorista` | `scripts/provision-aviso-motorista.ps1` | Outbox: um aviso por motorista e evento |
+| `new_avisomotorista` | `packages/deploy/provision-aviso-motorista.ps1` | Outbox: um aviso por motorista e evento |
 | `DriverNoticePlugin` pré-operação | `plugins/DriverRecordSharing` | Motorista mudou: zera `new_visualizacaodomotorista` e ajusta `new_foiprogramado` na mesma gravação |
 | `DriverNoticePlugin` pós-operação | `plugins/DriverRecordSharing` | Cria o aviso na transação da reserva, com o serviço de sistema |
-| `Flow Aviso Motorista \| Enviar` | `scripts/provision-aviso-motorista-flows.ps1` | Entrega Power Apps e Web Push em paralelo; grava Enviado, Falhou ou Sem app. Novo que deixou de valer (saiu de Programado ou trocou o motorista) vira Cancelado sem push |
+| `Flow Aviso Motorista \| Enviar` | `packages/deploy/provision-flow-aviso-motorista.ps1` | Entrega Power Apps e Web Push em paralelo; grava Enviado, Falhou ou Sem app. Novo que deixou de valer (saiu de Programado ou trocou o motorista) vira Cancelado sem push |
 | `Flow Aviso Motorista \| Vigia` | idem | A cada 10 min: concilia, alerta a operação, reenvia o vencido |
 
 Regras:
@@ -43,7 +43,7 @@ Nada disso sai de branch: o assembly é compartilhado e o `npm run push` sai da 
 1. Merge do PR na `main`.
 2. `npm run push` na `main` atualizada. Provisiona a tabela (antes do plugin) e publica o assembly com os 3 steps.
    A partir daqui a regra da visualização já vale, e os avisos acumulam em Pendente sem entrega. Os flows antigos seguem atendendo.
-3. `scripts/provision-aviso-motorista-flows.ps1 -Apply`. Cria os dois flows desligados.
+3. `packages/deploy/provision-flow-aviso-motorista.ps1 -Apply`. Cria os dois flows desligados.
 4. Autorize as conexões dos flows no maker portal se a ativação pedir.
 5. `scripts/virada-aviso-motorista.ps1` (dry-run) e confira `pré-requisitos OK`.
 6. `scripts/virada-aviso-motorista.ps1 -Apply`: liga o Enviar, cancela o acumulado anterior, liga a Vigia e só então desliga os antigos.
