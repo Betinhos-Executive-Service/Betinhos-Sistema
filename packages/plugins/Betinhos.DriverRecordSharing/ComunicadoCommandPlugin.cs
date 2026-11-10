@@ -188,8 +188,7 @@ namespace Betinhos.DriverRecordSharing
                 try { input = serializer.DeserializeObject(raw) as Dictionary<string, object>; }
                 catch { input = null; }
             }
-            if (input == null)
-                return serializer.Serialize(new Dictionary<string, object> { { "v", 1 }, { "erro", "formato" }, { "servidorEm", stamp } });
+            if (input == null) return FormatError(stamp);
 
             var ipStamp = Field(input, "ipStamp") as Dictionary<string, object>;
             var ip = ipStamp == null ? "" : Text(Field(ipStamp, "ip"), 100);
@@ -210,9 +209,12 @@ namespace Betinhos.DriverRecordSharing
             // Campos truncados + caracteres escapados (", <, >) podem passar do limite do desserializador: serializa sem o limite e,
             // se a coluna não comportar, grava a marca de erro em vez de derrubar a abertura ou a ciência.
             var json = new JavaScriptSerializer().Serialize(result);
-            return json.Length <= EvidenciaMaxChars
-                ? json
-                : serializer.Serialize(new Dictionary<string, object> { { "v", 1 }, { "erro", "formato" }, { "servidorEm", stamp } });
+            return json.Length <= EvidenciaMaxChars ? json : FormatError(stamp);
+        }
+
+        private static string FormatError(string stamp)
+        {
+            return new JavaScriptSerializer().Serialize(new Dictionary<string, object> { { "v", 1 }, { "erro", "formato" }, { "servidorEm", stamp } });
         }
 
         private static object Field(Dictionary<string, object> source, string name)
@@ -284,10 +286,10 @@ namespace Betinhos.DriverRecordSharing
 
         private static bool ConstantTimeEquals(byte[] left, byte[] right)
         {
-            var diff = left.Length ^ right.Length;
-            for (var index = 0; index < left.Length; index++)
-                diff |= left[index] ^ right[index % Math.Max(right.Length, 1)];
-            return diff == 0 && right.Length > 0;
+            if (left.Length != right.Length) return false;
+            var diff = 0;
+            for (var index = 0; index < left.Length; index++) diff |= left[index] ^ right[index];
+            return diff == 0;
         }
 
         private static void ValidateSignature(string json)

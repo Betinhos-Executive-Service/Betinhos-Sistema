@@ -68,7 +68,7 @@ describe('gerarComprovantesPdf', () => {
     expect(texto).toContain('Mapa: https://www.google.com/maps?q=-23.18000,-45.88000')
     expect(texto).toMatch(/Ciência\n[\s\S]*198\.51\.100\.9 \(não verificado\)[\s\S]*Localização: não autorizada/)
     // A nota quebra em duas linhas.
-    expect(texto.replace(/\n/g, ' ')).toContain('IP carimbado pelo servidor da Betinhos; aparelho e localização informados pelo aparelho do motorista.')
+    expect(texto.replace(/\n/g, ' ')).toContain('IP conferido pelo servidor da Betinhos quando marcado como verificado; aparelho e localização informados pelo aparelho do motorista.')
   })
 
   it('Informativo mostra só o bloco "Leitura"', async () => {

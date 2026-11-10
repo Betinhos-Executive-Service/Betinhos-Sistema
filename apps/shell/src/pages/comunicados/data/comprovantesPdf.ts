@@ -11,7 +11,7 @@ const SUAVE = rgb(0.42, 0.42, 0.46)
 
 export type DadosPdf = { modo: ModoPdf; alvo: string; pares: Par[]; geradoPor: string; geradoEm: Date; versao: string }
 
-const NOTA = 'Assinatura registrada pelo App Motoristas com a conta Microsoft do motorista; datas do servidor. IP carimbado pelo servidor da Betinhos; aparelho e localização informados pelo aparelho do motorista.'
+const NOTA = 'Assinatura registrada pelo App Motoristas com a conta Microsoft do motorista; datas do servidor. IP conferido pelo servidor da Betinhos quando marcado como verificado; aparelho e localização informados pelo aparelho do motorista.'
 const AVISO_HASH = 'O identificador é calculado na geração deste PDF a partir do título e do texto do comunicado; não é prova de integridade nem de autoria.'
 
 /** PDF de evidência: capa com o resumo e um comprovante por par (motorista × comunicado), cada um em página nova. */
@@ -86,6 +86,7 @@ export async function gerarComprovantesPdf({ modo, alvo, pares, geradoPor, gerad
     if (ciencia) campo('Ciência', formatDate(d.cienteEm))
     y -= 6
 
+    espaco(130) // título e primeiro bloco não ficam separados pela quebra de página
     texto('Aparelho e local', { size: 11, negrito: true, depois: 2 })
     const momentos: [string, Evidencia | null][] = ciencia ? [['Abertura', d.evidenciaAbertura], ['Ciência', d.evidenciaCiencia]] : [['Leitura', d.evidenciaAbertura]]
     for (const [momento, evidencia] of momentos) {
