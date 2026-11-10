@@ -60,7 +60,7 @@ $uri = "$apiBase/new_postocombustivels?`$select=new_postocombustivelid,new_cnpj,
 while ($uri) {
   $page = Invoke-Dv "GET" $uri
   foreach ($r in $page.value) { if ($r.new_cnpj) { $existentes[[string]$r.new_cnpj] = $r } }
-  $uri = $page.'@odata.nextLink'
+  $uri = if ($page.PSObject.Properties['@odata.nextLink']) { $page.'@odata.nextLink' } else { $null }
 }
 
 $novos = 0; $marcados = 0; $desmarcados = 0; $coordenadas = 0; $semCoordenada = 0
