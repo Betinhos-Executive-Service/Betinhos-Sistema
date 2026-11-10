@@ -16,8 +16,8 @@
 #   - o cadastro de passageiros é lido só da Tenaris e o dedup/busca comparam o nome sem
 #     maiúsculas nem espaços nas pontas (duplicados criados no mesmo lote e homônimo de outro cliente).
 # Solicitante do serviço = Responsável da linha (era o passageiro 1) e passageiro reconhecido também pelo e-mail.
-# Desempenho: Update_BD_Existente só roda quando algo muda no cadastro (Condition_BD_Mudou) e List_rows_Cliente
-# lê só a Tenaris.
+# Desempenho: Update_BD_Existente só roda quando algo muda no cadastro (Condition_BD_Mudou), sem forçar a
+# classificação do cadastro existente, e List_rows_Cliente lê só a Tenaris.
 # O resto do flow não muda. Já no formato final, não faz nada. Sem -Apply é DRY RUN.
 #
 # Antes de alterar, salva o clientdata atual em packages/deploy/flows/backup/. Para reverter:
@@ -146,11 +146,12 @@ $solicitante = $cond.Loop_Servicos.actions.Filter_array_Solicitante_First
 $mapaUpdate = $elseBD.Append_to_array_variable_varGUIDMap_2
 $listaCliente = $cond.List_rows_Cliente
 if (-not $listaCliente) { throw 'O flow não está no formato esperado: List_rows_Cliente ausente.' }
+$forcaClassif = @($update.PSObject.Properties.Name) -contains 'item/cr40f_classificacao'
 $temClienteFiltro = @($listaCliente.inputs.parameters.PSObject.Properties.Name) -contains '$filter'
 if (-not $solicitante -or -not $mapaUpdate) { throw 'O flow não está no formato esperado: Filter_array_Solicitante_First ou Append_to_array_variable_varGUIDMap_2 ausente.' }
 $temSolicitante = $solicitante.inputs.where -like "*Responsável - Nome*"
 $temEmail = $loop.Filter_BDLocal.inputs.where -like "*cr40f_email*"
-if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao -and $temSolicitante -and $temEmail -and $temSoMudou -and $temClienteFiltro) {
+if ($temOcorrencias -and -not $gravaPax -and -not $paxJsonConcat -and $temFalhas -and $temIdentificacao -and $temSolicitante -and $temEmail -and $temSoMudou -and -not $forcaClassif -and $temClienteFiltro) {
   Write-Output "${Ambiente}: '$flowName' já está no formato final (ocorrências, passageiros sem json(concat), e-mail com as falhas, cadastro só da Tenaris, solicitante = responsável, passageiro reconhecido pelo e-mail, update só quando muda); nada a alterar."
   return
 }
@@ -233,24 +234,27 @@ if (-not $temEmail) {
 } else { Write-Output '  Reconhecimento por e-mail: já aplicado; sem mudança.' }
 
 # Desempenho: o Loop_UpsertBD (sequencial) regravava todo passageiro já cadastrado a cada sync. Update_BD_Existente
-# passa a rodar só quando o que ele gravaria difere do cadastro (telefone, e-mail, departamento preenchidos no lote,
-# classificação ou nome vazio); o mapa usa o id do Filter_BDLocal, que existe com ou sem update.
-if (-not $temSoMudou) {
+# passa a rodar só quando o que ele gravaria difere do cadastro (telefone, e-mail ou departamento preenchidos no lote,
+# ou nome vazio); o mapa usa o id do Filter_BDLocal, que existe com ou sem update. A classificação deixa de ser
+# forçada no cadastro existente (Visitante e Solicitante voltavam a Passageiro Frequente); o novo nasce 202410000.
+if (-not $temSoMudou -or $forcaClassif) {
   $bd = "first(body('Filter_BDLocal'))"
   $difere = foreach ($c in @(@('Telefone', 'cr40f_telefone'), @('Email', 'cr40f_email'), @('Departamento', 'cr40f_departamento'))) {
     "and(not(empty(outputs('Compose_$($c[0])'))), not(equals(outputs('Compose_$($c[0])'), coalesce(${bd}?['$($c[1])'], ''))))"
   }
-  $mudou = "@or($($difere -join ', '), not(equals(${bd}?['cr40f_classificacao'], 202410000)), empty(coalesce(${bd}?['cr40f_nomedopassageiro'], '')))"
-  $updAcao = $elseBD.Update_BD_Existente
-  $elseBD.PSObject.Properties.Remove('Update_BD_Existente')
-  $elseBD | Add-Member -NotePropertyName Condition_BD_Mudou -NotePropertyValue ([pscustomobject]@{
-      type = 'If'; expression = $mudou; runAfter = [pscustomobject]@{}
-      actions = [pscustomobject]@{ Update_BD_Existente = $updAcao }; else = [pscustomobject]@{ actions = [pscustomobject]@{} } })
-  $mapaUpdate.runAfter = After 'Condition_BD_Mudou'
-  $mapaUpdate.inputs.value.guidNativo = "@{${bd}?['cr40f_bancodedadosid']}"
-  $selBD = $listaBD.inputs.parameters
-  if ($selBD.'$select' -notlike '*cr40f_classificacao*') { $selBD.'$select' += ',cr40f_classificacao' }
-  Write-Output '  Loop_UpsertBD: Update_BD_Existente só quando muda (Condition_BD_Mudou); varGUIDMap usa o id do Filter_BDLocal; $select + cr40f_classificacao'
+  $mudou = "@or($($difere -join ', '), empty(coalesce(${bd}?['cr40f_nomedopassageiro'], '')))"
+  if ($temSoMudou) { $elseBD.Condition_BD_Mudou.expression = $mudou }
+  else {
+    $updAcao = $elseBD.Update_BD_Existente
+    $elseBD.PSObject.Properties.Remove('Update_BD_Existente')
+    $elseBD | Add-Member -NotePropertyName Condition_BD_Mudou -NotePropertyValue ([pscustomobject]@{
+        type = 'If'; expression = $mudou; runAfter = [pscustomobject]@{}
+        actions = [pscustomobject]@{ Update_BD_Existente = $updAcao }; else = [pscustomobject]@{ actions = [pscustomobject]@{} } })
+    $mapaUpdate.runAfter = After 'Condition_BD_Mudou'
+    $mapaUpdate.inputs.value.guidNativo = "@{${bd}?['cr40f_bancodedadosid']}"
+  }
+  $update.PSObject.Properties.Remove('item/cr40f_classificacao')
+  Write-Output '  Loop_UpsertBD: Update_BD_Existente só quando muda (Condition_BD_Mudou), sem forçar a classificação; varGUIDMap usa o id do Filter_BDLocal'
 } else { Write-Output '  Update só quando muda: já aplicado; sem mudança.' }
 
 # Desempenho: List_rows_Cliente lia a tabela inteira de clientes, com todas as colunas, para achar a Tenaris.
@@ -319,6 +323,7 @@ if (@($condSalvo.Loop_UpsertBD.actions.PSObject.Properties.Name) -notcontains 'F
   $condSalvo.Loop_Servicos.actions.Filter_array_Solicitante_First.inputs.where -notlike "*Responsável - Nome*" -or
   $condSalvo.Loop_UpsertBD.actions.Filter_BDLocal.inputs.where -notlike "*cr40f_email*" -or
   -not $condSalvo.Loop_UpsertBD.actions.Condition_nome_nao_existe_ainda.else.actions.Condition_BD_Mudou -or
+  @($condSalvo.Loop_UpsertBD.actions.Condition_nome_nao_existe_ainda.else.actions.Condition_BD_Mudou.actions.Update_BD_Existente.inputs.parameters.PSObject.Properties.Name) -contains 'item/cr40f_classificacao' -or
   @($condSalvo.List_rows_Cliente.inputs.parameters.PSObject.Properties.Name) -notcontains '$filter') {
   throw 'A gravação não persistiu: Filter_Ocorrencias, Compose_PaxDoServico em array, Select_Falhas, filtro da Tenaris, solicitante pelo Responsável, busca por e-mail, Condition_BD_Mudou ou filtro do List_rows_Cliente ausente, ou Upsert_Geral ainda grava o campo de passageiros.'
 }
