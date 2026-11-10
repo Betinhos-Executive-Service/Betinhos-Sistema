@@ -1,6 +1,7 @@
-// Porte de Tela Planner/src/quoteDomain.js (sem mudança de comportamento).
+// Porte de Tela Planner/src/quoteDomain.js; a busca usa quoteSearch.ts.
 import { localDateKey } from './management'
 import { addBusinessDays, QUOTE_STATUS_FLOW, QUOTE_TERMINAL_STATUSES } from './quoteTaskFlow'
+import { matchesQuoteSearch, quoteSearchTerms } from './quoteSearch'
 import type { QuoteInput, QuoteOptionData, Task } from './types'
 
 export { QUOTE_TERMINAL_STATUSES }
@@ -163,7 +164,7 @@ export interface QuoteFilters {
   deadline?: string | string[]
 }
 
-type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds'> & { id?: string }
+type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds' | 'assigneeNames'> & { id?: string }
 
 function primaryTaskByQuote(tasks: QuoteTask[]): Map<string, QuoteTask> {
   return new Map(tasks.filter((task) => task.quoteId && !task.parentTaskId).map((task) => [String(task.quoteId), task]))
@@ -171,11 +172,10 @@ function primaryTaskByQuote(tasks: QuoteTask[]): Map<string, QuoteTask> {
 
 export function filterQuotes<Q extends QuoteInput>(quotes: Q[] = [], tasks: QuoteTask[] = [], filters: QuoteFilters = {}, today: string = localDateKey()): Q[] {
   const taskByQuote = primaryTaskByQuote(tasks)
-  const needle = String(filters.query || '').trim().toLocaleLowerCase('pt-BR')
+  const terms = quoteSearchTerms(filters.query)
   return quotes.filter((quote) => {
     const task = taskByQuote.get(String(quote.id))
-    const searchable = [quote.code, quote.title, quote.client, quote.clientContact, quote.status].join(' ').toLocaleLowerCase('pt-BR')
-    if (needle && !searchable.includes(needle)) return false
+    if (!matchesQuoteSearch(quote, terms, task?.assigneeNames)) return false
     const selected = (value: string | string[] | undefined): string[] => Array.isArray(value) ? value : value ? [value] : []
     if (selected(filters.status).length && !selected(filters.status).includes(String(quote.status))) return false
     if (selected(filters.priority).length && !selected(filters.priority).includes(String(quote.priority))) return false

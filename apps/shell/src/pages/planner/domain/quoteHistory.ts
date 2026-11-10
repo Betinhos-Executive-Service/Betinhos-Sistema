@@ -1,7 +1,7 @@
-// Porte de Tela Planner/src/quotes/quoteHistory.js (sem mudança de comportamento).
-import { normalizeText } from './domain'
+// Porte de Tela Planner/src/quotes/quoteHistory.js; a busca usa quoteSearch.ts.
 import { QUOTE_TERMINAL_STATUSES } from './quoteDomain'
 import { chosenQuoteOption } from './quoteScenarios'
+import { matchesQuoteSearch, quoteSearchTerms } from './quoteSearch'
 import type { QuoteInput, QuoteOptionData, QuoteProposalVersion } from './types'
 
 export const quoteResultLabel = (status: string | undefined): string | undefined => status === 'Perdida' ? 'Negada' : status === 'Aceita pelo cliente' ? 'Aceita' : status
@@ -25,11 +25,11 @@ export interface QuoteHistoryFilters {
 }
 
 export function filterQuoteHistory<Q extends QuoteInput>(quotes: readonly Q[], { query = '', status = '', from = '', to = '' }: QuoteHistoryFilters = {}): Q[] {
-  const needle = normalizeText(query)
+  const terms = quoteSearchTerms(query)
   return quotes.filter((quote) => {
     if (!QUOTE_TERMINAL_STATUSES.includes(quote.status as string)) return false
     if (status && quote.status !== status) return false
-    if (needle && ![quote.code, quote.client, quote.title, quote.route, quote.origin, quote.destination].some((value) => normalizeText(value).includes(needle))) return false
+    if (!matchesQuoteSearch(quote, terms)) return false
     const date = quoteHistoryDate(quote.finalizationAt)
     return !(from && (!date || date < from)) && !(to && (!date || date > to))
   }).sort((a, b) => (Date.parse(b.finalizationAt as string) || 0) - (Date.parse(a.finalizationAt as string) || 0))

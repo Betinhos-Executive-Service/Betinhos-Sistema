@@ -51,7 +51,7 @@ export default function QuoteHistory({ quotes, onOpen }: any) {
   const filtered = Boolean(query || status || preset !== "all");
   return <section className="panel quote-history-panel" aria-label="Histórico de cotações">
     <div className="quote-history-toolbar">
-      <label className="quote-history-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Buscar no histórico" value={query} onChange={(event) => { setQuery(event.target.value); resetRows(); }} placeholder="Buscar por número, cliente ou serviço" /></label>
+      <label className="quote-history-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Buscar no histórico" value={query} onChange={(event) => { setQuery(event.target.value); resetRows(); }} placeholder="Buscar por número, cliente, contato, rota, data, veículo, valor…" /></label>
       <div className="quote-history-period"><SearchableSelect value={periodChoice} onChange={changePeriod} options={periods} aria-label="Período de encerramento" /></div>
       <button type="button" className="button button-secondary quote-history-filter-toggle" aria-expanded={filtersExpanded} aria-controls="quote-history-filters" onClick={() => setFiltersExpanded((value: any) => !value)}><SlidersHorizontal size={15} aria-hidden="true" />Filtros<ChevronDown size={14} aria-hidden="true" /></button>
     </div>
