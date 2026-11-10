@@ -58,12 +58,15 @@ function Get-Campo($Objeto, [string] $Nome) {
 # e exportada. Entra no valor:
 #  - cada linha de solutioncomponents (id, tipo, comportamento): componente incluido ou retirado;
 #  - tabela (1): o JSON da metadata (colunas, chaves, relacionamentos e as opcoes de cada coluna de escolha, sim/nao, estado e
-#    status) e o modifiedon de formularios, visoes, graficos e regras de negocio da tabela (subcomponentes vao no export);
-#  - escolha global (9): o JSON da definicao; papel (20): modifiedon e o JSON dos privilegios; perfil de seguranca de coluna (70):
-#    modifiedon do perfil e das permissoes;
-#  - tipos com registro proprio ($LeitoresPorTipo) e componentes de tabela (tipo >= 10000, ex. Custom API): modifiedon.
-# Lacunas conhecidas (por isso o modo observar antes de confiar): faixa de opcoes classica (RibbonDiffXml) e o que nao atualiza
-# modifiedon nem a metadata. Coluna, relacionamento ou chave soltos (2, 10, 14) ficam incertos.
+#    status) e a versionnumber de formularios, visoes, graficos e regras de negocio da tabela (subcomponentes vao no export);
+#  - escolha global (9): o JSON da definicao; papel (20): versionnumber e o JSON dos privilegios; perfil de seguranca de coluna (70):
+#    versionnumber do perfil e das permissoes;
+#  - tipos com registro proprio ($LeitoresPorTipo) e componentes de tabela (tipo >= 10000, ex. Custom API): versionnumber.
+# versionnumber (rowversion) e o sinal de mudanca: existe em toda tabela de componente e muda a cada gravacao da linha. modifiedon
+# nao serve: systemform, fieldpermission, canvasapp, attributeimageconfig, entityimageconfig e appaction_appactionrule_classicrules
+# nao tem a coluna (400 no primeiro uso real, Producao 42690598079). Colunas conferidas no DEV: testa-impressao.ps1.
+# Lacunas conhecidas (por isso o modo observar antes de confiar): faixa de opcoes classica (RibbonDiffXml) e o que nao grava a
+# linha nem a metadata. Coluna, relacionamento ou chave soltos (2, 10, 14) ficam incertos.
 $script:LeitoresPorTipo = @{
   20 = @("roles", "roleid"); 26 = @("savedqueries", "savedqueryid"); 29 = @("workflows", "workflowid")
   59 = @("savedqueryvisualizations", "savedqueryvisualizationid"); 60 = @("systemforms", "formid"); 61 = @("webresourceset", "webresourceid")
@@ -89,21 +92,23 @@ function Get-ImpressaoDigital($Dv, [string] $Nome) {
   $porTipo = @{}
   foreach ($c in $componentes) { if (-not $porTipo.ContainsKey($c.tipo)) { $porTipo[$c.tipo] = @() }; $porTipo[$c.tipo] += $c.id }
 
-  # Consulta em lote: id -> modifiedon (e a coluna extra, se houver). Falha vira motivo, nunca aprovacao.
+  # Consulta em lote: id -> versionnumber (e a coluna extra, se houver). Falha vira motivo, nunca aprovacao.
   $lote = {
     param([string] $Caminho, [string] $Chave, [string] $Extra)
     $mapa = @{}
     try {
-      foreach ($r in @(Read-DvAll $Dv $Caminho)) { $mapa[([string] $r.$Chave).ToLowerInvariant()] = @{ data = [string] $r.modifiedon; extra = if ($Extra) { [string] $r.$Extra } else { "" } } }
+      foreach ($r in @(Read-DvAll $Dv $Caminho)) { $mapa[([string] $r.$Chave).ToLowerInvariant()] = @{ data = [string] $r.versionnumber; extra = if ($Extra) { [string] $r.$Extra } else { "" } } }
       return $mapa
     }
     catch { $motivos.Add("leitura de $($Caminho.Split('?')[0]) falhou: $(Get-ErroDv $_)"); return $null }
   }
   $porData = {
     param([int] $Tipo, [string] $Conjunto, [string] $Chave)
-    $mapa = & $lote "$Conjunto`?`$select=$Chave,modifiedon" $Chave ""
+    $mapa = & $lote "$Conjunto`?`$select=$Chave,versionnumber" $Chave ""
     if ($null -eq $mapa) { return }
     foreach ($id in $porTipo[$Tipo]) {
+      # A listagem esconde linhas (ex. mapa do site de app, isappaware): quem falta e lido pelo id.
+      if (-not $mapa.ContainsKey($id)) { $um = & $lote "$Conjunto`?`$select=$Chave,versionnumber&`$filter=$Chave eq $id" $Chave ""; if ($um -and $um.ContainsKey($id)) { $mapa[$id] = $um[$id] } }
       if ($mapa.ContainsKey($id)) { $linhas.Add("r|$Tipo|$id|$($mapa[$id].data)") } else { $motivos.Add("tipo $Tipo $id sem registro em $Conjunto") }
     }
   }
@@ -129,7 +134,7 @@ function Get-ImpressaoDigital($Dv, [string] $Nome) {
       }
       foreach ($s in $script:SubcomponentesDaTabela) {
         $filtro = if ($s[3]) { "&`$filter=$($s[3])" } else { "" }
-        $mapa = & $lote "$($s[0])?`$select=$($s[1]),$($s[2]),modifiedon$filtro" $s[1] $s[2]
+        $mapa = & $lote "$($s[0])?`$select=$($s[1]),$($s[2]),versionnumber$filtro" $s[1] $s[2]
         if ($null -eq $mapa) { continue }
         foreach ($k in $mapa.Keys) { if ($nomes.ContainsKey($mapa[$k].extra)) { $linhas.Add("s|$($nomes[$mapa[$k].extra])|$($s[0])|$k|$($mapa[$k].data)") } }
       }
@@ -139,7 +144,7 @@ function Get-ImpressaoDigital($Dv, [string] $Nome) {
       & $porData $tipo $script:LeitoresPorTipo[$tipo][0] $script:LeitoresPorTipo[$tipo][1]
       if ($tipo -eq 20) { foreach ($id in $ids) { $textos += "RetrieveRolePrivilegesRole(RoleId=@p)?@p=$id" } }
       if ($tipo -eq 70) {
-        $mapa = & $lote "fieldpermissions?`$select=fieldpermissionid,_fieldsecurityprofileid_value,modifiedon" "fieldpermissionid" "_fieldsecurityprofileid_value"
+        $mapa = & $lote "fieldpermissions?`$select=fieldpermissionid,_fieldsecurityprofileid_value,versionnumber" "fieldpermissionid" "_fieldsecurityprofileid_value"
         if ($null -ne $mapa) { foreach ($k in $mapa.Keys) { if ($ids -contains $mapa[$k].extra.ToLowerInvariant()) { $linhas.Add("p|$($mapa[$k].extra)|$k|$($mapa[$k].data)") } } }
       }
     }
