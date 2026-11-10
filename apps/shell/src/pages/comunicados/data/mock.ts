@@ -32,7 +32,7 @@ export function createMockSource(): Source {
   ]
   const destinatarios: Destinatario[] = [
     destinatario(1, id(10), id(1), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Carlos Andrade', assinaturaJson: ASSINATURA, observacao: 'Combinado, mas a porta 4 fica fechada depois das 23h.' }),
-    destinatario(2, id(10), id(2), hoje, { abertoEm: hoje }),
+    destinatario(2, id(10), id(2), hoje, { abertoEm: hoje, cienteEm: hoje, nomeAssinante: 'Márcio Lima', assinaturaJson: ASSINATURA }),
     destinatario(3, id(10), id(3), hoje, { pushStatus: COMUNICADO_PUSH.falhou, pushErro: 'Dispositivo não registrado' }),
     destinatario(4, id(11), id(1), ontem, { abertoEm: ontem, lidoEm: ontem }),
     destinatario(5, id(11), id(2), ontem),
