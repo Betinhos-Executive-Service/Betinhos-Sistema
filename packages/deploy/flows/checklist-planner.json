@@ -1,0 +1,1379 @@
+{
+  "triggers": {
+    "When_checklist_concluded": {
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      },
+      "inputs": {
+        "host": {
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/filterexpression": "new_estado eq 100000002 and new_temproblema eq true",
+          "subscriptionRequest/filteringattributes": "new_estado",
+          "subscriptionRequest/entityname": "new_checklistveiculo",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "type": "OpenApiConnectionWebhook"
+    }
+  },
+  "actions": {
+    "Init_tarefa": {
+      "runAfter": {
+        "Init_equipe": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "TarefaId",
+            "value": "",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "Tem_itens": {
+      "runAfter": {
+        "Itens_nok": [
+          "Succeeded"
+        ]
+      },
+      "actions": {
+        "Subitens": {
+          "runAfter": {},
+          "type": "Select",
+          "inputs": {
+            "select": {
+              "title": "@take(concat(coalesce(item()?['rotulo'], 'Item'), ': ', join(coalesce(item()?['problemas'], createArray()), ', '), if(empty(coalesce(item()?['observacao'], '')), '', concat(' — ', item()?['observacao']))), 150)",
+              "done": false,
+              "id": "@concat('check-', item()?['chave'])"
+            },
+            "from": "@body('Itens_nok')"
+          }
+        },
+        "Descricao": {
+          "runAfter": {
+            "Titulo": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@take(concat('Motorista: ', coalesce(body('Ler_checklist')?['_new_motorista_value@OData.Community.Display.V1.FormattedValue'], 'não informado'), decodeUriComponent('%0A'), 'Enviado em: ', convertTimeZone(coalesce(body('Ler_checklist')?['new_concluidoem'], utcNow()), 'UTC', 'E. South America Standard Time', 'dd/MM/yyyy HH:mm'), decodeUriComponent('%0A'), 'Tipo: ', if(equals(body('Ler_checklist')?['new_origem'], 100000002), 'Troca', if(equals(body('Ler_checklist')?['new_origem'], 100000001), 'Manual', 'Quinzenal')), if(equals(body('Ler_checklist')?['new_origem'], 100000002), concat(decodeUriComponent('%0A'), 'Entregue por: ', coalesce(body('Ler_checklist')?['_new_entreguepor_value@OData.Community.Display.V1.FormattedValue'], 'não identificado')), ''), decodeUriComponent('%0A'), decodeUriComponent('%0A'), 'Itens Não OK:', decodeUriComponent('%0A'), join(body('Linhas'), decodeUriComponent('%0A'))), 8000)"
+        },
+        "Completar": {
+          "runAfter": {
+            "Garantir_tarefa": [
+              "Succeeded"
+            ]
+          },
+          "actions": {
+            "Bloco_relacoes": {
+              "runAfter": {
+                "Bloco_lookups": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut",
+                  "Skipped"
+                ]
+              },
+              "actions": {
+                "Ids_relacionados": {
+                  "runAfter": {
+                    "Buscar_relacoes": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Select",
+                  "inputs": {
+                    "select": "@item()?['_cr40f_funcionario_value']",
+                    "from": "@body('Buscar_relacoes')?['value']"
+                  }
+                },
+                "Buscar_relacoes": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannertarearesponsavels",
+                      "$filter": "_cr40f_tarefa_value eq @{variables('TarefaId')}",
+                      "$select": "_cr40f_funcionario_value"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Para_cada_responsavel": {
+                  "actions": {
+                    "Falta_relacao": {
+                      "runAfter": {},
+                      "actions": {
+                        "Relacao_responsavel": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "cr40f_plannertarearesponsavels",
+                              "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                              "item/cr40f_Funcionario@odata.bind": "@concat('/cr40f_funcionarioses(', item(), ')')",
+                              "item/cr40f_name": "@{concat(variables('TarefaId'), '-', item())}"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@not(contains(body('Ids_relacionados'), item()))",
+                              true
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Ids_relacionados": [
+                      "Succeeded"
+                    ]
+                  },
+                  "foreach": "@variables('Responsaveis')",
+                  "type": "Foreach"
+                },
+                "Relacao_equipe": {
+                  "runAfter": {},
+                  "actions": {
+                    "Buscar_relacao_equipe": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "ListRecords",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                          "connectionName": "shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "cr40f_plannertarefaequipes",
+                          "$top": 1,
+                          "$filter": "_cr40f_tarefa_value eq @{variables('TarefaId')} and _cr40f_equipe_value eq @{variables('EquipeId')}",
+                          "$select": "cr40f_plannertarefaequipeid"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Criar_relacao_equipe": {
+                      "runAfter": {
+                        "Buscar_relacao_equipe": [
+                          "Succeeded"
+                        ]
+                      },
+                      "actions": {
+                        "Relacao_equipe_nova": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "entityName": "cr40f_plannertarefaequipes",
+                              "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                              "item/cr40f_name": "@{concat(variables('TarefaId'), '-', variables('EquipeId'))}",
+                              "item/cr40f_Equipe@odata.bind": "@concat('/cr40f_plannerequipes(', variables('EquipeId'), ')')"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@empty(body('Buscar_relacao_equipe')?['value'])",
+                              true
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@not(empty(variables('EquipeId')))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "type": "Scope"
+            },
+            "Resumo": {
+              "runAfter": {
+                "Falhas_texto": [
+                  "Succeeded"
+                ]
+              },
+              "actions": {
+                "Evento_falha": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "CreateRecord",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannertarefaeventos",
+                      "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                      "item/cr40f_descricao": "@{take(concat('Checklist: etapas não concluídas (reexecute o run do flow para completar): ', outputs('Falhas_texto')), 2000)}",
+                      "item/cr40f_ocorridoem": "@utcNow()",
+                      "item/cr40f_tipo": 100000001
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Encerrar_com_falha": {
+                  "runAfter": {
+                    "Evento_falha": [
+                      "Succeeded",
+                      "Failed",
+                      "TimedOut"
+                    ]
+                  },
+                  "type": "Terminate",
+                  "inputs": {
+                    "runError": {
+                      "code": "ChecklistPlannerIncompleto",
+                      "message": "@{take(outputs('Falhas_texto'), 1000)}"
+                    },
+                    "runStatus": "Failed"
+                  }
+                }
+              },
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@not(empty(outputs('Falhas_texto')))",
+                      true
+                    ]
+                  }
+                ]
+              }
+            },
+            "Bloco_eventos": {
+              "runAfter": {
+                "Bloco_relacoes": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut",
+                  "Skipped"
+                ]
+              },
+              "actions": {
+                "Eventos_criacao": {
+                  "runAfter": {
+                    "Buscar_eventos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@equals(item()?['cr40f_tipo'], 100000000)",
+                    "from": "@body('Buscar_eventos')?['value']"
+                  }
+                },
+                "Buscar_eventos": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannertarefaeventos",
+                      "$filter": "_cr40f_tarefa_value eq @{variables('TarefaId')}",
+                      "$select": "cr40f_tipo,cr40f_campo,cr40f_descricao"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Eventos_atribuicao": {
+                  "runAfter": {
+                    "Buscar_eventos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@equals(item()?['cr40f_campo'], 'notification:assignment')",
+                    "from": "@body('Buscar_eventos')?['value']"
+                  }
+                },
+                "Atribuicao_falta": {
+                  "runAfter": {
+                    "Eventos_atribuicao": [
+                      "Succeeded"
+                    ],
+                    "Criacao_falta": [
+                      "Succeeded"
+                    ],
+                    "Eventos_sem_responsavel": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Tem_responsaveis": {
+                      "runAfter": {},
+                      "actions": {
+                        "Evento_atribuicao": {
+                          "runAfter": {
+                            "Contexto_atribuicao": [
+                              "Succeeded"
+                            ]
+                          },
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "CreateRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "item/cr40f_ocorridoem": "@utcNow()",
+                              "item/cr40f_tipo": 100000003,
+                              "item/cr40f_valoranterior": "",
+                              "item/cr40f_descricao": "Responsáveis atribuídos.",
+                              "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                              "item/cr40f_campo": "notification:assignment",
+                              "entityName": "cr40f_plannertarefaeventos",
+                              "item/cr40f_valornovo": "@string(outputs('Contexto_atribuicao'))"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        },
+                        "Contexto_atribuicao": {
+                          "runAfter": {},
+                          "type": "Compose",
+                          "inputs": {
+                            "assigneeIds": "@variables('Responsaveis')",
+                            "sourceCode": "CHECKLIST:@{triggerOutputs()?['body/new_checklistveiculoid']}",
+                            "plannerBaseUrl": "@first(split(coalesce(body('Ler_checklist')?['@odata.id'], ''), '/api/data/'))",
+                            "previousAssigneeIds": [],
+                            "plannerAppUrl": null,
+                            "actorName": "Checklist de vistoria (App Motoristas)",
+                            "sourceType": "manual",
+                            "actorEmployeeId": "",
+                            "creatorEmployeeId": "",
+                            "actorUserId": ""
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Sem_responsavel_falta": {
+                            "runAfter": {},
+                            "actions": {
+                              "Evento_sem_responsavel": {
+                                "runAfter": {},
+                                "type": "OpenApiConnection",
+                                "inputs": {
+                                  "host": {
+                                    "operationId": "CreateRecord",
+                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                    "connectionName": "shared_commondataserviceforapps"
+                                  },
+                                  "parameters": {
+                                    "entityName": "cr40f_plannertarefaeventos",
+                                    "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                                    "item/cr40f_descricao": "<preservado do DEV>",
+                                    "item/cr40f_ocorridoem": "@utcNow()",
+                                    "item/cr40f_tipo": 100000001
+                                  },
+                                  "authentication": "@parameters('$authentication')"
+                                }
+                              }
+                            },
+                            "type": "If",
+                            "expression": {
+                              "and": [
+                                {
+                                  "equals": [
+                                    "@empty(body('Eventos_sem_responsavel'))",
+                                    true
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@greater(length(variables('Responsaveis')), 0)",
+                              true
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@and(empty(body('Eventos_atribuicao')), not(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Resolver_responsaveis')?['status'], ''))), not(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Bloco_relacoes')?['status'], ''))))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "Eventos_sem_responsavel": {
+                  "runAfter": {
+                    "Buscar_eventos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@startsWith(coalesce(item()?['cr40f_descricao'], ''), 'Tarefa criada sem responsável')",
+                    "from": "@body('Buscar_eventos')?['value']"
+                  }
+                },
+                "Criacao_falta": {
+                  "runAfter": {
+                    "Eventos_criacao": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Evento_criada": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "CreateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                          "connectionName": "shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "cr40f_plannertarefaeventos",
+                          "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                          "item/cr40f_descricao": "Tarefa criada.",
+                          "item/cr40f_ocorridoem": "@utcNow()",
+                          "item/cr40f_tipo": 100000000
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@empty(body('Eventos_criacao'))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "type": "Scope"
+            },
+            "Bloco_anexos": {
+              "runAfter": {
+                "Bloco_eventos": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut",
+                  "Skipped"
+                ]
+              },
+              "actions": {
+                "Anexos_json": {
+                  "runAfter": {
+                    "Buscar_anexos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@startsWith(trim(coalesce(item()?['cr40f_valornovo'], '')), '{')",
+                    "from": "@body('Buscar_anexos')?['value']"
+                  }
+                },
+                "Buscar_fotos": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_checklistveiculofotos",
+                      "$orderby": "new_itemchave asc,new_ordem asc",
+                      "$filter": "_new_checklist_value eq @{triggerOutputs()?['body/new_checklistveiculoid']}",
+                      "$select": "new_itemchave,new_caminho,new_nomearquivo,new_ordem"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Tem_url": {
+                  "runAfter": {
+                    "Url_anexos": [
+                      "Succeeded"
+                    ],
+                    "Fotos_pendentes": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Para_cada_foto": {
+                      "runtimeConfiguration": {
+                        "concurrency": {
+                          "repetitions": 1
+                        }
+                      },
+                      "runAfter": {},
+                      "foreach": "@body('Fotos_pendentes')",
+                      "actions": {
+                        "Enviar_anexo": {
+                          "runtimeConfiguration": {
+                            "secureData": {
+                              "properties": [
+                                "inputs"
+                              ]
+                            }
+                          },
+                          "runAfter": {
+                            "Ler_foto": [
+                              "Succeeded"
+                            ]
+                          },
+                          "type": "Http",
+                          "inputs": {
+                            "body": {
+                              "metadados": {
+                                "tarefaId": "@{variables('TarefaId')}",
+                                "tarefa": "@{outputs('Titulo')}",
+                                "origem": "PLANNER_INTERNO"
+                              },
+                              "caminhoCompleto": "@{concat('Tarefas Planner/', if(startsWith(item()?['new_caminho'], 'Checklists/DEV/'), 'DEV/', ''), 'CHECKLIST-', triggerOutputs()?['body/new_checklistveiculoid'], '/Anexos')}",
+                              "mimeType": "@{if(endsWith(toLower(item()?['new_nomearquivo']), '.png'), 'image/png', if(endsWith(toLower(item()?['new_nomearquivo']), '.webp'), 'image/webp', if(or(endsWith(toLower(item()?['new_nomearquivo']), '.jpg'), endsWith(toLower(item()?['new_nomearquivo']), '.jpeg')), 'image/jpeg', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'application/octet-stream'))))}",
+                              "nomeArquivo": "@item()?['new_nomearquivo']",
+                              "conteudoBase64": "@{base64(body('Ler_foto'))}"
+                            },
+                            "method": "POST",
+                            "retryPolicy": {
+                              "type": "none"
+                            },
+                            "headers": {
+                              "Content-Type": "application/json"
+                            },
+                            "uri": "@outputs('Url_anexos')"
+                          }
+                        },
+                        "Anexo_ok": {
+                          "runAfter": {
+                            "Enviar_anexo": [
+                              "Succeeded"
+                            ]
+                          },
+                          "actions": {
+                            "Anexo_json": {
+                              "runAfter": {},
+                              "type": "Compose",
+                              "inputs": {
+                                "nomeOriginal": "@item()?['new_nomearquivo']",
+                                "mimeType": "@coalesce(body('Enviar_anexo')?['mimeType'], if(endsWith(toLower(item()?['new_nomearquivo']), '.png'), 'image/png', if(endsWith(toLower(item()?['new_nomearquivo']), '.webp'), 'image/webp', if(or(endsWith(toLower(item()?['new_nomearquivo']), '.jpg'), endsWith(toLower(item()?['new_nomearquivo']), '.jpeg')), 'image/jpeg', coalesce(outputs('Ler_foto')?['headers']?['Content-Type'], 'application/octet-stream')))))",
+                                "id": "@body('Enviar_anexo')?['identificador']",
+                                "size": "@body('Enviar_anexo')?['tamanho']",
+                                "sharePointId": "@body('Enviar_anexo')?['identificador']",
+                                "name": "@coalesce(body('Enviar_anexo')?['nomeArquivo'], item()?['new_nomearquivo'])",
+                                "fileLocator": "@coalesce(body('Enviar_anexo')?['fileLocator'], body('Enviar_anexo')?['identificador'])",
+                                "path": "@coalesce(body('Enviar_anexo')?['caminhoSharePoint'], body('Enviar_anexo')?['caminhoCompleto'], '')",
+                                "returnId": ""
+                              }
+                            },
+                            "Evento_anexo": {
+                              "runAfter": {
+                                "Anexo_json": [
+                                  "Succeeded"
+                                ]
+                              },
+                              "type": "OpenApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "operationId": "CreateRecord",
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                                  "connectionName": "shared_commondataserviceforapps"
+                                },
+                                "parameters": {
+                                  "item/cr40f_ocorridoem": "@utcNow()",
+                                  "item/cr40f_tipo": 100000001,
+                                  "item/cr40f_valoranterior": "",
+                                  "item/cr40f_descricao": "Anexo adicionado.",
+                                  "item/cr40f_Tarefa@odata.bind": "@concat('/cr40f_plannertarefas(', variables('TarefaId'), ')')",
+                                  "item/cr40f_campo": "anexo",
+                                  "entityName": "cr40f_plannertarefaeventos",
+                                  "item/cr40f_valornovo": "@string(outputs('Anexo_json'))"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Falha_resposta": {
+                                "runAfter": {},
+                                "type": "AppendToArrayVariable",
+                                "inputs": {
+                                  "value": "@{concat(item()?['new_nomearquivo'], ': ', coalesce(body('Enviar_anexo')?['erro'], 'flow de anexos sem sucesso'))}",
+                                  "name": "FalhasAnexo"
+                                }
+                              }
+                            }
+                          },
+                          "type": "If",
+                          "expression": {
+                            "and": [
+                              {
+                                "equals": [
+                                  "@and(equals(body('Enviar_anexo')?['sucesso'], true), not(empty(coalesce(body('Enviar_anexo')?['identificador'], ''))))",
+                                  true
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "Ler_foto": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "GetFileContentByPath",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_onedriveforbusiness",
+                              "connectionName": "shared_onedriveforbusiness"
+                            },
+                            "parameters": {
+                              "path": "@{concat('/', item()?['new_caminho'], '/', item()?['new_nomearquivo'])}",
+                              "inferContentType": true
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        },
+                        "Falha_anexo": {
+                          "runAfter": {
+                            "Anexo_ok": [
+                              "Failed",
+                              "Skipped",
+                              "TimedOut"
+                            ]
+                          },
+                          "type": "AppendToArrayVariable",
+                          "inputs": {
+                            "value": "@{concat(item()?['new_nomearquivo'], ': ', if(equals(actions('Ler_foto')?['status'], 'Succeeded'), if(equals(actions('Enviar_anexo')?['status'], 'Succeeded'), 'evento do anexo não gravado', 'falha ao enviar ao flow de anexos'), concat('arquivo não lido no OneDrive em ', item()?['new_caminho'])))}",
+                            "name": "FalhasAnexo"
+                          }
+                        }
+                      },
+                      "type": "Foreach"
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Sem_url": {
+                        "runAfter": {},
+                        "type": "AppendToArrayVariable",
+                        "inputs": {
+                          "value": "URL do flow de anexos não configurada (new_URLFlowsalvararquivosSharePoint).",
+                          "name": "FalhasAnexo"
+                        }
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@or(not(empty(outputs('Url_anexos'))), equals(length(body('Fotos_pendentes')), 0))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "Nomes_anexados": {
+                  "runAfter": {
+                    "Anexos_json": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Select",
+                  "inputs": {
+                    "select": "@coalesce(json(item()?['cr40f_valornovo'])?['nomeOriginal'], json(item()?['cr40f_valornovo'])?['name'])",
+                    "from": "@body('Anexos_json')"
+                  }
+                },
+                "Ler_url_anexos": {
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs",
+                        "outputs"
+                      ]
+                    }
+                  },
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "environmentvariabledefinitions",
+                      "$expand": "environmentvariabledefinition_environmentvariablevalue($select=value)",
+                      "$filter": "schemaname eq 'new_URLFlowsalvararquivosSharePoint'",
+                      "$top": 1,
+                      "$select": "defaultvalue"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Fotos_pendentes": {
+                  "runAfter": {
+                    "Chaves_nok": [
+                      "Succeeded"
+                    ],
+                    "Nomes_anexados": [
+                      "Succeeded"
+                    ],
+                    "Buscar_fotos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Query",
+                  "inputs": {
+                    "where": "@and(contains(body('Chaves_nok'), item()?['new_itemchave']), not(contains(body('Nomes_anexados'), item()?['new_nomearquivo'])))",
+                    "from": "@body('Buscar_fotos')?['value']"
+                  }
+                },
+                "Chaves_nok": {
+                  "runAfter": {},
+                  "type": "Select",
+                  "inputs": {
+                    "select": "@item()?['chave']",
+                    "from": "@body('Itens_nok')"
+                  }
+                },
+                "Buscar_anexos": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannertarefaeventos",
+                      "$filter": "_cr40f_tarefa_value eq @{variables('TarefaId')} and cr40f_campo eq 'anexo'",
+                      "$select": "cr40f_valornovo"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Url_anexos": {
+                  "runtimeConfiguration": {
+                    "secureData": {
+                      "properties": [
+                        "inputs"
+                      ]
+                    }
+                  },
+                  "runAfter": {
+                    "Ler_url_anexos": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Compose",
+                  "inputs": "@coalesce(first(coalesce(first(body('Ler_url_anexos')?['value'])?['environmentvariabledefinition_environmentvariablevalue'], createArray()))?['value'], first(body('Ler_url_anexos')?['value'])?['defaultvalue'], '')"
+                }
+              },
+              "type": "Scope"
+            },
+            "Bloco_lookups": {
+              "runAfter": {},
+              "actions": {
+                "Vincular_equipe": {
+                  "runAfter": {
+                    "Vincular_principal": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Gravar_equipe": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "UpdateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                          "connectionName": "shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "cr40f_plannertarefas",
+                          "item/cr40f_EquipePlanner@odata.bind": "@concat('/cr40f_plannerequipes(', variables('EquipeId'), ')')",
+                          "recordId": "@variables('TarefaId')"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@and(not(empty(variables('EquipeId'))), empty(body('Ler_tarefa')?['_cr40f_equipeplanner_value']))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "Ler_tarefa": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "GetItem",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannertarefas",
+                      "$select": "_cr40f_cr40f_funcionarioresponsavel_value,_cr40f_equipeplanner_value",
+                      "recordId": "@variables('TarefaId')"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Vincular_principal": {
+                  "runAfter": {
+                    "Ler_tarefa": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Gravar_principal": {
+                      "runAfter": {},
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "UpdateRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                          "connectionName": "shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "cr40f_plannertarefas",
+                          "item/cr40f_cr40f_funcionarioresponsavel@odata.bind": "@concat('/cr40f_funcionarioses(', first(variables('Responsaveis')), ')')",
+                          "recordId": "@variables('TarefaId')"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@and(not(empty(variables('Responsaveis'))), empty(body('Ler_tarefa')?['_cr40f_cr40f_funcionarioresponsavel_value']))",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "type": "Scope"
+            },
+            "Falhas_texto": {
+              "runAfter": {
+                "Bloco_anexos": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut",
+                  "Skipped"
+                ]
+              },
+              "type": "Compose",
+              "inputs": "@concat(if(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Resolver_responsaveis')?['status'], '')), 'responsáveis não resolvidos; ', ''), if(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Bloco_lookups')?['status'], '')), 'responsável/equipe da tarefa; ', ''), if(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Bloco_relacoes')?['status'], '')), 'relações de responsável/equipe; ', ''), if(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Bloco_eventos')?['status'], '')), 'eventos de criação/atribuição; ', ''), if(contains(createArray('Failed', 'TimedOut'), coalesce(actions('Bloco_anexos')?['status'], '')), 'anexos; ', ''), join(variables('FalhasAnexo'), '; '))"
+            }
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@not(empty(variables('TarefaId')))",
+                  true
+                ]
+              }
+            ]
+          }
+        },
+        "Resolver_responsaveis": {
+          "runAfter": {
+            "Prazo": [
+              "Succeeded"
+            ]
+          },
+          "actions": {
+            "Tem_equipe": {
+              "runAfter": {
+                "Buscar_equipe": [
+                  "Succeeded"
+                ]
+              },
+              "actions": {
+                "Buscar_membros": {
+                  "runAfter": {
+                    "Guardar_equipe": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_plannerequipemembros",
+                      "$filter": "_cr40f_equipe_value eq @{variables('EquipeId')} and statecode eq 0 and _cr40f_funcionario_value ne null",
+                      "$select": "_cr40f_funcionario_value"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Ids_membros": {
+                  "runAfter": {
+                    "Buscar_membros": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "Select",
+                  "inputs": {
+                    "select": "@item()?['_cr40f_funcionario_value']",
+                    "from": "@body('Buscar_membros')?['value']"
+                  }
+                },
+                "Guardar_equipe": {
+                  "runAfter": {},
+                  "type": "SetVariable",
+                  "inputs": {
+                    "value": "@first(body('Buscar_equipe')?['value'])?['cr40f_plannerequipeid']",
+                    "name": "EquipeId"
+                  }
+                },
+                "Guardar_responsaveis": {
+                  "runAfter": {
+                    "Ids_membros": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "SetVariable",
+                  "inputs": {
+                    "value": "@if(empty(body('Ids_membros')), createArray(), union(createArray(if(contains(body('Ids_membros'), coalesce(first(body('Buscar_equipe')?['value'])?['_cr40f_responsavelprincipal_value'], '')), coalesce(first(body('Buscar_equipe')?['value'])?['_cr40f_responsavelprincipal_value'], ''), first(body('Ids_membros')))), body('Ids_membros')))",
+                    "name": "Responsaveis"
+                  }
+                }
+              },
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@greater(length(body('Buscar_equipe')?['value']), 0)",
+                      true
+                    ]
+                  }
+                ]
+              }
+            },
+            "Buscar_equipe": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "cr40f_plannerequipes",
+                  "$orderby": "createdon asc",
+                  "$top": 1,
+                  "$filter": "cr40f_nome eq 'Frota' and statecode eq 0",
+                  "$select": "cr40f_plannerequipeid,_cr40f_responsavelprincipal_value"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Sem_membros": {
+              "runAfter": {
+                "Tem_equipe": [
+                  "Succeeded"
+                ]
+              },
+              "actions": {
+                "Buscar_junior": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "cr40f_funcionarioses",
+                      "$orderby": "createdon asc",
+                      "$top": 1,
+                      "$filter": "<preservado do DEV>",
+                      "$select": "cr40f_funcionariosid"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Tem_junior": {
+                  "runAfter": {
+                    "Buscar_junior": [
+                      "Succeeded"
+                    ]
+                  },
+                  "actions": {
+                    "Junior_responsavel": {
+                      "runAfter": {},
+                      "type": "SetVariable",
+                      "inputs": {
+                        "value": "@createArray(first(body('Buscar_junior')?['value'])?['cr40f_funcionariosid'])",
+                        "name": "Responsaveis"
+                      }
+                    }
+                  },
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@greater(length(body('Buscar_junior')?['value']), 0)",
+                          true
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@empty(variables('Responsaveis'))",
+                      true
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "type": "Scope"
+        },
+        "Qtd": {
+          "runAfter": {
+            "Linhas": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@length(body('Itens_nok'))"
+        },
+        "Titulo": {
+          "runAfter": {
+            "Qtd": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@concat('Checklist ', coalesce(body('Ler_checklist')?['_new_veiculo_value@OData.Community.Display.V1.FormattedValue'], 'sem placa'), ' – ', outputs('Qtd'), if(equals(outputs('Qtd'), 1), ' item Não OK', ' itens Não OK'))"
+        },
+        "Prazo": {
+          "runAfter": {
+            "Descricao": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@concat(formatDateTime(addDays(convertTimeZone(utcNow(), 'UTC', 'E. South America Standard Time'), 2), 'yyyy-MM-dd'), 'T12:00:00Z')"
+        },
+        "Linhas": {
+          "runAfter": {
+            "Subitens": [
+              "Succeeded"
+            ]
+          },
+          "type": "Select",
+          "inputs": {
+            "select": "@concat('- ', concat(coalesce(item()?['rotulo'], 'Item'), ': ', join(coalesce(item()?['problemas'], createArray()), ', '), if(empty(coalesce(item()?['observacao'], '')), '', concat(' — ', item()?['observacao']))))",
+            "from": "@body('Itens_nok')"
+          }
+        },
+        "Garantir_tarefa": {
+          "runAfter": {
+            "Resolver_responsaveis": [
+              "Succeeded",
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "actions": {
+            "Criar_tarefa": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "CreateRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "item/cr40f_prazo": "@outputs('Prazo')",
+                  "item/cr40f_codigoorigem": "CHECKLIST:@{triggerOutputs()?['body/new_checklistveiculoid']}",
+                  "item/cr40f_checklistjson": "@if(lessOrEquals(length(string(body('Subitens'))), 4000), string(body('Subitens')), string(take(body('Subitens'), 15)))",
+                  "item/cr40f_status": 100000000,
+                  "item/cr40f_descricao": "@outputs('Descricao')",
+                  "item/cr40f_titulo": "@outputs('Titulo')",
+                  "item/cr40f_prioridade": 100000002,
+                  "item/cr40f_origem": 100000000,
+                  "entityName": "cr40f_plannertarefas"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Guardar_tarefa_nova": {
+              "runAfter": {
+                "Criar_tarefa": [
+                  "Succeeded"
+                ]
+              },
+              "type": "SetVariable",
+              "inputs": {
+                "value": "@outputs('Criar_tarefa')?['body/cr40f_plannertarefaid']",
+                "name": "TarefaId"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Guardar_tarefa_existente": {
+                "runAfter": {},
+                "type": "SetVariable",
+                "inputs": {
+                  "value": "@first(body('Buscar_tarefa')?['value'])?['cr40f_plannertarefaid']",
+                  "name": "TarefaId"
+                }
+              }
+            }
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@empty(body('Buscar_tarefa')?['value'])",
+                  true
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "type": "If",
+      "expression": {
+        "and": [
+          {
+            "equals": [
+              "@greater(length(body('Itens_nok')), 0)",
+              true
+            ]
+          }
+        ]
+      }
+    },
+    "Buscar_tarefa": {
+      "runAfter": {
+        "Ler_checklist": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_plannertarefas",
+          "$orderby": "createdon asc",
+          "$top": 1,
+          "$filter": "cr40f_codigoorigem eq 'CHECKLIST:@{triggerOutputs()?['body/new_checklistveiculoid']}'",
+          "$select": "cr40f_plannertarefaid"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Itens_nok": {
+      "runAfter": {
+        "Buscar_tarefa": [
+          "Succeeded"
+        ]
+      },
+      "type": "Query",
+      "inputs": {
+        "where": "@and(equals(item()?['tipo'], 'okNok'), equals(item()?['valor'], 'nok'))",
+        "from": "@json(coalesce(body('Ler_checklist')?['new_respostasjson'], '[]'))"
+      }
+    },
+    "Init_falhas": {
+      "runAfter": {
+        "Init_tarefa": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "FalhasAnexo",
+            "value": [],
+            "type": "array"
+          }
+        ]
+      }
+    },
+    "Init_equipe": {
+      "runAfter": {
+        "Init_responsaveis": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "EquipeId",
+            "value": "",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "Ler_checklist": {
+      "runAfter": {
+        "Init_falhas": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "new_checklistveiculos",
+          "$select": "new_name,new_origem,new_concluidoem,new_respostasjson,_new_veiculo_value,_new_motorista_value,_new_entreguepor_value",
+          "recordId": "@triggerOutputs()?['body/new_checklistveiculoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Init_responsaveis": {
+      "runAfter": {},
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Responsaveis",
+            "value": [],
+            "type": "array"
+          }
+        ]
+      }
+    }
+  },
+  "contentVersion": "1.0.0.0",
+  "outputs": {},
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
+}
