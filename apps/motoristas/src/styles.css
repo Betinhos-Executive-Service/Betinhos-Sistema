@@ -12686,12 +12686,16 @@ select,
 
 .details-card-v1 .detail-link,
 .detail-contact-link,
-.questions-box .questions-link,
 .finalize-help button {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
   margin-top: -12px !important;
   margin-bottom: -12px !important;
+}
+
+/* "Contatar o Júnior" é botão com borda: a margem negativa o jogava sobre o rótulo "Dúvidas?". */
+.questions-box .questions-link {
+  min-height: 44px !important;
 }
 
 /* Carimbo de versão: canto inferior direito, discreto, não captura toque nem foco. */

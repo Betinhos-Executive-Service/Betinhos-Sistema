@@ -458,7 +458,7 @@ function App() {
   const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, abrirPostosProximos: abrirPostosDoGasto, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
 
-  const telaPostos = rotasPostos(screen, { origem: postosOrigem, setScreen });
+  const telaPostos = rotasPostos(screen, { origem: postosOrigem, setScreen, motoristaId: driverContext?.id ?? "" });
   if (telaPostos) return show(telaPostos);
 
   const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });

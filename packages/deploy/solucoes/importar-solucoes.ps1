@@ -7,11 +7,15 @@ param(
   [switch] $ImportarTudo,
   # Ensaio (so TEST): solucoes separadas por virgula, ou "todas", importadas como update, sem --stage-and-upgrade. Mede quanto
   # o upgrade custa; o PROD recusa.
-  [string] $SemUpgrade = ""
+  [string] $SemUpgrade = "",
+  # Escolha do modo pelo inventario (inventario.ps1): update quando nada saiu da solucao, upgrade no resto. Sem -Escolher (modo
+  # observar, o padrao), importa sempre com upgrade e registra o que teria escolhido e se teria acertado.
+  [switch] $Escolher
 )
 
 # Etapa 2 dos workflows publicar.yml e retirar-caixa.yml: importa os ZIPs de manifesto.json na ordem das 4 (camada mais baixa
-# primeiro; a AppBetinhos, so no manifesto da retirada, vai por ultimo), com --stage-and-upgrade. O alvo e explicito e a conexao
+# primeiro; a AppBetinhos, so no manifesto da retirada, vai por ultimo), com --stage-and-upgrade, ou como update quando o
+# inventario prova que nada saiu da solucao e -Escolher esta ligado (inventario.ps1). O alvo e explicito e a conexao
 # so aceita o host dele. Fotos e comparacao ficam no workflow.
 # Pula a solucao cujo conteudo e igual ao da ultima publicacao que passou no ambiente (Test-PodePular): reinstalar as 4 custa
 # ~24 min por ambiente, e em geral so uma mudou. Grava publicadas.json em $Pasta para o workflow registrar depois da comparacao.
@@ -25,6 +29,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   $extra = @(); if ($ImportarTudo) { $extra += "-ImportarTudo" }
   if ($Publicadas) { $extra += @("-Publicadas", $Publicadas) }
   if ($SemUpgrade) { $extra += @("-SemUpgrade", $SemUpgrade) }
+  if ($Escolher) { $extra += "-Escolher" }
   & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Pasta $Pasta -Alvo $Alvo @extra
   exit $LASTEXITCODE
 }
@@ -34,6 +39,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 . (Join-Path $PSScriptRoot "impressao.ps1")
+. (Join-Path $PSScriptRoot "inventario.ps1")
 
 $Pasta = (Resolve-Path -LiteralPath $Pasta).Path
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostsAlvo[$Alvo])
@@ -75,13 +81,41 @@ foreach ($nome in $ordem) {
     $registro += New-RegistroPublicado $item $antes
     continue
   }
+  # Escolha pelo inventario: o do DEV veio no pacote; o do destino e lido agora, antes do import.
+  $escolha = @{ modo = "instalacao"; motivo = "primeira instalacao"; sobrando = @() }
+  $inventarioAntes = $null
+  if ($antes) {
+    $arquivoDev = Join-Path $Pasta "inventarios\$nome.json"
+    $inventarioDev = if (Test-Path -LiteralPath $arquivoDev -PathType Leaf) { Read-JsonFile $arquivoDev } else { $null }
+    $inventarioAntes = try { Get-InventarioDaSolucao (Update-DvToken $dv) $nome } catch { @{ itens = @(); incerto = $true; motivos = @("inventario falhou: $(Get-ErroDv $_)") } }
+    $escolha = Get-ModoDeImport $inventarioDev $inventarioAntes ([bool] $ImportarTudo)
+    Write-Step "$nome escolha: $($escolha.modo) ($($escolha.motivo))$(if (-not $Escolher) { '; modo observar: importa com upgrade' })"
+    @($escolha.sobrando | Select-Object -First 10) | ForEach-Object { Write-Step "  so no destino: $_" }
+  }
   # Nome diferente do parametro: o PowerShell nao diferencia maiusculas, e $semUpgrade seria o [string] $SemUpgrade ("False").
-  $comoUpdate = [bool] ($antes -and $semUpgradeLista -contains $nome)
+  $comoUpdate = [bool] ($antes -and ($semUpgradeLista -contains $nome -or ($Escolher -and $escolha.modo -eq "update")))
   $modo = if (-not $antes) { "instalacao" } elseif ($comoUpdate) { "update" } else { "upgrade" }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes; modo: $modo)"
   $inicio = Get-Date
   $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush) $comoUpdate
-  $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; modo = $modo; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
+  $minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1)
+  # Modo observar: o upgrade de fato apagou algo? Compara o destino antes e depois (Get-ObservacaoDoModo).
+  $observacao = $null
+  if ($antes -and $modo -eq "upgrade" -and -not $Escolher) {
+    $inventarioDepois = try { Get-InventarioDaSolucao (Update-DvToken $dv) $nome } catch { @{ itens = @(); incerto = $true; motivos = @("inventario falhou: $(Get-ErroDv $_)") } }
+    $observacao = Get-ObservacaoDoModo $escolha.modo $inventarioAntes $inventarioDepois
+    Write-Step "$nome observacao da escolha: $($observacao.observacao) ($(@($observacao.apagados).Count) item(ns) apagado(s) pelo upgrade)"
+    @($observacao.apagados | Select-Object -First 10) | ForEach-Object { Write-Step "  apagado: $_" }
+    if ($observacao.observacao -eq "erro") {
+      Write-Host "::warning title=Escolha do modo de import::$nome - a escolha disse update, mas o upgrade apagou $(@($observacao.apagados).Count) item(ns). Nao ligue SOLUCOES_IMPORT_MODO=escolher; veja a skill verificar-solucoes."
+    }
+  }
+  $resultado += [ordered]@{
+    solucao = $nome; antes = $antes; depois = $r.Versao; modo = $modo; minutos = $minutos; pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false
+    escolha = $escolha.modo; motivoEscolha = $escolha.motivo; soNoDestino = @($escolha.sobrando | Select-Object -First 20)
+    observacaoEscolha = if ($observacao) { $observacao.observacao } else { $null }
+    apagadosPeloUpgrade = if ($observacao) { @($observacao.apagados | Select-Object -First 20) } else { @() }
+  }
   $registro += New-RegistroPublicado $item $r.Versao
 }
 Write-JsonFile (Join-Path $Pasta "importados.json") @($resultado)

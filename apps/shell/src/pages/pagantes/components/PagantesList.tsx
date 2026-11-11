@@ -3,7 +3,7 @@ import { type MenuAction, type TableColumn, type TableQuickFilters, type TableVi
 import { VirtualTable } from '../../../app/VirtualTable'
 import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
-import { hasFalha, label, statusTone } from '../domain/status'
+import { label } from '../domain/status'
 import type { ChoiceSet, Contato, Pagante } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
@@ -37,12 +37,6 @@ export function openFromRow(event: MouseEvent<HTMLElement>, rowSelector: string,
   target.closest(rowSelector)?.querySelector<HTMLButtonElement>(openSelector)?.click()
 }
 
-const severity = (p: Pagante) => {
-  if (hasFalha(p)) return { tone: 'danger' as const, label: 'Falha de envio' }
-  const tone = statusTone(p.status)
-  return tone === 'danger' || tone === 'warning' ? { tone, label: tone === 'danger' ? 'Pagamento recusado ou expirado' : 'Aguardando pagamento' } : null
-}
-
 export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Pagante>[] = [
     { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
@@ -56,7 +50,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaAfastadaDemais, areaEmVolta, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, ZOOM_MINIMO_BUSCA, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
+import { areaEmVolta, comFriccao, guardadoValido, medidasGaveta, posicaoAposArrasto, posicaoAposToque, rotuloSemConexao, VALIDADE_GUARDADO_MS, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
 import { distanciaKm } from "../src/features/despesas/rankingPostos.ts";
-import { POSTOS_MOCK } from "../src/features/postos/remoto.ts";
+import { comGuardado, ehFalhaDeRede, POSTOS_MOCK } from "../src/features/postos/remoto.ts";
+import { guardar, lerGuardado } from "../src/features/postos/guardados.ts";
 
 const posto = (id: string, lat: number, lon: number, nome = id): Posto => ({ id, nome, endereco: "", lat, lon });
 
@@ -15,11 +16,6 @@ test("consultaPostosNaArea filtra rede CTF, exclui Pendente (aceita sem status) 
 
 test("consultaPostosNaArea aceita outro limite", () => {
   assert.match(consultaPostosNaArea({ sul: 0, norte: 1, oeste: 0, leste: 1 }, 50), /&\$top=50$/);
-});
-
-test("areaAfastadaDemais pede para aproximar abaixo do zoom mínimo", () => {
-  assert.equal(areaAfastadaDemais(ZOOM_MINIMO_BUSCA - 1), true);
-  assert.equal(areaAfastadaDemais(ZOOM_MINIMO_BUSCA), false);
 });
 
 test("distanciaKm (haversine): zero no mesmo ponto e ~111 km por grau de latitude", () => {
@@ -135,7 +131,7 @@ test("conjunto fictício do modo local fica na região de São José dos Campos"
 });
 
 // ---------------- Preço e recomendação (postosDados) ----------------
-import { idMenorPreco, indexarRanking, indicadorNoMapa, juntarDados, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
+import { idMenorPreco, podeAvaliar, indexarRanking, indicadorNoMapa, juntarDados, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
 import { SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
 import type { RankingPostos } from "../src/features/despesas/rankingPostos.ts";
 
@@ -211,6 +207,103 @@ test("idMenorPreco destaca o mais barato só com 2 ou mais preços diferentes", 
   assert.equal(idMenorPreco([]), "");
 });
 
+test("medidasGaveta: aberta deixa livre a faixa dos botões do mapa; meio fica entre recolhida e aberta", () => {
+  const g = medidasGaveta(600);
+  assert.equal(g.visivel.recolhida, 76);
+  assert.ok(g.visivel.aberta <= 600 - 148);
+  assert.ok(g.visivel.meio > g.visivel.recolhida && g.visivel.meio < g.visivel.aberta);
+  assert.deepEqual([g.deslocamento.aberta, g.deslocamento.meio > 0, g.deslocamento.recolhida > g.deslocamento.meio], [0, true, true]);
+  assert.ok(medidasGaveta(100).total >= 76);
+});
+
+test("comFriccao: dentro dos limites acompanha o dedo; fora, só 25% da distância", () => {
+  assert.equal(comFriccao(50, 0, 100), 50);
+  assert.equal(comFriccao(-40, 0, 100), -10);
+  assert.equal(comFriccao(140, 0, 100), 110);
+});
+
+test("posicaoAposArrasto: sem flick vai à mais próxima; com flick, à próxima na direção do gesto", () => {
+  const g = medidasGaveta(600);
+  const { meio, recolhida } = g.deslocamento;
+  assert.equal(posicaoAposArrasto(meio - 5, 0, g), "meio");
+  assert.equal(posicaoAposArrasto(5, 0.02, g), "aberta");
+  assert.equal(posicaoAposArrasto(recolhida - 4, 0, g), "recolhida");
+  assert.equal(posicaoAposArrasto(meio + 10, 0.2, g), "recolhida");
+  assert.equal(posicaoAposArrasto(meio - 10, -0.2, g), "aberta");
+  assert.equal(posicaoAposArrasto(5, -0.5, g), "aberta");
+  assert.equal(posicaoAposArrasto(recolhida - 2, 0.5, g), "recolhida");
+});
+
+test("posicaoAposToque alterna meio e aberta; recolhida e aberta vão ao meio", () => {
+  assert.deepEqual((["recolhida", "meio", "aberta"] as const).map(posicaoAposToque), ["meio", "aberta", "meio"]);
+});
+
+test("guardadoValido: vale por 7 dias e recusa data futura ou inválida", () => {
+  const agora = Date.UTC(2026, 10, 11, 12);
+  assert.equal(guardadoValido(agora - VALIDADE_GUARDADO_MS, agora), true);
+  assert.equal(guardadoValido(agora - VALIDADE_GUARDADO_MS - 1, agora), false);
+  assert.equal(guardadoValido(agora + 1, agora), false);
+  assert.equal(guardadoValido(Number.NaN, agora), false);
+});
+
+test("rotuloSemConexao usa o fuso de São Paulo", () => {
+  assert.equal(rotuloSemConexao(Date.UTC(2026, 10, 10, 17, 32)), "Sem conexão · dados de 10/11 14:32");
+  assert.equal(rotuloSemConexao(Date.UTC(2026, 10, 11, 2, 5)), "Sem conexão · dados de 10/11 23:05");
+});
+
+test("podeAvaliar: só o posto do convite, de 0 a 7 dias atrás (dia de São Paulo)", () => {
+  const agora = new Date("2026-11-11T15:00:00Z");
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-11" }, "a", agora), true);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-04" }, "a", agora), true);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-03" }, "a", agora), false);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-12" }, "a", agora), false);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-10" }, "b", agora), false);
+  assert.equal(podeAvaliar(null, "a", agora), false);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-10" }, "a", new Date("2026-11-11T01:00:00Z")), true);
+});
+
+// localStorage de mentira: o node não tem um.
+function comArmazenamento(corpo: (dados: Map<string, string>) => void | Promise<void>) {
+  const dados = new Map<string, string>();
+  const antes = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (k: string) => dados.get(k) ?? null, setItem: (k: string, v: string) => { dados.set(k, v); } } });
+  return Promise.resolve(corpo(dados)).finally(() => { if (antes) Object.defineProperty(globalThis, "localStorage", antes); else delete (globalThis as { localStorage?: unknown }).localStorage; });
+}
+
+test("guardar e lerGuardado: ida e volta, separados por motorista, sem id não guarda nem lê", () => comArmazenamento((dados) => {
+  guardar("m1", "area", [1, 2]);
+  assert.deepEqual(lerGuardado<number[]>("m1", "area")?.dados, [1, 2]);
+  assert.equal(lerGuardado("m2", "area"), null);
+  guardar("", "area", [9]);
+  assert.equal(lerGuardado("", "area"), null);
+  assert.deepEqual([...dados.keys()], ["app-motoristas-postos:m1:area"]);
+}));
+
+test("lerGuardado: cópia vencida, de formato inesperado ou ilegível vira null", () => comArmazenamento((dados) => {
+  dados.set("app-motoristas-postos:m1:area", JSON.stringify({ salvoEm: Date.now() - VALIDADE_GUARDADO_MS - 1000, dados: [1] }));
+  assert.equal(lerGuardado("m1", "area"), null);
+  dados.set("app-motoristas-postos:m1:area", JSON.stringify({ salvoEm: Date.now(), dados: "x" }));
+  assert.equal(lerGuardado("m1", "area"), null);
+  dados.set("app-motoristas-postos:m1:area", "{não é json");
+  assert.equal(lerGuardado("m1", "area"), null);
+}));
+
+test("comGuardado: sucesso guarda; falha de rede usa a cópia do motorista; outro erro não usa a cópia", () => comArmazenamento(async () => {
+  assert.deepEqual(await comGuardado("m1", "area", async () => [1], (d) => d, (d) => d), { dados: [1], desde: null });
+  const offline = await comGuardado("m1", "area", async () => { throw new TypeError("Failed to fetch"); }, (d) => d, (d) => d);
+  assert.deepEqual(offline.dados, [1]);
+  assert.equal(typeof offline.desde, "number");
+  await assert.rejects(comGuardado("m1", "area", async () => { throw Object.assign(new Error("403 Forbidden"), { code: 403 }); }, (d) => d, (d) => d), /403/);
+  await assert.rejects(comGuardado("m2", "area", async () => { throw new TypeError("Failed to fetch"); }, (d) => d, (d) => d), /Failed to fetch/);
+}));
+
+test("ehFalhaDeRede: fetch e tempo esgotado sim; 401, 403 e 500 não", () => {
+  assert.equal(ehFalhaDeRede(new TypeError("Failed to fetch")), true);
+  assert.equal(ehFalhaDeRede({ message: "Network request failed" }), true);
+  assert.equal(ehFalhaDeRede({ message: "The request timed out" }), true);
+  assert.equal(ehFalhaDeRede({ message: "Unauthorized (401)" }), false);
+  assert.equal(ehFalhaDeRede(new Error("Internal Server Error 500")), false);
+});
 test("paraFicha leva preço, histórico e avaliações do ranking para a ficha; sem ranking, preço 0 e sem avaliações", async () => {
   const { paraFicha } = await import("../src/features/postos/postosDados.ts");
   const dados = indexarRanking(ranking({ ...itemRanking("a", 6.09, aval(3, 2)), historico: [{ data: "2026-11-03", precoLitro: 6.09 }] }));
