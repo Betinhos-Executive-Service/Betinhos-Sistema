@@ -4,7 +4,10 @@ param(
   [Parameter(Mandatory = $true)] [ValidateSet("Test", "Prod")] [string] $Alvo,
   # JSON da ultima publicacao que passou neste ambiente (tag solucoes-<alvo>). Vazio ou invalido: importa tudo.
   [string] $Publicadas = "",
-  [switch] $ImportarTudo
+  [switch] $ImportarTudo,
+  # Ensaio (so TEST): solucoes separadas por virgula, ou "todas", importadas como update, sem --stage-and-upgrade. Mede quanto
+  # o upgrade custa; o PROD recusa.
+  [string] $SemUpgrade = ""
 )
 
 # Etapa 2 dos workflows publicar.yml e retirar-caixa.yml: importa os ZIPs de manifesto.json na ordem das 4 (camada mais baixa
@@ -21,6 +24,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   # Switch por splat: com -File, "-ImportarTudo:True" (como o Core serializa) e recusado pelo Windows PowerShell.
   $extra = @(); if ($ImportarTudo) { $extra += "-ImportarTudo" }
   if ($Publicadas) { $extra += @("-Publicadas", $Publicadas) }
+  if ($SemUpgrade) { $extra += @("-SemUpgrade", $SemUpgrade) }
   & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Pasta $Pasta -Alvo $Alvo @extra
   exit $LASTEXITCODE
 }
@@ -40,6 +44,12 @@ $permitidas = @($script:Solucoes) + @("AppBetinhos")
 $estranhas = @($nomes | Where-Object { $permitidas -notcontains $_ })
 if ($estranhas.Count) { throw "Manifesto com solucao fora do permitido: $($estranhas -join ', ')." }
 $ordem = @($permitidas | Where-Object { $nomes -contains $_ })
+$semUpgradeLista = @($SemUpgrade -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if ($semUpgradeLista.Count -and $Alvo -ne "Test") { throw "-SemUpgrade e so ensaio no TEST; o $Alvo sempre importa com --stage-and-upgrade." }
+if ($semUpgradeLista -contains "todas") { $semUpgradeLista = @($permitidas) }
+$foraDoPermitido = @($semUpgradeLista | Where-Object { $permitidas -notcontains $_ })
+if ($foraDoPermitido.Count) { throw "-SemUpgrade com solucao desconhecida: $($foraDoPermitido -join ', ')." }
+if ($semUpgradeLista.Count) { Write-Step "ENSAIO: import como update (sem --stage-and-upgrade) em $($semUpgradeLista -join ', ')" }
 Assert-ConexaoWebPush $nomes $Alvo $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
 $conexaoWebPush = Get-ConexaoWebPushDoImport $env:CONEXAO_WEBPUSH $env:WEBPUSH_VINCULAR_DEPOIS
 $conectorWebPush = if ($conexaoWebPush -and $nomes -contains "BetinhosAutomacao") { Get-ConectorWebPush $dv } else { "" }
@@ -61,14 +71,16 @@ foreach ($nome in $ordem) {
   }
   if (Test-PodePular $item $antes $anteriores) {
     Write-Step "pulando $nome em ${Alvo}: conteudo igual ao da versao instalada ($antes)"
-    $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $antes; minutos = 0; pacPerdeuConexao = $false; pulada = $true }
+    $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $antes; modo = "pulada"; minutos = 0; pacPerdeuConexao = $false; pulada = $true }
     $registro += New-RegistroPublicado $item $antes
     continue
   }
-  Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes)"
+  $semUpgrade = [bool] ($antes -and $semUpgradeLista -contains $nome)
+  $modo = if (-not $antes) { "instalacao" } elseif ($semUpgrade) { "update" } else { "upgrade" }
+  Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes; modo: $modo)"
   $inicio = Get-Date
-  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush)
-  $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
+  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush) $semUpgrade
+  $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; modo = $modo; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
   $registro += New-RegistroPublicado $item $r.Versao
 }
 Write-JsonFile (Join-Path $Pasta "importados.json") @($resultado)
