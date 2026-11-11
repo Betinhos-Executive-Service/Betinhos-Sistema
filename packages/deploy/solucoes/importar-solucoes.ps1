@@ -75,11 +75,12 @@ foreach ($nome in $ordem) {
     $registro += New-RegistroPublicado $item $antes
     continue
   }
-  $semUpgrade = [bool] ($antes -and $semUpgradeLista -contains $nome)
-  $modo = if (-not $antes) { "instalacao" } elseif ($semUpgrade) { "update" } else { "upgrade" }
+  # Nome diferente do parametro: o PowerShell nao diferencia maiusculas, e $semUpgrade seria o [string] $SemUpgrade ("False").
+  $comoUpdate = [bool] ($antes -and $semUpgradeLista -contains $nome)
+  $modo = if (-not $antes) { "instalacao" } elseif ($comoUpdate) { "update" } else { "upgrade" }
   Write-Step "importando $nome $($item.versao) em $Alvo (instalada: $antes; modo: $modo)"
   $inicio = Get-Date
-  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush) $semUpgrade
+  $r = Import-SolucaoGerenciada $dv (Join-Path $Pasta $item.arquivo) $Alvo 60 $permitidas (New-ConfiguracaoDeImport $Pasta $nome $conexaoWebPush $conectorWebPush) $comoUpdate
   $resultado += [ordered]@{ solucao = $nome; antes = $antes; depois = $r.Versao; modo = $modo; minutos = [math]::Round(((Get-Date) - $inicio).TotalMinutes, 1); pacPerdeuConexao = $r.PacPerdeuConexao; pulada = $false }
   $registro += New-RegistroPublicado $item $r.Versao
 }
