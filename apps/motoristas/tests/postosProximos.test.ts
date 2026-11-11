@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaAfastadaDemais, CENTRO_PADRAO, consultaPostosNaArea, distanciaKm, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, ZOOM_MINIMO_BUSCA, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
+import { areaAfastadaDemais, areaEmVolta, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, ZOOM_MINIMO_BUSCA, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
+import { distanciaKm } from "../src/features/despesas/rankingPostos.ts";
 import { POSTOS_MOCK } from "../src/features/postos/remoto.ts";
 
 const posto = (id: string, lat: number, lon: number, nome = id): Posto => ({ id, nome, endereco: "", lat, lon });
 
-test("consultaPostosNaArea filtra rede CTF, exclui Pendente e limita ao retângulo visível", () => {
+test("consultaPostosNaArea filtra rede CTF, exclui Pendente (aceita sem status) e limita ao retângulo visível", () => {
   const consulta = consultaPostosNaArea({ sul: -23.25, norte: -23.15, oeste: -45.95, leste: -45.8 });
   assert.equal(consulta, "$select=new_postocombustivelid,new_name,new_logradouro,new_numero,new_bairro,new_municipio,new_uf,new_latitude,new_longitude"
-    + "&$filter=new_aceitactf eq true and new_statusgeo ne 100000000 and new_latitude ge -23.250000 and new_latitude le -23.150000 and new_longitude ge -45.950000 and new_longitude le -45.800000"
+    + "&$filter=new_aceitactf eq true and (new_statusgeo eq null or new_statusgeo ne 100000000) and new_latitude ge -23.250000 and new_latitude le -23.150000 and new_longitude ge -45.950000 and new_longitude le -45.800000"
     + `&$top=${LIMITE_POSTOS}`);
 });
 
@@ -52,8 +53,8 @@ test("origem das distâncias: GPS do motorista; sem GPS, o centro padrão", () =
   assert.equal(rotuloOrigem(comGps), "de você");
   const semGps = origemDasDistancias(null);
   assert.deepEqual(semGps, { ponto: CENTRO_PADRAO, doMotorista: false });
-  assert.equal(tituloLista(semGps), "Mais próximos do centro do mapa");
-  assert.equal(rotuloOrigem(semGps), "do centro do mapa");
+  assert.equal(tituloLista(semGps), "Mais próximos do centro de São José dos Campos");
+  assert.equal(rotuloOrigem(semGps), "do centro de São José dos Campos");
 });
 
 test("a lista mede do motorista: a ordem e as distâncias não mudam com o posto tocado nem com o mapa arrastado", () => {
@@ -67,6 +68,39 @@ test("a lista mede do motorista: a ordem e as distâncias não mudam com o posto
   // Sem GPS a medida parte do centro padrão, não do centro de onde o mapa foi arrastado.
   const semGps = maisProximos(postos, origemDasDistancias(null).ponto);
   assert.equal(semGps[0].distanciaKm, distanciaKm(CENTRO_PADRAO, postos.find((p) => p.id === semGps[0].id)!));
+});
+
+test("areaEmVolta: a caixa tem meia-largura do raio em latitude e longitude", () => {
+  const area = areaEmVolta(CENTRO_PADRAO, 10);
+  const norte = distanciaKm(CENTRO_PADRAO, { lat: area.norte, lon: CENTRO_PADRAO.lon });
+  const leste = distanciaKm(CENTRO_PADRAO, { lat: CENTRO_PADRAO.lat, lon: area.leste });
+  assert.ok(Math.abs(norte - 10) < 0.2, `norte ${norte}`);
+  assert.ok(Math.abs(leste - 10) < 0.2, `leste ${leste}`);
+});
+
+test("proximoRaio amplia até o 10º posto caber no raio da caixa e para ao bater o limite ou no maior raio", () => {
+  const origem = { lat: -23, lon: -45 };
+  const emFila = (n: number, passoKm: number) => Array.from({ length: n }, (_, i) => posto(`p${i}`, -23 - ((i + 1) * passoKm) / 111.32, -45));
+  const [pequeno, medio, grande] = RAIOS_LISTA_KM;
+  // 10 postos, o último a 1 km: já basta no menor raio.
+  assert.equal(proximoRaio(emFila(10, 0.1), origem, pequeno), null);
+  // só 9 postos: precisa ampliar.
+  assert.equal(proximoRaio(emFila(9, 0.1), origem, pequeno), medio);
+  // 10 postos, mas o 10º a 5 km: fora do raio de 3 km, amplia; dentro do de 10 km, basta.
+  assert.equal(proximoRaio(emFila(10, 0.5), origem, pequeno), medio);
+  assert.equal(proximoRaio(emFila(10, 0.5), origem, medio), null);
+  // no maior raio não há o que tentar.
+  assert.equal(proximoRaio(emFila(3, 1), origem, grande), null);
+  // bateu o limite: ampliar só piora o recorte arbitrário.
+  assert.equal(proximoRaio(emFila(5, 1), origem, pequeno, 5), null);
+});
+
+test("areaJaCarregada só reaproveita área contida e que não bateu o limite", () => {
+  const carregada = { sul: -23.3, norte: -23.1, oeste: -46, leste: -45.8 };
+  const dentro = { sul: -23.25, norte: -23.15, oeste: -45.95, leste: -45.85 };
+  assert.equal(areaJaCarregada(dentro, { area: carregada, cheia: false }), true);
+  assert.equal(areaJaCarregada(dentro, { area: carregada, cheia: true }), false);
+  assert.equal(areaJaCarregada({ ...dentro, norte: -23.05 }, { area: carregada, cheia: false }), false);
 });
 
 test("zoomDoFoco mantém o zoom atual e limita em 15", () => {
@@ -147,7 +181,9 @@ test("notaDoPosto: percentual e total; sem avaliações some; maioria que não r
   assert.deepEqual(notaDoPosto(aval(12, 11)), { texto: "92%", total: 12, alerta: false });
   assert.equal(notaDoPosto(SEM_AVALIACOES), null);
   assert.equal(notaDoPosto(aval(7, 2))?.alerta, true);
-  assert.equal(notaDoPosto(aval(1, 0))?.alerta, false, "uma opinião só não alerta");
+  assert.equal(notaDoPosto(aval(1, 0))?.alerta, true, "0% nunca aparece com polegar positivo");
+  assert.equal(notaDoPosto(aval(1, 1))?.alerta, false);
+  assert.equal(notaDoPosto(aval(4, 2))?.alerta, false, "metade recomendando não alerta");
 });
 
 test("indicadorNoMapa só marca aprovação clara ou alerta", () => {

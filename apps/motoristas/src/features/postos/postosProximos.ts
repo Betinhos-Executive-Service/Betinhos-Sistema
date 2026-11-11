@@ -1,8 +1,7 @@
 // Postos próximos: regras puras (consulta por área, distância, ordenação). Sem React nem Dataverse, para testar direto.
-import { enderecoLegivel, nomePosto } from "../despesas/rankingPostos.ts";
+import { distanciaKm, enderecoLegivel, nomePosto, type Posicao } from "../despesas/rankingPostos.ts";
 import { mapsSearchUrl, wazeNavigateUrl } from "../detalhe/mapLinks.ts";
 
-export type Posicao = { lat: number; lon: number };
 export type Area = { sul: number; norte: number; oeste: number; leste: number };
 export type Posto = { id: string; nome: string; endereco: string; lat: number; lon: number };
 
@@ -16,6 +15,8 @@ export const ZOOM_MINIMO_BUSCA = 11;
 export const LIMITE_POSTOS = 200;
 export const TAMANHO_LISTA = 10;
 export const ESPERA_BUSCA_MS = 400;
+export const RAIOS_LISTA_KM = [3, 10, 30];
+const KM_POR_GRAU = 111.32;
 
 // Nomes lógicos de new_postocombustivel (confirmados em carregar-postos-ctf.ps1 e FuelSchema.cs).
 export const STATUS_GEO_PENDENTE = 100000000;
@@ -27,7 +28,7 @@ const coordenada = (valor: number) => valor.toFixed(6);
 export function consultaPostosNaArea({ sul, norte, oeste, leste }: Area, limite = LIMITE_POSTOS) {
   const filtro = [
     "new_aceitactf eq true",
-    `new_statusgeo ne ${STATUS_GEO_PENDENTE}`,
+    `(new_statusgeo eq null or new_statusgeo ne ${STATUS_GEO_PENDENTE})`,
     `new_latitude ge ${coordenada(sul)}`,
     `new_latitude le ${coordenada(norte)}`,
     `new_longitude ge ${coordenada(oeste)}`,
@@ -38,18 +39,36 @@ export function consultaPostosNaArea({ sul, norte, oeste, leste }: Area, limite 
 
 export const areaAfastadaDemais = (zoom: number) => zoom < ZOOM_MINIMO_BUSCA;
 
-export function distanciaKm(a: Posicao, b: Posicao) {
-  const rad = (grau: number) => (grau * Math.PI) / 180;
-  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
-  return 2 * 6371 * Math.asin(Math.sqrt(h));
-}
-
 /** De onde as distâncias são medidas: o GPS do motorista ou, sem ele, o centro padrão. Nunca o posto tocado nem o centro do mapa arrastado. */
 export type Origem = { ponto: Posicao; doMotorista: boolean };
 
 export const origemDasDistancias = (posicao: Posicao | null): Origem => (posicao ? { ponto: posicao, doMotorista: true } : { ponto: CENTRO_PADRAO, doMotorista: false });
-export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro do mapa");
-export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você" : "do centro do mapa");
+export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro de São José dos Campos");
+export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você" : "do centro de São José dos Campos");
+
+/** Caixa de meia-largura `raioKm` em volta do ponto. Tudo a até `raioKm` do ponto cabe nela. */
+export function areaEmVolta({ lat, lon }: Posicao, raioKm: number): Area {
+  const dLat = raioKm / KM_POR_GRAU;
+  const dLon = raioKm / (KM_POR_GRAU * Math.cos((lat * Math.PI) / 180));
+  return { sul: lat - dLat, norte: lat + dLat, oeste: lon - dLon, leste: lon + dLon };
+}
+
+/**
+ * Raios (km) tentados na busca da lista, do menor ao maior. Depois de buscar na caixa de `raioAtual`, devolve o próximo raio ou null se já basta:
+ * a lista só é confiável se tem `TAMANHO_LISTA` postos e o último está dentro do raio (nada mais perto ficou fora da caixa).
+ * Se a busca bateu o limite, ampliar só piora o recorte arbitrário; sem raio maior, não há o que tentar.
+ */
+export function proximoRaio(postos: Posto[], origem: Posicao, raioAtual: number, limite = LIMITE_POSTOS) {
+  const lista = maisProximos(postos, origem);
+  const completa = lista.length >= TAMANHO_LISTA && lista[lista.length - 1].distanciaKm <= raioAtual;
+  if (completa || postos.length >= limite) return null;
+  return RAIOS_LISTA_KM.find((raio) => raio > raioAtual) ?? null;
+}
+
+/** A nova área já foi carregada (inteira dentro da anterior) e a anterior não bateu o limite: não há nada novo a buscar. */
+export function areaJaCarregada(nova: Area, { area, cheia }: { area: Area; cheia: boolean }) {
+  return !cheia && nova.sul >= area.sul && nova.norte <= area.norte && nova.oeste >= area.oeste && nova.leste <= area.leste;
+}
 
 /** Zoom ao centralizar um posto: mantém o atual, limitado a ZOOM_MAXIMO_FOCO. */
 export const zoomDoFoco = (zoomAtual: number) => Math.min(zoomAtual, ZOOM_MAXIMO_FOCO);

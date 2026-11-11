@@ -2,14 +2,15 @@ import { Crosshair, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp,
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { rotuloRecomendacoes } from "../despesas/avaliacaoPostos";
+import { distanciaKm, type Posicao } from "../despesas/rankingPostos";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { descreverGpsErro } from "../termos/termosMulta";
 import { PostosMapa, type Foco, type PostosMapaControle, type Vista } from "./PostosMapa";
 import { idMenorPreco, juntarDados, juntarPosto, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
-import { areaAfastadaDemais, ESPERA_BUSCA_MS, distanciaKm, LIMITE_POSTOS, maisProximos, origemDasDistancias, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Posicao, type Posto } from "./postosProximos";
-import { carregarDadosPostos, carregarPostosNaArea } from "./remoto";
+import { areaAfastadaDemais, areaJaCarregada, ESPERA_BUSCA_MS, LIMITE_POSTOS, origemDasDistancias, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Area, type Posto } from "./postosProximos";
+import { carregarDadosPostos, carregarMaisProximos, carregarPostosNaArea, lerPosicaoDoMotorista } from "./remoto";
 
 type Busca = "ok" | "carregando" | "erro" | "afastado";
 
@@ -17,13 +18,6 @@ type Busca = "ok" | "carregando" | "erro" | "afastado";
 const ALTURA_CARTAO = 196;
 const ALTURA_CARTAO_COM_DADOS = 250;
 const ZOOM_MINHA_POSICAO = 14;
-
-function lerPosicao(): Promise<Posicao> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(null); return; }
-    navigator.geolocation.getCurrentPosition(({ coords }) => resolve({ lat: coords.latitude, lon: coords.longitude }), reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
-  });
-}
 
 function Nota({ dados }: { dados: DadosPosto }) {
   const nota = notaDoPosto(dados.avaliacoes);
@@ -66,6 +60,9 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   const [vista, setVista] = useState<Vista | null>(null);
   const [postos, setPostos] = useState<Posto[]>([]);
   const [busca, setBusca] = useState<Busca>("carregando");
+  // A lista tem busca própria, em volta da origem das distâncias: o mapa só mostra o que está na tela.
+  const [proximos, setProximos] = useState<Posto[]>([]);
+  const [buscaLista, setBuscaLista] = useState<"ok" | "carregando" | "erro">("carregando");
   // Preço e recomendação vêm do ranking, carregado uma vez em paralelo com o mapa. Se falhar, a tela segue sem eles (como o convite de avaliação).
   const [dadosPorId, setDadosPorId] = useState<DadosPorId | null>(null);
   const [selecionado, setSelecionado] = useState<Posto | null>(null);
@@ -74,7 +71,10 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   const [listaEntrou, setListaEntrou] = useState(false);
   const [foco, setFoco] = useState<Foco | null>(null);
   const moveuSozinho = useRef(false);
+  const marcarMovimento = useCallback(() => { moveuSozinho.current = true; }, []);
   const pedido = useRef(0);
+  const pedidoLista = useRef(0);
+  const ultimaCarga = useRef<{ area: Area; cheia: boolean } | null>(null);
   const chaveFoco = useRef(0);
   const primeiraBusca = useRef(true);
   const caixa = useRef<HTMLDivElement | null>(null);
@@ -84,7 +84,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
 
   const localizar = useCallback(() => {
     setAviso("");
-    lerPosicao().then((atual) => {
+    lerPosicaoDoMotorista().then((atual) => {
       setPosicao(atual);
       // Quem já arrastou o mapa não perde o lugar quando o GPS responde tarde.
       if (!moveuSozinho.current) irPara(atual.lat, atual.lon, ZOOM_MINHA_POSICAO);
@@ -105,32 +105,53 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
 
   const buscar = useCallback(async (atual: Vista) => {
     const id = ++pedido.current;
-    if (areaAfastadaDemais(atual.zoom)) { setPostos([]); setBusca("afastado"); return; }
+    if (areaAfastadaDemais(atual.zoom)) { ultimaCarga.current = null; setPostos([]); setBusca("afastado"); return; }
     setBusca("carregando");
     try {
       const lista = await carregarPostosNaArea(atual.area);
       if (id !== pedido.current) return;
+      ultimaCarga.current = { area: atual.area, cheia: lista.length >= LIMITE_POSTOS };
       setPostos(lista);
       setBusca("ok");
     } catch (erro) {
       if (id !== pedido.current) return;
       reportAppError(erro, { severity: "warning", source: "app", action: "carregarPostosProximos", screen: "PostosProximos", notifyUser: false });
+      ultimaCarga.current = null;
       setBusca("erro");
     }
   }, []);
 
   useEffect(() => {
     if (!vista) return;
+    // Movimento do próprio app (centralizar um posto) cai numa área já carregada: não busca de novo.
+    if (ultimaCarga.current && !areaAfastadaDemais(vista.zoom) && areaJaCarregada(vista.area, ultimaCarga.current)) return;
     const espera = primeiraBusca.current ? 0 : ESPERA_BUSCA_MS;
     primeiraBusca.current = false;
     const relogio = window.setTimeout(() => { void buscar(vista); }, espera);
     return () => window.clearTimeout(relogio);
   }, [vista, buscar]);
 
-  // Distância sempre do motorista (ou do centro padrão sem GPS); a lista vem dos postos carregados na área visível.
+  // Distância sempre do motorista (ou do centro padrão sem GPS); a lista busca em caixas crescentes em volta dessa origem.
   const origem = useMemo(() => origemDasDistancias(posicao), [posicao]);
+
+  const buscarLista = useCallback(async (ponto: Posicao) => {
+    const id = ++pedidoLista.current;
+    setBuscaLista("carregando");
+    try {
+      const lista = await carregarMaisProximos(ponto);
+      if (id !== pedidoLista.current) return;
+      setProximos(lista);
+      setBuscaLista("ok");
+    } catch (erro) {
+      if (id !== pedidoLista.current) return;
+      reportAppError(erro, { severity: "warning", source: "app", action: "carregarMaisProximosPostos", screen: "PostosProximos", notifyUser: false });
+      setBuscaLista("erro");
+    }
+  }, []);
+  useEffect(() => { void buscarLista(origem.ponto); }, [buscarLista, origem]);
+
   const exibidos = useMemo(() => juntarDados(postos, dadosPorId), [postos, dadosPorId]);
-  const lista = useMemo(() => maisProximos(exibidos, origem.ponto), [exibidos, origem]);
+  const lista = useMemo(() => juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) })), [proximos, dadosPorId, origem]);
   const menorPreco = useMemo(() => idMenorPreco(lista), [lista]);
   const cartao = cartaoPosto ? juntarPosto(cartaoPosto, dadosPorId) : null;
 
@@ -153,10 +174,10 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <AppShell screenLabel="PostosProximos">
-      <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={() => (vista ? buscar(vista) : undefined)} />
+      <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={async () => { await Promise.all([vista ? buscar(vista) : undefined, buscarLista(origem.ponto)]); }} />
       <section className="termo-screen gr-screen pp-screen" aria-label="Postos próximos" onKeyDown={(evento) => { if (evento.key === "Escape") setSelecionado(null); }}>
-        <div ref={caixa} className="pp-mapa-caixa" onPointerDown={() => { moveuSozinho.current = true; }}>
-          <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={setVista} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
+        <div ref={caixa} className="pp-mapa-caixa">
+          <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={setVista} onMoveuSozinho={marcarMovimento} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
           {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
           <div className="pp-controles">
             <div className="pp-zoom">
@@ -186,7 +207,8 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
         {aviso ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{aviso}</p><button type="button" className="termo-text-button pp-acao" onClick={localizar}>Tentar de novo</button></div> : null}
         {busca === "afastado" ? <div className="termo-alert" data-tone="atencao" role="status"><p>Aproxime o mapa para ver os postos.</p></div> : null}
         {busca === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); }}>Tentar de novo</button></div> : null}
-        <section aria-labelledby="pp-lista-titulo" aria-busy={busca === "carregando"}>
+        {buscaLista === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos mais próximos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { void buscarLista(origem.ponto); }}>Tentar de novo</button></div> : null}
+        <section aria-labelledby="pp-lista-titulo" aria-busy={buscaLista === "carregando"}>
           <div className="pp-lista-cabeca">
             <h2 className="gr-subtitulo" id="pp-lista-titulo">{tituloLista(origem)}</h2>
             {lista.length ? <span className="pp-lista-total">{lista.length} {lista.length === 1 ? "posto" : "postos"}</span> : null}
@@ -207,10 +229,10 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
                 </li>
               ))}
             </ul>
-          ) : busca === "carregando" ? (
+          ) : buscaLista === "carregando" ? (
             <ul className="pp-lista" aria-hidden="true">{[0, 1, 2].map((n) => <li key={n} className="pp-item pp-item--esqueleto"><span /><span /></li>)}</ul>
-          ) : busca === "erro" ? null : (
-            <p className="termo-empty"><MapPin aria-hidden="true" /> {busca === "afastado" ? "Aproxime o mapa para listar os postos." : "Nenhum posto da rede CTF nesta área. Arraste o mapa para outra região."}</p>
+          ) : buscaLista === "erro" ? null : (
+            <p className="termo-empty"><MapPin aria-hidden="true" /> Nenhum posto da rede CTF encontrado num raio de 30 km.</p>
           )}
         </section>
         {busca === "ok" && postos.length >= LIMITE_POSTOS ? <p className="gr-legenda">Mostrando os {LIMITE_POSTOS} primeiros desta área. Aproxime o mapa para ver os outros.</p> : null}

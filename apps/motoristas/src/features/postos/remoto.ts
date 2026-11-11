@@ -2,10 +2,9 @@
 import { hasDataverseRuntime, retrieveMultiple } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
-import { isMockGastosCartao } from "../despesas/gastosCartao.ts";
-import { carregarRankingPostos, type RankingPostos } from "../despesas/rankingPostos.ts";
+import { carregarRankingPostos, obterPosicao, type Posicao, type RankingPostos } from "../despesas/rankingPostos.ts";
 import { indexarRanking, type DadosPorId } from "./postosDados.ts";
-import { consultaPostosNaArea, mapearPosto, type Area, type Posto } from "./postosProximos.ts";
+import { areaEmVolta, consultaPostosNaArea, mapearPosto, maisProximos, proximoRaio, RAIOS_LISTA_KM, type Area, type Posto } from "./postosProximos.ts";
 
 const POSTO = (n: number, nome: string, endereco: string, lat: number, lon: number): Posto => ({ id: `mock-posto-${n}`, nome, endereco, lat, lon });
 
@@ -36,6 +35,21 @@ export async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
   return entities.map((linha) => mapearPosto(linha as Record<string, unknown>)).filter((posto): posto is Posto => posto !== null);
 }
 
+/** Os 10 mais próximos de `origem`: busca em caixas cada vez maiores (ver `proximoRaio`), porque o limite da consulta não é ordenado por distância. */
+export async function carregarMaisProximos(origem: Posicao): Promise<Posto[]> {
+  let raio: number | null = RAIOS_LISTA_KM[0];
+  let postos: Posto[] = [];
+  while (raio !== null) {
+    postos = await carregarPostosNaArea(areaEmVolta(origem, raio));
+    raio = proximoRaio(postos, origem, raio);
+  }
+  return maisProximos(postos, origem);
+}
+
+// Posição do motorista no modo local: perto dos postos fictícios (não do ponto padrão do centro, para a distância não dar 0 m).
+const POSICAO_MOCK: Posicao = { lat: -23.1905, lon: -45.882 };
+export const lerPosicaoDoMotorista = () => obterPosicao({ precisa: true, mock: POSICAO_MOCK });
+
 // Preço e recomendação fictícios, com os mesmos ids de POSTOS_MOCK: barato e bem recomendado (9), verde (1, 12), amarelo (2, 3, 6), caro (5, 4), maioria não recomenda (3) e sem dados (os demais).
 const aval = (total: number, recomendam: number, contagemMotivos: Record<string, number> = {}): ResumoAvaliacoes => ({ ...SEM_AVALIACOES, total, recomendam, contagemMotivos, motivos: Object.keys(contagemMotivos) });
 const RANKING_MOCK = (() => {
@@ -62,7 +76,7 @@ const VALIDADE_CACHE_MS = 10 * 60 * 1000;
 let cache: { carregadoEm: number; dados: Promise<DadosPorId> } | null = null;
 
 async function lerRanking(): Promise<RankingPostos> {
-  if (!isMockGastosCartao()) return carregarRankingPostos();
+  if (hasDataverseRuntime()) return carregarRankingPostos();
   await new Promise((resolve) => setTimeout(resolve, 300));
   if (new URLSearchParams(window.location.search).get("mockRankingPostos") === "erro") throw new Error("Falha simulada ao carregar os postos.");
   return RANKING_MOCK;

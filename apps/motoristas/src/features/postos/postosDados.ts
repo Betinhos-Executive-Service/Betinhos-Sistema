@@ -46,10 +46,10 @@ export function rotuloBaseDoPreco({ abastecimentos, dias, ultimoAbastecimento }:
 
 export type Nota = { texto: string; total: number; alerta: boolean };
 
-/** Recomendação para a lista: "92%" e a contagem. Sem avaliações, nada. */
+/** Recomendação para a lista: "92%" e a contagem. Sem avaliações, nada. Alerta (polegar para baixo) sempre que menos da metade recomenda, mesmo com uma opinião só: um "0%" com polegar positivo engana. */
 export function notaDoPosto(avaliacoes: ResumoAvaliacoes): Nota | null {
   if (avaliacoes.total <= 0) return null;
-  return { texto: `${percentualRecomenda(avaliacoes)}%`, total: avaliacoes.total, alerta: maioriaNaoRecomenda(avaliacoes) };
+  return { texto: `${percentualRecomenda(avaliacoes)}%`, total: avaliacoes.total, alerta: avaliacoes.recomendam * 2 < avaliacoes.total };
 }
 
 /** Indicador do mapa: só destaca o que muda a decisão (alerta, ou aprovação clara de 2 ou mais motoristas). */

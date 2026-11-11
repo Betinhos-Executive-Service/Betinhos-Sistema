@@ -1,7 +1,8 @@
 import maplibregl from "maplibre-gl";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { indicadorNoMapa, notaDoPosto, rotuloPrecoLitro, rotuloPrecoMapa, type PostoExibido } from "./postosDados";
-import { CENTRO_PADRAO, ZOOM_INICIAL, type Area, type Posicao } from "./postosProximos";
+import type { Posicao } from "../despesas/rankingPostos";
+import { CENTRO_PADRAO, ZOOM_INICIAL, type Area } from "./postosProximos";
 
 export type Vista = { area: Area; zoom: number };
 /** Pedido para o mapa centralizar um ponto. `deslocamentoY` empurra o ponto para cima (cartão aberto embaixo). */
@@ -14,6 +15,8 @@ type Props = {
   selecionadoId: string;
   foco: Foco | null;
   onVista: (vista: Vista) => void;
+  /** O motorista arrastou ou deu zoom no mapa (gesto, não botão nem movimento do app). */
+  onMoveuSozinho: () => void;
   onSelecionar: (posto: PostoExibido) => void;
   onDesselecionar: () => void;
 };
@@ -70,15 +73,15 @@ function lerVista(mapa: maplibregl.Map): Vista {
 
 const reduzMovimento = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, onVista, onSelecionar, onDesselecionar }, ref) {
+export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, onVista, onMoveuSozinho, onSelecionar, onDesselecionar }, ref) {
   const raiz = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<maplibregl.Map | null>(null);
   const pinos = useRef(new Map<string, { marcador: maplibregl.Marker; el: HTMLElement }>());
   const referencia = useRef<maplibregl.Marker | null>(null);
   const porId = useRef(new Map<string, PostoExibido>());
   // Os callbacks mudam a cada render; o mapa é criado uma vez e lê sempre o mais recente.
-  const callbacks = useRef({ onVista, onSelecionar, onDesselecionar });
-  callbacks.current = { onVista, onSelecionar, onDesselecionar };
+  const callbacks = useRef({ onVista, onMoveuSozinho, onSelecionar, onDesselecionar });
+  callbacks.current = { onVista, onMoveuSozinho, onSelecionar, onDesselecionar };
 
   useImperativeHandle(ref, () => ({ aproximar: () => { mapa.current?.zoomIn(); }, afastar: () => { mapa.current?.zoomOut(); } }), []);
 
@@ -108,6 +111,10 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
       const alvo = instancia.getZoom() >= ZOOM_INCLINA ? INCLINACAO : 0;
       if (Math.abs(instancia.getPitch() - alvo) > 0.5) instancia.easeTo({ pitch: alvo, duration: reduzMovimento() ? 0 : 300 });
     });
+    // Só gestos do motorista trazem originalEvent; botões +/− e os movimentos do app não.
+    const aoGesto = (evento: { originalEvent?: unknown }) => { if (evento.originalEvent) callbacks.current.onMoveuSozinho(); };
+    instancia.on("dragstart", aoGesto);
+    instancia.on("zoomstart", aoGesto);
     instancia.on("moveend", () => callbacks.current.onVista(lerVista(instancia)));
     instancia.on("click", (evento) => {
       if ((evento.originalEvent.target as HTMLElement | null)?.closest(".pp-pino")) return;
