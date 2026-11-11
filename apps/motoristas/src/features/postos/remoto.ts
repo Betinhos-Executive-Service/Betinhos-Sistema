@@ -6,7 +6,7 @@ import { carregarRankingPostos, obterPosicao, type ConviteAvaliacao, type Posica
 import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
 import { guardar, lerGuardado } from "./guardados.ts";
 import { indexarRanking, type DadosPorId, type DadosPosto } from "./postosDados.ts";
-import { areaEmVolta, consultaPostosNaArea, mapearPosto, maisProximos, proximoRaio, RAIOS_LISTA_KM, type Area, type Posto } from "./postosProximos.ts";
+import { areaEmVolta, consultaPostosNaArea, candidatosDaLista, mapearPosto, proximoRaio, RAIOS_LISTA_KM, type Area, type Posto } from "./postosProximos.ts";
 
 const POSTO = (n: number, nome: string, endereco: string, lat: number, lon: number): Posto => ({ id: `mock-posto-${n}`, nome, endereco, lat, lon });
 
@@ -62,19 +62,19 @@ export async function comGuardado<T, G = T>(motoristaId: string, chave: string, 
 
 export const carregarPostosDaArea = (motoristaId: string, area: Area) => comGuardado(motoristaId, "area", () => carregarPostosNaArea(area), (postos) => postos, (postos) => postos);
 
-/** Os 10 mais próximos de `origem`: busca em caixas cada vez maiores (ver `proximoRaio`), porque o limite da consulta não é ordenado por distância. */
-async function buscarMaisProximos(origem: Posicao): Promise<Posto[]> {
+/** Candidatos da lista (ver `candidatosDaLista`): busca em caixas cada vez maiores (ver `proximoRaio`), porque o limite da consulta não é ordenado por distância. */
+async function buscarCandidatos(origem: Posicao): Promise<Posto[]> {
   let raio: number | null = RAIOS_LISTA_KM[0];
   let postos: Posto[] = [];
   while (raio !== null) {
     postos = await carregarPostosNaArea(areaEmVolta(origem, raio));
     raio = proximoRaio(postos, origem, raio);
   }
-  return maisProximos(postos, origem);
+  return candidatosDaLista(postos, origem);
 }
 
-// Do aparelho, a lista é reordenada a partir da origem de agora (o GPS pode ter mudado desde que foi guardada).
-export const carregarMaisProximos = (motoristaId: string, origem: Posicao) => comGuardado(motoristaId, "lista", () => buscarMaisProximos(origem), (postos) => postos, (postos) => maisProximos(postos, origem));
+// Do aparelho, os candidatos são recortados a partir da origem de agora (o GPS pode ter mudado desde que foram guardados).
+export const carregarCandidatosLista = (motoristaId: string, origem: Posicao) => comGuardado(motoristaId, "lista", () => buscarCandidatos(origem), (postos) => postos, (postos) => candidatosDaLista(postos, origem));
 
 // Posição do motorista no modo local: perto dos postos fictícios (não do ponto padrão do centro, para a distância não dar 0 m).
 const POSICAO_MOCK: Posicao = { lat: -23.1905, lon: -45.882 };

@@ -137,6 +137,7 @@
 .pp-nota small { color:#64748b; font-size:.74rem; font-weight:700; }
 .pp-nota[data-alerta], .pp-cartao-nota[data-alerta] { color:#b42318; }
 .pp-selo { display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:999px; background:#e7f6ec; color:#15803d; font-size:.66rem; font-weight:800; letter-spacing:.01em; white-space:nowrap; }
+.pp-selo--neutro { background:#f1f5f9; color:#64748b; }
 .pp-item--esqueleto { cursor:default; box-shadow:inset 0 0 0 1px #e2e8f0; }
 .pp-item--esqueleto span { height:12px; border-radius:6px; background:#e8edf5; animation:pp-pulsa 1.1s ease-in-out infinite; }
 .pp-item--esqueleto span:last-child { width:44px; justify-self:end; grid-column:3; }
@@ -194,7 +195,7 @@
 .pp-gaveta-alca { justify-self:center; width:36px; height:4px; border-radius:2px; background:#cbd5e1; }
 .pp-gaveta-cabeca { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:40px; }
 .pp-gaveta-titulo { color:var(--pp-marca); font-size:.98rem; font-weight:800; }
-.pp-lista-total { margin-left:auto; color:#64748b; font-size:.75rem; font-weight:700; }
+.pp-lista-total { margin-left:auto; color:#64748b; font-size:.75rem; font-weight:700; white-space:nowrap; }
 .pp-gaveta-seta { width:18px; height:18px; color:#64748b; transition:transform 340ms var(--pp-gaveta); }
 .pp-gaveta[data-posicao="aberta"] .pp-gaveta-seta { transform:rotate(180deg); }
 .pp-gaveta-corpo { flex:1 1 auto; min-height:0; padding:0 12px calc(12px + env(safe-area-inset-bottom)); overflow-y:hidden; overscroll-behavior:contain; touch-action:pan-y; }

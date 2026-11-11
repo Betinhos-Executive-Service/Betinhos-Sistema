@@ -12,9 +12,9 @@ import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { descreverGpsErro } from "../termos/termosMulta";
 import { PostosMapa, type Foco, type PostosMapaControle, type Vista } from "./PostosMapa";
 import { PostosGaveta } from "./PostosGaveta";
-import { idMenorPreco, juntarDados, juntarPosto, notaDoPosto, paraFicha, podeAvaliar, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
+import { juntarDados, juntarPosto, notaDoPosto, paraFicha, podeAvaliar, recomendados, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido, type Recomendado } from "./postosDados";
 import { areaJaCarregada, ESPERA_BUSCA_MS, LIMITE_POSTOS, medidasGaveta, origemDasDistancias, rotuloKm, rotuloOrigem, rotuloSemConexao, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Area, type PosicaoGaveta, type Posto } from "./postosProximos";
-import { carregarDadosPostos, carregarMaisProximos, carregarPostosDaArea, invalidarRanking, lerPosicaoDoMotorista } from "./remoto";
+import { carregarCandidatosLista, carregarDadosPostos, carregarPostosDaArea, invalidarRanking, lerPosicaoDoMotorista } from "./remoto";
 
 type Busca = "ok" | "carregando" | "erro";
 
@@ -34,14 +34,15 @@ function Nota({ dados }: { dados: DadosPosto }) {
   return <span className="pp-nota" data-alerta={nota.alerta || undefined}><Icone aria-hidden="true" />{nota.texto}<small>· {nota.total}</small></span>;
 }
 
-function ItemMeta({ posto, menor }: { posto: PostoExibido; menor: boolean }) {
+/** Sem nenhum preço na lista (ranking falhou) o selo "Sem preço recente" em todos só faria ruído. */
+function ItemMeta({ posto, comNota }: { posto: Recomendado<PostoExibido>; comNota: boolean }) {
   const dados = posto.dados;
-  if (!dados) return null;
+  if (!dados) return comNota ? <span className="pp-item-meta"><span className="pp-selo pp-selo--neutro">{posto.motivo}</span></span> : null;
   return (
     <span className="pp-item-meta">
       <span className="pp-preco" data-cor={dados.cor}><i aria-hidden="true" />{rotuloPrecoLitro(dados.precoLitro)}</span>
       <Nota dados={dados} />
-      {menor ? <span className="pp-selo">Menor preço</span> : null}
+      <span className="pp-selo" aria-label={`Nota ${posto.pontos} de 100: ${posto.motivo}`}>{posto.pontos} · {posto.motivo}</span>
     </span>
   );
 }
@@ -186,7 +187,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
     const id = ++pedidoLista.current;
     setBuscaLista("carregando");
     try {
-      const { dados: lista, desde: quando } = await carregarMaisProximos(motoristaId, ponto);
+      const { dados: lista, desde: quando } = await carregarCandidatosLista(motoristaId, ponto);
       if (id !== pedidoLista.current) return;
       setProximos(lista);
       setDesde((anterior) => ({ ...anterior, lista: quando }));
@@ -201,8 +202,9 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
 
   // O posto aberto (vindo da lista) sempre ganha pino, mesmo fora dos 200 da área do mapa.
   const exibidos = useMemo(() => juntarDados(selecionado && !postos.some((posto) => posto.id === selecionado.id) ? [...postos, selecionado] : postos, dadosPorId), [postos, selecionado, dadosPorId]);
-  const lista = useMemo(() => juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) })), [proximos, dadosPorId, origem]);
-  const menorPreco = useMemo(() => idMenorPreco(lista), [lista]);
+  // Ordem por nota (preço, recomendação, distância); sem nenhum preço a ordem é só a distância e o título diz "Mais próximos".
+  const lista = useMemo(() => recomendados(juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) }))), [proximos, dadosPorId, origem]);
+  const comNota = lista.some((posto) => posto.pontos !== null);
   const cartao = cartaoPosto ? juntarPosto(cartaoPosto, dadosPorId) : null;
 
   // Palco = área do mapa e da gaveta; a gaveta se mede por ele.
@@ -274,7 +276,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
           </div>
           <PostosGaveta
             gaveta={gaveta} posicao={gavetaPosicao} onPosicao={setGavetaPosicao}
-            titulo={tituloLista(origem)} contagem={lista.length ? `${lista.length} ${lista.length === 1 ? "posto" : "postos"}` : ""}
+            titulo={tituloLista(origem, comNota)} contagem={lista.length ? `${lista.length} ${lista.length === 1 ? "posto" : "postos"}` : ""}
             acima={(
               <article className={`pp-cartao${selecionado ? " is-aberto" : ""}`} aria-label={cartao ? `Posto ${cartao.nome}` : "Posto"} aria-hidden={selecionado ? undefined : true}>
                 {cartao ? (
@@ -303,7 +305,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
                         <span className="pp-item-icone" data-cor={posto.dados?.cor}><Fuel aria-hidden="true" /></span>
                         <span className="pp-item-texto">
                           <strong>{posto.nome}</strong>
-                          <ItemMeta posto={posto} menor={posto.id === menorPreco} />
+                          <ItemMeta posto={posto} comNota={comNota} />
                           {posto.endereco ? <span className="pp-item-endereco">{posto.endereco}</span> : null}
                         </span>
                         <span className="pp-item-km"><b>{rotuloKm(posto.distanciaKm)}</b><small>{origem.doMotorista ? "de você" : "do centro"}</small></span>

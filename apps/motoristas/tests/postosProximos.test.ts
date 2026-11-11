@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaEmVolta, comFriccao, guardadoValido, medidasGaveta, posicaoAposArrasto, posicaoAposToque, rotuloSemConexao, VALIDADE_GUARDADO_MS, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
+import { areaEmVolta, comFriccao, guardadoValido, medidasGaveta, posicaoAposArrasto, posicaoAposToque, rotuloSemConexao, VALIDADE_GUARDADO_MS, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, candidatosDaLista, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
 import { distanciaKm } from "../src/features/despesas/rankingPostos.ts";
 import { comGuardado, ehFalhaDeRede, POSTOS_MOCK } from "../src/features/postos/remoto.ts";
 import { guardar, lerGuardado } from "../src/features/postos/guardados.ts";
@@ -46,10 +46,12 @@ test("origem das distâncias: GPS do motorista; sem GPS, o centro padrão", () =
   const comGps = origemDasDistancias(gps);
   assert.deepEqual(comGps, { ponto: gps, doMotorista: true });
   assert.equal(tituloLista(comGps), "Mais próximos de você");
+  assert.equal(tituloLista(comGps, true), "Recomendados perto de você");
   assert.equal(rotuloOrigem(comGps), "de você");
   const semGps = origemDasDistancias(null);
   assert.deepEqual(semGps, { ponto: CENTRO_PADRAO, doMotorista: false });
   assert.equal(tituloLista(semGps), "Mais próximos do centro de SJC");
+  assert.equal(tituloLista(semGps, true), "Recomendados perto do centro de SJC");
   assert.equal(rotuloOrigem(semGps), "do centro de São José dos Campos");
 });
 
@@ -74,21 +76,30 @@ test("areaEmVolta: a caixa tem meia-largura do raio em latitude e longitude", ()
   assert.ok(Math.abs(leste - 10) < 0.2, `leste ${leste}`);
 });
 
-test("proximoRaio amplia até o 10º posto caber no raio da caixa e para ao bater o limite ou no maior raio", () => {
+test("proximoRaio amplia de 10 para 30 km até ter 10 postos no raio e para ao bater o limite ou no maior raio", () => {
   const origem = { lat: -23, lon: -45 };
   const emFila = (n: number, passoKm: number) => Array.from({ length: n }, (_, i) => posto(`p${i}`, -23 - ((i + 1) * passoKm) / 111.32, -45));
-  const [pequeno, medio, grande] = RAIOS_LISTA_KM;
-  // 10 postos, o último a 1 km: já basta no menor raio.
-  assert.equal(proximoRaio(emFila(10, 0.1), origem, pequeno), null);
+  const [medio, grande] = RAIOS_LISTA_KM;
+  assert.deepEqual(RAIOS_LISTA_KM, [10, 30]);
+  // 10 postos, o último a 1 km: já basta em 10 km.
+  assert.equal(proximoRaio(emFila(10, 0.1), origem, medio), null);
   // só 9 postos: precisa ampliar.
-  assert.equal(proximoRaio(emFila(9, 0.1), origem, pequeno), medio);
-  // 10 postos, mas o 10º a 5 km: fora do raio de 3 km, amplia; dentro do de 10 km, basta.
-  assert.equal(proximoRaio(emFila(10, 0.5), origem, pequeno), medio);
-  assert.equal(proximoRaio(emFila(10, 0.5), origem, medio), null);
+  assert.equal(proximoRaio(emFila(9, 0.1), origem, medio), grande);
+  // 10 postos, mas o 10º a 15 km: fora dos 10 km, amplia.
+  assert.equal(proximoRaio(emFila(10, 1.5), origem, medio), grande);
   // no maior raio não há o que tentar.
   assert.equal(proximoRaio(emFila(3, 1), origem, grande), null);
   // bateu o limite: ampliar só piora o recorte arbitrário.
-  assert.equal(proximoRaio(emFila(5, 1), origem, pequeno, 5), null);
+  assert.equal(proximoRaio(emFila(5, 1), origem, medio, 5), null);
+});
+
+test("candidatosDaLista: todos os postos a até 10 km; com menos de 10, até 30 km", () => {
+  const origem = { lat: -23, lon: -45 };
+  const emKm = (id: string, km: number) => posto(id, -23 - km / 111.32, -45);
+  const muitos = [...Array.from({ length: 12 }, (_, i) => emKm(`p${i}`, i + 0.5)), emKm("longe", 20)];
+  assert.deepEqual(candidatosDaLista(muitos, origem).map((p) => p.id), Array.from({ length: 10 }, (_, i) => `p${i}`));
+  const poucos = [emKm("a", 2), emKm("b", 25), emKm("fora", 40)];
+  assert.deepEqual(candidatosDaLista(poucos, origem).map((p) => p.id), ["a", "b"]);
 });
 
 test("areaJaCarregada só reaproveita área contida e que não bateu o limite", () => {
@@ -131,7 +142,7 @@ test("conjunto fictício do modo local fica na região de São José dos Campos"
 });
 
 // ---------------- Preço e recomendação (postosDados) ----------------
-import { idMenorPreco, podeAvaliar, indexarRanking, indicadorNoMapa, juntarDados, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
+import { idMenorPreco, podeAvaliar, recomendados, indexarRanking, indicadorNoMapa, juntarDados, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
 import { SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
 import type { RankingPostos } from "../src/features/despesas/rankingPostos.ts";
 
@@ -310,4 +321,33 @@ test("paraFicha leva preço, histórico e avaliações do ranking para a ficha; 
   assert.equal(vazia.precoLitro, 0);
   assert.equal(vazia.historico.length, 0);
   assert.equal(vazia.avaliacoes.total, 1);
+});
+
+const candidato = (id: string, km: number, preco: number | null, avaliacoes = SEM_AVALIACOES) => {
+  const dados = preco === null ? null : indexarRanking(ranking(itemRanking(id, preco, avaliacoes))).get(id)!;
+  return { ...posto(id, 0, 0), distanciaKm: km, dados };
+};
+
+test("recomendados: o mais barato e bem avaliado passa na frente do mais perto", () => {
+  const lista = recomendados([candidato("perto", 0.3, 6.6), candidato("barato", 4, 5.9, aval(10, 9)), candidato("meio", 2, 6.2)]);
+  // "meio" é R$ 0,40 mais barato que "perto": 1,7 km a mais não compensa.
+  assert.deepEqual(lista.map((p) => p.id), ["barato", "meio", "perto"]);
+  assert.equal(lista[0].motivo, "Menor preço");
+  assert.ok(lista.every((p) => p.pontos !== null && p.pontos >= 0 && p.pontos <= 100));
+});
+
+test("recomendados: maioria que não recomenda derruba a nota; motivo é o critério que mais pesou", () => {
+  const lista = recomendados([candidato("ruim", 1, 6.2, aval(10, 1)), candidato("bom", 1, 6.5, aval(10, 10)), candidato("caro", 0.1, 6.9)]);
+  assert.equal(lista[0].id, "bom");
+  assert.equal(lista[0].motivo, "Bem avaliado");
+  assert.ok(lista.find((p) => p.id === "ruim")!.pontos! < lista[0].pontos!);
+  assert.equal(lista.find((p) => p.id === "caro")!.motivo, "Mais perto");
+});
+
+test("recomendados: sem preço vai para o fim, por distância, com 'Sem preço recente'; corta em 10", () => {
+  const semPreco = [candidato("sp-longe", 3, null), candidato("sp-perto", 0.2, null)];
+  const lista = recomendados([...semPreco, candidato("caro", 9, 6.9)]);
+  assert.deepEqual(lista.map((p) => p.id), ["caro", "sp-perto", "sp-longe"]);
+  assert.deepEqual(lista.slice(1).map((p) => [p.pontos, p.motivo]), [[null, "Sem preço recente"], [null, "Sem preço recente"]]);
+  assert.equal(recomendados(Array.from({ length: 15 }, (_, i) => candidato(`p${i}`, i, 6))).length, 10);
 });
