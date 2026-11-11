@@ -53,7 +53,7 @@ test("origem das distâncias: GPS do motorista; sem GPS, o centro padrão", () =
   assert.equal(rotuloOrigem(comGps), "de você");
   const semGps = origemDasDistancias(null);
   assert.deepEqual(semGps, { ponto: CENTRO_PADRAO, doMotorista: false });
-  assert.equal(tituloLista(semGps), "Mais próximos do centro de São José dos Campos");
+  assert.equal(tituloLista(semGps), "Mais próximos do centro de SJC");
   assert.equal(rotuloOrigem(semGps), "do centro de São José dos Campos");
 });
 

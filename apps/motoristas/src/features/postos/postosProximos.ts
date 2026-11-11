@@ -43,7 +43,7 @@ export const areaAfastadaDemais = (zoom: number) => zoom < ZOOM_MINIMO_BUSCA;
 export type Origem = { ponto: Posicao; doMotorista: boolean };
 
 export const origemDasDistancias = (posicao: Posicao | null): Origem => (posicao ? { ponto: posicao, doMotorista: true } : { ponto: CENTRO_PADRAO, doMotorista: false });
-export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro de São José dos Campos");
+export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro de SJC");
 export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você" : "do centro de São José dos Campos");
 
 /** Caixa de meia-largura `raioKm` em volta do ponto. Tudo a até `raioKm` do ponto cabe nela. */

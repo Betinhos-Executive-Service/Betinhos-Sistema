@@ -779,7 +779,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Postos próximos",
     steps: [
       step("voltar", "Voltar", ["Volta para a tela de onde você abriu os postos."], { target: SERVICE_HOME }),
-      step("mapa", "Mapa", ["Arraste para andar pelo mapa e use dois dedos ou os botões + e − para aproximar. Os postos da rede CTF da área aparecem como pinos azuis; o ponto azul redondo é você (sem localização, um ponto cinza marca o centro de São José dos Campos).", "Com o mapa muito afastado o app pede para aproximar, para não carregar postos demais."], { target: ".pp-mapa" }),
+      step("mapa", "Mapa", ["Arraste para andar pelo mapa e use dois dedos ou os botões + e − para aproximar.", "Os postos da rede CTF aparecem como pinos coloridos pelo preço em relação à meta (verde dentro, vermelho acima). O ponto azul é você; sem localização, um ponto cinza marca o centro de São José dos Campos.", "Com o mapa muito afastado o app pede para aproximar, para não carregar postos demais."], { target: ".pp-mapa" }),
       step("pino", "Pino do posto", ["Toque num pino para ver o nome, o endereço e a distância. Ir abre a rota no Google Maps; Waze abre no Waze."], { target: ".pp-cartao", optional: true }),
       step("lista", "Mais próximos", ["Os 10 postos mais próximos de você, do mais perto ao mais longe (sem a sua localização, contam a partir do centro de São José dos Campos). Tocar num deles centraliza o mapa nele e abre o cartão."], { target: ".pp-lista", optional: true }),
       helpStep()
