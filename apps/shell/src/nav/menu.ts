@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'conciliacao-cartao'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'conciliacao-cartao' | 'composicao'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -110,7 +110,7 @@ export const MENU: MenuGroup[] = [
       wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
       table('cr40f_pedidodecotacao'),
       wr('Fluxo de Caixa', 'cr40f_TelaFluxoDeCaixa.html'),
-      table('cr40f_composicaodeprecos'),
+      { kind: 'page', id: 'composicao', label: 'Composição de Preço', page: 'composicao' },
       table('new_marketing'),
     ],
   },
@@ -126,6 +126,8 @@ export function rotaAtualizada(id: string, query: URLSearchParams): { id: string
   if (id === 'cr40f_homebetinhos') return { id: 'inicio', query }
   // A tabela nativa de clientes virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_clientes1') return { id: 'clientes', query }
+  // A grade nativa de Composição de Preço virou a tela React (ordena também pelas colunas da Reserva).
+  if (id === 'cr40f_composicaodeprecos') return { id: 'composicao', query }
   // O WebResource e a página personalizada de Funções Operacionais viraram a tela React.
   if (id === 'new_telafuncoesoperacionais' || id === 'custom-page-funcoes-operacionais') return { id: 'funcoes-operacionais', query }
   // O WebResource da Gestão de Qualidade virou a tela React; links antigos seguem abrindo.

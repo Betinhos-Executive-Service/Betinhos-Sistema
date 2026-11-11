@@ -64,6 +64,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   infleet: <MapPin />,
   planner: <ClipboardList />,
   cr40f_composicaodeprecos: <Calculator />,
+  composicao: <Calculator />,
   ops: <Coins />,
   pagantes: <Users />,
   cr40f_recibos_v2: <Receipt />,

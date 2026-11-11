@@ -1,0 +1,27 @@
+/* Composição de Preço: lista com colunas da Reserva. Só tokens do Design System. */
+.cp-num { font-variant-numeric: tabular-nums; }
+.cp-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+
+.cp-open { display: grid; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.cp-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
+.cp-open:focus-visible, .cp-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+/* Linha e cartão inteiros abrem o registro (clique delegado ao botão do ID). */
+.cp-table .bt-table__row:not(.bt-table__row--loading), .cp-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .cp-table .bt-table__row:not(.bt-table__row--loading):hover, .cp-card:hover { background-color: var(--bt-color-surface-soft); }
+  .cp-open:hover strong { color: var(--bt-color-action); }
+}
+
+.cp-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.cp-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.cp-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.cp-card__open:active { transform: scale(0.97); }
+.cp-card__head { display: flex; justify-content: space-between; gap: var(--bt-space-2); font-size: var(--bt-font-size-14); }
+.cp-card__name { font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); overflow-wrap: anywhere; }
+.cp-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+
+@media (max-width: 560px) {
+  .cp-search { flex: 1 1 100%; max-width: none; }
+}
