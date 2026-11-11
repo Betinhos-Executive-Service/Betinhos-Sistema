@@ -190,7 +190,7 @@ flowchart TD
     E1[pac auth + exportar-do-dev.ps1: conferencia das 4 como barreira, versao seguinte, export gerenciado] --> E2[artefato pacotes]
   end
   E2 --> subgraph_i
-  subgraph importar [job importar - environment test ou prod, revisor no prod]
+  subgraph importar [job importar - environment test ou prod; aprovação no job aprovar-prod, environment prod-aprovacao]
     subgraph_i[foto-ambiente antes] --> I2[excluir Custom APIs cr40f_AI*V2 legado]
     I2 --> I3[preservar valores de variaveis so com padrao]
     I3 --> I4[importar-solucoes: stage-and-upgrade na ordem Core, Automacao, Interface, Motoristas]

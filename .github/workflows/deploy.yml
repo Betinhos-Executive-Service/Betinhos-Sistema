@@ -450,9 +450,9 @@ jobs:
             echo "::warning::Pacote anterior não decifrou (PACOTES_SENHA trocado?); exporta sem reaproveitar."
             rm -rf cache-solucoes
           fi
-      - name: Instalar pac
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Conferir e exportar o que mudou
         run: |
