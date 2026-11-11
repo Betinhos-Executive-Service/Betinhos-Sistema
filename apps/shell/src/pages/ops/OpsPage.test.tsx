@@ -15,7 +15,35 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('button')!)
 
+
+const blobText = (blob: Blob) => new Promise<string>((resolve) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result))
+  reader.readAsText(blob)
+})
+
 describe('Ordens de Pagamento', () => {
+  it('seleção em lote: copia os números e exporta as OPs selecionadas', async () => {
+    const writeText = vi.fn(async (_text: string) => undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    const blobs: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { blobs.push(blob); return 'blob:x' }, revokeObjectURL: () => undefined }))
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('OP-401')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    fireEvent.click((await screen.findByText('OP-402')).closest('.bt-table__row')!.querySelector('.pg-num')!, { shiftKey: true })
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    expect(within(faixa).getByText(/selecionados/)).toBeTruthy()
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Copiar números' }))
+    await screen.findByText(/números de OP copiados\./)
+    expect(writeText.mock.calls[0][0]).toMatch(/OP-401/)
+    expect(writeText.mock.calls[0][0]).toMatch(/OP-402/)
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
+    await screen.findByText(/OPs exportadas\./)
+    expect(await blobText(blobs[0])).toMatch(/OP-401/)
+  })
+
   it('Fechar mês no cabeçalho: escolhe cliente e mês, confirma e avisa', async () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Fechar mês' }))

@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
-import { CalendarCheck, FileStack, RefreshCw, SearchX } from 'lucide-react'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { listCache } from '../../app/listCache'
+import { downloadCsv } from '../../app/csv'
+import { SelectionBar, useRowSelection } from '../../app/Selecao'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
+import { copyText } from '../pagantes/components/QuickActions'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
 import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
 import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
 import { opsQuery } from './domain/query'
+import { opsCsv, opsNumeros } from './domain/exportar'
 import type { Op } from './domain/types'
 import { useOps } from './useOps'
 import { OpsCards, OpsTable } from './components/OpsList'
@@ -89,6 +93,8 @@ function Ops({ host }: { host: Host }) {
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const clearAll = () => { clearFilters(); setQuery('') }
+  const sel = useRowSelection(visible)
+  const selecting = !mobile && sel.rows.length > 0
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   const current = selectedId ? list.find((op) => op.id === selectedId) ?? null : null
@@ -140,6 +146,32 @@ function Ops({ host }: { host: Host }) {
     setGerarOpId(op.id)
   }
 
+  function exportar(rows: Op[]) {
+    if (!ops.choices) return
+    downloadCsv(`ops-${todaySaoPaulo()}.csv`, opsCsv(rows, ops.choices))
+    toast({ tone: 'success', message: rows.length === 1 ? '1 OP exportada.' : `${rows.length} OPs exportadas.` })
+  }
+
+  async function copiarNumeros(rows: Op[]) {
+    const numeros = opsNumeros(rows)
+    try {
+      await copyText(numeros.join('\n'))
+      const n = numeros.length
+      toast({ tone: 'success', message: n === 1 ? '1 número de OP copiado.' : `${n} números de OP copiados.` })
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível copiar. ${reasonText(reason)}` })
+    }
+  }
+
+  // Ações em lote: as mesmas na faixa da seleção e no clique direito.
+  const bulkActions = (rows: Op[]): MenuAction[] => {
+    const semNumero = !opsNumeros(rows).length
+    return [
+      { id: 'exportar', label: 'Exportar seleção', icon: <Download size={16} />, onSelect: () => exportar(rows) },
+      { id: 'copiar', label: 'Copiar números', icon: <Copy size={16} />, disabled: semNumero, title: semNumero ? 'As OPs selecionadas ainda não têm número.' : undefined, onSelect: () => void copiarNumeros(rows) },
+    ]
+  }
+
   const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
   let body
@@ -160,7 +192,7 @@ function Ops({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -169,13 +201,17 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
-          <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />}
-          {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
-        </ViewBar>
+        <div {...sel.bar}>
+          <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+            {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
+              {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+              <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
+              <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
+              {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />}
+              {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
+            </>}
+          </ViewBar>
+        </div>
       </div>
       {ops.error && ops.choices ? (
         <Alert tone="danger" title={ops.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
