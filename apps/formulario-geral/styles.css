@@ -900,7 +900,7 @@ h3 {
   border-radius: var(--radius-sm);
   background: var(--surface-soft);
   box-shadow: var(--shadow-control);
-  --passenger-toolbar-width: 146px;
+  --passenger-toolbar-width: 178px;
   --passenger-control-height: 40px;
 }
 
@@ -1046,6 +1046,21 @@ h3 {
   box-shadow: var(--shadow-focus), var(--shadow-control);
 }
 
+#tab-panel-details .toolbar-icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#tab-panel-details #linkCadastroButton {
+  color: var(--accent);
+  background: #ffffff;
+}
+
 #tab-panel-details #addPassenger {
   width: var(--passenger-control-height);
   min-width: var(--passenger-control-height);
@@ -1065,10 +1080,17 @@ h3 {
 
 #tab-panel-details .passenger-stack {
   min-height: var(--passenger-control-height);
+}
+
+#tab-panel-details .passenger-stack > .passenger-field-label {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--passenger-control-height) + 2px);
   padding-right: calc(var(--passenger-toolbar-width) + 8px);
 }
 
-#tab-panel-details .passenger-block.is-shared-address .passenger-stack {
+#tab-panel-details .passenger-block.is-shared-address .passenger-stack > .passenger-field-label {
+  min-height: 0;
   padding-right: 0;
 }
 
@@ -7912,9 +7934,9 @@ body.is-import-dragging .import-drop-overlay {
     padding-top: 0;
   }
 
-  #tab-panel-details .passenger-block.is-shared-address .passenger-stack {
+  #tab-panel-details .passenger-stack > .passenger-field-label {
+    min-height: 0;
     padding-right: 0;
-    padding-top: 0;
   }
 
   #tab-panel-details .passenger-block.is-shared-address .custom-address {
