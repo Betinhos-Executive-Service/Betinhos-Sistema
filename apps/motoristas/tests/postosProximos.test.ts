@@ -133,7 +133,7 @@ test("indexarRanking ignora postoId vazio (plugin antigo) e preço inválido, e 
 test("formatação de preço: vírgula, /L e etiqueta curta do mapa", () => {
   assert.equal(rotuloPrecoLitro(6.19), "R$ 6,19/L");
   assert.equal(rotuloPrecoLitro(6), "R$ 6,00/L");
-  assert.equal(rotuloPrecoMapa(5.9), "5,90");
+  assert.equal(rotuloPrecoMapa(5.9), "R$ 5,90");
 });
 
 test("rotuloDia e rotuloBaseDoPreco dizem quando e com base em quê", () => {

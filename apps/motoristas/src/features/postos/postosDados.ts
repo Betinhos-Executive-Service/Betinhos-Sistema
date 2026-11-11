@@ -27,8 +27,8 @@ export const juntarDados = (postos: Posto[], dados: DadosPorId | null): PostoExi
 
 const virgula = (valor: number) => valor.toFixed(2).replace(".", ",");
 export const rotuloPrecoLitro = (valor: number) => `R$ ${virgula(valor)}/L`;
-/** Sem "R$" nem "/L": cabe na etiqueta do pino. */
-export const rotuloPrecoMapa = virgula;
+/** Com "R$" e sem "/L": cabe na etiqueta do pino. */
+export const rotuloPrecoMapa = (valor: number) => `R$ ${virgula(valor)}`;
 
 /** "2026-11-03" vira "03/11"; sem data válida, vazio. Lê as partes da string para o fuso não mudar o dia. */
 export function rotuloDia(iso: string) {
