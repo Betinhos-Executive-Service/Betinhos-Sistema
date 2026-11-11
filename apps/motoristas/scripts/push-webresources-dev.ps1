@@ -9,8 +9,10 @@ param(
 #  - new_exchange_lifecycle_commands.js e new_exchange_lifecycle_dialog.html: barra de comandos do form da troca de carro.
 # So atualiza web resource que ja existe, com o id que TEST e PROD tambem usam (nunca cria: peca nova entra pela solucao).
 # Conteudo: PATCH so quando difere (CRLF e LF contam como iguais). A descricao termina com o commit ("<texto> <sha>"), que
-# pendentes-dev.ps1 e a trava do PROD leem; ela so e gravada depois do PublishXml, e o PublishXml inclui todo recurso cuja
-# descricao ainda nao tem o commit: uma execucao que falhou no meio nunca deixa conteudo salvo sem publicar.
+# pendentes-dev.ps1 e a trava do PROD leem. O GET devolve a camada publicada, e a descricao tambem so aparece nela depois do
+# PublishXml (gravada depois dele, fica so na camada nao publicada). Por isso conteudo e descricao vao no mesmo PATCH, antes do
+# PublishXml, e o PublishXml inclui todo recurso cuja descricao publicada ainda nao tem o commit: uma execucao que falhou no
+# meio volta pendente e publica de novo na proxima.
 # A forma (OnLoad dos forms, form "App Motoristas (push)" e o app) e da migration 20261110-1700-push-redirect-forms.ps1.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
@@ -84,17 +86,17 @@ if ($DryRun) {
   return
 }
 
-function Set-WebResource($W, [hashtable] $Corpo) {
-  Invoke-RestMethod -Method Patch -Uri "$api/webresourceset($($W.Id))" -Headers ($headers + @{ 'If-Match' = '*' }) -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes(($Corpo | ConvertTo-Json -Compress))) | Out-Null
+foreach ($w in $publicar) {
+  $corpo = @{ description = $w.Descricao }
+  if ($w.MudaConteudo) { $corpo.content = $w.Conteudo }
+  Write-Step "atualizando $($w.Nome)"
+  Invoke-RestMethod -Method Patch -Uri "$api/webresourceset($($w.Id))" -Headers ($headers + @{ 'If-Match' = '*' }) -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes(($corpo | ConvertTo-Json -Compress))) | Out-Null
 }
-
-foreach ($w in @($catalogo | Where-Object { $_.MudaConteudo })) { Write-Step "atualizando $($w.Nome)"; Set-WebResource $w @{ content = $w.Conteudo } }
 if ($publicar.Count) {
   $xml = '<importexportxml><webresources>' + (($publicar | ForEach-Object { "<webresource>{$($_.Id)}</webresource>" }) -join '') + '</webresources></importexportxml>'
   Write-Step 'publicando'
   Invoke-RestMethod -Method Post -Uri "$api/PublishXml" -Headers $headers -ContentType 'application/json; charset=utf-8' -Body (@{ ParameterXml = $xml } | ConvertTo-Json) | Out-Null
 }
-foreach ($w in @($catalogo | Where-Object { $_.MudaDescricao })) { Set-WebResource $w @{ description = $w.Descricao } }
 
 foreach ($w in $catalogo) {
   $publicado = Invoke-RestMethod -Method Get -Uri "$api/webresourceset($($w.Id))?`$select=content,description" -Headers $headers
