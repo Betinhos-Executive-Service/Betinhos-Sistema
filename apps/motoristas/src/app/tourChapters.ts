@@ -70,6 +70,9 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
         "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."
       ], { target: dt("treinamentos") }),
+      step("postos-proximos", "Postos próximos", [
+        "Um mapa com os postos da rede CTF perto de você, para abastecer com o cartão. Toque num pino para ver o endereço e abrir a rota no Maps ou no Waze."
+      ], { target: dt("postosProximos") }),
       step("manutencao", "Manutenção", [
         "Notou ruído, luz acesa no painel ou pneu vibrando? Solicite o reparo aqui, com a gravidade, a descrição e fotos.",
         "O pedido é enviado para a equipe da Betinhos."
@@ -772,6 +775,17 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
+    id: "postos-proximos",
+    title: "Postos próximos",
+    steps: [
+      step("voltar", "Voltar", ["Volta para a tela de onde você abriu os postos."], { target: SERVICE_HOME }),
+      step("mapa", "Mapa", ["Arraste para andar pelo mapa e use dois dedos ou os botões + e − para aproximar.", "Os postos da rede CTF aparecem como pinos coloridos pelo preço em relação à meta (verde dentro, vermelho acima). O ponto azul é você; sem localização, um ponto cinza marca o centro de São José dos Campos.", "Com o mapa muito afastado o app pede para aproximar, para não carregar postos demais."], { target: ".pp-mapa" }),
+      step("pino", "Pino do posto", ["Toque num pino para ver o nome, o endereço e a distância. Ir abre a rota no Google Maps; Waze abre no Waze."], { target: ".pp-cartao", optional: true }),
+      step("lista", "Mais próximos", ["Os 10 postos mais próximos de você, do mais perto ao mais longe (sem a sua localização, contam a partir do centro de São José dos Campos). Tocar num deles centraliza o mapa nele e abre o cartão."], { target: ".pp-lista", optional: true }),
+      helpStep()
+    ]
+  },
+  {
     id: "gastos-cartao",
     title: "Gastos do cartão",
     steps: [
@@ -842,6 +856,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   gastosCartao: ["gastos-cartao"],
   gastosRelatorio: ["gastos-relatorio"],
   rankingPostos: ["ranking-postos"],
+  postosProximos: ["postos-proximos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],

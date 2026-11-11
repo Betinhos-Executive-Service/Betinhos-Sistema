@@ -43,7 +43,8 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   treinamentos: "treinamentos",
   gastosCartao: "gastos-cartao",
   gastosRelatorio: "gastos-relatorio",
-  rankingPostos: "ranking-postos"
+  rankingPostos: "ranking-postos",
+  postosProximos: "postos-proximos"
 };
 
 const SCREEN_HASH_ALIASES: Record<string, Screen> = {
@@ -120,7 +121,9 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   "gastos-relatorio": "gastosRelatorio",
   gastosrelatorio: "gastosRelatorio",
   "ranking-postos": "rankingPostos",
-  rankingpostos: "rankingPostos"
+  rankingpostos: "rankingPostos",
+  "postos-proximos": "postosProximos",
+  postosproximos: "postosProximos"
 };
 
 const HASH_ROUTE_DETAIL_SCREENS = new Set<Screen>([
@@ -242,7 +245,8 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   treinamentos: 1,
   gastosCartao: 1,
   gastosRelatorio: 1,
-  rankingPostos: 2
+  rankingPostos: 2,
+  postosProximos: 1
 };
 
 const drillSpring = {
@@ -278,7 +282,7 @@ const fastFade = {
   ease: "easeOut" as const
 };
 
-const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "gastosCartao";
+const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "gastosCartao" || screenName === "postosProximos";
 const isDetailScreen = (screenName: Screen) => screenName === "detalhes" || screenName === "detalhesHistorico";
 const isTaskScreen = (screenName: Screen) =>
   screenName === "receber" || screenName === "voucher" || screenName === "finalizar" || screenName === "canceladoLocal";

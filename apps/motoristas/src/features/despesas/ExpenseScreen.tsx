@@ -1,3 +1,4 @@
+import { Fuel } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../shared/ui/FormFields";
@@ -64,6 +65,8 @@ type ExpenseScreenProps = {
   quickReadFilled?: QuickReadFilledFields;
   /** Completar gasto do cartão: data, valor, forma de pagamento e estabelecimento ficam travados (vêm do banco). */
   cartaoGasto?: boolean;
+  /** Atalho para o mapa de postos da rede CTF; sem ele o botão não aparece. */
+  onPostosProximos?: () => void;
 };
 
 /** A folha de conferência do cartão leva o foco para este campo. */
@@ -94,7 +97,8 @@ export function ExpenseScreen({
   currentVehicleId,
   quickRead,
   quickReadFilled = {},
-  cartaoGasto
+  cartaoGasto,
+  onPostosProximos
 }: ExpenseScreenProps) {
   const isSubmitting = submitState !== "idle";
   const cameraScroll = useCameraScroll("gastos");
@@ -226,6 +230,9 @@ export function ExpenseScreen({
                   ))}
                 </ul>
               </section>
+            ) : null}
+            {onPostosProximos ? (
+              <button type="button" className="expense-postos" disabled={isSubmitting} onClick={onPostosProximos}><Fuel aria-hidden="true" />Postos próximos</button>
             ) : null}
             <fieldset disabled={isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
               {referenceLoading ? <div className="form-error-summary">Carregando regras de despesa.</div> : null}
