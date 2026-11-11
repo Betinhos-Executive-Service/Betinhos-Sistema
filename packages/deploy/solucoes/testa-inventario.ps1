@@ -75,7 +75,9 @@ function Rotas-Base {
   $script:rotas['*/solutioncomponents?*'] = Lista @(
     [pscustomobject]@{ objectid = 'T1'; componenttype = 1; rootcomponentbehavior = 0 },
     [pscustomobject]@{ objectid = 'P1'; componenttype = 70; rootcomponentbehavior = 0 },
-    [pscustomobject]@{ objectid = 'A1'; componenttype = 91; rootcomponentbehavior = 0 })
+    [pscustomobject]@{ objectid = 'A1'; componenttype = 91; rootcomponentbehavior = 0 },
+    [pscustomobject]@{ objectid = 'X1'; componenttype = 10092; rootcomponentbehavior = 0 })
+  $script:rotas['*/solutioncomponentdefinitions?*'] = Lista @([pscustomobject]@{ solutioncomponenttype = 10092; primaryentityname = 'appsetting' })
   $script:rotas['*/EntityDefinitions?$select=MetadataId,LogicalName'] = Lista @([pscustomobject]@{ MetadataId = 'T1'; LogicalName = 'cr40f_x' }, [pscustomobject]@{ MetadataId = 'T9'; LogicalName = 'outra' })
   # As de opcoes antes da tabela: no -like, o ? de '(t1)?' casa qualquer caractere, inclusive a barra de '(t1)/Attributes'.
   $script:rotas['*/EntityDefinitions(t1)/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata*'] = $opcoes
@@ -94,6 +96,7 @@ $inv = Get-InventarioDaSolucao $dv 'BetinhosCore'
 $i = @($inv.itens)
 Confere (-not $inv.incerto) "inventario: certo com todas as leituras ($(@($inv.motivos) -join '; '))"
 Confere ($i -contains 'c|1|t1' -and $i -contains 'c|70|p1' -and $i -contains 'c|91|a1') 'inventario: linhas da solucao'
+Confere ($i -contains 'c|e:appsetting|x1' -and -not ($i -like 'c|10092|*')) 'inventario: tipo >= 10000 entra pelo nome da tabela (o numero muda por ambiente)'
 Confere ($i -contains 'a|cr40f_x|cr40f_a' -and $i -contains 'o|cr40f_x.cr40f_status|1' -and $i -contains 'r|cr40f_x_y') 'inventario: metadata e opcoes da tabela'
 Confere ($i -contains 's|systemforms|f1' -and $i -contains 's|savedqueries|v1' -and -not ($i -contains 's|systemforms|f9')) 'inventario: formularios e visoes so das tabelas da solucao'
 Confere ($i -contains 'fp|p1|cr40f_x.cr40f_a' -and -not ($i -like 'fp|p9*')) 'inventario: permissoes so dos perfis da solucao'
@@ -101,6 +104,10 @@ Confere ($i -contains 'pt|a1|pt1' -and -not ($i -like '*pt9')) 'inventario: tipo
 $script:rotas['*/EntityDefinitions(t1)?*'] = [Exception]::new('503 indisponivel')
 $inv = Get-InventarioDaSolucao $dv 'BetinhosCore'
 Confere ($inv.incerto -and (@($inv.motivos) -join ' ') -like '*503*') 'inventario: leitura que falha deixa incerto'
+Rotas-Base
+$script:rotas['*/solutioncomponentdefinitions?*'] = Lista @()
+$inv = Get-InventarioDaSolucao $dv 'BetinhosCore'
+Confere ($inv.incerto -and (@($inv.motivos) -join ' ') -like '*10092 sem tabela*') 'inventario: tipo >= 10000 sem tabela conhecida deixa incerto'
 Rotas-Base
 $script:rotas['*/solutions?*'] = Lista @()
 Confere ((Get-InventarioDaSolucao $dv 'BetinhosCore').incerto) 'inventario: solucao ausente e incerto'

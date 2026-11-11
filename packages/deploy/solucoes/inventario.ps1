@@ -8,7 +8,8 @@
 #
 # O inventario e o conjunto do que o upgrade apagaria se sumisse do pacote. O export grava o do DEV (o mesmo conteudo do ZIP;
 # o grupo dataverse-dev impede mudanca no meio) e o import le o do destino antes de importar. Itens:
-#  - c|tipo|id: cada linha de solutioncomponents (componente que saiu da solucao);
+#  - c|tipo|id: cada linha de solutioncomponents (componente que saiu da solucao); tipo >= 10000 vira e:<tabela>, porque o
+#    numero desses tipos muda de um ambiente para outro;
 #  - tabela (1): a|tabela|coluna, k|tabela|chave, r|relacionamento, o|tabela.coluna|valor (opcoes de escolha, escolha multipla
 #    e status) e s|conjunto|id de formularios, visoes, graficos e regras de negocio da tabela;
 #  - escolha global (9): o|global:id|valor; papel (20): rp|papel|privilegio; perfil de seguranca de coluna (70):
@@ -26,9 +27,20 @@ function Get-InventarioDaSolucao($Dv, [string] $Nome) {
   $sid = Get-SolucaoId $Dv $Nome
   if (-not $sid) { return @{ itens = @(); incerto = $true; motivos = @("solucao $Nome nao existe em $($Dv.Host)") } }
   $componentes = @(Get-LinhasDaSolucao $Dv $sid)
+  # Tipo >= 10000 (componente de tabela: appsetting, Custom API...) e numerado por ambiente: o mesmo componente e 10091 no DEV e
+  # 10092 no TEST (observado em 11/11/2026, execucao 43061491630). No inventario entra o nome da tabela, igual em todo ambiente.
+  $tabelaDoTipo = @{}
+  if (@($componentes | Where-Object { $_.tipo -ge 10000 }).Count) {
+    try { $tabelaDoTipo = Get-TiposPorEntidade $Dv } catch { $motivos.Add("leitura dos tipos de componente falhou: $(Get-ErroDv $_)") }
+  }
   $porTipo = @{}
   foreach ($c in $componentes) {
-    [void] $itens.Add("c|$($c.tipo)|$($c.id)")
+    $tipo = [string] $c.tipo
+    if ($c.tipo -ge 10000) {
+      if ($tabelaDoTipo.ContainsKey($c.tipo) -and $tabelaDoTipo[$c.tipo]) { $tipo = "e:$($tabelaDoTipo[$c.tipo])" }
+      else { $motivos.Add("tipo $($c.tipo) sem tabela conhecida") }
+    }
+    [void] $itens.Add("c|$tipo|$($c.id)")
     if (-not $porTipo.ContainsKey($c.tipo)) { $porTipo[$c.tipo] = @() }
     $porTipo[$c.tipo] += $c.id
   }
