@@ -85,7 +85,7 @@ function Logs({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <LogsCards list={slice} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -94,7 +94,7 @@ function Logs({ host }: { host: Host }) {
   return (
     <div className="page page--full lg-page">
       <div role="toolbar" aria-label="Comandos dos logs">
-        <ViewBar onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="lg-search" value={query} onChange={setQuery} placeholder="Buscar por mensagem, código, tela ou usuário" aria-label="Buscar logs" />
           <Select className="lg-periodo" aria-label="Período" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? PERIODO_PADRAO)} />

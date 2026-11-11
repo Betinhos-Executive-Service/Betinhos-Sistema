@@ -91,7 +91,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de registros">
-        <ViewBar onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}>
           {kinds.length > 1 && <SegmentedControl size="compact" aria-label="Tipo de registro" options={kinds.map((item) => ({ value: item, label: PLURAL[item] }))} value={kind} onChange={trocar} />}
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar registro" placeholder="Buscar descrição, placa ou pessoa" value={busca} onChange={setBusca} />
           <Button size="compact" variant="action" icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>
@@ -101,7 +101,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
         rows={slice}
         rowKey={(linha) => linha.id}
         onRowClick={(linha) => onOpen(linha.kind, linha.id)}
-        view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }}
+        view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {todas.length}{kind === 'multa' && todas.some((linha) => linha.termoIndisponivel) ? ' · Coluna Termo indisponível: não foi possível ler os termos' : ''}</span>}
         empty={<EmptyState compact align="start" title={`Nenhum registro de ${KIND_LABEL[kind].toLowerCase()} com estes filtros`} action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

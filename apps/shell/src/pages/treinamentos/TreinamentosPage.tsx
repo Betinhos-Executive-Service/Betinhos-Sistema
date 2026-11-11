@@ -101,7 +101,7 @@ function Treinamentos({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <TreinamentosCards list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -110,7 +110,7 @@ function Treinamentos({ host }: { host: Host }) {
   return (
     <div className="page tr-page">
       <div role="toolbar" aria-label="Comandos de treinamentos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="tr-search" value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
