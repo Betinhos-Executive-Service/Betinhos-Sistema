@@ -62,7 +62,7 @@ describe('Ordens de Pagamento', () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     await openRow('OP-401')
     const ficha = await screen.findByRole('dialog', { name: 'OP-401' })
-    expect(await within(ficha).findByText(/2 parcelas ativas/)).toBeTruthy()
+    expect(await within(ficha).findByText(/2 parcelas · recebido/)).toBeTruthy()
     expect(within(ficha).getByText('Mariana Albuquerque')).toBeTruthy()
     expect(within(ficha).getByText(/Há pagamento confirmado/)).toBeTruthy()
     expect(within(ficha).getByRole('button', { name: 'Cancelar OP' })).toHaveProperty('disabled', true)
