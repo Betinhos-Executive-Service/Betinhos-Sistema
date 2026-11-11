@@ -1132,7 +1132,7 @@ h3 {
 }
 
 #tab-panel-return .return-observation-field .segmented {
-  max-width: 650px;
+  max-width: 760px;
 }
 
 #tab-panel-return .return-observation-field textarea {
@@ -2187,8 +2187,8 @@ textarea.is-touch-resizing,
 .obs-field .segmented {
   width: 100%;
   min-width: 0;
-  max-width: 657px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 760px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border-color: var(--line-strong);
@@ -2200,6 +2200,7 @@ textarea.is-touch-resizing,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   min-height: 31px;
   padding: 4px 7px;
   border-color: rgb(148 163 184 / 0.28);
@@ -2210,6 +2211,23 @@ textarea.is-touch-resizing,
   white-space: normal;
   cursor: pointer;
   box-shadow: inset 0 -1px 0 rgb(15 23 42 / 0.04);
+}
+
+.seg-icon {
+  display: inline-flex;
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+.seg-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .obs-field .seg:hover {
@@ -8096,7 +8114,7 @@ body.is-import-dragging .import-drop-overlay {
   .obs-field .segmented {
     width: 100%;
     max-width: none;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow: hidden;
   }
 
