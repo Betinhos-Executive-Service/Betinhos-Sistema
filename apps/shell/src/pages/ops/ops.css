@@ -23,7 +23,6 @@
 .op-etapas__item--atual::before { background-color: var(--bt-color-brand); }
 
 .op-passo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-3); padding: var(--bt-space-3-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface-neutral); }
-.op-passo--info { border-left: 3px solid var(--bt-color-brand); }
 .op-passo--warning { border-color: var(--bt-color-warning); background-color: var(--bt-color-warning-soft); }
 .op-passo--success { border-color: var(--bt-color-success); background-color: var(--bt-color-success-soft); }
 .op-passo__texto { display: grid; gap: var(--bt-space-0-5); min-width: 0; flex: 1 1 16rem; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
