@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildActiveFleetQuery } from "../src/features/meu-carro/remoto.ts";
-import { buildAutomaticServiceVehiclePatch, finalizeExchangeRemote, SERVICE_VEHICLE_ORIGIN } from "../src/features/finalizar/remoto.ts";
+import { buildAutomaticServiceVehiclePatch, buildFinalizeServiceVehiclePatch, finalizeExchangeRemote, SERVICE_VEHICLE_ORIGIN } from "../src/features/finalizar/remoto.ts";
 import { buildMaintenanceRequestAssignedVehiclesQuery, buildMaintenanceRequestRecord, buildMaintenanceRequestVehiclesQuery } from "../src/features/manutencao/remoto.ts";
 import { buildExchangeDisplay, getExchangeCompletionState, shouldShowOpenExchangeForDriver } from "../src/features/servicos/trocas.ts";
 import { buildReceiptEmailContent, normalizeReceiptIdentifier } from "../src/features/recibo/remoto.ts";
@@ -696,4 +696,11 @@ test("modo assíncrono resolvido em um ambiente não vale para outro", async () 
   await withWindow(dev.windowMock, async () => { assert.equal(await resolveExpenseUploadModeRemote(), "async"); });
   const other = mockExpenseUploadRuntime("https://orgoutro.crm2.dynamics.com", () => "");
   await withWindow(other.windowMock, async () => { assert.equal(usesAsyncExpenseUpload(), false); });
+});
+
+test("finalização com Não se aplica segue sem carro; sem escolha continua barrada", () => {
+  const vehicleResolution = { decisao: "indisponivel" as const, motivo: "infleet-indisponivel", totalSegundos: 0, candidatos: [] };
+  const patch = buildFinalizeServiceVehiclePatch({ vehicleResolution, vehicleChoice: { veiculoId: "", placa: "", origem: "nao-se-aplica" } } as never);
+  assert.deepEqual(Object.keys(patch), ["new_evidenciaveiculoinfleet"]);
+  assert.throws(() => buildFinalizeServiceVehiclePatch({ vehicleResolution, vehicleChoice: null } as never), /Escolha o carro/);
 });
