@@ -2,8 +2,9 @@
 import { hasDataverseRuntime, retrieveMultiple } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
-import { carregarRankingPostos, obterPosicao, type Posicao, type RankingPostos } from "../despesas/rankingPostos.ts";
-import { indexarRanking, type DadosPorId } from "./postosDados.ts";
+import { carregarRankingPostos, obterPosicao, type ConviteAvaliacao, type Posicao, type RankingPostos } from "../despesas/rankingPostos.ts";
+import { guardar, lerGuardado } from "./guardados.ts";
+import { indexarRanking, type DadosPorId, type DadosPosto } from "./postosDados.ts";
 import { areaEmVolta, consultaPostosNaArea, mapearPosto, maisProximos, proximoRaio, RAIOS_LISTA_KM, type Area, type Posto } from "./postosProximos.ts";
 
 const POSTO = (n: number, nome: string, endereco: string, lat: number, lon: number): Posto => ({ id: `mock-posto-${n}`, nome, endereco, lat, lon });
@@ -26,8 +27,12 @@ export const POSTOS_MOCK: Posto[] = [
 
 const dentro = (posto: Posto, { sul, norte, oeste, leste }: Area) => posto.lat >= sul && posto.lat <= norte && posto.lon >= oeste && posto.lon <= leste;
 
-export async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
+// No modo local, ficar sem rede faz a leitura falhar como falharia a do Dataverse (testa o aviso "Sem conexão").
+const semRede = () => typeof navigator !== "undefined" && navigator.onLine === false;
+
+async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
   if (!hasDataverseRuntime()) {
+    if (semRede()) throw new Error("Sem conexão.");
     await new Promise((resolve) => setTimeout(resolve, 150));
     return POSTOS_MOCK.filter((posto) => dentro(posto, area));
   }
@@ -35,8 +40,26 @@ export async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
   return entities.map((linha) => mapearPosto(linha as Record<string, unknown>)).filter((posto): posto is Posto => posto !== null);
 }
 
+/** Dados de uma leitura e, se vieram do aparelho por falha da rede, quando foram guardados (`desde`, ms). */
+export type Resultado<T> = { dados: T; desde: number | null };
+
+/** Lê e guarda; se a leitura falha e há cópia válida (7 dias), devolve a cópia. Sem cópia, o erro segue. */
+async function comGuardado<T, G = T>(chave: string, carregar: () => Promise<T>, paraGuardar: (dados: T) => G, restaurar: (guardado: G) => T, valido?: (dados: unknown) => boolean): Promise<Resultado<T>> {
+  try {
+    const dados = await carregar();
+    guardar(chave, paraGuardar(dados));
+    return { dados, desde: null };
+  } catch (erro) {
+    const guardado = lerGuardado<G>(chave, valido);
+    if (!guardado) throw erro;
+    return { dados: restaurar(guardado.dados), desde: guardado.salvoEm };
+  }
+}
+
+export const carregarPostosDaArea = (area: Area) => comGuardado("area", () => carregarPostosNaArea(area), (postos) => postos, (postos) => postos);
+
 /** Os 10 mais próximos de `origem`: busca em caixas cada vez maiores (ver `proximoRaio`), porque o limite da consulta não é ordenado por distância. */
-export async function carregarMaisProximos(origem: Posicao): Promise<Posto[]> {
+async function buscarMaisProximos(origem: Posicao): Promise<Posto[]> {
   let raio: number | null = RAIOS_LISTA_KM[0];
   let postos: Posto[] = [];
   while (raio !== null) {
@@ -45,6 +68,9 @@ export async function carregarMaisProximos(origem: Posicao): Promise<Posto[]> {
   }
   return maisProximos(postos, origem);
 }
+
+// Do aparelho, a lista é reordenada a partir da origem de agora (o GPS pode ter mudado desde que foi guardada).
+export const carregarMaisProximos = (origem: Posicao) => comGuardado("lista", () => buscarMaisProximos(origem), (postos) => postos, (postos) => maisProximos(postos, origem));
 
 // Posição do motorista no modo local: perto dos postos fictícios (não do ponto padrão do centro, para a distância não dar 0 m).
 const POSICAO_MOCK: Posicao = { lat: -23.1905, lon: -45.882 };
@@ -73,18 +99,38 @@ const RANKING_MOCK = (() => {
 
 // O ranking não muda de minuto em minuto: uma leitura serve a várias aberturas da tela. Falha não fica guardada.
 const VALIDADE_CACHE_MS = 10 * 60 * 1000;
-let cache: { carregadoEm: number; dados: Promise<DadosPorId> } | null = null;
+export type RankingTela = { dados: DadosPorId; convite: ConviteAvaliacao | null };
+let cache: { carregadoEm: number; dados: Promise<Resultado<RankingTela>> } | null = null;
+
+/** Depois de avaliar: a próxima leitura traz a nota nova e o convite sem este posto. */
+export const invalidarRanking = () => { cache = null; };
+
+function rankingMock(): RankingPostos {
+  // O convite aponta o posto mais perto do motorista (id 1), abastecido há 2 dias.
+  const abasteceu = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() - 2 * 86_400_000));
+  return { ...RANKING_MOCK, convite: { postoId: "mock-posto-1", nome: "Posto Exemplo Centro", data: abasteceu } };
+}
 
 async function lerRanking(): Promise<RankingPostos> {
   if (hasDataverseRuntime()) return carregarRankingPostos();
+  if (semRede()) throw new Error("Sem conexão.");
   await new Promise((resolve) => setTimeout(resolve, 300));
   if (new URLSearchParams(window.location.search).get("mockRankingPostos") === "erro") throw new Error("Falha simulada ao carregar os postos.");
-  return RANKING_MOCK;
+  return rankingMock();
 }
 
-export function carregarDadosPostos(): Promise<DadosPorId> {
+type RankingGuardado = { dados: [string, DadosPosto][]; convite: ConviteAvaliacao | null };
+const rankingGuardadoValido = (valor: unknown) => Array.isArray((valor as RankingGuardado | null)?.dados);
+
+const carregarRankingTela = () => comGuardado<RankingTela, RankingGuardado>("ranking",
+  async () => { const ranking = await lerRanking(); return { dados: indexarRanking(ranking), convite: ranking.convite }; },
+  ({ dados, convite }) => ({ dados: [...dados], convite }),
+  ({ dados, convite }) => ({ dados: new Map(dados), convite }),
+  rankingGuardadoValido);
+
+export function carregarDadosPostos(): Promise<Resultado<RankingTela>> {
   if (cache && Date.now() - cache.carregadoEm < VALIDADE_CACHE_MS) return cache.dados;
-  const atual = { carregadoEm: Date.now(), dados: lerRanking().then(indexarRanking) };
+  const atual: NonNullable<typeof cache> = { carregadoEm: Date.now(), dados: carregarRankingTela().then((resultado) => { if (resultado.desde !== null && cache === atual) cache = null; return resultado; }) };
   cache = atual;
   atual.dados.catch(() => { if (cache === atual) cache = null; });
   return atual.dados;

@@ -14,6 +14,8 @@ type Props = {
   posicao: Posicao | null;
   selecionadoId: string;
   foco: Foco | null;
+  /** Tema escuro do aparelho: troca o estilo do mapa sem recriá-lo. */
+  escuro: boolean;
   onVista: (vista: Vista) => void;
   /** O motorista arrastou ou deu zoom no mapa (gesto, não botão nem movimento do app). */
   onMoveuSozinho: () => void;
@@ -21,8 +23,13 @@ type Props = {
   onDesselecionar: () => void;
 };
 
-// Mesmo estilo gratuito (sem chave) do acompanhamento do motorista. A atribuição vem do próprio estilo: OpenFreeMap, OpenMapTiles e OpenStreetMap.
-const ESTILO = "https://tiles.openfreemap.org/styles/positron";
+// Mesmo estilo gratuito (sem chave) do acompanhamento do motorista; no tema escuro, o "dark" do OpenFreeMap. A atribuição vem do próprio estilo: OpenFreeMap, OpenMapTiles e OpenStreetMap.
+const estiloDe = (escuro: boolean) => `https://tiles.openfreemap.org/styles/${escuro ? "dark" : "positron"}`;
+// Postos agrupados pelo próprio MapLibre quando afastados; os pinos individuais seguem como HTML (cor, etiqueta de preço) a partir daí.
+const FONTE = "postos";
+const CAMADA_GRUPOS = "pp-grupos";
+const RAIO_AGRUPAR = 48;
+const ZOOM_MAXIMO_AGRUPAR = 14;
 const INCLINACAO = 45;
 const ZOOM_INCLINA = 13;
 // Gota com ponta em (20, 52), o rodapé do viewBox: o marcador ancora em "bottom" e a ponta cai exatamente na coordenada.
@@ -73,7 +80,7 @@ function lerVista(mapa: maplibregl.Map): Vista {
 
 const reduzMovimento = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, onVista, onMoveuSozinho, onSelecionar, onDesselecionar }, ref) {
+export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, escuro, onVista, onMoveuSozinho, onSelecionar, onDesselecionar }, ref) {
   const raiz = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<maplibregl.Map | null>(null);
   const pinos = useRef(new Map<string, { marcador: maplibregl.Marker; el: HTMLElement }>());
@@ -83,26 +90,69 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
   const callbacks = useRef({ onVista, onMoveuSozinho, onSelecionar, onDesselecionar });
   callbacks.current = { onVista, onMoveuSozinho, onSelecionar, onDesselecionar };
 
+  const escuroAtual = useRef(escuro);
+  const geojson = useRef<GeoJSON.FeatureCollection<GeoJSON.Point>>({ type: "FeatureCollection", features: [] });
+  const selecionado = useRef(selecionadoId);
+  selecionado.current = selecionadoId;
+
+  /** Pinos HTML = postos fora de grupos nos tiles carregados + o selecionado; cria os que faltam e remove os que saíram. */
+  const sincronizarPinos = () => {
+    const instancia = mapa.current;
+    if (!instancia?.getSource(FONTE)) return;
+    const desejados = new Set(instancia.querySourceFeatures(FONTE, { filter: ["!", ["has", "point_count"]] }).map((f) => String(f.properties?.id)));
+    if (selecionado.current) desejados.add(selecionado.current);
+    for (const [id, { marcador }] of pinos.current) {
+      if (desejados.has(id) && porId.current.has(id)) continue;
+      marcador.remove();
+      pinos.current.delete(id);
+    }
+    for (const id of desejados) {
+      const posto = porId.current.get(id);
+      if (!posto || pinos.current.has(id)) continue;
+      const el = criarPino(() => { const atual = porId.current.get(id); if (atual) callbacks.current.onSelecionar(atual); });
+      const marcador = new maplibregl.Marker({ element: el, anchor: "bottom", pitchAlignment: "viewport", rotationAlignment: "viewport" }).setLngLat([posto.lon, posto.lat]).addTo(instancia);
+      atualizarPino(el, posto);
+      pinos.current.set(id, { marcador, el });
+    }
+    marcarSelecionado();
+  };
+  const marcarSelecionado = () => {
+    for (const [id, { marcador, el }] of pinos.current) {
+      const ativo = id === selecionado.current;
+      el.classList.toggle("is-selecionado", ativo);
+      el.setAttribute("aria-pressed", String(ativo));
+      marcador.getElement().style.zIndex = ativo ? "3" : "";
+    }
+  };
+
   useImperativeHandle(ref, () => ({ aproximar: () => { mapa.current?.zoomIn(); }, afastar: () => { mapa.current?.zoomOut(); } }), []);
 
   useEffect(() => {
     if (!raiz.current) return;
     const instancia = new maplibregl.Map({
-      container: raiz.current, style: ESTILO, center: [CENTRO_PADRAO.lon, CENTRO_PADRAO.lat], zoom: ZOOM_INICIAL, pitch: INCLINACAO,
+      container: raiz.current, style: estiloDe(escuroAtual.current), center: [CENTRO_PADRAO.lon, CENTRO_PADRAO.lat], zoom: ZOOM_INICIAL, pitch: INCLINACAO,
       dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: 0, attributionControl: false
     });
     instancia.touchZoomRotate.disableRotation();
     instancia.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-left");
-    instancia.on("load", () => {
+    // Roda a cada estilo carregado (o primeiro e as trocas de tema, que descartam fontes e camadas).
+    instancia.on("style.load", () => {
       // Prédios 3D dos mesmos tiles gratuitos, abaixo dos rótulos para os nomes de rua continuarem legíveis.
       const rotulos = instancia.getStyle().layers.find((camada) => camada.type === "symbol");
       if (instancia.getSource("openmaptiles")) {
         instancia.addLayer({
           id: "predios-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 14,
-          paint: { "fill-extrusion-color": "#f2f2f0", "fill-extrusion-opacity": 0.9, "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] }
+          paint: { "fill-extrusion-color": escuroAtual.current ? "#2b2d31" : "#f2f2f0", "fill-extrusion-opacity": 0.9, "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] }
         }, rotulos?.id);
       }
+      instancia.addSource(FONTE, { type: "geojson", data: geojson.current, cluster: true, clusterRadius: RAIO_AGRUPAR, clusterMaxZoom: ZOOM_MAXIMO_AGRUPAR });
+      instancia.addLayer({ id: CAMADA_GRUPOS, type: "circle", source: FONTE, filter: ["has", "point_count"], paint: { "circle-color": "#2159d2", "circle-radius": ["step", ["get", "point_count"], 18, 10, 22, 50, 26], "circle-stroke-width": 3, "circle-stroke-color": "#ffffff" } });
+      instancia.addLayer({ id: `${CAMADA_GRUPOS}-contagem`, type: "symbol", source: FONTE, filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": ["Noto Sans Bold"], "text-size": 14, "text-allow-overlap": true }, paint: { "text-color": "#ffffff" } });
     });
+    // Pinos individuais = pontos não agrupados nos tiles carregados (mais o selecionado, que nunca some dentro de um grupo).
+    instancia.on("sourcedata", (evento) => { if (evento.sourceId === FONTE && evento.isSourceLoaded) sincronizarPinos(); });
+    instancia.on("mouseenter", CAMADA_GRUPOS, () => { instancia.getCanvas().style.cursor = "pointer"; });
+    instancia.on("mouseleave", CAMADA_GRUPOS, () => { instancia.getCanvas().style.cursor = ""; });
     const marcarZoom = () => raiz.current?.classList.toggle("pp-mapa--etiquetas", instancia.getZoom() >= ZOOM_ETIQUETAS);
     instancia.on("zoom", marcarZoom);
     marcarZoom();
@@ -115,43 +165,39 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
     const aoGesto = (evento: { originalEvent?: unknown }) => { if (evento.originalEvent) callbacks.current.onMoveuSozinho(); };
     instancia.on("dragstart", aoGesto);
     instancia.on("zoomstart", aoGesto);
-    instancia.on("moveend", () => callbacks.current.onVista(lerVista(instancia)));
+    instancia.on("moveend", () => { callbacks.current.onVista(lerVista(instancia)); sincronizarPinos(); });
     instancia.on("click", (evento) => {
       if ((evento.originalEvent.target as HTMLElement | null)?.closest(".pp-pino")) return;
-      callbacks.current.onDesselecionar();
+      const grupo = instancia.getLayer(CAMADA_GRUPOS) ? instancia.queryRenderedFeatures(evento.point, { layers: [CAMADA_GRUPOS] })[0] : undefined;
+      if (!grupo) { callbacks.current.onDesselecionar(); return; }
+      // Tocar no grupo aproxima até ele se abrir em pinos.
+      const fonte = instancia.getSource(FONTE) as maplibregl.GeoJSONSource | undefined;
+      fonte?.getClusterExpansionZoom(Number(grupo.properties?.cluster_id)).then((zoom) => {
+        instancia.easeTo({ center: (grupo.geometry as GeoJSON.Point).coordinates as [number, number], zoom: zoom + 0.5, duration: reduzMovimento() ? 0 : 500 });
+      }, () => { /* Grupo já aberto por outro movimento. */ });
     });
     mapa.current = instancia;
     callbacks.current.onVista(lerVista(instancia));
     return () => { instancia.remove(); mapa.current = null; pinos.current.clear(); referencia.current = null; };
   }, []);
 
+  // Postos novos: atualiza a fonte (os grupos se refazem) e os pinos já na tela (ranking chegou, nota mudou).
   useEffect(() => {
-    const instancia = mapa.current;
-    if (!instancia) return;
     porId.current = new Map(postos.map((posto) => [posto.id, posto]));
-    for (const [id, { marcador }] of pinos.current) {
-      if (porId.current.has(id)) continue;
-      marcador.remove();
-      pinos.current.delete(id);
-    }
-    for (const posto of postos) {
-      const existente = pinos.current.get(posto.id);
-      if (existente) { atualizarPino(existente.el, posto); continue; }
-      const el = criarPino(() => { const atual = porId.current.get(posto.id); if (atual) callbacks.current.onSelecionar(atual); });
-      const marcador = new maplibregl.Marker({ element: el, anchor: "bottom", pitchAlignment: "viewport", rotationAlignment: "viewport" }).setLngLat([posto.lon, posto.lat]).addTo(instancia);
-      atualizarPino(el, posto);
-      pinos.current.set(posto.id, { marcador, el });
-    }
+    geojson.current = { type: "FeatureCollection", features: postos.map((posto) => ({ type: "Feature", properties: { id: posto.id }, geometry: { type: "Point", coordinates: [posto.lon, posto.lat] } })) };
+    (mapa.current?.getSource(FONTE) as maplibregl.GeoJSONSource | undefined)?.setData(geojson.current);
+    for (const [id, { el }] of pinos.current) { const posto = porId.current.get(id); if (posto) atualizarPino(el, posto); }
+    sincronizarPinos();
   }, [postos]);
 
+  useEffect(() => { sincronizarPinos(); }, [selecionadoId]);
+
+  // Tema: troca o estilo sem recriar o mapa (o "style.load" refaz prédios e grupos).
   useEffect(() => {
-    for (const [id, { marcador, el }] of pinos.current) {
-      const ativo = id === selecionadoId;
-      el.classList.toggle("is-selecionado", ativo);
-      el.setAttribute("aria-pressed", String(ativo));
-      marcador.getElement().style.zIndex = ativo ? "3" : "";
-    }
-  }, [selecionadoId, postos]);
+    if (escuroAtual.current === escuro) return;
+    escuroAtual.current = escuro;
+    mapa.current?.setStyle(estiloDe(escuro), { diff: false });
+  }, [escuro]);
 
   // "Você" (GPS) ou, sem GPS, o ponto de referência das distâncias.
   useEffect(() => {

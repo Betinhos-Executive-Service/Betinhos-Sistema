@@ -1,10 +1,12 @@
 /* Postos próximos: mapa MapLibre (estilo positron, mesmo do acompanhamento), cartão do posto e lista.
    Tokens do Design System: marca #001a3d, ação #2159d2, ação suave #edf3ff, superfície #fff/#fcfcfb. Motion: transform/opacity, curvas fortes (--pp-saida, --pp-gaveta), UI abaixo de 300 ms.
    Reaproveita termos.css (alertas, vazio) e gr-* (subtítulo, legenda). */
-.pp-screen { --pp-marca:#001a3d; --pp-acao:#2159d2; --pp-acao-suave:#edf3ff; --pp-vidro:rgba(255,255,255,.92); --pp-sombra:0 4px 14px rgba(0,26,61,.12), 0 1px 2px rgba(0,26,61,.08); --pp-saida:cubic-bezier(.23,1,.32,1); --pp-gaveta:cubic-bezier(.32,.72,0,1); gap:12px; grid-auto-rows:max-content; }
-.pp-mapa-caixa { min-height:clamp(340px, 57dvh, 560px); position:relative; isolation:isolate; border-radius:18px; overflow:hidden; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
-.pp-mapa { width:100%; height:clamp(340px, 57dvh, 560px); touch-action:none; }
-.pp-mapa .maplibregl-ctrl-attrib { margin:0 0 6px 6px; padding:0 5px; border-radius:5px; font-size:.58rem; line-height:1.45; background:rgba(255,255,255,.38); }
+.pp-screen { --pp-marca:#001a3d; --pp-acao:#2159d2; --pp-acao-suave:#edf3ff; --pp-vidro:rgba(255,255,255,.92); --pp-sombra:0 4px 14px rgba(0,26,61,.12), 0 1px 2px rgba(0,26,61,.08); --pp-saida:cubic-bezier(.23,1,.32,1); --pp-gaveta:cubic-bezier(.32,.72,0,1); display:flex; flex-direction:column; gap:8px; width:100%; flex:1 1 auto; min-height:0; }
+.pp-screen > * { flex:none; }
+.pp-palco { position:relative; flex:1 1 auto !important; min-height:440px; overflow:hidden; border-radius:18px; isolation:isolate; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
+.pp-mapa-caixa { position:absolute; inset:0; }
+.pp-mapa { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
+.pp-mapa .maplibregl-ctrl-attrib { margin:0 0 6px 6px; opacity:0; padding:0 5px; border-radius:5px; font-size:.58rem; line-height:1.45; background:rgba(255,255,255,.38); }
 .pp-mapa .maplibregl-ctrl-attrib a { color:#7b8798; }
 .pp-mapa .maplibregl-ctrl-bottom-left { z-index:1; }
 
@@ -68,8 +70,8 @@
 @keyframes pp-halo { 0% { transform:scale(.6); opacity:.7; } 100% { transform:scale(1.15); opacity:0; } }
 .pp-centro span { position:absolute; inset:3px; border-radius:50%; background:#64748b; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,26,61,.3); }
 
-/* Cartão do posto: sheet flutuante embaixo do mapa, sempre montado para animar entrada e saída por transição (interrompível; trocar de posto só troca o texto). O mapa desloca o pino para a parte livre acima dele. */
-.pp-cartao { position:absolute; z-index:3; left:10px; right:10px; bottom:28px; display:grid; gap:2px; padding:14px 16px 12px; border-radius:18px; background:#fff; box-shadow:0 -1px 4px rgba(0,26,61,.04), 0 12px 32px rgba(0,26,61,.2); transform:translateY(16px); opacity:0; visibility:hidden; pointer-events:none; transition:transform 150ms ease-in, opacity 150ms ease-in, visibility 0s linear 150ms; }
+/* Cartão do posto: flutua logo acima da gaveta (slot .pp-gaveta-acima), sempre montado para animar entrada e saída por transição (interrompível; trocar de posto só troca o texto). O mapa desloca o pino para a parte livre acima dele. */
+.pp-cartao { position:relative; display:grid; gap:2px; margin:0 10px 10px; padding:14px 16px 12px; border-radius:18px; background:#fff; box-shadow:0 -1px 4px rgba(0,26,61,.04), 0 12px 32px rgba(0,26,61,.2); transform:translateY(16px); opacity:0; visibility:hidden; pointer-events:none; transition:transform 150ms ease-in, opacity 150ms ease-in, visibility 0s linear 150ms; }
 .pp-cartao.is-aberto { transform:none; opacity:1; visibility:visible; pointer-events:auto; transition:transform 260ms var(--pp-gaveta), opacity 200ms var(--pp-saida), visibility 0s; }
 .pp-cartao-nome { padding-right:36px; color:var(--pp-marca); font-size:1.02rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
 .pp-cartao-meta { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 8px; margin-top:2px; }
@@ -107,9 +109,7 @@
 .pp-acao { min-height:44px; }
 
 /* Lista: distância em destaque à direita, endereço em uma linha. */
-.pp-lista-cabeca { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
-.pp-lista-total { color:#64748b; font-size:.75rem; font-weight:700; }
-.pp-lista { display:grid; gap:8px; margin:8px 0 0; padding:0; list-style:none; }
+.pp-lista { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
 .pp-item { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:12px; width:100%; min-height:64px; padding:10px 14px 10px 12px; border:0; border-radius:14px; background:#fcfcfb; box-shadow:inset 0 0 0 1px #e2e8f0; color:#0f172a; text-align:left; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:box-shadow 160ms var(--pp-saida), background-color 160ms var(--pp-saida), transform 140ms var(--pp-saida); }
 .pp-item:active { transform:scale(.97); }
 .pp-item-icone { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--pp-acao-suave); color:var(--pp-acao); transition:background-color 160ms var(--pp-saida), color 160ms var(--pp-saida); }
@@ -153,6 +153,7 @@
 @keyframes pp-entra { from { transform:translateY(8px); opacity:0; } }
 /* Movimento reduzido: sem deslocamento nem escala; o cartão só muda a opacidade. */
 @media (prefers-reduced-motion:reduce) {
+  .pp-gaveta { transition:none !important; }
   .pp-pino-fig, .pp-pino-etiqueta, .pp-item, .pp-botao, .pp-ir, .pp-cartao-fechar { transition:none; }
   .pp-pino:active .pp-pino-fig, .pp-item:active, .pp-botao:active, .pp-ir:active, .pp-cartao-fechar:active { transform:none; }
   .pp-pino.is-selecionado .pp-pino-fig { transform:scale(1.24); }
@@ -169,3 +170,31 @@
 .expense-postos:disabled { opacity:.55; cursor:default; }
 /* Com preço e recomendação o cartão cresce: o endereço cabe numa linha. */
 .pp-cartao-dados ~ .pp-cartao-endereco { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
+
+/* Aviso do limite de 200 postos: pílula discreta, sem ponto pulsante. */
+.pp-status--limite { font-weight:600; font-size:.72rem; min-height:26px; color:#64748b; }
+
+/* Avaliar no cartão: convite de quem abasteceu ali (critério em postosDados.podeAvaliar). */
+.pp-avaliar { display:grid; gap:6px; margin-top:8px; padding-top:8px; box-shadow:inset 0 1px 0 rgba(0,26,61,.08); font-size:.8rem; color:#334155; }
+.pp-avaliar strong { font-size:.82rem; font-weight:800; color:var(--pp-marca); }
+.pp-avaliar .rp-escolha { min-height:44px; }
+.pp-avaliar-feita { margin-top:8px; font-size:.8rem; color:#475569; }
+.pp-avaliar-erro { margin:0; color:#b42318; font-size:.76rem; }
+
+/* Gaveta: folha arrastável sobre o mapa (3 posições). Só transform anima; durante o arrasto sem transição. */
+.pp-gaveta { position:absolute; z-index:4; left:0; right:0; bottom:0; will-change:transform; transition:transform 340ms var(--pp-gaveta); touch-action:none; pointer-events:none; }
+.pp-gaveta.is-arrastando { transition:none; }
+.pp-gaveta-acima { position:absolute; left:0; right:0; bottom:100%; pointer-events:none; }
+.pp-gaveta-acima > * { pointer-events:none; }
+.pp-gaveta-acima > .is-aberto { pointer-events:auto; }
+.pp-gaveta-folha { position:relative; display:flex; flex-direction:column; height:100%; border-radius:20px 20px 0 0; background:#fff; box-shadow:0 -6px 24px rgba(0,26,61,.16), 0 -1px 0 rgba(0,26,61,.06); pointer-events:auto; overflow:hidden; }
+.pp-gaveta-puxador { display:grid; gap:2px; padding:8px 16px 8px; cursor:grab; touch-action:none; -webkit-tap-highlight-color:transparent; user-select:none; }
+.pp-gaveta-puxador:focus-visible { outline:0; box-shadow:inset 0 0 0 2px var(--pp-acao); border-radius:20px 20px 0 0; }
+.pp-gaveta-alca { justify-self:center; width:36px; height:4px; border-radius:2px; background:#cbd5e1; }
+.pp-gaveta-cabeca { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:40px; }
+.pp-gaveta-titulo { color:var(--pp-marca); font-size:.98rem; font-weight:800; }
+.pp-lista-total { margin-left:auto; color:#64748b; font-size:.75rem; font-weight:700; }
+.pp-gaveta-seta { width:18px; height:18px; color:#64748b; transition:transform 340ms var(--pp-gaveta); }
+.pp-gaveta[data-posicao="aberta"] .pp-gaveta-seta { transform:rotate(180deg); }
+.pp-gaveta-corpo { flex:1 1 auto; min-height:0; padding:0 12px calc(12px + env(safe-area-inset-bottom)); overflow-y:hidden; overscroll-behavior:contain; touch-action:pan-y; }
+.pp-gaveta[data-posicao="aberta"] .pp-gaveta-corpo { overflow-y:auto; }
