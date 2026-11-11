@@ -10,8 +10,6 @@ export const CENTRO_PADRAO: Posicao = { lat: -23.1896, lon: -45.8841 };
 export const ZOOM_INICIAL = 13;
 /** Tocar em um posto centraliza sem aproximar além disto. */
 export const ZOOM_MAXIMO_FOCO = 15;
-/** Abaixo disto a área visível passa de ~30 km: pedimos para aproximar em vez de buscar tudo. */
-export const ZOOM_MINIMO_BUSCA = 11;
 export const LIMITE_POSTOS = 200;
 export const TAMANHO_LISTA = 10;
 export const ESPERA_BUSCA_MS = 400;
@@ -36,8 +34,6 @@ export function consultaPostosNaArea({ sul, norte, oeste, leste }: Area, limite 
   ].join(" and ");
   return `$select=${COLUNAS.join(",")}&$filter=${filtro}&$top=${limite}`;
 }
-
-export const areaAfastadaDemais = (zoom: number) => zoom < ZOOM_MINIMO_BUSCA;
 
 /** De onde as distâncias são medidas: o GPS do motorista ou, sem ele, o centro padrão. Nunca o posto tocado nem o centro do mapa arrastado. */
 export type Origem = { ponto: Posicao; doMotorista: boolean };
@@ -106,3 +102,55 @@ export function rotuloKm(km: number) {
 
 export const urlGoogleMaps = ({ lat, lon }: Posicao) => mapsSearchUrl(`${lat},${lon}`);
 export const urlWaze = ({ lat, lon }: Posicao) => wazeNavigateUrl(lat, lon);
+
+// Gaveta com a lista: três posições (recolhida, meio, aberta), medidas em deslocamento vertical (translateY) a partir da posição aberta.
+export type PosicaoGaveta = "recolhida" | "meio" | "aberta";
+export type Gaveta = { total: number; visivel: Record<PosicaoGaveta, number>; deslocamento: Record<PosicaoGaveta, number> };
+/** Acima desta velocidade (px/ms) o arrasto vira "flick": vai para a próxima posição na direção do gesto, mesmo sem passar do meio do caminho. */
+export const VELOCIDADE_FLICK = 0.11;
+/** Altura da gaveta recolhida (puxador, título e contagem). */
+export const ALTURA_RECOLHIDA = 76;
+/** Faixa do mapa que a gaveta aberta deixa livre: cabem os botões de zoom e "minha posição" (10 + 80 + 8 + 40 + 10). */
+const FAIXA_CONTROLES = 148;
+const FRICCAO = 0.25;
+
+/** Alturas visíveis e deslocamentos da gaveta para um palco de `altura` px. Aberta deixa livre a faixa dos botões do mapa; meio mostra uns 34%. */
+export function medidasGaveta(altura: number): Gaveta {
+  const total = Math.max(Math.round(altura - FAIXA_CONTROLES), Math.round(altura * 0.6), ALTURA_RECOLHIDA);
+  const meio = Math.min(total, Math.max(Math.round(altura * 0.34), 200));
+  const visivel = { recolhida: ALTURA_RECOLHIDA, meio, aberta: total };
+  return { total, visivel, deslocamento: { recolhida: total - visivel.recolhida, meio: total - visivel.meio, aberta: 0 } };
+}
+
+/** Fricção nas bordas: além do limite o deslocamento acompanha o dedo com 25% da distância. */
+export function comFriccao(deslocamento: number, minimo: number, maximo: number) {
+  if (deslocamento < minimo) return minimo + (deslocamento - minimo) * FRICCAO;
+  if (deslocamento > maximo) return maximo + (deslocamento - maximo) * FRICCAO;
+  return deslocamento;
+}
+
+/** Onde a gaveta assenta ao soltar. `velocidade` em px/ms, positiva descendo. Flick vai à próxima posição na direção do gesto; senão, a mais próxima. */
+export function posicaoAposArrasto(deslocamento: number, velocidade: number, gaveta: Gaveta): PosicaoGaveta {
+  const posicoes = (Object.keys(gaveta.deslocamento) as PosicaoGaveta[]).sort((a, b) => gaveta.deslocamento[a] - gaveta.deslocamento[b]);
+  if (Math.abs(velocidade) > VELOCIDADE_FLICK) {
+    const sentido = Math.sign(velocidade);
+    const adiante = posicoes.filter((posicao) => (gaveta.deslocamento[posicao] - deslocamento) * sentido > 1);
+    if (adiante.length) return sentido > 0 ? adiante[0] : adiante[adiante.length - 1];
+    return sentido > 0 ? posicoes[posicoes.length - 1] : posicoes[0];
+  }
+  return posicoes.reduce((melhor, posicao) => (Math.abs(gaveta.deslocamento[posicao] - deslocamento) < Math.abs(gaveta.deslocamento[melhor] - deslocamento) ? posicao : melhor));
+}
+
+/** Toque no puxador: recolhida abre no meio, meio abre de vez, aberta volta ao meio. */
+export const posicaoAposToque = (posicao: PosicaoGaveta): PosicaoGaveta => (posicao === "meio" ? "aberta" : "meio");
+
+// Sem sinal: os últimos dados carregados ficam no aparelho por 7 dias.
+export const VALIDADE_GUARDADO_MS = 7 * 24 * 60 * 60 * 1000;
+export const guardadoValido = (salvoEm: number, agora: number) => Number.isFinite(salvoEm) && salvoEm <= agora && agora - salvoEm <= VALIDADE_GUARDADO_MS;
+
+const FUSO = "America/Sao_Paulo";
+/** "Sem conexão · dados de 10/11 14:32", no fuso de São Paulo. */
+export function rotuloSemConexao(salvoEm: number) {
+  const partes = new Map(new Intl.DateTimeFormat("pt-BR", { timeZone: FUSO, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(salvoEm)).map(({ type, value }) => [type, value]));
+  return `Sem conexão · dados de ${partes.get("day")}/${partes.get("month")} ${partes.get("hour")}:${partes.get("minute")}`;
+}
