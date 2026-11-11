@@ -11,9 +11,9 @@ namespace Betinhos.DriverRecordSharing
     {
         public const string MessageName = "new_SincronizarVeiculoAtual";
         public const string ResultParameter = "new_ResumoJson";
-        private readonly string _infleetToken;
+        private readonly string _secureConfig;
 
-        public SyncCurrentVehiclePlugin(string unsecureConfig, string secureConfig) { _infleetToken = secureConfig; }
+        public SyncCurrentVehiclePlugin(string unsecureConfig, string secureConfig) { _secureConfig = secureConfig; }
 
         public void Execute(IServiceProvider serviceProvider)
         {
@@ -25,7 +25,7 @@ namespace Betinhos.DriverRecordSharing
 
             var now = DateTime.UtcNow;
             IReadOnlyList<CurrentVehicleSyncPlanner.DriverVehicle> infleet;
-            try { infleet = new InfleetGraphQlGateway(_infleetToken).ListDriverCurrentVehicles(); }
+            try { infleet = new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, _secureConfig, tracing)).ListDriverCurrentVehicles(); }
             catch (InfleetUnavailableException error) { throw new InvalidPluginExecutionException("Infleet indisponível: " + error.Message); }
 
             var fleet = LoadFleet(system);

@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Xrm.Sdk;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -47,14 +48,19 @@ namespace Betinhos.DriverRecordSharing
         public InfleetUnavailableException(string message, Exception inner = null) : base(message, inner) { }
     }
 
-    // Cliente GraphQL somente leitura. O token vem da configuração segura do step e nunca é registrado.
+    // Cliente GraphQL somente leitura. O token vem da tabela cr40f_segredo (ou da configuração segura do step) e nunca é registrado.
     public sealed class InfleetGraphQlGateway : IInfleetGateway, IVehicleHistoryGateway
     {
+        public const string SecretName = "infleet.token";
         private const string Endpoint = "https://api.infleet.com.br/v1/graphql";
         private const int TimeoutMs = 10000;
         private const int Attempts = 2;
         private const string IdentificationCategories = "[VEHICLE_TOKEN_USED, VEHICLE_DRIVER_RECOGNIZED, FACE_ID_DETECTED, BLUETOOTH_VEHICLE_DRIVER_ADDED, MANUAL_VEHICLE_DRIVER_ADDED]";
         private readonly string _token;
+
+        // Token pela tabela cr40f_segredo e, sem linha, pela configuração segura do step.
+        public static string ReadToken(IOrganizationService system, string secureConfig, ITracingService tracing) =>
+            SecretReader.ReadTableOrSecureConfig(system, SecretName, secureConfig, tracing);
 
         public InfleetGraphQlGateway(string token)
         {
