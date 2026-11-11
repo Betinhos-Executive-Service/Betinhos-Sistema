@@ -89,6 +89,9 @@ test('App Motoristas: código vai pelas soluções (BetinhosMotoristas); teste, 
   assert.equal(caminhoDaPublicacao(['apps/motoristas/src/App.tsx']).caminho, 'solucoes')
   assert.equal(caminhoDaPublicacao(['apps/motoristas/src/pwa/sw.js', 'apps/shell/src/main.tsx']).caminho, 'solucoes')
   assert.equal(caminhoDaPublicacao(['apps/motoristas/tests/media.test.ts', 'apps/motoristas/docs/a.md', 'apps/motoristas/AGENTS.md', 'apps/motoristas/.claude/skills/x/SKILL.md', 'apps/motoristas/scripts/qa/verify-tour.cjs']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/scripts/push-webresources-dev.ps1']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/webresources/new_appmotoristas_push_redirect.js']).caminho, 'solucoes')
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/20261110-1700-push-redirect-forms.ps1']).caminho, 'solucoes')
 })
 
 test('arquivo desconhecido vai pelo caminho seguro', () => {
