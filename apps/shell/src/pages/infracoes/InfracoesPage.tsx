@@ -80,7 +80,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
       <>
         {mobile
           ? (visible.length ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -90,7 +90,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
     <div className={embutido ? 'if-page' : 'page page--full if-page'}>
       {embutido ? null : <CabecalhoShell actions={headerActions} />}
       <div role="toolbar" aria-label="Comandos de infrações">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}

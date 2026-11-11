@@ -193,7 +193,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
           <EnvBadge env={source.envLabel} />
           <SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">
@@ -225,7 +225,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
             rows={desktopSlice.slice}
             loading={loading && !rows.length}
             onOpen={(id) => setSelection({ mode: 'open', id })}
-            view={{ config: view.config, onChange: view.setConfig, extraCell: lista.extra.cell }}
+            view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: lista.extra.cell }}
             quickFilters={quickFilters}
             footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
             empty={pending

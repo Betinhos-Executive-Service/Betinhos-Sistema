@@ -111,7 +111,7 @@ function Pessoas({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -120,7 +120,7 @@ function Pessoas({ host }: { host: Host }) {
   return (
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="ps-filters__search" value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />}

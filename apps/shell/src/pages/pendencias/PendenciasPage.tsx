@@ -115,7 +115,7 @@ function Pendencias({ host }: Props) {
       <>
         {mobile
           ? (visible.length ? <PendenciasCards list={slice} onOpen={setSelectedId} {...acoes} /> : <div className="surface">{empty}</div>)
-          : <PendenciasTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} {...acoes} />}
+          : <PendenciasTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} {...acoes} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -124,7 +124,7 @@ function Pendencias({ host }: Props) {
   return (
     <div className="page page--full pd-page">
       <div role="toolbar" aria-label="Comandos de pendências">
-        <ViewBar view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}>
+        <ViewBar pinnable view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />
           <Select className="pg-filters__select" aria-label="Período do serviço" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />

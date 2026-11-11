@@ -92,7 +92,7 @@ function Equipamentos({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <EquipamentosCards list={slice} inativos={inativos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -102,7 +102,7 @@ function Equipamentos({ host }: { host: Host }) {
     <ImagensContext.Provider value={imagens}>
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
