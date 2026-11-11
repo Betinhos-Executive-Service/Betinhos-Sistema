@@ -40,6 +40,10 @@ on:
         description: 'Importar as soluções mesmo com conteúdo igual ao da última publicação no ambiente'
         type: boolean
         default: false
+      ensaio_sem_upgrade:
+        description: 'Ensaio, só com alvo test: soluções (vírgula, ou todas) importadas como update, sem --stage-and-upgrade. Vazio = upgrade, como sempre.'
+        required: false
+        default: ''
   workflow_call:
     inputs:
       alvo:
@@ -80,8 +84,12 @@ jobs:
     steps:
       - name: Alvo válido
         shell: bash
+        env:
+          ENSAIO_SEM_UPGRADE: ${{ inputs.ensaio_sem_upgrade || '' }}
         run: |
           case "${{ inputs.alvo }}" in test|prod|test-e-prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
+          # Antes do export: o ensaio sem upgrade é só no TEST, e recusar aqui não sobe versão no DEV à toa.
+          if [ -n "$ENSAIO_SEM_UPGRADE" ] && [ "${{ inputs.alvo }}" != "test" ]; then echo "::error::ensaio_sem_upgrade só vale com alvo test."; exit 1; fi
       - name: Secret PACOTES_SENHA
         shell: bash
         env:
@@ -186,6 +194,7 @@ jobs:
     with:
       alvo: test
       importar_tudo: ${{ inputs.importar_tudo }}
+      sem_upgrade: ${{ inputs.ensaio_sem_upgrade || '' }}
     secrets: inherit
 
   # Revisor obrigatório (Renan) no environment prod-aprovacao, regra de branch main. Roda junto com o importar-test para a

@@ -119,3 +119,13 @@ Qualquer conta do GitHub baixa artefatos deste repositório, e PR de fork lê ca
 - Entrada `pulada` sem ZIP no import: `importar-solucoes.ps1` exige `Test-PodePular` (versão instalada e hash da tag); senão falha pedindo `importar_tudo`. Depois de `pac admin copy` PROD → TEST, a tag `solucoes-test` fica velha: rode o ensaio com `importar_tudo`.
 - A tag `solucoes-<alvo>` passa a guardar `impressao` (`New-RegistroPublicado`); registro antigo, sem ela, nunca pula.
 - Camadas Active: leituras e remoções 8 por vez (`Invoke-EmParalelo`, runspaces), backup de todas antes de remover, segunda tentativa uma a uma para a que falhar, código 1 se sobrar falha.
+
+## Ensaio: import sem upgrade (só TEST)
+
+Pergunta do ensaio: quanto do import é o `--stage-and-upgrade`? O upgrade monta uma solução de espera (holding), importa e desinstala a versão antiga, apagando o que saiu da solução. O update só troca o que veio no pacote e deixa no ambiente o que saiu. Referência com upgrade: BetinhosCore no TEST levou 9,5 min (#390) e 12 min (#399), e no PROD 12,3 e 11,3 min.
+
+- Input `ensaio_sem_upgrade` do "Publicar soluções" (soluções separadas por vírgula, ou `todas`). Só vale com alvo `test`: o job `exportar` recusa outro alvo antes de subir versão, e `importar-solucoes.ps1` e `Import-SolucaoGerenciada` recusam o PROD de novo.
+- Rodar da `develop` (a trava do commit compara o DEV com o commit da execução), com `importar_tudo` ligado. Sem ele, o TEST pula a solução com o mesmo conteúdo.
+- Comparação justa: duas execuções seguidas com o mesmo conteúdo, a primeira com `ensaio_sem_upgrade` vazio (upgrade) e a segunda com `BetinhosCore`. Os minutos e o `modo` (`upgrade`, `update`, `instalacao`, `pulada`) de cada solução ficam no resumo do job (`importados.json`).
+- Sem remoção pendente no DEV: com componente que saiu da solução desde a última publicação, o update o deixaria no TEST, e o próximo upgrade o apagaria, o que pode aparecer como perda na comparação seguinte.
+- Resultado esperado para levar ao PROD: se o update for bem mais rápido, o import passa a escolher por solução (upgrade quando algo saiu da solução, update no resto). Essa escolha é outro PR, e o PROD continua com `--stage-and-upgrade` até lá.
