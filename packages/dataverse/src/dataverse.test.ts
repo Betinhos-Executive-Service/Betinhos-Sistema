@@ -99,6 +99,23 @@ describe('xrm shim', () => {
     expect((await failed.json()).error.message).toContain('Veículo sem motorista.')
   })
 
+  it('executa ação vinculada no registro, sem o parâmetro vinculado no corpo', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'cr40f_composicaodeprecos', EntitySetName: 'cr40f_composicaodeprecoses' })
+      return json({ NewRowVersion: '2' })
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const response = await xrm.WebApi!.online!.execute({
+      entity: { entityType: 'cr40f_composicaodeprecos', id: '{ABC}' },
+      TargetField: 'cr40f_valor',
+      getMetadata: () => ({ boundParameter: 'entity', operationType: 0, operationName: 'new_AplicarEntradaCelulaComposicao', parameterTypes: { entity: {}, TargetField: {} } }),
+    })
+    expect(await response.json()).toEqual({ NewRowVersion: '2' })
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit]
+    expect(url).toBe('https://org.example/api/data/v9.2/cr40f_composicaodeprecoses(abc)/Microsoft.Dynamics.CRM.new_AplicarEntradaCelulaComposicao')
+    expect(JSON.parse(String(init.body))).toEqual({ TargetField: 'cr40f_valor' })
+  })
+
   it('executeMultiple manda os Updates num changeset de $batch e rejeita se o changeset falhar', async () => {
     // Como no DEV: changeset com falha devolve o status do erro no $batch inteiro, com o JSON dentro do multipart.
     const multipart = (text: string, status = 200) => new Response(text, { status, headers: { 'Content-Type': 'multipart/mixed; boundary=batchresponse_x' } })
