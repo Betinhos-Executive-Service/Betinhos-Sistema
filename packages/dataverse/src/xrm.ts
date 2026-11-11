@@ -65,12 +65,13 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
   return {
     WebApi: {
       async retrieveMultipleRecords(entity, options = '', maxPageSize) {
-        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string; '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string }>(`${await set(entity)}${options}`, { maxPageSize })
+        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string; '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string }>(`${await set(entity)}${options}`, { maxPageSize, allAnnotations: true })
         // Como no Xrm real: FetchXML não traz nextLink, a próxima página vem do cookie (sem ele as telas de views paravam na 1ª página).
         return { entities: page.value, nextLink: page['@odata.nextLink'], fetchXmlPagingCookie: page['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'] }
       },
       async retrieveRecord(entity, id, options = '') {
-        return client.request<Row>(`${await set(entity)}(${cleanId(id)})${options}`)
+        // Como no Xrm real, todas as anotações: scripts do model-driven leem `lookuplogicalname` (ex.: cliente no recibo).
+        return client.request<Row>(`${await set(entity)}(${cleanId(id)})${options}`, { allAnnotations: true })
       },
       async createRecord(entity, data) {
         return { entityType: entity, id: await client.create(await set(entity), data) }
