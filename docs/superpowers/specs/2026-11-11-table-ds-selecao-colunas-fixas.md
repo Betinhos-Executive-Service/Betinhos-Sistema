@@ -8,6 +8,12 @@ A Tabela Geral (`apps/shell/src/pages/geral/components/GeralTable.tsx`) tem um g
 
 Ordenar, filtrar pelo título, ocultar, reordenar e redimensionar colunas já existem no `Table` (com `view`) e não mudam.
 
+## Decisões confirmadas (Renan, 11/11/2026)
+
+- Nenhuma coluna é fixa por padrão; o usuário escolhe quais fixar.
+- Com a seleção ligada, o clique simples seleciona e abrir vai para duplo clique, Enter, chevron ou "Abrir" no menu.
+- Colunas fixas sempre em bloco contínuo à esquerda (sem fixar no meio nem à direita).
+
 ## O que muda no DS
 
 Tudo é opcional: tela que não passa as props novas continua como está.
