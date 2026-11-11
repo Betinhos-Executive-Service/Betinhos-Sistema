@@ -103,8 +103,6 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
     return () => { ativo = false; };
   }, []);
 
-  const aoMudarVista = useCallback((nova: Vista) => setVista(nova), []);
-
   const buscar = useCallback(async (atual: Vista) => {
     const id = ++pedido.current;
     if (areaAfastadaDemais(atual.zoom)) { setPostos([]); setBusca("afastado"); return; }
@@ -158,7 +156,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
       <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={() => (vista ? buscar(vista) : undefined)} />
       <section className="termo-screen gr-screen pp-screen" aria-label="Postos próximos" onKeyDown={(evento) => { if (evento.key === "Escape") setSelecionado(null); }}>
         <div ref={caixa} className="pp-mapa-caixa" onPointerDown={() => { moveuSozinho.current = true; }}>
-          <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={aoMudarVista} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
+          <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={setVista} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
           {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
           <div className="pp-controles">
             <div className="pp-zoom">

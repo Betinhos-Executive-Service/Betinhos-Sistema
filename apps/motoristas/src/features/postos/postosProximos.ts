@@ -5,7 +5,6 @@ import { mapsSearchUrl, wazeNavigateUrl } from "../detalhe/mapLinks.ts";
 export type Posicao = { lat: number; lon: number };
 export type Area = { sul: number; norte: number; oeste: number; leste: number };
 export type Posto = { id: string; nome: string; endereco: string; lat: number; lon: number };
-export type PostoComDistancia = Posto & { distanciaKm: number };
 
 /** São José dos Campos: centro do mapa quando a localização do motorista não está disponível. */
 export const CENTRO_PADRAO: Posicao = { lat: -23.1896, lon: -45.8841 };
@@ -56,7 +55,7 @@ export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você"
 export const zoomDoFoco = (zoomAtual: number) => Math.min(zoomAtual, ZOOM_MAXIMO_FOCO);
 
 /** Os mais próximos de `origem`, do menor para o maior; empate pelo nome para a lista não pular. */
-export function maisProximos<T extends Posto>(postos: T[], origem: Posicao, quantidade = TAMANHO_LISTA): (T & { distanciaKm: number })[] {
+export function maisProximos<T extends Posto>(postos: T[], origem: Posicao, quantidade = TAMANHO_LISTA) {
   return postos
     .map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem, posto) }))
     .sort((a, b) => a.distanciaKm - b.distanciaKm || a.nome.localeCompare(b.nome, "pt-BR"))

@@ -51,7 +51,7 @@ function atualizarPino(el: HTMLElement, posto: PostoExibido) {
     if (indicador) etiqueta.dataset.nota = indicador; else delete etiqueta.dataset.nota;
   }
   const nota = dados ? notaDoPosto(dados.avaliacoes) : null;
-  el.setAttribute("aria-label", [`Posto ${posto.nome}`, dados ? `${rotuloPrecoLitro(dados.precoLitro)}` : "", nota ? `${nota.texto} recomendam` : ""].filter(Boolean).join(", "));
+  el.setAttribute("aria-label", [`Posto ${posto.nome}`, dados ? rotuloPrecoLitro(dados.precoLitro) : "", nota ? `${nota.texto} recomendam` : ""].filter(Boolean).join(", "));
 }
 
 function criarPonto(classe: string, rotulo: string) {

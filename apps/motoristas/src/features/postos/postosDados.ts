@@ -15,9 +15,10 @@ export type DadosPorId = ReadonlyMap<string, DadosPosto>;
 /** Ranking nulo (falha ao carregar) ou sem `postoId` (plugin antigo) vira mapa vazio: a tela segue sem preço nem nota. */
 export function indexarRanking(ranking: RankingPostos | null): Map<string, DadosPosto> {
   const mapa = new Map<string, DadosPosto>();
+  const dias = ranking?.dias ?? 0;
   for (const posto of ranking?.postos ?? []) {
     if (!posto.postoId || mapa.has(posto.postoId) || !Number.isFinite(posto.precoLitro) || posto.precoLitro <= 0) continue;
-    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias: ranking?.dias ?? 0, avaliacoes: posto.avaliacoes });
+    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias, avaliacoes: posto.avaliacoes });
   }
   return mapa;
 }
@@ -65,8 +66,7 @@ export function motivosPrincipais({ contagemMotivos, motivos }: Pick<ResumoAvali
 
 /** Id do posto mais barato entre os que têm preço. Só destaca com 2 ou mais preços diferentes; no empate fica o primeiro (a lista já vem do mais perto). */
 export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
-  const comPreco = postos.filter((posto) => posto.dados);
-  const menor = comPreco.reduce<(typeof comPreco)[number] | null>((atual, posto) => (!atual || posto.dados!.precoLitro < atual.dados!.precoLitro ? posto : atual), null);
-  const maior = Math.max(...comPreco.map((posto) => posto.dados!.precoLitro));
-  return menor && menor.dados!.precoLitro < maior ? menor.id : "";
+  const precos = postos.flatMap(({ id, dados }) => (dados ? [{ id, preco: dados.precoLitro }] : []));
+  const menor = precos.reduce<(typeof precos)[number] | null>((atual, item) => (!atual || item.preco < atual.preco ? item : atual), null);
+  return menor && precos.some(({ preco }) => preco > menor.preco) ? menor.id : "";
 }
