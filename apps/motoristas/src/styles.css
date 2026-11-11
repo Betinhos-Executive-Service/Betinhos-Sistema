@@ -2,7 +2,7 @@
 @import "./features/comunicados/comunicados.css";
 @import "./features/checklist/checklists.css";
 @import "./features/termos/termos.css";
-@import "leaflet/dist/leaflet.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "./features/treinamentos/treinamentos.css";
 @import "./features/postos/postos.css";
 @import "./app/tour.css";

@@ -10,6 +10,8 @@ export type PostoComDistancia = Posto & { distanciaKm: number };
 /** São José dos Campos: centro do mapa quando a localização do motorista não está disponível. */
 export const CENTRO_PADRAO: Posicao = { lat: -23.1896, lon: -45.8841 };
 export const ZOOM_INICIAL = 13;
+/** Tocar em um posto centraliza sem aproximar além disto. */
+export const ZOOM_MAXIMO_FOCO = 15;
 /** Abaixo disto a área visível passa de ~30 km: pedimos para aproximar em vez de buscar tudo. */
 export const ZOOM_MINIMO_BUSCA = 11;
 export const LIMITE_POSTOS = 200;
@@ -42,6 +44,16 @@ export function distanciaKm(a: Posicao, b: Posicao) {
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 }
+
+/** De onde as distâncias são medidas: o GPS do motorista ou, sem ele, o centro padrão. Nunca o posto tocado nem o centro do mapa arrastado. */
+export type Origem = { ponto: Posicao; doMotorista: boolean };
+
+export const origemDasDistancias = (posicao: Posicao | null): Origem => (posicao ? { ponto: posicao, doMotorista: true } : { ponto: CENTRO_PADRAO, doMotorista: false });
+export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro do mapa");
+export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você" : "do centro do mapa");
+
+/** Zoom ao centralizar um posto: mantém o atual, limitado a ZOOM_MAXIMO_FOCO. */
+export const zoomDoFoco = (zoomAtual: number) => Math.min(zoomAtual, ZOOM_MAXIMO_FOCO);
 
 /** Os mais próximos de `origem`, do menor para o maior; empate pelo nome para a lista não pular. */
 export function maisProximos(postos: Posto[], origem: Posicao, quantidade = TAMANHO_LISTA): PostoComDistancia[] {

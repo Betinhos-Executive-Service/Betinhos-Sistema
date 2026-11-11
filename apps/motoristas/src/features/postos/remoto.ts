@@ -7,7 +7,7 @@ const POSTO = (n: number, nome: string, endereco: string, lat: number, lon: numb
 
 // Nomes genéricos, coordenadas na região de São José dos Campos.
 export const POSTOS_MOCK: Posto[] = [
-  POSTO(1, "Posto Exemplo Centro", "Avenida Exemplo, 100 - Centro - São José dos Campos/SP", -23.1896, -45.8841),
+  POSTO(1, "Posto Exemplo Centro", "Avenida Exemplo, 100 - Centro - São José dos Campos/SP", -23.1921, -45.8869),
   POSTO(2, "Posto Exemplo Jardim Satélite", "Rua Exemplo, 250 - Jardim Satélite - São José dos Campos/SP", -23.2287, -45.8933),
   POSTO(3, "Auto Posto Exemplo Dutra", "Rodovia Presidente Dutra, km 150 - São José dos Campos/SP", -23.2075, -45.8412),
   POSTO(4, "Posto Exemplo Aquarius", "Avenida Exemplo, 800 - Jardim Aquarius - São José dos Campos/SP", -23.2174, -45.9068),

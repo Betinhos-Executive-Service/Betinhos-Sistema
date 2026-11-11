@@ -1,25 +1,29 @@
 ---
 name: verificar-postos-proximos
-description: "Verifica a tela Postos próximos do App Motoristas (mapa Leaflet com OpenStreetMap, postos da rede CTF da tabela new_postocombustivel, os 10 mais próximos, cartão com Ir/Waze) e o atalho na tela de gastos. Use ao mudar src/features/postos/**, tests/postosProximos.test.ts, wazeNavigateUrl em src/features/detalhe/mapLinks.ts ou a entrada no menu inicial."
+description: "Verifica a tela Postos próximos do App Motoristas (mapa MapLibre GL com estilo positron do OpenFreeMap, postos da rede CTF da tabela new_postocombustivel, os 10 mais próximos, cartão com Ir/Waze) e o atalho na tela de gastos. Use ao mudar src/features/postos/**, tests/postosProximos.test.ts, wazeNavigateUrl em src/features/detalhe/mapLinks.ts ou a entrada no menu inicial."
 ---
 # Verificar postos próximos
 
 ## Cobre
-- Código: `src/features/postos/` (`postosProximos.ts` com a consulta OData por área, haversine e top 10; `remoto.ts` com o mock e a leitura via `Xrm.WebApi`; `PostosMapa.tsx`; `PostosProximosScreen.tsx`; `rotas.tsx`; `postos.css`), `wazeNavigateUrl` em `src/features/detalhe/mapLinks.ts`, entrada "Postos próximos" em `src/features/servicos/InitialScreen.tsx`, atalho `.expense-postos` em `src/features/despesas/ExpenseScreen.tsx`, rota `#postos-proximos` em `src/app/navigation.ts`, capítulo do tour `postos-proximos`.
-- Regra: só `new_aceitactf = true`, `new_statusgeo` diferente de Pendente (100000000) e com latitude e longitude. Busca por caixa da área visível (debounce de 400 ms, `$select` mínimo, `$top` 200); abaixo do zoom 11 pede para aproximar o mapa. Sem GPS, centro em São José dos Campos com aviso discreto. Sem nota de avaliação, de propósito.
+- Código: `src/features/postos/` (`postosProximos.ts` com a consulta OData por área, haversine, origem das distâncias e top 10; `remoto.ts` com o mock e a leitura via `Xrm.WebApi`; `PostosMapa.tsx` em MapLibre GL 4.7.1; `PostosProximosScreen.tsx`; `rotas.tsx`; `postos.css`), `wazeNavigateUrl` em `src/features/detalhe/mapLinks.ts`, entrada "Postos próximos" em `src/features/servicos/InitialScreen.tsx`, atalho `.expense-postos` em `src/features/despesas/ExpenseScreen.tsx`, rota `#postos-proximos` em `src/app/navigation.ts`, capítulo do tour `postos-proximos`.
+- Regra de dados: só `new_aceitactf = true`, `new_statusgeo` diferente de Pendente (100000000) e com latitude e longitude. Busca por caixa da área visível (debounce de 400 ms, `$select` mínimo, `$top` 200); abaixo do zoom 11 pede para aproximar o mapa. Sem nota de avaliação, de propósito.
+- Regra de distância: sempre do motorista (GPS). Sem GPS, do centro padrão de São José dos Campos (ponto cinza no mapa) e o título da lista muda para "Mais próximos do centro do mapa". Nunca do posto tocado nem de onde o mapa foi arrastado. A lista ordena os postos carregados na área visível e mostra os 10 mais próximos.
+- Mapa: estilo `https://tiles.openfreemap.org/styles/positron` (gratuito, sem chave, o mesmo do repositório `acompanhar-motorista`), inclinação 45 a partir do zoom 13 (visão geral fica de cima), prédios 3D (`fill-extrusion` da fonte `openmaptiles`, minzoom 14), atribuição do estilo (OpenFreeMap, OpenMapTiles, OpenStreetMap). A lib vai dentro do arquivo único (o worker nasce de Blob); o CSS entra por `@import "maplibre-gl/dist/maplibre-gl.css"` em `src/styles.css` (importar CSS no TS não funciona no build, que só lê o primeiro arquivo de saída do esbuild).
 
 ## Preparar ambiente
 - `pnpm test` e `pnpm typecheck` em `apps/motoristas`.
-- Build: `node scripts/build-react-singlefile.cjs --no-version` (apaga e recria `dist/`). Sirva `dist/` com `python3 -m http.server <porta>` e abra `http://localhost:<porta>/index.html#postos-proximos`; o servidor do Vite puro não aplica o CSS do app. Os mosaicos do OpenStreetMap precisam de internet.
+- Build: `node scripts/build-react-singlefile.cjs --no-version` (apaga e recria `dist/`). Sirva `dist/` com `python3 -m http.server <porta>` e abra `http://localhost:<porta>/index.html#postos-proximos`; o servidor do Vite puro não aplica o CSS do app. Os mosaicos do OpenFreeMap precisam de internet; espere ~4 s antes de capturar.
+- Dispensar o tour: `localStorage["app-motoristas-tour-v2:localhost-driver:*"] = "visto"` antes de abrir. Playwright: viewport 390×844, `permissions: ["geolocation"]` e `geolocation` em -23.1896, -45.8841 (ou sem permissão para o estado sem GPS).
+- Avisos `Expected value to be of type number, but found null` no console vêm do estilo positron; não são do app.
 
-## Roteiro (mock em localhost, viewport 390×844, geolocalização em -23.1896, -45.8841)
+## Roteiro (mock em localhost, viewport 390×844)
 1. Menu inicial → "Postos próximos" abre `#postos-proximos`; no Relatório de gastos o botão "Postos próximos" leva à mesma tela e Voltar retorna ao ponto de origem.
-2. O mapa mostra mosaicos do OSM, a legenda "© OpenStreetMap", pinos azuis dos postos e o marcador da posição. Pendentes nunca aparecem (o mock só traz geocodificados).
-3. A lista mostra até 10 postos, do mais perto ao mais longe do centro do mapa. Tocar em um item centraliza o mapa e abre o cartão: nome, endereço, "a X km de você", "Ir" (Google Maps) e "Waze".
-4. Tocar em um pino abre o mesmo cartão; X fecha. Arrastar o mapa recarrega a lista depois de ~400 ms; zoom abaixo de 11 mostra o pedido para aproximar.
-5. Negar a localização: aviso discreto de centro padrão, mapa em São José dos Campos. O botão de mira volta à posição do motorista.
+2. O mapa ocupa ~57% da altura, em branco (positron), com pinos azuis de bomba, ponto azul pulsante do motorista, botões flutuantes de aproximar, afastar e minha posição (44 px) e atribuição discreta no canto. Pendentes nunca aparecem.
+3. Lista "Mais próximos de você" com a distância em destaque à direita ("399 m de você"); nunca "0 m". Tocar em um item ou pino centraliza o mapa **sem aproximar** (zoom atual, no máximo 15), deixa o pino acima do cartão e abre o cartão: nome, endereço, "a X km de você", "Ir" (Google Maps) e "Waze". A lista continua com os mesmos 10.
+4. X, Esc ou toque no mapa fecham o cartão. Arrastar o mapa recarrega a lista depois de ~400 ms; zoom abaixo de 11 mostra o pedido para aproximar. Carregando mostra esqueleto; sem postos mostra o vazio; falha da consulta mostra o erro com "Tentar de novo".
+5. Negar a localização: aviso amarelo com "Tentar de novo", ponto cinza no centro, título "Mais próximos do centro do mapa" e distâncias "do centro". A mira aparece só quando há GPS e volta à posição do motorista.
 6. Sem rolagem horizontal; a versão `vX.Y.Z · dd/mm/aaaa HH:mm` aparece no canto.
 
 ## No DEV (não coberto pelo mock)
 - Abra o app pelo Dataverse e confira a consulta real: o papel do motorista precisa de leitura em `new_postocombustivel`, e a Web API devolve a lista de postos CTF na área (compare com a tabela por `new_municipio`).
-- Confira no navegador do WebResource se a política de segurança de conteúdo deixa carregar `tile.openstreetmap.org` e se o uso de mosaicos continua dentro da política do OSM (uso leve; para volume alto, trocar o provedor).
+- Confira no WebResource se a política de segurança de conteúdo deixa carregar `tiles.openfreemap.org` (estilo, tiles e fontes) e criar o worker do MapLibre por Blob (`worker-src blob:`). Se o Blob for barrado, o mapa fica em branco: nesse caso usar `maplibregl.setWorkerUrl` com um arquivo de worker publicado como web resource. O uso é leve; para volume alto, avaliar hospedar os tiles.

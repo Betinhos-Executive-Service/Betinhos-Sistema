@@ -1,44 +1,84 @@
-/* Postos próximos: mapa Leaflet, cartão do posto e lista. Reaproveita termos.css (alertas, vazio) e gr-* (subtítulo, legenda). */
-.pp-screen { gap:10px; }
-.pp-mapa-caixa { position:relative; isolation:isolate; border:1px solid #dbe4f3; border-radius:14px; overflow:hidden; background:#e8edf5; }
-.pp-mapa { width:100%; height:clamp(280px, 46vh, 440px); touch-action:none; }
-.pp-mapa .leaflet-control-attribution { font-size:.65rem; }
-.pp-mapa .leaflet-bar a { width:36px; height:36px; line-height:36px; }
+/* Postos próximos: mapa MapLibre (estilo positron, mesmo do acompanhamento), cartão do posto e lista.
+   Tokens do Design System: marca #001a3d, ação #2159d2, ação suave #edf3ff, superfície #fff/#fcfcfb. Motion: 160 ms ease-out, transform/opacity.
+   Reaproveita termos.css (alertas, vazio) e gr-* (subtítulo, legenda). */
+.pp-screen { --pp-marca:#001a3d; --pp-acao:#2159d2; --pp-acao-suave:#edf3ff; --pp-vidro:rgba(255,255,255,.92); --pp-sombra:0 6px 18px rgba(0,26,61,.14), 0 1px 3px rgba(0,26,61,.08); gap:12px; grid-auto-rows:max-content; }
+.pp-mapa-caixa { min-height:clamp(340px, 57dvh, 560px); position:relative; isolation:isolate; border-radius:18px; overflow:hidden; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
+.pp-mapa { width:100%; height:clamp(340px, 57dvh, 560px); touch-action:none; }
+.pp-mapa .maplibregl-ctrl-attrib { margin:0 0 6px 6px; padding:0 6px; border-radius:6px; font-size:.62rem; line-height:1.5; background:rgba(255,255,255,.72); }
+.pp-mapa .maplibregl-ctrl-attrib a { color:#64748b; }
+.pp-mapa .maplibregl-ctrl-bottom-left { z-index:1; }
 
-.pp-pino { background:none; border:0; }
-.pp-pino svg { display:block; width:30px; height:38px; fill:#2159d2; stroke:#fff; stroke-width:1.5; filter:drop-shadow(0 2px 2px rgba(0,26,61,.35)); transition:transform 160ms ease, fill 160ms ease; transform-origin:50% 100%; }
-.pp-pino circle { fill:#fff; stroke:none; }
-.pp-pino.is-selecionado svg { fill:#001a3d; transform:scale(1.25); }
-.pp-pino:focus-visible svg { outline:2px solid #6c91e8; outline-offset:2px; }
-.pp-voce { background:none; border:0; }
-.pp-voce span { display:block; width:22px; height:22px; border-radius:50%; background:#1a73e8; border:3px solid #fff; box-shadow:0 0 0 6px rgba(26,115,232,.22), 0 1px 4px rgba(0,0,0,.35); }
+/* Controles flutuantes: vidro, 44 px de toque. */
+.pp-controles { position:absolute; z-index:2; top:12px; right:12px; display:grid; gap:8px; }
+.pp-botao { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:14px; background:var(--pp-vidro); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:var(--pp-sombra); color:var(--pp-marca); cursor:pointer; transition:transform 160ms ease-out, background-color 160ms ease-out; }
+.pp-botao svg { width:20px; height:20px; }
+.pp-botao:active { transform:scale(.96); }
+.pp-botao--destaque { color:var(--pp-acao); }
+.pp-botao:focus-visible { outline:0; box-shadow:var(--pp-sombra), 0 0 0 3px rgba(33,89,210,.3); }
+@media (hover:hover) and (pointer:fine) { .pp-botao:hover { background:#fff; } }
+.pp-status { position:absolute; z-index:2; top:12px; left:12px; display:inline-flex; align-items:center; gap:8px; min-height:32px; padding:0 12px; border-radius:999px; background:var(--pp-vidro); box-shadow:var(--pp-sombra); color:#475569; font-size:.75rem; font-weight:700; }
+.pp-status i { width:8px; height:8px; border-radius:50%; background:var(--pp-acao); animation:pp-pulsa 1.1s ease-in-out infinite; }
+@keyframes pp-pulsa { 0%,100% { opacity:.3; } 50% { opacity:1; } }
 
-.pp-minha-posicao { position:absolute; z-index:500; top:92px; right:10px; display:grid; place-items:center; width:36px; height:36px; padding:0; border:2px solid rgba(0,0,0,.2); border-radius:4px; background:#fff; color:#001a3d; cursor:pointer; }
-.pp-minha-posicao svg { width:20px; height:20px; }
-.pp-status { position:absolute; z-index:500; top:10px; left:10px; padding:5px 10px; border-radius:999px; background:rgba(255,255,255,.94); color:#475569; font-size:.75rem; font-weight:700; box-shadow:0 1px 4px rgba(0,26,61,.18); }
+/* Pinos de posto (HTML do MapLibre): corpo azul com ícone de bomba; selecionado fica na cor da marca, maior. */
+.pp-pino { display:grid; place-items:end center; width:44px; height:50px; padding:0; border:0; background:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.pp-pino svg { display:block; width:34px; height:42px; filter:drop-shadow(0 3px 3px rgba(0,26,61,.3)); transform-origin:50% 100%; transition:transform 160ms ease-out; overflow:visible; }
+.pp-pino-corpo { fill:var(--pp-acao); stroke:#fff; stroke-width:2; transition:fill 160ms ease-out; }
+.pp-pino-icone { fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.pp-pino.is-selecionado svg { transform:scale(1.28); }
+.pp-pino.is-selecionado .pp-pino-corpo { fill:var(--pp-marca); }
+.pp-pino:focus-visible { outline:0; }
+.pp-pino:focus-visible svg { filter:drop-shadow(0 0 0 #fff) drop-shadow(0 0 3px var(--pp-acao)); }
 
-.pp-cartao { position:absolute; z-index:1000; left:8px; right:8px; bottom:8px; display:grid; gap:3px; padding:12px 44px 12px 14px; border-radius:12px; background:#fff; box-shadow:0 6px 20px rgba(0,26,61,.28); }
-.pp-cartao-nome { color:#001a3d; font-size:1rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
-.pp-cartao-endereco { color:#475569; font-size:.82rem; line-height:1.35; }
-.pp-cartao-distancia { color:#2159d2; font-size:.82rem; font-weight:800; }
-.pp-cartao-fechar { position:absolute; top:4px; right:4px; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; border-radius:50%; background:none; color:#64748b; cursor:pointer; }
+/* Posição do motorista: ponto azul com pulso, como o carro do acompanhamento. Sem GPS: ponto cinza do centro padrão. */
+.pp-voce, .pp-centro { position:relative; width:22px; height:22px; pointer-events:none; }
+.pp-voce span { position:absolute; inset:0; border-radius:50%; background:var(--pp-acao); border:3px solid #fff; box-shadow:0 1px 5px rgba(0,26,61,.35); }
+.pp-voce::before { content:""; position:absolute; inset:-14px; border-radius:50%; background:rgba(33,89,210,.18); animation:pp-halo 2.2s ease-out infinite; }
+@keyframes pp-halo { 0% { transform:scale(.5); opacity:.9; } 100% { transform:scale(1.2); opacity:0; } }
+.pp-centro span { position:absolute; inset:3px; border-radius:50%; background:#64748b; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,26,61,.3); }
+
+/* Cartão do posto: sheet flutuante embaixo do mapa. O mapa desloca o pino para a parte livre acima dele. */
+.pp-cartao { position:absolute; z-index:3; left:10px; right:10px; bottom:30px; display:grid; gap:4px; padding:14px 52px 12px 16px; border-radius:18px; background:#fff; box-shadow:0 -2px 6px rgba(0,26,61,.05), 0 12px 32px rgba(0,26,61,.22); animation:pp-sobe 200ms ease-out; }
+@keyframes pp-sobe { from { transform:translateY(12px); opacity:0; } to { transform:none; opacity:1; } }
+.pp-cartao-nome { color:var(--pp-marca); font-size:1rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
+.pp-cartao-endereco { color:#475569; font-size:.82rem; line-height:1.35; overflow-wrap:anywhere; }
+.pp-cartao-distancia { justify-self:start; margin-top:2px; padding:2px 10px; border-radius:999px; background:var(--pp-acao-suave); color:var(--pp-acao); font-size:.8rem; font-weight:800; }
+.pp-cartao-fechar { position:absolute; top:4px; right:4px; display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:none; color:#64748b; cursor:pointer; }
 .pp-cartao-fechar svg { width:18px; height:18px; }
-.pp-cartao-acoes { display:flex; gap:8px; margin-top:6px; }
-.pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; flex:1 1 0; min-height:44px; padding:0 14px; border:1px solid #2159d2; border-radius:10px; background:#fff; color:#2159d2; font-size:.9rem; font-weight:800; text-decoration:none; }
+.pp-cartao-fechar:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+.pp-cartao-acoes { display:flex; gap:8px; margin-top:8px; }
+.pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; flex:1 1 0; min-height:46px; padding:0 14px; border:1px solid var(--pp-acao); border-radius:12px; background:#fff; color:var(--pp-acao); font-size:.92rem; font-weight:800; text-decoration:none; transition:transform 160ms ease-out; }
+.pp-ir:active { transform:scale(.98); }
 .pp-ir svg { width:16px; height:16px; }
-.pp-ir--primario { background:#2159d2; color:#fff; }
+.pp-ir--primario { background:var(--pp-acao); color:#fff; }
 .pp-ir:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+.pp-aviso { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex-wrap:wrap; }
+.pp-aviso p { flex:1 1 190px; }
+.pp-aviso .termo-text-button { margin-top:0; flex:none; }
+.pp-acao { min-height:44px; }
 
-.pp-lista { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
-.pp-item { display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:10px; width:100%; min-height:56px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; color:#0f172a; text-align:left; cursor:pointer; transition:border-color 160ms ease, background-color 160ms ease; }
-.pp-item svg { width:18px; height:18px; color:#2159d2; }
-.pp-item[data-ativo] { border-color:#6c91e8; background:#edf3ff; }
-.pp-item:focus-visible { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+/* Lista: distância em destaque à direita. */
+.pp-lista-cabeca { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.pp-lista-total { color:#64748b; font-size:.75rem; font-weight:700; }
+.pp-lista { display:grid; gap:8px; margin:8px 0 0; padding:0; list-style:none; }
+.pp-item { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:12px; width:100%; min-height:64px; padding:10px 14px 10px 12px; border:1px solid #e2e8f0; border-radius:14px; background:#fcfcfb; color:#0f172a; text-align:left; cursor:pointer; transition:border-color 160ms ease-out, background-color 160ms ease-out, transform 160ms ease-out; }
+.pp-item:active { transform:scale(.99); }
+.pp-item-icone { display:grid; place-items:center; width:36px; height:36px; border-radius:12px; background:var(--pp-acao-suave); color:var(--pp-acao); }
+.pp-item-icone svg { width:18px; height:18px; }
+.pp-item[data-ativo] { border-color:#6c91e8; background:var(--pp-acao-suave); }
+.pp-item:focus-visible { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.14); }
 .pp-item-texto { display:grid; gap:1px; min-width:0; }
 .pp-item-texto strong { font-size:.92rem; font-weight:800; overflow-wrap:anywhere; }
 .pp-item-texto span { color:#64748b; font-size:.78rem; line-height:1.3; overflow-wrap:anywhere; }
-.pp-item-km { color:#001a3d; font-size:.85rem; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
-@media (prefers-reduced-motion: reduce) { .pp-pino svg, .pp-item { transition:none; } }
+.pp-item-km { display:grid; justify-items:end; gap:0; white-space:nowrap; }
+.pp-item-km b { color:var(--pp-marca); font-size:1.02rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.pp-item-km small { color:#64748b; font-size:.68rem; font-weight:700; }
+.pp-item--esqueleto { cursor:default; border-style:dashed; }
+.pp-item--esqueleto span { height:12px; border-radius:6px; background:#e8edf5; animation:pp-pulsa 1.1s ease-in-out infinite; }
+.pp-item--esqueleto span:last-child { width:44px; justify-self:end; grid-column:3; }
+.pp-item--esqueleto span:first-child { grid-column:1 / 3; }
+@media (hover:hover) and (pointer:fine) { .pp-item:hover { border-color:#6c91e8; } }
+@media (prefers-reduced-motion: reduce) { .pp-pino svg, .pp-item, .pp-botao, .pp-ir { transition:none; } .pp-cartao, .pp-status i, .pp-voce::before, .pp-item--esqueleto span { animation:none; } }
 
 /* Atalho na tela Registrar gasto. */
 .expense-postos { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin:0 0 10px; padding:0 14px; border:1px solid #cfdcf6; border-radius:10px; background:#edf3ff; color:#2159d2; font-size:.9rem; font-weight:800; cursor:pointer; }

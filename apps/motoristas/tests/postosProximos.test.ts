@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { areaAfastadaDemais, CENTRO_PADRAO, consultaPostosNaArea, distanciaKm, LIMITE_POSTOS, mapearPosto, maisProximos, rotuloKm, urlGoogleMaps, urlWaze, ZOOM_MINIMO_BUSCA, type Posto } from "../src/features/postos/postosProximos.ts";
+import { areaAfastadaDemais, CENTRO_PADRAO, consultaPostosNaArea, distanciaKm, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, ZOOM_MINIMO_BUSCA, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
 import { POSTOS_MOCK } from "../src/features/postos/remoto.ts";
 
 const posto = (id: string, lat: number, lon: number, nome = id): Posto => ({ id, nome, endereco: "", lat, lon });
@@ -42,6 +42,38 @@ test("maisProximos desempata pelo nome e não altera a lista recebida", () => {
   const postos = [posto("b", -23.1, -45, "Zeta"), posto("a", -23.1, -45, "Alfa")];
   assert.deepEqual(maisProximos(postos, { lat: -23, lon: -45 }).map((p) => p.nome), ["Alfa", "Zeta"]);
   assert.deepEqual(postos.map((p) => p.id), ["b", "a"]);
+});
+
+test("origem das distâncias: GPS do motorista; sem GPS, o centro padrão", () => {
+  const gps = { lat: -23.2, lon: -45.9 };
+  const comGps = origemDasDistancias(gps);
+  assert.deepEqual(comGps, { ponto: gps, doMotorista: true });
+  assert.equal(tituloLista(comGps), "Mais próximos de você");
+  assert.equal(rotuloOrigem(comGps), "de você");
+  const semGps = origemDasDistancias(null);
+  assert.deepEqual(semGps, { ponto: CENTRO_PADRAO, doMotorista: false });
+  assert.equal(tituloLista(semGps), "Mais próximos do centro do mapa");
+  assert.equal(rotuloOrigem(semGps), "do centro do mapa");
+});
+
+test("a lista mede do motorista: a ordem e as distâncias não mudam com o posto tocado nem com o mapa arrastado", () => {
+  const motorista = { lat: -23.2, lon: -45.9 };
+  const postos = [posto("perto", -23.201, -45.9), posto("meio", -23.22, -45.9), posto("longe", -23.3, -45.9)];
+  const lista = maisProximos(postos, origemDasDistancias(motorista).ponto);
+  assert.deepEqual(lista.map((p) => p.id), ["perto", "meio", "longe"]);
+  // Nenhum item mede de si mesmo: a distância ao motorista nunca é 0 m para postos fora do ponto do GPS.
+  assert.ok(lista.every((p) => p.distanciaKm > 0.05));
+  assert.equal(rotuloKm(lista[0].distanciaKm), "111 m");
+  // Sem GPS a medida parte do centro padrão, não do centro de onde o mapa foi arrastado.
+  const semGps = maisProximos(postos, origemDasDistancias(null).ponto);
+  assert.equal(semGps[0].distanciaKm, distanciaKm(CENTRO_PADRAO, postos.find((p) => p.id === semGps[0].id)!));
+});
+
+test("zoomDoFoco mantém o zoom atual e limita em 15", () => {
+  assert.equal(ZOOM_MAXIMO_FOCO, 15);
+  assert.equal(zoomDoFoco(12.4), 12.4);
+  assert.equal(zoomDoFoco(15), 15);
+  assert.equal(zoomDoFoco(17.2), 15);
 });
 
 test("mapearPosto monta nome e endereço legíveis; sem coordenada não vira pino", () => {
