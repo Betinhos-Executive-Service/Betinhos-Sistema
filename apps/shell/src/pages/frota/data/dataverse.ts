@@ -41,10 +41,7 @@ const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<strin
   gerarContrato: { envVar: 'new_FlowUrlGerarContratoMultas', body: (id) => ({ GUID_MULTA: id }), timeoutMs: 40_000, nome: 'Gerar contrato' },
 }
 
-const FLOW_CLASSIFICAR_VAR = 'new_FlowUrlClassificarManutencao'
-
 export function createXrmSource(xrm: XrmHost): DataSource {
-  let classificarUrl: string | null = null
   const api = xrm.WebApi as XrmWebApi
   const clientUrl = xrm.Utility?.getGlobalContext().getClientUrl().replace(/\/+$/, '') ?? location.origin
   const apiUrl = `${clientUrl}/api/data/v9.2`
@@ -226,33 +223,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     async update(kind: Kind, id: string, patch: Record<string, unknown>) {
       await api.updateRecord(KIND_TABLE[kind], cleanId(id), patch)
-    },
-
-    async classificacao(id: string) {
-      const row = await api.retrieveRecord(KIND_TABLE.manutencao, cleanId(id), `?$select=${CAMPO.servicos},${CAMPO.categorias},${CAMPO.origem},${CAMPO.confianca}`)
-      const num = (value: unknown) => (typeof value === 'number' ? value : null)
-      return { servicos: lerMulti(row[CAMPO.servicos]), categorias: lerMulti(row[CAMPO.categorias]), origem: num(row[CAMPO.origem]), confianca: num(row[CAMPO.confianca]) }
-    },
-
-    async classificarAgora(id: string) {
-      if (!GUID.test(id)) throw new Error('Identificador inválido')
-      const url = classificarUrl ?? (classificarUrl = await readEnvVar(FLOW_CLASSIFICAR_VAR))
-      if (!url) throw new Error(`URL da classificação não configurada (variável ${FLOW_CLASSIFICAR_VAR})`)
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 20_000)
-      try {
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: cleanId(id) }), signal: controller.signal })
-        if (!response.ok) throw new Error(`A classificação respondeu ${response.status}`)
-        const body = (await response.json()) as Record<string, unknown>
-        const lista = (value: unknown) => (Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : [])
-        const num = (value: unknown) => (typeof value === 'number' ? value : null)
-        return { servicos: lista(body.servicos), categorias: lista(body.categorias), origem: num(body.origem), confianca: num(body.confianca) }
-      } catch (reason) {
-        // O erro original pode citar a URL assinada; só a mensagem própria sai daqui.
-        throw new Error(reason instanceof Error && reason.message.startsWith('A classificação') ? reason.message : 'Não foi possível chamar a classificação agora')
-      } finally {
-        clearTimeout(timer)
-      }
     },
 
     async openForm(kind, id) {

@@ -1,0 +1,2 @@
+.lista-selecao { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.lista-barra { display: flow-root; }

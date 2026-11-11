@@ -1,6 +1,8 @@
 name: Importar soluções (reutilizável)
 
-# Importa no TEST ou no PROD os pacotes que o job "exportar" do publicar.yml deixou no artefato "pacotes" (mesma execução):
+# Importa no TEST ou no PROD os pacotes que o job "exportar" do publicar.yml deixou no artefato "pacotes" (mesma execução,
+# cifrado com o secret PACOTES_SENHA e decifrado aqui). Os backups das camadas Active e das Custom APIs (JSON com o conteúdo
+# de WebResource, flow e step) sobem cifrados no artefato backups-<alvo>; fotos-<alvo> fica em claro (só hashes e nomes):
 # foto antes, backup (só PROD), exclusão das Custom APIs cr40f_AI*V2 não gerenciadas (legado que trava o upgrade), import com
 # upgrade, remoção das camadas Active (hotfixes e telas publicadas direto no ambiente; a main já contém todos), estados
 # ligado/desligado devolvidos ao que a foto registrou, foto depois e comparação. Qualquer perda reprova.
@@ -24,11 +26,17 @@ on:
         type: boolean
         required: false
         default: false
+      sem_upgrade:
+        description: 'Ensaio, só no TEST: soluções (vírgula, ou todas) importadas como update, sem --stage-and-upgrade.'
+        type: string
+        required: false
+        default: ''
 
 jobs:
   importar:
     runs-on: windows-latest
     timeout-minutes: 240
+    # O environment prod não tem revisor: a aprovação é o job aprovar-prod (environment prod-aprovacao) de quem chama.
     environment: ${{ inputs.alvo }}
     # O mesmo grupo do retirar-caixa.yml e do caminho "front" do producao.yml: uma escrita por ambiente de cada vez.
     concurrency:
@@ -43,6 +51,10 @@ jobs:
       TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
       DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
       IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
+      SEM_UPGRADE: ${{ inputs.sem_upgrade }}
+      # SOLUCOES_IMPORT_MODO (variável do repositório): vazia = observar (sempre upgrade; registra a escolha e se o upgrade
+      # apagou algo); escolher = update quando o inventário prova que nada saiu da solução (inventario.ps1).
+      ESCOLHER_MODO: ${{ vars.SOLUCOES_IMPORT_MODO == 'escolher' }}
       TAG_PUBLICADAS: solucoes-${{ inputs.alvo }}
       # Id da conexão do Web Push neste ambiente. Obrigatória no PROD quando a BetinhosAutomacao vai junto (importar-solucoes.ps1).
       CONEXAO_WEBPUSH: ${{ vars.CONEXAO_WEBPUSH }}
@@ -54,6 +66,7 @@ jobs:
         shell: bash
         run: |
           case "${{ inputs.alvo }}" in test|prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
+          if [ -n "$SEM_UPGRADE" ] && [ "${{ inputs.alvo }}" != "test" ]; then echo "::error::sem_upgrade é só ensaio no TEST."; exit 1; fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -61,10 +74,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: pacotes
-          path: pacotes
-      - name: Instalar pac
+          path: pacotes-cifrado
+      - name: Decifrar os pacotes
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh decifrar pacotes-cifrado/pacotes.tar.enc pacotes
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-alvo --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Backup do PROD
         # A conta de serviço precisa estar registrada como app de administração (pac admin application register, uma vez).
@@ -102,18 +120,20 @@ jobs:
       - name: Importar
         run: |
           $extra = @(); if ($env:IMPORTAR_TUDO -eq 'true') { $extra += '-ImportarTudo' }
+          if ($env:SEM_UPGRADE) { $extra += @('-SemUpgrade', $env:SEM_UPGRADE) }
+          if ($env:ESCOLHER_MODO -eq 'true') { $extra += '-Escolher' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS -Publicadas publicadas-antes.json @extra
           if ($LASTEXITCODE -ne 0) { throw "importar-solucoes.ps1 falhou ($LASTEXITCODE)." }
       - name: Remover camadas Active (hotfixes já na main)
         # Publicação parcial (input solucoes) só mexe nas camadas das soluções importadas. Sem isso, publicar só a BetinhosCore
         # apagaria no PROD a camada Active de tela, flows e plugins da Automação e da Interface, e o PROD voltaria à versão
-        # gerenciada antiga até a publicação seguinte. Com as 3 do Sistema, segue o padrão do script (inclui a AppBetinhos).
+        # gerenciada antiga até a publicação seguinte. Com as 4, segue o padrão do script (inclui a AppBetinhos).
         run: |
           $nomes = @((Get-Content -Raw pacotes/manifesto.json | ConvertFrom-Json) | ForEach-Object { $_.solucao })
-          $todas = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosInterface')
+          $todas = @('BetinhosCore', 'BetinhosAutomacao', 'BetinhosMotoristas', 'BetinhosInterface')
           $extra = @()
           if (@($todas | Where-Object { $nomes -notcontains $_ }).Count) { $extra = @('-Solucoes', ($nomes -join ',')) }
-          Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 3 do Sistema' })"
+          Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 4 soluções' })"
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd @extra
           if ($LASTEXITCODE -ne 0) { throw "remover-camadas-active.ps1 falhou ($LASTEXITCODE)." }
       - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
@@ -145,7 +165,8 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Publicar soluções: ${{ inputs.alvo }}"
+            echo "## Publicar soluções: ${{ inputs.alvo }} (modo de import: ${{ vars.SOLUCOES_IMPORT_MODO == 'escolher' && 'escolher' || 'observar' }})"
+            echo 'escolha: o que o inventário decidiu (update ou upgrade); observacaoEscolha (modo observar): acerto, conservador (upgrade sem nada a apagar) ou erro (escolheu update e o upgrade apagou algo; não ligue o escolher).'
             echo '```json'
             cat pacotes/importados.json 2>/dev/null || echo "import não concluído"
             echo '```'
@@ -166,6 +187,22 @@ jobs:
           path: |
             fotos/
             pacotes/importados.json
-            camadas-active/
-            custom-apis-legado/
+          retention-days: 90
+      - name: Cifrar os backups
+        # msdyn_componentjson da camada Active traz o conteúdo do componente (WebResource, clientdata do flow, configuração
+        # do step) e pode ter URL assinada. Para restaurar: PACOTES_SENHA=... bash artefato-cifrado.sh decifrar backups.tar.enc <pasta>.
+        if: always()
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          mkdir -p backups
+          for d in camadas-active custom-apis-legado; do if [ -d "$d" ]; then cp -r "$d" backups/; fi; done
+          bash packages/deploy/solucoes/artefato-cifrado.sh cifrar backups backups-cifrado/backups.tar.enc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backups-${{ inputs.alvo }}
+          path: backups-cifrado/
+          if-no-files-found: ignore
           retention-days: 90

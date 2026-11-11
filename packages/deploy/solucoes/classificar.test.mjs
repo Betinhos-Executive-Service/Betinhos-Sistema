@@ -21,6 +21,7 @@ test('Custom API e parâmetros vão para a Automação', () => {
 })
 test('WebResource comum vai para a Interface', () => assert.equal(solucaoDe(c(61, { nome: 'cr40f_SistemaBetinhos.html' })), 'BetinhosInterface'))
 test('WebResource do app de motoristas vai para Motoristas', () => assert.equal(solucaoDe(c(61, { nome: 'new_app-motoristas-v2' })), 'BetinhosMotoristas'))
+test('service worker do app de motoristas vai para Motoristas', () => assert.equal(solucaoDe(c(61, { nome: 'new_app-motoristas-v2-sw' })), 'BetinhosMotoristas'))
 test('biblioteca de comandos do ribbon de tabela vai para o Core, não para a Interface', () => {
   assert.equal(solucaoDe(c(61, { nome: 'new_troca_operacional_commands' })), 'BetinhosCore')
   assert.equal(solucaoDe(c(61, { nome: 'new_model_driven_formulario_geral_command.js' })), 'BetinhosCore')

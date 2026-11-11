@@ -12,22 +12,25 @@ param(
   [string] $Cache = "",
   # Sem -Confiar (modo observar, o padrao): exporta tudo como antes e so registra o que a impressao digital teria decidido,
   # provando a decisao contra o pacote fresco. Com -Confiar: pula ou reaproveita de verdade.
-  [switch] $Confiar
+  [switch] $Confiar,
+  # Grava em $Pasta/inventarios o inventario de cada solucao do manifesto (inventario.ps1): o import compara com o destino e
+  # escolhe update ou upgrade. So o publicar.yml pede; o pacote do Deploy nao precisa.
+  [switch] $Inventario
 )
 
 # Etapa 1 dos workflows publicar.yml e retirar-caixa.yml, e fim do deploy.yml (pacote para o publicar), no DEV: conferencia
 # das 4 solucoes (barreira), impressao digital de cada solucao escolhida (impressao.ps1) e, conforme Get-DecisaoDeExport:
 #  - pular: sem mudanca desde a ultima publicacao em todos os alvos; vai ao manifesto como "pulada", sem ZIP e sem subir versao;
 #  - cache: copia o ZIP do ultimo Deploy, conferido (hash, UniqueName, versao atual do DEV e Managed);
-#  - exportar: versao seguinte (pac solution online-version) e export gerenciado conferido.
-# Grava os ZIPs e manifesto.json (solucao, versao, arquivo, hash, impressao, origem, decisao, observacao, commit) em $Pasta.
+#  - exportar: versao seguinte (pac solution online-version) e export gerenciado conferido; os exports rodam juntos no fim.
+# Varre os ZIPs (segredos.ps1) e falha se houver segredo; so entao grava manifesto.json. Grava os ZIPs e manifesto.json (solucao, versao, arquivo, hash, impressao, origem, decisao, observacao, commit) em $Pasta.
 # -Caixa: exporta a AppBetinhos (upgrade que antecede a retirada) em vez das 4; a conferencia e a mesma; sem impressao.
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
 if ($PSVersionTable.PSEdition -eq "Core") {
   $ps = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
   # Switch por splat: com -File, "-Caixa:True" (como o Core serializa) e recusado pelo Windows PowerShell.
-  $extra = @(); if ($Caixa) { $extra += "-Caixa" }; if ($Confiar) { $extra += "-Confiar" }
+  $extra = @(); if ($Caixa) { $extra += "-Caixa" }; if ($Confiar) { $extra += "-Confiar" }; if ($Inventario) { $extra += "-Inventario" }
   if ($Publicadas) { $extra += @("-Publicadas", $Publicadas) }
   if ($Cache) { $extra += @("-Cache", $Cache) }
   & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Pedido -Pasta $Pasta @extra
@@ -39,6 +42,8 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "dataverse.ps1")
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 . (Join-Path $PSScriptRoot "impressao.ps1")
+. (Join-Path $PSScriptRoot "segredos.ps1")
+. (Join-Path $PSScriptRoot "inventario.ps1")
 
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostDev)
 $escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Pedido) }
@@ -66,6 +71,7 @@ if ($Cache -and (Test-Path -LiteralPath (Join-Path $Cache "manifesto.json"))) {
 }
 
 $manifesto = @()
+$pendentes = @()
 foreach ($nome in $escolhidas) {
   $atual = Get-VersaoInstalada $dv $nome
   if (-not $atual) { throw "Solucao $nome nao existe no DEV." }
@@ -104,13 +110,50 @@ foreach ($nome in $escolhidas) {
   $nova = Get-VersaoSeguinte $atual
   Write-Step "$nome $atual -> $nova"
   Invoke-Pac $dv.Url @("solution", "online-version", "--solution-name", $nome, "--solution-version", $nova) | Out-Null
-  $r = Export-SolucaoGerenciada $dv $nome (Join-Path $Pasta "$($nome)_managed.zip")
-  $entrada.versao = $r.Versao; $entrada.arquivo = Split-Path $r.Caminho -Leaf; $entrada.hash = Get-HashDoPacote $r.Caminho
-  $entrada.observacao = Get-ObservacaoDaDecisao $decisao $entrada.hash
-  if ($entrada.observacao -eq "erro") {
-    Write-Host "::warning title=Impressao digital::$nome - a impressao disse '$($decisao.acao)', mas o pacote novo tem outro conteudo. Nao ligue SOLUCOES_IMPRESSAO=confiar; veja a skill verificar-solucoes."
-  }
+  $pendentes += [pscustomobject]@{ Nome = $nome; Caminho = (Join-Path $Pasta "$($nome)_managed.zip"); Entrada = $entrada; Decisao = $decisao }
   $manifesto += $entrada
 }
+
+# Exports em paralelo: em serie, as 4 levavam ~6 min; juntas, o tempo da maior (BetinhosCore, ~2 min). O Dataverse pode recusar
+# operacao de solucao simultanea (CustomizationLockException) e o pac pode tropecar no proprio cache; o export que falhar tem uma
+# segunda tentativa sozinho, como era antes. Export so le o DEV e Export-SolucaoGerenciada apaga o ZIP antigo antes.
+if ($pendentes.Count) {
+  $dv = Update-DvToken $dv
+  $carregar = @((Join-Path $PSScriptRoot "dataverse.ps1"), (Join-Path $PSScriptRoot "solucoes.ps1"))
+  Write-Step "exportando em paralelo: $(@($pendentes | ForEach-Object { $_.Nome }) -join ', ')"
+  $inicioExport = Get-Date
+  $rodada = @(Invoke-EmParalelo -Itens $pendentes -Argumentos @($dv) -Carregar $carregar -Limite 4 -Bloco {
+      param($P, $Dv)
+      Export-SolucaoGerenciada $Dv $P.Nome $P.Caminho
+    })
+  Write-Step "exports em paralelo: $([math]::Round(((Get-Date) - $inicioExport).TotalMinutes, 1)) min, $(@($rodada | Where-Object { $_.Erro }).Count) falha(s)"
+  foreach ($x in $rodada) {
+    $p = $x.Item
+    $r = $x.Resultado
+    if ($x.Erro) {
+      Write-Step "$($p.Nome) falhou no export em paralelo ($($x.Erro)); segunda tentativa sozinho"
+      $r = Export-SolucaoGerenciada $dv $p.Nome $p.Caminho
+    }
+    $entrada = $p.Entrada
+    $entrada.versao = $r.Versao; $entrada.arquivo = Split-Path $r.Caminho -Leaf; $entrada.hash = Get-HashDoPacote $r.Caminho
+    $entrada.observacao = Get-ObservacaoDaDecisao $p.Decisao $entrada.hash
+    if ($entrada.observacao -eq "erro") {
+      Write-Host "::warning title=Impressao digital::$($p.Nome) - a impressao disse '$($p.Decisao.acao)', mas o pacote novo tem outro conteudo. Nao ligue SOLUCOES_IMPRESSAO=confiar; veja a skill verificar-solucoes."
+    }
+  }
+}
+# Inventario do DEV de cada pacote (exportado ou do cache): o mesmo conteudo do ZIP, porque o grupo dataverse-dev segura o DEV.
+# Falha nunca barra o export: vira inventario incerto, e o import fica no upgrade.
+if ($Inventario -and -not $Caixa) {
+  $dv = Update-DvToken $dv
+  New-Item -ItemType Directory -Force -Path (Join-Path $Pasta "inventarios") | Out-Null
+  foreach ($entrada in @($manifesto | Where-Object { $_.origem -ne "pulada" })) {
+    $inv = try { Get-InventarioDaSolucao $dv $entrada.solucao } catch { @{ itens = @(); incerto = $true; motivos = @("inventario falhou: $(Get-ErroDv $_)") } }
+    Write-JsonFile (Join-Path $Pasta "inventarios\$($entrada.solucao).json") $inv
+    Write-Step "$($entrada.solucao) inventario: $(@($inv.itens).Count) item(ns)$(if ($inv.incerto) { "; INCERTO: $(@($inv.motivos | Select-Object -First 3) -join '; ')" })"
+  }
+}
+# Trava de segredos (segredos.ps1) antes de qualquer artefato ou cache: inclui os ZIPs vindos do cache do Deploy.
+Assert-PacotesSemSegredo $Pasta
 Write-JsonFile (Join-Path $Pasta "manifesto.json") @($manifesto)
 Write-Step "export concluido: $(@($manifesto | Where-Object { $_.origem -eq 'exportado' }).Count) exportada(s), $(@($manifesto | Where-Object { $_.origem -eq 'cache' }).Count) do Deploy, $(@($manifesto | Where-Object { $_.origem -eq 'pulada' }).Count) pulada(s)"

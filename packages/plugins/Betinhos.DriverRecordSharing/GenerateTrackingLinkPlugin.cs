@@ -12,7 +12,7 @@ using Microsoft.Xrm.Sdk.Query;
 namespace Betinhos.DriverRecordSharing
 {
     // Custom API new_GerarLinkAcompanhamento: pede ao Worker um link de acompanhamento do embarque
-    // e grava o link na reserva. Configuração segura do step: {"url":"https://<worker>/api/links","segredo":"..."}.
+    // e grava o link na reserva. Worker: segredo link-acompanhamento.worker (TrackingLinkWorkerConfig.Load).
     public sealed class GenerateTrackingLinkPlugin : IPlugin
     {
         public const string MessageName = "new_GerarLinkAcompanhamento";
@@ -21,14 +21,11 @@ namespace Betinhos.DriverRecordSharing
         private const int TimeoutMs = 15000;
         private const string GenericError = "Não foi possível gerar o link agora.";
         private const string IsoFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
-        private readonly string _url;
-        private readonly string _secret;
+        private readonly string _secureConfig;
 
         public GenerateTrackingLinkPlugin(string unsecureConfig, string secureConfig)
         {
-            var config = TrackingLinkWorkerConfig.Parse(secureConfig);
-            _url = config.Url;
-            _secret = config.Secret;
+            _secureConfig = secureConfig;
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -44,7 +41,8 @@ namespace Betinhos.DriverRecordSharing
             if (!context.InputParameters.Contains(ServiceIdParameter) || !(context.InputParameters[ServiceIdParameter] is Guid serviceId) || serviceId == Guid.Empty)
                 throw new InvalidPluginExecutionException("Serviço inválido.");
 
-            if (string.IsNullOrWhiteSpace(_url) || string.IsNullOrWhiteSpace(_secret))
+            var config = TrackingLinkWorkerConfig.Load(system, _secureConfig, tracing);
+            if (!config.IsConfigured)
             {
                 context.OutputParameters[ResultParameter] = Fail("Link de acompanhamento não configurado.");
                 return;
@@ -60,7 +58,7 @@ namespace Betinhos.DriverRecordSharing
                     return;
                 }
 
-                var link = RequestLink(built.Payload, tracing);
+                var link = RequestLink(config, built.Payload, tracing);
                 if (link == null)
                 {
                     context.OutputParameters[ResultParameter] = Fail(GenericError);
@@ -252,19 +250,19 @@ namespace Betinhos.DriverRecordSharing
         }
 
         // Um POST, sem retry. Devolve (link, expiraEm UTC) ou null em falha; nunca registra o segredo.
-        private Tuple<string, DateTime?> RequestLink(Dictionary<string, object> payload, ITracingService tracing)
+        private static Tuple<string, DateTime?> RequestLink(TrackingLinkWorkerConfig config, Dictionary<string, object> payload, ITracingService tracing)
         {
             var serializer = new JavaScriptSerializer();
             var body = Encoding.UTF8.GetBytes(serializer.Serialize(payload));
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             try
             {
-                var request = (HttpWebRequest)WebRequest.Create(_url);
+                var request = (HttpWebRequest)WebRequest.Create(config.Url);
                 request.Method = "POST";
                 request.ContentType = "application/json";
                 request.Timeout = TimeoutMs;
                 request.ReadWriteTimeout = TimeoutMs;
-                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + _secret;
+                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + config.Secret;
                 using (var stream = request.GetRequestStream()) stream.Write(body, 0, body.Length);
                 using (var response = (HttpWebResponse)request.GetResponse())
                 using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))

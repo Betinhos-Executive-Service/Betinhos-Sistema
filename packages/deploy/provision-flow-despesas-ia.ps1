@@ -10,6 +10,11 @@
 # com as mesmas mensagens. Qualquer falha no escopo de análise grava cr40f_iastatusanalise = Erro e o motivo em
 # cr40f_iamotivos, sem tocar em cr40f_statusoperacional.
 #
+# Devolução (design 2026-11-10-despesa-devolucao-design.md): na primeira dúvida a IA grava em new_motivodevolucao a
+# mensagem_motorista (até 2 frases curtas, ~140 caracteres, cortada em 200 por segurança; sem ela, uma frase genérica, nunca os motivos antifraude) e envia à IA a
+# new_justificativamotorista. Segunda dúvida (já havia justificativa ou motivo de devolução) não volta ao motorista:
+# new_aguardandogestor = Sim e o motivo existente fica. Validar zera new_aguardandogestor e também preserva o motivo.
+#
 # Constantes (modelo, max_tokens, effort, system prompt, prefixo da mensagem e schema) vêm de
 # packages/despesas-ia/dist/constantes.json. Gere antes: pnpm --filter @betinhos/despesas-ia constantes
 # A chave (new_AnthropicKeyDespesasAnalise) vai no valor padrão, preenchido pelo Renan no maker portal; este script nunca grava nem lê o valor.
@@ -433,7 +438,8 @@ $definitionText = @'
               "litros": "@triggerOutputs()?['body/cr40f_litros']",
               "km": "@triggerOutputs()?['body/cr40f_kminformado']",
               "observacao": "@triggerOutputs()?['body/cr40f_observacao']",
-              "valorDoExtratoCartao": "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))"
+              "valorDoExtratoCartao": "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))",
+              "justificativaMotorista": "@if(empty(trim(coalesce(triggerOutputs()?['body/new_justificativamotorista'], ''))), null, trim(triggerOutputs()?['body/new_justificativamotorista']))"
             },
             "reservas": "@body('Reservas_contexto')",
             "duplicatas": "@body('Duplicatas_contexto')",
@@ -622,6 +628,8 @@ $gravarText = @'
       "item/cr40f_possivelduplicidade": "@equals(outputs('Resposta')?['possivel_duplicidade'], true)",
       "item/cr40f_iadecisao": "@if(equals(outputs('Resposta')?['decisao'], 'validar'), 100000000, 100000001)",
       "item/cr40f_iamotivos": "@{join(outputs('Resposta')?['motivos'], decodeUriComponent('%0A'))}",
+      "item/new_motivodevolucao": "@if(or(equals(outputs('Resposta')?['decisao'], 'validar'), not(empty(trim(coalesce(triggerOutputs()?['body/new_motivodevolucao'], ''))))), triggerOutputs()?['body/new_motivodevolucao'], if(empty(trim(coalesce(outputs('Resposta')?['mensagem_motorista'], ''))), 'Precisamos conferir esta despesa. Troque o comprovante ou explique o que aconteceu.', substring(trim(outputs('Resposta')?['mensagem_motorista']), 0, min(length(trim(outputs('Resposta')?['mensagem_motorista'])), 200))))",
+      "item/new_aguardandogestor": "@and(not(equals(outputs('Resposta')?['decisao'], 'validar')), or(not(empty(trim(coalesce(triggerOutputs()?['body/new_justificativamotorista'], '')))), not(empty(trim(coalesce(triggerOutputs()?['body/new_motivodevolucao'], ''))))))",
       "item/cr40f_iavalorlido": "@outputs('Resposta')?['valor_lido']",
       "item/cr40f_iadatalida": "@outputs('Resposta')?['data_lida']",
       "item/cr40f_iacnpjlido": "@if(equals(outputs('Resposta')?['cnpj_lido'], null), null, substring(outputs('Resposta')?['cnpj_lido'], 0, min(length(outputs('Resposta')?['cnpj_lido']), 20)))",
@@ -743,6 +751,8 @@ function Conferir($lido, [string] $texto) {
     'Contexto com veiculo e historico' = ($ctx.veiculo -ceq "@outputs('Veiculo_contexto')") -and ($ctx.historico.motorista -ceq "@body('Historico_motorista_contexto')") -and ($ctx.historico.veiculo -ceq "@body('Historico_veiculo_contexto')")
     'Contexto com valorDoExtratoCartao' = $ctx.despesa.valorDoExtratoCartao -ceq "@and(equals(triggerOutputs()?['body/cr40f_origem'], 100000002), equals(triggerOutputs()?['body/cr40f_conciliadacartao'], true))"
     'comprovantes do último envio' = ($a.Comprovantes.inputs.parameters.'$orderby' -ceq 'createdon desc,cr40f_ordem desc') -and ($a.Arquivos.foreach -ceq "@reverse(outputs('Comprovantes')?['body/value'])") -and ($a.Comprovantes.inputs.parameters.'$top' -ceq "@min(3, max(1, coalesce(triggerOutputs()?['body/new_uploadexpectedcount'], 3)))")
+    'Contexto com justificativaMotorista (só texto preenchido)' = $ctx.despesa.justificativaMotorista -ceq "@if(empty(trim(coalesce(triggerOutputs()?['body/new_justificativamotorista'], ''))), null, trim(triggerOutputs()?['body/new_justificativamotorista']))"
+    'Gravar_resultado grava motivo da devolução e aguardandogestor nos dois ramos' = (@($a.Gravar_resultado.actions.Gravar_resultado_com_OS, $a.Gravar_resultado.else.actions.Gravar_resultado_sem_OS) | Where-Object { $_.inputs.parameters.'item/new_motivodevolucao' -ceq $semOs.inputs.parameters.'item/new_motivodevolucao' -and $_.inputs.parameters.'item/new_aguardandogestor' -ceq $semOs.inputs.parameters.'item/new_aguardandogestor' }).Count -eq 2
     'histórico antes dos comprovantes' = (@($a.Comprovantes.runAfter.Veiculo_contexto) -join ',') -eq 'Succeeded'
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })

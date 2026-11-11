@@ -9,3 +9,23 @@ allowBuilds:
 # Pacotes do nosso Design System entram assim que publicados (a espera vale só para terceiros).
 minimumReleaseAgeExclude:
   - '@betinhos-executive-service/*'
+# O App Motoristas precisa construir o mesmo HTML de antes da migração: o npm resolvia framer-motion/motion-dom 12.40.0.
+overrides:
+  motion@12.40.0>framer-motion: 12.40.0
+  framer-motion@12.40.0>motion-dom: 12.40.0
+# lucide-react 0.468 não declara @types/react como peer; sem isso o pnpm ligava o @types/react 19 do workspace.
+packageExtensions:
+  lucide-react@0.468.0:
+    peerDependencies:
+      '@types/react': '*'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+  # O ui não declara @types/react: os .d.ts dele achavam o @types/react içado em node_modules/.pnpm/node_modules,
+  # que no install filtrado (shell + motoristas) é o 18.3.30 do app. Como peer opcional, cada consumidor liga o seu.
+  '@betinhos-executive-service/ui':
+    peerDependencies:
+      '@types/react': '*'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true

@@ -18,6 +18,7 @@ import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilt
 import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, matchesKeyword, readFuncionario, sortFuncionarios } from './data/lista'
 import { type AcessoInicial, createAcessoSource } from './data/acesso'
 import { createFuncionariosSource } from './data/hostSource'
+import { createSource as createComunicadosSource } from '../comunicados/data/source'
 import { funcionariosQuery } from './data/query'
 import type { DataSource } from './data/source'
 import type { Funcionario, FuncionarioView } from './data/types'
@@ -142,6 +143,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // A ficha aberta no mesmo funcionário não recarrega só com setSelection: a versão força a releitura.
   const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
+  const comunicados = useMemo(() => createComunicadosSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
     setAcessoAberto(null)
     setLiberacoesPendentes(({ [id]: _, ...resto }) => (emailPendente ? { ...resto, [id]: emailPendente } : resto))
@@ -152,7 +154,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })}
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} comunicados={comunicados} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })}
       emailPendente={selection.mode === 'open' ? liberacoesPendentes[selection.id] : undefined}
       onLiberacaoConcluida={(id) => { setLiberacoesPendentes(({ [id]: _, ...resto }) => resto); void onSaved(id, false) }} />
   )
@@ -191,7 +193,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
           <EnvBadge env={source.envLabel} />
           <SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">
@@ -223,7 +225,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
             rows={desktopSlice.slice}
             loading={loading && !rows.length}
             onOpen={(id) => setSelection({ mode: 'open', id })}
-            view={{ config: view.config, onChange: view.setConfig, extraCell: lista.extra.cell }}
+            view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: lista.extra.cell }}
             quickFilters={quickFilters}
             footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
             empty={pending

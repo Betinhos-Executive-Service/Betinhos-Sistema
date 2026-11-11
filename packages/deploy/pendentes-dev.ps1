@@ -2,7 +2,7 @@ param(
   # Commit de referencia: no Deploy, o HEAD da develop; na trava do publicar.yml, o commit levado ao PROD.
   [string] $Ate = 'HEAD',
   [string] $EnvironmentUrl = $env:DV_ENVIRONMENT_URL,
-  # Linhas tela=..., webresources=..., formulario=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
+  # Linhas tela=..., webresources=..., formulario=..., motoristas=..., motoristas_sw=..., motoristas_wr=... e plugins=a,b para $GITHUB_OUTPUT (sem: JSON).
   [switch] $GitHub
 )
 
@@ -10,6 +10,10 @@ param(
 #  - tela: descricao do cr40f_SistemaBetinhos.html ("vX.Y.Z <sha>", push-dev.ps1);
 #  - webresources: descricao de Tela_GerarPagantes/index.html ("vX.Y.Z <sha>", push-webresources-dev.ps1);
 #  - formulario: descricao de new_formulario_geral.html ("vX.Y.Z <sha>", push-formulario-dev.ps1);
+#  - motoristas e motoristasSw: descricao de new_app-motoristas-v2 e new_app-motoristas-v2-sw ("vX.Y.Z <sha>",
+#    apps/motoristas/scripts/push-front-dev.ps1). O commit gravado pelo repositorio antigo (app-motoristas-v2) nao existe aqui: conta como pendente;
+#  - motoristasWr: descricao de cada web resource avulso do App Motoristas ("<texto> <sha>", apps/motoristas/scripts/push-webresources-dev.ps1);
+#    pendente se qualquer um dos tres estiver.
 #  - plugins: descricao de cada assembly Cr40f.<Nome>.Plugin e do Betinhos.DriverRecordSharing (<sha>, gravada no CI).
 # Pendente = sem commit registrado, assembly ausente no DEV, ou git diff <registrado> $Ate tocando a peca
 # (regras em mudancas-dev.mjs). Comparar com o que o DEV tem, e nao com o push anterior, faz um deploy cancelado na fila
@@ -58,9 +62,10 @@ function Get-Mudancas([string] $Sha) {
 $motivos = New-Object System.Collections.Generic.List[string]
 
 # $Nome guarda "vX.Y.Z <sha>" na descricao; $Peca e o campo de mudancas-dev.mjs.
-function Test-WebResourcePendente([string] $Nome, [string] $Peca) {
+# $Padrao captura o commit no grupo 1 (padrao: "vX.Y.Z <sha>").
+function Test-WebResourcePendente([string] $Nome, [string] $Peca, [string] $Padrao = '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') {
   $rows = @(Get-Dv "webresourceset?`$select=description&`$filter=name eq '$Nome'")
-  if ($rows.Count -ne 1 -or "$($rows[0].description)" -notmatch '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') { $motivos.Add("${Peca}: sem commit registrado no DEV"); return $true }
+  if ($rows.Count -ne 1 -or "$($rows[0].description)" -notmatch $Padrao) { $motivos.Add("${Peca}: sem commit registrado no DEV ($Nome)"); return $true }
   $sha = $Matches[1]
   $m = Get-Mudancas $sha
   if ($null -eq $m) { $motivos.Add("${Peca}: commit $($sha.Substring(0,7)) do DEV fora do repositorio"); return $true }
@@ -71,6 +76,13 @@ function Test-WebResourcePendente([string] $Nome, [string] $Peca) {
 $tela = Test-WebResourcePendente 'cr40f_SistemaBetinhos.html' 'tela'
 $webresources = Test-WebResourcePendente 'Tela_GerarPagantes/index.html' 'webresources'
 $formulario = Test-WebResourcePendente 'new_formulario_geral.html' 'formulario'
+$motoristas = Test-WebResourcePendente 'new_app-motoristas-v2' 'motoristas'
+$motoristasSw = Test-WebResourcePendente 'new_app-motoristas-v2-sw' 'motoristasSw'
+# Os tres sao conferidos (sem parar no primeiro), para os motivos listarem todos.
+$motoristasWr = $false
+foreach ($n in 'new_appmotoristas_push_redirect.js', 'new_exchange_lifecycle_commands.js', 'new_exchange_lifecycle_dialog.html') {
+  if (Test-WebResourcePendente $n 'motoristasWr' ' ([0-9a-f]{40})$') { $motoristasWr = $true }
+}
 
 $plugins = New-Object System.Collections.Generic.List[string]
 $assemblies = @{}
@@ -89,5 +101,5 @@ foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | S
 }
 
 foreach ($linha in $motivos) { [Console]::Error.WriteLine("[pendentes] $linha") }
-if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "formulario=$($formulario.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
-else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; formulario = $formulario; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }
+if ($GitHub) { "tela=$($tela.ToString().ToLowerInvariant())"; "webresources=$($webresources.ToString().ToLowerInvariant())"; "formulario=$($formulario.ToString().ToLowerInvariant())"; "motoristas=$($motoristas.ToString().ToLowerInvariant())"; "motoristas_sw=$($motoristasSw.ToString().ToLowerInvariant())"; "motoristas_wr=$($motoristasWr.ToString().ToLowerInvariant())"; "plugins=$($plugins -join ',')" }
+else { [pscustomobject]@{ ate = $ate; tela = $tela; webresources = $webresources; formulario = $formulario; motoristas = $motoristas; motoristasSw = $motoristasSw; motoristasWr = $motoristasWr; plugins = @($plugins); motivos = @($motivos) } | ConvertTo-Json -Compress }

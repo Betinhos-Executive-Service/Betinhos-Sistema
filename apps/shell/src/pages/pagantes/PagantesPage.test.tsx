@@ -16,6 +16,13 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('button')!)
 
+
+const blobText = (blob: Blob) => new Promise<string>((resolve) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result))
+  reader.readAsText(blob)
+})
+
 describe('Pagantes', () => {
   it('lista no mock, abre a ficha com rateio e marca como pago com recibo', async () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
@@ -65,13 +72,46 @@ describe('Pagantes', () => {
     expect(within(confirm).queryByRole('checkbox', { name: /Gerar e enviar o recibo/ })).toBeNull()
   })
 
-  it('clique em qualquer ponto da linha abre a ficha; ações rápidas não', async () => {
+  it('clique na linha seleciona, duplo clique abre a ficha; ações rápidas não', async () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     const row = (await screen.findByText('PAG-1203')).closest('.bt-table__row') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: /Copiar link|Sem link/ }))
-    expect(screen.queryByRole('dialog', { name: 'Helena Prado' })).toBeNull()
+    expect(screen.queryByText('1 selecionado')).toBeNull()
     fireEvent.click(within(row).getByText(/860,50/))
+    expect(row.getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('dialog', { name: 'Helena Prado' })).toBeNull()
+    fireEvent.doubleClick(within(row).getByText(/860,50/))
     expect(await screen.findByRole('dialog', { name: 'Helena Prado' })).toBeTruthy()
+  })
+
+  it('seleção em lote: faixa com contagem, exporta e gera recibos dos selecionados', async () => {
+    const blobs: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { blobs.push(blob); return 'blob:x' }, revokeObjectURL: () => undefined }))
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('PAG-1201')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    fireEvent.click((await screen.findByText('PAG-1203')).closest('.bt-table__row')!.querySelector('.pg-num')!, { ctrlKey: true })
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    expect(within(faixa).getByText('2 selecionados')).toBeTruthy()
+    expect(screen.queryByRole('searchbox', { name: 'Buscar pagantes' })).toBeNull()
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
+    await screen.findByText('2 pagantes exportados.')
+    const csv = await blobText(blobs[0])
+    expect(csv).toMatch(/PAG-1201/)
+    expect(csv).toMatch(/PAG-1203/)
+
+    // No mock o gerador só funciona dentro do Dataverse: o erro aparece e a seleção foi limpa.
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Gerar recibos' }))
+    await screen.findByText('O gerador de recibo só funciona dentro do Dataverse.')
+    expect(screen.queryByRole('group', { name: 'Comandos da seleção' })).toBeNull()
+  })
+
+  it('recibo gerado e não enviado oferece gerar de novo, não reenviar', async () => {
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await openRow('PAG-1211')
+    const ficha = await screen.findByRole('dialog')
+    expect(within(ficha).getByRole('button', { name: 'Gerar recibo novamente' })).toBeTruthy()
+    expect(within(ficha).queryByRole('button', { name: 'Reenviar recibo' })).toBeNull()
   })
 
   it('gerar recibo fecha a ficha antes de abrir o gerador e mostra o erro', async () => {

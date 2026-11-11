@@ -1,0 +1,193 @@
+{
+  "triggers": {
+    "When_participation_is_queued": {
+      "inputs": {
+        "host": {
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/filterexpression": "cr40f_pushstatus eq 100000000",
+          "subscriptionRequest/filteringattributes": "cr40f_pushstatus",
+          "subscriptionRequest/entityname": "cr40f_treinamentoparticipacao",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "type": "OpenApiConnectionWebhook"
+    }
+  },
+  "actions": {
+    "Mark_lookup_failed": {
+      "runAfter": {
+        "Get_treinamento": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_treinamentoparticipacaos",
+          "item/cr40f_pushstatus": 100000002,
+          "item/cr40f_pusherro": "Nao foi possivel localizar o motorista ou o treinamento.",
+          "recordId": "@triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Get_funcionario": {
+      "runAfter": {},
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_funcionarioses",
+          "$select": "cr40f_emailmicrosoft",
+          "recordId": "@triggerOutputs()?['body/_cr40f_funcionario_value']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Get_treinamento": {
+      "runAfter": {
+        "Get_funcionario": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_treinamentos",
+          "$select": "cr40f_name",
+          "recordId": "@triggerOutputs()?['body/_cr40f_treinamento_value']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_driver_failed": {
+      "runAfter": {
+        "Get_funcionario": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_treinamentoparticipacaos",
+          "item/cr40f_pushstatus": 100000002,
+          "item/cr40f_pusherro": "Nao foi possivel localizar o e-mail do motorista.",
+          "recordId": "@triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_sent": {
+      "runAfter": {
+        "Send_push": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_treinamentoparticipacaos",
+          "item/cr40f_pushstatus": 100000001,
+          "item/cr40f_pusherro": "",
+          "recordId": "@triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Send_push": {
+      "runAfter": {
+        "Get_treinamento": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "SendPushNotificationV2",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_powerappsnotificationv2",
+          "connectionName": "shared_powerappsnotificationv2-1"
+        },
+        "parameters": {
+          "payload/dynamicParams/entityLogicalName": "cr40f_treinamentoparticipacao",
+          "payload/message": "Novo treinamento: @{outputs('Get_treinamento')?['body/cr40f_name']}",
+          "payload/playerType": "PowerApps",
+          "payload/app": "{\"type\":\"AppModule\",\"displayName\":\"App Motoristas v2\",\"appIdentifier\":\"new_AppMotoristasv2\"}",
+          "payload/dynamicParams/recordId": "@triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']",
+          "payload/openApp": true,
+          "payload/recipients": [
+            "@outputs('Get_funcionario')?['body/cr40f_emailmicrosoft']"
+          ]
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Mark_failed": {
+      "runAfter": {
+        "Send_push": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "UpdateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_treinamentoparticipacaos",
+          "item/cr40f_pushstatus": 100000002,
+          "item/cr40f_pusherro": "@{actions('Send_push')?['error']?['message']}",
+          "recordId": "@triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "contentVersion": "1.0.0.0",
+  "outputs": {},
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
+}

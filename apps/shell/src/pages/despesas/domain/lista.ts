@@ -13,13 +13,14 @@ import type { Despesa, DespesaChoices } from './types'
 export const TELA = 'despesas'
 
 /** Colunas na ordem padrão; a primeira (Despesa) é fixa. */
+// Valor e status logo depois da data: em 1024–1280px é o que o gestor procura e precisa caber sem rolar de lado.
 export const DESPESA_COLUMNS: ViewColumnDef[] = [
   { key: 'despesa', label: 'Despesa' },
   { key: 'data', label: 'Data' },
-  { key: 'motorista', label: 'Motorista' },
   { key: 'valor', label: 'Valor' },
   { key: 'operacional', label: 'Operacional' },
   { key: 'financeiro', label: 'Financeiro' },
+  { key: 'motorista', label: 'Motorista' },
   { key: 'alertas', label: 'Alertas' },
 ]
 
@@ -48,6 +49,7 @@ const asText = (v: number | null) => (v == null ? null : String(v))
 
 /** Alertas que valem para a despesa (a coluna mostra os dois primeiros; a IA fica na ficha). */
 export const alertasDe = (d: Despesa): Alerta[] => [
+  ...(d.aguardandoGestor ? ['esperando-gestor' as const] : []),
   ...(semComprovante(d) ? ['sem-comprovante' as const] : []),
   ...(d.possivelDuplicidade ? ['duplicidade' as const] : []),
   ...(suspeitaIA(d) ? ['ia-suspeita' as const] : []),
@@ -138,6 +140,7 @@ export function builtinViews(choices: DespesaChoices): StoredView[] {
   const one = (field: 'operacional' | 'financeiro', value: number) => ({ ...emptyFilters(), quick: { [field]: quick(field, pick(choices[field], [value])) } })
   const comAlerta = (a: Alerta) => ({ ...emptyFilters(), quick: { alertas: quick('alertas', [alerta(a)]) } })
   return [
+    view('esperando-gestor', 'Esperando gestor', 0, comAlerta('esperando-gestor')),
     view('aguardando', 'Aguardando pagamento', 1, one('financeiro', FINANCEIRO.aguardando)),
     view('corrigir', 'Precisa corrigir', 2, one('operacional', OPERACIONAL.corrigir)),
     view('sem-comprovante', 'Sem comprovante', 3, comAlerta('sem-comprovante')),

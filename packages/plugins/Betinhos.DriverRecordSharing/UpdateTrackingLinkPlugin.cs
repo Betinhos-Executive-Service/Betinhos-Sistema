@@ -14,11 +14,11 @@ namespace Betinhos.DriverRecordSharing
     public sealed class UpdateTrackingLinkPlugin : IPlugin
     {
         private const int TimeoutMs = 60000; // o Worker geocodifica com orçamento de até 45 s
-        private readonly TrackingLinkWorkerConfig _config;
+        private readonly string _secureConfig;
 
         public UpdateTrackingLinkPlugin(string unsecureConfig, string secureConfig)
         {
-            _config = TrackingLinkWorkerConfig.Parse(secureConfig);
+            _secureConfig = secureConfig;
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -27,7 +27,9 @@ namespace Betinhos.DriverRecordSharing
             var factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
             var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
 
-            if (!_config.IsConfigured)
+            var system = factory.CreateOrganizationService(null);
+            var config = TrackingLinkWorkerConfig.Load(system, _secureConfig, tracing);
+            if (!config.IsConfigured)
             {
                 tracing?.Trace("UpdateTrackingLink: Worker não configurado; atualização ignorada.");
                 return;
@@ -36,7 +38,6 @@ namespace Betinhos.DriverRecordSharing
             Guid serviceId = Guid.Empty;
             try
             {
-                var system = factory.CreateOrganizationService(null);
                 serviceId = ResolveServiceId(context, system);
                 if (serviceId == Guid.Empty) return;
 
@@ -45,7 +46,7 @@ namespace Betinhos.DriverRecordSharing
                 var status = service.GetAttributeValue<OptionSetValue>(PluginConfig.ServiceStatus);
                 if (!TrackingLinkRevocation.ShouldRefresh(status?.Value, link)) return;
 
-                var url = TrackingLinkRevocation.BuildLinkUrl(_config.Url, TrackingLinkRevocation.ExtractId(link));
+                var url = TrackingLinkRevocation.BuildLinkUrl(config.Url, TrackingLinkRevocation.ExtractId(link));
                 if (url == null)
                 {
                     tracing?.Trace("UpdateTrackingLink: URL da API inválida; atualização ignorada.");
@@ -57,14 +58,14 @@ namespace Betinhos.DriverRecordSharing
                 {
                     // Motorista sem rastreio (terceiro, sem carro, removido): revoga para o cliente não ver o motorista anterior.
                     tracing?.Trace("UpdateTrackingLink: revogando link serviceId={0}: {1}", serviceId, built.Error);
-                    if (!Send("DELETE", url, null, tracing)) return;
+                    if (!Send(config, "DELETE", url, null, tracing)) return;
                     var update = new Entity(PluginConfig.ServiceTable, serviceId);
                     update[PluginConfig.ServiceTrackingLink] = null;
                     update[PluginConfig.ServiceTrackingLinkExpiresAt] = null;
                     system.Update(update);
                     return;
                 }
-                Send("PUT", url, Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(built.Payload)), tracing);
+                Send(config, "PUT", url, Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(built.Payload)), tracing);
             }
             catch (Exception error)
             {
@@ -88,7 +89,7 @@ namespace Betinhos.DriverRecordSharing
 
         // Uma chamada, sem retry; nunca registra o segredo. DELETE aceita 404 (link já expirado ou revogado).
         // PUT: 404 (expirado/revogado) e 409 (concluído) só vão para o trace.
-        private bool Send(string method, string url, byte[] body, ITracingService tracing)
+        private static bool Send(TrackingLinkWorkerConfig config, string method, string url, byte[] body, ITracingService tracing)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             try
@@ -97,7 +98,7 @@ namespace Betinhos.DriverRecordSharing
                 request.Method = method;
                 request.Timeout = TimeoutMs;
                 request.ReadWriteTimeout = TimeoutMs;
-                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + _config.Secret;
+                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + config.Secret;
                 if (body != null)
                 {
                     request.ContentType = "application/json";

@@ -12,11 +12,11 @@ namespace Betinhos.DriverRecordSharing
         public const string MessageName = "new_ResolverVeiculoDoServico";
         public const string ServiceIdParameter = "new_ReservaId";
         public const string ResultParameter = "new_ResultadoJson";
-        private readonly string _infleetToken;
+        private readonly string _secureConfig;
 
         public ResolveServiceVehiclePlugin(string unsecureConfig, string secureConfig)
         {
-            _infleetToken = secureConfig;
+            _secureConfig = secureConfig;
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -53,7 +53,7 @@ namespace Betinhos.DriverRecordSharing
                     Fleet = LoadFleet(system)
                 };
 
-                var gatewayLazy = new Lazy<InfleetGraphQlGateway>(() => new InfleetGraphQlGateway(_infleetToken));
+                var gatewayLazy = new Lazy<InfleetGraphQlGateway>(() => new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, _secureConfig, tracing)));
                 input.RegisterMissing = plate => RegisterMissing(system, gatewayLazy, plate, tracing);
 
                 var result = ServiceVehicleResolver.Resolve(input, () => gatewayLazy.Value);

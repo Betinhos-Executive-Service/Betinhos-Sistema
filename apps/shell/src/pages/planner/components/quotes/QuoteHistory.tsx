@@ -15,7 +15,7 @@ function Result({ status }: any) {
   return <span className={`quote-history-result ${status === "Aceita pelo cliente" ? "accepted" : status === "Perdida" ? "rejected" : "cancelled"}`}><Icon size={13} aria-hidden="true" />{quoteResultLabel(status)}</span>;
 }
 
-export default function QuoteHistory({ quotes, onOpen }: any) {
+export default function QuoteHistory({ quotes, tasks, employees, onOpen }: any) {
   const [query, setQuery] = useState<any>("");
   const [status, setStatus] = useState<any>("");
   const [preset, setPreset] = useState<any>("all");
@@ -30,7 +30,7 @@ export default function QuoteHistory({ quotes, onOpen }: any) {
   const [pointerExpansion, setPointerExpansion] = useState<any>(false);
   const todayKey = quoteHistoryDate(new Date().toISOString());
   const range = resolveQuoteHistoryPeriod(preset, todayKey, customRange);
-  const selection = useMemo(() => selectQuoteHistory(quotes, { query, status, ...range, direction, page }), [quotes, query, status, range.from, range.to, direction, page]);
+  const selection = useMemo(() => selectQuoteHistory(quotes, { query, status, ...range, tasks, employees, direction, page }), [quotes, tasks, employees, query, status, range.from, range.to, direction, page]);
   useEffect(() => {
     if (page !== selection.page) setPage(selection.page);
     if (expandedQuoteId && !selection.items.some((quote) => quote.id === expandedQuoteId)) setExpandedQuoteId("");
@@ -51,7 +51,7 @@ export default function QuoteHistory({ quotes, onOpen }: any) {
   const filtered = Boolean(query || status || preset !== "all");
   return <section className="panel quote-history-panel" aria-label="Histórico de cotações">
     <div className="quote-history-toolbar">
-      <label className="quote-history-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Buscar no histórico" value={query} onChange={(event) => { setQuery(event.target.value); resetRows(); }} placeholder="Buscar por número, cliente ou serviço" /></label>
+      <label className="quote-history-search"><Search size={16} aria-hidden="true" /><input type="search" aria-label="Buscar no histórico" value={query} onChange={(event) => { setQuery(event.target.value); resetRows(); }} placeholder="Buscar número, cliente, rota, data, valor…" /></label>
       <div className="quote-history-period"><SearchableSelect value={periodChoice} onChange={changePeriod} options={periods} aria-label="Período de encerramento" /></div>
       <button type="button" className="button button-secondary quote-history-filter-toggle" aria-expanded={filtersExpanded} aria-controls="quote-history-filters" onClick={() => setFiltersExpanded((value: any) => !value)}><SlidersHorizontal size={15} aria-hidden="true" />Filtros<ChevronDown size={14} aria-hidden="true" /></button>
     </div>

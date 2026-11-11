@@ -63,7 +63,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
         </ViewBar>
       </div>
@@ -71,7 +71,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
         rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
-        view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }}
+        view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {linhas.length}</span>}
         empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

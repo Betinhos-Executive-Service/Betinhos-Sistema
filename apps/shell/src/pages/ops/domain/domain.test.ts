@@ -4,9 +4,10 @@ import { STATUS } from '../../pagantes/domain/status'
 import { dateOnly, mapOp } from '../data/queries'
 import { passageirosCurto, periodo } from '../components/OpsList'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { opsNumeros } from './exportar'
 import { VIEWS_KEY, loadViews } from './filters'
 import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, opFields, readOp, sortOps } from './lista'
-import { OP_STATUS, cancelBlock, resumoRateio } from './status'
+import { OP_STATUS, cancelBlock, proximoPasso, resumoRateio, type Resumo } from './status'
 import { buildTimeline } from './timeline'
 import { FALLBACK_OP_CHOICES } from './status'
 import { createMockOps } from '../data/mock'
@@ -95,5 +96,40 @@ describe('apresentação', () => {
     expect(events.some((e) => e.title === 'Pagamento de Ricardo Menezes')).toBe(true)
     expect(events.at(-1)?.title).toBe('Status atual: Pagamento Parcial')
     expect(rateioDe(op.id).some((p) => p.status === STATUS.pago)).toBe(true)
+  })
+})
+
+describe('exportar OPs', () => {
+  it('copiar números pula OP sem código', () => {
+    const [a, b, c] = [
+      mapOp({ cr40f_financeiroid: '1', cr40f_idfinanceiro: 'OP-1', cr40f_status: 100000001 }),
+      mapOp({ cr40f_financeiroid: '2', cr40f_status: 100000001 }),
+      mapOp({ cr40f_financeiroid: '3', cr40f_idfinanceiro: 'OP-3', cr40f_status: 100000001 }),
+    ]
+    expect(opsNumeros([a, b, c])).toEqual(['OP-1', 'OP-3'])
+  })
+})
+
+describe('proximoPasso', () => {
+  const r = (over: Partial<Resumo>): Resumo => ({ parcelas: 0, soma: 0, recebido: 0, servicos: 1000, diferenca: 0, referencia: 1000, ...over })
+  const aberta = { valor: 1000, status: OP_STATUS.aberta }
+
+  it('sem pagantes pede para gerar', () => {
+    expect(proximoPasso(aberta, r({}))).toMatchObject({ feitas: ['criada'], acao: 'gerar', titulo: 'Próximo passo: gerar pagantes' })
+  })
+  it('rateio que não fecha pede para refazer', () => {
+    expect(proximoPasso(aberta, r({ parcelas: 2, soma: 900, diferenca: -100 }))).toMatchObject({ feitas: ['criada'], acao: 'refazer', tone: 'warning' })
+  })
+  it('rateio fechado aguarda pagamento, sem ação', () => {
+    expect(proximoPasso(aberta, r({ parcelas: 2, soma: 1000, recebido: 500 }))).toMatchObject({ feitas: ['criada', 'pagantes'], acao: null, titulo: 'Aguardando pagamento' })
+  })
+  it('recebido cobre a OP: quitada', () => {
+    expect(proximoPasso(aberta, r({ parcelas: 2, soma: 1000, recebido: 1000 }))).toMatchObject({ feitas: ['criada', 'pagantes', 'recebida'], tone: 'success', acao: null })
+  })
+  it('OP paga sem pagantes também é quitada', () => {
+    expect(proximoPasso({ valor: 1000, status: OP_STATUS.paga }, r({}))).toMatchObject({ titulo: 'OP quitada', detalhe: 'Pagamento registrado na OP.' })
+  })
+  it('valor diferente dos serviços vem antes do rateio, mantendo a ação', () => {
+    expect(proximoPasso({ valor: 2370, status: OP_STATUS.aberta }, r({ servicos: 4250, referencia: 2370 }))).toMatchObject({ titulo: 'Confira o valor antes de cobrar', tone: 'warning', acao: 'gerar' })
   })
 })

@@ -1,9 +1,10 @@
 # Operacoes de solucao para a segmentacao da AppBetinhos (dot-source depois do dataverse.ps1).
 # Mensagens sem acento: o Windows PowerShell 5.1 le .ps1 sem BOM como ANSI.
 
-$script:Solucoes = @("BetinhosCore", "BetinhosAutomacao", "BetinhosInterface", "BetinhosMotoristas")
-# BetinhosMotoristas continua nas 4 (distribuicao e conferencia), mas e publicada so pelo repositorio app-motoristas-v2.
-$script:SolucoesPublicadasAqui = @("BetinhosCore", "BetinhosAutomacao", "BetinhosInterface")
+# Ordem de import (camada mais baixa primeiro). A BetinhosMotoristas vem antes da BetinhosInterface: ela so depende da Core e da
+# Automacao (regras.json), e o service worker do app (new_app-motoristas-v2-sw) saiu da Interface para ela. Assim, no TEST e no
+# PROD, ele ja esta na Motoristas quando o upgrade da Interface o retira dela, e nunca e apagado.
+$script:Solucoes = @("BetinhosCore", "BetinhosAutomacao", "BetinhosMotoristas", "BetinhosInterface")
 $script:HostDev = "org23b93544.crm2.dynamics.com"
 $script:IdVazio = "00000000-0000-0000-0000-000000000000"
 
@@ -375,7 +376,7 @@ function Set-EstadoDv($Dv, [string] $Alvo, [string] $Conjunto, [string] $Id, [in
 # ligados sao desligados, para o ensaio nao mandar e-mail, WhatsApp nem cobranca a clientes reais (regra de negocio e BPF,
 # categorias 2 e 4, ficam). O que esta fora dessas solucoes (AutoNumberGuard, acoes do sistema...) nao e "novo" e fica como esta.
 # Devolve a lista das mudancas feitas e das falhas.
-function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
+function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos, $Aposentados = @()) {
   Assert-HostAlvo $Dv $Alvo
   $mudancas = @(); $falhas = @()
   $fluxosAgora = @{}; $categorias = @{}; $nomes = @{}
@@ -392,7 +393,7 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
   foreach ($p in $Foto.fluxos.PSObject.Properties) {
     $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
     if (-not $fluxosAgora.ContainsKey($id) -or $fluxosAgora[$id] -eq $antes) { continue }
-    try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes } }
+    try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes }; $fluxosAgora[$id] = $antes }
     catch { $falhas += "fluxo $($p.Value.nome) ($id): $(Get-ErroDv $_)" }
   }
   foreach ($p in $Foto.steps.PSObject.Properties) {
@@ -416,6 +417,16 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos) {
     foreach ($id in @($stepsAgora.Keys | Where-Object { $rastreados.ContainsKey($_) -and -not $naFoto.ContainsKey($_) -and $stepsAgora[$_] -eq 0 })) {
       try { Set-EstadoDv $Dv $Alvo "sdkmessageprocessingsteps" $id 1; $mudancas += [ordered]@{ tipo = "step novo"; id = $id; nome = $nomes[$id]; de = 0; para = 1 } }
       catch { $falhas += "step novo $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
+    }
+  }
+  # Fluxo aposentado (fluxos-aposentados.json, decisao registrada): desliga depois de restaurar, so com o substituto ligado,
+  # para o ambiente nunca ficar sem nenhum dos dois. Sem substituto ligado fica como estava.
+  foreach ($a in @($Aposentados)) {
+    $substitutoLigado = @($fluxosAgora.Keys | Where-Object { $nomes[$_] -eq [string] $a.substituto -and $fluxosAgora[$_] -eq 1 }).Count -gt 0
+    if (-not $substitutoLigado) { continue }
+    foreach ($id in @($fluxosAgora.Keys | Where-Object { $nomes[$_] -eq [string] $a.nome -and $fluxosAgora[$_] -eq 1 })) {
+      try { Set-EstadoDv $Dv $Alvo "workflows" $id 0; $mudancas += [ordered]@{ tipo = "fluxo aposentado"; id = $id; nome = $nomes[$id]; de = 1; para = 0 }; $fluxosAgora[$id] = 0 }
+      catch { $falhas += "fluxo aposentado $($nomes[$id]) ($id): $(Get-ErroDv $_)" }
     }
   }
   return @{ Mudancas = $mudancas; Falhas = $falhas }
@@ -459,26 +470,13 @@ function Get-VersaoSeguinte([string] $Versao) {
   return ($partes -join ".")
 }
 
-# Lista do workflow ("BetinhosCore,BetinhosInterface"; vazia = as 4) na ordem de import (camada mais baixa primeiro).
+# Lista do workflow ("BetinhosCore,BetinhosInterface"; vazia = as 4) na ordem de import ($script:Solucoes).
 function Get-SolucoesEscolhidas([string] $Lista) {
   $pedidas = @($Lista -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-  if ($pedidas.Count -eq 0) { return $script:SolucoesPublicadasAqui }
-  if ($pedidas -contains "BetinhosMotoristas") { throw "BetinhosMotoristas e publicada pelo repositorio app-motoristas-v2." }
-  $estranhas = @($pedidas | Where-Object { $script:SolucoesPublicadasAqui -notcontains $_ })
-  if ($estranhas.Count) { throw "Solucao fora do Sistema: $($estranhas -join ', ') (validas: $($script:SolucoesPublicadasAqui -join ', '))." }
-  return @($script:SolucoesPublicadasAqui | Where-Object { $pedidas -contains $_ })
-}
-
-# Componentes publicados pelo app-motoristas-v2 (ids em minusculo): os da BetinhosMotoristas e o service worker, que no PROD
-# ainda esta na BetinhosInterface. A camada Active deles e a versao que o app publicou, nao um hotfix a remover.
-function Get-IdsDoApp($Dv) {
-  $ids = @{}
-  $solucaoId = Get-SolucaoId $Dv "BetinhosMotoristas"
-  if ($solucaoId) { foreach ($linha in @(Get-LinhasDaSolucao $Dv $solucaoId)) { $ids[$linha.id] = $true } }
-  foreach ($sw in @(Read-DvAll $Dv "webresourceset?`$select=webresourceid&`$filter=name eq 'new_app-motoristas-v2-sw'")) {
-    $ids[([string] $sw.webresourceid).ToLowerInvariant()] = $true
-  }
-  return $ids
+  if ($pedidas.Count -eq 0) { return $script:Solucoes }
+  $estranhas = @($pedidas | Where-Object { $script:Solucoes -notcontains $_ })
+  if ($estranhas.Count) { throw "Solucao fora do Sistema: $($estranhas -join ', ') (validas: $($script:Solucoes -join ', '))." }
+  return @($script:Solucoes | Where-Object { $pedidas -contains $_ })
 }
 
 function Get-VersaoInstalada($Dv, [string] $Nome) {
@@ -516,9 +514,13 @@ function Test-FalhaTransitoriaDoServidor([string] $Erro) {
 
 # Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
 # holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
-function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "") {
+# $SemUpgrade: com versao instalada, importa como update (sem --stage-and-upgrade). Quem decide e importar-solucoes.ps1: o
+# ensaio so no TEST, ou a escolha pelo inventario (inventario.ps1). O update troca os
+# componentes que vieram no pacote e deixa no ambiente os que sairam da solucao; o upgrade apaga esses, mas monta e desmonta
+# uma solucao de espera (holding), o que custa ~10 min no BetinhosCore.
+function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
   $args = @("solution", "import", "--path", $Caminho)
-  if ($VersaoInstalada) { $args += "--stage-and-upgrade" }
+  if ($VersaoInstalada -and -not $SemUpgrade) { $args += "--stage-and-upgrade" }
   if ($Configuracao) { $args += @("--settings-file", $Configuracao) }
   return $args + @("--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180")
 }
@@ -535,7 +537,14 @@ function Wait-VersaoInstalada($Dv, [string] $Nome, [string] $Versao, [int] $Minu
 # "Novo Servico" e "Retirado" usam a referencia do Web Push (BetinhosAutomacao). Sem conexao, o flow nao religa (0x80060467, ensaio
 # de 06/11/2026) e o PROD ficaria sem aviso ao motorista. A referencia so existe depois do import, entao a conexao entra por ele.
 $script:ReferenciaWebPush = "new_webpushmotoristas"
-$script:ConectorWebPush = "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+# O conector personalizado tem o mesmo nome em todo ambiente, mas o id interno ganha um sufixo por ambiente (DEV ...5f30e351431b40001e,
+# PROD ...5f10c3aafe51dca724). Por isso o id do --settings-file e lido no ambiente de destino, na hora do import.
+$script:NomeConectorWebPush = "new_app-20motoristas-20web-20push"
+function Get-ConectorWebPush($Dv) {
+  $linhas = @(Read-DvAll $Dv "connectors?`$select=connectorinternalid&`$filter=name eq '$($script:NomeConectorWebPush)'" | Where-Object { $_.connectorinternalid })
+  if ($linhas.Count -ne 1) { throw "Conector $($script:NomeConectorWebPush) nao encontrado (ou repetido: $($linhas.Count)) no ambiente de destino; sem ele o vinculo do Web Push nao pode ser montado." }
+  return "/providers/Microsoft.PowerApps/apis/$($linhas[0].connectorinternalid)"
+}
 
 # O vinculo por --settings-file exige que a conta do CI possa usar a conexao (ConnectionAuthorizationFailed no ensaio de
 # 09/11/2026), e o Power Platform nao deixa compartilhar a conexao com service principal. Mas a permissao so e cobrada quando o
@@ -555,17 +564,18 @@ function Assert-ConexaoWebPush([string[]] $Solucoes, [string] $Alvo, [string] $C
 }
 
 # Grava o arquivo de --settings-file da BetinhosAutomacao. Sem conexao (TEST sem Web Push), nao ha arquivo.
-function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $Conexao) {
+function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $Conexao, [string] $Conector) {
   if ($Solucao -ne "BetinhosAutomacao" -or -not $Conexao) { return "" }
+  if (-not $Conector) { throw "Vinculo do Web Push sem o id do conector do ambiente de destino (Get-ConectorWebPush)." }
   $caminho = Join-Path $Pasta "configuracao-$Solucao.json"
-  $corpo = [ordered]@{ EnvironmentVariables = @(); ConnectionReferences = @([ordered]@{ LogicalName = $script:ReferenciaWebPush; ConnectionId = $Conexao; ConnectorId = $script:ConectorWebPush }) }
+  $corpo = [ordered]@{ EnvironmentVariables = @(); ConnectionReferences = @([ordered]@{ LogicalName = $script:ReferenciaWebPush; ConnectionId = $Conexao; ConnectorId = $Conector }) }
   [IO.File]::WriteAllText($caminho, (ConvertTo-Json $corpo -Depth 4), (New-Object Text.UTF8Encoding $false))
   return $caminho
 }
 
 # Importa o ZIP gerenciado com upgrade e prova pela versao instalada. Pac com erro nao e falha se a versao chegou.
 # $Alvo: Test ou Prod (explicito). $Permitidas: as 4 por padrao; a retirada passa tambem AppBetinhos (upgrade antes de desinstalar).
-function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "") {
+function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
   Assert-HostAlvo $Dv $Alvo
   $m = Get-ManifestoDoPacote $Caminho
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
@@ -575,7 +585,7 @@ function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test
   do {
     $tentativas++
     $erroPac = $null
-    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) $Configuracao) | Out-Null }
+    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) $Configuracao $SemUpgrade) | Out-Null }
     catch {
       $erroPac = "$($_.Exception.Message)"
       if ($tentativas -lt 2 -and (Test-FalhaTransitoriaDoServidor $erroPac) -and (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) -ne $m.Version) {

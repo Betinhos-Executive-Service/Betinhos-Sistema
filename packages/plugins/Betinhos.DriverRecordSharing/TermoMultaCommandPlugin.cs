@@ -17,12 +17,20 @@ namespace Betinhos.DriverRecordSharing
 
     public sealed class TermoInfleetGateway : ITermoInfleet
     {
-        private readonly string token;
-        public TermoInfleetGateway(string token) { this.token = token; }
+        private readonly IOrganizationService system;
+        private readonly string secureConfig;
+        private readonly ITracingService tracing;
+
+        public TermoInfleetGateway(IOrganizationService system, string secureConfig, ITracingService tracing)
+        {
+            this.system = system;
+            this.secureConfig = secureConfig;
+            this.tracing = tracing;
+        }
 
         public Dictionary<string, object> Coletar(string placa, DateTime infracaoUtc)
         {
-            var gateway = new InfleetGraphQlGateway(token);
+            var gateway = new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, secureConfig, tracing));
             var vehicle = gateway.FindVehicleByPlate(placa);
             if (vehicle == null) return new Dictionary<string, object> { ["erro"] = "Veículo " + placa + " não encontrado no InFleet." };
             var from = infracaoUtc.AddMinutes(-30);
@@ -64,14 +72,17 @@ namespace Betinhos.DriverRecordSharing
 
         private const int PrazoAssinaturaDias = 7;
         private readonly Func<DateTime> clock;
-        private readonly Func<ITermoInfleet> infleet;
+        private readonly Func<IOrganizationService, ITracingService, ITermoInfleet> infleet;
 
         public TermoMultaCommandPlugin() : this((string)null, (string)null) { }
 
         public TermoMultaCommandPlugin(string unsecureConfig, string secureConfig)
-            : this(() => DateTime.UtcNow, () => new TermoInfleetGateway(secureConfig)) { }
+            : this(() => DateTime.UtcNow, (system, tracing) => new TermoInfleetGateway(system, secureConfig, tracing)) { }
 
         public TermoMultaCommandPlugin(Func<DateTime> clock, Func<ITermoInfleet> infleet)
+            : this(clock, infleet == null ? null : (Func<IOrganizationService, ITracingService, ITermoInfleet>)((system, tracing) => infleet())) { }
+
+        private TermoMultaCommandPlugin(Func<DateTime> clock, Func<IOrganizationService, ITracingService, ITermoInfleet> infleet)
         {
             this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
             this.infleet = infleet ?? throw new ArgumentNullException(nameof(infleet));
@@ -228,7 +239,7 @@ namespace Betinhos.DriverRecordSharing
 
             var dataInfracao = multa.GetAttributeValue<DateTime?>("cr40f_dataehorario");
             Dictionary<string, object> infleetDados;
-            try { infleetDados = dataInfracao.HasValue ? infleet().Coletar(placa, dataInfracao.Value) : new Dictionary<string, object> { ["erro"] = "Multa sem data/hora." }; }
+            try { infleetDados = dataInfracao.HasValue ? infleet(system, tracing).Coletar(placa, dataInfracao.Value) : new Dictionary<string, object> { ["erro"] = "Multa sem data/hora." }; }
             catch (Exception error) { infleetDados = new Dictionary<string, object> { ["erro"] = error.Message }; }
             var evidencias = new Dictionary<string, object>
             {

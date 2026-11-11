@@ -3,10 +3,13 @@ name: Retirar AppBetinhos
 # Segunda janela da promoção (depois de "Publicar soluções" com as 4 no mesmo alvo): tira do TEST ou do PROD as soluções
 # gerenciadas antigas, AppBetinhos e gerarpagantes, que as 4 substituem.
 #  1. foto-dev (environment dev, só leitura): foto do DEV da mesma janela, prova do que saiu da AppBetinhos de propósito;
-#  2. retirar (environment do alvo; no prod com revisor): foto antes; registros das tabelas aceitas exportados em JSON (elas só
+#  2. retirar (environment do alvo; no prod, só depois do aprovar-prod, que tem o revisor no environment prod-aprovacao e roda
+#     junto com o foto-dev): foto antes; registros das tabelas aceitas exportados em JSON (elas só
 #     existem na AppBetinhos e somem com ela; decisão registrada no input); conferir-retirada --dev (o que está só na caixa tem
 #     de estar ausente do DEV; tabela com registros só se aceita); desinstalação das duas; foto depois e comparação --retirada
 #     (o que era só da caixa e sumiu é informativo; queda de registros e qualquer outra perda reprovam).
+# Artefatos: foto-dev e retirada-<alvo> (fotos: só hashes e nomes) em claro; os registros exportados sobem cifrados com o
+# secret PACOTES_SENHA (registros-<alvo>; repositório público). Nenhum job deste workflow exporta ZIP de solução.
 # Não faz upgrade da AppBetinhos antes de desinstalar: no TEST (30/10/2026) ele caiu duas vezes com erro de transporte SQL do
 # servidor aos 30-50 min; a desinstalação direta apaga o mesmo conjunto, e a barreira com a foto do DEV prova que é o esperado.
 on:
@@ -52,8 +55,21 @@ jobs:
           path: foto-dev/
           retention-days: 90
 
+  # Revisor obrigatório (Renan) no environment prod-aprovacao; o environment prod não tem revisor (publicar.yml).
+  aprovar-prod:
+    if: inputs.alvo == 'prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: prod-aprovacao
+    steps:
+      - name: Aprovado
+        run: echo "Retirada no PROD aprovada por ${{ github.actor }}." >> "$GITHUB_STEP_SUMMARY"
+
   retirar:
-    needs: foto-dev
+    needs: [foto-dev, aprovar-prod]
+    if: >-
+      !cancelled() && needs.foto-dev.result == 'success' &&
+      (inputs.alvo == 'test' || needs.aprovar-prod.result == 'success')
     runs-on: windows-latest
     timeout-minutes: 240
     environment: ${{ inputs.alvo }}
@@ -71,9 +87,9 @@ jobs:
         with:
           name: foto-dev
           path: foto-dev
-      - name: Instalar pac
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-alvo --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Foto antes
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/antes.json
@@ -108,6 +124,17 @@ jobs:
           name: retirada-${{ inputs.alvo }}
           path: |
             fotos/
-            registros/
             foto-dev/
+          retention-days: 90
+      - name: Cifrar os registros exportados
+        if: always() && hashFiles('registros/**') != ''
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh cifrar registros registros-cifrado/registros.tar.enc
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('registros/**') != ''
+        with:
+          name: registros-${{ inputs.alvo }}
+          path: registros-cifrado/
           retention-days: 90

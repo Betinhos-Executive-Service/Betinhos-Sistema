@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mudancasDev, pluginDoArquivo } from './mudancas-dev.mjs'
 
 test('só a tela publica a tela e nenhum plugin', () => {
-  assert.deepEqual(mudancasDev(['apps/shell/src/App.tsx', 'docs/x.md']), { tela: true, webresources: false, formulario: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['apps/shell/src/App.tsx', 'docs/x.md']), { tela: true, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
 })
 
 test('script de publicação da tela também republica a tela', () => {
@@ -22,13 +22,13 @@ test('Betinhos.DriverRecordSharing publica como driverrecordsharing; ExpenseUplo
   assert.equal(pluginDoArquivo('packages/plugins/scripts/push-driverrecordsharing-plugin.ps1'), 'driverrecordsharing')
   assert.equal(pluginDoArquivo('packages/plugins/Betinhos.DriverRecordSharing.Tests/FuelMathTests.cs'), null)
   assert.equal(pluginDoArquivo('packages/plugins/Betinhos.ExpenseUpload/ExpenseUploadCommand.cs'), null)
-  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.ExpenseUpload/A.cs', 'packages/plugins/Betinhos.ExpenseUpload.Tests/B.cs']), { tela: false, webresources: false, formulario: false, plugins: [] })
-  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.DriverRecordSharing/A.cs', 'packages/plugins/Cr40f.Frota.Plugin/B.cs', 'packages/plugins/Betinhos.DriverRecordSharing/C.cs']), { tela: false, webresources: false, formulario: false, plugins: ['driverrecordsharing', 'frota'] })
+  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.ExpenseUpload/A.cs', 'packages/plugins/Betinhos.ExpenseUpload.Tests/B.cs']), { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['packages/plugins/Betinhos.DriverRecordSharing/A.cs', 'packages/plugins/Cr40f.Frota.Plugin/B.cs', 'packages/plugins/Betinhos.DriverRecordSharing/C.cs']), { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: ['driverrecordsharing', 'frota'] })
 })
 
 test('teste de plugin não republica', () => {
   assert.equal(pluginDoArquivo('packages/plugins/Cr40f.Frota.Plugin.Tests/FrotaTests.cs'), null)
-  assert.deepEqual(mudancasDev(['packages/plugins/Cr40f.Frota.Plugin.Tests/FrotaTests.cs']), { tela: false, webresources: false, formulario: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['packages/plugins/Cr40f.Frota.Plugin.Tests/FrotaTests.cs']), { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
 })
 
 test('vários plugins saem sem repetição e em ordem', () => {
@@ -37,19 +37,19 @@ test('vários plugins saem sem repetição e em ordem', () => {
     'packages/plugins/Cr40f.Acesso.Plugin/B.cs',
     'packages/plugins/tools/Cr40f.Portal.Registrar/Program.cs',
   ])
-  assert.deepEqual(r, { tela: false, webresources: false, formulario: false, plugins: ['acesso', 'portal'] })
+  assert.deepEqual(r, { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: ['acesso', 'portal'] })
 })
 
 test('flow e schema não publicam nada (continuam à mão)', () => {
-  assert.deepEqual(mudancasDev(['packages/deploy/provision-flow-avaliacao.ps1']), { tela: false, webresources: false, formulario: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['packages/deploy/provision-flow-avaliacao.ps1']), { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
 })
 
 test('sem base publica só a tela', () => {
-  assert.deepEqual(mudancasDev(null), { tela: true, webresources: false, formulario: false, plugins: [] })
+  assert.deepEqual(mudancasDev(null), { tela: true, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
 })
 
 test('tela Gerar Pagantes publica os WebResources, não a tela do sistema', () => {
-  assert.deepEqual(mudancasDev(['apps/gerar-pagantes/src/ui/App.tsx']), { tela: false, webresources: true, formulario: false, plugins: [] })
+  assert.deepEqual(mudancasDev(['apps/gerar-pagantes/src/ui/App.tsx']), { tela: false, webresources: true, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
   assert.equal(mudancasDev(['packages/deploy/push-webresources-dev.ps1']).webresources, true)
   assert.equal(mudancasDev(['apps/gerar-pagantes/src/money.test.ts']).webresources, false)
   assert.equal(mudancasDev(['pnpm-lock.yaml']).webresources, true)
@@ -60,7 +60,7 @@ test('plugin Gerar Pagantes entra pelo nome da pasta', () => {
 })
 
 test('Formulário Geral publica o WebResource; teste, fixture, .md e docs do app não', () => {
-  assert.deepEqual(mudancasDev(['apps/formulario-geral/app.js']), { tela: false, webresources: false, formulario: true, plugins: [] })
+  assert.deepEqual(mudancasDev(['apps/formulario-geral/app.js']), { tela: false, webresources: false, formulario: true, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] })
   assert.equal(mudancasDev(['apps/formulario-geral/scripts/xlsx_import_core.js']).formulario, true)
   assert.equal(mudancasDev(['apps/formulario-geral/power-platform/flows/ai_schedule_interpret.json', 'apps/formulario-geral/scripts/provision-ai-schedule-flows.ps1']).formulario, false)
   assert.equal(mudancasDev(['packages/deploy/push-formulario-dev.ps1']).formulario, true)
@@ -68,4 +68,25 @@ test('Formulário Geral publica o WebResource; teste, fixture, .md e docs do app
   assert.equal(mudancasDev(['apps/formulario-geral/scripts/ai_schedule_conversation.fixtures.mjs']).formulario, false)
   assert.equal(mudancasDev(['apps/formulario-geral/IMPORTACAO_SERVICOS.md', 'apps/formulario-geral/docs/AI_AGENDAR_POR_IA.md']).formulario, false)
   assert.equal(mudancasDev(['apps/shell/src/App.tsx']).formulario, false)
+})
+
+test('App Motoristas: código e build publicam o app; o service worker sai sozinho; teste e docs não publicam', () => {
+  const nada = { motoristas: false, motoristasSw: false }
+  const so = (arquivos) => { const r = mudancasDev(arquivos); return { motoristas: r.motoristas, motoristasSw: r.motoristasSw } }
+  assert.deepEqual(so(['apps/motoristas/src/App.tsx']), { motoristas: true, motoristasSw: false })
+  assert.deepEqual(so(['apps/motoristas/src/pwa/sw.js']), { motoristas: false, motoristasSw: true })
+  assert.deepEqual(so(['apps/motoristas/scripts/push-front-dev.ps1']), { motoristas: true, motoristasSw: true })
+  assert.deepEqual(so(['apps/motoristas/package.json', 'apps/motoristas/vite.config.ts']), { motoristas: true, motoristasSw: false })
+  assert.deepEqual(so(['pnpm-lock.yaml']), { motoristas: true, motoristasSw: false })
+  assert.deepEqual(so(['apps/motoristas/tests/media.test.ts', 'apps/motoristas/docs/x.md', 'apps/motoristas/AGENTS.md', 'apps/motoristas/scripts/qa/verify-tour.cjs']), nada)
+  assert.equal(mudancasDev(['apps/motoristas/src/App.tsx']).tela, false)
+})
+
+test('App Motoristas: web resources avulsos publicam só a peça motoristasWr', () => {
+  const r = mudancasDev(['apps/motoristas/webresources/new_appmotoristas_push_redirect.js'])
+  assert.deepEqual(r, { tela: false, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: true, plugins: [] })
+  assert.equal(mudancasDev(['apps/motoristas/webresources/new_exchange_lifecycle_dialog.html']).motoristasWr, true)
+  assert.equal(mudancasDev(['apps/motoristas/scripts/push-webresources-dev.ps1']).motoristasWr, true)
+  assert.equal(mudancasDev(['apps/motoristas/src/App.tsx', 'pnpm-lock.yaml', 'apps/motoristas/scripts/push-front-dev.ps1']).motoristasWr, false)
+  assert.equal(mudancasDev(['apps/motoristas/tests/pushRedirect.test.ts']).motoristasWr, false)
 })

@@ -16,6 +16,8 @@ import { FieldInput } from './FieldInput'
 import { FotoPerfil } from './FotoPerfil'
 import { ImageDrop } from './ImageDrop'
 import { AnotacoesTab } from './Anotacoes'
+import { ComunicadosTab } from './ComunicadosTab'
+import type { Source as ComunicadosSource } from '../../comunicados/data/source'
 import { AcessoApp, type EstadoAcesso, SeloApp, useContaApp } from './AcessoApp'
 import type { AcessoInicial, AcessoSource } from '../data/acesso'
 import { DocumentosArquivos } from './DocumentosArquivos'
@@ -26,7 +28,7 @@ import { SecretText } from './SecretText'
 import { useNotify } from './Toasts'
 import { VeiculoPicker } from './VeiculoPicker'
 
-type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'anotacoes'
+type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'comunicados' | 'anotacoes'
 const TABS: { key: Tab; label: string }[] = [
   { key: 'dados', label: 'Dados' },
   { key: 'documentos', label: 'Documentos' },
@@ -34,6 +36,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'multas', label: 'Multas' },
   { key: 'veiculos', label: 'Veículos' },
   { key: 'equipamentos', label: 'Equipamentos' },
+  { key: 'comunicados', label: 'Comunicados' },
   { key: 'anotacoes', label: 'Anotações' },
 ]
 const GROUPS: FieldGroup[] = ['pessoais', 'vinculo', 'contato', 'detalhes', 'assinatura']
@@ -49,13 +52,15 @@ type Props = {
   /** Muda quando algo fora da ficha alterou o registro (ex.: cadastro de acesso); força a releitura. */
   versao?: number
   acesso?: AcessoSource | null
+  /** Fonte dos comunicados; sem ela a aba Comunicados some. */
+  comunicados?: ComunicadosSource | null
   onCadastrarAcesso?: (inicial: AcessoInicial) => void
   /** E-mail criado pelo cadastro cuja liberação no Dataverse ficou pendente (ainda não gravado na ficha). */
   emailPendente?: string
   onLiberacaoConcluida?: (id: string) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, comunicados, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -66,7 +71,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
   const [errors, setErrors] = useState<Record<string, string>>({})
   // A seção aberta vive na URL (`secao=documentos`); "Dados" é o padrão. Colaborador novo só tem a seção Dados.
   const [secao, setTab] = useQueryTexto('secao', 'dados')
-  const tab: Tab = !id ? 'dados' : TABS.find((item) => item.key === secao)?.key ?? 'dados'
+  const tabs = comunicados ? TABS : TABS.filter((item) => item.key !== 'comunicados')
+  const tab: Tab = !id ? 'dados' : tabs.find((item) => item.key === secao)?.key ?? 'dados'
   const idAnterior = useRef(id)
   // Id do colaborador recém-criado cujo PDF não subiu: a troca de id vinda do próprio save não zera o arquivo pendente.
   const manterAditivoDe = useRef<string | null>(null)
@@ -100,7 +106,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
 
   const emailFicha = String(original?.values.cr40f_emailmicrosoft ?? '')
   // Sem o módulo de acesso (ex.: ficha aberta pela Central de Documentos) não consulta o usuário do app.
-  const [conta, setConta] = useContaApp(acesso ? emailFicha : '', source.usuarioDoApp)
+  const [conta, setConta, reconferirConta] = useContaApp(acesso ? emailFicha : '', source.usuarioDoApp)
   const estadoAcesso: EstadoAcesso = emailFicha ? conta : emailPendente ? 'liberando' : 'sem'
 
   async function recarregarAposLiberacao() {
@@ -244,7 +250,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         </header>
 
         <div className="drawer-tabs">
-          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={TABS.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
+          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
         </div>
 
         <div className="drawer-body" role="tabpanel">
@@ -303,6 +309,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   acesso={acesso}
                   estado={estadoAcesso}
                   setConta={setConta}
+                  reconferir={reconferirConta}
                   emailPendente={emailPendente}
                   onAtualizado={() => void recarregarAposLiberacao()}
                   onAlterado={() => onSaved(original.id, false)}
@@ -324,6 +331,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
           {original && tab === 'multas' && <MultasTab source={source} id={original.id} />}
           {original && tab === 'veiculos' && <VeiculosTab source={source} id={original.id} />}
           {original && tab === 'equipamentos' && <EquipamentosTab source={source} id={original.id} />}
+          {original && comunicados && tab === 'comunicados' && <ComunicadosTab source={comunicados} id={original.id} nome={String(original.values.cr40f_nomecompleto ?? '')} />}
           {original && tab === 'anotacoes' && <AnotacoesTab source={source} id={original.id} />}
         </div>
 

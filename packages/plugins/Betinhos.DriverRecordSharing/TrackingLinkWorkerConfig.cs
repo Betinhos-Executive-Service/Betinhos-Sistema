@@ -2,15 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Web.Script.Serialization;
+using Microsoft.Xrm.Sdk;
 
 namespace Betinhos.DriverRecordSharing
 {
-    // Configuração segura dos steps de link: {"url":"https://<worker>/api/links","segredo":"..."}.
+    // Configuração dos steps de link: {"url":"https://<worker>/api/links","segredo":"..."}, na tabela cr40f_segredo
+    // (mesmo JSON) ou, sem linha, na configuração segura do step.
     public sealed class TrackingLinkWorkerConfig
     {
+        public const string SecretName = "link-acompanhamento.worker";
+
         public string Url { get; private set; }
         public string Secret { get; private set; }
         public bool IsConfigured { get { return !string.IsNullOrWhiteSpace(Url) && !string.IsNullOrWhiteSpace(Secret); } }
+
+        public static TrackingLinkWorkerConfig Load(IOrganizationService system, string secureConfig, ITracingService tracing) =>
+            Parse(SecretReader.ReadTableOrSecureConfig(system, SecretName, secureConfig, tracing));
 
         public static TrackingLinkWorkerConfig Parse(string secureConfig)
         {

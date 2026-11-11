@@ -45,8 +45,7 @@ export function PessoasTable({ list, choices, dups, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty}
-        severity={(p) => (dups.has(p.id) ? { tone: 'warning', label: 'Possível duplicado' } : null)} />
+      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

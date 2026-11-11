@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
+import { openFromRow, openOnRow, openRowActions, selectionRowActions, type SelectionProps } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { opTone } from '../domain/status'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
 
 type Props = { list: Op[]; choices: OpChoices; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Op>>
 
 /** "Fulano - telefone" por linha (texto do flow): na lista basta o nome. */
 export function passageirosCurto(texto: string) {
@@ -37,7 +37,7 @@ function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
   )
 }
 
-export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
+export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
   const columns: TableColumn<Op>[] = [
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
@@ -47,8 +47,8 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
     { key: 'criada', header: 'Criada em', label: 'Criada em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
   ]
   return (
-    <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+    <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

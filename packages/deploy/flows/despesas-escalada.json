@@ -1,0 +1,128 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    }
+  },
+  "triggers": {
+    "Todo_dia_7h30": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "schedule": {
+          "hours": [
+            "7"
+          ],
+          "minutes": [
+            30
+          ]
+        }
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      }
+    }
+  },
+  "actions": {
+    "Try": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Limite": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "@formatDateTime(addDays(utcNow(), -3), 'yyyy-MM-ddTHH:mm:ssZ')"
+        },
+        "Paradas": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Limite": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "__SET_DESPESA__",
+              "$select": "cr40f_despesaoperacionalid",
+              "$filter": "statecode eq 0 and cr40f_statusoperacional eq 100000001 and (new_aguardandogestor eq false or new_aguardandogestor eq null) and createdon ge 2026-11-10T03:00:00Z and modifiedon lt @{outputs('Limite')}",
+              "$orderby": "modifiedon asc",
+              "$top": 500
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Para_cada_parada": {
+          "type": "Foreach",
+          "runAfter": {
+            "Paradas": [
+              "Succeeded"
+            ]
+          },
+          "foreach": "@outputs('Paradas')?['body/value']",
+          "actions": {
+            "Escalar": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateRecord"
+                },
+                "parameters": {
+                  "entityName": "__SET_DESPESA__",
+                  "recordId": "@items('Para_cada_parada')?['cr40f_despesaoperacionalid']",
+                  "item/new_aguardandogestor": true
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 5
+            }
+          }
+        }
+      }
+    },
+    "Catch": {
+      "type": "Scope",
+      "runAfter": {
+        "Try": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "actions": {
+        "Falhar": {
+          "type": "Terminate",
+          "runAfter": {},
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "EscaladaFalhou",
+              "message": "A escalada de despesas ao gestor falhou; confira a execução do flow."
+            }
+          }
+        }
+      }
+    }
+  }
+}

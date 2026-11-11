@@ -16,7 +16,9 @@ public sealed class FakeGraphGateway : IGraphGateway
 
     private void Registrar(string metodo) { Chamadas.Add(metodo); if (FalharEm == metodo) throw new AcessoException("GRAPH_INDISPONIVEL", "503 em " + metodo); }
 
-    public GraphUsuario? UsuarioPorUpn(string upn) { Registrar("UsuarioPorUpn"); return Usuarios.TryGetValue(upn, out var u) ? u : null; }
+    /// <summary>Gancho antes de cada leitura do usuário (ex.: simular falha só na conferência).</summary>
+    public System.Action? AoLerUsuario;
+    public GraphUsuario? UsuarioPorUpn(string upn) { Registrar("UsuarioPorUpn"); AoLerUsuario?.Invoke(); return Usuarios.TryGetValue(upn, out var u) ? u : null; }
     public string? UltimoEmailPessoal;
     public GraphUsuario CriarUsuario(string upn, string nome, string senha, string? celular, string? emailPessoal = null)
     {
@@ -24,12 +26,14 @@ public sealed class FakeGraphGateway : IGraphGateway
         var u = new GraphUsuario { Id = IdDe(upn), Upn = upn, DisplayName = nome, Ativo = true };
         Usuarios[upn] = u; return u;
     }
-    public void DefinirAtivo(string id, bool ativo) { Registrar("DefinirAtivo"); Usuarios.Values.Single(u => u.Id == id).Ativo = ativo; }
+    public void DefinirAtivo(string id, bool ativo) { Registrar("DefinirAtivo"); if (!IgnorarMudancas) Usuarios.Values.Single(u => u.Id == id).Ativo = ativo; }
     public void AtribuirLicenca(string id, string sku) { Registrar("AtribuirLicenca"); Usuarios.Values.Single(u => u.Id == id).SkuIds.Add(sku); }
-    public void RemoverLicenca(string id, string sku) { Registrar("RemoverLicenca"); Usuarios.Values.Single(u => u.Id == id).SkuIds.Remove(sku); }
+    public void RemoverLicenca(string id, string sku) { Registrar("RemoverLicenca"); if (!IgnorarMudancas) Usuarios.Values.Single(u => u.Id == id).SkuIds.RemoveAll(s => string.Equals(s, sku, System.StringComparison.OrdinalIgnoreCase)); }
     public bool EhMembro(string g, string id) { Registrar("EhMembro"); return Membros.Contains((g, id)); }
     public void AdicionarAoGrupo(string g, string id) { Registrar("AdicionarAoGrupo"); Membros.Add((g, id)); }
-    public void RemoverDoGrupo(string g, string id) { Registrar("RemoverDoGrupo"); Membros.Remove((g, id)); }
+    public void RemoverDoGrupo(string g, string id) { Registrar("RemoverDoGrupo"); if (!IgnorarMudancas) Membros.Remove((g, id)); }
+    /// <summary>Graph aceita as escritas sem efeito (simula acesso que continua depois do encerrar).</summary>
+    public bool IgnorarMudancas;
     public readonly List<string> Senhas = new();
     public bool SemPermissaoSenha;
     public void RedefinirSenha(string id, string senha)

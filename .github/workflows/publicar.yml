@@ -1,8 +1,8 @@
 name: Publicar soluções
 
-# Leva as 3 soluções gerenciadas do Sistema (BetinhosCore, BetinhosAutomacao, BetinhosInterface) do DEV para o
-# TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, app e sitemap. Dados não vão por solução.
-# A BetinhosMotoristas é publicada só pelo repositório app-motoristas-v2.
+# Leva as 4 soluções gerenciadas (BetinhosCore, BetinhosAutomacao, BetinhosMotoristas, BetinhosInterface, nesta ordem de import)
+# do DEV para o TEST e/ou o PROD: tabelas, colunas, formulários, visões, flows, plugins, WebResources, apps e sitemaps. Dados não vão
+# por solução. A BetinhosMotoristas é o App Motoristas (apps/motoristas), publicado daqui desde a fase 3 da migração do app-motoristas-v2.
 # Caminho normal: o workflow Produção (producao.yml) chama este com alvo test-e-prod quando a main recebe mudança fora da tela.
 # À mão (Actions › Run workflow) continua valendo para refazer um ensaio ou repetir um alvo.
 #  - exportar (environment dev): trava do commit (a tela e os plugins do DEV têm de ser os deste commit), conferência das 4 soluções no DEV
@@ -10,9 +10,15 @@ name: Publicar soluções
 #    pacotes que o TEST ensaiou. Por solução, a impressão digital do DEV (impressao.ps1) decide antes do export: sem mudança
 #    desde a última publicação em todos os alvos = pulada (sem ZIP); igual ao pacote do último Deploy = reaproveita; senão exporta.
 #    Só vale com a variável SOLUCOES_IMPRESSAO=confiar; sem ela (modo observar) exporta tudo e prova a decisão no resumo;
-#  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
-#    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão. Solução com o mesmo
-#    conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada; importar_tudo força o import.
+#  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde e com o aprovar-prod
+#    aprovado. A aprovação do Renan fica no environment prod-aprovacao (job aprovar-prod), pedida logo depois do export e
+#    respondida enquanto o TEST importa (decisão do Renan, 11/11/2026: aprovar antes de o TEST terminar; o TEST continua
+#    barrando). O environment prod só guarda os secrets e a regra de branch (main). Backup do PROD feito pelo próprio job, ou
+#    rótulo informado à mão. Solução com o mesmo conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada;
+#    importar_tudo força o import.
+# Repositório público: qualquer conta do GitHub baixa artefatos. O export passa pela trava de segredos (segredos.ps1, dentro
+# do exportar-do-dev.ps1) e o artefato "pacotes" sobe só cifrado (artefato-cifrado.sh, AES-256 com o secret PACOTES_SENHA
+# do repositório). Sem o secret, o job falha antes do export.
 on:
   workflow_dispatch:
     inputs:
@@ -23,7 +29,7 @@ on:
         default: test
         options: [test, test-e-prod, prod]
       solucoes:
-        description: 'Soluções separadas por vírgula (vazio = as 3 do Sistema)'
+        description: 'Soluções separadas por vírgula (vazio = as 4)'
         required: false
         default: ''
       backup:
@@ -34,6 +40,10 @@ on:
         description: 'Importar as soluções mesmo com conteúdo igual ao da última publicação no ambiente'
         type: boolean
         default: false
+      ensaio_sem_upgrade:
+        description: 'Ensaio, só com alvo test: soluções (vírgula, ou todas) importadas como update, sem --stage-and-upgrade. Vazio = upgrade, como sempre.'
+        required: false
+        default: ''
   workflow_call:
     inputs:
       alvo:
@@ -74,8 +84,18 @@ jobs:
     steps:
       - name: Alvo válido
         shell: bash
+        env:
+          ENSAIO_SEM_UPGRADE: ${{ inputs.ensaio_sem_upgrade || '' }}
         run: |
           case "${{ inputs.alvo }}" in test|prod|test-e-prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
+          # Antes do export: o ensaio sem upgrade é só no TEST, e recusar aqui não sobe versão no DEV à toa.
+          if [ -n "$ENSAIO_SEM_UPGRADE" ] && [ "${{ inputs.alvo }}" != "test" ]; then echo "::error::ensaio_sem_upgrade só vale com alvo test."; exit 1; fi
+      - name: Secret PACOTES_SENHA
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          if [ -z "$PACOTES_SENHA" ]; then echo "::error::Secret PACOTES_SENHA ausente (repository secret). Sem ele os pacotes não podem subir cifrados; nada foi exportado."; exit 1; fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -83,20 +103,21 @@ jobs:
         with:
           node-version: 24
       - name: Trava do commit (tela e plugins do DEV são os deste commit)
-        # O export sai do DEV, que recebe a develop. Se a develop já tem tela ou plugin novo que não está neste commit, o PROD
-        # o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1) e de cada
-        # assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing (no workflow Deploy); pendentes-dev.ps1 compara com este commit.
+        # O export sai do DEV, que recebe a develop. Se a develop já tem tela, App Motoristas ou plugin novo que não está neste commit,
+        # o PROD o receberia sem passar pela main. O DEV registra o commit publicado na descrição da tela (push-dev.ps1), do app e do
+        # service worker do App Motoristas (push-front-dev.ps1), dos web resources avulsos dele (push-webresources-dev.ps1) e de cada assembly Cr40f.*.Plugin e Betinhos.DriverRecordSharing (no
+        # workflow Deploy); pendentes-dev.ps1 compara com este commit.
         run: |
           $r = powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/pendentes-dev.ps1 -Ate $env:GITHUB_SHA | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'pendentes-dev.ps1 falhou.' }
-          if ($r.tela -or $r.webresources -or $r.formulario -or @($r.plugins).Count) {
+          if ($r.tela -or $r.webresources -or $r.formulario -or $r.motoristas -or $r.motoristasSw -or $r.motoristasWr -or @($r.plugins).Count) {
             $r.motivos | ForEach-Object { Write-Host $_ }
             throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
           }
           Write-Host "DEV com a tela e os plugins de $($env:GITHUB_SHA.Substring(0,7))."
-      - name: Instalar pac
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Última publicação em cada alvo
         # Tags solucoes-<alvo> (versão, hash e impressão digital de cada solução). Arquivo vazio = alvo sem registro, não pula.
@@ -117,9 +138,20 @@ jobs:
       - name: Pacote do último Deploy
         uses: actions/cache/restore@v4
         with:
-          path: cache-solucoes
-          key: solucoes-dev-${{ github.sha }}
-          restore-keys: solucoes-dev-
+          path: cache-cifrado
+          key: solucoes-dev-cifrado-${{ github.sha }}
+          restore-keys: solucoes-dev-cifrado-
+      - name: Decifrar o pacote do último Deploy
+        # Cache cifrado (PR de fork lê caches da branch padrão). Sem cache, ou se não decifrar, segue sem reaproveitamento.
+        if: hashFiles('cache-cifrado/pacotes.tar.enc') != ''
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: |
+          if ! bash packages/deploy/solucoes/artefato-cifrado.sh decifrar cache-cifrado/pacotes.tar.enc cache-solucoes; then
+            echo "::warning::Pacote do último Deploy não decifrou (PACOTES_SENHA trocado?); exporta sem reaproveitar."
+            rm -rf cache-solucoes
+          fi
       - name: Conferir, decidir por solução e exportar
         # SOLUCOES_IMPRESSAO (variável do repositório): vazia = modo observar (exporta tudo e só registra o que teria decidido);
         # confiar = pula a solução sem mudança e reaproveita o pacote do Deploy. importar_tudo nunca pula.
@@ -127,7 +159,8 @@ jobs:
           CONFIAR: ${{ vars.SOLUCOES_IMPRESSAO == 'confiar' }}
           IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
         run: |
-          $extra = @('-Cache', 'cache-solucoes')
+          # -Inventario: o import compara com o destino e escolhe update ou upgrade (SOLUCOES_IMPORT_MODO, _importar-solucoes.yml).
+          $extra = @('-Cache', 'cache-solucoes', '-Inventario')
           if ($env:IMPORTAR_TUDO -ne 'true') { $extra += @('-Publicadas', $env:PUBLICADAS) }
           if ($env:CONFIAR -eq 'true') { $extra += '-Confiar' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-do-dev.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Solucoes "$env:SOLUCOES" -Pasta pacotes @extra
@@ -143,10 +176,16 @@ jobs:
             echo '```'
             echo 'origem: exportado, cache (pacote do Deploy) ou pulada (sem mudança). observacao "erro" = a impressão digital falhou; não ligue o modo confiar.'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Cifrar os pacotes
+        # Só depois da trava de segredos (o export falha antes daqui se achar segredo).
+        shell: bash
+        env:
+          PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
+        run: bash packages/deploy/solucoes/artefato-cifrado.sh cifrar pacotes pacotes-cifrado/pacotes.tar.enc
       - uses: actions/upload-artifact@v4
         with:
           name: pacotes
-          path: pacotes/
+          path: pacotes-cifrado/
           retention-days: 7
 
   importar-test:
@@ -156,13 +195,26 @@ jobs:
     with:
       alvo: test
       importar_tudo: ${{ inputs.importar_tudo }}
+      sem_upgrade: ${{ inputs.ensaio_sem_upgrade || '' }}
     secrets: inherit
 
+  # Revisor obrigatório (Renan) no environment prod-aprovacao, regra de branch main. Roda junto com o importar-test para a
+  # espera pela aprovação não somar ao tempo do ensaio; o importar-prod espera os dois.
+  aprovar-prod:
+    needs: exportar
+    if: inputs.alvo == 'test-e-prod' || inputs.alvo == 'prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: prod-aprovacao
+    steps:
+      - name: Aprovado
+        run: echo "PROD aprovado por ${{ github.actor }}; o import só começa com o TEST verde (test-e-prod)." >> "$GITHUB_STEP_SUMMARY"
+
   importar-prod:
-    needs: [exportar, importar-test]
-    # Com test-e-prod o PROD só vem depois do TEST verde; com prod (à mão) o TEST foi pulado de propósito.
+    needs: [exportar, importar-test, aprovar-prod]
+    # Com test-e-prod o PROD só vem depois do TEST verde; com prod (à mão) o TEST foi pulado de propósito. Nos dois, só com a aprovação.
     if: >-
-      !cancelled() && needs.exportar.result == 'success' &&
+      !cancelled() && needs.exportar.result == 'success' && needs.aprovar-prod.result == 'success' &&
       ((inputs.alvo == 'test-e-prod' && needs.importar-test.result == 'success') ||
        (inputs.alvo == 'prod' && needs.importar-test.result == 'skipped'))
     uses: ./.github/workflows/_importar-solucoes.yml

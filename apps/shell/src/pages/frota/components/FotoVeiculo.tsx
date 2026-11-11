@@ -21,28 +21,36 @@ function limitar<T>(task: () => Promise<T>) {
 }
 
 // Cache persistente (Cache Storage): a foto já vista aparece na hora e é revalidada em segundo plano uma vez por sessão.
+// "Sem foto" também fica guardado por 6 h: a maioria dos veículos não tem pasta, e perguntar de novo a cada visita
+// gerava rajadas de chamadas ao Flow (#270). Enviar foto pela tela limpa a marca na hora (invalidarFoto).
 const CACHE_NOME = 'frota-fotos-v1'
+const SEM_FOTO = 'X-Frota-Sem-Foto'
+const SEM_FOTO_MS = 6 * 60 * 60 * 1000
 const cacheKey = (id: string) => `/__frota-foto/${encodeURIComponent(id)}`
 
-async function lerPersistido(id: string) {
+async function lerPersistido(id: string): Promise<Blob | 'sem-foto' | null> {
   try {
     if (typeof caches === 'undefined') return null
     const resp = await (await caches.open(CACHE_NOME)).match(cacheKey(id))
-    return resp ? await resp.blob() : null
+    if (!resp) return null
+    const marcado = Number(resp.headers.get(SEM_FOTO))
+    if (marcado) return Date.now() - marcado < SEM_FOTO_MS ? 'sem-foto' : null
+    return await resp.blob()
   } catch { return null }
 }
 
-async function gravarPersistido(id: string, blob: Blob | null) {
+async function gravarPersistido(id: string, valor: Blob | 'sem-foto' | null) {
   try {
     if (typeof caches === 'undefined') return
     const store = await caches.open(CACHE_NOME)
-    if (blob) await store.put(cacheKey(id), new Response(blob, { headers: { 'Content-Type': blob.type } }))
+    if (valor === 'sem-foto') await store.put(cacheKey(id), new Response(null, { headers: { [SEM_FOTO]: String(Date.now()) } }))
+    else if (valor) await store.put(cacheKey(id), new Response(valor, { headers: { 'Content-Type': valor.type } }))
     else await store.delete(cacheKey(id))
   } catch { /* Sem Cache Storage: segue só com a memória. */ }
 }
 
 function buscarRemoto(source: DataSource, id: string) {
-  return limitar(() => source.fotoVeiculo(id)).then(async (blob) => { await gravarPersistido(id, blob); return blob })
+  return limitar(() => source.fotoVeiculo(id)).then(async (blob) => { await gravarPersistido(id, blob ?? 'sem-foto'); return blob })
 }
 
 function fotoUrl(source: DataSource, id: string) {
@@ -52,6 +60,7 @@ function fotoUrl(source: DataSource, id: string) {
   if (!url) {
     const mapa = porId
     const atual: Promise<string | null> = lerPersistido(id).then((salvo) => {
+      if (salvo === 'sem-foto') return null
       if (!salvo) return buscarRemoto(source, id).then((blob) => (blob ? URL.createObjectURL(blob) : null))
       const local = URL.createObjectURL(salvo)
       // Revalida sem bloquear; troca a imagem só se mudou.

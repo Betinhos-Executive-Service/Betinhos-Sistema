@@ -165,7 +165,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
       <>
         {mobile
           ? (visible.length ? <ValidacaoCards list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} /> : <div className="surface">{empty}</div>)
-          : <ValidacaoTable list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig }} extraCell={extra.cell} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <ValidacaoTable list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig, pinnable: true }} extraCell={extra.cell} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -174,7 +174,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   return (
     <div className="page vc-page">
       <div role="toolbar" aria-label="Comandos da validação do cliente">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="vc-search" value={query} onChange={setQuery} placeholder="Buscar serviço, pedido, trajeto ou mensagem" aria-label="Buscar serviços" />
           <Button variant="secondary" icon={<MessageCircleQuestion size={16} />} disabled={!data.loaded} aria-label={`Dúvidas abertas: ${duvidas}`} onClick={() => view.select('pronta:em-duvida')}>{mobile ? null : `Dúvidas (${duvidas})`}</Button>

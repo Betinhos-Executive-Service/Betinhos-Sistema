@@ -1,0 +1,140 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "type": "SecureObject",
+      "defaultValue": {}
+    },
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      },
+      "inputs": {
+        "triggerAuthenticationType": "All",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "SessionId": {
+      "type": "Compose",
+      "inputs": "@coalesce(triggerBody()?['data']?['object']?['id'], '')"
+    },
+    "EhSessaoCheckout": {
+      "type": "If",
+      "runAfter": {
+        "SessionId": [
+          "Succeeded"
+        ]
+      },
+      "expression": {
+        "startsWith": [
+          "@outputs('SessionId')",
+          "cs_"
+        ]
+      },
+      "actions": {
+        "Comando": {
+          "type": "Compose",
+          "inputs": {
+            "acao": "sincronizar",
+            "sessionId": "@outputs('SessionId')"
+          }
+        },
+        "Sincronizar": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Comando": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "PerformUnboundAction"
+            },
+            "parameters": {
+              "actionName": "new_CobrancaQR",
+              "item/new_Command": "@{string(outputs('Comando'))}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        }
+      },
+      "else": {
+        "actions": {}
+      }
+    },
+    "Ok": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "EhSessaoCheckout": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "statusCode": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "recebido": true
+        }
+      }
+    },
+    "Falhou": {
+      "type": "Response",
+      "kind": "Http",
+      "runAfter": {
+        "EhSessaoCheckout": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "inputs": {
+        "statusCode": 500,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "recebido": false
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

@@ -1,0 +1,47 @@
+---
+name: verificar-compartilhamento-motorista
+description: "Verifica o compartilhamento de registros com o motorista (ServiceDriverSharePlugin + DataverseAccessHelper): conceder/revogar acesso na reserva, passageiros, solicitante e trocas, inclusive quando o motorista é dono do registro (gestor que também dirige). Use após mudar packages/plugins/Betinhos.DriverRecordSharing/DataverseAccessHelper.cs, DriverResolver.cs, ServiceDriverSharePlugin.cs ou ServiceVehicleSynchronizer.cs (carro do serviço pela posse)."
+---
+# Verificar compartilhamento com o motorista
+
+## Cobre
+- Código: `packages/plugins/Betinhos.DriverRecordSharing/DataverseAccessHelper.cs`, `DriverResolver.cs`, `ServiceDriverSharePlugin.cs`.
+- Testes: `packages/plugins/Betinhos.DriverRecordSharing.Tests/DataverseAccessHelperTests.cs` (dono do registro x não dono, conceder e revogar) e `PassengerChangeTests.cs` (Update de passageiro só recalcula `cr40f_passageirosetelefonedecontato` das OS quando nome/telefone mudam de valor).
+- Scripts: `scripts/validate-driver-record-sharing-plugin.ps1`, `scripts/verify-driver-record-sharing-plugin-e2e.ps1`, `scripts/register-driver-record-sharing-plugin-webapi.ps1`.
+
+## Regra que não pode quebrar
+- O Dataverse recusa revogar o próprio dono ("Only owner can revoke access to the owner", 0x80040223). Em plugin síncrono, capturar a exceção não salva a operação: a transação já foi marcada para rollback. Por isso o helper lê o `ownerid` do alvo e pula conceder/revogar quando o usuário é o dono. Toda chamada de acesso deve passar pelo `DataverseAccessHelper`.
+
+## Regra da revogação por papel
+- Solicitante e passageiro são o mesmo registro (`cr40f_bancodedados`). Antes de revogar a pessoa de um motorista, `ServicePassengerRepository.IsContactInOtherServiceForEmployee` olha os dois papéis nas outras OS dele (solicitante **ou** passageiro). Checar só o mesmo papel derrubou o acesso no PROD em 27/10/2026 (OS-11115 x OS-10762) e o app passou a dar 403 em `retrieveRecord` de `cr40f_bancodedados`.
+- Teste: `packages/plugins/Betinhos.DriverRecordSharing.Tests/ContactRetentionTests.cs`. Em DEV: pessoa solicitante na OS A e passageiro na OS B, mesmo motorista; tirar o motorista da OS A → ele continua lendo a pessoa (trace `keep requester`).
+
+## Preparar ambiente
+- A chave de assinatura fica em `%USERPROFILE%\.codex\keys\Betinhos.DriverRecordSharing.snk`, fora do repositório (vale para todo worktree); não gere chave nova (mudaria a identidade do assembly).
+
+## Regra do passageiro
+- `ServicePassengerViewSynchronizer` é o dono único de `cr40f_passageirosetelefonedecontato` (o flow Tenaris não grava mais o campo) e ordena os vínculos por `cr40f_ordemdeselecao` e depois `createdon`.
+- O flow Tenaris regrava nome e telefone de `cr40f_bancodedados` a cada sincronização com o mesmo valor. `HandlePassenger` compara com a pré-imagem `pre` (nome, telefone) e só chama `SyncServicesForPassenger` se o valor mudou (nulo = vazio). Sem pré-imagem, qualquer atributo presente conta como mudança.
+
+## Regra do carro do serviço (posse)
+- `ServiceVehicleSynchronizer` (chamado pelo `ServiceDriverSharePlugin` no Create/Update da reserva, da posse e da troca) só preenche `cr40f_veiculo` pela posse quando o motorista é **terceiro** (`cr40f_tipodevinculo` = 1). Terceiro não passa pela Infleet na finalização do app (`skipVehicle`), então a posse é a única fonte do carro dele.
+- Colaborador recebe o carro só na finalização (Infleet ou escolha do motorista, origem 100000002/100000003). Se um serviço dele ainda aberto (Pré-reserva, Solicitado, Confirmado ou Programado) tiver carro de origem Automático (sobra de posse), o plugin limpa o carro e mantém a origem Automático. Serviço em execução ou encerrado não é mexido (histórico; no PROD há OS paradas em Em Execução).
+- A limpeza manda `new_origemveiculo` junto; sem isso, `MarkManualVehicleOriginIfNeeded` remarca o serviço como Manual.
+- Testes: `ServiceVehicleSynchronizerTests` (`EmployeeDriverNeverGetsVehicleFromPossession`, `EmployeeDriverLosesVehicleLeftByPreviousThirdPartyPossession`, `StartedOrClosedEmployeeServiceKeepsHistoricalPossessionVehicle`, `PossessionChangeResyncsServicesThatHaveNotStartedYet`). A lista de status "não começou" é `PluginConfig.ServiceNotStartedStatuses`, usada tanto na limpeza quanto na busca de OS futuras ao mudar posse ou troca.
+- DEV: definir um colaborador com posse aberta como motorista de uma OS futura → `cr40f_veiculo` fica vazio (trace `skip employee driver`). Fazer o mesmo com um terceiro → recebe o carro da posse. Na auditoria, nenhuma alteração de `cr40f_veiculo` pela conta de serviço em OS de colaborador.
+
+## Roteiro
+1. `cd packages/plugins/Betinhos.DriverRecordSharing.Tests && dotnet test -v q --filter "DataverseAccessHelperTests|PassengerChangeTests"` → `Com falha: 0`, 8 testes.
+   - Prova em produção do problema que `PassengerChangeTests` cobre: auditoria da OS 2149 (PROD) com `cr40f_passageirosetelefonedecontato` alternando entre `" / "` (flow) e `";\r\n"` (plugin) a cada sincronização. Depois do deploy, uma sincronização sem mudança de contato não gera auditoria nesse campo.
+2. Prova do antes: troque temporariamente o helper por `git show origin/main:packages/plugins/Betinhos.DriverRecordSharing/DataverseAccessHelper.cs` e rode o passo 1 → os testes `*_SkipsOwner*` falham; restaure o arquivo.
+3. Suíte inteira: `dotnet test -v q` → `Com falha: 0`.
+4. DEV (somente com autorização para publicar o plugin, a partir da `main` atualizada): registrar com `register-driver-record-sharing-plugin-webapi.ps1 ... -Apply` → `REGISTRO E VALIDACAO OK`. Depois, em uma reserva cujo `ownerid` é o usuário do motorista atual:
+   - trocar o motorista para outro → salva; o novo motorista ganha acesso; o dono continua dono.
+   - trocar outro motorista para o dono → salva sem criar compartilhamento para o dono.
+   - cancelar a reserva → salva.
+   - remover passageiro → salva.
+   - troca entre dois motoristas comuns → o anterior perde o compartilhamento (`RetrieveSharedPrincipalsAndAccess`).
+   No Rastreamento de Plug-in, as linhas `RevokeAccess skip owner` / `EnsureAccess skip owner` aparecem nos casos do dono.
+
+## Evidência
+- Saída do `dotnet test` (antes/depois) e, em DEV, o trace do plug-in de cada cenário.

@@ -576,6 +576,46 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Empty(world.Stripe.Gets);
         }
 
+        // ---------- chave: tabela cr40f_segredo, depois configuração segura ----------
+
+        private static void Segredo(World world, string valor) =>
+            world.Service.Rows(SecretReader.Table).Add(new Entity(SecretReader.Table, Guid.NewGuid())
+            {
+                [SecretReader.NameColumn] = QrChargeConfig.SecretName,
+                [SecretReader.ValueColumn] = valor
+            });
+
+        [Fact]
+        public void ChaveDaTabelaVenceAConfiguracaoSegura()
+        {
+            var world = new World();
+            Segredo(world, "sk_test_tabela");
+            Assert.Equal("sk_test_tabela", QrChargeConfig.Load(world.Service, null, "sk_test_config", null).StripeKey);
+        }
+
+        [Fact]
+        public void SemLinhaNaTabelaUsaAChaveDaConfiguracaoSegura()
+        {
+            var world = new World();
+            var config = QrChargeConfig.Load(world.Service, "{\"successUrl\":\"https://x.com/fim\"}", "{\"chave\":\"sk_test_config\"}", null);
+            Assert.Equal("sk_test_config", config.StripeKey);
+            Assert.Equal("https://x.com/fim", config.SuccessUrl);
+        }
+
+        [Fact]
+        public void SemChaveEmNenhumaFonteCriarRecusaENadaEGravado()
+        {
+            var world = new World();
+            var config = QrChargeConfig.Load(world.Service, null, null, null);
+            Assert.False(config.IsConfigured);
+            var handler = new QrChargeCommandHandler(world.Service, world.User.Id, null,
+                () => config.IsConfigured ? new StripeHttpGateway(config.StripeKey) : null, config.SuccessUrl, () => Now);
+
+            Assert.Contains("ainda não está configurada", Erro(handler.Handle(world.CreateCommand(38000))));
+            Assert.Empty(world.Service.Created);
+            Assert.Empty(world.Service.Updated);
+        }
+
         // ---------- apoio ----------
 
         private static string Command(string acao, string sessionId) =>

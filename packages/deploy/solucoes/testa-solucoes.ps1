@@ -310,24 +310,11 @@ Confere (-not (Exit-Trava $dv 'dev' 'sistema/1') -and $script:chamadas.Count -eq
 # Publicacao no TEST: versao seguinte, solucoes escolhidas na ordem de import e import so no TEST
 Confere ((Get-VersaoSeguinte '1.0.0.4') -eq '1.0.0.5' -and (Get-VersaoSeguinte '2.1.0.99') -eq '2.1.0.100') 'versao seguinte sobe a revisao'
 Confere ((Falha-Com { Get-VersaoSeguinte '1.0' }) -like '*fora do formato*') 'versao fora do formato falha'
-Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosInterface') 'lista vazia = as 3 do Sistema na ordem'
-Confere ((@(Get-SolucoesEscolhidas ' BetinhosInterface, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosInterface') 'lista escolhida volta na ordem de import'
+Confere ((@(Get-SolucoesEscolhidas '') -join ',') -eq 'BetinhosCore,BetinhosAutomacao,BetinhosMotoristas,BetinhosInterface') 'lista vazia = as 4, com a Motoristas antes da Interface'
+Confere ((@(Get-SolucoesEscolhidas ' BetinhosMotoristas, BetinhosCore ') -join ',') -eq 'BetinhosCore,BetinhosMotoristas') 'lista escolhida volta na ordem de import'
+Confere ((@(Get-SolucoesEscolhidas 'BetinhosCore,BetinhosInterface') -join ',') -eq 'BetinhosCore,BetinhosInterface') 'Interface sem a Motoristas volta a valer (service worker ja na Motoristas no TEST e no PROD)'
+Confere ((@(Get-SolucoesEscolhidas 'BetinhosInterface,BetinhosMotoristas') -join ',') -eq 'BetinhosMotoristas,BetinhosInterface') 'Motoristas importa antes da Interface (service worker nunca apagado)'
 Confere ((Falha-Com { Get-SolucoesEscolhidas 'AppBetinhos' }) -like '*fora do Sistema*AppBetinhos*') 'solucao fora do Sistema falha'
-Confere ((Falha-Com { Get-SolucoesEscolhidas 'BetinhosCore,BetinhosMotoristas' }) -like '*app-motoristas-v2*') 'BetinhosMotoristas nao sai por aqui'
-$script:respostas = @(
-  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }, [pscustomobject]@{ objectid = 'bbb'; componenttype = 80; rootcomponentbehavior = 0 }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ webresourceid = 'CCC' }) })
-$doApp = Get-IdsDoApp $dv
-Confere ($doApp.Count -eq 3 -and $doApp.ContainsKey('aaa') -and $doApp.ContainsKey('bbb') -and $doApp.ContainsKey('ccc')) 'app: componentes de uma solucao com varios e o service worker'
-$script:respostas = @(
-  [pscustomobject]@{ value = @([pscustomobject]@{ solutionid = 'm' }) },
-  [pscustomobject]@{ value = @([pscustomobject]@{ objectid = 'AAA'; componenttype = 61; rootcomponentbehavior = 0 }) },
-  [pscustomobject]@{ value = @() })
-$doApp = Get-IdsDoApp $dv
-Confere ($doApp.Count -eq 1 -and $doApp.ContainsKey('aaa')) 'app: um componente so e sem service worker'
-$script:respostas = @([pscustomobject]@{ value = @() }, [pscustomobject]@{ value = @() })
-Confere ((Get-IdsDoApp $dv).Count -eq 0) 'app: solucao ausente nao falha'
 Confere ($null -eq (Falha-Com { Assert-HostTest $dvTest })) 'import: host do TEST passa'
 Confere ((Falha-Com { Assert-HostTest @{ Host = 'orgf261ae8e.crm2.dynamics.com' } }) -like '*alvo Test*') 'import: PROD recusado'
 Confere ((Falha-Com { Assert-HostTest $dv }) -like '*alvo Test*') 'import: DEV recusado'
@@ -371,6 +358,32 @@ $script:respostas = @(
 $r = Restore-Estados $dvProd 'Prod' $fotoEstados
 Confere ($r.Mudancas.Count -eq 0 -and $r.Falhas.Count -eq 1 -and $r.Falhas[0] -like 'fluxo F1*recusado*') 'restaura: falha do Dataverse vira item em Falhas, nao excecao'
 
+# Fluxo aposentado: desliga depois de restaurar so com o substituto ligado; sem substituto ligado fica como estava
+$fotoAposentado = [pscustomobject]@{ fluxos = [pscustomobject]@{ 'a1' = [pscustomobject]@{ nome = 'Antigo'; estado = 1 }; 'v1' = [pscustomobject]@{ nome = 'Vigia'; estado = 1 } }; steps = [pscustomobject]@{} }
+$aposentados = @([pscustomobject]@{ nome = 'Antigo'; substituto = 'Vigia' })
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 1 -and $r.Mudancas[0].tipo -eq 'fluxo aposentado' -and $patches.Count -eq 1 -and $patches[0].Uri -like '*workflows(a1)' -and ($patches[0].Body | ConvertFrom-Json).statecode -eq 0) 'aposentado: desliga com o substituto ligado'
+$vigiaDesligada = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 0; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}, [pscustomobject]@{}
+)
+$script:respostas = $vigiaDesligada; $script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 2 -and $r.Mudancas[0].nome -eq 'Vigia' -and $r.Mudancas[1].tipo -eq 'fluxo aposentado' -and $patches[0].Uri -like '*workflows(v1)' -and $patches[1].Uri -like '*workflows(a1)') 'aposentado: restaura o substituto antes e so entao desliga o antigo'
+$fotoVigiaDesligada = [pscustomobject]@{ fluxos = [pscustomobject]@{ 'a1' = [pscustomobject]@{ nome = 'Antigo'; estado = 1 }; 'v1' = [pscustomobject]@{ nome = 'Vigia'; estado = 0 } }; steps = [pscustomobject]@{} }
+$script:respostas = $vigiaDesligada; $script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoVigiaDesligada -Aposentados $aposentados
+Confere ($r.Mudancas.Count -eq 0 -and @($script:chamadas | Where-Object { $_.Method -eq 'Patch' }).Count -eq 0) 'aposentado: sem substituto ligado fica como estava'
+
 # -DesligarNovos le as 6 solucoes rastreadas (so BetinhosCore existe aqui, com n1 e n3); n4 e n5 estao fora delas e ficam como estao
 $script:respostas = @(
   [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'f2'; name = 'F2'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n1'; name = 'Novo'; statecode = 1; category = 5 }, [pscustomobject]@{ workflowid = 'n2'; name = 'Regra'; statecode = 1; category = 2 }, [pscustomobject]@{ workflowid = 'n4'; name = 'Fora das solucoes'; statecode = 1; category = 5 }) },
@@ -403,6 +416,7 @@ $script:SegundosEntreTentativas = 0
 $script:pacChamadas = 0
 Confere (((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' 'c.json') -join ' ') -like '*--settings-file c.json*') 'import passa o arquivo de configuracao'
 Confere (-not ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4') -contains '--settings-file')) 'import sem configuracao nao passa --settings-file'
+Confere (-not ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' '' $true) -contains '--stage-and-upgrade') -and ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' '' $true) -contains '--activate-plugins')) 'import: ensaio sem upgrade tira so o stage-and-upgrade'
 Confere ((Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' }) -like '*CONEXAO_WEBPUSH*') 'PROD com Automacao sem conexao recusa'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore') 'Prod' '' })) 'PROD so com Core passa sem conexao'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' 'abc' })) 'PROD com conexao passa'
@@ -410,11 +424,20 @@ Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosAutomacao') 'Te
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' 'true' })) 'PROD sem conexao passa com WEBPUSH_VINCULAR_DEPOIS'
 Confere ((Get-ConexaoWebPushDoImport 'abc' 'true') -eq '' -and (Get-ConexaoWebPushDoImport 'abc' '') -eq 'abc' -and (Get-ConexaoWebPushDoImport 'abc' 'false') -eq 'abc') 'WEBPUSH_VINCULAR_DEPOIS=true pula o --settings-file'
 $pastaCfg = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString('N')); [void] [IO.Directory]::CreateDirectory($pastaCfg)
-$cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc'
+$cfg = New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc' '/providers/Microsoft.PowerApps/apis/shared_x-5fprod'
 $lido = Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json
 Confere (@($lido.ConnectionReferences).Count -eq 1 -and @($lido.ConnectionReferences)[0].LogicalName -eq 'new_webpushmotoristas' -and @($lido.ConnectionReferences)[0].ConnectionId -eq 'abc') 'configuracao traz a referencia do Web Push'
-Confere (-not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosCore' 'abc') -and -not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' '')) 'sem configuracao fora da Automacao ou sem conexao'
+Confere (@($lido.ConnectionReferences)[0].ConnectorId -eq '/providers/Microsoft.PowerApps/apis/shared_x-5fprod') 'configuracao usa o conector lido no ambiente de destino'
+Confere ((Falha-Com { New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' 'abc' '' }) -like '*conector*') 'vinculo sem o conector do ambiente recusa'
+Confere (-not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosCore' 'abc' 'c') -and -not (New-ConfiguracaoDeImport $pastaCfg 'BetinhosAutomacao' '' 'c')) 'sem configuracao fora da Automacao ou sem conexao'
 Remove-Item -LiteralPath $pastaCfg -Recurse -Force
+$script:conectoresDv = @(@{ connectorinternalid = 'shared_new-5fapp-20motoristas-20web-20push-5f10c3aafe51dca724' })
+$readDvAllReal = ${function:Read-DvAll}
+function Read-DvAll($Dv, [string] $Path) { $script:caminhoConector = $Path; return $script:conectoresDv }
+Confere ((Get-ConectorWebPush @{}) -eq '/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f10c3aafe51dca724' -and $script:caminhoConector -like "*name eq 'new_app-20motoristas-20web-20push'*") 'conector do Web Push vem do ambiente de destino pelo nome'
+$script:conectoresDv = @()
+Confere ((Falha-Com { Get-ConectorWebPush @{} }) -like '*nao encontrado*') 'ambiente sem o conector do Web Push recusa'
+Set-Item function:Read-DvAll $readDvAllReal
 function Invoke-Pac([string] $Url, [string[]] $Argumentos) { $script:pacChamadas++; if ($script:pacChamadas -eq 1) { throw "pac solution import falhou: Connection State is closed." }; return @() }
 function Get-ManifestoDoPacote([string] $ZipPath) { return @{ UniqueName = 'BetinhosCore'; Version = '1.0.0.9'; Managed = $true } }
 # versao instalada: antes (1.0.0.8) nas consultas da 1a tentativa e da checagem, depois 1.0.0.9 na prova final

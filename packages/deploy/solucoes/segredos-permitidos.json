@@ -1,0 +1,16 @@
+[
+  {
+    "solucao": "BetinhosInterface",
+    "arquivo": "WebResources/new_TelaCurriculo*",
+    "tipo": "sig",
+    "motivo": "Tela legada com URL de flow assinada fixa no codigo; sai no PR que move a URL para variavel de ambiente.",
+    "ate": "2026-12-10"
+  },
+  {
+    "solucao": "BetinhosInterface",
+    "arquivo": "WebResources/new_teladespesasoperacionais*",
+    "tipo": "sig",
+    "motivo": "Tela legada com URL de flow assinada fixa no codigo; sai no PR que move a URL para variavel de ambiente.",
+    "ate": "2026-12-10"
+  }
+]

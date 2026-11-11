@@ -212,7 +212,7 @@ Outros scripts de apoio em `packages/deploy`: `set-variavel-ambiente.ps1`, `site
 ## 6. IA
 
 ### 6.1 Agentes de departamento (`packages/agentes-ia`)
-Pacote `@betinhos/agentes-ia` (TypeScript, `@anthropic-ai/sdk` 0.133.0 só em devDependencies, para avaliação). Modelo declarado em `src/constantes.ts`: `claude-opus-5-5`, `max_tokens` 8000, `effort` `medium`, saída em JSON Schema (`src/schema.ts`). As constantes são exportadas para o flow por `scripts/gerar-constantes.ts` (`pnpm --filter @betinhos/agentes-ia constantes`, gera `dist/constantes.json`).
+Pacote `@betinhos/agentes-ia` (TypeScript, `@anthropic-ai/sdk` 0.133.0 só em devDependencies, para avaliação). Modelo declarado em `src/constantes.ts`: `claude-opus-5-5`, `max_tokens` 12000 (8000 cortava a resposta do Financeiro e deixava a do Pessoas no limite; a chamada leva ~60 s para 8000 e o timeout do flow é 110 s), `effort` `medium`, saída em JSON Schema (`src/schema.ts`). As constantes são exportadas para o flow por `scripts/gerar-constantes.ts` (`pnpm --filter @betinhos/agentes-ia constantes`, gera `dist/constantes.json`).
 
 | Agente | Fonte do contexto (`src/`) | Tipos de proposta | Ações permitidas |
 |---|---|---|---|

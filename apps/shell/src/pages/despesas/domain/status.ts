@@ -6,6 +6,9 @@ export const OPERACIONAL = { enviado: 100000000, corrigir: 100000001, validado: 
 export const FINANCEIRO = { naoReembolsavel: 100000000, aguardando: 100000001, pago: 100000002, cancelado: 100000003 } as const
 export const ANEXO = { sem: 100000000, enviando: 100000001, completo: 100000002, falhou: 100000003, parcial: 100000004 } as const
 
+/** Motivo de devolução ou cancelamento: mínimo para o motorista entender, máximo para caber no Memo sem surpresa. */
+export const MOTIVO = { min: 10, max: 500 } as const
+
 /** Rótulos de DEV; só entram se a metadata não responder. */
 export const FALLBACK_CHOICES: DespesaChoices = {
   operacional: [

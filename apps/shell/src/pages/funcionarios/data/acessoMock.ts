@@ -3,6 +3,7 @@ import { AcessoError, MENSAGENS } from './acesso'
 import { normalizeSearch as semAcentos } from './format'
 import { encontrarParecidos, type LinhaFuncionario } from './parecidos'
 import { latenciaMock } from '../../../app/latenciaMock'
+import { usuariosAppMock } from './usuariosAppMock'
 
 // 1,2 s: o bastante para ver o progresso no mock.
 const delay = <T,>(value: T, ms = 1200) => new Promise<T>((resolve) => setTimeout(() => resolve(value), latenciaMock(ms)))
@@ -50,8 +51,10 @@ export function createAcessoMock(): AcessoSource {
       const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
       if (!f.email) throw new AcessoError('FUNCIONARIO_SEM_EMAIL', MENSAGENS.FUNCIONARIO_SEM_EMAIL, [])
       if (semAcentos(confirmacao.trim()) !== semAcentos(f.nome.split(/\s+/)[0])) throw new AcessoError('CONFIRMACAO_INVALIDA', MENSAGENS.CONFIRMACAO_INVALIDA, [])
-      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }]
-      return delay(etapas)
+      const etapas: Etapa[] = [{ etapa: 'confirmacao', estado: 'feita', detalhe: 'ok' }, { etapa: 'licenca', estado: 'feita', detalhe: 'removida' }, { etapa: 'conta', estado: 'feita', detalhe: 'desativada' }, { etapa: 'grupo', estado: 'feita', detalhe: 'removido' }, { etapa: 'bloqueio', estado: 'feita', detalhe: 'bloqueado no Dataverse' }, { etapa: 'conferencia', estado: 'feita', detalhe: 'acesso retirado' }]
+      const r = await delay(etapas)
+      if (f.email in usuariosAppMock) usuariosAppMock[f.email] = false
+      return r
     },
     async reativar(funcionarioId) {
       const f = MOCK_FUNCIONARIOS[funcionarioId] ?? { nome: 'Funcionário Mock', email: 'x@betinhos.onmicrosoft.com' }
@@ -60,7 +63,9 @@ export function createAcessoMock(): AcessoSource {
         emailMicrosoft: f.email, senhaTemporaria: 'Rz4!tW8nQ2kM6p', linkApp: 'https://org23b93544.crm2.dynamics.com/WebResources/new_app-motoristas-v2',
         etapas: [{ etapa: 'usuario', estado: 'feita', detalhe: 'encontrado' }, { etapa: 'conta', estado: 'feita', detalhe: 'reativada' }, { etapa: 'licenca', estado: 'feita', detalhe: 'atribuída' }, { etapa: 'grupo', estado: 'feita', detalhe: 'adicionado' }, { etapa: 'systemuser', estado: 'feita', detalhe: 'sincronizado pelo Power Platform' }, { etapa: 'senha', estado: 'feita', detalhe: 'redefinida' }],
       }
-      return delay(resultado)
+      const r = await delay(resultado)
+      usuariosAppMock[f.email] = true
+      return r
     },
   }
 }

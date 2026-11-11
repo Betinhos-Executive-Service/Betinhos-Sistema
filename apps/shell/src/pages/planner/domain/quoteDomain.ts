@@ -1,7 +1,8 @@
-// Porte de Tela Planner/src/quoteDomain.js (sem mudança de comportamento).
+// Porte de Tela Planner/src/quoteDomain.js; a busca (quoteSearchText) é nova.
+import { normalizeText } from './domain'
 import { localDateKey } from './management'
 import { addBusinessDays, QUOTE_STATUS_FLOW, QUOTE_TERMINAL_STATUSES } from './quoteTaskFlow'
-import type { QuoteInput, QuoteOptionData, Task } from './types'
+import type { Employee, QuoteInput, QuoteOptionData, Task } from './types'
 
 export { QUOTE_TERMINAL_STATUSES }
 export const QUOTE_STATUSES: string[] = [...QUOTE_STATUS_FLOW, ...QUOTE_TERMINAL_STATUSES]
@@ -155,6 +156,61 @@ export function isQuoteOpen(status: unknown): boolean {
   return QUOTE_OPEN_STATUSES.includes(status as string)
 }
 
+const digits = (value: unknown): string => String(value ?? '').replace(/\D/g, '')
+
+// Data pura ("2026-11-10") vira "10/11/2026"; data e hora (UTC do Dataverse) vira a de São Paulo.
+function dateTerms(value: unknown): string {
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ''))
+  return day ? `${day[3]}/${day[2]}/${day[1]}` : formatDateTime(value)
+}
+
+// O Dataverse devolve o valor cru ("1250.5"); a busca também acha "1.250,50".
+const moneyTerms = (value: unknown): unknown[] => [value, digits(value), Number.isFinite(parseQuoteMoney(value)) ? formatMoney(value) : '']
+
+const optionTerms = (options?: readonly QuoteOptionData[] | null): unknown[] => (options || []).flatMap((option) => [
+  option.name, option.label, option.vehicleType, option.legacyVehicleType, ...moneyTerms(option.value), option.notes, option.commercialTerms,
+  ...(option.items || []).map((item) => item.vehicleType),
+])
+
+/** Texto sem acento com tudo o que a busca encontra numa cotação (telefone e valor também só em dígitos). */
+export function quoteSearchText(quote: QuoteInput, assigneeNames: readonly string[] = []): string {
+  return normalizeText([
+    quote.code, String(quote.code ?? '').replace(/[^\p{L}\p{N}]/gu, ''),
+    quote.title, quote.subject, quote.client, quote.clientContact, quote.clientEmail, quote.clientPhone, digits(quote.clientPhone),
+    quote.status, QUOTE_PRIORITIES.find((item) => item.id === quote.priority)?.label,
+    quote.route, quote.origin, quote.destination,
+    dateTerms(quote.deadline), dateTerms(quote.serviceDate), dateTerms(quote.returnDate),
+    quote.vehicleType, quote.passengers, quote.passengerProfile,
+    ...moneyTerms(quote.value),
+    quote.notes, quote.description, quote.internalNotes, quote.commercialTerms,
+    quote.lossReason, quote.waitingFor, quote.waitingFrom, dateTerms(quote.waitingReturnDate),
+    ...optionTerms(quote.options), ...optionTerms(quote.proposalOptions),
+    ...assigneeNames,
+  ].join(' '))
+}
+
+/** Palavras da busca, sem acento; todas precisam aparecer, em qualquer ordem. */
+export const quoteSearchTerms = (query: unknown): string[] => normalizeText(query).split(/\s+/).filter(Boolean)
+
+type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds' | 'assigneeNames'> & { id?: string }
+type QuotePerson = Pick<Employee, 'id' | 'name'>
+
+export const quoteCreatorName = (quote: QuoteInput, employees: readonly QuotePerson[] = []): string =>
+  (quote.creatorEmployeeId && employees.find((employee) => employee.id === quote.creatorEmployeeId)?.name) || quote.creatorName || ''
+
+export const quotePeopleNames = (quote: QuoteInput, task: QuoteTask | undefined, employees: readonly QuotePerson[] = []): string[] =>
+  [...(task?.assigneeNames || []), quoteCreatorName(quote, employees)]
+
+export function primaryTaskByQuote<T extends QuoteTask>(tasks: readonly T[]): Map<string, T> {
+  return new Map(tasks.filter((task) => task.quoteId && !task.parentTaskId).map((task) => [String(task.quoteId), task]))
+}
+
+export function matchesQuoteSearch(quote: QuoteInput, terms: readonly string[], assigneeNames?: readonly string[]): boolean {
+  if (!terms.length) return true
+  const text = quoteSearchText(quote, assigneeNames)
+  return terms.every((term) => text.includes(term))
+}
+
 export interface QuoteFilters {
   query?: string
   status?: string | string[]
@@ -163,19 +219,12 @@ export interface QuoteFilters {
   deadline?: string | string[]
 }
 
-type QuoteTask = Pick<Task, 'quoteId' | 'parentTaskId' | 'assigneeIds'> & { id?: string }
-
-function primaryTaskByQuote(tasks: QuoteTask[]): Map<string, QuoteTask> {
-  return new Map(tasks.filter((task) => task.quoteId && !task.parentTaskId).map((task) => [String(task.quoteId), task]))
-}
-
-export function filterQuotes<Q extends QuoteInput>(quotes: Q[] = [], tasks: QuoteTask[] = [], filters: QuoteFilters = {}, today: string = localDateKey()): Q[] {
+export function filterQuotes<Q extends QuoteInput>(quotes: Q[] = [], tasks: QuoteTask[] = [], filters: QuoteFilters = {}, today: string = localDateKey(), employees: readonly QuotePerson[] = []): Q[] {
   const taskByQuote = primaryTaskByQuote(tasks)
-  const needle = String(filters.query || '').trim().toLocaleLowerCase('pt-BR')
+  const terms = quoteSearchTerms(filters.query)
   return quotes.filter((quote) => {
     const task = taskByQuote.get(String(quote.id))
-    const searchable = [quote.code, quote.title, quote.client, quote.clientContact, quote.status].join(' ').toLocaleLowerCase('pt-BR')
-    if (needle && !searchable.includes(needle)) return false
+    if (terms.length && !matchesQuoteSearch(quote, terms, quotePeopleNames(quote, task, employees))) return false
     const selected = (value: string | string[] | undefined): string[] => Array.isArray(value) ? value : value ? [value] : []
     if (selected(filters.status).length && !selected(filters.status).includes(String(quote.status))) return false
     if (selected(filters.priority).length && !selected(filters.priority).includes(String(quote.priority))) return false
