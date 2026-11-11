@@ -15,10 +15,11 @@ public sealed class ObterFotoPassageiroHandler
     public const string Negado = "{\"ok\":false,\"motivo\":\"indisponivel\"}";
 
     private readonly IOrganizationService _sistema;
-    private readonly IConsultaArquivo _arquivos;
+    private readonly IConsultaArquivo? _arquivos;
     private readonly Action<string> _trace;
 
-    public ObterFotoPassageiroHandler(IOrganizationService sistema, IConsultaArquivo arquivos, Action<string>? trace = null)
+    /// <param name="arquivos">null quando não há URL do flow: nega com o motivo no trace.</param>
+    public ObterFotoPassageiroHandler(IOrganizationService sistema, IConsultaArquivo? arquivos, Action<string>? trace = null)
     {
         _sistema = sistema; _arquivos = arquivos; _trace = trace ?? (_ => { });
     }
@@ -48,6 +49,7 @@ public sealed class ObterFotoPassageiroHandler
         var caminho = CaminhoNaBiblioteca(link!);
         if (caminho is null) return Negar("link da foto fora da biblioteca");
 
+        if (_arquivos is null) return Negar("URL do flow de consulta ausente");
         ArquivoLido arquivo;
         try { arquivo = _arquivos.Ler(caminho, caminho.Substring(caminho.LastIndexOf('/') + 1)); }
         catch (Exception erro) { return Negar("falha ao ler a foto: " + erro.Message); }

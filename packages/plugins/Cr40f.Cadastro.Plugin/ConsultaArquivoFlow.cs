@@ -30,7 +30,7 @@ public sealed class ConsultaArquivoFlow : IConsultaArquivo
 
     public ConsultaArquivoFlow(string url)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttps) throw new InvalidOperationException("URL do flow de consulta ausente ou inválida na configuração segura.");
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttps) throw new InvalidOperationException("URL do flow de consulta inválida (precisa ser https).");
         _url = url;
     }
 
@@ -45,8 +45,26 @@ public sealed class ConsultaArquivoFlow : IConsultaArquivo
         req.Timeout = TimeoutMs;
         req.ReadWriteTimeout = TimeoutMs;
         req.ContentLength = bytes.Length;
-        using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
-        using var resp = (HttpWebResponse)req.GetResponse();
+        try
+        {
+            using (var s = req.GetRequestStream()) s.Write(bytes, 0, bytes.Length);
+            using var resp = (HttpWebResponse)req.GetResponse();
+            return LerResposta(resp);
+        }
+        catch (WebException erro)
+        {
+            // Motivo montado aqui, sem a URL nem o sig= do gatilho.
+            throw new InvalidOperationException(MotivoFalha(erro.Status, (erro.Response as HttpWebResponse)?.StatusCode));
+        }
+    }
+
+    public static string MotivoFalha(WebExceptionStatus status, HttpStatusCode? http) =>
+        status == WebExceptionStatus.Timeout ? "tempo esgotado (" + TimeoutMs / 1000 + " s)"
+        : http is HttpStatusCode c ? "flow respondeu HTTP " + (int)c
+        : "falha de rede (" + status + ")";
+
+    private static ArquivoLido LerResposta(HttpWebResponse resp)
+    {
         if (resp.StatusCode != HttpStatusCode.OK) throw new InvalidOperationException("Flow respondeu " + (int)resp.StatusCode + ".");
         if (resp.ContentLength > LimiteBytes) throw new InvalidOperationException("Resposta do flow acima do limite.");
         using var stream = resp.GetResponseStream();
