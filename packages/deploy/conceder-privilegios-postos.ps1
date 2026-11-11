@@ -104,14 +104,14 @@ $papel = $papeis[0]
 
 $profundidade = @{ 1 = "Basic"; 2 = "Local"; 4 = "Deep"; 8 = "Global" }
 function Get-Atual { @(Get-Rows "roleprivilegescollection" "privilegeid,privilegedepthmask" "roleid eq $($papel.roleid) and privilegeid eq $privilegioId") }
-$atual = Get-Atual
+$atual = @(Get-Atual)
 $depthAtual = if ($atual.Count -eq 1) { $profundidade[[int]$atual[0].privilegedepthmask] } else { "nenhum" }
 if ($depthAtual -eq "Global") { Write-Step "$Role ja tem $privilegio=Global; nada a fazer"; Write-Step "PRIVILEGIOS OK"; return }
 if (-not $Apply) { Write-Step "DRY RUN $Role receberia $privilegio=Global (hoje: $depthAtual)"; Write-Step "DRY RUN OK; use -Apply"; return }
 
 $concessao = @{ "@odata.type" = "Microsoft.Dynamics.CRM.RolePrivilege"; PrivilegeId = $privilegioId; Depth = "Global"; BusinessUnitId = $papel._businessunitid_value }
 Invoke-Dataverse "POST" "roles($($papel.roleid))/Microsoft.Dynamics.CRM.AddPrivilegesRole" @{ Privileges = @($concessao) } | Out-Null
-$depois = Get-Atual
+$depois = @(Get-Atual)
 if ($depois.Count -ne 1 -or $profundidade[[int]$depois[0].privilegedepthmask] -ne "Global") { throw "$Role ficou com $privilegio fora da profundidade esperada (Global)." }
 Write-Step "$Role concedido: $privilegio=Global"
 Write-Step "PRIVILEGIOS OK"
