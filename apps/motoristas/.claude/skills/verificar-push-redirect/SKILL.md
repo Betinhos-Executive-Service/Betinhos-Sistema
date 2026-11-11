@@ -32,4 +32,5 @@ description: "Verifica o redirect do toque das notificações do App Motoristas 
 
 ## Limites
 - O toque real no celular exige a notificação do Flow e o App instalado.
+- O GET de `webresourceset` devolve a camada publicada (conteúdo e descrição). Descrição gravada sem `PublishXml` fica só na não publicada: leia com `webresourceset(<id>)/Microsoft.Dynamics.CRM.RetrieveUnpublished()`. Foi a causa da falha do Deploy de 11/11/2026 (run 42930775442).
 - TEST e PROD: somente leitura.
