@@ -3,6 +3,7 @@ import { hasDataverseRuntime, retrieveMultiple } from "../../data/dataverse/clie
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
 import { carregarRankingPostos, obterPosicao, type ConviteAvaliacao, type Posicao, type RankingPostos } from "../despesas/rankingPostos.ts";
+import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
 import { guardar, lerGuardado } from "./guardados.ts";
 import { indexarRanking, type DadosPorId, type DadosPosto } from "./postosDados.ts";
 import { areaEmVolta, consultaPostosNaArea, mapearPosto, maisProximos, proximoRaio, RAIOS_LISTA_KM, type Area, type Posto } from "./postosProximos.ts";
@@ -107,7 +108,7 @@ export const invalidarRanking = () => { cache = null; };
 
 function rankingMock(): RankingPostos {
   // O convite aponta o posto mais perto do motorista (id 1), abastecido há 2 dias.
-  const abasteceu = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() - 2 * 86_400_000));
+  const abasteceu = todayInSaoPaulo(new Date(Date.now() - 2 * 86_400_000));
   return { ...RANKING_MOCK, convite: { postoId: "mock-posto-1", nome: "Posto Exemplo Centro", data: abasteceu } };
 }
 

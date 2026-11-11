@@ -167,7 +167,7 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
     instancia.on("zoomstart", aoGesto);
     instancia.on("moveend", () => { callbacks.current.onVista(lerVista(instancia)); sincronizarPinos(); });
     instancia.on("click", (evento) => {
-      if ((evento.originalEvent.target as HTMLElement | null)?.closest(".pp-pino")) return;
+      if (evento.originalEvent.target instanceof Element && evento.originalEvent.target.closest(".pp-pino")) return;
       const grupo = instancia.getLayer(CAMADA_GRUPOS) ? instancia.queryRenderedFeatures(evento.point, { layers: [CAMADA_GRUPOS] })[0] : undefined;
       if (!grupo) { callbacks.current.onDesselecionar(); return; }
       // Tocar no grupo aproxima até ele se abrir em pinos.

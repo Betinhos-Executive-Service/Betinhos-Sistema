@@ -16,10 +16,12 @@ type Props = {
 /** Passou disto (px) é arrasto; menos que isso é toque no puxador. */
 const LIMIAR_ARRASTO = 6;
 
+type Arrasto = { id: number; inicioY: number; inicioDeslocamento: number; ultimoY: number; ultimoT: number; velocidade: number; moveu: boolean; deslocamento: number };
+
 /** Gaveta (bottom sheet) com 3 posições. O arrasto é do puxador, com pointer capture; só `transform` anima (nunca a altura). */
 export function PostosGaveta({ gaveta, posicao, onPosicao, titulo, contagem, acima, children }: Props) {
   const raiz = useRef<HTMLDivElement | null>(null);
-  const arrasto = useRef<{ id: number; inicioY: number; inicioDeslocamento: number; ultimoY: number; ultimoT: number; velocidade: number; moveu: boolean; deslocamento: number } | null>(null);
+  const arrasto = useRef<Arrasto | null>(null);
   const aplicar = (deslocamento: number) => { if (raiz.current) raiz.current.style.transform = `translate3d(0, ${deslocamento}px, 0)`; };
 
   useLayoutEffect(() => { aplicar(gaveta.deslocamento[posicao]); }, [gaveta, posicao]);

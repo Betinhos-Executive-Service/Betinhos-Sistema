@@ -114,7 +114,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   const [busca, setBusca] = useState<Busca>("carregando");
   // A lista tem busca própria, em volta da origem das distâncias: o mapa só mostra o que está na tela.
   const [proximos, setProximos] = useState<Posto[]>([]);
-  const [buscaLista, setBuscaLista] = useState<"ok" | "carregando" | "erro">("carregando");
+  const [buscaLista, setBuscaLista] = useState<Busca>("carregando");
   // Preço e recomendação vêm do ranking, carregado uma vez em paralelo com o mapa. Se falhar, a tela segue sem eles (como o convite de avaliação).
   const [dadosPorId, setDadosPorId] = useState<DadosPorId | null>(null);
   const [convite, setConvite] = useState<ConviteAvaliacao | null>(null);

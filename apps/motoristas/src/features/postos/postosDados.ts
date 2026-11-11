@@ -1,6 +1,7 @@
 // Preço e recomendação dos postos da tela Postos próximos: junção por id com o ranking e formatação. Sem React nem Dataverse.
 import { maioriaNaoRecomenda, motivoPositivo, percentualRecomenda, rotuloMotivo, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
 import { METAS_GASTOS, semaforo, type Semaforo } from "../despesas/gastosRelatorio.ts";
+import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
 import type { ConviteAvaliacao, RankingPostos } from "../despesas/rankingPostos.ts";
 import type { Posto } from "./postosProximos.ts";
 
@@ -73,8 +74,6 @@ export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
 
 /** Janela em que o motorista ainda pode avaliar o posto onde abasteceu. */
 export const DIAS_PARA_AVALIAR = 30;
-const FUSO = "America/Sao_Paulo";
-const diaEmSaoPaulo = (data: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(data);
 
 /**
  * O motorista abasteceu neste posto nos últimos 30 dias e ainda não o avaliou? Vale o `convite` do ranking (plugin FuelRanking): o último
@@ -82,6 +81,6 @@ const diaEmSaoPaulo = (data: Date) => new Intl.DateTimeFormat("en-CA", { timeZon
  */
 export function podeAvaliar(convite: Pick<ConviteAvaliacao, "postoId" | "data"> | null, postoId: string, agora: Date) {
   if (!convite || convite.postoId !== postoId) return false;
-  const dias = (Date.parse(`${diaEmSaoPaulo(agora)}T00:00:00Z`) - Date.parse(`${convite.data}T00:00:00Z`)) / 86_400_000;
+  const dias = (Date.parse(`${todayInSaoPaulo(agora)}T00:00:00Z`) - Date.parse(`${convite.data}T00:00:00Z`)) / 86_400_000;
   return Number.isFinite(dias) && dias >= 0 && dias <= DIAS_PARA_AVALIAR;
 }
