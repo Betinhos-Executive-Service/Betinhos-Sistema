@@ -89,3 +89,6 @@ export function carregarDadosPostos(): Promise<DadosPorId> {
   atual.dados.catch(() => { if (cache === atual) cache = null; });
   return atual.dados;
 }
+
+/** Depois de uma avaliação: a próxima abertura relê o ranking, com a nota nova. */
+export function esquecerDadosPostos() { cache = null; }

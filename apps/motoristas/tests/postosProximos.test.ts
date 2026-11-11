@@ -210,3 +210,19 @@ test("idMenorPreco destaca o mais barato só com 2 ou mais preços diferentes", 
   assert.equal(idMenorPreco(iguais), "", "empate total não destaca");
   assert.equal(idMenorPreco([]), "");
 });
+
+test("paraFicha leva preço, histórico e avaliações do ranking para a ficha; sem ranking, preço 0 e sem avaliações", async () => {
+  const { paraFicha } = await import("../src/features/postos/postosDados.ts");
+  const dados = indexarRanking(ranking({ ...itemRanking("a", 6.09, aval(3, 2)), historico: [{ data: "2026-11-03", precoLitro: 6.09 }] }));
+  const [comDados, semDados] = juntarDados([posto("a", -23.19, -45.88), posto("b", -23.2, -45.9)], dados);
+  const ficha = paraFicha(comDados, 1.2);
+  assert.equal(ficha.postoId, "a");
+  assert.equal(ficha.precoLitro, 6.09);
+  assert.equal(ficha.distanciaKm, 1.2);
+  assert.equal(ficha.historico.length, 1);
+  assert.equal(ficha.avaliacoes.total, 3);
+  const vazia = paraFicha(semDados, 4, aval(1, 1));
+  assert.equal(vazia.precoLitro, 0);
+  assert.equal(vazia.historico.length, 0);
+  assert.equal(vazia.avaliacoes.total, 1);
+});

@@ -1,22 +1,23 @@
-import { Crosshair, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ChevronRight, Crosshair, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { rotuloRecomendacoes } from "../despesas/avaliacaoPostos";
+import { rotuloRecomendacoes, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos";
+import { PostoDetalheDialog } from "../despesas/PostoDetalheDialog";
 import { distanciaKm, type Posicao } from "../despesas/rankingPostos";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { descreverGpsErro } from "../termos/termosMulta";
 import { PostosMapa, type Foco, type PostosMapaControle, type Vista } from "./PostosMapa";
-import { idMenorPreco, juntarDados, juntarPosto, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
+import { idMenorPreco, juntarDados, juntarPosto, motivosPrincipais, notaDoPosto, paraFicha, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
 import { areaAfastadaDemais, areaJaCarregada, ESPERA_BUSCA_MS, LIMITE_POSTOS, origemDasDistancias, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Area, type Posto } from "./postosProximos";
-import { carregarDadosPostos, carregarMaisProximos, carregarPostosNaArea, lerPosicaoDoMotorista } from "./remoto";
+import { carregarDadosPostos, carregarMaisProximos, carregarPostosNaArea, esquecerDadosPostos, lerPosicaoDoMotorista } from "./remoto";
 
 type Busca = "ok" | "carregando" | "erro" | "afastado";
 
 /** Altura reservada ao cartão sobre o mapa: o pino tocado fica centralizado na parte livre. Com preço e recomendação o cartão cresce. */
-const ALTURA_CARTAO = 196;
-const ALTURA_CARTAO_COM_DADOS = 250;
+const ALTURA_CARTAO = 236;
+const ALTURA_CARTAO_COM_DADOS = 290;
 const ZOOM_MINHA_POSICAO = 14;
 
 function Nota({ dados }: { dados: DadosPosto }) {
@@ -69,6 +70,10 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   // O cartão fica montado para animar a saída: guarda o último posto aberto enquanto fecha.
   const [cartaoPosto, setCartaoPosto] = useState<Posto | null>(null);
   const [listaEntrou, setListaEntrou] = useState(false);
+  // Ficha do posto (histórico, avaliações e o Recomendo do motorista), herdada da antiga lista do Relatório de gastos.
+  const [fichaAberta, setFichaAberta] = useState(false);
+  // Avaliação feita aqui vale na hora, também para posto sem preço no ranking (que não está em dadosPorId).
+  const [avaliacoesLocais, setAvaliacoesLocais] = useState<ReadonlyMap<string, ResumoAvaliacoes>>(new Map());
   const [foco, setFoco] = useState<Foco | null>(null);
   const moveuSozinho = useRef(false);
   const pedido = useRef(0);
@@ -169,6 +174,16 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
     return () => window.clearTimeout(relogio);
   }, [lista.length, listaEntrou]);
 
+  const fecharFicha = useCallback(() => setFichaAberta(false), []);
+  const aplicarAvaliacao = useCallback((postoId: string, avaliacoes: ResumoAvaliacoes) => {
+    esquecerDadosPostos();
+    setAvaliacoesLocais((atual) => new Map(atual).set(postoId, avaliacoes));
+    setDadosPorId((atual) => {
+      const dados = atual?.get(postoId);
+      return dados && atual ? new Map(atual).set(postoId, { ...dados, avaliacoes }) : atual;
+    });
+  }, []);
+
   const distanciaCartao = cartao ? `a ${rotuloKm(distanciaKm(origem.ponto, cartao))} ${rotuloOrigem(origem)}` : "";
 
   return (
@@ -195,6 +210,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
                   <span className="pp-cartao-distancia">{distanciaCartao}</span>
                 </div>
                 {cartao.endereco ? <span className="pp-cartao-endereco">{cartao.endereco}</span> : null}
+                <button type="button" className="pp-ficha" tabIndex={selecionado ? 0 : -1} onClick={() => setFichaAberta(true)}>Detalhes e avaliação<ChevronRight aria-hidden="true" /></button>
                 <div className="pp-cartao-acoes">
                   <a className="pp-ir pp-ir--primario" href={urlGoogleMaps(cartao)} target="_blank" rel="noreferrer"><Navigation aria-hidden="true" />Ir</a>
                   <a className="pp-ir" href={urlWaze(cartao)} target="_blank" rel="noreferrer">Waze</a>
@@ -237,6 +253,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
         {busca === "ok" && postos.length >= LIMITE_POSTOS ? <p className="gr-legenda">Mostrando os {LIMITE_POSTOS} primeiros desta área. Aproxime o mapa para ver os outros.</p> : null}
         <p className="gr-legenda">Postos da rede CTF (cartão de combustível).</p>
       </section>
+      {fichaAberta && cartao ? <PostoDetalheDialog posto={paraFicha(cartao, distanciaKm(origem.ponto, cartao), avaliacoesLocais.get(cartao.id))} dias={cartao.dados?.dias ?? 30} onAvaliado={aplicarAvaliacao} onClose={fecharFicha} /> : null}
     </AppShell>
   );
 }

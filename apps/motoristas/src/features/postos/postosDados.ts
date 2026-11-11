@@ -1,14 +1,14 @@
 // Preço e recomendação dos postos da tela Postos próximos: junção por id com o ranking e formatação. Sem React nem Dataverse.
-import { maioriaNaoRecomenda, motivoPositivo, percentualRecomenda, rotuloMotivo, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
+import { maioriaNaoRecomenda, motivoPositivo, percentualRecomenda, rotuloMotivo, SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
 import { METAS_GASTOS, semaforo, type Semaforo } from "../despesas/gastosRelatorio.ts";
-import type { RankingPostos } from "../despesas/rankingPostos.ts";
+import type { PostoProximo, RankingPostos } from "../despesas/rankingPostos.ts";
 import type { Posto } from "./postosProximos.ts";
 
 /**
  * O ranking (Custom API new_ObterRankingPostos) devolve, por posto, a média ponderada do R$/litro (soma dos valores ÷ soma dos litros)
  * dos abastecimentos de TODA a frota nos últimos `dias` (30). `postoId` é o new_postocombustivelid: a mesma chave desta tela.
  */
-export type DadosPosto = { precoLitro: number; cor: Semaforo; abastecimentos: number; ultimoAbastecimento: string; dias: number; avaliacoes: ResumoAvaliacoes };
+export type DadosPosto = { precoLitro: number; cor: Semaforo; abastecimentos: number; ultimoAbastecimento: string; dias: number; historico: PostoProximo["historico"]; avaliacoes: ResumoAvaliacoes };
 export type PostoExibido = Posto & { dados: DadosPosto | null };
 export type DadosPorId = ReadonlyMap<string, DadosPosto>;
 
@@ -18,7 +18,7 @@ export function indexarRanking(ranking: RankingPostos | null): Map<string, Dados
   const dias = ranking?.dias ?? 0;
   for (const posto of ranking?.postos ?? []) {
     if (!posto.postoId || mapa.has(posto.postoId) || !Number.isFinite(posto.precoLitro) || posto.precoLitro <= 0) continue;
-    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias, avaliacoes: posto.avaliacoes });
+    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias, historico: posto.historico, avaliacoes: posto.avaliacoes });
   }
   return mapa;
 }
@@ -69,4 +69,13 @@ export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
   const precos = postos.flatMap(({ id, dados }) => (dados ? [{ id, preco: dados.precoLitro }] : []));
   const menor = precos.reduce<(typeof precos)[number] | null>((atual, item) => (!atual || item.preco < atual.preco ? item : atual), null);
   return menor && precos.some(({ preco }) => preco > menor.preco) ? menor.id : "";
+}
+
+/** Ficha do posto (PostoDetalheDialog): o posto do mapa com o que o ranking sabe dele. Sem ranking, preço 0 (a ficha esconde "Quanto custa") e sem avaliações. */
+export function paraFicha({ id, nome, endereco, lat, lon, dados }: PostoExibido, distanciaKm: number, avaliacoes?: ResumoAvaliacoes): PostoProximo {
+  return {
+    postoId: id, nome, endereco, lat, lon, aproximada: false, distanciaKm,
+    precoLitro: dados?.precoLitro ?? 0, cor: dados?.cor ?? "amarelo", abastecimentos: dados?.abastecimentos ?? 0, ultimoAbastecimento: dados?.ultimoAbastecimento ?? "",
+    historico: dados?.historico ?? [], avaliacoes: avaliacoes ?? dados?.avaliacoes ?? SEM_AVALIACOES
+  };
 }

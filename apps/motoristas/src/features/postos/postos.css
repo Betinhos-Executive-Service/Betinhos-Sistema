@@ -92,6 +92,9 @@
 .pp-cartao-fechar svg { width:18px; height:18px; }
 .pp-cartao-fechar:active { transform:scale(.92); }
 .pp-cartao-fechar:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+.pp-ficha { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; min-height:44px; margin-top:8px; padding:0 12px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; color:var(--pp-acao); font:inherit; font-size:.88rem; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.pp-ficha svg { width:18px; height:18px; flex:none; }
+.pp-ficha:active { background:var(--pp-acao-suave); }
 .pp-cartao-acoes { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:8px; margin-top:10px; }
 .pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:46px; padding:0 14px; border:0; border-radius:12px; background:var(--pp-acao-suave); color:var(--pp-acao); font-size:.92rem; font-weight:800; text-decoration:none; transition:transform 140ms var(--pp-saida), background-color 140ms var(--pp-saida); -webkit-tap-highlight-color:transparent; }
 .pp-ir:active { transform:scale(.97); }

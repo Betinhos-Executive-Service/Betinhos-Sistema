@@ -755,7 +755,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Logo abaixo fica o café e lanche médio, quando há dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
-      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro, a comparação com a meta e a opinião dos motoristas."], { target: ".gr-preco-postos" }),
+      step("precos", "Postos próximos", ["Abre o mapa dos postos da rede CTF perto de você, com o que a frota pagou por litro, a comparação com a meta e a opinião dos motoristas."], { target: ".gr-preco-postos" }),
       step("convite", "Como foi no posto", ["Depois de abastecer, quando a nota é lida e você ainda não avaliou aquele posto, o app pergunta como foi. Um toque em Recomendo ou Não recomendo já salva. O X dispensa a pergunta."], { target: ".gr-convite", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
@@ -765,22 +765,12 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
-    id: "ranking-postos",
-    title: "Postos perto de você",
-    steps: [
-      step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
-      step("melhor", "Melhor opção", ["O destaque é o menor preço até 10 km de você. A cor compara com a meta da empresa: Dentro da meta, Pouco acima da meta ou Acima da meta.", "Se a maioria dos motoristas não recomenda o posto, aparece um alerta. Toque nele para ver o endereço, os últimos abastecimentos e as avaliações."], { target: ".rp-hero", optional: true }),
-      step("postos", "Outros postos", ["Toque em um posto para ver os detalhes e dizer como foi: Recomendo ou Não recomendo. Um toque já salva, e motivos e comentário são opcionais. O ícone do mapa abre o posto no Maps."], { target: ".rp-lista", optional: true }),
-      helpStep()
-    ]
-  },
-  {
     id: "postos-proximos",
     title: "Postos próximos",
     steps: [
       step("voltar", "Voltar", ["Volta para a tela de onde você abriu os postos."], { target: SERVICE_HOME }),
       step("mapa", "Mapa", ["Arraste para andar pelo mapa e use dois dedos ou os botões + e − para aproximar.", "Os postos da rede CTF aparecem como pinos coloridos pelo preço em relação à meta (verde dentro, vermelho acima). O ponto azul é você; sem localização, um ponto cinza marca o centro de São José dos Campos.", "Com o mapa muito afastado o app pede para aproximar, para não carregar postos demais."], { target: ".pp-mapa" }),
-      step("pino", "Pino do posto", ["Toque num pino para ver o nome, o endereço e a distância. Ir abre a rota no Google Maps; Waze abre no Waze."], { target: ".pp-cartao", optional: true }),
+      step("pino", "Pino do posto", ["Toque num pino para ver o nome, o preço médio, o endereço e a distância. Ir abre a rota no Google Maps; Waze abre no Waze.", "Detalhes e avaliação abre a ficha do posto: últimos abastecimentos, o que os colegas dizem e o seu Recomendo ou Não recomendo. Um toque já salva; motivos e comentário são opcionais."], { target: ".pp-cartao", optional: true }),
       step("lista", "Mais próximos", ["Os 10 postos mais próximos de você, do mais perto ao mais longe (sem a sua localização, contam a partir do centro de São José dos Campos). Tocar num deles centraliza o mapa nele e abre o cartão."], { target: ".pp-lista", optional: true }),
       helpStep()
     ]
@@ -855,7 +845,6 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   treinamentos: ["treinamento-detalhe", "treinamentos"],
   gastosCartao: ["gastos-cartao"],
   gastosRelatorio: ["gastos-relatorio"],
-  rankingPostos: ["ranking-postos"],
   postosProximos: ["postos-proximos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
