@@ -39,6 +39,21 @@ namespace Betinhos.DriverRecordSharing
             return EnvironmentVariables.Read(system, schemaName);
         }
 
+        // Segredo que só existia na configuração segura do step (não viaja na solução): tabela primeiro, depois a configuração.
+        // Registra só a fonte usada (tabela, config segura ou ausente), nunca o valor. Null quando ausente.
+        public static string ReadTableOrSecureConfig(IOrganizationService system, string name, string secureConfig, ITracingService tracing = null)
+        {
+            var value = ReadTable(system, name, tracing);
+            var source = "tabela";
+            if (value == null)
+            {
+                value = string.IsNullOrWhiteSpace(secureConfig) ? null : secureConfig.Trim();
+                source = value == null ? "ausente" : "config segura";
+            }
+            tracing?.Trace("Segredo {0}: fonte {1}", name, source);
+            return value;
+        }
+
         // Valor do segredo pelo nome, ou null (ausente, vazio ou tabela ilegível, por exemplo antes do schema chegar ao ambiente).
         public static string ReadTable(IOrganizationService system, string name, ITracingService tracing = null)
         {

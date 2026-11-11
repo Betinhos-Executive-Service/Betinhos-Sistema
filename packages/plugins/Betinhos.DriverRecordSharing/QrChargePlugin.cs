@@ -8,18 +8,20 @@ using Microsoft.Xrm.Sdk.Query;
 namespace Betinhos.DriverRecordSharing
 {
     // Custom API new_CobrancaQR: cobrança por QR code no Stripe Checkout, sempre em reais.
-    // A chave do Stripe fica na configuração segura do step (só admin lê); o motorista nunca a vê.
+    // A chave do Stripe fica na tabela cr40f_segredo (ou na configuração segura do step; só admin lê); o motorista nunca a vê.
     // Entrada new_Command (JSON com "acao"), saída new_Result (contrato de src/lib/qrCharge.ts ou {"erro"}).
     public sealed class QrChargePlugin : IPlugin
     {
         public const string MessageName = "new_CobrancaQR";
         public const string CommandParameter = "new_Command";
         public const string ResultParameter = "new_Result";
-        private readonly QrChargeConfig _config;
+        private readonly string _unsecureConfig;
+        private readonly string _secureConfig;
 
         public QrChargePlugin(string unsecureConfig, string secureConfig)
         {
-            _config = QrChargeConfig.Parse(unsecureConfig, secureConfig);
+            _unsecureConfig = unsecureConfig;
+            _secureConfig = secureConfig;
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -32,7 +34,7 @@ namespace Betinhos.DriverRecordSharing
 
             // Serviço elevado: o motorista não precisa de privilégio na tabela de cobranças; o handler confere o dono.
             var system = factory.CreateOrganizationService(null);
-            var config = _config;
+            var config = QrChargeConfig.Load(system, _unsecureConfig, _secureConfig, tracing);
             var handler = new QrChargeCommandHandler(
                 system,
                 context.InitiatingUserId,

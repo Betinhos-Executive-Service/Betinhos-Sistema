@@ -12,11 +12,11 @@ namespace Betinhos.DriverRecordSharing
     public sealed class RevokeTrackingLinkPlugin : IPlugin
     {
         private const int TimeoutMs = 15000;
-        private readonly TrackingLinkWorkerConfig _config;
+        private readonly string _secureConfig;
 
         public RevokeTrackingLinkPlugin(string unsecureConfig, string secureConfig)
         {
-            _config = TrackingLinkWorkerConfig.Parse(secureConfig);
+            _secureConfig = secureConfig;
         }
 
         public void Execute(IServiceProvider serviceProvider)
@@ -32,7 +32,9 @@ namespace Betinhos.DriverRecordSharing
             if (status == null) return;
             if (TrackingLinkRevocation.Decide(status.Value, "x") == TrackingLinkRevocation.LinkAction.None) return;
 
-            if (!_config.IsConfigured)
+            var system = factory.CreateOrganizationService(null);
+            var config = TrackingLinkWorkerConfig.Load(system, _secureConfig, tracing);
+            if (!config.IsConfigured)
             {
                 tracing?.Trace("RevokeTrackingLink: Worker não configurado; revogação ignorada.");
                 return;
@@ -40,7 +42,6 @@ namespace Betinhos.DriverRecordSharing
 
             try
             {
-                var system = factory.CreateOrganizationService(null);
                 var service = system.Retrieve(context.PrimaryEntityName, context.PrimaryEntityId, new ColumnSet(PluginConfig.ServiceTrackingLink));
                 var link = service.GetAttributeValue<string>(PluginConfig.ServiceTrackingLink);
                 var action = TrackingLinkRevocation.Decide(status.Value, link);
@@ -48,8 +49,8 @@ namespace Betinhos.DriverRecordSharing
 
                 var id = TrackingLinkRevocation.ExtractId(link);
                 var url = action == TrackingLinkRevocation.LinkAction.Conclude
-                    ? TrackingLinkRevocation.BuildConcludeUrl(_config.Url, id)
-                    : TrackingLinkRevocation.BuildLinkUrl(_config.Url, id);
+                    ? TrackingLinkRevocation.BuildConcludeUrl(config.Url, id)
+                    : TrackingLinkRevocation.BuildLinkUrl(config.Url, id);
                 if (url == null)
                 {
                     tracing?.Trace("RevokeTrackingLink: link fora do formato esperado; campos mantidos. serviceId={0}", context.PrimaryEntityId);
@@ -58,10 +59,10 @@ namespace Betinhos.DriverRecordSharing
                 if (action == TrackingLinkRevocation.LinkAction.Conclude)
                 {
                     // Concluir não limpa os campos: o cliente ainda vê "Serviço concluído" até o link expirar.
-                    Send("POST", url, true, tracing);
+                    Send(config, "POST", url, true, tracing);
                     return;
                 }
-                if (!Send("DELETE", url, false, tracing)) return;
+                if (!Send(config, "DELETE", url, false, tracing)) return;
 
                 var update = new Entity(PluginConfig.ServiceTable, context.PrimaryEntityId);
                 update[PluginConfig.ServiceTrackingLink] = null;
@@ -75,7 +76,7 @@ namespace Betinhos.DriverRecordSharing
         }
 
         // Uma chamada, sem retry. True em 2xx (ou 404 quando notFoundIsOk); nunca registra o segredo.
-        private bool Send(string method, string url, bool notFoundIsOk, ITracingService tracing)
+        private static bool Send(TrackingLinkWorkerConfig config, string method, string url, bool notFoundIsOk, ITracingService tracing)
         {
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             try
@@ -85,7 +86,7 @@ namespace Betinhos.DriverRecordSharing
                 if (method == "POST") request.ContentLength = 0;
                 request.Timeout = TimeoutMs;
                 request.ReadWriteTimeout = TimeoutMs;
-                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + _config.Secret;
+                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + config.Secret;
                 using (var response = (HttpWebResponse)request.GetResponse())
                 {
                     var code = (int)response.StatusCode;

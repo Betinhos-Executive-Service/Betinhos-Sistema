@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Xrm.Sdk;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -18,6 +19,12 @@ namespace Betinhos.DriverRecordSharing
         public string StripeKey { get; private set; }
         public string SuccessUrl { get; private set; } = DefaultSuccessUrl;
         public bool IsConfigured => !string.IsNullOrEmpty(StripeKey);
+
+        public const string SecretName = "stripe.cobranca-qr";
+
+        // Chave (ou o JSON {"chave","successUrl"}) pela tabela cr40f_segredo e, sem linha, pela configuração segura do step.
+        public static QrChargeConfig Load(IOrganizationService system, string unsecureConfig, string secureConfig, ITracingService tracing) =>
+            Parse(unsecureConfig, SecretReader.ReadTableOrSecureConfig(system, SecretName, secureConfig, tracing));
 
         public static QrChargeConfig Parse(string unsecureConfig, string secureConfig)
         {
