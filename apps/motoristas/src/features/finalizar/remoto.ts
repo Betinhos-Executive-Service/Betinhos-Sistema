@@ -77,7 +77,7 @@ export function buildFinalizeServiceVehiclePatch(payload: FinalizePayload) {
   const resolution = payload.vehicleResolution;
   if (!resolution) throw new Error("Carro do serviço não conferido. Tente finalizar novamente.");
   const patch = buildInfleetServiceVehiclePatch(resolution, payload.vehicleChoice ?? null, (vehicleId) => bind(DATAVERSE.veiculos, vehicleId));
-  if (!patch.new_origemveiculo) throw new Error("Escolha o carro usado no serviço antes de finalizar.");
+  if (!patch.new_origemveiculo && payload.vehicleChoice?.origem !== "nao-se-aplica") throw new Error("Escolha o carro usado no serviço antes de finalizar.");
   return patch;
 }
 

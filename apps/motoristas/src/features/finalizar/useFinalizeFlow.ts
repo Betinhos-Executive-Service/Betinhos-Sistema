@@ -220,11 +220,13 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
             }
           : loadMockFleet);
         if (!choice) return;
-        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
+        if (resolution.motivo === "motorista-terceiro" && choice.origem !== "nao-se-aplica") choice = { ...choice, origem: "terceiro" };
       }
       const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
       const outcome = resolution.decisao === "automatico"
         ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : choice?.origem === "nao-se-aplica"
+        ? "não se aplica (sem carro gravado)"
         : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
       console.info("[mock Infleet]", scenario, patch);
       setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
