@@ -73,6 +73,18 @@ describe('xrm shim', () => {
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
   })
 
+  it('pede todas as anotações, como o Xrm real (recibo lê o lookuplogicalname do cliente)', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'cr40f_bancodedados', EntitySetName: 'cr40f_bancodedadoses' })
+      return json({ value: [] })
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    await xrm.WebApi!.retrieveRecord('cr40f_bancodedados', '{ABC}', '?$select=_cr40f_cliente_value')
+    await xrm.WebApi!.retrieveMultipleRecords('cr40f_bancodedados', '?$select=a', 50)
+    const prefers = fetchMock.mock.calls.slice(1).map((c) => ((c as unknown[])[1] as { headers: Record<string, string> }).headers.Prefer)
+    expect(prefers).toEqual(['odata.include-annotations="*"', 'odata.include-annotations="*",odata.maxpagesize=50'])
+  })
+
   it('repassa o cookie de paginação do FetchXML (telas com views só carregavam a 1ª página)', async () => {
     const cookie = '<cookie pagenumber="2" pagingcookie="%253ccookie" />'
     const fetchMock = vi.fn(async (url: string) => {
