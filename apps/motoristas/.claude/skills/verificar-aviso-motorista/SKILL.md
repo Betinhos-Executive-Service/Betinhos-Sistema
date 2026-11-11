@@ -1,12 +1,12 @@
 ---
 name: verificar-aviso-motorista
-description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar visualização na mesma gravação e outbox new_avisomotorista), flows Enviar e Vigia e a virada dos flows antigos. Use após mudar plugins/DriverRecordSharing/DriverNotice*, scripts/*aviso-motorista*, ou ao publicar a virada."
+description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar visualização na mesma gravação e outbox new_avisomotorista), flows Enviar e Vigia e a virada dos flows antigos. Use após mudar packages/plugins/Betinhos.DriverRecordSharing/DriverNotice*, scripts/*aviso-motorista*, ou ao publicar a virada."
 ---
 # Verificar aviso ao motorista
 
 ## Cobre
-- Código: `plugins/DriverRecordSharing/DriverNoticePlugin.cs`, `DriverNoticeRules.cs`, `DriverNoticeWriter.cs`.
-- Testes: `plugins/DriverRecordSharing.Tests/DriverNoticePluginTests.cs`.
+- Código: `packages/plugins/Betinhos.DriverRecordSharing/DriverNoticePlugin.cs`, `DriverNoticeRules.cs`, `DriverNoticeWriter.cs`.
+- Testes: `packages/plugins/Betinhos.DriverRecordSharing.Tests/DriverNoticePluginTests.cs`.
 - Scripts: `packages/deploy/provision-aviso-motorista.ps1`, `packages/deploy/provision-flow-aviso-motorista.ps1`, `scripts/virada-aviso-motorista.ps1`.
 - Contrato e ordem de publicação: `docs/virada-aviso-motorista.md`.
 
@@ -18,18 +18,18 @@ description: "Verifica o aviso de troca de motorista: DriverNoticePlugin (zerar 
 - A Vigia reenvia voltando o aviso para Pendente: o texto do push mora só no Enviar.
 - Janela da saída (`docs/vigia-janela-saida.md`): reenvio só ao motorista 4 h antes (grava `new_reenviadoem`), alerta à operação 3 h antes; nunca antes de `new_prazovisualizacao`; horário entre 22h e 6h vai para 20h/21h da véspera. Falhou e Sem app de aviso Novo esperam a hora do alerta; Retirado e Pendente parado (por `modifiedon`) alertam na hora.
 - O `-Apply` dos flows recusa sem a coluna `new_reenviadoem` e só desliga o flow antigo "Flow Notificação Serviço Não Visualizado | Interno e Motoristas" com a Vigia ligada.
-- A tabela vem antes dos steps: `push-dev.ps1` provisiona antes de publicar o plugin, e o registro recusa sem ela.
+- A tabela vem antes dos steps: provisione a tabela antes de o Deploy publicar o plugin, e o registro recusa sem ela.
 - Virada: novo liga antes de antigo desligar; reversão no sentido inverso. Flows antigos ficam desligados, nunca excluídos (sete scripts leem "Novo Serviço" como modelo).
 
 ## Preparar ambiente
-- Copie `plugins/DriverRecordSharing/DriverRecordSharing.snk` (gitignored) do checkout principal para o worktree; não gere chave nova.
+- A chave de assinatura fica em `%USERPROFILE%\.codex\keys\Betinhos.DriverRecordSharing.snk`, fora do repositório (vale para todo worktree); não gere chave nova (mudaria a identidade do assembly).
 
 ## Roteiro local
-1. `cd plugins/DriverRecordSharing.Tests && dotnet test -v q --filter DriverNoticePluginTests` → `Com falha: 0`.
+1. `cd packages/plugins/Betinhos.DriverRecordSharing.Tests && dotnet test -v q --filter DriverNoticePluginTests` → `Com falha: 0`.
 2. Suíte inteira: `dotnet test -v q` → `Com falha: 0`.
 3. Dry-run dos três scripts (DEV, só leitura). Para `-EnvironmentUrl` do PROD, cada um deve recusar com `Publicacao direta bloqueada`.
 
-## Roteiro no DEV (depois do merge e do `npm run push` da `main`)
+## Roteiro no DEV (depois do merge na `develop` e do Deploy no DEV)
 Use uma reserva sem cliente, OT ou manutenção, com saída no futuro (OS-1929 serviu em 06/11/2026), e as contas `TESTE` e `teste 2`, que têm usuário ativo. Motorista com e-mail e sem usuário ativo (`Fulaninho do cruze`) é recusado pelo compartilhamento. Programado sem motorista é bloqueado por regra existente. No DEV o único operador é o Renan. Conclua com a consulta de `new_avisomotoristas` por `_new_reserva_value`.
 
 | Ação | Esperado |

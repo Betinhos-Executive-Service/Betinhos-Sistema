@@ -7,9 +7,9 @@ description: Verifica a sincronização do carro atual do motorista pela Infleet
 
 ## 1. Testes unitários (sempre)
 ```powershell
-cd plugins/DriverRecordSharing.Tests; dotnet test --nologo -v q
+cd packages/plugins/Betinhos.DriverRecordSharing.Tests; dotnet test --nologo -v q
 ```
-Em worktree, copie antes `plugins/DriverRecordSharing/DriverRecordSharing.snk` do checkout principal (é ignorado pelo git; não gere chave nova).
+A chave de assinatura fica em `%USERPROFILE%\.codex\keys\Betinhos.DriverRecordSharing.snk`, fora do repositório (vale para todo worktree); não gere chave nova (mudaria a identidade do assembly).
 Cobrem em `CurrentVehicleSyncPlannerTests`: troca, sem mudança, cadastro de placa nova, terceiro ignorado e limpeza (só quando a Infleet devolve o motorista com `vehicle: null` e a origem do carro atual é Infleet).
 
 ## 2. Formato da Infleet (somente leitura)

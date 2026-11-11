@@ -25,7 +25,7 @@ test('o limite é agora menos 3 dias, em UTC como o modifiedon', () => {
 test('o filtro pega só Precisa corrigir, que ainda não espera o gestor, parada há mais de 3 dias', () => {
   const p = Paradas.inputs.parameters
   assert.equal(Paradas.inputs.host.operationId, 'ListRecords')
-  assert.equal(p.$filter, `statecode eq 0 and cr40f_statusoperacional eq ${PRECISA_CORRIGIR} and (new_aguardandogestor eq false or new_aguardandogestor eq null) and modifiedon lt @{outputs('Limite')}`)
+  assert.equal(p.$filter, `statecode eq 0 and cr40f_statusoperacional eq ${PRECISA_CORRIGIR} and (new_aguardandogestor eq false or new_aguardandogestor eq null) and createdon ge 2026-11-10T03:00:00Z and modifiedon lt @{outputs('Limite')}`)
   assert.equal(p.$select, 'cr40f_despesaoperacionalid')
   assert.equal(p.entityName, '__SET_DESPESA__')
 })

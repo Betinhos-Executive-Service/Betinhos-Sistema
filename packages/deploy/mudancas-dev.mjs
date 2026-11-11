@@ -8,7 +8,9 @@ import { FRONT, NEUTRO, PLUGIN_PASTA, nomePlugin } from './caminho-publicacao.mj
 //  - formulario: o WebResource do Formulário Geral (apps/formulario-geral, push-formulario-dev.ps1); teste, fixture e documentação do app não republicam;
 //  - plugins: cada plugin cujo código, registrador ou script de publicação mudou (push-<nome>-plugin.ps1);
 //  - motoristas e motoristasSw: o HTML do App Motoristas (new_app-motoristas-v2) e o service worker dele (new_app-motoristas-v2-sw),
-//    publicados por apps/motoristas/scripts/push-front-dev.ps1. Teste, documentação e scripts do app que não entram no build não republicam.
+//    publicados por apps/motoristas/scripts/push-front-dev.ps1. Teste, documentação e scripts do app que não entram no build não republicam;
+//  - motoristasWr: os web resources avulsos do App Motoristas (apps/motoristas/webresources: redirect do push e comandos da troca),
+//    publicados por apps/motoristas/scripts/push-webresources-dev.ps1.
 // Teste de plugin (<pasta>.Tests) e Betinhos.ExpenseUpload (congelado) não republicam: o assembly publicado não muda.
 // Flows têm decisão própria (flows-dev.mjs, pela tag flows-dev-publicado); flow novo, schema e sitemap:* continuam à mão:
 // usam az login e conexões do usuário. Por aqui, arquivo de flow não publica nada.
@@ -36,6 +38,8 @@ const MOTORISTAS_BUILD = [
 ]
 const motoristasMudou = (a) => MOTORISTAS_PUBLICACAO.test(a) || (!MOTORISTAS_SW.test(a) && MOTORISTAS_BUILD.some((r) => r.test(a)))
 const motoristasSwMudou = (a) => MOTORISTAS_PUBLICACAO.test(a) || MOTORISTAS_SW.test(a)
+// Cópia da fonte, sem build: só o arquivo do web resource e o script que publica.
+const motoristasWrMudou = (a) => /^apps\/motoristas\/(webresources\/[^/]+|scripts\/push-webresources-dev\.ps1)$/.test(a)
 
 const PLUGIN = [
   new RegExp(`^packages/plugins/(?:${PLUGIN_PASTA})/`),
@@ -53,7 +57,7 @@ export function pluginDoArquivo(arquivo) {
 
 // arquivos: lista do git diff --name-only. null = sem base (primeiro push, before inexistente): publica a tela e nenhum plugin.
 export function mudancasDev(arquivos) {
-  if (arquivos == null) return { tela: true, webresources: false, formulario: false, motoristas: false, motoristasSw: false, plugins: [] }
+  if (arquivos == null) return { tela: true, webresources: false, formulario: false, motoristas: false, motoristasSw: false, motoristasWr: false, plugins: [] }
   const lista = arquivos.map((a) => a.trim()).filter(Boolean)
   const plugins = new Set()
   for (const a of lista) {
@@ -66,11 +70,12 @@ export function mudancasDev(arquivos) {
     formulario: lista.some(formularioMudou),
     motoristas: lista.some(motoristasMudou),
     motoristasSw: lista.some(motoristasSwMudou),
+    motoristasWr: lista.some(motoristasWrMudou),
     plugins: [...plugins].sort(),
   }
 }
 
-// Uso: git diff --name-only A B | node mudancas-dev.mjs            → JSON {tela, webresources, formulario, motoristas, motoristasSw, plugins}
+// Uso: git diff --name-only A B | node mudancas-dev.mjs            → JSON {tela, webresources, formulario, motoristas, motoristasSw, motoristasWr, plugins}
 //      git diff --name-only A B | node mudancas-dev.mjs --github   → linhas tela=..., webresources=..., formulario=... e plugins=a,b (para $GITHUB_OUTPUT)
 //      node mudancas-dev.mjs --sem-base [--github]
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -1,6 +1,6 @@
 ---
 name: verificar-plugins
-description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin, Cr40f.Protecao.Plugin, Cr40f.Prontuario.Plugin) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
+description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incluindo ValorOpPlugin, Cr40f.Documentos.Plugin, Cr40f.Frota.Plugin e Cr40f.Portal.Plugin, Cr40f.Protecao.Plugin, Cr40f.Prontuario.Plugin, Cr40f.Cadastro.Plugin com a foto do passageiro) e seus registradores. Use após mudar packages/plugins/** ou quando pedirem para testar plugin, valor da OP ou sincronização financeira."
 ---
 # Verificar plugins do Dataverse
 
@@ -66,3 +66,9 @@ description: "Verifica os plugins C# do Dataverse (Cr40f.Financeiro.Plugin, incl
 - Schema no DEV (só leitura): `powershell -NoProfile -ExecutionPolicy Bypass -File packages/deploy/provision-tabela-segredos.ps1 -SomenteValidar` → "VALIDAR OK"; depois de criado, rodar sem a opção confere IsSecured, auditoria desligada em `cr40f_valor`, chave Active, perfil e tabela na AppBetinhos e nenhum papel além do Administrador com privilégio.
 - Comportamento no DEV: com o segredo gravado (`gravar-segredo.ps1`, "gravado e conferido por hash") e a variável legada vazia, `cr40f_InsightsCombustivel` e o organizador de observação respondem com IA e o Gerar Pagantes gera link Cielo/envia e-mail; o Log de rastreamento do plugin mostra só nomes de segredo, nunca valor.
 - Limite: nunca imprimir, colar em chat ou commitar valor de segredo; PROD só leitura sem pedido explícito.
+
+## Foto do passageiro (Custom API `new_ObterFotoPassageiro`, `Cr40f.Cadastro.Plugin`)
+1. `dotnet test packages/plugins/Cr40f.Cadastro.Plugin.Tests` → "Com falha: 0" (44 em 10/11/2026; 9 de `UrlFlowConsultaTests`).
+2. URL do flow "Flow - Consultar Arquivos Sharepoint": variável `new_URLFlowConsultarArquivosSharePoint` (valor atual, senão padrão) primeiro; configuração segura do step só como fallback (ela não viaja na solução, por isso TEST/PROD ficavam sem foto). Sem as duas → `{"ok":false,"motivo":"indisponivel"}` e o trace diz "URL do flow ausente".
+3. Trace nunca leva a URL nem `sig=`: só a origem ("variável de ambiente"/"configuração segura") e o motivo da negação (HTTP N, tempo esgotado, falha de rede).
+4. Comportamento (DEV depois do Deploy; PROD depois do caminho plugin): no App Motoristas, abrir um serviço Programado do próprio motorista com passageiro que tem foto → aparece a foto, não a inicial. Log de rastreamento só aparece com exceção no PROD.

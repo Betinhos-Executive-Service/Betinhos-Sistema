@@ -84,7 +84,7 @@ function Get-MissingPrerequisites {
   $missing = @()
   if (@(Get-Rows "EntityDefinitions" "LogicalName" "LogicalName eq 'new_avisomotorista'").Count -ne 1) { $missing += "tabela new_avisomotorista" }
   $types = @(Get-Rows "plugintypes" "plugintypeid" "typename eq '$noticeType'")
-  if ($types.Count -ne 1) { $missing += "plugin DriverNoticePlugin (publique da main atualizada com npm run push)" }
+  if ($types.Count -ne 1) { $missing += "plugin DriverNoticePlugin (publique pelo Deploy da develop)" }
   else {
     $steps = @(Get-Rows "sdkmessageprocessingsteps" "sdkmessageprocessingstepid" "_eventhandler_value eq $($types[0].plugintypeid) and statecode eq 0")
     if ($steps.Count -ne $expectedSteps) { $missing += "steps ativos do DriverNoticePlugin: $($steps.Count) de $expectedSteps" }

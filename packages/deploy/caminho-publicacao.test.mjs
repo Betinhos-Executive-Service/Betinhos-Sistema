@@ -89,6 +89,9 @@ test('App Motoristas: código vai pelas soluções (BetinhosMotoristas); teste, 
   assert.equal(caminhoDaPublicacao(['apps/motoristas/src/App.tsx']).caminho, 'solucoes')
   assert.equal(caminhoDaPublicacao(['apps/motoristas/src/pwa/sw.js', 'apps/shell/src/main.tsx']).caminho, 'solucoes')
   assert.equal(caminhoDaPublicacao(['apps/motoristas/tests/media.test.ts', 'apps/motoristas/docs/a.md', 'apps/motoristas/AGENTS.md', 'apps/motoristas/.claude/skills/x/SKILL.md', 'apps/motoristas/scripts/qa/verify-tour.cjs']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/scripts/push-webresources-dev.ps1']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/motoristas/webresources/new_appmotoristas_push_redirect.js']).caminho, 'solucoes')
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/20261110-1700-push-redirect-forms.ps1']).caminho, 'solucoes')
 })
 
 test('arquivo desconhecido vai pelo caminho seguro', () => {
@@ -117,4 +120,12 @@ test('sem base conhecida: soluções', () => {
 
 test('README dentro de pasta de plugin não muda o PROD', () => {
   assert.equal(caminhoDoArquivo('packages/plugins/README.md'), 'nada')
+})
+
+test('migration de schema vai pelas soluções; o script que decide e testa as migrations não muda o PROD', () => {
+  for (const a of ['packages/deploy/migrations/20261110-1600-postos-aceita-ctf.ps1', 'packages/deploy/migrations/_dv.ps1', 'packages/deploy/migrations/remocoes.json']) {
+    assert.equal(caminhoDoArquivo(a), 'solucoes', a)
+  }
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/20261110-1600-postos-aceita-ctf.ps1', 'apps/shell/src/x.ts']).caminho, 'solucoes')
+  assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/README.md', 'packages/deploy/migrations-dev.mjs', 'packages/deploy/migrations-ci.test.mjs']).caminho, 'nada')
 })

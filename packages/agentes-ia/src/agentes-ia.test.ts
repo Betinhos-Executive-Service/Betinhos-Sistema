@@ -149,7 +149,7 @@ describe('constantes do flow', () => {
   it('reúne modelo, schema e os quatro agentes, sem @ (o Logic Apps leria como expressão)', () => {
     const c = constantesDoFlow()
     expect(c.modelo).toBe('claude-opus-5-5')
-    expect(c.maxTokens).toBe(8000)
+    expect(c.maxTokens).toBe(12000)
     expect(c.effort).toBe('medium')
     expect(Object.keys(c.agentes)).toEqual(['financeiro', 'logistica', 'pessoas', 'frota'])
     expect(c.agentes.logistica.acoes).toEqual(['AtribuirMotorista', 'AtribuirVeiculo'])

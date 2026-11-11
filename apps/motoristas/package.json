@@ -8,13 +8,12 @@
     "build": "node scripts/build-react-singlefile.cjs",
     "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "deploy:webresource": "powershell -ExecutionPolicy Bypass -File scripts/deploy-webresource.ps1",
-    "push": "powershell -ExecutionPolicy Bypass -File scripts/push-dev.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path 'C:/Users/mendo/Desktop/vscode/Sistema Betinhos/packages/deploy/solucoes/distribuir-apos-push.ps1') { & 'C:/Users/mendo/Desktop/vscode/Sistema Betinhos/packages/deploy/solucoes/distribuir-apos-push.ps1' } else { Write-Warning 'distribuicao automatica: distribuir-apos-push.ps1 ainda nao esta na main do Sistema Betinhos' }\"",
     "check:hygiene": "node --test --experimental-strip-types tests/repositoryHygiene.test.ts",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "preview": "node scripts/serve-dist.cjs",
     "demo:capture": "node scripts/capture-demo-screens.cjs",
     "demo:render": "remotion render remotion/index.ts AppMotoristasDemo remotion-output/app-motoristas-demo.mp4",
-    "demo:video": "npm run demo:capture && npm run demo:render"
+    "demo:video": "pnpm demo:capture && pnpm demo:render"
   },
   "dependencies": {
     "@betinhos-executive-service/ui": "1.18.0",

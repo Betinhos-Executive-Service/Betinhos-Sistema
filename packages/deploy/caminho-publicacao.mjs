@@ -40,6 +40,8 @@ export const NEUTRO = [
   // App Motoristas: teste, documentação, skills e scripts de QA não mudam o PROD. O resto do app (build e service worker) vai pelas
   // soluções: o HTML e o service worker estão na BetinhosMotoristas.
   /^apps\/motoristas\/(tests|docs|\.claude|scripts\/qa)\//,
+  // Publicação no DEV dos web resources avulsos do app; os próprios arquivos (apps/motoristas/webresources) vão pelas soluções.
+  /^apps\/motoristas\/scripts\/push-webresources-dev\.ps1$/,
   /^apps\/motoristas\/.+\.md$/,
   /^apps\/gerar-pagantes\/.+\.test\.[^/]+$/,
   // Formulário Geral: o que vai ao WebResource muda o PROD (soluções); teste, fixture, documentação e a pasta docs/ não.
@@ -49,7 +51,7 @@ export const NEUTRO = [
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
   /^packages\/plugins\/Betinhos\.ExpenseUpload\//,
-  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
+  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|migrations-dev|migrations-ci|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
   /^packages\/deploy\/flows\/backup\//,
   /^packages\/deploy\/package\.json$/,
   /(^|\/)[^/]+\.md$/,

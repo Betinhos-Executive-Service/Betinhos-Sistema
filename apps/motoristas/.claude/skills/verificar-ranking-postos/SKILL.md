@@ -5,16 +5,16 @@ description: "Verifica os postos perto do motorista e as avaliações: Custom AP
 # Verificar ranking de postos
 
 ## Cobre
-- Código: `plugins/DriverRecordSharing/FuelRanking.cs`, `FuelRankingPlugin.cs`, `FuelRepository.LoadFleetFuelings`, `FuelRepository.LoadPostos`, `PostoGeocoder.cs`, `src/features/despesas/rankingPostos.ts`, `src/features/despesas/RankingPostosScreen.tsx`, `plugins/DriverRecordSharing/PostoAvaliacoes.cs`, `PostoAvaliacaoPlugin.cs`, `FuelRepository.LoadAvaliacoes`, `SaveAvaliacao`, `src/features/despesas/avaliacaoPostos.ts`, `src/features/despesas/PostoDetalheDialog.tsx`.
-- Testes: `plugins/DriverRecordSharing.Tests/FuelRankingTests.cs`, `PostoAvaliacoesTests.cs`, `tests/rankingPostos.test.ts`.
+- Código: `packages/plugins/Betinhos.DriverRecordSharing/FuelRanking.cs`, `FuelRankingPlugin.cs`, `FuelRepository.LoadFleetFuelings`, `FuelRepository.LoadPostos`, `PostoGeocoder.cs`, `src/features/despesas/rankingPostos.ts`, `src/features/despesas/RankingPostosScreen.tsx`, `packages/plugins/Betinhos.DriverRecordSharing/PostoAvaliacoes.cs`, `PostoAvaliacaoPlugin.cs`, `FuelRepository.LoadAvaliacoes`, `SaveAvaliacao`, `src/features/despesas/avaliacaoPostos.ts`, `src/features/despesas/PostoDetalheDialog.tsx`.
+- Testes: `packages/plugins/Betinhos.DriverRecordSharing.Tests/FuelRankingTests.cs`, `PostoAvaliacoesTests.cs`, `tests/rankingPostos.test.ts`.
 - Regra: últimos 30 dias, categoria "Abastecimento" (DEV) ou "Combustível" (PROD), CNPJ válido de `cr40f_iacnpjlido`, fora os CNPJs da empresa e o R$/litro fora de `FuelMath` (3 a 12), status enviado, a corrigir ou validado. A resposta nunca traz CNPJ, e os abastecimentos não identificam motorista; só comentários de avaliação saem com o nome do autor, por decisão do Renan. Coordenada vem do cadastro da ANP e, sem ela, do Nominatim (mostrada como "cerca de"); posto pendente fica fora. Cada chamada resolve no máximo 1 posto novo; se BrasilAPI, ANP ou Nominatim falharem, nada é gravado e o posto volta para a fila. O app filtra 10 km e calcula o semáforo pela meta `METAS_GASTOS.litro`.
 
 - Avaliações: qualquer motorista avalia, uma por posto (avaliar de novo substitui). Valem 12 meses. `new_oculta`, marcada pela gestão na tabela `new_avaliacaoposto`, esconde só o comentário: o voto segue contando, e editar não desfaz a ocultação. Sem a tabela ou com falha na leitura, o ranking sai com `postoId` e `avaliacoes` nulos, e a ficha esconde a seção. A data é `new_avaliadoem`, não `modifiedon`, que muda ao ocultar.
 
 ## Preparar ambiente
-- `npm test` e `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`.
-- `dotnet test` em `plugins/DriverRecordSharing.Tests` (em worktree, copie `DriverRecordSharing.snk` do checkout principal; é ignorado pelo Git).
-- Dev server: `PORT=<porta livre> node scripts/dev-server.cjs`. Ele reescreve `dist/`; restaure com `git checkout -- dist package.json package-lock.json`.
+- `pnpm test` e `pnpm typecheck`.
+- `dotnet test` em `packages/plugins/Betinhos.DriverRecordSharing.Tests` (chave em `%USERPROFILE%\.codex\keys\Betinhos.DriverRecordSharing.snk`, fora do repositório).
+- Dev server: `PORT=<porta livre> node scripts/dev-server.cjs`. Ele reescreve `dist/`; restaure com `git checkout -- dist package.json`.
 
 ## Roteiro (mock em localhost, viewport 390×844)
 1. Abra `/?p=1#gastos-relatorio` e toque no cartão "Postos perto de mim", em Suas médias (sem gastos no período, o link "Ver postos perto de mim") → rota `#ranking-postos`, título "Postos perto de você".

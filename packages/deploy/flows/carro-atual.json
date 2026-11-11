@@ -1,0 +1,140 @@
+{
+  "actions": {
+    "Sincronizar_veiculo_atual": {
+      "inputs": {
+        "host": {
+          "operationId": "PerformUnboundAction",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "actionName": "new_SincronizarVeiculoAtual"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "type": "OpenApiConnection"
+    },
+    "Alertar_falha": {
+      "runAfter": {
+        "Sincronizar_veiculo_atual": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "actions": {
+        "Execucoes_anteriores": {
+          "inputs": {
+            "host": {
+              "operationId": "ListRecords",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "flowruns",
+              "$orderby": "starttime desc",
+              "$top": 2,
+              "$filter": "_workflow_value eq dc945bad-26c7-f111-a05c-7ced8da8c473 and starttime lt @{addSeconds(trigger()['startTime'], -30)}",
+              "$select": "status,starttime"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "type": "OpenApiConnection"
+        },
+        "Segunda_falha_seguida": {
+          "runAfter": {
+            "Execucoes_anteriores": [
+              "Succeeded"
+            ]
+          },
+          "actions": {
+            "Enviar_alerta": {
+              "inputs": {
+                "host": {
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "connectionName": "shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/Importance": "High",
+                  "emailMessage/Body": "<p>O flow <b>Infleet - Sincronizar carro atual dos motoristas</b> falhou 2 vezes seguidas no ambiente @{workflow()?['tags']?['environmentName']}.</p><p>Erro: @{coalesce(outputs('Sincronizar_veiculo_atual')?['body']?['error']?['message'], 'sem mensagem')}</p><p>Se for &quot;Token da Infleet n&atilde;o configurado&quot;, um import recriou o step sem a configura&ccedil;&atilde;o segura: rode scripts/provision-current-vehicle.ps1 -Apply no ambiente afetado.</p><p>Novo aviso s&oacute; depois que voltar a funcionar e falhar de novo.</p>",
+                  "emailMessage/Subject": "[Infleet] Carro atual dos motoristas parou de sincronizar",
+                  "emailMessage/To": "<preservado do DEV>"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "type": "OpenApiConnection"
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "type": "If",
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@length(outputs('Execucoes_anteriores')?['body/value'])",
+                  2
+                ]
+              },
+              {
+                "equals": [
+                  "@first(outputs('Execucoes_anteriores')?['body/value'])?['status']",
+                  "Failed"
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@last(outputs('Execucoes_anteriores')?['body/value'])?['status']",
+                    "Failed"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "type": "Scope"
+    },
+    "Manter_falha": {
+      "runAfter": {
+        "Alertar_falha": [
+          "Succeeded",
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "type": "Terminate",
+      "inputs": {
+        "runError": {
+          "code": "SincronizacaoFalhou",
+          "message": "Sincronizar_veiculo_atual falhou; veja a acao."
+        },
+        "runStatus": "Failed"
+      }
+    }
+  },
+  "triggers": {
+    "A_cada_5_minutos": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 5,
+        "timeZone": "E. South America Standard Time"
+      }
+    }
+  },
+  "contentVersion": "1.0.0.0",
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  }
+}

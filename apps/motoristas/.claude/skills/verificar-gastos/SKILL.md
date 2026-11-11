@@ -11,13 +11,13 @@ description: "Verifica a tela Registrar gasto: validação, carregamento do envi
 - PROD usa o envio síncrono antigo (`usesAsyncExpenseUpload()` só é verdadeiro na URL do DEV).
 
 ## Preparar ambiente
-- `npm test` e `npx tsc --noEmit --noUnusedLocals --noUnusedParameters`.
-- Dev server: `PORT=<porta livre> node scripts/dev-server.cjs` (ou `npm run dev`). Ele recompila `dist/` a cada mudança em `src/`; restaure `dist/` com `git checkout -- dist` antes do commit se não for publicar.
+- `pnpm test` e `pnpm typecheck`.
+- Dev server: `PORT=<porta livre> node scripts/dev-server.cjs` (ou `pnpm dev`). Ele recompila `dist/` a cada mudança em `src/`; restaure `dist/` com `git checkout -- dist` antes do commit se não for publicar.
 - Prévia local sem Dataverse: `http://127.0.0.1:<porta>/?dev=preview` (catálogo), card "Gastos" na seção OPERACAO.
 
 ## Roteiro
-1. `npm test` → `ℹ fail 0`; os testes de `expenseUpload.test.ts` cobrem diário, nova tentativa, status (`describeExpenseSubmission`) e progresso (`{ phase: "creating" }`, `{ phase: "uploading", order, total }`).
-2. `npx tsc ...` → sem saída.
+1. `pnpm test` → `ℹ fail 0`; os testes de `expenseUpload.test.ts` cobrem diário, nova tentativa, status (`describeExpenseSubmission`) e progresso (`{ phase: "creating" }`, `{ phase: "uploading", order, total }`).
+2. `pnpm typecheck` → sem saída.
 3. Navegador interno em `?dev=preview` → clique no card "Gastos" → a tela "Registrar gasto" abre com a seção "ENVIOS PENDENTES" contendo:
    - "Abastecimento · R$ 245,90 · 19/10" / "Aguardando conexão para enviar." / botão "Enviar agora";
    - "Almoço · R$ 58,00 · 19/10" / "Comprovante não foi anexado." / botão "Tentar de novo".
@@ -44,7 +44,7 @@ new MutationObserver(snap).observe(document.body, { subtree: true, childList: tr
 Depois de uns 5 s: `window.__seen`.
 
 Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a borda esquerda do print; é da moldura da prévia, não da tela.
-7. Mudou `SendStepsOverlay` ou `ExpenseSendOverlay`? Prove que o gasto continua idêntico: compare o HTML do overlay antigo (`git show <base>:src/features/despesas/ExpenseSendOverlay.tsx`, salvo em `.verificacao/`) com o novo em todos os estados (`saving`/`uploading`/`done`/`error`, 0, 1 e N fotos) com `react-dom/server` `renderToStaticMarkup`, empacotando com `npx esbuild <entrada>.tsx --bundle --platform=node --jsx=automatic --loader:.svg=dataurl`. Esperado: 0 diferenças. Em 21/10/2026: 9 estados, 0 diferenças; sequência do passo 5 igual antes e depois.
+7. Mudou `SendStepsOverlay` ou `ExpenseSendOverlay`? Prove que o gasto continua idêntico: compare o HTML do overlay antigo (`git show <base>:src/features/despesas/ExpenseSendOverlay.tsx`, salvo em `.verificacao/`) com o novo em todos os estados (`saving`/`uploading`/`done`/`error`, 0, 1 e N fotos) com `react-dom/server` `renderToStaticMarkup`, empacotando com `pnpm exec esbuild <entrada>.tsx --bundle --platform=node --jsx=automatic --loader:.svg=dataurl`. Esperado: 0 diferenças. Em 21/10/2026: 9 estados, 0 diferenças; sequência do passo 5 igual antes e depois.
 
 ## Leitura rápida no mock
 
@@ -77,7 +77,7 @@ Observação: `scroll_to` dentro da prévia rola o palco na horizontal e corta a
 - Animações: o painel do navegador interno pode pausar animações quando está oculto; se o card aparecer translúcido no print, confira `document.getAnimations()` (currentTime 0 = timeline pausado, não é bug).
 
 ## Evidência obrigatória
-- Saída de `npm test` e `tsc`.
+- Saída de `pnpm test` e `tsc`.
 - Sequência do script do passo 5 e screenshot 390×844 com o overlay e com Envios pendentes.
 - Console sem erros (`read_console_messages` com `onlyErrors`).
 

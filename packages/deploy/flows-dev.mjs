@@ -10,6 +10,8 @@ import { pathToFileURL } from 'node:url'
 const script = (nome) => new RegExp(`^packages/deploy/provision-flow-${nome}\\.ps1$`)
 const flowsDir = (...nomes) => new RegExp(`^packages/deploy/flows/(${nomes.join('|')})$`)
 const NAO_TESTE = '(?!.*\\.test\\.)'
+// Funções comuns dos scripts que só atualizam flow existente a partir do JSON exportado do DEV.
+const SINCRONIZAR = 'sincronizar-flow\\.ps1'
 
 // Fontes que entram nas constantes geradas (dist/ é ignorado pelo git): código de src sem testes e o gerador.
 const AGENTES_IA = new RegExp(`^packages/agentes-ia/(src/${NAO_TESTE}[^/]+\\.ts|scripts/gerar-constantes\\.ts)$`)
@@ -38,6 +40,30 @@ export const ENTRADAS = [
     nome: 'conciliacao-cartao', script: 'provision-flow-conciliacao-cartao.ps1', apply: true,
     flows: ['Conciliação do cartão | Diário', 'Conciliação do cartão | Reprocessada', 'Conciliação do cartão | Despesa atualizada'],
     arquivos: [script('conciliacao-cartao'), flowsDir('conciliacao-cartao-diario\\.json', 'conciliacao-cartao-tempo-real\\.mjs')],
+  },
+  {
+    nome: 'checklists', script: 'provision-flow-checklists.ps1', flows: ['Flow Checklists | Rotina diaria', 'Flow Push Checklist | Motoristas'], apply: true,
+    arquivos: [script('checklists'), flowsDir('checklists-rotina-diaria\\.json', 'checklist-push\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'carro-atual', script: 'provision-flow-carro-atual.ps1', flows: ['Infleet - Sincronizar carro atual dos motoristas'], apply: true,
+    arquivos: [script('carro-atual'), flowsDir('carro-atual\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'checklist-planner', script: 'provision-flow-checklist-planner.ps1', flows: ['Flow Checklist Não OK | Planner'], apply: true,
+    arquivos: [script('checklist-planner'), flowsDir('checklist-planner\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'cobranca-qr-webhook', script: 'provision-flow-cobranca-qr-webhook.ps1', flows: ['Flow Webhook Stripe | Cobrança QR'], apply: true,
+    arquivos: [script('cobranca-qr-webhook'), flowsDir('cobranca-qr-webhook\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'combustivel-insights', script: 'provision-flow-combustivel-insights.ps1', flows: ['Combustível — insights noturnos'], apply: true,
+    arquivos: [script('combustivel-insights'), flowsDir('combustivel-insights\\.json', SINCRONIZAR)],
+  },
+  {
+    nome: 'comunicados-push', script: 'provision-flow-comunicados-push.ps1', flows: ['Flow Push Comunicados | Motoristas'], apply: true,
+    arquivos: [script('comunicados-push'), flowsDir('comunicados-push\\.json', SINCRONIZAR)],
   },
   { nome: 'salvar-foto', script: 'provision-flow-salvar-foto.ps1', flows: ['Flow Salvar Foto BD - Onedrive'], apply: true, arquivos: [script('salvar-foto')] },
   { nome: 'consultar-onedrive', script: 'provision-flow-consultar-onedrive.ps1', flows: ['Flow - Consultar Arquivo OneDrive'], arquivos: [script('consultar-onedrive')] },
@@ -81,11 +107,15 @@ export const ENTRADAS = [
     nome: 'prontuario-anexo', script: 'provision-flow-prontuario-anexo.ps1', flows: ['Prontuário | Anexar pelo Claude'], apply: true,
     args: [['SiteUrl', 'FLOW_SHAREPOINT_SITE_URL']], arquivos: [script('prontuario-anexo'), flowsDir('prontuario-anexar-claude\\.json')],
   },
+  {
+    nome: 'treinamentos-push', script: 'provision-flow-treinamentos-push.ps1', flows: ['Push Treinamentos | Motoristas'], apply: true,
+    arquivos: [script('treinamentos-push'), flowsDir('treinamentos-push\\.json', SINCRONIZAR)],
+  },
   { nome: 'resumo-diario', script: 'provision-flow-resumo-diario.ps1', flows: ['Flow Alertas | Resumo diário'], arquivos: [script('resumo-diario')] },
   {
     nome: 'termo-multa', script: 'provision-flow-termo-multa.ps1', apply: true,
-    flows: ['Termo de multa | Cópia ao motorista', 'Termo de multa | Expirar pendentes', 'Termo de multa | Lembrete diário', 'Termo de multa | Aviso ao gestor'],
-    arquivos: [script('termo-multa')],
+    flows: ['Termo de multa | Cópia ao motorista', 'Termo de multa | Expirar pendentes', 'Termo de multa | Lembrete diário', 'Termo de multa | Aviso ao gestor', 'Termo de multa | Push ao motorista'],
+    arquivos: [script('termo-multa'), flowsDir('termo-multa-push\\.json', SINCRONIZAR)],
   },
 ]
 

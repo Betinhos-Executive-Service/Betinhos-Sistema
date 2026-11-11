@@ -5,7 +5,7 @@ param(
 )
 
 # Carrega a rede CTF (cartao Sem Parar Combustivel) em new_postocombustivel, casando pelo CNPJ. Registros nao entram
-# em solucao: rode em cada ambiente, depois que a coluna new_aceitactf existir nele (DEV: provision-postos-ctf.ps1;
+# em solucao: rode em cada ambiente, depois que a coluna new_aceitactf existir nele (DEV: migration 20261110-1600-postos-aceita-ctf.ps1, aplicada pelo Deploy;
 # PROD: pelas solucoes). Dry-run por padrao. Requer az login.
 # $Arquivo: JSON (UTF-8) gerado da "Lista de Postos" do portal Sem Parar, ja geocodificado, uma linha por CNPJ:
 #   [{ cnpj, razao, nomeAnp, logradouro, numero, bairro, municipio, uf, cep, lat, lon, precisao: anp|rua|bairro|cidade|null }]
@@ -60,7 +60,7 @@ $uri = "$apiBase/new_postocombustivels?`$select=new_postocombustivelid,new_cnpj,
 while ($uri) {
   $page = Invoke-Dv "GET" $uri
   foreach ($r in $page.value) { if ($r.new_cnpj) { $existentes[[string]$r.new_cnpj] = $r } }
-  $uri = $page.'@odata.nextLink'
+  $uri = if ($page.PSObject.Properties['@odata.nextLink']) { $page.'@odata.nextLink' } else { $null }
 }
 
 $novos = 0; $marcados = 0; $desmarcados = 0; $coordenadas = 0; $semCoordenada = 0

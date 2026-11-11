@@ -476,9 +476,6 @@ function Get-SolucoesEscolhidas([string] $Lista) {
   if ($pedidas.Count -eq 0) { return $script:Solucoes }
   $estranhas = @($pedidas | Where-Object { $script:Solucoes -notcontains $_ })
   if ($estranhas.Count) { throw "Solucao fora do Sistema: $($estranhas -join ', ') (validas: $($script:Solucoes -join ', '))." }
-  # Transicao do service worker do app (saiu da Interface para a Motoristas): a Interface sozinha apagaria o sw no PROD enquanto a
-  # Motoristas de la ainda nao o tem. Tire esta trava quando o PROD tiver recebido uma BetinhosMotoristas com o sw.
-  if ($pedidas -contains "BetinhosInterface" -and $pedidas -notcontains "BetinhosMotoristas") { throw "BetinhosInterface sem a BetinhosMotoristas apagaria o service worker do app no PROD; publique as duas juntas." }
   return @($script:Solucoes | Where-Object { $pedidas -contains $_ })
 }
 
