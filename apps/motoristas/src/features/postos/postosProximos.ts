@@ -56,7 +56,7 @@ export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você"
 export const zoomDoFoco = (zoomAtual: number) => Math.min(zoomAtual, ZOOM_MAXIMO_FOCO);
 
 /** Os mais próximos de `origem`, do menor para o maior; empate pelo nome para a lista não pular. */
-export function maisProximos(postos: Posto[], origem: Posicao, quantidade = TAMANHO_LISTA): PostoComDistancia[] {
+export function maisProximos<T extends Posto>(postos: T[], origem: Posicao, quantidade = TAMANHO_LISTA): (T & { distanciaKm: number })[] {
   return postos
     .map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem, posto) }))
     .sort((a, b) => a.distanciaKm - b.distanciaKm || a.nome.localeCompare(b.nome, "pt-BR"))

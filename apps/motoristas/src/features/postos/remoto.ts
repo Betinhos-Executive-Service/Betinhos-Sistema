@@ -1,6 +1,10 @@
 // Postos próximos no Dataverse (new_postocombustivel) e o conjunto fictício do modo local.
 import { hasDataverseRuntime, retrieveMultiple } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
+import { SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
+import { isMockGastosCartao } from "../despesas/gastosCartao.ts";
+import { carregarRankingPostos, type RankingPostos } from "../despesas/rankingPostos.ts";
+import { indexarRanking, type DadosPorId } from "./postosDados.ts";
 import { consultaPostosNaArea, mapearPosto, type Area, type Posto } from "./postosProximos.ts";
 
 const POSTO = (n: number, nome: string, endereco: string, lat: number, lon: number): Posto => ({ id: `mock-posto-${n}`, nome, endereco, lat, lon });
@@ -30,4 +34,44 @@ export async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
   }
   const { entities } = await retrieveMultiple(DATAVERSE.postosCombustivel, consultaPostosNaArea(area));
   return entities.map((linha) => mapearPosto(linha as Record<string, unknown>)).filter((posto): posto is Posto => posto !== null);
+}
+
+// Preço e recomendação fictícios, com os mesmos ids de POSTOS_MOCK: barato e bem recomendado (9), verde (1, 12), amarelo (2, 3, 6), caro (5, 4), maioria não recomenda (3) e sem dados (os demais).
+const aval = (total: number, recomendam: number, contagemMotivos: Record<string, number> = {}): ResumoAvaliacoes => ({ ...SEM_AVALIACOES, total, recomendam, contagemMotivos, motivos: Object.keys(contagemMotivos) });
+const RANKING_MOCK = (() => {
+  const base = { aproximada: false, endereco: "", historico: [] };
+  const item = (postoId: string, precoLitro: number, abastecimentos: number, ultimoAbastecimento: string, avaliacoes: ResumoAvaliacoes) => ({ ...base, postoId, nome: postoId, precoLitro, abastecimentos, ultimoAbastecimento, lat: 0, lon: 0, avaliacoes });
+  return {
+    dias: 30,
+    convite: null,
+    postos: [
+      item("mock-posto-9", 5.99, 8, "2026-11-08", aval(12, 11, { combustivel_bom: 8, sem_fila: 5, bom_atendimento: 2 })),
+      item("mock-posto-1", 6.09, 5, "2026-11-03", aval(8, 6, { sem_fila: 4, combustivel_bom: 3, banheiro_ruim: 1 })),
+      item("mock-posto-6", 6.14, 3, "2026-11-05", aval(4, 4, { bom_atendimento: 3, banheiro_limpo: 1 })),
+      item("mock-posto-12", 6.05, 2, "2026-11-06", SEM_AVALIACOES),
+      item("mock-posto-2", 6.15, 3, "2026-11-04", aval(1, 1, { local_seguro: 1 })),
+      item("mock-posto-3", 6.19, 4, "2026-11-01", aval(7, 2, { fila_grande: 4, mau_atendimento: 3, combustivel_ruim: 1 })),
+      item("mock-posto-4", 6.52, 1, "2026-10-29", aval(3, 3, { bom_atendimento: 2 })),
+      item("mock-posto-5", 6.89, 2, "2026-11-02", aval(4, 3, { banheiro_limpo: 2, local_seguro: 2 }))
+    ]
+  } satisfies RankingPostos;
+})();
+
+// O ranking não muda de minuto em minuto: uma leitura serve a várias aberturas da tela. Falha não fica guardada.
+const VALIDADE_CACHE_MS = 10 * 60 * 1000;
+let cache: { carregadoEm: number; dados: Promise<DadosPorId> } | null = null;
+
+async function lerRanking(): Promise<RankingPostos> {
+  if (!isMockGastosCartao()) return carregarRankingPostos();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (new URLSearchParams(window.location.search).get("mockRankingPostos") === "erro") throw new Error("Falha simulada ao carregar os postos.");
+  return RANKING_MOCK;
+}
+
+export function carregarDadosPostos(): Promise<DadosPorId> {
+  if (cache && Date.now() - cache.carregadoEm < VALIDADE_CACHE_MS) return cache.dados;
+  const atual = { carregadoEm: Date.now(), dados: lerRanking().then(indexarRanking) };
+  cache = atual;
+  atual.dados.catch(() => { if (cache === atual) cache = null; });
+  return atual.dados;
 }

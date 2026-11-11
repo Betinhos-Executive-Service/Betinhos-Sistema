@@ -99,3 +99,78 @@ test("conjunto fictício do modo local fica na região de São José dos Campos"
   assert.ok(POSTOS_MOCK.length >= 10);
   assert.ok(POSTOS_MOCK.every((p) => distanciaKm(CENTRO_PADRAO, p) < 40 && p.id && p.nome));
 });
+
+// ---------------- Preço e recomendação (postosDados) ----------------
+import { idMenorPreco, indexarRanking, indicadorNoMapa, juntarDados, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
+import { SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
+import type { RankingPostos } from "../src/features/despesas/rankingPostos.ts";
+
+const itemRanking = (postoId: string, precoLitro: number, avaliacoes = SEM_AVALIACOES) => ({ postoId, nome: postoId, precoLitro, abastecimentos: 5, ultimoAbastecimento: "2026-11-03", lat: 0, lon: 0, aproximada: false, endereco: "", historico: [], avaliacoes });
+const ranking = (...postos: ReturnType<typeof itemRanking>[]): RankingPostos => ({ dias: 30, convite: null, postos });
+const aval = (total: number, recomendam: number, contagemMotivos: Record<string, number> = {}) => ({ ...SEM_AVALIACOES, total, recomendam, contagemMotivos, motivos: Object.keys(contagemMotivos) });
+
+test("juntarDados casa posto e ranking pelo id; ausente fica sem dados", () => {
+  const dados = indexarRanking(ranking(itemRanking("a", 6.09, aval(12, 11)), itemRanking("b", 6.89)));
+  const juntos = juntarDados([posto("a", 0, 0), posto("c", 0, 0)], dados);
+  assert.equal(juntos[0].dados?.precoLitro, 6.09);
+  assert.equal(juntos[0].dados?.avaliacoes.total, 12);
+  assert.equal(juntos[0].dados?.cor, "verde");
+  assert.equal(juntos[1].dados, null);
+});
+
+test("juntarDados com ranking que falhou (null) devolve os postos sem preço nem nota", () => {
+  assert.deepEqual(juntarDados([posto("a", 0, 0)], null).map((p) => p.dados), [null]);
+  assert.equal(indexarRanking(null).size, 0);
+});
+
+test("indexarRanking ignora postoId vazio (plugin antigo) e preço inválido, e colore pelo semáforo da meta", () => {
+  const dados = indexarRanking(ranking(itemRanking("", 6), itemRanking("x", 0), itemRanking("v", 6.1), itemRanking("m", 6.2), itemRanking("r", 6.5)));
+  assert.deepEqual([...dados.keys()], ["v", "m", "r"]);
+  assert.deepEqual(["v", "m", "r"].map((id) => dados.get(id)?.cor), ["verde", "amarelo", "vermelho"]);
+  assert.equal(dados.get("v")?.dias, 30);
+});
+
+test("formatação de preço: vírgula, /L e etiqueta curta do mapa", () => {
+  assert.equal(rotuloPrecoLitro(6.19), "R$ 6,19/L");
+  assert.equal(rotuloPrecoLitro(6), "R$ 6,00/L");
+  assert.equal(rotuloPrecoMapa(5.9), "5,90");
+});
+
+test("rotuloDia e rotuloBaseDoPreco dizem quando e com base em quê", () => {
+  assert.equal(rotuloDia("2026-11-03"), "03/11");
+  assert.equal(rotuloDia(""), "");
+  assert.equal(rotuloBaseDoPreco({ abastecimentos: 5, dias: 30, ultimoAbastecimento: "2026-11-03" }), "Média de 5 abastecimentos em 30 dias · último em 03/11");
+  assert.equal(rotuloBaseDoPreco({ abastecimentos: 1, dias: 30, ultimoAbastecimento: "2026-11-03" }), "1 abastecimento em 30 dias · último em 03/11");
+});
+
+test("notaDoPosto: percentual e total; sem avaliações some; maioria que não recomenda vira alerta", () => {
+  assert.deepEqual(notaDoPosto(aval(12, 11)), { texto: "92%", total: 12, alerta: false });
+  assert.equal(notaDoPosto(SEM_AVALIACOES), null);
+  assert.equal(notaDoPosto(aval(7, 2))?.alerta, true);
+  assert.equal(notaDoPosto(aval(1, 0))?.alerta, false, "uma opinião só não alerta");
+});
+
+test("indicadorNoMapa só marca aprovação clara ou alerta", () => {
+  assert.equal(indicadorNoMapa(aval(12, 11)), "bom");
+  assert.equal(indicadorNoMapa(aval(7, 2)), "alerta");
+  assert.equal(indicadorNoMapa(aval(1, 1)), null);
+  assert.equal(indicadorNoMapa(SEM_AVALIACOES), null);
+});
+
+test("motivosPrincipais devolve até 2 mais citados com o sinal; sem contador usa a lista do plugin", () => {
+  const motivos = motivosPrincipais(aval(12, 11, { sem_fila: 5, combustivel_bom: 8, bom_atendimento: 2 }));
+  assert.deepEqual(motivos.map((m) => m.rotulo), ["Combustível bom", "Sem fila"]);
+  assert.ok(motivos.every((m) => m.positivo));
+  assert.equal(motivosPrincipais({ contagemMotivos: {}, motivos: ["fila_grande", "id_desconhecido"] }).map((m) => m.rotulo).join(), "Fila grande");
+  assert.equal(motivosPrincipais(aval(3, 1, { fila_grande: 2 }))[0].positivo, false);
+});
+
+test("idMenorPreco destaca o mais barato só com 2 ou mais preços diferentes", () => {
+  const dados = indexarRanking(ranking(itemRanking("a", 6.2), itemRanking("b", 5.99), itemRanking("c", 6.5)));
+  const com = juntarDados([posto("a", 0, 0), posto("sem", 0, 0), posto("b", 0, 0), posto("c", 0, 0)], dados);
+  assert.equal(idMenorPreco(com), "b");
+  assert.equal(idMenorPreco(com.filter((p) => p.id === "b")), "", "um só preço não é menor");
+  const iguais = juntarDados([posto("a", 0, 0), posto("d", 0, 0)], indexarRanking(ranking(itemRanking("a", 6), itemRanking("d", 6))));
+  assert.equal(idMenorPreco(iguais), "", "empate total não destaca");
+  assert.equal(idMenorPreco([]), "");
+});
