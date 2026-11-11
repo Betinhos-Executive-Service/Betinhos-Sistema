@@ -11,9 +11,9 @@
 .pp-mapa .maplibregl-ctrl-attrib a { color:#475569; }
 .pp-mapa .maplibregl-ctrl-top-left { z-index:1; }
 
-/* Cabeçalho compartilhado: o título desta tela cabe numa linha entre Voltar e as ações (só aqui, sem mexer no componente comum). */
+/* Cabeçalho compartilhado: em tela estreita o título desta tela quebra em até 2 linhas em vez de invadir as ações (só aqui, sem mexer no componente comum). */
 .services-menu:has(+ .pp-screen) .services-title-block { padding:0 6px; }
-.services-menu:has(+ .pp-screen) .services-title-block strong { font-size:1.04rem; white-space:nowrap; }
+.services-menu:has(+ .pp-screen) .services-title-block strong { font-size:1.04rem; text-wrap:balance; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 
 /* Controles flutuantes: bloco de zoom compacto (divisor fino) e "minha posição" separado. 40 px visíveis; o toque chega a 44 px por pseudo-elemento invisível. */
 .pp-controles { position:absolute; z-index:2; top:10px; right:10px; display:grid; gap:8px; justify-items:end; }
