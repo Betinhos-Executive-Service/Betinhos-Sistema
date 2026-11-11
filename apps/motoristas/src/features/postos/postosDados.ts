@@ -3,7 +3,7 @@ import { maioriaNaoRecomenda, percentualRecomenda, SEM_AVALIACOES, type ResumoAv
 import { METAS_GASTOS, semaforo, type Semaforo } from "../despesas/gastosRelatorio.ts";
 import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
 import type { ConviteAvaliacao, PostoProximo, RankingPostos } from "../despesas/rankingPostos.ts";
-import type { Posto } from "./postosProximos.ts";
+import { RAIOS_LISTA_KM, TAMANHO_LISTA, type Posto } from "./postosProximos.ts";
 
 /**
  * O ranking (Custom API new_ObterRankingPostos) devolve, por posto, a média ponderada do R$/litro (soma dos valores ÷ soma dos litros)
@@ -65,6 +65,42 @@ export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
   const precos = postos.flatMap(({ id, dados }) => (dados ? [{ id, preco: dados.precoLitro }] : []));
   const menor = precos.reduce<(typeof precos)[number] | null>((atual, item) => (!atual || item.preco < atual.preco ? item : atual), null);
   return menor && precos.some(({ preco }) => preco > menor.preco) ? menor.id : "";
+}
+
+/** Pesos da nota da lista (0 a 100): preço, recomendação dos motoristas e distância. Aceitar CTF já é filtro da consulta. */
+export const PESOS_NOTA = { preco: 0.4, recomendacao: 0.35, distancia: 0.25 } as const;
+
+export type Recomendado<T> = T & { pontos: number | null; motivo: string };
+
+/** Recomendação suavizada: sem avaliações vale 0,5; 1 de 1 não vale o mesmo que 20 de 20. */
+const fatorRecomendacao = ({ recomendam, total }: ResumoAvaliacoes) => (recomendam + 1.5) / (total + 3);
+
+/**
+ * Os `TAMANHO_LISTA` melhores candidatos pela nota: preço entre os candidatos (o mais barato vale 1, o mais caro 0), recomendação suavizada
+ * e distância (0 km vale 1, o raio vale 0). Sem preço recente não há nota: vão para o fim, do mais perto ao mais longe.
+ * Motivo = o critério que mais pesou na nota; o mais barato da lista leva "Menor preço" (com 2 ou mais preços diferentes).
+ */
+export function recomendados<T extends PostoExibido & { distanciaKm: number }>(candidatos: T[], quantidade = TAMANHO_LISTA): Recomendado<T>[] {
+  const raio = Math.max(RAIOS_LISTA_KM[0], ...candidatos.map((posto) => posto.distanciaKm));
+  const precos = candidatos.flatMap((posto) => (posto.dados ? [posto.dados.precoLitro] : []));
+  const [barato, caro] = [Math.min(...precos), Math.max(...precos)];
+  const menor = idMenorPreco(candidatos);
+  const pontuados = candidatos.map((posto): Recomendado<T> => {
+    if (!posto.dados) return { ...posto, pontos: null, motivo: "Sem preço recente" };
+    const avaliado = posto.dados.avaliacoes.total > 0;
+    const partes = [
+      { motivo: posto.id === menor ? "Menor preço" : "Bom preço", valor: PESOS_NOTA.preco * (caro > barato ? (caro - posto.dados.precoLitro) / (caro - barato) : 1) },
+      { motivo: avaliado ? "Bem avaliado" : "", valor: PESOS_NOTA.recomendacao * fatorRecomendacao(posto.dados.avaliacoes) },
+      { motivo: "Mais perto", valor: PESOS_NOTA.distancia * Math.min(1, Math.max(0, 1 - posto.distanciaKm / raio)) }
+    ];
+    const total = partes.reduce((soma, parte) => soma + parte.valor, 0);
+    // Sem avaliações a recomendação é neutra: entra na nota, mas não é motivo.
+    const principal = posto.id === menor ? partes[0] : partes.filter((parte) => parte.motivo).reduce((maior, parte) => (parte.valor > maior.valor ? parte : maior));
+    return { ...posto, pontos: Math.round(total * 100), motivo: principal.motivo };
+  });
+  return pontuados
+    .sort((a, b) => (b.pontos ?? -1) - (a.pontos ?? -1) || a.distanciaKm - b.distanciaKm || a.nome.localeCompare(b.nome, "pt-BR"))
+    .slice(0, quantidade);
 }
 
 /** Janela em que o motorista ainda pode avaliar o posto onde abasteceu (a mesma do plugin FuelRanking, `DiasConvite`). */

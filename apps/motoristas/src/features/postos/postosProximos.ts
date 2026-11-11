@@ -13,7 +13,8 @@ export const ZOOM_MAXIMO_FOCO = 15;
 export const LIMITE_POSTOS = 200;
 export const TAMANHO_LISTA = 10;
 export const ESPERA_BUSCA_MS = 400;
-export const RAIOS_LISTA_KM = [3, 10, 30];
+/** Raio dos candidatos da lista (km): 10, ampliado para 30 se não houver `TAMANHO_LISTA` postos CTF dentro. */
+export const RAIOS_LISTA_KM = [10, 30];
 const KM_POR_GRAU = 111.32;
 
 // Nomes lógicos de new_postocombustivel (confirmados em carregar-postos-ctf.ps1 e FuelSchema.cs).
@@ -39,7 +40,8 @@ export function consultaPostosNaArea({ sul, norte, oeste, leste }: Area, limite 
 export type Origem = { ponto: Posicao; doMotorista: boolean };
 
 export const origemDasDistancias = (posicao: Posicao | null): Origem => (posicao ? { ponto: posicao, doMotorista: true } : { ponto: CENTRO_PADRAO, doMotorista: false });
-export const tituloLista = (origem: Origem) => (origem.doMotorista ? "Mais próximos de você" : "Mais próximos do centro de SJC");
+/** "Recomendados" quando a ordem usou preço e recomendação; sem o ranking a lista cai na distância e o título diz isso. */
+export const tituloLista = (origem: Origem, recomendados = false) => `${recomendados ? "Recomendados perto" : "Mais próximos"} ${origem.doMotorista ? "de você" : "do centro de SJC"}`;
 export const rotuloOrigem = (origem: Origem) => (origem.doMotorista ? "de você" : "do centro de São José dos Campos");
 
 /** Caixa de meia-largura `raioKm` em volta do ponto. Tudo a até `raioKm` do ponto cabe nela. */
@@ -49,16 +51,22 @@ export function areaEmVolta({ lat, lon }: Posicao, raioKm: number): Area {
   return { sul: lat - dLat, norte: lat + dLat, oeste: lon - dLon, leste: lon + dLon };
 }
 
+/** Postos a até `raioKm` de `origem`, do mais perto ao mais longe. */
+const dentroDe = <T extends Posto>(postos: T[], origem: Posicao, raioKm: number) => maisProximos(postos, origem, Infinity).filter((posto) => posto.distanciaKm <= raioKm);
+
 /**
- * Raios (km) tentados na busca da lista, do menor ao maior. Depois de buscar na caixa de `raioAtual`, devolve o próximo raio ou null se já basta:
- * a lista só é confiável se tem `TAMANHO_LISTA` postos e o último está dentro do raio (nada mais perto ficou fora da caixa).
+ * Depois de buscar na caixa de `raioAtual`, devolve o próximo raio ou null se já basta: basta com `TAMANHO_LISTA` postos dentro do raio.
  * Se a busca bateu o limite, ampliar só piora o recorte arbitrário; sem raio maior, não há o que tentar.
  */
 export function proximoRaio(postos: Posto[], origem: Posicao, raioAtual: number, limite = LIMITE_POSTOS) {
-  const lista = maisProximos(postos, origem);
-  const completa = lista.length >= TAMANHO_LISTA && lista[lista.length - 1].distanciaKm <= raioAtual;
-  if (completa || postos.length >= limite) return null;
+  if (dentroDe(postos, origem, raioAtual).length >= TAMANHO_LISTA || postos.length >= limite) return null;
   return RAIOS_LISTA_KM.find((raio) => raio > raioAtual) ?? null;
+}
+
+/** Candidatos da lista: os postos no menor raio de RAIOS_LISTA_KM com `TAMANHO_LISTA` postos (ou no maior), do mais perto ao mais longe. */
+export function candidatosDaLista<T extends Posto>(postos: T[], origem: Posicao) {
+  const raio = RAIOS_LISTA_KM.find((km) => dentroDe(postos, origem, km).length >= TAMANHO_LISTA) ?? RAIOS_LISTA_KM[RAIOS_LISTA_KM.length - 1];
+  return dentroDe(postos, origem, raio);
 }
 
 /** A nova área já foi carregada (inteira dentro da anterior) e a anterior não bateu o limite: não há nada novo a buscar. */

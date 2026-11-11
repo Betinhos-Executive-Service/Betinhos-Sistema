@@ -1,4 +1,4 @@
-import { Crosshair, Info, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { Crosshair, Info, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
@@ -12,9 +12,9 @@ import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { descreverGpsErro } from "../termos/termosMulta";
 import { PostosMapa, type Foco, type PostosMapaControle, type Vista } from "./PostosMapa";
 import { PostosGaveta } from "./PostosGaveta";
-import { idMenorPreco, juntarDados, juntarPosto, notaDoPosto, paraFicha, podeAvaliar, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
+import { juntarDados, juntarPosto, notaDoPosto, paraFicha, podeAvaliar, recomendados, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido, type Recomendado } from "./postosDados";
 import { areaJaCarregada, ESPERA_BUSCA_MS, LIMITE_POSTOS, medidasGaveta, origemDasDistancias, rotuloKm, rotuloOrigem, rotuloSemConexao, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Area, type PosicaoGaveta, type Posto } from "./postosProximos";
-import { carregarDadosPostos, carregarMaisProximos, carregarPostosDaArea, invalidarRanking, lerPosicaoDoMotorista } from "./remoto";
+import { carregarCandidatosLista, carregarDadosPostos, carregarPostosDaArea, invalidarRanking, lerPosicaoDoMotorista } from "./remoto";
 
 type Busca = "ok" | "carregando" | "erro";
 
@@ -27,21 +27,17 @@ const ALTURA_PINO_FOLGA = 60;
 const FOLGA_CARTAO = 16;
 const ZOOM_MINHA_POSICAO = 14;
 
-function Nota({ dados }: { dados: DadosPosto }) {
-  const nota = notaDoPosto(dados.avaliacoes);
-  if (!nota) return null;
-  const Icone = nota.alerta ? ThumbsDown : ThumbsUp;
-  return <span className="pp-nota" data-alerta={nota.alerta || undefined}><Icone aria-hidden="true" />{nota.texto}<small>· {nota.total}</small></span>;
-}
-
-function ItemMeta({ posto, menor }: { posto: PostoExibido; menor: boolean }) {
+/** Uma linha: preço, % que recomenda e o motivo da posição. Sem nenhum preço na lista (ranking falhou), nada: "Sem preço recente" em todos só faria ruído. */
+function ItemMeta({ posto, comNota }: { posto: Recomendado<PostoExibido>; comNota: boolean }) {
   const dados = posto.dados;
-  if (!dados) return null;
+  if (!dados) return comNota ? <span className="pp-item-meta"><span className="pp-motivo pp-motivo--neutro">{posto.motivo}</span></span> : null;
+  const nota = notaDoPosto(dados.avaliacoes);
+  const Polegar = nota?.alerta ? ThumbsDown : ThumbsUp;
   return (
-    <span className="pp-item-meta">
+    <span className="pp-item-meta" aria-label={`${rotuloPrecoLitro(dados.precoLitro)}${nota ? `, ${nota.texto} recomendam` : ""}. Nota ${posto.pontos} de 100: ${posto.motivo}`}>
       <span className="pp-preco" data-cor={dados.cor}><i aria-hidden="true" />{rotuloPrecoLitro(dados.precoLitro)}</span>
-      <Nota dados={dados} />
-      {menor ? <span className="pp-selo">Menor preço</span> : null}
+      {nota ? <span className="pp-nota" data-alerta={nota.alerta || undefined}><Polegar aria-hidden="true" />{nota.texto}</span> : null}
+      <span className="pp-motivo">{posto.motivo}</span>
     </span>
   );
 }
@@ -186,7 +182,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
     const id = ++pedidoLista.current;
     setBuscaLista("carregando");
     try {
-      const { dados: lista, desde: quando } = await carregarMaisProximos(motoristaId, ponto);
+      const { dados: lista, desde: quando } = await carregarCandidatosLista(motoristaId, ponto);
       if (id !== pedidoLista.current) return;
       setProximos(lista);
       setDesde((anterior) => ({ ...anterior, lista: quando }));
@@ -201,8 +197,9 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
 
   // O posto aberto (vindo da lista) sempre ganha pino, mesmo fora dos 200 da área do mapa.
   const exibidos = useMemo(() => juntarDados(selecionado && !postos.some((posto) => posto.id === selecionado.id) ? [...postos, selecionado] : postos, dadosPorId), [postos, selecionado, dadosPorId]);
-  const lista = useMemo(() => juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) })), [proximos, dadosPorId, origem]);
-  const menorPreco = useMemo(() => idMenorPreco(lista), [lista]);
+  // Ordem por nota (preço, recomendação, distância); sem nenhum preço a ordem é só a distância e o título diz "Mais próximos".
+  const lista = useMemo(() => recomendados(juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) }))), [proximos, dadosPorId, origem]);
+  const comNota = lista.some((posto) => posto.pontos !== null);
   const cartao = cartaoPosto ? juntarPosto(cartaoPosto, dadosPorId) : null;
 
   // Palco = área do mapa e da gaveta; a gaveta se mede por ele.
@@ -274,7 +271,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
           </div>
           <PostosGaveta
             gaveta={gaveta} posicao={gavetaPosicao} onPosicao={setGavetaPosicao}
-            titulo={tituloLista(origem)} contagem={lista.length ? `${lista.length} ${lista.length === 1 ? "posto" : "postos"}` : ""}
+            titulo={tituloLista(origem, comNota)} contagem={lista.length ? `${lista.length} ${lista.length === 1 ? "posto" : "postos"}` : ""}
             acima={(
               <article className={`pp-cartao${selecionado ? " is-aberto" : ""}`} aria-label={cartao ? `Posto ${cartao.nome}` : "Posto"} aria-hidden={selecionado ? undefined : true}>
                 {cartao ? (
@@ -300,13 +297,9 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
                   {lista.map((posto, indice) => (
                     <li key={posto.id} style={listaEntrou ? undefined : ({ "--pp-i": Math.min(indice, 8) } as CSSProperties)}>
                       <button type="button" className="pp-item" data-ativo={posto.id === selecionado?.id || undefined} onClick={() => selecionar(posto)}>
-                        <span className="pp-item-icone" data-cor={posto.dados?.cor}><Fuel aria-hidden="true" /></span>
-                        <span className="pp-item-texto">
-                          <strong>{posto.nome}</strong>
-                          <ItemMeta posto={posto} menor={posto.id === menorPreco} />
-                          {posto.endereco ? <span className="pp-item-endereco">{posto.endereco}</span> : null}
-                        </span>
-                        <span className="pp-item-km"><b>{rotuloKm(posto.distanciaKm)}</b><small>{origem.doMotorista ? "de você" : "do centro"}</small></span>
+                        <strong className="pp-item-nome">{posto.nome}</strong>
+                        <span className="pp-item-km">{rotuloKm(posto.distanciaKm)}</span>
+                        <ItemMeta posto={posto} comNota={comNota} />
                       </button>
                     </li>
                   ))}
