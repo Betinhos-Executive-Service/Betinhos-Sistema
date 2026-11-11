@@ -31,6 +31,7 @@ jobs:
   importar:
     runs-on: windows-latest
     timeout-minutes: 240
+    # O environment prod não tem revisor: a aprovação é o job aprovar-prod (environment prod-aprovacao) de quem chama.
     environment: ${{ inputs.alvo }}
     # O mesmo grupo do retirar-caixa.yml e do caminho "front" do producao.yml: uma escrita por ambiente de cada vez.
     concurrency:
@@ -69,9 +70,9 @@ jobs:
         env:
           PACOTES_SENHA: ${{ secrets.PACOTES_SENHA }}
         run: bash packages/deploy/solucoes/artefato-cifrado.sh decifrar pacotes-cifrado/pacotes.tar.enc pacotes
-      - name: Instalar pac
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-alvo --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Backup do PROD
         # A conta de serviço precisa estar registrada como app de administração (pac admin application register, uma vez).
