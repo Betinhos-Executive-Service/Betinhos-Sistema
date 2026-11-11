@@ -514,7 +514,8 @@ function Test-FalhaTransitoriaDoServidor([string] $Erro) {
 
 # Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
 # holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
-# $SemUpgrade (ensaio, so no TEST): com versao instalada, importa como update (sem --stage-and-upgrade). O update troca os
+# $SemUpgrade: com versao instalada, importa como update (sem --stage-and-upgrade). Quem decide e importar-solucoes.ps1: o
+# ensaio so no TEST, ou a escolha pelo inventario (inventario.ps1). O update troca os
 # componentes que vieram no pacote e deixa no ambiente os que sairam da solucao; o upgrade apaga esses, mas monta e desmonta
 # uma solucao de espera (holding), o que custa ~10 min no BetinhosCore.
 function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
@@ -576,7 +577,6 @@ function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $
 # $Alvo: Test ou Prod (explicito). $Permitidas: as 4 por padrao; a retirada passa tambem AppBetinhos (upgrade antes de desinstalar).
 function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
   Assert-HostAlvo $Dv $Alvo
-  if ($SemUpgrade -and $Alvo -ne "Test") { throw "Import sem upgrade e so ensaio no TEST; $Alvo sempre usa --stage-and-upgrade." }
   $m = Get-ManifestoDoPacote $Caminho
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
   if ($Permitidas -notcontains $m.UniqueName) { throw "$Caminho e '$($m.UniqueName)', fora de: $($Permitidas -join ', ')." }
