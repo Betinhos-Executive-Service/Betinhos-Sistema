@@ -1,5 +1,5 @@
 // Preço e recomendação dos postos da tela Postos próximos: junção por id com o ranking e formatação. Sem React nem Dataverse.
-import { maioriaNaoRecomenda, motivoPositivo, percentualRecomenda, rotuloMotivo, SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
+import { maioriaNaoRecomenda, percentualRecomenda, SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
 import { METAS_GASTOS, semaforo, type Semaforo } from "../despesas/gastosRelatorio.ts";
 import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
 import type { ConviteAvaliacao, PostoProximo, RankingPostos } from "../despesas/rankingPostos.ts";
@@ -59,11 +59,6 @@ export function indicadorNoMapa(avaliacoes: ResumoAvaliacoes): "bom" | "alerta" 
   return avaliacoes.total >= 2 && percentualRecomenda(avaliacoes) >= 70 ? "bom" : null;
 }
 
-/** Os motivos mais citados (até `quantidade`), pelo contador; sem contador, a lista que o plugin já ordenou. */
-export function motivosPrincipais({ contagemMotivos, motivos }: Pick<ResumoAvaliacoes, "contagemMotivos" | "motivos">, quantidade = 2) {
-  const porContagem = Object.keys(contagemMotivos).filter((id) => contagemMotivos[id] > 0).sort((a, b) => contagemMotivos[b] - contagemMotivos[a] || a.localeCompare(b));
-  return (porContagem.length ? porContagem : motivos).filter((id) => rotuloMotivo(id)).slice(0, quantidade).map((id) => ({ id, rotulo: rotuloMotivo(id), positivo: motivoPositivo(id) }));
-}
 
 /** Id do posto mais barato entre os que têm preço. Só destaca com 2 ou mais preços diferentes; no empate fica o primeiro (a lista já vem do mais perto). */
 export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {

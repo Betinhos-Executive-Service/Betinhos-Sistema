@@ -1,4 +1,4 @@
-import { ChevronRight, Crosshair, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { Crosshair, Info, Fuel, MapPin, Minus, Navigation, Plus, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
@@ -12,16 +12,16 @@ import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { descreverGpsErro } from "../termos/termosMulta";
 import { PostosMapa, type Foco, type PostosMapaControle, type Vista } from "./PostosMapa";
 import { PostosGaveta } from "./PostosGaveta";
-import { idMenorPreco, juntarDados, juntarPosto, motivosPrincipais, notaDoPosto, paraFicha, podeAvaliar, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
+import { idMenorPreco, juntarDados, juntarPosto, notaDoPosto, paraFicha, podeAvaliar, rotuloBaseDoPreco, rotuloPrecoLitro, type DadosPorId, type DadosPosto, type PostoExibido } from "./postosDados";
 import { areaJaCarregada, ESPERA_BUSCA_MS, LIMITE_POSTOS, medidasGaveta, origemDasDistancias, rotuloKm, rotuloOrigem, rotuloSemConexao, tituloLista, urlGoogleMaps, urlWaze, zoomDoFoco, type Area, type PosicaoGaveta, type Posto } from "./postosProximos";
 import { carregarDadosPostos, carregarMaisProximos, carregarPostosDaArea, invalidarRanking, lerPosicaoDoMotorista } from "./remoto";
 
 type Busca = "ok" | "carregando" | "erro";
 
 /** Altura do cartão acima da gaveta: o pino tocado fica centralizado na parte livre do mapa. Com preço e recomendação o cartão cresce; com o convite de avaliar, mais ainda. */
-const ALTURA_CARTAO = 236;
-const ALTURA_CARTAO_COM_DADOS = 290;
-const ALTURA_AVALIAR = 84;
+const ALTURA_CARTAO = 120;
+const ALTURA_CARTAO_COM_DADOS = 162;
+const ALTURA_AVALIAR = 58;
 /** O pino (42 px) mais a etiqueta (22 px) sobem a partir da ponta: a ponta fica abaixo do centro da área livre para a etiqueta não cortar no topo. */
 const ALTURA_PINO_FOLGA = 60;
 const FOLGA_CARTAO = 16;
@@ -67,10 +67,10 @@ function CartaoAvaliar({ postoId, dados, convite, onAvaliado }: { postoId: strin
   };
   return (
     <div className="pp-avaliar">
-      <strong id="pp-avaliar-pergunta">Você abasteceu aqui em {formatDiaMes(convite.data)}. Como foi?</strong>
-      <div className="rp-escolha" role="group" aria-labelledby="pp-avaliar-pergunta">
-        <button type="button" data-tom="positivo" disabled={salvando} onClick={() => void avaliar(true)}><ThumbsUp aria-hidden="true" />Recomendo</button>
-        <button type="button" data-tom="negativo" disabled={salvando} onClick={() => void avaliar(false)}><ThumbsDown aria-hidden="true" />Não recomendo</button>
+      <strong id="pp-avaliar-pergunta">Abasteceu aqui em {formatDiaMes(convite.data)}. Recomenda?</strong>
+      <div className="pp-avaliar-botoes" role="group" aria-labelledby="pp-avaliar-pergunta">
+        <button type="button" data-tom="positivo" aria-label="Recomendo" disabled={salvando} onClick={() => void avaliar(true)}><ThumbsUp aria-hidden="true" />Sim</button>
+        <button type="button" data-tom="negativo" aria-label="Não recomendo" disabled={salvando} onClick={() => void avaliar(false)}><ThumbsDown aria-hidden="true" />Não</button>
       </div>
       {erro ? <small className="pp-avaliar-erro" role="alert">{erro}</small> : null}
     </div>
@@ -79,7 +79,6 @@ function CartaoAvaliar({ postoId, dados, convite, onAvaliado }: { postoId: strin
 
 function CartaoDados({ dados }: { dados: DadosPosto }) {
   const nota = notaDoPosto(dados.avaliacoes);
-  const motivos = motivosPrincipais(dados.avaliacoes);
   const Icone = nota?.alerta ? ThumbsDown : ThumbsUp;
   return (
     <div className="pp-cartao-dados">
@@ -88,7 +87,6 @@ function CartaoDados({ dados }: { dados: DadosPosto }) {
         {nota ? <span className="pp-cartao-nota" data-alerta={nota.alerta || undefined}><Icone aria-hidden="true" />{rotuloRecomendacoes(dados.avaliacoes)}</span> : null}
       </div>
       <span className="pp-cartao-base">{rotuloBaseDoPreco(dados)}</span>
-      {motivos.length ? <ul className="pp-motivos">{motivos.map((motivo) => <li key={motivo.id} data-positivo={motivo.positivo || undefined}>{motivo.rotulo}</li>)}</ul> : null}
     </div>
   );
 }
@@ -284,15 +282,12 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
                     <button type="button" className="pp-cartao-fechar" aria-label="Fechar" tabIndex={selecionado ? 0 : -1} onClick={() => setSelecionado(null)}><X aria-hidden="true" /></button>
                     <strong className="pp-cartao-nome">{cartao.nome}</strong>
                     {cartao.dados ? <CartaoDados dados={cartao.dados} /> : null}
-                    <div className="pp-cartao-meta">
-                      <span className="pp-cartao-distancia">{distanciaCartao}</span>
-                    </div>
-                    {cartao.endereco ? <span className="pp-cartao-endereco">{cartao.endereco}</span> : null}
+                    <p className="pp-cartao-onde"><span className="pp-cartao-distancia">{distanciaCartao}</span>{cartao.endereco ? <> · {cartao.endereco}</> : null}</p>
                     {cartao.dados ? <CartaoAvaliar key={cartao.id} postoId={cartao.id} dados={cartao.dados} convite={convite} onAvaliado={aoAvaliar} /> : null}
-                    <button type="button" className="pp-ficha" tabIndex={selecionado ? 0 : -1} onClick={() => setFichaAberta(true)}>Detalhes e avaliação<ChevronRight aria-hidden="true" /></button>
                     <div className="pp-cartao-acoes">
                       <a className="pp-ir pp-ir--primario" href={urlGoogleMaps(cartao)} target="_blank" rel="noreferrer"><Navigation aria-hidden="true" />Ir</a>
                       <a className="pp-ir" href={urlWaze(cartao)} target="_blank" rel="noreferrer">Waze</a>
+                      <button type="button" className="pp-ir pp-ficha" aria-label="Detalhes e avaliação do posto" tabIndex={selecionado ? 0 : -1} onClick={() => setFichaAberta(true)}><Info aria-hidden="true" />Detalhes</button>
                     </div>
                   </>
                 ) : null}
