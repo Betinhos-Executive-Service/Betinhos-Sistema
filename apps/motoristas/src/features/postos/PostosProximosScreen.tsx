@@ -106,7 +106,8 @@ function CartaoDados({ dados }: { dados: DadosPosto }) {
   );
 }
 
-export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
+/** `motoristaId` separa os dados guardados no aparelho por motorista; vazio (ainda não carregou), nada é guardado nem lido do aparelho. */
+export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => void; motoristaId: string }) {
   const [posicao, setPosicao] = useState<Posicao | null>(null);
   const [aviso, setAviso] = useState("");
   const [vista, setVista] = useState<Vista | null>(null);
@@ -152,20 +153,20 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   }, [irPara]);
   useEffect(() => { localizar(); }, [localizar]);
 
-  const buscarRanking = useCallback(() => carregarDadosPostos().then(({ dados, desde: quando }) => {
+  const buscarRanking = useCallback(() => carregarDadosPostos(motoristaId).then(({ dados, desde: quando }) => {
     setDadosPorId(dados.dados);
     setConvite(dados.convite);
     setDesde((atual) => ({ ...atual, ranking: quando }));
   }, (erro) => {
     reportAppError(erro, { severity: "warning", source: "app", action: "carregarRankingPostosProximos", screen: "PostosProximos", notifyUser: false });
-  }), []);
+  }), [motoristaId]);
   useEffect(() => { void buscarRanking(); }, [buscarRanking]);
 
   const buscar = useCallback(async (atual: Vista) => {
     const id = ++pedido.current;
     setBusca("carregando");
     try {
-      const { dados: lista, desde: quando } = await carregarPostosDaArea(atual.area);
+      const { dados: lista, desde: quando } = await carregarPostosDaArea(motoristaId, atual.area);
       if (id !== pedido.current) return;
       // Do aparelho, a cópia não corresponde a esta área: nada de "já carregada", a próxima busca tenta a rede de novo.
       ultimaCarga.current = quando === null ? { area: atual.area, cheia: lista.length >= LIMITE_POSTOS } : null;
@@ -178,7 +179,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
       ultimaCarga.current = null;
       setBusca("erro");
     }
-  }, []);
+  }, [motoristaId]);
 
   useEffect(() => {
     if (!vista) return;
@@ -197,7 +198,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
     const id = ++pedidoLista.current;
     setBuscaLista("carregando");
     try {
-      const { dados: lista, desde: quando } = await carregarMaisProximos(ponto);
+      const { dados: lista, desde: quando } = await carregarMaisProximos(motoristaId, ponto);
       if (id !== pedidoLista.current) return;
       setProximos(lista);
       setDesde((anterior) => ({ ...anterior, lista: quando }));
@@ -207,7 +208,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
       reportAppError(erro, { severity: "warning", source: "app", action: "carregarMaisProximosPostos", screen: "PostosProximos", notifyUser: false });
       setBuscaLista("erro");
     }
-  }, []);
+  }, [motoristaId]);
   useEffect(() => { void buscarLista(origem.ponto); }, [buscarLista, origem]);
 
   // O posto aberto (vindo da lista) sempre ganha pino, mesmo fora dos 200 da área do mapa.

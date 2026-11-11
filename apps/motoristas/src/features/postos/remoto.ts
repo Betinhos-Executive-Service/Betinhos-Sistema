@@ -44,20 +44,23 @@ async function carregarPostosNaArea(area: Area): Promise<Posto[]> {
 /** Dados de uma leitura e, se vieram do aparelho por falha da rede, quando foram guardados (`desde`, ms). */
 export type Resultado<T> = { dados: T; desde: number | null };
 
-/** Lê e guarda; se a leitura falha e há cópia válida (7 dias), devolve a cópia. Sem cópia, o erro segue. */
-async function comGuardado<T, G = T>(chave: string, carregar: () => Promise<T>, paraGuardar: (dados: T) => G, restaurar: (guardado: G) => T, valido?: (dados: unknown) => boolean): Promise<Resultado<T>> {
+/** Falha de conexão (aparelho sem rede, fetch que não chegou ou tempo esgotado); 401/403/5xx não entram. Xrm.WebApi rejeita com `{ message }`, não com Error. */
+export const ehFalhaDeRede = (erro: unknown) => semRede() || erro instanceof TypeError || /failed to fetch|network ?error|network request failed|load failed|err_internet|timed? ?out/i.test(String((erro as { message?: unknown } | null)?.message ?? erro));
+
+/** Lê e guarda; se a leitura falha por falta de rede e há cópia válida do motorista (7 dias), devolve a cópia. Sem cópia, ou em qualquer outro erro, o erro segue. */
+export async function comGuardado<T, G = T>(motoristaId: string, chave: string, carregar: () => Promise<T>, paraGuardar: (dados: T) => G, restaurar: (guardado: G) => T, valido?: (dados: unknown) => boolean): Promise<Resultado<T>> {
   try {
     const dados = await carregar();
-    guardar(chave, paraGuardar(dados));
+    guardar(motoristaId, chave, paraGuardar(dados));
     return { dados, desde: null };
   } catch (erro) {
-    const guardado = lerGuardado<G>(chave, valido);
+    const guardado = ehFalhaDeRede(erro) ? lerGuardado<G>(motoristaId, chave, valido) : null;
     if (!guardado) throw erro;
     return { dados: restaurar(guardado.dados), desde: guardado.salvoEm };
   }
 }
 
-export const carregarPostosDaArea = (area: Area) => comGuardado("area", () => carregarPostosNaArea(area), (postos) => postos, (postos) => postos);
+export const carregarPostosDaArea = (motoristaId: string, area: Area) => comGuardado(motoristaId, "area", () => carregarPostosNaArea(area), (postos) => postos, (postos) => postos);
 
 /** Os 10 mais próximos de `origem`: busca em caixas cada vez maiores (ver `proximoRaio`), porque o limite da consulta não é ordenado por distância. */
 async function buscarMaisProximos(origem: Posicao): Promise<Posto[]> {
@@ -71,7 +74,7 @@ async function buscarMaisProximos(origem: Posicao): Promise<Posto[]> {
 }
 
 // Do aparelho, a lista é reordenada a partir da origem de agora (o GPS pode ter mudado desde que foi guardada).
-export const carregarMaisProximos = (origem: Posicao) => comGuardado("lista", () => buscarMaisProximos(origem), (postos) => postos, (postos) => maisProximos(postos, origem));
+export const carregarMaisProximos = (motoristaId: string, origem: Posicao) => comGuardado(motoristaId, "lista", () => buscarMaisProximos(origem), (postos) => postos, (postos) => maisProximos(postos, origem));
 
 // Posição do motorista no modo local: perto dos postos fictícios (não do ponto padrão do centro, para a distância não dar 0 m).
 const POSICAO_MOCK: Posicao = { lat: -23.1905, lon: -45.882 };
@@ -101,7 +104,7 @@ const RANKING_MOCK = (() => {
 // O ranking não muda de minuto em minuto: uma leitura serve a várias aberturas da tela. Falha não fica guardada.
 const VALIDADE_CACHE_MS = 10 * 60 * 1000;
 export type RankingTela = { dados: DadosPorId; convite: ConviteAvaliacao | null };
-let cache: { carregadoEm: number; dados: Promise<Resultado<RankingTela>> } | null = null;
+let cache: { motoristaId: string; carregadoEm: number; dados: Promise<Resultado<RankingTela>> } | null = null;
 
 /** Depois de avaliar: a próxima leitura traz a nota nova e o convite sem este posto. */
 export const invalidarRanking = () => { cache = null; };
@@ -123,15 +126,15 @@ async function lerRanking(): Promise<RankingPostos> {
 type RankingGuardado = { dados: [string, DadosPosto][]; convite: ConviteAvaliacao | null };
 const rankingGuardadoValido = (valor: unknown) => Array.isArray((valor as RankingGuardado | null)?.dados);
 
-const carregarRankingTela = () => comGuardado<RankingTela, RankingGuardado>("ranking",
+const carregarRankingTela = (motoristaId: string) => comGuardado<RankingTela, RankingGuardado>(motoristaId, "ranking",
   async () => { const ranking = await lerRanking(); return { dados: indexarRanking(ranking), convite: ranking.convite }; },
   ({ dados, convite }) => ({ dados: [...dados], convite }),
   ({ dados, convite }) => ({ dados: new Map(dados), convite }),
   rankingGuardadoValido);
 
-export function carregarDadosPostos(): Promise<Resultado<RankingTela>> {
-  if (cache && Date.now() - cache.carregadoEm < VALIDADE_CACHE_MS) return cache.dados;
-  const atual: NonNullable<typeof cache> = { carregadoEm: Date.now(), dados: carregarRankingTela().then((resultado) => { if (resultado.desde !== null && cache === atual) cache = null; return resultado; }) };
+export function carregarDadosPostos(motoristaId: string): Promise<Resultado<RankingTela>> {
+  if (cache?.motoristaId === motoristaId && Date.now() - cache.carregadoEm < VALIDADE_CACHE_MS) return cache.dados;
+  const atual: NonNullable<typeof cache> = { motoristaId, carregadoEm: Date.now(), dados: carregarRankingTela(motoristaId).then((resultado) => { if (resultado.desde !== null && cache === atual) cache = null; return resultado; }) };
   cache = atual;
   atual.dados.catch(() => { if (cache === atual) cache = null; });
   return atual.dados;

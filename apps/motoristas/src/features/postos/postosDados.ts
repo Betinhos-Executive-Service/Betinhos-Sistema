@@ -72,11 +72,11 @@ export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
   return menor && precos.some(({ preco }) => preco > menor.preco) ? menor.id : "";
 }
 
-/** Janela em que o motorista ainda pode avaliar o posto onde abasteceu. */
-export const DIAS_PARA_AVALIAR = 30;
+/** Janela em que o motorista ainda pode avaliar o posto onde abasteceu (a mesma do plugin FuelRanking, `DiasConvite`). */
+export const DIAS_PARA_AVALIAR = 7;
 
 /**
- * O motorista abasteceu neste posto nos últimos 30 dias e ainda não o avaliou? Vale o `convite` do ranking (plugin FuelRanking): o último
+ * O motorista abasteceu neste posto nos últimos 7 dias e ainda não o avaliou? Vale o `convite` do ranking (plugin FuelRanking): o último
  * abastecimento do PRÓPRIO motorista, por CNPJ, em posto que ele ainda não avaliou. O ranking da frota não diz quem abasteceu onde.
  */
 export function podeAvaliar(convite: Pick<ConviteAvaliacao, "postoId" | "data"> | null, postoId: string, agora: Date) {

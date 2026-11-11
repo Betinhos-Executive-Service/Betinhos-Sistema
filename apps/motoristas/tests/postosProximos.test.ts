@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { areaEmVolta, comFriccao, guardadoValido, medidasGaveta, posicaoAposArrasto, posicaoAposToque, rotuloSemConexao, VALIDADE_GUARDADO_MS, areaJaCarregada, CENTRO_PADRAO, consultaPostosNaArea, LIMITE_POSTOS, mapearPosto, maisProximos, origemDasDistancias, proximoRaio, RAIOS_LISTA_KM, rotuloKm, rotuloOrigem, tituloLista, urlGoogleMaps, urlWaze, ZOOM_MAXIMO_FOCO, zoomDoFoco, type Posto } from "../src/features/postos/postosProximos.ts";
 import { distanciaKm } from "../src/features/despesas/rankingPostos.ts";
-import { POSTOS_MOCK } from "../src/features/postos/remoto.ts";
+import { comGuardado, ehFalhaDeRede, POSTOS_MOCK } from "../src/features/postos/remoto.ts";
+import { guardar, lerGuardado } from "../src/features/postos/guardados.ts";
 
 const posto = (id: string, lat: number, lon: number, nome = id): Posto => ({ id, nome, endereco: "", lat, lon });
 
@@ -250,13 +251,56 @@ test("rotuloSemConexao usa o fuso de São Paulo", () => {
   assert.equal(rotuloSemConexao(Date.UTC(2026, 10, 11, 2, 5)), "Sem conexão · dados de 10/11 23:05");
 });
 
-test("podeAvaliar: só o posto do convite, de 0 a 30 dias atrás (dia de São Paulo)", () => {
+test("podeAvaliar: só o posto do convite, de 0 a 7 dias atrás (dia de São Paulo)", () => {
   const agora = new Date("2026-11-11T15:00:00Z");
   assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-11" }, "a", agora), true);
-  assert.equal(podeAvaliar({ postoId: "a", data: "2026-10-12" }, "a", agora), true);
-  assert.equal(podeAvaliar({ postoId: "a", data: "2026-10-11" }, "a", agora), false);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-04" }, "a", agora), true);
+  assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-03" }, "a", agora), false);
   assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-12" }, "a", agora), false);
   assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-10" }, "b", agora), false);
   assert.equal(podeAvaliar(null, "a", agora), false);
   assert.equal(podeAvaliar({ postoId: "a", data: "2026-11-10" }, "a", new Date("2026-11-11T01:00:00Z")), true);
+});
+
+// localStorage de mentira: o node não tem um.
+function comArmazenamento(corpo: (dados: Map<string, string>) => void | Promise<void>) {
+  const dados = new Map<string, string>();
+  const antes = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (k: string) => dados.get(k) ?? null, setItem: (k: string, v: string) => { dados.set(k, v); } } });
+  return Promise.resolve(corpo(dados)).finally(() => { if (antes) Object.defineProperty(globalThis, "localStorage", antes); else delete (globalThis as { localStorage?: unknown }).localStorage; });
+}
+
+test("guardar e lerGuardado: ida e volta, separados por motorista, sem id não guarda nem lê", () => comArmazenamento((dados) => {
+  guardar("m1", "area", [1, 2]);
+  assert.deepEqual(lerGuardado<number[]>("m1", "area")?.dados, [1, 2]);
+  assert.equal(lerGuardado("m2", "area"), null);
+  guardar("", "area", [9]);
+  assert.equal(lerGuardado("", "area"), null);
+  assert.deepEqual([...dados.keys()], ["app-motoristas-postos:m1:area"]);
+}));
+
+test("lerGuardado: cópia vencida, de formato inesperado ou ilegível vira null", () => comArmazenamento((dados) => {
+  dados.set("app-motoristas-postos:m1:area", JSON.stringify({ salvoEm: Date.now() - VALIDADE_GUARDADO_MS - 1000, dados: [1] }));
+  assert.equal(lerGuardado("m1", "area"), null);
+  dados.set("app-motoristas-postos:m1:area", JSON.stringify({ salvoEm: Date.now(), dados: "x" }));
+  assert.equal(lerGuardado("m1", "area"), null);
+  dados.set("app-motoristas-postos:m1:area", "{não é json");
+  assert.equal(lerGuardado("m1", "area"), null);
+}));
+
+test("comGuardado: sucesso guarda; falha de rede usa a cópia do motorista; outro erro não usa a cópia", () => comArmazenamento(async () => {
+  assert.deepEqual(await comGuardado("m1", "area", async () => [1], (d) => d, (d) => d), { dados: [1], desde: null });
+  const offline = await comGuardado("m1", "area", async () => { throw new TypeError("Failed to fetch"); }, (d) => d, (d) => d);
+  assert.deepEqual(offline.dados, [1]);
+  assert.equal(typeof offline.desde, "number");
+  await assert.rejects(comGuardado("m1", "area", async () => { throw Object.assign(new Error("403 Forbidden"), { code: 403 }); }, (d) => d, (d) => d), /403/);
+  await assert.rejects(comGuardado("m2", "area", async () => { throw new TypeError("Failed to fetch"); }, (d) => d, (d) => d), /Failed to fetch/);
+}));
+
+test("ehFalhaDeRede: fetch e tempo esgotado sim; 401, 403 e 500 não", () => {
+  assert.equal(ehFalhaDeRede(new TypeError("Failed to fetch")), true);
+  assert.equal(ehFalhaDeRede({ message: "Network request failed" }), true);
+  assert.equal(ehFalhaDeRede({ message: "The request timed out" }), true);
+  assert.equal(ehFalhaDeRede({ message: "Unauthorized (401)" }), false);
+  assert.equal(ehFalhaDeRede(new Error("Internal Server Error 500")), false);
 });

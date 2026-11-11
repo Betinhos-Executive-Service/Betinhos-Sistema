@@ -134,7 +134,7 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
       dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: 0, attributionControl: false
     });
     instancia.touchZoomRotate.disableRotation();
-    instancia.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-left");
+    instancia.addControl(new maplibregl.AttributionControl({ compact: false }), "top-left");
     // Roda a cada estilo carregado (o primeiro e as trocas de tema, que descartam fontes e camadas).
     instancia.on("style.load", () => {
       // Prédios 3D dos mesmos tiles gratuitos, abaixo dos rótulos para os nomes de rua continuarem legíveis.

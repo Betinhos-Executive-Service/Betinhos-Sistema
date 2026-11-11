@@ -6,9 +6,10 @@
 .pp-palco { position:relative; flex:1 1 auto !important; min-height:440px; overflow:hidden; border-radius:18px; isolation:isolate; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
 .pp-mapa-caixa { position:absolute; inset:0; }
 .pp-mapa { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
-.pp-mapa .maplibregl-ctrl-attrib { margin:0 0 6px 6px; opacity:0; padding:0 5px; border-radius:5px; font-size:.58rem; line-height:1.45; background:rgba(255,255,255,.38); }
-.pp-mapa .maplibregl-ctrl-attrib a { color:#7b8798; }
-.pp-mapa .maplibregl-ctrl-bottom-left { z-index:1; }
+/* Atribuição (licença OSM/OpenFreeMap): no canto superior esquerdo, abaixo do aviso de busca, longe da gaveta. Fundo claro vale nos dois estilos de mapa. */
+.pp-mapa .maplibregl-ctrl-attrib { margin:44px 0 0 10px; padding:1px 6px; border-radius:6px; font-size:.6rem; line-height:1.45; background:rgba(255,255,255,.82); color:#475569; }
+.pp-mapa .maplibregl-ctrl-attrib a { color:#475569; }
+.pp-mapa .maplibregl-ctrl-top-left { z-index:1; }
 
 /* Cabeçalho compartilhado: o título desta tela cabe numa linha entre Voltar e as ações (só aqui, sem mexer no componente comum). */
 .services-menu:has(+ .pp-screen) .services-title-block { padding:0 6px; }
