@@ -12,7 +12,7 @@ import { valorOp, type Op, type OpChoices } from '../domain/types'
 import { OpBadge, periodo } from './OpsList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
-type Related = { rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
+type Related = { valor: number | null; rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 type Props = {
@@ -40,7 +40,7 @@ function Section({ title, children, aside }: { title: string; children: ReactNod
   )
 }
 
-/** Rateio, serviços e contatos dos pagantes, buscados quando a ficha abre. Contato só enriquece o WhatsApp. */
+/** Rateio, serviços, contatos dos pagantes e o valor da OP (relido: a lista pode tê-lo lido no meio da soma), buscados quando a ficha abre. Contato só enriquece o WhatsApp. */
 function useRelated(source: Source, opId: string | null, version: number) {
   const [data, setData] = useState<Related>(null)
   useEffect(() => {
@@ -49,8 +49,12 @@ function useRelated(source: Source, opId: string | null, version: number) {
     setData(null)
     Promise.all([source.pagantes.rateio(opId), source.pagantes.servicos(opId), source.pagantes.choices()])
       .then(async ([rateio, servicos, pagChoices]) => {
-        const contatos = await source.pagantes.contatos(rateio.map((p) => p.pessoaId)).catch(() => new Map<string, Contato>())
-        if (!cancelled) setData({ rateio, servicos, contatos, pagChoices })
+        // Valor depois dos serviços: o que se compara nunca é mais antigo que a lista de serviços.
+        const [valor, contatos] = await Promise.all([
+          source.valor(opId),
+          source.pagantes.contatos(rateio.map((p) => p.pessoaId)).catch(() => new Map<string, Contato>()),
+        ])
+        if (!cancelled) setData({ valor, rateio, servicos, contatos, pagChoices })
       })
       .catch((reason) => { if (!cancelled) setData({ error: message(reason) }) })
     return () => { cancelled = true }
@@ -60,8 +64,9 @@ function useRelated(source: Source, opId: string | null, version: number) {
 
 const lines = (texto: string) => texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
 
-export function OpDrawer({ op, onClose, choices, source, version, busy, onCancel, onGerarPagantes }: Props) {
-  const related = useRelated(source, op?.id ?? null, version)
+export function OpDrawer({ op: opDaLista, onClose, choices, source, version, busy, onCancel, onGerarPagantes }: Props) {
+  const related = useRelated(source, opDaLista?.id ?? null, version)
+  const op = opDaLista && related && !('error' in related) ? { ...opDaLista, valor: related.valor } : opDaLista
   const rateio = related && !('error' in related) ? related.rateio : null
   const bloqueio = op ? (related && 'error' in related ? 'O rateio não carregou; atualize antes de cancelar.' : cancelBlock(op, rateio)) : null
   const cancelada = op?.status === OP_STATUS.cancelada

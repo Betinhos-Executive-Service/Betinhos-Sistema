@@ -24,6 +24,8 @@ export type Source = {
   /** Até 50 OPs do período que batem com a busca (usada enquanto a lista não carregou inteira). */
   search: (since: Date | null, query: string) => Promise<Op[]>
   choices: () => Promise<OpChoices>
+  /** Valor atual da OP, relido ao abrir a ficha: o plugin soma os serviços um a um logo depois de criar a OP. */
+  valor: (id: string) => Promise<number | null>
   cancel: (id: string) => Promise<void>
   pagantes: Pick<PagantesSource, 'rateio' | 'servicos' | 'contatos' | 'choices' | 'gerarPagantesUrl'>
   kv: KV
@@ -41,6 +43,7 @@ function createMockSource(host: Host): Source {
       return mockSearch(rows, (op) => (!since || (op.criadoEm != null && op.criadoEm >= since)) && normalizeSearch(`${op.codigo} ${op.cliente} ${op.passageiros}`).includes(t))
     },
     choices: async () => withOpFallback({}),
+    valor: async (id) => rows.find((op) => op.id === id)?.valor ?? null,
     async cancel(id) {
       await wait(400)
       const row = rows.find((op) => op.id === id)
@@ -87,6 +90,10 @@ export function createSource(host: Host): Source {
     async choices() {
       const [status, idioma] = await Promise.all(['cr40f_status', 'cr40f_idioma'].map((attribute) => host.metadata.choices(ENTITY_OP, attribute).catch(() => [])))
       return withOpFallback({ status, idioma })
+    },
+    async valor(id) {
+      const [row] = await host.client.getAll(`${await entitySet()}?$select=cr40f_valor&$filter=cr40f_financeiroid eq ${id}`)
+      return typeof row?.cr40f_valor === 'number' ? row.cr40f_valor : null
     },
     cancel: async (id) => host.client.update(await entitySet(), id, { cr40f_status: OP_STATUS.cancelada }),
     pagantes: createPagantesSource(host),
