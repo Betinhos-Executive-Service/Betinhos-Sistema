@@ -29,6 +29,7 @@ import { rotasRecebimento } from "./features/recebimento/rotas";
 import { rotasManutencao } from "./features/manutencao/rotas";
 import { rotasColisao } from "./features/colisao/rotas";
 import { rotasDespesas } from "./features/despesas/rotas";
+import { rotasPostos } from "./features/postos/rotas";
 import { expenseFlowView } from "./features/despesas/receiptQuickRead";
 import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
@@ -77,6 +78,8 @@ function App() {
   );
   const { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store } = useEstadoInicial(hashRoutingActive);
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  // Tela de onde os postos foram abertos (início ou registrar gasto): o Voltar devolve para lá.
+  const [postosOrigem, setPostosOrigem] = useState<Screen>("inicio");
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
   const [selectedDetail, setSelectedDetail] = useState<DetailData | null>(() => initialDetailRef.current);
@@ -407,6 +410,12 @@ function App() {
       setScreen("gastosCartao");
       return;
     }
+    if (screenName === "postosProximos") {
+      setComunicadoOrigin("");
+      setPostosOrigem("inicio");
+      setScreen("postosProximos");
+      return;
+    }
     if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
@@ -445,8 +454,12 @@ function App() {
   const telaColisao = rotasColisao(screen, { ...colisao, ...veiculos, driverContext, remoteOperation, setScreen, setToast });
   if (telaColisao) return show(telaColisao);
 
-  const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, remoteMode, remoteOperation, setScreen, setToast });
+  const abrirPostosDoGasto = () => { setPostosOrigem("gastos"); setScreen("postosProximos"); };
+  const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, abrirPostosProximos: abrirPostosDoGasto, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
+
+  const telaPostos = rotasPostos(screen, { origem: postosOrigem, setScreen });
+  if (telaPostos) return show(telaPostos);
 
   const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });
   if (telaIdeias) return show(telaIdeias);

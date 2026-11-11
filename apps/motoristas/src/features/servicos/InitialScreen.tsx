@@ -53,6 +53,13 @@ const baseModules = [
     disabled: false,
   },
   {
+    id: "postosProximos",
+    label: "Postos próximos",
+    detail: "Mapa da rede CTF",
+    icon: "postosProximos",
+    disabled: false,
+  },
+  {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
@@ -89,6 +96,7 @@ const screenAliases: Record<string, string[]> = {
   checklists: ["checklists"],
   multas: ["multas"],
   treinamentos: ["treinamentos"],
+  postosProximos: ["postosProximos"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -104,6 +112,7 @@ const moduleHandlers: Record<string, string[]> = {
   checklists: [],
   multas: [],
   treinamentos: [],
+  postosProximos: [],
   services: [
     "onServices",
     "onService",
@@ -354,6 +363,11 @@ function ModuleIcon({ name }: { name: string }) {
   if (name === "treinamentos") {
     // Lucide graduation-cap: conteúdo de formação.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
+  if (name === "postosProximos") {
+    // Lucide fuel: posto de combustível.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
   if (name === "checklist") {

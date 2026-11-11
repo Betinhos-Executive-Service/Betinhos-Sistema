@@ -47,3 +47,8 @@ export function buildGoogleMapsSearchUrl(label: string, value: string) {
 export function mapsSearchUrl(busca: string) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(busca.trim())}`;
 }
+
+// Abre o Waze já navegando até a coordenada.
+export function wazeNavigateUrl(lat: number, lon: number) {
+  return `https://waze.com/ul?ll=${lat},${lon}&navigate=yes`;
+}

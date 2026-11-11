@@ -1,0 +1,47 @@
+/* Postos próximos: mapa Leaflet, cartão do posto e lista. Reaproveita termos.css (alertas, vazio) e gr-* (subtítulo, legenda). */
+.pp-screen { gap:10px; }
+.pp-mapa-caixa { position:relative; isolation:isolate; border:1px solid #dbe4f3; border-radius:14px; overflow:hidden; background:#e8edf5; }
+.pp-mapa { width:100%; height:clamp(280px, 46vh, 440px); touch-action:none; }
+.pp-mapa .leaflet-control-attribution { font-size:.65rem; }
+.pp-mapa .leaflet-bar a { width:36px; height:36px; line-height:36px; }
+
+.pp-pino { background:none; border:0; }
+.pp-pino svg { display:block; width:30px; height:38px; fill:#2159d2; stroke:#fff; stroke-width:1.5; filter:drop-shadow(0 2px 2px rgba(0,26,61,.35)); transition:transform 160ms ease, fill 160ms ease; transform-origin:50% 100%; }
+.pp-pino circle { fill:#fff; stroke:none; }
+.pp-pino.is-selecionado svg { fill:#001a3d; transform:scale(1.25); }
+.pp-pino:focus-visible svg { outline:2px solid #6c91e8; outline-offset:2px; }
+.pp-voce { background:none; border:0; }
+.pp-voce span { display:block; width:22px; height:22px; border-radius:50%; background:#1a73e8; border:3px solid #fff; box-shadow:0 0 0 6px rgba(26,115,232,.22), 0 1px 4px rgba(0,0,0,.35); }
+
+.pp-minha-posicao { position:absolute; z-index:500; top:92px; right:10px; display:grid; place-items:center; width:36px; height:36px; padding:0; border:2px solid rgba(0,0,0,.2); border-radius:4px; background:#fff; color:#001a3d; cursor:pointer; }
+.pp-minha-posicao svg { width:20px; height:20px; }
+.pp-status { position:absolute; z-index:500; top:10px; left:10px; padding:5px 10px; border-radius:999px; background:rgba(255,255,255,.94); color:#475569; font-size:.75rem; font-weight:700; box-shadow:0 1px 4px rgba(0,26,61,.18); }
+
+.pp-cartao { position:absolute; z-index:1000; left:8px; right:8px; bottom:8px; display:grid; gap:3px; padding:12px 44px 12px 14px; border-radius:12px; background:#fff; box-shadow:0 6px 20px rgba(0,26,61,.28); }
+.pp-cartao-nome { color:#001a3d; font-size:1rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
+.pp-cartao-endereco { color:#475569; font-size:.82rem; line-height:1.35; }
+.pp-cartao-distancia { color:#2159d2; font-size:.82rem; font-weight:800; }
+.pp-cartao-fechar { position:absolute; top:4px; right:4px; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; border-radius:50%; background:none; color:#64748b; cursor:pointer; }
+.pp-cartao-fechar svg { width:18px; height:18px; }
+.pp-cartao-acoes { display:flex; gap:8px; margin-top:6px; }
+.pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; flex:1 1 0; min-height:44px; padding:0 14px; border:1px solid #2159d2; border-radius:10px; background:#fff; color:#2159d2; font-size:.9rem; font-weight:800; text-decoration:none; }
+.pp-ir svg { width:16px; height:16px; }
+.pp-ir--primario { background:#2159d2; color:#fff; }
+.pp-ir:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+
+.pp-lista { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.pp-item { display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:10px; width:100%; min-height:56px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; color:#0f172a; text-align:left; cursor:pointer; transition:border-color 160ms ease, background-color 160ms ease; }
+.pp-item svg { width:18px; height:18px; color:#2159d2; }
+.pp-item[data-ativo] { border-color:#6c91e8; background:#edf3ff; }
+.pp-item:focus-visible { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+.pp-item-texto { display:grid; gap:1px; min-width:0; }
+.pp-item-texto strong { font-size:.92rem; font-weight:800; overflow-wrap:anywhere; }
+.pp-item-texto span { color:#64748b; font-size:.78rem; line-height:1.3; overflow-wrap:anywhere; }
+.pp-item-km { color:#001a3d; font-size:.85rem; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
+@media (prefers-reduced-motion: reduce) { .pp-pino svg, .pp-item { transition:none; } }
+
+/* Atalho na tela Registrar gasto. */
+.expense-postos { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin:0 0 10px; padding:0 14px; border:1px solid #cfdcf6; border-radius:10px; background:#edf3ff; color:#2159d2; font-size:.9rem; font-weight:800; cursor:pointer; }
+.expense-postos svg { width:18px; height:18px; }
+.expense-postos:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
+.expense-postos:disabled { opacity:.55; cursor:default; }
