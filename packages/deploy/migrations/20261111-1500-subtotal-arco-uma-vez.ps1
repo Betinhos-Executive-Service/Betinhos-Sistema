@@ -4,45 +4,30 @@
 )
 
 # Coluna calculada new_subtotal (cr40f_composicaodeprecos) somava cr40f_valorarcometropolitano duas vezes
-# (provado em 5.000 linhas do PROD em 11/11/2026). Tira o segundo termo da formula: o GetEntityProperty do arco que
-# grava SetAttributeValueStep4_29, o SelectFirstNonNull (_28) e o Add (_17), e liga o SelectFirstNonNull seguinte
-# direto no resultado anterior (_18). Idempotente: com o arco uma vez so, nada muda. Somente DEV; o PROD recebe pelas solucoes.
-
+# (provado em 5.000 linhas do PROD em 11/11/2026). O Dataverse recusa tirar atividades da formula, entao a correcao
+# e uma troca: o SelectFirstNonNull do segundo arco (_28) passa a somar com o resultado sem o arco (_20) em vez do
+# resultado que ja tinha o arco (_18). As duas referencias ao arco continuam no XAML; so a primeira entra na soma.
+# Idempotente: com a ligacao nova, nada muda. Somente DEV; o PROD recebe pelas solucoes.
 . "$PSScriptRoot\_dv.ps1"
 Connect-Dv $EnvironmentUrl $PSCommandPath ([bool] $Apply)
 
 $table = "cr40f_composicaodeprecos"
 $path = "EntityDefinitions(LogicalName='$table')/Attributes(LogicalName='new_subtotal')/Microsoft.Dynamics.CRM.MoneyAttributeMetadata"
+$antes = '{ SetAttributeValueStep4_18, SetAttributeValueStep4_28 }'
+$depois = '{ SetAttributeValueStep4_20, SetAttributeValueStep4_28 }'
 $attr = Invoke-Dv "GET" $path
 $xaml = [string] $attr.FormulaDefinition
-$arco = ([regex]::Matches($xaml, 'Attribute="cr40f_valorarcometropolitano"')).Count
-if ($arco -eq 1) { Write-Step "new_subtotal ja soma o arco uma vez; nada a fazer."; return }
-if ($arco -ne 2) { throw "new_subtotal com $arco referencias ao arco; esperado 2. Formula mudou, revisar a migration." }
+if ($xaml.Contains($depois)) { Write-Step "new_subtotal ja soma o arco uma vez; nada a fazer."; return }
+if (([regex]::Matches($xaml, [regex]::Escape($antes))).Count -ne 1) { throw "Ligacao $antes nao encontrada uma unica vez. Formula mudou, revisar a migration." }
+$novo = $xaml.Replace($antes, $depois)
 
-$atividade = '<mxswa:ActivityReference AssemblyQualifiedName="[^"]*" DisplayName="EvaluateExpression">(?:(?!</mxswa:ActivityReference>).)*?Result">\[{0}\]</OutArgument></mxswa:ActivityReference\.Arguments></mxswa:ActivityReference>'
-$cortes = @(
-  '<mxswa:GetEntityProperty Attribute="cr40f_valorarcometropolitano"[^>]*Value="\[SetAttributeValueStep4_29\]">.*?</mxswa:GetEntityProperty>',
-  ($atividade -f 'SetAttributeValueStep4_28'),
-  ($atividade -f 'SetAttributeValueStep4_17')
-)
-$novo = $xaml
-foreach ($corte in $cortes) {
-  $re = [regex]::new($corte, [Text.RegularExpressions.RegexOptions]::Singleline)
-  if ($re.Matches($novo).Count -ne 1) { throw "Trecho nao encontrado uma unica vez: $corte" }
-  $novo = $re.Replace($novo, "", 1)
-}
-if (([regex]::Matches($novo, '\{ SetAttributeValueStep4_17 \}')).Count -ne 1) { throw "Ligacao do SetAttributeValueStep4_17 nao encontrada uma unica vez." }
-$novo = $novo.Replace('{ SetAttributeValueStep4_17 }', '{ SetAttributeValueStep4_18 }')
-if (([regex]::Matches($novo, 'Attribute="cr40f_valorarcometropolitano"')).Count -ne 1) { throw "Formula resultante nao ficou com o arco uma vez." }
+if (-not $Apply) { Write-Step "DRY RUN religaria o segundo arco de $table.new_subtotal. Use -Apply para aplicar."; return }
 
-if (-not $Apply) { Write-Step "DRY RUN tiraria o segundo arco de $table.new_subtotal. Use -Apply para aplicar."; return }
-
-$corpo = @{}
-foreach ($p in $attr.PSObject.Properties) { if ($p.Name -notlike '@odata.context') { $corpo[$p.Name] = $p.Value } }
+$corpo = @{ "@odata.type" = "#Microsoft.Dynamics.CRM.MoneyAttributeMetadata" }
+foreach ($p in $attr.PSObject.Properties) { if ($p.Name -notlike '@odata.*') { $corpo[$p.Name] = $p.Value } }
 $corpo["FormulaDefinition"] = $novo
 Invoke-Dv "PUT" "EntityDefinitions(LogicalName='$table')/Attributes($($attr.MetadataId))" $corpo | Out-Null
 Publish-Tabela $table
 
-$conferido = [string] (Invoke-Dv "GET" $path).FormulaDefinition
-if (([regex]::Matches($conferido, 'Attribute="cr40f_valorarcometropolitano"')).Count -ne 1) { throw "PUT nao gravou a formula nova." }
+if (-not ([string] (Invoke-Dv "GET" $path).FormulaDefinition).Contains($depois)) { throw "PUT nao gravou a formula nova." }
 Write-Step "OK: $table.new_subtotal soma o arco uma vez."

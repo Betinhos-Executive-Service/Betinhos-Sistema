@@ -74,7 +74,7 @@ export function PostosGaveta({ gaveta, posicao, onPosicao, titulo, contagem, aci
     <div ref={raiz} className="pp-gaveta" data-posicao={posicao} style={{ height: gaveta.total }}>
       <div className="pp-gaveta-acima">{acima}</div>
       <section className="pp-gaveta-folha" aria-labelledby="pp-lista-titulo">
-        <div className="pp-gaveta-puxador" role="button" tabIndex={0} aria-expanded={posicao !== "recolhida"} aria-label="Lista dos postos mais próximos" onPointerDown={aoPressionar} onPointerMove={aoMover} onPointerUp={(e) => soltar(e, false)} onPointerCancel={(e) => soltar(e, true)} onKeyDown={aoTeclar}>
+        <div className="pp-gaveta-puxador" role="button" tabIndex={0} aria-expanded={posicao !== "recolhida"} aria-label="Lista dos postos recomendados" onPointerDown={aoPressionar} onPointerMove={aoMover} onPointerUp={(e) => soltar(e, false)} onPointerCancel={(e) => soltar(e, true)} onKeyDown={aoTeclar}>
           <span className="pp-gaveta-alca" aria-hidden="true" />
           <span className="pp-gaveta-cabeca">
             <span className="pp-gaveta-titulo" id="pp-lista-titulo">{titulo}</span>
