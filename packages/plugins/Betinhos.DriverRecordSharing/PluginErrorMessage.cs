@@ -29,15 +29,24 @@ namespace Betinhos.DriverRecordSharing
             return new InvalidPluginExecutionException(ForUser(exception, correlationId), exception);
         }
 
+        // Procura o código nas exceções e faults internos; a mensagem cobre o 503 de uma execução
+        // aninhada do próprio plugin, que chega aqui com o código genérico de plugin.
         internal static bool IsConcurrentShare(Exception exception)
         {
             for (var current = exception; current != null; current = current.InnerException)
             {
-                var fault = current as System.ServiceModel.FaultException<OrganizationServiceFault>;
-                if (fault?.Detail?.ErrorCode == ConcurrentShareErrorCode) return true;
+                var fault = (current as System.ServiceModel.FaultException<OrganizationServiceFault>)?.Detail;
+                for (; fault != null; fault = fault.InnerFault)
+                {
+                    if (fault.ErrorCode == ConcurrentShareErrorCode) return true;
+                }
             }
 
-            return false;
+            var messages = new List<string>();
+            Collect(exception, messages, 0);
+            return messages.Exists(m =>
+                m.IndexOf("[SHARE_CONCURRENT]", StringComparison.Ordinal) >= 0 ||
+                m.IndexOf("concurrent Share requests", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         public static string ForUser(Exception exception, Guid correlationId)
