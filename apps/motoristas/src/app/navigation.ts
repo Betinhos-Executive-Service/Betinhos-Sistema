@@ -43,7 +43,6 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   treinamentos: "treinamentos",
   gastosCartao: "gastos-cartao",
   gastosRelatorio: "gastos-relatorio",
-  rankingPostos: "ranking-postos",
   postosProximos: "postos-proximos"
 };
 
@@ -120,8 +119,8 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   gastoscartao: "gastosCartao",
   "gastos-relatorio": "gastosRelatorio",
   gastosrelatorio: "gastosRelatorio",
-  "ranking-postos": "rankingPostos",
-  rankingpostos: "rankingPostos",
+  "ranking-postos": "postosProximos",
+  rankingpostos: "postosProximos",
   "postos-proximos": "postosProximos",
   postosproximos: "postosProximos"
 };
@@ -245,7 +244,6 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   treinamentos: 1,
   gastosCartao: 1,
   gastosRelatorio: 1,
-  rankingPostos: 2,
   postosProximos: 1
 };
 

@@ -131,7 +131,7 @@ test("conjunto fictício do modo local fica na região de São José dos Campos"
 });
 
 // ---------------- Preço e recomendação (postosDados) ----------------
-import { idMenorPreco, podeAvaliar, indexarRanking, indicadorNoMapa, juntarDados, motivosPrincipais, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
+import { idMenorPreco, podeAvaliar, indexarRanking, indicadorNoMapa, juntarDados, notaDoPosto, rotuloBaseDoPreco, rotuloDia, rotuloPrecoLitro, rotuloPrecoMapa } from "../src/features/postos/postosDados.ts";
 import { SEM_AVALIACOES } from "../src/features/despesas/avaliacaoPostos.ts";
 import type { RankingPostos } from "../src/features/despesas/rankingPostos.ts";
 
@@ -187,14 +187,6 @@ test("indicadorNoMapa só marca aprovação clara ou alerta", () => {
   assert.equal(indicadorNoMapa(aval(7, 2)), "alerta");
   assert.equal(indicadorNoMapa(aval(1, 1)), null);
   assert.equal(indicadorNoMapa(SEM_AVALIACOES), null);
-});
-
-test("motivosPrincipais devolve até 2 mais citados com o sinal; sem contador usa a lista do plugin", () => {
-  const motivos = motivosPrincipais(aval(12, 11, { sem_fila: 5, combustivel_bom: 8, bom_atendimento: 2 }));
-  assert.deepEqual(motivos.map((m) => m.rotulo), ["Combustível bom", "Sem fila"]);
-  assert.ok(motivos.every((m) => m.positivo));
-  assert.equal(motivosPrincipais({ contagemMotivos: {}, motivos: ["fila_grande", "id_desconhecido"] }).map((m) => m.rotulo).join(), "Fila grande");
-  assert.equal(motivosPrincipais(aval(3, 1, { fila_grande: 2 }))[0].positivo, false);
 });
 
 test("idMenorPreco destaca o mais barato só com 2 ou mais preços diferentes", () => {
@@ -303,4 +295,19 @@ test("ehFalhaDeRede: fetch e tempo esgotado sim; 401, 403 e 500 não", () => {
   assert.equal(ehFalhaDeRede({ message: "The request timed out" }), true);
   assert.equal(ehFalhaDeRede({ message: "Unauthorized (401)" }), false);
   assert.equal(ehFalhaDeRede(new Error("Internal Server Error 500")), false);
+});
+test("paraFicha leva preço, histórico e avaliações do ranking para a ficha; sem ranking, preço 0 e sem avaliações", async () => {
+  const { paraFicha } = await import("../src/features/postos/postosDados.ts");
+  const dados = indexarRanking(ranking({ ...itemRanking("a", 6.09, aval(3, 2)), historico: [{ data: "2026-11-03", precoLitro: 6.09 }] }));
+  const [comDados, semDados] = juntarDados([posto("a", -23.19, -45.88), posto("b", -23.2, -45.9)], dados);
+  const ficha = paraFicha(comDados, 1.2);
+  assert.equal(ficha.postoId, "a");
+  assert.equal(ficha.precoLitro, 6.09);
+  assert.equal(ficha.distanciaKm, 1.2);
+  assert.equal(ficha.historico.length, 1);
+  assert.equal(ficha.avaliacoes.total, 3);
+  const vazia = paraFicha(semDados, 4, aval(1, 1));
+  assert.equal(vazia.precoLitro, 0);
+  assert.equal(vazia.historico.length, 0);
+  assert.equal(vazia.avaliacoes.total, 1);
 });

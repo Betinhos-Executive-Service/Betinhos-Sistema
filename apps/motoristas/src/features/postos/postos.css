@@ -11,9 +11,9 @@
 .pp-mapa .maplibregl-ctrl-attrib a { color:#475569; }
 .pp-mapa .maplibregl-ctrl-top-left { z-index:1; }
 
-/* Cabeçalho compartilhado: o título desta tela cabe numa linha entre Voltar e as ações (só aqui, sem mexer no componente comum). */
+/* Cabeçalho compartilhado: em tela estreita o título desta tela quebra em até 2 linhas em vez de invadir as ações (só aqui, sem mexer no componente comum). */
 .services-menu:has(+ .pp-screen) .services-title-block { padding:0 6px; }
-.services-menu:has(+ .pp-screen) .services-title-block strong { font-size:1.04rem; white-space:nowrap; }
+.services-menu:has(+ .pp-screen) .services-title-block strong { font-size:1.04rem; text-wrap:balance; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 
 /* Controles flutuantes: bloco de zoom compacto (divisor fino) e "minha posição" separado. 40 px visíveis; o toque chega a 44 px por pseudo-elemento invisível. */
 .pp-controles { position:absolute; z-index:2; top:10px; right:10px; display:grid; gap:8px; justify-items:end; }
@@ -72,31 +72,27 @@
 .pp-centro span { position:absolute; inset:3px; border-radius:50%; background:#64748b; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,26,61,.3); }
 
 /* Cartão do posto: flutua logo acima da gaveta (slot .pp-gaveta-acima), sempre montado para animar entrada e saída por transição (interrompível; trocar de posto só troca o texto). O mapa desloca o pino para a parte livre acima dele. */
-.pp-cartao { position:relative; display:grid; gap:2px; margin:0 10px 10px; padding:14px 16px 12px; border-radius:18px; background:#fff; box-shadow:0 -1px 4px rgba(0,26,61,.04), 0 12px 32px rgba(0,26,61,.2); transform:translateY(16px); opacity:0; visibility:hidden; pointer-events:none; transition:transform 150ms ease-in, opacity 150ms ease-in, visibility 0s linear 150ms; }
+.pp-cartao { position:relative; display:grid; gap:2px; margin:0 10px 8px; padding:10px 14px; border-radius:18px; background:#fff; box-shadow:0 -1px 4px rgba(0,26,61,.04), 0 12px 32px rgba(0,26,61,.2); transform:translateY(16px); opacity:0; visibility:hidden; pointer-events:none; transition:transform 150ms ease-in, opacity 150ms ease-in, visibility 0s linear 150ms; }
 .pp-cartao.is-aberto { transform:none; opacity:1; visibility:visible; pointer-events:auto; transition:transform 260ms var(--pp-gaveta), opacity 200ms var(--pp-saida), visibility 0s; }
-.pp-cartao-nome { padding-right:36px; color:var(--pp-marca); font-size:1.02rem; font-weight:800; line-height:1.25; overflow-wrap:anywhere; }
-.pp-cartao-meta { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 8px; margin-top:2px; }
-.pp-cartao-distancia { color:var(--pp-acao); font-size:.9rem; font-weight:800; font-variant-numeric:tabular-nums; }
-.pp-cartao-dados { display:grid; gap:3px; margin-top:6px; }
+.pp-cartao-nome { padding-right:36px; color:var(--pp-marca); font-size:.98rem; font-weight:800; line-height:1.25; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+.pp-cartao-onde { margin:2px 0 0; color:#64748b; font-size:.78rem; line-height:1.35; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; overflow-wrap:anywhere; }
+.pp-cartao-distancia { color:var(--pp-acao); font-size:.8rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.pp-cartao-dados { display:grid; gap:1px; margin-top:2px; }
 .pp-cartao-linha { display:flex; align-items:center; justify-content:space-between; gap:4px 12px; flex-wrap:wrap; }
-.pp-cartao-preco { color:#0f172a; font-size:1.55rem; font-weight:800; line-height:1.1; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+.pp-cartao-preco { color:#0f172a; font-size:1.3rem; font-weight:800; line-height:1.15; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
 .pp-cartao-preco[data-cor="verde"] { color:#15803d; }
 .pp-cartao-preco[data-cor="amarelo"] { color:#c2410c; }
 .pp-cartao-preco[data-cor="vermelho"] { color:#c81e1e; }
 .pp-cartao-nota { font-size:.84rem; }
 .pp-cartao-nota svg { width:15px; height:15px; }
 .pp-cartao-base { color:#64748b; font-size:.72rem; line-height:1.3; }
-.pp-motivos { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 0; padding:0; list-style:none; }
-.pp-motivos li { display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:.72rem; font-weight:700; }
-.pp-motivos li[data-positivo] { background:#e7f6ec; color:#15803d; }
-.pp-motivos li:not([data-positivo]) { background:#fde8e8; color:#b42318; }
-.pp-cartao-endereco { color:#64748b; font-size:.78rem; line-height:1.35; overflow-wrap:anywhere; }
-.pp-cartao-fechar { position:absolute; top:4px; right:4px; display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:none; color:#64748b; cursor:pointer; transition:transform 140ms var(--pp-saida); -webkit-tap-highlight-color:transparent; }
+.pp-cartao-fechar { position:absolute; top:0; right:0; display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:none; color:#64748b; cursor:pointer; transition:transform 140ms var(--pp-saida); -webkit-tap-highlight-color:transparent; }
 .pp-cartao-fechar svg { width:18px; height:18px; }
 .pp-cartao-fechar:active { transform:scale(.92); }
 .pp-cartao-fechar:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
-.pp-cartao-acoes { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:8px; margin-top:10px; }
-.pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:46px; padding:0 14px; border:0; border-radius:12px; background:var(--pp-acao-suave); color:var(--pp-acao); font-size:.92rem; font-weight:800; text-decoration:none; transition:transform 140ms var(--pp-saida), background-color 140ms var(--pp-saida); -webkit-tap-highlight-color:transparent; }
+.pp-ficha { font:inherit; font-size:.92rem; font-weight:800; cursor:pointer; }
+.pp-cartao-acoes { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.2fr); gap:6px; margin-top:8px; }
+.pp-ir { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 8px; border:0; border-radius:12px; background:var(--pp-acao-suave); color:var(--pp-acao); font-size:.92rem; font-weight:800; text-decoration:none; transition:transform 140ms var(--pp-saida), background-color 140ms var(--pp-saida); -webkit-tap-highlight-color:transparent; }
 .pp-ir:active { transform:scale(.97); }
 .pp-ir svg { width:16px; height:16px; }
 .pp-ir--primario { background:var(--pp-acao); color:#fff; }
@@ -169,18 +165,22 @@
 .expense-postos svg { width:18px; height:18px; }
 .expense-postos:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
 .expense-postos:disabled { opacity:.55; cursor:default; }
-/* Com preço e recomendação o cartão cresce: o endereço cabe numa linha. */
-.pp-cartao-dados ~ .pp-cartao-endereco { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden; }
 
 /* Aviso do limite de 200 postos: pílula discreta, sem ponto pulsante. */
 .pp-status--limite { font-weight:600; font-size:.72rem; min-height:26px; color:#64748b; }
 
 /* Avaliar no cartão: convite de quem abasteceu ali (critério em postosDados.podeAvaliar). */
-.pp-avaliar { display:grid; gap:6px; margin-top:8px; padding-top:8px; box-shadow:inset 0 1px 0 rgba(0,26,61,.08); font-size:.8rem; color:#334155; }
+.pp-avaliar { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px 8px; margin-top:6px; padding-top:6px; box-shadow:inset 0 1px 0 rgba(0,26,61,.08); font-size:.8rem; color:#334155; }
 .pp-avaliar strong { font-size:.82rem; font-weight:800; color:var(--pp-marca); }
-.pp-avaliar .rp-escolha { min-height:44px; }
-.pp-avaliar-feita { margin-top:8px; font-size:.8rem; color:#475569; }
-.pp-avaliar-erro { margin:0; color:#b42318; font-size:.76rem; }
+.pp-avaliar-botoes { display:flex; gap:6px; }
+.pp-avaliar-botoes button { display:inline-flex; align-items:center; gap:5px; min-height:44px; padding:0 12px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; color:#001a3d; font:inherit; font-size:.84rem; font-weight:800; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+.pp-avaliar-botoes button[data-tom="positivo"] svg { color:#15803d; }
+.pp-avaliar-botoes button[data-tom="negativo"] svg { color:#b42318; }
+.pp-avaliar-botoes button:active { transform:scale(.97); }
+.pp-avaliar-botoes button:disabled { opacity:.55; cursor:default; }
+.pp-avaliar-botoes svg { width:16px; height:16px; flex:none; }
+.pp-avaliar-feita { margin-top:4px; font-size:.8rem; color:#475569; }
+.pp-avaliar-erro { grid-column:1 / -1; margin:0; color:#b42318; font-size:.76rem; }
 
 /* Gaveta: folha arrastável sobre o mapa (3 posições). Só transform anima; durante o arrasto sem transição. */
 .pp-gaveta { position:absolute; z-index:4; left:0; right:0; bottom:0; will-change:transform; transition:transform 340ms var(--pp-gaveta); touch-action:none; pointer-events:none; }

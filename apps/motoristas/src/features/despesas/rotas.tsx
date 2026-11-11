@@ -15,11 +15,10 @@ import { GastoCartaoDuplicadoDialog } from "./GastoCartaoDuplicadoDialog";
 import { LeituraCartaoSheet } from "./LeituraCartaoSheet";
 import { GastosCartaoScreen } from "./GastosCartaoScreen";
 import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
-import { RankingPostosScreen } from "./RankingPostosScreen";
 import { reportAppError } from "../../shared/appErrorLogger";
 
 type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCartao> & {
-  abrirPostosProximos: () => void;
+  abrirPostosProximos: (origem: Screen) => void;
   maintenanceCurrentVehicleId: string;
   maintenanceVehicles: MaintenanceRequestVehicleOption[];
   maintenanceVehiclesLoading: boolean;
@@ -189,7 +188,7 @@ export function rotasDespesas(screen: Screen, {
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
         cartaoGasto={Boolean(gastoCartaoAtual)}
-        onPostosProximos={abrirPostosProximos}
+        onPostosProximos={() => abrirPostosProximos("gastos")}
       />
       {gastoCartaoAtual && conferenciaCartao ? (
         <LeituraCartaoSheet
@@ -247,13 +246,10 @@ export function rotasDespesas(screen: Screen, {
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}
         onAttach={anexarDespesa}
-        onPrecoPostos={() => setScreen("rankingPostos")}
+        onPrecoPostos={() => abrirPostosProximos("gastosRelatorio")}
       />
     );
   }
 
-  if (screen === "rankingPostos") {
-    return <RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />;
-  }
   return null;
 }

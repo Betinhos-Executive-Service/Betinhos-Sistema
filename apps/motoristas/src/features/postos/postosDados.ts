@@ -1,15 +1,15 @@
 // Preço e recomendação dos postos da tela Postos próximos: junção por id com o ranking e formatação. Sem React nem Dataverse.
-import { maioriaNaoRecomenda, motivoPositivo, percentualRecomenda, rotuloMotivo, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
+import { maioriaNaoRecomenda, percentualRecomenda, SEM_AVALIACOES, type ResumoAvaliacoes } from "../despesas/avaliacaoPostos.ts";
 import { METAS_GASTOS, semaforo, type Semaforo } from "../despesas/gastosRelatorio.ts";
 import { todayInSaoPaulo } from "../despesas/receiptQuickRead.ts";
-import type { ConviteAvaliacao, RankingPostos } from "../despesas/rankingPostos.ts";
+import type { ConviteAvaliacao, PostoProximo, RankingPostos } from "../despesas/rankingPostos.ts";
 import type { Posto } from "./postosProximos.ts";
 
 /**
  * O ranking (Custom API new_ObterRankingPostos) devolve, por posto, a média ponderada do R$/litro (soma dos valores ÷ soma dos litros)
  * dos abastecimentos de TODA a frota nos últimos `dias` (30). `postoId` é o new_postocombustivelid: a mesma chave desta tela.
  */
-export type DadosPosto = { precoLitro: number; cor: Semaforo; abastecimentos: number; ultimoAbastecimento: string; dias: number; avaliacoes: ResumoAvaliacoes };
+export type DadosPosto = { precoLitro: number; cor: Semaforo; abastecimentos: number; ultimoAbastecimento: string; dias: number; historico: PostoProximo["historico"]; avaliacoes: ResumoAvaliacoes };
 export type PostoExibido = Posto & { dados: DadosPosto | null };
 export type DadosPorId = ReadonlyMap<string, DadosPosto>;
 
@@ -19,7 +19,7 @@ export function indexarRanking(ranking: RankingPostos | null): Map<string, Dados
   const dias = ranking?.dias ?? 0;
   for (const posto of ranking?.postos ?? []) {
     if (!posto.postoId || mapa.has(posto.postoId) || !Number.isFinite(posto.precoLitro) || posto.precoLitro <= 0) continue;
-    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias, avaliacoes: posto.avaliacoes });
+    mapa.set(posto.postoId, { precoLitro: posto.precoLitro, cor: semaforo(posto.precoLitro, METAS_GASTOS.litro), abastecimentos: posto.abastecimentos, ultimoAbastecimento: posto.ultimoAbastecimento, dias, historico: posto.historico, avaliacoes: posto.avaliacoes });
   }
   return mapa;
 }
@@ -59,11 +59,6 @@ export function indicadorNoMapa(avaliacoes: ResumoAvaliacoes): "bom" | "alerta" 
   return avaliacoes.total >= 2 && percentualRecomenda(avaliacoes) >= 70 ? "bom" : null;
 }
 
-/** Os motivos mais citados (até `quantidade`), pelo contador; sem contador, a lista que o plugin já ordenou. */
-export function motivosPrincipais({ contagemMotivos, motivos }: Pick<ResumoAvaliacoes, "contagemMotivos" | "motivos">, quantidade = 2) {
-  const porContagem = Object.keys(contagemMotivos).filter((id) => contagemMotivos[id] > 0).sort((a, b) => contagemMotivos[b] - contagemMotivos[a] || a.localeCompare(b));
-  return (porContagem.length ? porContagem : motivos).filter((id) => rotuloMotivo(id)).slice(0, quantidade).map((id) => ({ id, rotulo: rotuloMotivo(id), positivo: motivoPositivo(id) }));
-}
 
 /** Id do posto mais barato entre os que têm preço. Só destaca com 2 ou mais preços diferentes; no empate fica o primeiro (a lista já vem do mais perto). */
 export function idMenorPreco(postos: Pick<PostoExibido, "id" | "dados">[]) {
@@ -83,4 +78,13 @@ export function podeAvaliar(convite: Pick<ConviteAvaliacao, "postoId" | "data"> 
   if (!convite || convite.postoId !== postoId) return false;
   const dias = (Date.parse(`${todayInSaoPaulo(agora)}T00:00:00Z`) - Date.parse(`${convite.data}T00:00:00Z`)) / 86_400_000;
   return Number.isFinite(dias) && dias >= 0 && dias <= DIAS_PARA_AVALIAR;
+}
+
+/** Ficha do posto (PostoDetalheDialog): o posto do mapa com o que o ranking sabe dele. Sem ranking, preço 0 (a ficha esconde "Quanto custa") e sem avaliações. */
+export function paraFicha({ id, nome, endereco, lat, lon, dados }: PostoExibido, distanciaKm: number, avaliacoes?: ResumoAvaliacoes): PostoProximo {
+  return {
+    postoId: id, nome, endereco, lat, lon, aproximada: false, distanciaKm,
+    precoLitro: dados?.precoLitro ?? 0, cor: dados?.cor ?? "amarelo", abastecimentos: dados?.abastecimentos ?? 0, ultimoAbastecimento: dados?.ultimoAbastecimento ?? "",
+    historico: dados?.historico ?? [], avaliacoes: avaliacoes ?? dados?.avaliacoes ?? SEM_AVALIACOES
+  };
 }

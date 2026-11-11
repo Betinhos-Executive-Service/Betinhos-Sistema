@@ -454,7 +454,7 @@ function App() {
   const telaColisao = rotasColisao(screen, { ...colisao, ...veiculos, driverContext, remoteOperation, setScreen, setToast });
   if (telaColisao) return show(telaColisao);
 
-  const abrirPostosDoGasto = () => { setPostosOrigem("gastos"); setScreen("postosProximos"); };
+  const abrirPostosDoGasto = (origem: Screen) => { setPostosOrigem(origem); setScreen("postosProximos"); };
   const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, abrirPostosProximos: abrirPostosDoGasto, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
 
