@@ -74,6 +74,14 @@ describe('Pagantes', () => {
     expect(await screen.findByRole('dialog', { name: 'Helena Prado' })).toBeTruthy()
   })
 
+  it('recibo gerado e não enviado oferece gerar de novo, não reenviar', async () => {
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await openRow('PAG-1211')
+    const ficha = await screen.findByRole('dialog')
+    expect(within(ficha).getByRole('button', { name: 'Gerar recibo novamente' })).toBeTruthy()
+    expect(within(ficha).queryByRole('button', { name: 'Reenviar recibo' })).toBeNull()
+  })
+
   it('gerar recibo fecha a ficha antes de abrir o gerador e mostra o erro', async () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     await openRow('PAG-1202')

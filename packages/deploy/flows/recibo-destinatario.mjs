@@ -10,6 +10,8 @@ const PAG = "outputs('Get_a_row_by_ID_PAG')"
 const BD = "outputs('Get_a_row_by_ID_BD')"
 const DEST = "outputs('Get_destinatario_recibo')"
 const OVERRIDE = "triggerBody()?['EMAIL_DESTINO']"
+const RECIBO_ENVIADO = 202410001
+const RECIBO_GERADO = 202410002
 
 function escopoComAcao(acoes, nome) {
   if (acoes?.[nome]) return acoes
@@ -63,8 +65,23 @@ export function aplicarDestinatario(definition, { manual }) {
     }
   }
 
-  if (manual) Object.values(definicao.triggers)[0].inputs.schema.properties.EMAIL_DESTINO = { type: 'string' }
+  if (manual) {
+    Object.values(definicao.triggers)[0].inputs.schema.properties.EMAIL_DESTINO = { type: 'string' }
+    statusSoComEmail(definicao)
+  }
   return definicao
+}
+
+// O manual gravava "Recibo Enviado" mesmo sem SEND_EMAIL ou com o e-mail falhando.
+// Agora o status sai no fim: Enviado só se o e-mail saiu agora (ou já tinha saído antes); senão Gerado.
+// Gerado dispara o automático, que só age em Pendente.
+function statusSoComEmail(definicao) {
+  const escopo = escopoComAcao(definicao.actions, 'Marcar_Concluido')
+  if (!escopo?.Update_a_row_1) throw new Error('Marcar_Concluido ou Update_a_row_1 não encontrado.')
+  delete escopo.Update_a_row_1.inputs.parameters['item/cr40f_statusdorecibo']
+  const enviouAgora = "and(equals(triggerBody()?['SEND_EMAIL'], true), equals(actions('Condition_Enviar_Email')?['status'], 'Succeeded'))"
+  const jaEnviado = `equals(${PAG}?['body/cr40f_statusdorecibo'], ${RECIBO_ENVIADO})`
+  escopo.Marcar_Concluido.inputs.parameters['item/cr40f_statusdorecibo'] = `@if(or(${enviouAgora}, ${jaEnviado}), ${RECIBO_ENVIADO}, ${RECIBO_GERADO})`
 }
 
 // Uso: node recibo-destinatario.mjs --manual entrada.json saida.json. Imprime "igual" quando a definição já está aplicada.
