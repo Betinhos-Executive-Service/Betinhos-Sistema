@@ -151,5 +151,80 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             Assert.Null(SecretReader.Read(new Svc(), "new_AnthropicKeyCombustivel"));
         }
+
+        // ---------- segredos que só existiam na configuração segura do step ----------
+
+        private static void AssertSource(Tracer trace, string name, string source, params string[] hidden)
+        {
+            Assert.Contains("Segredo " + name + ": fonte " + source, trace.Lines);
+            foreach (var value in hidden) Assert.DoesNotContain(trace.Lines, l => l.Contains(value));
+        }
+
+        [Fact]
+        public void InfleetToken_TabelaVenceAConfiguracaoSegura()
+        {
+            var trace = new Tracer();
+            var svc = new Svc { TableRow = " token-tabela " };
+            Assert.Equal("token-tabela", InfleetGraphQlGateway.ReadToken(svc, "token-config", trace));
+            Assert.Equal("infleet.token", svc.LastTableName);
+            AssertSource(trace, "infleet.token", "tabela", "token-tabela", "token-config");
+        }
+
+        [Theory]
+        [InlineData(null, false)]
+        [InlineData("   ", false)]
+        [InlineData(null, true)]
+        public void InfleetToken_SemLinhaUsaAConfiguracaoSegura(string tableRow, bool tableThrows)
+        {
+            var trace = new Tracer();
+            Assert.Equal("token-config", InfleetGraphQlGateway.ReadToken(new Svc { TableRow = tableRow, TableThrows = tableThrows }, " token-config\n", trace));
+            AssertSource(trace, "infleet.token", "config segura", "token-config");
+        }
+
+        [Fact]
+        public void InfleetToken_SemNenhumaFonteContinuaNaoConfigurado()
+        {
+            var trace = new Tracer();
+            var token = InfleetGraphQlGateway.ReadToken(new Svc(), null, trace);
+            Assert.Null(token);
+            AssertSource(trace, "infleet.token", "ausente");
+            var error = Assert.Throws<InfleetUnavailableException>(() => new InfleetGraphQlGateway(token));
+            Assert.Equal("Token da Infleet não configurado.", error.Message);
+        }
+
+        private const string WorkerTabela = "{\"url\":\"https://tabela.dev/api/links\",\"segredo\":\"s-tabela\"}";
+        private const string WorkerConfig = "{\"url\":\"https://config.dev/api/links\",\"segredo\":\"s-config\"}";
+
+        [Fact]
+        public void WorkerDoLink_TabelaVenceAConfiguracaoSegura()
+        {
+            var trace = new Tracer();
+            var svc = new Svc { TableRow = WorkerTabela };
+            var config = TrackingLinkWorkerConfig.Load(svc, WorkerConfig, trace);
+            Assert.Equal("https://tabela.dev/api/links", config.Url);
+            Assert.Equal("s-tabela", config.Secret);
+            Assert.Equal("link-acompanhamento.worker", svc.LastTableName);
+            AssertSource(trace, "link-acompanhamento.worker", "tabela", "s-tabela", "s-config");
+        }
+
+        [Fact]
+        public void WorkerDoLink_SemLinhaUsaAConfiguracaoSegura()
+        {
+            var trace = new Tracer();
+            var config = TrackingLinkWorkerConfig.Load(new Svc(), WorkerConfig, trace);
+            Assert.Equal("https://config.dev/api/links", config.Url);
+            Assert.Equal("s-config", config.Secret);
+            AssertSource(trace, "link-acompanhamento.worker", "config segura", "s-config");
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        public void WorkerDoLink_SemNenhumaFonteContinuaNaoConfigurado(string secureConfig)
+        {
+            var trace = new Tracer();
+            Assert.False(TrackingLinkWorkerConfig.Load(new Svc(), secureConfig, trace).IsConfigured);
+            AssertSource(trace, "link-acompanhamento.worker", "ausente");
+        }
     }
 }

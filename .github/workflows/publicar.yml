@@ -10,9 +10,12 @@ name: Publicar soluções
 #    pacotes que o TEST ensaiou. Por solução, a impressão digital do DEV (impressao.ps1) decide antes do export: sem mudança
 #    desde a última publicação em todos os alvos = pulada (sem ZIP); igual ao pacote do último Deploy = reaproveita; senão exporta.
 #    Só vale com a variável SOLUCOES_IMPRESSAO=confiar; sem ela (modo observar) exporta tudo e prova a decisão no resumo;
-#  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde, e o environment prod
-#    tem revisor obrigatório (Renan). Backup do PROD feito pelo próprio job, ou rótulo informado à mão. Solução com o mesmo
-#    conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada; importar_tudo força o import.
+#  - importar-test e depois importar-prod (_importar-solucoes.yml). O PROD só começa com o TEST verde e com o aprovar-prod
+#    aprovado. A aprovação do Renan fica no environment prod-aprovacao (job aprovar-prod), pedida logo depois do export e
+#    respondida enquanto o TEST importa (decisão do Renan, 11/11/2026: aprovar antes de o TEST terminar; o TEST continua
+#    barrando). O environment prod só guarda os secrets e a regra de branch (main). Backup do PROD feito pelo próprio job, ou
+#    rótulo informado à mão. Solução com o mesmo conteúdo da última publicação no ambiente (tag solucoes-<alvo>) é pulada;
+#    importar_tudo força o import.
 # Repositório público: qualquer conta do GitHub baixa artefatos. O export passa pela trava de segredos (segredos.ps1, dentro
 # do exportar-do-dev.ps1) e o artefato "pacotes" sobe só cifrado (artefato-cifrado.sh, AES-256 com o secret PACOTES_SENHA
 # do repositório). Sem o secret, o job falha antes do export.
@@ -104,9 +107,9 @@ jobs:
             throw "O DEV difere deste commit ($($env:GITHUB_SHA.Substring(0,7))). Espere o Deploy da develop terminar (ou rode-o com forcar_plugins), ou leve a develop inteira para a main e publique de novo."
           }
           Write-Host "DEV com a tela e os plugins de $($env:GITHUB_SHA.Substring(0,7))."
-      - name: Instalar pac
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
         run: |
-          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
           pac auth create --name ci-dev --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
       - name: Última publicação em cada alvo
         # Tags solucoes-<alvo> (versão, hash e impressão digital de cada solução). Arquivo vazio = alvo sem registro, não pula.
@@ -185,11 +188,23 @@ jobs:
       importar_tudo: ${{ inputs.importar_tudo }}
     secrets: inherit
 
+  # Revisor obrigatório (Renan) no environment prod-aprovacao, regra de branch main. Roda junto com o importar-test para a
+  # espera pela aprovação não somar ao tempo do ensaio; o importar-prod espera os dois.
+  aprovar-prod:
+    needs: exportar
+    if: inputs.alvo == 'test-e-prod' || inputs.alvo == 'prod'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: prod-aprovacao
+    steps:
+      - name: Aprovado
+        run: echo "PROD aprovado por ${{ github.actor }}; o import só começa com o TEST verde (test-e-prod)." >> "$GITHUB_STEP_SUMMARY"
+
   importar-prod:
-    needs: [exportar, importar-test]
-    # Com test-e-prod o PROD só vem depois do TEST verde; com prod (à mão) o TEST foi pulado de propósito.
+    needs: [exportar, importar-test, aprovar-prod]
+    # Com test-e-prod o PROD só vem depois do TEST verde; com prod (à mão) o TEST foi pulado de propósito. Nos dois, só com a aprovação.
     if: >-
-      !cancelled() && needs.exportar.result == 'success' &&
+      !cancelled() && needs.exportar.result == 'success' && needs.aprovar-prod.result == 'success' &&
       ((inputs.alvo == 'test-e-prod' && needs.importar-test.result == 'success') ||
        (inputs.alvo == 'prod' && needs.importar-test.result == 'skipped'))
     uses: ./.github/workflows/_importar-solucoes.yml

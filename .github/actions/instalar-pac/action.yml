@@ -1,0 +1,32 @@
+name: Instalar pac
+description: >-
+  Power Platform CLI (Microsoft.PowerApps.CLI.Tool) na última versão estável do NuGet, com a pasta de ferramentas do dotnet
+  em cache por versão. O dotnet tool install levava 40-65 s por job; do cache, poucos segundos. Só instala: o pac auth
+  continua no workflow. Sem resposta do NuGet, instala a última sem cache, como antes.
+runs:
+  using: composite
+  steps:
+    - id: versao
+      shell: pwsh
+      run: |
+        $v = ''
+        try {
+          $todas = (Invoke-RestMethod -TimeoutSec 20 'https://api.nuget.org/v3-flatcontainer/microsoft.powerapps.cli.tool/index.json').versions
+          $v = @($todas | Where-Object { $_ -notmatch '-' })[-1]
+        } catch { Write-Host "::warning::NuGet sem resposta ($($_.Exception.Message)); instala o pac sem cache." }
+        "versao=$v" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+        Join-Path $HOME '.dotnet\tools' | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+    - id: cache
+      if: steps.versao.outputs.versao != ''
+      uses: actions/cache@v4
+      with:
+        path: ~/.dotnet/tools
+        key: pac-${{ runner.os }}-${{ steps.versao.outputs.versao }}
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: pwsh
+      env:
+        VERSAO: ${{ steps.versao.outputs.versao }}
+      run: |
+        $extra = @(); if ($env:VERSAO) { $extra = @('--version', $env:VERSAO) }
+        dotnet tool install --global Microsoft.PowerApps.CLI.Tool @extra
+        if ($LASTEXITCODE -ne 0) { throw "dotnet tool install do pac falhou ($LASTEXITCODE)." }

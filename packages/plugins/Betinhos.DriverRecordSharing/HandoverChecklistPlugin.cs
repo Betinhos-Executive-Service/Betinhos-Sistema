@@ -10,9 +10,9 @@ namespace Betinhos.DriverRecordSharing
     // ganha um checklist de origem Troca. Roda fora da transação da sincronização: falha aqui não a desfaz.
     public sealed class HandoverChecklistPlugin : IPlugin
     {
-        private readonly string _infleetToken;
+        private readonly string _secureConfig;
 
-        public HandoverChecklistPlugin(string unsecureConfig, string secureConfig) { _infleetToken = secureConfig; }
+        public HandoverChecklistPlugin(string unsecureConfig, string secureConfig) { _secureConfig = secureConfig; }
 
         public void Execute(IServiceProvider serviceProvider)
         {
@@ -21,11 +21,12 @@ namespace Betinhos.DriverRecordSharing
             var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
             if (context.MessageName != PluginConfig.UpdateMessage || context.PrimaryEntityName != PluginConfig.EmployeeTable) return;
 
+            var system = factory.CreateOrganizationService(null);
             IVehicleHistoryGateway gateway = null;
-            try { gateway = new InfleetGraphQlGateway(_infleetToken); }
+            try { gateway = new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, _secureConfig, tracing)); }
             catch (InfleetUnavailableException error) { tracing?.Trace("HandoverChecklist sem Infleet: {0}", error.Message); }
 
-            var result = Handle(context, factory.CreateOrganizationService(null), gateway, DateTime.UtcNow, tracing);
+            var result = Handle(context, system, gateway, DateTime.UtcNow, tracing);
             tracing?.Trace("HandoverChecklist {0}", result);
         }
 
