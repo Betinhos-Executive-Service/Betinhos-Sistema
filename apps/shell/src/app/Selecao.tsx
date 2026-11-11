@@ -19,9 +19,7 @@ export function useRowSelection<Row extends { id: string }>(visible: Row[]) {
   }
   const selection: TableSelection<Row> = { selected, onChange }
   const bar = { ref: barRef, className: 'lista-barra', style: rows.length ? { minHeight: barHeight } : undefined }
-  // O Table só vê as linhas desenhadas (lote e janela da rolagem): o clique direito numa selecionada age sobre a seleção inteira, como a faixa.
-  const targets = (clicked: Row[]) => (clicked.some((row) => selected.has(row.id)) ? rows : clicked)
-  return { selection, rows, bar, targets, clear: () => setSelected(new Set()) }
+  return { selection, rows, bar, clear: () => setSelected(new Set()) }
 }
 
 /** Faixa do ViewBar enquanto há linhas selecionadas: limpar, contagem e as mesmas ações do clique direito. */

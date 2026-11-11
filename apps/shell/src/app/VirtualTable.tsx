@@ -43,9 +43,10 @@ export function useVirtualRows<T>(rows: T[], rowKey: (row: T) => string, scrolle
 /**
  * `Table` do DS que desenha só as linhas perto da tela quando a lista passa de `VIRTUAL_FROM`; rola no `main` do shell.
  * O pacote não virtualiza: aqui o `Table` recebe só a janela de linhas e as de fora viram margem antes da primeira e
- * depois da última (`virtual.css`). Limitação: o Ctrl+F do navegador só acha as linhas desenhadas.
+ * depois da última (`virtual.css`); a seleção recebe todas (`selection.all`), para o "selecionar todas", o Shift e o lote
+ * do clique direito. Limitação: o Ctrl+F do navegador só acha as linhas desenhadas.
  */
-export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: TableProps<Row>) {
+export function VirtualTable<Row>({ rows, rowKey, className, style, selection, ...props }: TableProps<Row>) {
   const host = useRef<HTMLDivElement>(null)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -89,7 +90,7 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
 
   return (
     <div ref={host} className="vt-host">
-      <Table {...props} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
+      <Table {...props} selection={selection && { ...selection, all: rows }} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
     </div>
   )
 }
