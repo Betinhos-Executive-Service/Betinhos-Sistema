@@ -1,4 +1,5 @@
 import { Crosshair, Fuel, MapPin, Minus, Navigation, Plus, X } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { AppShell } from "../../shared/ui/layout/AppShell";
@@ -14,8 +15,6 @@ type Busca = "ok" | "carregando" | "erro" | "afastado";
 const ALTURA_CARTAO = 196;
 const ZOOM_MINHA_POSICAO = 14;
 
-const isMock = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
-
 function lerPosicao(): Promise<Posicao> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(null); return; }
@@ -30,6 +29,9 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   const [postos, setPostos] = useState<Posto[]>([]);
   const [busca, setBusca] = useState<Busca>("carregando");
   const [selecionado, setSelecionado] = useState<Posto | null>(null);
+  // O cartão fica montado para animar a saída: guarda o último posto aberto enquanto fecha.
+  const [cartaoPosto, setCartaoPosto] = useState<Posto | null>(null);
+  const [listaEntrou, setListaEntrou] = useState(false);
   const [foco, setFoco] = useState<Foco | null>(null);
   const moveuSozinho = useRef(false);
   const pedido = useRef(0);
@@ -86,36 +88,50 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   // Centraliza o posto sem aproximar: mantém o zoom atual (no máximo 15) e deixa o pino acima do cartão.
   const selecionar = useCallback((posto: Posto) => {
     setSelecionado(posto);
+    setCartaoPosto(posto);
     irPara(posto.lat, posto.lon, zoomDoFoco(vista?.zoom ?? ZOOM_MINHA_POSICAO), ALTURA_CARTAO);
     caixa.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [irPara, vista?.zoom]);
 
-  const distanciaCartao = selecionado ? `a ${rotuloKm(distanciaKm(origem.ponto, selecionado))} ${rotuloOrigem(origem)}` : "";
+  // Escalonamento da lista só na primeira carga; depois de ~700 ms a classe sai e movimentos do mapa não animam.
+  useEffect(() => {
+    if (!lista.length || listaEntrou) return;
+    const relogio = window.setTimeout(() => setListaEntrou(true), 700);
+    return () => window.clearTimeout(relogio);
+  }, [lista.length, listaEntrou]);
+
+  const distanciaCartao = cartaoPosto ? `a ${rotuloKm(distanciaKm(origem.ponto, cartaoPosto))} ${rotuloOrigem(origem)}` : "";
 
   return (
     <AppShell screenLabel="PostosProximos">
-      <ServicesMenu title="Postos próximos" eyebrow={isMock() ? "Combustível · Mock local" : "Combustível"} homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={() => (vista ? buscar(vista) : undefined)} />
+      <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={() => (vista ? buscar(vista) : undefined)} />
       <section className="termo-screen gr-screen pp-screen" aria-label="Postos próximos" onKeyDown={(evento) => { if (evento.key === "Escape") setSelecionado(null); }}>
         <div ref={caixa} className="pp-mapa-caixa" onPointerDown={() => { moveuSozinho.current = true; }}>
           <PostosMapa ref={controle} postos={postos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={aoMudarVista} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
           {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
           <div className="pp-controles">
-            <button type="button" className="pp-botao" aria-label="Aproximar" onClick={() => controle.current?.aproximar()}><Plus aria-hidden="true" /></button>
-            <button type="button" className="pp-botao" aria-label="Afastar" onClick={() => controle.current?.afastar()}><Minus aria-hidden="true" /></button>
-            {posicao ? <button type="button" className="pp-botao pp-botao--destaque" aria-label="Minha posição" onClick={() => irPara(posicao.lat, posicao.lon, ZOOM_MINHA_POSICAO)}><Crosshair aria-hidden="true" /></button> : null}
+            <div className="pp-zoom">
+              <button type="button" className="pp-botao" aria-label="Aproximar" onClick={() => controle.current?.aproximar()}><Plus aria-hidden="true" /></button>
+              <button type="button" className="pp-botao" aria-label="Afastar" onClick={() => controle.current?.afastar()}><Minus aria-hidden="true" /></button>
+            </div>
+            {posicao ? <button type="button" className="pp-botao pp-botao--solto pp-botao--destaque" aria-label="Minha posição" onClick={() => irPara(posicao.lat, posicao.lon, ZOOM_MINHA_POSICAO)}><Crosshair aria-hidden="true" /></button> : null}
           </div>
-          {selecionado ? (
-            <article className="pp-cartao" aria-label={`Posto ${selecionado.nome}`}>
-              <button type="button" className="pp-cartao-fechar" aria-label="Fechar" onClick={() => setSelecionado(null)}><X aria-hidden="true" /></button>
-              <strong className="pp-cartao-nome">{selecionado.nome}</strong>
-              {selecionado.endereco ? <span className="pp-cartao-endereco">{selecionado.endereco}</span> : null}
-              <span className="pp-cartao-distancia">{distanciaCartao}</span>
-              <div className="pp-cartao-acoes">
-                <a className="pp-ir pp-ir--primario" href={urlGoogleMaps(selecionado)} target="_blank" rel="noreferrer"><Navigation aria-hidden="true" />Ir</a>
-                <a className="pp-ir" href={urlWaze(selecionado)} target="_blank" rel="noreferrer">Waze</a>
-              </div>
-            </article>
-          ) : null}
+          <article className={`pp-cartao${selecionado ? " is-aberto" : ""}`} aria-label={cartaoPosto ? `Posto ${cartaoPosto.nome}` : "Posto"} aria-hidden={selecionado ? undefined : true}>
+            {cartaoPosto ? (
+              <>
+                <button type="button" className="pp-cartao-fechar" aria-label="Fechar" tabIndex={selecionado ? 0 : -1} onClick={() => setSelecionado(null)}><X aria-hidden="true" /></button>
+                <strong className="pp-cartao-nome">{cartaoPosto.nome}</strong>
+                <div className="pp-cartao-meta">
+                  <span className="pp-cartao-distancia">{distanciaCartao}</span>
+                </div>
+                {cartaoPosto.endereco ? <span className="pp-cartao-endereco">{cartaoPosto.endereco}</span> : null}
+                <div className="pp-cartao-acoes">
+                  <a className="pp-ir pp-ir--primario" href={urlGoogleMaps(cartaoPosto)} target="_blank" rel="noreferrer"><Navigation aria-hidden="true" />Ir</a>
+                  <a className="pp-ir" href={urlWaze(cartaoPosto)} target="_blank" rel="noreferrer">Waze</a>
+                </div>
+              </>
+            ) : null}
+          </article>
         </div>
         {aviso ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{aviso}</p><button type="button" className="termo-text-button pp-acao" onClick={localizar}>Tentar de novo</button></div> : null}
         {busca === "afastado" ? <div className="termo-alert" data-tone="atencao" role="status"><p>Aproxime o mapa para ver os postos.</p></div> : null}
@@ -126,9 +142,9 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
             {lista.length ? <span className="pp-lista-total">{lista.length} {lista.length === 1 ? "posto" : "postos"}</span> : null}
           </div>
           {lista.length ? (
-            <ul className="pp-lista">
-              {lista.map((posto) => (
-                <li key={posto.id}>
+            <ul className={`pp-lista${listaEntrou ? "" : " pp-lista--entrada"}`}>
+              {lista.map((posto, indice) => (
+                <li key={posto.id} style={listaEntrou ? undefined : ({ "--pp-i": Math.min(indice, 8) } as CSSProperties)}>
                   <button type="button" className="pp-item" data-ativo={posto.id === selecionado?.id || undefined} onClick={() => selecionar(posto)}>
                     <span className="pp-item-icone"><Fuel aria-hidden="true" /></span>
                     <span className="pp-item-texto"><strong>{posto.nome}</strong>{posto.endereco ? <span>{posto.endereco}</span> : null}</span>

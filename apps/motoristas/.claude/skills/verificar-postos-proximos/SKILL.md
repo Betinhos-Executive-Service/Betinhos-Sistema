@@ -13,16 +13,18 @@ description: "Verifica a tela Postos próximos do App Motoristas (mapa MapLibre 
 ## Preparar ambiente
 - `pnpm test` e `pnpm typecheck` em `apps/motoristas`.
 - Build: `node scripts/build-react-singlefile.cjs --no-version` (apaga e recria `dist/`). Sirva `dist/` com `python3 -m http.server <porta>` e abra `http://localhost:<porta>/index.html#postos-proximos`; o servidor do Vite puro não aplica o CSS do app. Os mosaicos do OpenFreeMap precisam de internet; espere ~4 s antes de capturar.
-- Dispensar o tour: `localStorage["app-motoristas-tour-v2:localhost-driver:*"] = "visto"` antes de abrir. Playwright: viewport 390×844, `permissions: ["geolocation"]` e `geolocation` em -23.1896, -45.8841 (ou sem permissão para o estado sem GPS).
+- Dispensar o tour: `localStorage["app-motoristas-tour-v2:localhost-driver:*"] = "visto"` antes de abrir (use `addInitScript`; gravar depois do carregamento deixa o tour aparecer). Playwright: viewport 390×844, `permissions: ["geolocation"]` e `geolocation` em -23.1896, -45.8841 (ou sem permissão para o estado sem GPS).
 - Avisos `Expected value to be of type number, but found null` no console vêm do estilo positron; não são do app.
 
 ## Roteiro (mock em localhost, viewport 390×844)
 1. Menu inicial → "Postos próximos" abre `#postos-proximos`; no Relatório de gastos o botão "Postos próximos" leva à mesma tela e Voltar retorna ao ponto de origem.
-2. O mapa ocupa ~57% da altura, em branco (positron), com pinos azuis de bomba, ponto azul pulsante do motorista, botões flutuantes de aproximar, afastar e minha posição (44 px) e atribuição discreta no canto. Pendentes nunca aparecem.
+2. O mapa ocupa ~57% da altura, em branco (positron), com pinos azuis de bomba, ponto azul pulsante do motorista, bloco compacto de zoom (+ e − com divisor) e botão "minha posição" separado (40 px visíveis, toque de 44 px por pseudo-elemento) e atribuição discreta no canto. Pendentes nunca aparecem.
 3. Lista "Mais próximos de você" com a distância em destaque à direita ("399 m de você"); nunca "0 m". Tocar em um item ou pino centraliza o mapa **sem aproximar** (zoom atual, no máximo 15), deixa o pino acima do cartão e abre o cartão: nome, endereço, "a X km de você", "Ir" (Google Maps) e "Waze". A lista continua com os mesmos 10.
 4. X, Esc ou toque no mapa fecham o cartão. Arrastar o mapa recarrega a lista depois de ~400 ms; zoom abaixo de 11 mostra o pedido para aproximar. Carregando mostra esqueleto; sem postos mostra o vazio; falha da consulta mostra o erro com "Tentar de novo".
 5. Negar a localização: aviso amarelo com "Tentar de novo", ponto cinza no centro, título "Mais próximos do centro do mapa" e distâncias "do centro". A mira aparece só quando há GPS e volta à posição do motorista.
-6. Sem rolagem horizontal; a versão `vX.Y.Z · dd/mm/aaaa HH:mm` aparece no canto.
+6. Movimento: o cartão fica sempre montado (classe `is-aberto`): entra com translateY+opacity (260 ms, curva de gaveta) e sai em 150 ms; trocar de posto só troca o texto. A lista escalona 40 ms só na primeira carga (classe `pp-lista--entrada`, sai após 700 ms). Com `prefers-reduced-motion: reduce` só muda a opacidade. Para conferir o frame do meio da entrada, abra uma sessão CDP (`Animation.setPlaybackRate` 0.1) antes de tocar no pino.
+7. Cabeçalho: título "Postos próximos" numa linha (regra `.services-menu:has(+ .pp-screen)` em `postos.css`); a tela não mostra mais "Mock local" no sobretítulo.
+8. Sem rolagem horizontal; a versão `vX.Y.Z · dd/mm/aaaa HH:mm` aparece no canto.
 
 ## No DEV (não coberto pelo mock)
 - Abra o app pelo Dataverse e confira a consulta real: o papel do motorista precisa de leitura em `new_postocombustivel`, e a Web API devolve a lista de postos CTF na área (compare com a tabela por `new_municipio`).
