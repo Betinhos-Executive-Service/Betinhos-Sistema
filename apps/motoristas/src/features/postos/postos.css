@@ -6,8 +6,8 @@
 .pp-palco { position:relative; flex:1 1 auto !important; min-height:440px; overflow:hidden; border-radius:18px; isolation:isolate; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
 .pp-mapa-caixa { position:absolute; inset:0; }
 .pp-mapa { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
-/* Atribuição (licença OSM/OpenFreeMap): no canto superior esquerdo, abaixo do aviso de busca, longe da gaveta. Fundo claro vale nos dois estilos de mapa. */
-.pp-mapa .maplibregl-ctrl-attrib { margin:44px 0 0 10px; padding:1px 6px; border-radius:6px; font-size:.6rem; line-height:1.45; background:rgba(255,255,255,.82); color:#475569; }
+/* Atribuição (licença OSM/OpenFreeMap): colada na borda de cima, longe da gaveta; o aviso de busca fica logo abaixo. */
+.pp-mapa .maplibregl-ctrl-attrib { margin:0; padding:1px 6px; border-radius:0 0 6px 0; font-size:.6rem; line-height:1.45; background:rgba(255,255,255,.82); color:#475569; }
 .pp-mapa .maplibregl-ctrl-attrib a { color:#475569; }
 .pp-mapa .maplibregl-ctrl-top-left { z-index:1; }
 
@@ -27,7 +27,7 @@
 .pp-botao--destaque { color:var(--pp-acao); }
 .pp-botao:focus-visible { outline:0; box-shadow:inset 0 0 0 2px var(--pp-acao); }
 @media (hover:hover) and (pointer:fine) { .pp-botao:hover { background:rgba(255,255,255,.98); } }
-.pp-status { position:absolute; z-index:2; top:10px; left:10px; display:inline-flex; align-items:center; gap:8px; min-height:30px; padding:0 12px; border-radius:999px; background:var(--pp-vidro); box-shadow:var(--pp-sombra); color:#475569; font-size:.75rem; font-weight:700; }
+.pp-status { position:absolute; z-index:2; top:24px; left:10px; display:inline-flex; align-items:center; gap:8px; min-height:30px; padding:0 12px; border-radius:999px; background:var(--pp-vidro); box-shadow:var(--pp-sombra); color:#475569; font-size:.75rem; font-weight:700; }
 .pp-status i { width:8px; height:8px; border-radius:50%; background:var(--pp-acao); animation:pp-pulsa 1.1s ease-in-out infinite; }
 @keyframes pp-pulsa { 0%,100% { opacity:.3; } 50% { opacity:1; } }
 

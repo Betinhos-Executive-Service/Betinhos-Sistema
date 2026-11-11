@@ -25,20 +25,6 @@ const ALTURA_AVALIAR = 84;
 const ALTURA_PINO_FOLGA = 60;
 const FOLGA_CARTAO = 16;
 const ZOOM_MINHA_POSICAO = 14;
-const TEMA_ESCURO = "(prefers-color-scheme: dark)";
-
-/** Tema escuro do aparelho, acompanhando a mudança sem recarregar. O app não tem seletor de tema próprio. */
-function useTemaEscuro() {
-  const [escuro, setEscuro] = useState(() => window.matchMedia?.(TEMA_ESCURO).matches ?? false);
-  useEffect(() => {
-    const consulta = window.matchMedia?.(TEMA_ESCURO);
-    if (!consulta) return;
-    const mudou = () => setEscuro(consulta.matches);
-    consulta.addEventListener("change", mudou);
-    return () => consulta.removeEventListener("change", mudou);
-  }, []);
-  return escuro;
-}
 
 function Nota({ dados }: { dados: DadosPosto }) {
   const nota = notaDoPosto(dados.avaliacoes);
@@ -123,7 +109,6 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
   const [desde, setDesde] = useState<{ area: number | null; lista: number | null; ranking: number | null }>({ area: null, lista: null, ranking: null });
   const [gavetaPosicao, setGavetaPosicao] = useState<PosicaoGaveta>("meio");
   const [alturaPalco, setAlturaPalco] = useState(0);
-  const escuro = useTemaEscuro();
   const [selecionado, setSelecionado] = useState<Posto | null>(null);
   // O cartão fica montado para animar a saída: guarda o último posto aberto enquanto fecha.
   const [cartaoPosto, setCartaoPosto] = useState<Posto | null>(null);
@@ -272,7 +257,7 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
         {buscaLista === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos mais próximos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { void buscarLista(origem.ponto); }}>Tentar de novo</button></div> : null}
         <div ref={palco} className="pp-palco">
           <div className="pp-mapa-caixa">
-            <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} escuro={escuro} onVista={setVista} onMoveuSozinho={() => { moveuSozinho.current = true; }} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
+            <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={setVista} onMoveuSozinho={() => { moveuSozinho.current = true; }} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
             {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
             {busca === "ok" && postos.length >= LIMITE_POSTOS ? <span className="pp-status pp-status--limite" role="status">Mostrando {LIMITE_POSTOS} postos desta área</span> : null}
             <div className="pp-controles">

@@ -14,8 +14,6 @@ type Props = {
   posicao: Posicao | null;
   selecionadoId: string;
   foco: Foco | null;
-  /** Tema escuro do aparelho: troca o estilo do mapa sem recriá-lo. */
-  escuro: boolean;
   onVista: (vista: Vista) => void;
   /** O motorista arrastou ou deu zoom no mapa (gesto, não botão nem movimento do app). */
   onMoveuSozinho: () => void;
@@ -23,8 +21,8 @@ type Props = {
   onDesselecionar: () => void;
 };
 
-// Mesmo estilo gratuito (sem chave) do acompanhamento do motorista; no tema escuro, o "dark" do OpenFreeMap. A atribuição vem do próprio estilo: OpenFreeMap, OpenMapTiles e OpenStreetMap.
-const estiloDe = (escuro: boolean) => `https://tiles.openfreemap.org/styles/${escuro ? "dark" : "positron"}`;
+// Mesmo estilo gratuito (sem chave) do acompanhamento do motorista. A atribuição vem do próprio estilo: OpenFreeMap, OpenMapTiles e OpenStreetMap.
+const ESTILO = "https://tiles.openfreemap.org/styles/positron";
 // Postos agrupados pelo próprio MapLibre quando afastados; os pinos individuais seguem como HTML (cor, etiqueta de preço) a partir daí.
 const FONTE = "postos";
 const CAMADA_GRUPOS = "pp-grupos";
@@ -80,7 +78,7 @@ function lerVista(mapa: maplibregl.Map): Vista {
 
 const reduzMovimento = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, escuro, onVista, onMoveuSozinho, onSelecionar, onDesselecionar }, ref) {
+export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosMapa({ postos, posicao, selecionadoId, foco, onVista, onMoveuSozinho, onSelecionar, onDesselecionar }, ref) {
   const raiz = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<maplibregl.Map | null>(null);
   const pinos = useRef(new Map<string, { marcador: maplibregl.Marker; el: HTMLElement }>());
@@ -90,7 +88,6 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
   const callbacks = useRef({ onVista, onMoveuSozinho, onSelecionar, onDesselecionar });
   callbacks.current = { onVista, onMoveuSozinho, onSelecionar, onDesselecionar };
 
-  const escuroAtual = useRef(escuro);
   const geojson = useRef<GeoJSON.FeatureCollection<GeoJSON.Point>>({ type: "FeatureCollection", features: [] });
   const selecionado = useRef(selecionadoId);
   selecionado.current = selecionadoId;
@@ -130,7 +127,7 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
   useEffect(() => {
     if (!raiz.current) return;
     const instancia = new maplibregl.Map({
-      container: raiz.current, style: estiloDe(escuroAtual.current), center: [CENTRO_PADRAO.lon, CENTRO_PADRAO.lat], zoom: ZOOM_INICIAL, pitch: INCLINACAO,
+      container: raiz.current, style: ESTILO, center: [CENTRO_PADRAO.lon, CENTRO_PADRAO.lat], zoom: ZOOM_INICIAL, pitch: INCLINACAO,
       dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: 0, attributionControl: false
     });
     instancia.touchZoomRotate.disableRotation();
@@ -142,7 +139,7 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
       if (instancia.getSource("openmaptiles")) {
         instancia.addLayer({
           id: "predios-3d", type: "fill-extrusion", source: "openmaptiles", "source-layer": "building", minzoom: 14,
-          paint: { "fill-extrusion-color": escuroAtual.current ? "#2b2d31" : "#f2f2f0", "fill-extrusion-opacity": 0.9, "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] }
+          paint: { "fill-extrusion-color": "#f2f2f0", "fill-extrusion-opacity": 0.9, "fill-extrusion-height": ["coalesce", ["get", "render_height"], 10], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0] }
         }, rotulos?.id);
       }
       instancia.addSource(FONTE, { type: "geojson", data: geojson.current, cluster: true, clusterRadius: RAIO_AGRUPAR, clusterMaxZoom: ZOOM_MAXIMO_AGRUPAR });
@@ -191,13 +188,6 @@ export const PostosMapa = forwardRef<PostosMapaControle, Props>(function PostosM
   }, [postos]);
 
   useEffect(() => { sincronizarPinos(); }, [selecionadoId]);
-
-  // Tema: troca o estilo sem recriar o mapa (o "style.load" refaz prédios e grupos).
-  useEffect(() => {
-    if (escuroAtual.current === escuro) return;
-    escuroAtual.current = escuro;
-    mapa.current?.setStyle(estiloDe(escuro), { diff: false });
-  }, [escuro]);
 
   // "Você" (GPS) ou, sem GPS, o ponto de referência das distâncias.
   useEffect(() => {
