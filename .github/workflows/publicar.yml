@@ -159,7 +159,8 @@ jobs:
           CONFIAR: ${{ vars.SOLUCOES_IMPRESSAO == 'confiar' }}
           IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
         run: |
-          $extra = @('-Cache', 'cache-solucoes')
+          # -Inventario: o import compara com o destino e escolhe update ou upgrade (SOLUCOES_IMPORT_MODO, _importar-solucoes.yml).
+          $extra = @('-Cache', 'cache-solucoes', '-Inventario')
           if ($env:IMPORTAR_TUDO -ne 'true') { $extra += @('-Publicadas', $env:PUBLICADAS) }
           if ($env:CONFIAR -eq 'true') { $extra += '-Confiar' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/exportar-do-dev.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Solucoes "$env:SOLUCOES" -Pasta pacotes @extra
