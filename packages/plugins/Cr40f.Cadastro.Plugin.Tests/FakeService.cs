@@ -14,6 +14,8 @@ public sealed class FakeService : IOrganizationService
     public List<Entity> Atualizados { get; } = new();
     /// <summary>Simula usuário sem privilégio de leitura em todo Retrieve.</summary>
     public bool NegarLeitura { get; set; }
+    /// <summary>Simula consulta recusada em todo RetrieveMultiple.</summary>
+    public bool NegarRetrieveMultiple { get; set; }
 
     public FakeService Com(params Entity[] linhas)
     {
@@ -37,6 +39,7 @@ public sealed class FakeService : IOrganizationService
 
     public EntityCollection RetrieveMultiple(QueryBase query)
     {
+        if (NegarRetrieveMultiple) throw new InvalidOperationException("Principal user is missing prvReadEnvironmentVariableDefinition privilege");
         var expressao = (QueryExpression)query;
         var linhas = Linhas(expressao.EntityName)
             .Where(e => expressao.Criteria.Conditions.All(c => c.Operator != ConditionOperator.Equal || Equals(Valor(e, c.AttributeName, expressao.EntityName), c.Values[0])))
