@@ -4,6 +4,7 @@ import { STATUS } from '../../pagantes/domain/status'
 import { dateOnly, mapOp } from '../data/queries'
 import { passageirosCurto, periodo } from '../components/OpsList'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
+import { opsNumeros } from './exportar'
 import { VIEWS_KEY, loadViews } from './filters'
 import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, opFields, readOp, sortOps } from './lista'
 import { OP_STATUS, cancelBlock, resumoRateio } from './status'
@@ -95,5 +96,16 @@ describe('apresentação', () => {
     expect(events.some((e) => e.title === 'Pagamento de Ricardo Menezes')).toBe(true)
     expect(events.at(-1)?.title).toBe('Status atual: Pagamento Parcial')
     expect(rateioDe(op.id).some((p) => p.status === STATUS.pago)).toBe(true)
+  })
+})
+
+describe('exportar OPs', () => {
+  it('copiar números pula OP sem código', () => {
+    const [a, b, c] = [
+      mapOp({ cr40f_financeiroid: '1', cr40f_idfinanceiro: 'OP-1', cr40f_status: 100000001 }),
+      mapOp({ cr40f_financeiroid: '2', cr40f_status: 100000001 }),
+      mapOp({ cr40f_financeiroid: '3', cr40f_idfinanceiro: 'OP-3', cr40f_status: 100000001 }),
+    ]
+    expect(opsNumeros([a, b, c])).toEqual(['OP-1', 'OP-3'])
   })
 })
