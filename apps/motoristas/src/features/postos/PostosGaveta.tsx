@@ -15,6 +15,7 @@ type Props = {
 
 /** Passou disto (px) é arrasto; menos que isso é toque no puxador. */
 const LIMIAR_ARRASTO = 6;
+const ORDEM: readonly PosicaoGaveta[] = ["recolhida", "meio", "aberta"];
 
 type Arrasto = { id: number; inicioY: number; inicioDeslocamento: number; ultimoY: number; ultimoT: number; velocidade: number; moveu: boolean; deslocamento: number };
 
@@ -61,9 +62,12 @@ export function PostosGaveta({ gaveta, posicao, onPosicao, titulo, contagem, aci
   };
 
   const aoTeclar = (evento: KeyboardEvent<HTMLDivElement>) => {
-    if (evento.key !== "Enter" && evento.key !== " ") return;
+    // Enter/Espaço alternam como o toque; as setas chegam às três posições (o toque sozinho não recolhe).
+    const indice = ORDEM.indexOf(posicao);
+    const destino = evento.key === "ArrowUp" ? ORDEM[Math.min(indice + 1, ORDEM.length - 1)] : evento.key === "ArrowDown" ? ORDEM[Math.max(indice - 1, 0)] : evento.key === "Enter" || evento.key === " " ? posicaoAposToque(posicao) : null;
+    if (!destino) return;
     evento.preventDefault();
-    onPosicao(posicaoAposToque(posicao));
+    onPosicao(destino);
   };
 
   return (

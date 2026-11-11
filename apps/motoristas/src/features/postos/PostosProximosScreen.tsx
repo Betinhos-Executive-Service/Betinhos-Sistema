@@ -210,7 +210,8 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
   }, []);
   useEffect(() => { void buscarLista(origem.ponto); }, [buscarLista, origem]);
 
-  const exibidos = useMemo(() => juntarDados(postos, dadosPorId), [postos, dadosPorId]);
+  // O posto aberto (vindo da lista) sempre ganha pino, mesmo fora dos 200 da área do mapa.
+  const exibidos = useMemo(() => juntarDados(selecionado && !postos.some((posto) => posto.id === selecionado.id) ? [...postos, selecionado] : postos, dadosPorId), [postos, selecionado, dadosPorId]);
   const lista = useMemo(() => juntarDados(proximos, dadosPorId).map((posto) => ({ ...posto, distanciaKm: distanciaKm(origem.ponto, posto) })), [proximos, dadosPorId, origem]);
   const menorPreco = useMemo(() => idMenorPreco(lista), [lista]);
   const cartao = cartaoPosto ? juntarPosto(cartaoPosto, dadosPorId) : null;
@@ -262,7 +263,7 @@ export function PostosProximosScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <AppShell screenLabel="PostosProximos">
-      <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={async () => { await Promise.all([vista ? buscar(vista) : undefined, buscarLista(origem.ponto), buscarRanking()]); }} />
+      <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={async () => { invalidarRanking(); await Promise.all([vista ? buscar(vista) : undefined, buscarLista(origem.ponto), buscarRanking()]); }} />
       <section className="pp-screen" aria-label="Postos próximos" onKeyDown={(evento) => { if (evento.key === "Escape") setSelecionado(null); }}>
         {avisoSemConexao ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{avisoSemConexao}</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); void buscarLista(origem.ponto); void buscarRanking(); }}>Tentar de novo</button></div> : null}
         {aviso ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{aviso}</p><button type="button" className="termo-text-button pp-acao" onClick={localizar}>Tentar de novo</button></div> : null}
