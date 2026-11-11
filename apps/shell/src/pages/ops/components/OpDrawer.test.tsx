@@ -34,12 +34,12 @@ describe('OpDrawer', () => {
   it('relê o valor da OP: a lista leu no meio da soma do plugin e não acusa divergência', async () => {
     renderDrawer(4250)
     await screen.findByText(/5 serviços/)
-    expect(screen.queryByText('Valor da OP diferente dos serviços')).toBeNull()
+    expect(screen.queryByText('Confira o valor antes de cobrar')).toBeNull()
     expect(screen.getAllByText('R$ 4.250,00').length).toBeGreaterThan(0)
   })
 
   it('continua avisando quando o valor gravado diverge de verdade', async () => {
     renderDrawer(2370)
-    expect(await screen.findByText('Valor da OP diferente dos serviços')).toBeTruthy()
+    expect(await screen.findByText('Confira o valor antes de cobrar')).toBeTruthy()
   })
 })
