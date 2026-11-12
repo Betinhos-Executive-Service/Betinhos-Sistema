@@ -71,7 +71,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
         rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
-        view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }}
+        view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {linhas.length}</span>}
         empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

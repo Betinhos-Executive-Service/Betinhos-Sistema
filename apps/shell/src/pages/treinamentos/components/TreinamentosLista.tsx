@@ -31,11 +31,12 @@ function Situacao({ t }: { t: Linha }) {
   return <StatusBadge tone={publicado ? 'success' : 'neutral'}>{publicado ? 'Publicado' : 'Rascunho'}</StatusBadge>
 }
 
-function Titulo({ t }: { t: Linha }) {
+/** `descricao`: no cartão do celular a segunda linha fica; na tabela a descrição é uma coluna própria. */
+function Titulo({ t, descricao = true }: { t: Linha; descricao?: boolean }) {
   return (
     <span className="tr-titulo">
       <strong title={t.titulo}>{t.titulo || 'Sem título'}</strong>
-      {t.descricao ? <small title={t.descricao}>{t.descricao}</small> : null}
+      {descricao && t.descricao ? <small title={t.descricao}>{t.descricao}</small> : null}
     </span>
   )
 }
@@ -54,8 +55,9 @@ function Progresso({ t, conta }: { t: Linha; conta: ProgressoConta | undefined }
   )
 }
 
-function Publico({ t, funcionarios }: { t: Linha; funcionarios: Funcionario[] }) {
+function Publico({ t, funcionarios, umaLinha }: { t: Linha; funcionarios: Funcionario[]; umaLinha?: boolean }) {
   const { principal, detalhe } = publicoCelula(t, funcionarios)
+  if (umaLinha) { const texto = [principal, detalhe].filter(Boolean).join(' · '); return <span className="tr-corte" title={texto}>{texto}</span> }
   return <span className="tr-titulo"><span className="tr-corte" title={principal}>{principal}</span>{detalhe ? <small>{detalhe}</small> : null}</span>
 }
 
@@ -77,10 +79,11 @@ function Quando({ value, vazio }: { value: string | null; vazio: string }) {
 export function TreinamentosTable({ list, funcionarios = [], progresso = {}, onOpen, loading, view, quickFilters, footer, empty }: Props) {
   const hoje = todaySaoPaulo()
   const columns: TableColumn<Linha>[] = [
-    { key: 'titulo', header: 'Treinamento', label: 'Treinamento', sortable: true, defaultWidth: 280, width: 'minmax(220px, 2.4fr)', cell: (t) => <Titulo t={t} /> },
+    { key: 'titulo', header: 'Treinamento', label: 'Treinamento', sortable: true, defaultWidth: 280, width: 'minmax(220px, 2.4fr)', cell: (t) => <Titulo t={t} descricao={false} /> },
+    { key: 'descricao', header: 'Descrição', label: 'Descrição', sortable: true, defaultWidth: 280, width: 'minmax(200px, 2fr)', hideBelow: 'compact', cell: (t) => <span className="tr-corte tr-muted" title={t.descricao || undefined}>{t.descricao || '—'}</span> },
     { key: 'estado', header: 'Situação', label: 'Situação', sortable: true, defaultWidth: 100, width: 'minmax(96px, .6fr)', cell: (t) => <Situacao t={t} /> },
     { key: 'progresso', header: 'Conclusão', label: 'Conclusão', sortable: true, defaultWidth: 160, width: 'minmax(150px, 1.2fr)', cell: (t) => <Progresso t={t} conta={progresso[t.id]} /> },
-    { key: 'publico', header: 'Público-alvo', label: 'Público-alvo', sortable: true, defaultWidth: 160, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (t) => <Publico t={t} funcionarios={funcionarios} /> },
+    { key: 'publico', header: 'Público-alvo', label: 'Público-alvo', sortable: true, defaultWidth: 160, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (t) => <Publico t={t} funcionarios={funcionarios} umaLinha /> },
     { key: 'exigencias', header: 'Exige', label: 'Exige', sortable: true, defaultWidth: 160, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (t) => <Exige t={t} /> },
     { key: 'validade', header: 'Validade', label: 'Validade', sortable: true, defaultWidth: 140, width: 'minmax(130px, .9fr)', cell: (t) => <Validade t={t} hoje={hoje} /> },
     { key: 'publicadoEm', header: 'Publicado em', label: 'Publicado em', sortable: true, defaultWidth: 110, width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (t) => <Quando value={t.publicadoEm} vazio="Não publicado" /> },

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableQuickFilters } from '@betinhos/ui'
+import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
@@ -49,12 +49,14 @@ type Props = {
   tail?: ReactNode
   footer: ReactNode
   empty: ReactNode
+  /** Botão "Densidade das linhas" da `ViewBar`: `default` (confortável, 56 px) ou `dense` (44 px, o padrão da Geral). */
+  density?: TableDensity
 }
 
 const SKELETON_ROWS = 8
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -193,10 +195,10 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     setScroller(grid ?? null)
     setHeadHeight(grid?.querySelector<HTMLElement>('.bt-table__head')?.offsetHeight ?? 0)
   }, [scrollRef])
-  const { visible, start, before, after, measure } = useVirtualRows(rows, rowId, skeleton ? null : scroller, headHeight, 44)
+  const { visible, start, before, after, measure } = useVirtualRows(rows, rowId, skeleton ? null : scroller, headHeight, density === 'minimal' ? 32 : density === 'dense' ? 44 : 56)
 
   return (
-    <div ref={root} className={!loading && rows.length === 0 ? 'bt-table gr-table gr-table--empty' : 'bt-table gr-table'}>
+    <div ref={root} className={['bt-table gr-table', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && rows.length === 0 && 'gr-table--empty'].filter(Boolean).join(' ')}>
       <span className="gr-sr" role="status">{announce}</span>
       <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
         <div className="bt-table__head" role="row">

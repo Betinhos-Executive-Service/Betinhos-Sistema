@@ -17,6 +17,7 @@
 @media (min-width: 821px) {
   .vt-table.bt-table--view .bt-table__scroll { container-type: inline-size; }
   .vt-table.bt-table--view .bt-table__head, .vt-table.bt-table--view .bt-table__row { grid-template-columns: var(--vt-fit, var(--bt-table-columns)); }
+  .vt-table.bt-table--view .bt-table__row > .bt-table__cell { white-space: nowrap; }
   .vt-table.bt-table--view .bt-table__row > .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (min-width: 821px) and (max-width: 1120px) {

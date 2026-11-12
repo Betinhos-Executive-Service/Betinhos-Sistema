@@ -8,6 +8,8 @@
 .cl-open:focus-visible, .cl-card__open:focus-visible, .cl-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 
 /* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do nome). */
+.cl-table .bt-table__cell { white-space: nowrap; }
+.cl-table .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; text-overflow: ellipsis; }
 .cl-table .bt-table__row:not(.bt-table__row--loading), .cl-card { cursor: pointer; }
 @media (hover: hover) and (pointer: fine) {
   .cl-table .bt-table__row:not(.bt-table__row--loading):hover, .cl-card:hover { background-color: var(--bt-color-surface-soft); }

@@ -3,7 +3,7 @@ import { type MenuAction, type TableColumn, type TableQuickFilters, type TableSe
 import { VirtualTable } from '../../../app/VirtualTable'
 import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
-import { label } from '../domain/status'
+import { hasFalha, label } from '../domain/status'
 import type { ChoiceSet, Contato, Pagante } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
@@ -16,9 +16,8 @@ export type SelectionProps<Row> = { selection: TableSelection<Row>; bulkActions:
 /** Nome como botão real: a linha tem ações próprias e não pode ser um `button` inteiro. */
 function OpenName({ p, onOpen }: { p: Pagante; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="pg-open" onClick={() => onOpen(p.id)}>
+    <button type="button" className="pg-open" title={p.pessoa || undefined} onClick={() => onOpen(p.id)}>
       <strong>{p.pessoa || 'Pagante sem pessoa'}</strong>
-      <span>{p.codigo}</span>
     </button>
   )
 }
@@ -54,10 +53,11 @@ export function openOnRow(selecting: boolean) {
 export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
   const columns: TableColumn<Pagante>[] = [
     { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
+    { key: 'codigo', header: 'Código', label: 'Código', sortable: true, defaultWidth: 120, width: 'minmax(90px, .7fr)', cell: (p) => p.codigo || '—' },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 110, width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
     { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
     { key: 'forma', header: 'Forma', label: 'Forma', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', hideBelow: 'compact', cell: (p) => label(choices.forma, p.forma) },
-    { key: 'status', header: 'Pagamento', label: 'Pagamento', sortable: true, defaultWidth: 200, width: 'minmax(140px, 1fr)', cell: (p) => <span className="pg-badges"><PagamentoBadge p={p} choices={choices} /><FalhaBadge p={p} /></span> },
+    { key: 'status', header: 'Pagamento', label: 'Pagamento', sortable: true, defaultWidth: 270, width: 'minmax(200px, 1.4fr)', cell: (p) => <span className="pg-badges" title={[label(choices.status, p.status, 'Sem status'), hasFalha(p) && 'Falha de envio'].filter(Boolean).join(' · ')}><PagamentoBadge p={p} choices={choices} /><FalhaBadge p={p} /></span> },
     { key: 'recibo', header: 'Recibo', label: 'Recibo', sortable: true, defaultWidth: 160, width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (p) => <ReciboBadge p={p} choices={choices} /> },
     { key: 'criado', header: 'Criado em', label: 'Criado em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (p) => formatDate(p.criadoEm) },
     { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },

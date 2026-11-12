@@ -5,7 +5,7 @@ import { TIPO_LABEL, type Pendencia, type TipoPendencia } from './types'
 
 /**
  * A lista de Pendências no padrão do Design System (§10.9.1 e §10.9.2): colunas da visão, campos de filtro, leitura em
- * memória e as visões prontas. O período continua fora da visão: ele decide o que carrega.
+ * memória e as visões prontas.
  */
 
 export const TELA = 'pendencias'
@@ -15,6 +15,7 @@ export const PENDENCIA_SORT: ViewSort = { key: 'data', dir: 'desc' }
 export const PENDENCIA_COLUMNS: ViewColumnDef[] = [
   { key: 'tipo', label: 'Tipo' },
   { key: 'op', label: 'OP' },
+  { key: 'detalhe', label: 'Detalhe' },
   { key: 'cliente', label: 'Cliente' },
   { key: 'servicos', label: 'Serviços' },
   { key: 'data', label: 'Data' },
@@ -29,6 +30,7 @@ const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', lab
 export const PENDENCIA_FIELDS: FilterField[] = [
   { key: 'tipo', label: 'Tipo', kind: 'choice', options: TIPO_OPTIONS },
   { key: 'op', label: 'OP', kind: 'text' },
+  { key: 'detalhe', label: 'Detalhe', kind: 'text' },
   { key: 'cliente', label: 'Cliente', kind: 'text' },
   { key: 'servicos', label: 'Serviços', kind: 'number' },
   { key: 'data', label: 'Data', kind: 'date' },
@@ -39,7 +41,8 @@ export const PENDENCIA_FIELDS: FilterField[] = [
 export function readPendencia(p: Pendencia, key: string): unknown {
   switch (key) {
     case 'tipo': return p.tipo
-    case 'op': return [p.opCodigo, ...p.reservaCodigos, p.detalhe].filter(Boolean).join(' ')
+    case 'op': return [p.opCodigo, ...p.reservaCodigos].filter(Boolean).join(' ')
+    case 'detalhe': return p.detalhe
     case 'cliente': return p.cliente
     case 'servicos': return p.reservaIds.length
     case 'data': return p.data
@@ -63,6 +66,7 @@ export function sortPendencias(list: Pendencia[], sort: ViewSort | null) {
     switch (sort.key) {
       case 'tipo': return TIPO_LABEL[p.tipo]
       case 'op': return p.opCodigo || p.reservaCodigos[0]
+      case 'detalhe': return p.detalhe || null
       case 'cliente': return p.cliente
       case 'servicos': return p.reservaIds.length
       case 'data': return p.data?.getTime()

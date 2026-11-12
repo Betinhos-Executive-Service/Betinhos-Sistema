@@ -14,7 +14,13 @@
 .tr-error svg { flex: none; margin-top: 2px; }
 
 /* Lista */
-.tr-table .bt-table__row { min-height: 60px; }
+/* Uma linha por célula: conclusão com o texto ao lado da barra, exigências sem quebrar. */
+.tr-table .bt-table__cell { white-space: nowrap; }
+.tr-table .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; text-overflow: ellipsis; }
+.tr-table .tr-prog { display: flex; align-items: center; }
+.tr-table .tr-prog__texto { flex: none; }
+.tr-table .tr-prog__trilha { flex: 1 1 32px; min-width: 32px; }
+.tr-table .tr-chips { flex-wrap: nowrap; }
 .tr-titulo { display: grid; gap: 2px; min-width: 0; }
 .tr-titulo strong { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-titulo small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

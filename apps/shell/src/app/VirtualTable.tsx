@@ -26,6 +26,8 @@ export function useVirtualRows<T>(rows: T[], rowKey: (row: T) => string, scrolle
     scrollMargin,
     enabled,
   })
+  // Densidade trocada: as alturas guardadas das linhas fora da tela ficaram velhas; recomeça da estimativa nova.
+  useLayoutEffect(() => { virtualizer.measure() }, [virtualizer, estimate])
   const items = virtualizer.getVirtualItems()
   if (!enabled || !items.length) return { virtual: false, visible: rows, start: 0, before: 0, after: 0, measure: undefined }
   const first = items[0]
@@ -71,12 +73,15 @@ export function fitTemplate(template: string, pad = 0) {
  * O pacote não virtualiza: aqui o `Table` recebe só a janela de linhas e as de fora viram margem antes da primeira e
  * depois da última (`virtual.css`). Limitação: o Ctrl+F do navegador só acha as linhas desenhadas.
  */
+/** Altura estimada da linha (px, com a borda) por densidade, a mesma do `Table` do DS. */
+const rowEstimate = (density: string | undefined) => (density === 'minimal' ? 33 : density === 'dense' ? 45 : 57)
+
 export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: TableProps<Row>) {
   const host = useRef<HTMLDivElement>(null)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
   useLayoutEffect(() => { setScroller(host.current?.closest<HTMLElement>('.bt-shell__main') ?? null) }, [])
-  const { virtual, visible, start, before, after, measure } = useVirtualRows(rows, rowKey, scroller, scrollMargin, 57)
+  const { virtual, visible, start, before, after, measure } = useVirtualRows(rows, rowKey, scroller, scrollMargin, rowEstimate(props.view?.density ?? props.density))
 
   // Onde as linhas começam: muda com a barra de comandos acima (quebra de linha, chips), não com a rolagem.
   useLayoutEffect(() => {

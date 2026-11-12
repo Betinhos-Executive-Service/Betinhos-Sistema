@@ -80,7 +80,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
       <>
         {mobile
           ? (visible.length ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

@@ -14,9 +14,12 @@
   .cc-filtro--data { flex: 1 1 calc(50% - var(--bt-space-3)); }
 }
 
-.cc-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
-.cc-open strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); overflow-wrap: anywhere; }
-.cc-open span { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.cc-open { display: block; max-width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.cc-open strong { display: block; overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
+.cc-motivo { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+/* Uma linha por célula. */
+.cc-table .bt-table__cell { white-space: nowrap; }
+.cc-table .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; text-overflow: ellipsis; }
 .cc-open:focus-visible, .cc-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .cc-table .bt-table__row:not(.bt-table__row--loading), .cc-card { cursor: pointer; }
 @media (hover: hover) and (pointer: fine) {

@@ -9,7 +9,6 @@
    só em largura bem estreita os comandos descem para a linha de baixo. */
 .dp-barra { container-type: inline-size; }
 .dp-page .pg-filters__search { flex: 1 1 150px; min-width: 150px; }
-.dp-page .pg-filters__select { flex: 0 0 140px; min-width: 0; }
 @container (min-width: 720px) {
   .dp-barra .bt-viewbar, .dp-barra .bt-viewbar__end { flex-wrap: nowrap; }
   /* Em uma linha os botões não encolhem abaixo do próprio tamanho (crescem para a busca ocupar o espaço livre) e o nome

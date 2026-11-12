@@ -62,9 +62,8 @@ const pendenciaActions = (onOpen: (id: string) => void, acoes: Acoes) => (p: Pen
 
 function OpenName({ p, onOpen }: { p: Pendencia; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="pg-open" onClick={() => onOpen(p.id)}>
+    <button type="button" className="pg-open" title={titulo(p)} onClick={() => onOpen(p.id)}>
       <strong>{titulo(p)}</strong>
-      <span>{p.detalhe}</span>
     </button>
   )
 }
@@ -73,6 +72,7 @@ export function PendenciasTable({ list, onOpen, loading, view, quickFilters, foo
   const columns: TableColumn<Pendencia>[] = [
     { key: 'tipo', header: 'Tipo', label: 'Tipo', sortable: true, defaultWidth: 240, width: 'minmax(180px, 1.1fr)', cell: (p) => <TipoBadge p={p} /> },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 260, width: 'minmax(170px, 1.4fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
+    { key: 'detalhe', header: 'Detalhe', label: 'Detalhe', sortable: true, defaultWidth: 280, width: 'minmax(180px, 1.6fr)', cell: (p) => <span title={p.detalhe || undefined}>{p.detalhe || '—'}</span> },
     { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (p) => p.cliente || '—' },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 110, width: 'minmax(80px, .5fr)', cell: (p) => <span className="pg-num">{p.reservaIds.length}</span> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 120, width: 'minmax(88px, .7fr)', cell: (p) => <span className="pg-num">{formatDate(p.data)}</span> },

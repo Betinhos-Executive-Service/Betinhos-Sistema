@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -15,7 +15,7 @@ import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
 import { copyText } from '../pagantes/components/QuickActions'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
-import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
+import { VIEWS_KEY, loadViews, periodoStart, total } from './domain/filters'
 import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
 import { opsQuery } from './domain/query'
 import { opsCsv, opsNumeros } from './domain/exportar'
@@ -37,7 +37,6 @@ export function OpsPage({ host }: { host: Host }) {
   return <ToastProvider><Ops host={host} /></ToastProvider>
 }
 
-const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Ops({ host }: { host: Host }) {
@@ -46,11 +45,7 @@ function Ops({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
-  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
-  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
-  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const ops = useOps(source, since, listCache(host))
+  const ops = useOps(source, null, listCache(host))
   const choices = ops.choices
   const fields = useMemo(() => (choices ? opFields(choices) : []), [choices])
 
@@ -73,10 +68,10 @@ function Ops({ host }: { host: Host }) {
   })
 
   // Busca, OP aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms
-  // depois da última tecla; enquanto o período não chegou inteiro, a busca também vai ao servidor.
+  // depois da última tecla; enquanto a lista não chegou inteira, a busca também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
   const q = useDebouncedText(query)
-  const searchOps = useCallback((text: string) => source.search(since, text), [source, since])
+  const searchOps = useCallback((text: string) => source.search(null, text), [source])
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !ops.complete, search: searchOps })
   const list = useMergedById(ops.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
@@ -180,19 +175,19 @@ function Ops({ host }: { host: Host }) {
   } else if (!ops.choices) {
     body = <OpsTable list={[]} choices={{ status: [], idioma: [] }} onOpen={() => undefined} loading />
   } else if (ops.complete && !ops.loading && !ops.list.length) {
-    body = <EmptyState className="surface" align="start" icon={<FileStack size={36} />} title="Nenhuma OP neste período">As OPs nascem pelo botão Gerar OP nas reservas. Amplie o período para ver as mais antigas.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<FileStack size={36} />} title="Nenhuma OP ainda">As OPs nascem pelo botão Gerar OP nas reservas.</EmptyState>
   } else {
-    // O total só vale com o período inteiro e os valores dos serviços: até lá, o rodapé avisa que ainda soma.
+    // O total só vale com a lista inteira e os valores dos serviços: até lá, o rodapé avisa que ainda soma.
     const pending = !ops.complete && ops.loading
     const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
     const empty = pending
-      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
           ? (visible.length ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
+          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -206,7 +201,6 @@ function Ops({ host }: { host: Host }) {
             {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
               {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
               <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
-              <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
               {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />}
               {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
             </>}
