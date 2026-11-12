@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, ContextMenu, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus, X } from 'lucide-react'
+import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
@@ -46,7 +46,6 @@ export function GeralPage({ host }: { host: Host }) {
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
-const noSelectionTitle = 'Selecione um ou mais serviços.'
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
@@ -433,107 +432,38 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [toast, labelOf, clearSelection])
 
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
-  const mixedId = useId()
-  // Barra de seleção do celular: só aparece com linhas marcadas.
-  const selectionCommands = (
-    <>
-      {selectedIds.length === 1 ? <Button variant="action" size="touch" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
-      <Button variant="action" size="touch" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
-      <Button variant="action" size="touch" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
-      <Button variant="action" size="touch" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
-      <Button variant="action" size="touch" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
-      <Button variant="action" size="touch" icon={<Share2 size={16} />} onClick={askLiberar}>Liberar para o portal</Button>
-      {selectedState === 1
-        ? <Button variant="action" size="touch" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-        : selectedState === 0
-          ? <Button variant="danger" size="touch" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-          // aria-disabled (não disabled): continua focável e o leitor de tela lê o motivo; o clique não faz nada.
-          : <>
-            <Button variant="danger" size="touch" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
-            <Button variant="action" size="touch" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
-            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-          </>}
-      <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
-    </>
-  )
-  const oneTitle = 'Selecione exatamente um serviço.'
-  // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
-  const blocked = (reason: string, describedBy: string) => ({
-    className: 'gr-btn--blocked',
-    'aria-disabled': 'true' as const,
-    'aria-describedby': describedBy,
-    title: reason,
-    onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
-  })
-  // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
-  const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
+  const one = selectedIds.length === 1
   // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
   const size = mobile ? 'touch' : 'default'
-  const createButton = <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-  // Desktop com linhas marcadas: a linha de comando vira a barra da seleção (como no model-driven). Sem seleção, os comandos
-  // que dependem dela não aparecem; a única ação primária da página é "Criar serviço", a última à direita (DS §10.9.1).
-  const selecting = !mobile && selectedIds.length > 0
-  // Ações em lote do botão "Ações"; o clique direito na linha usa as mesmas, com Editar, Ativar/Desativar e Registrar Erro.
-  const bulkActions: MenuAction[] = [
-    { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
-    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
-    { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
-    { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
-    { id: 'cadastro', label: hint('Link de cadastro', cadastroBlock), icon: <UserPlus size={16} />, disabled: cadastroBlock != null, onSelect: () => { void gerarLinkCadastro() } },
-    { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
-    { id: 'portal', label: 'Liberar para o portal', icon: <Share2 size={16} />, onSelect: askLiberar },
-  ]
-  const one = selectedIds.length === 1
-  const contextActions: MenuAction[] = [
-    { id: 'editar', label: hint('Editar', one ? null : oneTitle), icon: <Pencil size={16} />, disabled: !one, onSelect: () => { void openForm('edit', selectedIds[0]) } },
-    ...bulkActions,
+  // Ações da seleção (DS §10.9.6): uma lista só para a linha de comando, o menu "Ações", a barra do celular e o clique direito.
+  // `inline` vai para a linha; "Editar" só entra nela com um serviço marcado, para não ocupar lugar inerte.
+  const selectionActions: SelectionAction[] = [
+    { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: one, onSelect: () => { void openForm('edit', selectedIds[0]) } },
+    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
     selectedState === 1
-      ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, group: '', onSelect: () => askState(true) }
-      : { id: 'desativar', label: hint('Desativar', selectedState === 0 ? null : mixedTitle), icon: <Archive size={16} />, tone: 'danger' as const, group: '', disabled: selectedState !== 0, onSelect: () => askState(false) },
-    { id: 'erro', label: hint('Registrar Erro', one ? null : oneTitle), icon: <Bug size={16} />, group: '', disabled: !one, onSelect: () => { void registrarErro() } },
+      ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, inline: true, onSelect: () => askState(true) }
+      : { id: 'desativar', label: 'Desativar', icon: <Archive size={16} />, tone: 'danger', inline: true, blocked: selectedState === 0 ? null : mixedTitle, onSelect: () => askState(false) },
+    { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, group: 'Enviar', onSelect: openVoucher },
+    { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, group: 'Enviar', onSelect: () => setDispRequest({ ids: selectedIds }) },
+    { id: 'portal', label: 'Liberar para o portal', icon: <Share2 size={16} />, group: 'Enviar', onSelect: askLiberar },
+    { id: 'link', label: 'Gerar link', icon: <Link2 size={16} />, group: 'Enviar', blocked: linkBlock, onSelect: () => { void gerarLink() } },
+    { id: 'cadastro', label: 'Link de cadastro', icon: <UserPlus size={16} />, group: 'Enviar', blocked: cadastroBlock, onSelect: () => { void gerarLinkCadastro() } },
+    { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, group: 'Operação', onSelect: askOp },
+    { id: 'erro', label: 'Registrar Erro', icon: <Bug size={16} />, group: 'Operação', single: true, onSelect: () => { void registrarErro() } },
   ]
-  const selectedLabel = selectedIds.length === 1 ? '1 selecionado' : `${selectedIds.length} selecionados`
-  const selectionBar = (
-    <div className="gr-selection" role="group" aria-label="Comandos da seleção">
-      <Button variant="ghost" size={size} icon={<X size={16} />} aria-label="Limpar seleção" title="Limpar seleção" onClick={clearSelection} />
-      <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedLabel}</StatusBadge></span>
-      {selectedIds.length === 1 ? <Button variant="action" size={size} icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
-      {selectedState === 1
-        ? <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-        : selectedState === 0
-          ? <Button variant="danger" size={size} icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-          : <>
-            <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
-            <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
-            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-          </>}
-      <Menu
-        align="start"
-        trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={`Ações (${selectedIds.length})`}>Ações</Button>}
-        actions={bulkActions}
-      />
-    </div>
-  )
-  // "⋮" (Mais ações): o que é raro sai da linha. Modo de exibição, link da tela e os atalhos para outras telas.
-  const shortcuts = (
-    <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size={size} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
-      actions={[
-        ...(mobile ? [] : [
-          { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
-          { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
-        ]),
-        { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
-        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('funcoes-operacionais') } },
-        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
-        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: openAuditoria },
-        { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
-        { id: 'portal', label: hint('Liberar para o portal', selectedIds.length ? null : noSelectionTitle), icon: <Share2 size={16} />, group: 'Atalhos', disabled: !selectedIds.length, onSelect: askLiberar },
-        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
-      ]}
-    />
-  )
-
+  const selection = { count: selectedIds.length, onClear: clearSelection, actions: selectionActions }
+  const contextActions = selectionMenuActions(selection)
+  // "⋮" (Mais ações): só o que é raro e não depende da seleção. Modo de exibição, link da tela e os atalhos para outras telas.
+  const moreActions: MenuAction[] = [
+    ...(mobile ? [] : [
+      { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
+      { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
+    ]),
+    { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
+    { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('funcoes-operacionais') } },
+    { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
+    { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
+  ]
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
   useShellHeader({ title: 'Geral', actions: headerActions })
 
@@ -671,33 +601,25 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     <ProtecaoContext.Provider value={protecao}>
       <div className="page page--full gr-page">
         {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-        <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
+        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
         <ViewBar
           onAudit={openAuditoria}
           view={viewState}
           columns={columnDefs}
           catalog={catalog}
           filters={{ fields: filterFields, search: searchFilter, notApplied }}
+          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
+          more={moreActions}
+          primary={<Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>}
+          selection={selection}
         >
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          {selecting ? selectionBar : (
-            <>
-              <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
-              <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-            </>
-          )}
-          {shortcuts}
-          {selecting ? null : createButton}
+          {/* No celular o cabeçalho já tem "Atualizar". */}
+          {mobile ? null : <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />}
         </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
         {body}
-        {mobile && geral.selected.size > 0 ? (
-          <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
-            <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
-            {selectionCommands}
-          </div>
-        ) : null}
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}

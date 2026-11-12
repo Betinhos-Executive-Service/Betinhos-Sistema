@@ -2,23 +2,6 @@
 .gr-meta { display: inline-flex; align-items: center; gap: var(--bt-space-2); font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
 .gr-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .gr-filters__view { flex: 0 1 200px; min-width: 160px; }
-.gr-filters__search { flex: 1 1 220px; min-width: 140px; max-width: 520px; }
-.gr-filters__selected { display: inline-flex; align-items: center; flex: 0 0 auto; }
-/* Numa linha de 40 px, sem quebrar, quando cabe: com a navegação no trilho a partir de 1200 px; com ela aberta (238 px a mais) a partir de 1360 px.
-   Abaixo disso (e no celular) a barra quebra em vez de cortar comandos. */
-.gr-toolbar .bt-button { white-space: nowrap; }
-/* O alternador Tabela | Cards nunca encolhe nem ganha rolagem própria dentro da barra. */
-.gr-toolbar .bt-segmented { flex: 0 0 auto; overflow: visible; }
-@media (min-width: 1200px) {
-  .bt-shell--rail .gr-toolbar, .bt-shell--rail .gr-toolbar .bt-page-toolbar__start, .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
-  .bt-shell--rail .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
-  .bt-shell--rail .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
-}
-@media (min-width: 1360px) {
-  .gr-toolbar, .gr-toolbar .bt-page-toolbar__start, .gr-toolbar .bt-page-toolbar__end { flex-wrap: nowrap; }
-  .gr-toolbar .bt-page-toolbar__start { flex: 1 1 auto; }
-  .gr-toolbar .bt-page-toolbar__end { flex: 0 0 auto; }
-}
 
 /* Células editáveis. As regras de posição vêm antes das colunas fixas (.gr-cell--first/select) para elas prevalecerem. */
 .gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
@@ -74,8 +57,6 @@
 .gr-empty > .bt-empty { padding: var(--bt-space-8) var(--bt-space-4); }
 
 /* Desativar/Ativar com seleção mista: aria-disabled mantém o foco e o motivo; só o visual de desativado. */
-.gr-btn--blocked { opacity: var(--bt-opacity-disabled); cursor: not-allowed; }
-.bt-button.gr-btn--blocked:active { transform: none; }
 
 /* Diálogo de colunas. */
 .gr-columns { display: grid; gap: var(--bt-space-1); max-height: 50vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
@@ -131,12 +112,11 @@
   .gr-cardsview .gr-loadmore { padding: 0 var(--bt-space-1); }
 }
 /* Barra da seleção (desktop): troca o lado direito da linha de comando enquanto houver linhas marcadas; Colunas e Filtros saem de cena. */
-.gr-selection { display: flex; align-items: center; gap: var(--bt-space-2); }
-.gr-commandline.is-selecting .bt-viewbar__end > .bt-button[aria-haspopup="dialog"] { display: none; }
 
 /* Celular: cards, sheet de edição e barra de seleção. */
 .gr-mobile { display: grid; gap: var(--bt-space-3); min-width: 0; }
-.gr-mobile.has-selection { padding-bottom: 200px; }
+/* A barra da seleção do DS (§10.9.6) fica fixa no rodapé e publica a altura. */
+.gr-mobile.has-selection { padding-bottom: var(--bt-selectionbar-height, 0); }
 .gr-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
 .gr-card { display: grid; gap: var(--bt-space-2); min-width: 0; padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
 .gr-card.is-selected { background-color: var(--bt-color-action-soft); }
@@ -149,9 +129,6 @@
 .gr-card__line { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
 .gr-card__line strong { color: var(--bt-color-text-primary); }
 .gr-card__route { color: var(--bt-color-text-primary); }
-.gr-selbar { position: fixed; inset: auto 0 0 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom)); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-panel); }
-.gr-selbar__count { flex: 1 0 100%; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-secondary); }
-.gr-selbar .bt-button { min-height: var(--bt-control-height-touch); }
 /* Rodapé de estado da rolagem infinita: linha fina; no celular os botões usam o tamanho de toque (44 px). */
 .gr-sentinel { height: 1px; }
 .gr-loadmore { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 40px; padding: 0 var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
@@ -201,11 +178,6 @@
 .gr-head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; width: 100%; }
 /* O gatilho do menu vem envolto no `.bt-menu` do DS (inline-flex): precisa encolher como item do flex para o rótulo truncar com reticências em vez de vazar sobre a coluna vizinha. */
 .gr-head > .bt-menu { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; }
-/* Em tela larga os comandos cabem numa linha: sem quebra, a busca encolhe antes de o "⋮" cair para uma segunda linha. */
-@media (min-width: 1400px) {
-  .gr-commandline .bt-viewbar__end { flex-wrap: nowrap; min-width: 0; }
-  .gr-commandline .gr-filters__search { flex: 1 1 160px; min-width: 120px; }
-}
 @media (hover: hover) and (pointer: fine) {
   .gr-table .bt-table__cell:hover .bt-colhead__chevron { opacity: 1; }
 }
@@ -265,8 +237,6 @@
 .gr-chip.is-ignored { border-style: dashed; }
 .gr-fd__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
 
-.gr-menu__hint { display: grid; gap: 2px; text-align: left; }
-.gr-menu__hint small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 
 /* Painel Serviços por motorista */
 .gr-ct { display: grid; gap: var(--bt-space-3); }

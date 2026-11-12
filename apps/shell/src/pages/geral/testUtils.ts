@@ -130,8 +130,11 @@ export async function pickView(name: string) {
 }
 
 /** Desktop: Gerar Voucher, Copiar Serviços, Gerar OP e Disparar vivem no menu "Ações" da barra. */
+/** Roda uma ação da seleção: o botão da linha de comando, se ela estiver lá (`inline`), ou o item do menu "Ações" (DS §10.9.6). */
 export async function acao(name: string) {
   const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
+  const inline = within(toolbar).queryByRole('button', { name })
+  if (inline) { fireEvent.click(inline); return }
   fireEvent.click(within(toolbar).getByRole('button', { name: /^Ações/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true }))
 }
