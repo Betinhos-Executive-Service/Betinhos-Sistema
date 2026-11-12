@@ -10,6 +10,13 @@ export const SITUACAO = {
   semMotorista: 100000004, divergencia: 100000005, ignorada: 100000006,
 } as const
 
+/** `cr40f_canal` (migration 20261112-1335): de onde veio a transação. */
+export const CANAL = { pluggy: 100000000, ctf: 100000001, ticketlog: 100000002 } as const
+const CANAL_LABEL: Record<number, string> = { [CANAL.pluggy]: 'Cartão Itaú', [CANAL.ctf]: 'CTF', [CANAL.ticketlog]: 'TicketLog' }
+/** Vazio = Pluggy: as linhas de antes da coluna são todas do Itaú. */
+export const canalLabel = (c: number | null) => CANAL_LABEL[c ?? CANAL.pluggy] ?? 'Outro'
+export const ehPluggy = (t: Transacao) => t.canal == null || t.canal === CANAL.pluggy
+
 /** Abas da tela. "Aguardando motorista" tem aba própria: a despesa já existe e quem age é o motorista. */
 export type Aba = 'revisar' | 'aguardando' | 'conciliadas' | 'ignoradas'
 
@@ -56,8 +63,8 @@ export function acoes(t: Transacao) {
   const aba = abaDe(t.situacao)
   const revisar = aba === 'revisar'
   return {
-    /** Sem motorista: procurar de novo o cartão vigente (depois do cadastro). Só compra, como no flow. */
-    reprocessar: revisar && !t.motoristaId && t.tipo === TIPO.compra,
+    /** Sem motorista: procurar de novo o cartão vigente (depois do cadastro). Só compra do Itaú, como no flow. */
+    reprocessar: revisar && !t.motoristaId && t.tipo === TIPO.compra && ehPluggy(t),
     casar: revisar && !!t.motoristaId && !t.despesaId,
     ignorar: revisar,
     reabrir: aba === 'ignoradas',

@@ -5,7 +5,7 @@ import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { acoes, cartaoVigente, janelaCandidatas, MOTIVO_CASADA, MOTIVO_REABERTA, motivoReprocessar, SITUACAO, tipoLabel } from '../domain/regras'
 import { message, type Source } from '../data/source'
 import type { Cartao, DespesaCandidata, Transacao } from '../domain/types'
-import { cartaoTexto, Situacao } from './TransacoesLista'
+import { Canal, cartaoTexto, Situacao } from './TransacoesLista'
 
 type Props = {
   transacao: Transacao | null
@@ -100,6 +100,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
               <div><dt>Valor</dt><dd className="cc-num">{formatMoney(t.valor)}</dd></div>
               <div><dt>Compra</dt><dd>{fmtData(t.dataCompra)}</dd></div>
               <div><dt>Situação</dt><dd><Situacao t={t} /></dd></div>
+              <div><dt>Canal</dt><dd><Canal t={t} /></dd></div>
               <div><dt>Cartão</dt><dd>{cartaoTexto(t)}</dd></div>
               <div><dt>Motorista</dt><dd>{t.motoristaNome || 'Sem motorista'}</dd></div>
               <div><dt>Tipo</dt><dd>{tipoLabel(t.tipo)}</dd></div>

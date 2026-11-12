@@ -20,6 +20,8 @@ export const DESPESA_COLUMNS: ViewColumnDef[] = [
   { key: 'valor', label: 'Valor' },
   { key: 'operacional', label: 'Operacional' },
   { key: 'financeiro', label: 'Financeiro' },
+  { key: 'categoria', label: 'Categoria' },
+  { key: 'forma', label: 'Forma de pagamento' },
   { key: 'motorista', label: 'Motorista' },
   { key: 'alertas', label: 'Alertas' },
 ]
@@ -93,6 +95,8 @@ export function sortDespesas(list: Despesa[], key: string, dir: 'asc' | 'desc', 
       case 'despesa': return d.estabelecimento || d.nome || null
       case 'data': return d.data ? d.data.getTime() : null
       case 'motorista': return d.motorista || null
+      case 'categoria': return d.categoria || null
+      case 'forma': return d.forma || null
       case 'valor': return d.valor
       case 'operacional': return d.statusOperacional == null ? null : label(choices.operacional, d.statusOperacional, '')
       case 'financeiro': return d.statusFinanceiro == null ? null : label(choices.financeiro, d.statusFinanceiro, '')

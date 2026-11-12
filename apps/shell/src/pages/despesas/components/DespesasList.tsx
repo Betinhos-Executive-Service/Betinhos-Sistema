@@ -25,6 +25,9 @@ export function FinanceiroBadge({ d, choices }: { d: Despesa; choices: DespesaCh
   return <StatusBadge tone={financeiroTone(d.statusFinanceiro)}>{label(choices.financeiro, d.statusFinanceiro, 'Sem status')}</StatusBadge>
 }
 
+/** Categoria e forma de pagamento: rótulo do cadastro, sem cor de status. */
+export const RotuloBadge = ({ texto, vazio }: { texto: string; vazio: string }) => <StatusBadge tone="neutral">{texto || vazio}</StatusBadge>
+
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
 export function Alertas({ d }: { d: Despesa }) {
   if (!d.possivelDuplicidade && !semComprovante(d)) return null
@@ -40,7 +43,6 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
   return (
     <button type="button" className="pg-open" onClick={() => onOpen(d.id)}>
       <strong>{titulo(d)}</strong>
-      <span>{[d.categoria || 'Sem categoria', d.forma].filter(Boolean).join(' · ')}</span>
     </button>
   )
 }
@@ -52,6 +54,8 @@ export function DespesasTable({ list, choices, onOpen, loading, view, quickFilte
     { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 110, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
     { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
     { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
+    { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 150, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },
+    { key: 'forma', header: 'Pagamento', label: 'Forma de pagamento', sortable: true, defaultWidth: 170, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.forma} vazio="Sem forma" /> },
     { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
     { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]

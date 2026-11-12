@@ -36,7 +36,7 @@ export function mapCartao(row: Row): Cartao {
 
 const TRANS_SELECT = [
   'cr40f_transacaocartaoid', 'cr40f_name', 'cr40f_idconta', 'cr40f_fatura', 'cr40f_datacompra', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_final',
-  'cr40f_parcela', 'cr40f_totalparcelas', 'cr40f_tipo', 'cr40f_situacao', 'cr40f_motivo', '_cr40f_cartao_value', '_cr40f_motorista_value', '_cr40f_despesa_value',
+  'cr40f_parcela', 'cr40f_totalparcelas', 'cr40f_tipo', 'cr40f_situacao', 'cr40f_canal', 'cr40f_motivo', '_cr40f_cartao_value', '_cr40f_motorista_value', '_cr40f_despesa_value',
 ]
 /** Últimos 12 meses pela data da compra (o período da tela filtra dentro disso). */
 export const transacoesPath = (set: string, desde: string) =>
@@ -47,7 +47,7 @@ export function mapTransacao(row: Row): Transacao {
   return {
     id: cleanId(str(row.cr40f_transacaocartaoid)), descricao: str(row.cr40f_name), conta: str(row.cr40f_idconta), fatura: str(row.cr40f_fatura),
     dataCompra: dia(row.cr40f_datacompra) ?? '', valor: num(row.cr40f_valor) ?? 0, estabelecimento: str(row.cr40f_estabelecimento), final: str(row.cr40f_final),
-    parcela: num(row.cr40f_parcela), totalParcelas: num(row.cr40f_totalparcelas), tipo: num(row.cr40f_tipo), situacao: num(row.cr40f_situacao), motivo: str(row.cr40f_motivo),
+    parcela: num(row.cr40f_parcela), totalParcelas: num(row.cr40f_totalparcelas), tipo: num(row.cr40f_tipo), situacao: num(row.cr40f_situacao), canal: num(row.cr40f_canal), motivo: str(row.cr40f_motivo),
     cartaoId: c.id, cartaoNome: c.nome, motoristaId: m.id, motoristaNome: m.nome, despesaId: d.id, despesaNome: d.nome,
   }
 }

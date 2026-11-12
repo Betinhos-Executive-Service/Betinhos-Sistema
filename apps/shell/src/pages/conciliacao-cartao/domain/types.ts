@@ -27,6 +27,8 @@ export type Transacao = {
   totalParcelas: number | null
   tipo: number | null
   situacao: number | null
+  /** `cr40f_canal`; vazio = Itaú/Pluggy (linhas antigas). */
+  canal: number | null
   motivo: string
   cartaoId: string
   cartaoNome: string

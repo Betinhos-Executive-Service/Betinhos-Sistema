@@ -39,6 +39,7 @@ describe('ações', () => {
     expect(acoes(t(5)).casar).toBe(false)
     expect(acoes(t(8)).reabrir).toBe(true)
     expect(acoes({ ...t(3), tipo: TIPO.estorno }).reprocessar).toBe(false)
+    expect(acoes(t(10)).reprocessar).toBe(false) // CTF: o flow do Itaú não trata
   })
 })
 

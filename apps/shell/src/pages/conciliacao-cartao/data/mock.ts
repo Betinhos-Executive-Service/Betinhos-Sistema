@@ -1,5 +1,5 @@
 import { OPERACIONAL } from '../../despesas/domain/status'
-import { SITUACAO, TIPO, type DespesaMotorista } from '../domain/regras'
+import { CANAL, SITUACAO, TIPO, type DespesaMotorista } from '../domain/regras'
 import type { Cartao, Pessoa, Transacao } from '../domain/types'
 
 /** Mesmos ids e nomes do mock de Equipamentos/Funcionários. */
@@ -42,7 +42,7 @@ export function createMockTransacoes(): Transacao[] {
     const cartao = cartoes.find((c) => c.id === o.cartaoId)
     return {
       id: tid(n), descricao, conta: cartao?.conta ?? CONTA_ITAU, fatura: dataCompra.slice(0, 7), dataCompra, valor, estabelecimento: descricao,
-      final: cartao?.final ?? '', parcela: 1, totalParcelas: 1, tipo: TIPO.compra, situacao, motivo,
+      final: cartao?.final ?? '', parcela: 1, totalParcelas: 1, tipo: TIPO.compra, situacao, canal: null, motivo,
       cartaoId: cartao?.id ?? '', cartaoNome: cartao?.nome ?? '', motoristaId: cartao?.motoristaId ?? '', motoristaNome: cartao?.motoristaNome ?? '',
       despesaId: '', despesaNome: '', ...o,
     }
@@ -57,6 +57,7 @@ export function createMockTransacoes(): Transacao[] {
     t(7, 'AUTO PECAS SILVA', '2026-10-25', 310.4, SITUACAO.aguardando, 'Nenhuma despesa lançada pelo motorista; despesa criada para ele validar.', { cartaoId: cid(1), despesaId: did(7), despesaNome: 'Cartão final 1234 · AUTO PECAS SILVA' }),
     t(8, 'IOF COMPRA INTERNACIONAL', '2026-10-31', 3.21, SITUACAO.ignorada, 'Lançamento que não é compra (encargo, estorno ou pagamento).', { tipo: TIPO.encargo }),
     t(9, 'LOJA PNEUS PARC 02/03', '2026-10-02', 400, SITUACAO.ignorada, 'Parcela seguinte de compra parcelada; a despesa é da compra inteira.', { cartaoId: cid(3), parcela: 2, totalParcelas: 3 }),
+    t(10, 'POSTO GRAAL TAUBATE', '2026-11-04', 412.37, SITUACAO.semMotorista, 'Motorista do CTF não encontrado pelo CPF nem pelo nome.', { canal: CANAL.ctf, conta: '', final: '' }),
   ]
 }
 
