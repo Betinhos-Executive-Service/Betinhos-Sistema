@@ -215,4 +215,35 @@ describe('virtualização das linhas', () => {
     expect((container.querySelector('[aria-label="rascunho 5"]') as HTMLInputElement).value).toBe('texto digitado')
     element.remove()
   })
+
+  it('com linha fixada fora da janela, Enter e setas seguem o índice absoluto, não a vizinha do DOM', () => {
+    const element = scroller()
+    const Editable = ({ id }: { id: string }) => {
+      const state = useGridRowState()
+      return <input data-grid-cell={`${id}:value`} aria-label={`campo ${id}`} onFocus={() => state?.setEditing(true)} onBlur={() => state?.setEditing(false)} />
+    }
+    const editableColumns = [column.accessor('value', { cell: ({ row }) => <Editable id={row.id} /> })]
+    const { container } = render(<DataTable data={rows} columns={editableColumns} getRowId={getRowId} rowRenderKeys={new Map()} scroller={element} />)
+    act(() => { (screen.getByLabelText('campo 5') as HTMLElement).focus() })
+    element.scrollTop = 899 * 38
+    act(() => { element.dispatchEvent(new Event('scroll')) })
+    const inputs = () => Array.from(container.querySelectorAll<HTMLElement>('tbody tr:not([data-spacer]) [data-grid-cell]'))
+    const index = (item: HTMLElement) => Number(item.dataset.gridCell?.split(':')[0])
+    const windowed = inputs().filter((item) => index(item) !== 5)
+    expect(inputs().some((item) => index(item) === 5)).toBe(true)
+    const first = windowed[0]
+    const last = windowed[windowed.length - 1]
+    // Para cima na primeira linha da janela: pede start - 1 (não cai na linha 5, que vem antes dela no DOM).
+    const handler = vi.fn()
+    container.querySelector('table')!.addEventListener('grid:reveal-row', (event) => handler((event as CustomEvent).detail))
+    expect(adjacentGridCell(first, 'ArrowUp')).toBeNull()
+    expect(handler).toHaveBeenLastCalledWith({ index: index(first) - 1, column: 0 })
+    // Enter na última linha visível: pede a linha absoluta seguinte.
+    expect(adjacentGridCell(last, 'Enter')).toBeNull()
+    expect(handler).toHaveBeenLastCalledWith({ index: index(last) + 1, column: 0 })
+    // Da linha fixada, para baixo vai para a 6 (pedida), não para a janela.
+    expect(adjacentGridCell(screen.getByLabelText('campo 5'), 'ArrowDown')).toBeNull()
+    expect(handler).toHaveBeenLastCalledWith({ index: 6, column: 0 })
+    element.remove()
+  })
 })

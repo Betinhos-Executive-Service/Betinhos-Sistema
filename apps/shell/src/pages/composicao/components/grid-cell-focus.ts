@@ -10,7 +10,7 @@ export type RevealGridRow = {
 
 /**
  * Célula vizinha no DOM. A grade desenha só as linhas perto da tela: quando a vizinha existe mas está fora da janela
- * (`data-row-start`/`data-row-count` da tabela), pede a rolagem pelo evento `REVEAL_GRID_ROW` e devolve null; a
+ * (`data-row-index` das linhas e `data-row-count` da tabela), pede a rolagem pelo evento `REVEAL_GRID_ROW` e devolve null; a
  * grade foca a célula quando a linha chega ao DOM.
  */
 export function adjacentGridCell(origin: HTMLElement | null, key: string, reverse = false): HTMLElement | null {
@@ -20,27 +20,33 @@ export function adjacentGridCell(origin: HTMLElement | null, key: string, revers
   const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr:not([data-spacer])'))
   const row = origin.closest('tr')
   if (!row) return null
-  const rowIndex = rows.indexOf(row)
-  const rowStart = Number(table.dataset.rowStart) || 0
+  // Índice absoluto na lista: `data-row-index` da grade virtualizada (a janela pode ter linhas fixadas fora dela);
+  // sem o atributo, a posição no DOM.
+  const absolute = (item: HTMLTableRowElement, position: number) => item.dataset.rowIndex === undefined ? position : Number(item.dataset.rowIndex)
+  const rowIndex = absolute(row, rows.indexOf(row))
   const rowCount = Number(table.dataset.rowCount) || rows.length
+  const rowAt = (index: number) => rows.find((item, position) => absolute(item, position) === index)
   const reveal = (detail: RevealGridRow) => { table.dispatchEvent(new CustomEvent<RevealGridRow>(REVEAL_GRID_ROW, { detail })); return null }
+  const editable = (item: HTMLElement) => item.dataset.gridEditable !== 'false'
   if (key === 'Tab') {
-    const cells = Array.from(table.querySelectorAll<HTMLElement>('[data-grid-cell]'))
+    const cells = Array.from(row.querySelectorAll<HTMLElement>('[data-grid-cell]'))
     const direction = reverse ? -1 : 1
     for (let index = cells.indexOf(origin) + direction; index >= 0 && index < cells.length; index += direction) {
-      if (cells[index].dataset.gridEditable !== 'false') return cells[index]
+      if (editable(cells[index])) return cells[index]
     }
-    const next = rowStart + rowIndex + direction
-    return next >= 0 && next < rowCount ? reveal({ index: next, edge: reverse ? 'last' : 'first' }) : null
+    const next = rowIndex + direction
+    if (next < 0 || next >= rowCount) return null
+    const target = rowAt(next)
+    if (!target) return reveal({ index: next, edge: reverse ? 'last' : 'first' })
+    const targetCells = Array.from(target.querySelectorAll<HTMLElement>('[data-grid-cell]'))
+    return (reverse ? targetCells.reverse() : targetCells).find(editable) ?? null
   }
   const fields = Array.from(row.querySelectorAll<HTMLElement>('[data-grid-cell]'))
   const columnIndex = fields.indexOf(origin)
   const vertical = key === 'Enter' ? (reverse ? -1 : 1) : key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0
   const horizontal = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0
-  const target = rows[rowIndex + vertical]
-  if (!target) {
-    const next = rowStart + rowIndex + vertical
-    return vertical && next >= 0 && next < rowCount ? reveal({ index: next, column: columnIndex + horizontal }) : null
-  }
+  const next = rowIndex + vertical
+  const target = vertical ? rowAt(next) : row
+  if (!target) return next >= 0 && next < rowCount ? reveal({ index: next, column: columnIndex + horizontal }) : null
   return target.querySelectorAll<HTMLElement>('[data-grid-cell]')[columnIndex + horizontal] ?? null
 }

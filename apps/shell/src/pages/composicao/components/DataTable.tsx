@@ -63,7 +63,7 @@ function DataRow<TData extends RowData>({ row, selected, presentation, report }:
   const rowId = row.id
   const state = useMemo(() => ({ setEditing: (on: boolean) => report(rowId, 'editing', on), setSaving: (on: boolean) => report(rowId, 'saving', on) }), [report, rowId])
   return <GridRowContext.Provider value={state}>
-    <tr data-state={selected ? 'selected' : undefined} className="price-grid__body-row">
+    <tr data-row-id={row.id} data-state={selected ? 'selected' : undefined} className="price-grid__body-row">
       {row.getAllCells().map((cell) => <td key={cell.id} {...presentation.get(cell.column.id)}>
         {flexRender(cell.column.columnDef.cell, cell.getContext())}
       </td>)}
@@ -215,6 +215,15 @@ export function DataTable<TData extends RowData>({
   const [scrollMargin, setScrollMargin] = useState(0)
   const rows = table.getRowModel().rows
   const { virtual, visible, start } = useVirtualRows(rows, (row) => row.id, scroller, scrollMargin, ROW_HEIGHT)
+  // Posição absoluta de cada linha no DOM para a navegação por teclado (grid-cell-focus). Vai pelo DOM, não por prop,
+  // para a linha mantida não renderizar de novo quando um filtro só muda a posição dela.
+  useLayoutEffect(() => {
+    const element = tableRef.current
+    if (!element) return
+    const positions = new Map(rows.map((row, index) => [row.id, index]))
+    element.querySelectorAll<HTMLTableRowElement>('tbody tr[data-row-id]').forEach((item) => { item.dataset.rowIndex = String(positions.get(item.dataset.rowId ?? '') ?? '') })
+  })
+
   // Linhas com célula editando ou salvando continuam montadas fora da janela: desmontar perderia o rascunho.
   const heldKinds = useRef({ editing: new Set<string>(), saving: new Set<string>() })
   const [held, setHeld] = useState<ReadonlySet<string>>(() => new Set())
@@ -257,7 +266,7 @@ export function DataTable<TData extends RowData>({
   useLayoutEffect(() => {
     const request = pendingFocus.current
     if (!request) return
-    const row = tableRef.current?.querySelectorAll('tbody tr:not([data-spacer])')[request.index - (virtual ? start : 0)]
+    const row = tableRef.current?.querySelector(`tbody tr[data-row-index="${request.index}"]`)
     if (!row) return
     pendingFocus.current = null
     const cells = Array.from(row.querySelectorAll<HTMLElement>('[data-grid-cell]'))
@@ -330,7 +339,7 @@ export function DataTable<TData extends RowData>({
   useEffect(() => onSelectionChange?.(selectedIds), [onSelectionChange, data, rowSelection])
 
   return (
-    <table ref={tableRef} className="price-grid" style={tableStyle} data-row-start={virtual ? start : 0} data-row-count={rows.length}>
+    <table ref={tableRef} className="price-grid" style={tableStyle} data-row-count={rows.length}>
       {layout && <colgroup>{leafColumns.map((column) => <col key={column.id} style={{ width: columnWidth(column.id) }} />)}</colgroup>}
       <thead>
         {table.getHeaderGroups().map((group) => (

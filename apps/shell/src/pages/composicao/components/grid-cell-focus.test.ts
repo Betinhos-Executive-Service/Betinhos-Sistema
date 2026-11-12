@@ -45,21 +45,21 @@ describe('adjacentGridCell', () => {
       return handler
     }
     it('seta para baixo na última linha desenhada pede a linha seguinte, na mesma coluna', () => {
-      document.querySelector('table')!.dataset.rowStart = '10'
+      document.querySelectorAll('tr').forEach((tr, position) => { tr.dataset.rowIndex = String(10 + position) })
       document.querySelector('table')!.dataset.rowCount = '50'
       const handler = revealed()
       expect(adjacentGridCell(cell('b2'), 'ArrowDown')).toBeNull()
       expect(handler).toHaveBeenCalledWith({ index: 12, column: 1 })
     })
     it('seta para cima na primeira linha desenhada pede a anterior', () => {
-      document.querySelector('table')!.dataset.rowStart = '10'
+      document.querySelectorAll('tr').forEach((tr, position) => { tr.dataset.rowIndex = String(10 + position) })
       document.querySelector('table')!.dataset.rowCount = '50'
       const handler = revealed()
       expect(adjacentGridCell(cell('a3'), 'ArrowUp')).toBeNull()
       expect(handler).toHaveBeenCalledWith({ index: 9, column: 2 })
     })
     it('Tab na última célula pede a primeira célula editável da próxima linha; Shift+Tab, a última da anterior', () => {
-      document.querySelector('table')!.dataset.rowStart = '10'
+      document.querySelectorAll('tr').forEach((tr, position) => { tr.dataset.rowIndex = String(10 + position) })
       document.querySelector('table')!.dataset.rowCount = '50'
       const handler = revealed()
       expect(adjacentGridCell(cell('b3'), 'Tab')).toBeNull()
