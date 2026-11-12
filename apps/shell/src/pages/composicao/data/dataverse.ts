@@ -1,6 +1,6 @@
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FORMULA_ENGINE_VERSION, FormulaError } from '../formula'
 import type { ViewQuery } from './views'
-import { buildCountQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
+import { buildCountQuery, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import { isWritableMoneyField, moneyFields, type ApplyCellInputResult, type CellFormula, type CellInput, type Composition, type DecimalString, type MoneyField } from './compositions'
 import { getMockRows, saveMockCell } from './mock-store'
 import { getXrmHost, type XrmWebApi } from './xrm'
@@ -229,7 +229,7 @@ async function loadReservationsInBatches(api: XrmWebApi, rows: DataverseEntity[]
   return reservations
 }
 
-const DEFAULT_FETCH = `<fetch count="${PAGE_SIZE}"><entity name="${compositionTable}"><filter><condition attribute="statecode" operator="eq" value="0"/></filter><order attribute="modifiedon" descending="true"/></entity></fetch>`
+const DEFAULT_FETCH = `<fetch count="${PAGE_SIZE}"><entity name="${compositionTable}"><filter><condition attribute="statecode" operator="eq" value="0"/></filter><order attribute="modifiedon" descending="true"/><order attribute="${compositionTable}id"/></entity></fetch>`
 
 /** Relê por FetchXML (com os vínculos) as linhas de uma view sem FetchXML, em lotes de 40, mantendo a ordem da view. */
 async function rereadViewRows(api: XrmWebApi, viewRows: DataverseEntity[], baseAttributes: string[]) {
