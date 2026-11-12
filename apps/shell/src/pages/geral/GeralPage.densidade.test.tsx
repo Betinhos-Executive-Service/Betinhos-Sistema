@@ -22,28 +22,30 @@ describe('Geral: espaço e densidade', () => {
     expect(within(toolbar).queryByRole('button', { name: /^Ações/ })).toBeNull()
     expect(within(toolbar).queryByText(/selecionado/)).toBeNull()
     const buttons = within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    // Ordem da direita: …, Atualizar, Mais ações e a primária por último.
-    expect(buttons.slice(-3)).toEqual(['Atualizar', 'Mais ações', 'Criar serviço'])
+    // Ordem da direita: …, Mais ações, Atualizar e a primária por último.
+    expect(buttons.slice(-3)).toEqual(['Mais ações', 'Atualizar', 'Criar serviço'])
     expect(buttons.indexOf('Colunas')).toBeLessThan(buttons.indexOf('Atualizar'))
   })
 
-  it('com 1 selecionado os comandos se habilitam e a contagem aparece como badge', async () => {
+  it('com 1 selecionado a busca vira contador com ✕ e ações; visão, Colunas, Filtros, Auditoria, ⋮, Atualizar e a primária ficam', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
-    expect(toolbar.classList.contains('is-selecting')).toBe(true)
-    const count = within(toolbar).getByText('1 selecionado')
-    expect(count.closest('.bt-badge')).not.toBeNull()
-    for (const name of ['Editar', 'Desativar', 'Limpar seleção']) expect(within(toolbar).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
-    expect(within(toolbar).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
+    const fixos = () => within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent).filter((name) => ['Colunas', 'Filtros', 'Auditoria', 'Mais ações', 'Atualizar', 'Criar serviço'].includes(name ?? ''))
+    const antes = fixos()
+    fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
+    const selecao = within(toolbar).getByRole('group', { name: 'Comandos da seleção' })
+    expect(within(selecao).getByRole('status').textContent).toBe('1 selecionado')
+    // DS §10.9.6, desktop largo: até 3 ações na linha; o resto no menu "Ações".
+    for (const name of ['Editar', 'Copiar Serviços', 'Desativar', 'Limpar seleção']) expect(within(selecao).getByRole('button', { name }).getAttribute('aria-disabled')).toBeNull()
     expect(within(toolbar).queryByRole('searchbox', { name: 'Buscar serviços' })).toBeNull()
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Ações (1)' }))
-    for (const name of ['Gerar Voucher', 'Copiar Serviços']) expect(((await screen.findByRole('menuitem', { name, hidden: true })) as HTMLButtonElement).disabled).toBe(false)
+    expect(fixos()).toEqual(antes)
+    fireEvent.click(within(selecao).getByRole('button', { name: /^Ações/ }))
+    for (const name of ['Gerar Voucher', 'Gerar OP']) expect(((await screen.findByRole('menuitem', { name, hidden: true })) as HTMLButtonElement).disabled).toBe(false)
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Escape' })
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Limpar seleção' }))
+    fireEvent.click(within(selecao).getByRole('button', { name: 'Limpar seleção' }))
     await waitFor(() => expect(within(toolbar).queryByText(/selecionado/)).toBeNull())
-    expect(within(toolbar).getByRole('button', { name: 'Criar serviço' })).toBeTruthy()
+    expect(within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' })).toBeTruthy()
   })
 
   it('lista sem cabeçalho de página: o título é a visão e Atualizar fica na linha de comando', async () => {
