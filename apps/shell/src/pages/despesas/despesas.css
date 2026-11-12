@@ -143,3 +143,5 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
   .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
   .dp-kpi, .dp-kpi:active { transition: none; transform: none; }
 }
+.dp-filas { justify-self: start; max-width: 100%; }
+.dp-conciliacao { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--bt-space-1); }

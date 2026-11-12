@@ -1,7 +1,7 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
-import type { Host } from '../../../host'
-import { mapPessoa, pessoasPath } from '../../equipamentos/data/queries'
-import { addDays, dateKey } from '../../operacional/domain/time'
+import type { Host } from '../../../../host'
+import { mapPessoa, pessoasPath } from '../../../equipamentos/data/queries'
+import { addDays, dateKey } from '../../../operacional/domain/time'
 import { ehCandidata, MOTIVO_REABERTA, SITUACAO, type CartaoForm } from '../domain/regras'
 import type { Cartao, DespesaCandidata, Pessoa, Transacao } from '../domain/types'
 import { createMockCartoes, createMockDespesas, createMockMotoristas, createMockTransacoes } from './mock'
@@ -9,14 +9,15 @@ import {
   candidatasPath, cartaoPayload, cartoesPath, casarPayload, ENTITIES, formaCartaoPath, mapCartao, mapDespesa, mapTransacao,
   reprocessarPayload, transacoesPath, type EntitySets,
 } from './queries'
-import { latenciaMock } from '../../../app/latenciaMock'
+import { latenciaMock } from '../../../../app/latenciaMock'
 
 export type Carga = { transacoes: Transacao[]; cartoes: Cartao[]; motoristas: Pessoa[] }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
   mock: boolean
-  load: () => Promise<Carga>
+  /** `soCartoes`: a tela de Cartões não precisa das transações de 12 meses. */
+  load: (soCartoes?: boolean) => Promise<Carga>
   /** Despesas do motorista que casam com a transação (critério do flow diário). */
   candidatas: (t: Transacao) => Promise<DespesaCandidata[]>
   /** Marca a despesa como conciliada e liga à transação (Conciliada manual). */
@@ -36,9 +37,9 @@ function createMockSource(): Source {
   const despesas = createMockDespesas()
   return {
     mock: true,
-    async load() {
+    async load(soCartoes) {
       await wait(300)
-      return { transacoes: createMockTransacoes(), cartoes: createMockCartoes(), motoristas: createMockMotoristas() }
+      return { transacoes: soCartoes ? [] : createMockTransacoes(), cartoes: createMockCartoes(), motoristas: createMockMotoristas() }
     },
     async candidatas(t) { await wait(300); return despesas.filter((d) => ehCandidata(d, t)) },
     async casar(_t, despesaId) {
@@ -75,10 +76,10 @@ export function createSource(host: Host): Source {
 
   return {
     mock: false,
-    async load() {
+    async load(soCartoes) {
       const s = await entitySets()
       const [transacoes, cartoes, motoristas] = await Promise.all([
-        client.getAll(transacoesPath(s.transacao, addDays(dateKey(new Date()), -365))), client.getAll(cartoesPath(s.cartao)), client.getAll(pessoasPath(s.funcionario)),
+        soCartoes ? Promise.resolve([]) : client.getAll(transacoesPath(s.transacao, addDays(dateKey(new Date()), -365))), client.getAll(cartoesPath(s.cartao)), client.getAll(pessoasPath(s.funcionario)),
       ])
       return { transacoes: transacoes.map(mapTransacao), cartoes: cartoes.map(mapCartao), motoristas: motoristas.map(mapPessoa) }
     },

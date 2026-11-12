@@ -1,10 +1,10 @@
 import { memo, type ReactNode } from 'react'
 import { StatusBadge, type TableColumn } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
-import { fmtData } from '../../equipamentos/components/EquipamentosList'
-import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { formatMoney } from '../../pagantes/domain/messages'
-import { situacaoLabel, situacaoTone } from '../domain/regras'
+import { VirtualTable } from '../../../../app/VirtualTable'
+import { fmtData } from '../../../equipamentos/components/EquipamentosList'
+import { openFromRow, openRowActions } from '../../../pagantes/components/PagantesList'
+import { formatMoney } from '../../../pagantes/domain/messages'
+import { canalLabel, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Transacao } from '../domain/types'
 
 type Props = { list: Transacao[]; onOpen: (id: string) => void; loading?: boolean; empty?: ReactNode; footer?: ReactNode }
@@ -24,11 +24,14 @@ function Abrir({ t, onOpen, className }: { t: Transacao; onOpen: (id: string) =>
   )
 }
 
+export const Canal = ({ t }: { t: Transacao }) => <StatusBadge tone="neutral">{canalLabel(t.canal)}</StatusBadge>
+
 /** `memo`: abrir ou fechar um drawer re-renderiza a página, não a lista (props estáveis). */
 export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, loading, empty, footer }: Props) {
   const columns: TableColumn<Transacao>[] = [
     { key: 'data', header: 'Compra', width: '96px', cell: (t) => <span className="cc-num">{fmtData(t.dataCompra)}</span> },
     { key: 'descricao', header: 'Lançamento', width: 'minmax(220px, 2.4fr)', cell: (t) => <Abrir t={t} onOpen={onOpen} className="cc-open" /> },
+    { key: 'canal', header: 'Canal', width: '120px', cell: (t) => <Canal t={t} /> },
     { key: 'cartao', header: 'Cartão', width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: cartaoTexto },
     { key: 'motorista', header: 'Motorista', width: 'minmax(130px, 1fr)', cell: (t) => t.motoristaNome || <span className="cc-muted">Sem motorista</span> },
     { key: 'valor', header: 'Valor', width: '110px', align: 'end', cell: (t) => <span className="cc-num">{formatMoney(t.valor)}</span> },
@@ -51,6 +54,7 @@ export const TransacoesCards = memo(function TransacoesCards({ list, onOpen }: P
             <span className="cc-muted">{[fmtData(t.dataCompra), t.motoristaNome || 'Sem motorista', cartaoTexto(t)].join(' · ')}</span>
             <span className="cc-card__valor">
               <strong className="cc-num">{formatMoney(t.valor)}</strong>
+              <Canal t={t} />
               <Situacao t={t} />
             </span>
           </div>

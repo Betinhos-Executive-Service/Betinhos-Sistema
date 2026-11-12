@@ -96,8 +96,6 @@ it('Gestão de Qualidade é a tela React; o id do WebResource antigo redireciona
 
 it('Pagamento de Fornecedores é rota React do Financeiro; o id do WebResource antigo redireciona', () => {
   expect(findItem('pagamento-fornecedores')?.group.id).toBe('financeiro')
-  expect(findItem('conciliacao-cartao')?.group.id).toBe('financeiro')
-  expect(findItem('conciliacao-cartao')?.item).toMatchObject({ kind: 'page', page: 'conciliacao-cartao', label: 'Conciliação do cartão' })
   expect(findItem('pagamento-fornecedores')?.item).toMatchObject({ kind: 'page', page: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores' })
   expect(findItem('cr40f_telapagamentofornecedores')).toBeNull()
   expect(rotaAtualizada('cr40f_telapagamentofornecedores', new URLSearchParams('tab=lots'))).toEqual({ id: 'pagamento-fornecedores', query: new URLSearchParams('tab=lots') })
@@ -108,4 +106,11 @@ it('Página Inicial é rota React, a tela padrão do shell, e o link antigo do W
   expect(DEFAULT_ITEM).toMatchObject({ kind: 'page', id: 'inicio', page: 'inicio', label: 'Página Inicial' })
   expect(findItem('cr40f_homebetinhos')).toBeNull()
   expect(rotaAtualizada('cr40f_homebetinhos', new URLSearchParams('visao=gestao'))).toEqual({ id: 'inicio', query: new URLSearchParams('visao=gestao') })
+})
+
+it('Conciliação do cartão saiu do menu: Cartões corporativos é de Cadastros e o link antigo abre a fila de Despesas', () => {
+  expect(findItem('conciliacao-cartao')).toBeNull()
+  expect(findItem('cartoes')?.group.id).toBe('cadastros')
+  expect(findItem('cartoes')?.item).toMatchObject({ kind: 'page', page: 'cartoes', label: 'Cartões corporativos' })
+  expect(rotaAtualizada('conciliacao-cartao', new URLSearchParams())).toEqual({ id: 'despesas-operacionais', query: new URLSearchParams('fila=sem-despesa') })
 })

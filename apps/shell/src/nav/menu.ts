@@ -10,7 +10,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'conciliacao-cartao'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -56,7 +56,6 @@ export const MENU: MenuGroup[] = [
       table('cr40f_recibos_v2'),
       { kind: 'page', id: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores', page: 'pagamento-fornecedores' },
       { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
-      { kind: 'page', id: 'conciliacao-cartao', label: 'Conciliação do cartão', page: 'conciliacao-cartao' },
     ],
   },
   {
@@ -87,6 +86,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
       { kind: 'page', id: 'treinamentos', label: 'Treinamentos', page: 'treinamentos' },
+      { kind: 'page', id: 'cartoes', label: 'Cartões corporativos', page: 'cartoes' },
     ],
   },
   {
@@ -134,6 +134,8 @@ export function rotaAtualizada(id: string, query: URLSearchParams): { id: string
   if (id === 'cr40f_telapagamentofornecedores') return { id: 'pagamento-fornecedores', query }
   // O WebResource dos Checklists de Veículos virou a aba Checklists da Frota; links antigos seguem abrindo.
   if (id === 'new_gestaochecklistsveiculos') return { id: 'frota-checklists', query }
+  // A Conciliação do cartão virou a fila "Compras sem despesa" de Despesas; links antigos seguem abrindo.
+  if (id === 'conciliacao-cartao') return { id: 'despesas-operacionais', query: new URLSearchParams([...query, ['fila', 'sem-despesa']]) }
   if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null

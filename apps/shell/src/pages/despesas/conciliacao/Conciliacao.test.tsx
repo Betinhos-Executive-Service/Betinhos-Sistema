@@ -1,42 +1,40 @@
 // @vitest-environment jsdom
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConciliacaoCartaoPage } from './ConciliacaoCartaoPage'
+import { DespesasPage } from '../DespesasPage'
+import { CartoesPage } from '../../cartoes/CartoesPage'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta.
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
 beforeEach(() => {
-  window.location.hash = '#/conciliacao-cartao'
+  window.localStorage.clear()
+  window.location.hash = '#/despesas-operacionais?fila=sem-despesa'
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 const linha = (nome: string) => screen.findByRole('button', { name: new RegExp(`^${nome}`) })
-const aba = (nome: RegExp) => fireEvent.click(screen.getByRole('tab', { name: nome }))
+const aba = (nome: RegExp) => fireEvent.click(screen.getByText(nome))
 
 async function abrir(nome: string) {
   fireEvent.click(await linha(nome))
   return screen.findByRole('dialog', { name: nome })
 }
 async function renderPage() {
-  render(<ConciliacaoCartaoPage host={{ mode: 'mock' }} />)
+  render(<DespesasPage host={{ mode: 'mock' }} />)
   await linha('POSTO SHELL AV BRASIL')
 }
 /** Espera o drawer fechar (o `<dialog>` some da árvore acessível). */
 const fechou = (nome: string) => waitFor(() => expect(screen.queryByRole('dialog', { name: nome })).toBeNull())
 
-describe('Conciliação do cartão', () => {
-  it('Para revisar mostra pendente, sem motorista e divergência; as outras abas separam o resto', async () => {
+describe('Compras sem despesa (Despesas)', () => {
+  it('Para revisar mostra pendente, sem motorista e divergência; Ignoradas separa o resto', async () => {
     await renderPage()
-    expect(screen.getByText('Dados de exemplo')).toBeTruthy()
     for (const n of ['RESTAURANTE SABOR', 'ESTACIONAMENTO CENTRO', 'LAVA RAPIDO JARDINS']) await linha(n)
     expect(screen.queryByText('POSTO IPIRANGA MARGINAL')).toBeNull()
-    aba(/^Aguardando motorista/); await linha('AUTO PECAS SILVA')
-    aba(/^Conciliadas/); await linha('POSTO IPIRANGA MARGINAL'); await linha('PEDAGIO ECOVIAS')
     aba(/^Ignoradas/); await linha('IOF COMPRA INTERNACIONAL')
-    aba(/^Cartões/); await linha('Nubank conta toda · Elaine')
   })
 
   it('filtra por motorista', async () => {
@@ -56,9 +54,6 @@ describe('Conciliação do cartão', () => {
     await fechou('POSTO SHELL AV BRASIL')
     expect(await screen.findByText('Transação casada com a despesa.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^POSTO SHELL AV BRASIL/ })).toBeNull()
-    aba(/^Conciliadas/)
-    const row = (await linha('POSTO SHELL AV BRASIL')).closest('.bt-table__row') as HTMLElement
-    expect(within(row).getByText('Conciliada manual')).toBeTruthy()
   })
 
   it('ignorar exige motivo; com motivo vai para Ignoradas e pode reabrir', async () => {
@@ -107,9 +102,7 @@ describe('Conciliação do cartão', () => {
     fireEvent.click(await within(d).findByRole('radio', { name: /Lavagem do carro/ }))
     fireEvent.click(within(d).getByRole('button', { name: 'Casar com a despesa escolhida' }))
     await fechou('LAVA RAPIDO JARDINS')
-    aba(/^Conciliadas/)
-    const row = (await linha('LAVA RAPIDO JARDINS')).closest('.bt-table__row') as HTMLElement
-    expect(within(row).getByText('Elaine Mock Duarte')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^LAVA RAPIDO JARDINS/ })).toBeNull()
   })
 
   it('sem cartão vigente: cadastra o cartão a partir da transação e reprocessa', async () => {
@@ -136,6 +129,30 @@ describe('Conciliação do cartão', () => {
     const row = (await linha('ESTACIONAMENTO CENTRO')).closest('.bt-table__row') as HTMLElement
     expect(within(row).getByText('Fabio Demo Nunes')).toBeTruthy()
     expect(within(row).getByText('Pendente')).toBeTruthy()
-    aba(/^Cartões/); await linha('Itaú final 9012 · Fabio')
+  })
+})
+
+describe('Cartões corporativos', () => {
+  it('lista os cartões e abre o cadastro', async () => {
+    render(<CartoesPage host={{ mode: 'mock' }} />)
+    await linha('Nubank conta toda · Elaine')
+    fireEvent.click(screen.getByRole('button', { name: /Novo cartão/ }))
+    expect(await screen.findByRole('dialog', { name: 'Novo cartão' })).toBeTruthy()
+  })
+})
+
+describe('Ficha da despesa e coluna Conciliação', () => {
+  it('mostra o canal na lista e o bloco Compra no cartão (CTF) na ficha', async () => {
+    window.location.hash = '#/despesas-operacionais'
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    const linhas = await screen.findAllByText('Posto Shell Faria Lima')
+    expect((await screen.findAllByText('CTF')).length).toBeGreaterThan(0)
+    fireEvent.click(linhas[0].closest('button')!)
+    const ficha = await screen.findByRole('dialog', { name: 'Posto Shell Faria Lima' })
+    expect(within(ficha).getByText('Compra no cartão')).toBeTruthy()
+    expect(within(ficha).getByText('FJK2B19')).toBeTruthy()
+    expect(within(ficha).getByText('Diesel S10')).toBeTruthy()
+    fireEvent.click(within(ficha).getByRole('button', { name: /Abrir compra/ }))
+    expect(await screen.findByRole('dialog', { name: 'POSTO SHELL FARIA LIMA' })).toBeTruthy()
   })
 })
