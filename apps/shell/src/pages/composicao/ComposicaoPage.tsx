@@ -169,7 +169,9 @@ function openColumnKeys(open: ViewDefinition, interpreted: ViewDefinition, catal
   for (const [index, column] of open.columns.entries()) {
     const resolved = interpreted.columns[index].id
     if (resolved === column.id) continue
-    if (!catalog.some((field) => field.id === resolved)) return null
+    const field = catalog.find((item) => item.id === resolved)
+    // Posição igual não basta: o atributo tem de ser o mesmo, senão o valor iria para a coluna errada (relê).
+    if (!field || (column.id !== field.attribute && !column.id.endsWith(`.${field.attribute}`))) return null
     keys.set(resolved, column.id)
   }
   return keys
