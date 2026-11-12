@@ -17,7 +17,7 @@ import type { DataTableFeatures } from './components/features'
 import { EditableViewFieldCell } from './components/ViewFieldCell'
 import { adjacentGridCell } from './components/grid-cell-focus'
 import { isWritableMoneyField, moneyFields, type CellInput, type Composition, type MoneyField } from './data/compositions'
-import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, type FormulaMap } from './data/dataverse'
+import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, type CompositionPage, type FormulaMap } from './data/dataverse'
 import { buildNativeCompositionQuery, resolveCompositionQuery, type ResolvedCompositionQuery } from './data/composition-query'
 import { collectCompositionPages, compositionWorkbook, freshPageRecords } from './data/composition-export'
 import { createColumnFilterLabels } from './data/column-filter-values'
@@ -325,6 +325,17 @@ function ComposicaoContent({ host }: { host: Host }) {
     }).finally(() => { ids.forEach((id) => { if (formulasPendingRef.current.get(id) === settled) formulasPendingRef.current.delete(id) }) })
     ids.forEach((id) => formulasPendingRef.current.set(id, settled))
   }, [])
+  /** Primeira página de uma consulta: substitui as linhas, zera a paginação e a fila de gravação e começa a acompanhar as fórmulas. */
+  const applyFirstPage = useCallback((page: CompositionPage, request: number) => {
+    saveQueueRef.current?.reset()
+    loadedIdsRef.current = new Set(page.records.map((record) => record.id))
+    loadedPagesRef.current = 1
+    setRows(page.records)
+    setDataSource(page.source)
+    setNextLink(page.nextLink)
+    setConnectionError(null)
+    trackFormulas(page.records, page.formulas, request)
+  }, [trackFormulas])
   useEffect(() => {
     if (!usingMockData) return
     setCatalog(mockColumnCatalog())
@@ -375,16 +386,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         setConnectionError(errorMessage(error, 'Falha ao carregar dados do Dataverse.'))
       }
       if (!current()) return
-      if (firstPage) {
-        saveQueueRef.current?.reset()
-        loadedIdsRef.current = new Set(firstPage.records.map((record) => record.id))
-        loadedPagesRef.current = 1
-        setRows(firstPage.records)
-        setDataSource(firstPage.source)
-        setNextLink(firstPage.nextLink)
-        setConnectionError(null)
-        trackFormulas(firstPage.records, firstPage.formulas, request)
-      }
+      if (firstPage) applyFirstPage(firstPage, request)
       setLoading(false)
       if (firstPage?.source === 'mock') {
         skipLoadRef.current = true
@@ -437,7 +439,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       }
     })()
     return () => { alive = false }
-  }, [trackFormulas])
+  }, [applyFirstPage])
   const rememberView = (id: string | null) => {
     try { if (id) window.localStorage.setItem(LAST_VIEW_KEY, id); else window.localStorage.removeItem(LAST_VIEW_KEY) } catch { /* sem armazenamento local: abre pela view padrão */ }
   }
@@ -631,16 +633,9 @@ function ComposicaoContent({ host }: { host: Host }) {
       setLoading(false)
       return
     }
-    loadCompositions(undefined, queryView).then(({ records, source, nextLink: nextPage, formulas }) => {
+    loadCompositions(undefined, queryView).then((page) => {
       if (!active) return
-      saveQueueRef.current?.reset()
-      loadedIdsRef.current = new Set(records.map((record) => record.id))
-      setRows(records)
-      setDataSource(source)
-      setNextLink(nextPage)
-      loadedPagesRef.current = 1
-      setConnectionError(null)
-      trackFormulas(records, formulas, request)
+      applyFirstPage(page, request)
     }).catch((error: unknown) => {
       if (!active) return
       void logAppError(error, { action: 'carregar-composicoes', phase: 'load', component: 'ComposicaoPage' })
@@ -650,7 +645,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       if (active) setLoading(false)
     })
     return () => { active = false }
-  }, [catalogReady, queryError, queryView, trackFormulas])
+  }, [applyFirstPage, catalogReady, queryError, queryView])
 
   const loadMore = useCallback(async () => {
     if (!nextLink || loadingMoreRef.current || refreshingRef.current) return
