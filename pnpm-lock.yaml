@@ -387,9 +387,15 @@ importers:
       '@fontsource/manrope':
         specifier: ^5.2.6
         version: 5.3.0
+      '@tanstack/react-table':
+        specifier: ^9.3.1
+        version: 9.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-virtual':
         specifier: ^3.14.7
         version: 3.14.23(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      big.js:
+        specifier: ^7.0.1
+        version: 7.0.1
       docx:
         specifier: ^9.14.0
         version: 9.14.0
@@ -424,6 +430,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/big.js':
+        specifier: ^7.0.0
+        version: 7.0.0
       '@types/react':
         specifier: ^19.2.0
         version: 19.3.0
@@ -623,9 +632,6 @@ packages:
 
   '@betinhos-executive-service/tokens@1.18.0':
     resolution: {integrity: sha512-siyEGtc0pxXflxzCUYnL73ig3pDw9ogoKc3SuZFt28PZPUN68y8nWcjPDInNvps3pzRCieMiyfvq0ukSd/4mvA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.18.0/d6ea0fc9517468f162d831679bb9e6e6716f0046}
-
-  '@betinhos-executive-service/tokens@1.19.0':
-    resolution: {integrity: sha512-DX81p/3jUp7cfMGMl21dfDyEb76bv7jk4T5AGMgju1aVtb+9kd6e+/cdYEhT7ClwaDOAegTpkSw4iEy2k4YMZQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.19.0/bb6732c3e6366e103ef5298b329b92a9a0d89cd5}
 
   '@betinhos-executive-service/tokens@1.22.0':
     resolution: {integrity: sha512-WwLvKLQSUO1YbEZTweyiFeznCQJfHj3FwWXUAIcZ/J3scPLm4M/MRdsG6HvKZGDmTh20yo52CfVuNOQHIKriUQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.22.0/6a942d526bbaa2184604f2d68257b29b4552e87a}
@@ -1857,11 +1863,30 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
+  '@tanstack/react-store@0.11.2':
+    resolution: {integrity: sha512-oj5O5DmiMWE+ih+SioX2ayC1kbK7d3fpLx0B75fPJr9nY3zU+hoW010yr64qXsY/9fyiLVE2bn5mGNV3owm8RQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/react-table@9.3.1':
+    resolution: {integrity: sha512-E6Ya5TnY6EaGyZYIUqig/29Lr/gJSAubQkLJFqiWkUl5nRCr0Xr9hvJot+NiRTtG+TzGxHTiqUW3bnLtQxlHug==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      react: '>=18'
+
   '@tanstack/react-virtual@3.14.23':
     resolution: {integrity: sha512-Oyy58qQwdaQieA+A4WUDtnh9D1rv5FZvGdw8og9Xeyh88V6HH94vMSyV5i9ATIbYNe9t5Ix0WXRo9NOTpHDkYw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/store@0.11.2':
+    resolution: {integrity: sha512-sJ4mjol8uQsHV0gOJzzjwXfh2Fwm+Sz0+8deqiTm4jGbMdjzNSW+xZCFm0kUa870uhd8yi+DpKnZb5Kc4apa0Q==}
+
+  '@tanstack/table-core@9.3.1':
+    resolution: {integrity: sha512-zQvlxSNi2qGM3L4jh85Z6hqMfdIR5qOfD9KHOU32nuKFJGN0RlJ7UvV1lsPb1fPVhpFYI0VP3jJGxLdLDpTKjQ==}
+    engines: {node: '>=20'}
 
   '@tanstack/virtual-core@3.19.8':
     resolution: {integrity: sha512-Oz/SYBo/aVPyQkwtOw7Q23myITUgFIof2glQqydYJAPL6mH2SkJDkvDKZTklB+7gv5jGLZQhyTcd7SO1A1EODQ==}
@@ -1912,6 +1937,9 @@ packages:
 
   '@types/babel__traverse@7.28.0':
     resolution: {integrity: sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q==}
+
+  '@types/big.js@7.0.0':
+    resolution: {integrity: sha512-WfAGp7IbJvyB8EmWK4tJD24rJRAL6uVbw3LV/hJntFNam+os9KWKj0PzXo8rRRpjupYK8U0M8FoBB8dBhWF2dg==}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -2211,6 +2239,9 @@ packages:
   big-integer@1.6.52:
     resolution: {integrity: sha512-QxD8cf2eVqJOOz63z6JIN9BzvVs/dlySa5HGSBH5xtR8dPteIRQnBxxKqkNTiT6jbDTF6jAfrd4oMcND9RGbQg==}
     engines: {node: '>=0.6'}
+
+  big.js@7.0.1:
+    resolution: {integrity: sha512-iFgV784tD8kq4ccF1xtNMZnXeZzVuXWWM+ERFzKQjv+A5G9HC8CY3DuV45vgzFFcW+u2tIvmF95+AzWgs6BjCg==}
 
   binary@0.3.0:
     resolution: {integrity: sha512-D4H1y5KYwpJgK8wk1Cue5LLPgmwHKYSChkbspQg5JtVuR5ulGckxfR62H3AE9UDkdMC8yyXlqYihuz3Aqg2XZg==}
@@ -4326,8 +4357,6 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.18.0': {}
 
-  '@betinhos-executive-service/tokens@1.19.0': {}
-
   '@betinhos-executive-service/tokens@1.22.0': {}
 
   '@betinhos-executive-service/ui@1.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
@@ -4340,7 +4369,7 @@ snapshots:
 
   '@betinhos-executive-service/ui@1.18.0(@types/react@18.3.30)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.19.0
+      '@betinhos-executive-service/tokens': 1.22.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
@@ -4348,7 +4377,7 @@ snapshots:
 
   '@betinhos-executive-service/ui@1.18.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.19.0
+      '@betinhos-executive-service/tokens': 1.22.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
@@ -5291,11 +5320,32 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
+  '@tanstack/react-store@0.11.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@tanstack/store': 0.11.2
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+      use-sync-external-store: 1.7.0(react@19.3.0)
+
+  '@tanstack/react-table@9.3.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@tanstack/react-store': 0.11.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tanstack/table-core': 9.3.1
+      react: 19.3.0
+    transitivePeerDependencies:
+      - react-dom
+
   '@tanstack/react-virtual@3.14.23(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@tanstack/virtual-core': 3.19.8
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
+
+  '@tanstack/store@0.11.2': {}
+
+  '@tanstack/table-core@9.3.1':
+    dependencies:
+      '@tanstack/store': 0.11.2
 
   '@tanstack/virtual-core@3.19.8': {}
 
@@ -5359,6 +5409,8 @@ snapshots:
   '@types/babel__traverse@7.28.0':
     dependencies:
       '@babel/types': 7.29.8
+
+  '@types/big.js@7.0.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
@@ -5726,6 +5778,8 @@ snapshots:
       require-from-string: 2.0.2
 
   big-integer@1.6.52: {}
+
+  big.js@7.0.1: {}
 
   binary@0.3.0:
     dependencies:
