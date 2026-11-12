@@ -12,7 +12,7 @@ import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, builti
 import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
-import { NavTopo } from './components/NavTopo'
+import { NavTopo } from '../../app/NavTopo'
 import { TreinamentoEditor } from './components/TreinamentoEditor'
 import { TreinamentoPainel } from './components/TreinamentoPainel'
 import './treinamentos.css'
@@ -79,7 +79,7 @@ function Treinamentos({ host }: { host: Host }) {
   } else if (target && !data.loaded) {
     body = data.error ? erroCarga : <div className="surface tr-loading" role="status" aria-label="Carregando treinamento" />
   } else if (target && !selected) {
-    body = <><NavTopo onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
+    body = <><NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
   } else if (selected) {
     body = isPublicado(selected) && target?.mode !== 'edit'
       ? <TreinamentoPainel key={selected.id} item={selected} funcionarios={data.funcionarios} source={source} onBack={goHome} onEditar={() => editar(selected.id)} onReaplicar={() => reaplicar(selected)} />

@@ -21,7 +21,8 @@ Dados: "Novo procedimento de embarque no GRU" (Ciência, todos): Carlos (evidên
 2. Voltar → "Gerar PDF por motorista" → escolher Carlos Andrade → 2 comunicados marcados, "Gerar PDF (2)", "Trocar motorista" volta à busca; motorista sem concluídos mostra "Este motorista ainda não concluiu nenhum comunicado."; Esc e clique fora fecham (não durante a geração).
 3. `#/funcionarios` → Carlos Alberto Teste → aba Comunicados (entre Equipamentos e Anotações): 2 concluídos marcados; "Gerar PDF (n)".
 4. Baixar: o arquivo sai como `comprovante-<comunicado>-<motorista>.pdf` (1 par), `comunicados-<motorista>-<n>.pdf` (por motorista) ou `comunicado-<titulo>-<n>-comprovantes.pdf`. Abrir: capa (tipo, alvo, quantidade, período, autor, data), uma página por par (linha do tempo, seção "Aparelho e local" com blocos Abertura e Ciência, ou só Leitura no Informativo; aparelho, versão do App, IP "(verificado)" ou "(não verificado)", coordenadas com ±precisão e link do mapa, ou "não autorizada"/"indisponível"/"tempo esgotado"; sem coluna: "Não registrado (registro anterior à captura do aparelho)."; assinatura 250×100 ou "Assinatura não disponível no registro.", observação, texto integral, IDs, SHA-256, notas) e rodapé "Gerado por … · Sistema Betinhos v… · Página i/n". Acentos corretos; emoji é descartado sem falhar. Dá para renderizar com `pdftoppm -png -r 80 arquivo.pdf pg`.
-5. Console sem `console.error` nem `pageerror`.
+5. Voltar no canto superior esquerdo, antes do caminho e do título, no relatório, no editor (novo e rascunho) e no "Comunicado não encontrado" (`app/NavTopo.tsx`, o mesmo de Treinamentos). Teste: `ComunicadosPage.test.tsx` (Voltar antes do título).
+6. Console sem `console.error` nem `pageerror`.
 
 ## Não verificável no mock
 - Leitura real dos destinatários (`new_comunicadodestinatario` filtrado por `_new_motorista_value`) e do nome do usuário (`WhoAmI` + `systemuser.fullname`) no Dataverse; sem nome, o rodapé diz "usuário não identificado".

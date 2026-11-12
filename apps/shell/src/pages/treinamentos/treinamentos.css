@@ -13,9 +13,6 @@
 .tr-error { display: flex; gap: var(--bt-space-2); align-items: flex-start; margin: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-danger); }
 .tr-error svg { flex: none; margin-top: 2px; }
 
-/* Voltar no canto superior esquerdo de toda tela interna */
-.tr-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-3); }
-
 /* Lista */
 .tr-table .bt-table__row { min-height: 60px; }
 .tr-titulo { display: grid; gap: 2px; min-width: 0; }
