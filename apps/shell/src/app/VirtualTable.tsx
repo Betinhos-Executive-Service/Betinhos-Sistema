@@ -1,6 +1,6 @@
 import { Table, type TableProps } from '@betinhos/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import './virtual.css'
 
 /** Até aqui a lista desenha todas as linhas (o primeiro lote da rolagem infinita fica como sempre foi). */
@@ -90,7 +90,7 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
   return (
     <div ref={host} className="vt-host">
       <Table {...props} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
-      <BarraHorizontal host={host} />
+      <BarraHorizontal />
     </div>
   )
 }
@@ -100,13 +100,14 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
  * chega lá não vê as colunas da direita (ex.: Motorista em Despesas com colunas a mais). Esta acompanha a rolagem da
  * tabela nos dois sentidos e só aparece quando as colunas passam da largura.
  */
-function BarraHorizontal({ host }: { host: RefObject<HTMLDivElement | null> }) {
+function BarraHorizontal() {
   const barra = useRef<HTMLDivElement>(null)
   const conteudo = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const bar = barra.current
     const inner = conteudo.current
-    const scroll = host.current?.querySelector<HTMLElement>('.bt-table__scroll')
+    // Pelo pai no DOM, não pelo ref do `vt-host`: o React liga o ref do pai só depois dos efeitos dos filhos.
+    const scroll = bar?.parentElement?.querySelector<HTMLElement>('.bt-table__scroll')
     if (!bar || !inner || !scroll) return
     const update = () => {
       const sobra = scroll.scrollWidth - scroll.clientWidth
