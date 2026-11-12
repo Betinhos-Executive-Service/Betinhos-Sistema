@@ -1,33 +1,41 @@
 /* Postos próximos: mapa MapLibre (estilo positron, mesmo do acompanhamento), cartão do posto e lista.
    Tokens do Design System: marca #001a3d, ação #2159d2, ação suave #edf3ff, superfície #fff/#fcfcfb. Motion: transform/opacity, curvas fortes (--pp-saida, --pp-gaveta), UI abaixo de 300 ms.
    Reaproveita termos.css (alertas, vazio) e gr-* (subtítulo, legenda). */
-.pp-screen { --pp-marca:#001a3d; --pp-acao:#2159d2; --pp-acao-suave:#edf3ff; --pp-vidro:rgba(255,255,255,.92); --pp-sombra:0 4px 14px rgba(0,26,61,.12), 0 1px 2px rgba(0,26,61,.08); --pp-saida:cubic-bezier(.23,1,.32,1); --pp-gaveta:cubic-bezier(.32,.72,0,1); display:flex; flex-direction:column; gap:8px; width:100%; flex:1 1 auto; min-height:0; }
-.pp-screen > * { flex:none; }
-.pp-palco { position:relative; flex:1 1 auto !important; min-height:440px; overflow:hidden; border-radius:18px; isolation:isolate; background:#f0f0f0; box-shadow:0 0 0 1px rgba(0,26,61,.06), 0 10px 28px rgba(0,26,61,.06); }
+.pp-screen { --pp-marca:#001a3d; --pp-acao:#2159d2; --pp-acao-suave:#edf3ff; --pp-superficie:#fff; --pp-sombra:0 4px 14px rgba(0,26,61,.12), 0 1px 2px rgba(0,26,61,.08); --pp-saida:cubic-bezier(.23,1,.32,1); --pp-gaveta:cubic-bezier(.32,.72,0,1); --pp-topo:70px; position:absolute; inset:0; z-index:0; }
+.pp-palco { position:absolute; inset:0; overflow:hidden; isolation:isolate; background:#f0f0f0; }
 .pp-mapa-caixa { position:absolute; inset:0; }
 .pp-mapa { position:absolute; inset:0; width:100%; height:100%; touch-action:none; }
-/* Atribuição (licença OSM/OpenFreeMap): colada na borda de cima, longe da gaveta; o aviso de busca fica logo abaixo. */
-.pp-mapa .maplibregl-ctrl-attrib { margin:0; padding:1px 6px; border-radius:0 0 6px 0; font-size:.6rem; line-height:1.45; background:rgba(255,255,255,.82); color:#475569; }
+/* Atribuição (licença OSM/OpenFreeMap): colada na borda esquerda, logo abaixo do cabeçalho e longe da gaveta; os avisos ficam logo abaixo. */
+.pp-mapa .maplibregl-ctrl-attrib { margin:0; padding:1px 6px; border-radius:0 6px 6px 0; font-size:.6rem; line-height:1.45; background:rgba(255,255,255,.82); color:#475569; }
 .pp-mapa .maplibregl-ctrl-attrib a { color:#475569; }
-.pp-mapa .maplibregl-ctrl-top-left { z-index:1; }
+.pp-mapa .maplibregl-ctrl-top-left { z-index:1; top:var(--pp-topo); }
 
-/* Cabeçalho compartilhado: em tela estreita o título desta tela quebra em até 2 linhas em vez de invadir as ações (só aqui, sem mexer no componente comum). */
-.services-menu:has(+ .pp-screen) .services-title-block { padding:0 6px; }
+/* Mapa em tela cheia: o cabeçalho flutua sobre ele, sem fundo nem divisor; botões e título sólidos (decisão do Renan, 12/11/2026). --pp-topo = cabeçalho + folga. */
+.container-5:has(> .pp-screen) { position:relative; padding:0; overflow:hidden; }
+.services-menu:has(+ .pp-screen) { position:absolute; z-index:5; top:0; left:0; right:0; border-bottom:0 !important; background:transparent !important; pointer-events:none; }
+.services-menu:has(+ .pp-screen) :is(.services-title-block, .services-nav-button) { pointer-events:auto; }
+.services-menu:has(+ .pp-screen) :is(.services-title-block, .services-nav-button) { background:#fff; box-shadow:0 4px 14px rgba(0,26,61,.12), 0 1px 2px rgba(0,26,61,.08); }
+/* Em tela estreita o título quebra em até 2 linhas em vez de invadir as ações. */
+.services-menu:has(+ .pp-screen) .services-title-block { padding:4px 12px; border-radius:14px; }
 .services-menu:has(+ .pp-screen) .services-title-block strong { font-size:1.04rem; text-wrap:balance; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* Avisos e status empilhados abaixo da atribuição, à esquerda dos controles do mapa (40 px + folgas); dentro do palco, abaixo da gaveta e do cartão. */
+.pp-avisos { position:absolute; z-index:3; top:calc(var(--pp-topo) + 24px); left:10px; right:60px; display:grid; gap:6px; justify-items:start; pointer-events:none; }
+.pp-avisos > * { pointer-events:auto; }
+.pp-avisos .pp-aviso { justify-self:stretch; box-shadow:var(--pp-sombra); }
 
 /* Controles flutuantes: bloco de zoom compacto (divisor fino) e "minha posição" separado. 40 px visíveis; o toque chega a 44 px por pseudo-elemento invisível. */
-.pp-controles { position:absolute; z-index:2; top:10px; right:10px; display:grid; gap:8px; justify-items:end; }
-.pp-zoom { display:grid; border-radius:12px; background:var(--pp-vidro); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:var(--pp-sombra); overflow:hidden; }
+.pp-controles { position:absolute; z-index:2; top:calc(var(--pp-topo) + 10px); right:10px; display:grid; gap:8px; justify-items:end; }
+.pp-zoom { display:grid; border-radius:12px; background:var(--pp-superficie); box-shadow:var(--pp-sombra); overflow:hidden; }
 .pp-zoom .pp-botao + .pp-botao { box-shadow:inset 0 1px 0 rgba(0,26,61,.1); }
 .pp-botao { position:relative; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; background:transparent; color:var(--pp-marca); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform 140ms var(--pp-saida), background-color 140ms var(--pp-saida); }
 .pp-botao::before { content:""; position:absolute; inset:-2px; }
 .pp-botao svg { width:18px; height:18px; }
 .pp-botao:active { transform:scale(.97); background:rgba(0,26,61,.05); }
-.pp-botao--solto { border-radius:12px; background:var(--pp-vidro); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:var(--pp-sombra); }
+.pp-botao--solto { border-radius:12px; background:var(--pp-superficie); box-shadow:var(--pp-sombra); }
 .pp-botao--destaque { color:var(--pp-acao); }
 .pp-botao:focus-visible { outline:0; box-shadow:inset 0 0 0 2px var(--pp-acao); }
-@media (hover:hover) and (pointer:fine) { .pp-botao:hover { background:rgba(255,255,255,.98); } }
-.pp-status { position:absolute; z-index:2; top:24px; left:10px; display:inline-flex; align-items:center; gap:8px; min-height:30px; padding:0 12px; border-radius:999px; background:var(--pp-vidro); box-shadow:var(--pp-sombra); color:#475569; font-size:.75rem; font-weight:700; }
+@media (hover:hover) and (pointer:fine) { .pp-botao:hover { background:#f8fafc; } }
+.pp-status { display:inline-flex; align-items:center; gap:8px; min-height:30px; padding:0 12px; border-radius:999px; background:var(--pp-superficie); box-shadow:var(--pp-sombra); color:#475569; font-size:.75rem; font-weight:700; }
 .pp-status i { width:8px; height:8px; border-radius:50%; background:var(--pp-acao); animation:pp-pulsa 1.1s ease-in-out infinite; }
 @keyframes pp-pulsa { 0%,100% { opacity:.3; } 50% { opacity:1; } }
 

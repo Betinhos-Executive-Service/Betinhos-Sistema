@@ -59,7 +59,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
       await page.goto(`${BASE}?mockLeitura=${mode}&t=${Date.now()}#inicio`);
       await page.waitForTimeout(1500);
       // Na Home, "Gastos" abre o relatório; "Anexar despesa" com formulário vazio abre a câmera direto.
-      // O tile (o aviso "Gastos do cartão · N para completar" também casa com /Gastos/ e abre a lista do cartão).
+      // Clica no tile pelo data-tour: a etiqueta "N gastos a completar" das pendências abre a lista do cartão, não o relatório.
       await main().locator('[data-tour="expenses"]').click();
       const attach = main().getByRole("button", { name: "Anexar despesa" });
       await attach.waitFor({ state: "visible", timeout: 10000 });

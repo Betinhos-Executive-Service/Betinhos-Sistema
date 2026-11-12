@@ -118,13 +118,13 @@ export type Gaveta = { total: number; visivel: Record<PosicaoGaveta, number>; de
 export const VELOCIDADE_FLICK = 0.11;
 /** Altura da gaveta recolhida (puxador, título e contagem). */
 export const ALTURA_RECOLHIDA = 76;
-/** Faixa do mapa que a gaveta aberta deixa livre: cabem os botões de zoom e "minha posição" (10 + 80 + 8 + 40 + 10). */
-const FAIXA_CONTROLES = 148;
+/** Faixa do topo que a gaveta aberta deixa livre: `--pp-topo` do postos.css (70: cabeçalho de 62 + folga) + botões de zoom e "minha posição" (10 + 80 + 8 + 40 + 10). */
+const FAIXA_CONTROLES = 218;
 const FRICCAO = 0.25;
 
-/** Alturas visíveis e deslocamentos da gaveta para um palco de `altura` px. Aberta deixa livre a faixa dos botões do mapa; meio mostra uns 34%. */
+/** Alturas visíveis e deslocamentos da gaveta para um palco de `altura` px. Aberta nunca cobre o cabeçalho nem os botões do mapa, inclusive em tela baixa; meio mostra uns 34%. */
 export function medidasGaveta(altura: number): Gaveta {
-  const total = Math.max(Math.round(altura - FAIXA_CONTROLES), Math.round(altura * 0.6), ALTURA_RECOLHIDA);
+  const total = Math.max(Math.round(altura - FAIXA_CONTROLES), ALTURA_RECOLHIDA);
   const meio = Math.min(total, Math.max(Math.round(altura * 0.34), 200));
   const visivel = { recolhida: ALTURA_RECOLHIDA, meio, aberta: total };
   return { total, visivel, deslocamento: { recolhida: total - visivel.recolhida, meio: total - visivel.meio, aberta: 0 } };

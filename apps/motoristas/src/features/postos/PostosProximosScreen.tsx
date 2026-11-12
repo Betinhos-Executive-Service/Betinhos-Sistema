@@ -252,15 +252,9 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
     <AppShell screenLabel="PostosProximos">
       <ServicesMenu title="Postos próximos" eyebrow="Combustível" homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={async () => { invalidarRanking(); await Promise.all([vista ? buscar(vista) : undefined, buscarLista(origem.ponto), buscarRanking()]); }} />
       <section className="pp-screen" aria-label="Postos próximos" onKeyDown={(evento) => { if (evento.key === "Escape") setSelecionado(null); }}>
-        {avisoSemConexao ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{avisoSemConexao}</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); void buscarLista(origem.ponto); void buscarRanking(); }}>Tentar de novo</button></div> : null}
-        {aviso ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{aviso}</p><button type="button" className="termo-text-button pp-acao" onClick={localizar}>Tentar de novo</button></div> : null}
-        {busca === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); }}>Tentar de novo</button></div> : null}
-        {buscaLista === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos mais próximos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { void buscarLista(origem.ponto); }}>Tentar de novo</button></div> : null}
         <div ref={palco} className="pp-palco">
           <div className="pp-mapa-caixa">
             <PostosMapa ref={controle} postos={exibidos} posicao={posicao} selecionadoId={selecionado?.id ?? ""} foco={foco} onVista={setVista} onMoveuSozinho={() => { moveuSozinho.current = true; }} onSelecionar={selecionar} onDesselecionar={() => setSelecionado(null)} />
-            {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
-            {busca === "ok" && postos.length >= LIMITE_POSTOS ? <span className="pp-status pp-status--limite" role="status">Mostrando {LIMITE_POSTOS} postos desta área</span> : null}
             <div className="pp-controles">
               <div className="pp-zoom">
                 <button type="button" className="pp-botao" aria-label="Aproximar" onClick={() => controle.current?.aproximar()}><Plus aria-hidden="true" /></button>
@@ -268,6 +262,14 @@ export function PostosProximosScreen({ onBack, motoristaId }: { onBack: () => vo
               </div>
               {posicao ? <button type="button" className="pp-botao pp-botao--solto pp-botao--destaque" aria-label="Minha posição" onClick={() => irPara(posicao.lat, posicao.lon, ZOOM_MINHA_POSICAO)}><Crosshair aria-hidden="true" /></button> : null}
             </div>
+          </div>
+          <div className="pp-avisos">
+            {busca === "carregando" ? <span className="pp-status" role="status"><i aria-hidden="true" />Buscando postos…</span> : null}
+            {busca === "ok" && postos.length >= LIMITE_POSTOS ? <span className="pp-status pp-status--limite" role="status">Mostrando {LIMITE_POSTOS} postos desta área</span> : null}
+            {avisoSemConexao ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{avisoSemConexao}</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); void buscarLista(origem.ponto); void buscarRanking(); }}>Tentar de novo</button></div> : null}
+            {aviso ? <div className="termo-alert pp-aviso" data-tone="atencao" role="status"><p>{aviso}</p><button type="button" className="termo-text-button pp-acao" onClick={localizar}>Tentar de novo</button></div> : null}
+            {busca === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { if (vista) void buscar(vista); }}>Tentar de novo</button></div> : null}
+            {buscaLista === "erro" ? <div className="termo-alert pp-aviso" data-tone="erro" role="alert"><p>Não foi possível carregar os postos mais próximos.</p><button type="button" className="termo-text-button pp-acao" onClick={() => { void buscarLista(origem.ponto); }}>Tentar de novo</button></div> : null}
           </div>
           <PostosGaveta
             gaveta={gaveta} posicao={gavetaPosicao} onPosicao={setGavetaPosicao}

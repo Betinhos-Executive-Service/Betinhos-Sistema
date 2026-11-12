@@ -36,6 +36,12 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
 12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-app-comunicados` e `verificar-checklists-app`.
 
+## Início compacto em telas baixas (12/11/2026)
+
+- Mock, viewports 320×568, 360×640, 375×667, 390×844 e 844×390 (deitado). No Início: saudação "Olá, Nome" numa linha; card Serviços com duas linhas ("Serviços" + "Próximo em Xmin"; sem próximo, "N hoje" ou "Corridas de hoje"); pendências como etiquetas (`button.concept-pending-row`) que abrem a tela certa; grade 3 colunas (5 deitado).
+- Medir no console: `(s=>[s.scrollHeight,s.clientHeight])(document.querySelector('.concept-shell'))`. Esperado: iguais (sem rolagem) de 360×640 para cima; 320×568 rola ~55 px; nenhum tile abaixo de 66 px (`document.querySelector('.concept-tile').getBoundingClientRect().height`).
+- `scripts/qa/verify-ux-flows.cjs` abre Serviços por `[data-tour="servicos"]` (o texto do card muda). Sem Google Chrome, rode com `CHROME_PATH=<chromium do Playwright>`; o FAIL de CORS do Worker `carimbo-ip` vindo de `127.0.0.1` é do ambiente local.
+
 ## Confirmação depois de finalizar (modo Dataverse, 28/10/2026)
 - Depois de gravar a finalização, `finalizeSelected` recarrega a agenda (`loadRemoteStore`, 8 s por tentativa) e tenta de novo uma vez. A finalização já está salva: tempo esgotado **nunca** devolve o serviço à galeria. Depois de 2 falhas o motorista vê "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir." e o log `confirm-agenda-after-finalize` sai com `attempts: 2, restoredToAgenda: false`.
 - Antes disso o app devolvia o serviço e mandava finalizar de novo (64 casos, 18 motoristas, 07–28/10/2026), embora a OS estivesse Concluído.
