@@ -22,16 +22,16 @@ describe('Geral: espaço e densidade', () => {
     expect(within(toolbar).queryByRole('button', { name: /^Ações/ })).toBeNull()
     expect(within(toolbar).queryByText(/selecionado/)).toBeNull()
     const buttons = within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    // Ordem da direita: …, Atualizar, Mais ações e a primária por último.
-    expect(buttons.slice(-3)).toEqual(['Atualizar', 'Mais ações', 'Criar serviço'])
+    // Ordem da direita: …, Mais ações, Atualizar e a primária por último.
+    expect(buttons.slice(-3)).toEqual(['Mais ações', 'Atualizar', 'Criar serviço'])
     expect(buttons.indexOf('Colunas')).toBeLessThan(buttons.indexOf('Atualizar'))
   })
 
-  it('com 1 selecionado a busca vira contador com ✕ e ações; visão, Colunas, Filtros, Auditoria, ⋮ e a primária ficam', async () => {
+  it('com 1 selecionado a busca vira contador com ✕ e ações; visão, Colunas, Filtros, Auditoria, ⋮, Atualizar e a primária ficam', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
-    const fixos = () => within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent).filter((name) => ['Colunas', 'Filtros', 'Auditoria', 'Mais ações', 'Criar serviço'].includes(name ?? ''))
+    const fixos = () => within(toolbar).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent).filter((name) => ['Colunas', 'Filtros', 'Auditoria', 'Mais ações', 'Atualizar', 'Criar serviço'].includes(name ?? ''))
     const antes = fixos()
     fireEvent.click(within(dataRows()[1]).getByRole('checkbox'))
     const selecao = within(toolbar).getByRole('group', { name: 'Comandos da seleção' })
