@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, Search, SearchX, Trash2, X } from 'lucide-react'
-import { ContextMenu, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
+import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, SearchX, Trash2, X } from 'lucide-react'
+import { Button, ContextMenu, SearchBox, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
@@ -1526,10 +1526,7 @@ function ComposicaoContent({ host }: { host: Host }) {
           <div className="composition-view-actions">
           <ViewManager catalog={catalog} views={views} active={activeView} definition={viewDefinition} disabled={commandLocked || (!catalogReady && dataSource !== 'mock')} mockMode={dataSource === 'mock'} filterDrawerHost={filterDrawerHost} onChange={applyViewDefinition} onSelect={selectView} onSave={saveCurrentView} onDelete={deleteCurrentView} />
           </div>
-          <label className="composition-search">
-            <Search aria-hidden="true" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} disabled={!catalogReady && dataSource !== 'mock'} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />
-          </label>
+          <SearchBox className="composition-search" size="compact" value={search} onChange={setSearch} disabled={!catalogReady && dataSource !== 'mock'} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />
         </div>
         <span className="composition-count" aria-label={nextLink ? `${visibleRows.length} registros carregados de ${totalCount ?? 'um total ainda não calculado'}` : undefined}>{nextLink
             ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
@@ -1548,13 +1545,13 @@ function ComposicaoContent({ host }: { host: Host }) {
       )}
 
       <nav className="composition-commandbar" aria-label="Ações da composição de preços">
-        <button type="button" data-command="refresh" disabled={commandLocked} onClick={() => void refreshData()} title="Recarregar dados sem perder filtros, seleção ou posição"><RefreshCw className={commandPhase === 'refresh' ? 'command-icon--spin' : ''} /><span className="command-button-label">{commandPhase === 'refresh' ? 'Atualizando…' : 'Atualizar'}</span></button>
-        <button type="button" data-command="export" disabled={commandLocked || !dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)} onClick={() => void exportExcel()} title={selectedCount ? `Extrair os ${selectedCount} serviços selecionados para Excel` : "Extrair as linhas da view e dos filtros atuais para Excel"}><Download /><span className="command-button-label">{exporting ? 'Extraindo…' : selectedCount ? `Extrair ${selectedCount} para Excel` : 'Extrair para Excel'}</span></button>
+        <Button variant="secondary" size="compact" data-command="refresh" disabled={commandLocked} onClick={() => void refreshData()} title="Recarregar dados sem perder filtros, seleção ou posição" icon={<RefreshCw size={16} className={commandPhase === 'refresh' ? 'command-icon--spin' : ''} />}><span className="command-button-label">{commandPhase === 'refresh' ? 'Atualizando…' : 'Atualizar'}</span></Button>
+        <Button variant="secondary" size="compact" data-command="export" disabled={commandLocked || !dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)} onClick={() => void exportExcel()} title={selectedCount ? `Extrair os ${selectedCount} serviços selecionados para Excel` : "Extrair as linhas da view e dos filtros atuais para Excel"} icon={<Download size={16} />}><span className="command-button-label">{exporting ? 'Extraindo…' : selectedCount ? `Extrair ${selectedCount} para Excel` : 'Extrair para Excel'}</span></Button>
         <span className="composition-commandbar__divider" aria-hidden="true" />
-        <button type="button" data-command="op" disabled={commandLocked || !dataSource || !selectedCount} onClick={() => void generateOp()} title={selectedCount ? `Gerar 1 OP com as ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para gerar OP'}><FilePlus2 /><span className="command-button-label">{commandPhase === 'inspect-op' ? 'Verificando…' : commandPhase === 'send-op' ? 'Enviando…' : 'Gerar OP'}</span></button>
-        <button type="button" data-command="audit" disabled={commandLocked || !dataSource} onClick={() => setAuditIds(selectedIds)} title={selectedCount ? 'Ver auditoria das composições selecionadas' : 'Ver auditoria da tabela'}><ClipboardList /><span className="command-button-label">Auditoria</span></button>
+        <Button variant="action" size="compact" data-command="op" disabled={commandLocked || !dataSource || !selectedCount} onClick={() => void generateOp()} title={selectedCount ? `Gerar 1 OP com as ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para gerar OP'} icon={<FilePlus2 size={16} />}><span className="command-button-label">{commandPhase === 'inspect-op' ? 'Verificando…' : commandPhase === 'send-op' ? 'Enviando…' : 'Gerar OP'}</span></Button>
+        <Button variant="secondary" size="compact" data-command="audit" disabled={commandLocked || !dataSource} onClick={() => setAuditIds(selectedIds)} title={selectedCount ? 'Ver auditoria das composições selecionadas' : 'Ver auditoria da tabela'} icon={<ClipboardList size={16} />}><span className="command-button-label">Auditoria</span></Button>
         <span className="composition-commandbar__divider" aria-hidden="true" />
-        <button type="button" data-command="delete" disabled={commandLocked || !dataSource || !selectedCount} onClick={excludeSelected} title={selectedCount ? `Excluir ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para excluir'}><Trash2 /><span className="command-button-label">{commandPhase === 'delete' ? 'Excluindo…' : 'Excluir'}</span></button>
+        <Button variant="danger" size="compact" data-command="delete" disabled={commandLocked || !dataSource || !selectedCount} onClick={excludeSelected} title={selectedCount ? `Excluir ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para excluir'} icon={<Trash2 size={16} />}><span className="command-button-label">{commandPhase === 'delete' ? 'Excluindo…' : 'Excluir'}</span></Button>
         <span className="composition-commandbar__context" role="status">{commandProgress || (dataSource === 'mock' ? selectedCount ? `Modo local · ${selectedCount} selecionado(s)` : 'Modo local · ações simuladas' : selectedCount ? `${selectedCount} ${selectedCount === 1 ? 'registro selecionado' : 'registros selecionados'}` : 'Selecione registros para Gerar OP ou Excluir')}</span>
       </nav>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Columns3, Filter, Plus, Settings2, Trash2, X } from 'lucide-react'
+import { Button } from '@betinhos/ui'
 import { ColumnManager } from './ColumnManager'
 import { FilterManager } from './FilterManager'
 import { SearchableSelect } from './SearchableSelect'
@@ -112,10 +113,10 @@ export function ViewManager({ catalog, views, active, definition, disabled, mock
   }
   return <>
     <label className="view-select-label">View<SearchableSelect className="view-select-menu" aria-label="Selecionar view" value={active?.id ?? ''} disabled={disabled} onChange={onSelect} options={[{ value: '', label: 'Padrão' }, ...views.map((view) => ({ value: view.id, label: view.name, icon: view.kind === 'personal' ? 'user' as const : undefined }))]} /></label>
-    <button type="button" className="view-settings-button" title="Colunas" disabled={disabled || !catalog.length} aria-expanded={panel === 'columns'} onClick={() => { if (panel === 'columns') close(); else { setDraft(definition); setColumnScreen('selected'); setPanel('columns') } }}><Columns3 size={16} aria-hidden="true" /><span className="view-button-label">Colunas</span></button>
-    <button type="button" className="view-settings-button" title="Filtros" disabled={disabled || !catalog.length} onClick={() => { setDraft(definition); setError(''); setPanel('filters') }}><Filter size={16} aria-hidden="true" /><span className="view-button-label">Filtros</span>{filterCount ? <span className="view-button-count" aria-hidden="true">{filterCount}</span> : null}</button>
-    <button type="button" className="view-settings-button view-new-button" title="Nova view" disabled={disabled || !catalog.length} onClick={() => openWizard('create')}><Plus size={16} aria-hidden="true" /><span className="view-button-label">Nova view</span></button>
-    {active && <button type="button" className="view-settings-button" title="Gerenciar" disabled={disabled || !catalog.length || (active.nativeOnly && !active.nativeFiltersEditable)} onClick={() => openWizard('edit')}><Settings2 size={16} aria-hidden="true" /><span className="view-button-label">Gerenciar</span></button>}
+    <Button variant="secondary" size="compact" className="view-settings-button" title="Colunas" icon={<Columns3 size={16} aria-hidden="true" />} disabled={disabled || !catalog.length} aria-expanded={panel === 'columns'} onClick={() => { if (panel === 'columns') close(); else { setDraft(definition); setColumnScreen('selected'); setPanel('columns') } }}><span className="view-button-label">Colunas</span></Button>
+    <Button variant="secondary" size="compact" className="view-settings-button" title="Filtros" icon={<Filter size={16} aria-hidden="true" />} disabled={disabled || !catalog.length} onClick={() => { setDraft(definition); setError(''); setPanel('filters') }}><span className="view-button-label">Filtros</span>{filterCount ? <span className="view-button-count" aria-hidden="true">{filterCount}</span> : null}</Button>
+    <Button variant="action" size="compact" className="view-settings-button" title="Nova view" icon={<Plus size={16} aria-hidden="true" />} disabled={disabled || !catalog.length} onClick={() => openWizard('create')}><span className="view-button-label">Nova view</span></Button>
+    {active && <Button variant="secondary" size="compact" className="view-settings-button" title="Gerenciar" icon={<Settings2 size={16} aria-hidden="true" />} disabled={disabled || !catalog.length || (active.nativeOnly && !active.nativeFiltersEditable)} onClick={() => openWizard('edit')}><span className="view-button-label">Gerenciar</span></Button>}
     {dirty && <span className="view-unsaved-indicator" role="status">Alterações não salvas</span>}
 
     {panel === 'columns' && (() => {
