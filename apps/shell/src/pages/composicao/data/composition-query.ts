@@ -137,6 +137,8 @@ export function buildCountQuery(fetchXml: string) {
   const entity = document.querySelector('fetch > entity')
   if (document.querySelector('parsererror') || !fetch || !entity || fetch.getAttribute('aggregate') === 'true') return null
   for (const name of ['count', 'page', 'top', 'paging-cookie', 'returntotalrecordcount']) fetch.removeAttribute(name)
+  // Os vínculos da linha (reserva e cliente) são só de leitura: a contagem usa apenas os filtros da view.
+  removeRowLinks(document)
   fetch.setAttribute('aggregate', 'true')
   fetch.removeAttribute('distinct')
   document.querySelectorAll('attribute, all-attributes, order').forEach((node) => node.remove())
@@ -219,5 +221,51 @@ export function nextFetchXmlPage(fetchXml: string, pagingCookie?: string) {
   fetch.setAttribute('page', String(page))
   if (encoded && Number(cookie?.getAttribute('pagenumber')) === page) fetch.setAttribute('paging-cookie', decodeURIComponent(decodeURIComponent(encoded)))
   else fetch.removeAttribute('paging-cookie')
+  return new XMLSerializer().serializeToString(document)
+}
+
+/** Aliases fixos dos vínculos que levam reserva e cliente na consulta principal; não colidem com os da view (a_…, r1…). */
+export const ROW_LINKS = { reserva: 'cmp_res', cliente: 'cmp_cli' } as const
+
+const RESERVATION_LINK_ATTRIBUTES = ['cr40f_trajeto', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo', 'cr40f_passageiro1', 'cr40f_passageiro2', 'cr40f_passageiro3', 'cr40f_passageiro4']
+const CLIENT_LINK_ATTRIBUTES = ['cr40f_nomedocliente', 'cr40f_registro', 'cr40f_endereco']
+
+function linkWithAttributes(document: Document, attributes: { entity: string; from: string; to: string; alias: string; names: string[] }) {
+  const link = document.createElement('link-entity')
+  link.setAttribute('name', attributes.entity)
+  link.setAttribute('from', attributes.from)
+  link.setAttribute('to', attributes.to)
+  link.setAttribute('link-type', 'outer')
+  link.setAttribute('alias', attributes.alias)
+  for (const name of attributes.names) {
+    const attribute = document.createElement('attribute')
+    attribute.setAttribute('name', name)
+    link.appendChild(attribute)
+  }
+  return link
+}
+
+function removeRowLinks(document: Document) {
+  document.querySelectorAll(`link-entity[alias="${ROW_LINKS.reserva}"], link-entity[alias="${ROW_LINKS.cliente}"]`).forEach((link) => link.remove())
+}
+
+/** Garante na consulta os vínculos reserva→cliente usados pela linha; idempotente, e devolve a consulta como veio quando é agregada ou inválida. */
+export function withRowLinks(fetchXml: string) {
+  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+  const fetch = document.querySelector('fetch')
+  const entity = document.querySelector('fetch > entity')
+  if (document.querySelector('parsererror') || !fetch || !entity || fetch.getAttribute('aggregate') === 'true') return fetchXml
+  if (document.querySelector(`link-entity[alias="${ROW_LINKS.reserva}"]`)) return fetchXml
+  const reservation = linkWithAttributes(document, { entity: 'cr40f_reservadeveculos', from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral', alias: ROW_LINKS.reserva, names: RESERVATION_LINK_ATTRIBUTES })
+  reservation.appendChild(linkWithAttributes(document, { entity: 'cr40f_clientes1', from: 'cr40f_clientes1id', to: 'cr40f_cliente', alias: ROW_LINKS.cliente, names: CLIENT_LINK_ATTRIBUTES }))
+  entity.appendChild(reservation)
+  return new XMLSerializer().serializeToString(document)
+}
+
+/** Tira os vínculos da linha (caminho de quem não tem leitura na reserva ou no cliente). */
+export function withoutRowLinks(fetchXml: string) {
+  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+  if (document.querySelector('parsererror') || !document.querySelector(`link-entity[alias="${ROW_LINKS.reserva}"]`)) return fetchXml
+  removeRowLinks(document)
   return new XMLSerializer().serializeToString(document)
 }

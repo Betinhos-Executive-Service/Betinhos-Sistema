@@ -1,6 +1,6 @@
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FORMULA_ENGINE_VERSION, FormulaError } from '../formula'
 import type { ViewQuery } from './views'
-import { buildCountQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, withBaseAttributes, withFetchPageSize } from './composition-query'
+import { buildCountQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import { isWritableMoneyField, moneyFields, type ApplyCellInputResult, type CellFormula, type CellInput, type Composition, type DecimalString, type MoneyField } from './compositions'
 import { getMockRows, saveMockCell } from './mock-store'
 import { getXrmHost, type XrmWebApi } from './xrm'
@@ -11,7 +11,6 @@ type DataversePage = { entities: DataverseEntity[]; nextLink?: string }
 
 const compositionTable = 'cr40f_composicaodeprecos'
 const reservationTable = 'cr40f_reservadeveculos'
-const clientTable = 'cr40f_clientes1'
 const formulaTable = 'new_formuladecelulacomposicao'
 const applyCellInputAction = 'new_AplicarEntradaCelulaComposicao'
 const formatted = '@OData.Community.Display.V1.FormattedValue'
@@ -155,6 +154,8 @@ export type CompositionPage = {
   records: Composition[]
   source: 'dataverse' | 'mock'
   nextLink: string | null
+  /** false quando o usuário não lê reserva ou cliente e a página veio pela leitura em lote. */
+  rowLinks?: boolean
 }
 
 export type CompositionTotalRow = Pick<Composition, 'id' | 'client' | 'route' | 'departureAt' | 'values'>
@@ -168,30 +169,82 @@ export async function loadStatusColors(): Promise<Record<string, string>> {
   return Object.fromEntries((metadata.OptionSet?.Options ?? []).filter((option) => option.Value !== undefined && /^#[0-9a-f]{6}$/i.test(option.Color ?? '')).map((option) => [String(option.Value), option.Color!]))
 }
 
-export async function enrichCompositionClients(records: Composition[]) {
-  const api = getWebApiOrNull()
-  if (!api) return records
-  const clientIds = [...new Set(records.map((record) => record.clientId).filter((id): id is string => typeof id === 'string'))]
-  const clients = new Map<string, DataverseEntity>()
-  const clientPages = await Promise.all(batches(clientIds, 50).map((ids) => {
-    const filter = ids.map((id) => `cr40f_clientes1id eq ${id}`).join(' or ')
-    return api.retrieveMultipleRecords(clientTable, `?$select=cr40f_clientes1id,cr40f_nomedocliente,cr40f_registro,cr40f_endereco&$filter=${encodeURIComponent(`(${filter})`)}`)
+const PRIVILEGE_DENIED = 0x80040220
+
+/** Recusa por falta de privilégio: código 0x80040220 (como número, com ou sem sinal, ou no texto) ou status HTTP 403. */
+function isPrivilegeDenied(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+  const fields = error as Record<string, unknown>
+  const message = typeof fields.message === 'string' ? fields.message : ''
+  if (/0x80040220/i.test(message)) return true
+  return [fields.errorCode, fields.code, fields.status, fields.statusCode].some((value) => {
+    const number = typeof value === 'string' ? Number(value) : value
+    if (typeof number === 'number') return number === 403 || number === PRIVILEGE_DENIED || number === PRIVILEGE_DENIED - 0x100000000
+    return typeof value === 'string' && /0x80040220/i.test(value)
+  })
+}
+
+const LINK_LOOKUPS = ['cliente', 'passageiro1', 'passageiro2', 'passageiro3', 'passageiro4']
+
+/** Reserva no formato da leitura em lote, montada a partir das colunas cmp_res.* / cmp_cli.* da linha. */
+function reservationFromLinks(row: DataverseEntity): DataverseEntity {
+  const reservation: DataverseEntity = {}
+  const prefix = `${ROW_LINKS.reserva}.`
+  for (const [key, value] of Object.entries(row)) {
+    if (!key.startsWith(prefix)) continue
+    const name = key.slice(prefix.length)
+    const lookup = LINK_LOOKUPS.find((item) => name === `cr40f_${item}` || name.startsWith(`cr40f_${item}@`))
+    reservation[lookup ? name.replace(`cr40f_${lookup}`, `_cr40f_${lookup}_value`) : name] = value
+  }
+  return reservation
+}
+
+type RowQuery = { entities: DataverseEntity[]; nextLink?: string; fetchXmlPagingCookie?: string }
+
+/** Consulta FetchXML com os vínculos da linha; sem privilégio na reserva ou no cliente, o Dataverse recusa tudo e a consulta se repete sem eles. */
+async function retrieveWithRowLinks(api: XrmWebApi, query: string): Promise<{ result: RowQuery; query: string; linked: boolean }> {
+  const linked = query.startsWith('?fetchXml=') && decodeURIComponent(query.slice('?fetchXml='.length)).includes(`alias="${ROW_LINKS.reserva}"`)
+  try { return { result: await api.retrieveMultipleRecords(compositionTable, query), query, linked } }
+  catch (error) {
+    if (!linked || !isPrivilegeDenied(error)) throw error
+    const plain = `?fetchXml=${encodeURIComponent(withoutRowLinks(decodeURIComponent(query.slice('?fetchXml='.length))))}`
+    return { result: await api.retrieveMultipleRecords(compositionTable, plain), query: plain, linked: false }
+  }
+}
+
+/** Leitura antiga das reservas, em lotes de 50: só para quem não pode lê-las junto da consulta principal. */
+async function loadReservationsInBatches(api: XrmWebApi, rows: DataverseEntity[]) {
+  const reservations = new Map<string, DataverseEntity>()
+  const ids = [...new Set(rows.map((row) => row._cr40f_servicorelacionadogeral_value).filter((id): id is string => typeof id === 'string'))]
+  const pages = await Promise.all(batches(ids, 50).map((batch) => {
+    const filter = batch.map((id) => `cr40f_reservadeveculosid eq ${id}`).join(' or ')
+    return api.retrieveMultipleRecords(
+      reservationTable,
+      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value&$filter=${encodeURIComponent(`(${filter})`)}`,
+    )
   }))
-  clientPages.forEach((related) => {
-    related.entities.forEach((row) => {
-      if (typeof row.cr40f_clientes1id === 'string') clients.set(row.cr40f_clientes1id, row)
-    })
-  })
-  return records.map((record) => {
-    const client = record.clientId ? clients.get(record.clientId) : undefined
-    if (!client) return record
-    return {
-      ...record,
-      client: stringValue(client.cr40f_nomedocliente, record.client),
-      clientRegistration: stringValue(client.cr40f_registro, ''),
-      clientAddress: stringValue(client.cr40f_endereco, ''),
-    }
-  })
+  pages.forEach((related) => related.entities.forEach((row) => {
+    if (typeof row.cr40f_reservadeveculosid === 'string') reservations.set(row.cr40f_reservadeveculosid, row)
+  }))
+  return reservations
+}
+
+const DEFAULT_FETCH = `<fetch count="${PAGE_SIZE}"><entity name="${compositionTable}"><filter><condition attribute="statecode" operator="eq" value="0"/></filter><order attribute="modifiedon" descending="true"/></entity></fetch>`
+
+/** Relê por FetchXML (com os vínculos) as linhas de uma view sem FetchXML, em lotes de 40, mantendo a ordem da view. */
+async function rereadViewRows(api: XrmWebApi, viewRows: DataverseEntity[], baseAttributes: string[]) {
+  let linked = true
+  const batchesOfRows = await Promise.all(batches(viewRows.map((row) => String(row.cr40f_composicaodeprecosid)), 40).map(async (ids) => {
+    if (!ids.length) return []
+    const values = ids.map((id) => `<value>${id}</value>`).join('')
+    const source = `<fetch><entity name="${compositionTable}"><filter><condition attribute="cr40f_composicaodeprecosid" operator="in">${values}</condition></filter></entity></fetch>`
+    const query = `?fetchXml=${encodeURIComponent(withRowLinks(withBaseAttributes(source, baseAttributes) ?? source))}`
+    const read = await retrieveWithRowLinks(api, query)
+    if (!read.linked) linked = false
+    return read.result.entities
+  }))
+  const detailById = new Map(batchesOfRows.flat().map((row) => [String(row.cr40f_composicaodeprecosid), row]))
+  return { rows: viewRows.map((row) => detailById.get(String(row.cr40f_composicaodeprecosid))).filter((row): row is DataverseEntity => Boolean(row)), linked }
 }
 
 export async function loadCompositions(nextLink?: string, view?: ViewQuery): Promise<CompositionPage> {
@@ -199,59 +252,44 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
   if (!api) return { records: getMockRows(), source: 'mock', nextLink: null }
   const selectedMoney = moneyFields.map(({ key }) => key)
   const baseAttributes = ['cr40f_composicaodeprecosid', 'cr40f_servicorelacionadogeral', 'new_status', 'new_dataehorariodesaidacalculado', 'versionnumber', ...selectedMoney]
-  const viewFetchXml = view ? 'fetchXml' in view ? view.fetchXml : view.sourceFetchXml : undefined
-  // A consulta da view já pede os atributos base da linha; assim a releitura por lote (uma ida a mais ao servidor por página) só é necessária para views sem FetchXML.
-  const gridFetchXml = viewFetchXml ? withBaseAttributes(viewFetchXml, baseAttributes) ?? viewFetchXml : undefined
-  const query = nextLink ? toQueryOptions(nextLink) : gridFetchXml ? `?fetchXml=${encodeURIComponent(withFetchPageSize(gridFetchXml, PAGE_SIZE))}` : view && !('fetchXml' in view) ? `?${view.kind === 'personal' ? 'userQuery' : 'savedQuery'}=${view.id}` : `?$select=cr40f_composicaodeprecosid,_cr40f_servicorelacionadogeral_value,new_status,new_dataehorariodesaidacalculado,${selectedMoney.join(',')}&$filter=statecode eq 0&$orderby=modifiedon desc`
+  const viewFetchXml = view ? 'fetchXml' in view ? view.fetchXml : view.sourceFetchXml : DEFAULT_FETCH
+  // Atributos base, reserva e cliente vêm na própria consulta: uma ida ao servidor por página.
+  const gridFetchXml = viewFetchXml ? withRowLinks(withBaseAttributes(viewFetchXml, baseAttributes) ?? viewFetchXml) : undefined
+  const query = nextLink ? toQueryOptions(nextLink) : gridFetchXml ? `?fetchXml=${encodeURIComponent(withFetchPageSize(gridFetchXml, PAGE_SIZE))}` : `?${view && 'kind' in view && view.kind === 'personal' ? 'userQuery' : 'savedQuery'}=${view && 'id' in view ? view.id : ''}`
+  const isFetchXml = query.startsWith('?fetchXml=')
   // Em FetchXML o tamanho vem do count; maxPageSize faz o Dataverse ignorar page/paging-cookie e repetir a página 1.
-  const result = await api.retrieveMultipleRecords(compositionTable, query, query.startsWith('?fetchXml=') ? undefined : PAGE_SIZE)
-  const viewRows = result.entities
-  const detailsIncluded = !view || (query.startsWith('?fetchXml=') && hasBaseAttributes(decodeURIComponent(query.slice('?fetchXml='.length)), baseAttributes))
-  const compositionRows = !detailsIncluded ? (await Promise.all(batches(viewRows.map((row) => String(row.cr40f_composicaodeprecosid)), 40).map(async (ids) => {
-    if (!ids.length) return []
-    const filter = ids.map((id) => `cr40f_composicaodeprecosid eq ${id}`).join(' or ')
-    const details = await api.retrieveMultipleRecords(compositionTable, `?$select=cr40f_composicaodeprecosid,_cr40f_servicorelacionadogeral_value,new_status,new_dataehorariodesaidacalculado,${selectedMoney.join(',')}&$filter=${encodeURIComponent(`(${filter})`)}`)
-    return details.entities
-  }))).flat() : viewRows
-  const detailById = new Map(compositionRows.map((row) => [String(row.cr40f_composicaodeprecosid), row]))
-  const orderedRows = view ? viewRows.map((row) => detailById.get(String(row.cr40f_composicaodeprecosid))).filter((row): row is DataverseEntity => Boolean(row)) : compositionRows
-  const reservationIds = [...new Set(compositionRows
-    .map((row) => row._cr40f_servicorelacionadogeral_value)
-    .filter((id): id is string => typeof id === 'string'))]
-  const reservations = new Map<string, DataverseEntity>()
+  const read = isFetchXml ? await retrieveWithRowLinks(api, query) : { result: await api.retrieveMultipleRecords(compositionTable, query, PAGE_SIZE) as RowQuery, query, linked: false }
+  const result = read.result
+  let rowLinks = read.linked
+  let orderedRows = result.entities
+  if (!isFetchXml) {
+    const reread = await rereadViewRows(api, result.entities, baseAttributes)
+    orderedRows = reread.rows
+    rowLinks = reread.linked
+  }
+  const viewById = new Map(result.entities.map((row) => [String(row.cr40f_composicaodeprecosid), row]))
 
   const formulaMapsPromise = loadFormulaMaps(orderedRows.map((row) => String(row.cr40f_composicaodeprecosid)))
-  const reservationPagesPromise = Promise.all(batches(reservationIds, 50).map((ids) => {
-    const filter = ids.map((id) => `cr40f_reservadeveculosid eq ${id}`).join(' or ')
-    return api.retrieveMultipleRecords(
-      reservationTable,
-      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value&$filter=${encodeURIComponent(`(${filter})`)}`,
-    )
-  }))
-  const [formulaMaps, reservationPages] = await Promise.all([formulaMapsPromise, reservationPagesPromise])
-  reservationPages.forEach((related) => {
-    related.entities.forEach((row) => {
-      if (typeof row.cr40f_reservadeveculosid === 'string') reservations.set(row.cr40f_reservadeveculosid, row)
-    })
-  })
+  const reservationsPromise = rowLinks ? Promise.resolve(new Map<string, DataverseEntity>()) : loadReservationsInBatches(api, orderedRows)
+  const [formulaMaps, reservations] = await Promise.all([formulaMapsPromise, reservationsPromise])
 
-  const viewById = new Map(viewRows.map((row) => [String(row.cr40f_composicaodeprecosid), row]))
   const records = orderedRows.map((row) => {
-    const reservation = reservations.get(String(row._cr40f_servicorelacionadogeral_value ?? ''))
+    const reservation = rowLinks ? reservationFromLinks(row) : reservations.get(String(row._cr40f_servicorelacionadogeral_value ?? ''))
     const clientId = typeof reservation?._cr40f_cliente_value === 'string' ? reservation._cr40f_cliente_value : null
     const id = String(row.cr40f_composicaodeprecosid)
     const values = Object.fromEntries(selectedMoney.map((key) => [key, decimalValue(row[key])]) as [MoneyField, DecimalString][]) as Record<MoneyField, DecimalString>
     const statusLabel = row[`new_status${formatted}`]
     const date = row.new_dataehorariodesaidacalculado ?? reservation?.cr40f_dataehorriodesada
     const clientLabel = reservation?.[`_cr40f_cliente_value${formatted}`]
+    const clientPrefix = `${ROW_LINKS.cliente}.`
     return {
       id,
       viewFields: viewById.get(id),
       clientId,
       serviceId: typeof row._cr40f_servicorelacionadogeral_value === 'string' ? row._cr40f_servicorelacionadogeral_value : null,
-      client: stringValue(clientLabel, 'Cliente sem nome'),
-      clientRegistration: '',
-      clientAddress: '',
+      client: stringValue(rowLinks ? row[`${clientPrefix}cr40f_nomedocliente`] : undefined, stringValue(clientLabel, 'Cliente sem nome')),
+      clientRegistration: rowLinks ? stringValue(row[`${clientPrefix}cr40f_registro`], '') : '',
+      clientAddress: rowLinks ? stringValue(row[`${clientPrefix}cr40f_endereco`], '') : '',
       route: stringValue(reservation?.cr40f_trajeto, 'Trajeto não informado'),
       departureAt: typeof date === 'string' ? date : '',
       status: typeof statusLabel === 'string' && statusLabel.toLocaleLowerCase('pt-BR').startsWith('conclu') ? 'Concluído' as const : 'Pendente' as const,
@@ -264,7 +302,7 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
       rowVersion: typeof row['@odata.etag'] === 'string' ? row['@odata.etag'] : String(row.versionnumber ?? ''),
     }
   })
-  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(query, result) }
+  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(read.query, result), rowLinks }
 }
 
 /** Total de composições da consulta atual; null quando a view não permite agregação ou o limite é excedido. */

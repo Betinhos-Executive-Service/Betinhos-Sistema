@@ -4,23 +4,100 @@ import { loadCompositions } from './dataverse'
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('busca fórmulas e reservas em paralelo durante o carregamento', async () => {
-  const compositionId = '11111111-2222-4333-8444-555555555555'
-  const reservationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
-  let finishFormulas!: (value: { entities: unknown[] }) => void
-  const formulas = new Promise<{ entities: unknown[] }>((resolve) => { finishFormulas = resolve })
+const compositionId = '11111111-2222-4333-8444-555555555555'
+const reservationId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+const F = '@OData.Community.Display.V1.FormattedValue'
+const linkedRow = {
+  cr40f_composicaodeprecosid: compositionId,
+  _cr40f_servicorelacionadogeral_value: reservationId,
+  'cmp_res.cr40f_trajeto': 'Aeroporto',
+  'cmp_res.cr40f_cliente': 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+  [`cmp_res.cr40f_cliente${F}`]: 'Rótulo do cliente',
+  [`cmp_res.cr40f_status${F}`]: 'Confirmada',
+  [`cmp_res.cr40f_tipodoservico${F}`]: 'Transfer',
+  [`cmp_res.cr40f_tipodeveiculo${F}`]: 'Sedan',
+  [`cmp_res.cr40f_passageiro1${F}`]: 'Ana',
+  [`cmp_res.cr40f_passageiro2${F}`]: 'Bia',
+  'cmp_cli.cr40f_nomedocliente': 'Cliente Teste',
+  'cmp_cli.cr40f_registro': '123',
+  'cmp_cli.cr40f_endereco': 'Rua A',
+}
+
+it('lê reserva e cliente na própria consulta, em uma chamada por página', async () => {
   const retrieveMultipleRecords = vi.fn((entity: string) => {
-    if (entity === 'cr40f_composicaodeprecos') return Promise.resolve({ entities: [{ cr40f_composicaodeprecosid: compositionId, _cr40f_servicorelacionadogeral_value: reservationId }] })
-    if (entity === 'new_formuladecelulacomposicao') return formulas
-    return Promise.resolve({ entities: [{ cr40f_reservadeveculosid: reservationId, cr40f_trajeto: 'Aeroporto' }] })
+    if (entity === 'cr40f_composicaodeprecos') return Promise.resolve({ entities: [linkedRow] })
+    return Promise.resolve({ entities: [] })
   })
   vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
 
-  const loading = loadCompositions()
-  await vi.waitFor(() => expect(retrieveMultipleRecords.mock.calls.some(([entity]) => entity === 'cr40f_reservadeveculos')).toBe(true))
-  finishFormulas({ entities: [] })
+  const page = await loadCompositions(undefined, { fetchXml: '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/></entity></fetch>' })
 
-  expect((await loading).records[0].route).toBe('Aeroporto')
+  expect(retrieveMultipleRecords.mock.calls.filter(([entity]) => entity === 'cr40f_composicaodeprecos')).toHaveLength(1)
+  expect(retrieveMultipleRecords.mock.calls.map(([entity]) => entity).filter((entity) => ['cr40f_reservadeveculos', 'cr40f_clientes1'].includes(entity))).toEqual([])
+  expect(page.rowLinks).toBe(true)
+  expect(page.records[0]).toMatchObject({ client: 'Cliente Teste', clientId: 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', clientRegistration: '123', clientAddress: 'Rua A', route: 'Aeroporto', serviceStatus: 'Confirmada', serviceType: 'Transfer', vehicleType: 'Sedan', passengers: ['Ana', 'Bia'] })
+})
+
+it('a consulta padrão (sem view) também leva os vínculos', async () => {
+  const retrieveMultipleRecords = vi.fn(() => Promise.resolve({ entities: [] }))
+  vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
+
+  await loadCompositions()
+
+  const query = decodeURIComponent((retrieveMultipleRecords.mock.calls as unknown[][]).find(([entity]) => entity === 'cr40f_composicaodeprecos')![1] as string)
+  expect(query).toContain('alias="cmp_res"')
+  expect(query).toContain('attribute="statecode"')
+  expect(query).toContain('count="100"')
+  expect(query).toContain('attribute="modifiedon" descending="true"')
+})
+
+it.each([
+  ['código 0x80040220', { errorCode: -2147220960, message: 'sem privilégio' }],
+  ['status HTTP 403', { status: 403, message: 'Forbidden' }],
+])('sem privilégio na reserva ou no cliente (%s), repete sem os vínculos e lê reservas como antes', async (_name, failure) => {
+  const queries: string[] = []
+  const retrieveMultipleRecords = vi.fn((entity: string, query: string) => {
+    if (entity === 'cr40f_composicaodeprecos') {
+      queries.push(decodeURIComponent(query))
+      if (query.includes(encodeURIComponent('cmp_res'))) return Promise.reject(failure)
+      return Promise.resolve({ entities: [{ cr40f_composicaodeprecosid: compositionId, _cr40f_servicorelacionadogeral_value: reservationId }] })
+    }
+    if (entity === 'cr40f_reservadeveculos') return Promise.resolve({ entities: [{ cr40f_reservadeveculosid: reservationId, cr40f_trajeto: 'Aeroporto' }] })
+    return Promise.resolve({ entities: [] })
+  })
+  vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
+
+  const page = await loadCompositions(undefined, { fetchXml: '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/></entity></fetch>' })
+
+  expect(queries).toHaveLength(2)
+  expect(queries[1]).not.toContain('cmp_')
+  expect(page.rowLinks).toBe(false)
+  expect(page.records[0].route).toBe('Aeroporto')
+  expect(page.records[0].client).toBe('Cliente sem nome')
+})
+
+it('outro erro da consulta não vira repetição sem vínculos', async () => {
+  const retrieveMultipleRecords = vi.fn(() => Promise.reject(new Error('timeout')))
+  vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
+
+  await expect(loadCompositions()).rejects.toThrow('timeout')
+  expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
+})
+
+it('view sem FetchXML relê as linhas por FetchXML com os vínculos', async () => {
+  const retrieveMultipleRecords = vi.fn((entity: string, query: string) => {
+    if (entity !== 'cr40f_composicaodeprecos') return Promise.resolve({ entities: [] })
+    if (query.startsWith('?userQuery=')) return Promise.resolve({ entities: [{ cr40f_composicaodeprecosid: compositionId }] })
+    return Promise.resolve({ entities: [linkedRow] })
+  })
+  vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
+
+  const page = await loadCompositions(undefined, { kind: 'personal', id: 'u1' } as never)
+
+  const reread = decodeURIComponent(String((retrieveMultipleRecords.mock.calls as unknown[][])[1][1]))
+  expect(reread).toContain('alias="cmp_res"')
+  expect(reread).toContain(compositionId)
+  expect(page.records[0].client).toBe('Cliente Teste')
 })
 
 it('pagina views com ordem na link-entity, em que o Dataverse devolve sempre pagenumber 2 sem cookie', async () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize } from './composition-query'
+import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import type { CatalogField, ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
@@ -199,5 +199,34 @@ describe('atributos base no FetchXML da grade', () => {
     expect(withBaseAttributes('<fetch aggregate="true"><entity name="x"><attribute name="x" aggregate="count" alias="t"/></entity></fetch>', base)).toBeNull()
     expect(withBaseAttributes('<fetch><entity', base)).toBeNull()
     expect(hasBaseAttributes('<fetch><entity name="x"><attribute name="new_status"/></entity></fetch>', base)).toBe(false)
+  })
+})
+
+describe('vínculos da linha (reserva e cliente)', () => {
+  const base = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/></entity></fetch>'
+
+  it('acrescenta reserva e cliente como link-entity sem duplicar', () => {
+    const once = withRowLinks(base)
+    expect(once).toContain('<link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" link-type="outer" alias="cmp_res">')
+    expect(once).toContain('<link-entity name="cr40f_clientes1" from="cr40f_clientes1id" to="cr40f_cliente" link-type="outer" alias="cmp_cli">')
+    expect(withRowLinks(once)).toBe(once)
+  })
+
+  it('pede os mesmos atributos que a leitura em lote pedia', () => {
+    const document = new DOMParser().parseFromString(withRowLinks(base), 'application/xml')
+    const names = (alias: string) => [...document.querySelectorAll(`link-entity[alias="${alias}"] > attribute`)].map((item) => item.getAttribute('name'))
+    expect(names('cmp_res')).toEqual(['cr40f_trajeto', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo', 'cr40f_passageiro1', 'cr40f_passageiro2', 'cr40f_passageiro3', 'cr40f_passageiro4'])
+    expect(names('cmp_cli')).toEqual(['cr40f_nomedocliente', 'cr40f_registro', 'cr40f_endereco'])
+  })
+
+  it('não mexe em consulta agregada e sabe tirar os vínculos', () => {
+    const aggregate = '<fetch aggregate="true"><entity name="cr40f_composicaodeprecos"/></fetch>'
+    expect(withRowLinks(aggregate)).toBe(aggregate)
+    expect(withoutRowLinks(withRowLinks(base))).not.toContain('cmp_')
+    expect(withoutRowLinks(base)).toBe(base)
+  })
+
+  it('a contagem ignora os vínculos', () => {
+    expect(buildCountQuery(withRowLinks(base))).toBe(buildCountQuery(base))
   })
 })
