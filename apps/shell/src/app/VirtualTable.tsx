@@ -90,6 +90,47 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
   return (
     <div ref={host} className="vt-host">
       <Table {...props} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
+      <BarraHorizontal />
     </div>
   )
+}
+
+/**
+ * Barra de rolagem horizontal presa ao pé da tela. A do `Table` fica no fim da lista, depois da última linha, e quem não
+ * chega lá não vê as colunas da direita (ex.: Motorista em Despesas com colunas a mais). Esta acompanha a rolagem da
+ * tabela nos dois sentidos e só aparece quando as colunas passam da largura.
+ */
+function BarraHorizontal() {
+  const barra = useRef<HTMLDivElement>(null)
+  const conteudo = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const bar = barra.current
+    const inner = conteudo.current
+    // Pelo pai no DOM, não pelo ref do `vt-host`: o React liga o ref do pai só depois dos efeitos dos filhos.
+    const scroll = bar?.parentElement?.querySelector<HTMLElement>('.bt-table__scroll')
+    if (!bar || !inner || !scroll) return
+    const update = () => {
+      const sobra = scroll.scrollWidth - scroll.clientWidth
+      bar.hidden = sobra <= 1
+      if (bar.hidden) return
+      inner.style.width = `${bar.clientWidth + sobra}px`
+      bar.scrollLeft = scroll.scrollLeft
+    }
+    const daTabela = () => { if (Math.abs(bar.scrollLeft - scroll.scrollLeft) > 1) bar.scrollLeft = scroll.scrollLeft }
+    const daBarra = () => { if (Math.abs(scroll.scrollLeft - bar.scrollLeft) > 1) scroll.scrollLeft = bar.scrollLeft }
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(scroll)
+    // O cabeçalho tem a largura das colunas (max-content): muda ao mostrar, esconder ou alargar coluna.
+    const head = scroll.querySelector<HTMLElement>('.bt-table__head')
+    if (head) observer?.observe(head)
+    scroll.addEventListener('scroll', daTabela, { passive: true })
+    bar.addEventListener('scroll', daBarra, { passive: true })
+    return () => {
+      observer?.disconnect()
+      scroll.removeEventListener('scroll', daTabela)
+      bar.removeEventListener('scroll', daBarra)
+    }
+  })
+  return <div ref={barra} className="vt-xbar" aria-hidden="true" hidden><div ref={conteudo} className="vt-xbar__fill" /></div>
 }
