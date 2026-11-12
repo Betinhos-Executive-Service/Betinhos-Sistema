@@ -42,10 +42,18 @@ export function useVirtualRows<T>(rows: T[], rowKey: (row: T) => string, scrolle
 
 /** Colunas a partir desta largura (px) encolhem; as menores (seleção, ícones) ficam fixas. */
 const FIT_FROM = 64
+/** Quanto uma coluna pode encolher: até esta fração da largura dela na visão, nunca abaixo de MIN_PX. */
+const MIN_RATIO = 0.65
+const MIN_PX = 72
+
+/** Largura mínima da coluna, tirada da largura dela na visão (salva pelo usuário ou a padrão da tela). */
+export const minimoDaColuna = (largura: number) => Math.min(largura, Math.max(MIN_PX, Math.round(largura * MIN_RATIO)))
 
 /**
- * Modelo de colunas que cabe na largura: `Npx` (≥ FIT_FROM) vira `max(48px, min(Npx, fatia))`, com a fatia proporcional
- * a N no espaço que sobra depois das colunas fixas e dos espaçamentos. Exportada para teste.
+ * Modelo de colunas que encolhe para caber: `Npx` (≥ FIT_FROM) vira `max(mínimo, min(Npx, fatia))`, com a fatia
+ * proporcional a N no espaço que sobra depois das colunas fixas e dos espaçamentos e o mínimo vindo da própria largura
+ * na visão (`minimoDaColuna`). Se os mínimos não cabem, as colunas passam da borda e a barra presa ao pé (BarraHorizontal)
+ * leva até elas. Exportada para teste.
  */
 export function fitTemplate(template: string) {
   const tracks = template.match(/minmax\([^)]*\)|\S+/g) ?? []
@@ -54,7 +62,7 @@ export function fitTemplate(template: string) {
   if (!big) return template
   const fixed = tracks.reduce((sum, t) => sum + ((px(t) ?? FIT_FROM) < FIT_FROM ? px(t)! : 0), 0)
   const free = `(100% - ${tracks.length - 1} * var(--bt-table-gap, 0px) - ${fixed}px)`
-  return tracks.map((t) => ((px(t) ?? 0) >= FIT_FROM ? `max(48px, min(${t}, calc(${free} * ${px(t)! / big})))` : t)).join(' ')
+  return tracks.map((t) => ((px(t) ?? 0) >= FIT_FROM ? `max(${minimoDaColuna(px(t)!)}px, min(${t}, calc(${free} * ${px(t)! / big})))` : t)).join(' ')
 }
 
 /**
@@ -105,8 +113,8 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
   })
 
   const hasView = props.view != null
-  // Colunas de visão cabem na largura da lista: cada largura salva vira teto e, sem espaço, todas encolhem na mesma
-  // proporção (o texto trunca) em vez de empurrar as últimas para fora. O DS grava o modelo em `--bt-table-columns`.
+  // Colunas de visão encolhem para caber na largura da lista: cada largura salva vira teto e, sem espaço, todas encolhem
+  // na mesma proporção até o mínimo de cada uma (o texto trunca). O DS grava o modelo em `--bt-table-columns`.
   useLayoutEffect(() => {
     const table = host.current?.querySelector<HTMLElement>('.bt-table--view')
     if (!table) return
@@ -125,6 +133,47 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
   return (
     <div ref={host} className="vt-host">
       <Table {...props} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
+      <BarraHorizontal />
     </div>
   )
+}
+
+/**
+ * Barra de rolagem horizontal presa ao pé da tela. A do `Table` fica no fim da lista, depois da última linha, e quem não
+ * chega lá não vê as colunas da direita (ex.: Motorista em Despesas com colunas a mais). Esta acompanha a rolagem da
+ * tabela nos dois sentidos e só aparece quando as colunas passam da largura.
+ */
+function BarraHorizontal() {
+  const barra = useRef<HTMLDivElement>(null)
+  const conteudo = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const bar = barra.current
+    const inner = conteudo.current
+    // Pelo pai no DOM, não pelo ref do `vt-host`: o React liga o ref do pai só depois dos efeitos dos filhos.
+    const scroll = bar?.parentElement?.querySelector<HTMLElement>('.bt-table__scroll')
+    if (!bar || !inner || !scroll) return
+    const update = () => {
+      const sobra = scroll.scrollWidth - scroll.clientWidth
+      bar.hidden = sobra <= 1
+      if (bar.hidden) return
+      inner.style.width = `${bar.clientWidth + sobra}px`
+      bar.scrollLeft = scroll.scrollLeft
+    }
+    const daTabela = () => { if (Math.abs(bar.scrollLeft - scroll.scrollLeft) > 1) bar.scrollLeft = scroll.scrollLeft }
+    const daBarra = () => { if (Math.abs(scroll.scrollLeft - bar.scrollLeft) > 1) scroll.scrollLeft = bar.scrollLeft }
+    update()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    observer?.observe(scroll)
+    // O cabeçalho tem a largura das colunas (max-content): muda ao mostrar, esconder ou alargar coluna.
+    const head = scroll.querySelector<HTMLElement>('.bt-table__head')
+    if (head) observer?.observe(head)
+    scroll.addEventListener('scroll', daTabela, { passive: true })
+    bar.addEventListener('scroll', daBarra, { passive: true })
+    return () => {
+      observer?.disconnect()
+      scroll.removeEventListener('scroll', daTabela)
+      bar.removeEventListener('scroll', daBarra)
+    }
+  })
+  return <div ref={barra} className="vt-xbar" aria-hidden="true" hidden><div ref={conteudo} className="vt-xbar__fill" /></div>
 }
