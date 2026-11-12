@@ -50,7 +50,7 @@ export function PendenciasLista({ lista, mobile, onRenovar, onAbrirFicha }: Prop
     { key: 'tipo', header: 'Documento', cell: (p) => p.tipo.nome },
     { key: 'validade', header: 'Validade', cell: (p) => (p.doc?.validade ? formatBR(p.doc.validade) : '—'), hideBelow: 'compact' },
     { key: 'estado', header: 'Situação', cell: (p) => <StatusDoc estado={p.estado} dias={p.dias} /> },
-    { key: 'acoes', header: '', cell: acoes, align: 'end' },
+    { key: 'acoes', header: '', cell: acoes },
   ]
   return <Table className="doc-table doc-table--clicavel" columns={columns} rows={lista} rowKey={(p) => p.chave} rowActions={rowActions} onClick={aoClicar} />
 }

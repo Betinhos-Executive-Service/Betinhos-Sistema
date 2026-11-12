@@ -42,7 +42,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
     { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },
     { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', cell: (op) => <OpBadge op={op} choices={choices} /> },
     { key: 'criada', header: 'Criada em', label: 'Criada em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
   ]

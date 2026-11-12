@@ -70,7 +70,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
   const rows = <R,>() => top.linhas as unknown as R[]
   const link = (entidade: Entidade, id: string) => linkRegistro(clientUrl, entidade, id)
   const linkCol = <R extends { id: string },>(entidade: Entidade, nome: (r: R) => string): TableColumn<R> =>
-    ({ key: 'abrir', header: <span className="dash-sr">Abrir no Dataverse</span>, width: '44px', align: 'end', cell: (r) => <Abrir href={link(entidade, r.id)} nome={nome(r)} /> })
+    ({ key: 'abrir', header: <span className="dash-sr">Abrir no Dataverse</span>, width: '44px', cell: (r) => <Abrir href={link(entidade, r.id)} nome={nome(r)} /> })
   const comLink = clientUrl != null
 
   if (detalhe.tipo === 'servicos') {
@@ -87,7 +87,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
         ...(detalhe.comOp ? [{ key: 'op', header: 'OP', width: 'minmax(84px, .8fr)', cell: (l: LinhaServicoDetalhe) => l.op || '—' }] : []),
         { key: 'cl', header: 'Cliente', width: 'minmax(0, 1.2fr)', cell: (l) => l.cliente },
         { key: 'm', header: 'Motorista', width: 'minmax(0, 1fr)', cell: (l) => l.motorista },
-        { key: 'v', header: 'Valor', align: 'end', width: 'minmax(88px, .8fr)', cell: (l) => forte(brl(l.valor)) },
+        { key: 'v', header: 'Valor', width: 'minmax(88px, .8fr)', cell: (l) => forte(brl(l.valor)) },
       ]
     if (comLink) colunas.push(linkCol<LinhaServicoDetalhe>('reserva', (l) => `serviço ${codigo(l)} de ${dataBR(l.dia)}`))
     return <>

@@ -66,8 +66,8 @@ function PorMesCard({ pontos, total, periodo }: { pontos: MultasMes[]; total: nu
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Multas', (p) => juntar(multas(p.qtd), `${int(p.pendentes)} pendentes`))]
     : [
       { key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) },
-      { key: 'q', header: 'Multas', align: 'end', cell: (p) => int(p.qtd) },
-      { key: 'p', header: 'Pendentes', align: 'end', cell: (p) => int(p.pendentes) },
+      { key: 'q', header: 'Multas', cell: (p) => int(p.qtd) },
+      { key: 'p', header: 'Pendentes', cell: (p) => int(p.pendentes) },
     ]
   return (
     <AnaliseCard
@@ -86,7 +86,7 @@ function PorMotoristaCard({ linhas, periodo }: { linhas: LinhaMultaMotorista[]; 
     ? [{ key: 'n', header: 'Motorista', cell: (l) => l.motorista }, resto('Multas', (l) => juntar(multas(l.qtd), `Participação ${pct(l.pct)}`))]
     : [
       { key: 'n', header: 'Motorista', width: 'minmax(0, 1.3fr)', cell: (l) => forte(l.motorista) },
-      { key: 'q', header: 'Multas', align: 'end', width: 'minmax(56px, .5fr)', cell: (l) => int(l.qtd) },
+      { key: 'q', header: 'Multas', width: 'minmax(56px, .5fr)', cell: (l) => int(l.qtd) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.4fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.motorista}`} tom="warning" /></span> },
     ]
   const [maior] = linhas
@@ -106,7 +106,7 @@ function PorInfracaoCard({ linhas, periodo }: { linhas: LinhaMultaInfracao[]; pe
     ? [{ key: 'i', header: 'Infração', cell: (l) => l.infracao }, resto('Multas', (l) => juntar(multas(l.qtd), `Participação ${pct(l.pct)}`))]
     : [
       { key: 'i', header: 'Infração (código e descrição)', width: 'minmax(0, 2.4fr)', cell: (l) => <span className="dash-mu-infracao">{l.infracao}</span> },
-      { key: 'q', header: 'Multas', align: 'end', width: 'minmax(64px, .4fr)', cell: (l) => int(l.qtd) },
+      { key: 'q', header: 'Multas', width: 'minmax(64px, .4fr)', cell: (l) => int(l.qtd) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.infracao}`} tom="warning" /></span> },
     ]
   const [maior] = linhas

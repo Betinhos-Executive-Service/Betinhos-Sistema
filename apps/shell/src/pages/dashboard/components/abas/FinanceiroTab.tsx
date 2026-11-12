@@ -69,8 +69,8 @@ function StatusFaturamentoCard({ linhas, periodo }: { linhas: LinhaStatusFat[]; 
     ]
     : [
       { key: 's', header: 'Status', width: 'minmax(0, 1.2fr)', cell: (l) => <Status texto={l.status} /> },
-      { key: 'q', header: 'Serviços', align: 'end', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
-      { key: 'v', header: 'Faturamento', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Serviços', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
+      { key: 'v', header: 'Faturamento', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.status}`} /></span> },
     ]
   return (
@@ -99,8 +99,8 @@ function TabelaDistribuicao({ coluna, linhas, badge, mobile }: { coluna: string;
     ]
     : [
       { key: 'n', header: coluna, width: 'minmax(0, 1.2fr)', cell: nome },
-      { key: 'q', header: 'Registros', align: 'end', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
-      { key: 'v', header: 'Valor', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Registros', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
+      { key: 'v', header: 'Valor', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
   return <Table columns={colunas} rows={linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhum pagamento registrado" />} />
@@ -159,12 +159,12 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
     ]
     : [
       { key: 'c', header: 'Cliente', width: TRILHAS[0].width, cell: (l) => <Nome texto={l.cliente} /> },
-      { key: 's', header: 'Serviços', align: 'end', width: TRILHAS[1].width, cell: (l) => <Duplo valor={int(l.servicos)} apoio={pct(l.pctServicos)} /> },
-      { key: 'f', header: 'Faturamento', align: 'end', width: TRILHAS[2].width, cell: (l) => forte(brl(l.faturamento)) },
-      { key: 't', header: 'Ticket médio', align: 'end', width: TRILHAS[3].width, cell: (l) => brl(l.ticket) },
+      { key: 's', header: 'Serviços', width: TRILHAS[1].width, cell: (l) => <Duplo valor={int(l.servicos)} apoio={pct(l.pctServicos)} /> },
+      { key: 'f', header: 'Faturamento', width: TRILHAS[2].width, cell: (l) => forte(brl(l.faturamento)) },
+      { key: 't', header: 'Ticket médio', width: TRILHAS[3].width, cell: (l) => brl(l.ticket) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: TRILHAS[4].width, cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.cliente} no faturamento`} /></span> },
       {
-        key: 'b', header: 'Meses', align: 'end', width: TRILHAS[5].width,
+        key: 'b', header: 'Meses', width: TRILHAS[5].width,
         cell: (l) => {
           const aberta = abertas.aberta(l.cliente)
           return (

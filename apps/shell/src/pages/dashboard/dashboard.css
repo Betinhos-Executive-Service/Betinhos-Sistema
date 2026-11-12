@@ -197,7 +197,7 @@
 .dash-part .bt-progress { gap: 0; }
 .dash-part .bt-progress__head { display: none; }
 .dash-part .dash-duplo { text-align: right; }
-/* Participação depois de uma coluna numérica alinhada à direita: respiro extra para os títulos não colarem. */
+/* Participação depois de uma coluna numérica: respiro extra para os títulos não colarem. */
 .dash-col-part { display: block; width: 100%; padding-left: var(--bt-space-3); }
 
 /* Tabelas mensais: vão de 8 px entre colunas para caber mais meses. */

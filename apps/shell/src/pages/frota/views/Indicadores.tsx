@@ -127,8 +127,8 @@ export function Indicadores({ data, errors, today }: { data: FrotaData; errors: 
             empty={<EmptyState compact align="start" title="Sem veículos" />}
             columns={[
               { key: 'veiculo', header: 'Veículo', width: 'minmax(110px, 1.2fr)', cell: (item) => item.placa || 'Sem placa' },
-              { key: 'total', header: <Ordenar rotulo="Total" ativo={ordem === 'total'} onClick={() => setOrdem('total')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{brl(item.total)}</span> },
-              { key: 'custoPorKm', header: <Ordenar rotulo="R$/km" ativo={ordem === 'custoPorKm'} onClick={() => setOrdem('custoPorKm')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{item.custoPorKm === null ? '—' : brl(item.custoPorKm)}</span> },
+              { key: 'total', header: <Ordenar rotulo="Total" ativo={ordem === 'total'} onClick={() => setOrdem('total')} />, cell: (item) => <span className="frota-nowrap">{brl(item.total)}</span> },
+              { key: 'custoPorKm', header: <Ordenar rotulo="R$/km" ativo={ordem === 'custoPorKm'} onClick={() => setOrdem('custoPorKm')} />, cell: (item) => <span className="frota-nowrap">{item.custoPorKm === null ? '—' : brl(item.custoPorKm)}</span> },
               { key: 'maiorFonte', header: 'Maior fonte', cell: (item) => (item.maiorFonte ? FONTE_LABEL[item.maiorFonte] : '—') },
             ]}
           />
@@ -143,9 +143,9 @@ export function Indicadores({ data, errors, today }: { data: FrotaData; errors: 
           empty={<EmptyState compact align="start" title="Sem multas no período" />}
           columns={[
             { key: 'motorista', header: 'Motorista', width: 'minmax(160px, 2fr)', cell: (item) => item.motorista },
-            { key: 'qtd', header: 'Multas', align: 'end', cell: (item) => item.qtd },
-            { key: 'valor', header: 'Valor (catálogo)', align: 'end', cell: (item) => <span className="frota-nowrap">{todasSemValor(item) ? NAO_INFORMADO : brl(item.valor)}{item.semValor > 0 && <span className="frota-muted"> · {item.semValor} sem valor</span>}</span> },
-            { key: 'pontos', header: 'Pontos na CNH', align: 'end', hideBelow: 'mobile', cell: (item) => item.pontos },
+            { key: 'qtd', header: 'Multas', cell: (item) => item.qtd },
+            { key: 'valor', header: 'Valor (catálogo)', cell: (item) => <span className="frota-nowrap">{todasSemValor(item) ? NAO_INFORMADO : brl(item.valor)}{item.semValor > 0 && <span className="frota-muted"> · {item.semValor} sem valor</span>}</span> },
+            { key: 'pontos', header: 'Pontos na CNH', hideBelow: 'mobile', cell: (item) => item.pontos },
           ]}
         />
       </Surface>
