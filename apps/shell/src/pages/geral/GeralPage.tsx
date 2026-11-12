@@ -611,15 +611,17 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           filters={{ fields: filterFields, search: searchFilter, notApplied }}
           search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
-          // O espaço da busca vira o contador ao marcar linhas; "Atualizar" e o selo ficam junto da primária para não sumirem.
+          // O espaço da busca vira o contador ao marcar linhas; "Atualizar" fica junto da primária para não sumir.
           primary={<>
-            {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
             {/* No celular o cabeçalho já tem "Atualizar". */}
             {mobile ? null : <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />}
             <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
           </>}
           selection={selection}
-        />
+        >
+          {/* Fica no espaço da busca: some durante a seleção e deixa a largura para o contador, que senão cobre Auditoria. */}
+          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
         {body}
