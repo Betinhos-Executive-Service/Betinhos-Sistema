@@ -11,7 +11,11 @@
 :where(.composicao) button:not(:disabled) { cursor: pointer; }
 :where(.composicao) textarea { resize: vertical; }
 :where(.composicao) [hidden]:not([hidden="until-found"]) { display: none !important; }
-.composicao { width: 100%; height: 100%; min-width: 0; min-height: 0; font-family: var(--bt-font-family-sans); color: var(--bt-color-text-primary); }
+.composicao { display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; min-height: 0; font-family: var(--bt-font-family-sans); color: var(--bt-color-text-primary); }
+/* O cabeçalho é o PageLayout do shell; a grade ocupa o resto da altura da janela. */
+.composicao .composition-layout { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.composicao .composition-layout__body { flex: 1; min-height: 0; }
+.composicao .composition-layout__body > .composition-workspace { height: 100%; }
 
 /* Tabela (antes os componentes Table do shadcn, com classes Tailwind). */
 .composicao .price-grid th, .composicao .price-grid td { vertical-align: middle; }
@@ -26,7 +30,7 @@
   position: relative;
   container-type: inline-size;
   display: grid;
-  grid-template-rows: auto 42px 40px minmax(0, 1fr) 24px;
+  grid-template-rows: 42px 40px minmax(0, 1fr) 24px;
   overflow: hidden;
   background: var(--bt-color-surface);
 }
@@ -295,7 +299,17 @@
 .composicao .view-select-label select { max-width: 245px; padding: 0 10px; }
 .composicao .view-settings-button { display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; font-weight: 600; cursor: pointer; }
 .composicao .view-settings-button:hover { border-color: var(--bt-focus-border); background: var(--bt-color-surface-soft); }
-.composicao .view-load-error { position: absolute; z-index: 20; top: 78px; right: 12px; max-width: 320px; padding: 8px 12px; border: 1px solid var(--bt-color-danger-soft); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface-neutral); color: var(--bt-color-danger); font-size: var(--bt-font-size-11); }
+.composicao .view-load-error { position: absolute; z-index: 20; top: 46px; right: 12px; max-width: 320px; padding: 8px 12px; border: 1px solid var(--bt-color-danger-soft); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface-neutral); color: var(--bt-color-danger); font-size: var(--bt-font-size-11); }
+/* Aviso com ação ("Tentar novamente"): fica sobre a grade, sem criar linha no grid da página. Avisos simples usam o toast do shell. */
+.composicao .composition-notice { position: absolute; z-index: 20; top: 46px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100% - 24px)); padding: 8px 10px 8px 12px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); }
+.composicao .composition-notice--success { border-color: var(--bt-color-success-soft); color: var(--bt-color-success); }
+.composicao .composition-notice--warning { border-color: var(--bt-color-warning-soft); color: var(--bt-color-warning); }
+.composicao .composition-notice--error { border-color: var(--bt-color-danger-soft); color: var(--bt-color-danger); }
+.composicao .composition-notice button { flex: none; height: 26px; padding: 0 10px; border: 1px solid currentColor; border-radius: var(--bt-radius-xs); background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.composicao .composition-notice .composition-notice__close { display: inline-grid; place-items: center; width: 26px; padding: 0; border-color: transparent; }
+.composicao .composition-notice .composition-notice__close svg { width: 14px; height: 14px; }
+/* Rótulo provisório: a metadata ainda não chegou e o cabeçalho mostra o nome técnico do campo. */
+.composicao .column-header--provisional { opacity: 0.65; font-style: italic; }
 .composicao .view-editor-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 22px; background: color-mix(in srgb, var(--bt-color-ink-950) 72%, transparent); }
 .composicao .view-editor { display: flex; flex-direction: column; width: min(1120px, 100%); height: min(800px, calc(100vh - 44px)); min-height: 0; overflow: hidden; border: 1px solid var(--bt-color-action-soft); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface-soft); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-brand-hover); font-size: var(--bt-font-size-13); }
 .composicao .view-editor button { border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background: var(--bt-color-surface); color: var(--bt-color-action); font: inherit; cursor: pointer; }
@@ -777,7 +791,7 @@
 .composicao .cell-action:disabled { cursor: not-allowed; opacity: .58; }
 
 @media (max-width: 720px) {
-  .composicao .composition-page { grid-template-rows: auto 42px 40px minmax(0, 1fr) 23px; }
+  .composicao .composition-page { grid-template-rows: 42px 40px minmax(0, 1fr) 23px; }
   .composicao .formula-bar { --formula-field-width: 104px; --formula-fx-width: 28px; grid-template-columns: minmax(78px, var(--formula-field-width)) var(--formula-fx-width) minmax(0, 1fr); }
   .composicao .composition-toolbar { min-height: var(--bt-layout-page-header-min-height-mobile); flex-wrap: wrap; gap: 6px; padding: 7px 9px; }
   .composicao .composition-heading h1 { white-space: normal; }
