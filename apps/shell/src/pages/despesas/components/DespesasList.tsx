@@ -34,7 +34,7 @@ export const RotuloBadge = ({ texto, vazio }: { texto: string; vazio: string }) 
 /** Situação da compra no cartão ligada à despesa e o canal dela; sem compra ligada, travessão. */
 function ConciliacaoCelula({ compra }: { compra?: Transacao }) {
   if (!compra) return <span className="pg-muted">—</span>
-  return <span className="cc-badges"><Situacao t={compra} /><Canal t={compra} /></span>
+  return <span className="dp-conciliacao"><Situacao t={compra} /><Canal t={compra} /></span>
 }
 
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
@@ -65,7 +65,7 @@ export function DespesasTable({ list, choices, compras, onOpen, loading, view, q
     { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
     { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 150, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },
     { key: 'forma', header: 'Pagamento', label: 'Forma de pagamento', sortable: true, defaultWidth: 170, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.forma} vazio="Sem forma" /> },
-    { key: 'conciliacao', header: 'Conciliação', label: 'Conciliação', sortable: true, defaultWidth: 210, width: 'minmax(200px, 1.2fr)', hideBelow: 'compact', cell: (d) => <ConciliacaoCelula compra={compras?.get(d.id)} /> },
+    { key: 'conciliacao', header: 'Conciliação', label: 'Conciliação', sortable: true, defaultWidth: 170, width: 'minmax(160px, 1fr)', hideBelow: 'compact', cell: (d) => <ConciliacaoCelula compra={compras?.get(d.id)} /> },
     { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
     { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]
