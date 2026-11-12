@@ -179,7 +179,11 @@ describe('Compras sem despesa: resumo, filtros, lote e exportação', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
     await renderPage()
     fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
-    const texto = await blobs[0].text()
+    const texto = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.readAsText(blobs[0])
+    })
     expect(texto).toMatch(/RESTAURANTE SABOR/)
     expect(texto).not.toMatch(/POSTO IPIRANGA MARGINAL/)
   })
