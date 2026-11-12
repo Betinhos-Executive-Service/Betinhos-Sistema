@@ -54,6 +54,11 @@ export function isDataverseHostRuntime() {
   return /\.dynamics\.com$/i.test(window.location.hostname);
 }
 
+// Página servida pelo host do Dataverse (com origem): o WebApi por fetch usa o cookie da sessão.
+export function canFetchOnDataverseHost() {
+  return typeof window !== "undefined" && Boolean(window.location?.origin) && isDataverseHostRuntime();
+}
+
 // Aberto pela URL direta: janela de topo (ou parent sem Xrm) no host do Dataverse.
 export function isStandaloneWebResourceRuntime() {
   if (!isDataverseHostRuntime()) return false;
@@ -77,7 +82,7 @@ function getFetchRuntime(): XrmLike {
       Utility: { getGlobalContext: () => ({ userSettings: { userId: whoAmIUserId }, getClientUrl: () => clientUrl }) },
       WebApi: createFetchWebApi(clientUrl, entitySetByName)
     };
-    dataverseLog("Xrm.WebApi ausente: usando WebApi por fetch na URL direta do web resource.", { clientUrl });
+    dataverseLog("Host do Dataverse: usando WebApi por fetch com o cookie da sessão.", { clientUrl });
   }
   return fetchRuntime;
 }
@@ -134,6 +139,9 @@ export function dataverseError(message: string, data?: unknown) {
 }
 
 export function getWindowXrm(): XrmLike | null {
+  // No host do Dataverse (URL direta ou dentro do model-driven) os dados vão por fetch com o cookie da sessão:
+  // o Xrm.WebApi do model-driven travava o carregamento no PROD (12/11/2026), e a URL direta já usava fetch.
+  if (canFetchOnDataverseHost()) return getFetchRuntime();
   const current = window as Window & { Xrm?: XrmLike };
   try {
     const parentWindow = window.parent as Window & { Xrm?: XrmLike };

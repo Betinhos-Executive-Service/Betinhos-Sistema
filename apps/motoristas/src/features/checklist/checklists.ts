@@ -1,5 +1,6 @@
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
-import { retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
+import { canFetchOnDataverseHost, retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
+import { createFetchWebApi } from "../../data/dataverse/fetchWebApi.ts";
 
 // Checklist de vistoria de veículo. Contrato com o plugin ChecklistCommandPlugin
 // (plugins/DriverRecordSharing/ChecklistAnswers.cs): itens copiados do modelo e respostas em JSON.
@@ -360,10 +361,15 @@ type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown
 
 // Copiado de executeComunicadoAction (comunicados.ts): parâmetros sempre Edm.String e execute com bind.
 export async function executeChecklistAction(operationName: string, parameters: Record<string, string>) {
-  let xrm: XrmApi | undefined;
-  try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
-  xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
-  const online = xrm?.WebApi?.online;
+  // Host do Dataverse (URL direta ou model-driven): Action por fetch com o cookie da sessão, como em customApi.ts.
+  let online: { execute?: (request: Record<string, unknown>) => Promise<Response> } | undefined =
+    canFetchOnDataverseHost() ? createFetchWebApi(window.location.origin, {}).online : undefined;
+  if (!online) {
+    let xrm: XrmApi | undefined;
+    try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
+    xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
+    online = xrm?.WebApi?.online;
+  }
   const execute = online?.execute?.bind(online);
   if (!execute) throw new Error("Abra o aplicativo no Power Apps para enviar o checklist.");
   const parameterTypes = Object.fromEntries(Object.keys(parameters).map((key) => [key, { typeName: "Edm.String", structuralProperty: 1 }]));
