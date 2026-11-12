@@ -306,18 +306,15 @@ function formatTimeUntil(date: Date, now: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}min`;
 }
 
-function getNextServiceItem(props: InitialScreenProps, now: number) {
+function getNextServiceDate(props: InitialScreenProps, now: number) {
   const directDate = getServiceDate(props.nextServiceAt ?? props.proximoServicoEm);
-  if (directDate) return { date: directDate, item: null };
+  if (directDate) return directDate;
 
   const serviceDates = filterAgendaGalleryItems(props.services ?? [], now)
     .filter((service) => service.tipo !== "HEADER" && !service.canceled && service.detail)
-    .map((item) => {
-      const date = resolveAgendaDate(item, now);
-      return { item, date };
-    })
-    .filter((service): service is { item: AgendaItem; date: Date } => Boolean(service.date))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .map((item) => resolveAgendaDate(item, now))
+    .filter((date): date is Date => Boolean(date))
+    .sort((a, b) => a.getTime() - b.getTime());
 
   return serviceDates[0] ?? null;
 }
@@ -419,8 +416,7 @@ export function InitialScreen(props: InitialScreenProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const driverName = getFirstName(props.driverName ?? props.motoristaNome);
-  const nextService = useMemo(() => getNextServiceItem(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
-  const nextServiceDate = nextService?.date ?? null;
+  const nextServiceDate = useMemo(() => getNextServiceDate(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
   const agendaCount = useMemo(() => getTodayAgendaCount(props.services, now), [now, props.services]);
   const modules = useMemo(
     () => baseModules.concat(
@@ -443,11 +439,11 @@ export function InitialScreen(props: InitialScreenProps) {
   const gridModules = modules.filter((module) => module.id !== "services");
   const multasPrazo = props.multasBanner?.split(" · ")[1];
   const pendingTypes = [
-    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
-    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
-    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
-    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
-    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `Gastos do cartão · ${n} para completar` },
+    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)}` },
+    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)}${multasPrazo ? ` · ${multasPrazo.replace(/^prazo /, "")}` : ""}` },
+    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)}` },
+    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)}` },
+    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `${n} gasto${plural(n)} a completar` },
   ];
   const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id === "gastosCartao" ? "expenses" : type.id, type.count]));
   const pendencias = pendingTypes
@@ -492,20 +488,9 @@ export function InitialScreen(props: InitialScreenProps) {
     <PullToRefresh className="pull-refresh--home" scrollRef={shellRef} onRefresh={props.onRefresh ?? (() => window.location.reload())}>
     <main ref={shellRef} className="concept-shell">
       <header className="concept-topbar">
-        <div>
-          <span className="concept-kicker">Olá,</span>
-          <h1>{driverName}</h1>
-        </div>
+        <h1><span className="concept-kicker">Olá,</span> {driverName}</h1>
         <img className="concept-avatar" src={betinhosLogo} alt="Betinhos" />
       </header>
-
-      {nextServiceDate && (
-        <button className="concept-next-service" type="button" onClick={() => navigateTo("services")}>
-          <span className="concept-next-eyebrow">Próximo serviço em</span>
-          <strong>{formatTimeUntil(nextServiceDate, now)}</strong>
-          <small>{nextService?.item?.description ?? "Abrir agenda"}</small>
-        </button>
-      )}
 
       {servicesModule && (
         <button
@@ -521,9 +506,10 @@ export function InitialScreen(props: InitialScreenProps) {
           </span>
           <span className="concept-module-text">
             <strong>{servicesModule.label}</strong>
-            <small>
-              {servicesModule.detail}
-              {agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
+            <small className={nextServiceDate ? "concept-next" : undefined}>
+              {nextServiceDate
+                ? <>Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></>
+                : agendaCount > 0 ? `${agendaCount} hoje` : servicesModule.detail}
             </small>
           </span>
         </button>
@@ -535,7 +521,6 @@ export function InitialScreen(props: InitialScreenProps) {
             <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
               <span className="concept-pending-dot" aria-hidden="true" />
               <span className="concept-pending-text">{item.text}</span>
-              <span className="concept-pending-chevron" aria-hidden="true">›</span>
             </button>
           ))}
         </section>
