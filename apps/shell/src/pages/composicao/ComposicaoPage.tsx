@@ -3,7 +3,6 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, Search, SearchX, Trash2, X } from 'lucide-react'
 import { ContextMenu, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
-import { PageLayout } from '../../app/PageLayout'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
 import { HoldGridRow } from './components/HoldGridRow'
@@ -1520,15 +1519,9 @@ function ComposicaoContent({ host }: { host: Host }) {
 
   return (
     <div className="composicao">
-    <PageLayout
-      className="page--full composition-layout"
-      bodyClassName="composition-layout__body"
-      title="Composição de preços"
-      description="Valores relacionados às reservas"
-      meta={<span className="composition-count" aria-label={nextLink ? `${visibleRows.length} registros carregados de ${totalCount ?? 'um total ainda não calculado'}` : undefined}>{nextLink
-            ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
-            : `${visibleRows.length} ${visibleRows.length === 1 ? 'registro' : 'registros'}`}</span>}
-      actions={(
+    <div className="page page--full composition-layout">
+      <h1 className="composition-title">Composição de preços</h1>
+      <div className="composition-topbar">
         <div className="composition-actions">
           <div className="composition-view-actions">
           <ViewManager catalog={catalog} views={views} active={activeView} definition={viewDefinition} disabled={commandLocked || (!catalogReady && dataSource !== 'mock')} mockMode={dataSource === 'mock'} filterDrawerHost={filterDrawerHost} onChange={applyViewDefinition} onSelect={selectView} onSave={saveCurrentView} onDelete={deleteCurrentView} />
@@ -1538,8 +1531,11 @@ function ComposicaoContent({ host }: { host: Host }) {
             <input value={search} onChange={(event) => setSearch(event.target.value)} disabled={!catalogReady && dataSource !== 'mock'} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />
           </label>
         </div>
-      )}
-    >
+        <span className="composition-count" aria-label={nextLink ? `${visibleRows.length} registros carregados de ${totalCount ?? 'um total ainda não calculado'}` : undefined}>{nextLink
+            ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
+            : `${visibleRows.length} ${visibleRows.length === 1 ? 'registro' : 'registros'}`}</span>
+      </div>
+      <div className="composition-layout__body">
     <div className="composition-workspace">
     <section className="composition-page" aria-label="Composições de preço">
       {viewError && <div className="view-load-error" role="alert">Visualizações: {viewError}</div>}
@@ -1655,7 +1651,8 @@ function ComposicaoContent({ host }: { host: Host }) {
     </section>
     <div className="view-filter-drawer-host" ref={setFilterDrawerHost} />
     </div>
-    </PageLayout>
+      </div>
+    </div>
     </div>
   )
 }
