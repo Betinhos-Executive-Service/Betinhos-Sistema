@@ -142,14 +142,14 @@ describe('Cartões corporativos', () => {
 })
 
 describe('Ficha da despesa e coluna Conciliação', () => {
-  it('mostra o canal na lista e o bloco Compra no cartão (CTF) na ficha', async () => {
+  it('mostra a situação numa linha na lista e o canal no bloco Compra no cartão da ficha', async () => {
     window.location.hash = '#/despesas-operacionais'
     render(<DespesasPage host={{ mode: 'mock' }} />)
     const linhas = await screen.findAllByText('Posto Shell Faria Lima')
-    expect((await screen.findAllByText('CTF')).length).toBeGreaterThan(0)
     fireEvent.click(linhas[0].closest('button')!)
     const ficha = await screen.findByRole('dialog', { name: 'Posto Shell Faria Lima' })
     expect(within(ficha).getByText('Compra no cartão')).toBeTruthy()
+    expect(within(ficha).getByText('CTF')).toBeTruthy()
     expect(within(ficha).getByText('FJK2B19')).toBeTruthy()
     expect(within(ficha).getByText('Diesel S10')).toBeTruthy()
     fireEvent.click(within(ficha).getByRole('button', { name: /Abrir compra/ }))

@@ -4,7 +4,7 @@ import { VirtualTable } from '../../../app/VirtualTable'
 import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
-import { Canal, Situacao } from '../conciliacao/components/TransacoesLista'
+import { Situacao } from '../conciliacao/components/TransacoesLista'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'
 import { decidivel } from '../domain/decisao'
@@ -31,10 +31,9 @@ export function FinanceiroBadge({ d, choices }: { d: Despesa; choices: DespesaCh
 /** Categoria e forma de pagamento: rótulo do cadastro, sem cor de status. */
 export const RotuloBadge = ({ texto, vazio }: { texto: string; vazio: string }) => <StatusBadge tone="neutral">{texto || vazio}</StatusBadge>
 
-/** Situação da compra no cartão ligada à despesa e o canal dela; sem compra ligada, travessão. */
+/** Situação da compra no cartão ligada à despesa (o canal já aparece na forma de pagamento e na ficha); sem compra, travessão. */
 function ConciliacaoCelula({ compra }: { compra?: Transacao }) {
-  if (!compra) return <span className="pg-muted">—</span>
-  return <span className="dp-conciliacao"><Situacao t={compra} /><Canal t={compra} /></span>
+  return compra ? <Situacao t={compra} /> : <span className="pg-muted">—</span>
 }
 
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
@@ -58,16 +57,16 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
 
 export function DespesasTable({ list, choices, compras, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Despesa>[] = [
-    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 220, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
-    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 100, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 110, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
-    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
-    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
-    { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 150, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },
-    { key: 'forma', header: 'Pagamento', label: 'Forma de pagamento', sortable: true, defaultWidth: 170, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.forma} vazio="Sem forma" /> },
-    { key: 'conciliacao', header: 'Conciliação', label: 'Conciliação', sortable: true, defaultWidth: 170, width: 'minmax(160px, 1fr)', hideBelow: 'compact', cell: (d) => <ConciliacaoCelula compra={compras?.get(d.id)} /> },
-    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
-    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
+    { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 180, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
+    { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 92, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 96, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
+    { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 130, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
+    { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
+    { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 124, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },
+    { key: 'forma', header: 'Pagamento', label: 'Pagamento', sortable: true, defaultWidth: 136, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.forma} vazio="Sem forma" /> },
+    { key: 'conciliacao', header: 'Conciliação', label: 'Conciliação', sortable: true, defaultWidth: 160, width: 'minmax(160px, 1fr)', hideBelow: 'compact', cell: (d) => <ConciliacaoCelula compra={compras?.get(d.id)} /> },
+    { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 130, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => <span>{d.motorista || '—'}</span> },
+    { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 120, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>

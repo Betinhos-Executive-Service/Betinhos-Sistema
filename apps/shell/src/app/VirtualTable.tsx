@@ -40,6 +40,32 @@ export function useVirtualRows<T>(rows: T[], rowKey: (row: T) => string, scrolle
   }
 }
 
+/** Colunas a partir desta largura (px) encolhem; as menores (seleção, ícones) ficam fixas. */
+const FIT_FROM = 64
+/** Quanto uma coluna pode encolher: até esta fração da largura dela na visão, nunca abaixo de MIN_PX. */
+const MIN_RATIO = 0.65
+const MIN_PX = 72
+
+/** Largura mínima da coluna, tirada da largura dela na visão (salva pelo usuário ou a padrão da tela). */
+export const minimoDaColuna = (largura: number) => Math.min(largura, Math.max(MIN_PX, Math.round(largura * MIN_RATIO)))
+
+/**
+ * Modelo de colunas que encolhe para caber: `Npx` (≥ FIT_FROM) vira `max(mínimo, min(Npx, fatia))`, com a fatia
+ * proporcional a N no espaço que sobra da largura visível da lista (`100cqw` do `.bt-table__scroll`) depois do recuo
+ * lateral da linha (`pad`), das colunas fixas e dos espaçamentos, e o mínimo vindo da própria largura na visão
+ * (`minimoDaColuna`). A base é o rolador e não a linha (`%`) para a linha poder passar da borda junto com as colunas. Se os mínimos não cabem, as colunas passam da borda e a barra presa ao pé (BarraHorizontal)
+ * leva até elas. Exportada para teste.
+ */
+export function fitTemplate(template: string, pad = 0) {
+  const tracks = template.match(/minmax\([^)]*\)|\S+/g) ?? []
+  const px = (track: string) => (/^\d+(\.\d+)?px$/.test(track) ? Number.parseFloat(track) : null)
+  const big = tracks.reduce((sum, t) => sum + ((px(t) ?? 0) >= FIT_FROM ? px(t)! : 0), 0)
+  if (!big) return template
+  const fixed = tracks.reduce((sum, t) => sum + ((px(t) ?? FIT_FROM) < FIT_FROM ? px(t)! : 0), 0)
+  const free = `(100cqw - ${tracks.length - 1} * var(--bt-table-gap, 0px) - ${fixed + pad}px)`
+  return tracks.map((t) => ((px(t) ?? 0) >= FIT_FROM ? `max(${minimoDaColuna(px(t)!)}px, min(${t}, calc(${free} * ${px(t)! / big})))` : t)).join(' ')
+}
+
 /**
  * `Table` do DS que desenha só as linhas perto da tela quando a lista passa de `VIRTUAL_FROM`; rola no `main` do shell.
  * O pacote não virtualiza: aqui o `Table` recebe só a janela de linhas e as de fora viram margem antes da primeira e
@@ -86,6 +112,26 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
       measure(node)
     })
   })
+
+  const hasView = props.view != null
+  // Colunas de visão encolhem para caber na largura da lista: cada largura salva vira teto e, sem espaço, todas encolhem
+  // na mesma proporção até o mínimo de cada uma (o texto trunca). O DS grava o modelo em `--bt-table-columns`.
+  useLayoutEffect(() => {
+    const table = host.current?.querySelector<HTMLElement>('.bt-table--view')
+    if (!table) return
+    const fit = () => {
+      const head = getComputedStyle(table.querySelector('.bt-table__head') ?? table)
+      const pad = Number.parseFloat(head.paddingLeft) + Number.parseFloat(head.paddingRight) || 0
+      for (const [from, to] of [['--bt-table-columns', '--vt-fit'], ['--bt-table-columns-compact', '--vt-fit-compact']]) {
+        const value = fitTemplate(table.style.getPropertyValue(from), pad)
+        if (table.style.getPropertyValue(to) !== value) table.style.setProperty(to, value)
+      }
+    }
+    fit()
+    const observer = new MutationObserver(fit)
+    observer.observe(table, { attributes: true, attributeFilter: ['style'] })
+    return () => observer.disconnect()
+  }, [hasView])
 
   return (
     <div ref={host} className="vt-host">

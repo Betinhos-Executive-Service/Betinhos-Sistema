@@ -9,3 +9,16 @@
 .vt-xbar { position: sticky; bottom: 0; z-index: 3; overflow-x: auto; overflow-y: hidden; margin-inline: var(--bt-border-width-default); background-color: var(--bt-color-surface); }
 .vt-xbar[hidden] { display: none; }
 .vt-xbar__fill { height: 1px; }
+
+/* Colunas de visão encolhem para caber (teto = largura na visão, piso = mínimo tirado dela, texto trunca); ver VirtualTable.
+   Quando os mínimos não cabem, as colunas passam da borda e aparece a barra presa ao pé (acima). Celular mantém o layout do DS.
+   As trilhas medem a partir da largura visível do rolador (container), e a linha segue com a largura do DS (max-content,
+   mínimo 100%): rolando para o lado, borda, fundo do hover e cabeçalho acompanham até a última coluna. */
+@media (min-width: 821px) {
+  .vt-table.bt-table--view .bt-table__scroll { container-type: inline-size; }
+  .vt-table.bt-table--view .bt-table__head, .vt-table.bt-table--view .bt-table__row { grid-template-columns: var(--vt-fit, var(--bt-table-columns)); }
+  .vt-table.bt-table--view .bt-table__row > .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (min-width: 821px) and (max-width: 1120px) {
+  .vt-table.bt-table--view .bt-table__head, .vt-table.bt-table--view .bt-table__row { grid-template-columns: var(--vt-fit-compact, var(--vt-fit, var(--bt-table-columns-compact, var(--bt-table-columns)))); }
+}
