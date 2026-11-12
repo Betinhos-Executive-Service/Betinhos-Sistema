@@ -14041,21 +14041,19 @@ select,
 
 .concept-shell > .concept-module-card--primary { width: 100%; min-height: 76px; padding: 12px; }
 .concept-module-card--primary .concept-module-text { gap: 3px; }
-.concept-module-card--primary .concept-inline-count { font-weight: 700; color: rgba(255, 255, 255, 0.72); }
 .concept-module-card--primary .concept-next-service {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
+  display: block;
+  width: auto;
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
+  font-size: 0.9rem;
 }
 .concept-module-card--primary .concept-next-service::after { content: none; }
-.concept-module-card--primary .concept-next-eyebrow { color: rgba(255, 255, 255, 0.82); font-size: 0.86rem; font-weight: 650; text-transform: none; }
-.concept-module-card--primary .concept-next-eyebrow b { color: #ffffff; font-weight: 850; }
-.concept-module-card--primary .concept-next-service small { max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+.concept-module-card--primary .concept-next-service b { color: #ffffff; font-weight: 850; }
 
 .concept-pending { display: flex; flex-wrap: wrap; gap: 6px; }
 

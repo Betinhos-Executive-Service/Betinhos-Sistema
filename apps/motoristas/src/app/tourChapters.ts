@@ -36,11 +36,11 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Se o nome estiver errado, avise a operação."
       ], { target: ".concept-topbar" }),
       step("proximo-servico", "Próximo serviço em", [
-        "Dentro do botão Serviços: a contagem regressiva até o horário do seu próximo serviço, com o trajeto logo abaixo.",
+        "Dentro do botão Serviços: a contagem regressiva até o horário do seu próximo serviço.",
         "Ela se atualiza sozinha a cada minuto e some quando não há serviço futuro. Tocar abre a lista de Serviços."
       ], { target: ".concept-next-service", optional: true }),
       step("servicos", "Serviços", [
-        "É o coração do app: a sua agenda. O número ao lado de \"Serviços\" é quantos serviços de hoje estão com você.",
+        "É o coração do app: a sua agenda, com todos os serviços que estão com você.",
         "Toque aqui para ver cada serviço, abrir o detalhe e registrar todas as etapas até a finalização."
       ], { target: dt("servicos") }),
       step("pendencias", "Pendências", [

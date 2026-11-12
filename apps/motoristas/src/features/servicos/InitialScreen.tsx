@@ -509,18 +509,12 @@ export function InitialScreen(props: InitialScreenProps) {
             <ModuleIcon name={servicesModule.icon} />
           </span>
           <span className="concept-module-text">
-            <strong>
-              {servicesModule.label}
-              {agendaCount > 0 ? <span className="concept-inline-count"> · {agendaCount} hoje</span> : null}
-            </strong>
-            {nextServiceDate ? (
-              <span className="concept-next-service">
-                <span className="concept-next-eyebrow">Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></span>
-                {nextService?.item?.description ? <small>{nextService.item.description}</small> : null}
-              </span>
-            ) : (
-              <small>{servicesModule.detail}</small>
-            )}
+            <strong>{servicesModule.label}</strong>
+            <small className={nextServiceDate ? "concept-next-service" : undefined}>
+              {nextServiceDate
+                ? <>Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></>
+                : agendaCount > 0 ? `${agendaCount} hoje` : servicesModule.detail}
+            </small>
           </span>
         </button>
       )}
