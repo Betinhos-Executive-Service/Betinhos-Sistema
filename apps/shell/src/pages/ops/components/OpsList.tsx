@@ -30,9 +30,8 @@ export function OpBadge({ op, choices }: { op: Op; choices: OpChoices }) {
 
 function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="pg-open" onClick={() => onOpen(op.id)}>
+    <button type="button" className="pg-open" title={op.codigo || undefined} onClick={() => onOpen(op.id)}>
       <strong>{op.codigo || 'OP sem código'}</strong>
-      <span>{op.cliente || 'Sem cliente'}</span>
     </button>
   )
 }
@@ -40,6 +39,7 @@ function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
 export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
   const columns: TableColumn<Op>[] = [
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
+    { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span title={op.cliente || undefined}>{op.cliente || 'Sem cliente'}</span> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
     { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
     { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },

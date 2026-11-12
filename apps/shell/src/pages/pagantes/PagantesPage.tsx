@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { Download, FileText, RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -12,7 +12,7 @@ import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
+import { VIEWS_KEY, loadViews, total } from './domain/filters'
 import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, paganteFields, paganteKeywordText, readPagante, sortPagantes } from './domain/lista'
 import { formatMoney } from './domain/messages'
 import { pagantesQuery } from './domain/query'
@@ -30,9 +30,8 @@ export function PagantesPage({ host }: { host: Host }) {
   return <ToastProvider><Pagantes host={host} /></ToastProvider>
 }
 
-/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
+/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['status', 'forma', 'recibo', 'falhas'] as const
-const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 function Pagantes({ host }: { host: Host }) {
@@ -41,11 +40,7 @@ function Pagantes({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
-  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
-  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
-  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const pg = usePagantes(source, since, listCache(host))
+  const pg = usePagantes(source, null, listCache(host))
   const choices = pg.choices
   const fields = useMemo(() => (choices ? paganteFields(choices) : []), [choices])
 
@@ -68,10 +63,10 @@ function Pagantes({ host }: { host: Host }) {
   })
 
   // Busca, ficha aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms
-  // depois da última tecla; enquanto o período não chegou inteiro, a busca por código também vai ao servidor.
+  // depois da última tecla; enquanto a lista não chegou inteira, a busca por código também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
   const q = useDebouncedText(query)
-  const searchPagantes = useCallback((text: string) => source.search(since, text), [source, since])
+  const searchPagantes = useCallback((text: string) => source.search(null, text), [source])
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !pg.listComplete, search: searchPagantes })
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
@@ -181,20 +176,20 @@ function Pagantes({ host }: { host: Host }) {
   } else if (!pg.choices) {
     body = <PagantesTable list={[]} choices={{ status: [], forma: [], recibo: [] }} contatos={pg.contatos} onOpen={() => undefined} loading />
   } else if (pg.listComplete && !pg.loading && !pg.list.length) {
-    body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante neste período">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento. Amplie o período para ver os mais antigos.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante ainda">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento.</EmptyState>
   } else {
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
-    // O total só vale com o período inteiro: até lá, o rodapé avisa que ainda soma.
+    // O total só vale com a lista inteira: até lá, o rodapé avisa que ainda soma.
     const pending = !pg.listComplete && pg.loading
     const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
     const empty = pending
-      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
           ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
+          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -208,7 +203,6 @@ function Pagantes({ host }: { host: Host }) {
             {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
               {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
               <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
-              <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
               {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
             </>}
           </ViewBar>

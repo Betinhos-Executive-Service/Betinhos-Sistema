@@ -6,7 +6,7 @@ import { valorOp, type Op, type OpChoices } from './types'
 
 /**
  * A lista de Ordens de Pagamento no padrão do Design System (§10.9.1 e §10.9.2): colunas da visão, campos de filtro,
- * leitura em memória e as visões prontas. O período continua fora da visão: ele decide o que carrega.
+ * leitura em memória e as visões prontas.
  */
 
 export const TELA = 'ops'
@@ -15,6 +15,7 @@ export const OP_SORT: ViewSort = { key: 'criada', dir: 'desc' }
 /** Colunas na ordem padrão; a primeira (OP) é fixa. */
 export const OP_COLUMNS: ViewColumnDef[] = [
   { key: 'op', label: 'OP' },
+  { key: 'cliente', label: 'Cliente' },
   { key: 'servicos', label: 'Serviços' },
   { key: 'passageiros', label: 'Passageiros' },
   { key: 'valor', label: 'Valor' },
@@ -28,12 +29,12 @@ const options = (list: { value: number; label: string }[]): FilterOption[] => li
 export function opFields(choices: OpChoices): FilterField[] {
   return [
     { key: 'op', label: 'OP', kind: 'text' },
+    { key: 'cliente', label: 'Cliente', kind: 'text' },
     { key: 'servicos', label: 'Primeiro serviço', kind: 'date' },
     { key: 'passageiros', label: 'Passageiros', kind: 'text' },
     { key: 'valor', label: 'Valor', kind: 'number', money: true },
     { key: 'status', label: 'Status', kind: 'choice', options: options(choices.status) },
     { key: 'criada', label: 'Criada em', kind: 'date' },
-    { key: 'cliente', label: 'Cliente', kind: 'text', advancedOnly: true },
     { key: 'trajetos', label: 'Trajetos', kind: 'text', advancedOnly: true },
     { key: 'ultimo', label: 'Último serviço', kind: 'date', advancedOnly: true },
     { key: 'idioma', label: 'Idioma', kind: 'choice', options: options(choices.idioma), advancedOnly: true },
@@ -75,6 +76,7 @@ export function sortOps(list: Op[], sort: ViewSort | null, choices: OpChoices) {
   return sortRows(list, (op) => {
     switch (sort.key) {
       case 'op': return codigoNum(op.codigo) ?? (op.codigo || null)
+      case 'cliente': return op.cliente
       case 'servicos': return op.primeiroServico?.getTime()
       case 'passageiros': return op.passageiros
       case 'valor': return valorOp(op)

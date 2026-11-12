@@ -74,9 +74,7 @@
   .grid tbody tr[aria-selected="true"] { background-color: var(--bt-color-action-soft); }
   .grid-skeleton { cursor: default !important; }
   .person { display: flex; align-items: center; gap: var(--bt-space-2-5); min-width: 0; }
-  .person > div { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
-  .person strong { font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
-  .person .muted { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); align-items: center; font-size: var(--bt-font-size-12); }
+  .person strong { overflow: hidden; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); text-overflow: ellipsis; white-space: nowrap; }
   @media (hover: hover) and (pointer: fine) {
     .grid tbody tr:not(.grid-skeleton):not([aria-selected="true"]):hover { background-color: var(--bt-color-surface-soft); }
     .th-sort:hover .th-sort-idle { opacity: 1; }

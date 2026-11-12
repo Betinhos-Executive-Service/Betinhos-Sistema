@@ -75,7 +75,7 @@ function Clientes({ host }: { host: Host }) {
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum cliente com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = mobile
       ? (visible.length ? <ClientesCards list={visible} onOpen={open} /> : <div className="surface">{empty}</div>)
-      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
+      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
   }
 
   return (

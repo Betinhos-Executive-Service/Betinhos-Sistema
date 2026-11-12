@@ -43,6 +43,8 @@
 .gr-grid { overflow: auto; }
 /* Densidade "tabela densa" (DS 1.5.0 §5.2/§10.9): linha 44 px via --bt-table-row-dense, cabeçalho 32 px. */
 .gr-table { --gr-row-height: var(--bt-table-row-dense); }
+.gr-table.gr-table--confortavel { --gr-row-height: 56px; }
+.gr-table.gr-table--minima { --gr-row-height: 32px; --bt-control-height-compact: 24px; --bt-control-height-default: 24px; }
 .gr-table .bt-table__head, .gr-table .bt-table__row { grid-template-columns: var(--gr-columns); gap: 0; padding: 0; width: 100%; min-width: var(--gr-min-width, max-content); }
 .gr-table .bt-table__head { display: grid; position: sticky; top: 0; z-index: 2; }
 .gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }

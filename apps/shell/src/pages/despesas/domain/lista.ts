@@ -9,7 +9,7 @@ import type { Despesa, DespesaChoices } from './types'
 
 /**
  * A lista de Despesas no padrão do Design System (§10.9.1 e §10.9.2): colunas da visão, campos de filtro, leitura de
- * cada campo para filtrar em memória e as visões prontas. O período continua fora da visão: ele decide o que carrega.
+ * cada campo para filtrar em memória e as visões prontas.
  */
 
 export const TELA = 'despesas'

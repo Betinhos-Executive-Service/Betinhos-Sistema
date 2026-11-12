@@ -225,7 +225,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
             rows={desktopSlice.slice}
             loading={loading && !rows.length}
             onOpen={(id) => setSelection({ mode: 'open', id })}
-            view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: lista.extra.cell }}
+            view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: lista.extra.cell }}
             quickFilters={quickFilters}
             footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
             empty={pending

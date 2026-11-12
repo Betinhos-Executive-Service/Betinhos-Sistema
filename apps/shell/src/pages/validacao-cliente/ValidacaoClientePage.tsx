@@ -165,7 +165,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
       <>
         {mobile
           ? (visible.length ? <ValidacaoCards list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} /> : <div className="surface">{empty}</div>)
-          : <ValidacaoTable list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig, pinnable: true }} extraCell={extra.cell} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <ValidacaoTable list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true }} extraCell={extra.cell} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

@@ -86,7 +86,7 @@ function Logs({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <LogsCards list={slice} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -117,12 +117,12 @@ type ListProps = { list: LogApp[]; onOpen: (id: string) => void; loading?: boole
 
 function LogsTable({ list, onOpen, loading, view, quickFilters, footer, empty }: ListProps & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }) {
   const columns: TableColumn<LogApp>[] = [
-    { key: 'mensagem', header: 'Mensagem', label: 'Mensagem', sortable: true, defaultWidth: 380, width: 'minmax(240px, 3fr)', cell: (l) => (
-      <button type="button" className="lg-open" onClick={() => onOpen(l.id)}>
+    { key: 'erro', header: 'Erro', label: 'Erro', sortable: true, defaultWidth: 200, width: 'minmax(140px, 1.2fr)', cell: (l) => (
+      <button type="button" className="lg-open" title={l.erro || undefined} onClick={() => onOpen(l.id)}>
         <strong>{l.erro || 'Erro'}</strong>
-        <span>{l.mensagem || 'Sem mensagem'}</span>
       </button>
     ) },
+    { key: 'mensagem', header: 'Mensagem', label: 'Mensagem', sortable: true, defaultWidth: 380, width: 'minmax(240px, 3fr)', cell: (l) => <span title={l.mensagem || undefined}>{l.mensagem || 'Sem mensagem'}</span> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 170, width: 'minmax(140px, 1fr)', cell: (l) => <span className="lg-num">{fmtData(l.data)}</span> },
     { key: 'app', header: 'App', label: 'App', sortable: true, defaultWidth: 150, width: 'minmax(110px, 1fr)', cell: (l) => l.app || '—' },
     { key: 'severidade', header: 'Severidade', label: 'Severidade', sortable: true, defaultWidth: 120, width: 'minmax(96px, .7fr)', cell: (l) => <Severidade l={l} /> },

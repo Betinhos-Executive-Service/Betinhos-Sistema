@@ -5,16 +5,15 @@
 .ps-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ps-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
 .ps-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
-.ps-contato { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
-.ps-contato span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-contato { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-table .ps-badges, .ps-table .ps-actions { flex-wrap: nowrap; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; }
 
 .ps-filters__view { flex: 0 1 220px; min-width: 180px; }
 .ps-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 .ps-filters__select { flex: 0 1 170px; min-width: 150px; }
 
-.ps-open { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
-.ps-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
-.ps-open span { overflow: hidden; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
+.ps-open { display: block; max-width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.ps-open strong { display: block; overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
 .ps-open:focus-visible, .ps-card__open:focus-visible, .ps-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 
 /* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do nome). */

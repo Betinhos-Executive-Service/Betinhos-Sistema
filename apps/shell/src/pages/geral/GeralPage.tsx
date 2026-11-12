@@ -633,6 +633,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           )
           : (
             <GeralTable
+              density={viewState.density}
               columns={visibleColumns}
               customWidths={prefs?.widths}
               onResize={resizeColumn}

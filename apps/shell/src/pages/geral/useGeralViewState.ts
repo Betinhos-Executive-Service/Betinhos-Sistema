@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   emptyFilters, sameConfig, storedFilters,
-  type TableFilters, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig, type ViewSort,
+  type TableDensity, type TableFilters, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig, type ViewSort,
 } from '@betinhos/ui'
 import { applyColumnPrefs, type ColumnPrefs, type KV } from './domain/columns'
 import { fromConfigKey, toConfigKey } from './domain/extraLinks'
@@ -76,6 +76,8 @@ function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filt
   }
 }
 
+const DENSITY_KEY = 'betinhos.densidade.geral'
+
 /**
  * Adapta a Geral (savedquery/userquery do Dataverse + preferências de coluna no navegador) ao contrato `TableViewState`
  * do `@betinhos/ui`, para usar a `ViewBar` sem trocar o armazenamento das visões. Visões do sistema aparecem como
@@ -126,6 +128,14 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
   }, [columns, prefs, sort, filters, hidden, baseline, setPrefs, setSort, setFilters])
 
 
+  // A Geral nasceu densa (grade editável): Compacta é o padrão; Confortável fica lembrada no navegador.
+  const { kv } = o
+  const [density, setDensityState] = useState<TableDensity>(() => { try { const v = kv.getItem(DENSITY_KEY); return v === 'default' || v === 'minimal' ? v : 'dense' } catch { return 'dense' } })
+  const setDensity = useCallback((next: TableDensity) => {
+    setDensityState(next)
+    try { kv.setItem(DENSITY_KEY, next) } catch { /* sem armazenamento: só não lembra */ }
+  }, [kv])
+
   const { selectView, reloadViews, createView, updateView, renameView, deleteView } = o
   const restore = useCallback(() => {
     const padrao = views.find((e) => e.scope === 'padrao') ?? views[0]
@@ -146,6 +156,8 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     dirty: !sameConfig(config, baseline),
     canPublish: false,
     setConfig,
+    density,
+    setDensity,
     select: selectView,
     restore,
     save: updateView,

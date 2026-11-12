@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, SegmentedControl, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, SegmentedControl, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -15,7 +15,7 @@ import { createSource as createConciliacaoSource } from './conciliacao/data/sour
 import { useConciliacao } from './conciliacao/useConciliacao'
 import { ComprasSemDespesa, contarSemDespesa } from './conciliacao/ComprasSemDespesa'
 import { CompraDrawers } from './conciliacao/CompraDrawers'
-import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, opcoes, periodoStart, type Periodo } from './domain/filters'
+import { VIEWS_KEY, loadViews, opcoes } from './domain/filters'
 import { DESPESA_COLUMNS, TELA, builtinViews, despesaFields, despesaKeywordText, fromLegacyFilters, legacyViewConfig, readDespesa, sortDespesas } from './domain/lista'
 import { despesasQuery } from './domain/query'
 import { MENSAGEM_DECISAO, aplicarDecisao, proximaEsperando, type Decisao } from './domain/decisao'
@@ -34,11 +34,10 @@ export function DespesasPage({ host }: { host: Host }) {
 }
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
-/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
+/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['operacional', 'financeiro', 'categoria', 'motorista', 'alertas'] as const
 /** Entradas da tela: a lista de despesas e a fila de compras do cartão que ainda não têm despesa (`?fila=sem-despesa`). */
 type Fila = 'despesas' | 'sem-despesa'
-const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 
 function Despesas({ host }: { host: Host }) {
   const auditoria = useAuditoria()
@@ -46,11 +45,7 @@ function Despesas({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
-  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
-  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
-  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const despesas = useDespesas(source, since, listCache(host))
+  const despesas = useDespesas(source, null, listCache(host))
   // Compras do cartão (últimos 12 meses), uma carga só: a coluna Conciliação, a ficha e a fila usam a mesma.
   const conciliacaoSource = useMemo(() => createConciliacaoSource(host), [host])
   const conciliacao = useConciliacao(conciliacaoSource)
@@ -61,10 +56,10 @@ function Despesas({ host }: { host: Host }) {
   const [compraId, setCompraId] = useState<string | null>(null)
   const choices = despesas.choices
   // Busca e despesa aberta continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms depois da
-  // última tecla; enquanto o período não chegou inteiro, a busca também vai ao servidor.
+  // última tecla; enquanto a lista não chegou inteira, a busca também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
   const q = useDebouncedText(query)
-  const searchDespesas = useCallback((text: string) => source.search(since, text), [source, since])
+  const searchDespesas = useCallback((text: string) => source.search(null, text), [source])
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !despesas.complete, search: searchDespesas })
   const list = useMergedById(despesas.list, found)
   const op = useMemo(() => opcoes(list), [list])
@@ -110,7 +105,7 @@ function Despesas({ host }: { host: Host }) {
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
-  // Os cartões de totais só valem com o período inteiro: até lá ficam carregando.
+  // Os cartões de totais só valem com a lista inteira: até lá ficam carregando.
   const pending = !despesas.complete && despesas.loading
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
 
@@ -135,10 +130,8 @@ function Despesas({ host }: { host: Host }) {
     return true
   }, [source, despesas.mutate, toast, setSelectedId])
 
-  // A despesa ligada à compra pode ser de antes do período carregado: as compras vêm de 12 meses, então amplia até lá.
   const abrirDespesa = (id: string) => {
     setCompraId(null)
-    if (!list.some((d) => d.id === id) && (periodo === '30' || periodo === '90')) setPeriodo('365')
     setSelectedId(id)
   }
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload(); void conciliacao.reload() }, [despesas.reload, conciliacao.reload])
@@ -162,17 +155,17 @@ function Despesas({ host }: { host: Host }) {
   } else if (loadingFirst) {
     body = <DespesasTable list={[]} choices={{ operacional: [], financeiro: [], anexo: [], origem: [], anexoTipo: [], anexoStatus: [] }} onOpen={() => undefined} loading />
   } else if (despesas.complete && !despesas.loading && !despesas.list.length) {
-    body = <EmptyState className="surface" align="start" icon={<ReceiptText size={36} />} title="Nenhuma despesa neste período">As despesas são lançadas pelos motoristas no App Motoristas. Amplie o período para ver as mais antigas.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<ReceiptText size={36} />} title="Nenhuma despesa ainda">As despesas são lançadas pelos motoristas no App Motoristas.</EmptyState>
   } else {
-    const footer = <span className="pg-num">{plural(visible.length, 'despesa', 'despesas')} de {list.length} no período{pending ? ' · carregando o restante…' : ''}</span>
+    const footer = <span className="pg-num">{plural(visible.length, 'despesa', 'despesas')} de {list.length}{pending ? ' · carregando o restante…' : ''}</span>
     const empty = pending
-      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma despesa com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = (
       <>
         {mobile
           ? (visible.length ? <DespesasCards list={slice} choices={choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <DespesasTable list={slice} choices={choices} compras={compras} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
+          : <DespesasTable list={slice} choices={choices} compras={compras} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -189,7 +182,6 @@ function Despesas({ host }: { host: Host }) {
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
-          <Select className="pg-filters__select" aria-label="Período do gasto" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
           {/* O cabeçalho do shell (com o Atualizar de headerActions) só aparece no celular; no desktop o botão fica aqui. */}
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}
         </ViewBar>

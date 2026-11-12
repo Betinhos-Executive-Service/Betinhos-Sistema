@@ -16,11 +16,13 @@ export function Situacao({ t }: { t: Transacao }) {
   return <StatusBadge tone={situacaoTone(t.situacao)}>{situacaoLabel(t.situacao)}</StatusBadge>
 }
 
-function Abrir({ t, onOpen, className }: { t: Transacao; onOpen: (id: string) => void; className: string }) {
+/** `motivo`: no cartão do celular a segunda linha fica; na tabela o motivo é uma coluna própria. */
+function Abrir({ t, onOpen, className, motivo = true }: { t: Transacao; onOpen: (id: string) => void; className: string; motivo?: boolean }) {
+  const titulo = t.estabelecimento || t.descricao || 'Sem descrição'
   return (
-    <button type="button" className={className} onClick={() => onOpen(t.id)}>
-      <strong>{t.estabelecimento || t.descricao || 'Sem descrição'}</strong>
-      {t.motivo ? <span>{t.motivo}</span> : null}
+    <button type="button" className={className} title={motivo ? undefined : titulo} onClick={() => onOpen(t.id)}>
+      <strong>{titulo}</strong>
+      {motivo && t.motivo ? <span>{t.motivo}</span> : null}
     </button>
   )
 }
@@ -38,8 +40,9 @@ export const Canal = ({ t }: { t: Transacao }) => <StatusBadge tone="neutral">{c
 export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, loading, empty, footer, selection, bulkActions }: TableProps) {
   const hoje = todaySaoPaulo()
   const columns: TableColumn<Transacao>[] = [
-    { key: 'data', header: 'Compra', width: '104px', cell: (t) => <span className="cc-data"><span className="cc-num">{fmtData(t.dataCompra)}</span><Idade t={t} hoje={hoje} /></span> },
-    { key: 'descricao', header: 'Lançamento', width: 'minmax(220px, 2.4fr)', cell: (t) => <Abrir t={t} onOpen={onOpen} className="cc-open" /> },
+    { key: 'data', header: 'Compra', width: '150px', cell: (t) => <span className="cc-data"><span className="cc-num">{fmtData(t.dataCompra)}</span><Idade t={t} hoje={hoje} /></span> },
+    { key: 'descricao', header: 'Lançamento', width: 'minmax(220px, 2.4fr)', cell: (t) => <Abrir t={t} onOpen={onOpen} className="cc-open" motivo={false} /> },
+    { key: 'motivo', header: 'Motivo', width: 'minmax(160px, 1.4fr)', cell: (t) => <span className="cc-motivo" title={t.motivo || undefined}>{t.motivo || '—'}</span> },
     { key: 'canal', header: 'Canal', width: '120px', cell: (t) => <Canal t={t} /> },
     { key: 'cartao', header: 'Cartão', width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: cartaoTexto },
     { key: 'motorista', header: 'Motorista', width: 'minmax(130px, 1fr)', cell: (t) => t.motoristaNome || <span className="cc-muted">Sem motorista</span> },

@@ -102,7 +102,7 @@ function Treinamentos({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <TreinamentosCards list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

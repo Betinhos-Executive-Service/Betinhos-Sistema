@@ -14,7 +14,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('button')!)
+const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('.bt-table__row')!.querySelector<HTMLElement>('.pg-open')!)
 
 
 const blobText = (blob: Blob) => new Promise<string>((resolve) => {

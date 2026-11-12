@@ -6,7 +6,7 @@ import type { ChoiceSet, Contato, Pagante } from './types'
 
 /**
  * A lista de Pagantes no padrão do Design System (§10.9.1 e §10.9.2): colunas da visão, campos de filtro, leitura em
- * memória e as visões prontas. O período continua fora da visão: ele decide o que carrega.
+ * memória e as visões prontas.
  */
 
 export const TELA = 'pagantes'
@@ -15,6 +15,7 @@ export const PAGANTE_SORT: ViewSort = { key: 'criado', dir: 'desc' }
 /** Colunas na ordem padrão; a primeira (Pagante) é fixa. */
 export const PAGANTE_COLUMNS: ViewColumnDef[] = [
   { key: 'pessoa', label: 'Pagante' },
+  { key: 'codigo', label: 'Código' },
   { key: 'op', label: 'OP' },
   { key: 'valor', label: 'Valor' },
   { key: 'forma', label: 'Forma' },
@@ -31,6 +32,7 @@ const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', lab
 export function paganteFields(choices: ChoiceSet): FilterField[] {
   return [
     { key: 'pessoa', label: 'Pagante', kind: 'text' },
+    { key: 'codigo', label: 'Código', kind: 'text' },
     { key: 'op', label: 'OP', kind: 'text' },
     { key: 'valor', label: 'Valor', kind: 'number', money: true },
     { key: 'forma', label: 'Forma', kind: 'choice', options: options(choices.forma) },
@@ -48,6 +50,7 @@ const asText = (v: number | null) => (v == null ? null : String(v))
 export function readPagante(p: Pagante, key: string): unknown {
   switch (key) {
     case 'pessoa': return [p.pessoa, p.codigo].filter(Boolean).join(' ')
+    case 'codigo': return p.codigo
     case 'op': return p.op
     case 'valor': return p.valor
     case 'forma': return asText(p.forma)
@@ -78,6 +81,7 @@ export function sortPagantes(list: Pagante[], sort: ViewSort | null, choices: Ch
   return sortRows(list, (p) => {
     switch (sort.key) {
       case 'pessoa': return p.pessoa
+      case 'codigo': return Number(p.codigo.replace(/\D/g, '')) || p.codigo || null
       case 'op': return Number(p.op.replace(/\D/g, '')) || p.op || null
       case 'valor': return p.valor
       case 'forma': return p.forma == null ? null : label(choices.forma, p.forma, '')

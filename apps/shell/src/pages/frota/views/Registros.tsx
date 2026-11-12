@@ -101,7 +101,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload }
         rows={slice}
         rowKey={(linha) => linha.id}
         onRowClick={(linha) => onOpen(linha.kind, linha.id)}
-        view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }}
+        view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {todas.length}{kind === 'multa' && todas.some((linha) => linha.termoIndisponivel) ? ' · Coluna Termo indisponível: não foi possível ler os termos' : ''}</span>}
         empty={<EmptyState compact align="start" title={`Nenhum registro de ${KIND_LABEL[kind].toLowerCase()} com estes filtros`} action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}

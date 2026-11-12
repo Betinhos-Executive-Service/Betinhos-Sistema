@@ -94,6 +94,9 @@ describe('capa na lista (SharePoint sob demanda)', () => {
   it('capa que falha ao baixar mostra o ícone do tipo, sem imagem quebrada', async () => {
     const baixar = montar((c) => c.includes('/1/'))
     await screen.findByRole('button', { name: /^Item 01/ })
+    // Como no teste acima: só "aparece" depois que as linhas montaram e passaram a ser observadas (o CI é lento).
+    await waitFor(() => expect(thumbs()).toHaveLength(50))
+    await new Promise((r) => setTimeout(r, 50))
     aparecer(thumbs().slice(0, 2))
     await waitFor(() => expect(baixar).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(thumbs()[0].querySelector('img')).toBeTruthy())

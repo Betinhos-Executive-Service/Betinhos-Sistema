@@ -14,9 +14,8 @@ const fmtPontos = (v: number) => `${v} ${v === 1 ? 'ponto' : 'pontos'}`
 
 function OpenName({ i, onOpen }: { i: Infracao; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="if-open" onClick={() => onOpen(i.id)}>
+    <button type="button" className="if-open" title={i.codigo || undefined} onClick={() => onOpen(i.id)}>
       <strong className="if-num">{i.codigo || 'Sem código'}</strong>
-      <span>{i.descricao || 'Sem descrição'}</span>
     </button>
   )
 }
@@ -35,6 +34,7 @@ const usoCount = (uso: Map<string, MultaUso[]>, id: string) => uso.get(id)?.leng
 export function InfracoesTable({ list, uso, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Infracao>[] = [
     { key: 'infracao', header: 'Infração', label: 'Infração', sortable: true, defaultWidth: 360, width: 'minmax(220px, 2.6fr)', cell: (i) => <OpenName i={i} onOpen={onOpen} /> },
+    { key: 'descricao', header: 'Descrição', label: 'Descrição', sortable: true, defaultWidth: 320, width: 'minmax(200px, 2.4fr)', cell: (i) => <span title={i.descricao || undefined}>{i.descricao || 'Sem descrição'}</span> },
     { key: 'gravidade', header: 'Gravidade', label: 'Gravidade', sortable: true, defaultWidth: 160, width: 'minmax(120px, .8fr)', cell: (i) => <Badges i={i} /> },
     { key: 'pontos', header: 'Pontos', label: 'Pontos', sortable: true, defaultWidth: 100, width: '76px', cell: (i) => <span className="if-num">{i.pontos ?? '—'}</span> },
     { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: (i) => <span className="if-num">{fmtValor(i.valor)}</span> },

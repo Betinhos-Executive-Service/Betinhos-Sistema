@@ -92,7 +92,7 @@ function Equipamentos({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <EquipamentosCards list={slice} inativos={inativos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
