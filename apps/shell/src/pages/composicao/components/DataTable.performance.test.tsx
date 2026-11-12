@@ -4,6 +4,7 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DataTable } from './DataTable'
 import { adjacentGridCell } from './grid-cell-focus'
+import { useGridRowState } from './grid-row-state'
 import type { DataTableFeatures } from './features'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -187,6 +188,31 @@ describe('virtualização das linhas', () => {
     expect(element.scrollTop).toBeGreaterThan(800 * 38)
     act(() => { element.dispatchEvent(new Event('scroll')) })
     expect(container.querySelector('[data-grid-cell="900:value"]')).not.toBeNull()
+    element.remove()
+  })
+
+  it('mantém montada a linha em edição ao rolar para longe e voltar: o rascunho não se perde', () => {
+    const element = scroller()
+    // Célula mínima com a mesma ligação da EditableViewFieldCell: avisa a grade quando entra e sai da edição.
+    const Editable = ({ id }: { id: string }) => {
+      const state = useGridRowState()
+      return <input aria-label={`rascunho ${id}`} onFocus={() => state?.setEditing(true)} onBlur={() => state?.setEditing(false)} />
+    }
+    const editableColumns = [column.accessor('value', { cell: ({ row }) => <Editable id={row.id} /> })]
+    const { container } = render(<DataTable data={rows} columns={editableColumns} getRowId={getRowId} rowRenderKeys={new Map()} scroller={element} />)
+    const input = screen.getByLabelText('rascunho 5') as HTMLInputElement
+    act(() => { input.focus() })
+    fireEvent.change(input, { target: { value: 'texto digitado' } })
+    // O foco sai do input ao rolar (como num clique fora); a edição continua marcada pela célula real, aqui mantida por foco forçado.
+    const scrollTo = (top: number) => { element.scrollTop = top; act(() => { element.dispatchEvent(new Event('scroll')) }) }
+    scrollTo(899 * 38)
+    expect(container.querySelector('[aria-label="rascunho 900"]')).not.toBeNull()
+    expect((container.querySelector('[aria-label="rascunho 5"]') as HTMLInputElement | null)?.value).toBe('texto digitado')
+    expect(container.querySelector('table')?.dataset.rowCount).toBe('1200')
+    const total = Array.from(container.querySelectorAll<HTMLElement>('tr[data-spacer] td')).reduce((sum, td) => sum + Number(td.style.height.replace('px', '')), 0)
+    expect(total + bodyRows(container).length * 38).toBe(1200 * 38)
+    scrollTo(0)
+    expect((container.querySelector('[aria-label="rascunho 5"]') as HTMLInputElement).value).toBe('texto digitado')
     element.remove()
   })
 })

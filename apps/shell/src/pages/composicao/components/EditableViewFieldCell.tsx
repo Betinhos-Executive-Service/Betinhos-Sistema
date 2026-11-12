@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useGridRowState } from './grid-row-state'
 import { choiceOptions, dateFieldConfig, lookupOptions, relatedRecordId, saveRelatedField, type DateFieldConfig, type EditOption, type SavedFieldValue } from '../data/related-field-edit'
 import { gridFieldDraft, gridFieldValue, numericFieldTypes } from '../data/grid-field-value'
 import { ViewFieldCell, type ViewFieldCellProps } from './ViewFieldCell'
@@ -23,6 +24,7 @@ export function EditableViewFieldCell(props: Props) {
   const cell = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
   const editingRef = useRef(false)
+  const gridRow = useGridRowState()
   const savingRef = useRef(false)
   const draftRef = useRef('')
   const selectOnFocus = useRef(true)
@@ -54,7 +56,7 @@ export function EditableViewFieldCell(props: Props) {
   const currentLabel = typeof shownFormatted === 'string' ? shownFormatted : field.type === 'Boolean' ? booleanOptions.find((option) => option.value === String(shownValue))?.label ?? '' : shownValue === null || shownValue === undefined ? '' : String(shownValue)
 
   const changeDraft = (text: string) => { draftRef.current = text; setDraft(text) }
-  const close = () => { editingRef.current = false; setEditing(false); onEditingChange?.(false) }
+  const close = () => { editingRef.current = false; setEditing(false); onEditingChange?.(false); gridRow?.setEditing(false) }
   const begin = (initial?: string, fromKeyboard = false) => {
     if (!canEdit || savingRef.current || onBeforeEdit?.() === false) return
     if (timer.current) clearTimeout(timer.current)
@@ -74,6 +76,7 @@ export function EditableViewFieldCell(props: Props) {
     editingRef.current = true
     setEditing(true)
     onEditingChange?.(true)
+    gridRow?.setEditing(true)
   }
 
   useLayoutEffect(() => {
@@ -150,6 +153,7 @@ export function EditableViewFieldCell(props: Props) {
     setMessage('Salvando')
     savingRef.current = true
     onSavingChange?.(true)
+    gridRow?.setSaving(true)
     close()
     if (restoreFocus) focusNext(navigation, reverse)
     void saveRelatedField(field, recordId, next, option).then(async (result) => {
@@ -164,7 +168,7 @@ export function EditableViewFieldCell(props: Props) {
       failedDraft.current = originalDraft
       setFeedback('error')
       setMessage(errorText(error))
-    }).finally(() => { savingRef.current = false; onSavingChange?.(false) })
+    }).finally(() => { savingRef.current = false; onSavingChange?.(false); gridRow?.setSaving(false) })
   }
 
   const cancel = () => { failedDraft.current = null; close(); setFeedback(null); setMessage(''); focusNext() }

@@ -280,8 +280,6 @@
 .composicao .view-pinned { position: sticky !important; z-index: 3; background: var(--bt-color-surface); }
 .composicao .price-grid thead .view-pinned { z-index: 9; background: var(--bt-color-surface-soft); }
 .composicao .price-grid__footer .view-pinned { z-index: 7; background: var(--bt-color-surface-soft); }
-.composicao .price-grid thead th { position: sticky; }
-.composicao .price-grid thead th:has(.view-column-resize) { position: sticky; }
 /* Alça no padrão do DS (.bt-table__resize): área de 10px na borda direita com uma linha de 2px que aparece ao passar no título. */
 .composicao .view-column-resize { position: absolute; z-index: 11; top: 0; right: 0; width: 10px; height: 100%; cursor: col-resize; touch-action: none; }
 .composicao .view-column-resize::after { content: ""; position: absolute; top: 8px; bottom: 8px; right: 0; width: 2px; border-radius: var(--bt-radius-full); background-color: transparent; transition: background-color var(--bt-duration-fast) ease; }

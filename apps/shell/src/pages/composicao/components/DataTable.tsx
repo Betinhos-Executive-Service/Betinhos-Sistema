@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   useTable,
   flexRender,
@@ -12,6 +12,7 @@ import {
   type TableFeatures,
 } from '@tanstack/react-table'
 import { useVirtualRows } from '../../../app/VirtualTable'
+import { GridRowContext } from './grid-row-state'
 import { REVEAL_GRID_ROW, type RevealGridRow } from './grid-cell-focus'
 import { dataTableFeatures, type DataTableFeatures } from './features'
 import type { ViewColumn } from '../data/views'
@@ -51,18 +52,23 @@ type ResizeApi = { begin: (id: string, startX: number, startWidth: number) => vo
 
 const clampWidth = (width: number) => Math.max(100, Math.min(600, width))
 
-function DataRow<TData extends RowData>({ row, selected, presentation }: {
+function DataRow<TData extends RowData>({ row, selected, presentation, report }: {
   row: Row<DataTableFeatures, TData>
   selected: boolean
   presentation: RowPresentation
+  report: (rowId: string, kind: 'editing' | 'saving', on: boolean) => void
   columns: DataTableProps<TData>['columns']
   renderKey: unknown
 }) {
-  return <tr data-state={selected ? 'selected' : undefined} className="price-grid__body-row">
-    {row.getAllCells().map((cell) => <td key={cell.id} {...presentation.get(cell.column.id)}>
-      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-    </td>)}
-  </tr>
+  const rowId = row.id
+  const state = useMemo(() => ({ setEditing: (on: boolean) => report(rowId, 'editing', on), setSaving: (on: boolean) => report(rowId, 'saving', on) }), [report, rowId])
+  return <GridRowContext.Provider value={state}>
+    <tr data-state={selected ? 'selected' : undefined} className="price-grid__body-row">
+      {row.getAllCells().map((cell) => <td key={cell.id} {...presentation.get(cell.column.id)}>
+        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+      </td>)}
+    </tr>
+  </GridRowContext.Provider>
 }
 
 // O TanStack recria os objetos Row a cada mudança de `data`; a linha só precisa renderizar de novo quando o
@@ -208,7 +214,16 @@ export function DataTable<TData extends RowData>({
   const tableRef = useRef<HTMLTableElement>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
   const rows = table.getRowModel().rows
-  const { virtual, visible, start, before, after } = useVirtualRows(rows, (row) => row.id, scroller, scrollMargin, ROW_HEIGHT)
+  const { virtual, visible, start } = useVirtualRows(rows, (row) => row.id, scroller, scrollMargin, ROW_HEIGHT)
+  // Linhas com célula editando ou salvando continuam montadas fora da janela: desmontar perderia o rascunho.
+  const heldKinds = useRef({ editing: new Set<string>(), saving: new Set<string>() })
+  const [held, setHeld] = useState<ReadonlySet<string>>(() => new Set())
+  const report = useCallback((rowId: string, kind: 'editing' | 'saving', on: boolean) => {
+    const kinds = heldKinds.current
+    kinds[kind][on ? 'add' : 'delete'](rowId)
+    const next = new Set([...kinds.editing, ...kinds.saving])
+    setHeld((current) => current.size === next.size && [...next].every((id) => current.has(id)) ? current : next)
+  }, [])
   // Onde a primeira linha começa no conteúdo do scroller: a tabela pode ter algo acima dela e o cabeçalho é fixo.
   useLayoutEffect(() => {
     const element = tableRef.current
@@ -232,6 +247,7 @@ export function DataTable<TData extends RowData>({
     const reveal = (event: Event) => {
       const request = (event as CustomEvent<RevealGridRow>).detail
       pendingFocus.current = request
+      // Posição calculada com a altura fixa da linha (ROW_HEIGHT); se as linhas passarem a ter altura variável, medir.
       scroller.scrollTop = Math.max(0, scrollMargin + request.index * ROW_HEIGHT - scroller.clientHeight / 2)
       setRevealTick((tick) => tick + 1)
     }
@@ -278,6 +294,39 @@ export function DataTable<TData extends RowData>({
     style: cellStyle(item.id),
   }])), [columns, layoutShape])
 
+  const spacer = (key: string, height: number) => <tr key={key} aria-hidden="true" data-spacer className="price-grid__spacer"><td colSpan={leafColumns.length} style={{ height }} /></tr>
+  const dataRow = (row: Row<DataTableFeatures, TData>) => (
+    <MemoDataRow
+      key={row.id}
+      row={row}
+      columns={columns}
+      selected={row.getIsSelected()}
+      presentation={rowPresentation}
+      report={report}
+      renderKey={rowRenderKeys ? rowRenderKeys.get(row.id) : {}}
+    />
+  )
+  // Uma lista só, com chaves: a linha mantida passa de "na janela" a "fora dela" sem desmontar. As linhas mantidas ficam
+  // entre espaçadores que somam a altura que a posição delas já ocupava, para a rolagem não pular.
+  const bodyItems: ReactNode[] = []
+  if (!virtual) bodyItems.push(...visible.map(dataRow))
+  else {
+    const end = start + visible.length
+    const heldOutside = held.size ? rows.flatMap((row, index) => held.has(row.id) && (index < start || index >= end) ? [{ row, index }] : []) : []
+    const push = (from: number, items: typeof heldOutside, to: number, tag: string) => {
+      let cursor = from
+      for (const item of items) {
+        if (item.index > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (item.index - cursor) * ROW_HEIGHT))
+        bodyItems.push(dataRow(item.row))
+        cursor = item.index + 1
+      }
+      if (to > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (to - cursor) * ROW_HEIGHT))
+    }
+    push(0, heldOutside.filter((item) => item.index < start), start, 'antes')
+    bodyItems.push(...visible.map(dataRow))
+    push(end, heldOutside.filter((item) => item.index >= end), rows.length, 'depois')
+  }
+
   useEffect(() => onSelectionChange?.(selectedIds), [onSelectionChange, data, rowSelection])
 
   return (
@@ -304,18 +353,7 @@ export function DataTable<TData extends RowData>({
       </thead>
       <tbody>
         {rows.length ? (<>
-          {virtual && before > 0 && <tr aria-hidden="true" data-spacer className="price-grid__spacer"><td colSpan={leafColumns.length} style={{ height: before }} /></tr>}
-          {visible.map((row) => (
-            <MemoDataRow
-              key={row.id}
-              row={row}
-              columns={columns}
-              selected={row.getIsSelected()}
-              presentation={rowPresentation}
-              renderKey={rowRenderKeys ? rowRenderKeys.get(row.id) : {}}
-            />
-          ))}
-          {virtual && after > 0 && <tr aria-hidden="true" data-spacer className="price-grid__spacer"><td colSpan={leafColumns.length} style={{ height: after }} /></tr>}
+          {bodyItems}
         </>) : (
           <tr className="price-grid__empty-row">
             <td className="price-grid__empty" colSpan={leafColumns.length}>
