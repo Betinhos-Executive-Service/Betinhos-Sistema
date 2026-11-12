@@ -40,6 +40,23 @@ export function useVirtualRows<T>(rows: T[], rowKey: (row: T) => string, scrolle
   }
 }
 
+/** Colunas a partir desta largura (px) encolhem; as menores (seleção, ícones) ficam fixas. */
+const FIT_FROM = 64
+
+/**
+ * Modelo de colunas que cabe na largura: `Npx` (≥ FIT_FROM) vira `max(48px, min(Npx, fatia))`, com a fatia proporcional
+ * a N no espaço que sobra depois das colunas fixas e dos espaçamentos. Exportada para teste.
+ */
+export function fitTemplate(template: string) {
+  const tracks = template.match(/minmax\([^)]*\)|\S+/g) ?? []
+  const px = (track: string) => (/^\d+(\.\d+)?px$/.test(track) ? Number.parseFloat(track) : null)
+  const big = tracks.reduce((sum, t) => sum + ((px(t) ?? 0) >= FIT_FROM ? px(t)! : 0), 0)
+  if (!big) return template
+  const fixed = tracks.reduce((sum, t) => sum + ((px(t) ?? FIT_FROM) < FIT_FROM ? px(t)! : 0), 0)
+  const free = `(100% - ${tracks.length - 1} * var(--bt-table-gap, 0px) - ${fixed}px)`
+  return tracks.map((t) => ((px(t) ?? 0) >= FIT_FROM ? `max(48px, min(${t}, calc(${free} * ${px(t)! / big})))` : t)).join(' ')
+}
+
 /**
  * `Table` do DS que desenha só as linhas perto da tela quando a lista passa de `VIRTUAL_FROM`; rola no `main` do shell.
  * O pacote não virtualiza: aqui o `Table` recebe só a janela de linhas e as de fora viram margem antes da primeira e
@@ -86,6 +103,24 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
       measure(node)
     })
   })
+
+  const hasView = props.view != null
+  // Colunas de visão cabem na largura da lista: cada largura salva vira teto e, sem espaço, todas encolhem na mesma
+  // proporção (o texto trunca) em vez de empurrar as últimas para fora. O DS grava o modelo em `--bt-table-columns`.
+  useLayoutEffect(() => {
+    const table = host.current?.querySelector<HTMLElement>('.bt-table--view')
+    if (!table) return
+    const fit = () => {
+      for (const [from, to] of [['--bt-table-columns', '--vt-fit'], ['--bt-table-columns-compact', '--vt-fit-compact']]) {
+        const value = fitTemplate(table.style.getPropertyValue(from))
+        if (table.style.getPropertyValue(to) !== value) table.style.setProperty(to, value)
+      }
+    }
+    fit()
+    const observer = new MutationObserver(fit)
+    observer.observe(table, { attributes: true, attributeFilter: ['style'] })
+    return () => observer.disconnect()
+  }, [hasView])
 
   return (
     <div ref={host} className="vt-host">

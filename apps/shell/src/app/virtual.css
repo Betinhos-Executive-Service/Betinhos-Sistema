@@ -2,3 +2,11 @@
 .vt-host { display: contents; }
 .vt-table .bt-table__row:nth-child(1 of .bt-table__row) { margin-top: var(--vt-before, 0px); }
 .vt-table .bt-table__row:nth-last-child(1 of .bt-table__row) { margin-bottom: var(--vt-after, 0px); }
+/* Colunas de visão cabem na lista (teto = largura salva, texto trunca); ver VirtualTable. Celular mantém o layout do DS. */
+@media (min-width: 821px) {
+  .vt-table.bt-table--view .bt-table__head, .vt-table.bt-table--view .bt-table__row { grid-template-columns: var(--vt-fit, var(--bt-table-columns)); width: 100%; }
+  .vt-table.bt-table--view .bt-table__row > .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (min-width: 821px) and (max-width: 1120px) {
+  .vt-table.bt-table--view .bt-table__head, .vt-table.bt-table--view .bt-table__row { grid-template-columns: var(--vt-fit-compact, var(--vt-fit, var(--bt-table-columns-compact, var(--bt-table-columns)))); }
+}
