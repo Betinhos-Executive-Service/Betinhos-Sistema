@@ -6,6 +6,7 @@ import { logAppError } from '@betinhos/ui/error-logger'
 import { PageLayout } from '../../app/PageLayout'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
+import { HoldGridRow } from './components/HoldGridRow'
 import { ViewManager } from './components/ViewManager'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
@@ -444,7 +445,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     try { if (id) window.localStorage.setItem(LAST_VIEW_KEY, id); else window.localStorage.removeItem(LAST_VIEW_KEY) } catch { /* sem armazenamento local: abre pela view padrão */ }
   }
   const selectView = useCallback((id: string) => {
-    if (commandLocked) return
+    if (commandLocked || id === activeView?.id) return
     const selected = views.find((view) => view.id === id) ?? null
     setActiveView(selected)
     setOpenQuery(null)
@@ -461,7 +462,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     setNextLink(null)
     setLoading(true)
     loadedPagesRef.current = 1
-  }, [applyViewDefinition, commandLocked, dataSource, views])
+  }, [activeView?.id, applyViewDefinition, commandLocked, dataSource, views])
   const saveCurrentView = useCallback(async (name: string, kind: 'personal' | 'public', overwrite: boolean, definition: ViewDefinition) => {
     if (!catalog.length || !definition.columns.length) throw new Error('Escolha ao menos uma coluna disponível.')
     const saved = dataSource === 'mock'
@@ -1284,6 +1285,7 @@ function ComposicaoContent({ host }: { host: Host }) {
                 {cellFeedback.status === 'error' ? <X aria-hidden="true" /> : null}
               </span>
             ) : null}
+            <HoldGridRow active={isEditing || cellFeedback?.status === 'saving'} />
             {isEditing ? (
               <input
                 ref={inputRef}

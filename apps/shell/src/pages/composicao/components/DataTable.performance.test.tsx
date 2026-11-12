@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DataTable } from './DataTable'
 import { adjacentGridCell } from './grid-cell-focus'
 import { useGridRowState } from './grid-row-state'
+import { HoldGridRow } from './HoldGridRow'
+import { useState } from 'react'
 import type { DataTableFeatures } from './features'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -244,6 +246,31 @@ describe('virtualização das linhas', () => {
     // Da linha fixada, para baixo vai para a 6 (pedida), não para a janela.
     expect(adjacentGridCell(screen.getByLabelText('campo 5'), 'ArrowDown')).toBeNull()
     expect(handler).toHaveBeenLastCalledWith({ index: 6, column: 0 })
+    element.remove()
+  })
+
+  it('célula monetária em edição: HoldGridRow mantém a linha montada fora da janela: o texto digitado continua ao voltar', () => {
+    const element = scroller()
+    const MoneyCell = ({ id }: { id: string }) => {
+      const [draft, setDraft] = useState<string | null>(null)
+      return <div>
+        <HoldGridRow active={draft !== null} />
+        {draft === null
+          ? <button onClick={() => setDraft('')}>editar {id}</button>
+          : <input aria-label={`valor ${id}`} value={draft} onChange={(event) => setDraft(event.target.value)} />}
+      </div>
+    }
+    const moneyColumns = [column.accessor('value', { cell: ({ row }) => <MoneyCell id={row.id} /> })]
+    const { container } = render(<DataTable data={rows} columns={moneyColumns} getRowId={getRowId} rowRenderKeys={new Map()} scroller={element} />)
+    fireEvent.click(screen.getByText('editar 5'))
+    fireEvent.change(screen.getByLabelText('valor 5'), { target: { value: '123,45' } })
+    const scrollTo = (top: number) => { element.scrollTop = top; act(() => { element.dispatchEvent(new Event('scroll')) }) }
+    scrollTo(899 * 38)
+    expect(container.querySelector('[aria-label="valor 5"]')).not.toBeNull()
+    scrollTo(0)
+    expect((screen.getByLabelText('valor 5') as HTMLInputElement).value).toBe('123,45')
+    // Terminada a edição, a linha volta a sair da janela.
+    fireEvent.change(screen.getByLabelText('valor 5'), { target: { value: '' } })
     element.remove()
   })
 })
