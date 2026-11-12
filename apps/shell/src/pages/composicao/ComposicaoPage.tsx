@@ -1134,7 +1134,7 @@ function ComposicaoContent({ host }: { host: Host }) {
               <span className="lookup-preview">
                 <button type="button" className="lookup-link" onClick={() => {
                   const navigation = getXrmHost()?.Navigation
-                  if (navigation) void navigation.openForm({ entityName: 'cr40f_clientes1', entityId: clientId })
+                  if (typeof navigation?.openForm === 'function') void navigation.openForm({ entityName: 'cr40f_clientes1', entityId: clientId })
                 }} aria-label={`Abrir cliente ${item.client}`}>
                   {item.client}
                 </button>

@@ -163,15 +163,6 @@ export type CompositionPage = {
 
 export type CompositionTotalRow = Pick<Composition, 'id' | 'client' | 'route' | 'departureAt' | 'values'>
 
-export async function loadStatusColors(): Promise<Record<string, string>> {
-  if (!getWebApiOrNull()) return {}
-  const url = `${getDataverseUrl()}/api/data/v9.2/EntityDefinitions(LogicalName='${compositionTable}')/Attributes(LogicalName='new_status')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet`
-  const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-  if (!response.ok) return {}
-  const metadata = await response.json() as { OptionSet?: { Options?: { Value?: number; Color?: string }[] } }
-  return Object.fromEntries((metadata.OptionSet?.Options ?? []).filter((option) => option.Value !== undefined && /^#[0-9a-f]{6}$/i.test(option.Color ?? '')).map((option) => [String(option.Value), option.Color!]))
-}
-
 const PRIVILEGE_DENIED = 0x80040220
 
 /** Recusa por falta de privilégio: código 0x80040220 (como número, com ou sem sinal, ou no texto) ou status HTTP 403. */

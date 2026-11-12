@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, hasBaseAttributes, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
+import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import type { CatalogField, ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
@@ -189,16 +189,13 @@ describe('atributos base no FetchXML da grade', () => {
     const entity = new DOMParser().parseFromString(result, 'application/xml').querySelector('fetch > entity')!
     expect([...entity.children].map((node) => node.tagName)).toEqual(['attribute', 'attribute', 'attribute', 'filter', 'link-entity'])
     expect([...entity.querySelectorAll(':scope > attribute')].map((node) => node.getAttribute('name'))).toEqual(['new_status', 'cr40f_composicaodeprecosid', 'versionnumber'])
-    expect(hasBaseAttributes(result, base)).toBe(true)
   })
 
   it('mantém consultas com all-attributes e recusa agregadas ou inválidas', () => {
     const all = '<fetch top="1"><entity name="cr40f_composicaodeprecos"><all-attributes/></entity></fetch>'
     expect(withBaseAttributes(all, base)).toBe(all)
-    expect(hasBaseAttributes(all, base)).toBe(true)
     expect(withBaseAttributes('<fetch aggregate="true"><entity name="x"><attribute name="x" aggregate="count" alias="t"/></entity></fetch>', base)).toBeNull()
     expect(withBaseAttributes('<fetch><entity', base)).toBeNull()
-    expect(hasBaseAttributes('<fetch><entity name="x"><attribute name="new_status"/></entity></fetch>', base)).toBe(false)
   })
 })
 

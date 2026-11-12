@@ -186,17 +186,6 @@ export function withBaseAttributes(fetchXml: string, names: readonly string[]) {
   return new XMLSerializer().serializeToString(document)
 }
 
-/** Indica se a consulta FetchXML já devolve os atributos base, dispensando a releitura das linhas por lote. */
-export function hasBaseAttributes(fetchXml: string, names: readonly string[]) {
-  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
-  const entity = document.querySelector('fetch > entity')
-  if (document.querySelector('parsererror') || !entity) return false
-  const children = [...entity.children]
-  if (children.some((node) => node.tagName === 'all-attributes')) return true
-  const existing = new Set(children.filter((node) => node.tagName === 'attribute').map((node) => node.getAttribute('name')))
-  return names.every((name) => existing.has(name))
-}
-
 /** Tamanho efetivo da página de um FetchXML (count próprio da view, ou o padrão informado). */
 export function fetchPageSize(fetchXml: string, fallback: number) {
   const fetch = new DOMParser().parseFromString(fetchXml, 'application/xml').querySelector('fetch')

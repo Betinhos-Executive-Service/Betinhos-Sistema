@@ -14,5 +14,7 @@ export function openGridRecord(table: string, recordId: string): Promise<unknown
       data: JSON.stringify({ mode: 'edit', entityName: GENERAL_TABLE, id: recordId, recordId, entityId: recordId }),
     }, { target: 1 })
   }
+  // O shim do Xrm do shell não tem openForm: sem ele a linha não abre, em vez de lançar.
+  if (typeof navigation.openForm !== 'function') return undefined
   return navigation.openForm({ entityName: table, entityId: recordId })
 }
