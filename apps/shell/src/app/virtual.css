@@ -2,3 +2,10 @@
 .vt-host { display: contents; }
 .vt-table .bt-table__row:nth-child(1 of .bt-table__row) { margin-top: var(--vt-before, 0px); }
 .vt-table .bt-table__row:nth-last-child(1 of .bt-table__row) { margin-bottom: var(--vt-after, 0px); }
+
+/* Rolagem horizontal pela barra presa ao pé da tela (BarraHorizontal): a da tabela fica escondida, só aparece no fim da lista. */
+.vt-table .bt-table__scroll { scrollbar-width: none; }
+.vt-table .bt-table__scroll::-webkit-scrollbar { display: none; }
+.vt-xbar { position: sticky; bottom: 0; z-index: 3; overflow-x: auto; overflow-y: hidden; margin-inline: var(--bt-border-width-default); background-color: var(--bt-color-surface); }
+.vt-xbar[hidden] { display: none; }
+.vt-xbar__fill { height: 1px; }
