@@ -35,6 +35,7 @@ import { openGridRecord } from './data/record-navigation'
 import { getXrmHost } from './data/xrm'
 import { relatedRecordId, type SavedFieldValue } from './data/related-field-edit'
 import { gridNumberInput } from './data/grid-field-value'
+import './composicao.css'
 
 const column = createColumnHelper<DataTableFeatures, Composition>()
 const SAVE_FEEDBACK_DURATION = 1600
