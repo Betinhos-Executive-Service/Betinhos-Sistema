@@ -36,6 +36,16 @@ export type Transacao = {
   motoristaNome: string
   despesaId: string
   despesaNome: string
+  /** Só CTF/TicketLog: dados do abastecimento (vazios no Itaú). */
+  placa: string
+  combustivel: string
+  litros: number | null
+  precoLitro: number | null
+  hodometro: number | null
+  kmRodado: number | null
+  desconto: number | null
+  cidadePosto: string
+  veiculoNome: string
 }
 
 /** Despesa do motorista que pode ser casada com a transação (só o que a tela mostra). */
@@ -48,4 +58,4 @@ export type DespesaCandidata = {
   estabelecimento: string
 }
 
-export type { Pessoa } from '../../equipamentos/domain/types'
+export type { Pessoa } from '../../../equipamentos/domain/types'

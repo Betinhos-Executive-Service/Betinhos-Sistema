@@ -1,6 +1,6 @@
 import type { StatusTone } from '@betinhos/ui'
-import { OPERACIONAL } from '../../despesas/domain/status'
-import { addDays } from '../../operacional/domain/time'
+import { OPERACIONAL } from '../../domain/status'
+import { addDays } from '../../../operacional/domain/time'
 import type { Cartao, DespesaCandidata, Transacao } from './types'
 
 /** Choices criados por provision-conciliacao-cartao.ps1 (mesmos códigos do flow diário). */

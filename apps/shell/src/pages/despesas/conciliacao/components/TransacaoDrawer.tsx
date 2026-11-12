@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Dialog, Drawer, Field, Radio, Textarea, useToast } from '@betinhos/ui'
-import { fmtData } from '../../equipamentos/components/EquipamentosList'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { fmtData } from '../../../equipamentos/components/EquipamentosList'
+import { formatDate, formatMoney } from '../../../pagantes/domain/messages'
 import { acoes, cartaoVigente, janelaCandidatas, MOTIVO_CASADA, MOTIVO_REABERTA, motivoReprocessar, SITUACAO, tipoLabel } from '../domain/regras'
 import { message, type Source } from '../data/source'
 import type { Cartao, DespesaCandidata, Transacao } from '../domain/types'
@@ -79,7 +79,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
     if (!motivo.trim()) { setErroMotivo('Diga por que a transação não precisa de despesa.'); return }
     void run(() => source.ignorar(t, motivo), { ...t, situacao: SITUACAO.ignorada, motivo: motivo.trim() }, 'Transação ignorada.')
   }
-  const reabrir = () => t && void run(() => source.reabrir(t), { ...t, situacao: SITUACAO.pendente, motivo: MOTIVO_REABERTA }, 'Transação de volta em Para revisar.')
+  const reabrir = () => t && void run(() => source.reabrir(t), { ...t, situacao: SITUACAO.pendente, motivo: MOTIVO_REABERTA }, 'Compra de volta na fila Compras sem despesa.')
   function reprocessar(c: Cartao) {
     if (!t) return
     const salvo = { ...t, cartaoId: c.id, cartaoNome: c.nome, motoristaId: c.motoristaId, motoristaNome: c.motoristaNome, situacao: SITUACAO.pendente, motivo: motivoReprocessar(c) }
@@ -92,7 +92,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
 
   return (
     <>
-      <Drawer open={t != null} onClose={close} size="wide" eyebrow="Conciliação do cartão" title={t ? t.estabelecimento || t.descricao || 'Transação' : 'Transação'}
+      <Drawer open={t != null} onClose={close} size="wide" eyebrow="Compra no cartão" title={t ? t.estabelecimento || t.descricao || 'Transação' : 'Transação'}
         footer={<Button variant="secondary" disabled={saving} onClick={close}>Fechar</Button>}>
         {t ? (
           <div className="cc-detalhe">
@@ -124,7 +124,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
                     Conta {t.conta || '—'}{t.final ? `, final ${t.final}` : ', sem final'}, em {fmtData(t.dataCompra)}. Cadastre o cartão com o motorista e volte para reprocessar.
                   </Alert>
                 ) : (
-                  <Alert tone="danger" title="Mais de um cartão vale para esta compra">Ajuste as vigências na aba Cartões para sobrar um só nesta data.</Alert>
+                  <Alert tone="danger" title="Mais de um cartão vale para esta compra">Ajuste as vigências na tela Cartões corporativos (Cadastros) para sobrar um só nesta data.</Alert>
                 )}
               </section>
             ) : null}
@@ -163,7 +163,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
 
             {pode?.reabrir ? (
               <section className="cc-secao" aria-label="Reabrir">
-                <p className="cc-texto">Ignorada por engano? Reabra para ela voltar a Para revisar.</p>
+                <p className="cc-texto">Ignorada por engano? Reabra para ela voltar à fila Compras sem despesa.</p>
                 <div><Button variant="secondary" loading={saving} onClick={reabrir}>Reabrir transação</Button></div>
               </section>
             ) : null}

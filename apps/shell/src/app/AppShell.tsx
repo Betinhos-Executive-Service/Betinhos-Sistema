@@ -87,7 +87,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
-  'conciliacao-cartao': <CreditCard />,
+  cartoes: <CreditCard />,
   cr40f_formapagamentodespesa: <Wallet />,
   cr40f_anexocolisao_v2: <Paperclip />,
   cr40f_anexorecebimento_v2: <Paperclip />,

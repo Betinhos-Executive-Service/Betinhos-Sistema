@@ -4,14 +4,17 @@ import { VirtualTable } from '../../../app/VirtualTable'
 import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { Canal, Situacao } from '../conciliacao/components/TransacoesLista'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'
 import { decidivel } from '../domain/decisao'
 import { financeiroTone, operacionalTone, semComprovante } from '../domain/status'
+import type { Transacao } from '../conciliacao/domain/types'
+import type { ComprasPorDespesa } from '../domain/lista'
 import type { Despesa, DespesaChoices } from '../domain/types'
 
 type Props = { list: Despesa[]; choices: DespesaChoices; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
+type TableProps = Props & { compras?: ComprasPorDespesa; view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
 
 export const titulo = (d: Despesa) => d.estabelecimento || d.nome || 'Despesa sem nome'
 
@@ -27,6 +30,12 @@ export function FinanceiroBadge({ d, choices }: { d: Despesa; choices: DespesaCh
 
 /** Categoria e forma de pagamento: rótulo do cadastro, sem cor de status. */
 export const RotuloBadge = ({ texto, vazio }: { texto: string; vazio: string }) => <StatusBadge tone="neutral">{texto || vazio}</StatusBadge>
+
+/** Situação da compra no cartão ligada à despesa e o canal dela; sem compra ligada, travessão. */
+function ConciliacaoCelula({ compra }: { compra?: Transacao }) {
+  if (!compra) return <span className="pg-muted">—</span>
+  return <span className="cc-badges"><Situacao t={compra} /><Canal t={compra} /></span>
+}
 
 /** Sinais que pedem atenção, sempre com texto (DS §3.6). */
 export function Alertas({ d }: { d: Despesa }) {
@@ -47,7 +56,7 @@ function OpenName({ d, onOpen }: { d: Despesa; onOpen: (id: string) => void }) {
   )
 }
 
-export function DespesasTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
+export function DespesasTable({ list, choices, compras, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Despesa>[] = [
     { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 220, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 100, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
@@ -56,6 +65,7 @@ export function DespesasTable({ list, choices, onOpen, loading, view, quickFilte
     { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
     { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 150, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },
     { key: 'forma', header: 'Pagamento', label: 'Forma de pagamento', sortable: true, defaultWidth: 170, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.forma} vazio="Sem forma" /> },
+    { key: 'conciliacao', header: 'Conciliação', label: 'Conciliação', sortable: true, defaultWidth: 210, width: 'minmax(200px, 1.2fr)', hideBelow: 'compact', cell: (d) => <ConciliacaoCelula compra={compras?.get(d.id)} /> },
     { key: 'motorista', header: 'Motorista', label: 'Motorista', sortable: true, defaultWidth: 150, width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (d) => d.motorista || '—' },
     { key: 'alertas', header: 'Alertas', label: 'Alertas', defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <Alertas d={d} /> },
   ]

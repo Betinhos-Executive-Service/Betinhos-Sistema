@@ -1,4 +1,4 @@
-import { OPERACIONAL } from '../../despesas/domain/status'
+import { OPERACIONAL } from '../../domain/status'
 import { CANAL, SITUACAO, TIPO, type DespesaMotorista } from '../domain/regras'
 import type { Cartao, Pessoa, Transacao } from '../domain/types'
 
@@ -44,7 +44,7 @@ export function createMockTransacoes(): Transacao[] {
       id: tid(n), descricao, conta: cartao?.conta ?? CONTA_ITAU, fatura: dataCompra.slice(0, 7), dataCompra, valor, estabelecimento: descricao,
       final: cartao?.final ?? '', parcela: 1, totalParcelas: 1, tipo: TIPO.compra, situacao, canal: null, motivo,
       cartaoId: cartao?.id ?? '', cartaoNome: cartao?.nome ?? '', motoristaId: cartao?.motoristaId ?? '', motoristaNome: cartao?.motoristaNome ?? '',
-      despesaId: '', despesaNome: '', ...o,
+      despesaId: '', despesaNome: '', placa: '', combustivel: '', litros: null, precoLitro: null, hodometro: null, kmRodado: null, desconto: null, cidadePosto: '', veiculoNome: '', ...o,
     }
   }
   return [
@@ -52,12 +52,16 @@ export function createMockTransacoes(): Transacao[] {
     t(2, 'RESTAURANTE SABOR', '2026-10-20', 89.9, SITUACAO.divergencia, 'Mais de uma despesa do motorista com o mesmo valor e data próxima; escolha no Sistema Betinhos.', { cartaoId: cid(3) }),
     t(3, 'ESTACIONAMENTO CENTRO', '2026-10-28', 120, SITUACAO.semMotorista, 'Cartão sem motorista vigente na data; cadastre o vínculo no Sistema Betinhos.', { final: '9012' }),
     t(4, 'LAVA RAPIDO JARDINS', '2026-10-30', 64.5, SITUACAO.semMotorista, 'Cartão sem motorista vigente na data; cadastre o vínculo no Sistema Betinhos.', { conta: CONTA_NUBANK, final: '4321' }),
-    t(5, 'POSTO IPIRANGA MARGINAL', '2026-10-15', 180, SITUACAO.automatica, 'Casada com a despesa lançada pelo motorista (mesmo valor e data próxima).', { cartaoId: cid(1), despesaId: did(6), despesaNome: 'Combustível 15/10' }),
-    t(6, 'PEDAGIO ECOVIAS', '2026-09-20', 75, SITUACAO.manual, 'Casada manualmente no Sistema Betinhos.', { cartaoId: cid(2), despesaId: did(9), despesaNome: 'Pedágio Imigrantes' }),
-    t(7, 'AUTO PECAS SILVA', '2026-10-25', 310.4, SITUACAO.aguardando, 'Nenhuma despesa lançada pelo motorista; despesa criada para ele validar.', { cartaoId: cid(1), despesaId: did(7), despesaNome: 'Cartão final 1234 · AUTO PECAS SILVA' }),
+    t(5, 'POSTO IPIRANGA MARGINAL', '2026-10-15', 180, SITUACAO.automatica, 'Casada com a despesa lançada pelo motorista (mesmo valor e data próxima).', { cartaoId: cid(1), despesaId: 'mock-desp-7', despesaNome: 'Combustível · Marcos' }),
+    t(6, 'PEDAGIO ECOVIAS', '2026-09-20', 75, SITUACAO.manual, 'Casada manualmente no Sistema Betinhos.', { cartaoId: cid(2), despesaId: 'mock-desp-2', despesaNome: 'Pedágio · Ana' }),
+    t(7, 'AUTO PECAS SILVA', '2026-10-25', 310.4, SITUACAO.aguardando, 'Nenhuma despesa lançada pelo motorista; despesa criada para ele validar.', { cartaoId: cid(1), despesaId: 'mock-desp-3', despesaNome: 'Estacionamento · Marcos' }),
     t(8, 'IOF COMPRA INTERNACIONAL', '2026-10-31', 3.21, SITUACAO.ignorada, 'Lançamento que não é compra (encargo, estorno ou pagamento).', { tipo: TIPO.encargo }),
     t(9, 'LOJA PNEUS PARC 02/03', '2026-10-02', 400, SITUACAO.ignorada, 'Parcela seguinte de compra parcelada; a despesa é da compra inteira.', { cartaoId: cid(3), parcela: 2, totalParcelas: 3 }),
     t(10, 'POSTO GRAAL TAUBATE', '2026-11-04', 412.37, SITUACAO.semMotorista, 'Motorista do CTF não encontrado pelo CPF nem pelo nome.', { canal: CANAL.ctf, conta: '', final: '' }),
+    t(11, 'POSTO SHELL FARIA LIMA', '2026-11-05', 238.9, SITUACAO.automatica, 'Casada com a despesa lançada pelo motorista (mesmo valor e data próxima).', {
+      canal: CANAL.ctf, conta: '', final: '', motoristaId: 'm1', motoristaNome: nome('m1'), despesaId: 'mock-desp-1', despesaNome: 'Combustível · Carlos',
+      placa: 'FJK2B19', combustivel: 'Diesel S10', litros: 41.2, precoLitro: 5.9602, hodometro: 48210, kmRodado: 612, desconto: 6.4, cidadePosto: 'São Paulo', veiculoNome: 'Mercedes S500 · FJK-2B19',
+    }),
   ]
 }
 

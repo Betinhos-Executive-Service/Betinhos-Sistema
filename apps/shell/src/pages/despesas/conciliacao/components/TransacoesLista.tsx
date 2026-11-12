@@ -1,9 +1,9 @@
 import { memo, type ReactNode } from 'react'
 import { StatusBadge, type TableColumn } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
-import { fmtData } from '../../equipamentos/components/EquipamentosList'
-import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { VirtualTable } from '../../../../app/VirtualTable'
+import { fmtData } from '../../../equipamentos/components/EquipamentosList'
+import { openFromRow, openRowActions } from '../../../pagantes/components/PagantesList'
+import { formatMoney } from '../../../pagantes/domain/messages'
 import { canalLabel, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Transacao } from '../domain/types'
 

@@ -41,7 +41,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   inicio: () => import('../pages/inicio/InicioPage').then((m) => m.InicioPage),
   qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
   treinamentos: () => import('../pages/treinamentos/TreinamentosPage').then((m) => m.TreinamentosPage),
-  'conciliacao-cartao': () => import('../pages/conciliacao-cartao/ConciliacaoCartaoPage').then((m) => m.ConciliacaoCartaoPage),
+  cartoes: () => import('../pages/cartoes/CartoesPage').then((m) => m.CartoesPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
