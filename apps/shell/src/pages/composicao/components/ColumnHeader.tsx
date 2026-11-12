@@ -27,12 +27,14 @@ type Props = {
   onTogglePin: () => void
   onBeforeOpen: () => void
   onClose: () => void
+  /** Sem a metadata a ordenação e o filtro ainda não valem: só o rótulo. */
+  disabled?: boolean
 }
 
 type Panel = { request: number; anchor: HTMLElement; field: FilterField; value: FilterCondition | undefined }
 
 /** Título da coluna no padrão do DS (§10.9.2): menu Ordenar/Filtrar/Limpar/Fixar/Ocultar e o painel "Filtrar por". */
-export function ColumnHeader({ id, label, type, field, filters, sort, displayValue, referenceClass = '', canHide, pinned, onApply, onClear, onSort, onHide, onTogglePin, onBeforeOpen, onClose }: Props) {
+export function ColumnHeader({ id, label, type, field, filters, sort, displayValue, referenceClass = '', canHide, pinned, onApply, onClear, onSort, onHide, onTogglePin, onBeforeOpen, onClose, disabled = false }: Props) {
   const rootRef = useRef<HTMLSpanElement>(null)
   const [panel, setPanel] = useState<Panel | null>(null)
   const openRequest = useRef(0)
@@ -74,6 +76,8 @@ export function ColumnHeader({ id, label, type, field, filters, sort, displayVal
   const closeFilter = useCallback(() => { setPanel(null); onCloseRef.current() }, [])
   const thenClose = <A extends unknown[]>(action: (...args: A) => void) => (...args: A) => { action(...args); onClose() }
   const sortLabel = sort ? `, ordem ${sort.descending ? 'decrescente' : 'crescente'}` : ''
+
+  if (disabled) return <span className={`column-header${referenceClass}`} aria-label={label}>{label}</span>
 
   return (
     <span ref={rootRef} role="group" className={`column-header${referenceClass}`} aria-label={`${label}${filters.length ? ', filtrada' : ''}${sortLabel}`} onMouseDownCapture={onBeforeOpen}>

@@ -230,3 +230,20 @@ describe('vínculos da linha (reserva e cliente)', () => {
     expect(buildCountQuery(withRowLinks(base))).toBe(buildCountQuery(base))
   })
 })
+
+describe('withLinkKeys', () => {
+  const source = '<fetch><entity name="cr40f_composicaodeprecos"><link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" alias="a_1"><attribute name="cr40f_trajeto"/></link-entity></entity></fetch>'
+  it('acrescenta a chave do vínculo uma única vez', async () => {
+    const { withLinkKeys } = await import('./composition-query')
+    const once = withLinkKeys(source)
+    expect(once).toContain('<attribute name="cr40f_reservadeveculosid"')
+    expect(withLinkKeys(once)).toBe(once)
+  })
+  it('não mexe em agregação nem em all-attributes', async () => {
+    const { withLinkKeys } = await import('./composition-query')
+    const aggregate = source.replace('<fetch>', '<fetch aggregate="true">')
+    expect(withLinkKeys(aggregate)).toBe(aggregate)
+    const all = source.replace('<attribute name="cr40f_trajeto"/>', '<all-attributes/>')
+    expect(withLinkKeys(all)).toBe(all)
+  })
+})

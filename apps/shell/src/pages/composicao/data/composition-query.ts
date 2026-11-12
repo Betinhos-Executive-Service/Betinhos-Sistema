@@ -224,6 +224,24 @@ export function nextFetchXmlPage(fetchXml: string, pagingCookie?: string) {
   return new XMLSerializer().serializeToString(document)
 }
 
+/** Leva junto a chave (`from`) de cada vínculo com alias da view: sem ela a coluna relacionada não sabe qual registro editar. */
+export function withLinkKeys(fetchXml: string) {
+  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+  const fetch = document.querySelector('fetch')
+  if (document.querySelector('parsererror') || !fetch || fetch.getAttribute('aggregate') === 'true') return fetchXml
+  let changed = false
+  for (const link of document.querySelectorAll('link-entity[alias]')) {
+    const from = link.getAttribute('from')
+    const children = [...link.children]
+    if (!from || children.some((node) => node.tagName === 'all-attributes' || node.tagName === 'attribute' && node.getAttribute('name') === from)) continue
+    const attribute = document.createElement('attribute')
+    attribute.setAttribute('name', from)
+    link.insertBefore(attribute, children.find((node) => node.tagName !== 'attribute') ?? null)
+    changed = true
+  }
+  return changed ? new XMLSerializer().serializeToString(document) : fetchXml
+}
+
 /** Aliases fixos dos vínculos que levam reserva e cliente na consulta principal; não colidem com os da view (a_…, r1…). */
 export const ROW_LINKS = { reserva: 'cmp_res', cliente: 'cmp_cli' } as const
 

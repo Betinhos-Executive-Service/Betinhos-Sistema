@@ -159,7 +159,21 @@ export function ComposicaoPage({ host }: { host: Host }) {
   return <ToastProvider><ComposicaoContent host={host} /></ToastProvider>
 }
 
-type OpenQuery = { view: { fetchXml: string } | undefined; viewId: string | null; shape: string }
+/** `keys`: id resolvido da coluna → nome da célula no resultado da consulta da abertura (alias da própria view, ex. `a_67d5.campo`). */
+type OpenQuery = { view: { fetchXml: string } | undefined; viewId: string | null; shape: string; keys: ReadonlyMap<string, string> }
+
+/** Casa, coluna a coluna, o layout da abertura com a view interpretada; null quando não casam (a abertura é então refeita). */
+function openColumnKeys(open: ViewDefinition, interpreted: ViewDefinition, catalog: CatalogField[]): Map<string, string> | null {
+  if (open.columns.length !== interpreted.columns.length) return null
+  const keys = new Map<string, string>()
+  for (const [index, column] of open.columns.entries()) {
+    const resolved = interpreted.columns[index].id
+    if (resolved === column.id) continue
+    if (!catalog.some((field) => field.id === resolved)) return null
+    keys.set(resolved, column.id)
+  }
+  return keys
+}
 
 /** Parte da definição que muda a consulta (ids, filtros e ordenação); larguras e fixação não entram. */
 function queryShapeKey(definition: ViewDefinition) {
@@ -346,7 +360,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         ? { ...defaultViewDefinition([]), columns: openView.columns.map(({ id, width }) => ({ id, width, pinned: false })) }
         : viewDefinitionRef.current
       if (useOpen) { viewDefinitionRef.current = openDefinition; setViewDefinition(openDefinition) }
-      setOpenQuery({ view: useOpen ? { fetchXml: openView.fetchXml } : undefined, viewId: useOpen ? picked!.id : null, shape: queryShapeKey(openDefinition) })
+      setOpenQuery({ view: useOpen ? { fetchXml: openView.fetchXml } : undefined, viewId: useOpen ? picked!.id : null, shape: queryShapeKey(openDefinition), keys: new Map() })
       const pagePromise = loadCompositions(undefined, useOpen ? { fetchXml: openView.fetchXml } : undefined)
       // A metadata parte depois que a primeira página foi pedida: ela não disputa a fila com os dados.
       const catalogPromise = loadColumnCatalog().then((fields) => ({ fields }), (error: unknown) => ({ error }))
@@ -384,12 +398,12 @@ function ComposicaoContent({ host }: { host: Host }) {
         const interpretedActive = picked ? interpreted.find((view) => view.id === picked.id) ?? null : null
         let invalidate = false
         if (useOpen && interpretedActive) {
-          const sameColumns = interpretedActive.definition.columns.map(({ id }) => id).join('|') === openDefinition.columns.map(({ id }) => id).join('|')
-          if (sameColumns) {
+          const keys = openColumnKeys(openDefinition, interpretedActive.definition, fields)
+          if (keys) {
             const shape = queryShapeKey(interpretedActive.definition)
             viewDefinitionRef.current = interpretedActive.definition
             setViewDefinition(interpretedActive.definition)
-            setOpenQuery((previous) => previous && { ...previous, shape })
+            setOpenQuery((previous) => previous && { ...previous, shape, keys })
           } else invalidate = true
           setActiveView(interpretedActive)
           if (invalidate) { setViewDefinition(interpretedActive.definition); setOpenQuery(null) }
@@ -1084,6 +1098,8 @@ function ComposicaoContent({ host }: { host: Host }) {
     }
   }
   // Os cabeçalhos ficam em useMemo sem viewDefinition.columns nas dependências: lê sempre a versão atual (fixar/ocultar).
+  /** Nome da célula do valor no resultado: na consulta da abertura é o da própria view; depois, o da consulta resolvida. */
+  const valueKeyFor = useCallback((id: string) => openActive ? openQuery?.keys.get(id) ?? id : viewValueKey(id, viewShape, catalog), [catalog, openActive, openQuery?.keys, viewShape])
   const columnHeaderPropsRef = useRef(columnHeaderProps)
   columnHeaderPropsRef.current = columnHeaderProps
 
@@ -1100,7 +1116,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         : moneyFields.some((field) => field.key === id) ? moneyFormat(value) : value
 
       const catalogField = catalog.find((field) => field.id === id)
-      return <ColumnHeader id={id} label={label} field={catalogField} type={catalogField?.type ?? (id === 'date' ? 'DateTime' : moneyFields.some((field) => field.key === id) ? 'Money' : 'String')} displayValue={displayFilter} referenceClass={referenceIndex >= 0 ? ` column-header--reference${referenceTone}` : ''} {...columnHeaderPropsRef.current(id)} />
+      return <ColumnHeader id={id} label={label} field={catalogField} type={catalogField?.type ?? (id === 'date' ? 'DateTime' : moneyFields.some((field) => field.key === id) ? 'Money' : 'String')} displayValue={displayFilter} referenceClass={referenceIndex >= 0 ? ` column-header--reference${referenceTone}` : ''} disabled={!catalogReady} {...columnHeaderPropsRef.current(id)} />
     }
 
     const staticColumns = [column.display({
@@ -1319,7 +1335,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       },
     }))
     return column.columns([...staticColumns, ...priceColumns])
-  }, [beginEdit, catalog, clearCellError, commitEdit, focusNextEditableCell, focusVerticalCell, insertFormulaReference, persistCellInput, prepareInput, setCellFeedback, viewDefinition.filters, viewDefinition.filterGroups, viewDefinition.sort])
+  }, [beginEdit, catalog, catalogReady, clearCellError, commitEdit, focusNextEditableCell, focusVerticalCell, insertFormulaReference, persistCellInput, prepareInput, setCellFeedback, viewDefinition.filters, viewDefinition.filterGroups, viewDefinition.sort])
 
   const applySavedViewField = useCallback((result: SavedFieldValue) => {
     setRows((current) => current.map((row) => {
@@ -1327,7 +1343,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       let changed = false
       for (const candidate of catalog) {
         if (candidate.table !== result.table || candidate.attribute !== result.attribute) continue
-        const key = viewValueKey(candidate.id, viewShape, catalog)
+        const key = valueKeyFor(candidate.id)
         if (relatedRecordId(candidate, fields, key, row.id) !== result.recordId) continue
         fields[key] = result.value
         const formattedKey = `${key}@OData.Community.Display.V1.FormattedValue`
@@ -1341,7 +1357,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         if (result.attribute === 'cr40f_cliente') {
           Object.assign(displayPatch, { clientId: result.value, client: result.formatted ?? 'Cliente sem nome', clientRegistration: '', clientAddress: '' })
           for (const candidate of catalog.filter((field) => field.relationships?.[0]?.to === 'cr40f_servicorelacionadogeral' && field.relationships?.[1]?.to === 'cr40f_cliente')) {
-            const key = viewValueKey(candidate.id, viewShape, catalog)
+            const key = valueKeyFor(candidate.id)
             fields[key] = null
             delete fields[`${key}@OData.Community.Display.V1.FormattedValue`]
             if (candidate.primaryIdAttribute) fields[`${key.slice(0, key.lastIndexOf('.'))}.${candidate.primaryIdAttribute}`] = null
@@ -1356,7 +1372,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     }))
     if (catalog.some((field) => field.table === result.table && field.attribute === result.attribute && field.type === 'Lookup') || result.table === 'cr40f_reservadeveculos' && result.attribute === 'cr40f_dataehorriodesada') setRelatedRefreshPending(true)
     if (result.refreshWarning) setNotice({ tone: 'warning', title: 'Campo salvo', detail: result.refreshWarning, retryRefresh: true })
-  }, [catalog, viewShape])
+  }, [catalog, valueKeyFor])
 
   const displayedColumns = useMemo(() => {
     const base = new Map(columns.map((definition) => [definition.id, definition]))
@@ -1377,14 +1393,14 @@ function ComposicaoContent({ host }: { host: Host }) {
       if (!catalogField && !openActive) return null
       const field = catalogField ?? provisionalField(id)
       const provisional = !catalogField
-      const valueKey = openActive ? id : viewValueKey(id, viewShape, catalog)
-      // O FetchXML da abertura não traz o id do registro relacionado: campo de outra tabela só edita depois que a consulta é remontada.
-      const editable = dataSource === 'dataverse' && !provisional && (!openActive || field.path.length === 0)
+      const valueKey = valueKeyFor(id)
+      // Campo de outra tabela edita quando a linha traz o id do registro relacionado (a abertura leva a chave de cada vínculo).
+      const editable = dataSource === 'dataverse' && !provisional
       return column.accessor((row) => readViewField(row.viewFields, valueKey).value, {
         id,
         header: () => provisional
           ? <span className="column-header column-header--provisional" title={id}>{field.label}</span>
-          : <ColumnHeader id={id} label={field.label} field={field} type={field.type} displayValue={columnFilterLabelsRef.current(id, (row) => String(readViewField(row.viewFields, valueKey).value ?? ''), (row) => readViewField(row.viewFields, valueKey).formatted)} {...columnHeaderPropsRef.current(id)} />,
+          : <ColumnHeader id={id} label={field.label} field={field} type={field.type} displayValue={columnFilterLabelsRef.current(id, (row) => String(readViewField(row.viewFields, valueKey).value ?? ''), (row) => readViewField(row.viewFields, valueKey).formatted)} {...columnHeaderPropsRef.current(id)} disabled={!catalogReady} />,
         cell: ({ getValue, row }) => {
           const value = getValue()
           if (id === 'new_status' && value !== null && value !== undefined && value !== '') {
@@ -1421,7 +1437,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       }))
     }
     return [base.get('select')!, ...layout.map((item) => base.get(item.id) ?? generic(item.id)).filter((item): item is NonNullable<typeof item> => Boolean(item))]
-  }, [applySavedViewField, catalog, columns, commitEdit, dataSource, openActive, statusColors, viewShape])
+  }, [applySavedViewField, catalog, catalogReady, columns, commitEdit, dataSource, openActive, statusColors, valueKeyFor, viewShape])
   const tableLayout = useMemo(() => [{ id: 'select', width: 36, pinned: true }, ...viewDefinition.columns], [viewDefinition])
   const resizeColumn = useCallback((id: string, width: number) => {
     const current = viewDefinitionRef.current
@@ -1605,7 +1621,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         <CellHoverPreview />
         {loading ? <PriceGridSkeleton />
           : connectionError && rows.length === 0 ? <div className="price-grid__empty" role="alert">{connectionError}</div>
-            : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={`${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
+            : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
         {!loading && nextLink && !connectionError ? (
           <div ref={loadMoreRef} className="composition-load-more" role="status" aria-busy={loadingMore}>
             <LoaderCircle aria-hidden="true" />Carregando mais registros…

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ComposicaoPage } from './ComposicaoPage'
 import { catalogCacheKey } from './data/catalog-cache'
@@ -174,4 +174,60 @@ it('cache de catálogo vencido é ignorado: abre igual e usa o catálogo da rede
   expect(await screen.findByText('Situação')).toBeTruthy()
   expect(screen.queryByText('Antigo')).toBeNull()
   expect(catalog.load).toHaveBeenCalledTimes(1)
+})
+
+const RESERVATION = '22222222-2222-4222-8222-222222222222'
+const LINKED_FETCH = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/><link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" alias="a_67d5" link-type="outer"><attribute name="cr40f_trajeto"/></link-entity><filter><condition attribute="statecode" operator="eq" value="0"/></filter></entity></fetch>'
+const LINKED_LAYOUT = '<grid name="resultset" object="1" jump="new_status" select="1" icon="1" preview="1"><row name="result" id="cr40f_composicaodeprecosid"><cell name="new_status" width="140"/><cell name="a_67d5.cr40f_trajeto" width="160"/></row></grid>'
+const relationships = [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }]
+const trajeto: CatalogField = {
+  id: `cr40f_reservadeveculos@cr40f_servicorelacionadogeral.cr40f_trajeto`, label: 'Trajeto da reserva', table: 'cr40f_reservadeveculos', attribute: 'cr40f_trajeto',
+  primaryIdAttribute: 'cr40f_reservadeveculosid', path: ['cr40f_reservadeveculos'], relationships, type: 'String', available: true, writable: true,
+}
+
+it('coluna de tabela relacionada: catálogo tardio não refaz a consulta, preserva linhas e seleção e a célula vira editável', async () => {
+  let release!: (fields: CatalogField[]) => void
+  catalog.load.mockReturnValue(new Promise<CatalogField[]>((resolve) => { release = resolve }))
+  const xrm = fakeXrm((entity, query) => {
+    if (entity === 'savedquery') return { entities: [{ ...view, fetchxml: LINKED_FETCH, layoutxml: LINKED_LAYOUT }] }
+    if (entity === 'cr40f_composicaodeprecos') {
+      return { entities: query.includes('aggregate') ? [{ total: 1 }] : [row('11111111-1111-4111-8111-111111111111', { 'a_67d5.cr40f_trajeto': 'Aeroporto', 'a_67d5.cr40f_reservadeveculosid': RESERVATION })] }
+    }
+    return { entities: [] }
+  })
+
+  const { container } = render(<ComposicaoPage host={host} />)
+  expect(await screen.findByText('Aeroporto')).toBeTruthy()
+  await waitFor(() => expect(xrm.count('cr40f_composicaodeprecos')).toBe(2))
+  const checkbox = screen.getByRole('checkbox', { name: /Selecionar Cliente 1111/ }) as HTMLInputElement
+  fireEvent.click(checkbox)
+  expect(checkbox.checked).toBe(true)
+  const before = xrm.count('cr40f_composicaodeprecos')
+  // A consulta da abertura leva a chave do registro relacionado (`from` do vínculo), necessária para editar depois.
+  const openQuery = decodeURIComponent(xrm.calls.find((call) => call.entity === 'cr40f_composicaodeprecos')!.query)
+  expect(openQuery).toMatch(/alias="a_67d5"[^>]*>(?:<attribute[^>]*>)*<attribute name="cr40f_reservadeveculosid"/)
+
+  await act(async () => { release([field('new_status', 'Situação'), trajeto]) })
+
+  expect(await screen.findByText('Trajeto da reserva')).toBeTruthy()
+  expect(screen.getByText('Aeroporto')).toBeTruthy()
+  expect((screen.getByRole('checkbox', { name: /Selecionar Cliente 1111/ }) as HTMLInputElement).checked).toBe(true)
+  expect(xrm.count('cr40f_composicaodeprecos')).toBe(before)
+  const cell = container.querySelector(`[data-grid-cell="11111111-1111-4111-8111-111111111111:${trajeto.id}"]`)
+  expect(cell?.getAttribute('data-grid-editable')).toBe('true')
+})
+
+it('sem catálogo, ordenar e filtrar ficam desabilitados até a metadata chegar', async () => {
+  let release!: (fields: CatalogField[]) => void
+  catalog.load.mockReturnValue(new Promise<CatalogField[]>((resolve) => { release = resolve }))
+  fakeXrm(standard)
+
+  render(<ComposicaoPage host={host} />)
+
+  expect(await screen.findByText('Aprovada')).toBeTruthy()
+  expect(screen.queryAllByRole('group')).toHaveLength(0)
+
+  await act(async () => { release([field('new_status', 'Situação')]) })
+
+  await waitFor(() => expect(screen.getAllByRole('group').length).toBeGreaterThan(0))
 })

@@ -1,6 +1,6 @@
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FORMULA_ENGINE_VERSION, FormulaError } from '../formula'
 import type { ViewQuery } from './views'
-import { buildCountQuery, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
+import { buildCountQuery, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withLinkKeys, withRowLinks, withoutRowLinks } from './composition-query'
 import { isWritableMoneyField, moneyFields, type ApplyCellInputResult, type CellFormula, type CellInput, type Composition, type DecimalString, type MoneyField } from './compositions'
 import { getMockRows, saveMockCell } from './mock-store'
 import { getXrmHost, type XrmWebApi } from './xrm'
@@ -258,7 +258,7 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
   const baseAttributes = ['cr40f_composicaodeprecosid', 'cr40f_servicorelacionadogeral', 'new_status', 'new_dataehorariodesaidacalculado', 'versionnumber', ...selectedMoney]
   const viewFetchXml = view ? 'fetchXml' in view ? view.fetchXml : view.sourceFetchXml : DEFAULT_FETCH
   // Atributos base, reserva e cliente vêm na própria consulta: uma ida ao servidor por página.
-  const gridFetchXml = viewFetchXml ? withRowLinks(withBaseAttributes(viewFetchXml, baseAttributes) ?? viewFetchXml) : undefined
+  const gridFetchXml = viewFetchXml ? withRowLinks(withLinkKeys(withBaseAttributes(viewFetchXml, baseAttributes) ?? viewFetchXml)) : undefined
   const query = nextLink ? toQueryOptions(nextLink) : gridFetchXml ? `?fetchXml=${encodeURIComponent(withFetchPageSize(gridFetchXml, PAGE_SIZE))}` : `?${view && 'kind' in view && view.kind === 'personal' ? 'userQuery' : 'savedQuery'}=${view && 'id' in view ? view.id : ''}`
   const isFetchXml = query.startsWith('?fetchXml=')
   // Em FetchXML o tamanho vem do count; maxPageSize faz o Dataverse ignorar page/paging-cookie e repetir a página 1.
