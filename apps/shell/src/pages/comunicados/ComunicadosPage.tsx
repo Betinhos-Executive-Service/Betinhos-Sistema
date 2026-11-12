@@ -9,6 +9,7 @@ import { useComunicados } from './useComunicados'
 import { ComunicadosLista } from './components/ComunicadosLista'
 import { ComunicadoEditor } from './components/ComunicadoEditor'
 import { ComunicadoRelatorio } from './components/ComunicadoRelatorio'
+import { BrandLoader } from '../../app/BrandLoader'
 import './comunicados.css'
 
 export function ComunicadosPage({ host }: { host: Host }) {
@@ -46,7 +47,7 @@ function Comunicados({ host }: { host: Host }) {
   } else if (!data.loaded) {
     body = data.error
       ? <Alert tone="danger" title="Não foi possível carregar os comunicados" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error}</Alert>
-      : <div className="surface cm-loading" role="status" aria-label="Carregando comunicado" />
+      : <div className="surface"><BrandLoader variant="inline" label="Carregando comunicado" text="Carregando comunicado…" /></div>
   } else if (!selected) {
     body = <Alert tone="warning" title="Comunicado não encontrado" action={<Button variant="secondary" onClick={goHome}>Voltar para a lista</Button>}>Ele pode ter sido excluído. Atualize a lista para conferir.</Alert>
   } else if (isDisparado(selected)) {

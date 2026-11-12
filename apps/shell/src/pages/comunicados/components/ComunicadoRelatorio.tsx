@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, Checkbox, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
+import { Alert, Avatar, Breadcrumb, Button, Checkbox, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
 import { AlertTriangle, ArrowLeft, Bell, Check, Clock, Copy, Download, Eye, FileText, MessageSquare, PenLine, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Source } from '../data/source'
 import {
@@ -9,6 +9,7 @@ import {
 import { baixarComprovantes, textoErroPdf } from '../data/baixarComprovantes'
 import { paresDoComunicado } from '../domain/comprovante'
 import { Assinatura } from './Assinatura'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   item: Comunicado
@@ -181,7 +182,7 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
             </div>
           ) : null}
           <ul className="cm-results__body" aria-busy={!loaded}>
-            {!loaded && loading ? [0, 1, 2].map((i) => <li key={i} className="cm-list__skeleton"><Skeleton shape="rect" height={44} /></li>) : null}
+            {!loaded && loading ? <li className="cm-list__skeleton"><BrandLoader variant="inline" size="md" label="Carregando destinatários" text="Carregando destinatários…" /></li> : null}
             {visiveis.map((row) => {
               const falhou = row.pushStatus === COMUNICADO_PUSH.falhou
               const ativo = selected?.id === row.id

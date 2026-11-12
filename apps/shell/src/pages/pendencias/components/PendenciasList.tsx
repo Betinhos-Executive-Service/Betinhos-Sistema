@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Button, StatusBadge, Table, type StatusTone, type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { Button, StatusBadge, type StatusTone, type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { LoadingTable } from '../../../app/VirtualTable'
 import { CalendarCheck, ExternalLink, Split, Wrench } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
@@ -81,7 +82,7 @@ export function PendenciasTable({ list, onOpen, loading, view, quickFilters, foo
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <Table className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={pendenciaActions(onOpen, acoes)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <LoadingTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={pendenciaActions(onOpen, acoes)} loading={loading} loadingLabel="Carregando pendências" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

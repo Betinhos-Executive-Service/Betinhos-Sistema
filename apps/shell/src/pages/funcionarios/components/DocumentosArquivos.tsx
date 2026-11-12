@@ -6,6 +6,7 @@ import type { DataSource } from '../data/source'
 import type { Documento } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { useNotify } from './Toasts'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
 const PREVIEWABLE = /^(application\/pdf|image\/|text\/plain)/
@@ -166,7 +167,7 @@ export function DocumentosArquivos({ source, id }: { source: DataSource; id: str
           </li>
         ))}
 
-        {docs === null && [0, 1].map((n) => <li key={`sk${n}`} className="file-row file-row--skeleton" aria-hidden><span className="bt-skeleton sk--icon" /><span className="bt-skeleton bt-skeleton--text sk--text" /></li>)}
+        {docs === null && <li className="file-row file-row--skeleton"><BrandLoader variant="inline" size="sm" label="Carregando documentos" text="Carregando documentos…" /></li>}
 
         {docs?.map((doc) => (
           <li key={doc.id || doc.nome} className="file-row">

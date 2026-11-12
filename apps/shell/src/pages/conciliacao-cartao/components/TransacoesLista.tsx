@@ -36,7 +36,7 @@ export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, l
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.cc-open')}>
-      <VirtualTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} rowActions={openRowActions(onOpen)} loading={loading} empty={empty} footer={footer} />
+      <VirtualTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
     </div>
   )
 })

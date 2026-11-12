@@ -7,6 +7,7 @@ import { label } from '../../pagantes/domain/status'
 import { tipoPrevia } from '../domain/arquivo'
 import { arquivoTone } from '../domain/status'
 import type { Anexo, Arquivo, DespesaChoices } from '../domain/types'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Ler = (anexo: Anexo) => Promise<Arquivo>
 type Estado = { arquivo: Arquivo } | { erro: string } | null
@@ -30,6 +31,7 @@ function useArquivo(ler: Ler, anexo: Anexo | null) {
   return { estado, tentarDeNovo }
 }
 
+/** Miniatura: spinner pequeno; o visualizador usa o loader da marca. */
 const Carregando = () => <span className="dp-previa__vazio"><Spinner size={20} label="Buscando no OneDrive" />Buscando no OneDrive…</span>
 
 function Falha({ erro, onRetry, grande = false }: { erro: string; onRetry: () => void; grande?: boolean }) {
@@ -145,7 +147,7 @@ function Visualizador({ anexos, indice, onChange, ler }: { anexos: Anexo[]; indi
           </header>
           <div className="dp-viewer__body">
             {total > 1 ? <Button variant="secondary" className="dp-viewer__nav dp-viewer__nav--prev" icon={<ChevronLeft size={20} />} aria-label="Comprovante anterior" onClick={() => ir(-1)} /> : null}
-            {estado == null ? <Carregando />
+            {estado == null ? <BrandLoader variant="inline" size="md" label="Buscando no OneDrive" text="Buscando no OneDrive…" />
               : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande />
                 : <Conteudo arquivo={estado.arquivo} grande />}
             {total > 1 ? <Button variant="secondary" className="dp-viewer__nav dp-viewer__nav--next" icon={<ChevronRight size={20} />} aria-label="Próximo comprovante" onClick={() => ir(1)} /> : null}

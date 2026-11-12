@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, buttonClassName, EmptyState, MetricCard, Skeleton, StatusBadge, Surface } from '@betinhos/ui'
+import { Button, buttonClassName, EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
 import { AlertCircle, Bell, CalendarClock, CalendarDays, CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, ExternalLink, ListTodo, Maximize2, Minimize2, Newspaper, RefreshCw, UserRound, Users } from 'lucide-react'
 import { imagemSegura } from '../data/capas'
 import { textoPlano, urlSegura } from '../domain/inicio'
 import { dailyMessages as frases, getDailyMessage, rotateDailyMessage } from '../domain/frases/frases'
 import type { Comunicado, Indicador, Noticia, ServicoAReceber, Tarefa } from '../domain/types'
 import type { Escopo } from '../useInicio'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 function IconeIndicador({ indicador }: { indicador: Indicador }) {
   const { id, tom } = indicador
@@ -18,9 +19,9 @@ function IconeIndicador({ indicador }: { indicador: Indicador }) {
   return <Bell size={20} />
 }
 
-export function Indicadores({ itens, carregando, quantos, onAbrir }: { itens: Indicador[] | null; carregando: boolean; quantos: number; onAbrir: (i: Indicador) => void }) {
+export function Indicadores({ itens, carregando, onAbrir }: { itens: Indicador[] | null; carregando: boolean; quantos: number; onAbrir: (i: Indicador) => void }) {
   if (!itens) {
-    return <div className="ini-metricas" aria-busy="true">{Array.from({ length: quantos }, (_, i) => <MetricCard key={i} label=" " value="" hint=" " loading />)}</div>
+    return <BrandLoader variant="inline" size="sm" label="Carregando indicadores" />
   }
   return (
     <div className="ini-metricas" aria-label="Indicadores da visão" aria-busy={carregando || undefined}>
@@ -70,7 +71,7 @@ function Bloco({ titulo, tom, tarefas, carregando, vazio, onAbrir }: { titulo: s
   return (
     <section className={`ini-bloco ini-bloco--${tom}`}>
       <h3>{titulo} <strong>{String(tarefas.length).padStart(2, '0')}</strong></h3>
-      {carregando ? <div className="ini-skeletons"><Skeleton height={44} /><Skeleton height={44} /></div>
+      {carregando ? <BrandLoader variant="inline" size="sm" label={`Carregando tarefas: ${titulo}`} />
         : tarefas.length === 0 ? <p className="ini-vazio">{vazio}</p>
         : <ul className="ini-tarefas">{tarefas.slice(0, 3).map((t) => (
           <li key={t.id}>
@@ -110,7 +111,7 @@ export function PainelPlanner({ atrasadas, hoje, carregando, escopo, onEscopo, o
 export function ServicosAReceber({ servicos, carregando, onAbrir }: { servicos: ServicoAReceber[]; carregando: boolean; onAbrir: () => void }) {
   return (
     <Surface title={<><CalendarDays size={18} aria-hidden="true" /> Serviços a receber</>} action={<span className="ini-legenda">Hoje e amanhã</span>}>
-      {carregando ? <div className="ini-skeletons"><Skeleton height={44} /><Skeleton height={44} /><Skeleton height={44} /></div>
+      {carregando ? <BrandLoader variant="inline" size="sm" label="Carregando serviços a receber" text="Carregando serviços…" />
         : servicos.length === 0 ? <p className="ini-vazio">Nenhum serviço previsto</p>
         : <ul className="ini-receber">{servicos.map((s) => (
           <li key={s.id}>
@@ -181,7 +182,7 @@ export function Radar({ noticias, capas }: { noticias: Noticia[] | null; capas: 
   const capaDe = (n: Noticia) => capas[urlSegura(n.url) ?? '']
 
   const conteudo = (modo: 'compacto' | 'expandido') => {
-    if (!noticias) return <div className="ini-skeletons"><Skeleton height={140} shape="rect" /><Skeleton height={56} /><Skeleton height={56} /></div>
+    if (!noticias) return <BrandLoader variant="inline" size="md" label="Carregando notícias" text="Carregando notícias…" />
     const visiveis = (modo === 'expandido' && tema !== 'Todos' ? lista.filter((n) => n.tema === tema) : lista).slice(0, modo === 'expandido' ? 24 : 3)
     if (!visiveis.length) return <EmptyState compact title="Nenhuma notícia disponível" />
     const [destaque, ...resto] = visiveis as [Noticia, ...Noticia[]]

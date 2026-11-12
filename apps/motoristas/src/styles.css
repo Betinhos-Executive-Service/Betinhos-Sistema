@@ -4482,10 +4482,10 @@ svg {
   text-align: center;
 }
 
-/* Sucesso: o anel para e fecha em dourado; o selo com o check aparece no canto da logo. */
+/* Sucesso: o anel para e fecha em navy; o selo com o check aparece no canto da logo. */
 .loading-overlay-card.is-success .brand-loader__ring {
   animation: none;
-  background: #c9a24e;
+  background: #001a3d;
   transition: background 180ms ease;
 }
 
@@ -4989,6 +4989,11 @@ button:disabled {
 }
 
 .camera-error,
+/* Loader da marca dentro do véu escuro da câmera: sem a altura mínima do inline. */
+.camera-loading .brand-loader--inline {
+  min-height: 0;
+}
+
 .camera-loading,
 .camera-start-panel {
   position: absolute;
@@ -11741,6 +11746,10 @@ select,
   animation: action-button-spin 1.05s linear infinite reverse !important;
 }
 
+/* Spinner do ActionButton fora do botão navy/vermelho: navy da marca (os detalhes brancos sumiriam no fundo claro). */
+.action-button:not(.action-button--primary):not(.action-button--danger) .action-button-spinner { color: #001a3d !important; border-left-color: rgba(0, 26, 61, 0.2) !important; }
+.action-button:not(.action-button--primary):not(.action-button--danger) .action-button-spinner::after { border-color: rgba(0, 26, 61, 0.14) !important; border-top-color: rgba(0, 26, 61, 0.55) !important; }
+
 @keyframes action-button-spin {
   to {
     transform: rotate(360deg);
@@ -13225,8 +13234,8 @@ select,
   display: block;
   width: 18px;
   height: 18px;
-  border: 2px solid #edf3ff;
-  border-top-color: #2159d2;
+  border: 2px solid rgba(0, 26, 61, 0.12);
+  border-top-color: #001a3d;
   border-radius: 999px;
   animation: expense-upload-spin 800ms linear infinite;
 }
@@ -13235,8 +13244,8 @@ select,
   width: 28px;
   height: 28px;
   border-width: 3px;
-  border-color: #d6e2fb;
-  border-top-color: #2159d2;
+  border-color: rgba(0, 26, 61, 0.12);
+  border-top-color: #001a3d;
 }
 
 .expense-send-close {

@@ -82,7 +82,7 @@ function App() {
   const [selectedDetail, setSelectedDetail] = useState<DetailData | null>(() => initialDetailRef.current);
   const fotoManutencao = useMaintenanceFinalizePhoto({ setScreen });
   const avisos = useAvisos({ screen, selectedDetail });
-  const { logAppError, setCriticalError, setDataLoadingState, setToast } = avisos;
+  const { logAppError, setCriticalError, setToast } = avisos;
   const [completingDetailKey, setCompletingDetailKey] = useState("");
   const fila = useFilaServicos({ selectedDetail, setScreen, setToast, store });
   const { blockIfNotFirstPending } = fila;
@@ -213,9 +213,9 @@ function App() {
   const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
   const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
   const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
-  const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
+  const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast });
   const { checklists, setChecklistOrigin, setSelectedChecklistId } = checklistsLista;
-  const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
+  const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen });
   const { comunicados, setComunicadoOrigin } = comunicadosLista;
 
   useServiceDeepLink({
@@ -225,7 +225,6 @@ function App() {
     isReceiptPreviewMode,
     pendingServiceDeepLinkRef,
     serviceDeepLinkHandledRef,
-    setDataLoadingState,
     setScreen,
     setSelectedDetail,
     setToast
@@ -233,8 +232,7 @@ function App() {
 
   useComunicadoDeepLink({ comunicadosLista, setScreen, setToast });
 
-  const { refreshLocal } = useAgendaLoad({
-    completeDataLoadingState: avisos.completeDataLoadingState,
+  const { agendaCarregando, refreshLocal } = useAgendaLoad({
     comunicadosDriverIdRef,
     dados,
     initialHashRouteRef,
@@ -247,7 +245,6 @@ function App() {
     screen,
     selectedChecklistId: checklistsLista.selectedChecklistId,
     serviceDeepLinkHandledRef,
-    setDataLoadingState,
     setDriverContext,
     setRemoteMode,
     setScreen,
@@ -285,7 +282,8 @@ function App() {
   const tour = useTour({
     blocked: Boolean(finalizar.vehicleChoiceRequest || remoteOperation || despesas.expenseSend),
     criticalError: avisos.criticalError,
-    dataLoading: avisos.dataLoading,
+    // Agenda carregando conta como carga: o tour espera a lista aparecer.
+    dataLoading: Boolean(avisos.dataLoading) || agendaCarregando,
     driverContextId: driverContext?.id,
     expenseReading: screen === "gastos" && expenseFlowView(despesas.expenseQuickRead) === "leitura",
     screen,
@@ -304,7 +302,6 @@ function App() {
     remoteMode,
     screen,
     selectedDetail,
-    setDataLoadingState,
     setDriverContext,
     setExpenseReferenceData: despesas.setExpenseReferenceData,
     setExpenseReferenceError: despesas.setExpenseReferenceError,
@@ -517,6 +514,7 @@ function App() {
   if (telaDetalhe) return show(telaDetalhe);
 
   const telaHistorico = rotasHistorico(screen, {
+    agendaCarregando,
     refreshLocal,
     selectedDetail,
     setScreen,
@@ -526,6 +524,7 @@ function App() {
   if (telaHistorico) return show(telaHistorico);
 
   const telaServicos = rotasServicos(screen, {
+    agendaCarregando,
     checklists,
     completingDetailKey,
     comunicados,

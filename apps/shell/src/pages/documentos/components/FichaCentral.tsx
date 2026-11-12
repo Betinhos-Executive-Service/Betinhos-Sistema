@@ -38,7 +38,7 @@ function VeiculoCarregado({ source, docs, id, onClose, onChanged }: Omit<Props, 
   if (!result) {
     return (
       <Drawer open size="wide" eyebrow="Veículo" title="Carregando veículo" onClose={onClose}>
-        <Carregando />
+        <Carregando label="Carregando veículo" size="md" />
       </Drawer>
     )
   }

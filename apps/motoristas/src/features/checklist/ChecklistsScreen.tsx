@@ -38,6 +38,7 @@ import {
   type ChecklistResposta,
   type ChecklistVeiculo
 } from "./checklists";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 export type ChecklistsLoadStatus = "loading" | "ready" | "error";
 
@@ -415,7 +416,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
                   <small>{progressCount.done} de {progressCount.total} itens preenchidos · progresso salvo neste aparelho</small>
                 </div>
                 {pageError ? <div className="form-error-summary" role="alert">{pageError}</div> : null}
-                {!draft ? <p className="checklist-loading" role="status">Carregando checklist…</p> : selected.itens.map((item) => item.tipo === "okNok" ? (
+                {!draft ? <BrandLoader variant="inline" size="md" label="Carregando checklist" text="Carregando checklist" /> : selected.itens.map((item) => item.tipo === "okNok" ? (
                   <ChecklistOkNokField
                     key={item.chave}
                     item={item}
@@ -518,9 +519,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
           <div className="comunicado-list services-panel checklist-list">
             {notice ? <p className="checklist-notice" role="status">{notice}</p> : null}
             {loadStatus === "loading" && !items.length ? (
-              <div className="comunicado-skeleton" role="status" aria-busy="true" aria-label="Carregando checklists">
-                <span /><span />
-              </div>
+              <BrandLoader variant="inline" label="Carregando checklists" text="Carregando checklists" />
             ) : loadStatus === "error" && !items.length ? (
               <div className="comunicado-load-error" role="alert">
                 <p>Não foi possível carregar os checklists. Verifique a conexão e tente novamente.</p>

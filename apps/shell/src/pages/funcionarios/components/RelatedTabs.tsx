@@ -1,4 +1,4 @@
-import { Alert, Button, buttonClassName, EmptyState, Spinner, StatusBadge } from '@betinhos/ui'
+import { Alert, Button, buttonClassName, EmptyState, StatusBadge } from '@betinhos/ui'
 import { ChevronRight, ExternalLink, Inbox } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { hrefFor } from '../../../nav/useHashRoute'
@@ -6,6 +6,7 @@ import { statusLabel, statusTone } from '../../equipamentos/domain/choices'
 import type { DataSource } from '../data/source'
 import type { EquipamentoResumo, Multa, Posse } from '../data/types'
 import { errorMessage } from '../data/xrm'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
 const fmt = (value: string | null) => (value ? dateTime.format(new Date(value)) : '—')
@@ -28,7 +29,7 @@ export function useLoad<T>(load: () => Promise<T>) {
 }
 
 export function Status({ loading, error, empty, emptyText = 'Nenhum registro.' }: { loading: boolean; error?: string; empty: boolean; emptyText?: string }) {
-  if (loading) return <p className="loading-line"><Spinner size={16} /> Carregando…</p>
+  if (loading) return <BrandLoader variant="inline" size="md" label="Carregando" text="Carregando…" />
   if (error) return <Alert tone="danger" title="Não foi possível carregar.">{error}</Alert>
   if (empty) return <EmptyState compact align="start" icon={<Inbox />} title={emptyText} />
   return null

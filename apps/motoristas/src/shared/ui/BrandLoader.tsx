@@ -1,16 +1,21 @@
 import type React from "react";
 import logo from "../../assets/images/logo-betinhos-b-192.webp";
 
-type BrandLoaderProps = {
+export type BrandLoaderProps = {
   /** Nome lido pelo leitor de tela (ex.: "Carregando serviços"). */
   label: string;
   /** Texto visível embaixo da logo; sem ele só a logo aparece. */
   text?: string;
-  /** Cobre a janela toda; sem isso cobre o pai mais próximo com `position: relative`. */
-  fullscreen?: boolean;
+  /**
+   * `overlay` (padrão): véu cinza com blur sobre o bloco que carrega; o pai precisa de `position` (classe `brand-loader-host`).
+   * `inline`: ocupa o lugar do conteúdo que ainda não chegou. `fullscreen`: só para a abertura do app.
+   */
+  variant?: "overlay" | "inline" | "fullscreen";
+  /** `lg` tela/lista, `md` painel/diálogo, `sm` card/linha. */
+  size?: "lg" | "md" | "sm";
 };
 
-/** Marca do loader: anel girando em volta da logo B (estilos em brand-loader.css). */
+/** Marca do loader: anel navy girando em volta da logo B (estilos em brand-loader.css). */
 export function BrandLoaderMark({ children }: { children?: React.ReactNode }) {
   return (
     <span className="brand-loader__mark" aria-hidden="true">
@@ -21,10 +26,17 @@ export function BrandLoaderMark({ children }: { children?: React.ReactNode }) {
   );
 }
 
-/** Loader geral do App Motoristas: logo B no centro, anel girando e fundo acinzentado com blur. */
-export function BrandLoader({ label, text, fullscreen }: BrandLoaderProps) {
+/**
+ * Loader geral do App Motoristas. Fica no bloco que carrega, nunca na tela toda:
+ * se só a lista carrega, o cabeçalho, a navegação e o resto da tela continuam usáveis.
+ */
+export function BrandLoader({ label, text, variant = "overlay", size = "lg" }: BrandLoaderProps) {
+  const classes = ["brand-loader"];
+  if (variant === "inline") classes.push("brand-loader--inline");
+  if (variant === "fullscreen") classes.push("brand-loader--fixed");
+  if (size !== "lg") classes.push(`brand-loader--${size}`);
   return (
-    <div className={fullscreen ? "brand-loader brand-loader--fixed" : "brand-loader"} role="status" aria-label={label}>
+    <div className={classes.join(" ")} role="status" aria-live="polite" aria-label={label}>
       <BrandLoaderMark />
       {text ? <p className="brand-loader__label" aria-hidden="true">{text}</p> : null}
     </div>

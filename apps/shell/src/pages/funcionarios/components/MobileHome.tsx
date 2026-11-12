@@ -7,6 +7,7 @@ import type { Filters, SortKey } from '../data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from '../data/schema'
 import type { FuncionarioView } from '../data/types'
 import { AlertBadge, Avatar, EnvBadge, SemAppBadge, StatusBadge } from './Badges'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   views: FuncionarioView[]
@@ -85,7 +86,7 @@ export function MobileHome(props: Props) {
       <main className="m-content">
         <p className="m-count">{visible.length} de {views.length} colaboradores</p>
         {loading && !views.length ? (
-          <ul className="m-list" aria-hidden>{[0, 1, 2, 3, 4].map((n) => <li key={n} className="m-row m-row--sk"><span className="bt-skeleton m-sk-avatar" /><span className="m-sk-lines"><span className="bt-skeleton bt-skeleton--text" /><span className="bt-skeleton bt-skeleton--text" /></span></li>)}</ul>
+          <BrandLoader variant="inline" label="Carregando colaboradores" text="Carregando colaboradores…" />
         ) : error ? (
           <div className="m-state" role="alert">
             <EmptyState tone="danger" icon={<CloudOff />} title="Não foi possível carregar os colaboradores." action={<Button variant="secondary" size="touch" icon={<RefreshCw size={16} />} onClick={onReload}>Tentar de novo</Button>}>{error}</EmptyState>

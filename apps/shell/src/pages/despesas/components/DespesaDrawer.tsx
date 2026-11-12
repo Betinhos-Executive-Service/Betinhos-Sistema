@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, Drawer, Skeleton } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer } from '@betinhos/ui'
 import { ExternalLink, MapPin } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
@@ -13,6 +13,7 @@ import { Item } from './Ficha'
 import { ComprovantesGaleria } from './Comprovantes'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   despesa: Despesa | null
@@ -153,7 +154,7 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version, o
 
 function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos; choices: DespesaChoices; statusAnexo: string; source: Source }) {
   if (anexos == null) {
-    return <Section title="Comprovantes"><div className="pg-ficha__loading" role="status" aria-label="Carregando comprovantes"><Skeleton height={18} /><Skeleton height={18} /></div></Section>
+    return <Section title="Comprovantes"><BrandLoader variant="inline" size="sm" label="Carregando comprovantes" text="Carregando comprovantes…" /></Section>
   }
   if ('error' in anexos) return <Alert tone="danger" title="Não foi possível carregar os comprovantes">{anexos.error}</Alert>
   return (

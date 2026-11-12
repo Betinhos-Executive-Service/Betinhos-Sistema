@@ -25,6 +25,7 @@ import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../despesas
 import { buildWhatsAppUrl, openExternalUrl } from "../../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "./maintenanceFinalize";
 import type { DetailData, MaintenancePhotoKind } from "../../types";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type FinalizeScreenProps = {
   detail: DetailData;
@@ -512,7 +513,7 @@ function MaintenanceFinalize({
             }}
           />
 
-          {expenseReferenceLoading ? <div className="form-error-summary">Carregando cidades.</div> : null}
+          {expenseReferenceLoading ? <BrandLoader variant="inline" size="sm" label="Carregando cidades" text="Carregando cidades" /> : null}
           {!expenseReferenceLoading && expenseReferenceError ? <div className="form-error-summary">{expenseReferenceError}</div> : null}
           <SelectField
             ref={cityRef}

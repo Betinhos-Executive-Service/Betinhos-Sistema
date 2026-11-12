@@ -48,7 +48,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

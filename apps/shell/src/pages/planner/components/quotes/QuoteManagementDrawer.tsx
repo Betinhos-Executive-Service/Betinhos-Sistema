@@ -21,6 +21,7 @@ import QuoteOptionsEditor from './QuoteOptionsEditor';
 import { chosenQuoteOption, formatQuoteOption, newQuoteOption, normalizeQuoteOptions, prepareQuoteResponse, resolveQuoteAcceptance } from '../../domain/quoteScenarios';
 import { LOSS_REASONS, isLossReason } from '../../domain/quoteNotifications';
 import { InputSelect } from '../AssignmentFields';
+import { BrandLoader } from '../../../../app/BrandLoader';
 
 // As 4 etapas da tela. "Aguardando informação" é a etapa Preço parada.
 const STEPS = ["Pedido", "Preço", "Enviar", "Resposta"];
@@ -422,10 +423,10 @@ export default function QuoteManagementDrawer({ quote, task, employees = [], tea
     </form>
   </details>;
   const attachmentsBlock = <Surface eyebrow={`Anexos${attachmentList?.items?.length ? ` · ${attachmentList.items.length}` : ""}`} aria-label="Anexos da cotação">
-    {attachmentList?.loading && <p role="status">Carregando anexos…</p>}
+    {attachmentList?.loading && <BrandLoader variant="inline" size="sm" label="Carregando anexos" text="Carregando anexos…" />}
     {attachmentList?.error && <p role="alert">{attachmentList.error}<button type="button" className="button button-quiet" onClick={() => void attachmentsApi?.ensure(quote.id, true)}>Tentar novamente</button></p>}
     {attachmentsApi && AttachmentSectionComponent && <AttachmentSectionComponent taskId={quote.id} attachments={attachmentList?.items || []} loadAttachmentContent={loadAttachmentContent} onAttachment={(id: string, files: File[]) => attachmentsApi.add(id, files)} onDeleteAttachment={(id: string, attachment: LiveAttachment) => attachmentsApi.remove(id, attachment)} itemLabel="à cotação" sizeHint="Até 10 MB por arquivo" compact showPreview={false} />}
-    {task && <>{task.detailsLoading && <p role="status">Carregando anexos da tarefa…</p>}
+    {task && <>{task.detailsLoading && <BrandLoader variant="inline" size="sm" label="Carregando anexos da tarefa" text="Carregando anexos da tarefa…" />}
       {task.detailsError && <p role="alert">{task.detailsError}<button type="button" className="button button-quiet" onClick={() => onEnsureTaskDetails?.(task.id)}>Tentar novamente</button></p>}
       {AttachmentSectionComponent && (task.attachments || []).length > 0 && <AttachmentSectionComponent taskId={task.id} attachments={task.attachments} loadAttachmentContent={loadAttachmentContent} title="Anexos da tarefa (anterior)" sizeHint="Somente leitura" compact showPreview={false} />}</>}
   </Surface>;

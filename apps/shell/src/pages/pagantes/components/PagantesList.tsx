@@ -56,7 +56,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} loadingLabel="Carregando pagantes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

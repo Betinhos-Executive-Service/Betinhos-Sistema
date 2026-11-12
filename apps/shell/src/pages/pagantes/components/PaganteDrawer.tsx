@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, Skeleton, StatusBadge } from '@betinhos/ui'
+import { Alert, Button, Drawer, StatusBadge } from '@betinhos/ui'
 import { CheckCircle2, ExternalLink, FileText, Lock, Split, XCircle } from 'lucide-react'
 import type { Source } from '../data/source'
 import { totalOp } from '../data/queries'
@@ -10,6 +10,7 @@ import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   p: Pagante | null
@@ -143,7 +144,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
                 <Item label="E-mail">{contato.email ? <a href={`mailto:${encodeURIComponent(contato.email)}`}>{contato.email}</a> : ''}</Item>
               </dl>
             ) : contatoLoading ? (
-              <div className="pg-ficha__loading" role="status" aria-label="Carregando contato"><Skeleton height={18} /><Skeleton height={18} /></div>
+              <BrandLoader variant="inline" size="sm" label="Carregando contato" text="Carregando contato…" />
             ) : (
               <p className="pg-muted">{!p.pessoaId ? 'Pagante sem pessoa vinculada.' : contatoError ? `Não foi possível carregar o contato. ${contatoError}` : 'Pessoa não encontrada ou inativa.'}</p>
             )}
@@ -171,7 +172,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
 
 function RelatedBlocks({ p, related, choices, onOpen }: { p: Pagante; related: Related; choices: ChoiceSet; onOpen: (p: Pagante) => void }) {
   if (related == null) {
-    return <Section title="Rateio da OP"><div className="pg-ficha__loading" role="status" aria-label="Carregando rateio"><Skeleton height={18} /><Skeleton height={18} /><Skeleton height={18} /></div></Section>
+    return <Section title="Rateio da OP"><BrandLoader variant="inline" size="sm" label="Carregando rateio" text="Carregando rateio…" /></Section>
   }
   if ('error' in related) return <Alert tone="danger" title="Não foi possível carregar o rateio da OP">{related.error}</Alert>
   // A própria parcela vem da lista (mais nova que a consulta, se o status acabou de mudar).

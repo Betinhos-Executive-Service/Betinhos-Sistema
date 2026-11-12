@@ -10,6 +10,7 @@ import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { SELO_DEVOLUCAO, estadoDevolucao, motivoParaMotorista, MOTIVO_PADRAO } from "./devolucao";
 import { formatDiaMes, isMockGastosCartao } from "./gastosCartao";
 import { METAS_GASTOS, PERIODOS, ehPendente, formatBRL, plural, semaforo, type DespesaRelatorio, type PeriodoId, type RelatorioModelo, type Semaforo } from "./gastosRelatorio";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 export type GastosRelatorioLoadStatus = "loading" | "ready" | "error";
 
@@ -66,7 +67,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, idsComple
           ))}
         </div>
         {carregando ? (
-          <div className="gr-skeleton" role="status" aria-busy="true" aria-label="Carregando relatório de gastos"><span /><span /><span /></div>
+          <BrandLoader variant="inline" label="Carregando relatório de gastos" text="Carregando relatório de gastos" />
         ) : erro ? (
           <div className="termo-alert" data-tone="erro" role="alert">
             <p>Não foi possível carregar o relatório de gastos.</p>

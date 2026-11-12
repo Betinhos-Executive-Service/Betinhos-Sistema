@@ -2,6 +2,7 @@ import { MapPin, ThumbsDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { PostoDetalheDialog } from "./PostoDetalheDialog";
 import { AppShell } from "../../shared/ui/layout/AppShell";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { maioriaNaoRecomenda, rotuloRecomendacoes, type ResumoAvaliacoes } from "./avaliacaoPostos";
@@ -82,7 +83,7 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
           <p className="termo-empty">Nenhum posto usado pela frota a até {RAIO_KM} km de você nos últimos {carga.ranking.dias} dias.</p>
         ) : (
           <>
-            {carga.atualizando ? <p className="rp-carregando-texto" role="status">Atualizando postos…</p> : null}
+            {carga.atualizando ? <BrandLoader variant="inline" size="sm" label="Atualizando postos" text="Atualizando postos" /> : null}
             {carga.aviso ? <div className="termo-alert" data-tone="atencao" role="alert"><p>{carga.aviso}</p></div> : null}
             <ListaPostos proximos={proximos} dias={carga.ranking.dias} onAbrir={setAberto} />
           </>
@@ -95,37 +96,10 @@ export function RankingPostosScreen({ onBack }: { onBack: () => void }) {
 
 const TEXTO_ETAPA: Record<Etapa, string> = { localizacao: "Buscando sua localização…", postos: "Procurando postos perto de você…" };
 
-const ARCO_MARCADOR = "M24 118 A86 86 0 0 1 196 118";
-const MARCAS_PAINEL = Array.from({ length: 17 }, (_, indice) => {
-  const angulo = ((indice * 11.25 - 90) * Math.PI) / 180;
-  const maior = indice % 4 === 0;
-  const ponto = (raio: number) => ({ x: 110 + raio * Math.sin(angulo), y: 118 - raio * Math.cos(angulo) });
-  return { maior, inicio: ponto(74), fim: ponto(maior ? 64 : 68) };
-});
-
 function ListaCarregando({ etapa }: { etapa: Etapa }) {
   return (
-    <div className="rp-loader" role="status">
-      <svg className="rp-painel" viewBox="0 0 220 172" aria-hidden="true">
-        <defs>
-          <linearGradient id="rp-vidro" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0b2d5e" /><stop offset="1" stopColor="#001a3d" /></linearGradient>
-          <linearGradient id="rp-faixa" x1="24" y1="0" x2="196" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#ef4444" /><stop offset="0.5" stopColor="#ffb300" /><stop offset="1" stopColor="#2fbf71" /></linearGradient>
-        </defs>
-        <rect x="3" y="3" width="214" height="166" rx="28" fill="url(#rp-vidro)" stroke="#cbd5e1" strokeWidth="2" />
-        <path className="rp-painel-trilho" d={ARCO_MARCADOR} />
-        <path className="rp-painel-nivel" d={ARCO_MARCADOR} pathLength={100} />
-        {MARCAS_PAINEL.map(({ maior, inicio, fim }, indice) => (
-          <line key={indice} className={maior ? "rp-painel-marca rp-painel-marca--maior" : "rp-painel-marca"} x1={inicio.x} y1={inicio.y} x2={fim.x} y2={fim.y} />
-        ))}
-        <text x="24" y="141">E</text>
-        <text x="110" y="82">½</text>
-        <text x="196" y="141">F</text>
-        <path className="rp-painel-bomba" transform="translate(98 132)" d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5" />
-        <path className="rp-painel-ponteiro" d="M106.500 118 L110 44 L113.500 118 Z" />
-        <circle className="rp-painel-eixo" cx="110" cy="118" r="10" />
-        <circle className="rp-painel-centro" cx="110" cy="118" r="3.500" />
-      </svg>
-      <p key={etapa} className="rp-loader-texto">{TEXTO_ETAPA[etapa]}</p>
+    <div className="rp-loader">
+      <BrandLoader variant="inline" size="md" label={TEXTO_ETAPA[etapa]} text={TEXTO_ETAPA[etapa]} />
       <ol className="rp-etapas">
         <li data-estado={etapa === "localizacao" ? "ativa" : "feita"}><i aria-hidden="true" />Localização</li>
         <li data-estado={etapa === "postos" ? "ativa" : "pendente"}><i aria-hidden="true" />Postos</li>
