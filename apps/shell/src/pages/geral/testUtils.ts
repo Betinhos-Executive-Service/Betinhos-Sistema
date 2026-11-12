@@ -60,7 +60,8 @@ export function usarAmbienteGeral() {
 
   beforeEach(() => {
     window.localStorage.clear()
-    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    // Desktop largo (≥1280 px): a linha de comando do DS mostra até 3 ações da seleção; abaixo disso, só 1.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('min-width: 1280px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
   })
   afterEach(() => {
     cleanup()
