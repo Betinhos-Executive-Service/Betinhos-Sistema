@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
-import { BuildBadge } from '@betinhos/ui'
 import { AppShell } from './app/AppShell'
 import { AuditoriaProvider } from './app/auditoria/AuditoriaProvider'
 import { useDocumentosBadge } from './app/useDocumentosBadge'
@@ -54,13 +53,10 @@ export function App() {
       : { ok: true, text: 'Conectado ao Dataverse' }
 
   return (
-    <>
-      <AuditoriaProvider host={host}>
-        <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
-          <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
-        </AppShell>
-      </AuditoriaProvider>
-      <BuildBadge version={__APP_VERSION__} isoDate={__BUILD_DATE__} />
-    </>
+    <AuditoriaProvider host={host}>
+      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
+        <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
+      </AppShell>
+    </AuditoriaProvider>
   )
 }
