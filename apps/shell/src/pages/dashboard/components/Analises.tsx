@@ -23,7 +23,7 @@ export function TotalProduzidoCard({ dados: tp, periodo }: { dados: TotalProduzi
   const anos = tp.anos.map(String)
   const colunas: TableColumn<PontoTP>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Por ano', (p) => <Linhas itens={anos.map((a, i) => `${a}: ${brlS(p.valores[i])}`)} />)]
-    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, ...anos.map((a, i) => ({ key: a, header: a, align: 'end' as const, cell: (p: PontoTP) => brl(p.valores[i]) }))]
+    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, ...anos.map((a, i) => ({ key: a, header: a, cell: (p: PontoTP) => brl(p.valores[i]) }))]
   return (
     <AnaliseCard
       titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} chips={tp.chips} apoio={tp.apoio}
@@ -41,8 +41,8 @@ export function MetaRealizadoCard({ dados: mr, periodo }: { dados: MetaRealizado
     ? [{ key: 'm', header: 'Mês', cell: (l) => l.rotulo }, resto('Meta e realizado', (l) => juntar(`Meta ${brlS(l.meta)}`, `Realizado ${brlS(l.real)}`, pct(l.pct)))]
     : [
       { key: 'm', header: 'Mês', width: 'minmax(0, .7fr)', cell: (l) => forte(l.rotulo) },
-      { key: 'meta', header: 'Meta', align: 'end', cell: (l) => brl(l.meta) },
-      { key: 'real', header: 'Realizado', align: 'end', cell: (l) => forte(brl(l.real)) },
+      { key: 'meta', header: 'Meta', cell: (l) => brl(l.meta) },
+      { key: 'real', header: 'Realizado', cell: (l) => forte(brl(l.real)) },
       { key: 'pct', header: 'Atingimento', width: 'minmax(0, 1.3fr)', cell: (l) => <Participacao valor={l.pct} rotulo={`Atingimento de ${l.rotulo}`} tom={l.tom} /> },
     ]
   return (
@@ -59,7 +59,7 @@ export function TicketMensalCard({ dados: tm, periodo }: { dados: TicketMensal; 
   const mobile = useMedia(MEDIA_MOBILE)
   const colunas: TableColumn<PontoTicket>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Ticket médio', (p) => (p.valor == null ? '—' : `Ticket médio ${brl(p.valor)}`))]
-    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Ticket médio', align: 'end', cell: (p) => (p.valor == null ? '—' : brl(p.valor)) }]
+    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Ticket médio', cell: (p) => (p.valor == null ? '—' : brl(p.valor)) }]
   return (
     <AnaliseCard
       titulo="Ticket médio — mensal" periodo={periodo} unidade="R$ por serviço" valor={tm.valor} sub={tm.sub} chips={tm.chips}

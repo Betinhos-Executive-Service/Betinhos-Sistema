@@ -27,7 +27,7 @@ function PorMesCard({ dados, periodo }: { dados: Servicos; periodo: string }) {
   type Mes = Servicos['porMes'][number]
   const colunas: TableColumn<Mes>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (m) => m.rotulo }, { key: 'q', header: 'Serviços', width: COLUNA_LARGA, cell: (m) => `${int(m.qtd)} serviços` }]
-    : [{ key: 'm', header: 'Mês', cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> }, { key: 'q', header: 'Serviços', align: 'end', cell: (m) => int(m.qtd) }]
+    : [{ key: 'm', header: 'Mês', cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> }, { key: 'q', header: 'Serviços', cell: (m) => int(m.qtd) }]
   return (
     <AnaliseCard
       titulo="Serviços por mês" periodo={periodo} unidade="serviços por mês" valor={int(dados.kpis.total)}
@@ -52,8 +52,8 @@ function ParticipacaoCard({ titulo, coluna, linhas, periodo }: { titulo: string;
     ]
     : [
       { key: 't', header: coluna, width: 'minmax(0, 1.3fr)', cell: (l) => <Nome texto={l.tipo} /> },
-      { key: 'q', header: 'Serviços', align: 'end', width: 'minmax(64px, .7fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
-      { key: 'f', header: 'Faturamento', align: 'end', cell: (l) => brl(l.fat) },
+      { key: 'q', header: 'Serviços', width: 'minmax(64px, .7fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
+      { key: 'f', header: 'Faturamento', cell: (l) => brl(l.fat) },
       { key: 'p', header: <span className="dash-col-part">% do faturamento</span>, width: 'minmax(0, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pctFat} rotulo={`Faturamento de ${l.tipo}`} /></span> },
     ]
   return (

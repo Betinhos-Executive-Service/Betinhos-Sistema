@@ -59,7 +59,7 @@ export function DespesasTable({ list, choices, compras, onOpen, loading, view, q
   const columns: TableColumn<Despesa>[] = [
     { key: 'despesa', header: 'Despesa', label: 'Despesa', sortable: true, defaultWidth: 180, width: 'minmax(190px, 1.6fr)', cell: (d) => <OpenName d={d} onOpen={onOpen} /> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 92, width: 'minmax(92px, .7fr)', cell: (d) => <span className="pg-num">{formatDate(d.data)}</span> },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 96, width: 'minmax(100px, .8fr)', align: 'end', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 96, width: 'minmax(100px, .8fr)', cell: (d) => <span className="pg-num">{formatMoney(d.valor)}</span> },
     { key: 'operacional', header: 'Operacional', label: 'Operacional', sortable: true, defaultWidth: 130, width: 'minmax(140px, 1fr)', cell: (d) => <OperacionalBadge d={d} choices={choices} /> },
     { key: 'financeiro', header: 'Financeiro', label: 'Financeiro', sortable: true, defaultWidth: 160, width: 'minmax(150px, 1fr)', hideBelow: 'compact', cell: (d) => <FinanceiroBadge d={d} choices={choices} /> },
     { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 124, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (d) => <RotuloBadge texto={d.categoria} vazio="Sem categoria" /> },

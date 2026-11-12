@@ -34,7 +34,7 @@ export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, l
     { key: 'canal', header: 'Canal', width: '120px', cell: (t) => <Canal t={t} /> },
     { key: 'cartao', header: 'Cartão', width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: cartaoTexto },
     { key: 'motorista', header: 'Motorista', width: 'minmax(130px, 1fr)', cell: (t) => t.motoristaNome || <span className="cc-muted">Sem motorista</span> },
-    { key: 'valor', header: 'Valor', width: '110px', align: 'end', cell: (t) => <span className="cc-num">{formatMoney(t.valor)}</span> },
+    { key: 'valor', header: 'Valor', width: '110px', cell: (t) => <span className="cc-num">{formatMoney(t.valor)}</span> },
     { key: 'situacao', header: 'Situação', width: 'minmax(150px, .9fr)', cell: (t) => <Situacao t={t} /> },
   ]
   return (

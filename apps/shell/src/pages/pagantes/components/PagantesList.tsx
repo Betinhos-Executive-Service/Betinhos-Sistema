@@ -55,12 +55,12 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   const columns: TableColumn<Pagante>[] = [
     { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 110, width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', align: 'end', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
     { key: 'forma', header: 'Forma', label: 'Forma', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', hideBelow: 'compact', cell: (p) => label(choices.forma, p.forma) },
     { key: 'status', header: 'Pagamento', label: 'Pagamento', sortable: true, defaultWidth: 200, width: 'minmax(140px, 1fr)', cell: (p) => <span className="pg-badges"><PagamentoBadge p={p} choices={choices} /><FalhaBadge p={p} /></span> },
     { key: 'recibo', header: 'Recibo', label: 'Recibo', sortable: true, defaultWidth: 160, width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (p) => <ReciboBadge p={p} choices={choices} /> },
     { key: 'criado', header: 'Criado em', label: 'Criado em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (p) => formatDate(p.criadoEm) },
-    { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', align: 'end', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
+    { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
   ]
   return (
     // Com seleção, o clique na linha seleciona (DS) e o duplo clique abre a ficha.

@@ -41,7 +41,7 @@ export function PessoasTable({ list, choices, dups, onOpen, loading, view, quick
     { key: 'contato', header: 'Contato', label: 'Contato', defaultWidth: 220, width: 'minmax(150px, 1.1fr)', hideBelow: 'compact', cell: (p) => <span className="ps-contato"><span>{p.telefone || '—'}</span><span>{p.email}</span></span> },
     { key: 'tags', header: 'Classificação', label: 'Classificação', sortable: true, defaultWidth: 240, width: 'minmax(150px, 1fr)', cell: (p) => <Badges p={p} choices={choices} dup={dups.has(p.id)} /> },
     { key: 'ultimo', header: 'Último serviço', label: 'Último serviço', sortable: true, defaultWidth: 140, width: 'minmax(96px, .7fr)', hideBelow: 'compact', cell: (p) => formatDay(p.ultimoServico) },
-    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', align: 'end', cell: (p) => <ContatoActions p={p} compact /> },
+    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', cell: (p) => <ContatoActions p={p} compact /> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>

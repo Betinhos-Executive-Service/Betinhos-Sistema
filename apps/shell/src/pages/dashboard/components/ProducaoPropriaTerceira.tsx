@@ -19,8 +19,8 @@ export function ProducaoPropriaTerceira({ dados, periodo }: { dados: ProducaoPT;
     ]
     : [
       { key: 'm', header: 'Mês', cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> },
-      { key: 'p', header: 'Própria', align: 'end', cell: (m) => int(m.propria) },
-      { key: 't', header: 'Terceirizada', align: 'end', cell: (m) => int(m.terceirizada) },
+      { key: 'p', header: 'Própria', cell: (m) => int(m.propria) },
+      { key: 't', header: 'Terceirizada', cell: (m) => int(m.terceirizada) },
     ]
   const tabela = <Table columns={colunasMes} rows={dados.meses} rowKey={(m) => m.mes} empty="Nenhum serviço com veículo classificado." />
   return (
