@@ -329,7 +329,7 @@ export async function fetchViewRows(): Promise<ViewRows> {
   const webApi = api()
   const [personal, publicViews, pins] = await Promise.all([
     webApi.retrieveMultipleRecords('userquery', `?$select=userqueryid,name,description,fetchxml,layoutxml&$filter=returnedtypecode eq '${COMPOSITION_TABLE}' and statecode eq 0`),
-    webApi.retrieveMultipleRecords('savedquery', `?$select=savedqueryid,name,description,fetchxml,layoutxml,querytype&$filter=returnedtypecode eq '${COMPOSITION_TABLE}' and querytype eq 0 and statecode eq 0`),
+    webApi.retrieveMultipleRecords('savedquery', `?$select=savedqueryid,name,description,fetchxml,layoutxml,querytype,isdefault&$filter=returnedtypecode eq '${COMPOSITION_TABLE}' and querytype eq 0 and statecode eq 0`),
     webApi.retrieveMultipleRecords(PIN_TABLE, '?$select=new_viewid,new_pins,new_definition').catch(() => ({ entities: [] as Record<string, unknown>[] })),
   ])
   return { personal: personal.entities, publicViews: publicViews.entities, pins: pins.entities }
