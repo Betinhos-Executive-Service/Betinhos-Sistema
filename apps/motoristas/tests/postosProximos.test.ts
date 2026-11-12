@@ -217,6 +217,8 @@ test("medidasGaveta: aberta deixa livre a faixa dos botões do mapa; meio fica e
   assert.ok(g.visivel.meio > g.visivel.recolhida && g.visivel.meio < g.visivel.aberta);
   assert.deepEqual([g.deslocamento.aberta, g.deslocamento.meio > 0, g.deslocamento.recolhida > g.deslocamento.meio], [0, true, true]);
   assert.ok(medidasGaveta(100).total >= 76);
+  // Tela baixa (celular pequeno ou deitado): a gaveta aberta continua abaixo do "minha posição".
+  assert.equal(medidasGaveta(480).visivel.aberta, 480 - 218);
 });
 
 test("comFriccao: dentro dos limites acompanha o dedo; fora, só 25% da distância", () => {

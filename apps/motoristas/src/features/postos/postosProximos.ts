@@ -122,9 +122,9 @@ export const ALTURA_RECOLHIDA = 76;
 const FAIXA_CONTROLES = 218;
 const FRICCAO = 0.25;
 
-/** Alturas visíveis e deslocamentos da gaveta para um palco de `altura` px. Aberta deixa livre a faixa dos botões do mapa; meio mostra uns 34%. */
+/** Alturas visíveis e deslocamentos da gaveta para um palco de `altura` px. Aberta nunca cobre o cabeçalho nem os botões do mapa, inclusive em tela baixa; meio mostra uns 34%. */
 export function medidasGaveta(altura: number): Gaveta {
-  const total = Math.max(Math.round(altura - FAIXA_CONTROLES), Math.round(altura * 0.6), ALTURA_RECOLHIDA);
+  const total = Math.max(Math.round(altura - FAIXA_CONTROLES), ALTURA_RECOLHIDA);
   const meio = Math.min(total, Math.max(Math.round(altura * 0.34), 200));
   const visivel = { recolhida: ALTURA_RECOLHIDA, meio, aberta: total };
   return { total, visivel, deslocamento: { recolhida: total - visivel.recolhida, meio: total - visivel.meio, aberta: 0 } };
