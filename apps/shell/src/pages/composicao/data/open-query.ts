@@ -6,7 +6,7 @@ export type OpenColumn = { id: string; valueKey: string; label: string; width: n
 export const LAST_VIEW_KEY = 'composicao:ultima-visao'
 
 /** Colunas e consulta da primeira página a partir só da linha da view (fetchxml + layoutxml), sem metadata. */
-export function openQueryFromViewRow(row: { fetchxml?: unknown; layoutxml?: unknown; name?: unknown }): { fetchXml: string; columns: OpenColumn[] } | null {
+export function openQueryFromViewRow(row: { fetchxml?: unknown; layoutxml?: unknown }): { fetchXml: string; columns: OpenColumn[] } | null {
   const fetchXml = String(row.fetchxml ?? '').trim()
   if (!fetchXml) return null
   // O valueKey é o nome da célula: coincide com o alias que a própria view usa no FetchXML.

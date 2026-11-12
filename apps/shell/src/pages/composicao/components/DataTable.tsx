@@ -361,9 +361,7 @@ export function DataTable<TData extends RowData>({
         ))}
       </thead>
       <tbody>
-        {rows.length ? (<>
-          {bodyItems}
-        </>) : (
+        {rows.length ? bodyItems : (
           <tr className="price-grid__empty-row">
             <td className="price-grid__empty" colSpan={leafColumns.length}>
               <div className="price-grid__empty-content">{emptyContent ?? 'Nenhuma composição encontrada.'}</div>

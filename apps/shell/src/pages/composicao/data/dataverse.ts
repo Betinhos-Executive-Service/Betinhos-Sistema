@@ -7,7 +7,6 @@ import { getXrmHost, type XrmWebApi } from './xrm'
 import { logDataverseFailure } from '@betinhos/ui/error-logger'
 
 type DataverseEntity = Record<string, unknown>
-type DataversePage = { entities: DataverseEntity[]; nextLink?: string }
 
 const compositionTable = 'cr40f_composicaodeprecos'
 const reservationTable = 'cr40f_reservadeveculos'

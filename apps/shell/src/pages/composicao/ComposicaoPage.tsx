@@ -27,7 +27,7 @@ import { matchesCompositionFilters, sumSelectedCompositions } from './data/compo
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './data/mock-views'
 import { withCalculatedTotals } from './data/composition-calculated'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
-import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewQuery, type ViewRows } from './data/views'
+import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
 import { LAST_VIEW_KEY, openQueryFromViewRow, pickOpenView } from './data/open-query'
 import { readViewField } from './data/view-field-read'
@@ -402,14 +402,14 @@ function ComposicaoContent({ host }: { host: Host }) {
         let invalidate = false
         if (useOpen && interpretedActive) {
           const keys = openColumnKeys(openDefinition, interpretedActive.definition, fields)
+          invalidate = !keys
           if (keys) {
             const shape = queryShapeKey(interpretedActive.definition)
             viewDefinitionRef.current = interpretedActive.definition
-            setViewDefinition(interpretedActive.definition)
             setOpenQuery((previous) => previous && { ...previous, shape, keys })
-          } else invalidate = true
+          } else setOpenQuery(null)
+          setViewDefinition(interpretedActive.definition)
           setActiveView(interpretedActive)
-          if (invalidate) { setViewDefinition(interpretedActive.definition); setOpenQuery(null) }
         } else if (useOpen) {
           setOpenQuery((previous) => previous && { ...previous, viewId: null })
         } else if (interpretedActive) {
