@@ -132,6 +132,83 @@ describe('Compras sem despesa (Despesas)', () => {
   })
 })
 
+describe('Compras sem despesa: resumo, filtros, lote e exportação', () => {
+  const celula = async (nome: string) => (await linha(nome)).closest('.bt-table__row')!.querySelector('.cc-num') as HTMLElement
+
+  it('o cartão de resumo filtra pela situação e o segundo clique volta', async () => {
+    await renderPage()
+    const card = screen.getByRole('button', { name: /Sem motorista/ })
+    expect(card.textContent).toMatch(/3 compras/)
+    fireEvent.click(card)
+    await waitFor(() => expect(screen.queryByText('RESTAURANTE SABOR')).toBeNull())
+    expect(await linha('ESTACIONAMENTO CENTRO')).toBeTruthy()
+    expect(window.location.hash).toMatch(/cc-situacao=100000004/)
+    fireEvent.click(card)
+    expect(await linha('RESTAURANTE SABOR')).toBeTruthy()
+  })
+
+  it('busca por estabelecimento ou motorista', async () => {
+    await renderPage()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar compras' }), { target: { value: 'restaurante' } })
+    await waitFor(() => expect(screen.queryByText('POSTO SHELL AV BRASIL')).toBeNull())
+    expect(await linha('RESTAURANTE SABOR')).toBeTruthy()
+  })
+
+  it('ignora várias compras de uma vez com um motivo pronto', async () => {
+    await renderPage()
+    // Mais recentes primeiro: POSTO GRAAL (04/11) e POSTO SHELL (03/11) ficam lado a lado.
+    fireEvent.click(await celula('POSTO GRAAL TAUBATE'))
+    fireEvent.click(await celula('POSTO SHELL AV BRASIL'), { shiftKey: true })
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Ignorar 2' }))
+    const dlg = await screen.findByRole('dialog', { name: 'Ignorar 2 compras?' })
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Ignorar compras' }))
+    expect(within(dlg).getByText('Diga por que estas compras não precisam de despesa.')).toBeTruthy()
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Tarifa ou encargo do banco.' }))
+    fireEvent.click(within(dlg).getByRole('button', { name: 'Ignorar compras' }))
+    expect(await screen.findByText('2 compras ignoradas.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^POSTO SHELL AV BRASIL/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^POSTO GRAAL TAUBATE/ })).toBeNull()
+    aba(/^Ignoradas/)
+    expect(await linha('POSTO GRAAL TAUBATE')).toBeTruthy()
+  })
+
+  it('exporta a lista filtrada em CSV', async () => {
+    const blobs: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { blobs.push(blob); return 'blob:x' }, revokeObjectURL: () => undefined }))
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar' }))
+    const texto = await blobs[0].text()
+    expect(texto).toMatch(/RESTAURANTE SABOR/)
+    expect(texto).not.toMatch(/POSTO IPIRANGA MARGINAL/)
+  })
+
+  it('drawer: única candidata já vem marcada e fechar não pede confirmação', async () => {
+    await renderPage()
+    const d = await abrir('POSTO SHELL AV BRASIL')
+    const radio = await within(d).findByRole('radio', { name: /Combustível Shell/ })
+    await waitFor(() => expect((radio as HTMLInputElement).checked).toBe(true))
+    expect(within(d).getByText(/valor exato · mesmo dia/)).toBeTruthy()
+    fireEvent.click(within(d).getByRole('button', { name: 'Fechar' }))
+    await fechou('POSTO SHELL AV BRASIL')
+  })
+
+  it('drawer da compra CTF mostra o abastecimento e abre a despesa ligada', async () => {
+    window.location.hash = '#/despesas-operacionais'
+    render(<DespesasPage host={{ mode: 'mock' }} />)
+    const linhas = await screen.findAllByText('Posto Shell Faria Lima')
+    fireEvent.click(linhas[0].closest('button')!)
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Posto Shell Faria Lima' })).getByRole('button', { name: /Abrir compra/ }))
+    const compra = await screen.findByRole('dialog', { name: 'POSTO SHELL FARIA LIMA' })
+    const abast = within(compra).getByRole('region', { name: 'Abastecimento' })
+    expect(within(abast).getByText('41,20')).toBeTruthy()
+    fireEvent.click(within(compra).getByRole('button', { name: 'Abrir despesa' }))
+    await fechou('POSTO SHELL FARIA LIMA')
+    expect(await screen.findByRole('dialog', { name: 'Posto Shell Faria Lima' })).toBeTruthy()
+  })
+})
+
 describe('Cartões corporativos', () => {
   it('lista os cartões e abre o cadastro', async () => {
     render(<CartoesPage host={{ mode: 'mock' }} />)

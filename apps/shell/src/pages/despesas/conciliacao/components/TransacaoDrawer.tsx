@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Dialog, Drawer, Field, Radio, Textarea, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, Radio, todaySaoPaulo, useToast } from '@betinhos/ui'
 import { fmtData } from '../../../equipamentos/components/EquipamentosList'
 import { formatDate, formatMoney } from '../../../pagantes/domain/messages'
-import { acoes, cartaoVigente, janelaCandidatas, MOTIVO_CASADA, MOTIVO_REABERTA, motivoReprocessar, SITUACAO, tipoLabel } from '../domain/regras'
+import { acoes, cartaoVigente, diferencaCandidata, ehPluggy, janelaCandidatas, MOTIVO_CASADA, MOTIVO_REABERTA, motivoReprocessar, SITUACAO, tipoLabel } from '../domain/regras'
 import { message, type Source } from '../data/source'
 import type { Cartao, DespesaCandidata, Transacao } from '../domain/types'
-import { Canal, cartaoTexto, Situacao } from './TransacoesLista'
+import { Canal, cartaoTexto, Idade, Situacao } from './TransacoesLista'
+import { MotivoIgnorar } from './MotivoIgnorar'
 
 type Props = {
   transacao: Transacao | null
@@ -15,15 +16,28 @@ type Props = {
   onSaved: (t: Transacao) => void
   /** Abre o cadastro do cartão já com a conta, o final e o início vindos da transação. */
   onCadastrarCartao: (t: Transacao) => void
+  /** Abre a ficha da despesa ligada (Despesas). */
+  onAbrirDespesa?: (id: string) => void
+}
+
+const num = (v: number | null, casas = 0) => (v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }))
+/** "valor exato · mesmo dia" ou "+R$ 0,03 · 1 dia depois" para comparar as candidatas com a compra. */
+function diferencaTexto(d: DespesaCandidata, t: Transacao) {
+  const { valor, dias } = diferencaCandidata(d, t)
+  const v = valor == null ? '' : valor === 0 ? 'valor exato' : `${valor > 0 ? '+' : '−'}${formatMoney(Math.abs(valor))}`
+  const dd = dias == null ? '' : dias === 0 ? 'mesmo dia' : `${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'} ${dias > 0 ? 'depois' : 'antes'}`
+  return [v, dd].filter(Boolean).join(' · ')
 }
 
 type Candidatas = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ok'; list: DespesaCandidata[] }
 
 /** Detalhe da transação com as ações de conciliação; com despesa escolhida ou motivo digitado, fechar pede confirmação. */
-export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSaved, onCadastrarCartao }: Props) {
+export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSaved, onCadastrarCartao, onAbrirDespesa }: Props) {
   const toast = useToast()
   const [candidatas, setCandidatas] = useState<Candidatas>({ status: 'loading' })
   const [escolhida, setEscolhida] = useState<string | null>(null)
+  /** Única candidata: já vem marcada e não conta como alteração ao fechar. */
+  const [sugerida, setSugerida] = useState<string | null>(null)
   const [motivo, setMotivo] = useState('')
   const [erroMotivo, setErroMotivo] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -34,19 +48,25 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
 
   // Outra transação (ou a mesma depois de reprocessar) limpa o que foi escolhido e busca as candidatas de novo.
   const chave = t && pode?.casar ? `${t.id}:${t.motoristaId}` : null
-  useEffect(() => { setEscolhida(null); setMotivo(''); setErroMotivo(null) }, [t?.id])
+  useEffect(() => { setEscolhida(null); setSugerida(null); setMotivo(''); setErroMotivo(null) }, [t?.id])
   useEffect(() => {
     if (!chave || !t) return
     let ativo = true
     setCandidatas({ status: 'loading' })
     source.candidatas(t).then(
-      (list) => { if (ativo) setCandidatas({ status: 'ok', list }) },
+      (list) => {
+        if (!ativo) return
+        setCandidatas({ status: 'ok', list })
+        const unica = list.length === 1 ? list[0].id : null
+        setSugerida(unica)
+        setEscolhida((atual) => atual ?? unica)
+      },
       (reason) => { if (ativo) setCandidatas({ status: 'error', message: message(reason) }) },
     )
     return () => { ativo = false }
   }, [chave])
 
-  const dirty = escolhida != null || motivo.trim() !== ''
+  const dirty = (escolhida != null && escolhida !== sugerida) || motivo.trim() !== ''
   function sair(destino: () => void) {
     if (saving) return
     if (dirty) { setPendingExit(() => destino); return }
@@ -98,7 +118,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
           <div className="cc-detalhe">
             <dl className="cc-dados">
               <div><dt>Valor</dt><dd className="cc-num">{formatMoney(t.valor)}</dd></div>
-              <div><dt>Compra</dt><dd>{fmtData(t.dataCompra)}</dd></div>
+              <div><dt>Compra</dt><dd>{fmtData(t.dataCompra)} · <Idade t={t} hoje={todaySaoPaulo()} /></dd></div>
               <div><dt>Situação</dt><dd><Situacao t={t} /></dd></div>
               <div><dt>Canal</dt><dd><Canal t={t} /></dd></div>
               <div><dt>Cartão</dt><dd>{cartaoTexto(t)}</dd></div>
@@ -107,9 +127,31 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
               <div><dt>Parcela</dt><dd>{parcela}</dd></div>
               <div><dt>Fatura</dt><dd>{t.fatura || '—'}</dd></div>
               <div className="cc-dados__wide"><dt>Descrição no banco</dt><dd>{t.descricao || '—'}</dd></div>
-              {t.despesaId ? <div className="cc-dados__wide"><dt>Despesa</dt><dd>{t.despesaNome || t.despesaId}</dd></div> : null}
+              {t.despesaId ? (
+                <div className="cc-dados__wide"><dt>Despesa</dt><dd className="cc-despesa">
+                  <span>{t.despesaNome || t.despesaId}</span>
+                  {onAbrirDespesa ? <Button variant="secondary" size="compact" disabled={saving} onClick={() => sair(() => onAbrirDespesa(t.despesaId))}>Abrir despesa</Button> : null}
+                </dd></div>
+              ) : null}
               {t.motivo ? <div className="cc-dados__wide"><dt>Motivo</dt><dd>{t.motivo}</dd></div> : null}
             </dl>
+
+            {!ehPluggy(t) ? (
+              <section className="cc-secao" aria-label="Abastecimento">
+                <h3 className="cc-secao__titulo">Abastecimento</h3>
+                <dl className="cc-dados">
+                  <div><dt>Placa</dt><dd>{t.placa || '—'}</dd></div>
+                  <div><dt>Veículo</dt><dd>{t.veiculoNome || '—'}</dd></div>
+                  <div><dt>Combustível</dt><dd>{t.combustivel || '—'}</dd></div>
+                  <div><dt>Litros</dt><dd className="cc-num">{num(t.litros, 2)}</dd></div>
+                  <div><dt>Preço por litro</dt><dd className="cc-num">{t.precoLitro == null ? '—' : `R$ ${num(t.precoLitro, 3)}`}</dd></div>
+                  <div><dt>Hodômetro</dt><dd className="cc-num">{t.hodometro == null ? '—' : `${num(t.hodometro)} km`}</dd></div>
+                  <div><dt>Km rodado</dt><dd className="cc-num">{t.kmRodado == null ? '—' : `${num(t.kmRodado)} km`}</dd></div>
+                  <div><dt>Desconto</dt><dd className="cc-num">{t.desconto == null ? '—' : formatMoney(t.desconto)}</dd></div>
+                  <div><dt>Cidade do posto</dt><dd>{t.cidadePosto || '—'}</dd></div>
+                </dl>
+              </section>
+            ) : null}
 
             {vig ? (
               <section className="cc-secao" aria-label="Reprocessar">
@@ -142,9 +184,10 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
                         {candidatas.list.map((d) => (
                           <Radio key={d.id} name={`despesa-${t.id}`} checked={escolhida === d.id} disabled={saving} onChange={() => setEscolhida(d.id)}
                             label={`${d.nome || d.estabelecimento || 'Despesa'} · ${formatMoney(d.valor)}`}
-                            description={[formatDate(d.data), d.protocolo, d.estabelecimento !== d.nome ? d.estabelecimento : ''].filter(Boolean).join(' · ')} />
+                            description={[diferencaTexto(d, t), formatDate(d.data), d.protocolo, d.estabelecimento !== d.nome ? d.estabelecimento : ''].filter(Boolean).join(' · ')} />
                         ))}
                       </div>
+                      {sugerida ? <p className="cc-muted">Só uma despesa bate com a compra; ela já vem marcada.</p> : null}
                       <div><Button disabled={!escolhida} loading={saving} onClick={() => casar(candidatas.list)}>Casar com a despesa escolhida</Button></div>
                     </>
                   )}
@@ -154,9 +197,7 @@ export function TransacaoDrawer({ transacao: t, cartoes, source, onClose, onSave
             {pode?.ignorar ? (
               <section className="cc-secao" aria-label="Ignorar">
                 <h3 className="cc-secao__titulo">Ignorar</h3>
-                <Field label="Motivo para ignorar" error={erroMotivo} hint="Ex.: compra pessoal já descontada, tarifa do banco.">
-                  <Textarea value={motivo} disabled={saving} maxLength={400} rows={2} onChange={(e) => { setMotivo(e.target.value); setErroMotivo(null) }} />
-                </Field>
+                <MotivoIgnorar value={motivo} disabled={saving} error={erroMotivo} onChange={(v) => { setMotivo(v); setErroMotivo(null) }} />
                 <div><Button variant="secondary" loading={saving} onClick={ignorar}>Ignorar transação</Button></div>
               </section>
             ) : null}
