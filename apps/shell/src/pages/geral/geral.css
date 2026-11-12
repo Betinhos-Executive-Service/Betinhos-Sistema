@@ -293,3 +293,22 @@
   .gr-page .bt-selection > .bt-button:has(> svg) { padding: 0; aspect-ratio: 1; }
   .gr-page .bt-selection > .bt-button:has(> svg) > .bt-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
+/* DS 1.25.0 pôs "Densidade das linhas" na área fixa: entre 820 e ~1000 px a seleção (contador + Editar/Copiar + "Ações", ~300 px)
+   voltava a cobrir Densidade e Auditoria. Abaixo de 300 px de zona o contador mostra só o número (--gr-selecao, do GeralPage;
+   o texto "N selecionados" segue para o leitor de tela) e "Ações" fica só ícone (o aria-label "Ações (N)" continua). */
+@container bt-viewbar-zone (max-width: 299px) {
+  .gr-page .bt-selection { gap: var(--bt-space-1); }
+  .gr-page .bt-selection__count { padding-right: var(--bt-space-2); }
+  .gr-page .bt-selection__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .gr-page .bt-selection__count::after { content: var(--gr-selecao) / ""; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); font-variant-numeric: tabular-nums; }
+  .gr-page .bt-selection .bt-menu > .bt-button:has(> svg) { padding: 0; aspect-ratio: 1; }
+  .gr-page .bt-selection .bt-menu > .bt-button:has(> svg) > .bt-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+/* Entre 821 e ~850 px de janela (barra ≤ 729 px) nem assim cabe: "Criar serviço" fica só ícone, com ou sem seleção, para nada mudar
+   de lugar. No celular (≤ 820 px) a barra quebra linha e o rótulo volta. */
+@media (min-width: 821px) {
+  @container bt-viewbar (max-width: 729px) {
+    .gr-page .bt-viewbar__end > .bt-button--primary:has(> svg) { padding: 0; aspect-ratio: 1; }
+    .gr-page .bt-viewbar__end > .bt-button--primary:has(> svg) > .bt-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  }
+}

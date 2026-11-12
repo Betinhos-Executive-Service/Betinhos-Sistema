@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
@@ -602,7 +602,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     <ProtecaoContext.Provider value={protecao}>
       <div className="page page--full gr-page">
         {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
+        {/* --gr-selecao: só o número do contador, que geral.css mostra quando falta largura (o texto inteiro fica para o leitor de tela). */}
+        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline" style={{ '--gr-selecao': `"${selectedIds.length}"` } as CSSProperties}>
         <ViewBar
           onAudit={openAuditoria}
           view={viewState}
@@ -615,7 +616,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           primary={<>
             {/* No celular o cabeçalho já tem "Atualizar". */}
             {mobile ? null : <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />}
-            <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
+            <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>
           </>}
           selection={selection}
         >
