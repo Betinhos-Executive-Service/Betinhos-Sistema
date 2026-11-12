@@ -6,7 +6,6 @@
 .dash-fi-subtitulo { margin: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); line-height: var(--bt-typography-body-small-line-height); }
 
 /* ---------- Clientes: linha com "Ver meses" ---------- */
-.dash-fi-clientes .bt-table__cell--end .bt-button { margin-right: calc(-1 * var(--bt-space-2)); }
 /* O detalhe aberto ocupa a linha inteira, abaixo das colunas (a trilha dele tem 0 px enquanto fechado). */
 .dash-fi-clientes .bt-table__row > .bt-table__cell:has(> .dash-fi-meses) { grid-column: 1 / -1; }
 .dash-fi-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: var(--bt-space-2); width: 100%; margin: 0; padding: 0 0 var(--bt-space-1); list-style: none; }

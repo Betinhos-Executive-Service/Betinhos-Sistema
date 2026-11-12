@@ -88,7 +88,7 @@ function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total:
   const mobile = useMedia(MEDIA_MOBILE)
   const colunas: TableColumn<PontoCusto>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Custo', (p) => `Custo ${brl(p.valor)}`)]
-    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Custo', align: 'end', cell: (p) => brl(p.valor) }]
+    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Custo', cell: (p) => brl(p.valor) }]
   return (
     <AnaliseCard
       titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
@@ -107,8 +107,8 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
     ? [{ key: 't', header: 'Tipo de reparo', cell: (l) => l.tipo }, resto('Custo', (l) => juntar(`${int(l.qtd)} registros`, `Custo ${brl(l.valor)}`, `Participação ${pct(l.pct)}`))]
     : [
       { key: 't', header: 'Tipo de reparo', width: 'minmax(0, 1.4fr)', cell: (l) => forte(l.tipo) },
-      { key: 'q', header: 'Qtd', align: 'end', width: 'minmax(56px, .5fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
-      { key: 'v', header: 'Custo', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Qtd', width: 'minmax(56px, .5fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
+      { key: 'v', header: 'Custo', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.tipo} no custo`} /></span> },
     ]
   const [maior] = linhas
@@ -138,9 +138,9 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
     ]
     : [
       { key: 'c', header: 'Categoria', width: 'minmax(160px, 1.3fr)', cell: (l) => forte(l.categoria) },
-      { key: 'q', header: 'Registros', align: 'end', width: 'minmax(72px, .6fr)', cell: (l) => int(l.qtd) },
-      ...(mostrarLM ? [{ key: 'lm', header: 'Mês anterior', align: 'end' as const, width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.lm) }] : []),
-      { key: 'ly', header: 'Ano anterior', align: 'end', width: 'minmax(92px, .7fr)', cell: (l) => anterior(l.ly) },
+      { key: 'q', header: 'Registros', width: 'minmax(72px, .6fr)', cell: (l) => int(l.qtd) },
+      ...(mostrarLM ? [{ key: 'lm', header: 'Mês anterior', width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.lm) }] : []),
+      { key: 'ly', header: 'Ano anterior', width: 'minmax(92px, .7fr)', cell: (l) => anterior(l.ly) },
       { key: 'm', header: <span className="dash-col-part">Meta</span>, width: 'minmax(180px, 1.6fr)', cell: (l) => <span className="dash-col-part">{l.meta ?? '—'}</span> },
       { key: 's', header: 'Status', width: 'minmax(132px, .9fr)', cell: (l) => <Selo status={l.status} /> },
     ]

@@ -109,9 +109,9 @@ function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { l
     ? [{ key: 'm', header: 'Mês', cell: (l) => l.rotulo }, { key: 'resto', header: 'Valores', width: COLUNA_LARGA, cell: (l) => juntar(`${int(l.lancamentos)} lançamentos`, `Despesa ${brl(l.valor)}`, `Alimentação ${brl(l.alimentacao)}`) }]
     : [
       { key: 'm', header: 'Mês', cell: (l) => forte(l.rotulo) },
-      { key: 'q', header: 'Lançamentos', align: 'end', cell: (l) => int(l.lancamentos) },
-      { key: 'v', header: 'Despesa', align: 'end', cell: (l) => forte(brl(l.valor)) },
-      { key: 'a', header: 'Alimentação', align: 'end', cell: (l) => brl(l.alimentacao) },
+      { key: 'q', header: 'Lançamentos', cell: (l) => int(l.lancamentos) },
+      { key: 'v', header: 'Despesa', cell: (l) => forte(brl(l.valor)) },
+      { key: 'a', header: 'Alimentação', cell: (l) => brl(l.alimentacao) },
     ]
   return (
     <AnaliseCard
@@ -137,8 +137,8 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
     ? [{ key: 'r', header: coluna, cell: (l) => l.rotulo }, { key: 'resto', header: 'Valores', width: COLUNA_LARGA, cell: (l) => juntar(`${int(l.lancamentos)} lançamentos`, brl(l.valor), `Participação ${pct(l.participacao)}`) }]
     : [
       { key: 'r', header: coluna, width: 'minmax(0, 1.2fr)', cell: (l) => <Nome texto={l.rotulo} /> },
-      { key: 'q', header: 'Lançamentos', align: 'end', width: 'minmax(0, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
-      { key: 'v', header: 'Valor', align: 'end', cell: (l) => forte(brl(l.valor)) },
+      { key: 'q', header: 'Lançamentos', width: 'minmax(0, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
+      { key: 'v', header: 'Valor', cell: (l) => forte(brl(l.valor)) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.participacao} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
   const resumo = dist.grupos > dist.linhas.length ? `${int(dist.linhas.length)} de ${int(dist.grupos)} ${plural}` : undefined
@@ -169,10 +169,10 @@ function PorMotoristaCard({ linhas, periodo, mobile }: Bloco & { linhas: LinhaMo
     ]
     : [
       { key: 'm', header: 'Motorista', width: 'minmax(0, 1.4fr)', cell: (l) => <Nome texto={l.motorista} /> },
-      { key: 'q', header: 'Lançamentos', align: 'end', width: 'minmax(0, .7fr)', cell: (l) => int(l.lancamentos) },
-      { key: 'h', header: 'Hospedagem', align: 'end', cell: (l) => <Duplo valor={brl(l.hospedagem)} apoio={l.hospedagemMedia != null ? `média ${brl(l.hospedagemMedia)}` : 'sem hospedagem'} /> },
-      { key: 'a', header: 'Alimentação', align: 'end', cell: (l) => <Duplo valor={brl(l.alimentacao)} apoio={`${brl(l.alimentacaoMediaDia)}/dia`} /> },
-      { key: 't', header: 'Total', align: 'end', cell: (l) => forte(brl(l.total)) },
+      { key: 'q', header: 'Lançamentos', width: 'minmax(0, .7fr)', cell: (l) => int(l.lancamentos) },
+      { key: 'h', header: 'Hospedagem', cell: (l) => <Duplo valor={brl(l.hospedagem)} apoio={l.hospedagemMedia != null ? `média ${brl(l.hospedagemMedia)}` : 'sem hospedagem'} /> },
+      { key: 'a', header: 'Alimentação', cell: (l) => <Duplo valor={brl(l.alimentacao)} apoio={`${brl(l.alimentacaoMediaDia)}/dia`} /> },
+      { key: 't', header: 'Total', cell: (l) => forte(brl(l.total)) },
     ]
   const top = useTopCelular(linhas, mobile, 'despesas')
   const tabela = <><Table columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>

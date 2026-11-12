@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Breadcrumb, Button, Checkbox, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
-import { AlertTriangle, ArrowLeft, Bell, Check, Clock, Copy, Download, Eye, FileText, MessageSquare, PenLine, RefreshCw, SearchX, Users } from 'lucide-react'
+import { Alert, Avatar, Button, Checkbox, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Spinner, StatusBadge, Surface, useToast } from '@betinhos/ui'
+import { AlertTriangle, Bell, Check, Clock, Copy, Download, Eye, FileText, MessageSquare, PenLine, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Source } from '../data/source'
 import {
   COMUNICADO_ESCOPO, COMUNICADO_PUSH, COMUNICADO_TIPO, buildResultadosCsv, canResendPush, duplicateComunicado, fileSlug, formatDate, isAberto, isPendente,
@@ -9,6 +9,7 @@ import {
 import { baixarComprovantes, textoErroPdf } from '../data/baixarComprovantes'
 import { paresDoComunicado } from '../domain/comprovante'
 import { Assinatura } from './Assinatura'
+import { NavTopo } from '../../../app/NavTopo'
 import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
@@ -142,13 +143,12 @@ export function ComunicadoRelatorio({ item, motoristas, source, onBack, onDuplic
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<Breadcrumb items={[{ label: 'Comunicados', href: '#/comunicados' }, { label: 'Relatório' }]} />}
+        breadcrumb={<NavTopo modulo="Comunicados" href="#/comunicados" onBack={onBack} atual="Relatório" />}
         title={item.titulo}
         meta={<><StatusBadge tone="success">Enviado</StatusBadge><StatusBadge tone="info">{ciencia ? 'Assinatura obrigatória' : 'Informativo'}</StatusBadge></>}
         description={`${formatDate(item.disparadoEm)} · ${item.escopo === COMUNICADO_ESCOPO.selecionados ? `${item.alvoIds.length} ${plural(item.alvoIds.length, 'motorista selecionado', 'motoristas selecionados')}` : 'Todos os motoristas com acesso ao app'}`}
         actions={(
           <div className="cm-actions">
-            <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>Voltar</Button>
             <Button variant="secondary" icon={<RefreshCw size={16} />} loading={loading && loaded} onClick={() => void load()}>Atualizar</Button>
             <Button variant="secondary" icon={<Copy size={16} />} onClick={() => onDuplicate(duplicateComunicado(item))}>Duplicar como rascunho</Button>
           </div>

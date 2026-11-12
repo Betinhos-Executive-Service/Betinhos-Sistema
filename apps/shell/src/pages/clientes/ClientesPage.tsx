@@ -75,13 +75,13 @@ function Clientes({ host }: { host: Host }) {
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum cliente com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     body = mobile
       ? (visible.length ? <ClientesCards list={visible} onOpen={open} /> : <div className="surface">{empty}</div>)
-      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
+      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
   }
 
   return (
     <div className="page page--full cl-page">
       <div role="toolbar" aria-label="Comandos de clientes">
-        <ViewBar onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="cl-search" value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />
           {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />}

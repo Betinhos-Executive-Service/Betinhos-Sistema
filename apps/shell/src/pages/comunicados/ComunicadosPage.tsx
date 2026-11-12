@@ -9,6 +9,7 @@ import { useComunicados } from './useComunicados'
 import { ComunicadosLista } from './components/ComunicadosLista'
 import { ComunicadoEditor } from './components/ComunicadoEditor'
 import { ComunicadoRelatorio } from './components/ComunicadoRelatorio'
+import { NavTopo } from '../../app/NavTopo'
 import { BrandLoader } from '../../app/BrandLoader'
 import './comunicados.css'
 
@@ -49,7 +50,7 @@ function Comunicados({ host }: { host: Host }) {
       ? <Alert tone="danger" title="Não foi possível carregar os comunicados" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error}</Alert>
       : <div className="surface"><BrandLoader variant="inline" label="Carregando comunicado" text="Carregando comunicado…" /></div>
   } else if (!selected) {
-    body = <Alert tone="warning" title="Comunicado não encontrado" action={<Button variant="secondary" onClick={goHome}>Voltar para a lista</Button>}>Ele pode ter sido excluído. Atualize a lista para conferir.</Alert>
+    body = <><NavTopo modulo="Comunicados" href="#/comunicados" onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Comunicado não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
   } else if (isDisparado(selected)) {
     body = <ComunicadoRelatorio key={selected.id} item={selected} motoristas={data.motoristas} source={source} onBack={goHome} onDuplicate={startNew} />
   } else {

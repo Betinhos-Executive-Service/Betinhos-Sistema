@@ -4,6 +4,7 @@ import { BrandLoader } from "../../shared/ui/BrandLoader";
 import {
   describeVehicle,
   needsFleetChoice,
+  NOT_APPLICABLE_VEHICLE_CHOICE,
   selectableCandidates,
   type DriverVehicleChoice,
   type FleetVehicle,
@@ -121,8 +122,8 @@ export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, on
         ) : null}
 
         {fleetMode && fleetState === "ready" ? (
+          // Sem foco automático: o teclado do celular cobriria os botões do fim do diálogo.
           <input
-            ref={(node) => { firstFocusRef.current = node; }}
             className="vehicle-choice-search"
             type="search"
             inputMode="search"
@@ -187,6 +188,17 @@ export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, on
             }}
           >
             Nenhuma das opções
+          </button>
+        ) : null}
+
+        {fleetState !== "loading" ? (
+          <button
+            className="contact-choice-cancel"
+            type="button"
+            disabled={Boolean(selectedId)}
+            onClick={() => onChoose(NOT_APPLICABLE_VEHICLE_CHOICE)}
+          >
+            Não se aplica
           </button>
         ) : null}
 

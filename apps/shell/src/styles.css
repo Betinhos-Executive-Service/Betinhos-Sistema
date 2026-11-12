@@ -59,3 +59,19 @@ a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
 .foto-ampliada__fechar:active { transform: scale(0.97); }
 .foto-ampliada__fechar:focus-visible { outline: none; box-shadow: var(--bt-focus-ring); }
 @media (prefers-reduced-motion: reduce) { .foto-ampliada figure { transform: none; } }
+
+/* Linhas verticais entre colunas em todas as tabelas, como na Geral (que já tem as suas). A célula avança metade do vão para a direita
+   e até as bordas da linha, e a borda fica no meio do vão: a largura do conteúdo não muda. :where() deixa as regras das páginas vencerem.
+   Coluna fixa (pinned) fica de fora: a sombra que cobre o vão foi feita para a caixa original. */
+@media (min-width: 821px) {
+  :where(.bt-table:not(.gr-table)) :where(.bt-table__row, .bt-table__head) > :where(.bt-table__cell:not(:last-child, .bt-table__cell--pinned)) {
+    align-self: stretch;
+    margin-block: calc(-1 * var(--bt-pin-y, 0px));
+    margin-right: calc(var(--sh-col-gap, var(--bt-table-gap)) / -2);
+    padding-block: var(--bt-pin-y, 0px);
+    padding-right: calc(var(--sh-col-gap, var(--bt-table-gap)) / 2 - var(--bt-border-width-default));
+    border-right: var(--bt-border-width-default) solid var(--bt-color-border);
+  }
+  /* A alça de redimensionar acompanha a borda, que agora é a beira da célula. */
+  :where(.bt-table:not(.gr-table)) :where(.bt-table__head) > :where(.bt-table__cell:not(:last-child, .bt-table__cell--pinned)) > .bt-table__resize { right: -4px; }
+}

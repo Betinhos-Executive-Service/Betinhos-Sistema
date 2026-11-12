@@ -670,6 +670,13 @@ includes(app, "switch-import-obs", "observacao importada deve trocar entre Mot/I
 includes(app, "[f.obsOperacao]: importObs.motorista", "salvamento importado deve gravar observacao motorista");
 includes(app, "[f.obsInterna]: importObs.interna", "salvamento importado deve gravar observacao interna");
 includes(app, "[f.obsFinal]: importObs.final", "salvamento importado deve gravar observacao final");
+includes(app, "obsFaturamento: \"new_observacaodefaturamento\"", "formulario deve mapear a observacao de faturamento");
+includes(app, "state.obs.faturamento = r[f.obsFaturamento]", "edicao deve carregar a observacao de faturamento");
+includes(app, "[f.obsFaturamento]: isReturn ? state.obsRet.faturamento : state.obs.faturamento", "salvamento deve gravar a observacao de faturamento");
+includes(app, "[f.obsFaturamento]: importObs.faturamento", "salvamento importado deve gravar observacao de faturamento");
+includes(html, "data-obs=\"faturamento\"", "formulario deve ter a aba de observacao de faturamento");
+includes(html, "data-ret-obs=\"faturamento\"", "retorno deve ter a aba de observacao de faturamento");
+includes(app, "function syncObsTabs", "abas de observacao devem acompanhar o estado apos limpar ou restaurar");
 includes(app, "[f.perfilPassageiro]: importObs.passageiro", "salvamento importado deve gravar preferencias do passageiro");
 includes(importTrechoCardFunction, "buildImportSelect(\"Tipo do serviço\", \"tipoServicoValue\", sortByLabel(state.options.tipoServico)", "tipo do servico importado deve seguir label e ordenacao do formulario comum");
 includes(importTrechoCardFunction, "buildImportSelect(\"Tipo do veículo\", \"tipoVeiculoValue\", state.options.tipoVeiculo", "tipo do veiculo importado deve seguir label do formulario comum");

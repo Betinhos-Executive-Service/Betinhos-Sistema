@@ -4,10 +4,13 @@ import {
   FileText, FolderCheck, FolderCog, Gauge, GraduationCap, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, ShieldCheck, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
-import { AppShell as Shell, type NavGroup } from '@betinhos/ui'
+import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
 import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { useInstallPrompt } from './useInstallPrompt'
+
+// Versão do build na última linha do rodapé da sidebar (DS §10.1), no lugar do BuildBadge flutuante.
+const BUILD = formatBuild(__APP_VERSION__, __BUILD_DATE__)
 
 // Logo B da Betinhos: o mesmo WebResource usado como favicon e ícone do app instalável.
 const BRAND_LOGO = '/WebResources/cr40f_SistemaBetinhosIcon192.png'
@@ -87,7 +90,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
-  'conciliacao-cartao': <CreditCard />,
+  cartoes: <CreditCard />,
   cr40f_formapagamentodespesa: <Wallet />,
   cr40f_anexocolisao_v2: <Paperclip />,
   cr40f_anexorecebimento_v2: <Paperclip />,
@@ -165,6 +168,7 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, de
           <span className="bt-shell__item-label">Instalar aplicativo</span>
         </button>
       ) : null}
+      version={BUILD}
     >
       {children}
     </Shell>

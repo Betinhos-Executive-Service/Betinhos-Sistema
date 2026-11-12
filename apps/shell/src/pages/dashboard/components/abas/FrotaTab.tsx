@@ -215,10 +215,10 @@ function EventosCard({ meses, periodo, mobile }: { meses: EventosMes[]; periodo:
   const taxa = (v: number) => dec(v, 2)
   const colunasDesk = [
     { key: 'm', header: 'Mês', ...col(72, .8), cell: (m: EventosMes) => forte(m.rotulo) },
-    ...SERIES_EVENTOS.map((s) => ({ key: s.chave, header: s.nome.split(' ')[0], align: 'end' as const, ...col(72), cell: (m: EventosMes) => int(m[s.chave as 'excesso']) })),
-    { key: 't', header: 'Total', align: 'end' as const, ...col(56), cell: (m: EventosMes) => forte(int(m.total)) },
-    { key: 'k', header: 'Km', align: 'end' as const, ...col(72), cell: (m: EventosMes) => num(m.km, 0) },
-    { key: 'x', header: 'Por 1.000 km', align: 'end' as const, ...col(96), cell: (m: EventosMes) => <Duplo valor={taxa(m.taxa)} apoio={`tendência ${taxa(m.tendencia)}`} /> },
+    ...SERIES_EVENTOS.map((s) => ({ key: s.chave, header: s.nome.split(' ')[0], ...col(72), cell: (m: EventosMes) => int(m[s.chave as 'excesso']) })),
+    { key: 't', header: 'Total', ...col(56), cell: (m: EventosMes) => forte(int(m.total)) },
+    { key: 'k', header: 'Km', ...col(72), cell: (m: EventosMes) => num(m.km, 0) },
+    { key: 'x', header: 'Por 1.000 km', ...col(96), cell: (m: EventosMes) => <Duplo valor={taxa(m.taxa)} apoio={`tendência ${taxa(m.tendencia)}`} /> },
   ]
   const colunas: TableColumn<EventosMes>[] = mobile
     ? [

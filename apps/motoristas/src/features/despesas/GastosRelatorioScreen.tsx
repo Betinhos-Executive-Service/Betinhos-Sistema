@@ -78,7 +78,7 @@ export function GastosRelatorioScreen({ modelo, periodoId, loadStatus, idsComple
         ) : modelo ? (
           <Relatorio key={periodoId} onPrecoPostos={onPrecoPostos} modelo={modelo} grafico={grafico} onGrafico={setGrafico} filtro={filtro} onFiltro={setFiltro} despesasRef={despesasRef} onVerPendentes={verPendentes} idsCompletar={idsCompletar} onCompletarGasto={onCompletarGasto} motoristaId={motoristaId} onDevolucaoEnviada={onDevolucaoEnviada} abrirDespesaId={abrirDespesaId} onDespesaAberta={onDespesaAberta} />
         ) : null}
-        {modelo?.despesas.length ? null : <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos perto de mim</button>}
+        {modelo?.despesas.length ? null : <button type="button" className="termo-text-button gr-preco-postos" onClick={onPrecoPostos}>Ver postos próximos</button>}
       </section>
       <ActionBar className="finalize-actions gr-actions">
         {totalPendentes > 0 ? <ActionButton variant="secondary" label={`Pendentes (${totalPendentes})`} onClick={verPendentes} /> : null}
@@ -214,7 +214,7 @@ function Relatorio({ onPrecoPostos, modelo, grafico, onGrafico, filtro, onFiltro
           {outrasMedias.map((cartao, i) => <CartaoMedia key={cartao.id} cartao={cartao} rotuloAnterior={periodo.rotuloAnterior} i={i + 3} />)}
           <li className="gr-postos-item">
             <button type="button" className="gr-media gr-postos gr-preco-postos" style={ordem(outrasMedias.length + 3)} onClick={onPrecoPostos}>
-              <span className="gr-media-titulo">Postos perto de mim</span>
+              <span className="gr-media-titulo">Postos próximos</span>
               <span className="gr-media-detalhe">Ver preços</span>
               <img className="gr-postos-img" src={postoCombustivel} alt="" />
             </button>

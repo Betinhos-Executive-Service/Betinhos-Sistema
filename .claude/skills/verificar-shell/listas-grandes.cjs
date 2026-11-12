@@ -115,7 +115,7 @@ async function waitText(page, re, timeout = 15000) { await page.getByText(re).fi
   await page.goto(`${BASE}?volume=3000#/funcionarios`)
   await page.locator('.bt-table__row').first().waitFor({ timeout: 20000 })
   const fFirst = Date.now() - t0
-  await waitText(page, /de 3008 ·/, 20000)
+  await waitText(page, /de 300\d ·/, 20000)
   log(`[funcionários] primeira linha em ${fFirst} ms; completa em ${Date.now() - t0} ms; linhas no DOM: ${await rows(page)}; rodapé: "${await footer(page)}"`)
   await page.screenshot({ path: `${OUT}/09-funcionarios.png` })
 

@@ -119,7 +119,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
           <div className="pg-ficha__actions">
             <QuickActions p={p} contato={contato} size="default" labels contatoLoading={contatoLoading} />
             {canGerarRecibo(p) ? (
-              <Button variant="secondary" icon={<FileText size={16} />} loading={busy} onClick={() => onRecibo(p)}>{reciboEnviado(p) || p.linkRecibo ? 'Reenviar recibo' : 'Gerar recibo'}</Button>
+              <Button variant="secondary" icon={<FileText size={16} />} loading={busy} onClick={() => onRecibo(p)}>{reciboEnviado(p) ? 'Reenviar recibo' : p.linkRecibo ? 'Gerar recibo novamente' : 'Gerar recibo'}</Button>
             ) : null}
             {p.opId ? <Button variant="secondary" icon={<Split size={16} />} disabled={busy} onClick={() => onAbrirOp(p)}>Abrir OP no Gerar Pagantes</Button> : null}
           </div>

@@ -63,7 +63,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
           <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
         </ViewBar>
       </div>
@@ -71,7 +71,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
         rows={slice}
         rowKey={(linha) => linha.veiculo.id}
         onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
-        view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }}
+        view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }}
         quickFilters={quickFilters}
         footer={<span className="frota-muted">{visiveis.length} de {linhas.length}</span>}
         empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}
@@ -82,7 +82,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
           { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
           { key: 'motorista', header: 'Motorista atual', label: 'Motorista atual', sortable: true, defaultWidth: 200, hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
           { key: 'pendencias', header: 'Pendências', label: 'Pendências', sortable: true, defaultWidth: 120, width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
-          { key: 'custo', header: 'Manutenção (12 meses)', label: 'Manutenção (12 meses)', sortable: true, defaultWidth: 190, align: 'end', hideBelow: 'compact', cell: ({ custo }) => (
+          { key: 'custo', header: 'Manutenção (12 meses)', label: 'Manutenção (12 meses)', sortable: true, defaultWidth: 190, hideBelow: 'compact', cell: ({ custo }) => (
             <span className="frota-nowrap">
               {custo.qtd === 0 ? '—' : custo.qtd === custo.semValor ? null : brl(custo.total)}
               {custo.semValor > 0 && <span className="frota-muted">{custo.qtd === custo.semValor ? '' : ' · '}{custo.semValor} sem valor</span>}

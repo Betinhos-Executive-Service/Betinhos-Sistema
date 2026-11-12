@@ -114,13 +114,13 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
           return ver ? <button type="button" className="dash-link-linha" onClick={ver} title={`Ver serviços de ${l.nome}`}>{nome}<span className="dash-sr">: ver serviços</span></button> : nome
         },
       },
-      { key: 's', header: 'Serviços', align: 'end', width: 'minmax(84px, .8fr)', cell: (l) => <Duplo valor={int(l.servicos)} apoio={`${porMes(l)}/mês`} /> },
-      { key: 'f', header: 'Faturamento', align: 'end', cell: (l) => forte(brl(l.faturamento)) },
-      { key: 't', header: 'Ticket', align: 'end', hideBelow: 'compact', cell: (l) => brl(l.ticket) },
+      { key: 's', header: 'Serviços', width: 'minmax(84px, .8fr)', cell: (l) => <Duplo valor={int(l.servicos)} apoio={`${porMes(l)}/mês`} /> },
+      { key: 'f', header: 'Faturamento', cell: (l) => forte(brl(l.faturamento)) },
+      { key: 't', header: 'Ticket', hideBelow: 'compact', cell: (l) => brl(l.ticket) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(140px, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.nome}`} /></span> },
       { key: 'c', header: 'CNH', width: 'minmax(92px, .7fr)', cell: (l) => dataBR(l.cnhDia) },
       {
-        key: 'm', header: <span className="dash-sr">Meses</span>, width: 'minmax(124px, auto)', align: 'end', cell: (l) => (l.meses.length ? (
+        key: 'm', header: <span className="dash-sr">Meses</span>, width: 'minmax(124px, auto)', cell: (l) => (l.meses.length ? (
           <Button variant="ghost" size="compact" aria-expanded={abertas.aberta(l.key)} aria-controls={abertas.aberta(l.key) ? idMeses(l) : undefined} aria-label={`${abertas.aberta(l.key) ? VER_MESES[1] : VER_MESES[0]} de ${l.nome}`} onClick={() => abertas.alternar(l.key)}>
             {abertas.aberta(l.key) ? VER_MESES[1] : VER_MESES[0]}
           </Button>
@@ -201,8 +201,8 @@ function NotaMesCard({ pontos, mo, periodo }: { pontos: NotaMes[]; mo: Motorista
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Nota', (p) => juntar(`Nota ${nota(p.nota)}`, `${int(p.validas)} notas válidas`))]
     : [
       { key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) },
-      { key: 'n', header: 'Nota média', align: 'end', cell: (p) => nota(p.nota) },
-      { key: 'v', header: 'Notas válidas', align: 'end', cell: (p) => int(p.validas) },
+      { key: 'n', header: 'Nota média', cell: (p) => nota(p.nota) },
+      { key: 'v', header: 'Notas válidas', cell: (p) => int(p.validas) },
     ]
   const score = mo.kpis.score
   return (
@@ -232,11 +232,11 @@ function ScoreMesCard({ linhas, periodo }: { linhas: LinhaScoreMotorista[]; peri
     ]
     : [
       { key: 'n', header: 'Motorista', width: trilhas[0].width, cell: (l) => <Nome texto={l.nome} meta={l.rotulo} /> },
-      { key: 'nota', header: 'Nota', align: 'end', width: trilhas[1].width, cell: (l) => <Duplo valor={notaCelula(l)} apoio={l.suficiente ? undefined : '< 100 km'} /> },
-      { key: 'km', header: 'Km', align: 'end', width: trilhas[2].width, cell: (l) => int(Math.round(l.distancia)) },
-      { key: 'a', header: 'Acel.', align: 'end', width: trilhas[3].width, cell: (l) => taxa(l.taxaAceleracao) },
-      { key: 'f', header: 'Fren.', align: 'end', width: trilhas[4].width, cell: (l) => taxa(l.taxaFrenagem) },
-      { key: 'o', header: 'Ocioso', align: 'end', width: trilhas[5].width, cell: (l) => taxa(l.taxaOcioso) },
+      { key: 'nota', header: 'Nota', width: trilhas[1].width, cell: (l) => <Duplo valor={notaCelula(l)} apoio={l.suficiente ? undefined : '< 100 km'} /> },
+      { key: 'km', header: 'Km', width: trilhas[2].width, cell: (l) => int(Math.round(l.distancia)) },
+      { key: 'a', header: 'Acel.', width: trilhas[3].width, cell: (l) => taxa(l.taxaAceleracao) },
+      { key: 'f', header: 'Fren.', width: trilhas[4].width, cell: (l) => taxa(l.taxaFrenagem) },
+      { key: 'o', header: 'Ocioso', width: trilhas[5].width, cell: (l) => taxa(l.taxaOcioso) },
     ]
   const top = useTopCelular(linhas, mobile, 'score')
   const tabela = <Table columns={colunas} rows={top.linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />

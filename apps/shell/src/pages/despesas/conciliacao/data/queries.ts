@@ -36,19 +36,22 @@ export function mapCartao(row: Row): Cartao {
 
 const TRANS_SELECT = [
   'cr40f_transacaocartaoid', 'cr40f_name', 'cr40f_idconta', 'cr40f_fatura', 'cr40f_datacompra', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_final',
-  'cr40f_parcela', 'cr40f_totalparcelas', 'cr40f_tipo', 'cr40f_situacao', 'cr40f_motivo', '_cr40f_cartao_value', '_cr40f_motorista_value', '_cr40f_despesa_value',
+  'cr40f_parcela', 'cr40f_totalparcelas', 'cr40f_tipo', 'cr40f_situacao', 'cr40f_canal', 'cr40f_motivo', '_cr40f_cartao_value', '_cr40f_motorista_value', '_cr40f_despesa_value',
+  'cr40f_placa', 'cr40f_combustivel', 'cr40f_litros', 'cr40f_precolitro', 'cr40f_hodometro', 'cr40f_kmrodado', 'cr40f_desconto', 'cr40f_cidadeposto', '_cr40f_veiculo_value',
 ]
 /** Últimos 12 meses pela data da compra (o período da tela filtra dentro disso). */
 export const transacoesPath = (set: string, desde: string) =>
   `${set}?$select=${TRANS_SELECT.join(',')}${filter(`statecode eq 0 and cr40f_datacompra ge ${desde}`)}${order('cr40f_datacompra desc')}`
 
 export function mapTransacao(row: Row): Transacao {
-  const c = lookup(row, 'cartao'); const m = lookup(row, 'motorista'); const d = lookup(row, 'despesa')
+  const c = lookup(row, 'cartao'); const m = lookup(row, 'motorista'); const d = lookup(row, 'despesa'); const v = lookup(row, 'veiculo')
   return {
     id: cleanId(str(row.cr40f_transacaocartaoid)), descricao: str(row.cr40f_name), conta: str(row.cr40f_idconta), fatura: str(row.cr40f_fatura),
     dataCompra: dia(row.cr40f_datacompra) ?? '', valor: num(row.cr40f_valor) ?? 0, estabelecimento: str(row.cr40f_estabelecimento), final: str(row.cr40f_final),
-    parcela: num(row.cr40f_parcela), totalParcelas: num(row.cr40f_totalparcelas), tipo: num(row.cr40f_tipo), situacao: num(row.cr40f_situacao), motivo: str(row.cr40f_motivo),
+    parcela: num(row.cr40f_parcela), totalParcelas: num(row.cr40f_totalparcelas), tipo: num(row.cr40f_tipo), situacao: num(row.cr40f_situacao), canal: num(row.cr40f_canal), motivo: str(row.cr40f_motivo),
     cartaoId: c.id, cartaoNome: c.nome, motoristaId: m.id, motoristaNome: m.nome, despesaId: d.id, despesaNome: d.nome,
+    placa: str(row.cr40f_placa), combustivel: str(row.cr40f_combustivel), litros: num(row.cr40f_litros), precoLitro: num(row.cr40f_precolitro),
+    hodometro: num(row.cr40f_hodometro), kmRodado: num(row.cr40f_kmrodado), desconto: num(row.cr40f_desconto), cidadePosto: str(row.cr40f_cidadeposto), veiculoNome: v.nome,
   }
 }
 

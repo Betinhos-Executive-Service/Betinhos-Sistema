@@ -10,7 +10,7 @@ export type XrmWebApi = {
   createRecord: (entity: string, data: Row) => Promise<RecordRef>
   updateRecord: (entity: string, id: string, data: Row) => Promise<RecordRef>
   deleteRecord: (entity: string, id: string) => Promise<RecordRef>
-  /** Ações sem vínculo (Custom API), no mesmo contrato de `Xrm.WebApi.online.execute`. */
+  /** Ações (Custom API), sem vínculo ou vinculadas a um registro, no mesmo contrato de `Xrm.WebApi.online.execute`. */
   online?: {
     execute: (request: ExecuteRequest) => Promise<Response>
     /** Cada item (lista aninhada ou request solto) vira um changeset: grava tudo ou nada. Fora do model-driven, só Update. */
@@ -65,12 +65,13 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
   return {
     WebApi: {
       async retrieveMultipleRecords(entity, options = '', maxPageSize) {
-        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string; '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string }>(`${await set(entity)}${options}`, { maxPageSize })
+        const page = await client.request<{ value: Row[]; '@odata.nextLink'?: string; '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'?: string }>(`${await set(entity)}${options}`, { maxPageSize, allAnnotations: true })
         // Como no Xrm real: FetchXML não traz nextLink, a próxima página vem do cookie (sem ele as telas de views paravam na 1ª página).
         return { entities: page.value, nextLink: page['@odata.nextLink'], fetchXmlPagingCookie: page['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'] }
       },
       async retrieveRecord(entity, id, options = '') {
-        return client.request<Row>(`${await set(entity)}(${cleanId(id)})${options}`)
+        // Como no Xrm real, todas as anotações: scripts do model-driven leem `lookuplogicalname` (ex.: cliente no recibo).
+        return client.request<Row>(`${await set(entity)}(${cleanId(id)})${options}`, { allAnnotations: true })
       },
       async createRecord(entity, data) {
         return { entityType: entity, id: await client.create(await set(entity), data) }
@@ -84,13 +85,15 @@ export function createXrmShim(client: DataverseClient, clientUrl: string): XrmHo
         return { entityType: entity, id: cleanId(id) }
       },
       online: {
-        // Só ações sem vínculo: as telas em iframe (ex.: Gestão de Checklists) chamam Custom APIs assim.
+        // Custom APIs das telas em iframe: sem vínculo (Gestão de Checklists) ou vinculadas à linha (Composição de Preço).
         async execute(request) {
           const { boundParameter, operationName, parameterTypes } = request.getMetadata()
-          if (boundParameter) return errorResponse(400, `Ação vinculada não suportada fora do model-driven: ${operationName}.`)
-          const body = Object.fromEntries(Object.keys(parameterTypes).map((key) => [key, request[key]]))
+          const body = Object.fromEntries(Object.keys(parameterTypes).filter((key) => key !== boundParameter).map((key) => [key, request[key]]))
           try {
-            const result = await client.request<unknown>(operationName, { method: 'POST', body: JSON.stringify(body) })
+            const target = boundParameter ? request[boundParameter] as Partial<RecordRef> | undefined : undefined
+            if (boundParameter && !(target?.entityType && target.id)) return errorResponse(400, `Ação vinculada sem registro: ${operationName}.`)
+            const path = target ? `${await set(target.entityType!)}(${cleanId(target.id!)})/Microsoft.Dynamics.CRM.${operationName}` : operationName
+            const result = await client.request<unknown>(path, { method: 'POST', body: JSON.stringify(body) })
             return new Response(result === undefined ? null : JSON.stringify(result), { status: result === undefined ? 204 : 200, headers: { 'Content-Type': 'application/json' } })
           } catch (error) {
             return errorResponse(error instanceof DataverseError ? error.status : 500, error instanceof Error ? error.message : String(error))

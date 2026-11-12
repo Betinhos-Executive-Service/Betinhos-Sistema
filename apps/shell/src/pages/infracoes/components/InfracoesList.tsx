@@ -36,11 +36,11 @@ export function InfracoesTable({ list, uso, onOpen, loading, view, quickFilters,
   const columns: TableColumn<Infracao>[] = [
     { key: 'infracao', header: 'Infração', label: 'Infração', sortable: true, defaultWidth: 360, width: 'minmax(220px, 2.6fr)', cell: (i) => <OpenName i={i} onOpen={onOpen} /> },
     { key: 'gravidade', header: 'Gravidade', label: 'Gravidade', sortable: true, defaultWidth: 160, width: 'minmax(120px, .8fr)', cell: (i) => <Badges i={i} /> },
-    { key: 'pontos', header: 'Pontos', label: 'Pontos', sortable: true, defaultWidth: 100, width: '76px', align: 'end', cell: (i) => <span className="if-num">{i.pontos ?? '—'}</span> },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', align: 'end', cell: (i) => <span className="if-num">{fmtValor(i.valor)}</span> },
+    { key: 'pontos', header: 'Pontos', label: 'Pontos', sortable: true, defaultWidth: 100, width: '76px', cell: (i) => <span className="if-num">{i.pontos ?? '—'}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: (i) => <span className="if-num">{fmtValor(i.valor)}</span> },
     { key: 'competencia', header: 'Competência', label: 'Competência', sortable: true, defaultWidth: 170, width: 'minmax(120px, .9fr)', hideBelow: 'compact', cell: (i) => labels(COMPETENCIA, i.competencia) || '—' },
     { key: 'responsavel', header: 'Responsável', label: 'Responsável', sortable: true, defaultWidth: 140, width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (i) => label(RESPONSABILIDADE, i.responsabilidade, '—') },
-    { key: 'multas', header: 'Multas', label: 'Multas', sortable: true, defaultWidth: 100, width: '72px', align: 'end', cell: (i) => <span className="if-num">{usoCount(uso, i.id) || '—'}</span> },
+    { key: 'multas', header: 'Multas', label: 'Multas', sortable: true, defaultWidth: 100, width: '72px', cell: (i) => <span className="if-num">{usoCount(uso, i.id) || '—'}</span> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.if-open')}>

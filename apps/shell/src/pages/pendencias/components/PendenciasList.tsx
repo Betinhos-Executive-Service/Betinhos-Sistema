@@ -75,9 +75,9 @@ export function PendenciasTable({ list, onOpen, loading, view, quickFilters, foo
     { key: 'tipo', header: 'Tipo', label: 'Tipo', sortable: true, defaultWidth: 240, width: 'minmax(180px, 1.1fr)', cell: (p) => <TipoBadge p={p} /> },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 260, width: 'minmax(170px, 1.4fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
     { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', hideBelow: 'compact', cell: (p) => p.cliente || '—' },
-    { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 110, width: 'minmax(80px, .5fr)', align: 'end', cell: (p) => <span className="pg-num">{p.reservaIds.length}</span> },
+    { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 110, width: 'minmax(80px, .5fr)', cell: (p) => <span className="pg-num">{p.reservaIds.length}</span> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 120, width: 'minmax(88px, .7fr)', cell: (p) => <span className="pg-num">{formatDate(p.data)}</span> },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },
     { key: 'acao', header: 'Ação', label: 'Ação', defaultWidth: 150, width: 'minmax(124px, .8fr)', cell: (p) => <AcaoPendencia p={p} {...acoes} /> },
   ]
   return (

@@ -7,7 +7,7 @@ import type { Source } from '../data/source'
 import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipacao, plural, podeLembrar, publicoLabel, PUSH, pushLabel, statusParticipacao, type FiltroParticipacao, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
-import { NavTopo } from './NavTopo'
+import { NavTopo } from '../../../app/NavTopo'
 import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void; onEditar: () => void; onReaplicar: () => void }
@@ -116,7 +116,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<NavTopo onBack={onBack} atual="Participação" />}
+        breadcrumb={<NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={onBack} atual="Participação" />}
         title={item.titulo}
         meta={<>
           <StatusBadge tone="success">Publicado</StatusBadge>

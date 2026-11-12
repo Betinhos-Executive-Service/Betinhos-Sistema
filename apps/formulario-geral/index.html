@@ -173,6 +173,7 @@
                 <div class="segmented" role="tablist" aria-label="Tipo de observação">
                   <button type="button" class="seg is-active" data-obs="motorista" role="tab" aria-selected="true">Mot</button>
                   <button type="button" class="seg" data-obs="interna" role="tab" aria-selected="false">Interna</button>
+                  <button type="button" class="seg" data-obs="faturamento" role="tab" aria-selected="false">Faturamento</button>
                   <button type="button" class="seg" data-obs="final" role="tab" aria-selected="false">Final</button>
                   <button type="button" class="seg" data-obs="passageiro" role="tab" aria-selected="false">Pref Pax</button>
                 </div>
@@ -190,7 +191,7 @@
                 <div class="passenger-toolbar">
                   <div class="icon-actions">
                     <button id="toggleEnderecoPersonalizado" type="button" class="secondary-action passenger-toolbar-action" title="Alternar endereço compartilhado por passageiros">Endereço único</button>
-                    <button id="linkCadastroButton" type="button" class="secondary-action passenger-toolbar-action" title="Gerar link de cadastro para todos os passageiros do serviço">Link de cadastro</button>
+                    <button id="linkCadastroButton" type="button" class="secondary-action passenger-toolbar-action" title="Gerar link de cadastro para todos os passageiros do serviço" aria-label="Link de cadastro"><svg class="toolbar-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Link de cadastro</button>
                     <button id="addPassenger" type="button" class="secondary-action passenger-toolbar-action success" title="Adicionar passageiro" aria-label="Adicionar passageiro">+</button>
                   </div>
                 </div>
@@ -516,6 +517,7 @@
               <div class="segmented" role="tablist" aria-label="Tipo de observação retorno">
                 <button type="button" class="seg is-active" data-ret-obs="motorista" role="tab" aria-selected="true">Mot</button>
                 <button type="button" class="seg" data-ret-obs="interna" role="tab" aria-selected="false">Interna</button>
+                <button type="button" class="seg" data-ret-obs="faturamento" role="tab" aria-selected="false">Faturamento</button>
                 <button type="button" class="seg" data-ret-obs="final" role="tab" aria-selected="false">Final</button>
                 <button type="button" class="seg" data-ret-obs="passageiro" role="tab" aria-selected="false">Pref Pax</button>
               </div>
