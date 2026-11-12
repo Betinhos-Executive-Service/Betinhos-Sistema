@@ -118,9 +118,11 @@ function decimalValue(value: unknown): DecimalString {
   try { return decimalString(decimal(String(value))) } catch { return '0.00' }
 }
 
+export type FormulaMap = Map<string, Partial<Record<MoneyField, CellFormula>>>
+
 async function loadFormulaMaps(compositionIds: string[]) {
   const api = getWebApi()
-  const maps = new Map<string, Partial<Record<MoneyField, CellFormula>>>()
+  const maps: FormulaMap = new Map()
   const pages = await Promise.all(batches(compositionIds, 40).map((ids) => {
     const filter = ids.map((id) => `_new_composicao_value eq ${id}`).join(' or ')
     return api.retrieveMultipleRecords(formulaTable, `?$select=_new_composicao_value,new_campodestino,new_expressao,new_versaomotor,versionnumber&$filter=statecode eq 0 and (${filter})`)
@@ -156,6 +158,8 @@ export type CompositionPage = {
   nextLink: string | null
   /** false quando o usuário não lê reserva ou cliente e a página veio pela leitura em lote. */
   rowLinks?: boolean
+  /** Fórmulas das células por composição: chegam depois da página e não bloqueiam a grade. Rejeita só para quem aguarda. */
+  formulas: Promise<FormulaMap>
 }
 
 export type CompositionTotalRow = Pick<Composition, 'id' | 'client' | 'route' | 'departureAt' | 'values'>
@@ -249,7 +253,7 @@ async function rereadViewRows(api: XrmWebApi, viewRows: DataverseEntity[], baseA
 
 export async function loadCompositions(nextLink?: string, view?: ViewQuery): Promise<CompositionPage> {
   const api = getWebApiOrNull()
-  if (!api) return { records: getMockRows(), source: 'mock', nextLink: null }
+  if (!api) return { records: getMockRows(), source: 'mock', nextLink: null, formulas: Promise.resolve(new Map()) }
   const selectedMoney = moneyFields.map(({ key }) => key)
   const baseAttributes = ['cr40f_composicaodeprecosid', 'cr40f_servicorelacionadogeral', 'new_status', 'new_dataehorariodesaidacalculado', 'versionnumber', ...selectedMoney]
   const viewFetchXml = view ? 'fetchXml' in view ? view.fetchXml : view.sourceFetchXml : DEFAULT_FETCH
@@ -269,9 +273,10 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
   }
   const viewById = new Map(result.entities.map((row) => [String(row.cr40f_composicaodeprecosid), row]))
 
-  const formulaMapsPromise = loadFormulaMaps(orderedRows.map((row) => String(row.cr40f_composicaodeprecosid)))
-  const reservationsPromise = rowLinks ? Promise.resolve(new Map<string, DataverseEntity>()) : loadReservationsInBatches(api, orderedRows)
-  const [formulaMaps, reservations] = await Promise.all([formulaMapsPromise, reservationsPromise])
+  // Fórmulas seguem à parte; o catch vazio só evita rejeição sem tratamento, quem aguarda ainda recebe o erro.
+  const formulas = loadFormulaMaps(orderedRows.map((row) => String(row.cr40f_composicaodeprecosid)))
+  formulas.catch(() => undefined)
+  const reservations = rowLinks ? new Map<string, DataverseEntity>() : await loadReservationsInBatches(api, orderedRows)
 
   const records = orderedRows.map((row) => {
     const reservation = rowLinks ? reservationFromLinks(row) : reservations.get(String(row._cr40f_servicorelacionadogeral_value ?? ''))
@@ -298,11 +303,11 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
       vehicleType: stringValue(reservation?.[`cr40f_tipodeveiculo${formatted}`], ''),
       passengers: [1, 2, 3, 4].map((index) => reservation?.[`_cr40f_passageiro${index}_value${formatted}`]).filter((name): name is string => typeof name === 'string' && name.length > 0),
       values,
-      formulas: formulaMaps.get(id) ?? {},
+      formulas: {},
       rowVersion: typeof row['@odata.etag'] === 'string' ? row['@odata.etag'] : String(row.versionnumber ?? ''),
     }
   })
-  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(read.query, result), rowLinks }
+  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(read.query, result), rowLinks, formulas }
 }
 
 /** Total de composições da consulta atual; null quando a view não permite agregação ou o limite é excedido. */
@@ -327,7 +332,9 @@ export async function loadCompositionById(id: string): Promise<Composition | und
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('ID da composição inválido.')
   const fetchXml = `<fetch top="1"><entity name="${compositionTable}"><all-attributes/><filter><condition attribute="cr40f_composicaodeprecosid" operator="eq" value="${id}"/></filter></entity></fetch>`
   const page = await loadCompositions(undefined, { fetchXml })
-  return page.records[0]
+  const record = page.records[0]
+  // Quem recarrega uma linha para editar precisa das fórmulas junto.
+  return record && { ...record, formulas: (await page.formulas).get(record.id) ?? {} }
 }
 
 export async function applyCompositionCellInput(

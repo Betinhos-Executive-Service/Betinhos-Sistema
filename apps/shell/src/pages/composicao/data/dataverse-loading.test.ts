@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { loadCompositions } from './dataverse'
+import { loadCompositionById, loadCompositions } from './dataverse'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -119,4 +119,54 @@ it('pagina views com ordem na link-entity, em que o Dataverse devolve sempre pag
     pages.push(pageOf(link!))
   }
   expect(pages).toEqual(['2', '3', '4'])
+})
+
+const formulaRow = { _new_composicao_value: compositionId, new_campodestino: 'new_ajuste', new_expressao: '=1+1', versionnumber: '7' }
+
+function formulaXrm(formulaCall: () => Promise<{ entities: unknown[] }>) {
+  const retrieveMultipleRecords = vi.fn((entity: string) => {
+    if (entity === 'cr40f_composicaodeprecos') return Promise.resolve({ entities: [linkedRow] })
+    if (entity === 'new_formuladecelulacomposicao') return formulaCall()
+    return Promise.resolve({ entities: [] })
+  })
+  vi.stubGlobal('window', { Xrm: { WebApi: { retrieveMultipleRecords } } })
+}
+
+it('a página resolve antes das fórmulas; elas chegam à parte', async () => {
+  let release!: (value: { entities: unknown[] }) => void
+  formulaXrm(() => new Promise((resolve) => { release = resolve }))
+
+  const page = await loadCompositions(undefined, { fetchXml: '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/></entity></fetch>' })
+
+  expect(page.records[0].formulas).toEqual({})
+  release({ entities: [formulaRow] })
+  const map = await page.formulas
+  expect(map.get(compositionId)).toMatchObject({ new_ajuste: { expression: '=1+1', rowVersion: '7' } })
+})
+
+it('falha ao ler fórmulas não derruba a página e rejeita só para quem aguarda', async () => {
+  const unhandled = vi.fn()
+  process.on('unhandledRejection', unhandled)
+  formulaXrm(() => Promise.reject(new Error('sem acesso')))
+
+  const page = await loadCompositions(undefined, { fetchXml: '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/></entity></fetch>' })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  expect(page.records).toHaveLength(1)
+  expect(unhandled).not.toHaveBeenCalled()
+  await expect(page.formulas).rejects.toThrow('sem acesso')
+  process.off('unhandledRejection', unhandled)
+})
+
+it('no mock as fórmulas já vêm resolvidas', async () => {
+  vi.stubGlobal('window', {})
+  const page = await loadCompositions()
+  expect(page.source).toBe('mock')
+  expect((await page.formulas).size).toBe(0)
+})
+
+it('recarregar por ID espera as fórmulas e as devolve na linha', async () => {
+  formulaXrm(() => Promise.resolve({ entities: [formulaRow] }))
+  const row = await loadCompositionById(compositionId)
+  expect(row?.formulas).toMatchObject({ new_ajuste: { expression: '=1+1' } })
 })
