@@ -1,5 +1,4 @@
 import type { ExpenseReferenceData } from "../features/despesas/expenses.types";
-import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import type { MaintenanceRequestDraft } from "../features/manutencao/MaintenanceRequestScreen";
 import { useEffect } from "react";
 import { loadExpenseReferenceDataRemote, prefetchExpenseReferenceDataRemote } from "../features/despesas/remoto";
@@ -18,7 +17,6 @@ type Options = {
   remoteMode: boolean;
   screen: Screen;
   selectedDetail: DetailData | null;
-  setDataLoadingState: (loading: LoadingOverlayState | null) => void;
   setDriverContext: React.Dispatch<React.SetStateAction<DriverContext | null>>;
   setExpenseReferenceData: React.Dispatch<React.SetStateAction<ExpenseReferenceData>>;
   setExpenseReferenceError: React.Dispatch<React.SetStateAction<string>>;
@@ -32,7 +30,7 @@ type Options = {
 };
 
 // Dados de apoio dos formulários: referências de despesa, veículos (gastos, colisão, manutenção) e clientes do recibo, carregados ao abrir a tela.
-export function useDadosFormularios({ driverContext, expenseReferenceData, isLocalhostRuntime, remoteMode, screen, selectedDetail, setDataLoadingState, setDriverContext, setExpenseReferenceData, setExpenseReferenceError, setExpenseReferenceLoading, setMaintenanceCurrentVehicleId, setMaintenanceRequestDraft, setMaintenanceVehicles, setMaintenanceVehiclesLoading, setReceiptClienteOptions, setToast }: Options) {
+export function useDadosFormularios({ driverContext, expenseReferenceData, isLocalhostRuntime, remoteMode, screen, selectedDetail, setDriverContext, setExpenseReferenceData, setExpenseReferenceError, setExpenseReferenceLoading, setMaintenanceCurrentVehicleId, setMaintenanceRequestDraft, setMaintenanceVehicles, setMaintenanceVehiclesLoading, setReceiptClienteOptions, setToast }: Options) {
   useEffect(() => {
     if (!remoteMode || !driverContext) return;
     prefetchExpenseReferenceDataRemote();
@@ -135,7 +133,6 @@ export function useDadosFormularios({ driverContext, expenseReferenceData, isLoc
       })
       .catch((error) => {
         if (!alive) return;
-        setDataLoadingState(null);
         reportAppError(error, {
           severity: "error",
           source: "app",

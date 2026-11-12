@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, Skeleton, StatusBadge } from '@betinhos/ui'
+import { Alert, Button, Drawer, StatusBadge } from '@betinhos/ui'
 import { Lock, Split, XCircle } from 'lucide-react'
 import { QuickActions } from '../../pagantes/components/QuickActions'
 import { formatDate, formatDateTime, formatMoney } from '../../pagantes/domain/messages'
@@ -11,6 +11,7 @@ import { buildTimeline } from '../domain/timeline'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
 import { OpBadge, periodo } from './OpsList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Related = { valor: number | null; rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -96,7 +97,7 @@ export function OpDrawer({ op: opDaLista, onClose, choices, source, version, bus
           </div>
 
           {cancelada ? <Alert tone="info" title="OP cancelada">Os serviços continuam ligados a ela. Para faturar de novo, gere outra OP a partir das reservas.</Alert> : null}
-          {related == null ? <div className="pg-ficha__loading" role="status" aria-label="Carregando a OP"><Skeleton height={18} /><Skeleton height={56} /></div> : null}
+          {related == null ? <BrandLoader variant="inline" size="sm" label="Carregando a OP" text="Carregando a OP…" /> : null}
           {related && 'error' in related ? <Alert tone="danger" title="Não foi possível carregar o rateio e os serviços">{related.error}</Alert> : null}
           {passo ? <Passo passo={passo} busy={busy} onAcao={gerar} /> : null}
 

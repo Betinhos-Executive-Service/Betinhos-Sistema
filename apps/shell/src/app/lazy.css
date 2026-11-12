@@ -1,5 +1,5 @@
 .gr-sentinel { height: 1px; }
 .lazy-footer { display: flex; align-items: center; gap: var(--bt-space-2); min-height: 40px; padding: 0 var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.lazy-footer__spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: lazy-spin .8s linear infinite; }
+.lazy-footer__spin { width: 12px; height: 12px; border: 2px solid #001a3d; border-right-color: transparent; border-radius: 50%; animation: lazy-spin .8s linear infinite; }
 @keyframes lazy-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .lazy-footer__spin { animation: none; } }

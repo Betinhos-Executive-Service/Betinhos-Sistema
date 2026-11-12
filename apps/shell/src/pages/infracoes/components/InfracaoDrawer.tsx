@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, Drawer, Skeleton, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, useToast } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Pencil } from 'lucide-react'
 import type { Source } from '../data/source'
 import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, label, labels } from '../domain/choices'
@@ -9,6 +9,7 @@ import type { Infracao, MultaUso } from '../domain/types'
 import { InfracaoForm } from './InfracaoForm'
 import { Badges, money } from './InfracoesList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -40,7 +41,7 @@ function Uso({ multas, state }: { multas: MultaUso[]; state: Props['usoState'] }
         <h3>Multas com esta infração</h3>
         {state === 'ok' ? <span className="if-muted if-num">{r.total} no total · {r.ultimos12} nos últimos 12 meses</span> : null}
       </header>
-      {state === 'loading' ? <div className="if-ficha__loading" role="status" aria-label="Carregando multas"><Skeleton height={18} /><Skeleton height={18} /></div>
+      {state === 'loading' ? <BrandLoader variant="inline" size="sm" label="Carregando multas" text="Carregando multas…" />
         : state !== 'ok' ? <Alert tone="danger" title="Não foi possível carregar as multas">{state}</Alert>
         : multas.length ? (
           <>

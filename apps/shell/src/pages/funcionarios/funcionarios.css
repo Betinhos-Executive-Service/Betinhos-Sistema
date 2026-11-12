@@ -12,7 +12,6 @@
   .cluster { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; }
   .hint { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
   .spin { animation: func-spin 800ms linear infinite; }
-  .loading-line { display: flex; gap: var(--bt-space-2); align-items: center; margin: 0; padding: var(--bt-space-3) 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
   .link { padding: 0; border: 0; background: none; color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-align: left; cursor: pointer; }
   .link:focus-visible { border-radius: var(--bt-radius-xs); box-shadow: 0 0 0 2px var(--bt-focus-border); }
   .dot { display: inline-block; width: 6px; height: 6px; margin-left: var(--bt-space-1); border-radius: var(--bt-radius-full); background-color: var(--bt-color-action); }
@@ -202,8 +201,7 @@
   .file-row--error .file-meta { color: var(--bt-color-danger); font-weight: var(--bt-font-weight-semibold); }
   .file-confirm { flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-1-5); }
   .file-confirm-text { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-danger); }
-  .sk--icon { width: 32px; height: 32px; }
-  .sk--text { width: 60%; }
+  .file-row--skeleton { display: block; }
   @media (hover: hover) and (pointer: fine) {
     .file-row:not(.file-row--skeleton):hover { background-color: var(--bt-color-surface-soft); }
     .file-open:hover .file-name { color: var(--bt-color-action); }
@@ -294,7 +292,7 @@
   .note-attachment-block { display: grid; gap: var(--bt-space-2); }
   .note-attachment-preview { justify-self: start; overflow: hidden; padding: 0; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); cursor: zoom-in; }
   .note-attachment-preview img { display: block; max-width: min(100%, 520px); max-height: 360px; object-fit: contain; }
-  .note-attachment-sk { display: block; width: 240px; height: 160px; }
+  .note-attachment-sk { display: grid; place-items: center; width: 240px; height: 160px; }
   .note-attachment { display: flex; flex-wrap: wrap; gap: var(--bt-space-2-5); align-items: center; padding: var(--bt-space-2-5) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); color: var(--bt-color-text-secondary); }
   .note-attachment-name { flex: 1; display: grid; min-width: 0; }
   .note-attachment-name strong { overflow: hidden; color: var(--bt-color-text-primary); text-overflow: ellipsis; white-space: nowrap; }
@@ -332,11 +330,6 @@
   .m-row-sub { overflow: hidden; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); text-overflow: ellipsis; white-space: nowrap; }
   .m-row-alerts { display: flex; flex-wrap: wrap; gap: var(--bt-space-1-5); margin-top: var(--bt-space-0-5); }
   .m-row-chevron { color: var(--bt-color-text-secondary); }
-  .m-row--sk { display: grid; grid-template-columns: auto 1fr; gap: var(--bt-space-3); align-items: center; min-height: 72px; padding: var(--bt-space-3) var(--bt-space-3-5); }
-  .m-sk-avatar { width: 44px; height: 44px; border-radius: var(--bt-radius-full); }
-  .m-sk-lines { display: grid; gap: var(--bt-space-2); }
-  .m-sk-lines .bt-skeleton:first-child { width: 60%; }
-  .m-sk-lines .bt-skeleton:last-child { width: 40%; }
   .m-state { overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); }
   /* FAB: única exceção de botão em pílula (DESIGN_SYSTEM §6.1), com shadow.action. */
   .m-fab { position: fixed; z-index: var(--bt-z-index-floating-action); right: var(--bt-space-4); bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom)); min-height: var(--bt-control-height-prominent) !important; padding: 0 var(--bt-space-5) 0 var(--bt-space-4); border-radius: var(--bt-radius-full); font-size: var(--bt-font-size-14); box-shadow: var(--app-shadow-action); }

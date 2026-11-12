@@ -4,6 +4,7 @@ import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
 import { EmptyState, buttonClassName } from '@betinhos/ui'
+import { BrandLoader } from './BrandLoader'
 import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
 import { LazyPage, PageFallback, RouteErrorBoundary } from './routes'
@@ -23,7 +24,7 @@ function EntityFrame({ host, entity, title }: { host: Extract<Host, { mode: 'dat
     })
     return () => { cancelled = true }
   }, [host, entity])
-  return src ? <Frame src={src} title={title} /> : <p className="frame__loading" role="status">Carregando {title}…</p>
+  return src ? <Frame src={src} title={title} /> : <div className="frame"><BrandLoader label={`Carregando ${title}`} text={`Carregando ${title}…`} /></div>
 }
 
 /** Escolhe o layout da rota: moldura para telas legadas, página do shell para os demais estados. */

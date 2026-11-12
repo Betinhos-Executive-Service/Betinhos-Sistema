@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrandLoader } from './BrandLoader'
 
 type Props = {
   src: string
@@ -14,7 +15,7 @@ export function Frame({ src, title, onLoad, className }: Props) {
   useEffect(() => setLoaded(false), [src])
   return (
     <div className={className ? `frame ${className}` : 'frame'} aria-busy={!loaded}>
-      {loaded ? null : <p className="frame__loading" role="status">Carregando {title}…</p>}
+      {loaded ? null : <BrandLoader label={`Carregando ${title}`} text={`Carregando ${title}…`} />}
       <iframe key={src} className="frame__iframe" src={src} title={title} onLoad={(event) => { onLoad?.(event.currentTarget); setLoaded(true) }} />
     </div>
   )

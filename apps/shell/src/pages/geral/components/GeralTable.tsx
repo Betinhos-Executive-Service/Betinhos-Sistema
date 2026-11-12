@@ -10,6 +10,7 @@ import { filterKindOf } from '../domain/filterKind'
 import { formatCell } from '../domain/format'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   columns: Column[]
@@ -53,7 +54,6 @@ type Props = {
   density?: TableDensity
 }
 
-const SKELETON_ROWS = 8
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
 export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
@@ -198,7 +198,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const { visible, start, before, after, measure } = useVirtualRows(rows, rowId, skeleton ? null : scroller, headHeight, density === 'minimal' ? 32 : density === 'dense' ? 44 : 56)
 
   return (
-    <div ref={root} className={['bt-table gr-table', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && rows.length === 0 && 'gr-table--empty'].filter(Boolean).join(' ')}>
+    <div ref={root} className={['bt-table gr-table brand-loader-host', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && rows.length === 0 && 'gr-table--empty'].filter(Boolean).join(' ')}>
       <span className="gr-sr" role="status">{announce}</span>
       <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
         <div className="bt-table__head" role="row">
@@ -269,14 +269,11 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
           })}
         </div>
         {skeleton
-          ? Array.from({ length: SKELETON_ROWS }, (_, i) => (
-            <div key={i} className="bt-table__row" role="row" aria-hidden="true">
-              <div className="bt-table__cell gr-cell--select" role="gridcell"><span className="bt-table__skeleton" style={{ width: 16 }} /></div>
-              {columns.map((column, index) => (
-                <div key={column.key} className={index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'} role="gridcell"><span className="bt-table__skeleton" /></div>
-              ))}
+          ? (
+            <div className="bt-table__row gr-table__loading" role="row">
+              <div role="gridcell"><BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" /></div>
             </div>
-          ))
+          )
           : <>{before ? <div aria-hidden="true" style={{ height: before }} /> : null}{visible.map((row, offset) => {
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
@@ -303,6 +300,8 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
       </div>
       {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
       <div className="bt-table__footer">{footer}</div>
+      {/* Recarga com a lista na tela: véu só sobre a tabela; filtros e menu continuam livres. */}
+      {loading && rows.length > 0 ? <BrandLoader label="Atualizando serviços" /> : null}
       {quick && filterField && filterAnchor ? (
         <ColumnFilter anchor={filterAnchor} field={filterField} value={quick.value[filterField.key]} search={quick.search} onChange={(condition) => quick.onChange(filterField.key, condition)} onClose={closeFilter} />
       ) : null}

@@ -60,5 +60,5 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
     },
     { key: 'admissao', header: 'Admissão', label: 'Admissão', sortable: true, defaultWidth: 120, cell: (row) => <span className="nowrap">{formatBR(row.values.cr40f_datadeadmissao as string) || muted}</span> },
   ]
-  return <VirtualTable className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+  return <VirtualTable className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} loadingLabel="Carregando colaboradores" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
 }

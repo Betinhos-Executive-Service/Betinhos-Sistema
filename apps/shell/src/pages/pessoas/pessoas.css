@@ -43,7 +43,6 @@
 .ps-ficha__item dt { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
 .ps-ficha__item dd { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
 .ps-ficha__text { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
-.ps-ficha__loading { display: grid; gap: var(--bt-space-2); }
 .ps-rows { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
 .ps-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--bt-space-2); min-height: var(--bt-control-height-default); padding: var(--bt-space-1-5) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-size: var(--bt-font-size-13); }
 .ps-dups { margin: 0 0 var(--bt-space-1); padding-left: var(--bt-space-4); }

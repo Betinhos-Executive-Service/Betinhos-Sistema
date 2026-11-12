@@ -1,6 +1,7 @@
 import { Table, type TableProps } from '@betinhos/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { BrandLoader } from './BrandLoader'
 import './virtual.css'
 
 /** Até aqui a lista desenha todas as linhas (o primeiro lote da rolagem infinita fica como sempre foi). */
@@ -69,6 +70,20 @@ export function fitTemplate(template: string, pad = 0) {
 }
 
 /**
+ * Troca as linhas-esqueleto do `Table` do DS pelo loader da marca, só dentro da tabela: na primeira carga (sem linhas)
+ * ele ocupa o corpo. Com linhas na tela elas continuam visíveis (as telas só passam `loading` na primeira carga).
+ */
+export function comLoaderDaMarca<Row>(props: TableProps<Row>, label = 'Carregando a lista'): TableProps<Row> {
+  if (!props.loading) return props
+  return { ...props, loading: false, empty: props.rows.length ? props.empty : <BrandLoader variant="inline" label={label} text={`${label}…`} /> }
+}
+
+/** `Table` do DS com o loader da marca no lugar das linhas-esqueleto (`comLoaderDaMarca`). */
+export function LoadingTable<Row>({ loadingLabel, ...props }: TableProps<Row> & { loadingLabel?: string }) {
+  return <Table {...comLoaderDaMarca(props, loadingLabel)} />
+}
+
+/**
  * `Table` do DS que desenha só as linhas perto da tela quando a lista passa de `VIRTUAL_FROM`; rola no `main` do shell.
  * O pacote não virtualiza: aqui o `Table` recebe só a janela de linhas e as de fora viram margem antes da primeira e
  * depois da última (`virtual.css`). Limitação: o Ctrl+F do navegador só acha as linhas desenhadas.
@@ -76,7 +91,7 @@ export function fitTemplate(template: string, pad = 0) {
 /** Altura estimada da linha (px, com a borda) por densidade, a mesma do `Table` do DS. */
 const rowEstimate = (density: string | undefined) => (density === 'minimal' ? 33 : density === 'dense' ? 45 : 57)
 
-export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: TableProps<Row>) {
+export function VirtualTable<Row>({ rows, rowKey, className, style, loadingLabel, ...props }: TableProps<Row> & { loadingLabel?: string }) {
   const host = useRef<HTMLDivElement>(null)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
@@ -140,7 +155,7 @@ export function VirtualTable<Row>({ rows, rowKey, className, style, ...props }: 
 
   return (
     <div ref={host} className="vt-host">
-      <Table {...props} aria-rowcount={virtual ? rows.length + 1 : undefined} rows={visible} rowKey={rowKey} className={[className, 'vt-table'].filter(Boolean).join(' ')} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
+      <Table {...comLoaderDaMarca({ ...props, rows: visible, rowKey, className: [className, 'vt-table'].filter(Boolean).join(' ') }, loadingLabel)} aria-rowcount={virtual ? rows.length + 1 : undefined} style={{ ...style, '--vt-before': `${before}px`, '--vt-after': `${after}px` } as CSSProperties} />
       <BarraHorizontal />
     </div>
   )

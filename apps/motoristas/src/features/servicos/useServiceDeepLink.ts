@@ -5,7 +5,6 @@ import { getInitialParams } from "../../app/bootstrap";
 import { hasDataverseRuntime } from "../../data/dataverse/cliente";
 import { reportAppError } from "../../shared/appErrorLogger";
 import type { ToastTone } from "../../shared/ui/LocalToast";
-import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../../types";
 
 type Options = {
@@ -15,14 +14,13 @@ type Options = {
   isReceiptPreviewMode: boolean;
   pendingServiceDeepLinkRef: MutableRefObject<ReturnType<typeof getInitialParams>>;
   serviceDeepLinkHandledRef: MutableRefObject<boolean>;
-  setDataLoadingState: (loading: LoadingOverlayState | null) => void;
   setScreen: (screen: Screen) => void;
   setSelectedDetail: Dispatch<SetStateAction<DetailData | null>>;
   setToast: (message: string, tone?: ToastTone) => void;
 };
 
 // Deep link de serviço vindo do push: abre o detalhe em paralelo com a carga da agenda.
-export function useServiceDeepLink({ dados, initialDetailRef, isButtonPreviewMode, isReceiptPreviewMode, pendingServiceDeepLinkRef, serviceDeepLinkHandledRef, setDataLoadingState, setScreen, setSelectedDetail, setToast }: Options) {
+export function useServiceDeepLink({ dados, initialDetailRef, isButtonPreviewMode, isReceiptPreviewMode, pendingServiceDeepLinkRef, serviceDeepLinkHandledRef, setScreen, setSelectedDetail, setToast }: Options) {
   // Deep link de serviço vindo do push (form OnLoad -> data=servicoId=...&tipo=...): busca o detalhe
   // em paralelo com loadRemoteStore e abre assim que chega. Se o serviço saiu da agenda do motorista
   // (ex.: "Serviço retirado da agenda"), cai em Serviços em vez de mostrar erro.
@@ -36,7 +34,6 @@ export function useServiceDeepLink({ dados, initialDetailRef, isButtonPreviewMod
       .then((detail) => {
         if (!alive || serviceDeepLinkHandledRef.current) return;
         serviceDeepLinkHandledRef.current = true;
-        setDataLoadingState(null);
         if (!detail) {
           setSelectedDetail(null);
           setScreen("servicos");

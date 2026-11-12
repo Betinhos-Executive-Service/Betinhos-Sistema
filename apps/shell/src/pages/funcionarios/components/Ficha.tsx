@@ -1,4 +1,4 @@
-import { Alert, Button, buttonClassName, Dialog, Spinner, Tabs } from '@betinhos/ui'
+import { Alert, Button, buttonClassName, Dialog, Tabs } from '@betinhos/ui'
 import { ChevronLeft, ExternalLink, FolderOpen, Save, Undo2, X } from 'lucide-react'
 import { useQueryTexto } from '../../../nav/queryState'
 import { useIsMobile } from '../lib/useMediaQuery'
@@ -27,6 +27,7 @@ import { EquipamentosTab, MultasTab, VeiculosTab } from './RelatedTabs'
 import { SecretText } from './SecretText'
 import { useNotify } from './Toasts'
 import { VeiculoPicker } from './VeiculoPicker'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'comunicados' | 'anotacoes'
 const TABS: { key: Tab; label: string }[] = [
@@ -254,7 +255,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         </div>
 
         <div className="drawer-body" role="tabpanel">
-          {loading && <p className="loading-line"><Spinner size={16} label="Carregando ficha" /> Carregando ficha…</p>}
+          {loading && <BrandLoader variant="inline" size="md" label="Carregando ficha" text="Carregando ficha…" />}
           {loadError && <Alert tone="danger" title="Não foi possível carregar a ficha.">{loadError}</Alert>}
 
           {!loading && !loadError && tab === 'dados' && (

@@ -17,6 +17,7 @@ import {
   type ParContagem,
   type PeriodoPadroes
 } from "../domain/padroesChecklists";
+import { BrandLoader } from "../../../../app/BrandLoader";
 
 // Aba "Padrões": contagens por quem entregou, por veículo e da frota. Cada linha abre os checklists que formam o número.
 
@@ -73,8 +74,8 @@ export function PadroesTab({ checklists, loading, failed, periodo, onPeriodo, ab
       </section>
 
       {loading && !checklists ? (
-        <section className="gestao-card" aria-label="Carregando padrões">
-          {[0, 1, 2].map((index) => <span key={index} className="gestao-row-skeleton" aria-hidden="true" />)}
+        <section className="gestao-card">
+          <BrandLoader variant="inline" size="md" label="Carregando padrões" text="Carregando padrões…" />
         </section>
       ) : null}
 

@@ -1,10 +1,11 @@
 import type { MouseEvent, ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Button, Checkbox, Skeleton, StatusBadge } from '@betinhos/ui'
+import { Button, Checkbox, StatusBadge } from '@betinhos/ui'
 import { ChoiceBadge } from './ChoiceBadge'
 import { formatCell } from '../domain/format'
 import { rowKey } from '../domain/layout'
 import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   rows: Row[]
@@ -26,7 +27,6 @@ type Props = {
   grid?: boolean
 }
 
-const SKELETON_CARDS = 4
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
@@ -38,13 +38,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
   }
   const valueOf = (row: Row, column: Column | undefined) => (column ? formatCell('readonly', row, rowKey(column, attributes?.get(column.key))) : '—')
 
-  if (loading && rows.length === 0) {
-    return (
-      <ul className={grid ? 'gr-cards gr-cards--grid' : 'gr-cards'} aria-label="Carregando serviços" aria-busy="true">
-        {Array.from({ length: SKELETON_CARDS }, (_, i) => <li key={i} className="gr-card" aria-hidden="true"><Skeleton height={16} width="40%" /><Skeleton height={14} /><Skeleton height={14} width="70%" /></li>)}
-      </ul>
-    )
-  }
+  if (loading && rows.length === 0) return <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" />
 
   return (
     <>

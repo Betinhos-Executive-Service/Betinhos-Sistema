@@ -3,6 +3,7 @@ import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { AppShell } from "../../shared/ui/layout/AppShell";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { dataUrlToObjectUrl } from "../../shared/camera/photoOrientation";
@@ -123,7 +124,10 @@ export function MaintenancePhotoPreviewScreen({
                       setVideoPreviewError(true);
                     }} />
                   ) : (
-                    <div className="camera-loading">Preparando previa...</div>
+                    <div className="camera-loading">
+                      <BrandLoader variant="inline" size="md" label="Preparando prévia" />
+                      <span aria-hidden="true">Preparando prévia...</span>
+                    </div>
                   )}
                   {videoPreviewError ? (
                     <div className="video-preview-fallback">

@@ -15,6 +15,7 @@ import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosL
 import { NavTopo } from '../../app/NavTopo'
 import { TreinamentoEditor } from './components/TreinamentoEditor'
 import { TreinamentoPainel } from './components/TreinamentoPainel'
+import { BrandLoader } from '../../app/BrandLoader'
 import './treinamentos.css'
 
 export function TreinamentosPage({ host }: { host: Host }) {
@@ -77,7 +78,7 @@ function Treinamentos({ host }: { host: Host }) {
   if (target?.mode === 'create') {
     body = editor(modelo ?? emptyDraft(), `novo-${createKey}`)
   } else if (target && !data.loaded) {
-    body = data.error ? erroCarga : <div className="surface tr-loading" role="status" aria-label="Carregando treinamento" />
+    body = data.error ? erroCarga : <div className="surface"><BrandLoader variant="inline" label="Carregando treinamento" text="Carregando treinamento…" /></div>
   } else if (target && !selected) {
     body = <><NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
   } else if (selected) {

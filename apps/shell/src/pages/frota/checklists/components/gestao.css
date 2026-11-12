@@ -50,7 +50,6 @@
 @keyframes gestao-grow { from { transform: scaleX(0); } }
 @keyframes gestao-draw { to { stroke-dashoffset: 0; } }
 @keyframes gestao-spin { to { transform: rotate(360deg); } }
-@keyframes gestao-shimmer { 50% { opacity: .55; } }
 @keyframes gestao-sheet { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 
 .gestao-checklists .gestao-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -245,7 +244,6 @@
 .gestao-checklists .gestao-list-delete { position: absolute; top: 50%; right: 44px; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-500); transform: translateY(-50%); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
 .gestao-checklists .gestao-list-delete:disabled { opacity: .55; }
 .gestao-checklists .gestao-list-chevron { color: var(--slate-400); }
-.gestao-checklists .gestao-row-skeleton { display: block; height: 62px; border-bottom: 1px solid var(--border); background: var(--surface-soft); animation: gestao-shimmer 1.2s ease-in-out infinite; }
 .gestao-checklists .gestao-empty { display: grid; justify-items: center; gap: 8px; padding: 40px 16px; color: var(--slate-400); text-align: center; animation: gestao-rise 260ms var(--ease-out) both; }
 .gestao-checklists .gestao-empty strong { color: var(--ink-900); font-size: 14px; }
 .gestao-checklists .gestao-empty p { margin: 0; color: var(--slate-500); font-size: 12px; }
@@ -386,7 +384,7 @@
 .gestao-checklists .chk-thumb { display: block; width: 72px; height: 72px; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); cursor: zoom-in; transition: border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
 .gestao-checklists .chk-thumb:active { transform: scale(.97); }
 .gestao-checklists .chk-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.gestao-checklists .chk-thumb.is-loading { cursor: default; animation: gestao-shimmer 1.2s ease-in-out infinite; }
+.gestao-checklists .chk-thumb.is-loading { display: grid; place-items: center; cursor: default; }
 .gestao-checklists .chk-thumb-falha { display: grid; align-content: center; justify-items: center; gap: 2px; width: 72px; height: 72px; padding: 4px; border: 1px dashed var(--border-hover); border-radius: 8px; background: var(--surface-neutral); text-align: center; }
 .gestao-checklists .chk-thumb-falha a { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 32px; color: var(--blue-600); font-size: 12px; font-weight: 800; line-height: 15px; text-decoration: none; }
 .gestao-checklists .chk-thumb-falha small, .gestao-checklists .chk-problem .chk-thumb-falha small { color: var(--slate-500); font-size: 11px; font-weight: 600; line-height: 14px; }
@@ -399,7 +397,6 @@
 .gestao-checklists .foto-viewer-head small { color: var(--slate-500); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .gestao-checklists .foto-viewer-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 240px; overflow: hidden; border-radius: 10px; background: var(--surface-neutral); }
 .gestao-checklists .foto-viewer-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 180px); object-fit: contain; }
-.gestao-checklists .foto-viewer-skeleton { display: block; width: min(100%, 640px); aspect-ratio: 4 / 3; max-height: calc(100dvh - 180px); animation: gestao-shimmer 1.2s ease-in-out infinite; background: var(--surface-soft); }
 .gestao-checklists .foto-viewer-nav { position: absolute; top: calc(50% - 18px); width: 36px; height: 36px; }
 .gestao-checklists .foto-viewer-nav.is-prev { left: 8px; }
 .gestao-checklists .foto-viewer-nav.is-next { right: 8px; }
@@ -580,7 +577,6 @@
 .gestao-checklists .mod-cond-naosuportado .gestao-icon { flex: none; margin-top: 2px; }
 .gestao-checklists .mod-previa-filtro { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .gestao-checklists .mod-previa-filtro .gestao-hint, .gestao-checklists .mod-previa-filtro .mod-aviso { margin: 0; }
-.gestao-checklists .mod-previa-filtro .gestao-row-skeleton { height: 40px; border-radius: 8px; border: 0; }
 .gestao-checklists .mod-previa-total { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--navy-900); font-size: 14px; }
 .gestao-checklists .mod-previa-total .gestao-icon { color: var(--blue-600); }
 .gestao-checklists .mod-previa-sub { margin: 4px 0 0; color: var(--slate-700); font-size: 12px; font-weight: 800; }

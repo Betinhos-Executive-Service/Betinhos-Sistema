@@ -41,6 +41,7 @@ const UPLOAD_ACTION_LABEL = { continue: "Enviar agora", retry: "Tentar de novo",
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 import { QUICK_READ_MAX_TENTATIVAS, isQuickReadFieldHighlighted, type QuickReadFilledFields, type QuickReadState } from "./receiptQuickRead";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type ExpenseScreenProps = {
   uploads?: ExpenseUploadListItem[];
@@ -235,7 +236,7 @@ export function ExpenseScreen({
               <button type="button" className="expense-postos" disabled={isSubmitting} onClick={onPostosProximos}><Fuel aria-hidden="true" />Postos próximos</button>
             ) : null}
             <fieldset disabled={isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
-              {referenceLoading ? <div className="form-error-summary">Carregando regras de despesa.</div> : null}
+              {referenceLoading ? <BrandLoader variant="inline" size="sm" label="Carregando regras de despesa" text="Carregando regras de despesa" /> : null}
               {!referenceLoading && referenceError ? <div className="form-error-summary">{referenceError}</div> : null}
               {!referenceLoading && !referenceError && (!categoriesReady || !paymentReady || !citiesReady) ? (
                 <div className="form-error-summary">Categorias, formas de pagamento ou cidades não encontradas no Dataverse.</div>
