@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
+  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, Receipt, ReceiptText, Route,
   ScrollText, Shield, ShieldCheck, Shuffle, Sparkles, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
@@ -96,7 +96,8 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_anexorecebimento_v2: <Paperclip />,
   comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,
-  new_telacomposicaopreco: <Calculator />,
+  composicao: <Calculator />,
+  new_telacomposicaopreco: <History />,
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */

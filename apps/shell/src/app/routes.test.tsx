@@ -5,6 +5,8 @@ import { findItem } from '../nav/menu'
 import { RouteLayout } from './RouteLayout'
 import { HOVER_DELAY_MS, isChunkLoadError, limparCacheDeTelas, navegador, PAGE_LOADERS, usePrefetchOnIntent } from './routes'
 
+vi.mock('../pages/composicao/ComposicaoPage', () => ({ ComposicaoPage: () => <p>Tela nativa da composição</p> }))
+
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -157,5 +159,23 @@ describe('falha ao baixar o chunk da tela', () => {
     PAGE_LOADERS.pagantes = () => Promise.resolve(() => <p>Tela de pagantes</p>)
     render(<Rota id="pagantes" />)
     expect(await screen.findByText('Tela de pagantes')).toBeTruthy()
+  })
+})
+
+describe('Composição de Preço nativa', () => {
+  it('o item composicao é uma página do shell e abre sem iframe', async () => {
+    const found = findItem('composicao')!
+    expect(found.item.kind).toBe('page')
+    const { container } = render(<Rota id="composicao" />)
+    expect(await screen.findByText('Tela nativa da composição')).toBeTruthy()
+    expect(container.querySelector('iframe')).toBeNull()
+  })
+
+  it('a rota antiga continua abrindo o WebResource em iframe', () => {
+    const found = findItem('new_telacomposicaopreco')!
+    expect(found.item.kind).toBe('webresource')
+    const host = { mode: 'dataverse', clientUrl: 'https://org.crm2.dynamics.com' } as unknown as Parameters<typeof RouteLayout>[0]['host']
+    const { container } = render(<RouteLayout host={host} group={found.group} item={found.item} label={found.item.label ?? ''} />)
+    expect(container.querySelector('iframe')).not.toBeNull()
   })
 })

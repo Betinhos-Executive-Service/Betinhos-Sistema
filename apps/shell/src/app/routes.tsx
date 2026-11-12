@@ -42,6 +42,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   inicio: () => import('../pages/inicio/InicioPage').then((m) => m.InicioPage),
   qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
   treinamentos: () => import('../pages/treinamentos/TreinamentosPage').then((m) => m.TreinamentosPage),
+  composicao: () => import('../pages/composicao/ComposicaoPage').then((m) => m.ComposicaoPage),
   cartoes: () => import('../pages/cartoes/CartoesPage').then((m) => m.CartoesPage),
 }
 
