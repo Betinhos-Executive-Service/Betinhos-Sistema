@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@betinhos/ui/styles.css'
 import './styles.css'
 import { App } from './App'
+import { esconderSplashInicial } from './app/BrandLoader'
 import { applyRouteFromSearch } from './nav/useHashRoute'
 import { instalarLogDeErros } from './app/errorLog'
 import { instalarMedicaoDesempenho } from './app/perfLog'
@@ -18,3 +19,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// O splash do index.html cobre o download do bundle; some quando o shell pinta o primeiro quadro.
+requestAnimationFrame(esconderSplashInicial)

@@ -1,0 +1,58 @@
+/* Loader da marca: logo B no centro, anel girando em volta, fundo acinzentado e borrado.
+   O mesmo visual vive no App Motoristas (apps/motoristas/src/shared/ui/brand-loader.css) e no splash dos dois index.html. */
+.brand-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  isolation: isolate;
+  animation: brand-loader-in 180ms ease-out both;
+}
+.brand-loader--fixed { position: fixed; z-index: 1000; }
+.brand-loader::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(228, 230, 235, 0.72);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+  backdrop-filter: blur(10px) saturate(0.9);
+}
+.brand-loader__mark { position: relative; width: 92px; height: 92px; }
+.brand-loader__logo {
+  position: absolute;
+  inset: 12px;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  box-shadow: 0 8px 24px rgba(0, 26, 61, 0.22);
+}
+.brand-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 0deg, rgba(212, 174, 92, 0) 0 30%, rgba(212, 174, 92, 0.55) 70%, #c9a24e 100%),
+    rgba(0, 26, 61, 0.1);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+  animation: brand-loader-spin 0.9s linear infinite;
+}
+.brand-loader__label {
+  margin: 0;
+  max-width: 260px;
+  color: #3d4554;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+@keyframes brand-loader-spin { to { transform: rotate(360deg); } }
+@keyframes brand-loader-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader { animation: none; }
+  .brand-loader__ring { animation-duration: 2.4s; }
+}

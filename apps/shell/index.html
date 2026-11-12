@@ -33,9 +33,25 @@
           .catch(function () {})
       }
     </script>
+    <style>
+      /* Splash da marca (mesmo visual do BrandLoader): aparece antes do JS e some no primeiro quadro do app. */
+      #boot-splash { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-content: center; background: #e4e6eb; }
+      #boot-splash .boot-splash__mark { position: relative; width: 92px; height: 92px; }
+      #boot-splash img { position: absolute; inset: 12px; width: 68px; height: 68px; border-radius: 50%; box-shadow: 0 8px 24px rgba(0, 26, 61, 0.22); }
+      #boot-splash .boot-splash__ring { position: absolute; inset: 0; border-radius: 50%;
+        background: conic-gradient(from 0deg, rgba(212, 174, 92, 0) 0 30%, rgba(212, 174, 92, 0.55) 70%, #c9a24e 100%), rgba(0, 26, 61, 0.1);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+        animation: boot-splash-spin 0.9s linear infinite; }
+      @keyframes boot-splash-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { #boot-splash .boot-splash__ring { animation-duration: 2.4s; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-splash" role="status" aria-label="Carregando">
+      <div class="boot-splash__mark" aria-hidden="true"><span class="boot-splash__ring"></span><img src="/src/assets/logo-betinhos-b-192.webp" alt="" /></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
