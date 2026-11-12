@@ -70,6 +70,9 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
         "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."
       ], { target: dt("treinamentos") }),
+      step("postos-proximos", "Postos próximos", [
+        "Um mapa com os postos da rede CTF perto de você, para abastecer com o cartão. Toque num pino para ver o endereço e abrir a rota no Maps ou no Waze."
+      ], { target: dt("postosProximos") }),
       step("manutencao", "Manutenção", [
         "Notou ruído, luz acesa no painel ou pneu vibrando? Solicite o reparo aqui, com a gravidade, a descrição e fotos.",
         "O pedido é enviado para a equipe da Betinhos."
@@ -752,7 +755,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Logo abaixo fica o café e lanche médio, quando há dados."
       ], { target: ".gr-destaques", optional: true }),
       step("alerta", "Pendências", ["Quando algum gasto precisa de correção ou foi recusado, o aviso aparece aqui no topo. Toque nele para ir direto à lista de pendentes."], { target: ".gr-alerta", optional: true }),
-      step("precos", "Postos perto de mim", ["Mostra os postos perto de você, com o que a frota pagou por litro, a comparação com a meta e a opinião dos motoristas."], { target: ".gr-preco-postos" }),
+      step("precos", "Postos próximos", ["Abre o mapa dos postos da rede CTF perto de você, com o que a frota pagou por litro, a comparação com a meta e a opinião dos motoristas."], { target: ".gr-preco-postos" }),
       step("convite", "Como foi no posto", ["Depois de abastecer, quando a nota é lida e você ainda não avaliou aquele posto, o app pergunta como foi. Um toque em Recomendo ou Não recomendo já salva. O X dispensa a pergunta."], { target: ".gr-convite", optional: true }),
       step("evolucao", "Médias por mês", ["Escolha R$/L ou Refeição para ver a média de cada mês. Os meses do período escolhido ficam em azul-escuro."], { target: ".gr-evolucao", optional: true }),
       step("despesas", "Despesas", ["Pendentes mostra o que precisa de correção, completar ou foi recusado. Todas mostra as despesas do período. Toque num gasto do cartão marcado Completar para preenchê-lo; nos outros, abre o detalhe com o comprovante."], { target: ".gr-despesas", optional: true }),
@@ -762,12 +765,13 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
-    id: "ranking-postos",
-    title: "Postos perto de você",
+    id: "postos-proximos",
+    title: "Postos próximos",
     steps: [
-      step("voltar", "Voltar", ["Volta para o Relatório de gastos."], { target: SERVICE_HOME }),
-      step("melhor", "Melhor opção", ["O destaque é o menor preço até 10 km de você. A cor compara com a meta da empresa: Dentro da meta, Pouco acima da meta ou Acima da meta.", "Se a maioria dos motoristas não recomenda o posto, aparece um alerta. Toque nele para ver o endereço, os últimos abastecimentos e as avaliações."], { target: ".rp-hero", optional: true }),
-      step("postos", "Outros postos", ["Toque em um posto para ver os detalhes e dizer como foi: Recomendo ou Não recomendo. Um toque já salva, e motivos e comentário são opcionais. O ícone do mapa abre o posto no Maps."], { target: ".rp-lista", optional: true }),
+      step("voltar", "Voltar", ["Volta para a tela de onde você abriu os postos."], { target: SERVICE_HOME }),
+      step("mapa", "Mapa", ["Arraste para andar pelo mapa e use dois dedos ou os botões + e − para aproximar.", "Os postos da rede CTF aparecem como pinos coloridos pelo preço em relação à meta (verde dentro, vermelho acima). O ponto azul é você; sem localização, um ponto cinza marca o centro de São José dos Campos.", "Postos muito juntos viram uma bolinha com a quantidade; toque nela para aproximar."], { target: ".pp-mapa" }),
+      step("pino", "Pino do posto", ["Toque num pino para ver o nome, o endereço e a distância. Ir abre a rota no Google Maps; Waze abre no Waze.", "Se você abasteceu ali há pouco, o cartão pergunta se recomenda o posto: é só tocar em Sim ou Não.", "Detalhes abre a ficha do posto: últimos abastecimentos, o que os colegas dizem e o seu Recomendo ou Não recomendo, com motivos e comentário opcionais."], { target: ".pp-cartao", optional: true }),
+      step("lista", "Recomendados", ["Arraste a gaveta para ver os 10 postos mais recomendados perto de você: a nota junta preço, opinião dos motoristas e distância, e o selo diz o que mais pesou. Sem preço recente, o posto fica no fim. Tocar num deles centraliza o mapa e abre o cartão.", "Sem sinal, o app mostra os últimos dados guardados, com o aviso \"Sem conexão\" e a data deles."], { target: ".pp-gaveta", optional: true }),
       helpStep()
     ]
   },
@@ -841,7 +845,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   treinamentos: ["treinamento-detalhe", "treinamentos"],
   gastosCartao: ["gastos-cartao"],
   gastosRelatorio: ["gastos-relatorio"],
-  rankingPostos: ["ranking-postos"],
+  postosProximos: ["postos-proximos"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],

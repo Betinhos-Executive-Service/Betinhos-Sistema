@@ -1,15 +1,17 @@
 import type { MouseEvent, ReactNode } from 'react'
-import { type MenuAction, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { type MenuAction, type TableColumn, type TableQuickFilters, type TableSelection, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
 import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
-import { hasFalha, label, statusTone } from '../domain/status'
+import { label } from '../domain/status'
 import type { ChoiceSet, Contato, Pagante } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 
 type Props = { list: Pagante[]; choices: ChoiceSet; contatos: Map<string, Contato>; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Pagante>>
+/** Seleção de linhas e as ações em lote do clique direito (as mesmas da faixa da seleção). */
+export type SelectionProps<Row> = { selection: TableSelection<Row>; bulkActions: (rows: Row[]) => MenuAction[] }
 
 /** Nome como botão real: a linha tem ações próprias e não pode ser um `button` inteiro. */
 function OpenName({ p, onOpen }: { p: Pagante; onOpen: (id: string) => void }) {
@@ -30,20 +32,26 @@ export const openRowActions = (onOpen: (id: string) => void) => (row: { id: stri
   { id: 'abrir', label: 'Abrir', icon: <ExternalLink size={16} />, onSelect: () => onOpen(row.id) },
 ]
 
+/** Com seleção: "Abrir" a linha e, depois de um divisor, as ações em lote sobre as selecionadas. */
+export const selectionRowActions = <Row extends { id: string }>(onOpen: (id: string) => void, bulkActions: (rows: Row[]) => MenuAction[]) =>
+  (row: Row, rows: Row[]): MenuAction[] => [...openRowActions(onOpen)(row), ...bulkActions(rows).map((action) => ({ ...action, group: '' }))]
+
 export function openFromRow(event: MouseEvent<HTMLElement>, rowSelector: string, openSelector: string) {
   const target = event.target as HTMLElement
   if (target.closest('a, button, input, select, textarea, label, [role="menu"], [role="menuitem"]')) return
-  if (window.getSelection?.()?.toString()) return
+  // No duplo clique o navegador já marcou a palavra: não é o usuário copiando texto.
+  if (event.type === 'dblclick') window.getSelection?.()?.removeAllRanges()
+  else if (window.getSelection?.()?.toString()) return
   target.closest(rowSelector)?.querySelector<HTMLButtonElement>(openSelector)?.click()
 }
 
-const severity = (p: Pagante) => {
-  if (hasFalha(p)) return { tone: 'danger' as const, label: 'Falha de envio' }
-  const tone = statusTone(p.status)
-  return tone === 'danger' || tone === 'warning' ? { tone, label: tone === 'danger' ? 'Pagamento recusado ou expirado' : 'Aguardando pagamento' } : null
+/** Abrir pela linha da tabela: clique sem seleção, duplo clique com ela. */
+export function openOnRow(selecting: boolean) {
+  const open = (event: MouseEvent<HTMLElement>) => openFromRow(event, '.bt-table__row', '.pg-open')
+  return selecting ? { onDoubleClick: open } : { onClick: open }
 }
 
-export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
+export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
   const columns: TableColumn<Pagante>[] = [
     { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 110, width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
@@ -55,8 +63,9 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
     { key: 'acoes', header: <span className="pg-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', cell: (p) => <QuickActions p={p} contato={contatos.get(p.pessoaId)} /> },
   ]
   return (
-    <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} severity={severity} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+    // Com seleção, o clique na linha seleciona (DS) e o duplo clique abre a ficha.
+    <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

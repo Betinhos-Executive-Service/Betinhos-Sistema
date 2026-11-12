@@ -53,6 +53,13 @@ const baseModules = [
     disabled: false,
   },
   {
+    id: "postosProximos",
+    label: "Postos próximos",
+    detail: "Mapa da rede CTF",
+    icon: "postosProximos",
+    disabled: false,
+  },
+  {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
@@ -89,6 +96,7 @@ const screenAliases: Record<string, string[]> = {
   checklists: ["checklists"],
   multas: ["multas"],
   treinamentos: ["treinamentos"],
+  postosProximos: ["postosProximos"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -104,6 +112,7 @@ const moduleHandlers: Record<string, string[]> = {
   checklists: [],
   multas: [],
   treinamentos: [],
+  postosProximos: [],
   services: [
     "onServices",
     "onService",
@@ -356,6 +365,11 @@ function ModuleIcon({ name }: { name: string }) {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
+  if (name === "postosProximos") {
+    // Lucide fuel: posto de combustível.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
   if (name === "checklist") {
     // Lucide clipboard-check.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1" fill="none" stroke="currentColor" strokeWidth="1.8" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m1 10 2 2 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
@@ -435,7 +449,7 @@ export function InitialScreen(props: InitialScreenProps) {
     { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
     { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `Gastos do cartão · ${n} para completar` },
   ];
-  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
+  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id === "gastosCartao" ? "expenses" : type.id, type.count]));
   const pendencias = pendingTypes
     .filter((type) => type.count > 0)
     .map((type) => ({ id: type.id, text: type.text(type.count) }));

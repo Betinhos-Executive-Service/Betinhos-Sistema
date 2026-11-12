@@ -20,7 +20,7 @@ export function parseRankingPostos(json: string): RankingPostos {
   return comNomesLimpos({ dias: body.dias, convite: body.convite ?? null, postos: body.postos.map((posto) => ({ ...posto, postoId: posto.postoId ?? "", endereco: posto.endereco ?? "", historico: posto.historico ?? [], avaliacoes: { ...SEM_AVALIACOES, ...posto.avaliacoes } })) });
 }
 
-function distanciaKm(a: Posicao, b: Posicao) {
+export function distanciaKm(a: Posicao, b: Posicao) {
   const rad = (grau: number) => (grau * Math.PI) / 180;
   const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(h));
@@ -134,17 +134,18 @@ export async function carregarRankingPostos(): Promise<RankingPostos> {
   return parseRankingPostos(String(resposta.new_RankingJson ?? ""));
 }
 
-export function obterPosicao(): Promise<Posicao> {
+/** `precisa` pede GPS de alta precisão; `mock` troca a posição do modo local (localhost). */
+export function obterPosicao({ precisa = false, mock = MOCK_POSICAO }: { precisa?: boolean; mock?: Posicao } = {}): Promise<Posicao> {
   if (isMockGastosCartao()) {
     if (mockModo() === "semgps") return Promise.reject({ code: 1 });
-    return new Promise((resolve) => setTimeout(() => resolve(MOCK_POSICAO), mockModo() === "lento" ? 1500 : 0));
+    return new Promise((resolve) => setTimeout(() => resolve(mock), mockModo() === "lento" ? 1500 : 0));
   }
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) { reject(null); return; }
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => resolve({ lat: coords.latitude, lon: coords.longitude }),
       reject,
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: precisa, timeout: 15000, maximumAge: 60000 }
     );
   });
 }

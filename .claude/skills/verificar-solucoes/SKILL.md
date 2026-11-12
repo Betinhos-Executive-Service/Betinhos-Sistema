@@ -119,3 +119,23 @@ Qualquer conta do GitHub baixa artefatos deste repositório, e PR de fork lê ca
 - Entrada `pulada` sem ZIP no import: `importar-solucoes.ps1` exige `Test-PodePular` (versão instalada e hash da tag); senão falha pedindo `importar_tudo`. Depois de `pac admin copy` PROD → TEST, a tag `solucoes-test` fica velha: rode o ensaio com `importar_tudo`.
 - A tag `solucoes-<alvo>` passa a guardar `impressao` (`New-RegistroPublicado`); registro antigo, sem ela, nunca pula.
 - Camadas Active: leituras e remoções 8 por vez (`Invoke-EmParalelo`, runspaces), backup de todas antes de remover, segunda tentativa uma a uma para a que falhar, código 1 se sobrar falha.
+
+## Ensaio: import sem upgrade (só TEST)
+
+Pergunta do ensaio: quanto do import é o `--stage-and-upgrade`? O upgrade monta uma solução de espera (holding), importa e desinstala a versão antiga, apagando o que saiu da solução. O update só troca o que veio no pacote e deixa no ambiente o que saiu. Referência com upgrade: BetinhosCore no TEST levou 9,5 min (#390) e 12 min (#399), e no PROD 12,3 e 11,3 min.
+
+- Input `ensaio_sem_upgrade` do "Publicar soluções" (soluções separadas por vírgula, ou `todas`). Só vale com alvo `test`: o job `exportar` recusa outro alvo antes de subir versão, e `importar-solucoes.ps1` e `Import-SolucaoGerenciada` recusam o PROD de novo.
+- Rodar da `develop` (a trava do commit compara o DEV com o commit da execução), com `importar_tudo` ligado. Sem ele, o TEST pula a solução com o mesmo conteúdo.
+- Comparação justa: duas execuções seguidas com o mesmo conteúdo, a primeira com `ensaio_sem_upgrade` vazio (upgrade) e a segunda com `BetinhosCore`. Os minutos e o `modo` (`upgrade`, `update`, `instalacao`, `pulada`) de cada solução ficam no resumo do job (`importados.json`).
+- Sem remoção pendente no DEV: com componente que saiu da solução desde a última publicação, o update o deixaria no TEST, e o próximo upgrade o apagaria, o que pode aparecer como perda na comparação seguinte.
+- Resultado (11/11/2026, TEST): BetinhosCore 12,1 min com upgrade ([43037415650](https://github.com/Betinhos-Executive-Service/Betinhos-Sistema/actions/runs/43037415650)) e 3,0 min como update ([43043705449](https://github.com/Betinhos-Executive-Service/Betinhos-Sistema/actions/runs/43043705449)), as duas sem perda. Daí a escolha automática abaixo.
+
+## Escolha do modo de import pelo inventário (`inventario.ps1`)
+
+Update quando nada saiu da solução, upgrade no resto. O export (`exportar-do-dev.ps1 -Inventario`, só no `publicar.yml`) grava em `pacotes/inventarios/<solução>.json` o inventário do DEV: linhas de `solutioncomponents` (`c|tipo|id`) e, por tabela, colunas, chaves, relacionamentos, opções de escolha e status, formulários, visões, gráficos e regras de negócio; opções das escolhas globais, privilégios dos papéis, permissões dos perfis de coluna, assemblies dos pacotes de plugin e tipos de plugin. O import lê o mesmo inventário no destino antes de importar (`Get-ModoDeImport`): item que só o destino tem = upgrade (é o que o upgrade apagaria). Inventário incerto (leitura falhou), ausente, primeira instalação e `importar_tudo` ficam no upgrade.
+
+- Variável do repositório `SOLUCOES_IMPORT_MODO`: vazia = **observar** (importa sempre com upgrade, registra a escolha e lê o destino de novo depois para ver o que o upgrade apagou; `Get-ObservacaoDoModo`); `escolher` = age.
+- No resumo do import (`importados.json`): `escolha`, `motivoEscolha`, `soNoDestino` (até 20 itens) e, no observar, `observacaoEscolha` e `apagadosPeloUpgrade`. `acerto` = escolheu update e nada foi apagado, ou upgrade e algo foi; `conservador` = upgrade sem nada a apagar (só tempo perdido; ex. componente de outra solução instalada só no destino); `erro` = escolheu update e o upgrade apagou algo (aviso no job). Um `erro` barra o `escolher`: ache o que o inventário não cobre antes de ligar.
+- Ligar o `escolher` só depois de algumas publicações (TEST e PROD) sem `erro` e com `update` escolhido em alguma.
+- Custo: o inventário do destino é lido antes de cada import (e de novo depois, no observar); no BetinhosCore, ~1 min por leitura.
+- Lacunas conhecidas: faixa de opções clássica (RibbonDiffXml) e conteúdo dentro de formulário, visão ou sitemap (o update troca o componente inteiro, então não deixa lixo).

@@ -1,5 +1,7 @@
 /* Despesas operacionais: reaproveita lista e ficha de Pagantes (pagantes.css). Só tokens do Design System. */
 .dp-alertas { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.bt-table--view .dp-alertas { flex-wrap: nowrap; }
+.bt-table--view .dp-alertas > .bt-badge { min-width: 0; flex-shrink: 1; }
 .dp-page .pg-card__foot { justify-content: flex-start; }
 /* Barra numa linha só, pela largura dela mesma (container query, já sem o menu lateral):
    título ~220 + Colunas/Filtros/Auditoria ~310 + busca 150 + período 140 + Atualizar 40 ~= 1040 px.
@@ -143,3 +145,4 @@ button.dp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(
   .dp-pronto, .dp-pronto:active:not(:disabled) { transition: none; transform: none; }
   .dp-kpi, .dp-kpi:active { transition: none; transform: none; }
 }
+.dp-filas { justify-self: start; max-width: 100%; }

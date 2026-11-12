@@ -20,6 +20,8 @@ const definicao = () => ({
         Get_a_row_by_ID_BD: { type: 'OpenApiConnection', runAfter: { Get_a_row_by_ID_PAG: ['Succeeded'] }, inputs: { parameters: { recordId: 'pessoa' } } },
         Get_a_row_by_ID_OP: { type: 'OpenApiConnection', runAfter: { Get_a_row_by_ID_BD: ['Succeeded'] }, inputs: { parameters: {} } },
         Switch_Idioma: { type: 'Switch', expression: 'antes', cases: { Pt: email('Prezado(a)'), En: email('Dear') } },
+        Update_a_row_1: { type: 'OpenApiConnection', inputs: { parameters: { 'item/cr40f_linkdorecibo': 'link', 'item/cr40f_statusdorecibo': 202410001 } } },
+        Marcar_Concluido: { type: 'OpenApiConnection', inputs: { parameters: { 'item/new_statusgeracaorecibo': 100000002 } } },
       },
     },
   },
@@ -53,4 +55,15 @@ test('só o manual aceita a troca avulsa', () => {
 test('aplicar de novo não muda nada', () => {
   const uma = aplicarDestinatario(definicao(), { manual: true })
   assert.deepEqual(aplicarDestinatario(uma, { manual: true }), uma)
+})
+
+test('manual só marca Recibo Enviado quando o e-mail saiu', () => {
+  const a = aplicarDestinatario(definicao(), { manual: true }).actions.Scope_Processo.actions
+  assert.equal(a.Update_a_row_1.inputs.parameters['item/cr40f_statusdorecibo'], undefined)
+  assert.equal(a.Update_a_row_1.inputs.parameters['item/cr40f_linkdorecibo'], 'link')
+  const status = a.Marcar_Concluido.inputs.parameters['item/cr40f_statusdorecibo']
+  assert.match(status, /^@if\(or\(and\(equals\(triggerBody\(\)\?\['SEND_EMAIL'\], true\), equals\(actions\('Condition_Enviar_Email'\)\?\['status'\], 'Succeeded'\)\)/)
+  assert.match(status, /, 202410001, 202410002\)$/)
+  const auto = aplicarDestinatario(definicao(), { manual: false }).actions.Scope_Processo.actions
+  assert.equal(auto.Update_a_row_1.inputs.parameters['item/cr40f_statusdorecibo'], 202410001)
 })

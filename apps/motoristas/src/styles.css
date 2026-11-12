@@ -2,7 +2,9 @@
 @import "./features/comunicados/comunicados.css";
 @import "./features/checklist/checklists.css";
 @import "./features/termos/termos.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "./features/treinamentos/treinamentos.css";
+@import "./features/postos/postos.css";
 @import "./app/tour.css";
 @font-face {
   font-family: "Centabel Book Embedded";
@@ -12684,12 +12686,16 @@ select,
 
 .details-card-v1 .detail-link,
 .detail-contact-link,
-.questions-box .questions-link,
 .finalize-help button {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
   margin-top: -12px !important;
   margin-bottom: -12px !important;
+}
+
+/* "Contatar o Júnior" é botão com borda: a margem negativa o jogava sobre o rótulo "Dúvidas?". */
+.questions-box .questions-link {
+  min-height: 44px !important;
 }
 
 /* Carimbo de versão: canto inferior direito, discreto, não captura toque nem foco. */
@@ -14287,71 +14293,6 @@ select,
 }
 @keyframes dv-explicar-entra-opacidade { from { opacity:0; } }
 @keyframes dv-explicar-sai-opacidade { to { opacity:0; } }
-.rp-loader { display:grid; justify-items:center; align-content:center; gap:14px; min-height:min(56dvh,420px); }
-.rp-painel { width:min(68vw,250px); height:auto; filter:drop-shadow(0 10px 18px rgba(0,26,61,.28)); }
-.rp-painel-trilho,.rp-painel-nivel { fill:none; stroke-linecap:round; stroke-width:9; }
-.rp-painel-trilho { stroke:rgba(255,255,255,.12); }
-.rp-painel-nivel { stroke:url(#rp-faixa); stroke-dasharray:100; stroke-dashoffset:50; }
-.rp-painel-marca { stroke:#8fa6c4; stroke-linecap:round; stroke-width:2; }
-.rp-painel-marca--maior { stroke:#fff; stroke-width:3; }
-.rp-painel text { fill:#dbe5f2; font-size:15px; font-weight:800; text-anchor:middle; }
-.rp-painel-bomba { fill:none; stroke:#8fa6c4; stroke-linecap:round; stroke-linejoin:round; stroke-width:2; }
-.rp-painel-ponteiro { fill:#ff5a3c; transform-origin:110px 118px; }
-.rp-painel-eixo { fill:#0b2d5e; stroke:#cbd5e1; stroke-width:2; }
-.rp-painel-centro { fill:#ff5a3c; }
-.rp-loader-texto { margin:0; color:#001a3d; font-size:.95rem; font-weight:800; text-align:center; }
-.rp-etapas { display:flex; gap:8px; margin:0; padding:0; list-style:none; }
-.rp-etapas li { display:flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:#e8edf4; color:#64748b; font-size:.74rem; font-weight:800; transition:background-color 200ms ease,color 200ms ease; }
-.rp-etapas i { width:7px; height:7px; border-radius:50%; background:#94a3b8; }
-.rp-etapas [data-estado="ativa"] { background:#001a3d; color:#fff; }
-.rp-etapas [data-estado="ativa"] i { background:#ffb300; }
-.rp-etapas [data-estado="feita"] { background:#eaf8f1; color:#147a4b; }
-.rp-etapas [data-estado="feita"] i { background:#147a4b; }
-.rp-carregando-texto { margin:0 2px; color:#475569; font-size:.85rem; font-weight:700; }
-@media (prefers-reduced-motion:no-preference) {
-  .rp-painel-ponteiro { animation:rp-ponteiro 2.6s cubic-bezier(.45,.05,.3,1) infinite; }
-  .rp-painel-nivel { animation:rp-nivel 2.6s cubic-bezier(.45,.05,.3,1) infinite; }
-  .rp-painel-bomba { animation:rp-bomba 2.6s ease-in-out infinite; }
-  .rp-loader-texto { animation:gr-entrada 240ms cubic-bezier(.23,1,.32,1) both; }
-  .rp-entrada { animation:gr-entrada 240ms cubic-bezier(.23,1,.32,1) both; animation-delay:calc(var(--i,0) * 40ms); }
-}
-@keyframes rp-ponteiro { 0%,100% { transform:rotate(-84deg); } 42% { transform:rotate(88deg); } 50% { transform:rotate(80deg); } 56% { transform:rotate(84deg); } 62% { transform:rotate(82deg); } }
-@keyframes rp-nivel { 0%,100% { stroke-dashoffset:96; } 42% { stroke-dashoffset:1; } 50% { stroke-dashoffset:6; } 56% { stroke-dashoffset:4; } 62% { stroke-dashoffset:5; } }
-@keyframes rp-bomba { 0%,100% { stroke:#8fa6c4; } 48% { stroke:#2fbf71; } }
-.rp-hero,.rp-posto { --rp-fundo:#eaf8f1; --rp-borda:#bfe6d2; --rp-cor:#147a4b; }
-.rp-hero { display:grid; gap:12px; padding:14px; border:1px solid var(--rp-borda); border-radius:16px; background:var(--rp-fundo); }
-.rp-hero[data-semaforo="amarelo"],.rp-posto[data-semaforo="amarelo"] { --rp-fundo:#fff7df; --rp-borda:#f3dc9a; --rp-cor:#856000; }
-.rp-hero[data-semaforo="vermelho"],.rp-posto[data-semaforo="vermelho"] { --rp-fundo:#fff0f3; --rp-borda:#f3c3cd; --rp-cor:#9f2940; }
-.rp-hero-abrir { display:grid; gap:8px; width:100%; padding:0; border:0; background:transparent; color:#001a3d; font:inherit; text-align:left; cursor:pointer; touch-action:manipulation; }
-.rp-hero-tag { justify-self:start; padding:4px 10px; border-radius:999px; background:var(--rp-cor); color:#fff; font-size:.72rem; font-weight:800; }
-.rp-hero-nome { font-size:1.12rem; font-weight:800; line-height:1.2; overflow-wrap:anywhere; }
-.rp-hero-linha { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
-.rp-hero-preco { font-size:2rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-.rp-hero-preco small { color:#475569; font-size:.85rem; }
-.rp-hero-distancia { color:var(--rp-cor); font-size:.95rem; font-weight:800; text-align:right; }
-.rp-hero-detalhe { color:#475569; font-size:.78rem; font-weight:600; line-height:1.35; }
-.rp-maps { display:flex; align-items:center; justify-content:center; gap:8px; min-height:44px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; color:#001a3d; font-size:.88rem; font-weight:800; text-decoration:none; touch-action:manipulation; }
-.rp-maps svg { width:18px; height:18px; }
-.rp-maps:active,.rp-posto-maps:active { transform:scale(.97); }
-.rp-lista { display:grid; margin:8px 0 0; padding:0; overflow:hidden; border:1px solid #e2e8f0; border-radius:14px; background:#fff; list-style:none; }
-.rp-posto { display:grid; grid-template-columns:minmax(0,1fr) 48px; align-items:center; border-top:1px solid #eef2f7; }
-.rp-posto:first-child { border-top:0; }
-.rp-posto-abrir { display:grid; grid-template-columns:10px minmax(0,1fr) auto; align-items:center; gap:10px; min-height:64px; padding:10px 4px 10px 14px; border:0; background:transparent; color:#001a3d; font:inherit; text-align:left; cursor:pointer; touch-action:manipulation; }
-.rp-posto-abrir:active { background:#f1f5f9; }
-.rp-posto-abrir i { width:10px; height:10px; border-radius:50%; background:var(--rp-cor); }
-.rp-posto-texto,.rp-posto-preco { display:grid; gap:2px; min-width:0; }
-.rp-posto-texto strong { font-size:.92rem; font-weight:800; line-height:1.2; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
-.rp-posto-texto span { color:#64748b; font-size:.76rem; font-weight:600; }
-.rp-posto-preco { justify-items:end; }
-.rp-posto-preco strong { font-size:1rem; font-weight:800; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.rp-posto-preco span { color:var(--rp-cor); font-size:.7rem; font-weight:800; }
-.rp-posto-maps { display:grid; place-items:center; align-self:stretch; color:#2159d2; touch-action:manipulation; }
-.rp-posto-maps svg { width:20px; height:20px; }
-.rp-hero-avaliacao { display:flex; align-items:center; gap:6px; color:#001a3d; font-size:.8rem; font-weight:800; }
-.rp-hero-avaliacao[data-alerta="true"] { color:#9f2940; }
-.rp-hero-avaliacao svg { flex:none; width:16px; height:16px; }
-.rp-posto-texto .rp-posto-avaliacao { color:#334155; font-weight:700; }
-.rp-posto-texto .rp-posto-avaliacao[data-alerta="true"] { color:#9f2940; }
 .gr-convite { display:grid; gap:10px; padding:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; }
 .gr-convite-topo { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
 .gr-convite-topo p { display:grid; gap:2px; min-width:0; margin:0; }
@@ -14440,8 +14381,6 @@ select,
 }
 @keyframes rp-folha-sobe { from { transform:translateY(100%); } }
 @keyframes rp-joinha { from { transform:scale(.8) rotate(-12deg); } }
-.rp-hero-abrir:focus-visible,.rp-posto-abrir:focus-visible,.rp-maps:focus-visible,.rp-posto-maps:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.18); border-radius:12px; }
-.rp-posto-abrir:focus-visible,.rp-posto-maps:focus-visible { box-shadow:inset 0 0 0 3px rgba(33,89,210,.18); }
 .rp-historico { display:grid; margin:0; padding:0; list-style:none; }
 .rp-historico li { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid #eef2f7; color:#475569; font-size:.88rem; font-weight:700; }
 .rp-historico li:first-child { border-top:0; }

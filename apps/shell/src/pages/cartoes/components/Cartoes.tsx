@@ -4,9 +4,9 @@ import { fmtData } from '../../equipamentos/components/EquipamentosList'
 import { opcoesAtivas } from '../../equipamentos/domain/cadastros'
 import { dateKey } from '../../operacional/domain/time'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { cartaoParaForm, validarCartao, vigenteEm, type CartaoErros, type CartaoForm } from '../domain/regras'
-import { message, type Source } from '../data/source'
-import type { Cartao, Pessoa } from '../domain/types'
+import { cartaoParaForm, validarCartao, vigenteEm, type CartaoErros, type CartaoForm } from '../../despesas/conciliacao/domain/regras'
+import { message, type Source } from '../../despesas/conciliacao/data/source'
+import type { Cartao, Pessoa } from '../../despesas/conciliacao/domain/types'
 
 const vigencia = (c: Cartao) => `${fmtData(c.inicio) || '—'} a ${c.fim ? fmtData(c.fim) : 'em uso'}`
 
@@ -116,7 +116,7 @@ export function CartaoDrawer({ target, onClose, cartoes, motoristas, source, onS
   )
   return (
     <>
-      <Drawer open={target != null} onClose={close} eyebrow="Conciliação do cartão" title={criando ? 'Novo cartão' : atual?.nome || 'Cartão'} footer={footer}>
+      <Drawer open={target != null} onClose={close} eyebrow="Cartões corporativos" title={criando ? 'Novo cartão' : atual?.nome || 'Cartão'} footer={footer}>
         <form id={formId} className="cc-form" noValidate onSubmit={(e) => { e.preventDefault(); void save() }}>
           <Field label="Nome" required error={erros.nome} hint="Ex.: Itaú final 1234 · Nome do motorista">
             <Input name="nome" value={form.nome} maxLength={200} disabled={saving} onChange={(e) => set('nome', e.target.value)} />

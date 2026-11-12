@@ -15,10 +15,10 @@ import { GastoCartaoDuplicadoDialog } from "./GastoCartaoDuplicadoDialog";
 import { LeituraCartaoSheet } from "./LeituraCartaoSheet";
 import { GastosCartaoScreen } from "./GastosCartaoScreen";
 import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
-import { RankingPostosScreen } from "./RankingPostosScreen";
 import { reportAppError } from "../../shared/appErrorLogger";
 
 type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCartao> & {
+  abrirPostosProximos: (origem: Screen) => void;
   maintenanceCurrentVehicleId: string;
   maintenanceVehicles: MaintenanceRequestVehicleOption[];
   maintenanceVehiclesLoading: boolean;
@@ -31,6 +31,7 @@ type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCart
 // Telas de gastos: relatório, gastos do cartão a completar, postos perto, e "Registrar gasto" (câmera e prévia do comprovante, leitura rápida, ilegível e formulário).
 export function rotasDespesas(screen: Screen, {
   abrirDespesaId,
+  abrirPostosProximos,
   abrirGastoCartao,
   anexarDespesa,
   duplicidadeCartao,
@@ -187,6 +188,7 @@ export function rotasDespesas(screen: Screen, {
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
         cartaoGasto={Boolean(gastoCartaoAtual)}
+        onPostosProximos={() => abrirPostosProximos("gastos")}
       />
       {gastoCartaoAtual && conferenciaCartao ? (
         <LeituraCartaoSheet
@@ -244,13 +246,10 @@ export function rotasDespesas(screen: Screen, {
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}
         onAttach={anexarDespesa}
-        onPrecoPostos={() => setScreen("rankingPostos")}
+        onPrecoPostos={() => abrirPostosProximos("gastosRelatorio")}
       />
     );
   }
 
-  if (screen === "rankingPostos") {
-    return <RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />;
-  }
   return null;
 }

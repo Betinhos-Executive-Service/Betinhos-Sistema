@@ -2,6 +2,7 @@ import type { StatusTone } from '@betinhos/ui'
 import { STATUS as PAGANTE, isPaid } from '../../pagantes/domain/status'
 import type { Pagante, ServicoOp } from '../../pagantes/domain/types'
 import { totalOp } from '../../pagantes/data/queries'
+import { formatMoney } from '../../pagantes/domain/messages'
 import type { Op, OpChoices } from './types'
 
 /** `cr40f_status` da OP. Pendente usa outra faixa (100000001) porque veio de uma versão antiga do choice. */
@@ -71,4 +72,35 @@ export function resumoRateio(op: Pick<Op, 'valor'>, rateio: Pagante[], servicos:
   // Sem parcela nenhuma não há rateio para comparar: a ficha mostra "sem pagantes", não uma diferença.
   const diferenca = referencia == null || !vivos.length ? 0 : cents(soma - referencia)
   return { parcelas: vivos.length, soma, recebido, servicos: totalServicos, diferenca, referencia }
+}
+
+/** Composição de preço dos serviços diferente do valor gravado na OP (centavo a centavo). */
+export const servicosDivergem = (op: Pick<Op, 'valor'>, r: Pick<Resumo, 'servicos'>) =>
+  op.valor != null && r.servicos != null && Math.round((op.valor - r.servicos) * 100) !== 0
+
+export const ETAPAS = [['criada', 'Criada'], ['pagantes', 'Pagantes'], ['recebida', 'Recebida']] as const
+export type Etapa = (typeof ETAPAS)[number][0]
+
+export type ProximoPasso = {
+  /** Etapas concluídas; a primeira de ETAPAS fora daqui é a atual. */
+  feitas: Etapa[]
+  tone: 'info' | 'warning' | 'success'
+  titulo: string
+  detalhe: string
+  acao: 'gerar' | 'refazer' | null
+}
+
+/** Onde a OP está e o que fazer agora. Divergência com os serviços vem antes do rateio: cobrar valor errado é o pior caso. */
+export function proximoPasso(op: Pick<Op, 'valor' | 'status'>, r: Resumo): ProximoPasso {
+  const recebida = op.status === OP_STATUS.paga || (r.parcelas > 0 && r.referencia != null && r.recebido >= r.referencia)
+  const rateada = recebida || (r.parcelas > 0 && r.diferenca === 0)
+  const feitas: Etapa[] = ['criada', ...(rateada ? ['pagantes' as const] : []), ...(recebida ? ['recebida' as const] : [])]
+  const acao = rateada ? null : r.parcelas ? 'refazer' : 'gerar'
+  if (recebida) return { feitas, tone: 'success', titulo: 'OP quitada', detalhe: r.recebido ? `Recebido ${formatMoney(r.recebido)}.` : 'Pagamento registrado na OP.', acao }
+  if (servicosDivergem(op, r)) {
+    return { feitas, tone: 'warning', titulo: 'Confira o valor antes de cobrar', detalhe: `Os serviços somam ${formatMoney(r.servicos)} e a OP vale ${formatMoney(op.valor)}. Ajuste a composição de preço.`, acao }
+  }
+  if (!r.parcelas) return { feitas, tone: 'info', titulo: 'Próximo passo: gerar pagantes', detalhe: `Divida a cobrança de ${formatMoney(r.referencia)} entre quem vai pagar.`, acao }
+  if (!rateada) return { feitas, tone: 'warning', titulo: 'Próximo passo: refazer o rateio', detalhe: `As parcelas ativas somam ${formatMoney(r.soma)} e a OP vale ${formatMoney(r.referencia)}.`, acao }
+  return { feitas, tone: 'info', titulo: 'Aguardando pagamento', detalhe: `Recebido ${formatMoney(r.recebido)} de ${formatMoney(r.referencia)}. Acompanhe as parcelas no Rateio.`, acao }
 }

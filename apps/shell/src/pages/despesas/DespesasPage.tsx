@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, SegmentedControl, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -11,6 +11,10 @@ import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource } from './data/source'
+import { createSource as createConciliacaoSource } from './conciliacao/data/source'
+import { useConciliacao } from './conciliacao/useConciliacao'
+import { ComprasSemDespesa, contarSemDespesa } from './conciliacao/ComprasSemDespesa'
+import { CompraDrawers } from './conciliacao/CompraDrawers'
 import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, opcoes, periodoStart, type Periodo } from './domain/filters'
 import { DESPESA_COLUMNS, TELA, builtinViews, despesaFields, despesaKeywordText, fromLegacyFilters, legacyViewConfig, readDespesa, sortDespesas } from './domain/lista'
 import { despesasQuery } from './domain/query'
@@ -22,6 +26,7 @@ import { DespesaDrawer } from './components/DespesaDrawer'
 import type { Despesa } from './domain/types'
 import '../pagantes/pagantes.css'
 import './despesas.css'
+import './conciliacao/conciliacao.css'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
 export function DespesasPage({ host }: { host: Host }) {
@@ -31,6 +36,8 @@ export function DespesasPage({ host }: { host: Host }) {
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
 const LEGACY_KEYS = ['operacional', 'financeiro', 'categoria', 'motorista', 'alertas'] as const
+/** Entradas da tela: a lista de despesas e a fila de compras do cartão que ainda não têm despesa (`?fila=sem-despesa`). */
+type Fila = 'despesas' | 'sem-despesa'
 const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 
 function Despesas({ host }: { host: Host }) {
@@ -44,6 +51,14 @@ function Despesas({ host }: { host: Host }) {
   const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
   const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
   const despesas = useDespesas(source, since, listCache(host))
+  // Compras do cartão (últimos 12 meses), uma carga só: a coluna Conciliação, a ficha e a fila usam a mesma.
+  const conciliacaoSource = useMemo(() => createConciliacaoSource(host), [host])
+  const conciliacao = useConciliacao(conciliacaoSource)
+  const compras = useMemo(() => new Map(conciliacao.transacoes.filter((t) => t.despesaId).map((t) => [t.despesaId, t])), [conciliacao.transacoes])
+  const [filaUrl, setFilaUrl] = useQueryTexto('fila', 'despesas')
+  const fila: Fila = filaUrl === 'sem-despesa' ? 'sem-despesa' : 'despesas'
+  const setFila = (f: Fila) => setFilaUrl(f)
+  const [compraId, setCompraId] = useState<string | null>(null)
   const choices = despesas.choices
   // Busca e despesa aberta continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms depois da
   // última tecla; enquanto o período não chegou inteiro, a busca também vai ao servidor.
@@ -80,8 +95,8 @@ function Despesas({ host }: { host: Host }) {
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => {
     const sort = view.config.sort
-    return extra.sort(choices && sort ? sortDespesas(list, sort.key, sort.dir, choices) : list, sort, (d) => d.id)
-  }, [list, choices, view.config.sort])
+    return extra.sort(choices && sort ? sortDespesas(list, sort.key, sort.dir, choices, compras) : list, sort, (d) => d.id)
+  }, [list, choices, view.config.sort, compras])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readDespesa, (d) => d.id)), [sorted, filters, allFields, extra])
   const index = useMemo(() => keywordIndex<Despesa>(despesaKeywordText), [])
   const visible = useMemo(() => {
@@ -120,7 +135,7 @@ function Despesas({ host }: { host: Host }) {
     return true
   }, [source, despesas.mutate, toast, setSelectedId])
 
-  const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload() }, [despesas.reload])
+  const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload(); void conciliacao.reload() }, [despesas.reload, conciliacao.reload])
   const loadingFirst = !choices
   const reloading = despesas.loading && !loadingFirst
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />, [refresh, reloading])
@@ -151,7 +166,7 @@ function Despesas({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <DespesasCards list={slice} choices={choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <DespesasTable list={slice} choices={choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
+          : <DespesasTable list={slice} choices={choices} compras={compras} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -160,8 +175,12 @@ function Despesas({ host }: { host: Host }) {
   return (
     <div className="page dp-page">
       <h1 className="dp-sr-only">Despesas operacionais</h1>
+      <SegmentedControl aria-label="Lista" className="dp-filas" value={fila} onChange={setFila}
+        options={[{ value: 'despesas', label: 'Despesas' }, { value: 'sem-despesa', label: `Compras sem despesa${conciliacao.loaded ? ` (${contarSemDespesa(conciliacao.transacoes)})` : ''}` }]} />
+      {fila === 'sem-despesa' ? <ComprasSemDespesa data={conciliacao} mobile={mobile} onOpen={setCompraId} onRefresh={() => void conciliacao.reload()} /> : (
+      <>
       <div role="toolbar" aria-label="Comandos de despesas" className="dp-barra">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
           {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
           <Select className="pg-filters__select" aria-label="Período do gasto" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
@@ -184,6 +203,8 @@ function Despesas({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {body}
+      </>
+      )}
       <Dialog open={trocaPendente != null} onClose={() => setTrocaPendente(null)} title="Descartar alterações?"
         actions={<>
           <Button variant="secondary" onClick={() => setTrocaPendente(null)}>Continuar editando</Button>
@@ -191,7 +212,8 @@ function Despesas({ host }: { host: Host }) {
         </>}>
         As colunas, filtros ou ordenação da visão “{view.active.name}” foram alterados e ainda não foram salvos.
       </Dialog>
-      {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} onDecidir={decidir} /> : null}
+      {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} onDecidir={decidir} compra={current ? compras.get(current.id) : null} onAbrirCompra={setCompraId} /> : null}
+      <CompraDrawers data={conciliacao} source={conciliacaoSource} abertaId={compraId} onClose={() => setCompraId(null)} />
     </div>
   )
 }

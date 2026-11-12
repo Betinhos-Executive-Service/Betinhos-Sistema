@@ -201,6 +201,7 @@
 .dash-col-part { display: block; width: 100%; padding-left: var(--bt-space-3); }
 
 /* Tabelas mensais: vão de 8 px entre colunas para caber mais meses. */
+.dash-tabela--densa { --sh-col-gap: var(--bt-space-2); }
 .dash-tabela--densa .bt-table__head, .dash-tabela--densa .bt-table__row { column-gap: var(--bt-space-2); }
 
 /* Região rolável: a tabela rola dentro do card (nunca a página); cabeçalho e 1ª coluna ficam fixos. */
@@ -208,7 +209,7 @@
 .dash-rolagem:focus-visible { outline: 0; border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
 .dash-rolagem > .bt-table { overflow: visible; border: 0; border-radius: 0; }
 .dash-rolagem .bt-table__head { position: sticky; top: 0; z-index: 2; }
-.dash-rolagem .bt-table__head > :first-child, .dash-rolagem .bt-table__row > :first-child { position: sticky; left: 0; z-index: 1; align-self: stretch; margin: 0 calc(-1 * var(--bt-space-2)) 0 calc(-1 * var(--bt-space-3-5)); padding: 0 var(--bt-space-2) 0 var(--bt-space-3-5); background-color: var(--bt-color-surface); box-shadow: inset -1px 0 0 var(--bt-color-border); }
+.dash-rolagem .bt-table__head > :first-child, .dash-rolagem .bt-table__row > :first-child { position: sticky; left: 0; z-index: 1; align-self: stretch; margin: 0 calc(-1 * var(--bt-space-2)) 0 calc(-1 * var(--bt-space-3-5)); padding: 0 var(--bt-space-2) 0 var(--bt-space-3-5); background-color: var(--bt-color-surface); box-shadow: inset -1px 0 0 var(--bt-color-border); border-right: 0; }
 .dash-rolagem .bt-table__head > :first-child { background-color: var(--bt-color-surface-neutral); }
 
 @media (max-width: 820px) {

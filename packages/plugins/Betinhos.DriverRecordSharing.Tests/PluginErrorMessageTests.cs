@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.ServiceModel;
 using Microsoft.Xrm.Sdk;
 using Xunit;
 
@@ -18,6 +19,64 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Contains("[POSSESSION_NOT_OPEN]", result);
             Assert.Contains("não possui posse", result);
             Assert.Contains(correlation.ToString("N"), result);
+        }
+
+        [Fact]
+        public void ConcurrentShareBecomesRetryable503()
+        {
+            var correlation = Guid.NewGuid();
+            var fault = new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { ErrorCode = unchecked((int)0x80048105), Message = "More than one concurrent Share requests detected" },
+                "fault");
+
+            var result = ToPluginException(fault, correlation);
+
+            Assert.Equal(PluginHttpStatusCode.ServiceUnavailable, HttpStatus(result));
+            Assert.StartsWith("[SHARE_CONCURRENT]", result.Message);
+            Assert.Contains(correlation.ToString("N"), result.Message);
+        }
+
+        [Fact]
+        public void OtherFaultKeepsDefaultStatus()
+        {
+            var fault = new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { ErrorCode = -2147220891, Message = "[POSSESSION_OVERLAP] Este motorista possui outra posse no mesmo período." },
+                "fault");
+
+            var result = ToPluginException(fault, Guid.NewGuid());
+
+            Assert.Equal(HttpStatus(new InvalidPluginExecutionException("x")), HttpStatus(result));
+            Assert.StartsWith("[POSSESSION_OVERLAP]", result.Message);
+        }
+
+        [Fact]
+        public void ConcurrentShareInsideInnerFaultIsDetected()
+        {
+            var fault = new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault
+                {
+                    ErrorCode = -2147220891,
+                    Message = "fault",
+                    InnerFault = new OrganizationServiceFault { ErrorCode = unchecked((int)0x80048105), Message = "share" }
+                },
+                "fault");
+
+            var result = ToPluginException(new InvalidOperationException("wrap", fault), Guid.NewGuid());
+
+            Assert.Equal(PluginHttpStatusCode.ServiceUnavailable, HttpStatus(result));
+        }
+
+        [Fact]
+        public void NestedPluginConcurrentShareStaysRetryable()
+        {
+            var fault = new FaultException<OrganizationServiceFault>(
+                new OrganizationServiceFault { ErrorCode = -2147220891, Message = "[SHARE_CONCURRENT] Outra gravação está liberando o mesmo cadastro agora; tente de novo. Ref: abc" },
+                "fault");
+
+            var result = ToPluginException(fault, Guid.NewGuid());
+
+            Assert.Equal(PluginHttpStatusCode.ServiceUnavailable, HttpStatus(result));
+            Assert.StartsWith("[SHARE_CONCURRENT]", result.Message);
         }
 
         [Fact]
@@ -67,12 +126,31 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.DoesNotContain("cr40f_segredo", result);
         }
 
+        private static InvalidPluginExecutionException ToPluginException(Exception exception, Guid correlationId)
+        {
+            return (InvalidPluginExecutionException)Invoke("ToPluginException", exception, correlationId);
+        }
+
+        // O SDK guarda o status HTTP numa propriedade não pública.
+        private static PluginHttpStatusCode HttpStatus(InvalidPluginExecutionException exception)
+        {
+            var value = typeof(InvalidPluginExecutionException)
+                .GetProperty("HttpStatus", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .GetValue(exception);
+            return (PluginHttpStatusCode)value;
+        }
+
         private static string ForUser(Exception exception, Guid correlationId)
+        {
+            return (string)Invoke("ForUser", exception, correlationId);
+        }
+
+        private static object Invoke(string method, Exception exception, Guid correlationId)
         {
             var type = typeof(ServiceDriverSharePlugin).Assembly.GetType(
                 "Betinhos.DriverRecordSharing.PluginErrorMessage",
                 throwOnError: true);
-            return (string)type.GetMethod("ForUser", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            return type.GetMethod(method, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { exception, correlationId });
         }
     }

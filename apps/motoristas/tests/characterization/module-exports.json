@@ -37,6 +37,7 @@
     "InfleetVehicleCandidate",
     "InfleetVehicleDecision",
     "InfleetVehicleResolution",
+    "NOT_APPLICABLE_VEHICLE_CHOICE",
     "SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN",
     "SERVICE_VEHICLE_ORIGIN_INFLEET",
     "buildInfleetServiceVehiclePatch",

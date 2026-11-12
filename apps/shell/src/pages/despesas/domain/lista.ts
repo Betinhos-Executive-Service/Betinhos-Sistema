@@ -1,5 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
 import { label } from '../../pagantes/domain/status'
+import { situacaoLabel } from '../conciliacao/domain/regras'
+import type { Transacao } from '../conciliacao/domain/types'
 import { ALERTAS, type Alerta, type Filters } from './filters'
 import { suspeitaIA } from './ia'
 import { FINANCEIRO, OPERACIONAL, semComprovante } from './status'
@@ -20,6 +22,9 @@ export const DESPESA_COLUMNS: ViewColumnDef[] = [
   { key: 'valor', label: 'Valor' },
   { key: 'operacional', label: 'Operacional' },
   { key: 'financeiro', label: 'Financeiro' },
+  { key: 'categoria', label: 'Categoria' },
+  { key: 'forma', label: 'Forma de pagamento' },
+  { key: 'conciliacao', label: 'Conciliação' },
   { key: 'motorista', label: 'Motorista' },
   { key: 'alertas', label: 'Alertas' },
 ]
@@ -86,13 +91,19 @@ export function matchesKeyword(d: Despesa, query: string) {
   return words.every((w) => text.includes(w))
 }
 
+/** Compra do cartão ligada a cada despesa (por id da despesa), vinda da conciliação. */
+export type ComprasPorDespesa = ReadonlyMap<string, Transacao>
+
 /** Ordena pela coluna da visão; vazios por último. */
-export function sortDespesas(list: Despesa[], key: string, dir: 'asc' | 'desc', choices: DespesaChoices) {
+export function sortDespesas(list: Despesa[], key: string, dir: 'asc' | 'desc', choices: DespesaChoices, compras?: ComprasPorDespesa) {
   const value = (d: Despesa): string | number | null => {
     switch (key) {
       case 'despesa': return d.estabelecimento || d.nome || null
       case 'data': return d.data ? d.data.getTime() : null
       case 'motorista': return d.motorista || null
+      case 'categoria': return d.categoria || null
+      case 'forma': return d.forma || null
+      case 'conciliacao': { const t = compras?.get(d.id); return t ? situacaoLabel(t.situacao) : null }
       case 'valor': return d.valor
       case 'operacional': return d.statusOperacional == null ? null : label(choices.operacional, d.statusOperacional, '')
       case 'financeiro': return d.statusFinanceiro == null ? null : label(choices.financeiro, d.statusFinanceiro, '')

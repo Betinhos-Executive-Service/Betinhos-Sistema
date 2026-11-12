@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Breadcrumb, Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Textarea, useToast } from '@betinhos/ui'
-import { AlertTriangle, ArrowLeft, Bell, Copy, PenLine, Save, Send, Trash2, Users } from 'lucide-react'
+import { Button, Checkbox, Dialog, Field, Input, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, Textarea, useToast } from '@betinhos/ui'
+import { AlertTriangle, Bell, Copy, PenLine, Save, Send, Trash2, Users } from 'lucide-react'
 import { useEscVoltar } from '../../../app/useEscVoltar'
+import { NavTopo } from '../../../app/NavTopo'
 import type { Source } from '../data/source'
 import {
   COMUNICADO_ESCOPO, COMUNICADO_TIPO, CORPO_MAX, TITULO_MAX, duplicateComunicado, plural, validateDraft,
@@ -112,11 +113,10 @@ export function ComunicadoEditor({ initial, motoristas, source, onBack, onSaved,
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<Breadcrumb items={[{ label: 'Comunicados', href: '#/comunicados' }, { label: draft.id ? 'Editar rascunho' : 'Novo' }]} />}
+        breadcrumb={<NavTopo modulo="Comunicados" href="#/comunicados" onBack={voltar} disabled={lock} atual={draft.id ? 'Editar rascunho' : 'Novo'} />}
         title={draft.id ? 'Editar comunicado' : 'Novo comunicado'}
         meta={<StatusBadge tone="neutral">Rascunho</StatusBadge>}
         description="Escreva o aviso, escolha os motoristas e acompanhe cada confirmação de ciência."
-        actions={<Button variant="secondary" icon={<ArrowLeft size={16} />} disabled={lock} onClick={voltar}>Voltar</Button>}
       />
 
       <div className="cm-columns">

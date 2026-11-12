@@ -290,12 +290,61 @@
             }
           }
         },
-        "Cada_conta": {
-          "type": "Foreach",
-          "foreach": "@coalesce(outputs('Contas')?['body/result/results'], json('[]'))",
+        "Esperar_banco": {
+          "type": "Wait",
           "runAfter": {
             "Contas": [
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "inputs": {
+            "interval": {
+              "count": 30,
+              "unit": "Minute"
+            }
+          }
+        },
+        "Contas_segunda": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Esperar_banco": [
               "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "apiId": "__BANCO__",
+              "connectionName": "shared_banco_mcp",
+              "operationId": "ListarContas"
+            },
+            "parameters": {
+              "body/item": "@items('Cada_conexao')?['item_id']",
+              "body/type": "CREDIT"
+            },
+            "authentication": "@parameters('$authentication')",
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 4,
+              "interval": "PT30S"
+            }
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        },
+        "Cada_conta": {
+          "type": "Foreach",
+          "foreach": "@coalesce(if(equals(actions('Contas')?['status'], 'Succeeded'), outputs('Contas')?['body/result/results'], outputs('Contas_segunda')?['body/result/results']), json('[]'))",
+          "runAfter": {
+            "Contas_segunda": [
+              "Succeeded",
+              "Skipped"
             ]
           },
           "runtimeConfiguration": {

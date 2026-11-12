@@ -130,3 +130,8 @@ test('Conferir exige no DEV os campos novos nos dois ramos de gravação', () =>
 test('o gatilho continua filtrando só cr40f_statusanexo: update com o mesmo valor também dispara (o filtro vale pela presença da coluna no PATCH)', () => {
   assert.match(ps1, /"subscriptionRequest\/filteringattributes": "cr40f_statusanexo"/)
 })
+
+test('grava o CNPJ lido (só dígitos, 14) em new_cnpjposto, que dispara a comparação de postos; inválido mantém o valor atual', () => {
+  const digitos = "replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', '')"
+  assert.ok(ps1.includes(`"item/new_cnpjposto": "@if(equals(length(${digitos}), 14), ${digitos}, triggerOutputs()?['body/new_cnpjposto'])",`))
+})

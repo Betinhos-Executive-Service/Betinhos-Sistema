@@ -220,11 +220,13 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
             }
           : loadMockFleet);
         if (!choice) return;
-        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
+        if (resolution.motivo === "motorista-terceiro" && choice.origem !== "nao-se-aplica") choice = { ...choice, origem: "terceiro" };
       }
       const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
       const outcome = resolution.decisao === "automatico"
         ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : choice?.origem === "nao-se-aplica"
+        ? "não se aplica (sem carro gravado)"
         : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
       console.info("[mock Infleet]", scenario, patch);
       setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
@@ -300,14 +302,15 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
           });
         })
         .catch((error) => {
+          // A finalização já foi gravada e o item saiu da agenda local; a atualização automática traz o resto
+          // quando a conexão voltar. No PROD (05–12/11/2026), 34 de 34 serviços com este aviso estavam Concluído.
           reportAppError(error, {
+            severity: "warning",
             source: "app", action: "finalizeSelected", phase: "confirm-agenda-after-finalize", screen: "servicos",
             detailId: detailToFinalize.id, detailType: detailToFinalize.type,
             payload: { dataverseId: detailToFinalize.dataverse?.id, timeoutMs: 8000, attempts: 2, restoredToAgenda: false }, notifyUser: false
           });
-          setCriticalError(
-            "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir."
-          );
+          setToast("Serviço finalizado. A agenda atualiza quando a conexão melhorar.", "warning");
         });
     }, 1650);
   };

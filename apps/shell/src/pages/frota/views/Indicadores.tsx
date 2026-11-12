@@ -8,7 +8,7 @@ import { brl, NAO_INFORMADO } from '../data/format'
 import { GRAVIDADE, label, STATUS_OPTIONS, TIPO_REPARO } from '../data/schema'
 import type { LoadResult } from '../data/source'
 import type { FrotaData } from '../data/types'
-import { downloadCsv, toCsv } from '../domain/csv'
+import { downloadCsv, toCsv } from '../../../app/csv'
 import { AVISO_12_MESES, custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, indisponiveisDe, periodoAlemDe12Meses, type CustoVeiculo, type EntradaCusto, type Fonte } from '../domain/custoTotal'
 import { centavos, contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
 

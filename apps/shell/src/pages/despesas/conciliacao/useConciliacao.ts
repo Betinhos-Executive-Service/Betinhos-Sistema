@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { message, type Carga, type Source } from './data/source'
 import { porData } from './domain/regras'
 import type { Cartao, Transacao } from './domain/types'
-import { byNome } from '../equipamentos/domain/cadastros'
+import { byNome } from '../../equipamentos/domain/cadastros'
 
 type State = Carga & { loaded: boolean; error: string | null }
 const upsertIn = <T extends { id: string }>(list: T[], item: T) => (list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item])
 
 /** Transações, cartões e motoristas carregados juntos (token contra respostas fora de ordem); gravações refletem sem recarregar. */
-export function useConciliacao(source: Source) {
+export function useConciliacao(source: Source, soCartoes = false) {
   const [state, setState] = useState<State>({ transacoes: [], cartoes: [], motoristas: [], loaded: false, error: null })
   const token = useRef(0)
 
@@ -16,14 +16,14 @@ export function useConciliacao(source: Source) {
     const current = ++token.current
     setState((s) => ({ ...s, error: null }))
     try {
-      const c = await source.load()
+      const c = await source.load(soCartoes)
       if (current !== token.current) return
       setState({ transacoes: [...c.transacoes].sort(porData), cartoes: [...c.cartoes].sort(byNome), motoristas: c.motoristas, loaded: true, error: null })
     } catch (reason) {
       if (current !== token.current) return
       setState((s) => ({ ...s, error: message(reason) }))
     }
-  }, [source])
+  }, [source, soCartoes])
 
   useEffect(() => { void reload() }, [reload])
 
