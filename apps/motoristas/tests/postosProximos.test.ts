@@ -213,10 +213,12 @@ test("idMenorPreco destaca o mais barato só com 2 ou mais preços diferentes", 
 test("medidasGaveta: aberta deixa livre a faixa dos botões do mapa; meio fica entre recolhida e aberta", () => {
   const g = medidasGaveta(600);
   assert.equal(g.visivel.recolhida, 76);
-  assert.ok(g.visivel.aberta <= 600 - 148);
+  assert.ok(g.visivel.aberta <= 600 - 218);
   assert.ok(g.visivel.meio > g.visivel.recolhida && g.visivel.meio < g.visivel.aberta);
   assert.deepEqual([g.deslocamento.aberta, g.deslocamento.meio > 0, g.deslocamento.recolhida > g.deslocamento.meio], [0, true, true]);
   assert.ok(medidasGaveta(100).total >= 76);
+  // Tela baixa (celular pequeno ou deitado): a gaveta aberta continua abaixo do "minha posição".
+  assert.equal(medidasGaveta(480).visivel.aberta, 480 - 218);
 });
 
 test("comFriccao: dentro dos limites acompanha o dedo; fora, só 25% da distância", () => {
