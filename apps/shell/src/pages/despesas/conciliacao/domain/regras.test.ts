@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { CONTA_ITAU, CONTA_NUBANK, createMockCartoes, createMockDespesas, createMockTransacoes } from '../data/mock'
 import { candidatasPath, mapCartao, mapTransacao } from '../data/queries'
-import { abaDe, acoes, cartaoParaForm, cartaoVigente, ehCandidata, filtrar, FILTROS_VAZIOS, janelaCandidatas, SITUACAO, TIPO, validarCartao } from './regras'
+import {
+  abaDe, acoes, CANAL, cartaoParaForm, cartaoVigente, csvLinhas, diasDesde, diferencaCandidata, ehCandidata, filtrar, FILTROS_VAZIOS, idadeTexto, janelaCandidatas,
+  ordenar, resumoRevisar, SITUACAO, TIPO, validarCartao,
+} from './regras'
+import { filtrosCodec } from './url'
 import type { Cartao, Transacao } from './types'
 
 const trans = createMockTransacoes()
@@ -28,6 +32,51 @@ describe('filtrar', () => {
     expect(filtrar(trans, { ...FILTROS_VAZIOS, cartaoId: t(1).cartaoId }).map((x) => x.id)).toEqual([t(1), t(5), t(7)].map((x) => x.id))
     expect(filtrar(trans, { ...FILTROS_VAZIOS, motoristaId: 'm3' }).map((x) => x.id)).toEqual([t(2).id, t(9).id])
     expect(filtrar(trans, { ...FILTROS_VAZIOS, de: '2026-10-28', ate: '2026-10-30' }).map((x) => x.id)).toEqual([t(3).id, t(4).id])
+  })
+})
+
+describe('filtros novos da fila', () => {
+  const ids = (l: Transacao[]) => l.map((x) => x.id)
+  it('busca sem acento e por várias palavras (estabelecimento, motorista, placa)', () => {
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'posto shell' }))).toEqual([t(1).id, t(11).id])
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'ELAINE' }))).toEqual([])
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'fjk2b19' }))).toEqual([t(11).id])
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'diego restaurante' }))).toEqual([t(2).id])
+  })
+  it('canal vazio no registro conta como Itaú; situação exata', () => {
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, canal: CANAL.ctf }))).toEqual([t(10).id, t(11).id])
+    expect(filtrar(trans, { ...FILTROS_VAZIOS, canal: CANAL.pluggy })).toHaveLength(9)
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, situacao: SITUACAO.semMotorista }))).toEqual([t(3).id, t(4).id, t(10).id])
+  })
+  it('resumo por situação soma quantidade e valor', () => {
+    const r = resumoRevisar(trans)
+    expect(r.get(SITUACAO.semMotorista)).toEqual({ qtd: 3, total: 120 + 64.5 + 412.37 })
+    expect(r.get(SITUACAO.divergencia)).toEqual({ qtd: 1, total: 89.9 })
+    expect(r.has(SITUACAO.ignorada)).toBe(false)
+  })
+  it('idade, ordem e diferença das candidatas', () => {
+    expect(diasDesde('2026-11-03', '2026-11-12')).toBe(9)
+    expect(diasDesde('2026-11-13', '2026-11-12')).toBe(0)
+    expect([0, 1, 5].map(idadeTexto)).toEqual(['hoje', 'há 1 dia', 'há 5 dias'])
+    expect(ordenar(trans, 'antigas')[0].id).toBe(t(6).id)
+    expect(ordenar(trans, 'valor')[0].id).toBe(t(10).id)
+    expect(ordenar(trans, 'recentes')).toBe(trans)
+    expect(diferencaCandidata({ valor: 250.03, data: new Date('2026-11-04T15:00:00Z') }, t(1))).toEqual({ valor: 0.03, dias: 1 })
+    // 01:00Z ainda é o dia anterior em São Paulo.
+    expect(diferencaCandidata({ valor: 250, data: new Date('2026-11-03T01:00:00Z') }, t(1))).toEqual({ valor: 0, dias: -1 })
+  })
+  it('CSV leva data em dd/mm/aaaa, canal e situação por extenso', () => {
+    const [linha] = csvLinhas([t(10)])
+    expect(linha.slice(0, 4)).toEqual(['04/11/2026', 'POSTO GRAAL TAUBATE', 'POSTO GRAAL TAUBATE', 'CTF'])
+    expect(linha).toContain('Sem motorista')
+    expect(linha).toContain(412.37)
+  })
+  it('filtros vão e voltam da URL', () => {
+    const f = { busca: 'shell', cartaoId: 'c1', motoristaId: 'm1', canal: CANAL.ctf, situacao: SITUACAO.pendente, de: '2026-10-01', ate: '2026-10-31' }
+    const q = new URLSearchParams()
+    for (const [k, v] of Object.entries(filtrosCodec.gravar(f))) if (typeof v === 'string') q.set(k, v)
+    expect(filtrosCodec.ler(q)).toEqual(f)
+    expect(filtrosCodec.ler(new URLSearchParams('cc-canal=x&cc-de=ontem'))).toEqual(FILTROS_VAZIOS)
   })
 })
 

@@ -135,6 +135,12 @@ function Despesas({ host }: { host: Host }) {
     return true
   }, [source, despesas.mutate, toast, setSelectedId])
 
+  // A despesa ligada à compra pode ser de antes do período carregado: as compras vêm de 12 meses, então amplia até lá.
+  const abrirDespesa = (id: string) => {
+    setCompraId(null)
+    if (!list.some((d) => d.id === id) && (periodo === '30' || periodo === '90')) setPeriodo('365')
+    setSelectedId(id)
+  }
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload(); void conciliacao.reload() }, [despesas.reload, conciliacao.reload])
   const loadingFirst = !choices
   const reloading = despesas.loading && !loadingFirst
@@ -177,7 +183,7 @@ function Despesas({ host }: { host: Host }) {
       <h1 className="dp-sr-only">Despesas operacionais</h1>
       <SegmentedControl aria-label="Lista" className="dp-filas" value={fila} onChange={setFila}
         options={[{ value: 'despesas', label: 'Despesas' }, { value: 'sem-despesa', label: `Compras sem despesa${conciliacao.loaded ? ` (${contarSemDespesa(conciliacao.transacoes)})` : ''}` }]} />
-      {fila === 'sem-despesa' ? <ComprasSemDespesa data={conciliacao} mobile={mobile} onOpen={setCompraId} onRefresh={() => void conciliacao.reload()} /> : (
+      {fila === 'sem-despesa' ? <ComprasSemDespesa data={conciliacao} source={conciliacaoSource} mobile={mobile} onOpen={setCompraId} onRefresh={() => void conciliacao.reload()} /> : (
       <>
       <div role="toolbar" aria-label="Comandos de despesas" className="dp-barra">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
@@ -213,7 +219,7 @@ function Despesas({ host }: { host: Host }) {
         As colunas, filtros ou ordenação da visão “{view.active.name}” foram alterados e ainda não foram salvos.
       </Dialog>
       {choices ? <DespesaDrawer despesa={current} onClose={() => setSelectedId(null)} choices={choices} source={source} version={version} onDecidir={decidir} compra={current ? compras.get(current.id) : null} onAbrirCompra={setCompraId} /> : null}
-      <CompraDrawers data={conciliacao} source={conciliacaoSource} abertaId={compraId} onClose={() => setCompraId(null)} />
+      <CompraDrawers data={conciliacao} source={conciliacaoSource} abertaId={compraId} onClose={() => setCompraId(null)} onAbrirDespesa={abrirDespesa} />
     </div>
   )
 }
