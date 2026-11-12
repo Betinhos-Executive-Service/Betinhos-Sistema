@@ -31,6 +31,7 @@ import {
   type ResultadoQuiz,
   type TreinamentoMotorista
 } from "./treinamentos";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 export type TreinamentosLoadStatus = "loading" | "ready" | "error";
 
@@ -355,7 +356,7 @@ export function TreinamentosScreen({ items, loadStatus, selectedId, onSelectedId
           <div id="trn-tabpanel" role="tabpanel" aria-labelledby={`trn-tab-${aba}`} className="termo-tabpanel" key={aba}>
             {erro ? <p className="termo-alert" data-tone="erro" role="alert">{erro}</p> : null}
             {loadStatus === "loading" && !items.length ? (
-              <div className="termo-skeleton" role="status" aria-busy="true" aria-label="Carregando treinamentos"><span /><span /></div>
+              <BrandLoader variant="inline" label="Carregando treinamentos" text="Carregando treinamentos" />
             ) : loadStatus === "error" && !items.length ? (
               <div className="termo-alert" data-tone="erro" role="alert">
                 <p>Não foi possível carregar os treinamentos.</p>

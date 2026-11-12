@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { taskHistoryDetails, visibleTaskHistory } from '../domain/taskHistory';
+import { BrandLoader } from "../../../app/BrandLoader";
 
 export default function TaskHistorySection({ history: rawHistory, employees = [], loading = false, error = "", onRetry }: any) {
   const [showHistory, setShowHistory] = useState<any>(false);
@@ -18,7 +19,7 @@ export default function TaskHistorySection({ history: rawHistory, employees = []
       </button>
     </div>
     {showHistory && (
-      loading ? <p>Carregando histórico…</p> : error ? <div className="quote-v3-inline-warning"><strong>Histórico indisponível</strong><span>{error}</span>{onRetry && <button className="button button-secondary" type="button" onClick={onRetry}>Tentar novamente</button>}</div> : (
+      loading ? <BrandLoader variant="inline" size="sm" label="Carregando histórico" text="Carregando histórico…" /> : error ? <div className="quote-v3-inline-warning"><strong>Histórico indisponível</strong><span>{error}</span>{onRetry && <button className="button button-secondary" type="button" onClick={onRetry}>Tentar novamente</button>}</div> : (
         history.length ? <div className="task-history-list">
           {visibleHistory.map((item, index) => {
             const details = taskHistoryDetails(item, employees);

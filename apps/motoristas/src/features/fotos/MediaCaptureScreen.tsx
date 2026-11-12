@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TextInputControl } from "../../shared/ui/FormFields";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { AppShell } from "../../shared/ui/layout/AppShell";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { describeCameraError } from "../../shared/camera/cameraErrors";
@@ -727,10 +728,16 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </div>
               ) : null}
 
-              {processing ? <div className="camera-loading camera-processing">{capturingPhoto ? "Capturando foto..." : "Preparando mídia..."}</div> : null}
+              {processing ? (
+                <div className="camera-loading camera-processing">
+                  <BrandLoader variant="inline" size="md" label={capturingPhoto ? "Capturando foto" : "Preparando mídia"} />
+                  <span aria-hidden="true">{capturingPhoto ? "Capturando foto..." : "Preparando mídia..."}</span>
+                </div>
+              ) : null}
               {starting ? (
                 <div className="camera-loading camera-permission-loading" aria-live="polite">
-                  <span>Abrindo câmera...</span>
+                  <BrandLoader variant="inline" size="md" label="Abrindo câmera" />
+                  <span aria-hidden="true">Abrindo câmera...</span>
                   {showSupportMessage ? <span>A câmera não respondeu. Fale com o suporte de TI da Betinhos.</span> : null}
                 </div>
               ) : null}

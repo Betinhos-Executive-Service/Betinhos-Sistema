@@ -6,7 +6,6 @@
 .frota-nowrap { white-space: nowrap; }
 .frota-cluster { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; }
 .frota-stack, .frota-lista, .frota-indicadores, .frota-pend { display: grid; gap: var(--bt-space-3); min-width: 0; }
-.frota-skeleton { display: grid; gap: var(--bt-space-2-5); }
 .frota-busca { width: min(320px, 100%); }
 .frota-filter { min-width: 160px; }
 .frota-data { width: 150px; }

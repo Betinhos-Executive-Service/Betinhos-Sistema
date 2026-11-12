@@ -34,7 +34,7 @@ describe('Frota', () => {
     const source = fakeSource('xrm', 'DEV')
     source.load = vi.fn(() => new Promise<LoadResult>((resolve) => { resolver = resolve }))
     renderFrota(source, 'veiculos')
-    expect(screen.getByRole('status', { name: '' })).toBeTruthy()
+    expect(screen.getByRole('status', { name: 'Carregando a frota' })).toBeTruthy()
     await act(async () => {
       resolver({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null, hodometro: null, hodometroEm: null }] }, errors: {} })
     })

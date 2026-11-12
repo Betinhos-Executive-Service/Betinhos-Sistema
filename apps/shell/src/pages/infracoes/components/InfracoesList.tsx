@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { StatusBadge, Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { LoadingTable } from '../../../app/VirtualTable'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, gravidadeTone, label, labels } from '../domain/choices'
 import type { Infracao, MultaUso } from '../domain/types'
@@ -43,7 +44,7 @@ export function InfracoesTable({ list, uso, onOpen, loading, view, quickFilters,
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.if-open')}>
-      <Table className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <LoadingTable className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando infrações" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

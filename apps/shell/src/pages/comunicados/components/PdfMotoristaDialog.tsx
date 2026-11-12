@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Button, Checkbox, Dialog, SearchBox, Skeleton, useToast } from '@betinhos/ui'
+import { Alert, Avatar, Button, Checkbox, Dialog, SearchBox, useToast } from '@betinhos/ui'
 import { ArrowLeft, FileText } from 'lucide-react'
 import { baixarComprovantes, textoErroPdf } from '../data/baixarComprovantes'
 import type { Source } from '../data/source'
 import { descricaoConclusao, paresDoMotorista } from '../domain/comprovante'
 import { plural, type Comunicado, type Destinatario, type Motorista } from '../domain/comunicados'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = { motoristas: Motorista[]; comunicados: Comunicado[]; source: Source; onClose: () => void }
 
@@ -75,7 +76,7 @@ export function PdfMotoristaDialog({ motoristas, comunicados, source, onClose }:
       ) : (
         <div className="cm-pdfdlg" key="comunicados" aria-busy={!rows && !erro}>
           {erro ? <Alert tone="danger" title="Não foi possível carregar" action={<Button variant="secondary" onClick={() => setTentativa((n) => n + 1)}>Tentar de novo</Button>}>{erro}</Alert> : null}
-          {!rows && !erro ? [0, 1, 2].map((i) => <Skeleton key={i} shape="rect" height={36} />) : null}
+          {!rows && !erro ? <BrandLoader variant="inline" size="md" label="Carregando comunicados do motorista" text="Carregando comunicados…" /> : null}
           {rows && !concluidos.length ? <p className="cm-pdfdlg__empty">Este motorista ainda não concluiu nenhum comunicado.</p> : null}
           {concluidos.length ? (
             <>

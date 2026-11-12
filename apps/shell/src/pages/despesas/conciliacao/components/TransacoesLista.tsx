@@ -50,7 +50,7 @@ export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, l
   return (
     // Com seleção, um clique marca a linha e o duplo clique abre (como em Pagantes).
     <div {...(selection ? { onDoubleClick: abrirLinha } : { onClick: abrirLinha })}>
-      <VirtualTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} empty={empty} footer={footer} />
+      <VirtualTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
     </div>
   )
 })

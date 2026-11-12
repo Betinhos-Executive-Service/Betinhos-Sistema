@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Icon } from "./icons";
 import { isMockChecklists, type ChecklistFotoEnviada } from "../domain/checklists";
 import { createFotos, createFotosMock, type CarregarFoto, type FotoCarregada } from "../data/fotosChecklist";
+import { BrandLoader } from "../../../../app/BrandLoader";
+import { Spinner } from "@betinhos/ui";
 
 // Um carregador por sessão: o cache por link vale para o detalhe e para a aba Padrões.
 let carregador: CarregarFoto | null = null;
@@ -70,7 +72,7 @@ function Miniatura({ foto, alt, onAbrir }: { foto: ChecklistFotoEnviada; alt: st
           <img src={estado.foto.url} alt={alt} loading="lazy" decoding="async" onError={onImagemErro} />
         </button>
       ) : estado.status === "falhou" ? <Falha foto={foto} erro={estado.erro} className="chk-thumb-falha" />
-        : <span className="chk-thumb is-loading" role="img" aria-label={`Carregando ${alt}`} />}
+        : <span className="chk-thumb is-loading"><Spinner size={16} label={`Carregando ${alt}`} /></span>}
     </span>
   );
 }
@@ -141,7 +143,7 @@ function Visualizador({ fotos, rotulo, indice, onIndice, onFechar }: {
         <div className="foto-viewer-stage">
           {estado.status === "pronta" ? <img src={estado.foto.url} alt={`${rotulo}, foto ${indice + 1}`} onError={onImagemErro} />
             : estado.status === "falhou" ? <Falha foto={foto} erro={estado.erro} className="chk-thumb-falha is-large" />
-            : <span className="foto-viewer-skeleton" role="img" aria-label={`Carregando ${rotulo}, foto ${indice + 1}`} />}
+            : <BrandLoader variant="inline" size="md" label={`Carregando ${rotulo}, foto ${indice + 1}`} text="Carregando a foto…" />}
           {varias ? (
             <>
               <button type="button" className="mod-icon-button foto-viewer-nav is-prev" aria-label="Foto anterior" onClick={() => ir(-1)}><Icon name="chevronLeft" size={16} /></button>

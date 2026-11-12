@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Dialog } from '@betinhos/ui'
 import { LinkAcompanhamento, LinkErro } from '../../../app/LinkAcompanhamento'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const COPY_FAILED = 'Não foi possível copiar automaticamente. Selecione e copie.'
 
@@ -40,7 +41,9 @@ export function CopyDialog({ open, text, loading, onClose, onCopied }: { open: b
       </>}
     >
       <div className="gr-dialog">
-        <pre className="gr-copy" ref={preRef} tabIndex={0} aria-busy={loading}>{loading ? 'Montando o texto…' : text}</pre>
+        {loading
+          ? <BrandLoader variant="inline" size="md" label="Montando o texto" text="Montando o texto…" />
+          : <pre className="gr-copy" ref={preRef} tabIndex={0}>{text}</pre>}
         {warning ? <p role="alert" className="gr-dialog__warn">{warning}</p> : null}
       </div>
     </Dialog>
@@ -158,7 +161,7 @@ export function LinkDialog({ request, onClose, onCopied, onCopyFailed }: { reque
       actions={<Button variant="secondary" onClick={onClose}>Fechar</Button>}
     >
       <div className="gr-dialog" aria-busy={shown?.loading || undefined}>
-        {shown?.loading ? <p role="status">Gerando o link…</p> : null}
+        {shown?.loading ? <BrandLoader variant="inline" size="md" label="Gerando o link" text="Gerando o link…" /> : null}
         {shown?.erro ? <LinkErro erro={shown.erro} /> : null}
         {shown?.link ? <>
           <p>Envie ao cliente ou passageiro: a página mostra o carro ao vivo e expira sozinha.</p>

@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Skeleton, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, EmptyState, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
 import { CreditCard, Plus, RefreshCw } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from '../despesas/conciliacao/data/source'
 import { useConciliacao } from '../despesas/conciliacao/useConciliacao'
 import { CartaoDrawer, CartoesLista, type CartaoTarget } from './components/Cartoes'
+import { BrandLoader } from '../../app/BrandLoader'
 import '../despesas/conciliacao/conciliacao.css'
 
 export function CartoesPage({ host }: { host: Host }) {
@@ -27,7 +28,7 @@ function Cartoes({ host }: { host: Host }) {
   if (data.error && !data.loaded) {
     body = <Alert tone="danger" title="Não foi possível carregar os cartões" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error}</Alert>
   } else if (!data.loaded) {
-    body = <div className="surface" role="status" aria-label="Carregando cartões"><Skeleton height={18} /><Skeleton height={18} /><Skeleton height={18} /></div>
+    body = <div className="surface"><BrandLoader variant="inline" label="Carregando cartões" text="Carregando cartões…" /></div>
   } else if (data.cartoes.length) {
     body = <CartoesLista list={data.cartoes} mobile={mobile} onOpen={(id) => setTarget({ mode: 'edit', id })} />
   } else {

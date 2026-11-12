@@ -13,6 +13,7 @@ import {
   type IdeaDraft,
   type IdeaDraftErrors
 } from "./ideas";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type IdeasScreenProps = {
   onBack: () => void;
@@ -146,10 +147,7 @@ export function IdeasScreen({ onBack, loadIdeas, createIdea, localNotice }: Idea
                     <button type="button" onClick={() => void refresh()}>Tentar novamente</button>
                   </div>
                 ) : loading && !ideas.length ? (
-                  <div className="ideas-skeleton" role="status" aria-label="Carregando ideias">
-                    <span />
-                    <span />
-                  </div>
+                  <BrandLoader variant="inline" size="md" label="Carregando ideias" text="Carregando ideias" />
                 ) : ideas.length ? (
                   <ul className="ideas-list">
                     {ideas.map((idea) => {

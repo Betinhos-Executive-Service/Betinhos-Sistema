@@ -1,6 +1,6 @@
 // components/Checklist.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { acceptFiles, Alert, Button, Dialog, Skeleton, useToast } from '@betinhos/ui'
+import { acceptFiles, Alert, Button, Dialog, Spinner, useToast } from '@betinhos/ui'
 import { File as FileIcon, FileImage, FileText, History, Paperclip, Plus, Trash2, Upload as UploadIcon } from 'lucide-react'
 import { formatBR, todaySP } from '../../funcionarios/data/dates'
 import { DOC_MAX_BYTES } from '../../funcionarios/data/sharepoint'
@@ -13,6 +13,7 @@ import type { Arquivo, DocEmitido, ItemChecklist } from '../domain/types'
 import { useDocumentos } from '../useDocumentos'
 import { ACCEPT, RenovarDrawer, type AlvoRenovar } from './RenovarDrawer'
 import { StatusDoc } from './StatusDoc'
+import { BrandLoader } from '../../../app/BrandLoader'
 import '../documentos.css'
 
 type Props = { source: DocsSource; donoId: string; titulo?: string }
@@ -35,7 +36,7 @@ export function Checklist({ source, donoId, titulo = 'Documentos controlados' }:
   }
 
   if (error && !data) return <Alert tone="danger" title="Não foi possível carregar os documentos" action={<Button variant="secondary" onClick={() => void reload()}>Tentar de novo</Button>}>{error}</Alert>
-  if (loading && !data) return <Skeleton shape="rect" height={160} />
+  if (loading && !data) return <BrandLoader variant="inline" size="md" label="Carregando documentos" text="Carregando documentos…" />
   if (!dono) return <p className="doc-muted">Cadastro não encontrado na lista de documentos.</p>
 
   return (
@@ -162,7 +163,7 @@ function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; s
           {v.numero ? `Nº ${v.numero} · ` : ''}{v.emissao ? `Emissão ${formatBR(v.emissao)} · ` : ''}{v.validade ? `Validade ${formatBR(v.validade)}` : 'Sem validade'}{v.observacao ? ` · ${v.observacao}` : ''}
         </p>
       ) : null}
-      {v && arquivos === null && !erroLista ? <Skeleton className="doc-arquivos__skeleton" shape="rect" height={28} /> : null}
+      {v && arquivos === null && !erroLista ? <p className="doc-muted"><Spinner size={14} label={`Carregando arquivos de ${item.tipo.nome}`} /></p> : null}
       {v && comArquivos ? (
         <div className="doc-arquivos">
           <ul className="doc-arquivos__lista" aria-label={`Arquivos de ${item.tipo.nome}`}>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import {
   describeVehicle,
   needsFleetChoice,
@@ -136,7 +137,7 @@ export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, on
         ) : null}
 
         {fleetState === "loading" ? (
-          <div className="contact-choice-phone vehicle-choice-status" role="status" aria-busy="true">Carregando carros…</div>
+          <BrandLoader variant="inline" size="md" label="Carregando carros" text="Carregando carros" />
         ) : null}
 
         {fleetState === "error" ? (

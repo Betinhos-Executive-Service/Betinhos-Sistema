@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { useDetalheDialog } from "./useDetalheDialog";
 import { carregarArquivoComprovante, carregarDetalheDespesa, type AnexoDespesa, type ArquivoComprovante, type DespesaDetalhe } from "./despesaDetalhe";
 import { formatDataHora } from "../termos/termosMulta";
@@ -41,7 +42,7 @@ function Comprovante({ anexo, indice }: { anexo: AnexoDespesa; indice: number })
     };
   }, [anexo, tentativa]);
 
-  if (estado.tipo === "carregando") return <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" />;
+  if (estado.tipo === "carregando") return <div className="gr-comprovante"><BrandLoader variant="inline" size="md" label="Carregando comprovante" /></div>;
   if (estado.tipo === "erro") {
     return (
       <div className="gr-comprovante gr-comprovante--erro">
@@ -162,7 +163,7 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
 
           <section aria-labelledby="gr-detalhe-comprovantes">
             <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">{estado === "acao" ? "Comprovante atual" : "Comprovante"}</h3>
-            {carga.tipo === "carregando" ? <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" /> : null}
+            {carga.tipo === "carregando" ? <div className="gr-comprovante"><BrandLoader variant="inline" size="md" label="Carregando comprovante" /></div> : null}
             {carga.tipo === "pronto" && anexos.length ? (
               <div className="gr-comprovantes">{anexos.map((anexo, i) => <Comprovante key={anexo.id} anexo={anexo} indice={i} />)}</div>
             ) : null}
@@ -176,7 +177,7 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
                 <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
               ))}
             </dl>
-            {carga.tipo === "carregando" ? <p className="gr-legenda" role="status">Carregando os outros dados…</p> : null}
+            {carga.tipo === "carregando" ? <BrandLoader variant="inline" size="sm" label="Carregando os outros dados" text="Carregando os outros dados" /> : null}
             {carga.tipo === "erro" ? (
               <div className="gr-vazio">
                 <p className="gr-legenda">{carga.mensagem}</p>

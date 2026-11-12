@@ -6,6 +6,7 @@
 @import "./features/treinamentos/treinamentos.css";
 @import "./features/postos/postos.css";
 @import "./app/tour.css";
+@import "./shared/ui/brand-loader.css";
 @font-face {
   font-family: "Centabel Book Embedded";
   src: url("./assets/fonts/Centabel-Book.ttf") format("truetype");
@@ -4353,10 +4354,6 @@ svg {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-overlay-spinner {
-    animation-duration: 1.8s;
-  }
-
   .local-toast,
   .local-toast-close {
     transition: none;
@@ -4471,49 +4468,38 @@ svg {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: rgba(251, 251, 250, 0.78);
-  backdrop-filter: blur(8px);
+  background: rgba(228, 230, 235, 0.72);
+  -webkit-backdrop-filter: blur(10px) saturate(0.9);
+  backdrop-filter: blur(10px) saturate(0.9);
 }
 
 .loading-overlay-card {
   position: relative;
   z-index: 2;
-  width: min(100%, 240px);
+  width: min(100%, 260px);
   min-width: 0;
   display: grid;
   justify-items: center;
-  gap: 12px;
-  padding: 24px 20px;
-  border: 1px solid #eaeaea;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+  gap: 16px;
   text-align: center;
 }
 
-.loading-overlay-mark {
-  position: relative;
-  width: 28px;
-  height: 28px;
-}
-
-.loading-overlay-spinner {
-  position: absolute;
-  inset: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 2px solid rgba(17, 17, 17, 0.12);
-  border-top-color: #111111;
-  animation: loading-overlay-spin 0.8s linear infinite;
-  transition:
-    opacity 180ms ease,
-    transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+/* Sucesso: o anel para e fecha em navy; o selo com o check aparece no canto da logo. */
+.loading-overlay-card.is-success .brand-loader__ring {
+  animation: none;
+  background: #001a3d;
+  transition: background 180ms ease;
 }
 
 .loading-overlay-check {
   position: absolute;
-  inset: 0;
+  right: 2px;
+  bottom: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #1f7a4d;
+  box-shadow: 0 0 0 3px #e4e6eb;
   opacity: 0;
   transform: scale(0.72) rotate(-8deg);
   transition:
@@ -4527,28 +4513,22 @@ svg {
   display: block;
   height: 2px;
   border-radius: 999px;
-  background: #111111;
+  background: #ffffff;
   transform-origin: left center;
 }
 
 .loading-overlay-check-stem {
-  top: 16px;
+  top: 14px;
   left: 8px;
-  width: 8px;
+  width: 6px;
   transform: rotate(45deg);
 }
 
 .loading-overlay-check-kick {
-  top: 17px;
-  left: 13px;
-  width: 12px;
+  top: 18px;
+  left: 12px;
+  width: 10px;
   transform: rotate(-45deg);
-}
-
-.loading-overlay-card.is-success .loading-overlay-spinner {
-  opacity: 0;
-  transform: scale(0.82);
-  animation: none;
 }
 
 .loading-overlay-card.is-success .loading-overlay-check {
@@ -5011,6 +4991,11 @@ button:disabled {
 }
 
 .camera-error,
+/* Loader da marca dentro do véu escuro da câmera: sem a altura mínima do inline. */
+.camera-loading .brand-loader--inline {
+  min-height: 0;
+}
+
 .camera-loading,
 .camera-start-panel {
   position: absolute;
@@ -11496,12 +11481,6 @@ select,
   }
 }
 
-@keyframes loading-overlay-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Final action button standardization */
 .action-button {
   min-height: 46px !important;
@@ -11689,6 +11668,10 @@ select,
   animation: action-button-spin 1.05s linear infinite reverse !important;
 }
 
+/* Spinner do ActionButton fora do botão navy/vermelho: navy da marca (os detalhes brancos sumiriam no fundo claro). */
+.action-button:not(.action-button--primary):not(.action-button--danger) .action-button-spinner { color: #001a3d !important; border-left-color: rgba(0, 26, 61, 0.2) !important; }
+.action-button:not(.action-button--primary):not(.action-button--danger) .action-button-spinner::after { border-color: rgba(0, 26, 61, 0.14) !important; border-top-color: rgba(0, 26, 61, 0.55) !important; }
+
 @keyframes action-button-spin {
   to {
     transform: rotate(360deg);
@@ -11717,9 +11700,6 @@ select,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-overlay-spinner,
-  .loading-overlay-spinner::before,
-  .loading-overlay-spinner-glow,
   .loading-overlay-progress::before,
   .action-button-spinner,
   .action-button-spinner::after,
@@ -13180,8 +13160,8 @@ select,
   display: block;
   width: 18px;
   height: 18px;
-  border: 2px solid #edf3ff;
-  border-top-color: #2159d2;
+  border: 2px solid rgba(0, 26, 61, 0.12);
+  border-top-color: #001a3d;
   border-radius: 999px;
   animation: expense-upload-spin 800ms linear infinite;
 }
@@ -13190,8 +13170,8 @@ select,
   width: 28px;
   height: 28px;
   border-width: 3px;
-  border-color: #d6e2fb;
-  border-top-color: #2159d2;
+  border-color: rgba(0, 26, 61, 0.12);
+  border-top-color: #001a3d;
 }
 
 .expense-send-close {

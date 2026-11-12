@@ -44,9 +44,6 @@
 .fo-page .service-card--driver-updated { border-color: rgba(20, 122, 75, 0.35); }
 .fo-page .service-card--clone-highlight { border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); animation: highlight-in 420ms var(--bt-ease-out) backwards; }
 .fo-page .is-driver-busy { opacity: 0.72; }
-.fo-page .skeleton-list { display: grid; gap: 10px; }
-.fo-page .skeleton-card { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 12px; min-height: 132px; padding: 16px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); animation: skeleton-pulse 1400ms ease-in-out infinite; animation-delay: calc(var(--item-index, 0) * 120ms); }
-.fo-page .skeleton-stack { display: grid; align-content: start; gap: 10px; }
 .fo-page .list-load-sentinel { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; color: var(--bt-color-text-secondary); font-size: 12px; font-weight: 600; }
 .fo-page .field { position: relative; min-width: 0; display: grid; gap: 6px; margin: 0; }
 .fo-page .field.is-invalid::after { content: attr(data-validation-message); color: var(--bt-color-danger); font-size: 12px; font-weight: 700; line-height: 17px; animation: fade-up 180ms var(--bt-ease-out) backwards; }
@@ -126,8 +123,6 @@
 .fo-page .service-detail__datetime span { grid-column: 1 / -1; color: #b9c7de; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .fo-page .service-detail__datetime small { color: #dbe5f5; font-size: 13px; font-weight: 700; }
 .fo-page .service-detail__datetime strong { font-size: 22px; font-weight: 800; line-height: 1.1; }
-.fo-page .loading-overlay { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: rgba(240, 240, 240, 0.72); animation: backdrop-in var(--bt-duration-normal) ease backwards; }
-.fo-page .loading-card { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-toast); color: var(--bt-color-brand); font-size: 14px; font-weight: 700; animation: pop-in 220ms var(--bt-ease-out) backwards; }
 @media (hover: hover) and (pointer: fine) {
   .fo-page .service-card:hover { border-color: var(--bt-color-border-hover); box-shadow: var(--bt-shadow-surface); }
   .fo-page .service-card__surface:hover { background: var(--bt-color-surface-soft); }
@@ -223,11 +218,6 @@
     box-shadow: 0 0 0 8px rgba(33, 89, 210, 0);
   }
 }
-@keyframes skeleton-pulse {
-  50% {
-    opacity: 0.55;
-  }
-}
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -262,10 +252,6 @@
   .fo-page .driver-card-feedback { height: var(--bt-control-height-compact); padding: 0 12px; border-radius: var(--bt-radius-sm); font-size: 12px; }
   .fo-page .service-card--clone-highlight { background: var(--bt-color-action-soft); box-shadow: inset 3px 0 0 var(--bt-color-action); }
   .fo-page .list-load-sentinel { border-top: 1px solid var(--bt-color-border); }
-  .fo-page .skeleton-list { gap: 0; }
-  .fo-page .skeleton-card { min-height: 68px; grid-template-columns: var(--row-time) minmax(0, 1fr); align-items: center; padding: 12px 20px; border: 0; border-top: 1px solid var(--bt-color-border); border-radius: 0; }
-  .fo-page .skeleton-card:first-child { border-top: 0; }
-  .fo-page .skeleton-stack { grid-template-columns: 160px minmax(0, 1fr) 180px; align-items: center; gap: 40px; }
   .fo-page .vehicle-layout { display: grid; grid-template-columns: minmax(0, 720px) minmax(260px, 340px); align-items: start; gap: 16px; }
   .fo-page .vehicle-panel { max-width: 720px; }
   .fo-page .vehicle-panel .panel__footer { position: sticky; bottom: 0; z-index: 2; margin: 0 -16px -16px; padding: 12px 16px; border-radius: 0 0 var(--bt-radius-lg) var(--bt-radius-lg); background: var(--bt-color-surface); }

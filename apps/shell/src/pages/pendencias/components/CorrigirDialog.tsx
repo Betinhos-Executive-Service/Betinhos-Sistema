@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Dialog, Skeleton } from '@betinhos/ui'
+import { Alert, Button, Dialog } from '@betinhos/ui'
 import type { Mudanca, Source } from '../data/source'
 import { CP, FAT, OP } from '../domain/codes'
 import type { Pendencia } from '../domain/types'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const ENTIDADE: Record<string, string> = { cr40f_financeiro: 'OP', cr40f_reservadeveculos: 'Serviço', cr40f_composicaodeprecos: 'Composição' }
 const ROTULOS: Record<string, Record<number, string>> = {
@@ -73,7 +74,7 @@ export function CorrigirDialog({ pendencia: p, source, onClose, onApplied }: Pro
         </>}>
       {p ? (
         previa == null ? (
-          <span className="pend-corrigir__loading" role="status" aria-label="Carregando prévia"><Skeleton height={18} /><Skeleton height={18} /></span>
+          <BrandLoader variant="inline" size="md" label="Carregando prévia" text="Simulando a correção…" />
         ) : 'error' in previa ? (
           <Alert tone="danger" title="Não foi possível simular a correção">{previa.error}</Alert>
         ) : vazio ? (

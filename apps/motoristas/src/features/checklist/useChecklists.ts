@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { getInitialChecklistId } from "../../app/bootstrap";
 import type { PortaDados } from "../../data/porta";
@@ -16,11 +15,10 @@ type Options = {
   previewMode: boolean;
   setScreen: (screen: Screen) => void;
   setToast: (message: string, tone?: ToastTone) => void;
-  setDataLoadingState: (loading: LoadingOverlayState | null) => void;
 };
 
 // Lista de checklists do motorista, seleção, origem da navegação e deep link do push.
-export function useChecklists({ dados, driverIdRef, previewMode, setScreen, setToast, setDataLoadingState }: Options) {
+export function useChecklists({ dados, driverIdRef, previewMode, setScreen, setToast }: Options) {
   const [checklists, setChecklists] = useState<ChecklistVeiculo[]>([]);
   const [checklistsStatus, setChecklistsStatus] = useState<ChecklistsLoadStatus>(() => isMockChecklists() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedChecklistId, setSelectedChecklistId] = useState("");
@@ -47,7 +45,6 @@ export function useChecklists({ dados, driverIdRef, previewMode, setScreen, setT
       .then((item) => {
         if (!alive || pendingChecklistDeepLinkRef.current !== deepLinkId) return;
         pendingChecklistDeepLinkRef.current = "";
-        setDataLoadingState(null);
         if (!item) {
           setScreen("checklists");
           setToast("Este checklist não está mais com você.", "warning");

@@ -1,6 +1,7 @@
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { formatDiaMes, isMockGastosCartao, type GastoCartao, type GastosCartaoLoadStatus } from "./gastosCartao";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -25,7 +26,7 @@ export function GastosCartaoScreen({ items, loadStatus, onBack, onReload, onOpen
       />
       <section className="termo-screen" aria-label="Gastos do cartão para completar">
         {loadStatus === "loading" && !items.length ? (
-          <div className="termo-skeleton" role="status" aria-busy="true" aria-label="Carregando gastos do cartão"><span /><span /></div>
+          <BrandLoader variant="inline" label="Carregando gastos do cartão" text="Carregando gastos do cartão" />
         ) : loadStatus === "error" && !items.length ? (
           <div className="termo-alert" data-tone="erro" role="alert">
             <p>Não foi possível carregar os gastos do cartão.</p>

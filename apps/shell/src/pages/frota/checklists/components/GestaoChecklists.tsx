@@ -56,6 +56,7 @@ import {
   type VeiculoFrota
 } from "../domain/gestaoChecklists";
 import { PERIODO_PADROES_INICIAL, type PeriodoPadroes } from "../domain/padroesChecklists";
+import { BrandLoader } from "../../../../app/BrandLoader";
 
 
 // Dentro do Sistema Betinhos (iframe com ?host=shell) o selo do Sistema ocupa o canto inferior direito.
@@ -564,7 +565,7 @@ export function GestaoChecklists() {
                 </div>
                 <div className="frota-head" aria-hidden="true"><span>Veículo</span><span>Motorista atual</span><span>Última vistoria</span><span>Situação</span><span /></div>
                 <div role="list">
-                  {loading ? [0, 1, 2, 3].map((index) => <span key={index} className="gestao-row-skeleton" aria-hidden="true" />) : null}
+                  {loading ? <BrandLoader variant="inline" size="md" label="Carregando a frota" text="Carregando a frota…" /> : null}
                   {frotaVisivel.map((veiculo, index) => (
                     <FrotaRow key={veiculo.id} veiculo={veiculo} situacao={situacoes.get(veiculo.id)} index={index} busy={busy}
                       onSolicitar={() => askSolicitar(veiculo)}
@@ -602,7 +603,7 @@ export function GestaoChecklists() {
                   </div>
                   <div className="chk-head" aria-hidden="true"><span>Veículo</span><span>Motorista</span><span>Data</span><span>Situação</span><span /></div>
                   <div role="list">
-                    {loading ? [0, 1, 2].map((index) => <span key={index} className="gestao-row-skeleton" aria-hidden="true" />) : null}
+                    {loading ? <BrandLoader variant="inline" size="md" label="Carregando checklists" text="Carregando checklists…" /> : null}
                     {chkVisiveis.map((item, index) => {
                       const estado = estadoLabel(item);
                       const selected = selectedChk?.id === item.id;
@@ -641,7 +642,7 @@ export function GestaoChecklists() {
                 {modelos.length > 1 ? <p className="gestao-hint mod-ordem-ajuda">Quando um veículo se encaixa em dois modelos, vale o que está mais acima. Use Subir e Descer para mudar a ordem; o padrão fica sempre por último.</p> : null}
                 <div className="mod-head" aria-hidden="true"><span>Modelo</span><span>Itens</span><span>Periodicidade</span><span>Situação</span><span /></div>
                 <div role="list">
-                  {loading ? [0, 1].map((index) => <span key={index} className="gestao-row-skeleton" aria-hidden="true" />) : null}
+                  {loading ? <BrandLoader variant="inline" size="md" label="Carregando modelos" text="Carregando modelos…" /> : null}
                   {linhasModelos.map(({ modelo, padrao: ehOPadrao, recebe }, index) => (
                     <div key={modelo.id} role="listitem" className={`mod-row-wrap ${ehOPadrao ? "" : "has-ordem"}`}>
                       <button type="button" className="mod-row" data-foco={`modelo-${modelo.id}`} disabled={busy} style={{ "--i": index } as CSSProperties} onClick={() => startEdit(modelo, `modelo-${modelo.id}`)}>

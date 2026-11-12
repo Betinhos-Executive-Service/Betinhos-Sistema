@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Alert, Button, Drawer, Sheet } from '@betinhos/ui'
 import { Copy, MessageCircle, UserRound } from 'lucide-react'
 import { temDadosCadastrados, validadeTexto, whatsappCadastroHref, type PassageiroCadastro } from '../domain/linkCadastro'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 export type LinkCadastroRequest = { codigo: string; loading: boolean; link?: string; expiraEm?: string; passageiros?: PassageiroCadastro[]; erro?: string }
 
@@ -22,7 +23,7 @@ export function LinkCadastroDrawer({ request, mobile, onClose, onCopied, onCopyF
   const eyebrow = shown?.codigo
   const body = (
     <div className="gr-lc" aria-busy={shown?.loading || undefined}>
-      {shown?.loading ? <p role="status">Gerando o link…</p> : null}
+      {shown?.loading ? <BrandLoader variant="inline" size="md" label="Gerando o link" text="Gerando o link…" /> : null}
       {shown?.erro ? <Alert tone="danger">{shown.erro}</Alert> : null}
       {shown?.link ? <>
         <p className="gr-lc__link">{shown.link}</p>

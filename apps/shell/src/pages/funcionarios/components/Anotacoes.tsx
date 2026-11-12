@@ -333,7 +333,7 @@ function Anexo({ anexo }: { anexo: AnexoInfo }) {
     <div className="note-attachment-block">
       {imagem && (
         <button type="button" className="note-attachment-preview" onClick={() => void obter(true)} aria-label={`Abrir imagem ${anexo.nome}`}>
-          {preview ? <img src={preview} alt={anexo.nome} /> : <span className="bt-skeleton note-attachment-sk" aria-hidden />}
+          {preview ? <img src={preview} alt={anexo.nome} /> : <span className="note-attachment-sk"><Spinner size={20} label={`Carregando ${anexo.nome}`} /></span>}
         </button>
       )}
       <div className="note-attachment">

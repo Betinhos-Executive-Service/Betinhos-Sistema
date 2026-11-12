@@ -19,6 +19,7 @@ import {
   type Operador,
   type VeiculoFiltro
 } from "../domain/filtroVeiculo";
+import { BrandLoader } from "../../../../app/BrandLoader";
 
 export type EstadoVeiculos = "carregando" | "erro" | "pronto";
 
@@ -226,9 +227,8 @@ function Previa({ estado, onTentar, vazio, previa, inativo }: {
 }) {
   if (estado === "carregando") {
     return (
-      <div className="mod-previa-filtro" aria-busy="true">
-        <p className="gestao-hint" role="status">Carregando os veículos…</p>
-        {[0, 1, 2].map((index) => <span key={index} className="gestao-row-skeleton" aria-hidden="true" />)}
+      <div className="mod-previa-filtro">
+        <BrandLoader variant="inline" size="sm" label="Carregando os veículos" text="Carregando os veículos…" />
       </div>
     );
   }

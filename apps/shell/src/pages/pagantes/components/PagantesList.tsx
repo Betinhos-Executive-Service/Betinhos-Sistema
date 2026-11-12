@@ -65,7 +65,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   return (
     // Com seleção, o clique na linha seleciona (DS) e o duplo clique abre a ficha.
     <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pagantes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

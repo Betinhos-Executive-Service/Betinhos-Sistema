@@ -48,6 +48,8 @@
 .gr-table .bt-table__row { min-height: var(--gr-row-height); user-select: none; -webkit-user-select: none; }
 /* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
 .gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
+/* Primeira carga: uma linha só com o loader, na largura visível (sem as colunas). */
+.gr-table .bt-table__row.gr-table__loading { display: block; min-width: 0; content-visibility: visible; }
 /* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
 .gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
@@ -268,7 +270,6 @@
 .gr-ct { display: grid; gap: var(--bt-space-3); }
 .gr-ct__nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
 .gr-ct__updated { flex: 1 1 auto; min-width: 0; text-align: right; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.gr-ct__loading { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
 .gr-ct__list, .gr-ct__routes { list-style: none; margin: 0; padding: 0; }
 .gr-ct__item { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3) 0; border-bottom: 1px solid var(--bt-color-border); }
 .gr-ct__row { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); }
