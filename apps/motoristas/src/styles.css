@@ -14029,54 +14029,74 @@ select,
   border: 0; border-radius: 12px; background: #001a3d; color: #ffffff; font: 800 15px "Manrope", Arial, sans-serif; cursor: pointer;
 }
 @media (prefers-reduced-motion: reduce) { .passenger-sheet { animation: none; } }
-/* Menu inicial compacto: pendências no topo e grade 3 colunas */
-.concept-shell > .concept-module-card--primary { width: 100%; margin-bottom: 12px; }
+/* Menu inicial compacto: saudação numa linha, próximo serviço dentro do card Serviços,
+   pendências em chips e grade 3 colunas que cabe em telas baixas (360×640 sem rolar). */
+.concept-shell { display: flex; flex-direction: column; gap: 10px; padding-top: 12px !important; }
+.concept-shell > * { flex-shrink: 0; margin-top: 0; margin-bottom: 0; }
 
-.concept-pending {
+.concept-topbar { margin: 0; padding: 0; gap: 12px; }
+.concept-topbar h1 { font-size: 1.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.concept-topbar .concept-kicker { display: inline; margin: 0; color: #687789; font-size: inherit; font-weight: 600; text-transform: none; }
+.concept-avatar { width: 34px; height: 34px; }
+
+.concept-shell > .concept-module-card--primary { width: 100%; min-height: 76px; padding: 12px; }
+.concept-module-card--primary .concept-module-text { gap: 3px; }
+.concept-module-card--primary .concept-inline-count { font-weight: 700; color: rgba(255, 255, 255, 0.72); }
+.concept-module-card--primary .concept-next-service {
   display: grid;
-  margin-bottom: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 14, 35, 0.08);
-  border-radius: 16px;
-  background: #ffffff;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
+.concept-module-card--primary .concept-next-service::after { content: none; }
+.concept-module-card--primary .concept-next-eyebrow { color: rgba(255, 255, 255, 0.82); font-size: 0.86rem; font-weight: 650; text-transform: none; }
+.concept-module-card--primary .concept-next-eyebrow b { color: #ffffff; font-weight: 850; }
+.concept-module-card--primary .concept-next-service small { max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem; }
+
+.concept-pending { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .concept-pending-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 0;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 12px 0 10px;
+  border: 1px solid rgba(0, 14, 35, 0.1);
+  border-radius: 999px;
   color: #000e23;
-  background: transparent;
+  background: #ffffff;
   font: inherit;
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1.3;
-  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 750;
+  line-height: 1.2;
   cursor: pointer;
 }
 
-.concept-pending-row + .concept-pending-row { border-top: 1px solid rgba(0, 14, 35, 0.06); }
-.concept-pending-row:active { background: #fcfcfb; }
-.concept-pending-dot { width: 8px; height: 8px; border-radius: 50%; background: #2159d2; }
-.concept-pending-chevron { color: #6b7788; font-size: 1.2rem; line-height: 1; }
+.concept-pending-row:active { background: #f3f4f6; }
+.concept-pending-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.concept-pending-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #2159d2; }
 
-/* A grade ocupa a sobra da tela: linhas de no mínimo 84px, até 132px em aparelhos altos; o ícone acompanha a altura do bloco (cqh). */
-.concept-shell { display: flex; flex-direction: column; }
-.concept-shell > * { flex-shrink: 0; }
-
+/* A grade ocupa a sobra da tela: linhas de 68–84px no mínimo (conforme a altura), até 132px em aparelhos altos; o ícone acompanha o bloco (cqh). */
 .concept-tile-grid {
   display: grid;
-  flex: 1 0 0;
-  min-height: calc(3 * 84px + 2 * 8px);
-  max-height: calc(3 * 132px + 2 * 12px);
+  flex: 1 0 auto;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(84px, 1fr);
-  gap: clamp(8px, 1.4dvh, 12px);
+  max-height: calc(4 * 132px + 3 * 12px);
+  grid-auto-rows: minmax(clamp(66px, 10.5dvh, 84px), 1fr);
+  gap: clamp(6px, 1.2dvh, 12px);
+}
+
+.concept-footer { margin-top: 8px; }
+
+/* Celular deitado: aproveita a largura com 5 colunas. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .concept-shell { max-width: 760px; margin: 0 auto; }
+  .concept-tile-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 72px; }
 }
 
 .concept-tile {

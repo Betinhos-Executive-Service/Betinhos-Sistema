@@ -443,11 +443,11 @@ export function InitialScreen(props: InitialScreenProps) {
   const gridModules = modules.filter((module) => module.id !== "services");
   const multasPrazo = props.multasBanner?.split(" · ")[1];
   const pendingTypes = [
-    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
-    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
-    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
-    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
-    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `Gastos do cartão · ${n} para completar` },
+    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)}` },
+    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)}${multasPrazo ? ` · ${multasPrazo.replace(/^prazo /, "")}` : ""}` },
+    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)}` },
+    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)}` },
+    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `${n} gasto${plural(n)} a completar` },
   ];
   const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id === "gastosCartao" ? "expenses" : type.id, type.count]));
   const pendencias = pendingTypes
@@ -492,20 +492,9 @@ export function InitialScreen(props: InitialScreenProps) {
     <PullToRefresh className="pull-refresh--home" scrollRef={shellRef} onRefresh={props.onRefresh ?? (() => window.location.reload())}>
     <main ref={shellRef} className="concept-shell">
       <header className="concept-topbar">
-        <div>
-          <span className="concept-kicker">Olá,</span>
-          <h1>{driverName}</h1>
-        </div>
+        <h1><span className="concept-kicker">Olá,</span> {driverName}</h1>
         <img className="concept-avatar" src={betinhosLogo} alt="Betinhos" />
       </header>
-
-      {nextServiceDate && (
-        <button className="concept-next-service" type="button" onClick={() => navigateTo("services")}>
-          <span className="concept-next-eyebrow">Próximo serviço em</span>
-          <strong>{formatTimeUntil(nextServiceDate, now)}</strong>
-          <small>{nextService?.item?.description ?? "Abrir agenda"}</small>
-        </button>
-      )}
 
       {servicesModule && (
         <button
@@ -520,11 +509,18 @@ export function InitialScreen(props: InitialScreenProps) {
             <ModuleIcon name={servicesModule.icon} />
           </span>
           <span className="concept-module-text">
-            <strong>{servicesModule.label}</strong>
-            <small>
-              {servicesModule.detail}
-              {agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
-            </small>
+            <strong>
+              {servicesModule.label}
+              {agendaCount > 0 ? <span className="concept-inline-count"> · {agendaCount} hoje</span> : null}
+            </strong>
+            {nextServiceDate ? (
+              <span className="concept-next-service">
+                <span className="concept-next-eyebrow">Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></span>
+                {nextService?.item?.description ? <small>{nextService.item.description}</small> : null}
+              </span>
+            ) : (
+              <small>{servicesModule.detail}</small>
+            )}
           </span>
         </button>
       )}
@@ -535,7 +531,6 @@ export function InitialScreen(props: InitialScreenProps) {
             <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
               <span className="concept-pending-dot" aria-hidden="true" />
               <span className="concept-pending-text">{item.text}</span>
-              <span className="concept-pending-chevron" aria-hidden="true">›</span>
             </button>
           ))}
         </section>

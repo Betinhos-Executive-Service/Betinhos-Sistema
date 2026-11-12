@@ -36,16 +36,16 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Se o nome estiver errado, avise a operação."
       ], { target: ".concept-topbar" }),
       step("proximo-servico", "Próximo serviço em", [
-        "A contagem regressiva até o horário do seu próximo serviço, com o trajeto logo abaixo.",
+        "Dentro do botão Serviços: a contagem regressiva até o horário do seu próximo serviço, com o trajeto logo abaixo.",
         "Ela se atualiza sozinha a cada minuto e some quando não há serviço futuro. Tocar abre a lista de Serviços."
       ], { target: ".concept-next-service", optional: true }),
       step("servicos", "Serviços", [
-        "É o coração do app: a sua agenda. O número ao lado de \"Corridas de hoje\" é quantos serviços de hoje estão com você.",
+        "É o coração do app: a sua agenda. O número ao lado de \"Serviços\" é quantos serviços de hoje estão com você.",
         "Toque aqui para ver cada serviço, abrir o detalhe e registrar todas as etapas até a finalização."
       ], { target: dt("servicos") }),
       step("pendencias", "Pendências", [
         "Avisos do que está esperando por você: checklists pendentes, multas para assinar (com o prazo) e comunicados para ler.",
-        "Cada linha abre direto a tela certa. Quando você resolve tudo, a área desaparece."
+        "Cada etiqueta abre direto a tela certa. Quando você resolve tudo, a área desaparece."
       ], { target: ".concept-pending", optional: true }),
       step("modulos", "Os módulos do app", [
         "Cada botão desta grade abre uma área do app. Um número no ícone mostra quantos itens estão pendentes ali.",
