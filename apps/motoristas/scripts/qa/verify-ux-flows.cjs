@@ -96,7 +96,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
 
   if (GROUPS.has("servicos")) {
     // Voltar do celular volta uma tela por vez.
-    await page.getByRole("button", { name: /Corridas de hoje/ }).click();
+    await page.locator('[data-tour="servicos"]').click();
     await page.waitForTimeout(800);
     await main().getByRole("button", { name: /Base Betinhos/ }).last().click();
     await page.waitForTimeout(900);
@@ -111,7 +111,7 @@ const check = (name, ok, extra = "") => results.push(`${ok ? "OK  " : "FAIL"} ${
     check("Voltar do celular: Serviços -> Início sem sair do app", back2 === "#inicio" && page.url().includes("webresource-app-motoristas"), back2);
 
     // Detalhe do serviço: alvos de toque, contato do passageiro e dica de rolagem.
-    await page.getByRole("button", { name: /Corridas de hoje/ }).click();
+    await page.locator('[data-tour="servicos"]').click();
     await page.waitForTimeout(800);
     await main().getByRole("button", { name: /Base Betinhos/ }).last().click();
     await page.waitForTimeout(1000);

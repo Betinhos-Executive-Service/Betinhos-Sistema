@@ -306,18 +306,15 @@ function formatTimeUntil(date: Date, now: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}min`;
 }
 
-function getNextServiceItem(props: InitialScreenProps, now: number) {
+function getNextServiceDate(props: InitialScreenProps, now: number) {
   const directDate = getServiceDate(props.nextServiceAt ?? props.proximoServicoEm);
-  if (directDate) return { date: directDate, item: null };
+  if (directDate) return directDate;
 
   const serviceDates = filterAgendaGalleryItems(props.services ?? [], now)
     .filter((service) => service.tipo !== "HEADER" && !service.canceled && service.detail)
-    .map((item) => {
-      const date = resolveAgendaDate(item, now);
-      return { item, date };
-    })
-    .filter((service): service is { item: AgendaItem; date: Date } => Boolean(service.date))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .map((item) => resolveAgendaDate(item, now))
+    .filter((date): date is Date => Boolean(date))
+    .sort((a, b) => a.getTime() - b.getTime());
 
   return serviceDates[0] ?? null;
 }
@@ -419,8 +416,7 @@ export function InitialScreen(props: InitialScreenProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const driverName = getFirstName(props.driverName ?? props.motoristaNome);
-  const nextService = useMemo(() => getNextServiceItem(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
-  const nextServiceDate = nextService?.date ?? null;
+  const nextServiceDate = useMemo(() => getNextServiceDate(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
   const agendaCount = useMemo(() => getTodayAgendaCount(props.services, now), [now, props.services]);
   const modules = useMemo(
     () => baseModules.concat(
@@ -510,7 +506,7 @@ export function InitialScreen(props: InitialScreenProps) {
           </span>
           <span className="concept-module-text">
             <strong>{servicesModule.label}</strong>
-            <small className={nextServiceDate ? "concept-next-service" : undefined}>
+            <small className={nextServiceDate ? "concept-next" : undefined}>
               {nextServiceDate
                 ? <>Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></>
                 : agendaCount > 0 ? `${agendaCount} hoje` : servicesModule.detail}
