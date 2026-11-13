@@ -2,7 +2,6 @@ import { mimeDoArquivo, type Arquivo, type Comprovante } from './arquivo'
 
 const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
 
-/** Cupom desenhado em SVG (imagem) ou PDF mínimo, como data URL: o mock não depende de blob. */
 /** Conteúdo fictício gerado no navegador (cupom em SVG ou PDF mínimo), sem link nem dado real. */
 export function createMockArquivo(anexo: Comprovante): Arquivo {
   // Como o flow, devolve o nome do OneDrive (com extensão) mesmo quando o Dataverse gravou sem.

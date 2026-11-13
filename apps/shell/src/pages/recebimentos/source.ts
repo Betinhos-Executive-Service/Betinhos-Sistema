@@ -19,9 +19,8 @@ export type RecebimentosSource = {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 function createMock(): RecebimentosSource {
-  const carregar = async (ids: string[]) => { await wait(250); return ids.flatMap(mockRecebimentos) }
   return {
-    carregar,
+    carregar: async (ids) => { await wait(250); return ids.flatMap(mockRecebimentos) },
     contar: async (ids) => new Map(ids.map((id) => [id.toLowerCase(), mockRecebimentos(id).length] as const).filter(([, n]) => n > 0)),
     async arquivo(r) {
       await wait(400)

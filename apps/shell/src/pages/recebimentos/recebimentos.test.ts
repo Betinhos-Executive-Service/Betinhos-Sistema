@@ -25,7 +25,7 @@ describe('recebimentos: domínio', () => {
 
   it('agrupa por serviço na ordem da ficha e deixa de fora o serviço sem comprovante', () => {
     const servicos = [{ id: ID(2).toUpperCase() }, { id: ID(3) }, { id: ID(1) }]
-    const grupos = agruparPorServico(servicos, [rec({ id: 'x', reservaId: ID(1), ordem: 2 }), rec({ id: 'y', reservaId: ID(1), ordem: 1 }), rec({ id: 'z', reservaId: ID(2) })])
+    const grupos = agruparPorServico(servicos, ordenar([rec({ id: 'x', reservaId: ID(1), ordem: 2 }), rec({ id: 'y', reservaId: ID(1), ordem: 1 }), rec({ id: 'z', reservaId: ID(2) })]))
     expect(grupos.map((g) => [g.servico.id.toLowerCase(), g.comprovantes.map((r) => r.id)])).toEqual([[ID(2), ['z']], [ID(1), ['y', 'x']]])
   })
 

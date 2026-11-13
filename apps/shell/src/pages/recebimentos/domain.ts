@@ -16,12 +16,10 @@ export function ordenar(lista: Recebimento[]) {
   return [...lista].sort((a, b) => ordem(a) - ordem(b) || (a.enviadoEm?.getTime() ?? 0) - (b.enviadoEm?.getTime() ?? 0))
 }
 
-/** Um grupo por serviço, na ordem dos serviços recebida; serviço sem comprovante fica de fora. */
+/** Um grupo por serviço, na ordem dos serviços recebida e mantendo a ordem da lista (passe já ordenada); serviço sem comprovante fica de fora. */
 export function agruparPorServico<S extends { id: string }>(servicos: S[], lista: Recebimento[]) {
-  const porReserva = new Map<string, Recebimento[]>()
-  for (const r of lista) porReserva.set(r.reservaId, [...(porReserva.get(r.reservaId) ?? []), r])
   return servicos
-    .map((servico) => ({ servico, comprovantes: ordenar(porReserva.get(servico.id.toLowerCase()) ?? []) }))
+    .map((servico) => ({ servico, comprovantes: lista.filter((r) => r.reservaId === servico.id.toLowerCase()) }))
     .filter((grupo) => grupo.comprovantes.length > 0)
 }
 

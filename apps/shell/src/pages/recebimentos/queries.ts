@@ -1,8 +1,7 @@
 import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import type { Recebimento } from './domain'
 
-/** Confirmado na metadata do DEV em 13/11/2026. */
-export const ENTITY = 'cr40f_anexorecebimento_v2'
+/** cr40f_anexorecebimento_v2, confirmado na metadata do DEV em 13/11/2026. */
 export const ENTITY_SET = 'cr40f_anexorecebimento_v2s'
 const MIDIA_VIDEO = 100000001
 const SELECT = 'cr40f_anexorecebimento_v2id,cr40f_nome,cr40f_nomearquivo,cr40f_sharelink,cr40f_urlsharepoint,cr40f_dataenvio,cr40f_ordem,cr40f_tipomidia,_cr40f_reserva_value,_cr40f_enviadopor_value'

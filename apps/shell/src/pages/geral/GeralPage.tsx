@@ -14,6 +14,7 @@ import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { recebimentosSource } from '../recebimentos/source'
+import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
 import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
@@ -420,21 +421,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       () => novos.forEach((id) => portalAsked.current.delete(id)),
     )
   }, [portal, portalVisible, rows, portalSeq])
-  // Comprovantes de recebimento: contagem das linhas carregadas, sem bloquear a lista; falha só esconde o indicador.
   const recebimentos = recebimentosSource(host)
-  const [contagem, setContagem] = useState<Map<string, number>>(new Map())
+  const contagem = useContagemRecebimentos(recebimentos, useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows]))
   const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
-  // Já contados: cada página nova consulta só as linhas que chegaram; falha tira do cache para a próxima mudança tentar de novo.
-  const contados = useRef(new Set<string>())
-  useEffect(() => {
-    const novos = rows.map((r) => String(r[ID_ATTRIBUTE]).toLowerCase()).filter((id) => !contados.current.has(id))
-    if (!novos.length) return
-    novos.forEach((id) => contados.current.add(id))
-    recebimentos.contar(novos).then(
-      (found) => setContagem((cur) => { const next = new Map(cur); for (const id of novos) { const n = found.get(id); if (n) next.set(id, n); else next.delete(id) } return next }),
-      () => novos.forEach((id) => contados.current.delete(id)),
-    )
-  }, [recebimentos, rows])
   const besideId = (id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
