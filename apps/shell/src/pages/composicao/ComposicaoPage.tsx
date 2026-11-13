@@ -182,10 +182,13 @@ function queryShapeKey(definition: ViewDefinition) {
   return JSON.stringify([definition.columns.map(({ id }) => id), definition.filters, definition.filterGroups, definition.groupOperator, definition.sort])
 }
 
+/** Rótulo das colunas da visão padrão que não são fixas do código (o nome lógico não aparece para o usuário). */
+const PROVISIONAL_LABELS: Record<string, string> = { new_status: 'Status' }
+
 /** Rótulo provisório de coluna ligada enquanto a metadata não chega: só o trecho depois do último ponto. */
 function provisionalField(id: string): CatalogField {
   const name = id.slice(id.lastIndexOf('.') + 1)
-  return { id, label: name, table: COMPOSITION_TABLE, attribute: name, path: [], type: 'String', available: true } as CatalogField
+  return { id, label: PROVISIONAL_LABELS[id] ?? name, table: COMPOSITION_TABLE, attribute: name, path: [], type: 'String', available: true } as CatalogField
 }
 
 function ComposicaoContent({ host }: { host: Host }) {
