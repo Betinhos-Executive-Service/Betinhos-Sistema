@@ -1,4 +1,5 @@
 import type { StatusTone } from '@betinhos/ui'
+import type { Row } from '@betinhos/dataverse'
 import type { AttributeInfo, CellKind, Column } from './types'
 
 /** Nunca editáveis na célula: identificação, auditoria, campos VIEW gerados por flow e voucher. */
@@ -71,4 +72,21 @@ export function tipoVariant(label: string): number {
 export function choiceColor(info: AttributeInfo | undefined, value: unknown): string | null {
   if (typeof value !== 'number') return null
   return info?.options.find((option) => option.value === value)?.color ?? null
+}
+
+const LOOKUP_TYPES = new Set(['Lookup', 'Customer', 'Owner'])
+const GUID = /^\{?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\}?$/i
+
+/**
+ * Registro apontado por uma célula de lookup: id pelo valor e tabela pela anotação da linha ou, sem ela (a Geral não pede
+ * `lookuplogicalname`, ver o client), pelo único alvo da metadata. Lookup com mais de um alvo sem anotação fica sem link.
+ */
+export function lookupTarget(row: Row, key: string, info: AttributeInfo | undefined): { table: string; id: string } | null {
+  if (!info || !LOOKUP_TYPES.has(info.type)) return null
+  const raw = row[key]
+  const id = typeof raw === 'string' ? GUID.exec(raw)?.[1] : undefined
+  if (!id) return null
+  const annotated = row[`${key}@Microsoft.Dynamics.CRM.lookuplogicalname`]
+  const table = typeof annotated === 'string' && annotated ? annotated : info.targets.length === 1 ? info.targets[0] : null
+  return table ? { table, id } : null
 }
