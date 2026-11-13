@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Spinner } from '@betinhos/ui'
 import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, RefreshCw, Video, X } from 'lucide-react'
 import { useQueryId } from '../../nav/queryState'
@@ -92,10 +92,12 @@ type Props<T extends Comprovante> = {
   meta?: (anexo: T) => string
   /** Selo do cartão (ex.: status do envio). */
   selo?: (anexo: T) => ReactNode
+  /** Grupo do cartão (ex.: serviço da OP): anexos seguidos com a mesma chave ficam sob um título. O visualizador navega por todos. */
+  grupo?: (anexo: T) => { chave: string; titulo: ReactNode }
 }
 
 /** Cartões com miniatura; clicar abre o visualizador. Sem arquivo no OneDrive, só o aviso. */
-export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo }: Props<T>) {
+export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo, grupo }: Props<T>) {
   // A galeria só repassa a `ler` os próprios anexos (do tipo T), então o alargamento é seguro.
   const ler = lerAnexo as Ler
   const visiveis = anexos.filter(temArquivo)
@@ -106,10 +108,21 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
   const setAberto = (indice: number | null) => setAbertoId(indice == null ? null : visiveis[indice]?.id ?? null)
   // Retângulo da miniatura clicada: o visualizador cresce a partir dela.
   const origem = useRef<DOMRect | null>(null)
+  // Blocos de anexos seguidos do mesmo grupo; sem `grupo`, um bloco só, sem título.
+  const blocos: { chave: string; titulo: ReactNode; itens: T[] }[] = []
+  for (const a of anexos) {
+    const g = grupo?.(a) ?? { chave: '', titulo: null }
+    const ultimo = blocos[blocos.length - 1]
+    if (ultimo && ultimo.chave === g.chave) ultimo.itens.push(a)
+    else blocos.push({ ...g, itens: [a] })
+  }
   return (
     <>
+      {blocos.map((bloco) => (
+      <Fragment key={bloco.chave}>
+      {bloco.titulo ? <h4 className="cmp-grupo">{bloco.titulo}</h4> : null}
       <ul className="cmp-comprovantes">
-        {anexos.map((a) => {
+        {bloco.itens.map((a) => {
           const indice = visiveis.indexOf(a)
           const meta = metaDe?.(a) ?? ''
           return (
@@ -127,6 +140,8 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
           )
         })}
       </ul>
+      </Fragment>
+      ))}
       <Visualizador anexos={visiveis} indice={aberto} onChange={setAberto} ler={ler} origem={origem} />
     </>
   )

@@ -66,3 +66,5 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
 }
 .cmp-num { font-variant-numeric: tabular-nums; }
 .cmp-vazio { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.cmp-grupo { margin: var(--bt-space-2) 0 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.cmp-grupo:first-child { margin-top: 0; }

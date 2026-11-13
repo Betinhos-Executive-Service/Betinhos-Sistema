@@ -23,6 +23,7 @@ function source(valorAtual: number): Source {
       servicos: async () => [servico(1, 1390), servico(2, 490), servico(3, 490), servico(4, 490), servico(5, 1390)],
       choices: async () => ({ status: [], forma: [] }),
       contatos: async () => new Map(),
+      recebimentos: { carregar: async () => [], contar: async () => new Map(), arquivo: async () => { throw new Error('sem arquivo') } },
     },
   } as unknown as Source
 }

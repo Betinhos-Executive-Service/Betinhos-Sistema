@@ -27,7 +27,7 @@ export type Source = {
   /** Valor atual da OP, relido ao abrir a ficha: o plugin soma os serviços um a um logo depois de criar a OP. */
   valor: (id: string) => Promise<number | null>
   cancel: (id: string) => Promise<void>
-  pagantes: Pick<PagantesSource, 'rateio' | 'servicos' | 'contatos' | 'choices' | 'gerarPagantesUrl'>
+  pagantes: Pick<PagantesSource, 'rateio' | 'servicos' | 'contatos' | 'choices' | 'gerarPagantesUrl' | 'recebimentos'>
   kv: KV
 }
 
