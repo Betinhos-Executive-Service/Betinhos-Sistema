@@ -65,3 +65,4 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
   .cmp-viewer { width: 100vw; height: 100dvh; border-radius: 0; }
 }
 .cmp-num { font-variant-numeric: tabular-nums; }
+.cmp-vazio { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }

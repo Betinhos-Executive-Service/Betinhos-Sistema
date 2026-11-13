@@ -293,3 +293,8 @@
 /* Cor real da choice (--gr-choice = hex do Dataverse) como no model-driven: fundo cheio (70% da cor) e texto quase preto
    puxado para a cor. */
 .gr-choice { background: color-mix(in srgb, var(--gr-choice) 70%, white); color: color-mix(in srgb, var(--gr-choice) 15%, black); box-shadow: none; }
+.gr-sheet__comprovantes { display: grid; gap: var(--bt-space-2); padding-top: var(--bt-space-3); border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-sheet__comprovantes h3 { margin: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+/* No celular, dois comprovantes por linha: os 4 de um serviço cabem sem rolar a ficha inteira. */
+.gr-sheet__comprovantes .cmp-comprovantes { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.gr-sheet__comprovantes .cmp-comprovante__previa { height: 120px; }

@@ -13,6 +13,7 @@ import type { Protecao } from './domain/protecao'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
+import { recebimentosSource } from '../recebimentos/source'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
@@ -636,6 +637,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
             onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
             search={(column, text) => source.search(column.attribute, text)}
+            recebimentos={recebimentosSource(host)}
           />
         ) : null}
         <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />

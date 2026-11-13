@@ -79,6 +79,7 @@ Cada tarefa termina com typecheck e testes da área verdes. Os commits são pequ
 
 ### T5. Seção na ficha do Geral
 - Em `GeralSheet.tsx`, a seção "Comprovantes de recebimento" com a galeria. Carrega ao abrir a linha e mostra o estado vazio quando não há comprovante.
+- O `GeralSheet` só existe no modo cartões; na tabela, abrir o serviço vai ao Formulário Geral. Decidido com o Renan em 13/11/2026: o indicador da T7 vira botão nas duas visões e abre um drawer "Comprovantes do serviço" com a mesma galeria.
 
 ### T6. Seções na OP e no Pagante
 - `OpDrawer.tsx`: `Section` "Comprovantes de recebimento" com o resumo "N comprovantes · M serviços" e um grupo por serviço (cabeçalho com ID, data e destino), usando as reservas que a ficha já carrega.
@@ -86,7 +87,7 @@ Cada tarefa termina com typecheck e testes da área verdes. Os commits são pequ
 - Uma única galeria por ficha (o visualizador navega por todos), para "N de M" valer para a OP.
 
 ### T7. Contagem na lista do Geral
-- Ao carregar cada página, `contarPorReserva` dos ids visíveis (em blocos, sem bloquear a lista). `renderCell` da coluna de ID mostra o ícone `Banknote` (dinheiro, Lucide) com o número ao lado do ID e `aria-label="4 comprovantes de recebimento"`. Falha na contagem só esconde o indicador.
+- Ao carregar cada página, `contarPorReserva` dos ids visíveis (em blocos, sem bloquear a lista). `renderCell` da coluna de ID mostra o ícone `Banknote` (dinheiro, Lucide) com o número ao lado do ID e `aria-label="4 comprovantes de recebimento"`. Falha na contagem só esconde o indicador. O indicador é um botão e abre o drawer "Comprovantes do serviço" (tabela e cartões).
 
 ### T8. Qualidade e verificação
 - `qualidade-antes-do-pr`: `/simplify` (2–3 passadas), `karpathy-coder`, `/code-review high --fix`.
