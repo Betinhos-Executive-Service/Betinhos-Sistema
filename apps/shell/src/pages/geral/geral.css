@@ -300,8 +300,8 @@
 .gr-sheet__comprovantes .cmp-comprovante__previa { height: 120px; }
 
 /* Indicador de comprovantes de recebimento ao lado do ID (abre o drawer do serviço). */
-.gr-recebimentos { display: inline-flex; align-items: center; gap: 3px; flex: none; padding: 1px 6px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background: var(--bt-color-surface); color: var(--bt-color-text-secondary); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 18px; cursor: pointer; transition: color 120ms ease-out, border-color 120ms ease-out; }
-.gr-recebimentos:hover { color: var(--bt-color-brand); border-color: var(--bt-color-brand); }
+.gr-recebimentos { display: inline-flex; align-items: center; gap: 3px; flex: none; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--bt-color-success) 30%, transparent); border-radius: var(--bt-radius-full); background: var(--bt-color-success-soft); color: var(--bt-color-success); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 18px; cursor: pointer; transition: color 120ms ease-out, border-color 120ms ease-out; }
+.gr-recebimentos:hover { border-color: var(--bt-color-success); }
 .gr-recebimentos:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .gr-recebimentos:active { transform: scale(.97); }
 @media (pointer: coarse) { .gr-recebimentos { min-height: 32px; padding: 0 10px; } }
