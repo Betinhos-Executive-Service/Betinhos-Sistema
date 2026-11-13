@@ -27,6 +27,7 @@ import { CompositionSaveQueue } from './data/composition-save-queue'
 import { matchesCompositionFilters, sumSelectedCompositions } from './data/composition-totals'
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './data/mock-views'
 import { withCalculatedTotals } from './data/composition-calculated'
+import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
 import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
@@ -185,9 +186,6 @@ function openColumnKeys(open: ViewDefinition, interpreted: ViewDefinition, catal
 function queryShapeKey(definition: ViewDefinition) {
   return JSON.stringify([definition.columns.map(({ id }) => id), definition.filters, definition.filterGroups, definition.groupOperator, definition.sort])
 }
-
-/** Rótulo das colunas da visão padrão que não são fixas do código (o nome lógico não aparece para o usuário). */
-const PROVISIONAL_LABELS: Record<string, string> = { new_status: 'Status' }
 
 /** Rótulo provisório de coluna ligada enquanto a metadata não chega: só o trecho depois do último ponto. */
 function provisionalField(id: string): CatalogField {

@@ -19,6 +19,8 @@ const FETCH = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="n
 const LAYOUT = '<grid name="resultset" object="1" jump="new_status" select="1" icon="1" preview="1"><row name="result" id="cr40f_composicaodeprecosid"><cell name="new_status" width="140"/></row></grid>'
 const view = { savedqueryid: 'vvvvvvvv-0000-4000-8000-000000000001', name: 'Padrão', description: '', fetchxml: FETCH, layoutxml: LAYOUT, querytype: 0, isdefault: true }
 const row = (id: string, extra: Record<string, unknown> = {}) => ({ cr40f_composicaodeprecosid: id, new_status: 1, [`new_status${F}`]: 'Aprovada', 'cmp_cli.cr40f_nomedocliente': `Cliente ${id.slice(0, 4)}`, versionnumber: 1, ...extra })
+/** Texto na grade: o painel de Colunas do DS fica montado mesmo fechado e repete os rótulos (`bt-choice__label`). */
+const gridText = (text: string) => screen.queryAllByText(text).filter((el) => !el.classList.contains('bt-choice__label'))
 const field = (id: string, label: string): CatalogField => ({ id, label, table: 'cr40f_composicaodeprecos', attribute: id, path: [], type: 'String', available: true, writable: true })
 
 type Handler = (entity: string, query: string, call: number) => unknown
@@ -173,7 +175,7 @@ it('cache de catálogo vencido é ignorado: abre igual e usa o catálogo da rede
 
   render(<ComposicaoPage host={host} />)
 
-  expect(await screen.findByText('Situação')).toBeTruthy()
+  await waitFor(() => expect(gridText('Situação')).toHaveLength(1))
   expect(screen.queryByText('Antigo')).toBeNull()
   expect(catalog.load).toHaveBeenCalledTimes(1)
 })
