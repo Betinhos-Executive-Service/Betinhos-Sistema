@@ -10,6 +10,8 @@ import { formatCell } from '../domain/format'
 import { columnLabel, rowKey } from '../domain/layout'
 import { ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellStatus, type Column, type LookupOption } from '../domain/types'
 import { useLookupSearch } from './useLookupSearch'
+import { ComprovantesRecebimento } from '../../recebimentos/ComprovantesRecebimento'
+import type { RecebimentosSource } from '../../recebimentos/source'
 
 type Props = {
   row: Row
@@ -24,6 +26,8 @@ type Props = {
   onSave: (column: Column, value: EditValue) => Promise<boolean>
   onReset: (column: Column) => void
   search: (column: Column, text: string) => Promise<LookupOption[]>
+  /** Comprovantes que o motorista enviou ao receber (só leitura). */
+  recebimentos: RecebimentosSource
 }
 
 type FieldProps = {
@@ -140,7 +144,7 @@ function SheetField({ row, column, info, status, onSave, onReset, search, onInva
 }
 
 /** Edição dos campos do serviço no celular: um campo por coluna editável da visão, gravado campo a campo. */
-export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search }: Props) {
+export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search, recebimentos }: Props) {
   const name = formatCell('readonly', row, 'cr40f_id')
   const [confirming, setConfirming] = useState(false)
   const invalid = useRef(new Set<string>())
@@ -192,6 +196,10 @@ export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose
               />
             )
           })}
+          <section className="gr-sheet__comprovantes" aria-labelledby="gr-sheet-comprovantes">
+            <h3 id="gr-sheet-comprovantes">Comprovantes de recebimento</h3>
+            <ComprovantesRecebimento source={recebimentos} reservaIds={[String(row[ID_ATTRIBUTE])]} />
+          </section>
         </div>
       </Sheet>
       <Dialog

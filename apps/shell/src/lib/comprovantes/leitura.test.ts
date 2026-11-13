@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
-import type { Anexo } from '../domain/types'
-import { createArquivos } from './arquivo'
+import type { Comprovante } from './arquivo'
+import { createArquivos, criarFila, MAX_BUSCAS } from './leitura'
 
-const anexo: Anexo = { id: 'a1', nome: 'cupom.jpg', tipo: 100000000, status: 100000001, url: null, driveItemId: 'DRIVE-1', enviadoEm: null, enviadoPor: '' }
+const anexo: Comprovante = { id: 'a1', nome: 'cupom.jpg', url: null, driveItemId: 'DRIVE-1' }
 const client = (url = 'https://flow.test/consultar') => ({ getAll: vi.fn(async (path: string) => (path.startsWith('environmentvariablevalues') ? [{ value: url }] : [])) }) as unknown as DataverseClient
 
 afterEach(() => vi.unstubAllGlobals())
@@ -56,7 +56,46 @@ describe('leitura do comprovante no OneDrive', () => {
   })
 
   it('sem arquivo no OneDrive ou sem variável configurada, explica o motivo', async () => {
-    await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('não tem o arquivo no OneDrive')
+    await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('ainda não tem o arquivo')
     await expect(createArquivos(client(''))(anexo)).rejects.toThrow('new_URLFlowConsultarArquivoOneDrive')
+  })
+
+  it('no máximo 4 buscas ao mesmo tempo; a 5ª espera uma terminar', async () => {
+    const respostas: (() => void)[] = []
+    const fetchMock = vi.fn(() => new Promise<Response>((ok) => respostas.push(() => ok(new Response(JSON.stringify({ sucesso: true, mimeType: 'image/jpeg', conteudoBase64: btoa('abc') }), { status: 200 })))))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:teste' }))
+    const ler = createArquivos(client())
+    const leituras = Array.from({ length: MAX_BUSCAS + 1 }, (_, i) => ler({ ...anexo, id: `a${i}` }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS)
+    respostas[0]()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS + 1))
+    respostas.slice(1).forEach((r) => r())
+    await Promise.all(leituras)
+  })
+
+  it('leitura que passa do tempo cai com mensagem clara e não fica em cache', async () => {
+    const fetchMock = vi.fn((_: string, init?: RequestInit) => new Promise<Response>((_ok, falha) => init?.signal?.addEventListener('abort', () => falha(new DOMException('aborted', 'AbortError')))))
+    vi.stubGlobal('fetch', fetchMock)
+    const ler = createArquivos(client(), 20)
+    await expect(ler(anexo)).rejects.toThrow('demorou mais de')
+    await expect(ler(anexo)).rejects.toThrow('demorou mais de')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('fila: a vaga passa direto para quem espera e a urgente fura a fila', async () => {
+    const fila = criarFila(1)
+    const ordem: string[] = []
+    let soltar = () => {}
+    const primeira = fila(() => new Promise<void>((ok) => { soltar = ok }))
+    const normal = fila(async () => { ordem.push('normal') })
+    const urgente = fila(async () => { ordem.push('urgente') }, true)
+    soltar()
+    // Quem chega logo depois de a vaga abrir não passa na frente de quem já esperava.
+    const atrasada = primeira.then(() => fila(async () => { ordem.push('atrasada') }))
+    await Promise.all([primeira, normal, urgente, atrasada])
+    expect(ordem).toEqual(['urgente', 'normal', 'atrasada'])
   })
 })

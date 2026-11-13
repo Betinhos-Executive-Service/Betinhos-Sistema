@@ -76,3 +76,16 @@
   .brand-loader { animation: none; }
   .brand-loader__ring { animation-duration: 2.4s; }
 }
+/* Registro abrindo por cima da lista (gaveta de lookup): só a marca, num cartão no meio da janela, sem véu e sem
+   bloquear a lista; a gaveta entra uma vez só, já com o registro. */
+.brand-loader--flutuante { position: fixed; z-index: 1000; pointer-events: none; }
+.brand-loader--flutuante::before { content: none; }
+.brand-loader--flutuante .brand-loader__card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 20px 24px;
+  border-radius: var(--bt-radius-lg, 12px);
+  background: var(--bt-color-surface, #fff);
+  box-shadow: 0 12px 32px rgba(0, 26, 61, 0.18);
+}

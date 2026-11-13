@@ -13,6 +13,9 @@ import type { Protecao } from './domain/protecao'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
+import { recebimentosSource } from '../recebimentos/source'
+import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
+import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
@@ -418,6 +421,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       () => novos.forEach((id) => portalAsked.current.delete(id)),
     )
   }, [portal, portalVisible, rows, portalSeq])
+  const recebimentos = recebimentosSource(host)
+  const contagem = useContagemRecebimentos(recebimentos, useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows]))
+  const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
+  const besideId = (id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -555,6 +562,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 selected={geral.selected}
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
+                besideId={besideId}
                 onEdit={setEditId}
                 onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
@@ -587,6 +595,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
+              besideId={besideId}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
               footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
@@ -636,8 +645,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
             onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
             search={(column, text) => source.search(column.attribute, text)}
+            recebimentos={recebimentos}
           />
         ) : null}
+        <ComprovantesServicoDrawer servico={comprovantesDe} source={recebimentos} mobile={mobile} onClose={() => setComprovantesDe(null)} />
         <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
         <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
           onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}

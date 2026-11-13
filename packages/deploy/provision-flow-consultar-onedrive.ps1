@@ -5,10 +5,11 @@
 # checklist, gravadas pelo App Motoristas), o link; devolve o conteúdo em base64, no mesmo formato do
 # "Flow - Consultar Arquivos Sharepoint" do Planner. Só lê arquivos dentro de /Despesas/ (comprovantes) ou de
 # /Checklists/ (fotos do checklist: Checklists/[DEV/]<placa>/<data> <id>, gravadas pelo "Flow Salvar Arquivos
-# Onedrive" na raiz do OneDrive do noreply, sem pasta raiz extra). Qualquer outra pasta recebe 403.
+# Onedrive" na raiz do OneDrive do noreply, sem pasta raiz extra) ou de /Recebimentos/ (comprovantes de recebimento do
+# App Motoristas: Recebimentos/[DEV/]<OS>). Qualquer outra pasta recebe 403.
 # Comprovantes novos (gravados no SharePoint do site BetinhosGestoInterna) chegam com origem = 'sharepoint' e
 # id = ItemId da biblioteca "Documentos Compartilhados": o ramo ViaSharePoint lê as propriedades do item
-# (GetFileItem), confere a pasta (Despesas ou Checklists) e devolve o conteúdo (GetFileContent). Sem origem, o ramo OneDrive
+# (GetFileItem), confere a pasta (Despesas, Checklists ou Recebimentos) e devolve o conteúdo (GetFileContent). Sem origem, o ramo OneDrive
 # de sempre (id b!… ou link) segue igual, no else.
 # Idempotente. Antes de alterar um flow existente, salva o clientdata em packages/deploy/flows/backup/. Para reverter:
 #   powershell -File packages/deploy/provision-flow-consultar-onedrive.ps1 -Restaurar <arquivo de backup>
@@ -140,7 +141,8 @@ $definitionText = @'
           "expression": { "and": [
             { "or": [
               { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/despesas/" ] },
-              { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/checklists/" ] }
+              { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/checklists/" ] },
+              { "contains": [ "@toLower(concat('/', string(body('PropriedadesSP')?['{Path}'])))", "/recebimentos/" ] }
             ] },
             { "not": { "equals": [ "@body('PropriedadesSP')?['{IsFolder}']", true ] } }
           ] },
@@ -223,7 +225,8 @@ $definitionText = @'
             "type": "If", "runAfter": { "Metadados": ["Succeeded"] },
             "expression": { "or": [
               { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/despesas/" ] },
-              { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/checklists/" ] }
+              { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/checklists/" ] },
+              { "startsWith": [ "@toLower(string(body('Metadados')?['Path']))", "/recebimentos/" ] }
             ] },
             "actions": {
               "Conteudo": {

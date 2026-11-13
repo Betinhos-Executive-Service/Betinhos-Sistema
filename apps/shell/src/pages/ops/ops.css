@@ -38,3 +38,6 @@
 .op-secao__body { display: grid; gap: var(--bt-space-2); padding: 0 var(--bt-space-3-5) var(--bt-space-3-5); }
 .op-secao__alerta { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
 @media (prefers-reduced-motion: reduce) { .op-secao__head h3::before { transition: none; } }
+
+/* Agrupada, o total sai da tabela e fica abaixo dos grupos. */
+.op-groups__total { padding: var(--bt-space-2) var(--bt-space-3); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }

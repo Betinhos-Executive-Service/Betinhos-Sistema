@@ -106,4 +106,38 @@ describe('Ordens de Pagamento', () => {
     await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
     expect(window.location.hash).not.toMatch(/[?&]status=/)
   })
+
+  it('Agrupar por status no painel Colunas: grupos começam fechados, abrem a tabela e o rodapé soma a lista', async () => {
+    window.location.hash = '#/ops'
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-401')
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    const painel = await screen.findByRole('dialog')
+    fireEvent.click(within(painel).getByRole('combobox', { name: 'Agrupar por' }))
+    fireEvent.click((await screen.findAllByText('Status')).find((el) => el.closest('[role="option"]'))!)
+    fireEvent.click(within(painel).getByRole('button', { name: 'Aplicar' }))
+
+    const grupo = await screen.findByRole('button', { name: /Pagamento Pendente/, expanded: false })
+    expect(screen.queryByText('OP-401')).toBeNull()
+    expect(screen.getByText(/OPs · /)).toBeTruthy()
+    fireEvent.click(grupo)
+    expect(grupo.getAttribute('aria-expanded')).toBe('true')
+    expect(grupo.closest('.bt-groups__group')!.querySelector('.bt-table__row')).toBeTruthy()
+
+    // O checkbox do cabeçalho de um grupo marca só aquele grupo (selection.scope).
+    const outro = document.querySelector<HTMLButtonElement>('.bt-groups__toggle[aria-expanded="false"]')!
+    fireEvent.click(outro)
+    const cabecalho = (toggle: HTMLElement) => within(toggle.closest<HTMLElement>('.bt-groups__group')!).getByRole('checkbox', { name: 'Selecionar linhas do grupo' }) as HTMLInputElement
+    const pendente = cabecalho(grupo)
+    const segundo = cabecalho(outro)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(true)
+    expect(segundo.checked).toBe(false)
+    expect(segundo.indeterminate).toBe(false)
+    // Desmarcar um grupo preserva a seleção feita no outro.
+    fireEvent.click(segundo)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(false)
+    expect(segundo.checked).toBe(true)
+  })
 })

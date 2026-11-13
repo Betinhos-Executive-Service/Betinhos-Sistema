@@ -1,6 +1,7 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
 import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
+import { recebimentosSource, type RecebimentosSource } from '../../recebimentos/source'
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import type { KV } from '../domain/filters'
@@ -24,6 +25,8 @@ export type Source = {
   /** Todos os pagantes ativos da OP (o rateio completo, sem limite de período). */
   rateio: (opId: string) => Promise<Pagante[]>
   servicos: (opId: string) => Promise<ServicoOp[]>
+  /** Comprovantes de recebimento dos serviços (fonte única por host, cache compartilhado). */
+  recebimentos: RecebimentosSource
   update: (id: string, payload: Row) => Promise<void>
   /** Abre o gerador de recibo do model-driven; `onRefresh` roda quando ele termina. */
   gerarRecibo: (ids: string[], onRefresh: () => void) => Promise<void>
@@ -49,7 +52,7 @@ export function browserKV(): KV {
   }
 }
 
-function createMockSource(): Source {
+function createMockSource(): Omit<Source, 'recebimentos'> {
   const now = new Date()
   const rows = createMockPagantes(now)
   return {
@@ -76,7 +79,7 @@ function createMockSource(): Source {
 }
 
 export function createSource(host: Host): Source {
-  if (host.mode === 'mock') return createMockSource()
+  if (host.mode === 'mock') return { ...createMockSource(), recebimentos: recebimentosSource(host) }
   let sets: Promise<EntitySets> | null = null
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => {
     const get = (name: string) => {
@@ -99,6 +102,7 @@ export function createSource(host: Host): Source {
       )
       return withFallback({ status, forma, recibo })
     },
+    recebimentos: recebimentosSource(host),
     contatos: async (ids) => loadContatos(host.client, (await entitySets()).pessoa, ids),
     rateio: async (opId) => loadPagantes(host.client, (await entitySets()).pagante, opFilter(opId)),
     servicos: async (opId) => loadServicos(host.client, await entitySets(), opId),
