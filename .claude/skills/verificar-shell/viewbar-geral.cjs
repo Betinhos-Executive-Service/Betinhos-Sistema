@@ -1,5 +1,5 @@
 // Linha de comando da Geral ou da Composição de Preço (a tela vem da rota: #/geral ou #/composicao; ViewBar com espaços nomeados, @betinhos/ui >= 1.26): uma linha, sem sobreposição, fixos parados com
-// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1), superfície com a altura e o topo do botão primário (>= 1.27.2), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
+// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1) nem faixa vazia no trecho da seleção (>= 1.32), superfície com a altura e o topo do botão primário (>= 1.27.2), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
 // verificar-viewbar-linha do repo do DS. Uso: node viewbar-geral.cjs http://localhost:36472/#/geral <pasta-de-saida> (ou .../#/composicao).
 // WIDTHS e COUNTS (lista separada por vírgula) trocam as larguras e as quantidades de marcados (ex.: prints).
 // Tela sem botão primário (Composição: Atualizar secundário em `primary`) só confere a superfície na altura do controle.
@@ -11,7 +11,7 @@ const path = require('path')
 const url = process.argv[2] || 'http://localhost:36472/#/geral'
 const out = process.argv[3] || '.'
 const list = (v, def) => (v ? v.split(',').map(Number) : def)
-const WIDTHS = list(process.env.WIDTHS, [390, 600, 820, 821, 1000, 1024, 1280, 1440, 1920])
+const WIDTHS = list(process.env.WIDTHS, [390, 600, 820, 821, 900, 1000, 1024, 1280, 1440, 1920])
 const COUNTS = list(process.env.COUNTS, [0, 1, 3])
 // Por tela: raiz da linha de comando, página e caixas de marcar linha (nunca a "Selecionar todas" do cabeçalho).
 const SCREENS = {
@@ -101,6 +101,18 @@ const measure = ({ root, primary }) => {
       if (gap > 4) gaps.push(`vão ${Math.round(gap)}px ${prev ? label(prev) : 'início'}→${next ? label(next) : 'fim'}`)
     }
     items.forEach((el, i) => { if (isSep(el) && (i === 0 || i === items.length - 1 || isSep(items[i - 1]) || isSep(items[i + 1]))) gaps.push(`fio solto (posição ${i})`) })
+    // Faixa vazia dentro do trecho da seleção (>= 1.32, como no medir.cjs do DS): o tingido abraça ✕, contador e ações;
+    // nada de espaço antes do primeiro item, depois do último nem entre itens além do gap do trecho.
+    const seg = surface.querySelector('.bt-viewbar__zone > .bt-selection')
+    if (seg && visible(seg)) {
+      const kids = [...seg.children].filter(visible).map((el) => el.getBoundingClientRect())
+      const gr = seg.getBoundingClientRect(), gs = getComputedStyle(seg), g = parseFloat(gs.columnGap) || 0
+      const ends = [{ right: gr.left + parseFloat(gs.paddingLeft) }, ...kids, { left: gr.right - parseFloat(gs.paddingRight) }]
+      for (let i = 0; i + 1 < ends.length; i += 1) {
+        const hole = ends[i + 1].left - ends[i].right - (i && i + 2 < ends.length ? g : 0)
+        if (hole > 0.5) gaps.push(`FAIXA VAZIA NA SELEÇÃO ${Math.round(hole)}px`)
+      }
+    }
   }
   // Altura única (>= 1.27.2, como no medir.cjs do DS): superfície e botão primário com o mesmo topo e a mesma altura (±0,5 px),
   // e a superfície na altura do controle (40 px desktop, 44 px toque).
