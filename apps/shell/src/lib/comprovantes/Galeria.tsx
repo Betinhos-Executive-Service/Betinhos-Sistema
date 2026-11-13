@@ -101,10 +101,10 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
   // A galeria só repassa a `ler` os próprios anexos (do tipo T), então o alargamento é seguro.
   const ler = lerAnexo as Ler
   const visiveis = anexos.filter(temArquivo)
+  const indicePorId = new Map(visiveis.map((a, i) => [a.id, i]))
   // O comprovante aberto no visualizador vive na URL (`comprovante=<id do anexo>`).
   const [abertoId, setAbertoId] = useQueryId('comprovante')
-  const achado = abertoId ? visiveis.findIndex((a) => a.id === abertoId) : -1
-  const aberto = achado >= 0 ? achado : null
+  const aberto = abertoId ? indicePorId.get(abertoId) ?? null : null
   const setAberto = (indice: number | null) => setAbertoId(indice == null ? null : visiveis[indice]?.id ?? null)
   // Retângulo da miniatura clicada: o visualizador cresce a partir dela.
   const origem = useRef<DOMRect | null>(null)
@@ -123,11 +123,11 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
           {bloco.titulo ? <h4 className="cmp-grupo">{bloco.titulo}</h4> : null}
           <ul className="cmp-comprovantes">
             {bloco.itens.map((a) => {
-              const indice = visiveis.indexOf(a)
+              const indice = indicePorId.get(a.id)
               const meta = metaDe?.(a) ?? ''
               return (
                 <li key={a.id} className="cmp-comprovante">
-                  {indice >= 0
+                  {indice != null
                     ? <Miniatura anexo={a} ler={ler} onOpen={(rect) => { origem.current = rect; setAberto(indice) }} />
                     : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não foi enviado</span></div>}
                   <div className="cmp-comprovante__info">
