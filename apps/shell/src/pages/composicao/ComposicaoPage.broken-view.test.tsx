@@ -54,6 +54,7 @@ it('abrir a tela na visão com campo removido mostra o aviso na hora, sem o vazi
   const alert = await screen.findByText(/usa o campo new_valorsubtotal, que não existe mais/)
   expect(alert.closest('[role="alert"]')?.textContent).toMatch(/Edite as colunas ou troque de visão/)
   expect(screen.queryByText('Nenhuma composição encontrada')).toBeNull()
+  expect(screen.getByText('Dados não carregados')).toBeTruthy()
 
   await openView('Padrão')
   expect(await screen.findByText('Aprovada')).toBeTruthy()

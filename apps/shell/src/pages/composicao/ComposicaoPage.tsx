@@ -1484,18 +1484,17 @@ function ComposicaoContent({ host }: { host: Host }) {
     try {
       // Com serviços selecionados, só eles; sem seleção, a mesma consulta da grade (view, filtros e busca).
       let records: Composition[]
-      // Linhas da grade são lidas pelo mesmo nome de célula da grade; as relidas, pelo da consulta resolvida.
-      let valueKey: ((id: string) => string) | undefined = valueKeyFor
       if (selectedVisibleRows.length) records = selectedVisibleRows
       else if (dataSource === 'mock') records = visibleRows
       else {
-        valueKey = undefined
         const { view, error } = resolveCompositionQuery(activeView, viewDefinition, catalog, search.trim())
         if (error) throw new Error(error)
         records = await collectCompositionPages((link) => loadCompositions(link, view))
       }
       const viewName = activeView?.name ?? 'Todas as composições'
-      const blob = compositionWorkbook(records, viewDefinition, catalog, selectedVisibleRows.length ? `${viewName} (selecionados)` : viewName, valueKey)
+      const blob = compositionWorkbook(records, viewDefinition, catalog, selectedVisibleRows.length ? `${viewName} (selecionados)` : viewName,
+        // Linhas da grade são lidas pelo mesmo nome de célula da grade; as relidas, pelo da consulta resolvida (padrão).
+        selectedVisibleRows.length || dataSource === 'mock' ? valueKeyFor : undefined)
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
@@ -1686,7 +1685,7 @@ function ComposicaoContent({ host }: { host: Host }) {
             ? `Modo local · ${rows.length} registros de demonstração · edições em memória`
             : dataSource === 'dataverse'
               ? `${getDataverseEnvironmentLabel()} · ${rows.length} composições reais · salva ao confirmar`
-              : 'Carregando dados…'}
+              : connectionError ? 'Dados não carregados' : 'Carregando dados…'}
         </span>
       </footer>
     </section>
