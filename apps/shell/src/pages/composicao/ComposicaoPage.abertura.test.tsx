@@ -72,7 +72,7 @@ it('catálogo que chega depois não refaz a consulta e o cabeçalho provisório 
 
   await act(async () => { release([field('new_status', 'Situação')]) })
 
-  await waitFor(() => expect(screen.getByRole('textbox', { name: /Buscar/ })).toHaveProperty('disabled', false))
+  await waitFor(() => expect(screen.getByRole('searchbox', { name: /Buscar/ })).toHaveProperty('disabled', false))
   expect(container.querySelector('.column-header--provisional')).toBeNull()
   expect(screen.getByText('Situação')).toBeTruthy()
   expect(screen.getByText('Aprovada')).toBeTruthy()

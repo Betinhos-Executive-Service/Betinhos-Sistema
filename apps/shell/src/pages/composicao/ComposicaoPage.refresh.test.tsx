@@ -32,12 +32,12 @@ it('ignora resposta antiga de Atualizar após mudar a busca', async () => {
 
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
   expect(await screen.findByText('1 registro')).toBeTruthy()
-  await waitFor(() => expect((screen.getByRole('textbox', { name: 'Buscar cliente ou trajeto' }) as HTMLInputElement).disabled).toBe(false))
+  await waitFor(() => expect((screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }) as HTMLInputElement).disabled).toBe(false))
 
   deferRefresh = true
   fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
   await waitFor(() => expect(finishRefresh).toBeTypeOf('function'))
-  fireEvent.change(screen.getByRole('textbox', { name: 'Buscar cliente ou trajeto' }), { target: { value: 'Horizonte' } })
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }), { target: { value: 'Horizonte' } })
   await waitFor(() => expect(load.mock.calls.some(([, view]) => view?.fetchXml?.includes('%Horizonte%'))).toBe(true))
   expect(await screen.findByText('Horizonte Sistemas')).toBeTruthy()
 

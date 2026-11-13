@@ -15,7 +15,7 @@ it('permite zerar uma busca sem resultados e recuperar as composições', async 
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
   expect(await screen.findByText('18 registros')).toBeTruthy()
 
-  const search = screen.getByRole('textbox', { name: 'Buscar cliente ou trajeto' }) as HTMLInputElement
+  const search = screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }) as HTMLInputElement
   fireEvent.change(search, { target: { value: 'cliente inexistente xyz' } })
   expect(await screen.findByText('Nenhum resultado para os filtros atuais')).toBeTruthy()
   expect(screen.getByText('0 registros')).toBeTruthy()

@@ -153,6 +153,7 @@ it('mostra estado vazio sem habilitar comandos de seleção', async () => {
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
   expect(await screen.findByText('Nenhuma composição encontrada')).toBeTruthy()
   expect(screen.getByText('0 registros')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Gerar OP' }).hasAttribute('disabled')).toBe(true)
-  expect(screen.getByRole('button', { name: 'Excluir' }).hasAttribute('disabled')).toBe(true)
+  // Sem seleção, Gerar OP e Excluir não aparecem na linha de comando (modo seleção do DS).
+  expect(screen.queryByRole('button', { name: 'Gerar OP' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Excluir' })).toBeNull()
 })

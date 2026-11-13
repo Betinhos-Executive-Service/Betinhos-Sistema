@@ -1,5 +1,6 @@
 import { moneyFields, type Composition } from './compositions'
 import type { CompositionTotalRow } from './dataverse'
+import { fetchDateRange, isDay } from './date-ranges'
 import type { CatalogField, SavedView, ViewDefinition } from './views'
 
 const STORAGE_KEY = 'tela-composicao-preco:mock-views:v1'
@@ -53,12 +54,20 @@ function value(row: MockViewRow, id: string): string {
 export function applyMockView<T extends MockViewRow>(rows: T[], definition: ViewDefinition): T[] {
   const matches = (row: T, filter: ViewDefinition['filters'][number]) => {
     const raw = String(value(row, filter.id) ?? '')
-    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(filter.value) && /^\d{4}-\d{2}-\d{2}T/.test(raw)
+    const range = fetchDateRange(filter.operator, Number(filter.value) || 0)
+    const dateOnly = (range || [filter.value, ...(filter.values ?? [])].some(isDay)) && /^\d{4}-\d{2}-\d{2}T/.test(raw)
     const date = dateOnly && raw ? new Date(raw) : null
     const current = date && !Number.isNaN(date.getTime())
       ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : raw
     if (filter.operator === 'null') return current === ''
     if (filter.operator === 'not-null') return current !== ''
+    if (range) return current !== '' && current >= range[0] && current <= range[1]
+    if (filter.operator === 'not-in') return !(filter.values ?? []).some((candidate) => current.toLocaleLowerCase('pt-BR') === candidate.toLocaleLowerCase('pt-BR'))
+    if (filter.operator === 'between') {
+      const [from = '', to = ''] = filter.values ?? []
+      const numeric = [current, from, to].every((item) => item !== '' && Number.isFinite(Number(item)))
+      return current !== '' && (numeric ? Number(current) >= Number(from) && Number(current) <= Number(to) : current.localeCompare(from, 'pt-BR') >= 0 && current.localeCompare(to, 'pt-BR') <= 0)
+    }
     if (filter.operator === 'in') return (filter.values ?? []).some((candidate) => current.toLocaleLowerCase('pt-BR') === candidate.toLocaleLowerCase('pt-BR'))
     const left = current.toLocaleLowerCase('pt-BR') === '1' ? 'true' : current.toLocaleLowerCase('pt-BR') === '0' ? 'false' : current.toLocaleLowerCase('pt-BR')
     const right = filter.value.toLocaleLowerCase('pt-BR') === '1' ? 'true' : filter.value.toLocaleLowerCase('pt-BR') === '0' ? 'false' : filter.value.toLocaleLowerCase('pt-BR')
