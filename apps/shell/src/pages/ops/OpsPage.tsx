@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, TableGroups, ToastProvider, ViewBar, groupRows, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -76,7 +76,8 @@ function Ops({ host }: { host: Host }) {
   const list = useMergedById(ops.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortOps(list, view.config.sort, choices) : list, view.config.sort, (op) => op.id), [list, choices, view.config.sort, extra])
-  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readOp, (op) => op.id)), [sorted, filters, allFields, extra])
+  const read = useMemo(() => extra.read(readOp, (op) => op.id), [extra])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -87,6 +88,13 @@ function Ops({ host }: { host: Host }) {
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  // Agrupar por (§10.9.1): grupos em memória sobre a lista já filtrada e buscada; lista vazia volta ao estado vazio.
+  const groups = useMemo(() => {
+    const found = groupRows(visible, view.config.group, allFields, read)
+    return found?.length ? found : null
+  }, [visible, view.config.group, allFields, read])
+  // Seleção agrupada: "Selecionar todas" e o Shift seguem a ordem desenhada (grupo a grupo), não a de `visible`.
+  const groupedRows = useMemo(() => groups?.flatMap((g) => g.rows) ?? null, [groups])
   const clearAll = () => { clearFilters(); setQuery('') }
   const sel = useRowSelection(visible)
   const selecting = !mobile && sel.rows.length > 0
@@ -179,15 +187,28 @@ function Ops({ host }: { host: Host }) {
   } else {
     // O total só vale com a lista inteira e os valores dos serviços: até lá, o rodapé avisa que ainda soma.
     const pending = !ops.complete && ops.loading
+    // A closure perde o narrowing de `choices`; aqui ela já está carregada.
+    const loaded = ops.choices
     const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
     const empty = pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas) e a seleção vale para a lista inteira.
+    const table = (rows: Op[], tableFooter?: ReactNode) => (
+      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={groupedRows ? { ...sel.selection, all: groupedRows } : sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+    )
+    body = groups ? (
+      <>
+        <TableGroups groups={groups} resetKey={JSON.stringify(view.config.group)} counting={pending}>
+          {(rows) => (mobile ? <GroupCards list={rows} choices={loaded} onOpen={setSelectedId} resetKey={lazyKey} pending={pending} /> : table(rows))}
+        </TableGroups>
+        {mobile ? null : <div className="op-groups__total">{footer}</div>}
+      </>
+    ) : (
       <>
         {mobile
-          ? (visible.length ? <OpsCards list={slice} choices={ops.choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <OpsTable list={slice} choices={ops.choices} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
+          ? (visible.length ? <OpsCards list={slice} choices={loaded} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
+          : table(slice, footer)}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -231,4 +252,13 @@ function Ops({ host }: { host: Host }) {
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </div>
   )
+}
+
+/** Cartões de um grupo aberto no celular: a mesma rolagem infinita da lista, por grupo. */
+function GroupCards({ resetKey, pending, ...props }: Parameters<typeof OpsCards>[0] & { resetKey: string; pending: boolean }) {
+  const { slice, more, loadMore } = useLazySlice(props.list, resetKey)
+  return <>
+    <OpsCards {...props} list={slice} />
+    <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
+  </>
 }
