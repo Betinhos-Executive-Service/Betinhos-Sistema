@@ -95,6 +95,6 @@ export const initialCompositions: Composition[] = sampleRecords.map(
     })
     values.new_subtotal = (920 + (index + 1) * 73.5).toFixed(2)
     values.new_valortotal = (1180 + (index + 1) * 91).toFixed(2)
-    return { id: `mock-${index + 1}`, clientId: null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
+    return { id: `mock-${index + 1}`, clientId: null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, viewFields: { new_status: index % 2 ? 2 : 1, 'new_status@OData.Community.Display.V1.FormattedValue': index % 2 ? 'Concluído' : 'Pendente' }, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
   },
 )

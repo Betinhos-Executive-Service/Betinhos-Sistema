@@ -182,10 +182,13 @@ function queryShapeKey(definition: ViewDefinition) {
   return JSON.stringify([definition.columns.map(({ id }) => id), definition.filters, definition.filterGroups, definition.groupOperator, definition.sort])
 }
 
+/** Rótulo das colunas da visão padrão que não são fixas do código (o nome lógico não aparece para o usuário). */
+const PROVISIONAL_LABELS: Record<string, string> = { new_status: 'Status' }
+
 /** Rótulo provisório de coluna ligada enquanto a metadata não chega: só o trecho depois do último ponto. */
 function provisionalField(id: string): CatalogField {
   const name = id.slice(id.lastIndexOf('.') + 1)
-  return { id, label: name, table: COMPOSITION_TABLE, attribute: name, path: [], type: 'String', available: true } as CatalogField
+  return { id, label: PROVISIONAL_LABELS[id] ?? name, table: COMPOSITION_TABLE, attribute: name, path: [], type: 'String', available: true } as CatalogField
 }
 
 function ComposicaoContent({ host }: { host: Host }) {
@@ -1128,7 +1131,6 @@ function ComposicaoContent({ host }: { host: Host }) {
         const clientId = item.clientId
         return (
           <span className="grid-client">
-            <span className={`grid-status ${item.status === 'Concluído' ? 'grid-status--done' : ''}`} />
             {clientId ? (
               <span className="lookup-preview">
                 <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
@@ -1140,7 +1142,7 @@ function ComposicaoContent({ host }: { host: Host }) {
                   {item.clientAddress && <span className="lookup-preview__detail"><span>Endereço</span><span>{item.clientAddress}</span></span>}
                 </span>
               </span>
-            ) : item.client}
+            ) : <span className="grid-client-name" title={item.client}>{item.client}</span>}
           </span>
         )
       },
@@ -1402,7 +1404,7 @@ function ComposicaoContent({ host }: { host: Host }) {
             const formattedValue = readViewField(row.original.viewFields, valueKey).formatted
             const title = typeof formattedValue === 'string' && formattedValue ? formattedValue : String(value)
             const color = statusColors[String(value)]
-            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className="grid-choice-badge" style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
+            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className={`grid-choice-badge${color ? '' : title.toLocaleLowerCase('pt-BR').startsWith('conclu') ? ' grid-choice-badge--done' : ' grid-choice-badge--pending'}`} style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
           }
           const formatted = readViewField(row.original.viewFields, valueKey).formatted
           return <EditableViewFieldCell field={field} value={value} formatted={formatted} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} />
@@ -1422,8 +1424,7 @@ function ComposicaoContent({ host }: { host: Host }) {
           const title = id === 'client' ? item.client : id === 'route' ? item.route : formatDepartureDate(item.departureAt)
           const target = id === 'client' ? item.clientId : id === 'route' ? item.serviceId : null
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
-            {id === 'client' && <span className={`grid-status ${item.status === 'Concluído' ? 'grid-status--done' : ''}`} />}
-            <span title={title}>{title}</span>
+            <span className="grid-client-name" title={title}>{title}</span>
             {id === 'client' && <span className="lookup-preview__card" role="tooltip"><strong>{item.client}</strong>{item.clientRegistration && <span>{item.clientRegistration}</span>}{item.clientAddress && <span>{item.clientAddress}</span>}</span>}
             {id === 'route' && target && <span className="lookup-preview__card" role="tooltip"><strong>Serviço relacionado</strong><span>{item.route}</span><span>Cliente: {item.client}</span>{item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}{item.serviceStatus && <span>Status: {item.serviceStatus}</span>}{item.serviceType && <span>Tipo: {item.serviceType}</span>}{item.vehicleType && <span>Veículo: {item.vehicleType}</span>}{item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}</span>}
           </span>

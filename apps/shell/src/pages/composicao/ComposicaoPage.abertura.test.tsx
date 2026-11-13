@@ -65,8 +65,10 @@ it('catálogo que chega depois não refaz a consulta e o cabeçalho provisório 
 
   const { container } = render(<ComposicaoPage host={host} />)
   expect(await screen.findByText('Aprovada')).toBeTruthy()
-  // PARK-T2c: antes do catálogo o rótulo é a parte do id depois do último ponto, marcada como provisória.
-  expect(container.querySelector('.column-header--provisional')?.textContent).toContain('new_status')
+  // PARK-T2c: antes do catálogo o cabeçalho fica marcado como provisório; o status da visão padrão já mostra "Status"
+  // (os demais campos mostram a parte do id depois do último ponto).
+  expect(container.querySelector('.column-header--provisional')?.textContent).toBe('Status')
+  expect(container.querySelector('.column-header--provisional')?.getAttribute('title')).toBe('new_status')
   await waitFor(() => expect(xrm.count('cr40f_composicaodeprecos')).toBe(2))
   const before = xrm.count('cr40f_composicaodeprecos')
 
