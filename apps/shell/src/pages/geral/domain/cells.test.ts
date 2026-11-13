@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { READONLY, cellKind, readonlyHint, statusTone, tipoVariant, choiceColor, isBadgeValue } from './cells'
+import { READONLY, cellKind, readonlyHint, statusTone, tipoVariant, choiceColor, isBadgeValue, lookupTarget } from './cells'
 import { formatCell, formatMoney, fromDateTimeLocal, parseMoney, toDateTimeLocal } from './format'
 import type { AttributeInfo, Column } from './types'
 
@@ -120,5 +120,26 @@ describe('isBadgeValue', () => {
     expect(isBadgeValue(col('cr40f_status', 'a'), 202410001)).toBe(false)
     expect(isBadgeValue(col('cr40f_status'), null)).toBe(false)
     expect(isBadgeValue(col('cr40f_trajeto'), 1)).toBe(false)
+  })
+})
+
+describe('lookupTarget', () => {
+  const id = 'e8b7c267-b4a9-4e0c-91c3-c5a72b6965fa'
+  const lookup = (targets: string[]): AttributeInfo => ({ ...info('Lookup'), targets })
+
+  it('usa o único alvo da metadata quando a linha não traz a tabela', () => {
+    expect(lookupTarget({ _cr40f_motorista_value: id }, '_cr40f_motorista_value', lookup(['cr40f_funcionarios']))).toEqual({ table: 'cr40f_funcionarios', id })
+  })
+
+  it('prefere a tabela anotada na linha (lookup com mais de um alvo)', () => {
+    const row = { _customerid_value: `{${id}}`, '_customerid_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'contact' }
+    expect(lookupTarget(row, '_customerid_value', { ...info('Customer'), targets: ['account', 'contact'] })).toEqual({ table: 'contact', id })
+  })
+
+  it('sem tabela definida, vazio ou fora de lookup não vira link', () => {
+    expect(lookupTarget({ _customerid_value: id }, '_customerid_value', { ...info('Customer'), targets: ['account', 'contact'] })).toBeNull()
+    expect(lookupTarget({ _cr40f_motorista_value: null }, '_cr40f_motorista_value', lookup(['cr40f_funcionarios']))).toBeNull()
+    expect(lookupTarget({ cr40f_trajeto: id }, 'cr40f_trajeto', info('String'))).toBeNull()
+    expect(lookupTarget({ _cr40f_motorista_value: id }, '_cr40f_motorista_value', undefined)).toBeNull()
   })
 })

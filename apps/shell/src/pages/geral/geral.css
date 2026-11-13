@@ -7,6 +7,12 @@
 .gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
 .gr-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--bt-focus-border); }
 .gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; color: var(--bt-color-text-primary); }
+/* Lookup com registro: link azul sublinhado que abre o registro no painel lateral (como a grade antiga do model-driven).
+   Ocupa só o texto, para o resto da célula continuar recebendo o duplo clique de edição. */
+.gr-lookup { flex: 0 1 auto; max-width: 100%; padding: 0; border: 0; border-radius: var(--bt-radius-xs); background: none; color: var(--bt-color-action); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; cursor: pointer; }
+.gr-lookup:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); }
+.gr-lookup:active { transform: scale(.98); }
+@media (hover: hover) and (pointer: fine) { .gr-lookup:hover { color: var(--bt-color-brand-hover); text-decoration-color: currentColor; } }
 .gr-cell__editor { flex: 1 1 auto; min-width: 0; }
 .gr-cell__editor .bt-control { min-height: 32px; }
 .gr-cell__mark { flex: 0 0 auto; display: inline-flex; align-items: center; }
