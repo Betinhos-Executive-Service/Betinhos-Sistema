@@ -57,6 +57,8 @@ const ROWS0: Funcionario[] = [
   person('m7', 'Helena Simulada Costa', 'Helena', { cr40f_funcao: 202410001, cr40f_nomedaempresa: 202410001, cr40f_tipodevinculo: 1 }),
   person('m8', 'Igor Fake Moreira', 'Igor', { cr40f_datadoaso: addMonths(offset(20), -12) }, veiculos[2]),
   // Acesso ao app encerrado (systemuser desabilitado), mas segue ativo no cadastro: exercita "Reativar acesso".
+  // ID no formato GUID: o lookup de motorista do mock da Geral abre a ficha dele por cima da lista.
+  person('f1f1f1f1-0000-4000-8000-000000000001', 'Carlos Lima', 'Lima', { cr40f_validadedacnh: offset(300) }),
   person('m9', 'Joana Encerrada Teste', 'Joana', { cr40f_emailmicrosoft: 'joana.teste@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' }),
 ]
 /** systemuser por e-mail no mock: Carlos ativo, Joana desabilitada (acesso encerrado). */

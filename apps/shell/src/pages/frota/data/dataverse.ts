@@ -211,6 +211,19 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       return { data, errors }
     },
 
+    async veiculo(id: string) {
+      if (!GUID.test(cleanId(id))) return null
+      const filtro = `cr40f_veiculosid eq ${cleanId(id)}`
+      try {
+        const [row] = await retrieveAll('veiculos', filtro)
+        return row ? mapVeiculo(row) : null
+      } catch (reason) {
+        if (!/hodometro/i.test(errorMessage(reason))) throw reason
+        const [row] = await retrieveAll('veiculos', filtro, SELECT_VEICULOS_SEM_HODOMETRO)
+        return row ? { ...mapVeiculo(row), hodometro: null, hodometroEm: null } : null
+      }
+    },
+
     async currentStatus(kind: Kind, id: string) {
       const row = await api.retrieveRecord(KIND_TABLE[kind], id, `?$select=${STATUS_FIELD[kind]}`)
       const value = row[STATUS_FIELD[kind]]
