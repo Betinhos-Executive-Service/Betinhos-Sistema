@@ -5,10 +5,21 @@ export const VIEW_MARKER = 'TelaComposicaoPreco:v1'
 const PIN_TABLE = 'new_configuracaovisualizacaocomposicao'
 
 export type ViewColumn = { id: string; width: number; pinned: boolean }
-export type ViewFilter = { id: string; operator: 'eq' | 'ne' | 'in' | 'like' | 'not-like' | 'begins-with' | 'not-begins-with' | 'ends-with' | 'not-ends-with' | 'gt' | 'ge' | 'lt' | 'le' | 'null' | 'not-null'; value: string; values?: string[]; nativeAlias?: string }
+/** Operadores de data sem valor (atalhos do filtro do Design System), gravados como o operador do FetchXML. */
+const DATE_PRESET_OPERATORS = ['today', 'tomorrow', 'yesterday', 'this-week', 'this-month', 'last-month'] as const
+type DatePresetOperator = typeof DATE_PRESET_OPERATORS[number]
+export const isDatePreset = (operator: string): operator is DatePresetOperator => (DATE_PRESET_OPERATORS as readonly string[]).includes(operator)
+/** `in`, `not-in` e `between` usam `values` (em `between`, início e fim); `next-x-days`/`last-x-days` levam o número de dias em `value`. */
+export type ViewFilter = { id: string; operator: 'eq' | 'ne' | 'in' | 'not-in' | 'between' | 'like' | 'not-like' | 'begins-with' | 'not-begins-with' | 'ends-with' | 'not-ends-with' | 'gt' | 'ge' | 'lt' | 'le' | 'null' | 'not-null' | DatePresetOperator | 'next-x-days' | 'last-x-days'; value: string; values?: string[]; nativeAlias?: string }
+const MULTI_VALUE_OPERATORS = new Set<ViewFilter['operator']>(['in', 'not-in', 'between'])
+const VALUELESS_OPERATORS = new Set<ViewFilter['operator']>(['null', 'not-null', ...DATE_PRESET_OPERATORS])
+const DATE_ONLY_OPERATORS = new Set<ViewFilter['operator']>([...DATE_PRESET_OPERATORS, 'next-x-days', 'last-x-days'])
+export const NUMERIC_TYPES = new Set(['Money', 'Integer', 'BigInt', 'Decimal', 'Double'])
 export type ViewFilterGroup = { id: string; operator: 'and' | 'or'; filters: ViewFilter[] }
 export type ViewSort = { id: string; descending: boolean }
 export type ViewDefinition = { columns: ViewColumn[]; filters: ViewFilter[]; filterGroups?: ViewFilterGroup[]; groupOperator?: 'and' | 'or'; sort: ViewSort[] }
+/** Condições soltas e as dos grupos, na ordem da definição. */
+export const allViewFilters = (definition: Pick<ViewDefinition, 'filters' | 'filterGroups'>) => [...definition.filters, ...(definition.filterGroups ?? []).flatMap((group) => group.filters)]
 export type SavedView = { id: string; kind: 'personal' | 'public'; name: string; definition: ViewDefinition; managed: boolean; nativeOnly?: boolean; nativeFiltersEditable?: boolean; sourceFetchXml?: string }
 export type ViewQuery = SavedView | { fetchXml: string }
 export type CatalogField = { id: string; label: string; table: string; tableLabel?: string; attribute: string; primaryIdAttribute?: string; primaryNameAttribute?: string; path: string[]; relationships?: { from: string; to: string }[]; type: string; available: boolean; pickerEligible?: boolean; writable?: boolean; reason?: string }
@@ -112,7 +123,7 @@ function fieldParts(id: string, catalog: CatalogField[]): Pick<CatalogField, 'ta
 }
 
 export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[]) {
-  const allFilters = [...definition.filters, ...(definition.filterGroups ?? []).flatMap((group) => group.filters)]
+  const allFilters = allViewFilters(definition)
   const used = new Set([...definition.columns.map((item) => item.id), ...allFilters.map((item) => item.id), ...definition.sort.map((item) => item.id)])
   for (const id of used) {
     const field = catalog.find((candidate) => candidate.id === id)
@@ -121,7 +132,9 @@ export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[
   for (const filter of allFilters) {
     const field = catalog.find((candidate) => candidate.id === filter.id)!
     if (['like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with'].includes(filter.operator) && field.type !== 'String' && field.type !== 'Memo') throw new Error(`Operador de texto não é válido para ${field.label}.`)
-    if (filter.operator === 'in' ? !filter.values?.length || filter.values.some((value) => !value.trim()) : filter.operator !== 'null' && filter.operator !== 'not-null' && !filter.value.trim()) throw new Error(`Informe um valor para o filtro de ${field.label}.`)
+    if (DATE_ONLY_OPERATORS.has(filter.operator) && field.type !== 'DateTime') throw new Error(`Operador de data não é válido para ${field.label}.`)
+    if (filter.operator === 'between' && field.type !== 'DateTime' && !NUMERIC_TYPES.has(field.type)) throw new Error(`Intervalo não é válido para ${field.label}.`)
+    if (MULTI_VALUE_OPERATORS.has(filter.operator) ? !filter.values?.length || filter.values.some((value) => !value.trim()) || (filter.operator === 'between' && filter.values.length !== 2) : !VALUELESS_OPERATORS.has(filter.operator) && !filter.value.trim()) throw new Error(`Informe um valor para o filtro de ${field.label}.`)
   }
   const fields = [...used].map((id) => ({ id, ...fieldParts(id, catalog) }))
   const links = new Map<string, { table: string; parent: string; from: string; to: string; alias: string; attributes: Set<string> }>()
@@ -146,7 +159,11 @@ export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[
     const fieldType = catalog.find((item) => item.id === filter.id)?.type
     const relation = field.path.length ? links.get(pathSignature(field.path, field.relationships)) : null
     const entityname = filter.nativeAlias ? ` entityname="${xml(filter.nativeAlias)}"` : relation ? ` entityname="${relation.alias}"` : ''
-    if (filter.operator === 'in') return `<condition attribute="${xml(field.attribute)}" operator="in"${entityname}>${(filter.values ?? []).map((value) => `<value>${xml(value)}</value>`).join('')}</condition>`
+    const condition = (operator: string, value?: string) => `<condition attribute="${xml(field.attribute)}" operator="${operator}"${entityname}${value === undefined ? '' : ` value="${xml(value)}"`} />`
+    if (filter.operator === 'in' || filter.operator === 'not-in' || (filter.operator === 'between' && fieldType !== 'DateTime')) return `<condition attribute="${xml(field.attribute)}" operator="${filter.operator}"${entityname}>${(filter.values ?? []).map((value) => `<value>${xml(value)}</value>`).join('')}</condition>`
+    // Intervalo de dias inclui o último dia inteiro: `between` do FetchXML pararia na meia-noite do dia final.
+    if (filter.operator === 'between') return `<filter type="and">${condition('on-or-after', filter.values![0])}${condition('on-or-before', filter.values![1])}</filter>`
+    if (isDatePreset(filter.operator)) return condition(filter.operator)
     const pattern = fieldType === 'Boolean' ? filter.value === 'true' ? '1' : filter.value === 'false' ? '0' : filter.value : filter.operator === 'like' || filter.operator === 'not-like' ? `%${filter.value}%` : filter.operator === 'begins-with' || filter.operator === 'not-begins-with' ? `${filter.value}%` : filter.operator === 'ends-with' || filter.operator === 'not-ends-with' ? `%${filter.value}` : filter.value
     const value = filter.operator === 'null' || filter.operator === 'not-null' ? '' : ` value="${xml(pattern)}"`
     const operator = fieldType === 'DateTime' && /^\d{4}-\d{2}-\d{2}$/.test(filter.value)
@@ -168,7 +185,7 @@ export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[
 
 function aliases(definition: ViewDefinition, catalog: CatalogField[]) {
   const result = new Map<string, string>()
-  const ids = [...new Set([...definition.columns.map((item) => item.id), ...definition.filters.map((item) => item.id), ...(definition.filterGroups ?? []).flatMap((group) => group.filters.map((filter) => filter.id)), ...definition.sort.map((item) => item.id)])]
+  const ids = [...new Set([...definition.columns.map((item) => item.id), ...allViewFilters(definition).map((item) => item.id), ...definition.sort.map((item) => item.id)])]
   for (const id of ids) {
     const path = fieldParts(id, catalog).path
     for (let index = 0; index < path.length; index++) {
@@ -221,10 +238,11 @@ export function parseNativeFilters(fetchXml: string, catalog: CatalogField[]): P
     const field = catalog.find((item) => item.available && item.attribute === attribute && (link ? item.table === link.getAttribute('name') : pathSignature(item.path, item.relationships) === (alias ? aliases.get(alias) : '')))
     const rawOperator = node.getAttribute('operator')
     const operator = ({ on: 'eq', 'on-or-after': 'ge', 'on-or-before': 'le' } as Record<string, string>)[rawOperator ?? ''] ?? rawOperator
-    if (!field || !operator || !['eq', 'ne', 'in', 'like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with', 'gt', 'ge', 'lt', 'le', 'null', 'not-null'].includes(operator)) return null
+    if (!field || !operator || !['eq', 'ne', 'in', 'not-in', 'like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with', 'gt', 'ge', 'lt', 'le', 'null', 'not-null', ...DATE_ONLY_OPERATORS].includes(operator)) return null
+    if (DATE_ONLY_OPERATORS.has(operator as ViewFilter['operator']) && field.type !== 'DateTime') return null
     const rawValue = node.getAttribute('value') ?? ''
     const value = field.type === 'Boolean' && (rawValue === '0' || rawValue === '1') ? rawValue === '1' ? 'true' : 'false' : field.type === 'Lookup' ? rawValue.replace(/^\{([0-9a-f-]{36})\}$/i, '$1') : rawValue
-    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' ? { values: [...node.querySelectorAll('value')].map((item) => item.textContent ?? '') } : {}), ...(link ? { nativeAlias: link.getAttribute('alias') ?? undefined } : {}) }
+    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' || operator === 'not-in' ? { values: [...node.querySelectorAll('value')].map((item) => item.textContent ?? '') } : {}), ...(link ? { nativeAlias: link.getAttribute('alias') ?? undefined } : {}) }
   }
   const filters: ViewFilter[] = []
   const filterGroups: ViewFilterGroup[] = []
@@ -358,7 +376,7 @@ export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: C
     const parsed = stored ?? parseNativeDefinition(String(row.fetchxml ?? ''), String(row.layoutxml ?? ''), catalog)
     const supported = parsed && parsed.columns.every((column) => catalog.some((field) => field.id === column.id && field.available))
     const definition = supported ? parsed : nativeLayoutDefinition(String(row.fetchxml ?? ''), String(row.layoutxml ?? ''), catalog)
-    const hasNativeAlias = [...definition.filters, ...(definition.filterGroups ?? []).flatMap((group) => group.filters)].some((filter) => filter.nativeAlias)
+    const hasNativeAlias = allViewFilters(definition).some((filter) => filter.nativeAlias)
     return { id, kind, name: String(row.name ?? ''), managed: description.startsWith(VIEW_MARKER), nativeOnly: !supported || !description.startsWith(VIEW_MARKER) || hasNativeAlias, nativeFiltersEditable: Boolean(parseNativeFilters(String(row.fetchxml ?? ''), catalog) || stored && hasNativeAlias), sourceFetchXml: String(row.fetchxml ?? ''), definition: { ...definition, columns: definition.columns.map((item) => ({ ...item, pinned: (pinned.get(id) ?? []).includes(item.id) })) } }
   })
 }

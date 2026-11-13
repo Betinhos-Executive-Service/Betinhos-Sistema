@@ -11,7 +11,6 @@ const catalog: CatalogField[] = ['Money', 'Lookup'].map((type, index) => ({ id: 
 const view: SavedView = { id: 'test', kind: 'personal', name: 'Campos externos', managed: true, definition: { columns: catalog.map((field) => ({ id: field.id, width: 160, pinned: false })), filters: [], sort: [] } }
 vi.mock('./data/dataverse', async (original) => ({ ...await original<typeof import('./data/dataverse')>(), loadCompositions: mocks.load, getDataverseEnvironmentLabel: () => 'DEV' }))
 vi.mock('./data/views', async (original) => ({ ...await original<typeof import('./data/views')>(), loadColumnCatalog: async () => catalog, loadViews: async () => [view], buildViews: () => [view], fetchViewRows: async () => ({ personal: [], publicViews: [], pins: [] }) }))
-vi.mock('./components/ViewManager', () => ({ ViewManager: ({ views, onSelect }: { views: SavedView[]; onSelect: (id: string) => void }) => <button disabled={!views.length} onClick={() => onSelect('test')}>Abrir campos externos</button> }))
 vi.mock('./data/related-field-edit', async (original) => ({ ...await original<typeof import('./data/related-field-edit')>(), saveRelatedField: mocks.save, lookupOptions: async () => [{ value: guid, label: 'OP nova', navigation: 'field1', entitySet: 'ops' }] }))
 
 let remoteAmount = 50
@@ -32,11 +31,19 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+/** Troca de visão pelo seletor da `ViewBar` (título da lista). */
+async function openView(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: /^Visão: / }))
+  // As visões chegam depois da abertura: o menu aberto recebe o item quando elas chegam. O jsdom não abre o
+  // `popover`, então o item conta como oculto para a árvore de acessibilidade.
+  fireEvent.click(await screen.findByRole('menuitemradio', { name, hidden: true }, { timeout: 5000 }))
+}
+
 async function open() {
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Abrir campos externos' })).toHaveProperty('disabled', false))
+  await waitFor(() => expect(screen.getByRole('button', { name: /^Visão: / })).toBeTruthy())
   await waitFor(() => expect(screen.getByRole('button', { name: 'Atualizar' })).toHaveProperty('disabled', false))
-  fireEvent.click(screen.getByRole('button', { name: 'Abrir campos externos' }))
+  await openView('Campos externos')
   await waitFor(() => expect(mocks.load.mock.calls.some(([, query]) => query?.id === 'test')).toBe(true))
   await waitFor(() => expect(screen.getAllByLabelText('Valor externo: 50')).toHaveLength(2))
 }

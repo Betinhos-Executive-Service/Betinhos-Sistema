@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
-import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, Search, SearchX, Trash2, X } from 'lucide-react'
-import { ContextMenu, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
+import { Check, LoaderCircle, SearchX, X } from 'lucide-react'
+import { ContextMenu, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
 import { HoldGridRow } from './components/HoldGridRow'
-import { ViewManager } from './components/ViewManager'
+import { CompositionCommandLine, type CommandLineActions } from './components/CompositionCommandLine'
+import { useComposicaoViewState } from './useComposicaoViewState'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
 import { CellHoverPreview } from './components/CellHoverPreview'
@@ -26,6 +27,7 @@ import { CompositionSaveQueue } from './data/composition-save-queue'
 import { matchesCompositionFilters, sumSelectedCompositions } from './data/composition-totals'
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './data/mock-views'
 import { withCalculatedTotals } from './data/composition-calculated'
+import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
 import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
@@ -84,6 +86,9 @@ type EditingCell = { rowId: string; field: MoneyField; value: string }
 type OptimisticInput = { rowId: string; field: MoneyField; input: CellInput; requestId: number }
 type SaveFeedback = { rowId: string; field: MoneyField; status: 'saving' | 'saved' | 'saved-leaving' | 'error'; message?: string; draft?: string }
 type ContextCell = { x: number; y: number; rowId: string; field: MoneyField }
+
+/** Altura da linha por densidade da `ViewBar`; Compacta (38 px) é a grade de sempre. */
+const ROW_HEIGHTS: Record<TableDensity, number> = { default: 44, dense: 38, minimal: 32 }
 
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message
@@ -182,9 +187,6 @@ function queryShapeKey(definition: ViewDefinition) {
   return JSON.stringify([definition.columns.map(({ id }) => id), definition.filters, definition.filterGroups, definition.groupOperator, definition.sort])
 }
 
-/** Rótulo das colunas da visão padrão que não são fixas do código (o nome lógico não aparece para o usuário). */
-const PROVISIONAL_LABELS: Record<string, string> = { new_status: 'Status' }
-
 /** Rótulo provisório de coluna ligada enquanto a metadata não chega: só o trecho depois do último ponto. */
 function provisionalField(id: string): CatalogField {
   const name = id.slice(id.lastIndexOf('.') + 1)
@@ -193,6 +195,7 @@ function provisionalField(id: string): CatalogField {
 
 function ComposicaoContent({ host }: { host: Host }) {
   const toast = useToast()
+  const mobile = useMediaQuery('(max-width: 820px)')
   const hostRef = useRef(host)
   hostRef.current = host
   const [rows, setRows] = useState<Composition[]>([])
@@ -230,7 +233,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   const [notice, setNotice] = useState<CommandNotice | null>(null)
   const [relatedRefreshPending, setRelatedRefreshPending] = useState(false)
   const [relatedFieldBusy, setRelatedFieldBusy] = useState(false)
-  const [filterDrawerHost, setFilterDrawerHost] = useState<HTMLDivElement | null>(null)
+  const [selectionResetKey, setSelectionResetKey] = useState(0)
   const [openQuery, setOpenQuery] = useState<OpenQuery | null>(null)
   const [formulasError, setFormulasError] = useState<string | null>(null)
   const [tableScroller, setTableScroller] = useState<HTMLDivElement | null>(null)
@@ -464,12 +467,15 @@ function ComposicaoContent({ host }: { host: Host }) {
     setLoading(true)
     loadedPagesRef.current = 1
   }, [activeView?.id, applyViewDefinition, commandLocked, dataSource, views])
+  // Views do modo local (localStorage) ou do Dataverse: um caminho só para ler e excluir.
+  const listViews = useCallback(async () => dataSource === 'mock' ? loadMockViews() : loadViews(catalog), [catalog, dataSource])
+  const removeView = useCallback(async (view: SavedView) => { if (dataSource === 'mock') deleteMockView(view); else await deleteView(view) }, [dataSource])
   const saveCurrentView = useCallback(async (name: string, kind: 'personal' | 'public', overwrite: boolean, definition: ViewDefinition) => {
     if (!catalog.length || !definition.columns.length) throw new Error('Escolha ao menos uma coluna disponível.')
     const saved = dataSource === 'mock'
       ? saveMockView(name, kind, definition, overwrite ? activeView ?? undefined : undefined)
       : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, activeView?.nativeOnly && activeView.nativeFiltersEditable && activeView.sourceFetchXml ? buildNativeCompositionQuery(activeView.sourceFetchXml, definition, catalog, '', true) : undefined)
-    const all = dataSource === 'mock' ? loadMockViews() : await loadViews(catalog)
+    const all = await listViews()
     setViews(all)
     const selected = all.find((view) => view.id === saved.id) ?? saved
     setActiveView(selected)
@@ -483,12 +489,11 @@ function ComposicaoContent({ host }: { host: Host }) {
     setNextLink(null)
     setLoading(true)
     loadedPagesRef.current = 1
-  }, [activeView, catalog, dataSource])
+  }, [activeView, catalog, dataSource, listViews])
   const deleteCurrentView = useCallback(async () => {
     if (!activeView) return
-    if (dataSource === 'mock') deleteMockView(activeView)
-    else await deleteView(activeView)
-    setViews(dataSource === 'mock' ? loadMockViews() : await loadViews(catalog))
+    await removeView(activeView)
+    setViews(await listViews())
     setActiveView(null)
     setOpenQuery(null)
     rememberView(null)
@@ -500,7 +505,24 @@ function ComposicaoContent({ host }: { host: Host }) {
     setNextLink(null)
     setLoading(true)
     loadedPagesRef.current = 1
-  }, [activeView, catalog, dataSource])
+  }, [activeView, dataSource, listViews, removeView])
+  const publishCurrentView = useCallback(async () => {
+    const personal = activeView
+    if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
+    // Filtros nativos que a tela não lê não iriam para a cópia: publicar e excluir a pessoal os perderia.
+    if (personal.nativeOnly && !personal.nativeFiltersEditable) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
+    // Pública é outra tabela (savedquery): cria a cópia pública e só depois retira a pessoal.
+    await saveCurrentView(personal.name, 'public', false, personal.definition)
+    try { await removeView(personal) } catch (error) {
+      throw new Error(`A visão pública foi criada, mas a pessoal "${personal.name}" não pôde ser excluída: ${errorMessage(error, 'erro desconhecido')}`)
+    }
+    // A lista já foi relida ao salvar a pública; só falta tirar a pessoal excluída.
+    setViews((current) => current.filter((view) => view.id !== personal.id))
+  }, [activeView, removeView, saveCurrentView])
+  const reloadViews = useCallback(async () => {
+    setViews(await listViews())
+    setViewError(null)
+  }, [listViews])
   const footerLabel = selectedCount === 1 ? 'Total de 1 linha selecionada' : `Total de ${selectedCount} linhas selecionadas`
   const selectedTotals = useMemo(() => sumSelectedCompositions(selectedVisibleRows), [selectedVisibleRows])
   const footerCells = selectedCount ? [
@@ -1514,24 +1536,42 @@ function ComposicaoContent({ host }: { host: Host }) {
     }] : []),
   ] : []
 
+  const viewReady = catalogReady || usingMockData
+  const showViewError = useCallback((message: string) => toast({ tone: 'danger', message }), [toast])
+  const viewBar = useComposicaoViewState({
+    catalog, ready: viewReady, mock: usingMockData, views, active: activeView, definition: viewDefinition, viewError, locked: commandLocked,
+    onChange: applyViewDefinition, selectView, saveView: saveCurrentView, deleteView: deleteCurrentView, publishView: publishCurrentView, reloadViews,
+    onError: showViewError,
+  })
+  // Sem dados ou com comando em andamento, as ações ficam inertes com o motivo (o antigo botão desabilitado).
+  const commandBlock = !dataSource ? 'Aguarde o carregamento dos dados.' : commandLocked ? 'Aguarde o comando em andamento.' : null
+  const commandLineActions = useRef<CommandLineActions>(null!)
+  commandLineActions.current = {
+    refresh: () => { void refreshData() },
+    exportExcel: () => { void exportExcel() },
+    generateOp: () => { void generateOp() },
+    exclude: excludeSelected,
+    audit: () => {
+      if (commandBlock) { toast({ tone: 'info', message: commandBlock }); return }
+      setAuditIds(selectedIds)
+    },
+    clearSelection: () => setSelectionResetKey((key) => key + 1),
+  }
+
   return (
     <div className="composicao">
     <div className="page page--full composition-layout">
       <h1 className="composition-title">Composição de preços</h1>
-      <div className="composition-topbar">
-        <div className="composition-actions">
-          <div className="composition-view-actions">
-          <ViewManager catalog={catalog} views={views} active={activeView} definition={viewDefinition} disabled={commandLocked || (!catalogReady && dataSource !== 'mock')} mockMode={dataSource === 'mock'} filterDrawerHost={filterDrawerHost} onChange={applyViewDefinition} onSelect={selectView} onSave={saveCurrentView} onDelete={deleteCurrentView} />
-          </div>
-          <label className="composition-search">
-            <Search aria-hidden="true" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} disabled={!catalogReady && dataSource !== 'mock'} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />
-          </label>
-        </div>
-        <span className="composition-count" aria-label={nextLink ? `${visibleRows.length} registros carregados de ${totalCount ?? 'um total ainda não calculado'}` : undefined}>{nextLink
-            ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
-            : `${visibleRows.length} ${visibleRows.length === 1 ? 'registro' : 'registros'}`}</span>
-      </div>
+      <CompositionCommandLine
+        view={viewBar} actions={commandLineActions} onSearch={setSearch} catalog={catalog} nativeFetchXml={activeView?.nativeOnly && !activeView.nativeFiltersEditable ? activeView.sourceFetchXml ?? null : null} ready={viewReady} mock={usingMockData} mobile={mobile} search={search}
+        commandPhase={commandPhase} commandLocked={commandLocked} commandBlock={commandBlock} exporting={exporting} selectedCount={selectedCount}
+        exportBlocked={!dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)}
+        countText={nextLink
+          ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
+          : `${visibleRows.length} ${visibleRows.length === 1 ? 'registro' : 'registros'}`}
+        countLabel={nextLink ? `${visibleRows.length} registros carregados de ${totalCount ?? 'um total ainda não calculado'}` : undefined}
+      />
+      <p className="composition-progress" role="status">{commandProgress}</p>
       <div className="composition-layout__body">
     <div className="composition-workspace">
     <section className="composition-page" aria-label="Composições de preço">
@@ -1544,16 +1584,6 @@ function ComposicaoContent({ host }: { host: Host }) {
         </div>
       )}
 
-      <nav className="composition-commandbar" aria-label="Ações da composição de preços">
-        <button type="button" data-command="refresh" disabled={commandLocked} onClick={() => void refreshData()} title="Recarregar dados sem perder filtros, seleção ou posição"><RefreshCw className={commandPhase === 'refresh' ? 'command-icon--spin' : ''} /><span className="command-button-label">{commandPhase === 'refresh' ? 'Atualizando…' : 'Atualizar'}</span></button>
-        <button type="button" data-command="export" disabled={commandLocked || !dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)} onClick={() => void exportExcel()} title={selectedCount ? `Extrair os ${selectedCount} serviços selecionados para Excel` : "Extrair as linhas da view e dos filtros atuais para Excel"}><Download /><span className="command-button-label">{exporting ? 'Extraindo…' : selectedCount ? `Extrair ${selectedCount} para Excel` : 'Extrair para Excel'}</span></button>
-        <span className="composition-commandbar__divider" aria-hidden="true" />
-        <button type="button" data-command="op" disabled={commandLocked || !dataSource || !selectedCount} onClick={() => void generateOp()} title={selectedCount ? `Gerar 1 OP com as ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para gerar OP'}><FilePlus2 /><span className="command-button-label">{commandPhase === 'inspect-op' ? 'Verificando…' : commandPhase === 'send-op' ? 'Enviando…' : 'Gerar OP'}</span></button>
-        <button type="button" data-command="audit" disabled={commandLocked || !dataSource} onClick={() => setAuditIds(selectedIds)} title={selectedCount ? 'Ver auditoria das composições selecionadas' : 'Ver auditoria da tabela'}><ClipboardList /><span className="command-button-label">Auditoria</span></button>
-        <span className="composition-commandbar__divider" aria-hidden="true" />
-        <button type="button" data-command="delete" disabled={commandLocked || !dataSource || !selectedCount} onClick={excludeSelected} title={selectedCount ? `Excluir ${selectedCount} composição(ões) selecionada(s)` : 'Selecione uma composição para excluir'}><Trash2 /><span className="command-button-label">{commandPhase === 'delete' ? 'Excluindo…' : 'Excluir'}</span></button>
-        <span className="composition-commandbar__context" role="status">{commandProgress || (dataSource === 'mock' ? selectedCount ? `Modo local · ${selectedCount} selecionado(s)` : 'Modo local · ações simuladas' : selectedCount ? `${selectedCount} ${selectedCount === 1 ? 'registro selecionado' : 'registros selecionados'}` : 'Selecione registros para Gerar OP ou Excluir')}</span>
-      </nav>
 
       <div ref={formulaBarContainerRef} className="formula-bar" aria-label="Barra de fórmulas">
         <span className="formula-bar__field" title={formulaBarField?.label ?? 'Selecione uma célula'}>{formulaBarField?.label ?? '—'}</span>
@@ -1614,7 +1644,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         <CellHoverPreview />
         {loading ? <PriceGridSkeleton />
           : connectionError && rows.length === 0 ? <div className="price-grid__empty" role="alert">{connectionError}</div>
-            : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
+            : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
         {!loading && nextLink && !connectionError ? (
           <div ref={loadMoreRef} className="composition-load-more" role="status" aria-busy={loadingMore}>
             <LoaderCircle aria-hidden="true" />Carregando mais registros…
@@ -1646,7 +1676,6 @@ function ComposicaoContent({ host }: { host: Host }) {
         </span>
       </footer>
     </section>
-    <div className="view-filter-drawer-host" ref={setFilterDrawerHost} />
     </div>
       </div>
     </div>

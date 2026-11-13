@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { ComposicaoPage } from './ComposicaoPage'
+
+// Teste da grade: a linha de comando real (ViewBar do DS) mantém o painel de colunas montado mesmo fechado, e as consultas
+// por papel ficam ~5x mais lentas no jsdom. Os comandos têm testes próprios (ComposicaoPage.commands/view-bar).
+vi.mock('./components/CompositionCommandLine', () => ({ CompositionCommandLine: () => null }))
 
 afterEach(cleanup)
 

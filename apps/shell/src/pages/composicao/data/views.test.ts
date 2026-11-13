@@ -169,3 +169,14 @@ describe('views nativas', () => {
     expect(deleteRecord).toHaveBeenCalledWith('userquery', 'view-id')
   })
 })
+
+it('lê de volta os operadores que a ViewBar grava: not-in, atalhos de data e próximos N dias', () => {
+  const xml = '<fetch><entity name="cr40f_composicaodeprecos"><filter type="and"><condition attribute="new_valortotal" operator="not-in"><value>1</value><value>2</value></condition><condition attribute="modifiedon" operator="this-week" /><condition attribute="modifiedon" operator="next-x-days" value="7" /></filter></entity></fetch>'
+  expect(parseNativeFilters(xml, catalog)?.filters).toEqual([
+    { id: 'new_valortotal', operator: 'not-in', value: '', values: ['1', '2'] },
+    { id: 'modifiedon', operator: 'this-week', value: '' },
+    { id: 'modifiedon', operator: 'next-x-days', value: '7' },
+  ])
+  // Atalho de data em campo que não é data não é aceito.
+  expect(parseNativeFilters('<fetch><entity name="cr40f_composicaodeprecos"><filter><condition attribute="new_valortotal" operator="today" /></filter></entity></fetch>', catalog)).toBeNull()
+})

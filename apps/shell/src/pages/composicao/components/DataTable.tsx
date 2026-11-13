@@ -40,6 +40,10 @@ type DataTableProps<TData extends RowData> = {
   headerRenderKeys?: ReadonlyMap<string, string>
   /** Quando muda, limpa seleção e ordenação locais sem remontar a grade. */
   resetKey?: string
+  /** Muda para desmarcar todas as linhas sem mexer na ordenação (✕ da seleção na `ViewBar`). */
+  selectionResetKey?: number
+  /** Altura da linha (densidade); padrão 38 px. */
+  rowHeight?: number
   /** Elemento que rola a grade. Com ele e mais de `VIRTUAL_FROM` linhas, só as linhas perto da tela entram no DOM. */
   scroller?: HTMLElement | null
 }
@@ -147,6 +151,8 @@ export function DataTable<TData extends RowData>({
   rowRenderKeys,
   headerRenderKeys,
   resetKey,
+  selectionResetKey = 0,
+  rowHeight = ROW_HEIGHT,
   scroller = null,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -202,6 +208,11 @@ export function DataTable<TData extends RowData>({
     setSorting([])
     setRowSelection({})
   }
+  const [appliedSelectionReset, setAppliedSelectionReset] = useState(selectionResetKey)
+  if (appliedSelectionReset !== selectionResetKey) {
+    setAppliedSelectionReset(selectionResetKey)
+    setRowSelection({})
+  }
   const table = useTable({
     features: dataTableFeatures,
     data,
@@ -214,7 +225,7 @@ export function DataTable<TData extends RowData>({
   const tableRef = useRef<HTMLTableElement>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
   const rows = table.getRowModel().rows
-  const { virtual, visible, start } = useVirtualRows(rows, (row) => row.id, scroller, scrollMargin, ROW_HEIGHT)
+  const { virtual, visible, start } = useVirtualRows(rows, (row) => row.id, scroller, scrollMargin, rowHeight)
   // Posição absoluta de cada linha no DOM para a navegação por teclado (grid-cell-focus). Vai pelo DOM, não por prop,
   // para a linha mantida não renderizar de novo quando um filtro só muda a posição dela.
   useLayoutEffect(() => {
@@ -256,13 +267,13 @@ export function DataTable<TData extends RowData>({
     const reveal = (event: Event) => {
       const request = (event as CustomEvent<RevealGridRow>).detail
       pendingFocus.current = request
-      // Posição calculada com a altura fixa da linha (ROW_HEIGHT); se as linhas passarem a ter altura variável, medir.
-      scroller.scrollTop = Math.max(0, scrollMargin + request.index * ROW_HEIGHT - scroller.clientHeight / 2)
+      // Posição calculada com a altura fixa da linha (rowHeight); se as linhas passarem a ter altura variável, medir.
+      scroller.scrollTop = Math.max(0, scrollMargin + request.index * rowHeight - scroller.clientHeight / 2)
       setRevealTick((tick) => tick + 1)
     }
     element.addEventListener(REVEAL_GRID_ROW, reveal)
     return () => element.removeEventListener(REVEAL_GRID_ROW, reveal)
-  }, [scroller, scrollMargin])
+  }, [scroller, scrollMargin, rowHeight])
   useLayoutEffect(() => {
     const request = pendingFocus.current
     if (!request) return
@@ -293,7 +304,7 @@ export function DataTable<TData extends RowData>({
   const tableStyle = Object.fromEntries(leafColumns.flatMap((item, index) => [
     [`--grid-width-${index}`, `${columnWidth(item.id)}px`],
     [`--grid-left-${index}`, `${pinnedLeft.get(item.id) ?? 0}px`],
-  ])) as CSSProperties
+  ]).concat([['--composition-row-h', `${rowHeight}px`]])) as CSSProperties
   if (layout) tableStyle.width = leafColumns.reduce((sum, item) => sum + columnWidth(item.id), 0)
   const cellClass = (id: string, base?: string) => `${pinnedLeft.has(id) ? base ?? '' : (base ?? '').replace(/\bfixed-col(?:--[a-z]+)?\b/g, '')}${pinnedLeft.has(id) ? ' view-pinned' : ''}`
   // As células leem a largura das variáveis CSS; só ordem e fixação mudam a apresentação das linhas.
@@ -325,11 +336,11 @@ export function DataTable<TData extends RowData>({
     const push = (from: number, items: typeof heldOutside, to: number, tag: string) => {
       let cursor = from
       for (const item of items) {
-        if (item.index > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (item.index - cursor) * ROW_HEIGHT))
+        if (item.index > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (item.index - cursor) * rowHeight))
         bodyItems.push(dataRow(item.row))
         cursor = item.index + 1
       }
-      if (to > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (to - cursor) * ROW_HEIGHT))
+      if (to > cursor) bodyItems.push(spacer(`${tag}-${cursor}`, (to - cursor) * rowHeight))
     }
     push(0, heldOutside.filter((item) => item.index < start), start, 'antes')
     bodyItems.push(...visible.map(dataRow))
