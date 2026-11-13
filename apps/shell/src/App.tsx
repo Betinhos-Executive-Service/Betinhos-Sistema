@@ -3,11 +3,12 @@ import { AppShell } from './app/AppShell'
 import { AuditoriaProvider } from './app/auditoria/AuditoriaProvider'
 import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
+import { fundoDaGaveta } from './app/abrirRegistro'
 import { usePrefetchOnIntent } from './app/routes'
 import { iniciarCapturaDeErros } from './app/erros'
 import { createHost } from './host'
 import { DEFAULT_ITEM, ENTITY_NAMES, findItem, itemLabel, rotaAtualizada } from './nav/menu'
-import { hrefFor, parseHash, useHashQuery, useHashRoute } from './nav/useHashRoute'
+import { hrefFor, parseHash, routeFromHash, useHashQuery, useHashRoute } from './nav/useHashRoute'
 
 type LabelsState = { labels: Map<string, string>; error: string | null }
 
@@ -26,8 +27,12 @@ export function App() {
     history.replaceState(history.state, '', hrefFor(nova.id, nova.query))
     window.dispatchEvent(new HashChangeEvent('hashchange'))
   }, [route, query])
-  const activeId = route || DEFAULT_ITEM.id
+  // Registro aberto de outra lista (link da Geral): a lista continua de fundo e a tela do registro entra só com a gaveta.
+  const fundo = fundoDaGaveta(location.hash)
+  const rotaId = route || DEFAULT_ITEM.id
+  const activeId = (fundo && routeFromHash(fundo)) || rotaId
   const found = findItem(activeId)
+  const gaveta = activeId === rotaId ? null : findItem(rotaId)
   const [{ labels, error }, setLabels] = useState<LabelsState>({ labels: new Map(), error: null })
 
   // Erros não tratados do app vão para cr40f_errodosistema, onde o plantão os encontra.
@@ -56,6 +61,11 @@ export function App() {
     <AuditoriaProvider host={host}>
       <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
         <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
+        {gaveta ? (
+          <div className="rota-gaveta">
+            <RouteLayout host={host} group={gaveta.group} item={gaveta.item} label={itemLabel(gaveta.item, labels)} />
+          </div>
+        ) : null}
       </AppShell>
     </AuditoriaProvider>
   )

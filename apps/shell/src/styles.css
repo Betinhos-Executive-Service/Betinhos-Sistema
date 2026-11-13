@@ -79,3 +79,10 @@ a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
   /* A alça de redimensionar acompanha a borda, que agora é a beira da célula. */
   :where(.bt-table:not(.gr-table)) :where(.bt-table__head) > :where(.bt-table__cell:not(:last-child, .bt-table__cell--pinned)) > .bt-table__resize { right: -4px; }
 }
+
+/* Gaveta de outra tela aberta por cima de uma lista (link da Geral): a tela do registro fica montada mas invisível e
+   sem clique; só a gaveta dela (<dialog> do DS ou .drawer-backdrop de Funcionários) aparece sobre a lista de fundo.
+   Os avisos (toast) da tela também: sem <dialog> modal aberto (ficha de Funcionários), a região fica na própria tela. */
+.rota-gaveta { position: fixed; inset: 0; z-index: var(--bt-z-index-drawer); overflow: hidden; visibility: hidden; pointer-events: none; }
+.rota-gaveta dialog[open], .rota-gaveta .drawer-backdrop { visibility: visible; pointer-events: auto; }
+.rota-gaveta .bt-toast-region { visibility: visible; }

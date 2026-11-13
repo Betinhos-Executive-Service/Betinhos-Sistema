@@ -14,20 +14,33 @@ const guid = (id: string) => id.replace(/[{}]/g, '')
 /**
  * Tabelas que têm tela no shell: o registro abre na gaveta (drawer) dessa tela, pela rota do menu e o parâmetro que a
  * tela já lê da URL. `voltar=1` faz o fechar da gaveta voltar para a lista de origem (`instalarVoltarDaGaveta`).
+ * `soNoPeriodo`: a tela só acha o registro na lista do período carregado; sem ele a gaveta não abriria por cima da
+ * lista de origem, então a tela abre inteira.
  */
-export const GAVETAS_DO_SHELL: Readonly<Record<string, { rota: string; chave: string }>> = {
+export const GAVETAS_DO_SHELL: Readonly<Record<string, { rota: string; chave: string; soNoPeriodo?: true }>> = {
   cr40f_funcionarios: { rota: 'funcionarios', chave: 'ficha' },
   cr40f_veiculos: { rota: 'frota-veiculos', chave: 'ficha' },
   cr40f_clientes1: { rota: 'clientes', chave: 'ver' },
   cr40f_bancodedados: { rota: 'pessoas', chave: 'ver' },
   cr40f_equipamento: { rota: 'equipamentos', chave: 'ver' },
-  cr40f_financeiro: { rota: 'ops', chave: 'abrir' },
-  cr40f_pagantes: { rota: 'pagantes', chave: 'abrir' },
-  cr40f_despesaoperacional: { rota: 'despesas-operacionais', chave: 'abrir' },
+  cr40f_financeiro: { rota: 'ops', chave: 'abrir', soNoPeriodo: true },
+  cr40f_pagantes: { rota: 'pagantes', chave: 'abrir', soNoPeriodo: true },
+  cr40f_despesaoperacional: { rota: 'despesas-operacionais', chave: 'abrir', soNoPeriodo: true },
 }
 
 /** Parâmetros com que as telas abrem uma gaveta; sem nenhum deles, a gaveta está fechada. */
 const CHAVES_DE_GAVETA = ['ficha', 'ver', 'editar', 'novo', 'abrir', 'registro']
+
+/** Hash da lista de onde a última gaveta foi aberta por `openGridRecord`; só na memória (recarregar abre a tela inteira). */
+let origemDaGaveta: string | null = null
+
+/**
+ * Lista que fica de fundo enquanto a gaveta aberta de outra lista (`voltar=1`) está na tela: o shell continua mostrando
+ * a origem (ex.: a Geral) e monta a tela do registro só para a gaveta. Sem gaveta de outra lista, null.
+ */
+export function fundoDaGaveta(hash: string): string | null {
+  return origemDaGaveta && parseHash(hash).query.get('voltar') === '1' ? origemDaGaveta : null
+}
 
 /**
  * Gaveta aberta a partir de outra lista (`voltar=1`): quando a tela fecha a gaveta (tira o parâmetro dela da URL), volta
@@ -52,6 +65,8 @@ export function openGridRecord(table: string, recordId: string): Promise<unknown
   const id = guid(recordId)
   const gaveta = GAVETAS_DO_SHELL[table]
   if (gaveta) {
+    // Gaveta aberta de dentro de outra gaveta: o fundo continua sendo a lista original.
+    origemDaGaveta = gaveta.soNoPeriodo ? null : fundoDaGaveta(location.hash) ?? location.hash
     location.hash = hrefFor(gaveta.rota, { [gaveta.chave]: id, voltar: '1' })
     return undefined
   }

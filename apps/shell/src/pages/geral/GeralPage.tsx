@@ -5,6 +5,7 @@ import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePl
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
+import { fundoDaGaveta } from '../../app/abrirRegistro'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
 import { useTableLabel } from '../../app/useListView'
 import { createSource } from './data/source'
@@ -82,6 +83,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // O estado da tela vive na URL (`#/geral?view=…`): lido uma vez ao montar e regravado sem empilhar histórico.
   const [initial] = useState(() => readUrlState(queryFromHash(window.location.hash)))
   const onStateChange = useCallback((state: UrlState) => {
+    // Com a gaveta de outra tela aberta por cima, o hash é dela: a Geral de fundo não regrava.
+    if (fundoDaGaveta(window.location.hash)) return
     const next = hrefFor('geral', new URLSearchParams(writeUrlState(state)))
     if (next !== window.location.hash) window.history.replaceState(null, '', next)
   }, [])
