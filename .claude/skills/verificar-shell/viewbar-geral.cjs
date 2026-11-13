@@ -1,5 +1,5 @@
 // Linha de comando da Geral (ViewBar com espaços nomeados, @betinhos/ui >= 1.26): uma linha, sem sobreposição, fixos parados com
-// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
+// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1), superfície com a altura e o topo do botão primário (>= 1.27.2), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
 // verificar-viewbar-linha do repo do DS. Uso: node viewbar-geral.cjs http://localhost:36472/#/geral <pasta-de-saida>
 // Grava viewbar-<w>-<n>.png, rodape-<w>-<n>.png (quando há rodapé) e, com TELA=1, geral-<w>-<n>.png da tela inteira.
 // PLAYWRIGHT: caminho do pacote playwright; CHROME_EXE: Chromium já instalado (opcional); SEM_SELO=1 esconde o selo do mock.
@@ -90,6 +90,20 @@ const measure = () => {
     }
     items.forEach((el, i) => { if (isSep(el) && (i === 0 || i === items.length - 1 || isSep(items[i - 1]) || isSep(items[i + 1]))) gaps.push(`fio solto (posição ${i})`) })
   }
+  // Altura única (>= 1.27.2, como no medir.cjs do DS): superfície e botão primário com o mesmo topo e a mesma altura (±0,5 px),
+  // e a superfície na altura do controle (40 px desktop, 44 px toque).
+  const altura = []
+  const prim = bar.querySelector('.bt-viewbar__end [data-vb="primary"] .bt-button--primary')
+  if (surface) {
+    const sr = surface.getBoundingClientRect()
+    const token = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(matchMedia('(pointer: coarse), (max-width: 820px)').matches ? '--bt-control-height-touch' : '--bt-control-height-default'))
+    if (Math.abs(sr.height - token) > 0.5) altura.push(`superfície ${sr.height.toFixed(1)} ≠ controle ${token}`)
+    if (prim && visible(prim)) {
+      const pr = prim.getBoundingClientRect()
+      if (Math.abs(sr.top - pr.top) > 0.5 || Math.abs(sr.height - pr.height) > 0.5) altura.push(`superfície ${sr.height.toFixed(1)}@${sr.top.toFixed(1)} × principal ${pr.height.toFixed(1)}@${pr.top.toFixed(1)}`)
+      else state.alturaUnica = `${sr.height.toFixed(1)}px`
+    } else altura.push('sem botão primário visível')
+  }
   // Rodapé do celular (>= 1.27.1): rótulo visível inteiro dentro do botão; o que não cabe vira só ícone (is-compact).
   const footerCut = []
   const footer = document.querySelector('.bt-selectionbar')
@@ -108,7 +122,7 @@ const measure = () => {
     }
     state.rodapeBotoes = [...footer.querySelectorAll('.bt-selectionbar__actions .bt-button')].filter((b) => !b.closest('.bt-selectionbar__measure')).map((b) => (b.textContent.trim() || name(b)) + (b.classList.contains('is-compact') ? '(ícone)' : ''))
   }
-  return { barW: Math.round(br.width), barH: Math.round(br.height), oneLine, overlaps, outside, cut, gaps, footerCut, fixed, state, pageScroll: document.documentElement.scrollWidth > window.innerWidth }
+  return { barW: Math.round(br.width), barH: Math.round(br.height), altura, oneLine, overlaps, outside, cut, gaps, footerCut, fixed, state, pageScroll: document.documentElement.scrollWidth > window.innerWidth }
 }
 
 ;(async () => {
@@ -149,12 +163,12 @@ const measure = () => {
     for (const r of set) r.fixosParados = JSON.stringify(r.fixed) === base
   }
   fs.writeFileSync(path.join(out, 'viewbar-medidas.json'), JSON.stringify({ rows, errors }, null, 2))
-  console.log('| Viewport | Sel. | Barra (px) | Altura | 1 linha | Sobreposição | Fora da barra | Texto cortado | Vão/fio solto | Rodapé cortado | Fixos parados | Estado |')
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|')
+  console.log('| Viewport | Sel. | Barra (px) | Altura | Altura única (sup.=primário) | 1 linha | Sobreposição | Fora da barra | Texto cortado | Vão/fio solto | Rodapé cortado | Fixos parados | Estado |')
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     const s = r.state
     const estado = [s.visao, s.texto ? 'fixos c/ texto' : 'fixos só ícone', s.principalTexto ? 'principal c/ texto' : 'principal só ícone', r.count ? (s.rodape ? 'seleção no rodapé' : `seleção ${s.selInline} inline${s.selTexto ? ' c/ texto' : ' só ícone'}`) : null, s.noMenu.length ? `no ⋮: ${s.noMenu.join(', ')}` : null, s.lupa ? 'lupa' : 'busca', s.selo ? `SELO NO ⋮ (${s.selo})` : null, r.count ? `"${s.contador}"` : null, s.atualizar ? 'Atualizar visível' : 'SEM ATUALIZAR', `busca ${s.buscaW}px`, `sobra ${s.sobra}px`, s.selLabels.length ? `[${s.selLabels.join(', ')}]` : null, s.rodapeBotoes ? `rodapé [${s.rodapeBotoes.join(', ')}]` : null].filter(Boolean).join('; ')
-    console.log(`| ${r.width} | ${r.count} | ${r.barW} | ${r.barH} | ${r.oneLine ? 'sim' : 'NÃO'} | ${r.overlaps.length ? r.overlaps.join(' ') : 'nenhuma'} | ${r.outside.length ? r.outside.join(' ') : '—'} | ${r.cut.length ? r.cut.join(', ') : 'nenhum'} | ${r.gaps.length ? r.gaps.join(', ') : 'nenhum'} | ${(r.footerCut.length ? r.footerCut.join(', ') : (r.state.rodape ? 'nenhum' : '—'))} | ${r.fixosParados ? 'sim' : 'NÃO'} | ${estado}${r.pageScroll ? ' (ROLAGEM HORIZONTAL)' : ''} |`)
+    console.log(`| ${r.width} | ${r.count} | ${r.barW} | ${r.barH} | ${r.altura.length ? r.altura.join(', ') : `sim (${r.state.alturaUnica})`} | ${r.oneLine ? 'sim' : 'NÃO'} | ${r.overlaps.length ? r.overlaps.join(' ') : 'nenhuma'} | ${r.outside.length ? r.outside.join(' ') : '—'} | ${r.cut.length ? r.cut.join(', ') : 'nenhum'} | ${r.gaps.length ? r.gaps.join(', ') : 'nenhum'} | ${(r.footerCut.length ? r.footerCut.join(', ') : (r.state.rodape ? 'nenhum' : '—'))} | ${r.fixosParados ? 'sim' : 'NÃO'} | ${estado}${r.pageScroll ? ' (ROLAGEM HORIZONTAL)' : ''} |`)
   }
   console.log(`Erros de console: ${errors.length ? errors.join(' | ') : 'nenhum'}`)
 })().catch((e) => { console.error(e); process.exit(1) })
