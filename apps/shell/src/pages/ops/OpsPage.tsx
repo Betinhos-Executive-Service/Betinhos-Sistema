@@ -193,9 +193,9 @@ function Ops({ host }: { host: Host }) {
     const empty = pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas) e a seleção vale para a lista inteira.
+    // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas); o lote do clique direito vale para a lista inteira e o checkbox do cabeçalho, só para o grupo (`scope`).
     const table = (rows: Op[], tableFooter?: ReactNode) => (
-      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={groupedRows ? { ...sel.selection, all: groupedRows } : sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={groupedRows ? { ...sel.selection, all: groupedRows, scope: rows } : sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
     )
     body = groups ? (
       <>

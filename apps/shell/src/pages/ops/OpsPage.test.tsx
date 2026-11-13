@@ -123,5 +123,21 @@ describe('Ordens de Pagamento', () => {
     fireEvent.click(grupo)
     expect(grupo.getAttribute('aria-expanded')).toBe('true')
     expect(grupo.closest('.bt-groups__group')!.querySelector('.bt-table__row')).toBeTruthy()
+
+    // O checkbox do cabeçalho de um grupo marca só aquele grupo (selection.scope).
+    const outro = document.querySelector<HTMLButtonElement>('.bt-groups__toggle[aria-expanded="false"]')!
+    fireEvent.click(outro)
+    const cabecalho = (toggle: HTMLElement) => within(toggle.closest<HTMLElement>('.bt-groups__group')!).getByRole('checkbox', { name: 'Selecionar linhas do grupo' }) as HTMLInputElement
+    const pendente = cabecalho(grupo)
+    const segundo = cabecalho(outro)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(true)
+    expect(segundo.checked).toBe(false)
+    expect(segundo.indeterminate).toBe(false)
+    // Desmarcar um grupo preserva a seleção feita no outro.
+    fireEvent.click(segundo)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(false)
+    expect(segundo.checked).toBe(true)
   })
 })
