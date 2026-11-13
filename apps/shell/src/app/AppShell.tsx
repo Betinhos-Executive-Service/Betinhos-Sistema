@@ -114,8 +114,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?
     items: group.items.map((item) => ({
       id: item.id,
       label: itemLabel(item, entityLabels),
-      href: item.kind === 'external' ? item.url : hrefFor(item.id),
-      external: item.kind === 'external',
+      href: hrefFor(item.id),
       icon: ITEM_ICONS[item.id],
       badge: badges?.[item.id],
     })),
