@@ -1140,7 +1140,7 @@ function ComposicaoContent({ host }: { host: Host }) {
                   {item.clientAddress && <span className="lookup-preview__detail"><span>Endereço</span><span>{item.clientAddress}</span></span>}
                 </span>
               </span>
-            ) : item.client}
+            ) : <span className="grid-client-name" title={item.client}>{item.client}</span>}
           </span>
         )
       },
