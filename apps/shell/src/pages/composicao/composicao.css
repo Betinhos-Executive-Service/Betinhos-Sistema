@@ -227,6 +227,8 @@
 @keyframes composicao-composition-load-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .composicao .composition-load-more { animation: none; } }
 .composicao .composition-load-error { color: var(--bt-color-danger); }
+/* Falha da consulta com a grade vazia: fica preso à esquerda, como o vazio, para seguir visível com rolagem horizontal. */
+.composicao .composition-load-failure { position: sticky; left: 0; max-width: 640px; padding: 16px; }
 .composicao .composition-load-error button { border: 0; background: transparent; color: var(--bt-color-action); font: inherit; font-weight: 600; cursor: pointer; }
 @keyframes composicao-composition-spin { to { transform: rotate(360deg); } }
 
