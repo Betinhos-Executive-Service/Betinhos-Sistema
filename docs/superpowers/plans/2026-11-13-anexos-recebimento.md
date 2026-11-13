@@ -25,7 +25,9 @@ O Financeiro confere os comprovantes que o motorista tirou ao receber (foto, ví
   - Repo público: nenhum link real (`sig=`) nem dado de passageiro em mock ou teste.
   - Despesas não pode regredir (mesma galeria, mesmos status e choices).
 - **Premissas:**
-  - Assumi: a ordem é `cr40f_ordem` crescente dentro do serviço, e os serviços seguem a ordem que a ficha já usa.
+  - Ordem: `cr40f_ordem` crescente dentro do serviço (decidido), e os serviços na ordem que a ficha já usa.
+  - Serviço pago pelo link sem comprovante: só "Nenhum comprovante enviado pelo motorista" (decidido; sem cruzar com o pagamento).
+  - Indicador na lista: ícone de dinheiro (`Banknote`) com a contagem ao lado do ID do serviço (decidido; sem coluna nova).
   - Assumi: o limite de vídeo é o que o flow aguenta devolver em base64. O valor é definido no teste no DEV (estimativa inicial de 25 MB). O tamanho só é conhecido na resposta; se o flow estourar ou demorar além do tempo, cai no "Abrir no SharePoint".
   - Assumi: a contagem da lista vem de uma consulta por página visível (ids em blocos), não de coluna calculada.
 
@@ -35,7 +37,7 @@ O Financeiro confere os comprovantes que o motorista tirou ao receber (foto, ví
 3. Abrir o vídeo → aparece o progresso e depois o player toca dentro do sistema. Com o flow falhando, aparece "Abrir no SharePoint", que abre o `cr40f_sharelink`.
 4. Abrir um PDF → aparece embutido, e baixar salva com o nome do arquivo.
 5. Abrir a OP desse serviço → comprovantes de todos os serviços da OP, agrupados por serviço. No Pagante da mesma OP, os mesmos, com o aviso de que são da OP inteira.
-6. Lista do Geral → o serviço com 4 comprovantes mostra o clipe com "4", e o sem comprovante não mostra nada.
+6. Lista do Geral → o serviço com 4 comprovantes mostra, ao lado do ID, o ícone de dinheiro (`Banknote`) com "4", e o sem comprovante não mostra nada.
 7. Despesas → a galeria e o visualizador continuam iguais (testes existentes verdes, mais o print).
 - **Casos de borda:**
   - Serviço sem comprovante: a seção diz "Nenhum comprovante enviado pelo motorista".
@@ -84,7 +86,7 @@ Cada tarefa termina com typecheck e testes da área verdes. Os commits são pequ
 - Uma única galeria por ficha (o visualizador navega por todos), para "N de M" valer para a OP.
 
 ### T7. Contagem na lista do Geral
-- Ao carregar cada página, `contarPorReserva` dos ids visíveis (em blocos, sem bloquear a lista). `renderCell` da coluna de ID mostra o `Paperclip` com o número e `aria-label="4 comprovantes de recebimento"`. Falha na contagem só esconde o indicador.
+- Ao carregar cada página, `contarPorReserva` dos ids visíveis (em blocos, sem bloquear a lista). `renderCell` da coluna de ID mostra o ícone `Banknote` (dinheiro, Lucide) com o número ao lado do ID e `aria-label="4 comprovantes de recebimento"`. Falha na contagem só esconde o indicador.
 
 ### T8. Qualidade e verificação
 - `qualidade-antes-do-pr`: `/simplify` (2–3 passadas), `karpathy-coder`, `/code-review high --fix`.
