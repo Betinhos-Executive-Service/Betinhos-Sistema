@@ -719,7 +719,7 @@
 .composicao .fixed-col--select { left: 0; }
 .composicao .fixed-col--client { left: 36px; width: 176px; min-width: 176px; max-width: 176px; }
 .composicao .fixed-col--route { left: 212px; width: 220px; min-width: 220px; max-width: 220px; }
-.composicao .fixed-col--date { left: 432px; width: 138px; min-width: 138px; max-width: 138px; color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.composicao .fixed-col--date { left: 432px; width: 138px; min-width: 138px; max-width: 138px; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
 .composicao .fixed-col--client, .composicao .fixed-col--route { box-shadow: none; }
 .composicao .fixed-col--date { box-shadow: 2px 0 0 var(--bt-color-border); }
 .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview:hover), .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview:focus-within), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview:hover), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview:focus-within), .composicao .price-grid tbody td:has(.grid-related-preview:hover), .composicao .price-grid tbody td:has(.grid-related-preview:focus-within) { z-index: 20; }
