@@ -243,8 +243,8 @@ describe('Geral', () => {
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     expect(screen.getByText('2 selecionados')).toBeTruthy()
-    // A linha de comando vira a barra da seleção; Editar (exige exatamente um) não aparece com 2 selecionados.
-    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull()
+    // Editar (exige exatamente um) fica na linha, inerte com o motivo, para a barra não mudar de lugar (DS 1.26).
+    expect(screen.getByRole('button', { name: 'Editar' }).getAttribute('aria-disabled')).toBe('true')
     await acao('Copiar Serviços')
     const copy = await screen.findByRole('dialog', { name: 'Copiar serviços' })
     expect((await within(copy).findByText(/\*ID:\* OS-/)).textContent).toContain('*Trajeto:*')
