@@ -21,9 +21,9 @@ it('Resumo Operacional é rota React do shell', () => {
 })
 
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
-  const labels = new Map([['cr40f_recibos_v2', 'Recibos']])
+  const labels = new Map([['cr40f_servicosporpassageiro', 'Serviços por passageiro']])
   expect(itemLabel(findItem('clientes')!.item, labels)).toBe('Clientes')
-  expect(itemLabel(findItem('cr40f_recibos_v2')!.item, labels)).toBe('Recibos')
+  expect(itemLabel(findItem('cr40f_servicosporpassageiro')!.item, labels)).toBe('Serviços por passageiro')
   expect(itemLabel(findItem('cr40f_trocasdecarro')!.item, labels)).toBe('cr40f_trocasdecarro')
 })
 
@@ -41,7 +41,7 @@ it('Equipamentos é rota React em Cadastros', () => {
 
 it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
   const frota = MENU.find((group) => group.id === 'frota')!
-  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Assistente', 'Checklists de Veículos'])
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Checklists de Veículos'])
   expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
@@ -113,4 +113,8 @@ it('Conciliação do cartão saiu do menu: Cartões corporativos é de Cadastros
   expect(findItem('cartoes')?.group.id).toBe('cadastros')
   expect(findItem('cartoes')?.item).toMatchObject({ kind: 'page', page: 'cartoes', label: 'Cartões corporativos' })
   expect(rotaAtualizada('conciliacao-cartao', new URLSearchParams())).toEqual({ id: 'despesas-operacionais', query: new URLSearchParams('fila=sem-despesa') })
+})
+
+it('Infleet abre dentro do shell, na área de conteúdo', () => {
+  expect(findItem('infleet')?.item).toMatchObject({ kind: 'site', url: 'https://app.infleet.com.br/monitoring' })
 })

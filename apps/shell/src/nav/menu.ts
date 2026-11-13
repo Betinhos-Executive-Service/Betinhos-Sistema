@@ -6,7 +6,8 @@ export type MenuItem =
   | { kind: 'webresource'; id: string; label: string; resource: string }
   /** Tabela ainda atendida pela lista/formulário nativos; o rótulo vem da metadata. */
   | { kind: 'entity'; id: string; entity: string; label?: string }
-  | { kind: 'external'; id: string; label: string; url: string }
+  /** Site de terceiro aberto na área de conteúdo (iframe), com link para abrir em nova aba. */
+  | { kind: 'site'; id: string; label: string; url: string }
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
@@ -35,11 +36,10 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'geral', label: 'Geral', page: 'geral' },
       { kind: 'page', id: 'dashboard', label: 'Dashboard', page: 'dashboard' },
       { kind: 'page', id: 'operacional', label: 'Resumo Operacional', page: 'operacional' },
-      { kind: 'page', id: 'assistente-logistica', label: 'Assistente', page: 'agentes', agente: 'logistica' },
       { kind: 'page', id: 'funcoes-operacionais', label: 'Funções Operacionais', page: 'funcoes-operacionais' },
       { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
       { kind: 'page', id: 'qualidade', label: 'Gestão de Qualidade', page: 'qualidade' },
-      { kind: 'external', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
+      { kind: 'site', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       { kind: 'page', id: 'planner', label: 'Planner', page: 'planner' },
     ],
   },
@@ -53,8 +53,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
       { kind: 'page', id: 'validacao-cliente', label: 'Validação do cliente', page: 'validacao-cliente' },
-      { kind: 'page', id: 'assistente-financeiro', label: 'Assistente', page: 'agentes', agente: 'financeiro' },
-      table('cr40f_recibos_v2'),
       { kind: 'page', id: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores', page: 'pagamento-fornecedores' },
       { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
     ],
@@ -71,7 +69,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-colisoes', label: 'Colisões', page: 'frota', aba: 'colisoes' },
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
-      { kind: 'page', id: 'assistente-frota', label: 'Assistente', page: 'agentes', agente: 'frota' },
       { kind: 'page', id: 'frota-checklists', label: 'Checklists de Veículos', page: 'frota', aba: 'checklists' },
     ],
   },
@@ -83,7 +80,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'clientes', label: 'Clientes', page: 'clientes' },
       { kind: 'page', id: 'funcionarios', label: 'Funcionários', page: 'funcionarios' },
       { kind: 'page', id: 'documentos', label: 'Documentos', page: 'documentos' },
-      { kind: 'page', id: 'assistente-pessoas', label: 'Assistente', page: 'agentes', agente: 'pessoas' },
       { kind: 'page', id: 'curriculos', label: 'Currículos', page: 'curriculos' },
       { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
       { kind: 'page', id: 'treinamentos', label: 'Treinamentos', page: 'treinamentos' },
