@@ -18,6 +18,7 @@ A rota antiga `#/new_telacomposicaopreco` (iframe do WebResource) continua no me
 - Seleção não cobre Densidade nem Auditoria: em 1440/1280 todos ficam na linha (só ícone); em 1024 Colunas, Densidade e Auditoria vão para o "⋮" (comportamento do DS). Medir com `getBoundingClientRect` de `.bt-selection` contra `[aria-label="Densidade das linhas"]` e `[data-vb=audit] button`.
 - Densidade: Confortável = linha de 44 px, Compacta (padrão) = 38 px, Mínima = 32 px (`tbody td` altura).
 - Colunas (painel do DS): desmarcar "Data" e Aplicar tira a coluna da grade e o título mostra "Alterada". Filtros abre o painel do DS (Por coluna = colunas da grade; Avançado = todos os campos do catálogo, grupos E/OU em dois níveis).
+- Sem linha de chips de filtro (CSS `.composition-commandline .bt-chips`, pedido do Renan em 13/11/2026): o número de filtros ativos fica no botão Filtros.
 - "Salvar como…" no mock grava no `localStorage` (`tela-composicao-preco:mock-views:v1`) e a visão vira o título.
 - Filtros sem equivalente no DS (ex.: "não começa com") e os filtros originais de view nativa não editável aparecem no botão "Filtros da visão (N)" (diálogo só leitura; "Remover filtros só leitura" só para os da definição).
 - Console sem erro nem aviso. Layout: sem rolagem horizontal da página em 1440, 1280 e 1024 px com a sidebar aberta; o título "Composição de preços" fica em uma linha (as ações descem para a segunda linha quando não cabem). As consultas `@container` valem pela largura da página (sidebar já descontada); as `@media` pelo viewport.

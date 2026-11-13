@@ -38,6 +38,8 @@
 .composicao .composition-heading h1 { margin: 0; white-space: nowrap; color: var(--bt-color-brand); font-family: var(--bt-font-family-display); font-size: 28px; font-weight: 400; line-height: var(--bt-typography-heading-page-line-height); letter-spacing: var(--bt-typography-heading-page-letter-spacing); -webkit-text-stroke: var(--bt-heading-page-stroke-width) currentColor; }
 .composicao .composition-heading p { margin: 2px 0 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
 .composicao .composition-commandline { min-width: 0; padding-bottom: var(--bt-space-2); }
+/* Sem a linha de chips de filtro (pedido do Renan, 13/11/2026): os filtros seguem no botão "Filtros", com o número dos ativos. */
+.composicao .composition-commandline .bt-chips { display: none; }
 /* Progresso dos comandos (Verificando…, Excluindo…): região viva sempre presente; vazia não ocupa altura. */
 .composicao .composition-progress { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
 .composicao .composition-progress:not(:empty) { padding-bottom: var(--bt-space-2); }
