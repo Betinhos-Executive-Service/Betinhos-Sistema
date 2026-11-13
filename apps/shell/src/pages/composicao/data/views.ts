@@ -104,6 +104,7 @@ function xml(value: string) {
 }
 
 export const DEFAULT_COLUMNS: ViewColumn[] = [
+  { id: 'new_status', width: 112, pinned: true },
   { id: 'client', width: 176, pinned: true },
   { id: 'route', width: 220, pinned: true },
   { id: 'date', width: 138, pinned: true },

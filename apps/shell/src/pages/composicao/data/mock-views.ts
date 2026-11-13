@@ -8,6 +8,7 @@ const STORAGE_KEY = 'tela-composicao-preco:mock-views:v1'
 
 export function mockColumnCatalog(): CatalogField[] {
   return [
+    { id: 'new_status', label: 'Status', type: 'Status' },
     { id: 'client', label: 'Cliente', type: 'String' },
     { id: 'route', label: 'Trajeto', type: 'String' },
     { id: 'date', label: 'Data', type: 'DateTime' },
