@@ -47,11 +47,14 @@
 .gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
 .gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
 .gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
+/* Comprovantes: coluna fixa entre a seleção e a primeira coluna da visão. */
+.gr-cell--marker { position: sticky; left: 40px; z-index: 1; justify-content: center; padding: 0; color: var(--bt-color-text-secondary); background-color: var(--bt-color-surface); }
+.gr-table .bt-table__head .bt-table__cell.gr-cell--marker { position: sticky; }
 /* O DS põe position: relative em toda célula do cabeçalho (especificidade maior): sem esta regra a caixa "Selecionar carregados" rolava embora enquanto as caixas das linhas ficavam fixas. */
 .gr-table .bt-table__head .bt-table__cell.gr-cell--select { position: sticky; }
-.gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
-.gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
-.gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
+.gr-cell--first { position: sticky; left: var(--gr-first-left, 40px); z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
+.gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--marker, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
+.gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--marker, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
 .gr-table .gr-cell--select { padding: 0; }
 /* Caixa de seleção centrada na trilha de 40 px: sem o espaço do rótulo (que é só para leitor de tela). */
 .gr-table .gr-cell--select .bt-choice { gap: 0; min-height: 0; align-items: center; }
