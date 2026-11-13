@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
-import type { Anexo } from '../domain/types'
-import { createArquivos } from './arquivo'
+import type { Comprovante } from './arquivo'
+import { createArquivos } from './leitura'
 
-const anexo: Anexo = { id: 'a1', nome: 'cupom.jpg', tipo: 100000000, status: 100000001, url: null, driveItemId: 'DRIVE-1', enviadoEm: null, enviadoPor: '' }
+const anexo: Comprovante = { id: 'a1', nome: 'cupom.jpg', url: null, driveItemId: 'DRIVE-1' }
 const client = (url = 'https://flow.test/consultar') => ({ getAll: vi.fn(async (path: string) => (path.startsWith('environmentvariablevalues') ? [{ value: url }] : [])) }) as unknown as DataverseClient
 
 afterEach(() => vi.unstubAllGlobals())

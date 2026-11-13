@@ -1,6 +1,6 @@
 import { IA_DECISAO, IA_STATUS, IA_VAZIA, type AnaliseIA } from '../domain/ia'
 import { ANEXO, FINANCEIRO, OPERACIONAL } from '../domain/status'
-import { mimeDoArquivo } from '../domain/arquivo'
+import { mimeDoArquivo } from '../../../lib/comprovantes/arquivo'
 import { mockVolume } from '../../../app/mockVolume'
 import type { Anexo, Arquivo, Despesa } from '../domain/types'
 

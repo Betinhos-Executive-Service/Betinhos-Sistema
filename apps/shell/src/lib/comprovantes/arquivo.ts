@@ -1,3 +1,9 @@
+/** Comprovante guardado no OneDrive/SharePoint; o Dataverse só tem o link (e, nos novos, o id do item). */
+export type Comprovante = { id: string; nome: string; url: string | null; driveItemId?: string }
+
+/** Conteúdo lido pelo flow, como blob URL local. */
+export type Arquivo = { nome: string; mime: string; url: string }
+
 /** Tipo de prévia: imagem e PDF abrem no visualizador; o resto só pelo link do OneDrive. */
 export type Previa = 'imagem' | 'pdf' | null
 

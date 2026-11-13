@@ -1,7 +1,6 @@
 import type { DataverseClient } from '@betinhos/dataverse'
-import { base64ToBlob } from '../../funcionarios/data/source'
-import { mimeDoArquivo } from '../domain/arquivo'
-import type { Anexo, Arquivo } from '../domain/types'
+import { base64ToBlob } from '../../pages/funcionarios/data/source'
+import { mimeDoArquivo, type Arquivo, type Comprovante } from './arquivo'
 
 /** Flow HTTP "Flow - Consultar Arquivo OneDrive" (criado por packages/deploy/provision-flow-consultar-onedrive.ps1). */
 export const FLOW_VAR = 'new_URLFlowConsultarArquivoOneDrive'
@@ -33,7 +32,7 @@ export function createArquivos(client: DataverseClient) {
     return value
   }).catch((error) => { url = null; throw error }))
 
-  async function buscar(anexo: Anexo): Promise<Arquivo> {
+  async function buscar(anexo: Comprovante): Promise<Arquivo> {
     // Comprovantes antigos não gravaram o id do OneDrive: o flow resolve pelo link de compartilhamento.
     if (!anexo.driveItemId && !anexo.url) throw new Error('Este comprovante não tem o arquivo no OneDrive.')
     const body = anexo.driveItemId
@@ -49,7 +48,7 @@ export function createArquivos(client: DataverseClient) {
     return { nome, mime, url: URL.createObjectURL(base64ToBlob(result.conteudoBase64, mime)) }
   }
 
-  return (anexo: Anexo) => {
+  return (anexo: Comprovante) => {
     let item = cache.get(anexo.id)
     if (!item) {
       item = buscar(anexo)

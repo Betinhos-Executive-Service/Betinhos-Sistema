@@ -1,0 +1,50 @@
+/* Comprovantes: cartões com miniatura (imagem ou PDF), rodapé com nome e link, e visualizador em tela cheia. Usado por Despesas e Recebimentos. */
+.cmp-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-weight: var(--bt-font-weight-bold); text-decoration: none; }
+.cmp-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .cmp-link:hover { text-decoration: underline; } }
+.cmp-comprovantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
+.cmp-comprovante { display: grid; grid-template-rows: auto auto; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.cmp-comprovante__previa { display: grid; place-items: center; height: 168px; overflow: hidden; padding: 0; border: 0; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-secondary); font: inherit; }
+button.cmp-comprovante__previa { cursor: zoom-in; transition: background-color var(--bt-duration-fast) var(--bt-ease-out); }
+button.cmp-comprovante__previa:active { transform: scale(0.99); }
+button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { button.cmp-comprovante__previa:hover { background-color: var(--bt-color-surface-soft); } }
+.cmp-comprovante__info { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-1) var(--bt-space-2) var(--bt-space-2-5); font-size: var(--bt-font-size-13); color: var(--bt-color-text-primary); }
+.cmp-comprovante__nome { grid-column: 1 / -1; overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+/* Tipo e data numa linha própria, sem cortar: a data é o que diferencia dois anexos. Status e link ficam na linha de baixo. */
+.cmp-comprovante__meta { grid-column: 1 / -1; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.cmp-comprovante__info > .bt-badge { justify-self: start; }
+.cmp-comprovante__info .cmp-link { display: grid; place-items: center; min-width: var(--bt-control-height-compact); min-height: var(--bt-control-height-compact); }
+
+.cmp-previa__img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.cmp-previa__pdf { width: 100%; height: 100%; border: 0; background-color: var(--bt-color-surface); }
+.cmp-previa__pdf--mini { pointer-events: none; }
+.cmp-previa__vazio { display: grid; justify-items: center; gap: var(--bt-space-2); padding: var(--bt-space-3); font-size: var(--bt-font-size-12); text-align: center; color: var(--bt-color-text-secondary); }
+.cmp-previa__vazio--erro { color: var(--bt-color-danger); }
+
+/* Visualizador: <dialog> sobre a ficha, imagem/PDF em tamanho real dentro da tela. */
+.cmp-viewer { width: min(1100px, 94vw); max-width: none; height: 90vh; max-height: none; margin: auto; padding: 0; border: 0; border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); }
+.cmp-viewer::backdrop { background-color: rgba(0, 26, 61, var(--bt-opacity-backdrop)); }
+.cmp-viewer[open] { animation: cmp-viewer-in var(--bt-duration-normal) var(--bt-ease-out); }
+@keyframes cmp-viewer-in { from { opacity: 0; transform: scale(.97); } }
+.cmp-viewer__panel { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
+.cmp-viewer__head { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 56px; padding: 0 var(--bt-space-2) 0 var(--bt-space-4); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.cmp-viewer__titulo { display: flex; align-items: baseline; gap: var(--bt-space-2); min-width: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.cmp-viewer__titulo strong { overflow: hidden; font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; color: var(--bt-color-text-primary); }
+.cmp-viewer__acoes { display: flex; flex: none; gap: var(--bt-space-1); }
+.cmp-viewer__acao { display: grid; place-items: center; width: var(--bt-control-height-default); height: var(--bt-control-height-default); padding: 0; border: 0; border-radius: var(--bt-radius-md); background-color: transparent; color: var(--bt-color-text-secondary); cursor: pointer; transition: background-color var(--bt-duration-fast) var(--bt-ease-out); }
+.cmp-viewer__acao:active { transform: scale(.97); }
+.cmp-viewer__acao:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .cmp-viewer__acao:hover { background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); } }
+.cmp-viewer__body { position: relative; display: grid; place-items: center; min-height: 0; padding: var(--bt-space-3); background-color: var(--bt-color-surface-neutral); }
+.cmp-viewer__body .cmp-previa__img { width: auto; max-width: 100%; height: auto; max-height: 100%; object-fit: contain; }
+.cmp-viewer__body .cmp-previa__pdf { align-self: stretch; height: 100%; }
+.cmp-viewer__nav { position: absolute; top: 50%; z-index: var(--bt-z-index-content); transform: translateY(-50%); }
+.cmp-viewer__nav--prev { left: var(--bt-space-3); }
+.cmp-viewer__nav--next { right: var(--bt-space-3); }
+
+@media (max-width: 560px) {
+  .cmp-comprovantes { grid-template-columns: minmax(0, 1fr); }
+  .cmp-viewer { width: 100vw; height: 100dvh; border-radius: 0; }
+}
+.cmp-num { font-variant-numeric: tabular-nums; }

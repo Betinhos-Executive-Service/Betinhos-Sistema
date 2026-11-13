@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, Drawer } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, StatusBadge } from '@betinhos/ui'
 import { ExternalLink, MapPin } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
@@ -14,7 +14,8 @@ import { decidivel, type Decisao } from '../domain/decisao'
 import { AnaliseIA } from './AnaliseIA'
 import { DecisaoBloco, type EstadoDecisao } from './DecisaoBloco'
 import { Item } from './Ficha'
-import { ComprovantesGaleria } from './Comprovantes'
+import { ComprovantesGaleria } from '../../../lib/comprovantes/Galeria'
+import { arquivoTone } from '../domain/status'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
@@ -192,9 +193,11 @@ function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos
     return <Section title="Comprovantes"><BrandLoader variant="inline" size="sm" label="Carregando comprovantes" text="Carregando comprovantes…" /></Section>
   }
   if ('error' in anexos) return <Alert tone="danger" title="Não foi possível carregar os comprovantes">{anexos.error}</Alert>
+  const meta = (a: Anexo) => [label(choices.anexoTipo, a.tipo, ''), a.enviadoEm ? formatDateTime(a.enviadoEm) : ''].filter(Boolean).join(' · ')
+  const selo = (a: Anexo) => <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? <ComprovantesGaleria anexos={anexos} choices={choices} ler={source.arquivo} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }
