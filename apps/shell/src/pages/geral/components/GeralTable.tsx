@@ -44,7 +44,7 @@ type Props = {
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
   renderCell: (row: Row, column: Column) => ReactNode
-  /** Conteúdo ao lado do ID (indicador de comprovantes). */
+  /** Slot logo depois do botão do ID da linha. */
   besideId?: (id: string, name: string) => ReactNode
   /** Contêiner de rolagem (`.gr-grid`): é a raiz do observador que carrega mais linhas. */
   scrollRef?: RefObject<HTMLDivElement | null>
@@ -131,7 +131,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     cancelAnimationFrame(d.frame)
     if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
     // Largura mudou: o estilo já está nela e a gravação renderiza com ela. Voltar à antiga aqui deixava a coluna errada quando
-    // um render no meio do arraste (ex.: a contagem de comprovantes chegando) já tinha posto a largura nova no React.
+    // qualquer render no meio do arraste já tinha posto a largura nova no React.
     if (d.width !== d.start) { onResize(d.key, d.width); return }
     const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
     if (grid) { const { cols, min } = layout(); grid.style.setProperty('--gr-columns', cols); grid.style.setProperty('--gr-min-width', min) }

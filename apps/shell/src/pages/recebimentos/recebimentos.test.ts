@@ -44,7 +44,6 @@ describe('recebimentos: consultas', () => {
     expect(c.getAll).toHaveBeenCalledTimes(2)
     const primeiro = decodeURIComponent(c.getAll.mock.calls[0][0])
     expect(primeiro).toContain('cr40f_anexorecebimento_v2s?$select=')
-    expect(primeiro).toContain('$orderby=cr40f_ordem asc')
     expect(primeiro.match(/_cr40f_reserva_value eq/g)).toHaveLength(15)
   })
 

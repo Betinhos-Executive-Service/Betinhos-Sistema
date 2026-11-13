@@ -60,7 +60,6 @@ export type Anexo = {
   enviadoPor: string
 }
 
-/** Conteúdo do comprovante pronto para mostrar: `url` é blob/data URL local, nunca o link do OneDrive. */
 export type { Arquivo } from '../../../lib/comprovantes/arquivo'
 
 export type DespesaChoices = {

@@ -31,7 +31,7 @@ const filtro = (ids: string[]) => encodeURIComponent(ids.map((id) => `_cr40f_res
 
 /** Comprovantes dos serviços, com o nome do motorista pela anotação formatada do lookup. */
 export async function loadRecebimentos(client: DataverseClient, reservaIds: string[]) {
-  const respostas = await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=${SELECT}&$filter=${filtro(ids)}&$orderby=cr40f_ordem asc`)))
+  const respostas = await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=${SELECT}&$filter=${filtro(ids)}`)))
   return respostas.flat().map(mapRecebimento)
 }
 

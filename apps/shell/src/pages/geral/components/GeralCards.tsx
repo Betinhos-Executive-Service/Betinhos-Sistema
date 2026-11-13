@@ -17,7 +17,7 @@ type Props = {
   onToggle: (id: string) => void
   /** Abre o serviço no Formulário Geral. */
   onOpen: (id: string) => void
-  /** Conteúdo ao lado do ID (indicador de comprovantes). */
+  /** Slot logo depois do botão do ID da linha. */
   besideId?: (id: string, name: string) => ReactNode
   /** Abre a sheet de edição dos campos. */
   onEdit: (id: string) => void

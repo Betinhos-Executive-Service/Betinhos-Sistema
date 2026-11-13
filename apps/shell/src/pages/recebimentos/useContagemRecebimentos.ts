@@ -11,7 +11,7 @@ export function useContagemRecebimentos(source: RecebimentosSource, ids: string[
     if (!novos.length) return
     novos.forEach((id) => contados.current.add(id))
     source.contar(novos).then(
-      (found) => setContagem((cur) => { const next = new Map(cur); for (const id of novos) { const n = found.get(id); if (n) next.set(id, n); else next.delete(id) } return next }),
+      (found) => setContagem((cur) => { const next = new Map(cur); for (const id of novos) { const n = found.get(id); if (n) next.set(id, n) } return next }),
       () => novos.forEach((id) => contados.current.delete(id)),
     )
   }, [source, ids])
