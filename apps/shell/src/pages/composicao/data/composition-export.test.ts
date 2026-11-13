@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { collectCompositionPages, compositionWorkbook } from './composition-export'
 import { initialCompositions } from './compositions'
-import type { ViewDefinition } from './views'
+import type { CatalogField, ViewDefinition } from './views'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { ViewFieldCell } from '../components/ViewFieldCell'
+import { readViewField } from './view-field-read'
 
 async function entries(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer())
@@ -73,5 +77,33 @@ describe('compositionWorkbook', () => {
     expect(files['xl/worksheets/sheet1.xml']).toContain('<c r="B5" s="5"><v>123.45</v></c>')
     expect(files['xl/styles.xml']).toContain('R$')
     expect(files['xl/styles.xml']).toContain('<cellStyles count="1">')
+  })
+
+  it('lookup direto, escolha e booleano da composição saem no Excel com o mesmo texto da grade', async () => {
+    const F = '@OData.Community.Display.V1.FormattedValue'
+    const base = { table: 'cr40f_composicaodeprecos', path: [], available: true }
+    const catalog: CatalogField[] = [
+      { ...base, id: 'cr40f_servicorelacionadogeral', attribute: 'cr40f_servicorelacionadogeral', label: 'Serviço Relacionado (Geral)', type: 'Lookup' },
+      { ...base, id: 'new_status', attribute: 'new_status', label: 'Status', type: 'Picklist' },
+      { ...base, id: 'cr40f_faturado', attribute: 'cr40f_faturado', label: 'Faturado', type: 'Boolean' },
+    ]
+    const definition: ViewDefinition = { columns: catalog.map(({ id }) => ({ id, width: 120, pinned: false })), filters: [], sort: [] }
+    // Forma devolvida pelo FetchXML da "Visualização Padrão 2" no DEV: o lookup só vem como `_<atributo>_value`.
+    const viewFields = {
+      _cr40f_servicorelacionadogeral_value: 'a49df940-ef76-f111-ab0e-00224838156e',
+      [`_cr40f_servicorelacionadogeral_value${F}`]: 'OS-1716',
+      '_cr40f_servicorelacionadogeral_value@Microsoft.Dynamics.CRM.lookuplogicalname': 'cr40f_reservadeveculos',
+      new_status: 100000000, [`new_status${F}`]: 'Aprovada',
+      cr40f_faturado: false,
+    }
+    const sheet = (await entries(compositionWorkbook([{ ...initialCompositions[0], viewFields }], definition, catalog, 'Visualização Padrão 2')))['xl/worksheets/sheet1.xml']
+    const excel = ['A5', 'B5', 'C5'].map((address) => /<t xml:space="preserve">([^<]*)<\/t>/.exec(sheet.slice(sheet.indexOf(`r="${address}"`)))?.[1])
+    const grid = catalog.map((field) => {
+      const { value, formatted } = readViewField(viewFields, field.attribute)
+      return renderToStaticMarkup(createElement('span', null, ViewFieldCell({ field, value, formatted, viewFields, valueKey: field.attribute, baseRecordId: 'x' }))).replace(/<[^>]+>/g, '')
+    })
+    expect(excel).toEqual(['OS-1716', 'Aprovada', 'Não'])
+    expect(grid).toEqual(excel)
+    expect(sheet).not.toContain('a49df940')
   })
 })

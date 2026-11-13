@@ -3,8 +3,8 @@ import type { CatalogField } from './views'
 /**
  * Cache do catálogo de campos (metadata do Dataverse) no navegador, compartilhado entre abas e sessões:
  * sem ele, cada aba nova relia a metadata das tabelas relacionadas antes de mostrar a grade.
- * O catálogo é usado imediatamente e a metadata é revalidada em segundo plano;
- * só muda a tela quando o schema realmente mudou. Não guarda dados de registros.
+ * Dentro da validade, o catálogo é usado imediatamente e a metadata não sai na abertura: é conferida com o navegador ocioso,
+ * depois da primeira página, e só muda a tela quando o schema realmente mudou. Não guarda dados de registros.
  *
  * O catálogo cru do DEV tem 16 mil campos e 8,4 milhões de caracteres, acima da cota do `localStorage`.
  * Por isso é gravado enxuto: dados de tabela e caminho uma vez por grupo e textos repetidos num dicionário.
