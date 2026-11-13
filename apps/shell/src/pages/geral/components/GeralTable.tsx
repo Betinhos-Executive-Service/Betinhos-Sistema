@@ -44,7 +44,7 @@ type Props = {
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
   renderCell: (row: Row, column: Column) => ReactNode
-  /** Slot logo depois do botão do ID da linha. */
+  /** Slot logo depois do botão da primeira coluna; `name` é o ID do serviço (`cr40f_id`), seja qual for a primeira coluna. */
   besideId?: (id: string, name: string) => ReactNode
   /** Contêiner de rolagem (`.gr-grid`): é a raiz do observador que carrega mais linhas. */
   scrollRef?: RefObject<HTMLDivElement | null>
@@ -293,7 +293,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                   return (
                     <div key={column.key} className="bt-table__cell gr-cell gr-cell--first" role="gridcell">
                       <button type="button" className="gr-open" aria-label={`Abrir serviço ${value} no Formulário Geral`} onClick={() => onOpen(id)}>{isBadgeValue(column, raw) && value !== '' ? <ChoiceBadge column={column} info={info} raw={raw} text={value} /> : value}</button>
-                      {besideId?.(id, value)}
+                      {besideId?.(id, formatCell('readonly', row, 'cr40f_id'))}
                     </div>
                   )
                 })}

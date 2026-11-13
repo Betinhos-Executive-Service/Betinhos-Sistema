@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
 import type { Comprovante } from './arquivo'
-import { createArquivos, MAX_BUSCAS } from './leitura'
+import { createArquivos, criarFila, MAX_BUSCAS } from './leitura'
 
 const anexo: Comprovante = { id: 'a1', nome: 'cupom.jpg', url: null, driveItemId: 'DRIVE-1' }
 const client = (url = 'https://flow.test/consultar') => ({ getAll: vi.fn(async (path: string) => (path.startsWith('environmentvariablevalues') ? [{ value: url }] : [])) }) as unknown as DataverseClient
@@ -83,5 +83,19 @@ describe('leitura do comprovante no OneDrive', () => {
     await expect(ler(anexo)).rejects.toThrow('demorou mais de')
     await expect(ler(anexo)).rejects.toThrow('demorou mais de')
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('fila: a vaga passa direto para quem espera e a urgente fura a fila', async () => {
+    const fila = criarFila(1)
+    const ordem: string[] = []
+    let soltar = () => {}
+    const primeira = fila(() => new Promise<void>((ok) => { soltar = ok }))
+    const normal = fila(async () => { ordem.push('normal') })
+    const urgente = fila(async () => { ordem.push('urgente') }, true)
+    soltar()
+    // Quem chega logo depois de a vaga abrir não passa na frente de quem já esperava.
+    const atrasada = primeira.then(() => fila(async () => { ordem.push('atrasada') }))
+    await Promise.all([primeira, normal, urgente, atrasada])
+    expect(ordem).toEqual(['urgente', 'normal', 'atrasada'])
   })
 })

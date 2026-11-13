@@ -28,8 +28,14 @@ export function mapRecebimento(row: Row): Recebimento {
 /** Ids válidos, sem repetição, em blocos de 15 (limite de URL do OData). */
 const blocos = (ids: string[]) => chunk([...new Set(ids.map(cleanId).filter((id) => GUID.test(id)))], 15)
 const filtro = (ids: string[]) => encodeURIComponent(ids.map((id) => `_cr40f_reserva_value eq ${id}`).join(' or '))
-const consultar = async (client: DataverseClient, reservaIds: string[], select: string) =>
-  (await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=${select}&$filter=${filtro(ids)}`)))).flat()
+/** No máximo 4 consultas ao mesmo tempo (a lista do Geral com 500 serviços daria 34 de uma vez), como em pessoas/data/queries.ts. */
+async function consultar(client: DataverseClient, reservaIds: string[], select: string) {
+  const rows: Row[] = []
+  for (const onda of chunk(blocos(reservaIds), 4)) {
+    rows.push(...(await Promise.all(onda.map((ids) => client.getAll(`${ENTITY_SET}?$select=${select}&$filter=${filtro(ids)}`)))).flat())
+  }
+  return rows
+}
 
 /** Comprovantes dos serviços, com o nome do motorista pela anotação formatada do lookup. */
 export async function loadRecebimentos(client: DataverseClient, reservaIds: string[]) {

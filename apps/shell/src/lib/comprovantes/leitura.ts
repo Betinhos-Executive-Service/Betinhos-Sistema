@@ -15,14 +15,17 @@ export const TEMPO_MAXIMO_MS = 60_000
 
 type FlowResult = { sucesso?: boolean; erro?: string; nomeArquivo?: string; mimeType?: string; conteudoBase64?: string }
 
-/** Fila simples: no máximo `limite` tarefas rodando; as outras esperam a vez, em ordem. */
+/**
+ * Fila simples: no máximo `limite` tarefas rodando; as outras esperam a vez, em ordem (a urgente fura a fila).
+ * A vaga passa direto de quem termina para o próximo da espera, sem brecha para quem chega no meio.
+ */
 export function criarFila(limite: number) {
   let rodando = 0
   const espera: (() => void)[] = []
-  return async <T>(tarefa: () => Promise<T>): Promise<T> => {
-    if (rodando >= limite) await new Promise<void>((vez) => espera.push(vez))
-    rodando += 1
-    try { return await tarefa() } finally { rodando -= 1; espera.shift()?.() }
+  return async <T>(tarefa: () => Promise<T>, urgente = false): Promise<T> => {
+    if (rodando < limite) rodando += 1
+    else await new Promise<void>((vez) => { if (urgente) espera.unshift(vez); else espera.push(vez) })
+    try { return await tarefa() } finally { const proxima = espera.shift(); if (proxima) proxima(); else rodando -= 1 }
   }
 }
 
@@ -74,10 +77,11 @@ export function createArquivos(client: DataverseClient, tempoMaximo = TEMPO_MAXI
     return { nome, mime, url: URL.createObjectURL(base64ToBlob(result.conteudoBase64, mime)) }
   }
 
-  return (anexo: Comprovante) => {
+  // `urgente`: o visualizador aberto pelo usuário passa na frente das miniaturas na espera.
+  return (anexo: Comprovante, opcoes?: { urgente?: boolean }) => {
     let item = cache.get(anexo.id)
     if (!item) {
-      item = naFila(() => buscar(anexo))
+      item = naFila(() => buscar(anexo), opcoes?.urgente)
       item.catch(() => cache.delete(anexo.id))
       cache.set(anexo.id, item)
     }

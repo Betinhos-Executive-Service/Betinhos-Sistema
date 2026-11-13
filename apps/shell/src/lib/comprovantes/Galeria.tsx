@@ -6,7 +6,8 @@ import { BrandLoader } from '../../app/BrandLoader'
 import { ehVideo, tipoPrevia, type Arquivo, type Comprovante } from './arquivo'
 import './comprovantes.css'
 
-type Ler = (anexo: Comprovante) => Promise<Arquivo>
+type Opcoes = { urgente?: boolean }
+type Ler = (anexo: Comprovante, opcoes?: Opcoes) => Promise<Arquivo>
 type Estado = { arquivo: Arquivo } | { erro: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
@@ -15,18 +16,18 @@ const temArquivo = (a: Comprovante) => Boolean(a.driveItemId || a.url)
 
 /**
  * Conteúdo do comprovante; o Source guarda em cache (e esquece falhas), então "Tentar de novo" busca outra vez.
- * Com `ativo` falso (miniatura fora da tela) não busca nada.
+ * Com `ativo` falso (miniatura fora da tela) não busca nada; `urgente` (visualizador) passa na frente na fila de buscas.
  */
-function useArquivo(ler: Ler, anexo: Comprovante | null, ativo = true) {
+function useArquivo(ler: Ler, anexo: Comprovante | null, ativo = true, urgente = false) {
   const [estado, setEstado] = useState<Estado>(null)
   const [tentativa, setTentativa] = useState(0)
   useEffect(() => {
     if (!anexo || !ativo) { setEstado(null); return }
     let cancelled = false
     setEstado(null)
-    ler(anexo).then((arquivo) => { if (!cancelled) setEstado({ arquivo }) }).catch((reason) => { if (!cancelled) setEstado({ erro: message(reason) }) })
+    ler(anexo, { urgente }).then((arquivo) => { if (!cancelled) setEstado({ arquivo }) }).catch((reason) => { if (!cancelled) setEstado({ erro: message(reason) }) })
     return () => { cancelled = true }
-  }, [ler, anexo, ativo, tentativa])
+  }, [ler, anexo, ativo, urgente, tentativa])
   const tentarDeNovo = useCallback(() => setTentativa((n) => n + 1), [])
   return { estado, tentarDeNovo }
 }
@@ -87,7 +88,7 @@ function Miniatura({ anexo, ler, onOpen }: { anexo: Comprovante; ler: Ler; onOpe
 
 type Props<T extends Comprovante> = {
   anexos: T[]
-  ler: (anexo: T) => Promise<Arquivo>
+  ler: (anexo: T, opcoes?: Opcoes) => Promise<Arquivo>
   /** Linha cinza do cartão (tipo, data, quem enviou). */
   meta?: (anexo: T) => string
   /** Selo do cartão (ex.: status do envio). */
@@ -118,8 +119,8 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
   }
   return (
     <>
-      {blocos.map((bloco) => (
-        <Fragment key={bloco.chave}>
+      {blocos.map((bloco, i) => (
+        <Fragment key={`${i}:${bloco.chave}`}>
           {bloco.titulo ? <h4 className="cmp-grupo">{bloco.titulo}</h4> : null}
           <ul className="cmp-comprovantes">
             {bloco.itens.map((a) => {
@@ -160,7 +161,7 @@ function Visualizador({ anexos, indice: pedido, onChange, ler, origem }: { anexo
   if (pedidoAnexo && pedido != null) ultimo.current = { anexo: pedidoAnexo, indice: pedido }
   const anexo = pedidoAnexo ?? ultimo.current?.anexo ?? null
   const indice = pedidoAnexo ? pedido : ultimo.current?.indice ?? null
-  const { estado, tentarDeNovo } = useArquivo(ler, anexo)
+  const { estado, tentarDeNovo } = useArquivo(ler, anexo, true, true)
   const total = anexos.length
   const arquivo = estado && 'arquivo' in estado ? estado.arquivo : null
   const nome = arquivo?.nome ?? anexo?.nome ?? ''
