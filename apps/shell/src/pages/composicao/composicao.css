@@ -728,8 +728,11 @@
 .composicao .grid-client { display: flex; align-items: center; gap: 6px; overflow: visible; color: var(--bt-color-ink-900); font-weight: 600; white-space: nowrap; }
 .composicao .lookup-preview { position: relative; min-width: 0; }
 .composicao .lookup-preview:hover, .composicao .lookup-preview:focus-within { z-index: 20; }
-.composicao .lookup-link { display: block; max-width: 146px; min-height: var(--bt-control-height-compact); overflow: hidden; padding: 4px 0; border: 0; background: none; color: var(--bt-color-text-primary); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--bt-color-slate-400); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.composicao .lookup-link:hover, .composicao .lookup-link:focus-visible { color: var(--bt-color-action); text-decoration-color: currentColor; }
+.composicao .lookup-link { display: block; max-width: 146px; min-height: var(--bt-control-height-compact); overflow: hidden; padding: 4px 0; border: 0; background: none; color: var(--bt-color-action); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.composicao .lookup-link:hover, .composicao .lookup-link:focus-visible { color: var(--bt-color-brand-hover); text-decoration-color: currentColor; }
+.composicao .lookup-link:active { transform: scale(.98); }
+/* Lookup comum da visão: o link ocupa só o texto, o resto da célula segue selecionando/editando. */
+.composicao .grid-lookup-link { display: inline-block; max-width: 100%; min-height: 0; padding: 0; vertical-align: middle; }
 .composicao .lookup-link:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 2px; }
 .composicao .lookup-preview__card { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; display: grid; gap: 10px; width: min(320px, calc(100vw - 48px)); padding: 14px 16px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-slate-700); font-size: var(--bt-font-size-12); font-weight: 400; line-height: 1.45; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-3px); transition: opacity 120ms ease, transform 120ms ease, visibility 120ms; pointer-events: none; }
 .composicao .lookup-preview__card strong { color: var(--bt-color-ink-900); font-size: var(--bt-font-size-13); }

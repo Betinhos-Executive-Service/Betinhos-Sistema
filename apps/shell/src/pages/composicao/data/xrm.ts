@@ -10,8 +10,8 @@ export type XrmWebApi = {
 export type XrmHost = {
   WebApi?: XrmWebApi
   Navigation?: {
-    openForm: (options: { entityName: string; entityId: string }) => Promise<unknown>
-    navigateTo?: (page: { pageType: 'webresource'; webresourceName: string; data: string }, options: { target: number }) => Promise<unknown>
+    openForm?: (options: { entityName: string; entityId: string }) => Promise<unknown>
+    navigateTo?: (page: { pageType: 'webresource'; webresourceName: string; data: string } | { pageType: 'entityrecord'; entityName: string; entityId: string }, options: { target: number; position?: number; width?: { value: number; unit: '%' | 'px' } }) => Promise<unknown>
     openConfirmDialog: (strings: { title: string; text: string; confirmButtonLabel?: string; cancelButtonLabel?: string }) => Promise<{ confirmed: boolean }>
   }
   Utility?: { getGlobalContext: () => { getClientUrl: () => string } }

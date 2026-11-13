@@ -32,7 +32,6 @@ import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } f
 import { LAST_VIEW_KEY, openQueryFromViewRow, pickOpenView } from './data/open-query'
 import { readViewField } from './data/view-field-read'
 import { openGridRecord } from './data/record-navigation'
-import { getXrmHost } from './data/xrm'
 import { relatedRecordId, type SavedFieldValue } from './data/related-field-edit'
 import { gridNumberInput } from './data/grid-field-value'
 import './composicao.css'
@@ -1132,10 +1131,7 @@ function ComposicaoContent({ host }: { host: Host }) {
             <span className={`grid-status ${item.status === 'Concluído' ? 'grid-status--done' : ''}`} />
             {clientId ? (
               <span className="lookup-preview">
-                <button type="button" className="lookup-link" onClick={() => {
-                  const navigation = getXrmHost()?.Navigation
-                  if (typeof navigation?.openForm === 'function') void navigation.openForm({ entityName: 'cr40f_clientes1', entityId: clientId })
-                }} aria-label={`Abrir cliente ${item.client}`}>
+                <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
                   {item.client}
                 </button>
                 <span className="lookup-preview__card" role="tooltip">
