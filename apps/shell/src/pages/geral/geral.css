@@ -229,9 +229,11 @@
 .gr-table .bt-table__head .bt-table__cell { position: relative; }
 .gr-table .bt-table__head .gr-cell--first { position: sticky; }
 /* Alça centrada na linha da borda (6 px de cada lado): só à esquerda, o clique na linha caía no cabeçalho vizinho e virava menu ou reordenação. */
-.gr-resize { position: absolute; top: 0; right: -7px; bottom: 0; width: 13px; cursor: col-resize; touch-action: none; z-index: 3; }
+.gr-resize { position: absolute; top: 0; right: -6px; bottom: 0; width: 12px; cursor: col-resize; touch-action: none; z-index: 3; }
 .gr-table .bt-table__head .bt-table__cell:last-child > .gr-resize, .gr-table .bt-table__head .bt-table__cell:last-child > .gr-resize::after { right: 0; }
-.gr-resize::after { content: ""; position: absolute; top: 0; bottom: 0; right: 6px; width: 2px; background-color: transparent; }
+.gr-resize::after { content: ""; position: absolute; top: 0; bottom: 0; right: 5px; width: 2px; background-color: transparent; }
+:root.gr-resizing, :root.gr-resizing * { cursor: col-resize !important; user-select: none; }
+.gr-resizing .gr-resize:active::after { background-color: var(--bt-color-action); }
 .gr-resize:focus-visible { outline: 0; }
 .gr-resize:focus-visible::after { background-color: var(--bt-focus-border); }
 @media (hover: hover) { .gr-resize:hover::after { background-color: var(--bt-color-action); } }

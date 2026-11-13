@@ -62,12 +62,13 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
   const BOOLEAN_WIDTH = 96
   // Durante o arraste a largura vive em `drag` e vai direto para o estilo da grade (um quadro por vez), sem renderizar a tabela; ao soltar é gravada nas preferências.
-  const drag = useRef<{ key: string; start: number; width: number; frame: number } | null>(null)
+  const drag = useRef<{ key: string; start: number; width: number; frame: number; done: () => void } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
   const refocus = useRef<string | null>(null)
   const pressing = useRef(false)
+  useEffect(() => () => drag.current?.done(), [])
   // Coluna com o painel de filtro aberto (chave) e o cabeçalho que o ancora.
   const [filterAt, setFilterAt] = useState<string | null>(null)
   const filterAnchor = filterAt ? Array.from(root.current?.querySelectorAll<HTMLElement>('.bt-colhead') ?? []).find((b) => b.dataset.col === filterAt) ?? null : null
@@ -102,8 +103,20 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     e.preventDefault()
     e.stopPropagation()
     pressing.current = true
-    e.currentTarget.setPointerCapture?.(e.pointerId)
-    drag.current = { key: column.key, start: column.width, width: column.width, frame: 0 }
+    const handle = e.currentTarget
+    const pointer = e.pointerId
+    handle.setPointerCapture?.(pointer)
+    // Esc devolve a largura de antes; o cursor de redimensionar vale na página inteira enquanto arrasta.
+    const esc = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      resizeFinish(handle, pointer, false)
+    }
+    window.addEventListener('keydown', esc, true)
+    document.documentElement.classList.add('gr-resizing')
+    const done = () => { window.removeEventListener('keydown', esc, true); document.documentElement.classList.remove('gr-resizing') }
+    drag.current = { key: column.key, start: column.width, width: column.width, frame: 0, done }
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
@@ -121,18 +134,24 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
       grid.style.setProperty('--gr-min-width', min)
     })
   }
-  const resizeEnd = (e: PointerEvent<HTMLDivElement>) => {
+  const resizeFinish = (handle: HTMLElement, pointer: number, commit: boolean) => {
     pressing.current = false
     const d = drag.current
-    drag.current = null
     if (!d) return
     cancelAnimationFrame(d.frame)
-    // Volta o estilo ao que o React conhece; se a largura mudou, a gravação abaixo renderiza com ela.
-    const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
+    d.done()
+    const changed = commit && d.width !== d.start
+    if (!changed) drag.current = null
+    // Grava no estilo a largura final (a mesma que o React renderiza depois de onResize) ou, sem mudança, a de antes.
+    // Voltar sempre à de antes quebrava: se a tabela renderizou no meio do arraste, o React já tinha a largura final
+    // como último estilo, não regravava ao soltar e a coluna voltava ao tamanho antigo.
+    const grid = handle.closest<HTMLElement>('.gr-grid')
     if (grid) { const { cols, min } = layout(); grid.style.setProperty('--gr-columns', cols); grid.style.setProperty('--gr-min-width', min) }
-    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
-    if (d.width !== d.start) onResize(d.key, d.width)
+    drag.current = null
+    if (handle.hasPointerCapture?.(pointer)) handle.releasePointerCapture?.(pointer)
+    if (changed) onResize(d.key, d.width)
   }
+  const resizeEnd = (e: PointerEvent<HTMLDivElement>) => resizeFinish(e.currentTarget, e.pointerId, true)
   const resizeKey = (column: Column) => (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
       e.preventDefault()
