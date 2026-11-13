@@ -34,7 +34,7 @@ describe('comprovantes de recebimento', () => {
 
   it('na OP, agrupa por serviço na ordem da ficha, com ID, data e destino no título', () => {
     const lista = [{ ...rec('x', 1), reservaId: 's2' }, rec('a', 1), { ...rec('y', 2), reservaId: 's2' }]
-    const servicos = [{ id: 'S2', codigo: 'OS-2', data: new Date(2026, 10, 11), destino: 'Embraer' }, { id: 's1', codigo: '', data: null, destino: '' }, { id: 's3', codigo: 'OS-3', data: null, destino: 'GRU' }]
+    const servicos = [{ id: 'S2', codigo: 'OS-2', data: new Date('2026-11-11T12:00:00-03:00'), destino: 'Embraer' }, { id: 's1', codigo: '', data: null, destino: '' }, { id: 's3', codigo: 'OS-3', data: null, destino: 'GRU' }]
     render(<ListaRecebimentos estado={{ lista }} recarregar={() => {}} source={fonte(async () => [])} servicos={servicos} />)
     expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['OS-2 · 11/11/2026 · Embraer', 'Serviço sem ID · — · Sem destino'])
     expect(screen.getAllByRole('button', { name: /^Ver / }).map((c) => c.getAttribute('aria-label'))).toEqual(['Ver x.jpg', 'Ver y.jpg', 'Ver a.jpg'])

@@ -30,7 +30,7 @@ describe('recebimentos: domínio', () => {
   })
 
   it('meta do cartão: data e hora do envio e motorista', () => {
-    expect(metaRecebimento(rec({ enviadoEm: new Date(2026, 10, 12, 9, 5), motorista: 'Carlos Souza' }))).toMatch(/12\/11\/2026.*09:05 · Carlos Souza/)
+    expect(metaRecebimento(rec({ enviadoEm: new Date('2026-11-12T09:05:00-03:00'), motorista: 'Carlos Souza' }))).toMatch(/12\/11\/2026.*09:05 · Carlos Souza/)
     expect(metaRecebimento(rec({}))).toBe('')
   })
 })
