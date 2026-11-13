@@ -740,13 +740,14 @@
 .composicao .lookup-preview__detail > span:first-child { color: var(--bt-color-text-secondary); }
 .composicao .lookup-preview__detail > span:last-child { overflow-wrap: anywhere; }
 .composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); }
-/* Status da composição na coluna Cliente: etiqueta com o texto (antes era só uma bolinha), no padrão das etiquetas das tabelas. */
-.composicao .grid-client-status { flex: none; min-width: 72px; justify-content: center; border-radius: var(--bt-radius-xs); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
 .composicao .grid-client > .lookup-preview, .composicao .grid-client > .lookup-preview .lookup-link, .composicao .grid-client-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composicao .grid-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--bt-color-warning); }
 .composicao .grid-status--done { background: var(--bt-color-success); }
 .composicao .grid-choice-badge { display: inline-flex; align-items: center; max-width: 100%; min-height: 24px; padding: 2px 8px; overflow: hidden; border: 0; border-radius: var(--bt-radius-xs); background: var(--bt-color-border); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .composicao .grid-boolean-badge { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 22px; padding: 2px 8px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: 600; }
+/* Status sem cor cadastrada na choice: amarelo enquanto não conclui, verde concluído (mesmos tons das etiquetas do DS). */
+.composicao .grid-choice-badge--pending { background: var(--bt-color-warning-soft); color: var(--bt-color-warning); }
+.composicao .grid-choice-badge--done { background: var(--bt-color-success-soft); color: var(--bt-color-success); }
 .composicao .grid-choice-badge[style*="--grid-choice"] { background: color-mix(in srgb, var(--grid-choice) 70%, white); color: color-mix(in srgb, var(--grid-choice) 15%, black); }
 .composicao .grid-boolean-badge::before { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--bt-color-slate-400); content: ''; }
 .composicao .grid-boolean-badge--true { border-color: var(--bt-color-success-soft); background: var(--bt-color-surface-neutral); color: var(--bt-color-success); }
