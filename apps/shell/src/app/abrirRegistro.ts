@@ -1,4 +1,5 @@
 import { getXrmHost } from '../pages/composicao/data/xrm'
+import { EVENTO_QUERY, hrefFor, parseHash } from '../nav/useHashRoute'
 
 const GENERAL_TABLE = 'cr40f_reservadeveculos'
 const GENERAL_WEBRESOURCE = 'new_formulario_geral.html'
@@ -11,14 +12,51 @@ export const GENERAL_DRAWER = { target: 2, position: 2, width: { value: 75, unit
 const guid = (id: string) => id.replace(/[{}]/g, '')
 
 /**
- * Abre o registro no painel lateral. Dentro do model-driven usa `navigateTo` (o Geral no Formulário Geral, o resto no
- * formulário nativo). Por URL direta o shim do Xrm não navega: o registro abre numa aba nova do Dataverse.
+ * Tabelas que têm tela no shell: o registro abre na gaveta (drawer) dessa tela, pela rota do menu e o parâmetro que a
+ * tela já lê da URL. `voltar=1` faz o fechar da gaveta voltar para a lista de origem (`instalarVoltarDaGaveta`).
  */
-/** Usado pela Composição e pela Geral: clique num registro relacionado (lookup, ID) abre o registro sem sair da lista. */
+export const GAVETAS_DO_SHELL: Readonly<Record<string, { rota: string; chave: string }>> = {
+  cr40f_funcionarios: { rota: 'funcionarios', chave: 'ficha' },
+  cr40f_veiculos: { rota: 'frota-veiculos', chave: 'ficha' },
+  cr40f_clientes1: { rota: 'clientes', chave: 'ver' },
+  cr40f_bancodedados: { rota: 'pessoas', chave: 'ver' },
+  cr40f_equipamento: { rota: 'equipamentos', chave: 'ver' },
+  cr40f_financeiro: { rota: 'ops', chave: 'abrir' },
+  cr40f_pagantes: { rota: 'pagantes', chave: 'abrir' },
+  cr40f_despesaoperacional: { rota: 'despesas-operacionais', chave: 'abrir' },
+}
+
+/** Parâmetros com que as telas abrem uma gaveta; sem nenhum deles, a gaveta está fechada. */
+const CHAVES_DE_GAVETA = ['ficha', 'ver', 'editar', 'novo', 'abrir', 'registro']
+
+/**
+ * Gaveta aberta a partir de outra lista (`voltar=1`): quando a tela fecha a gaveta (tira o parâmetro dela da URL), volta
+ * no histórico para a lista de onde o usuário veio, com a visão e os filtros dela. Instalado uma vez no `main`.
+ */
+export function instalarVoltarDaGaveta() {
+  const aoMudar = () => {
+    const { query } = parseHash(location.hash)
+    if (query.get('voltar') !== '1' || CHAVES_DE_GAVETA.some((chave) => query.has(chave))) return
+    history.back()
+  }
+  window.addEventListener(EVENTO_QUERY, aoMudar)
+  return () => window.removeEventListener(EVENTO_QUERY, aoMudar)
+}
+
+/**
+ * Abre um registro relacionado (lookup, ID) a partir de uma lista (Composição, Geral). Tabela com tela no shell: abre a
+ * gaveta dessa tela. Senão, dentro do model-driven, painel lateral com `navigateTo` (o Geral no Formulário Geral, o resto
+ * no formulário nativo); sem `navigateTo`, `openForm`; por URL direta, aba nova do Dataverse.
+ */
 export function openGridRecord(table: string, recordId: string): Promise<unknown> | undefined {
+  const id = guid(recordId)
+  const gaveta = GAVETAS_DO_SHELL[table]
+  if (gaveta) {
+    location.hash = hrefFor(gaveta.rota, { [gaveta.chave]: id, voltar: '1' })
+    return undefined
+  }
   const host = getXrmHost()
   const navigation = host?.Navigation
-  const id = guid(recordId)
   if (navigation?.navigateTo) {
     if (table === GENERAL_TABLE) {
       return navigation.navigateTo({

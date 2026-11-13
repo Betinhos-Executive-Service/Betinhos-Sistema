@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react'
 
 // WebResource não aceita rotas por path; a rota vive no hash (#/id-do-item?chave=valor).
 // O id (sem a query) identifica a tela no menu; a query guarda o estado da tela (ex.: a aba ativa).
-const EVENTO_QUERY = 'bt:hashquery'
+export const EVENTO_QUERY = 'bt:hashquery'
 
 function subscribe(onChange: () => void) {
   window.addEventListener('hashchange', onChange)

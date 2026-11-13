@@ -7,6 +7,17 @@ afterEach(() => vi.unstubAllGlobals())
 const id = 'e8b7c267-b4a9-4e0c-91c3-c5a72b6965fa'
 
 describe('navegação da grade', () => {
+  it('tabela com tela no shell abre a gaveta dessa tela, com volta para a lista', () => {
+    const navigateTo = vi.fn(async () => undefined)
+    vi.stubGlobal('Xrm', { Navigation: { navigateTo } })
+    location.hash = '#/geral'
+    void openGridRecord('cr40f_funcionarios', `{${id}}`)
+    expect(location.hash).toBe(`#/funcionarios?ficha=${id}&voltar=1`)
+    void openGridRecord('cr40f_clientes1', id)
+    expect(location.hash).toBe(`#/clientes?ver=${id}&voltar=1`)
+    expect(navigateTo).not.toHaveBeenCalled()
+  })
+
   it('abre Geral no Formulário Geral em painel lateral largo', () => {
     const navigateTo = vi.fn(async () => undefined)
     const openForm = vi.fn(async () => undefined)
@@ -19,22 +30,22 @@ describe('navegação da grade', () => {
   it('abre as outras tabelas no formulário nativo em painel lateral', () => {
     const navigateTo = vi.fn(async () => undefined)
     vi.stubGlobal('Xrm', { Navigation: { navigateTo } })
-    void openGridRecord('cr40f_clientes1', `{${id}}`)
-    expect(navigateTo).toHaveBeenCalledWith({ pageType: 'entityrecord', entityName: 'cr40f_clientes1', entityId: id }, { target: 2, position: 2, width: { value: 50, unit: '%' } })
+    void openGridRecord('cr40f_solicitantes', `{${id}}`)
+    expect(navigateTo).toHaveBeenCalledWith({ pageType: 'entityrecord', entityName: 'cr40f_solicitantes', entityId: id }, { target: 2, position: 2, width: { value: 50, unit: '%' } })
   })
 
   it('sem navigateTo usa o openForm', () => {
     const openForm = vi.fn(async () => undefined)
     vi.stubGlobal('Xrm', { Navigation: { openForm } })
-    void openGridRecord('cr40f_clientes1', id)
-    expect(openForm).toHaveBeenCalledWith({ entityName: 'cr40f_clientes1', entityId: id })
+    void openGridRecord('cr40f_solicitantes', id)
+    expect(openForm).toHaveBeenCalledWith({ entityName: 'cr40f_solicitantes', entityId: id })
   })
 
   it('por URL direta (shim sem navegação) abre o registro em aba nova', () => {
     const open = vi.fn()
     vi.stubGlobal('open', open)
     vi.stubGlobal('Xrm', { Navigation: {}, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm2.dynamics.com/' }) } })
-    void openGridRecord('cr40f_clientes1', id)
-    expect(open).toHaveBeenCalledWith(`https://org.crm2.dynamics.com/main.aspx?pagetype=entityrecord&etn=cr40f_clientes1&id=${id}`, '_blank', 'noopener')
+    void openGridRecord('cr40f_solicitantes', id)
+    expect(open).toHaveBeenCalledWith(`https://org.crm2.dynamics.com/main.aspx?pagetype=entityrecord&etn=cr40f_solicitantes&id=${id}`, '_blank', 'noopener')
   })
 })
