@@ -45,7 +45,7 @@ function useVisivel() {
 }
 
 /** Miniatura: spinner pequeno; o visualizador usa o loader da marca. */
-const Carregando = () => <span className="cmp-previa__vazio"><Spinner size={20} label="Buscando no OneDrive" />Buscando no OneDrive…</span>
+const Carregando = () => <span className="cmp-previa__vazio"><Spinner size={20} label="Buscando o arquivo" />Buscando o arquivo…</span>
 
 /** No visualizador, com o link do arquivo, oferece abrir direto no SharePoint (ex.: vídeo grande demais para o flow). */
 function Falha({ erro, onRetry, grande = false, link }: { erro: string; onRetry: () => void; grande?: boolean; link?: string | null }) {
@@ -129,12 +129,12 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
             <li key={a.id} className="cmp-comprovante">
               {indice >= 0
                 ? <Miniatura anexo={a} ler={ler} onOpen={(rect) => { origem.current = rect; setAberto(indice) }} />
-                : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não está no OneDrive</span></div>}
+                : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não foi enviado</span></div>}
               <div className="cmp-comprovante__info">
                 <strong className="cmp-comprovante__nome" title={a.nome}>{a.nome}</strong>
                 {meta ? <span className="cmp-comprovante__meta" title={meta}>{meta}</span> : null}
                 {selo?.(a)}
-                {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} no OneDrive`} title="Abrir no OneDrive"><ExternalLink size={16} aria-hidden="true" /></a> : null}
+                {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} em nova aba`} title="Abrir em nova aba"><ExternalLink size={16} aria-hidden="true" /></a> : null}
               </div>
             </li>
           )
@@ -222,7 +222,7 @@ function Visualizador({ anexos, indice: pedido, onChange, ler, origem }: { anexo
             <div key={anexo.id} className="cmp-viewer__conteudo">
             {estado == null ? (ehVideo(anexo)
               ? <BrandLoader variant="inline" size="md" label="Baixando o vídeo" text="Baixando o vídeo… pode levar até 1 minuto." />
-              : <BrandLoader variant="inline" size="md" label="Buscando no OneDrive" text="Buscando no OneDrive…" />)
+              : <BrandLoader variant="inline" size="md" label="Buscando o arquivo" text="Buscando o arquivo…" />)
               : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande link={anexo.url} />
                 : <Conteudo arquivo={estado.arquivo} grande />}
             </div>

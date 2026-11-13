@@ -56,7 +56,7 @@ describe('leitura do comprovante no OneDrive', () => {
   })
 
   it('sem arquivo no OneDrive ou sem variável configurada, explica o motivo', async () => {
-    await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('não tem o arquivo no OneDrive')
+    await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('ainda não tem o arquivo')
     await expect(createArquivos(client(''))(anexo)).rejects.toThrow('new_URLFlowConsultarArquivoOneDrive')
   })
 

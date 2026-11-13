@@ -51,7 +51,7 @@ export function createArquivos(client: DataverseClient, tempoMaximo = TEMPO_MAXI
 
   async function buscar(anexo: Comprovante): Promise<Arquivo> {
     // Comprovantes antigos não gravaram o id do OneDrive: o flow resolve pelo link de compartilhamento.
-    if (!anexo.driveItemId && !anexo.url) throw new Error('Este comprovante não tem o arquivo no OneDrive.')
+    if (!anexo.driveItemId && !anexo.url) throw new Error('Este comprovante ainda não tem o arquivo.')
     const body = anexo.driveItemId
       ? { id: anexo.driveItemId, nomeArquivo: anexo.nome, ...(noSharePoint(anexo.url) ? { origem: 'sharepoint' } : {}) }
       : { link: anexo.url, nomeArquivo: anexo.nome }
@@ -67,7 +67,7 @@ export function createArquivos(client: DataverseClient, tempoMaximo = TEMPO_MAXI
       if (controle.signal.aborted) throw new Error(`O arquivo demorou mais de ${Math.round(tempoMaximo / 1000)} s para chegar.`)
       throw erro
     } finally { clearTimeout(prazo) }
-    if (!response.ok || result.sucesso !== true || !result.conteudoBase64) throw new Error(result.erro || `O OneDrive não respondeu (HTTP ${response.status}).`)
+    if (!response.ok || result.sucesso !== true || !result.conteudoBase64) throw new Error(result.erro || `O arquivo não pôde ser lido (HTTP ${response.status}).`)
     // O nome no OneDrive tem a extensão (o gravado no Dataverse às vezes não: "comprovante-1").
     const nome = result.nomeArquivo?.trim() || anexo.nome
     const mime = mimeDoArquivo(nome, result.mimeType)
