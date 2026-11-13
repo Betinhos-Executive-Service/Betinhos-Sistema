@@ -21,6 +21,9 @@ const view = { savedqueryid: 'vvvvvvvv-0000-4000-8000-000000000001', name: 'Padr
 const row = (id: string, extra: Record<string, unknown> = {}) => ({ cr40f_composicaodeprecosid: id, new_status: 1, [`new_status${F}`]: 'Aprovada', 'cmp_cli.cr40f_nomedocliente': `Cliente ${id.slice(0, 4)}`, versionnumber: 1, ...extra })
 const field = (id: string, label: string): CatalogField => ({ id, label, table: 'cr40f_composicaodeprecos', attribute: id, path: [], type: 'String', available: true, writable: true })
 
+/** Rótulos do cabeçalho da grade (o drawer de colunas da ViewBar também lista as colunas fixas). */
+const headerLabels = (root: ParentNode) => [...root.querySelectorAll('.bt-colhead__label')].map((node) => node.textContent)
+
 type Handler = (entity: string, query: string, call: number) => unknown
 function fakeXrm(handler: Handler = () => ({ entities: [] })) {
   const calls: { entity: string; query: string }[] = []
@@ -76,7 +79,7 @@ it('catálogo que chega depois não refaz a consulta e o cabeçalho provisório 
 
   await waitFor(() => expect(screen.getByRole('searchbox', { name: /Buscar/ })).toHaveProperty('disabled', false))
   expect(container.querySelector('.column-header--provisional')).toBeNull()
-  expect(screen.getByText('Situação')).toBeTruthy()
+  expect(headerLabels(container)).toContain('Situação')
   expect(screen.getByText('Aprovada')).toBeTruthy()
   expect(xrm.count('cr40f_composicaodeprecos')).toBe(before)
 })
@@ -173,7 +176,7 @@ it('cache de catálogo vencido é ignorado: abre igual e usa o catálogo da rede
 
   render(<ComposicaoPage host={host} />)
 
-  expect(await screen.findByText('Situação')).toBeTruthy()
+  await waitFor(() => expect(headerLabels(document.body)).toContain('Situação'))
   expect(screen.queryByText('Antigo')).toBeNull()
   expect(catalog.load).toHaveBeenCalledTimes(1)
 })

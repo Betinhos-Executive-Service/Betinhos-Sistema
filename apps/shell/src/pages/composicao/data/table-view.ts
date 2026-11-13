@@ -14,6 +14,9 @@ import { isDatePreset, NUMERIC_TYPES, type CatalogField, type ViewColumn, type V
  */
 
 const FIXED_LABELS: Record<string, string> = { client: 'Cliente', route: 'Trajeto', date: 'Data' }
+
+/** Rótulo das colunas da visão padrão que não são fixas do código enquanto a metadata não chega (o nome lógico não aparece para o usuário). */
+export const PROVISIONAL_LABELS: Record<string, string> = { new_status: 'Status' }
 const TEXT_OPS: Partial<Record<ViewFilter['operator'], FilterCondition['op']>> = { like: 'contains', 'not-like': 'not-contains', eq: 'eq', ne: 'ne', 'begins-with': 'begins', 'ends-with': 'ends' }
 
 /** Tipo do Dataverse → tipo do filtro do DS; `null` quando o DS não filtra o campo (Uniqueidentifier, Customer…). */
@@ -43,7 +46,7 @@ export const columnIdOf = (key: string) => isExtraColumn(key) ? decodeURICompone
 
 export function columnLabel(id: string, catalog: Map<string, CatalogField>) {
   const field = catalog.get(id)
-  const label = FIXED_LABELS[id] ?? field?.label ?? moneyFields.find((item) => item.key === id)?.label ?? id
+  const label = FIXED_LABELS[id] ?? field?.label ?? PROVISIONAL_LABELS[id] ?? moneyFields.find((item) => item.key === id)?.label ?? id
   return field?.path.length && !FIXED_LABELS[id] ? `${field.tableLabel ?? field.table} › ${label}` : label
 }
 
