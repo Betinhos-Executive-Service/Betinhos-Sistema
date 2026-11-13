@@ -5,7 +5,7 @@
 .cmp-comprovantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
 .cmp-comprovante { display: grid; grid-template-rows: auto auto; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
 .cmp-comprovante__previa { display: grid; place-items: center; height: 168px; overflow: hidden; padding: 0; border: 0; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-secondary); font: inherit; }
-button.cmp-comprovante__previa { cursor: zoom-in; transition: background-color var(--bt-duration-fast) var(--bt-ease-out); }
+button.cmp-comprovante__previa { cursor: zoom-in; transition: background-color var(--bt-duration-fast) var(--bt-ease-out), transform var(--bt-duration-fast) var(--bt-ease-out); }
 button.cmp-comprovante__previa:active { transform: scale(0.99); }
 button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(--bt-focus-ring); }
 @media (hover: hover) and (pointer: fine) { button.cmp-comprovante__previa:hover { background-color: var(--bt-color-surface-soft); } }
@@ -27,8 +27,22 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
 /* Visualizador: <dialog> sobre a ficha, imagem/PDF em tamanho real dentro da tela. */
 .cmp-viewer { width: min(1100px, 94vw); max-width: none; height: 90vh; max-height: none; margin: auto; padding: 0; border: 0; border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); }
 .cmp-viewer::backdrop { background-color: rgba(0, 26, 61, var(--bt-opacity-backdrop)); }
-.cmp-viewer[open] { animation: cmp-viewer-in var(--bt-duration-normal) var(--bt-ease-out); }
-@keyframes cmp-viewer-in { from { opacity: 0; transform: scale(.97); } }
+/* Movimento: abre crescendo da miniatura (200 ms), fecha em 150 ms e a troca de arquivo faz um fade de 120 ms. Só transform e opacity. */
+.cmp-viewer { --cmp-ease: cubic-bezier(0.23, 1, 0.32, 1); transform-origin: var(--cmp-origem, center); }
+.cmp-viewer[open] { animation: cmp-viewer-in 200ms var(--cmp-ease); }
+.cmp-viewer[open]::backdrop { animation: cmp-fade-in 200ms var(--cmp-ease); }
+.cmp-viewer.cmp-viewer--saindo { animation: cmp-viewer-out 150ms ease-out forwards; }
+.cmp-viewer.cmp-viewer--saindo::backdrop { animation: cmp-fade-out 150ms ease-out forwards; }
+.cmp-viewer__conteudo { display: grid; place-items: center; width: 100%; height: 100%; min-height: 0; animation: cmp-fade-in 120ms ease-out; }
+@keyframes cmp-viewer-in { from { opacity: 0; transform: scale(.96); } }
+@keyframes cmp-viewer-out { to { opacity: 0; transform: scale(.98); } }
+@keyframes cmp-fade-in { from { opacity: 0; } }
+@keyframes cmp-fade-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .cmp-viewer[open] { animation-name: cmp-fade-in; }
+  .cmp-viewer.cmp-viewer--saindo { animation-name: cmp-fade-out; }
+  button.cmp-comprovante__previa:active { transform: none; }
+}
 .cmp-viewer__panel { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
 .cmp-viewer__head { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); min-height: 56px; padding: 0 var(--bt-space-2) 0 var(--bt-space-4); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
 .cmp-viewer__titulo { display: flex; align-items: baseline; gap: var(--bt-space-2); min-width: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
@@ -41,6 +55,7 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
 .cmp-viewer__body { position: relative; display: grid; place-items: center; min-height: 0; padding: var(--bt-space-3); background-color: var(--bt-color-surface-neutral); }
 .cmp-viewer__body .cmp-previa__img { width: auto; max-width: 100%; height: auto; max-height: 100%; object-fit: contain; }
 .cmp-viewer__body .cmp-previa__pdf { align-self: stretch; height: 100%; }
+.cmp-viewer__conteudo > .cmp-previa__pdf { align-self: stretch; }
 .cmp-viewer__nav { position: absolute; top: 50%; z-index: var(--bt-z-index-content); transform: translateY(-50%); }
 .cmp-viewer__nav--prev { left: var(--bt-space-3); }
 .cmp-viewer__nav--next { right: var(--bt-space-3); }

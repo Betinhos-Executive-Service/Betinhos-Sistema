@@ -73,13 +73,13 @@ function Conteudo({ arquivo, grande = false }: { arquivo: Arquivo; grande?: bool
 }
 
 /** Vídeo fica só com o ícone (é buscado ao abrir); o resto busca a prévia quando a miniatura chega perto da tela. */
-function Miniatura({ anexo, ler, onOpen }: { anexo: Comprovante; ler: Ler; onOpen: () => void }) {
+function Miniatura({ anexo, ler, onOpen }: { anexo: Comprovante; ler: Ler; onOpen: (origem: DOMRect) => void }) {
   const video = ehVideo(anexo)
   const [ref, visivel] = useVisivel()
   const { estado, tentarDeNovo } = useArquivo(ler, anexo, visivel && !video)
   if (estado && 'erro' in estado) return <div ref={ref} className="cmp-comprovante__previa"><Falha erro={estado.erro} onRetry={tentarDeNovo} /></div>
   return (
-    <button ref={ref} type="button" className="cmp-comprovante__previa" aria-label={`Ver ${estado?.arquivo.nome ?? anexo.nome}`} onClick={onOpen}>
+    <button ref={ref} type="button" className="cmp-comprovante__previa" aria-label={`Ver ${estado?.arquivo.nome ?? anexo.nome}`} onClick={(event) => onOpen(event.currentTarget.getBoundingClientRect())}>
       {video ? <IconeVideo /> : estado ? <Conteudo arquivo={estado.arquivo} /> : <Carregando />}
     </button>
   )
@@ -104,6 +104,8 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
   const achado = abertoId ? visiveis.findIndex((a) => a.id === abertoId) : -1
   const aberto = achado >= 0 ? achado : null
   const setAberto = (indice: number | null) => setAbertoId(indice == null ? null : visiveis[indice]?.id ?? null)
+  // Retângulo da miniatura clicada: o visualizador cresce a partir dela.
+  const origem = useRef<DOMRect | null>(null)
   return (
     <>
       <ul className="cmp-comprovantes">
@@ -113,7 +115,7 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
           return (
             <li key={a.id} className="cmp-comprovante">
               {indice >= 0
-                ? <Miniatura anexo={a} ler={ler} onOpen={() => setAberto(indice)} />
+                ? <Miniatura anexo={a} ler={ler} onOpen={(rect) => { origem.current = rect; setAberto(indice) }} />
                 : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não está no OneDrive</span></div>}
               <div className="cmp-comprovante__info">
                 <strong className="cmp-comprovante__nome" title={a.nome}>{a.nome}</strong>
@@ -125,7 +127,7 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
           )
         })}
       </ul>
-      <Visualizador anexos={visiveis} indice={aberto} onChange={setAberto} ler={ler} />
+      <Visualizador anexos={visiveis} indice={aberto} onChange={setAberto} ler={ler} origem={origem} />
     </>
   )
 }
@@ -133,10 +135,16 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
 /**
  * Visualizador em tela cheia por cima da ficha: <dialog> nativo empilhado sobre o Drawer (que também é
  * <dialog>), então Esc e o fundo fecham só ele. Setas trocam de arquivo.
+ * Abre crescendo da miniatura clicada e, ao fechar, espera a saída (~150 ms) mostrando o último arquivo.
  */
-function Visualizador({ anexos, indice, onChange, ler }: { anexos: Comprovante[]; indice: number | null; onChange: (i: number | null) => void; ler: Ler }) {
+function Visualizador({ anexos, indice: pedido, onChange, ler, origem }: { anexos: Comprovante[]; indice: number | null; onChange: (i: number | null) => void; ler: Ler; origem: { current: DOMRect | null } }) {
   const ref = useRef<HTMLDialogElement>(null)
-  const anexo = indice != null ? anexos[indice] ?? null : null
+  const pedidoAnexo = pedido != null ? anexos[pedido] ?? null : null
+  // Durante a saída o conteúdo continua o último aberto, para não sumir antes do fade.
+  const ultimo = useRef<{ anexo: Comprovante; indice: number } | null>(null)
+  if (pedidoAnexo && pedido != null) ultimo.current = { anexo: pedidoAnexo, indice: pedido }
+  const anexo = pedidoAnexo ?? ultimo.current?.anexo ?? null
+  const indice = pedidoAnexo ? pedido : ultimo.current?.indice ?? null
   const { estado, tentarDeNovo } = useArquivo(ler, anexo)
   const total = anexos.length
   const arquivo = estado && 'arquivo' in estado ? estado.arquivo : null
@@ -145,11 +153,28 @@ function Visualizador({ anexos, indice, onChange, ler }: { anexos: Comprovante[]
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
-    if (anexo && !dialog.open) dialog.showModal()
-    if (!anexo && dialog.open) dialog.close()
-  }, [anexo])
+    if (pedidoAnexo) {
+      dialog.classList.remove('cmp-viewer--saindo')
+      if (dialog.open) return
+      dialog.showModal()
+      // Origem da escala: o centro da miniatura, em relação ao visualizador (sem miniatura, o centro dele).
+      const de = origem.current
+      origem.current = null
+      const caixa = dialog.getBoundingClientRect()
+      dialog.style.setProperty('--cmp-origem', de && caixa.width ? `${de.left + de.width / 2 - caixa.left}px ${de.top + de.height / 2 - caixa.top}px` : 'center')
+      return
+    }
+    if (!dialog.open) return
+    dialog.classList.add('cmp-viewer--saindo')
+    const fechar = () => { dialog.classList.remove('cmp-viewer--saindo'); dialog.close(); ultimo.current = null }
+    // Fim da animação do próprio dialog fecha na hora; o timer cobre navegador sem animação (ou jsdom).
+    const aoAnimar = (event: AnimationEvent) => { if (event.target === dialog && !event.pseudoElement) fechar() }
+    const timer = window.setTimeout(fechar, 200)
+    dialog.addEventListener('animationend', aoAnimar)
+    return () => { window.clearTimeout(timer); dialog.removeEventListener('animationend', aoAnimar) }
+  }, [pedidoAnexo, origem])
 
-  const ir = (passo: number) => { if (indice != null && total > 1) onChange((indice + passo + total) % total) }
+  const ir = (passo: number) => { if (pedidoAnexo && indice != null && total > 1) onChange((indice + passo + total) % total) }
 
   return (
     <dialog
@@ -179,11 +204,13 @@ function Visualizador({ anexos, indice, onChange, ler }: { anexos: Comprovante[]
           </header>
           <div className="cmp-viewer__body">
             {total > 1 ? <Button variant="secondary" className="cmp-viewer__nav cmp-viewer__nav--prev" icon={<ChevronLeft size={20} />} aria-label="Comprovante anterior" onClick={() => ir(-1)} /> : null}
-            {estado == null ? (anexo && ehVideo(anexo)
+            <div key={anexo.id} className="cmp-viewer__conteudo">
+            {estado == null ? (ehVideo(anexo)
               ? <BrandLoader variant="inline" size="md" label="Baixando o vídeo" text="Baixando o vídeo… pode levar até 1 minuto." />
               : <BrandLoader variant="inline" size="md" label="Buscando no OneDrive" text="Buscando no OneDrive…" />)
-              : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande link={anexo?.url} />
+              : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande link={anexo.url} />
                 : <Conteudo arquivo={estado.arquivo} grande />}
+            </div>
             {total > 1 ? <Button variant="secondary" className="cmp-viewer__nav cmp-viewer__nav--next" icon={<ChevronRight size={20} />} aria-label="Próximo comprovante" onClick={() => ir(1)} /> : null}
           </div>
         </div>

@@ -55,4 +55,18 @@ describe('galeria de comprovantes', () => {
     expect(await within(viewer).findByText('O arquivo demorou mais de 60 s para chegar.')).toBeTruthy()
     expect(within(viewer).getByRole('link', { name: 'Abrir no SharePoint' }).getAttribute('href')).toBe('https://exemplo.test/v1')
   })
+
+  it('abre crescendo da miniatura e, ao fechar, mantém o arquivo até a saída terminar', async () => {
+    stubObserver()
+    const ler = vi.fn(async (a: Comprovante) => imagem(a))
+    render(<ComprovantesGaleria anexos={[foto]} ler={ler} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver recebimento-1.jpg' }))
+    const viewer = await screen.findByRole('dialog', { name: 'Comprovante recebimento-1.jpg' })
+    expect((viewer as HTMLDialogElement).style.getPropertyValue('--cmp-origem')).not.toBe('')
+    fireEvent.click(within(viewer).getByRole('button', { name: 'Fechar visualizador' }))
+    expect(viewer.classList.contains('cmp-viewer--saindo')).toBe(true)
+    expect(within(viewer).getByRole('img', { name: 'recebimento-1.jpg' })).toBeTruthy()
+    await vi.waitFor(() => expect(viewer.hasAttribute('open')).toBe(false))
+    expect(viewer.classList.contains('cmp-viewer--saindo')).toBe(false)
+  })
 })
