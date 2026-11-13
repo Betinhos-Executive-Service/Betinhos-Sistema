@@ -741,7 +741,7 @@
 .composicao .lookup-preview__detail > span:last-child { overflow-wrap: anywhere; }
 .composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); }
 /* Status da composição na coluna Cliente: etiqueta com o texto (antes era só uma bolinha), no padrão das etiquetas das tabelas. */
-.composicao .grid-client-status { flex: none; border-radius: var(--bt-radius-xs); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
+.composicao .grid-client-status { flex: none; min-width: 72px; justify-content: center; border-radius: var(--bt-radius-xs); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
 .composicao .grid-client > .lookup-preview, .composicao .grid-client > .lookup-preview .lookup-link, .composicao .grid-client-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composicao .grid-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--bt-color-warning); }
 .composicao .grid-status--done { background: var(--bt-color-success); }
