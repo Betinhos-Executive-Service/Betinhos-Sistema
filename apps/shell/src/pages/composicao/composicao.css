@@ -675,7 +675,8 @@
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: var(--bt-font-size-11);
+  color: var(--bt-color-text-primary);
+  font-size: var(--bt-font-size-13);
 }
 .composicao .price-grid th, .composicao .price-grid td { height: 38px; padding: 0 9px; border-right: 1px solid var(--bt-color-canvas); border-bottom: 0; background: var(--bt-color-surface); }
 .composicao .price-grid th, .composicao .price-grid td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -684,7 +685,7 @@
 .composicao .price-grid .grid-client, .composicao .price-grid .lookup-preview { max-width: 100%; min-width: 0; }
 .composicao .price-grid .grid-client .lookup-preview { flex: 1; }
 .composicao .price-grid .lookup-link { max-width: 100%; }
-.composicao .price-grid thead th { position: sticky; top: 0; z-index: 5; height: 38px; padding: 0 9px; border-bottom: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); color: var(--bt-color-slate-700); font-size: var(--bt-font-size-11); font-weight: 600; text-align: left; white-space: nowrap; }
+.composicao .price-grid thead th { position: sticky; top: 0; z-index: 5; height: 38px; padding: 0 9px; border-bottom: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: 600; text-align: left; white-space: nowrap; }
 .composicao .price-grid tbody tr:hover td, .composicao .price-grid tbody tr:hover th { background: var(--bt-color-surface-soft); }
 .composicao .price-grid--skeleton { pointer-events: none; }
 .composicao .price-grid--skeleton th, .composicao .price-grid--skeleton td { width: 128px; min-width: 128px; }
@@ -706,10 +707,10 @@
 }
 .composicao .price-grid__body-row:last-child td { border-bottom: 0; }
 .composicao .price-grid__footer { position: sticky; bottom: 0; z-index: 5; }
-.composicao .price-grid__footer td { height: 32px; border-top: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); color: var(--bt-color-slate-700); font-size: var(--bt-font-size-11); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.composicao .price-grid__footer td { height: 32px; border-top: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composicao .price-grid__footer .money-column { text-align: right; }
 .composicao .price-grid__footer .money-column--total { background: var(--bt-color-action-soft) !important; }
-.composicao .price-grid__footer-label { position: sticky; left: 0; z-index: 8; width: 570px; min-width: 570px; max-width: 570px; color: var(--bt-color-slate-700) !important; }
+.composicao .price-grid__footer-label { position: sticky; left: 0; z-index: 8; width: 570px; min-width: 570px; max-width: 570px; color: var(--bt-color-text-primary) !important; }
 
 .composicao .grid-select { width: 36px; min-width: 36px; max-width: 36px; padding: 0 !important; text-align: center !important; }
 .composicao .price-grid input[type="checkbox"] { width: 14px; height: 14px; margin: 0; accent-color: var(--bt-color-action); vertical-align: middle; }
@@ -727,7 +728,7 @@
 .composicao .grid-client { display: flex; align-items: center; gap: 6px; overflow: visible; color: var(--bt-color-ink-900); font-weight: 600; white-space: nowrap; }
 .composicao .lookup-preview { position: relative; min-width: 0; }
 .composicao .lookup-preview:hover, .composicao .lookup-preview:focus-within { z-index: 20; }
-.composicao .lookup-link { display: block; max-width: 146px; min-height: var(--bt-control-height-compact); overflow: hidden; padding: 4px 0; border: 0; background: none; color: var(--bt-color-action); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: transparent; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.composicao .lookup-link { display: block; max-width: 146px; min-height: var(--bt-control-height-compact); overflow: hidden; padding: 4px 0; border: 0; background: none; color: var(--bt-color-text-primary); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--bt-color-slate-400); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .composicao .lookup-link:hover, .composicao .lookup-link:focus-visible { color: var(--bt-color-action); text-decoration-color: currentColor; }
 .composicao .lookup-link:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 2px; }
 .composicao .lookup-preview__card { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; display: grid; gap: 10px; width: min(320px, calc(100vw - 48px)); padding: 14px 16px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-slate-700); font-size: var(--bt-font-size-12); font-weight: 400; line-height: 1.45; white-space: normal; opacity: 0; visibility: hidden; transform: translateY(-3px); transition: opacity 120ms ease, transform 120ms ease, visibility 120ms; pointer-events: none; }
@@ -738,17 +739,18 @@
 .composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); }
 .composicao .grid-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--bt-color-warning); }
 .composicao .grid-status--done { background: var(--bt-color-success); }
-.composicao .grid-choice-badge { display: inline-flex; align-items: center; max-width: 100%; min-height: 22px; padding: 2px 8px; overflow: hidden; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background: var(--bt-color-surface-soft); color: var(--bt-color-slate-700); font-size: var(--bt-font-size-11); font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.composicao .grid-boolean-badge { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 22px; padding: 2px 8px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: 600; }
+.composicao .grid-choice-badge { display: inline-flex; align-items: center; max-width: 100%; min-height: 24px; padding: 2px 8px; overflow: hidden; border: 0; border-radius: var(--bt-radius-xs); background: var(--bt-color-border); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: 600; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.composicao .grid-boolean-badge { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 22px; padding: 2px 8px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); font-size: var(--bt-font-size-12); font-weight: 600; }
+.composicao .grid-choice-badge[style*="--grid-choice"] { background: color-mix(in srgb, var(--grid-choice) 70%, white); color: color-mix(in srgb, var(--grid-choice) 15%, black); }
 .composicao .grid-boolean-badge::before { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--bt-color-slate-400); content: ''; }
 .composicao .grid-boolean-badge--true { border-color: var(--bt-color-success-soft); background: var(--bt-color-surface-neutral); color: var(--bt-color-success); }
 .composicao .grid-boolean-badge--true::before { background: var(--bt-color-success); }
-.composicao .grid-date-value { color: var(--bt-color-slate-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.composicao .grid-date-value { color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composicao .grid-related-link { display: inline-block; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
-.composicao .grid-route { display: block; overflow: hidden; color: var(--bt-color-slate-700); text-overflow: ellipsis; white-space: nowrap; }
-.composicao .money-cell { position: relative; display: flex; width: calc(100% + 18px); height: 37px; margin-inline: -9px; align-items: center; justify-content: flex-end; padding: 0 9px; outline: 0; color: var(--bt-color-slate-700); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; cursor: text; }
+.composicao .grid-route { display: block; overflow: hidden; color: var(--bt-color-text-primary); text-overflow: ellipsis; white-space: nowrap; }
+.composicao .money-cell { position: relative; display: flex; width: calc(100% + 18px); height: 37px; margin-inline: -9px; align-items: center; justify-content: flex-end; padding: 0 9px; outline: 0; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; cursor: text; }
 .composicao .money-cell--selected { z-index: 1; background: var(--bt-color-surface-soft); outline: 1px solid var(--bt-focus-border); outline-offset: -1px; }
 .composicao .money-cell--editing { z-index: 1; padding: 0; background: var(--bt-color-surface-soft); outline: 1px solid var(--bt-focus-border); outline-offset: -1px; }
 .composicao .money-cell-value { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -832,6 +834,10 @@
 .composicao .grid-field-editor--picker { padding-right: 28px; }
 .composicao .grid-field-editor--memo { padding-block: 7px; resize: none; line-height: 22px; }
 .composicao .grid-field-chevron { position: absolute; inset-inline-end: 3px; top: 7px; display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: var(--bt-radius-xs); background: transparent; color: var(--bt-color-slate-400); cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .composicao .grid-field-chevron { opacity: 0; }
+  .composicao .price-grid tbody td:hover .grid-field-chevron, .composicao .grid-field-cell:focus-within .grid-field-chevron { opacity: 1; }
+}
 .composicao .grid-field-chevron svg { width: 14px; height: 14px; }
 .composicao .grid-field-chevron:hover { background: var(--bt-color-action-soft); color: var(--bt-color-action); }
 .composicao .grid-field-options { position: fixed; z-index: 100; overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-xs); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); color: var(--bt-color-slate-700); font-family: inherit; font-size: var(--bt-font-size-12); }
