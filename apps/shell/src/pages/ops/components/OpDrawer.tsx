@@ -12,6 +12,8 @@ import { valorOp, type Op, type OpChoices } from '../domain/types'
 import { OpBadge, periodo } from './OpsList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { ListaRecebimentos, resumoRecebimentos, useRecebimentos } from '../../recebimentos/ComprovantesRecebimento'
+import type { RecebimentosSource } from '../../recebimentos/source'
 
 type Related = { valor: number | null; rateio: Pagante[]; servicos: ServicoOp[]; contatos: Map<string, Contato>; pagChoices: ChoiceSet } | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
@@ -101,7 +103,7 @@ export function OpDrawer({ op: opDaLista, onClose, choices, source, version, bus
           {related && 'error' in related ? <Alert tone="danger" title="Não foi possível carregar o rateio e os serviços">{related.error}</Alert> : null}
           {passo ? <Passo passo={passo} busy={busy} onAcao={gerar} /> : null}
 
-          {loaded && resumo ? <RelatedBlocks op={op} related={loaded} r={resumo} /> : null}
+          {loaded && resumo ? <RelatedBlocks op={op} related={loaded} r={resumo} source={source.pagantes.recebimentos} /> : null}
 
           <Section title="Resumo" aside={<span className="pg-muted">{[lines(op.passageiros)[0], label(choices.idioma, op.idioma, '')].filter(Boolean).join(' · ')}</span>}>
             <dl className="pg-ficha__grid">
@@ -154,7 +156,7 @@ function Passo({ passo, busy, onAcao }: { passo: ProximoPasso; busy: boolean; on
 
 type Loaded = Exclude<Related, { error: string } | null>
 
-function RelatedBlocks({ op, related, r }: { op: Op; related: Loaded; r: Resumo }) {
+function RelatedBlocks({ op, related, r, source }: { op: Op; related: Loaded; r: Resumo; source: RecebimentosSource }) {
   const divergem = servicosDivergem(op, r)
   return (
     <>
@@ -185,6 +187,17 @@ function RelatedBlocks({ op, related, r }: { op: Op; related: Loaded; r: Resumo 
           </ul>
         ) : <p className="pg-muted">Nenhum serviço ligado a esta OP.</p>}
       </Section>
+      <Recebimentos source={source} servicos={related.servicos} />
     </>
+  )
+}
+
+/** Comprovantes que os motoristas enviaram ao receber, de todos os serviços da OP, agrupados por serviço. */
+function Recebimentos({ source, servicos }: { source: RecebimentosSource; servicos: ServicoOp[] }) {
+  const recebimentos = useRecebimentos(source, servicos.map((s) => s.id))
+  return (
+    <Section title="Comprovantes de recebimento" aside={<span className="pg-muted">{resumoRecebimentos(recebimentos.estado)}</span>}>
+      <ListaRecebimentos {...recebimentos} source={source} servicos={servicos} />
+    </Section>
   )
 }

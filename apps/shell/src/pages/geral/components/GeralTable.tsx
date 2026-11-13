@@ -44,6 +44,8 @@ type Props = {
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
   renderCell: (row: Row, column: Column) => ReactNode
+  /** Slot logo depois do botão da primeira coluna; `name` é o ID do serviço (`cr40f_id`), seja qual for a primeira coluna. */
+  besideId?: (id: string, name: string) => ReactNode
   /** Contêiner de rolagem (`.gr-grid`): é a raiz do observador que carrega mais linhas. */
   scrollRef?: RefObject<HTMLDivElement | null>
   /** Dentro do contêiner de rolagem, logo depois da última linha (o sentinela da rolagem infinita). */
@@ -56,7 +58,7 @@ type Props = {
 
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, besideId, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -127,11 +129,12 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     drag.current = null
     if (!d) return
     cancelAnimationFrame(d.frame)
-    // Volta o estilo ao que o React conhece; se a largura mudou, a gravação abaixo renderiza com ela.
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
+    // Largura mudou: o estilo já está nela e a gravação renderiza com ela. Voltar à antiga aqui deixava a coluna errada quando
+    // qualquer render no meio do arraste já tinha posto a largura nova no React.
+    if (d.width !== d.start) { onResize(d.key, d.width); return }
     const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
     if (grid) { const { cols, min } = layout(); grid.style.setProperty('--gr-columns', cols); grid.style.setProperty('--gr-min-width', min) }
-    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture?.(e.pointerId)
-    if (d.width !== d.start) onResize(d.key, d.width)
   }
   const resizeKey = (column: Column) => (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
@@ -290,6 +293,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                   return (
                     <div key={column.key} className="bt-table__cell gr-cell gr-cell--first" role="gridcell">
                       <button type="button" className="gr-open" aria-label={`Abrir serviço ${value} no Formulário Geral`} onClick={() => onOpen(id)}>{isBadgeValue(column, raw) && value !== '' ? <ChoiceBadge column={column} info={info} raw={raw} text={value} /> : value}</button>
+                      {besideId?.(id, formatCell('readonly', row, 'cr40f_id'))}
                     </div>
                   )
                 })}

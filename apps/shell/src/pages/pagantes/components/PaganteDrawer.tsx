@@ -11,6 +11,8 @@ import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { ListaRecebimentos, resumoRecebimentos, useRecebimentos } from '../../recebimentos/ComprovantesRecebimento'
+import type { RecebimentosSource } from '../../recebimentos/source'
 
 type Props = {
   p: Pagante | null
@@ -150,7 +152,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
             )}
           </Section>
 
-          {p.opId ? <RelatedBlocks p={p} related={related} choices={choices} onOpen={onOpen} /> : null}
+          {p.opId ? <RelatedBlocks p={p} related={related} choices={choices} onOpen={onOpen} recebimentos={source.recebimentos} /> : null}
 
           <Section title="Linha do tempo">
             <ol className="pg-timeline">
@@ -170,7 +172,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
   )
 }
 
-function RelatedBlocks({ p, related, choices, onOpen }: { p: Pagante; related: Related; choices: ChoiceSet; onOpen: (p: Pagante) => void }) {
+function RelatedBlocks({ p, related, choices, onOpen, recebimentos }: { p: Pagante; related: Related; choices: ChoiceSet; onOpen: (p: Pagante) => void; recebimentos: RecebimentosSource }) {
   if (related == null) {
     return <Section title="Rateio da OP"><BrandLoader variant="inline" size="sm" label="Carregando rateio" text="Carregando rateio…" /></Section>
   }
@@ -216,6 +218,18 @@ function RelatedBlocks({ p, related, choices, onOpen }: { p: Pagante; related: R
           </ul>
         ) : <p className="pg-muted">Nenhum serviço ligado a esta OP.</p>}
       </Section>
+      <Recebimentos source={recebimentos} servicos={related.servicos} />
     </>
+  )
+}
+
+/** Comprovantes de recebimento da OP inteira (o anexo não tem pagante), agrupados por serviço. */
+function Recebimentos({ source, servicos }: { source: RecebimentosSource; servicos: ServicoOp[] }) {
+  const recebimentos = useRecebimentos(source, servicos.map((s) => s.id))
+  return (
+    <Section title="Comprovantes de recebimento" aside={<span className="pg-muted">{resumoRecebimentos(recebimentos.estado)}</span>}>
+      <p className="pg-muted">Comprovantes de todos os serviços da OP, não só deste pagante.</p>
+      <ListaRecebimentos {...recebimentos} source={source} servicos={servicos} />
+    </Section>
   )
 }
