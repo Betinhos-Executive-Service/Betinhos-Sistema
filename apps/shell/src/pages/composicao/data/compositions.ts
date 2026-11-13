@@ -86,6 +86,9 @@ const sampleRecords = [
   ['Lume Centro Empresarial', 'Guarulhos → Brooklin', '2026-09-05T18:05:00-03:00'],
 ] as const
 
+/** Clientes das três últimas linhas no mock de Clientes: o link de cliente abre a ficha dele por cima da grade. */
+const MOCK_CLIENTE_IDS = ['55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777']
+
 export const initialCompositions: Composition[] = sampleRecords.map(
   ([client, route, departureAt], index) => {
     const values = {} as Record<MoneyField, DecimalString>
@@ -95,6 +98,6 @@ export const initialCompositions: Composition[] = sampleRecords.map(
     })
     values.new_subtotal = (920 + (index + 1) * 73.5).toFixed(2)
     values.new_valortotal = (1180 + (index + 1) * 91).toFixed(2)
-    return { id: `mock-${index + 1}`, clientId: null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, viewFields: { new_status: index % 2 ? 2 : 1, 'new_status@OData.Community.Display.V1.FormattedValue': index % 2 ? 'Concluído' : 'Pendente' }, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
+    return { id: `mock-${index + 1}`, clientId: MOCK_CLIENTE_IDS[index - (sampleRecords.length - MOCK_CLIENTE_IDS.length)] ?? null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, viewFields: { new_status: index % 2 ? 2 : 1, 'new_status@OData.Community.Display.V1.FormattedValue': index % 2 ? 'Concluído' : 'Pendente' }, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
   },
 )

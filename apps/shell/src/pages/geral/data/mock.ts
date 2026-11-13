@@ -19,9 +19,11 @@ const lookupId = (group: number, n: number) => `bbbbbbbb-000${group}-4000-8000-$
 const options = (group: number, names: string[]): LookupOption[] => names.map((nome, i) => ({ id: lookupId(group, i + 1), nome }))
 
 export const MOCK_LOOKUPS: Record<string, LookupOption[]> = {
-  cr40f_motorista: options(1, ['Carlos Lima', 'Ana Souza', 'Bruno Dias', 'Teste']),
-  cr40f_veiculo: options(2, ['ABC1D23 · Corolla', 'DEF4G56 · Camry', 'GHI7J89 · Q5 Blindado', 'JKL0M12 · Spin']),
-  cr40f_cliente: options(3, ['Tenaris', 'Grupo Atlântico', 'Particular']),
+  // Carlos Lima, ABC1D23 e os clientes existem nos mocks de Funcionários, Frota e Clientes (mesmo ID): o lookup abre a
+  // gaveta de um registro de verdade. Os outros IDs não existem lá e a gaveta avisa "não encontrado".
+  cr40f_motorista: [{ id: 'f1f1f1f1-0000-4000-8000-000000000001', nome: 'Carlos Lima' }, ...options(1, ['Ana Souza', 'Bruno Dias', 'Teste'])],
+  cr40f_veiculo: [{ id: 'f2f2f2f2-0000-4000-8000-000000000001', nome: 'ABC1D23 · Corolla' }, ...options(2, ['DEF4G56 · Camry', 'GHI7J89 · Q5 Blindado', 'JKL0M12 · Spin'])],
+  cr40f_cliente: [{ id: '44444444-4444-4444-8444-444444444444', nome: 'Tenaris' }, { id: '11111111-1111-4111-8111-111111111111', nome: 'Grupo Atlântico' }, { id: '33333333-3333-4333-8333-333333333333', nome: 'Particular' }],
   cr40f_solicitante: options(4, ['Marina Alves', 'Paulo Reis', 'Renata Faria', 'Diego Torres']),
 }
 

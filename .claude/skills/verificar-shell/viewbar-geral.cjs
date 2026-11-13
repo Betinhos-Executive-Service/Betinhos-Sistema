@@ -1,18 +1,28 @@
-// Linha de comando da Geral (ViewBar com espaços nomeados, @betinhos/ui >= 1.26): uma linha, sem sobreposição, fixos parados com
-// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1), superfície com a altura e o topo do botão primário (>= 1.27.2), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
-// verificar-viewbar-linha do repo do DS. Uso: node viewbar-geral.cjs http://localhost:36472/#/geral <pasta-de-saida>
-// Grava viewbar-<w>-<n>.png, rodape-<w>-<n>.png (quando há rodapé) e, com TELA=1, geral-<w>-<n>.png da tela inteira.
+// Linha de comando da Geral ou da Composição de Preço (a tela vem da rota: #/geral ou #/composicao; ViewBar com espaços nomeados, @betinhos/ui >= 1.26): uma linha, sem sobreposição, fixos parados com
+// 0/1/3 serviços marcados, sem vão nem fio solto na superfície (>= 1.27.1) nem faixa vazia no trecho da seleção (>= 1.32), superfície com a altura e o topo do botão primário (>= 1.27.2), rodapé do celular sem rótulo cortado, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
+// verificar-viewbar-linha do repo do DS. Uso: node viewbar-geral.cjs http://localhost:36472/#/geral <pasta-de-saida> (ou .../#/composicao).
+// WIDTHS e COUNTS (lista separada por vírgula) trocam as larguras e as quantidades de marcados (ex.: prints).
+// Tela sem botão primário (Composição: Atualizar secundário em `primary`) só confere a superfície na altura do controle.
+// Grava viewbar-<w>-<n>.png, rodape-<w>-<n>.png (quando há rodapé) e, com TELA=1, <tela>-<w>-<n>.png da tela inteira.
 // PLAYWRIGHT: caminho do pacote playwright; CHROME_EXE: Chromium já instalado (opcional); SEM_SELO=1 esconde o selo do mock.
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright')
 const fs = require('fs')
 const path = require('path')
 const url = process.argv[2] || 'http://localhost:36472/#/geral'
 const out = process.argv[3] || '.'
-const WIDTHS = [390, 600, 820, 821, 1000, 1280, 1440, 1920]
-const COUNTS = [0, 1, 3]
+const list = (v, def) => (v ? v.split(',').map(Number) : def)
+const WIDTHS = list(process.env.WIDTHS, [390, 600, 820, 821, 900, 1000, 1024, 1280, 1440, 1920])
+const COUNTS = list(process.env.COUNTS, [0, 1, 3])
+// Por tela: raiz da linha de comando, página e caixas de marcar linha (nunca a "Selecionar todas" do cabeçalho).
+const SCREENS = {
+  geral: { root: '.gr-commandline', page: '.gr-page', box: /^Selecionar serviço/, primary: true },
+  composicao: { root: '.composition-commandline', page: '.composicao', box: /^Selecionar (?!todas)/, primary: false },
+}
+const tela = url.includes('#/composicao') ? 'composicao' : 'geral'
+const S = SCREENS[tela]
 
-const measure = () => {
-  const bar = document.querySelector('.gr-commandline .bt-viewbar--slots')
+const measure = ({ root, primary }) => {
+  const bar = document.querySelector(`${root} .bt-viewbar--slots`)
   const br = bar.getBoundingClientRect()
   const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[hidden]') && !el.closest('.bt-viewbar__measure') }
   // Controles folha da linha (botões e a caixa de busca), fora da barra do rodapé e da camada de medida.
@@ -62,6 +72,8 @@ const measure = () => {
   }
   const search = bar.querySelector('.bt-viewbar__search')
   const zone = bar.querySelector('.bt-viewbar__zone')
+  // A zona (reserva da busca e da seleção) também não se move: bordas esquerda e direita entram nos fixos.
+  { const zr = zone.getBoundingClientRect(); fixed.zonaE = Math.round(zr.left * 10) / 10; fixed.zonaD = Math.round(zr.right * 10) / 10 }
   const zoneKids = [...zone.children].filter(visible)
   const zoneUsed = zoneKids.reduce((a, el) => a + el.getBoundingClientRect().width, 0) + Math.max(0, zoneKids.length - 1) * parseFloat(getComputedStyle(zone).columnGap || '0')
   // >= 1.27: o secondary/ghost/só ícone de `primary` entra na superfície como `tools`; o principal fica fora.
@@ -89,6 +101,18 @@ const measure = () => {
       if (gap > 4) gaps.push(`vão ${Math.round(gap)}px ${prev ? label(prev) : 'início'}→${next ? label(next) : 'fim'}`)
     }
     items.forEach((el, i) => { if (isSep(el) && (i === 0 || i === items.length - 1 || isSep(items[i - 1]) || isSep(items[i + 1]))) gaps.push(`fio solto (posição ${i})`) })
+    // Faixa vazia dentro do trecho da seleção (>= 1.32, como no medir.cjs do DS): o tingido abraça ✕, contador e ações;
+    // nada de espaço antes do primeiro item, depois do último nem entre itens além do gap do trecho.
+    const seg = surface.querySelector('.bt-viewbar__zone > .bt-selection')
+    if (seg && visible(seg)) {
+      const kids = [...seg.children].filter(visible).map((el) => el.getBoundingClientRect())
+      const gr = seg.getBoundingClientRect(), gs = getComputedStyle(seg), g = parseFloat(gs.columnGap) || 0
+      const ends = [{ right: gr.left + parseFloat(gs.paddingLeft) }, ...kids, { left: gr.right - parseFloat(gs.paddingRight) }]
+      for (let i = 0; i + 1 < ends.length; i += 1) {
+        const hole = ends[i + 1].left - ends[i].right - (i && i + 2 < ends.length ? g : 0)
+        if (hole > 0.5) gaps.push(`FAIXA VAZIA NA SELEÇÃO ${Math.round(hole)}px`)
+      }
+    }
   }
   // Altura única (>= 1.27.2, como no medir.cjs do DS): superfície e botão primário com o mesmo topo e a mesma altura (±0,5 px),
   // e a superfície na altura do controle (40 px desktop, 44 px toque).
@@ -102,7 +126,8 @@ const measure = () => {
       const pr = prim.getBoundingClientRect()
       if (Math.abs(sr.top - pr.top) > 0.5 || Math.abs(sr.height - pr.height) > 0.5) altura.push(`superfície ${sr.height.toFixed(1)}@${sr.top.toFixed(1)} × principal ${pr.height.toFixed(1)}@${pr.top.toFixed(1)}`)
       else state.alturaUnica = `${sr.height.toFixed(1)}px`
-    } else altura.push('sem botão primário visível')
+    } else if (primary) altura.push('sem botão primário visível')
+    else state.alturaUnica = `${sr.height.toFixed(1)}px, sem primário`
   }
   // Rodapé do celular (>= 1.27.1): rótulo visível inteiro dentro do botão; o que não cabe vira só ícone (is-compact).
   const footerCut = []
@@ -132,37 +157,39 @@ const measure = () => {
   for (const width of WIDTHS) {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width <= 820 })
     const page = await ctx.newPage()
-    if (process.env.SEM_SELO) await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '.gr-commandline [data-vb="extra"]{display:none!important}'; document.head.appendChild(s) }) })
+    if (process.env.SEM_SELO) await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = '.gr-commandline [data-vb="extra"], .composition-commandline .bt-badge{display:none!important}'; document.head.appendChild(s) }) })
     page.on('console', (m) => { if (m.type() === 'error') errors.push(`${width}px: ${m.text()}`) })
     page.on('pageerror', (e) => errors.push(`${width}px: ${e.message}`))
     await page.goto(url, { waitUntil: 'networkidle' })
-    await page.waitForSelector('.gr-commandline .bt-viewbar--slots', { timeout: 60000 })
-    await page.waitForFunction(() => document.querySelectorAll('.gr-page input[type=checkbox]').length > 4, null, { timeout: 60000 })
+    await page.waitForSelector(`${S.root} .bt-viewbar--slots`, { timeout: 60000 })
+    await page.waitForFunction((sel) => document.querySelectorAll(`${sel} input[type=checkbox]`).length > 4, S.page, { timeout: 60000 })
     await page.waitForTimeout(500)
     await page.evaluate(() => document.fonts.ready)
-    const section = page.locator('.gr-page')
-    const boxes = section.getByRole('checkbox', { name: /^Selecionar serviço/ })
+    const boxes = page.locator(S.page).getByRole('checkbox', { name: S.box })
     let selected = 0
     for (const count of COUNTS) {
       while (selected < count) { await boxes.nth(selected).evaluate((el) => el.click()); selected += 1 }
       await page.waitForTimeout(150)
-      const m = await page.evaluate(measure)
+      const m = await page.evaluate(measure, S)
       m.state.contador = await page.evaluate(() => document.querySelector('.bt-selection__label, .bt-selectionbar .bt-selection__label')?.textContent ?? '')
       rows.push({ width, count, ...m })
-      await page.locator('.gr-commandline').screenshot({ path: path.join(out, `viewbar-${width}-${count}.png`) })
+      await page.locator(S.root).screenshot({ path: path.join(out, `viewbar-${width}-${count}.png`) })
       if (m.state.rodape) await page.locator('.bt-selectionbar').screenshot({ path: path.join(out, `rodape-${width}-${count}.png`) })
-      if (process.env.TELA) await page.screenshot({ path: path.join(out, `geral-${width}-${count}.png`) })
+      if (process.env.TELA) await page.screenshot({ path: path.join(out, `${tela}-${width}-${count}.png`) })
     }
     await ctx.close()
   }
   await browser.close()
-  // Fixos parados: mesma posição x com 0, 1 e 3 selecionados.
+  // Fixos parados: mesma posição x com 0, 1 e 3 selecionados. Busca e lupa moram na zona (a reserva): quando a seleção
+  // troca uma pela outra (>= 1.28, ex.: Composição em 821–1024 px), só se compara a que existe nos dois estados.
   for (const width of WIDTHS) {
     const set = rows.filter((r) => r.width === width)
-    const base = JSON.stringify(set[0].fixed)
-    for (const r of set) r.fixosParados = JSON.stringify(r.fixed) === base
+    const base = set[0].fixed
+    const same = (f) => Object.keys(base).every((k) => (['busca', 'lupa'].includes(k) && (base[k] === null || f[k] === null)) || base[k] === f[k])
+    for (const r of set) r.fixosParados = same(r.fixed)
   }
   fs.writeFileSync(path.join(out, 'viewbar-medidas.json'), JSON.stringify({ rows, errors }, null, 2))
+  console.log(`Tela: ${tela}`)
   console.log('| Viewport | Sel. | Barra (px) | Altura | Altura única (sup.=primário) | 1 linha | Sobreposição | Fora da barra | Texto cortado | Vão/fio solto | Rodapé cortado | Fixos parados | Estado |')
   console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {

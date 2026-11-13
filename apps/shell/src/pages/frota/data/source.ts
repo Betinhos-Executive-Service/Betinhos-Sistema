@@ -1,6 +1,6 @@
 import type { DateBehavior } from './dates'
 import type { Acordo } from '../domain/termoMulta'
-import type { FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta } from './types'
+import type { FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -27,6 +27,8 @@ export interface DataSource {
   envLabel: string
   /** Carrega todas as tabelas. Tabela que falhar vem vazia e com a mensagem em `errors`. */
   load(): Promise<LoadResult>
+  /** Um veículo pelo ID, mesmo inativo (a carga só traz os ativos): a ficha aberta por cima de outra lista o usa. */
+  veiculo?(id: string): Promise<Veiculo | null>
   /** Status atual do registro no servidor, para checar concorrência antes de gravar. */
   currentStatus(kind: Kind, id: string): Promise<number | null>
   /** Comportamento das colunas de data da tabela. Rejeita se a metadata não estiver disponível. */

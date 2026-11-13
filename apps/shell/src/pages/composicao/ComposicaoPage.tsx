@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Check, LoaderCircle, SearchX, X } from 'lucide-react'
-import { ContextMenu, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
+import { Alert, ContextMenu, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
@@ -31,6 +31,7 @@ import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
 import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
+import { describeLoadFailure } from './data/load-failure'
 import { LAST_VIEW_KEY, openQueryFromViewRow, pickOpenView } from './data/open-query'
 import { readViewField } from './data/view-field-read'
 import { openGridRecord } from './data/record-navigation'
@@ -89,6 +90,12 @@ type ContextCell = { x: number; y: number; rowId: string; field: MoneyField }
 
 /** Altura da linha por densidade da `ViewBar`; Compacta (38 px) é a grade de sempre. */
 const ROW_HEIGHTS: Record<TableDensity, number> = { default: 44, dense: 38, minimal: 32 }
+
+/** Consulta da grade que falhou (ex.: visão com campo removido): aviso no lugar da grade, em vez do vazio de "nenhuma composição". */
+function LoadFailure({ message }: { message: string }) {
+  const { title, detail } = describeLoadFailure(message)
+  return <div className="composition-load-failure"><Alert tone="danger" title={title}>{detail}</Alert></div>
+}
 
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message
@@ -339,6 +346,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     setDataSource(page.source)
     setNextLink(page.nextLink)
     setConnectionError(null)
+    setNotice((current) => current?.retryRefresh ? null : current)
     trackFormulas(page.records, page.formulas, request)
   }, [trackFormulas])
   useEffect(() => {
@@ -586,7 +594,9 @@ function ComposicaoContent({ host }: { host: Host }) {
       // Sem rede, a releitura automática falharia a cada 30 s; registra só a primeira falha de cada sequência.
       if (!background || !backgroundFailedRef.current) void logAppError(error, { action: background ? 'atualizar-composicoes-automatico' : 'atualizar-composicoes', phase: 'load', component: 'ComposicaoPage' })
       if (background) backgroundFailedRef.current = true
-      if (request === viewRequestRef.current && showNotice) setNotice({ tone: 'error', title: 'Não foi possível atualizar', detail: errorMessage(error, 'Os dados atuais foram mantidos.'), retryRefresh: true })
+      if (request !== viewRequestRef.current || !showNotice) return false
+      if (!rowsAtStart.length) setConnectionError(errorMessage(error, 'Falha ao carregar dados do Dataverse.'))
+      else setNotice({ tone: 'error', title: 'Não foi possível atualizar', detail: errorMessage(error, 'Os dados atuais foram mantidos.'), retryRefresh: true })
       return false
     }
     finally {
@@ -651,6 +661,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     setSelectedCell(null)
     setRows([])
     setNextLink(null)
+    setNotice((current) => current?.retryRefresh ? null : current)
     loadedPagesRef.current = 1
     if (queryError) {
       setConnectionError(queryError)
@@ -1481,7 +1492,9 @@ function ComposicaoContent({ host }: { host: Host }) {
         records = await collectCompositionPages((link) => loadCompositions(link, view))
       }
       const viewName = activeView?.name ?? 'Todas as composições'
-      const blob = compositionWorkbook(records, viewDefinition, catalog, selectedVisibleRows.length ? `${viewName} (selecionados)` : viewName)
+      const blob = compositionWorkbook(records, viewDefinition, catalog, selectedVisibleRows.length ? `${viewName} (selecionados)` : viewName,
+        // Linhas da grade são lidas pelo mesmo nome de célula da grade; as relidas, pelo da consulta resolvida (padrão).
+        selectedVisibleRows.length || dataSource === 'mock' ? valueKeyFor : undefined)
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
@@ -1643,7 +1656,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       <div ref={setTableRegion} className="composition-table-region" role="region" aria-label="Tabela de composições" tabIndex={0}>
         <CellHoverPreview />
         {loading ? <PriceGridSkeleton />
-          : connectionError && rows.length === 0 ? <div className="price-grid__empty" role="alert">{connectionError}</div>
+          : connectionError && rows.length === 0 ? <LoadFailure message={connectionError} />
             : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
         {!loading && nextLink && !connectionError ? (
           <div ref={loadMoreRef} className="composition-load-more" role="status" aria-busy={loadingMore}>
@@ -1672,7 +1685,7 @@ function ComposicaoContent({ host }: { host: Host }) {
             ? `Modo local · ${rows.length} registros de demonstração · edições em memória`
             : dataSource === 'dataverse'
               ? `${getDataverseEnvironmentLabel()} · ${rows.length} composições reais · salva ao confirmar`
-              : 'Carregando dados…'}
+              : connectionError ? 'Dados não carregados' : 'Carregando dados…'}
         </span>
       </footer>
     </section>

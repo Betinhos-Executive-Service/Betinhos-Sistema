@@ -636,8 +636,8 @@ packages:
   '@betinhos-executive-service/tokens@1.25.0':
     resolution: {integrity: sha512-iNXbt6usupa4Qkx//B1I181f6i+HHQ12jOSpnCfS2EbVo9rSVYcTiCyoWmBB4QKVN0RVy+Cym2UiK1LjLvDlwQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.25.0/b162f69b22d188646eccc08140bf7bed01817bbd}
 
-  '@betinhos-executive-service/tokens@1.27.2':
-    resolution: {integrity: sha512-705BkyO5Dz8KV9tmivkDeuYga7c3/5EQ0xr51zsEDYCdb7Gz7d1XRTDBfZIYgUSvDgmilC1GMYpiHiLc91OCDA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.27.2/f6b9b5ed8644a047d8eb2f105008cf960042dfe7}
+  '@betinhos-executive-service/tokens@1.28.0':
+    resolution: {integrity: sha512-M/9DUiz6ZXJNTmx7F69WmsYiCjQIEKr1s/ys1Fi+aeitORKpVUhybXonJn6DGoo6zRaBqRHzGqo4wzQpmngWKQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.28.0/9b2bcb3ab145225540d25d3cc1b7c98d8ad0831a}
 
   '@betinhos-executive-service/tokens@1.33.0':
     resolution: {integrity: sha512-JJ3B3JCNWe95cjyAE/3hNLIKGLnNER7+9JuS5PGWACoGu711Rrzcveg3+cRcI8RgfZgrMP0wohwK8OPD4niZQQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.33.0/f20f761ea69897644bfcdfdb24c33d9b0d194762}
@@ -4365,7 +4365,7 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.25.0': {}
 
-  '@betinhos-executive-service/tokens@1.27.2': {}
+  '@betinhos-executive-service/tokens@1.28.0': {}
 
   '@betinhos-executive-service/tokens@1.33.0': {}
 
