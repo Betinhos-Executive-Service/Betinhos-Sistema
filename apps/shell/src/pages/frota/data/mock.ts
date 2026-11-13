@@ -51,6 +51,8 @@ function seed(): FrotaData {
       { id: 'v1', placa: 'TST1A11', marca: 'Toyota', modelo: 'Corolla', cor: 'Preto', anoModelo: 2024, status: VEICULO.ATIVO, categoria: 100000000, motorista: bruno, hodometro: 171000, hodometroEm: iso(0) },
       { id: 'v2', placa: 'TST2B22', marca: 'VW', modelo: 'Virtus', cor: 'Prata', anoModelo: 2023, status: VEICULO.ATIVO, categoria: 100000000, motorista: ana, hodometro: null, hodometroEm: null },
       { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
+      // ID no formato GUID e inativo (vendido): o lookup de veículo do mock da Geral abre a ficha dele por cima da lista.
+      { id: 'f2f2f2f2-0000-4000-8000-000000000001', placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', cor: 'Cinza', anoModelo: 2019, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
       { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000002, motorista: null, hodometro: null, hodometroEm: null },
     ],
     manutencoes: [
@@ -130,6 +132,11 @@ export function createMockSource(): DataSource {
       await delay()
       const copia = structuredClone(data)
       return { data: { ...copia, multas: comTermo(copia.multas) }, errors: {} }
+    },
+    async veiculo(id) {
+      await delay()
+      const v = data.veiculos.find((item) => item.id === id)
+      return v ? structuredClone(v) : null
     },
     async currentStatus(kind, id) {
       return find(kind, id)?.status ?? null

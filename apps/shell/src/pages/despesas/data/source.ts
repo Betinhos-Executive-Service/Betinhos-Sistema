@@ -12,12 +12,15 @@ import { createMockAnexos, createMockDespesas } from './mock'
 import { createMockArquivo } from '../../../lib/comprovantes/mock'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
+import { guid } from '../../pagantes/data/queries'
 
 /** Tudo que a tela precisa do mundo externo. A única gravação é a decisão do gestor sobre a despesa. */
 export type Source = {
   mock: boolean
   /** Despesas do período; `onFirstPage` recebe a primeira página antes (lista grande). */
   load: (since: Date | null, onFirstPage?: (list: Despesa[]) => void) => Promise<Despesa[]>
+  /** Uma despesa pelo ID (gaveta aberta por cima de outra lista); `null` se não existe ou está inativa. */
+  get: (id: string) => Promise<Despesa | null>
   /** Até 50 despesas do período que batem com a busca (usada enquanto a lista não carregou inteira). */
   search: (since: Date | null, query: string) => Promise<Despesa[]>
   anexos: (despesaId: string) => Promise<Anexo[]>
@@ -42,6 +45,7 @@ function createMockSource(): Source {
       const t = normalizeSearch(q)
       return mockSearch(rows, (d) => (!since || (d.data != null && d.data >= since)) && normalizeSearch(`${d.protocolo} ${d.nome} ${d.estabelecimento}`).includes(t))
     },
+    async get(id) { await wait(200); const d = rows.find((x) => x.id === id); return d ? { ...d } : null },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
     async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
     choices: async () => withFallback({}),
@@ -76,6 +80,10 @@ export function createSource(host: Host): Source {
     async search(since, q) {
       const filter = despesasSearchFilter(q)
       return filter ? (await searchRows(host.client, despesasPath(await entitySet(ENTITY_DESPESA), since, filter))).map(mapDespesa) : []
+    },
+    get: async (id) => {
+      const [row] = await host.client.getAll(despesasPath(await entitySet(ENTITY_DESPESA), null, `cr40f_despesaoperacionalid eq ${guid(id)}`))
+      return row ? mapDespesa(row) : null
     },
     anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
     arquivo: createArquivos(host.client),

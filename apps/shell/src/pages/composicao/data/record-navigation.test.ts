@@ -1,20 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fecharGavetaRegistro, gavetaRegistroAberta as lerGaveta } from '../../../app/registroAberto'
 import { openGridRecord } from './record-navigation'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); fecharGavetaRegistro() })
 
 const id = 'e8b7c267-b4a9-4e0c-91c3-c5a72b6965fa'
 
 describe('navegação da grade', () => {
-  it('tabela com tela no shell abre a gaveta dessa tela, com volta para a lista', () => {
+  it('tabela com tela no shell abre a gaveta por cima da lista, sem trocar de rota', () => {
     const navigateTo = vi.fn(async () => undefined)
     vi.stubGlobal('Xrm', { Navigation: { navigateTo } })
-    location.hash = '#/geral'
+    location.hash = '#/geral?f=abc'
     void openGridRecord('cr40f_funcionarios', `{${id}}`)
-    expect(location.hash).toBe(`#/funcionarios?ficha=${id}&voltar=1`)
+    expect(lerGaveta()).toEqual({ table: 'cr40f_funcionarios', id })
     void openGridRecord('cr40f_clientes1', id)
-    expect(location.hash).toBe(`#/clientes?ver=${id}&voltar=1`)
+    expect(lerGaveta()).toEqual({ table: 'cr40f_clientes1', id })
+    expect(location.hash).toBe('#/geral?f=abc')
     expect(navigateTo).not.toHaveBeenCalled()
   })
 

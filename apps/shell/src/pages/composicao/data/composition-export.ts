@@ -93,7 +93,11 @@ function cell(address: string, value: unknown, style: number, numeric = false) {
   return `<c r="${address}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`
 }
 
-export function compositionWorkbook(rows: Composition[], definition: ViewDefinition, catalog: CatalogField[], viewName: string) {
+/**
+ * `valueKey`: nome da célula do valor em `row.viewFields`. Linhas vindas da grade usam o da consulta que as carregou
+ * (na abertura, os aliases da própria view, ex. `a_67d5.campo`); o padrão serve às linhas relidas pela consulta resolvida.
+ */
+export function compositionWorkbook(rows: Composition[], definition: ViewDefinition, catalog: CatalogField[], viewName: string, valueKey = (id: string) => viewValueKey(id, definition, catalog)) {
   const columns = definition.columns.map(({ id }) => ({ id, label: catalog.find((field) => field.id === id)?.label ?? moneyFields.find((field) => field.key === id)?.label ?? ({ client: 'Cliente', route: 'Trajeto', date: 'Data de saída' } as Record<string, string>)[id] ?? id }))
   if (!columns.length) throw new Error('A view não possui colunas para exportar.')
   const lastColumn = columnName(columns.length - 1)
@@ -111,7 +115,7 @@ export function compositionWorkbook(rows: Composition[], definition: ViewDefinit
       const address = `${columnName(col)}${rowNumber}`
       if (moneyIds.has(id)) return cell(address, row.values[id as keyof typeof row.values], alternate ? 6 : 5, true)
       const value = id === 'client' ? row.client : id === 'route' ? row.route : id === 'date' ? departureDate(row.departureAt) : (() => {
-        const key = viewValueKey(id, definition, catalog)
+        const key = valueKey(id)
         return row.viewFields?.[`${key}@OData.Community.Display.V1.FormattedValue`] ?? row.viewFields?.[key]
       })()
       return cell(address, value, alternate ? 4 : 0)

@@ -7,7 +7,7 @@ import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import type { KV } from '../domain/filters'
 import { withFallback } from '../domain/choices'
 import { MOCK_CHOICES, MOCK_CONTATOS, createMockPagantes, mockServicos } from './mock'
-import { ENTITIES, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, searchPagantes, type EntitySets } from './queries'
+import { ENTITIES, guid, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, searchPagantes, type EntitySets } from './queries'
 import { abrirGeradorDeRecibo } from './recibo'
 import { latenciaMock } from '../../../app/latenciaMock'
 
@@ -16,6 +16,8 @@ export type Source = {
   mock: boolean
   /** Pagantes do período; `onFirstPage` recebe a primeira página antes (lista grande). */
   load: (since: Date | null, onFirstPage?: (list: Pagante[]) => void) => Promise<Pagante[]>
+  /** Um pagante pelo ID (gaveta aberta por cima de outra lista); `null` se não existe ou está inativo. */
+  get: (id: string) => Promise<Pagante | null>
   /** Até 50 pagantes do período que batem com a busca (usada enquanto a lista não carregou inteira). */
   search: (since: Date | null, query: string) => Promise<Pagante[]>
   choices: () => Promise<ChoiceSet>
@@ -57,6 +59,7 @@ function createMockSource(): Omit<Source, 'recebimentos'> {
     mock: true,
     load: (since, onFirstPage) => mockProgressive(rows.filter((p) => !since || (p.criadoEm && p.criadoEm >= since)).map((p) => ({ ...p })), onFirstPage),
     search: (since, q) => { const t = normalizeSearch(q); return mockSearch(rows, (p) => (!since || (p.criadoEm != null && p.criadoEm >= since)) && normalizeSearch(p.codigo).startsWith(t)) },
+    async get(id) { await wait(200); const p = rows.find((x) => x.id === id); return p ? { ...p } : null },
     choices: async () => MOCK_CHOICES,
     async contatos(ids) { await wait(150); return new Map(ids.flatMap((id) => (MOCK_CONTATOS.has(id) ? [[id, MOCK_CONTATOS.get(id)!] as const] : []))) },
     async rateio(opId) { await wait(250); return rows.filter((p) => p.opId === opId).map((p) => ({ ...p })) },
@@ -90,6 +93,7 @@ export function createSource(host: Host): Source {
   return {
     mock: false,
     load: async (since, onFirstPage) => loadPagantes(host.client, (await entitySets()).pagante, periodFilter(since), onFirstPage),
+    get: async (id) => (await loadPagantes(host.client, (await entitySets()).pagante, `statecode eq 0 and cr40f_pagantesid eq ${guid(id)}`))[0] ?? null,
     search: async (since, q) => searchPagantes(host.client, (await entitySets()).pagante, periodFilter(since), q),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos em vez de travar a lista.
     async choices() {
