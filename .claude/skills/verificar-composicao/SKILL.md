@@ -35,7 +35,9 @@ A rota antiga `#/new_telacomposicaopreco` (iframe do WebResource) continua no me
 - Visão sem FetchXML (visão nativa): abre sem erro, filtros nativos conforme `nativeFiltersEditable`.
 - Sem privilégio em tabela relacionada: o servidor devolve `0x80040220` ou 403; a página repete a consulta sem os links e avisa.
 - 1.000+ linhas: rolagem fluida, contagem total certa, seleção e Excel só do que está selecionado.
-- Cache do catálogo vencido: chave `localStorage` `tela-composicao-preco:catalog:v1:<url>` com 12 h; altere `savedAt` para 13 h atrás e recarregue: o catálogo é relido (aparecem consultas `EntityDefinitions`) e a chave é regravada.
+- Excel de linhas marcadas na visão nativa aberta (ex.: "Visualização Padrão" com colunas ligadas `a_67d5.*`): Motorista, Cliente, Trajeto etc. saem preenchidos, como na grade (`unzip -p arq.xlsx xl/worksheets/sheet1.xml`).
+- Visão com campo removido (ex.: "Visualização Padrão SF" com `new_valorsubtotal` no DEV): ao abrir, a consulta dá 400 e a grade mostra o `Alert` "Esta visão usa o campo new_valorsubtotal, que não existe mais" (sem o vazio "Nenhuma composição encontrada"); Atualizar mantém o aviso na grade; trocar de visão ou filtro o limpa. No mock dá para simular com `window.Xrm` falso em `addInitScript` (roteiro em `ComposicaoPage.broken-view.test.tsx`).
+- Cache do catálogo vencido: chave `localStorage` `tela-composicao-preco:catalog:v2:<url>` com 12 h, gravada enxuta (`strings`, `groups`, `rows`; ~440 mil caracteres para os 16 mil campos do DEV em 13/11/2026, contra 8,4 milhões do catálogo cru, que estourava a cota e nunca gravava). Altere `savedAt` para 13 h atrás e recarregue: o catálogo é relido (aparecem consultas `EntityDefinitions`, ~29 no DEV) e a chave é regravada. Na segunda abertura dentro da validade, nenhuma `EntityDefinitions` antes da primeira linha.
 
 ## 5. Não verificável no mock
 Dados reais, FetchXML e paginação do servidor, privilégios, auditoria (`audits`), Gerar OP e exclusão de verdade, visões do Dataverse, tempo até a primeira linha, cache do catálogo contra metadata real e a versão publicada.
