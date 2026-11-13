@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, Search, SearchX, Trash2, X } from 'lucide-react'
-import { ContextMenu, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
+import { ContextMenu, StatusBadge, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
@@ -1128,7 +1128,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         const clientId = item.clientId
         return (
           <span className="grid-client">
-            <span className={`grid-status ${item.status === 'Concluído' ? 'grid-status--done' : ''}`} />
+            <StatusBadge tone={item.status === 'Concluído' ? 'success' : 'warning'} className="grid-client-status">{item.status}</StatusBadge>
             {clientId ? (
               <span className="lookup-preview">
                 <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
@@ -1422,8 +1422,8 @@ function ComposicaoContent({ host }: { host: Host }) {
           const title = id === 'client' ? item.client : id === 'route' ? item.route : formatDepartureDate(item.departureAt)
           const target = id === 'client' ? item.clientId : id === 'route' ? item.serviceId : null
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
-            {id === 'client' && <span className={`grid-status ${item.status === 'Concluído' ? 'grid-status--done' : ''}`} />}
-            <span title={title}>{title}</span>
+            {id === 'client' && <StatusBadge tone={item.status === 'Concluído' ? 'success' : 'warning'} className="grid-client-status">{item.status}</StatusBadge>}
+            <span className="grid-client-name" title={title}>{title}</span>
             {id === 'client' && <span className="lookup-preview__card" role="tooltip"><strong>{item.client}</strong>{item.clientRegistration && <span>{item.clientRegistration}</span>}{item.clientAddress && <span>{item.clientAddress}</span>}</span>}
             {id === 'route' && target && <span className="lookup-preview__card" role="tooltip"><strong>Serviço relacionado</strong><span>{item.route}</span><span>Cliente: {item.client}</span>{item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}{item.serviceStatus && <span>Status: {item.serviceStatus}</span>}{item.serviceType && <span>Tipo: {item.serviceType}</span>}{item.vehicleType && <span>Veículo: {item.vehicleType}</span>}{item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}</span>}
           </span>
