@@ -1,5 +1,5 @@
 // Linha de comando da Geral (ViewBar com espaços nomeados, @betinhos/ui >= 1.26): uma linha, sem sobreposição, fixos parados com
-// 0/1/3 serviços marcados, nenhum texto cortado, Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
+// 0/1/3 serviços marcados, nenhum texto cortado (nem o nome da visão, que em falta de espaço vira só ícone + chevron, >= 1.26.1), Atualizar visível, sem erro de console. Adaptado do medir.cjs da skill
 // verificar-viewbar-linha do repo do DS. Uso: node viewbar-geral.cjs http://localhost:36472/#/geral <pasta-de-saida>
 // PLAYWRIGHT: caminho do pacote playwright; CHROME_EXE: Chromium já instalado (opcional); SEM_SELO=1 esconde o selo do mock.
 const { chromium } = require(process.env.PLAYWRIGHT || 'playwright')
@@ -34,6 +34,10 @@ const measure = () => {
   // Texto cortado: rótulos visíveis (os só ícone ficam com 1 px e não contam) e o nome da visão.
   const texts = [...bar.querySelectorAll('.bt-button__label, .bt-viewbar__name, .bt-selection__label')].filter((el) => visible(el) && !el.closest('.bt-selectionbar'))
   const cut = texts.filter((el) => el.scrollWidth > el.clientWidth + 0.5).map((el) => el.textContent.trim())
+  // Seletor de visão (>= 1.26.1): nome inteiro ou só ícone + chevron (is-compact), nunca nome com reticências; só ícone exige title e aria-label.
+  const trigger = bar.querySelector('.bt-viewbar__trigger')
+  const triggerCompact = trigger.classList.contains('is-compact')
+  if (triggerCompact && !(trigger.title && trigger.getAttribute('aria-label'))) cut.push('visão só ícone sem title/aria-label')
   // Posição x dos fixos (o que nunca depende da seleção).
   const fixedSel = { visao: '.bt-viewbar__trigger', colunas: '[data-vb="colunas"]', filtros: '[data-vb="filtros"]', densidade: '[data-vb="density"]', auditoria: '[data-vb="audit"]', busca: '.bt-viewbar__search', lupa: 'button[aria-label="Buscar"]', mais: '.bt-viewbar__more', principal: '[data-vb="primary"]' }
   const fixed = {}
@@ -42,6 +46,7 @@ const measure = () => {
     fixed[key] = el && visible(el) ? Math.round(el.getBoundingClientRect().left * 10) / 10 : null
   }
   const state = {
+    visao: triggerCompact ? 'visão só ícone' : 'visão c/ nome',
     texto: !bar.querySelector('[data-vb="colunas"].is-compact'),
     principalTexto: !bar.querySelector('[data-vb="primary"].is-compact'),
     selInline: [...bar.querySelectorAll('.bt-viewbar__end [data-vb^="sel:"]')].filter(visible).length,
@@ -104,7 +109,7 @@ const measure = () => {
   console.log('|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     const s = r.state
-    const estado = [s.texto ? 'fixos c/ texto' : 'fixos só ícone', s.principalTexto ? 'principal c/ texto' : 'principal só ícone', r.count ? (s.rodape ? 'seleção no rodapé' : `seleção ${s.selInline} inline${s.selTexto ? ' c/ texto' : ' só ícone'}`) : null, s.noMenu.length ? `no ⋮: ${s.noMenu.join(', ')}` : null, s.lupa ? 'lupa' : 'busca', s.selo ? `selo ${s.selo}` : null, r.count ? `"${s.contador}"` : null, s.atualizar ? 'Atualizar visível' : 'SEM ATUALIZAR', `busca ${s.buscaW}px`, `sobra ${s.sobra}px`, s.selLabels.length ? `[${s.selLabels.join(', ')}]` : null].filter(Boolean).join('; ')
+    const estado = [s.visao, s.texto ? 'fixos c/ texto' : 'fixos só ícone', s.principalTexto ? 'principal c/ texto' : 'principal só ícone', r.count ? (s.rodape ? 'seleção no rodapé' : `seleção ${s.selInline} inline${s.selTexto ? ' c/ texto' : ' só ícone'}`) : null, s.noMenu.length ? `no ⋮: ${s.noMenu.join(', ')}` : null, s.lupa ? 'lupa' : 'busca', s.selo ? `selo ${s.selo}` : null, r.count ? `"${s.contador}"` : null, s.atualizar ? 'Atualizar visível' : 'SEM ATUALIZAR', `busca ${s.buscaW}px`, `sobra ${s.sobra}px`, s.selLabels.length ? `[${s.selLabels.join(', ')}]` : null].filter(Boolean).join('; ')
     console.log(`| ${r.width} | ${r.count} | ${r.barW} | ${r.barH} | ${r.oneLine ? 'sim' : 'NÃO'} | ${r.overlaps.length ? r.overlaps.join(' ') : 'nenhuma'} | ${r.outside.length ? r.outside.join(' ') : '—'} | ${r.cut.length ? r.cut.join(', ') : 'nenhum'} | ${r.fixosParados ? 'sim' : 'NÃO'} | ${estado}${r.pageScroll ? ' (ROLAGEM HORIZONTAL)' : ''} |`)
   }
   console.log(`Erros de console: ${errors.length ? errors.join(' | ') : 'nenhum'}`)
