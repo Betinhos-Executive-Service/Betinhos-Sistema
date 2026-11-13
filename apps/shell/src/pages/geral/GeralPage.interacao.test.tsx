@@ -52,6 +52,42 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)
   })
 
+  it('a largura fica ao soltar mesmo se a tabela renderizar no meio do arraste', async () => {
+    const host = { mode: 'mock' as const }
+    const { rerender } = render(<GeralPage host={host} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = px(track(/Trajeto/))
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(true)
+    // Render no meio do arraste (no DEV vem do virtualizador, da carga etc.): o React passa a conhecer a largura do arraste.
+    rerender(<GeralPage host={host} />)
+    fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(px(track(/Trajeto/))).toBe(before + 60)
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(false)
+  })
+
+  it('Esc no meio do arraste volta à largura de antes e não grava', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = track(/Trajeto/)
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 180, pointerId: 1, buttons: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(px(before) + 80))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(track(/Trajeto/)).toBe(before)
+    fireEvent.pointerMove(handle, { clientX: 220, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(handle, { clientX: 220, pointerId: 1 })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(track(/Trajeto/)).toBe(before)
+    expect(window.localStorage.getItem('betinhos.geral.colunas.v1') ?? '').not.toContain(`${px(before) + 80}`)
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(false)
+  })
+
   it('Alt+seta no cabeçalho move a coluna e avisa a nova posição', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
