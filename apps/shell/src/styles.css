@@ -33,7 +33,7 @@ a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
 /* Linha de comando das listas (ViewBar): o seletor de visão não cresce e os comandos ocupam o resto da linha. No desktop
    eles nunca descem para baixo do título: quebram dentro do próprio grupo, com o título na altura da primeira linha.
    (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
-.bt-viewbar { align-items: flex-start; }
+.bt-viewbar:not(.bt-viewbar--slots) { align-items: flex-start; }
 .bt-viewbar__start { flex: 0 1 auto; }
 .bt-viewbar__end { flex: 1 1 0; min-width: 0; }
 
