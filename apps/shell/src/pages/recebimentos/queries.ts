@@ -28,18 +28,18 @@ export function mapRecebimento(row: Row): Recebimento {
 /** Ids válidos, sem repetição, em blocos de 15 (limite de URL do OData). */
 const blocos = (ids: string[]) => chunk([...new Set(ids.map(cleanId).filter((id) => GUID.test(id)))], 15)
 const filtro = (ids: string[]) => encodeURIComponent(ids.map((id) => `_cr40f_reserva_value eq ${id}`).join(' or '))
+const consultar = async (client: DataverseClient, reservaIds: string[], select: string) =>
+  (await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=${select}&$filter=${filtro(ids)}`)))).flat()
 
 /** Comprovantes dos serviços, com o nome do motorista pela anotação formatada do lookup. */
 export async function loadRecebimentos(client: DataverseClient, reservaIds: string[]) {
-  const respostas = await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=${SELECT}&$filter=${filtro(ids)}`)))
-  return respostas.flat().map(mapRecebimento)
+  return (await consultar(client, reservaIds, SELECT)).map(mapRecebimento)
 }
 
 /** Quantos comprovantes cada serviço tem; serviço sem comprovante não entra no mapa. */
 export async function contarPorReserva(client: DataverseClient, reservaIds: string[]) {
-  const respostas = await Promise.all(blocos(reservaIds).map((ids) => client.getAll(`${ENTITY_SET}?$select=_cr40f_reserva_value&$filter=${filtro(ids)}`)))
   const contagem = new Map<string, number>()
-  for (const row of respostas.flat()) {
+  for (const row of await consultar(client, reservaIds, '_cr40f_reserva_value')) {
     const id = cleanId(String(row._cr40f_reserva_value ?? ''))
     if (id) contagem.set(id, (contagem.get(id) ?? 0) + 1)
   }

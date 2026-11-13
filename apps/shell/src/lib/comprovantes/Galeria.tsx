@@ -119,28 +119,28 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
   return (
     <>
       {blocos.map((bloco) => (
-      <Fragment key={bloco.chave}>
-      {bloco.titulo ? <h4 className="cmp-grupo">{bloco.titulo}</h4> : null}
-      <ul className="cmp-comprovantes">
-        {bloco.itens.map((a) => {
-          const indice = visiveis.indexOf(a)
-          const meta = metaDe?.(a) ?? ''
-          return (
-            <li key={a.id} className="cmp-comprovante">
-              {indice >= 0
-                ? <Miniatura anexo={a} ler={ler} onOpen={(rect) => { origem.current = rect; setAberto(indice) }} />
-                : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não foi enviado</span></div>}
-              <div className="cmp-comprovante__info">
-                <strong className="cmp-comprovante__nome" title={a.nome}>{a.nome}</strong>
-                {meta ? <span className="cmp-comprovante__meta" title={meta}>{meta}</span> : null}
-                {selo?.(a)}
-                {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} em nova aba`} title="Abrir em nova aba"><ExternalLink size={16} aria-hidden="true" /></a> : null}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-      </Fragment>
+        <Fragment key={bloco.chave}>
+          {bloco.titulo ? <h4 className="cmp-grupo">{bloco.titulo}</h4> : null}
+          <ul className="cmp-comprovantes">
+            {bloco.itens.map((a) => {
+              const indice = visiveis.indexOf(a)
+              const meta = metaDe?.(a) ?? ''
+              return (
+                <li key={a.id} className="cmp-comprovante">
+                  {indice >= 0
+                    ? <Miniatura anexo={a} ler={ler} onOpen={(rect) => { origem.current = rect; setAberto(indice) }} />
+                    : <div className="cmp-comprovante__previa"><span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />Arquivo ainda não foi enviado</span></div>}
+                  <div className="cmp-comprovante__info">
+                    <strong className="cmp-comprovante__nome" title={a.nome}>{a.nome}</strong>
+                    {meta ? <span className="cmp-comprovante__meta" title={meta}>{meta}</span> : null}
+                    {selo?.(a)}
+                    {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} em nova aba`} title="Abrir em nova aba"><ExternalLink size={16} aria-hidden="true" /></a> : null}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </Fragment>
       ))}
       <Visualizador anexos={visiveis} indice={aberto} onChange={setAberto} ler={ler} origem={origem} />
     </>
