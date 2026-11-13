@@ -44,3 +44,20 @@ it('trocar de tela fecha a gaveta', async () => {
   })
   expect(gavetaRegistroAberta()).toBeNull()
 })
+
+it('enquanto carrega mostra só o loader no meio da tela, sem gaveta provisória, e uma gaveta só depois', async () => {
+  render(<GavetaRegistro host={host} />)
+  act(() => abrirGavetaRegistro('cr40f_clientes1', '11111111-1111-4111-8111-111111111111'))
+  expect(screen.getByRole('status', { name: /^Carregando/ })).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
+  await screen.findByRole('dialog', { name: 'Grupo Atlântico' })
+  expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  expect(screen.queryByRole('status', { name: /^Carregando/ })).toBeNull()
+})
+
+it('Esc durante o carregamento desiste da abertura', () => {
+  render(<GavetaRegistro host={host} />)
+  act(() => abrirGavetaRegistro('cr40f_clientes1', '11111111-1111-4111-8111-111111111111'))
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(gavetaRegistroAberta()).toBeNull()
+})

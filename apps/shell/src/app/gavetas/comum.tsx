@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Drawer } from '@betinhos/ui'
 import type { Host } from '../../host'
-import { BrandLoader } from '../BrandLoader'
+import { CarregandoRegistro } from '../BrandLoader'
 
 /** O que todo adaptador recebe do hospedeiro: o registro (tabela já escolhida) e o fechar. */
 export type GavetaProps = { host: Host; id: string; onClose: () => void }
@@ -33,15 +33,14 @@ export function useCarga<T>(carregar: () => Promise<T>) {
   return { estado, tentarDeNovo }
 }
 
-/** Enquanto carrega ou se falhar, a gaveta já aparece por cima da lista, com o estado; carregado, mostra a da tela. */
+/** Enquanto carrega, só o loader no meio da tela (sem gaveta provisória); falhou, a gaveta mostra o erro; carregado, a da tela. */
 export function ComCarga<T>({ carga, rotulo, onClose, children }: { carga: ReturnType<typeof useCarga<T>>; rotulo: string; onClose: () => void; children: (dados: T) => ReactNode }) {
   const { estado, tentarDeNovo } = carga
   if (estado?.ok) return <>{children(estado.dados)}</>
+  if (!estado) return <CarregandoRegistro label={`Carregando ${rotulo.toLowerCase()}`} onCancel={onClose} />
   return (
-    <Drawer open eyebrow={rotulo} title={estado ? `Não foi possível abrir` : `Carregando…`} onClose={onClose}>
-      {estado
-        ? <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`} action={<Button variant="secondary" onClick={tentarDeNovo}>Tentar de novo</Button>}>{estado.erro}</Alert>
-        : <BrandLoader variant="inline" size="md" label={`Carregando ${rotulo.toLowerCase()}`} text={`Carregando ${rotulo.toLowerCase()}…`} />}
+    <Drawer open eyebrow={rotulo} title="Não foi possível abrir" onClose={onClose}>
+      <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`} action={<Button variant="secondary" onClick={tentarDeNovo}>Tentar de novo</Button>}>{estado.erro}</Alert>
     </Drawer>
   )
 }

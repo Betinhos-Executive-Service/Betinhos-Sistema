@@ -4,7 +4,7 @@ import type { Host } from '../../../host'
 import { Ficha } from '../../funcionarios/components/Ficha'
 import { createFuncionariosSource } from '../../funcionarios/data/hostSource'
 import { FichaVeiculo } from '../../frota/components/FichaVeiculo'
-import { Carregando } from '../../frota/components/Ui'
+import { CarregandoRegistro } from '../../../app/BrandLoader'
 import { todaySP } from '../../frota/data/dates'
 import { createFrotaSource } from '../../frota/data/hostSource'
 import type { DataSource as FrotaSource } from '../../frota/data/source'
@@ -53,13 +53,8 @@ function VeiculoCarregado({ source, docs, id, onClose, onChanged }: Omit<Props, 
   const result = carga && !naCarga && avulso?.id === id && avulso.veiculo ? { ...carga, data: { ...carga.data, veiculos: [...carga.data.veiculos, avulso.veiculo] } } : carga
   if (fatal) return <Indisponivel titulo="Não foi possível carregar o veículo" erro={fatal} onClose={onClose} onRetry={() => void reload()} />
   if (avulso?.id === id && avulso.erro) return <Indisponivel titulo="Não foi possível carregar o veículo" erro={avulso.erro} onClose={onClose} />
-  if (!result || esperandoAvulso) {
-    return (
-      <Drawer open size="wide" eyebrow="Veículo" title="Carregando veículo" onClose={onClose}>
-        <Carregando label="Carregando veículo" size="md" />
-      </Drawer>
-    )
-  }
+  // Sem gaveta provisória: o loader fica no meio da tela e a ficha entra uma vez só, já com o veículo.
+  if (!result || esperandoAvulso) return <CarregandoRegistro label="Carregando veículo" onCancel={onClose} />
   return (
     <FichaVeiculo
       source={source}
