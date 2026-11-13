@@ -3,8 +3,8 @@ import { readFilters, type ColumnCatalog, type FilterField, type FilterOption, t
 import { moneyFields } from './data/compositions'
 import { resolveFilterOption, searchFilterOptions } from './data/filter-options'
 import {
-  columnCatalogOf, columnDefsOf, columnIdOf, columnsFromConfig, configOf, extraColumnKey, filterFieldsOf, fromTableFilters, lockedCount, sortFromConfig, toTableFilters,
-  type LockedFilters,
+  columnCatalogOf, columnDefsOf, columnIdOf, columnsFromConfig, configOf, extraColumnKey, filterFieldsOf, filterKindOf, fromTableFilters, lockedCount, sortFromConfig, toTableFilters,
+  type FilterLabel, type LockedFilters,
 } from './data/table-view'
 import { allViewFilters, defaultViewDefinition, type CatalogField, type SavedView, type ViewDefinition } from './data/views'
 
@@ -40,6 +40,8 @@ export type ComposicaoViewState = {
   /** Filtros da definição sem equivalente no DS: ficam na consulta e aparecem só para leitura. */
   lockedFilters: LockedFilters
   clearLockedFilters: () => void
+  /** Nome de um valor de lookup ou escolha (GUID → nome), quando já lido. */
+  valueLabel: FilterLabel
 }
 
 const DENSITY_KEY = 'betinhos.densidade.composicao'
@@ -53,7 +55,6 @@ const comparable = (definition: ViewDefinition) => JSON.stringify({
   filterGroups: definition.filterGroups?.length ? definition.filterGroups : undefined,
   groupOperator: definition.filterGroups?.length ? definition.groupOperator : undefined,
 })
-const SELECTION_TYPES = new Set(['Picklist', 'State', 'Status'])
 const labelKey = (id: string, value: string) => `${id}|${value}`
 
 /**
@@ -74,6 +75,8 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
   const [labels, setLabels] = useState<Map<string, string>>(() => new Map())
   const [options, setOptions] = useState<Map<string, FilterOption[]>>(() => new Map())
   const requested = useRef(new Set<string>())
+  // Opções vistas na busca do painel: viram rótulo quando entram num filtro, sem renderizar a barra a cada busca.
+  const seen = useRef(new Map<string, string>())
   const remember = useCallback((found: { id: string; option: FilterOption }[]) => setLabels((current) => {
     const fresh = found.filter(({ id, option }) => current.get(labelKey(id, option.value)) !== option.label)
     if (!fresh.length) return current
@@ -81,11 +84,11 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     fresh.forEach(({ id, option }) => next.set(labelKey(id, option.value), option.label))
     return next
   }), [])
-  const label = useCallback((id: string, value: string) => labels.get(labelKey(id, value)) ?? options.get(id)?.find((option) => option.value === value)?.label ?? value, [labels, options])
+  const label = useCallback((id: string, value: string) => labels.get(labelKey(id, value)) ?? seen.current.get(labelKey(id, value)) ?? options.get(id)?.find((option) => option.value === value)?.label ?? value, [labels, options])
 
   // Só os ids das colunas e dos filtros decidem os campos: largura, fixação e ordenação não refazem a lista.
-  const columnIds = definition.columns.map((column) => column.id).join('\n')
-  const filterIds = allViewFilters(definition).map((filter) => filter.id).join('\n')
+  const columnIds = useMemo(() => definition.columns.map((column) => column.id).join('\n'), [definition])
+  const filterIds = useMemo(() => allViewFilters(definition).map((filter) => filter.id).join('\n'), [definition])
   const fields = useMemo(() => filterFieldsOf(catalog, columnIds.split('\n'), filterIds.split('\n'), keyOf, options), [catalog, columnIds, filterIds, keyOf, options])
   const fieldById = useMemo(() => new Map(fields.map((field) => [field.key, field])), [fields])
   const fieldFor = useCallback((id: string) => fieldById.get(keyOf(id)), [fieldById, keyOf])
@@ -94,32 +97,35 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
   useEffect(() => {
     if (mock || !ready) return
     const pending = (key: string) => !requested.current.has(key) && Boolean(requested.current.add(key))
-    const choices = [...new Set([...columnIds.split('\n'), ...filterIds.split('\n')])].flatMap((id) => {
+    const choices = [...new Set([...definition.columns.map((column) => column.id), ...allViewFilters(definition).map((filter) => filter.id)])].flatMap((id) => {
       const field = byId.get(id)
-      return field && SELECTION_TYPES.has(field.type) && pending(`opcoes:${id}`) ? [field] : []
+      return field && filterKindOf(field.type) === 'choice' && pending(`opcoes:${id}`) ? [field] : []
     })
     if (choices.length) {
       void Promise.all(choices.map((field) => searchFilterOptions(field, '').then((found) => [field.id, found] as const, () => null)))
-        .then((loaded) => setOptions((current) => new Map([...current, ...loaded.filter((item) => item !== null)])))
+        .then((loaded) => {
+          const found = loaded.filter((item) => item !== null)
+          if (found.length) setOptions((current) => new Map([...current, ...found]))
+        })
     }
     const lookups = allViewFilters(definition).flatMap((filter) => {
       const field = byId.get(filter.id)
       if (field?.type !== 'Lookup') return []
-      return (filter.values?.length ? filter.values : [filter.value]).filter((value) => value && pending(labelKey(filter.id, value))).map((value) => ({ field, value }))
+      return (filter.values?.length ? filter.values : [filter.value]).filter((value) => value && !seen.current.has(labelKey(filter.id, value)) && pending(labelKey(filter.id, value))).map((value) => ({ field, value }))
     })
     if (lookups.length) {
       void Promise.all(lookups.map(({ field, value }) => resolveFilterOption(field, value).then((option) => option ? [{ id: field.id, option }] : [], () => [])))
         .then((found) => remember(found.flat()))
     }
-  }, [byId, columnIds, definition, filterIds, mock, ready, remember])
+  }, [byId, definition, mock, ready, remember])
 
   const search = useCallback<LookupSearch>(async (field, text) => {
     const source = byId.get(columnIdOf(field.key))
     if (!source || mock) return []
     const found = await searchFilterOptions(source, text)
-    remember(found.map((option) => ({ id: source.id, option })))
+    found.forEach((option) => seen.current.set(labelKey(source.id, option.value), option.label))
     return found
-  }, [byId, mock, remember])
+  }, [byId, mock])
 
   const config = useMemo(() => configOf(definition, columnDefs, byId, keyOf, tableFilters.filters), [definition, columnDefs, byId, keyOf, tableFilters])
   const baseConfig = useMemo<ViewConfig>(() => configOf(baseline, columnDefs, byId, keyOf, toTableFilters(baseline, fieldFor, label).filters), [baseline, columnDefs, byId, keyOf, fieldFor, label])
@@ -135,7 +141,8 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     ]
   }, [o.views, baseConfig])
   const activeEntry = views.find((entry) => entry.id === (active?.id ?? '')) ?? views[0]
-  const dirty = useMemo(() => comparable(definition) !== comparable(baseline), [definition, baseline])
+  const baselineKey = useMemo(() => comparable(baseline), [baseline])
+  const dirty = useMemo(() => comparable(definition) !== baselineKey, [definition, baselineKey])
 
   const setConfig = useCallback((update: (config: ViewConfig) => ViewConfig) => {
     if (o.locked || !ready) { onError(ready ? 'Aguarde o comando em andamento para mudar a visão.' : 'Aguarde o carregamento dos campos para mudar a visão.'); return }
@@ -189,5 +196,5 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     canPublish: true,
     setConfig, density, setDensity, select: selectView, restore, save, saveAs, rename, remove: deleteView, publish: publishView, reload: reloadViews,
   }), [status, o.viewError, views, activeEntry, config, dirty, setConfig, density, setDensity, selectView, restore, save, saveAs, rename, deleteView, publishView, reloadViews])
-  return useMemo(() => ({ state, columnDefs, catalog: columnCatalog, filterFields: fields, search, lockedFilters: tableFilters.locked, clearLockedFilters }), [state, columnDefs, columnCatalog, fields, search, tableFilters.locked, clearLockedFilters])
+  return useMemo(() => ({ state, columnDefs, catalog: columnCatalog, filterFields: fields, search, lockedFilters: tableFilters.locked, clearLockedFilters, valueLabel: label }), [state, columnDefs, columnCatalog, fields, search, tableFilters.locked, clearLockedFilters, label])
 }

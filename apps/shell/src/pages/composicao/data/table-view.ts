@@ -1,5 +1,5 @@
 import {
-  conditionProblem, emptyFilters, storedFilters,
+  conditionProblem, emptyFilters, EXTRA_COLUMN_PREFIX, isExtraColumn, storedFilters,
   type ColumnCatalog, type ColumnCatalogType, type FilterCondition, type FilterField, type FilterGroup, type FilterKind, type FilterOption,
   type TableFilters, type ViewColumnDef, type ViewColumnState, type ViewConfig, type ViewSort as TableSort,
 } from '@betinhos/ui'
@@ -36,10 +36,10 @@ const relationOf = (field: CatalogField) => `${field.table}@${field.relationship
 /** Chave `x:` do DS para coluna fora das definições: a mesma que o painel monta a partir do `ColumnCatalog`. */
 export function extraColumnKey(id: string, catalog: Map<string, CatalogField>) {
   const field = catalog.get(id)
-  return field?.path.length ? `x:${enc(relationOf(field))}/${enc(id)}` : `x:${enc(id)}`
+  return EXTRA_COLUMN_PREFIX + (field?.path.length ? `${enc(relationOf(field))}/${enc(id)}` : enc(id))
 }
 /** Chave do DS → id da coluna na definição. */
-export const columnIdOf = (key: string) => key.startsWith('x:') ? decodeURIComponent(key.slice(2).split('/').pop() ?? '') : key
+export const columnIdOf = (key: string) => isExtraColumn(key) ? decodeURIComponent(key.slice(EXTRA_COLUMN_PREFIX.length).split('/').pop() ?? '') : key
 
 export function columnLabel(id: string, catalog: Map<string, CatalogField>) {
   const field = catalog.get(id)
@@ -234,19 +234,20 @@ export function toTableFilters(definition: ViewDefinition, fieldFor: (id: string
   const convert = (filter: ViewFilter, order: number) => {
     const field = fieldFor(filter.id)
     const condition = field ? toTableCondition(filter, field, `vf${seq++}`, label) : null
-    if (condition) origins.set(condition.id, { condition, filter, order })
-    return condition
+    if (!condition || !field) return null
+    origins.set(condition.id, { condition, filter, order })
+    return { condition, field }
   }
-  const group = (source: ViewFilterGroup, logic: 'and' | 'or', filters: ViewFilter[]): FilterGroup | null => {
-    const items = filters.map((filter) => convert(filter, -1))
-    return items.every(Boolean) ? { type: 'group', id: `vg:${source.id}`, logic, items: items as FilterCondition[] } : null
+  const group = (id: string, logic: 'and' | 'or', filters: ViewFilter[]): FilterGroup | null => {
+    const items = filters.map((filter) => convert(filter, -1)?.condition)
+    return items.every(Boolean) ? { type: 'group', id: `vg:${id}`, logic, items: items as FilterCondition[] } : null
   }
   const filters = emptyFilters()
   const items: Array<FilterCondition | FilterGroup> = []
   definition.filters.forEach((filter, index) => {
-    const condition = convert(filter, index)
-    if (!condition) { locked.filters.push(filter); lockedAt.set(filter, index); return }
-    const field = fieldFor(filter.id)!
+    const converted = convert(filter, index)
+    if (!converted) { locked.filters.push(filter); lockedAt.set(filter, index); return }
+    const { condition, field } = converted
     if (!field.advancedOnly && !filters.quick[field.key]) filters.quick[field.key] = condition
     else items.push(condition)
   })
@@ -254,18 +255,18 @@ export function toTableFilters(definition: ViewDefinition, fieldFor: (id: string
   let logic: 'and' | 'or' = 'and'
   if (definition.groupOperator !== 'or') {
     for (const source of groups) {
-      const converted = group(source, source.operator, source.filters)
+      const converted = group(source.id, source.operator, source.filters)
       if (converted) items.push(converted)
       else locked.groups.push(source)
     }
   } else if (groups.length && !definition.filters.length) {
-    const converted = groups.map((source) => group(source, source.operator, source.filters))
+    const converted = groups.map((source) => group(source.id, source.operator, source.filters))
     if (converted.every(Boolean)) { logic = 'or'; items.push(...converted as FilterGroup[]) }
     else locked.orGroups = groups
   } else if (groups.length) {
     // E entre as condições soltas e (G1 OU G2): só cabe nos dois níveis quando cada grupo é uma condição ou um OU.
     const flat = groups.every((source) => source.operator === 'or' || source.filters.length === 1)
-    const converted = flat ? group({ id: 'or', operator: 'or', filters: [] }, 'or', groups.flatMap((source) => source.filters)) : null
+    const converted = flat ? group('or', 'or', groups.flatMap((source) => source.filters)) : null
     if (converted) items.push(converted)
     else locked.orGroups = groups
   }

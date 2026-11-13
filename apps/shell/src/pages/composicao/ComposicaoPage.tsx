@@ -1561,7 +1561,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     <div className="page page--full composition-layout">
       <h1 className="composition-title">Composição de preços</h1>
       <CompositionCommandLine
-        view={viewBar} actions={commandLineActions} onSearch={setSearch} catalog={catalog} activeView={activeView} ready={viewReady} mock={usingMockData} mobile={mobile} search={search}
+        view={viewBar} actions={commandLineActions} onSearch={setSearch} catalog={catalog} nativeFetchXml={activeView?.nativeOnly && !activeView.nativeFiltersEditable ? activeView.sourceFetchXml ?? null : null} ready={viewReady} mock={usingMockData} mobile={mobile} search={search}
         commandPhase={commandPhase} commandLocked={commandLocked} commandBlock={commandBlock} exporting={exporting} selectedCount={selectedCount}
         exportBlocked={!dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)}
         countText={nextLink

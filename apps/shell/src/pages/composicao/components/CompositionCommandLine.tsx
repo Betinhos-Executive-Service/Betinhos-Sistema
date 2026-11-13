@@ -2,7 +2,7 @@ import { memo, type RefObject } from 'react'
 import { Download, FilePlus2, RefreshCw, Trash2 } from 'lucide-react'
 import { Button, SearchBox, StatusBadge, ViewBar, type MenuAction, type SelectionAction } from '@betinhos/ui'
 import type { ComposicaoViewState } from '../useComposicaoViewState'
-import type { CatalogField, SavedView } from '../data/views'
+import type { CatalogField } from '../data/views'
 import type { CommandPhase } from './useCompositionCommands'
 import { ReadOnlyFilters } from './ReadOnlyFilters'
 
@@ -21,7 +21,8 @@ type Props = {
   actions: RefObject<CommandLineActions>
   onSearch: (value: string) => void
   catalog: CatalogField[]
-  activeView: SavedView | null
+  /** FetchXML da view nativa com filtros originais não editáveis aqui. */
+  nativeFetchXml: string | null
   ready: boolean
   mock: boolean
   mobile: boolean
@@ -73,7 +74,7 @@ export const CompositionCommandLine = memo(function CompositionCommandLine(p: Pr
       >
         <span className="composition-count" aria-label={p.countLabel}>{p.countText}</span>
         {p.mock && !p.mobile ? <StatusBadge tone="info">Modo local</StatusBadge> : null}
-        {p.ready ? <ReadOnlyFilters catalog={p.catalog} nativeFetchXml={p.activeView?.nativeOnly && !p.activeView.nativeFiltersEditable ? p.activeView.sourceFetchXml ?? null : null} locked={p.view.lockedFilters} onClear={p.view.clearLockedFilters} /> : null}
+        {p.ready ? <ReadOnlyFilters catalog={p.catalog} nativeFetchXml={p.nativeFetchXml} valueLabel={p.view.valueLabel} locked={p.view.lockedFilters} onClear={p.view.clearLockedFilters} /> : null}
       </ViewBar>
     </div>
   )

@@ -42,7 +42,7 @@ it('linha de comando do DS: seleção mostra Gerar OP e Excluir, ✕ limpa e Aud
 it('filtros da visão nativa e condições sem equivalente ficam visíveis só para leitura', () => {
   const catalog = [{ id: 'cr40f_nome', label: 'Nome', table: 'cr40f_composicaodeprecos', attribute: 'cr40f_nome', path: [], type: 'String', available: true }] as CatalogField[]
   const fetchXml = '<fetch><entity name="cr40f_composicaodeprecos"><filter type="and"><condition attribute="cr40f_nome" operator="not-like" value="%Teste%" /></filter></entity></fetch>'
-  render(<ReadOnlyFilters catalog={catalog} nativeFetchXml={fetchXml} locked={{ filters: [{ id: 'cr40f_nome', operator: 'not-begins-with', value: 'X' }], groups: [], orGroups: [] }} onClear={() => undefined} />)
+  render(<ReadOnlyFilters catalog={catalog} nativeFetchXml={fetchXml} locked={{ filters: [{ id: 'cr40f_nome', operator: 'not-begins-with', value: 'X' }], groups: [], orGroups: [] }} valueLabel={(_id, value) => value} onClear={() => undefined} />)
   fireEvent.click(screen.getByRole('button', { name: 'Filtros da visão (2)' }))
   const dialog = screen.getByLabelText('Filtros originais da view')
   expect(within(dialog).getByText('Nome · não contém · %Teste%')).toBeTruthy()
