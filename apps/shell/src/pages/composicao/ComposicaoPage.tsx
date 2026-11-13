@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Check, ClipboardList, Download, FilePlus2, LoaderCircle, RefreshCw, Search, SearchX, Trash2, X } from 'lucide-react'
 import { ContextMenu, ToastProvider, useToast, type MenuAction } from '@betinhos/ui'
@@ -1406,7 +1406,7 @@ function ComposicaoContent({ host }: { host: Host }) {
             const formattedValue = readViewField(row.original.viewFields, valueKey).formatted
             const title = typeof formattedValue === 'string' && formattedValue ? formattedValue : String(value)
             const color = statusColors[String(value)]
-            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className="grid-choice-badge" style={color ? { color, borderColor: color, backgroundColor: `${color}18` } : undefined} title={title}>{title}</span>} />
+            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className="grid-choice-badge" style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
           }
           const formatted = readViewField(row.original.viewFields, valueKey).formatted
           return <EditableViewFieldCell field={field} value={value} formatted={formatted} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} />
