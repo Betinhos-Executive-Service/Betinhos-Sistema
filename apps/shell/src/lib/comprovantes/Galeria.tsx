@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Spinner } from '@betinhos/ui'
-import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, RefreshCw, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, RefreshCw, Video, X } from 'lucide-react'
 import { useQueryId } from '../../nav/queryState'
 import { BrandLoader } from '../../app/BrandLoader'
-import { tipoPrevia, type Arquivo, type Comprovante } from './arquivo'
+import { ehVideo, tipoPrevia, type Arquivo, type Comprovante } from './arquivo'
 import './comprovantes.css'
 
 type Ler = (anexo: Comprovante) => Promise<Arquivo>
@@ -13,48 +13,74 @@ const message = (reason: unknown) => (reason instanceof Error ? reason.message :
 /** Dá para buscar o conteúdo: pelo id do OneDrive ou, nos comprovantes antigos, pelo link. */
 const temArquivo = (a: Comprovante) => Boolean(a.driveItemId || a.url)
 
-/** Conteúdo do comprovante; o Source guarda em cache (e esquece falhas), então "Tentar de novo" busca outra vez. */
-function useArquivo(ler: Ler, anexo: Comprovante | null) {
+/**
+ * Conteúdo do comprovante; o Source guarda em cache (e esquece falhas), então "Tentar de novo" busca outra vez.
+ * Com `ativo` falso (miniatura fora da tela) não busca nada.
+ */
+function useArquivo(ler: Ler, anexo: Comprovante | null, ativo = true) {
   const [estado, setEstado] = useState<Estado>(null)
   const [tentativa, setTentativa] = useState(0)
   useEffect(() => {
-    if (!anexo) { setEstado(null); return }
+    if (!anexo || !ativo) { setEstado(null); return }
     let cancelled = false
     setEstado(null)
     ler(anexo).then((arquivo) => { if (!cancelled) setEstado({ arquivo }) }).catch((reason) => { if (!cancelled) setEstado({ erro: message(reason) }) })
     return () => { cancelled = true }
-  }, [ler, anexo, tentativa])
+  }, [ler, anexo, ativo, tentativa])
   const tentarDeNovo = useCallback(() => setTentativa((n) => n + 1), [])
   return { estado, tentarDeNovo }
+}
+
+/** Vira verdadeiro quando o elemento chega perto da tela (e fica); sem IntersectionObserver, já nasce visível. */
+function useVisivel() {
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  const [visivel, setVisivel] = useState(typeof IntersectionObserver === 'undefined')
+  useEffect(() => {
+    if (visivel || !el) return
+    const obs = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { setVisivel(true); obs.disconnect() } }, { rootMargin: '200px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [el, visivel])
+  return [setEl, visivel] as const
 }
 
 /** Miniatura: spinner pequeno; o visualizador usa o loader da marca. */
 const Carregando = () => <span className="cmp-previa__vazio"><Spinner size={20} label="Buscando no OneDrive" />Buscando no OneDrive…</span>
 
-function Falha({ erro, onRetry, grande = false }: { erro: string; onRetry: () => void; grande?: boolean }) {
+/** No visualizador, com o link do arquivo, oferece abrir direto no SharePoint (ex.: vídeo grande demais para o flow). */
+function Falha({ erro, onRetry, grande = false, link }: { erro: string; onRetry: () => void; grande?: boolean; link?: string | null }) {
   return (
     <span className="cmp-previa__vazio cmp-previa__vazio--erro" role={grande ? 'alert' : undefined}>
       <ImageOff size={grande ? 32 : 24} aria-hidden="true" />
       <span title={erro}>{grande ? erro : 'Prévia indisponível'}</span>
-      <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={onRetry}>Tentar de novo</Button>
+      <span className="cmp-previa__acoes">
+        {grande && link ? <a className="cmp-link" href={link} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true" />Abrir no SharePoint</a> : null}
+        <Button variant="secondary" icon={<RefreshCw size={14} />} onClick={onRetry}>Tentar de novo</Button>
+      </span>
     </span>
   )
 }
 
-/** Imagem ou PDF; outros tipos ficam só com abrir/baixar. Na miniatura o PDF não recebe clique. */
+const IconeVideo = () => <span className="cmp-previa__vazio"><Video size={28} aria-hidden="true" />Vídeo</span>
+
+/** Imagem, PDF ou vídeo; outros tipos ficam só com abrir/baixar. Na miniatura o PDF não recebe clique e o vídeo é só ícone. */
 function Conteudo({ arquivo, grande = false }: { arquivo: Arquivo; grande?: boolean }) {
   const tipo = tipoPrevia(arquivo.mime)
+  if (tipo === 'video') return grande ? <video className="cmp-previa__video" src={arquivo.url} controls playsInline aria-label={arquivo.nome} /> : <IconeVideo />
   if (tipo === 'imagem') return <img className="cmp-previa__img" src={arquivo.url} alt={grande ? arquivo.nome : ''} />
   if (tipo === 'pdf') return <iframe className={grande ? 'cmp-previa__pdf' : 'cmp-previa__pdf cmp-previa__pdf--mini'} src={grande ? arquivo.url : `${arquivo.url}#toolbar=0&navpanes=0&view=FitH`} title={arquivo.nome} tabIndex={grande ? undefined : -1} />
   return <span className="cmp-previa__vazio"><FileText size={28} aria-hidden="true" />{grande ? 'Este tipo de arquivo não tem prévia. Use abrir ou baixar.' : 'Sem prévia'}</span>
 }
 
+/** Vídeo fica só com o ícone (é buscado ao abrir); o resto busca a prévia quando a miniatura chega perto da tela. */
 function Miniatura({ anexo, ler, onOpen }: { anexo: Comprovante; ler: Ler; onOpen: () => void }) {
-  const { estado, tentarDeNovo } = useArquivo(ler, anexo)
-  if (estado && 'erro' in estado) return <div className="cmp-comprovante__previa"><Falha erro={estado.erro} onRetry={tentarDeNovo} /></div>
+  const video = ehVideo(anexo)
+  const [ref, visivel] = useVisivel()
+  const { estado, tentarDeNovo } = useArquivo(ler, anexo, visivel && !video)
+  if (estado && 'erro' in estado) return <div ref={ref} className="cmp-comprovante__previa"><Falha erro={estado.erro} onRetry={tentarDeNovo} /></div>
   return (
-    <button type="button" className="cmp-comprovante__previa" aria-label={`Ver ${estado?.arquivo.nome ?? anexo.nome}`} onClick={onOpen}>
-      {estado ? <Conteudo arquivo={estado.arquivo} /> : <Carregando />}
+    <button ref={ref} type="button" className="cmp-comprovante__previa" aria-label={`Ver ${estado?.arquivo.nome ?? anexo.nome}`} onClick={onOpen}>
+      {video ? <IconeVideo /> : estado ? <Conteudo arquivo={estado.arquivo} /> : <Carregando />}
     </button>
   )
 }
@@ -153,8 +179,10 @@ function Visualizador({ anexos, indice, onChange, ler }: { anexos: Comprovante[]
           </header>
           <div className="cmp-viewer__body">
             {total > 1 ? <Button variant="secondary" className="cmp-viewer__nav cmp-viewer__nav--prev" icon={<ChevronLeft size={20} />} aria-label="Comprovante anterior" onClick={() => ir(-1)} /> : null}
-            {estado == null ? <BrandLoader variant="inline" size="md" label="Buscando no OneDrive" text="Buscando no OneDrive…" />
-              : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande />
+            {estado == null ? (anexo && ehVideo(anexo)
+              ? <BrandLoader variant="inline" size="md" label="Baixando o vídeo" text="Baixando o vídeo… pode levar até 1 minuto." />
+              : <BrandLoader variant="inline" size="md" label="Buscando no OneDrive" text="Buscando no OneDrive…" />)
+              : 'erro' in estado ? <Falha erro={estado.erro} onRetry={tentarDeNovo} grande link={anexo?.url} />
                 : <Conteudo arquivo={estado.arquivo} grande />}
             {total > 1 ? <Button variant="secondary" className="cmp-viewer__nav cmp-viewer__nav--next" icon={<ChevronRight size={20} />} aria-label="Próximo comprovante" onClick={() => ir(1)} /> : null}
           </div>

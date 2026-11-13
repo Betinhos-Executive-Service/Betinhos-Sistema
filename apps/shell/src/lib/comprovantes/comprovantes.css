@@ -21,6 +21,8 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
 .cmp-previa__pdf--mini { pointer-events: none; }
 .cmp-previa__vazio { display: grid; justify-items: center; gap: var(--bt-space-2); padding: var(--bt-space-3); font-size: var(--bt-font-size-12); text-align: center; color: var(--bt-color-text-secondary); }
 .cmp-previa__vazio--erro { color: var(--bt-color-danger); }
+.cmp-previa__acoes { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--bt-space-3); }
+.cmp-previa__video { display: block; max-width: 100%; max-height: 100%; background-color: #000; border-radius: var(--bt-radius-xs); }
 
 /* Visualizador: <dialog> sobre a ficha, imagem/PDF em tamanho real dentro da tela. */
 .cmp-viewer { width: min(1100px, 94vw); max-width: none; height: 90vh; max-height: none; margin: auto; padding: 0; border: 0; border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
 import type { Comprovante } from './arquivo'
-import { createArquivos } from './leitura'
+import { createArquivos, MAX_BUSCAS } from './leitura'
 
 const anexo: Comprovante = { id: 'a1', nome: 'cupom.jpg', url: null, driveItemId: 'DRIVE-1' }
 const client = (url = 'https://flow.test/consultar') => ({ getAll: vi.fn(async (path: string) => (path.startsWith('environmentvariablevalues') ? [{ value: url }] : [])) }) as unknown as DataverseClient
@@ -58,5 +58,30 @@ describe('leitura do comprovante no OneDrive', () => {
   it('sem arquivo no OneDrive ou sem variável configurada, explica o motivo', async () => {
     await expect(createArquivos(client())({ ...anexo, driveItemId: '', url: null })).rejects.toThrow('não tem o arquivo no OneDrive')
     await expect(createArquivos(client(''))(anexo)).rejects.toThrow('new_URLFlowConsultarArquivoOneDrive')
+  })
+
+  it('no máximo 4 buscas ao mesmo tempo; a 5ª espera uma terminar', async () => {
+    const respostas: (() => void)[] = []
+    const fetchMock = vi.fn(() => new Promise<Response>((ok) => respostas.push(() => ok(new Response(JSON.stringify({ sucesso: true, mimeType: 'image/jpeg', conteudoBase64: btoa('abc') }), { status: 200 })))))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:teste' }))
+    const ler = createArquivos(client())
+    const leituras = Array.from({ length: MAX_BUSCAS + 1 }, (_, i) => ler({ ...anexo, id: `a${i}` }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS))
+    await new Promise((r) => setTimeout(r, 10))
+    expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS)
+    respostas[0]()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(MAX_BUSCAS + 1))
+    respostas.slice(1).forEach((r) => r())
+    await Promise.all(leituras)
+  })
+
+  it('leitura que passa do tempo cai com mensagem clara e não fica em cache', async () => {
+    const fetchMock = vi.fn((_: string, init?: RequestInit) => new Promise<Response>((_ok, falha) => init?.signal?.addEventListener('abort', () => falha(new DOMException('aborted', 'AbortError')))))
+    vi.stubGlobal('fetch', fetchMock)
+    const ler = createArquivos(client(), 20)
+    await expect(ler(anexo)).rejects.toThrow('demorou mais de')
+    await expect(ler(anexo)).rejects.toThrow('demorou mais de')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mimeDoArquivo, tipoPrevia } from './arquivo'
+import { ehVideo, mimeDoArquivo, tipoPrevia } from './arquivo'
 
 describe('prévia de comprovante', () => {
   it('usa o Content-Type do OneDrive e, se genérico, a extensão', () => {
@@ -9,9 +9,19 @@ describe('prévia de comprovante', () => {
     expect(mimeDoArquivo('qa.txt', '')).toBe('application/octet-stream')
   })
 
-  it('só imagem e PDF têm prévia', () => {
+  it('imagem, PDF e vídeo têm prévia', () => {
     expect(tipoPrevia('image/webp')).toBe('imagem')
     expect(tipoPrevia('application/pdf')).toBe('pdf')
+    expect(tipoPrevia(mimeDoArquivo('recebimento.MOV', null))).toBe('video')
+    expect(tipoPrevia('video/webm')).toBe('video')
     expect(tipoPrevia('image/heic')).toBeNull()
+  })
+
+  it('vídeo pelo tipo informado ou, sem ele, pela extensão', () => {
+    const base = { id: '1', url: null }
+    expect(ehVideo({ ...base, nome: 'recebimento-1', midia: 'video' })).toBe(true)
+    expect(ehVideo({ ...base, nome: 'clip.mp4', midia: 'foto' })).toBe(false)
+    expect(ehVideo({ ...base, nome: 'clip.mp4' })).toBe(true)
+    expect(ehVideo({ ...base, nome: 'cupom.jpg' })).toBe(false)
   })
 })
