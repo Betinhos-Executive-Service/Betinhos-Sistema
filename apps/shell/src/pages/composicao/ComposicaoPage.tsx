@@ -31,6 +31,7 @@ import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
 import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
+import { quandoOcioso } from '../../lib/ocioso'
 import { describeLoadFailure } from './data/load-failure'
 import { LAST_VIEW_KEY, openQueryFromViewRow, pickOpenView } from './data/open-query'
 import { readViewField } from './data/view-field-read'
@@ -357,6 +358,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   }, [usingMockData])
   // Abertura: views (3 leituras) -> primeira página com o FetchXML da view -> metadata em segundo plano. A grade aparece sem
   // esperar nenhuma metadata; a metadata só completa os campos (rótulos, edição, filtros) quando chega.
+  // Com catálogo em cache válido, a metadata não sai na abertura: só é conferida com o navegador ocioso, depois da primeira página.
   useEffect(() => {
     let alive = true
     const request = ++viewRequestRef.current
@@ -369,9 +371,9 @@ function ComposicaoContent({ host }: { host: Host }) {
     }
     let cacheKey: string | null = null
     try { cacheKey = catalogCacheKey(currentHost.mode === 'dataverse' ? currentHost.clientUrl : getDataverseUrl()) } catch { cacheKey = null }
-    let cached: CatalogField[] | null = null
-    try { cached = cacheKey ? readCachedCatalog(cacheKey) : null } catch { cached = null }
+    const cached = cacheKey ? readCachedCatalog(cacheKey) : null
     if (cached) setCatalog(cached)
+    let cancelRevalidation = () => {}
     void (async () => {
       let viewRows: ViewRows | null = null
       let viewsFailure: string | null = null
@@ -389,8 +391,8 @@ function ComposicaoContent({ host }: { host: Host }) {
       if (useOpen) { viewDefinitionRef.current = openDefinition; setViewDefinition(openDefinition) }
       setOpenQuery({ view: useOpen ? { fetchXml: openView.fetchXml } : undefined, viewId: useOpen ? picked!.id : null, shape: queryShapeKey(openDefinition), keys: new Map() })
       const pagePromise = loadCompositions(undefined, useOpen ? { fetchXml: openView.fetchXml } : undefined)
-      // A metadata parte depois que a primeira página foi pedida: ela não disputa a fila com os dados.
-      const catalogPromise = loadColumnCatalog().then((fields) => ({ fields }), (error: unknown) => ({ error }))
+      // Sem cache, a metadata parte depois que a primeira página foi pedida: ela não disputa a fila com os dados.
+      const catalogPromise = cached ? null : loadColumnCatalog().then((fields) => ({ fields }), (error: unknown) => ({ error }))
       let firstPage: Awaited<typeof pagePromise> | null = null
       try { firstPage = await pagePromise } catch (error) {
         if (!current()) return
@@ -407,7 +409,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         setCatalogReady(true)
         return
       }
-      const settled = cached ? { fields: cached } : await catalogPromise
+      const settled = catalogPromise ? await catalogPromise : { fields: cached ?? [] }
       if (!current()) return
       const fields = 'fields' in settled ? settled.fields : []
       try {
@@ -442,16 +444,24 @@ function ComposicaoContent({ host }: { host: Host }) {
       setCatalog(fields)
       if (!cached && 'fields' in settled && cacheKey) writeCachedCatalog(cacheKey, settled.fields)
       setCatalogReady(true)
-      if (cached) {
-        // Com catálogo em cache a tela já abriu; a metadata é revalidada e só muda a tela se o schema mudou.
-        const network = await catalogPromise
-        if (!current() || !('fields' in network) || sameCatalog(cached, network.fields)) return
-        if (cacheKey) writeCachedCatalog(cacheKey, network.fields)
-        setCatalog(network.fields)
-        if (viewRows) { try { setViews(buildViews(viewRows, network.fields)) } catch { /* mantém as views atuais */ } }
-      }
+      if (!cached) return
+      // Com cache a tela já abriu sem metadata. A conferência (coluna nova ou rótulo trocado dentro das 12 h) roda com o
+      // navegador ocioso, fora do caminho da primeira página, e só muda a tela se o schema mudou. Vale enquanto a tela
+      // estiver aberta (`alive`), não só enquanto a consulta da abertura for a atual: trocar de view, buscar ou filtrar antes
+      // da metadata chegar não pode descartar a conferência e deixar o cache defasado até vencer.
+      cancelRevalidation = quandoOcioso(() => {
+        if (!alive) return
+        void loadColumnCatalog().then((network) => {
+          if (sameCatalog(cached, network)) return
+          if (cacheKey) writeCachedCatalog(cacheKey, network)
+          if (!alive) return
+          setCatalog(network)
+          // As views lidas na abertura só substituem a lista se nada a mudou depois (salvar, excluir, trocar de visão).
+          if (viewRows && current()) { try { setViews(buildViews(viewRows, network)) } catch { /* mantém as views atuais */ } }
+        }, () => undefined)
+      })
     })()
-    return () => { alive = false }
+    return () => { alive = false; cancelRevalidation() }
   }, [applyFirstPage])
   const rememberView = (id: string | null) => {
     try { if (id) window.localStorage.setItem(LAST_VIEW_KEY, id); else window.localStorage.removeItem(LAST_VIEW_KEY) } catch { /* sem armazenamento local: abre pela view padrão */ }

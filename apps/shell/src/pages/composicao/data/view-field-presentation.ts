@@ -15,6 +15,18 @@ export function booleanPresentation(value: unknown, formatted?: unknown) {
   return { active, label: typeof formatted === 'string' && formatted.trim() ? formatted : active ? 'Sim' : 'Não' }
 }
 
+/**
+ * Texto puro de uma célula da visão, como a `ViewFieldCell` mostra lookups, escolhas, booleanos e datas (para o Excel):
+ * o texto formatado do Dataverse primeiro; booleano sem ele vira Sim/Não e data, dd/mm/aaaa hh:mm.
+ */
+export function viewFieldText(field: CatalogField | undefined, value: unknown, formatted: unknown): string {
+  if (value === null || value === undefined || value === '') return ''
+  if (field?.type === 'Boolean') return booleanPresentation(value, formatted).label
+  if (typeof formatted === 'string' && formatted) return formatted
+  if (field?.type === 'DateTime') return formatViewDate(String(value))
+  return typeof value === 'object' ? JSON.stringify(value) : String(value)
+}
+
 export function isPrimaryField(field: CatalogField): boolean {
   return field.attribute === field.primaryNameAttribute || field.attribute === field.primaryIdAttribute
 }

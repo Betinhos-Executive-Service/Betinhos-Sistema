@@ -1,5 +1,7 @@
 import { moneyFields, type Composition } from './compositions'
 import { viewValueKey, type CatalogField, type ViewDefinition } from './views'
+import { readViewField } from './view-field-read'
+import { viewFieldText } from './view-field-presentation'
 
 const moneyIds = new Set<string>(moneyFields.map(({ key }) => key))
 const encoder = new TextEncoder()
@@ -98,7 +100,10 @@ function cell(address: string, value: unknown, style: number, numeric = false) {
  * (na abertura, os aliases da própria view, ex. `a_67d5.campo`); o padrão serve às linhas relidas pela consulta resolvida.
  */
 export function compositionWorkbook(rows: Composition[], definition: ViewDefinition, catalog: CatalogField[], viewName: string, valueKey = (id: string) => viewValueKey(id, definition, catalog)) {
-  const columns = definition.columns.map(({ id }) => ({ id, label: catalog.find((field) => field.id === id)?.label ?? moneyFields.find((field) => field.key === id)?.label ?? ({ client: 'Cliente', route: 'Trajeto', date: 'Data de saída' } as Record<string, string>)[id] ?? id }))
+  const columns = definition.columns.map(({ id }) => {
+    const field = catalog.find((item) => item.id === id)
+    return { id, field, label: field?.label ?? moneyFields.find((field) => field.key === id)?.label ?? ({ client: 'Cliente', route: 'Trajeto', date: 'Data de saída' } as Record<string, string>)[id] ?? id }
+  })
   if (!columns.length) throw new Error('A view não possui colunas para exportar.')
   const lastColumn = columnName(columns.length - 1)
   const widths = columns.map(({ id, label }, index) => `<col min="${index + 1}" max="${index + 1}" width="${Math.min(48, Math.max(16, id === 'client' || id === 'route' ? 32 : label.length + 5))}" customWidth="1"/>`).join('')
@@ -111,12 +116,13 @@ export function compositionWorkbook(rows: Composition[], definition: ViewDefinit
   rows.forEach((row, index) => {
     const rowNumber = index + 5
     const alternate = index % 2 === 1
-    const cells = columns.map(({ id }, col) => {
+    const cells = columns.map(({ id, field }, col) => {
       const address = `${columnName(col)}${rowNumber}`
       if (moneyIds.has(id)) return cell(address, row.values[id as keyof typeof row.values], alternate ? 6 : 5, true)
+      // Mesma leitura da grade: lookup da tabela base vem como `_<atributo>_value`, com o nome no FormattedValue.
       const value = id === 'client' ? row.client : id === 'route' ? row.route : id === 'date' ? departureDate(row.departureAt) : (() => {
-        const key = valueKey(id)
-        return row.viewFields?.[`${key}@OData.Community.Display.V1.FormattedValue`] ?? row.viewFields?.[key]
+        const read = readViewField(row.viewFields, valueKey(id))
+        return viewFieldText(field, read.value, read.formatted)
       })()
       return cell(address, value, alternate ? 4 : 0)
     }).join('')

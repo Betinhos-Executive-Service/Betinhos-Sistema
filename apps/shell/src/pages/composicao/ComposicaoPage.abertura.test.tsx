@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ComposicaoPage } from './ComposicaoPage'
-import { catalogCacheKey } from './data/catalog-cache'
+import { catalogCacheKey, writeCachedCatalog } from './data/catalog-cache'
 import type { CatalogField } from './data/views'
 import type { Host } from '../../host'
 
@@ -42,7 +42,7 @@ const standard: Handler = (entity, query) => {
 }
 
 beforeEach(() => { try { localStorage.clear() } catch { /* sem storage */ } })
-afterEach(() => { cleanup(); catalog.load.mockReset(); delete (window as { Xrm?: unknown }).Xrm; vi.restoreAllMocks() })
+afterEach(() => { cleanup(); catalog.load.mockReset(); delete (window as { Xrm?: unknown }).Xrm; delete (window as { requestIdleCallback?: unknown }).requestIdleCallback; delete (window as { cancelIdleCallback?: unknown }).cancelIdleCallback; vi.restoreAllMocks() })
 
 it('abre mostrando a primeira página sem esperar a metadata e sem ler EntityDefinitions', async () => {
   catalog.load.mockReturnValue(new Promise(() => undefined))
@@ -156,7 +156,8 @@ it('mais de 1000 composições: carrega página por página e interrompe página
   })
 
   render(<ComposicaoPage host={host} />)
-  expect(await screen.findByText(/100 de 1\.500 registros/)).toBeTruthy()
+  // Primeira página + contagem + paginação no jsdom passam de 1 s sob carga: a espera padrão deixava o teste instável.
+  expect(await screen.findByText(/100 de 1\.500 registros/, undefined, { timeout: 5000 })).toBeTruthy()
   await waitFor(() => expect(notify).toBeTruthy())
   act(() => notify!())
   expect(await screen.findByText(/200 de 1\.500 registros/)).toBeTruthy()
@@ -178,6 +179,51 @@ it('cache de catálogo vencido é ignorado: abre igual e usa o catálogo da rede
   await waitFor(() => expect(gridText('Situação')).toHaveLength(1))
   expect(screen.queryByText('Antigo')).toBeNull()
   expect(catalog.load).toHaveBeenCalledTimes(1)
+})
+
+/** Captura o `requestIdleCallback`: a conferência do catálogo só roda quando o teste "fica ocioso". */
+function idleQueue() {
+  const tasks: (() => void)[] = []
+  window.requestIdleCallback = ((task: () => void) => tasks.push(task)) as unknown as typeof window.requestIdleCallback
+  window.cancelIdleCallback = (() => undefined) as typeof window.cancelIdleCallback
+  return { tasks, run: () => act(async () => { tasks.splice(0).forEach((task) => task()) }) }
+}
+
+it('cache válido: nenhuma metadata da rede até a primeira linha; a conferência só roda ociosa e atualiza o rótulo que mudou', async () => {
+  writeCachedCatalog(catalogCacheKey(CLIENT_URL), [field('new_status', 'Situação')])
+  catalog.load.mockResolvedValue([field('new_status', 'Situação nova')])
+  const idle = idleQueue()
+  fakeXrm(standard)
+
+  render(<ComposicaoPage host={host} />)
+
+  expect(await screen.findByText('Aprovada')).toBeTruthy()
+  await waitFor(() => expect(gridText('Situação')).toHaveLength(1))
+  await waitFor(() => expect(idle.tasks).toHaveLength(1))
+  expect(catalog.load).not.toHaveBeenCalled()
+
+  await idle.run()
+
+  expect(catalog.load).toHaveBeenCalledTimes(1)
+  await waitFor(() => expect(gridText('Situação nova')).toHaveLength(1))
+})
+
+it('cache válido e metadata igual: a conferência ociosa não regrava o cache', async () => {
+  const key = catalogCacheKey(CLIENT_URL)
+  writeCachedCatalog(key, [field('new_status', 'Situação')], Date.now() - 60_000)
+  const saved = localStorage.getItem(key)
+  catalog.load.mockResolvedValue([field('new_status', 'Situação')])
+  const idle = idleQueue()
+  fakeXrm(standard)
+
+  render(<ComposicaoPage host={host} />)
+  expect(await screen.findByText('Aprovada')).toBeTruthy()
+  await waitFor(() => expect(idle.tasks).toHaveLength(1))
+  await idle.run()
+
+  expect(catalog.load).toHaveBeenCalledTimes(1)
+  expect(localStorage.getItem(key)).toBe(saved)
+  expect(gridText('Situação')).toHaveLength(1)
 })
 
 const RESERVATION = '22222222-2222-4222-8222-222222222222'
