@@ -78,7 +78,7 @@ it('catálogo que chega depois não refaz a consulta e o cabeçalho provisório 
 
   await waitFor(() => expect(screen.getByRole('searchbox', { name: /Buscar/ })).toHaveProperty('disabled', false))
   expect(container.querySelector('.column-header--provisional')).toBeNull()
-  expect(screen.getByText('Situação')).toBeTruthy()
+  expect(gridText('Situação')).toHaveLength(1)
   expect(screen.getByText('Aprovada')).toBeTruthy()
   expect(xrm.count('cr40f_composicaodeprecos')).toBe(before)
 })
