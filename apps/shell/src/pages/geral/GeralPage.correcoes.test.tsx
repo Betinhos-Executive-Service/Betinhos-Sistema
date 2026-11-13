@@ -101,7 +101,7 @@ describe('Geral: correções finais', () => {
     beforeEach(() => { hooks.programada = true; writeText.mockReset().mockResolvedValue(undefined); vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } }) })
     afterEach(() => { hooks.programada = false; hooks.gerarLink = null; vi.unstubAllGlobals() })
     const item = async () => {
-      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Ações/ }))
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Mais ações/ }))
       return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
     }
 
@@ -228,12 +228,13 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   }
   const toolbar = () => screen.getByRole('toolbar', { name: 'Comandos de serviços' })
 
-  it('sem seleção o menu Ações não existe; com seleção, Gerar OP e Disparar aparecem habilitados', async () => {
+  it('sem seleção o ⋮ não tem ações da seleção; com seleção, Gerar OP e Disparar aparecem habilitados no grupo do ⋮', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     expect(within(toolbar()).queryByRole('button', { name: /^Ações/ })).toBeNull()
+    expect(within(toolbar()).getByRole('button', { name: 'Mais ações' })).toBeTruthy()
     await pick('OS-1004')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Ações \(\d+\)$/ }))
+    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Mais ações \(\d+ da seleção\)$/ }))
     for (const name of ['Gerar OP', 'Disparar']) {
       const item = await screen.findByRole('menuitem', { name, hidden: true })
       expect((item as HTMLButtonElement).disabled).toBe(false)
@@ -297,8 +298,8 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('Registrar Erro fica inerte com 2 selecionados', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1005', 'OS-1006')
-    // Registrar Erro é `single`: o DS o deixa inerte no menu "Ações" com o motivo padrão.
-    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Ações/ }))
+    // Registrar Erro é `single`: o DS o deixa inerte no ⋮ "Mais ações" com o motivo padrão.
+    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Mais ações/ }))
     const item = (await screen.findByRole('menuitem', { name: /Registrar Erro/, hidden: true })) as HTMLButtonElement
     expect(item.disabled).toBe(true)
     expect(within(item).getByText('Selecione exatamente um registro.')).toBeTruthy()

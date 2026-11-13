@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
@@ -435,12 +435,13 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const one = selectedIds.length === 1
   // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
   const size = mobile ? 'touch' : 'default'
-  // Ações da seleção (DS §10.9.6): uma lista só para a linha de comando, o menu "Ações", a barra do celular e o clique direito.
-  // `inline` vai para a linha; "Editar" só entra nela com um serviço marcado, para não ocupar lugar inerte.
+  // Ações da seleção (DS §10.9.6): uma lista só para a linha de comando, o menu ⋮, a barra do celular e o clique direito.
+  // `inline` vai para a linha. No desktop a lista é a mesma com 0, 1 ou N marcados: a barra reserva o espaço medindo-a, então
+  // os controles fixos não andam ao marcar (com N, "Editar" fica inerte com o motivo). No celular a barra do rodapé tem 2
+  // lugares: "Editar" só entra com um serviço marcado.
   const selectionActions: SelectionAction[] = [
-    { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: one, onSelect: () => { void openForm('edit', selectedIds[0]) } },
-    // No celular o botão divide a barra de seleção com outro e "Mais": o nome curto cabe inteiro.
-    { id: 'copiar', label: mobile ? 'Copiar' : 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
+    { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: mobile ? one : true, onSelect: () => { void openForm('edit', selectedIds[0]) } },
+    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
     selectedState === 1
       ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, inline: true, onSelect: () => askState(true) }
       : { id: 'desativar', label: 'Desativar', icon: <Archive size={16} />, tone: 'danger', inline: true, blocked: selectedState === 0 ? null : mixedTitle, onSelect: () => askState(false) },
@@ -465,8 +466,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
     { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
   ]
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
-  useShellHeader({ title: 'Geral', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Geral' })
 
   const { save, resetCell, cells, selectOnly, selectRange, toggle } = geral
   const selectForEdit = useCallback((id: string) => selectOnly(id, true), [selectOnly])
@@ -602,8 +603,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     <ProtecaoContext.Provider value={protecao}>
       <div className="page page--full gr-page">
         {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-        {/* --gr-selecao: só o número do contador, que geral.css mostra quando falta largura (o texto inteiro fica para o leitor de tela). */}
-        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline" style={{ '--gr-selecao': `"${selectedIds.length}"` } as CSSProperties}>
+        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
         <ViewBar
           onAudit={openAuditoria}
           view={viewState}
@@ -612,16 +612,15 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           filters={{ fields: filterFields, search: searchFilter, notApplied }}
           search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
-          // O espaço da busca vira o contador ao marcar linhas; "Atualizar" fica junto da primária para não sumir.
+          // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
-            {/* No celular o cabeçalho já tem "Atualizar". */}
-            {mobile ? null : <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />}
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
             <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>
           </>}
           selection={selection}
         >
-          {/* Fica no espaço da busca: some durante a seleção e deixa a largura para o contador, que senão cobre Auditoria. */}
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          {/* Depois da busca; continua visível com seleção (DS 1.26). Não encolhe: no celular empurraria "Criar serviço" para fora. */}
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
