@@ -53,6 +53,7 @@ const measure = () => {
     selTexto: !bar.querySelector('.bt-viewbar__end [data-vb^="sel:"].is-compact'),
     noMenu: ['colunas', 'densidade', 'auditoria'].filter((k) => fixed[k] === null),
     lupa: fixed.lupa !== null,
+    // >= 1.27: o ⋮ não tem selo (a seleção aparece como "N selecionados" na superfície); selo aqui é regressão.
     selo: bar.querySelector('.bt-viewbar__more .bt-viewbar__badge')?.textContent ?? '',
     rodape: Boolean(document.querySelector('.bt-selectionbar')),
   }
@@ -60,7 +61,8 @@ const measure = () => {
   const zone = bar.querySelector('.bt-viewbar__zone')
   const zoneKids = [...zone.children].filter(visible)
   const zoneUsed = zoneKids.reduce((a, el) => a + el.getBoundingClientRect().width, 0) + Math.max(0, zoneKids.length - 1) * parseFloat(getComputedStyle(zone).columnGap || '0')
-  const atualizar = bar.querySelector('[data-vb="primary"] button[aria-label="Atualizar"]')
+  // >= 1.27: o secondary/ghost/só ícone de `primary` entra na superfície como `tools`; o principal fica fora.
+  const atualizar = bar.querySelector('[data-vb="tools"] button[aria-label="Atualizar"], [data-vb="primary"] button[aria-label="Atualizar"]')
   state.atualizar = Boolean(atualizar && visible(atualizar))
   state.buscaW = search && visible(search) ? Math.round(search.getBoundingClientRect().width) : 0
   state.zonaW = Math.round(zone.getBoundingClientRect().width)
@@ -109,7 +111,7 @@ const measure = () => {
   console.log('|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     const s = r.state
-    const estado = [s.visao, s.texto ? 'fixos c/ texto' : 'fixos só ícone', s.principalTexto ? 'principal c/ texto' : 'principal só ícone', r.count ? (s.rodape ? 'seleção no rodapé' : `seleção ${s.selInline} inline${s.selTexto ? ' c/ texto' : ' só ícone'}`) : null, s.noMenu.length ? `no ⋮: ${s.noMenu.join(', ')}` : null, s.lupa ? 'lupa' : 'busca', s.selo ? `selo ${s.selo}` : null, r.count ? `"${s.contador}"` : null, s.atualizar ? 'Atualizar visível' : 'SEM ATUALIZAR', `busca ${s.buscaW}px`, `sobra ${s.sobra}px`, s.selLabels.length ? `[${s.selLabels.join(', ')}]` : null].filter(Boolean).join('; ')
+    const estado = [s.visao, s.texto ? 'fixos c/ texto' : 'fixos só ícone', s.principalTexto ? 'principal c/ texto' : 'principal só ícone', r.count ? (s.rodape ? 'seleção no rodapé' : `seleção ${s.selInline} inline${s.selTexto ? ' c/ texto' : ' só ícone'}`) : null, s.noMenu.length ? `no ⋮: ${s.noMenu.join(', ')}` : null, s.lupa ? 'lupa' : 'busca', s.selo ? `SELO NO ⋮ (${s.selo})` : null, r.count ? `"${s.contador}"` : null, s.atualizar ? 'Atualizar visível' : 'SEM ATUALIZAR', `busca ${s.buscaW}px`, `sobra ${s.sobra}px`, s.selLabels.length ? `[${s.selLabels.join(', ')}]` : null].filter(Boolean).join('; ')
     console.log(`| ${r.width} | ${r.count} | ${r.barW} | ${r.barH} | ${r.oneLine ? 'sim' : 'NÃO'} | ${r.overlaps.length ? r.overlaps.join(' ') : 'nenhuma'} | ${r.outside.length ? r.outside.join(' ') : '—'} | ${r.cut.length ? r.cut.join(', ') : 'nenhum'} | ${r.fixosParados ? 'sim' : 'NÃO'} | ${estado}${r.pageScroll ? ' (ROLAGEM HORIZONTAL)' : ''} |`)
   }
   console.log(`Erros de console: ${errors.length ? errors.join(' | ') : 'nenhum'}`)
