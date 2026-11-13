@@ -1,8 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, type ComponentType } from 'react'
-import { Drawer, ToastProvider } from '@betinhos/ui'
+import { ToastProvider } from '@betinhos/ui'
 import type { Host } from '../host'
 import { useHashRoute } from '../nav/useHashRoute'
-import { BrandLoader } from './BrandLoader'
+import { CarregandoRegistro } from './BrandLoader'
 import { fecharGavetaRegistro, useGavetaRegistro, type TabelaComGaveta } from './registroAberto'
 import type { GavetaProps } from './gavetas/comum'
 
@@ -36,7 +36,7 @@ export function GavetaRegistro({ host }: { host: Host }) {
   return (
     <ToastProvider>
       {aberto && Adaptador ? (
-        <Suspense fallback={<Drawer open title="Carregando…" onClose={fecharGavetaRegistro}><BrandLoader variant="inline" size="md" label="Carregando registro" text="Carregando registro…" /></Drawer>}>
+        <Suspense fallback={<CarregandoRegistro label="Carregando registro" onCancel={fecharGavetaRegistro} />}>
           <Adaptador key={`${aberto.table}:${aberto.id}`} host={host} id={aberto.id} onClose={fecharGavetaRegistro} />
         </Suspense>
       ) : null}
