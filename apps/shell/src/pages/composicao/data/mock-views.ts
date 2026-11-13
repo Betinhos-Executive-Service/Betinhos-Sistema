@@ -1,3 +1,4 @@
+import { todaySaoPaulo } from '@betinhos/ui'
 import { moneyFields, type Composition } from './compositions'
 import type { CompositionTotalRow } from './dataverse'
 import { fetchDateRange, isDay } from './date-ranges'
@@ -52,9 +53,11 @@ function value(row: MockViewRow, id: string): string {
 }
 
 export function applyMockView<T extends MockViewRow>(rows: T[], definition: ViewDefinition): T[] {
+  // O dia de hoje é lido uma vez por aplicação, não a cada linha e filtro.
+  const today = todaySaoPaulo()
   const matches = (row: T, filter: ViewDefinition['filters'][number]) => {
     const raw = String(value(row, filter.id) ?? '')
-    const range = fetchDateRange(filter.operator, Number(filter.value) || 0)
+    const range = fetchDateRange(filter.operator, Number(filter.value) || 0, today)
     const dateOnly = (range || [filter.value, ...(filter.values ?? [])].some(isDay)) && /^\d{4}-\d{2}-\d{2}T/.test(raw)
     const date = dateOnly && raw ? new Date(raw) : null
     const current = date && !Number.isNaN(date.getTime())

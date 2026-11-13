@@ -167,12 +167,15 @@ export function toTableCondition(filter: ViewFilter, field: FilterField, id: str
       if (isDatePreset(op)) return { ...base, op }
       if ((op === 'next-x-days' || op === 'last-x-days') && filter.value === '7') return { ...base, op: op === 'next-x-days' ? 'next-7' : 'last-7' }
       if (op === 'between') return values.length === 2 && values.every(isDay) ? { ...base, op: 'between', value: values[0], to: values[1] } : null
-      if (!isDay(filter.value)) return null
-      if (op === 'eq') return { ...base, op: 'on', value: filter.value }
-      if (op === 'lt') return { ...base, op: 'before', value: filter.value }
+      // Views nativas podem trazer data com hora (`AAAA-MM-DDTHH:mm:ss`): o filtro do DS trabalha com o dia.
+      const day = filter.value.slice(0, 10)
+      if (!isDay(day)) return null
+      if (op === 'eq') return { ...base, op: 'on', value: day }
+      if (op === 'lt') return { ...base, op: 'before', value: day }
+      if (op === 'gt') return { ...base, op: 'after', value: day }
       // "depois de X" do DS vale a partir do dia seguinte; "até X" é antes do dia seguinte.
-      if (op === 'ge') return { ...base, op: 'after', value: shiftDay(filter.value, -1) }
-      if (op === 'le') return { ...base, op: 'before', value: shiftDay(filter.value, 1) }
+      if (op === 'ge') return { ...base, op: 'after', value: shiftDay(day, -1) }
+      if (op === 'le') return { ...base, op: 'before', value: shiftDay(day, 1) }
       return null
     }
   }

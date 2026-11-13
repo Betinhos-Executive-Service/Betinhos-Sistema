@@ -7,7 +7,7 @@ description: "Verifica a Composição de Preço nativa do shell (#/composicao, a
 A rota antiga `#/new_telacomposicaopreco` (iframe do WebResource) continua no menu; esta skill cobre só `#/composicao`.
 
 ## 1. Testes
-- `cd apps/shell && npx tsc --noEmit -p . && npx vitest run src/pages/composicao src/app 2>&1 | grep -E "Test Files|Tests |FAIL"` (425 testes verdes em 12/11/2026; a pasta composicao tem 56 arquivos/296 testes em 13/11/2026). Node 24: `NODE_OPTIONS=--no-experimental-webstorage` se `localStorage` vier `undefined`.
+- `cd apps/shell && npx tsc --noEmit -p . && npx vitest run src/pages/composicao src/app 2>&1 | grep -E "Test Files|Tests |FAIL"` (425 testes verdes em 12/11/2026; a pasta composicao tem 57 arquivos/300 testes e o shell inteiro 349 arquivos/2.958 testes em 13/11/2026). Node 24: `NODE_OPTIONS=--no-experimental-webstorage` se `localStorage` vier `undefined`.
 
 ## 2. Mock (sem Dataverse)
 - `cd apps/shell && npx vite --port 36472 --strictPort`; abrir `http://localhost:36472/#/composicao` (viewport 1440x800). Porta ocupada pelo próprio worktree: confira o PID (`ss -ltnp | grep 36472`, cwd em `/proc/<pid>/cwd`) e encerre pelo PID.

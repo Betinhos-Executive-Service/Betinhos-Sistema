@@ -508,13 +508,16 @@ function ComposicaoContent({ host }: { host: Host }) {
   const publishCurrentView = useCallback(async () => {
     const personal = activeView
     if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
+    // Filtros nativos que a tela não lê não iriam para a cópia: publicar e excluir a pessoal os perderia.
+    if (personal.nativeOnly && !personal.nativeFiltersEditable) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
     // Pública é outra tabela (savedquery): cria a cópia pública e só depois retira a pessoal.
     await saveCurrentView(personal.name, 'public', false, personal.definition)
     try { await removeView(personal) } catch (error) {
       throw new Error(`A visão pública foi criada, mas a pessoal "${personal.name}" não pôde ser excluída: ${errorMessage(error, 'erro desconhecido')}`)
     }
-    setViews(await listViews())
-  }, [activeView, listViews, removeView, saveCurrentView])
+    // A lista já foi relida ao salvar a pública; só falta tirar a pessoal excluída.
+    setViews((current) => current.filter((view) => view.id !== personal.id))
+  }, [activeView, removeView, saveCurrentView])
   const reloadViews = useCallback(async () => {
     setViews(await listViews())
     setViewError(null)

@@ -314,7 +314,7 @@
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
 .composicao .grid-route { display: block; overflow: hidden; color: var(--bt-color-text-primary); text-overflow: ellipsis; white-space: nowrap; }
-.composicao .money-cell { position: relative; display: flex; width: calc(100% + 18px); height: 37px; margin-inline: -9px; align-items: center; justify-content: flex-end; padding: 0 9px; outline: 0; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; cursor: text; }
+.composicao .money-cell { position: relative; display: flex; width: calc(100% + 18px); height: calc(var(--composition-row-h, 38px) - 1px); margin-inline: -9px; align-items: center; justify-content: flex-end; padding: 0 9px; outline: 0; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; cursor: text; }
 .composicao .money-cell--selected { z-index: 1; background: var(--bt-color-surface-soft); outline: 1px solid var(--bt-focus-border); outline-offset: -1px; }
 .composicao .money-cell--editing { z-index: 1; padding: 0; background: var(--bt-color-surface-soft); outline: 1px solid var(--bt-focus-border); outline-offset: -1px; }
 .composicao .money-cell-value { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

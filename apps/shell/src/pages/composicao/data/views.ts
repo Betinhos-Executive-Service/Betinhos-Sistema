@@ -237,10 +237,11 @@ export function parseNativeFilters(fetchXml: string, catalog: CatalogField[]): P
     const field = catalog.find((item) => item.available && item.attribute === attribute && (link ? item.table === link.getAttribute('name') : pathSignature(item.path, item.relationships) === (alias ? aliases.get(alias) : '')))
     const rawOperator = node.getAttribute('operator')
     const operator = ({ on: 'eq', 'on-or-after': 'ge', 'on-or-before': 'le' } as Record<string, string>)[rawOperator ?? ''] ?? rawOperator
-    if (!field || !operator || !['eq', 'ne', 'in', 'like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with', 'gt', 'ge', 'lt', 'le', 'null', 'not-null'].includes(operator)) return null
+    if (!field || !operator || !['eq', 'ne', 'in', 'not-in', 'like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with', 'gt', 'ge', 'lt', 'le', 'null', 'not-null', ...DATE_ONLY_OPERATORS].includes(operator)) return null
+    if (DATE_ONLY_OPERATORS.has(operator as ViewFilter['operator']) && field.type !== 'DateTime') return null
     const rawValue = node.getAttribute('value') ?? ''
     const value = field.type === 'Boolean' && (rawValue === '0' || rawValue === '1') ? rawValue === '1' ? 'true' : 'false' : field.type === 'Lookup' ? rawValue.replace(/^\{([0-9a-f-]{36})\}$/i, '$1') : rawValue
-    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' ? { values: [...node.querySelectorAll('value')].map((item) => item.textContent ?? '') } : {}), ...(link ? { nativeAlias: link.getAttribute('alias') ?? undefined } : {}) }
+    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' || operator === 'not-in' ? { values: [...node.querySelectorAll('value')].map((item) => item.textContent ?? '') } : {}), ...(link ? { nativeAlias: link.getAttribute('alias') ?? undefined } : {}) }
   }
   const filters: ViewFilter[] = []
   const filterGroups: ViewFilterGroup[] = []

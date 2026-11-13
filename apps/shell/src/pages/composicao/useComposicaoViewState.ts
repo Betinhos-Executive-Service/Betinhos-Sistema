@@ -46,6 +46,7 @@ export type ComposicaoViewState = {
 
 const DENSITY_KEY = 'betinhos.densidade.composicao'
 const DEFAULT_NAME = 'Todas as composições'
+const LOCK_MESSAGE = 'Aguarde o comando em andamento para mudar a visão.'
 const DEFAULT_DEFINITION = defaultViewDefinition(moneyFields.map((field) => field.key))
 /** O que decide "Alterada": a mesma comparação do antigo gerenciador de views. */
 const comparable = (definition: ViewDefinition) => JSON.stringify({
@@ -145,7 +146,7 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
   const dirty = useMemo(() => comparable(definition) !== baselineKey, [definition, baselineKey])
 
   const setConfig = useCallback((update: (config: ViewConfig) => ViewConfig) => {
-    if (o.locked || !ready) { onError(ready ? 'Aguarde o comando em andamento para mudar a visão.' : 'Aguarde o carregamento dos campos para mudar a visão.'); return }
+    if (o.locked || !ready) { onError(ready ? LOCK_MESSAGE : 'Aguarde o carregamento dos campos para mudar a visão.'); return }
     const next = update(config)
     let result = definition
     if (JSON.stringify(next.columns) !== JSON.stringify(config.columns)) {
@@ -169,11 +170,21 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     try { window.localStorage.setItem(DENSITY_KEY, next) } catch { /* sem armazenamento: só não lembra */ }
   }, [])
 
-  const { selectView, saveView, deleteView, publishView, reloadViews } = o
+  const { reloadViews, selectView: openView } = o
+  // Com comando, edição ou carga em andamento a visão não muda nem grava (o antigo gerenciador ficava desabilitado).
+  const unlocked = useCallback(<T extends unknown[], R>(action: (...args: T) => Promise<R>) => async (...args: T) => {
+    if (o.locked) throw new Error(LOCK_MESSAGE)
+    return action(...args)
+  }, [o.locked])
+  const selectView = useCallback((id: string) => { if (o.locked) onError(LOCK_MESSAGE); else openView(id) }, [o.locked, openView, onError])
+  const saveView = useMemo(() => unlocked(o.saveView), [unlocked, o.saveView])
+  const deleteView = useMemo(() => unlocked(o.deleteView), [unlocked, o.deleteView])
+  const publishView = useMemo(() => unlocked(o.publishView), [unlocked, o.publishView])
   const restore = useCallback(() => {
-    if (active) selectView('')
+    if (o.locked) onError(LOCK_MESSAGE)
+    else if (active) openView('')
     else onChange(DEFAULT_DEFINITION)
-  }, [active, onChange, selectView])
+  }, [active, o.locked, openView, onChange, onError])
   const clearLockedFilters = useCallback(() => {
     if (!lockedCount(tableFilters.locked)) return
     const patch = fromTableFilters(tableFilters.filters, { ...tableFilters, locked: { filters: [], groups: [], orGroups: [] } }, (key) => fieldById.get(key))

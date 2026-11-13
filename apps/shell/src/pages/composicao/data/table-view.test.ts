@@ -120,6 +120,13 @@ describe('filtros: definição ↔ DS', () => {
     expect('filters' in patch && patch.filters).toEqual(definition.filters)
   })
 
+  it('data com hora (view nativa) abre pelo dia e "depois de" de gt mantém o filtro original se não mudar', () => {
+    const definition = definitionWith({ filters: [{ id: 'cr40f_data', operator: 'gt', value: '2026-11-01T00:00:00' }] })
+    const { state, patch } = roundTrip(definition)
+    expect(state.filters.advanced.items[0]).toEqual(expect.objectContaining({ op: 'after', value: '2026-11-01' }))
+    expect('filters' in patch && patch.filters).toEqual(definition.filters)
+  })
+
   it('filtro de view nativa (entityname do link) é preservado ao editar outro', () => {
     const native = { id: 'cr40f_reserva@cr40f_geral.cr40f_trajeto', operator: 'like' as const, value: 'GRU', nativeAlias: 'aa' }
     const definition = definitionWith({ filters: [native] })
