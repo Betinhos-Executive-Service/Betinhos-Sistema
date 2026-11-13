@@ -382,8 +382,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: npm:@betinhos-executive-service/ui@^1.31.0
-        version: '@betinhos-executive-service/ui@1.31.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
+        specifier: npm:@betinhos-executive-service/ui@^1.33.0
+        version: '@betinhos-executive-service/ui@1.33.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       '@fontsource/manrope':
         specifier: ^5.2.6
         version: 5.3.0
@@ -639,8 +639,8 @@ packages:
   '@betinhos-executive-service/tokens@1.27.2':
     resolution: {integrity: sha512-705BkyO5Dz8KV9tmivkDeuYga7c3/5EQ0xr51zsEDYCdb7Gz7d1XRTDBfZIYgUSvDgmilC1GMYpiHiLc91OCDA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.27.2/f6b9b5ed8644a047d8eb2f105008cf960042dfe7}
 
-  '@betinhos-executive-service/tokens@1.31.0':
-    resolution: {integrity: sha512-hFxjrM9BWQvL4NcPFiPZe2ngNxUmmvdz8/S+ucL4ut4gajV9t9664RnvjVFRaW0OknnQWT6/kNP8KmpEC38dEQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.31.0/0957c3520e48598f6811289d42751cc5db38f985}
+  '@betinhos-executive-service/tokens@1.33.0':
+    resolution: {integrity: sha512-JJ3B3JCNWe95cjyAE/3hNLIKGLnNER7+9JuS5PGWACoGu711Rrzcveg3+cRcI8RgfZgrMP0wohwK8OPD4niZQQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.33.0/f20f761ea69897644bfcdfdb24c33d9b0d194762}
 
   '@betinhos-executive-service/ui@1.11.0':
     resolution: {integrity: sha512-Z6pT9w8yha9CqAPO4VnvW7YpNz2qyS2nMnkKXCV/3p0S1NMem8Icu4JGQghuYf8RlhzElx+HpNZ5ubV3HnxL8g==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.11.0/ef92e2a9bfd19f0e19a4aff89a7bdcfe641d7652}
@@ -662,8 +662,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@betinhos-executive-service/ui@1.31.0':
-    resolution: {integrity: sha512-VMMspzQ6ytq0gDphXoccaqw1VyRvmKmtucx8RFi4STV3OcgYaKx1v5pK0trjH3YcK6G0jVwJj56CKx/NY0uDYw==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.31.0/13f07bb470f7758a027846b5a94090d975167fe4}
+  '@betinhos-executive-service/ui@1.33.0':
+    resolution: {integrity: sha512-YAo9Y9+H3At26looGiqVdycUdM8SMf4v9lLG6Ydn/SqELY9+He3RKv2SFQaE1d+o3nRkb0xC2my1d1z2YMrPJw==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.33.0/ce8ae95952004860ec81a868fbff191eb79cbf0e}
     peerDependencies:
       '@types/react': '*'
       react: ^19.2.0
@@ -4367,7 +4367,7 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.27.2': {}
 
-  '@betinhos-executive-service/tokens@1.31.0': {}
+  '@betinhos-executive-service/tokens@1.33.0': {}
 
   '@betinhos-executive-service/ui@1.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -4393,9 +4393,9 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@betinhos-executive-service/ui@1.31.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@betinhos-executive-service/ui@1.33.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.31.0
+      '@betinhos-executive-service/tokens': 1.33.0
       '@tanstack/react-virtual': 3.14.23(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
