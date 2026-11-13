@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react'
-import { MonitorOff, PlugZap, SearchX } from 'lucide-react'
+import { ExternalLink, MonitorOff, PlugZap, SearchX } from 'lucide-react'
 import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
 import { hrefFor } from '../nav/useHashRoute'
@@ -59,8 +59,18 @@ export function RouteLayout({ host, group, item, label }: Props) {
     )
   }
 
+  // Site de terceiro: não depende do Dataverse, abre igual no mock. O link cobre o caso de o site recusar o iframe.
+  if (item.kind === 'site') {
+    return (
+      <div className="site-frame">
+        <Frame src={item.url} title={label} />
+        <a className="site-frame__open" href={item.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden />Abrir em nova aba</a>
+      </div>
+    )
+  }
+
   if (host.mode === 'mock') {
-    const target = item.kind === 'webresource' ? item.resource : item.kind === 'entity' ? item.entity : item.url
+    const target = item.kind === 'webresource' ? item.resource : item.entity
     return (
       <PageLayout eyebrow={group?.label} title={label}>
         <EmptyState className="surface" align="start" icon={<PlugZap size={36} />} title="Esta tela abre dentro do Dataverse">

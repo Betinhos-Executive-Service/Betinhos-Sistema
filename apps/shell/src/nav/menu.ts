@@ -6,7 +6,8 @@ export type MenuItem =
   | { kind: 'webresource'; id: string; label: string; resource: string }
   /** Tabela ainda atendida pela lista/formulário nativos; o rótulo vem da metadata. */
   | { kind: 'entity'; id: string; entity: string; label?: string }
-  | { kind: 'external'; id: string; label: string; url: string }
+  /** Site de terceiro aberto na área de conteúdo (iframe), com link para abrir em nova aba. */
+  | { kind: 'site'; id: string; label: string; url: string }
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
@@ -38,7 +39,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'funcoes-operacionais', label: 'Funções Operacionais', page: 'funcoes-operacionais' },
       { kind: 'page', id: 'comunicados', label: 'Comunicados', page: 'comunicados' },
       { kind: 'page', id: 'qualidade', label: 'Gestão de Qualidade', page: 'qualidade' },
-      { kind: 'external', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
+      { kind: 'site', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       { kind: 'page', id: 'planner', label: 'Planner', page: 'planner' },
     ],
   },

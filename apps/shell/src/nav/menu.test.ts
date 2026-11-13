@@ -114,3 +114,7 @@ it('Conciliação do cartão saiu do menu: Cartões corporativos é de Cadastros
   expect(findItem('cartoes')?.item).toMatchObject({ kind: 'page', page: 'cartoes', label: 'Cartões corporativos' })
   expect(rotaAtualizada('conciliacao-cartao', new URLSearchParams())).toEqual({ id: 'despesas-operacionais', query: new URLSearchParams('fila=sem-despesa') })
 })
+
+it('Infleet abre dentro do shell, na área de conteúdo', () => {
+  expect(findItem('infleet')?.item).toMatchObject({ kind: 'site', url: 'https://app.infleet.com.br/monitoring' })
+})
