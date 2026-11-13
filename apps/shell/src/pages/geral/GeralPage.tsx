@@ -14,6 +14,7 @@ import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
 import { recebimentosSource } from '../recebimentos/source'
+import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
 import { GeralTable } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
@@ -419,6 +420,22 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       () => novos.forEach((id) => portalAsked.current.delete(id)),
     )
   }, [portal, portalVisible, rows, portalSeq])
+  // Comprovantes de recebimento: contagem das linhas carregadas, sem bloquear a lista; falha só esconde o indicador.
+  const recebimentos = recebimentosSource(host)
+  const [contagem, setContagem] = useState<Map<string, number>>(new Map())
+  const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
+  // Já contados: cada página nova consulta só as linhas que chegaram; falha tira do cache para a próxima mudança tentar de novo.
+  const contados = useRef(new Set<string>())
+  useEffect(() => {
+    const novos = rows.map((r) => String(r[ID_ATTRIBUTE]).toLowerCase()).filter((id) => !contados.current.has(id))
+    if (!novos.length) return
+    novos.forEach((id) => contados.current.add(id))
+    recebimentos.contar(novos).then(
+      (found) => setContagem((cur) => { const next = new Map(cur); for (const id of novos) { const n = found.get(id); if (n) next.set(id, n); else next.delete(id) } return next }),
+      () => novos.forEach((id) => contados.current.delete(id)),
+    )
+  }, [recebimentos, rows])
+  const besideId = (id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -556,6 +573,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 selected={geral.selected}
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
+                besideId={besideId}
                 onEdit={setEditId}
                 onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
@@ -588,6 +606,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
+              besideId={besideId}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
               footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
@@ -637,9 +656,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
             onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
             search={(column, text) => source.search(column.attribute, text)}
-            recebimentos={recebimentosSource(host)}
+            recebimentos={recebimentos}
           />
         ) : null}
+        <ComprovantesServicoDrawer servico={comprovantesDe} source={recebimentos} mobile={mobile} onClose={() => setComprovantesDe(null)} />
         <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
         <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
           onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}

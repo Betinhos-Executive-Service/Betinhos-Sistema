@@ -17,6 +17,8 @@ type Props = {
   onToggle: (id: string) => void
   /** Abre o serviço no Formulário Geral. */
   onOpen: (id: string) => void
+  /** Conteúdo ao lado do ID (indicador de comprovantes). */
+  besideId?: (id: string, name: string) => ReactNode
   /** Abre a sheet de edição dos campos. */
   onEdit: (id: string) => void
   /** Clique direito no card: menu de contexto com as ações da seleção (DS §10.9.3). */
@@ -31,7 +33,7 @@ const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, onEdit, onCardContextMenu, footer, grid = false }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
@@ -57,6 +59,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {name}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />
                 </span>
                 <button type="button" className="gr-open" aria-label={`Abrir serviço ${name} no Formulário Geral`} onClick={() => onOpen(id)}>{name}</button>
+                {besideId?.(id, name)}
                 {has.status && typeof statusRaw === 'number' ? <ChoiceBadge column={has.status} info={attributes?.get(has.status.key)} raw={statusRaw} text={formatCell('readonly', row, STATUS)} /> : null}
               </div>
               {data != null ? <p className="gr-card__line"><strong>{data}</strong></p> : null}
