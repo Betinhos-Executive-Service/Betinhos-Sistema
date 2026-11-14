@@ -91,7 +91,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
   it('Alt+seta no cabeçalho move a coluna e avisa a nova posição', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
-    const names = () => screen.getAllByRole('columnheader', { hidden: true }).slice(1).map((h) => h.getAttribute('title'))
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
     const [first, second, third] = names()
     fireEvent.keyDown(screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true }), { key: 'ArrowRight', altKey: true })
     await waitFor(() => expect(names().slice(0, 3)).toEqual([first, third, second]))
@@ -145,7 +145,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
 
   it('coluna Sim/Não não tem alça e as demais têm', async () => {
     await open()
-    const headers = screen.getAllByRole('columnheader', { hidden: true }).slice(1)
+    const headers = screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable)
     const without = headers.filter((h) => h.querySelector('.gr-resize') === null)
     expect(without.map((h) => h.getAttribute('title'))).toEqual(BOOLEAN_LABELS)
   })

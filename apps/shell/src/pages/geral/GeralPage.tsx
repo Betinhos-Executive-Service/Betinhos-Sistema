@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, DollarSign, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
@@ -425,6 +425,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const contagem = useContagemRecebimentos(recebimentos, useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows]))
   const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
   const besideId = (id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />
+  const marcadorRecebimentos = { label: 'Comprovantes de recebimento', header: <DollarSign size={14} aria-hidden="true" />, cell: besideId }
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -595,7 +596,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
-              besideId={besideId}
+              marker={marcadorRecebimentos}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
               footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
