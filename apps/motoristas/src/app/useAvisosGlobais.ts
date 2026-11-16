@@ -1,7 +1,7 @@
 import type { ToastState } from "../shared/ui/LocalToast";
 import { useEffect } from "react";
 import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../data/dataverse/fetchWebApi";
-import { APP_CONNECTION_LOST_MESSAGE, type AppErrorNotice } from "../shared/appErrorLogger";
+import type { AppErrorNotice } from "../shared/appErrorLogger";
 import type { ToastTone } from "../shared/ui/LocalToast";
 
 type Options = {
@@ -15,7 +15,7 @@ type Options = {
   voucherDraftTimerRef: React.MutableRefObject<number | null>;
 };
 
-// Avisos globais: fecha o toast sozinho, mostra "conexão perdida", repassa erros globais (logger e sessão expirada) e limpa timers ao sair.
+// Avisos globais: fecha o toast sozinho, repassa erros globais (logger e sessão expirada) e limpa timers ao sair.
 export function useAvisosGlobais({ completingClearTimerRef, finalizeTimerRef, lastGlobalErrorRef, setCriticalError, setCriticalErrorState, setToastState, toast, voucherDraftTimerRef }: Options) {
   useEffect(() => {
     if (!toast) return;
@@ -24,14 +24,9 @@ export function useAvisosGlobais({ completingClearTimerRef, finalizeTimerRef, la
   }, [toast]);
 
   useEffect(() => {
-    const showConnectionLostPopup = () => setCriticalErrorState(APP_CONNECTION_LOST_MESSAGE);
-
     const showSessionExpiredPopup = () => setCriticalErrorState(SESSION_EXPIRED_MESSAGE);
-    if (navigator.onLine === false) showConnectionLostPopup();
-    window.addEventListener("offline", showConnectionLostPopup);
     window.addEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
     return () => {
-      window.removeEventListener("offline", showConnectionLostPopup);
       window.removeEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
     };
   }, []);

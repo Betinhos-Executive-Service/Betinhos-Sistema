@@ -14,8 +14,9 @@ export function findFirstPendingDetail(agenda: LocalStore["agenda"]) {
   return agenda.find((item) => shouldShowAgendaItemInGallery(item) && item.tipo !== "HEADER" && !item.canceled && item.detail)?.detail;
 }
 
-export function findFirstPendingServiceDetail(agenda: LocalStore["agenda"]) {
-  return agenda.find((item) => shouldShowAgendaItemInGallery(item) && item.tipo === "SERVICO" && !item.canceled && item.detail)?.detail;
+/** `ignorar`: serviços já finalizados no aparelho e esperando envio não seguram a fila. */
+export function findFirstPendingServiceDetail(agenda: LocalStore["agenda"], ignorar?: (detail: DetailData) => boolean) {
+  return agenda.find((item) => shouldShowAgendaItemInGallery(item) && item.tipo === "SERVICO" && !item.canceled && item.detail && !ignorar?.(item.detail))?.detail;
 }
 
 export function initialStore(): LocalStore {

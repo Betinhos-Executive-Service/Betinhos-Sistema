@@ -35,6 +35,8 @@ import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
 import { useFilaServicos } from "./features/servicos/useFilaServicos";
 import { useFinalizeFlow } from "./features/finalizar/useFinalizeFlow";
+import { useEnvioPendente } from "./features/envio-pendente/useEnvioPendente";
+import { EnvioPendenteIndicador } from "./features/envio-pendente/EnvioPendenteIndicador";
 import { useMaintenanceFinalizePhoto } from "./features/finalizar/useMaintenanceFinalizePhoto";
 import { useReceiveFlow } from "./features/recebimento/useReceiveFlow";
 import { useQrChargeSummary } from "./features/recebimento/useQrChargeSummary";
@@ -197,6 +199,17 @@ function App() {
     store
   });
   const { finalizeSelected, getServiceObservationDraft, openFinalizeFlow, openLocalCancelFlow, openVoucherFlow, saveSelectedServiceObservation, saveVoucherDraft, voucherDrafts } = finalizar;
+  const envioPendente = useEnvioPendente({
+    ativo: remoteMode || isLocalhostRuntime,
+    askVehicleChoice: finalizar.askVehicleChoice,
+    dados,
+    remoteMode,
+    setReceiveProofs: recebimento.setReceiveProofs,
+    setReceiveUploadedCounts: recebimento.setReceiveUploadedCounts,
+    setStore,
+    setToast,
+    setVoucherDrafts: finalizar.setVoucherDrafts
+  });
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
   usePersistenciaRascunhos({
@@ -328,6 +341,7 @@ function App() {
       criticalError={avisos.criticalError}
       dataLoading={avisos.dataLoading}
       duvidaConferencia={despesas.duvidaConferencia}
+      envioPendente={<EnvioPendenteIndicador {...envioPendente} />}
       expenseSend={despesas.expenseSend}
       previousScreen={previousScreenRef.current}
       remoteMode={remoteMode}

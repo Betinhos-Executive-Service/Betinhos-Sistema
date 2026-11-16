@@ -14333,3 +14333,73 @@ select,
   .duvida-dialog { border-radius: 20px; max-height: calc(100dvh - 48px); }
 }
 @media (prefers-reduced-motion: reduce) { .duvida-overlay, .duvida-dialog { animation: none; } }
+
+/* Indicador de envio pendente (fila no aparelho): fixo embaixo, abaixo do toast, só os botões recebem toque. */
+.envio-pendente {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(18px, calc(env(safe-area-inset-bottom) + 10px));
+  z-index: 80;
+  max-width: calc(100% - 24px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid rgba(0, 14, 35, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #001a3d;
+  box-shadow: 0 8px 22px rgba(0, 14, 35, 0.16);
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.envio-pendente--acao {
+  border-color: rgba(149, 100, 0, 0.45);
+  border-radius: 14px;
+  flex-wrap: wrap;
+}
+
+.envio-pendente-texto {
+  min-width: 0;
+}
+
+.envio-pendente button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #001a3d;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.agenda-envio-pendente {
+  position: absolute;
+  top: 10px;
+  right: 64px;
+  z-index: 3;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(149, 100, 0, 0.14);
+  color: #7a5200;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* Faixa reservada no rodapé enquanto o indicador de envio aparece: ele não cobre conteúdo nem botões das telas. */
+body.com-envio-pendente .screen {
+  box-sizing: border-box;
+  padding-bottom: 52px;
+}
+
+body.com-envio-pendente--acao .screen {
+  padding-bottom: 104px;
+}

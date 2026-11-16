@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { findFirstPendingServiceDetail, isSameDetail } from "../../app/bootstrap";
+import { temEnvioPendente } from "../envio-pendente/fila";
 import type { LocalStore } from "../../lib/localWorkflow";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../../types";
@@ -19,7 +20,12 @@ export function useFilaServicos({ selectedDetail, setScreen, setToast, store }: 
   const blockIfNotFirstPending = (detail: typeof selectedDetail = selectedDetail) => {
     if (!detail) return true;
     if (detail.type !== "SERVICO") return false;
-    const firstPendingDetail = findFirstPendingServiceDetail(store.agenda);
+    if (temEnvioPendente(detail)) {
+      setToast("Este serviço está salvo no aparelho e será enviado quando a conexão voltar.");
+      setScreen("servicos");
+      return true;
+    }
+    const firstPendingDetail = findFirstPendingServiceDetail(store.agenda, temEnvioPendente);
     if (!firstPendingDetail || isSameDetail(firstPendingDetail, detail)) return false;
     const firstPendingKey = `${firstPendingDetail.type}:${firstPendingDetail.id}`;
     if (queueHighlightTimerRef.current) window.clearTimeout(queueHighlightTimerRef.current);

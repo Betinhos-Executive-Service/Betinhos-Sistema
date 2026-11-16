@@ -22,6 +22,12 @@ export type FinalizePayload = {
   vehicleChoice?: DriverVehicleChoice | null;
   // Motorista terceiro: a finalização não grava o carro do serviço.
   skipVehicle?: boolean;
+  // Horário em que o motorista finalizou (ISO), capturado no aparelho. Reenvio da fila usa este; sem ele vale o horário do envio.
+  finalizadoEm?: string;
+  // Voucher: link do Dataverse lido antes do primeiro POST ao Flow. No reenvio, link diferente do atual = o Flow já rodou (não chama de novo).
+  linkAnterior?: string;
+  // Chamado com o link lido antes do primeiro POST, para a fila guardar no item.
+  onLinkAnterior?: (link: string) => void | Promise<void>;
 };
 
 export const SERVICE_VEHICLE_ORIGIN = {
@@ -144,13 +150,16 @@ export async function finalizeServiceRemote(payload: FinalizePayload) {
   const dv = payload.detail.dataverse;
   if (!dv?.id) throw new Error("Serviço sem referência Dataverse.");
   dataverseLog("Finalização simples de serviço iniciada.", { detailId: payload.detail.id, dataverseId: dv.id });
-  payload.onProgress?.("Atualizando serviço no Dataverse.");
   const vehiclePatch = buildFinalizeServiceVehiclePatch(payload);
+  // Reenvio da fila: se o serviço já está concluído, não regrava (o merge da observação final não é idempotente).
+  const atual = await retrieveOne(DATAVERSE.geral, dv.id, "$select=cr40f_status");
+  if (Number(atual.cr40f_status) === OPERATION_STATUS.concluido) return;
+  payload.onProgress?.("Atualizando serviço no Dataverse.");
   await updateOne(DATAVERSE.geral, dv.id, {
     ...vehiclePatch,
     new_observacaofinal: mergeMotoristObservation(dv.record?.new_observacaofinal, getFieldValue(payload.fields, "Observação Final", "Observacao Final")),
     cr40f_status: OPERATION_STATUS.concluido,
-    new_datadefinalizacao: new Date().toISOString()
+    new_datadefinalizacao: payload.finalizadoEm ?? new Date().toISOString()
   });
 }
 
