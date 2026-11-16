@@ -1,7 +1,6 @@
 import type { Row } from '@betinhos/dataverse'
 import { EMPTY_GROUP_ID, GROUP_LIMIT, OTHERS_GROUP_ID, groupableFields, type FilterField, type FilterOption, type ViewGroup } from '@betinhos/ui'
 import { COMPROVANTES_KEY } from './comprovantes'
-import { TZ } from './format'
 
 /**
  * Agrupamento da Geral no servidor: quais campos agrupam, os baldes (valor + contagem real vinda do FetchXML agregado)
@@ -88,24 +87,19 @@ export function bucketsFromRows(rows: Row[], spec: GroupSpec): GroupBucket[] {
   return empty > 0 ? [...list, { id: EMPTY_GROUP_ID, label: 'Vazio', count: empty }] : list
 }
 
-const clock = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-
-/** Instante UTC (ISO) em que o dia `AAAA-MM-DD` começa em São Paulo; o fuso já teve horário de verão, então o deslocamento é medido, não fixo. */
-export function dayStartUtc(day: string): string {
-  const [year, month, date] = day.split('-').map(Number)
-  for (const offset of [3, 2, 4, 1, 5]) {
-    const instant = new Date(Date.UTC(year, month - 1, date, offset))
-    if (clock.format(instant).replace(', ', ' ') === `${day} 00:00`) return instant.toISOString()
-  }
-  return new Date(Date.UTC(year, month - 1, date, 3)).toISOString()
-}
-
-/** `[início, fim)` em UTC do mês (`AAAA-MM`) ou do ano (`AAAA`) do balde, em horário de São Paulo. */
+/**
+ * `[início, fim)` do mês (`AAAA-MM`) ou do ano (`AAAA`) do balde, só com a data (`AAAA-MM-DD`): o Dataverse resolve o valor
+ * no fuso do usuário, o mesmo do `dategrouping` que formou o balde (instantes UTC fixos errariam na borda do mês).
+ */
 export function periodRange(id: string): [string, string] {
   const [year, month] = id.split('-').map(Number)
   if (month) {
     const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`
-    return [dayStartUtc(`${id}-01`), dayStartUtc(`${next}-01`)]
+    return [`${id}-01`, `${next}-01`]
   }
-  return [dayStartUtc(`${year}-01-01`), dayStartUtc(`${year + 1}-01-01`)]
+  return [`${year}-01-01`, `${year + 1}-01-01`]
 }
+
+/** Aviso quando o servidor recusa agrupar: o agregado do Dataverse falha acima de 50.000 registros (`AggregateQueryRecordLimit`, 0x8004E023). */
+export const GROUPS_LIMIT_MESSAGE = 'Esta visão tem registros demais para agrupar; filtre mais.'
+export const isAggregateLimit = (error: unknown) => error instanceof Error && /AggregateQueryRecordLimit|8004E023|50[.,]?000/i.test(error.message)

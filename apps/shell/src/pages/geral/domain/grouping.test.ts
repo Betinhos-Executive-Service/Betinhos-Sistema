@@ -2,7 +2,7 @@
 import { EMPTY_GROUP_ID, OTHERS_GROUP_ID } from '@betinhos/ui'
 import { describe, expect, it } from 'vitest'
 import { buildFetch, buildGroupsFetch } from './fetch'
-import { bucketsFromRows, dayStartUtc, periodRange, type GroupSpec } from './grouping'
+import { bucketsFromRows, GROUPS_LIMIT_MESSAGE, isAggregateLimit, periodRange, type GroupSpec } from './grouping'
 import { searchConditions } from './search'
 
 const AGENDA = `<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" count="25" page="3">
@@ -78,18 +78,23 @@ describe('buildFetch com grupo aberto', () => {
     expect(Array.from(doc.querySelectorAll('condition[operator="not-in"] > value')).map((v) => v.textContent)).toEqual(['a', 'b'])
   })
 
-  it('mês e ano: intervalo [início, fim) em UTC no horário de São Paulo', () => {
+  it('mês e ano: intervalo [início, fim) só com datas, que o Dataverse resolve no fuso do usuário como o dategrouping', () => {
     const date = { attribute: 'cr40f_dataehorriodesada', kind: 'date' as const, by: 'month' as const }
     expect(conditions(open('2026-11', date))).toEqual([
-      ['cr40f_dataehorriodesada', 'ge', '2026-11-01T03:00:00.000Z'],
-      ['cr40f_dataehorriodesada', 'lt', '2026-12-01T03:00:00.000Z'],
+      ['cr40f_dataehorriodesada', 'ge', '2026-11-01'],
+      ['cr40f_dataehorriodesada', 'lt', '2026-12-01'],
     ])
-    expect(periodRange('2026-12')).toEqual(['2026-12-01T03:00:00.000Z', '2027-01-01T03:00:00.000Z'])
-    expect(periodRange('2026')).toEqual(['2026-01-01T03:00:00.000Z', '2027-01-01T03:00:00.000Z'])
+    expect(periodRange('2026-12')).toEqual(['2026-12-01', '2027-01-01'])
+    expect(periodRange('2026')).toEqual(['2026-01-01', '2027-01-01'])
   })
+})
 
-  it('mede o deslocamento de São Paulo na época do horário de verão', () => {
-    expect(dayStartUtc('2018-12-01')).toBe('2018-12-01T02:00:00.000Z')
+describe('isAggregateLimit', () => {
+  it('reconhece o limite do agregado do Dataverse e não outros erros', () => {
+    expect(isAggregateLimit(new Error('AggregateQueryRecordLimit exceeded'))).toBe(true)
+    expect(isAggregateLimit(new Error('The maximum record limit is exceeded. 0x8004E023'))).toBe(true)
+    expect(isAggregateLimit(new Error('Sem permissão'))).toBe(false)
+    expect(GROUPS_LIMIT_MESSAGE).toMatch(/filtre mais/)
   })
 })
 

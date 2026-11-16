@@ -220,15 +220,15 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   const listed = () => Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
   // Valor `AAAA-MM-DD` compara pelo dia (como o Dataverse faz com data); senão, como número.
   const isDayValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
-  // Valor ISO com horário (intervalo do grupo mês/ano) compara o instante.
+  // Valor ISO com horário compara o instante.
   const isInstant = /^\d{4}-\d{2}-\d{2}T/.test(value)
   const instantOf = (text: string) => (typeof raw === 'string' && !Number.isNaN(Date.parse(raw)) ? Date.parse(raw) - Date.parse(text) : NaN)
   switch (el.getAttribute('operator')) {
     case 'eq': return equals()
     // Como no SQL, `ne` e `not-in` não devolvem vazios.
     case 'ne': return !isEmpty(raw) && !equals()
-    case 'ge': return isInstant ? instantOf(value) >= 0 : numberOf(raw) >= Number(value)
-    case 'le': return isInstant ? instantOf(value) <= 0 : numberOf(raw) <= Number(value)
+    case 'ge': return isInstant ? instantOf(value) >= 0 : isDayValue ? day != null && day >= value : numberOf(raw) >= Number(value)
+    case 'le': return isInstant ? instantOf(value) <= 0 : isDayValue ? day != null && day <= value : numberOf(raw) <= Number(value)
     case 'gt': return isInstant ? instantOf(value) > 0 : isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
     case 'lt': return isInstant ? instantOf(value) < 0 : isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
     case 'in': return !isEmpty(raw) && listed()

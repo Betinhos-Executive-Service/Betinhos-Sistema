@@ -158,7 +158,8 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     views,
     active,
     config,
-    dirty: !sameConfig(config, baseline),
+    // O agrupamento é da tela (não é gravado na visão): fica fora de "Alterada", senão Salvar pareceria não ter efeito.
+    dirty: !sameConfig(withGroup(config, null), baseline),
     canPublish: false,
     setConfig,
     density,

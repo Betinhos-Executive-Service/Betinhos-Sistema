@@ -614,6 +614,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     body = (
       <>
         {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
+        {geral.groupNotice ? <Alert tone="warning">{geral.groupNotice}</Alert> : null}
         {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
         {cardsLayout
           ? (

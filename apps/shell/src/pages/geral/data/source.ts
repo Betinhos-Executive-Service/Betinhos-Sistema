@@ -5,7 +5,7 @@ import type { KV } from '../domain/columns'
 import { dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, buildGroupsFetch, quickFindAttributes, withGroup } from '../domain/fetch'
-import { bucketsFromRows, type GroupBucket, type GroupSpec, type GroupTarget } from '../domain/grouping'
+import { bucketsFromRows, GROUPS_LIMIT_MESSAGE, isAggregateLimit, type GroupBucket, type GroupSpec, type GroupTarget } from '../domain/grouping'
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
 import { SNAPSHOT_TENARIS, type Protecao } from '../domain/protecao'
@@ -423,8 +423,12 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     },
     async groups(req) {
       const fetchxml = buildGroupsFetch(req.fetchxml, { search: await resolveSearch(req.query, req.quickFind), spec: req.spec })
-      const body = await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal })
-      return bucketsFromRows(body.value, req.spec)
+      try {
+        const body = await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal })
+        return bucketsFromRows(body.value, req.spec)
+      } catch (error) {
+        throw isAggregateLimit(error) ? new Error(GROUPS_LIMIT_MESSAGE) : error
+      }
     },
     update: async (id, patch) => host.client.update(await entitySet(), id, patch),
     async clearLookup(id, attribute) {
