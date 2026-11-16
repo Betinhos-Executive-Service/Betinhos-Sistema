@@ -30,6 +30,7 @@ import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMo
 import { withCalculatedTotals } from './data/composition-calculated'
 import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
+import { isRouteField } from './data/view-field-presentation'
 import { buildViews, COMPOSITION_TABLE, COMPROVANTES_ID, defaultViewDefinition, isNativeColumn, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
 import { quandoOcioso } from '../../lib/ocioso'
@@ -203,6 +204,13 @@ function queryShapeKey(definition: ViewDefinition) {
 }
 
 /** Rótulo provisório de coluna ligada enquanto a metadata não chega: só o trecho depois do último ponto. */
+const hasRouteCard = (item: Composition) => Boolean(item.serviceId || item.departureAddress || item.destination)
+
+/** Texto do trajeto na célula com o cartão de saída e destino no hover, cabendo ou não na coluna. */
+function RouteDisplay({ item, text }: { item: Composition; text: string }) {
+  return <span className="lookup-preview grid-route"><span className="grid-client-name">{text}</span><RouteCard item={item} /></span>
+}
+
 function provisionalField(id: string): CatalogField {
   const name = id.slice(id.lastIndexOf('.') + 1)
   return { id, label: PROVISIONAL_LABELS[id] ?? name, table: COMPOSITION_TABLE, attribute: name, path: [], type: 'String', available: true } as CatalogField
@@ -1466,6 +1474,11 @@ function ComposicaoContent({ host }: { host: Host }) {
             return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className={`grid-choice-badge${color ? '' : title.toLocaleLowerCase('pt-BR').startsWith('conclu') ? ' grid-choice-badge--done' : ' grid-choice-badge--pending'}`} style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
           }
           const formatted = readViewField(row.original.viewFields, valueKey).formatted
+          // Trajeto do serviço relacionado vindo da própria view: mesmo cartão da coluna Trajeto, sempre no hover.
+          if (isRouteField(field, provisional) && hasRouteCard(row.original)) {
+            const text = typeof formatted === 'string' && formatted ? formatted : value === null || value === undefined || value === '' ? row.original.route : String(value)
+            return <EditableViewFieldCell field={field} value={value} formatted={formatted} display={<RouteDisplay item={row.original} text={text} />} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} />
+          }
           return <EditableViewFieldCell field={field} value={value} formatted={formatted} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} />
         },
       })

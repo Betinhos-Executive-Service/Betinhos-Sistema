@@ -324,6 +324,9 @@
 .composicao .grid-date-value { color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composicao .grid-related-link { display: inline-block; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
+/* Trajeto vindo da view (qualquer coluna): a célula deixa o cartão sair e fica por cima das vizinhas no hover. */
+.composicao .price-grid tbody td:has(.route-card) { overflow: visible; }
+.composicao .price-grid tbody td:has(.lookup-preview.grid-route:hover), .composicao .price-grid tbody td:has(.lookup-preview.grid-route:focus-within) { z-index: 20; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
 /* Trajeto: o cartão abre abaixo da linha do texto, sem cobrir o trajeto sob o ponteiro. */
 .composicao .fixed-col--route .lookup-preview { display: block; max-width: 100%; }

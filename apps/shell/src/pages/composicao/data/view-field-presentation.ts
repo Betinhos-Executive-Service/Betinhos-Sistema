@@ -40,3 +40,9 @@ export function primaryRecordId(field: CatalogField, viewFields: Record<string, 
   const value = viewFields[`${prefix}${primaryId}`]
   return typeof value === 'string' && guidPattern.test(value) ? value.replace(/[{}]/g, '') : null
 }
+
+/** Campo Trajeto da reserva ligada pelo serviço relacionado: a célula mostra o cartão de saída e destino desse serviço. Campo provisório (antes da metadata) vale pelo nome. */
+export function isRouteField(field: Pick<CatalogField, 'attribute' | 'table' | 'relationships'>, provisional = false) {
+  if (field.attribute !== 'cr40f_trajeto') return false
+  return provisional || field.table === 'cr40f_reservadeveculos' && field.relationships?.[0]?.to === 'cr40f_servicorelacionadogeral'
+}
