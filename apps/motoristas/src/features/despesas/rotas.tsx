@@ -193,7 +193,6 @@ export function rotasDespesas(screen: Screen, {
         quickRead={expenseQuickRead}
         quickReadFilled={expenseQuickReadFilled}
         cartaoGasto={Boolean(gastoCartaoAtual)}
-        onPostosProximos={() => abrirPostosProximos("gastos")}
       />
       {gastoCartaoAtual && conferenciaCartao ? (
         <LeituraCartaoSheet
