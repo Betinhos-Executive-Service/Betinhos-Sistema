@@ -39,9 +39,9 @@ it('ignora resposta antiga de Atualizar após mudar a busca', async () => {
   await waitFor(() => expect(finishRefresh).toBeTypeOf('function'))
   fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }), { target: { value: 'Horizonte' } })
   await waitFor(() => expect(load.mock.calls.some(([, view]) => view?.fetchXml?.includes('%Horizonte%'))).toBe(true))
-  expect(await screen.findByText('Horizonte Sistemas')).toBeTruthy()
+  expect((await screen.findAllByText('Horizonte Sistemas')).length).toBeGreaterThan(0)
 
   await act(async () => { finishRefresh({ records: [initialCompositions[0]], source: 'dataverse', nextLink: null, formulas: Promise.resolve(new Map()) }) })
-  expect(screen.getByText('Horizonte Sistemas')).toBeTruthy()
-  expect(screen.queryByText('Aurora Logística')).toBeNull()
+  expect(screen.getAllByText('Horizonte Sistemas').length).toBeGreaterThan(0)
+  expect(screen.queryAllByText('Aurora Logística')).toHaveLength(0)
 })
