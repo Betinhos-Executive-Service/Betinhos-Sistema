@@ -5,6 +5,14 @@
 /* Toque no celular: sem o retângulo azul padrão do navegador; o feedback vem de :active/:focus-visible do DS. */
 html { -webkit-tap-highlight-color: transparent; }
 
+/* O documento nunca rola: quem rola é .bt-shell__main. No app instalado do iOS 26/27 (WebKit 301994 e 300523) o documento
+   ficava deslocado na altura da barra de status: o fluxo descia ~47pt (faixa cinza e o notch somado de novo no cabeçalho)
+   enquanto a gaveta fixa ficava em 0, e o toque caía fora do alvo. Shell fixo no viewport, com 100% em vez de 100dvh
+   (o dvh do iOS mede a partir do fim da barra de status). O resto da defesa está em app/viewportIos.ts.
+   (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
+html, body { overflow: hidden; overscroll-behavior: none; }
+.bt-shell { position: fixed; inset: 0; height: auto; }
+
 /* A área de rolagem vira o bloco de contenção: spans absolutos (ex.: .sr-only nas células da tabela)
    não escapam do recorte e não esticam o documento, que rolava por trás da ficha aberta. */
 .bt-shell__main { position: relative; }
