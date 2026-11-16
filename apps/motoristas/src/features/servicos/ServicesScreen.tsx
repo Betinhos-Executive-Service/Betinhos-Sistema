@@ -11,6 +11,8 @@ import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
 import type { ComunicadoDestinatario } from "../comunicados/comunicados";
 import type { ChecklistVeiculo } from "../checklist/checklists";
+import { chaveDoEnvio } from "../envio-pendente/fila";
+import { useFilaEnvio } from "../envio-pendente/useFilaEnvio";
 
 type ServicesScreenProps = {
   items: AgendaItem[];
@@ -30,6 +32,7 @@ type ServicesScreenProps = {
 export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey = "", queueHighlightDetailKey = "", onOpenDetails, pendingComunicados = [], onOpenComunicado, pendingChecklists = [], onOpenChecklist, loading = false }: ServicesScreenProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const enviosPendentes = useFilaEnvio();
   const visibleItems = useMemo(() => filterAgendaGalleryItems(items, now), [items, now]);
 
   useEffect(() => {
@@ -99,6 +102,7 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
                       index={index}
                       isCompleting={isCompleting}
                       isQueueHighlight={isQueueHighlight}
+                      envioPendente={Boolean(item.detail && enviosPendentes.some((envio) => envio.id === chaveDoEnvio(item.detail!)))}
                       onOpen={(selected) => selected.detail && onOpenDetails(selected.detail)}
                     />
                   </motion.div>
