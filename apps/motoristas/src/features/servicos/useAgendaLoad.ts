@@ -5,6 +5,8 @@ import { getInitialDetail, getInitialParams } from "../../app/bootstrap";
 import { getHashRouteFallbackScreen, screenNeedsHashDetail, type HashRoute } from "../../app/navigation";
 import { hasDataverseRuntime, type DriverContext } from "../../data/dataverse/cliente";
 import { reportAppError } from "../../shared/appErrorLogger";
+import { classificarErro } from "../envio-pendente/classificarErro";
+import { lerAgendaOffline, salvarAgendaOffline } from "./agendaOffline";
 import { findDetailByParams, type LocalStore } from "../../lib/localWorkflow";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../../types";
@@ -42,6 +44,8 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
   const [agendaCarregando, setAgendaCarregando] = useState(
     () => !isButtonPreviewMode && !isReceiptPreviewMode && hasDataverseRuntime()
   );
+  // Horário (ISO) da agenda guardada que está na tela por falta de rede; null com a agenda atualizada.
+  const [agendaOfflineEm, setAgendaOfflineEm] = useState<string | null>(null);
 
   useEffect(() => {
     if (isButtonPreviewMode || isReceiptPreviewMode) return;
@@ -53,6 +57,8 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
       .then((remote) => {
         if (!alive) return;
         setAgendaCarregando(false);
+        setAgendaOfflineEm(null);
+        salvarAgendaOffline(remote);
         const remoteStore = { ...store, agenda: remote.agenda, history: remote.history };
         const hashRoute = initialHashRouteRef.current;
         const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
@@ -210,6 +216,16 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
       .catch((error) => {
         if (!alive) return;
         setAgendaCarregando(false);
+        // Sem rede: abre com a última agenda guardada no aparelho, sem derrubar o app para o modo local.
+        const guardada = classificarErro(error) === "rede" ? lerAgendaOffline() : null;
+        if (guardada) {
+          setDriverContext(guardada.driver);
+          comunicadosDriverIdRef.current = guardada.driver?.id ?? "";
+          setStore((current) => ({ ...current, agenda: guardada.agenda, history: [] }));
+          setAgendaOfflineEm(guardada.salvoEm);
+          setToast("");
+          return;
+        }
         reportAppError(error, {
           severity: "critical",
           source: "app",
@@ -233,6 +249,8 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
       if (!silent) setAgendaCarregando(true);
       try {
         const remote = await dados.carregarAgenda();
+        setAgendaOfflineEm(null);
+        salvarAgendaOffline(remote);
         setDriverContext(remote.driver);
         comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
@@ -259,6 +277,12 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
         if (!silent) setAgendaCarregando(false);
       } catch (error) {
         if (!silent) setAgendaCarregando(false);
+        // Queda de rede com agenda guardada: segue com a que está na tela e só mostra o aviso.
+        const guardada = classificarErro(error) === "rede" ? lerAgendaOffline() : null;
+        if (guardada) {
+          setAgendaOfflineEm((atual) => atual ?? guardada.salvoEm);
+          return;
+        }
         logAppError(error, "loadRemoteStore", "refresh");
         if (!silent || error instanceof Error) {
           setToast(error instanceof Error ? error.message : "Falha ao atualizar Dataverse.");
@@ -269,8 +293,17 @@ export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteR
     setStore((current) => ({ ...current }));
   };
 
+  // Com a agenda guardada na tela, a volta da rede atualiza sozinha.
+  useEffect(() => {
+    if (!agendaOfflineEm) return;
+    const aoVoltarRede = () => { void refreshLocal(undefined, { silent: true }); };
+    window.addEventListener("online", aoVoltarRede);
+    return () => window.removeEventListener("online", aoVoltarRede);
+  }, [agendaOfflineEm, remoteMode]);
+
   return {
     agendaCarregando,
+    agendaOfflineEm,
     refreshLocal
   };
 }

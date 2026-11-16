@@ -365,6 +365,30 @@ export async function createOne(entitySetName: string, data: Record<string, unkn
   }
 }
 
+/** Duplicata de chave primária: o registro já foi criado (412, 0x80040237 ou "matching key values already exists"). */
+export function isRecordAlreadyExistsError(error: unknown) {
+  const record = (error ?? {}) as { status?: unknown; errorCode?: unknown; code?: unknown; message?: unknown };
+  const code = String(record.errorCode ?? record.code ?? "").toLowerCase();
+  if (Number(record.status) === 412 || Number(record.errorCode) === 412) return true;
+  if (code === "0x80040237" || code === "-2147220937") return true;
+  return /matching key values already exists|cannot insert duplicate key|0x80040237|precondition failed/i.test(String(record.message ?? ""));
+}
+
+/**
+ * Cria com o GUID decidido pelo chamador (a chave primária vai no corpo). Reenvio do mesmo GUID não duplica:
+ * se o registro já existe, conta como sucesso.
+ */
+export async function createOneIdempotent(entitySetName: string, id: string, data: Record<string, unknown>) {
+  const entityName = getWebApiEntityName(entitySetName);
+  const guid = cleanGuid(id);
+  try {
+    await createOne(entitySetName, { ...data, [`${entityName}id`]: guid });
+  } catch (error) {
+    if (!isRecordAlreadyExistsError(error)) throw error;
+  }
+  return { id: guid };
+}
+
 export async function deleteOne(entitySetName: string, id: string) {
   const cleanId = cleanGuid(id);
   const entityName = getWebApiEntityName(entitySetName);

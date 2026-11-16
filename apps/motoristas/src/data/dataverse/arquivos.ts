@@ -1,8 +1,9 @@
 // Arquivos: data URLs, pastas e upload de fotos pelo Flow, com o vínculo da foto no Dataverse.
-import { cleanGuid, cleanODataGuid, createOne, dataverseError, getWindowXrm, retrieveOne, type DataverseRecord } from "./cliente.ts";
+import { cleanGuid, cleanODataGuid, createOneIdempotent, dataverseError, getWindowXrm, retrieveOne, type DataverseRecord } from "./cliente.ts";
 import { DATAVERSE } from "./entidades.ts";
 import { FLOW_URLS, assertFlowSuccess, requireFlowLink, runHttpFlow } from "./flow.ts";
 import { bind } from "./registros.ts";
+import { guidDeterministico } from "../../lib/guidDeterministico.ts";
 
 const DEV_DATAVERSE_URL = "https://org23b93544.crm2.dynamics.com/";
 
@@ -142,7 +143,9 @@ export async function createMaintenancePhotoLinkRecord({
   order: number;
 }) {
   if (!link.trim()) return;
-  await createOne(DATAVERSE.fotosManutencao, {
+  // Mesma manutenção, tipo e arquivo = mesmo registro: o reenvio da fila não duplica o vínculo da foto.
+  const recordId = await guidDeterministico(`foto-manutencao:${cleanGuid(maintenanceId)}:${origin}:${photoType}:${fileName}`);
+  await createOneIdempotent(DATAVERSE.fotosManutencao, recordId, {
     new_name: `${maintenanceBusinessId || cleanGuid(maintenanceId)} - ${origin} - ${order}`,
     new_tipofoto: photoType,
     new_origem: origin,
