@@ -1,10 +1,11 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, useShellHeader } from '@betinhos/ui'
 import { Landmark, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { listCache } from '../../app/listCache'
 import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useProgressiveData } from '../../app/useProgressiveData'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
@@ -49,12 +50,15 @@ function Clientes({ host }: { host: Host }) {
     const sort = view.config.sort
     return extra.sort(sort ? sortClientes(list, sort.key, sort.dir) : list, sort, byId)
   }, [list, view.config.sort, extra])
-  const filtered = useMemo(() => filterRows(sorted, valid, allFields, extra.read(readCliente, byId)), [sorted, valid, allFields, extra])
+  const read = useMemo(() => extra.read(readCliente, byId), [extra])
+  const filtered = useMemo(() => filterRows(sorted, valid, allFields, read), [sorted, valid, allFields, read])
   const index = useMemo(() => keywordIndex<Cliente>(clienteKeywordText), [])
   const visible = useMemo(() => {
     const words = searchWords(q)
     return words.length ? filtered.filter((c) => index.matches(c, words)) : filtered
   }, [filtered, index, q])
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
+  const lazyKey = useMemo(() => JSON.stringify({ valid, q, sort: view.config.sort }), [valid, q, view.config.sort])
 
   const refresh = useCallback(() => { void cs.reload() }, [cs.reload])
   const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar clientes" onClick={refresh} />, [refresh])
@@ -73,9 +77,15 @@ function Clientes({ host }: { host: Host }) {
     const open = (id: string) => setTarget({ mode: 'view', id })
     const footer = <span className="cl-num">{visible.length} de {list.length}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum cliente com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = mobile
-      ? (visible.length ? <ClientesCards list={visible} onOpen={open} /> : <div className="surface">{empty}</div>)
-      : <ClientesTable list={visible} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />
+    const table = (rows: Cliente[], tableFooter?: ReactNode) => (
+      <ClientesTable list={rows} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Cliente[]) => <ClientesCards list={rows} onOpen={open} />
+    body = groups
+      ? <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+      : mobile
+        ? (visible.length ? cards(visible) : <div className="surface">{empty}</div>)
+        : table(visible, footer)
   }
 
   return (

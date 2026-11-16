@@ -1,9 +1,10 @@
 import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar } from '@betinhos/ui'
 import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { useDebouncedText } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
@@ -113,7 +114,8 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const termo = useDebouncedText(busca)
   const [alertaUrl, setAlerta] = useQueryTexto('alerta')
   const alerta = ALERTAS.find((kind) => kind === alertaUrl) ?? null
-  const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, lista.fields, lista.extra.read(readFuncionario, (row) => row.id)), [views, lista.filters, lista.fields, lista.extra])
+  const desktopRead = useMemo(() => lista.extra.read(readFuncionario, (row: FuncionarioView) => row.id), [lista.extra])
+  const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, lista.fields, desktopRead), [views, lista.filters, lista.fields, desktopRead])
   const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesKeyword(row, termo)), [desktopFiltrados, termo])
   const desktopCounts = useMemo(() => countAlertas(desktopBase), [desktopBase])
   const desktopVisible = useMemo<FuncionarioView[]>(
@@ -123,6 +125,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // Rolagem infinita (sem paginação visível): trocar filtro, busca, alerta ou ordenação volta ao primeiro lote.
   const lazyKey = useMemo(() => JSON.stringify({ f: lista.filters, termo, alerta, sort: lista.view.config.sort }), [lista.filters, termo, alerta, lista.view.config.sort])
   const desktopSlice = useLazySlice(desktopVisible, lazyKey)
+  const groups = useRowGroups(desktopVisible, lista.view.config.group, lista.fields, desktopRead)
   const mobileSlice = useLazySlice(visible, JSON.stringify(filtrosCelular))
   const clearDesktop = () => { lista.clearFilters(); setBusca(''); setAlerta('') }
 
@@ -189,6 +192,20 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   }
 
   const { view, quickFilters } = lista
+  const footer = <span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>
+  const table = (list: FuncionarioView[], tableFooter?: ReactNode) => (
+    <FuncionarioTable
+      rows={list}
+      loading={loading && !rows.length}
+      onOpen={(id) => setSelection({ mode: 'open', id })}
+      view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: lista.extra.cell }}
+      quickFilters={quickFilters}
+      footer={tableFooter}
+      empty={pending
+        ? <EmptyState align="start" icon={<SearchX />} title="Procurando no restante da lista…" />
+        : <EmptyState align="start" icon={<SearchX />} title="Nenhum colaborador encontrado para estes filtros." action={<Button variant="secondary" onClick={clearDesktop}>Limpar filtros</Button>}>Revise a busca ou limpe os filtros para ver a lista completa.</EmptyState>}
+    />
+  )
   return (
     <div className="page func">
     <div className="app">
@@ -220,20 +237,14 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
         {error && !rows.length ? (
           <EmptyState className="surface" tone="danger" icon={<CloudOff />} title="Não foi possível carregar os colaboradores." action={<Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => void reload()}>Tentar de novo</Button>}>{error}</EmptyState>
         ) : (
-          <>
-          <FuncionarioTable
-            rows={desktopSlice.slice}
-            loading={loading && !rows.length}
-            onOpen={(id) => setSelection({ mode: 'open', id })}
-            view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: lista.extra.cell }}
-            quickFilters={quickFilters}
-            footer={<span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>}
-            empty={pending
-              ? <EmptyState align="start" icon={<SearchX />} title="Procurando no restante da lista…" />
-              : <EmptyState align="start" icon={<SearchX />} title="Nenhum colaborador encontrado para estes filtros." action={<Button variant="secondary" onClick={clearDesktop}>Limpar filtros</Button>}>Revise a busca ou limpe os filtros para ver a lista completa.</EmptyState>}
-          />
-          <LazyFooter loaded={desktopSlice.slice.length} more={desktopSlice.more} onLoadMore={desktopSlice.loadMore} pending={pending} />
-          </>
+          groups ? (
+            <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} table={table} footer={footer} />
+          ) : (
+            <>
+              {table(desktopSlice.slice, footer)}
+              <LazyFooter loaded={desktopSlice.slice.length} more={desktopSlice.more} onLoadMore={desktopSlice.loadMore} pending={pending} />
+            </>
+          )
         )}
       </main>
 
