@@ -1196,12 +1196,12 @@ function ComposicaoContent({ host }: { host: Host }) {
             <button type="button" className="lookup-link grid-route" onClick={() => { void openGridRecord('cr40f_reservadeveculos', serviceId) }} aria-label={`Abrir serviço relacionado: ${item.route}`}>
               {item.route}
             </button>
-            <RouteCard item={item} date={item.departureAt ? formatDepartureDate(item.departureAt) : ''} />
+            <RouteCard item={item} />
           </span>
         ) : item.departureAddress || item.destination ? (
           <span className="lookup-preview">
             <span className="grid-route">{item.route}</span>
-            <RouteCard item={item} date={item.departureAt ? formatDepartureDate(item.departureAt) : ''} />
+            <RouteCard item={item} />
           </span>
         ) : <span className="grid-route" title={item.route}>{item.route}</span>
       },
@@ -1462,7 +1462,7 @@ function ComposicaoContent({ host }: { host: Host }) {
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
             <span className="grid-client-name" title={title}>{title}</span>
             {id === 'client' && <ClientCard item={item} />}
-            {id === 'route' && (target || item.departureAddress || item.destination) && <RouteCard item={item} date={item.departureAt ? formatDepartureDate(item.departureAt) : ''} />}
+            {id === 'route' && (target || item.departureAddress || item.destination) && <RouteCard item={item} />}
           </span>
           return <EditableViewFieldCell field={field} value={value} formatted={id === 'client' ? item.client : undefined} display={display} viewFields={item.viewFields} valueKey={attribute} baseRecordId={item.id} ownerRecordId={item.serviceId} editable={dataSource === 'dataverse'} {...interactionProps(item.id, id)} onSaved={applySavedViewField} />
         },

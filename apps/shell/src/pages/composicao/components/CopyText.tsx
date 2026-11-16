@@ -47,20 +47,12 @@ export const cardEventGuard = {
   onKeyDown: (event: { stopPropagation: () => void }) => event.stopPropagation(),
 }
 
-/** Item da grade de dados do cartão: rótulo pequeno em cima, valor copiável embaixo. */
-function Meta({ label, text, wide }: { label: string; text: string; wide?: boolean }) {
-  return <span className={`route-card__meta-item${wide ? ' route-card__meta-item--wide' : ''}`}><span className="route-card__label">{label}</span><CopyText text={text} /></span>
-}
-
-/** Cartão do serviço relacionado no hover do trajeto: sempre mostra saída e destino completos. */
-export function RouteCard({ item, date }: { item: Composition; date: string }) {
+/** Cartão do hover do trajeto: só o trajeto e os endereços completos de saída e destino. */
+export function RouteCard({ item }: { item: Composition }) {
   const stops = [['Saída', item.departureAddress], ['Destino', item.destination]].filter(([, text]) => text)
   return (
     <span className="lookup-preview__card route-card" role="tooltip" {...cardEventGuard}>
-      <span className="route-card__header">
-        <span className="route-card__eyebrow">Serviço relacionado</span>
-        {item.serviceStatus && <span className="route-card__status">{item.serviceStatus}</span>}
-      </span>
+      <span className="route-card__header"><span className="route-card__eyebrow">Trajeto</span></span>
       <span className="route-card__title"><CopyText text={item.route} /></span>
       {stops.length > 0 && (
         <span className="route-card__stops">
@@ -73,13 +65,6 @@ export function RouteCard({ item, date }: { item: Composition; date: string }) {
           ))}
         </span>
       )}
-      <span className="route-card__meta">
-        <Meta label="Cliente" text={item.client} wide />
-        {date && <Meta label="Data" text={date} />}
-        {item.serviceType && <Meta label="Tipo" text={item.serviceType} />}
-        {item.vehicleType && <Meta label="Veículo" text={item.vehicleType} />}
-        {item.passengers.length > 0 && <Meta label="Passageiros" text={item.passengers.join(', ')} wide />}
-      </span>
     </span>
   )
 }
