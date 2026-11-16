@@ -5,7 +5,7 @@ import {
 } from '@betinhos/ui'
 import { moneyFields } from './compositions'
 import { isDay, shiftDay } from './date-ranges'
-import { isDatePreset, NUMERIC_TYPES, type CatalogField, type ViewColumn, type ViewDefinition, type ViewFilter, type ViewFilterGroup } from './views'
+import { isDatePreset, isNativeColumn, comprovantesOptions, NUMERIC_TYPES, type CatalogField, type ViewColumn, type ViewDefinition, type ViewFilter, type ViewFilterGroup } from './views'
 
 /**
  * Tradução entre a definição de view da Composição (`ViewDefinition`, que vira FetchXML e layoutXml) e o estado da `ViewBar`
@@ -86,6 +86,7 @@ export function columnsFromConfig(config: ViewConfig, previous: ViewColumn[]): V
 export function sortFromConfig(next: TableSort, current: ViewDefinition['sort']): ViewDefinition['sort'] {
   if (!next) return current.slice(1)
   const id = columnIdOf(next.key)
+  if (!isNativeColumn({ id })) return current
   return [{ id, descending: next.dir === 'desc' }, ...current.slice(1).filter((item) => item.id !== id)]
 }
 
@@ -134,7 +135,7 @@ export function filterFieldsOf(catalog: CatalogField[], columnIds: string[], fil
     return [{
       key: keyOf(field.id), label: FIXED_LABELS[field.id] ?? field.label, kind,
       ...(field.type === 'Money' ? { money: true } : {}),
-      ...(kind === 'choice' ? { options: loaded } : {}),
+      ...(kind === 'choice' ? { options: loaded } : comprovantesOptions(field.id)),
       ...(field.path.length && !FIXED_LABELS[field.id] ? { relation: field.tableLabel ?? field.table } : {}),
       ...(columns.has(field.id) ? {} : { advancedOnly: true }),
     }]

@@ -49,7 +49,15 @@ test('só o manual aceita a troca avulsa', () => {
   assert.doesNotMatch(JSON.stringify(auto.actions.Scope_Processo.actions.Destino_recibo), /EMAIL_DESTINO/)
   const manual = aplicarDestinatario(definicao(), { manual: true })
   assert.deepEqual(manual.triggers.manual.inputs.schema.properties.EMAIL_DESTINO, { type: 'string' })
-  assert.match(manual.actions.Scope_Processo.actions.Get_destinatario_recibo.inputs.parameters.recordId, /^@if\(empty\(triggerBody\(\)\?\['EMAIL_DESTINO'\]\)/)
+  assert.doesNotMatch(manual.actions.Scope_Processo.actions.Get_destinatario_recibo.inputs.parameters.recordId, /EMAIL_DESTINO/)
+})
+
+test('saudação e idioma são sempre do pagante', () => {
+  for (const manual of [false, true]) {
+    const { nome, idioma } = aplicarDestinatario(definicao(), { manual }).actions.Scope_Processo.actions.Destino_recibo.inputs
+    assert.equal(nome, "@outputs('Get_a_row_by_ID_BD')?['body/cr40f_nomedopassageiro']")
+    assert.equal(idioma, "@outputs('Get_a_row_by_ID_BD')?['body/_cr40f_idioma_label']")
+  }
 })
 
 test('aplicar de novo não muda nada', () => {

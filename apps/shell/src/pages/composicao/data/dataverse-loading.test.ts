@@ -11,6 +11,8 @@ const linkedRow = {
   cr40f_composicaodeprecosid: compositionId,
   _cr40f_servicorelacionadogeral_value: reservationId,
   'cmp_res.cr40f_trajeto': 'Aeroporto',
+  'cmp_res.cr40f_endereodesada': 'Rua de Saída, 10',
+  'cmp_res.cr40f_destino': 'Aeroporto de Guarulhos, Terminal 3',
   'cmp_res.cr40f_cliente': 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee',
   [`cmp_res.cr40f_cliente${F}`]: 'Rótulo do cliente',
   [`cmp_res.cr40f_status${F}`]: 'Confirmada',
@@ -35,7 +37,7 @@ it('lê reserva e cliente na própria consulta, em uma chamada por página', asy
   expect(retrieveMultipleRecords.mock.calls.filter(([entity]) => entity === 'cr40f_composicaodeprecos')).toHaveLength(1)
   expect(retrieveMultipleRecords.mock.calls.map(([entity]) => entity).filter((entity) => ['cr40f_reservadeveculos', 'cr40f_clientes1'].includes(entity))).toEqual([])
   expect(page.rowLinks).toBe(true)
-  expect(page.records[0]).toMatchObject({ client: 'Cliente Teste', clientId: 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', clientRegistration: '123', clientAddress: 'Rua A', route: 'Aeroporto', serviceStatus: 'Confirmada', serviceType: 'Transfer', vehicleType: 'Sedan', passengers: ['Ana', 'Bia'] })
+  expect(page.records[0]).toMatchObject({ client: 'Cliente Teste', clientId: 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', clientRegistration: '123', clientAddress: 'Rua A', route: 'Aeroporto', departureAddress: 'Rua de Saída, 10', destination: 'Aeroporto de Guarulhos, Terminal 3', serviceStatus: 'Confirmada', serviceType: 'Transfer', vehicleType: 'Sedan', passengers: ['Ana', 'Bia'] })
 })
 
 it('a consulta padrão (sem view) também leva os vínculos', async () => {

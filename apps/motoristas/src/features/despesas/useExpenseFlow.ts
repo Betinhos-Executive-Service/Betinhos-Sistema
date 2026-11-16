@@ -209,6 +209,13 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       };
       if (!accepted) {
         clearForm();
+        if (navigator.onLine === false) {
+          // O diário já guarda o gasto e o worker o envia sozinho quando a conexão volta.
+          setExpenseSend(null);
+          setToast("Salvo no aparelho. Será enviado quando a conexão voltar.", "info");
+          setScreen(destino);
+          return;
+        }
         setExpenseSend({ phase: "error", current: 0, total });
         return;
       }

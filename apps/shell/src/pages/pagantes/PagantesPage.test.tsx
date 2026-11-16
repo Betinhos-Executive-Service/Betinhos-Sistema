@@ -2,6 +2,11 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PagantesPage } from './PagantesPage'
+import { emptyFilters } from '@betinhos/ui'
+import { encodeTableFilters } from '../../app/filtersUrl'
+import { COMPROVANTES_KEY } from '../recebimentos/colunaOp'
+import { mockContagemPorOp } from '../recebimentos/mock'
+import { createMockPagantes } from './data/mock'
 import { VIEWS_KEY } from './domain/filters'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta e 1 s de espera não basta.
@@ -92,7 +97,8 @@ describe('Pagantes', () => {
     fireEvent.click((await screen.findByText('PAG-1203')).closest('.bt-table__row')!.querySelector('.pg-num')!, { ctrlKey: true })
     const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
     expect(within(faixa).getByText('2 selecionados')).toBeTruthy()
-    expect(screen.queryByRole('searchbox', { name: 'Buscar pagantes' })).toBeNull()
+    // Como na Geral, a busca continua na linha de comando durante a seleção.
+    expect(screen.getByRole('searchbox', { name: 'Buscar pagantes' })).toBeTruthy()
 
     fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
     await screen.findByText('2 pagantes exportados.')
@@ -142,5 +148,39 @@ describe('Pagantes', () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     expect(await screen.findByRole('dialog')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
+  })
+
+  it('coluna Comprovantes: o pagante mostra a contagem da OP dele e o drawer abre agrupado por serviço', async () => {
+    history.replaceState(null, '', '#/pagantes')
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    const lista = createMockPagantes(new Date()).filter((p) => p.opId)
+    const contagem = mockContagemPorOp(lista.map((p) => p.opId))
+    const p = lista.find((x) => contagem.has(x.opId))!
+    const n = contagem.get(p.opId)!
+    const linha = (await screen.findByText(p.codigo)).closest('.bt-table__row') as HTMLElement
+    fireEvent.click(await within(linha).findByRole('button', { name: new RegExp(`^${n} comprovantes? de recebimento$`) }))
+    const drawer = await screen.findByRole('dialog', { name: p.op })
+    expect(within(drawer).getByText('Recebimento')).toBeTruthy()
+    await within(drawer).findByText(new RegExp(`^${n} comprovantes?`))
+  })
+
+  it('filtro Com/Sem comprovante usa a contagem da OP do pagante', async () => {
+    const lista = createMockPagantes(new Date())
+    const com = mockContagemPorOp(lista.map((p) => p.opId).filter(Boolean))
+    const tem = (p: { opId: string }) => Boolean(p.opId) && com.has(p.opId)
+    const filtro = (op: 'yes' | 'no') => encodeTableFilters({ ...emptyFilters(), quick: { [COMPROVANTES_KEY]: { type: 'condition', id: 'rapido-comprovantes', field: COMPROVANTES_KEY, op } } })
+    const com1 = lista.find(tem)!
+    const sem1 = lista.find((p) => !tem(p))!
+
+    history.replaceState(null, '', `#/pagantes?f=${filtro('yes')}`)
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText(com1.codigo)
+    await waitFor(() => expect(screen.queryByText(sem1.codigo)).toBeNull())
+    cleanup()
+
+    history.replaceState(null, '', `#/pagantes?f=${filtro('no')}`)
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText(sem1.codigo)
+    await waitFor(() => expect(screen.queryByText(com1.codigo)).toBeNull())
   })
 })

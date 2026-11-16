@@ -3,23 +3,6 @@
 .bt-table--view .dp-alertas { flex-wrap: nowrap; }
 .bt-table--view .dp-alertas > .bt-badge { min-width: 0; flex-shrink: 1; }
 .dp-page .pg-card__foot { justify-content: flex-start; }
-/* Barra numa linha só, pela largura dela mesma (container query, já sem o menu lateral):
-   título ~220 + Colunas/Filtros/Auditoria ~310 + busca 150 + período 140 + Atualizar 40 ~= 1040 px.
-   Abaixo disso os três comandos ficam só com ícone (o nome segue para leitor de tela) e o selo do mock sai (o menu já avisa);
-   só em largura bem estreita os comandos descem para a linha de baixo. */
-.dp-barra { container-type: inline-size; }
-.dp-page .pg-filters__search { flex: 1 1 150px; min-width: 150px; }
-@container (min-width: 720px) {
-  .dp-barra .bt-viewbar, .dp-barra .bt-viewbar__end { flex-wrap: nowrap; }
-  /* Em uma linha os botões não encolhem abaixo do próprio tamanho (crescem para a busca ocupar o espaço livre) e o nome
-     da visão encolhe com reticências; com a base 0 do shell eles transbordavam para a esquerda, por cima do selo "Alterada". */
-  .dp-barra .bt-viewbar__end { flex: 1 0 auto; }
-  .dp-barra .bt-viewbar__start > .bt-menu { min-width: 0; }
-}
-@container (max-width: 1059px) {
-  .dp-barra .bt-viewbar__end > .bt-button .bt-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
-@container (max-width: 869px) { .dp-barra .bt-viewbar__end > .bt-badge { display: none; } }
 
 /* Cartões compactos (como na Frota): são atalho para a lista, não o assunto da tela; espaço antes da tabela.
    Uma fileira de 5 a partir de 560 px do próprio bloco; abaixo de 900 px saem ícone e dica para o rótulo caber. */

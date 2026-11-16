@@ -29,6 +29,8 @@ export type FinalizePayload = {
   linkAnterior?: string;
   // Chamado com o link lido antes do primeiro POST, para a fila guardar no item.
   onLinkAnterior?: (link: string) => void | Promise<void>;
+  // Reenvio da fila: confere o estado remoto antes e não repete o que o envio anterior já gravou (manutenção e troca).
+  reenvio?: boolean;
 };
 
 export const SERVICE_VEHICLE_ORIGIN = {
@@ -311,12 +313,31 @@ async function upsertMaintenanceExpense({
   return expenseId;
 }
 
+async function concluirItemDaAgendaManutencao(payload: FinalizePayload, geralId: string, finalizedAt: string) {
+  if (!geralId) return;
+  payload.onProgress?.("Concluindo item da agenda.");
+  await updateOne(DATAVERSE.geral, geralId, {
+    new_observacaofinal: getFieldValue(payload.fields, "Comentários do Colaborador", "Comentarios do Colaborador", "Comentários do Motorista", "Comentarios do Motorista", "Observações", "Observacoes"),
+    cr40f_status: OPERATION_STATUS.concluido,
+    new_datadefinalizacao: finalizedAt
+  });
+}
+
 export async function finalizeMaintenanceRemote(payload: FinalizePayload) {
   const dv = payload.detail.dataverse;
   if (!dv?.id) throw new Error("Manutenção sem referência Dataverse.");
   const record = dv.record ?? {};
   const geralId = cleanODataGuid(record.__geralId);
-  const finalizedAt = new Date().toISOString();
+  // Horário da ação (capturado no aparelho); o reenvio da fila nunca grava o horário do reenvio.
+  const finalizedAt = payload.finalizadoEm ?? new Date().toISOString();
+  if (payload.reenvio) {
+    // Envio anterior chegou ao fim (status Realizado) e só a resposta se perdeu: completa o item da agenda e encerra.
+    const atual = await retrieveOne(DATAVERSE.manutencoes, dv.id, "?$select=cr40f_status");
+    if (Number(atual.cr40f_status) === MAINTENANCE_STATUS.realizado) {
+      await concluirItemDaAgendaManutencao(payload, geralId, finalizedAt);
+      return;
+    }
+  }
   const paymentKey = normalizeText(getFieldValue(payload.fields, "Forma de Pagamento"));
   const paymentValue = MAINTENANCE_PAYMENT[paymentKey];
   dataverseLog("Finalização de manutenção iniciada.", {
@@ -430,14 +451,7 @@ export async function finalizeMaintenanceRemote(payload: FinalizePayload) {
   photoPatch.cr40f_status = MAINTENANCE_STATUS.realizado;
   payload.onProgress?.("Gravando links das fotos no Dataverse.");
   await updateOne(DATAVERSE.manutencoes, dv.id, photoPatch);
-  if (geralId) {
-    payload.onProgress?.("Concluindo item da agenda.");
-    await updateOne(DATAVERSE.geral, geralId, {
-      new_observacaofinal: getFieldValue(payload.fields, "Comentários do Colaborador", "Comentarios do Colaborador", "Comentários do Motorista", "Comentarios do Motorista", "Observações", "Observacoes"),
-      cr40f_status: OPERATION_STATUS.concluido,
-      new_datadefinalizacao: finalizedAt
-    });
-  }
+  await concluirItemDaAgendaManutencao(payload, geralId, finalizedAt);
 }
 
 export async function finalizeExchangeRemote(payload: FinalizePayload) {
@@ -448,6 +462,9 @@ export async function finalizeExchangeRemote(payload: FinalizePayload) {
   const isDriver1 = cleanODataGuid(record._cr40f_motorista1_value) === cleanGuid(driver.id);
   const isDriver2 = cleanODataGuid(record._cr40f_motorista2_value) === cleanGuid(driver.id);
   if (!isDriver1 && !isDriver2) throw new Error("Motorista atual não pertence a esta troca.");
+
+  // Confirmação já registrada (reenvio depois de resposta perdida): a versão esperada mudou e repetir daria conflito.
+  if (payload.reenvio && ((isDriver1 && record.new_concluidomotorista1 === true) || (isDriver2 && record.new_concluidomotorista2 === true))) return;
 
   const observation = getFieldValue(payload.fields, "Observações", "Observacoes", "Observação da Troca", "Observacao da Troca") || "Sem observação.";
   const completion = getExchangeCompletionState(record, isDriver1, isDriver2);

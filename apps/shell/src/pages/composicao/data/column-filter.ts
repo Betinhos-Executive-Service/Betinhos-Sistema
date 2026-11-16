@@ -1,7 +1,7 @@
 import type { FilterCondition, FilterField, FilterKind, FilterOption } from '@betinhos/ui'
 import { isDay } from './date-ranges'
 import { filterKindOf, fromTableCondition, toTableCondition } from './table-view'
-import type { ViewFilter } from './views'
+import { comprovantesOptions, type ViewFilter } from './views'
 
 /**
  * Filtro do menu da coluna (uma condição por coluna, DS §10.9.2) ↔ filtros da view. Usa os mesmos conversores da
@@ -18,7 +18,7 @@ export function filterKind(type: string): FilterKind {
 }
 
 export const toFilterField = (id: string, label: string, type: string): FilterField =>
-  ({ key: id, label, kind: filterKind(type), money: type === 'Money' })
+  ({ key: id, label, kind: filterKind(type), money: type === 'Money', ...comprovantesOptions(id) })
 
 /** Condição do DS → filtros da view para a coluna `id`. */
 export function toViewFilters(id: string, kind: FilterKind, c: FilterCondition): ViewFilter[] {

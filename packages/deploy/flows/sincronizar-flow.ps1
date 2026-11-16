@@ -99,8 +99,22 @@ function Resolve-ValoresDoDev($Repo, $Vivo, [string] $Caminho) {
   }
 }
 
+# host.connectionName de todas as ações, em qualquer profundidade (escopo, condição, foreach).
+function Get-ConnectionNames($Acoes) {
+  if (-not $Acoes) { return }
+  # StrictMode: propriedade ausente lança erro, então lê por PSObject.Properties.
+  $filho = { param($o, $n) $p = if ($o) { $o.PSObject.Properties[$n] } else { $null }; if ($p) { $p.Value } }
+  foreach ($p in $Acoes.PSObject.Properties) {
+    $acao = $p.Value
+    $nome = & $filho (& $filho (& $filho $acao 'inputs') 'host') 'connectionName'
+    if ($nome) { $nome }
+    Get-ConnectionNames (& $filho $acao 'actions')
+    Get-ConnectionNames (& $filho (& $filho $acao 'else') 'actions')
+  }
+}
+
 # clientdata nova: definição do JSON + connection references, nome de assinatura dos gatilhos e valores marcados do flow existente.
-function New-ClientDataDoJson([string] $ClientDataAtual, [string] $CaminhoJson) {
+function New-ClientDataDoJson([string] $ClientDataAtual, [string] $CaminhoJson, [string] $ClientDataReferencias = '') {
   $atual = $ClientDataAtual | ConvertFrom-Json
   $definicao = [IO.File]::ReadAllText($CaminhoJson, [Text.Encoding]::UTF8) | ConvertFrom-Json
   Resolve-ValoresDoDev $definicao $atual.properties.definition ''
@@ -115,12 +129,23 @@ function New-ClientDataDoJson([string] $ClientDataAtual, [string] $CaminhoJson) 
   foreach ($r in $refs.PSObject.Properties) {
     if (-not $r.Value.connection.connectionReferenceLogicalName) { throw "Connection reference '$($r.Name)' do flow existente sem nome lógico." }
   }
+  # Só com -FlowDeReferencias: connectionName que as ações usam e o flow existente não declara vem do flow de referência.
+  if ($ClientDataReferencias) {
+    $deReferencias = ($ClientDataReferencias | ConvertFrom-Json).properties.connectionReferences
+    foreach ($nome in @(Get-ConnectionNames $definicao.actions | Sort-Object -Unique)) {
+      if ($refs.PSObject.Properties[$nome]) { continue }
+      $emprestada = $deReferencias.PSObject.Properties[$nome]
+      if (-not $emprestada -or -not $emprestada.Value.connection.connectionReferenceLogicalName) { throw "Connection reference '$nome' ausente no flow existente e no flow de referência." }
+      $refs | Add-Member -NotePropertyName $nome -NotePropertyValue $emprestada.Value -Force
+    }
+  }
   return (@{ properties = @{ connectionReferences = $refs; definition = $definicao }; schemaVersion = $atual.schemaVersion } | ConvertTo-Json -Depth 100 -Compress)
 }
 
-function Sync-FlowExistente($Sessao, [string] $Nome, [string] $CaminhoJson, [switch] $Apply, [string] $Prefixo = 'flow') {
+function Sync-FlowExistente($Sessao, [string] $Nome, [string] $CaminhoJson, [switch] $Apply, [string] $Prefixo = 'flow', [string] $FlowDeReferencias = '') {
   $flow = Get-FlowExistente $Sessao $Nome
-  $novo = New-ClientDataDoJson $flow.clientdata $CaminhoJson
+  $referencias = if ($FlowDeReferencias) { (Get-FlowExistente $Sessao $FlowDeReferencias).clientdata } else { '' }
+  $novo = New-ClientDataDoJson $flow.clientdata $CaminhoJson $referencias
   $diferencas = @(Get-Diferencas ($novo | ConvertFrom-Json) ($flow.clientdata | ConvertFrom-Json))
   if ($diferencas.Count -eq 0) { Write-Output "[$Prefixo] '$Nome': sem mudança (definição igual à do DEV)."; return }
   Write-Output "[$Prefixo] '$Nome': $($diferencas.Count) diferença(s) com o DEV:"

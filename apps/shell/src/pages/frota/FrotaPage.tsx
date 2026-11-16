@@ -107,7 +107,8 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
   const refreshButton = useMemo(() => (
     <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Recarregar a frota" loading={loading} onClick={() => void reload()} />
   ), [loading, reload])
-  useShellHeader({ title: tab.label, actions: refreshButton })
+  // Nas listas (linha de comando como a da Geral) o "Atualizar" fica na própria linha; o cabeçalho do celular não repete.
+  useShellHeader({ title: tab.label, actions: LISTAS.includes(route.tab) ? undefined : refreshButton })
 
   let body
   if (loading && !result) body = <Carregando />
@@ -115,10 +116,10 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
   else body = (
     <ViewGate errors={errors} tables={tab.tables} onRetry={onReload}>
       {route.tab === 'pendencias' && <Pendencias data={data} errors={errors} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'multas' && route.sub === 'multas' && <Registros key="multas" kinds={['multa']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'colisoes' && <Registros key="colisoes" kinds={['colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
+      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} onReload={onReload} loading={loading} />}
+      {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
+      {route.tab === 'multas' && route.sub === 'multas' && <Registros key="multas" kinds={['multa']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
+      {route.tab === 'colisoes' && <Registros key="colisoes" kinds={['colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
       {route.tab === 'indicadores' && <Indicadores data={data} errors={errors} today={today} />}
       {route.tab === 'plano' && <PlanoPreventivo data={data} source={source} onReload={onReload} />}
     </ViewGate>

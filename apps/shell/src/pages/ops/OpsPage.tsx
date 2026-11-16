@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, TableGroups, ToastProvider, ViewBar, groupRows, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
-import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX, Split } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
-import { SelectionBar, useRowSelection } from '../../app/Selecao'
+import { selectionActions, useRowSelection } from '../../app/Selecao'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -14,11 +15,14 @@ import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
 import { copyText } from '../pagantes/components/QuickActions'
 import { formatMoney } from '../pagantes/domain/messages'
+import { ComprovantesOpDrawer, type OpAberta } from '../recebimentos/ComprovantesOpDrawer'
+import { useColunaComprovantes } from '../recebimentos/useColunaComprovantes'
 import { createSource } from './data/source'
 import { VIEWS_KEY, loadViews, periodoStart, total } from './domain/filters'
 import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
 import { opsQuery } from './domain/query'
 import { opsCsv, opsNumeros } from './domain/exportar'
+import { OP_STATUS } from './domain/status'
 import type { Op } from './domain/types'
 import { useOps } from './useOps'
 import { OpsCards, OpsTable } from './components/OpsList'
@@ -38,6 +42,8 @@ export function OpsPage({ host }: { host: Host }) {
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
+const opDaLinha = (op: Op): OpAberta => ({ id: op.id, nome: op.codigo || 'OP sem código' })
 
 function Ops({ host }: { host: Host }) {
   const auditoria = useAuditoria()
@@ -76,7 +82,10 @@ function Ops({ host }: { host: Host }) {
   const list = useMergedById(ops.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortOps(list, view.config.sort, choices) : list, view.config.sort, (op) => op.id), [list, choices, view.config.sort, extra])
-  const read = useMemo(() => extra.read(readOp, (op) => op.id), [extra])
+  const recebimentos = source.pagantes.recebimentos
+  const comprovantes = useColunaComprovantes(recebimentos, view.config, filters, list, opDaLinha, mobile)
+  const { comLeitura } = comprovantes
+  const read = useMemo(() => comLeitura(extra.read(readOp, (op) => op.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
@@ -88,11 +97,7 @@ function Ops({ host }: { host: Host }) {
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
-  // Agrupar por (§10.9.1): grupos em memória sobre a lista já filtrada e buscada; lista vazia volta ao estado vazio.
-  const groups = useMemo(() => {
-    const found = groupRows(visible, view.config.group, allFields, read)
-    return found?.length ? found : null
-  }, [visible, view.config.group, allFields, read])
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const sel = useRowSelection(visible)
   const selecting = !mobile && sel.rows.length > 0
@@ -119,11 +124,9 @@ function Ops({ host }: { host: Host }) {
     return () => { cancelled = true }
   }, [fechar.open, pendSource])
   const abrirFechar = useCallback(() => setFechar({ open: true, opcoes: null, erro: null }), [])
-  const headerActions = useMemo(() => <>
-    <Button icon={<CalendarCheck size={18} />} aria-label="Fechar mês" onClick={abrirFechar} />
-    <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar ordens de pagamento" onClick={refresh} />
-  </>, [refresh, abrirFechar])
-  useShellHeader({ title: 'Ordens de Pagamento', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Ordens de Pagamento' })
+  const size = mobile ? 'touch' : 'default'
 
   async function confirmCancel(op: Op) {
     if (busyId) return
@@ -167,7 +170,11 @@ function Ops({ host }: { host: Host }) {
   // Ações em lote: as mesmas na faixa da seleção e no clique direito.
   const bulkActions = (rows: Op[]): MenuAction[] => {
     const semNumero = !opsNumeros(rows).length
+    // Com uma OP só, o Gerar Pagantes sai direto da lista, sem abrir a gaveta.
+    const [unica] = rows.length === 1 ? rows : []
+    const cancelada = unica?.status === OP_STATUS.cancelada
     return [
+      ...(unica ? [{ id: 'gerar', label: 'Gerar pagantes', icon: <Split size={16} />, disabled: cancelada, title: cancelada ? 'A OP está cancelada.' : undefined, onSelect: () => gerarPagantes(unica) }] : []),
       { id: 'exportar', label: 'Exportar seleção', icon: <Download size={16} />, onSelect: () => exportar(rows) },
       { id: 'copiar', label: 'Copiar números', icon: <Copy size={16} />, disabled: semNumero, title: semNumero ? 'As OPs selecionadas ainda não têm número.' : undefined, onSelect: () => void copiarNumeros(rows) },
     ]
@@ -193,15 +200,11 @@ function Ops({ host }: { host: Host }) {
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas); o `TableGroups` faz o lote do clique direito valer para a lista inteira e o checkbox do cabeçalho, só para o grupo.
     const table = (rows: Op[], tableFooter?: ReactNode) => (
-      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} comprovantes={comprovantes.coluna} />
     )
     body = groups ? (
-      <>
-        <TableGroups groups={groups} resetKey={JSON.stringify(view.config.group)} counting={pending}>
-          {(rows) => (mobile ? <GroupCards list={rows} choices={loaded} onOpen={setSelectedId} resetKey={lazyKey} pending={pending} /> : table(rows))}
-        </TableGroups>
-        {mobile ? null : <div className="op-groups__total">{footer}</div>}
-      </>
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} footer={footer}
+        cards={(rows) => <OpsCards list={rows} choices={loaded} onOpen={setSelectedId} />} />
     ) : (
       <>
         {mobile
@@ -215,16 +218,16 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <div {...sel.bar}>
-          <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-            {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
-              {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-              <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
-              {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />}
-              {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
-            </>}
-          </ViewBar>
-        </div>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />
+            <Button size={size} icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>
+          </>}
+          // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
+          selection={{ count: selecting ? sel.rows.length : 0, onClear: sel.clear, actions: selectionActions(bulkActions(sel.rows)) }}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        </ViewBar>
       </div>
       {ops.error && ops.choices ? (
         <Alert tone="danger" title={ops.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
@@ -236,6 +239,7 @@ function Ops({ host }: { host: Host }) {
         <OpDrawer op={current} onClose={() => setSelectedId(null)} choices={ops.choices} source={source} version={version}
           busy={current != null && busyId === current.id} onCancel={setCancelRequest} onGerarPagantes={gerarPagantes} />
       ) : null}
+      <ComprovantesOpDrawer op={comprovantes.aberta} source={recebimentos} servicos={source.pagantes.servicos} mobile={mobile} onClose={comprovantes.fechar} />
       <CancelDialog op={cancelRequest} onClose={() => setCancelRequest(null)} onConfirm={(op) => void confirmCancel(op)} />
       <FecharMesDialog escolha={fechar} source={pendSource} onClose={() => setFechar({ open: false, opcoes: null, erro: null })}
         onDone={(r) => {
@@ -250,13 +254,4 @@ function Ops({ host }: { host: Host }) {
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </div>
   )
-}
-
-/** Cartões de um grupo aberto no celular: a mesma rolagem infinita da lista, por grupo. */
-function GroupCards({ resetKey, pending, ...props }: Parameters<typeof OpsCards>[0] & { resetKey: string; pending: boolean }) {
-  const { slice, more, loadMore } = useLazySlice(props.list, resetKey)
-  return <>
-    <OpsCards {...props} list={slice} />
-    <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
-  </>
 }

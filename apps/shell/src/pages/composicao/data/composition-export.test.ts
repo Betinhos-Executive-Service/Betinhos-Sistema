@@ -79,6 +79,13 @@ describe('compositionWorkbook', () => {
     expect(files['xl/styles.xml']).toContain('<cellStyles count="1">')
   })
 
+  it('Comprovantes não sai no Excel', async () => {
+    const definition: ViewDefinition = { columns: [{ id: 'comprovantes', width: 100, pinned: false }, { id: 'client', width: 120, pinned: false }], filters: [], sort: [] }
+    const sheet = (await entries(compositionWorkbook([initialCompositions[0]], definition, [], 'V')))['xl/worksheets/sheet1.xml']
+    expect(sheet).toContain('autoFilter ref="A4:A5"')
+    expect(sheet).not.toContain('Comprovantes')
+  })
+
   it('lookup direto, escolha e booleano da composição saem no Excel com o mesmo texto da grade', async () => {
     const F = '@OData.Community.Display.V1.FormattedValue'
     const base = { table: 'cr40f_composicaodeprecos', path: [], available: true }

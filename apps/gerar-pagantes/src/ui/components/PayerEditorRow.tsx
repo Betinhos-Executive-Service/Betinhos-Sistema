@@ -91,7 +91,12 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
         <Mail size={15} aria-hidden="true" />
         <PersonSelect size="compact" ariaLabel={`Destinatário do e-mail de ${draft.name}`} placeholder="Pesquisar pessoa" suggestions={people} excludedIds={new Set([draft.recipientId ?? ''])} onSearch={onSearch}
           onSelect={(person) => { dispatch({ type: 'setRecipient', key, person }); setPickingRecipient(false) }} />
-        <EmailForm label="Ou digite um e-mail" hint="Não cria cadastro." maxLength={RECEIPT_EMAIL_MAX_LENGTH} onSave={(email) => { dispatch({ type: 'setRecipientEmail', key, email }); setPickingRecipient(false) }} />
+        {emailValid(draft.email)
+          ? <EmailForm label="Ou digite um e-mail" hint="Não cria cadastro." maxLength={RECEIPT_EMAIL_MAX_LENGTH} onSave={(email) => { dispatch({ type: 'setRecipientEmail', key, email }); setPickingRecipient(false) }} />
+          // Pagante sem e-mail: o digitado pode ir para o cadastro dele já aqui.
+          : <EmailForm label="Ou digite um e-mail" hint={`"Usar e cadastrar" grava no cadastro de ${draft.name} ao salvar.`} maxLength={RECEIPT_EMAIL_MAX_LENGTH}
+            onRegister={(email) => { dispatch({ type: 'setPersonEmail', personId: draft.id, email }); dispatch({ type: 'setRecipient', key, person: draft }); setPickingRecipient(false) }}
+            onSave={(email) => { dispatch({ type: 'setRecipientEmail', key, email, onlyThisSend: true }); setPickingRecipient(false) }} />}
         <Button variant="ghost" size="compact" onClick={() => setPickingRecipient(false)}>Cancelar</Button>
       </div> : null}
       {choosesRecipient && !pickingRecipient && !recipientHasEmail && needsRecipient(draft) ? <div className="payer-editor__missing-wrap"><EmailForm label={`E-mail de ${draft.recipientName ?? draft.name}`} hint="Será gravado no cadastro ao salvar." onSave={(email) => dispatch({ type: 'setPersonEmail', personId: draft.recipientId ?? draft.id, email })} /></div> : null}
@@ -136,18 +141,21 @@ function RecipientChip({ draft, onPick }: { draft: PayerDraft; onPick: () => voi
   </Tooltip>
 }
 
-function EmailForm({ label, hint, maxLength = EMAIL_MAX_LENGTH, onSave }: { label: string; hint: string; maxLength?: number; onSave: (email: string) => void }) {
+/** Com `onRegister`, "Usar e cadastrar" é o primário (Enter) e "Usar só neste envio" o secundário. */
+function EmailForm({ label, hint, maxLength = EMAIL_MAX_LENGTH, onSave, onRegister }: { label: string; hint: string; maxLength?: number; onSave: (email: string) => void; onRegister?: (email: string) => void }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
-  function submit(event: FormEvent) {
-    event.preventDefault()
+  function use(action: (email: string) => void) {
     if (!emailValid(value) || value.trim().length > maxLength) { setError('Informe um e-mail válido, como nome@empresa.com.br.'); return }
-    onSave(value)
+    action(value)
   }
+  function submit(event: FormEvent) { event.preventDefault(); use(onRegister ?? onSave) }
   return <form className="payer-editor__missing" onSubmit={submit} noValidate>
     <Field label={label} error={error || undefined} hint={error ? undefined : hint}>
       <Input type="email" inputMode="email" autoComplete="off" size="compact" maxLength={maxLength} value={value} placeholder="nome@empresa.com.br" onChange={(event) => { setValue(event.target.value); setError('') }} />
     </Field>
-    <Button type="submit" variant="secondary" size="compact">Usar e-mail</Button>
+    {onRegister
+      ? <div className="payer-editor__email-actions"><Button type="submit" variant="primary" size="compact">Usar e cadastrar</Button><Button variant="secondary" size="compact" onClick={() => use(onSave)}>Usar só neste envio</Button></div>
+      : <Button type="submit" variant="secondary" size="compact">Usar e-mail</Button>}
   </form>
 }

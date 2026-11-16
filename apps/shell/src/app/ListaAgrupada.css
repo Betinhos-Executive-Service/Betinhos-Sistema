@@ -1,0 +1,2 @@
+/* Agrupada, o total sai da tabela e fica abaixo dos grupos. */
+.lista-agrupada__total { padding: var(--bt-space-2) var(--bt-space-3); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }

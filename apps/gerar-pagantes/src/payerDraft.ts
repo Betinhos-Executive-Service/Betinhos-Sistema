@@ -17,6 +17,8 @@ export interface PayerDraft extends Payer {
   settled: boolean
   /** Destinatário diferente do pagante também recebe o recibo. */
   receiptToRecipient: boolean
+  /** E-mail digitado com "Usar só neste envio": o resumo não oferece gravá-lo no cadastro. */
+  emailOnlyThisSend?: boolean
 }
 
 export interface DraftState {
@@ -34,6 +36,19 @@ const recipientIdOf = (payer: Payer) => payer.recipientId ?? (payer.recipientEma
 export const recipientIsOther = (draft: PayerDraft) => draft.recipientId !== draft.id
 export const recipientLabel = (draft: PayerDraft) => draft.recipientName ?? draft.recipientEmail ?? ''
 export const needsRecipient = (draft: PayerDraft) => !draft.settled && draft.generateLink && (draft.sendEmail || (recipientIsOther(draft) && draft.receiptToRecipient))
+
+/** Pagante sem e-mail no cadastro, oferecido no resumo ao salvar. */
+export interface MissingEmail { personId: Guid; name: string; email: string; save: boolean }
+
+/**
+ * O e-mail digitado como destinatário vem sugerido e marcado; destinatário cadastrado não é copiado.
+ * Quem escolheu "Usar só neste envio" na linha não é perguntado de novo.
+ */
+export const missingPayerEmails = (drafts: PayerDraft[]): MissingEmail[] =>
+  activeDrafts(drafts).filter((draft) => !draft.settled && !draft.emailOnlyThisSend && !emailValid(draft.email)).map((draft) => {
+    const typed = draft.recipientId ? '' : draft.recipientEmail?.trim() ?? ''
+    return { personId: draft.id, name: draft.name, email: typed, save: Boolean(typed) }
+  })
 
 export function draftFromPayer(payer: Payer): PayerDraft {
   const recipientId = recipientIdOf(payer)
@@ -101,7 +116,7 @@ export type DraftAction =
   | { type: 'setLink'; key: string; generateLink: boolean }
   | { type: 'setEmail'; key: string; sendEmail: boolean }
   | { type: 'setRecipient'; key: string; person: Person }
-  | { type: 'setRecipientEmail'; key: string; email: string }
+  | { type: 'setRecipientEmail'; key: string; email: string; onlyThisSend?: boolean }
   | { type: 'setReceipt'; key: string; receiptToRecipient: boolean }
   | { type: 'setPersonEmail'; personId: Guid; email: string }
   | { type: 'toggleResend'; key: string }
@@ -144,9 +159,9 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
     case 'setEmail': return { ...state, drafts: patch(drafts, action.key, { sendEmail: action.sendEmail }) }
     case 'setRecipient': {
       const email = state.pendingEmails[action.person.id] ?? action.person.email
-      return { ...state, drafts: patch(drafts, action.key, { recipientId: action.person.id, recipientName: action.person.name, recipientEmail: email, resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
+      return { ...state, drafts: patch(drafts, action.key, { recipientId: action.person.id, recipientName: action.person.name, recipientEmail: email, emailOnlyThisSend: false, resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
     }
-    case 'setRecipientEmail': return { ...state, drafts: patch(drafts, action.key, { recipientId: undefined, recipientName: undefined, recipientEmail: action.email.trim(), resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
+    case 'setRecipientEmail': return { ...state, drafts: patch(drafts, action.key, { recipientId: undefined, recipientName: undefined, recipientEmail: action.email.trim(), emailOnlyThisSend: action.onlyThisSend ?? false, resendEmail: resendAfterRecipientChange(drafts, action.key) }) }
     case 'setReceipt': return { ...state, drafts: patch(drafts, action.key, { receiptToRecipient: action.receiptToRecipient }) }
     case 'setPersonEmail': {
       const email = action.email.trim()

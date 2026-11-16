@@ -1,7 +1,7 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
-import { ArrowDown, ArrowUp } from 'lucide-react'
+import { Alert, Button, COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
+import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
@@ -10,6 +10,21 @@ import { formatCell } from '../domain/format'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { LoadSentinel } from './LoadMore'
+
+/** Um grupo do servidor: rótulo e contagem reais; `rows` só tem o que já carregou (abre sob demanda, 100 por vez). */
+export type GroupView = { id: string; label: string; count: number; open: boolean; rows: Row[]; more: boolean; loading: boolean; error: string | null }
+export type Grouping = {
+  /** `null` enquanto não agrupa (ou a contagem ainda não chegou): a grade mostra `rows`. */
+  groups: GroupView[] | null
+  onToggle: (id: string) => void
+  onLoadMore: (id: string) => void
+  onRetry: (id: string) => void
+  /** Entrada "Agrupar por…" do menu do título; `undefined` quando a coluna não agrupa. */
+  menu: (column: Column) => { date: boolean; active: 'value' | 'month' | 'year' | null; onChange: (next: 'value' | 'month' | 'year' | null) => void } | undefined
+}
+
+type Item = { type: 'group'; key: string; group: GroupView } | { type: 'row'; key: string; row: Row } | { type: 'foot'; key: string; group: GroupView }
 
 type Props = {
   columns: Column[]
@@ -53,11 +68,13 @@ type Props = {
   empty: ReactNode
   /** Botão "Densidade das linhas" da `ViewBar`: `default` (confortável, 56 px) ou `dense` (44 px, o padrão da Geral). */
   density?: TableDensity
+  /** Agrupamento no servidor: cabeçalhos recolhíveis com a contagem e as linhas de cada grupo aberto no lugar de `rows` na grade. */
+  grouping?: Grouping
 }
 
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense', grouping }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -215,12 +232,21 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     setScroller(grid ?? null)
     setHeadHeight(grid?.querySelector<HTMLElement>('.bt-table__head')?.offsetHeight ?? 0)
   }, [scrollRef])
-  const { visible, start, before, after, measure } = useVirtualRows(rows, rowId, skeleton ? null : scroller, headHeight, density === 'minimal' ? 32 : density === 'dense' ? 44 : 56)
+  const groups = grouping?.groups ?? null
+  const items = useMemo(() => groups
+    ? groups.flatMap((group): Item[] => [
+      { type: 'group', key: `g:${group.id}`, group },
+      ...(group.open ? group.rows.map((row): Item => ({ type: 'row', key: rowId(row), row })) : []),
+      ...(group.open && (group.loading || group.error || group.more || group.rows.length === 0) ? [{ type: 'foot', key: `t:${group.id}`, group } as Item] : []),
+    ])
+    : rows.map((row): Item => ({ type: 'row', key: rowId(row), row })), [groups, rows])
+  const { visible, start, before, after, measure } = useVirtualRows(items, (item) => item.key, skeleton ? null : scroller, headHeight, density === 'minimal' ? 32 : density === 'dense' ? 44 : 56)
+  const nothing = groups ? groups.length === 0 : rows.length === 0
 
   return (
-    <div ref={root} className={['bt-table gr-table brand-loader-host', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && rows.length === 0 && 'gr-table--empty'].filter(Boolean).join(' ')}>
+    <div ref={root} className={['bt-table gr-table brand-loader-host', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && nothing && 'gr-table--empty'].filter(Boolean).join(' ')}>
       <span className="gr-sr" role="status">{announce}</span>
-      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
+      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? items.length + 1 : undefined} style={style}>
         <div className="bt-table__head" role="row">
           <div className="bt-table__cell gr-cell--select" role="columnheader">
             <Checkbox
@@ -260,6 +286,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                     filtered={!column.alias && filteredKeys.includes(column.attribute)}
                     canHide={columns.length > 1}
                     onSort={(descending) => onSort({ attribute: column.attribute, alias: column.alias, descending })}
+                    group={grouping?.menu(column)}
                     onFilter={() => setFilterAt(column.key)}
                     onClearFilter={() => onClearFilter(column.attribute)}
                     onHide={() => onHide(column.key)}
@@ -296,7 +323,35 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
               <div role="gridcell"><BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" /></div>
             </div>
           )
-          : <>{before ? <div aria-hidden="true" style={{ height: before }} /> : null}{visible.map((row, offset) => {
+          : <>{before ? <div aria-hidden="true" style={{ height: before }} /> : null}{visible.map((item, offset) => {
+            if (item.type === 'group') {
+              const { group } = item
+              return (
+                <div key={item.key} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className="bt-table__row gr-grouprow" role="row">
+                  <div role="gridcell" aria-colspan={columns.length + 1}>
+                    <button type="button" className="bt-groups__toggle" aria-expanded={group.open} onClick={() => grouping?.onToggle(group.id)}>
+                      <span className={group.open ? 'bt-groups__chevron gr-grouprow__chevron is-open' : 'bt-groups__chevron gr-grouprow__chevron'} aria-hidden="true"><ChevronRight size={16} /></span>
+                      <span className="bt-groups__label">{group.label}</span>
+                      <span className="bt-groups__count" aria-label={`${group.count} ${group.count === 1 ? 'serviço' : 'serviços'}`}>{group.count}</span>
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+            if (item.type === 'foot') {
+              const { group } = item
+              return (
+                <div key={item.key} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className="bt-table__row gr-grouprow gr-grouprow--foot" role="row">
+                  <div role="gridcell" aria-colspan={columns.length + 1} className="gr-grouprow__foot">
+                    <LoadSentinel root={scrollRef ?? null} active={group.more && !group.loading && !group.error} loaded={group.rows.length} onLoadMore={() => grouping?.onLoadMore(group.id)} />
+                    {group.loading ? <><Spinner size={16} label={`Carregando ${group.label}`} /><span>Carregando…</span></> : null}
+                    {group.error ? <Alert tone="danger" className="gr-loadmore__error" action={<Button variant="secondary" size="compact" onClick={() => grouping?.onRetry(group.id)}>Tentar novamente</Button>}>{group.error}</Alert> : null}
+                    {!group.loading && !group.error && group.rows.length === 0 && !group.more ? <span>Nenhum serviço neste grupo</span> : null}
+                  </div>
+                </div>
+              )
+            }
+            const { row } = item
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
             return (
@@ -320,7 +375,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
           })}{after ? <div aria-hidden="true" style={{ height: after }} /> : null}</>}
         {tail}
       </div>
-      {!loading && rows.length === 0 && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
+      {!loading && nothing && empty != null ? <div className="bt-table__empty gr-empty">{empty}</div> : null}
       <div className="bt-table__footer">{footer}</div>
       {/* Recarga com a lista na tela: véu só sobre a tabela; filtros e menu continuam livres. */}
       {loading && rows.length > 0 ? <BrandLoader label="Atualizando serviços" /> : null}

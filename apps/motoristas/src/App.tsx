@@ -209,7 +209,8 @@ function App() {
     setReceiveUploadedCounts: recebimento.setReceiveUploadedCounts,
     setStore,
     setToast,
-    setVoucherDrafts: finalizar.setVoucherDrafts
+    setVoucherDrafts: finalizar.setVoucherDrafts,
+    aoConcluirChecklist: () => checklistsLista.reloadChecklists()
   });
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
@@ -249,7 +250,7 @@ function App() {
 
   useComunicadoDeepLink({ comunicadosLista, setScreen, setToast });
 
-  const { agendaCarregando, refreshLocal } = useAgendaLoad({
+  const { agendaCarregando, agendaOfflineEm, refreshLocal } = useAgendaLoad({
     comunicadosDriverIdRef,
     dados,
     initialHashRouteRef,
@@ -276,7 +277,7 @@ function App() {
     finalizeTimerRef: finalizar.finalizeTimerRef,
     lastGlobalErrorRef,
     setCriticalError,
-    setCriticalErrorState: avisos.setCriticalErrorState,
+    setSessionExpired: avisos.setSessionExpired,
     setToastState: avisos.setToastState,
     toast: avisos.toast,
     voucherDraftTimerRef: finalizar.voucherDraftTimerRef
@@ -341,9 +342,10 @@ function App() {
       closeTour={tour.closeTour}
       closeVehicleChoice={finalizar.closeVehicleChoice}
       criticalError={avisos.criticalError}
+      sessionExpired={avisos.sessionExpired}
       dataLoading={avisos.dataLoading}
       duvidaConferencia={despesas.duvidaConferencia}
-      envioPendente={<EnvioPendenteIndicador {...envioPendente} />}
+      envioPendente={<EnvioPendenteIndicador {...envioPendente} agendaOfflineEm={agendaOfflineEm} despesasPendentes={despesas.expenseUploadStatuses.filter(e => e.status.state === "interrupted").length} />}
       expenseSend={despesas.expenseSend}
       previousScreen={previousScreenRef.current}
       remoteMode={remoteMode}

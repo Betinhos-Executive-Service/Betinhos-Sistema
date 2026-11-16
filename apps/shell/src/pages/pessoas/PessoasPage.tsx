@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Plus, RefreshCw, SearchX, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
@@ -72,11 +73,9 @@ function Pessoas({ host }: { host: Host }) {
   const sorted = useMemo(() => {
     const sort = view.config.sort
     return extra.sort(choices && sort ? sortPessoas(list, sort.key, sort.dir, choices) : list, sort, (p) => p.id)
-  }, [list, choices, view.config.sort])
-  const filtered = useMemo(() => {
-    const read = (p: Pessoa, key: string) => readPessoa(p, key, dupIds)
-    return filterRows(sorted, valid, allFields, extra.read(read, (p) => p.id))
-  }, [sorted, valid, fields, dupIds])
+  }, [list, choices, view.config.sort, extra])
+  const read = useMemo(() => extra.read((p: Pessoa, key: string) => readPessoa(p, key, dupIds), (p) => p.id), [extra, dupIds])
+  const filtered = useMemo(() => filterRows(sorted, valid, allFields, read), [sorted, valid, allFields, read])
   const index = useMemo(() => keywordIndex<Pessoa>((p) => pessoaKeywordText(p, choices ? label(choices.cargo, p.cargo) : '')), [choices])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -87,10 +86,12 @@ function Pessoas({ host }: { host: Host }) {
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ valid, q, sort: view.config.sort }), [valid, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
 
   const refresh = useCallback(() => { void ps.reload() }, [ps.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pessoas" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pessoas', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pessoas' })
+  const size = mobile ? 'touch' : 'default'
   const clearAll = () => { clearFilters(); setQuery('') }
 
   let body
@@ -107,11 +108,15 @@ function Pessoas({ host }: { host: Host }) {
     const empty = pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do cadastro…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum registro com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Pessoa[], tableFooter?: ReactNode) => (
+      <PessoasTable list={rows} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Pessoa[]) => <PessoasCards list={rows} choices={choices} dups={dups} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <PessoasCards list={slice} choices={choices} dups={dups} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PessoasTable list={slice} choices={choices} dups={dups} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -120,11 +125,13 @@ function Pessoas({ host }: { host: Host }) {
   return (
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="ps-filters__search" value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!choices} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!choices} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {ps.error && choices ? (

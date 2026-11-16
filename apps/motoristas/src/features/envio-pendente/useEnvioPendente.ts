@@ -9,7 +9,10 @@ import { MOCK_FLEET } from "../../lib/serviceVehicleInfleetMock";
 import { wait } from "../../shared/wait";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { ExpensePhoto } from "../despesas/expenses";
-import { resolveServiceVehicleRemote } from "../finalizar/remoto";
+import { finalizeExchangeRemote, finalizeMaintenanceRemote, resolveServiceVehicleRemote } from "../finalizar/remoto";
+import { checklistDraftKey } from "../checklist/checklists";
+import { clearMediaDraft } from "../fotos/mediaDraftStore";
+import { removerDaAgendaOffline } from "../servicos/agendaOffline";
 import { loadActiveFleetRemote } from "../meu-carro/remoto";
 import { isThirdPartyDriver } from "../meu-carro/myVehicle";
 import { criarEnviador } from "./enviador";
@@ -22,6 +25,8 @@ type Options = {
   ativo: boolean;
   askVehicleChoice: (resolution: InfleetVehicleResolution, loadFleet: () => Promise<FleetVehicle[]>) => Promise<DriverVehicleChoice | null>;
   dados: PortaDados;
+  /** Chamado depois que um checklist guardado é concluído, para a lista de checklists atualizar. */
+  aoConcluirChecklist?: () => void;
   remoteMode: boolean;
   setReceiveProofs: Dispatch<SetStateAction<Record<string, ExpensePhoto[]>>>;
   setReceiveUploadedCounts: Dispatch<SetStateAction<Record<string, number>>>;
@@ -31,6 +36,14 @@ type Options = {
 };
 
 const INTERVALO_MS = 60_000;
+
+const MENSAGEM_ENVIADO: Record<FilaItem["tipo"], (titulo: string) => string> = {
+  voucher: (titulo) => `Voucher da ${titulo} enviado`,
+  servico: (titulo) => `Serviço da ${titulo} finalizado`,
+  manutencao: (titulo) => `Manutenção da ${titulo} enviada`,
+  troca: (titulo) => `Troca da ${titulo} confirmada`,
+  checklist: (titulo) => `Checklist do ${titulo} enviado`
+};
 
 const subscribeOnline = (aviso: () => void) => {
   window.addEventListener("online", aviso);
@@ -63,6 +76,13 @@ export function useEnvioPendente(options: Options) {
       const remoto = criarEnviador({
         salvarVoucher: (payload) => ref.current.dados.salvarVoucher(payload),
         finalizarServico: (payload) => ref.current.dados.finalizarServico(payload),
+        finalizarManutencao: finalizeMaintenanceRemote,
+        confirmarTroca: finalizeExchangeRemote,
+        enviarFotoChecklist: (args) => ref.current.dados.enviarFotoChecklist(args),
+        concluirChecklist: (id, respostasJson) => ref.current.dados.concluirChecklist(id, respostasJson),
+        guardarFotosChecklist: async (item, enviadas) => {
+          if (item.checklist) await filaDeEnvio.atualizar(item.id, { checklist: { ...item.checklist, draft: { ...item.checklist.draft, enviadas } } });
+        },
         resolverVeiculo: resolveServiceVehicleRemote,
         guardarLinkAnterior: (item, linkAnterior) => filaDeEnvio.atualizar(item.id, { linkAnterior }).then(() => undefined),
         ehTerceiro: async () => isThirdPartyDriver((await getDriverContext())?.funcionario)
@@ -72,8 +92,16 @@ export function useEnvioPendente(options: Options) {
     })(),
     aoEnviar: (item) => {
       try {
-        const { dados, remoteMode, setReceiveProofs, setReceiveUploadedCounts, setStore, setToast, setVoucherDrafts } = ref.current;
+        const { aoConcluirChecklist, dados, remoteMode, setReceiveProofs, setReceiveUploadedCounts, setStore, setToast, setVoucherDrafts } = ref.current;
         const { detail } = item;
+        if (!detail) {
+          // Checklist: o rascunho do formulário já cumpriu o papel; a lista recarrega para mostrar o concluído.
+          void clearMediaDraft(checklistDraftKey(item.checklist?.checklistId ?? item.detailId)).catch(() => undefined);
+          setToast(MENSAGEM_ENVIADO.checklist(item.titulo), "success");
+          aoConcluirChecklist?.();
+          return;
+        }
+        removerDaAgendaOffline(detail.id);
         setVoucherDrafts((atual) => semChave(atual, getVoucherDraftKey(detail)));
         setReceiveProofs((atual) => semChave(atual, detail.id));
         setReceiveUploadedCounts((atual) => semChave(atual, detail.id));
@@ -84,7 +112,7 @@ export function useEnvioPendente(options: Options) {
             ? { ...atual, agenda: removeAgendaDetail(atual.agenda, detail), signatures, photos }
             : { ...finalizeDetailLocally(atual, detail, item.fields), signatures, photos };
         });
-        setToast(item.tipo === "voucher" ? `Voucher da ${item.titulo} enviado` : `Serviço da ${item.titulo} finalizado`, "success");
+        setToast(MENSAGEM_ENVIADO[item.tipo](item.titulo), "success");
         if (remoteMode) {
           // O envio já foi confirmado: a recarga só traz o resto da agenda e nunca devolve este serviço.
           dados.carregarAgenda()

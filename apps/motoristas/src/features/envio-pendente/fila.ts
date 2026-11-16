@@ -1,7 +1,19 @@
 // Fila de envios pendentes do aparelho: o que o motorista finalizou sem conexão fica aqui até o Dataverse confirmar.
 // Não expira enquanto pendente. O backend é injetável (IndexedDB no app, memória nos testes).
 import type { DetailData, MaintenancePhotoKind } from "../../types";
+import type { ChecklistDraft, ChecklistItem } from "../checklist/checklists";
 import type { DriverVehicleChoice, InfleetVehicleResolution } from "../../lib/serviceVehicleInfleet";
+
+/** Checklist de vistoria guardado inteiro: itens, respostas e fotos; os links das fotos já subidas ficam em `draft.enviadas`. */
+export type ChecklistGuardado = {
+  checklistId: string;
+  placa: string;
+  solicitadoEm: string;
+  itens: ChecklistItem[];
+  draft: ChecklistDraft;
+};
+
+export type TipoEnvio = "voucher" | "servico" | "manutencao" | "troca" | "checklist";
 
 export type EstadoEnvio = "pendente" | "enviando" | "precisa-acao" | "falhou";
 export type MotivoAcao = "sessao" | "carro";
@@ -11,12 +23,14 @@ export type MotivoAcao = "sessao" | "carro";
 export type FilaItem = {
   id: string;
   detailId: string;
-  detailType: DetailData["type"];
+  detailType: DetailData["type"] | "CHECKLIST";
   dataverseId: string;
   /** Texto para exibir: "OS-1234". */
   titulo: string;
-  tipo: "voucher" | "servico";
-  detail: DetailData;
+  tipo: TipoEnvio;
+  /** Ausente só no checklist, que não é um detalhe da agenda. */
+  detail?: DetailData;
+  checklist?: ChecklistGuardado;
   fields: Record<string, string>;
   signatureDataUrl?: string;
   photos?: Partial<Record<MaintenancePhotoKind, string>>;
@@ -86,6 +100,8 @@ export function createIndexedDbBackend(): FilaBackend {
     delete: async (id) => { await transacao("readwrite", (store) => store.delete(id)); }
   };
 }
+
+export const chaveDoChecklist = (checklistId: string) => `CHECKLIST:${checklistId.replace(/[{}]/g, "").toLowerCase()}`;
 
 export function chaveDoEnvio(detail: Pick<DetailData, "type" | "id" | "dataverse">) {
   return `${detail.type}:${detail.dataverse?.id ?? detail.id}`;

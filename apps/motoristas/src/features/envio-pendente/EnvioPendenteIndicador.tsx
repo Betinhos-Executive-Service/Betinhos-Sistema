@@ -2,17 +2,18 @@ import { useEffect, useState } from "react";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import type { EnvioPendente } from "./useEnvioPendente";
 import type { FilaItem } from "./fila";
-import { MENSAGEM_SESSAO } from "./processador";
+import { descreverIndicador } from "./textoIndicador";
 
-type Props = Pick<EnvioPendente, "descartar" | "escolherCarro" | "itens" | "online" | "rodar" | "tentarDeNovo">;
-
-const rotuloPendentes = (total: number) => `${total} ${total === 1 ? "envio pendente" : "envios pendentes"}`;
+type Props = Pick<EnvioPendente, "descartar" | "escolherCarro" | "itens" | "online" | "rodar" | "tentarDeNovo"> & {
+  agendaOfflineEm?: string | null;
+  despesasPendentes?: number;
+};
 
 // Indicador fixo e discreto: só aparece sem conexão ou com envio na fila. Só os botões recebem toque.
-export function EnvioPendenteIndicador({ descartar, escolherCarro, itens, online, rodar, tentarDeNovo }: Props) {
+export function EnvioPendenteIndicador({ agendaOfflineEm = null, descartar, escolherCarro, despesasPendentes = 0, itens, online, rodar, tentarDeNovo }: Props) {
   const [descartando, setDescartando] = useState<FilaItem | null>(null);
-  const visivel = !(online && itens.length === 0);
-  const total = itens.length;
+  const total = itens.length + despesasPendentes;
+  const visivel = !(online && total === 0 && !agendaOfflineEm);
   const comAcao = itens.find((item) => item.estado === "precisa-acao" || item.estado === "falhou");
   const comAcaoVisivel = visivel && Boolean(comAcao);
 
@@ -25,30 +26,21 @@ export function EnvioPendenteIndicador({ descartar, escolherCarro, itens, online
   }, [visivel, comAcaoVisivel]);
 
   if (!visivel) return null;
-  const enviando = itens.some((item) => item.estado === "enviando");
 
-  let texto: string;
+  const { texto, situacao } = descreverIndicador({ itens, online, total, agendaOfflineEm });
   let acoes: React.ReactNode = null;
-  if (comAcao?.estado === "precisa-acao" && comAcao.motivo === "carro") {
-    texto = `${comAcao.titulo}: escolha o carro para enviar`;
+  if (comAcao && situacao === "carro") {
     acoes = <button type="button" onClick={() => void escolherCarro(comAcao)}>Escolher carro</button>;
-  } else if (comAcao?.estado === "precisa-acao") {
-    texto = comAcao.ultimoErro || MENSAGEM_SESSAO;
+  } else if (situacao === "sessao") {
     acoes = <button type="button" onClick={() => window.location.reload()}>Entrar de novo</button>;
   } else if (comAcao) {
-    texto = `${comAcao.titulo} não foi enviado`;
     acoes = (
       <>
         <button type="button" onClick={() => void tentarDeNovo(comAcao)}>Tentar de novo</button>
         <button type="button" onClick={() => setDescartando(comAcao)}>Descartar</button>
       </>
     );
-  } else if (enviando) {
-    texto = "Enviando…";
-  } else if (!online) {
-    texto = total ? `Sem conexão · ${rotuloPendentes(total)}` : "Sem conexão";
-  } else {
-    texto = rotuloPendentes(total);
+  } else if (situacao === "pendente" && itens.length) {
     acoes = <button type="button" onClick={() => rodar(true)}>Enviar agora</button>;
   }
 
