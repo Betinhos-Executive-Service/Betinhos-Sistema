@@ -3,28 +3,37 @@
 // campos de automação mudaram, a gravação repete com a ETag atual; se o negócio mudou, é conflito.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { LiveState, PlannerDataStore } from './dataverse'
+import { isQuoteConflict } from '../domain/quoteConflict'
 
 const quoteId = '11111111-1111-4111-8111-111111111111'
 const quotePath = `/cr40f_pedidodecotacaos(${quoteId})`
 
 type Patch = { url: string; ifMatch: string; body: Record<string, unknown> }
+type Log = { errorCode: string; severity: string }
 const g = globalThis as unknown as Record<string, unknown>
 let previous: Record<string, unknown> = {}
 
-beforeEach(() => { previous = { window: g.window, parent: g.parent, fetch: g.fetch }; vi.resetModules() })
+beforeEach(() => { previous = { window: g.window, parent: g.parent, fetch: g.fetch, document: g.document }; vi.resetModules() })
 afterEach(() => { Object.assign(globalThis, previous) })
 
-async function setup(freshRow: Record<string, unknown>): Promise<{ store: PlannerDataStore; patches: Patch[]; deletes: string[] }> {
+async function setup(freshRow: Record<string, unknown>): Promise<{ store: PlannerDataStore; patches: Patch[]; deletes: string[]; logs: Log[] }> {
   const patches: Patch[] = []
   const deletes: string[] = []
+  const logs: Log[] = []
   const xrm = { WebApi: {}, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://test.crm.dynamics.com', userSettings: { userId: 'u', userName: 'Renan' } }) } }
   g.window = { Xrm: xrm, location: { origin: 'https://test.crm.dynamics.com' }, setTimeout }
   g.parent = g.window
+  g.document = { referrer: '', visibilityState: 'visible' }
   g.fetch = async (rawUrl: string, init: { method?: string; body?: string; headers?: Record<string, string> } = {}) => {
     const url = decodeURIComponent(rawUrl)
     const method = init.method || 'GET'
     const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
     if (method === 'DELETE') { deletes.push(url); return ok(null) }
+    if (method === 'POST' && url.endsWith('/new_appmotoristaslogs')) {
+      const record = JSON.parse(init.body || '{}')
+      logs.push({ errorCode: record.new_errorcode, severity: record.new_severity })
+      return ok(null)
+    }
     if (method === 'PATCH' && url.endsWith(quotePath)) {
       const ifMatch = init.headers?.['If-Match'] || ''
       patches.push({ url, ifMatch, body: JSON.parse(init.body || '{}') })
@@ -40,7 +49,7 @@ async function setup(freshRow: Record<string, unknown>): Promise<{ store: Planne
     return ok({ value: [], PrimaryNameAttribute: 'cr40f_name' })
   }
   const { createDataStore } = await import('./dataverse')
-  return { store: createDataStore(), patches, deletes }
+  return { store: createDataStore(), patches, deletes, logs }
 }
 
 // Cotação como a tela leu logo depois do POST (ETag 1, sem o ID do MS Planner).
@@ -59,16 +68,24 @@ const rowAfterFlow = (overrides: Record<string, unknown> = {}) => ({
 
 describe('412 na cotação', () => {
   test('flow só gravou o ID do MS Planner: repete com a ETag atual e salva na primeira tentativa', async () => {
-    const { store, patches } = await setup(rowAfterFlow())
+    const { store, patches, logs } = await setup(rowAfterFlow())
     await store.updateQuote(stateWith(), quoteId, { status: 'Em análise pelo financeiro' })
     expect(patches.map((item) => item.ifMatch)).toEqual(['W/"1"', 'W/"2"'])
     expect(patches[1].body.cr40f_statuscotacao).toBe(100004001)
+    // O 412 recuperado não vira erro no log; fica só o registro informativo.
+    await vi.waitFor(() => expect(logs).toContainEqual({ errorCode: 'QUOTE_412_RECOVERED', severity: 'info' }))
+    expect(logs.filter((log) => log.severity === 'error')).toEqual([])
   })
 
   test('outra pessoa mudou um campo de negócio: não repete e avisa o conflito', async () => {
-    const { store, patches } = await setup(rowAfterFlow({ cr40f_statuscotacao: 100004001 }))
-    await expect(store.updateQuote(stateWith(), quoteId, { title: 'GRU editado' })).rejects.toThrow('alterada por outra pessoa')
+    const { store, patches, logs } = await setup(rowAfterFlow({ cr40f_statuscotacao: 100004001 }))
+    const failure = await store.updateQuote(stateWith(), quoteId, { title: 'GRU editado' }).catch((error: unknown) => error)
+    expect(String(failure)).toContain('alterada por outra pessoa')
+    // A tela reconhece o conflito pelo código e recarrega os dados.
+    expect(isQuoteConflict(failure)).toBe(true)
     expect(patches).toHaveLength(1)
+    await vi.waitFor(() => expect(logs).toContainEqual({ errorCode: 'QUOTE_412_CONFLICT', severity: 'warning' }))
+    expect(logs.filter((log) => log.severity === 'error')).toEqual([])
   })
 
   test('conflito de verdade com opções novas apaga as opções preparadas', async () => {
