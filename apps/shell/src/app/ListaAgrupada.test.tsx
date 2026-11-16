@@ -3,6 +3,8 @@ import { cleanup, configure, fireEvent, render, screen } from '@testing-library/
 import type { ComponentType } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Host } from '../host'
+import { ListaAgrupada } from './ListaAgrupada'
+import { LAZY_BATCH } from './LazyList'
 import { ClientesPage } from '../pages/clientes/ClientesPage'
 import { DespesasPage } from '../pages/despesas/DespesasPage'
 import { EquipamentosPage } from '../pages/equipamentos/EquipamentosPage'
@@ -53,5 +55,44 @@ describe('Agrupar por nas listas com visão', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Agrupar por esta coluna', hidden: true }))
     const grupos = await screen.findAllByRole('button', { expanded: false, name: /\d+ linhas?$/ })
     expect(grupos.length).toBeGreaterThan(0)
+  })
+})
+
+describe('ListaAgrupada: carga em lotes por grupo', () => {
+  const total = LAZY_BATCH + 20
+  const groups = [{ id: 'a', label: 'Grupo A', rows: Array.from({ length: total }, (_, i) => `linha ${i}`) }]
+  const group = { key: 'k' }
+
+  const montar = (mobile: boolean) => render(
+    <ListaAgrupada
+      groups={groups} group={group} lazyKey="x" mobile={mobile} footer="total"
+      table={(rows) => <ul data-testid="tabela">{rows.map((r) => <li key={r}>{r}</li>)}</ul>}
+      cards={(rows) => <ul data-testid="cartoes">{rows.map((r) => <li key={r}>{r}</li>)}</ul>}
+    />,
+  )
+  const abrir = () => fireEvent.click(screen.getByRole('button', { name: /Grupo A/ }))
+
+  beforeEach(() => {
+    // Sem IntersectionObserver o rodapé revela tudo sozinho; o stub mantém o sentinela esperando a rolagem.
+    vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} })
+  })
+
+  it('desktop: o grupo aberto mostra só o primeiro lote e deixa o sentinela da próxima carga', () => {
+    montar(false)
+    abrir()
+    expect(screen.getByTestId('tabela').children).toHaveLength(LAZY_BATCH)
+    expect(document.querySelector('.gr-sentinel')).not.toBeNull()
+    expect(screen.queryByTestId('cartoes')).toBeNull()
+    expect(screen.getByText('total')).toBeTruthy()
+  })
+
+  it('celular: o grupo aberto mostra cartões em lote e a tabela não aparece', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    montar(true)
+    abrir()
+    expect(screen.getByTestId('cartoes').children).toHaveLength(LAZY_BATCH)
+    expect(document.querySelector('.gr-sentinel')).not.toBeNull()
+    expect(screen.queryByTestId('tabela')).toBeNull()
+    expect(screen.queryByText('total')).toBeNull()
   })
 })

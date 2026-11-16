@@ -49,15 +49,12 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const [query, setQuery] = useQueryTexto('q')
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
-  const read = useMemo(() => {
-    const multas = (id: string) => uso.get(id)?.length ?? 0
-    return extra.read((row: Infracao, key: string) => readInfracao(row, key, multas), (i) => i.id)
-  }, [uso, extra])
+  const multas = useCallback((id: string) => uso.get(id)?.length ?? 0, [uso])
+  const read = useMemo(() => extra.read((row: Infracao, key: string) => readInfracao(row, key, multas), (i) => i.id), [multas, extra])
   const visible = useMemo(() => {
-    const multas = (id: string) => uso.get(id)?.length ?? 0
     const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && matchesKeyword(i, query))
     return extra.sort(sortInfracoes(list, view.config.sort, multas), view.config.sort, (i) => i.id)
-  }, [data.list, filters, query, uso, view.config.sort, read])
+  }, [data.list, filters, allFields, query, multas, view.config.sort, read, extra])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)

@@ -92,7 +92,7 @@ function Despesas({ host }: { host: Host }) {
   const sorted = useMemo(() => {
     const sort = view.config.sort
     return extra.sort(choices && sort ? sortDespesas(list, sort.key, sort.dir, choices, compras) : list, sort, (d) => d.id)
-  }, [list, choices, view.config.sort, compras])
+  }, [list, choices, view.config.sort, compras, extra])
   const read = useMemo(() => extra.read(readDespesa, (d) => d.id), [extra])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Despesa>(despesaKeywordText), [])

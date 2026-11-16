@@ -120,7 +120,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const desktopCounts = useMemo(() => countAlertas(desktopBase), [desktopBase])
   const desktopVisible = useMemo<FuncionarioView[]>(
     () => lista.extra.sort(sortFuncionarios(desktopBase.filter((row) => matchesAlerta(row, alerta)), lista.view.config.sort), lista.view.config.sort, (row) => row.id),
-    [desktopBase, alerta, lista.view.config.sort],
+    [desktopBase, alerta, lista.view.config.sort, lista.extra],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca, alerta ou ordenação volta ao primeiro lote.
   const lazyKey = useMemo(() => JSON.stringify({ f: lista.filters, termo, alerta, sort: lista.view.config.sort }), [lista.filters, termo, alerta, lista.view.config.sort])

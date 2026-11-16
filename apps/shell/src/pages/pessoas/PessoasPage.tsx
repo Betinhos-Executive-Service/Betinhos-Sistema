@@ -73,7 +73,7 @@ function Pessoas({ host }: { host: Host }) {
   const sorted = useMemo(() => {
     const sort = view.config.sort
     return extra.sort(choices && sort ? sortPessoas(list, sort.key, sort.dir, choices) : list, sort, (p) => p.id)
-  }, [list, choices, view.config.sort])
+  }, [list, choices, view.config.sort, extra])
   const read = useMemo(() => extra.read((p: Pessoa, key: string) => readPessoa(p, key, dupIds), (p) => p.id), [extra, dupIds])
   const filtered = useMemo(() => filterRows(sorted, valid, allFields, read), [sorted, valid, allFields, read])
   const index = useMemo(() => keywordIndex<Pessoa>((p) => pessoaKeywordText(p, choices ? label(choices.cargo, p.cargo) : '')), [choices])
