@@ -15,6 +15,8 @@ import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
 import { copyText } from '../pagantes/components/QuickActions'
 import { formatMoney } from '../pagantes/domain/messages'
+import { ComprovantesOpDrawer, type OpAberta } from '../recebimentos/ComprovantesOpDrawer'
+import { useColunaComprovantes } from '../recebimentos/useColunaComprovantes'
 import { createSource } from './data/source'
 import { VIEWS_KEY, loadViews, periodoStart, total } from './domain/filters'
 import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
@@ -40,6 +42,8 @@ export function OpsPage({ host }: { host: Host }) {
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
+const opDaLinha = (op: Op): OpAberta => ({ id: op.id, nome: op.codigo || 'OP sem código' })
 
 function Ops({ host }: { host: Host }) {
   const auditoria = useAuditoria()
@@ -78,7 +82,10 @@ function Ops({ host }: { host: Host }) {
   const list = useMergedById(ops.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortOps(list, view.config.sort, choices) : list, view.config.sort, (op) => op.id), [list, choices, view.config.sort, extra])
-  const read = useMemo(() => extra.read(readOp, (op) => op.id), [extra])
+  const recebimentos = source.pagantes.recebimentos
+  const comprovantes = useColunaComprovantes(recebimentos, view.config, filters, list, opDaLinha, mobile)
+  const { comLeitura } = comprovantes
+  const read = useMemo(() => comLeitura(extra.read(readOp, (op) => op.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
@@ -195,7 +202,7 @@ function Ops({ host }: { host: Host }) {
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas); o `TableGroups` faz o lote do clique direito valer para a lista inteira e o checkbox do cabeçalho, só para o grupo.
     const table = (rows: Op[], tableFooter?: ReactNode) => (
-      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} comprovantes={comprovantes.coluna} />
     )
     body = groups ? (
       <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} footer={footer}
@@ -234,6 +241,7 @@ function Ops({ host }: { host: Host }) {
         <OpDrawer op={current} onClose={() => setSelectedId(null)} choices={ops.choices} source={source} version={version}
           busy={current != null && busyId === current.id} onCancel={setCancelRequest} onGerarPagantes={gerarPagantes} />
       ) : null}
+      <ComprovantesOpDrawer op={comprovantes.aberta} source={recebimentos} servicos={source.pagantes.servicos} mobile={mobile} onClose={comprovantes.fechar} />
       <CancelDialog op={cancelRequest} onClose={() => setCancelRequest(null)} onConfirm={(op) => void confirmCancel(op)} />
       <FecharMesDialog escolha={fechar} source={pendSource} onClose={() => setFechar({ open: false, opcoes: null, erro: null })}
         onDone={(r) => {
