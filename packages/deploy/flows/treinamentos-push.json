@@ -165,8 +165,24 @@
         },
         "Has_subs_Send_push": {
           "actions": {
-            "Worker_Send_push": {
+            "Select_subs_Send_push": {
               "runAfter": {},
+              "type": "Select",
+              "inputs": {
+                "from": "@outputs('List_subs_Send_push')?['body/value']",
+                "select": {
+                  "endpoint": "@item()?['new_endpoint']",
+                  "p256dh": "@item()?['new_chavep256dh']",
+                  "auth": "@item()?['new_chaveauth']"
+                }
+              }
+            },
+            "Worker_Send_push": {
+              "runAfter": {
+                "Select_subs_Send_push": [
+                  "Succeeded"
+                ]
+              },
               "type": "OpenApiConnection",
               "inputs": {
                 "host": {
@@ -178,7 +194,7 @@
                   "body/payload/tag": "cr40f_treinamentoparticipacao-@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}",
                   "body/payload/body": "Novo treinamento: @{outputs('Get_treinamento')?['body/cr40f_name']}",
                   "body/payload/title": "App Motoristas",
-                  "body/subscriptions": "@select(outputs('List_subs_Send_push')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))",
+                  "body/subscriptions": "@body('Select_subs_Send_push')",
                   "body/payload/url": "/WebResources/new_app-motoristas-v2?treinamentoParticipacaoId=@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}"
                 },
                 "authentication": "@parameters('$authentication')"

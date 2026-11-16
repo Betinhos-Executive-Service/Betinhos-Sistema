@@ -182,14 +182,23 @@ $sendPush = @{
     authentication = $auth
   }
 }
+# A linguagem de expressoes do Power Automate nao tem a funcao select; as inscricoes viram { endpoint, p256dh, auth } numa acao Select.
+$selectSubs = @{
+  type = "Select"
+  runAfter = @{}
+  inputs = @{
+    from = "@outputs('List_subs')?['body/value']"
+    select = [ordered]@{ endpoint = "@item()?['new_endpoint']"; p256dh = "@item()?['new_chavep256dh']"; auth = "@item()?['new_chaveauth']" }
+  }
+}
 $worker = @{
   type = "OpenApiConnection"
-  runAfter = @{}
+  runAfter = (Ok "Select_subs")
   retryPolicy = $retry
   inputs = @{
     host = @{ apiId = "/providers/Microsoft.PowerApps/apis/$webPushApi"; connectionName = $webPushApi; operationId = "EnviarPush" }
     parameters = @{
-      "body/subscriptions" = "@select(outputs('List_subs')?['body/value'], json(concat('{`"endpoint`":`"', item()?['new_endpoint'], '`",`"p256dh`":`"', item()?['new_chavep256dh'], '`",`"auth`":`"', item()?['new_chaveauth'], '`"}')))"
+      "body/subscriptions" = "@body('Select_subs')"
       "body/payload/title" = "App Motoristas"
       "body/payload/body" = "@outputs('Compose_mensagem')"
       "body/payload/url" = "/WebResources/new_app-motoristas-v2?servicoId=$reservaIdInline"
@@ -203,6 +212,7 @@ $hasSubscriptions = @{
   runAfter = (Ok "List_subs")
   expression = @{ greater = @("@length(outputs('List_subs')?['body/value'])", 0) }
   actions = @{
+    Select_subs = $selectSubs
     Worker = $worker
     # Entregue = alguma inscricao com 2xx no servico de push; so assim o push do Power Apps fica de fora.
     Filter_ok = (Filter-Array "@outputs('Worker')?['body/results']" "@and(greaterOrEquals(item()?['status'], 200), less(item()?['status'], 300))" (Ok "Worker"))
