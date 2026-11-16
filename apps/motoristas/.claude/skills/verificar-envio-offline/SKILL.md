@@ -28,10 +28,16 @@ Também confira: o toast de salvo usa o rótulo "Aviso" (variante info), o indic
 - Troca: abra `.agenda-card.troca` > Finalizar, `setOffline(true)`, "Não tenho". Esperado: toast "Salvo no aparelho…", selo "Envio pendente", indicador "Sem conexão · 1 envio pendente"; ao reconectar, toast "Troca da <OS> confirmada". A manutenção não fecha no mock (cidade obrigatória e sem cidades no mock); cubra por testes.
 - Agenda sem rede: o mock não usa o modo remoto. Sirva o HTML do dev em `https://org.crm2.dynamics.com/...` com `page.route` (HTML do dev; `/api/data/` aborta com `internetdisconnected`), grave a chave `app-motoristas-agenda-offline-v1` com `addInitScript` (gere o JSON com `salvarAgendaOffline` sobre `agendaMock`), `setOffline(true)` e recarregue. Esperado: agenda de hoje e amanhã e o aviso "Agenda de HH:mm (sem conexão)" no rodapé, sem cobrir conteúdo (confira o fim da lista).
 
+## 2b. UX sem rede (mock, Playwright 390x844)
+
+- `tests/semConexao.test.ts`: `ehErroDeRede` (TypeError "Failed to fetch" e `navigator.onLine` false = rede; HTTP 500 não), 401 não vira `falhou`, indicador `descreverIndicador` mantém "Sem conexão · …" junto com falha/ação, e o logger não mostra toast técnico ("retrieveMultiple falhou.", "Feche e reabra…") quando a causa é rede.
+- Forçar offline sem derrubar a página: `Object.defineProperty(Navigator.prototype, "onLine", { get: () => false })` antes do `goto` (o processador não envia offline, então o item semeado no IndexedDB `app-motoristas-envio-pendente` continua pendente).
+- Esperado: cartão de checklist com selo "Envio pendente" (como o serviço); com item `falhou` o indicador mostra "Sem conexão · OS-… não foi enviado"; o selo fica na linha da etiqueta (SERVIÇO), abaixo da seta, sem encostar no horário.
+
 ## 3. Só se prova no DEV, com celular em modo avião
 
 - Modo avião real e queda no meio do envio (o `TypeError` real do `fetch`/CORS versus o mock).
-- Sessão expirada: 401 real ou redirecionamento do login Microsoft vira "Entre de novo para enviar".
+- Sessão expirada: 401 real ou redirecionamento do login Microsoft abre a tela cheia "Sua sessão da Microsoft expirou" (botão "Entrar de novo" = reload; fila e rascunhos continuam no aparelho) e o item da fila fica `precisa-acao`, nunca `falhou`. No mock: `window.dispatchEvent(new Event("app-motoristas:session-expired"))`.
 - Flow de assinatura com 504 e repetição: confirmar que o `cr40f_status` concluído evita gravação dupla.
 - Cenário "perguntar" da Infleet: item `precisa-acao/carro` e escolha do carro pelo indicador.
 - Formato real de `cr40f_id` no título do toast (no mock cai no id).

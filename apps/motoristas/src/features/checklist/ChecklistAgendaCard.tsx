@@ -1,5 +1,7 @@
 import { AgendaCard } from "../../shared/ui/AgendaCard";
 import { CompactNoticeCard } from "../../shared/ui/CompactNoticeCard";
+import { chaveDoChecklist } from "../envio-pendente/fila";
+import { useFilaEnvio } from "../envio-pendente/useFilaEnvio";
 import { checklistCardTexto, isChecklistPending, type ChecklistVeiculo } from "./checklists";
 
 type Props = {
@@ -18,6 +20,7 @@ function formatShortDate(value: string | null) {
 
 // Mesmo card da agenda (como o de comunicado) na lista de Checklists; em Serviços usa a variante compacta.
 export function ChecklistAgendaCard({ item, onOpen, variant = "card" }: Props) {
+  const enviosPendentes = useFilaEnvio();
   const pending = isChecklistPending(item);
   const { label, descricao } = checklistCardTexto(item);
   const when = pending ? formatShortDate(item.solicitadoEm) : formatShortDate(item.concluidoEm);
@@ -37,6 +40,7 @@ export function ChecklistAgendaCard({ item, onOpen, variant = "card" }: Props) {
           description: descricao
         }}
         bodyLabel="Checklist"
+        envioPendente={enviosPendentes.some((envio) => envio.id === chaveDoChecklist(item.id))}
         onOpen={() => onOpen(item.id)}
       />
     </div>
