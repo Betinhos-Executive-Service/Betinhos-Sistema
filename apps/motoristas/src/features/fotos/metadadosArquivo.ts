@@ -190,8 +190,6 @@ export function dhashDaAmostra(rgba: ArrayLike<number>) {
 
 // ---------- janela do evento ----------
 
-export const ANTES_DA_REFERENCIA_MS = 24 * 60 * 60 * 1000;
-export const TOLERANCIA_RELOGIO_MS = 10 * 60 * 1000;
 
 /** "2026-11-15" (data) ou "2026-11-15T14:30" (datetime-local) viram horário de Brasília; ISO com fuso fica como está. */
 export function referenciaIso(texto: string | null | undefined) {
@@ -201,12 +199,4 @@ export function referenciaIso(texto: string | null | undefined) {
     : /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(valor) ? `${valor.length === 16 ? `${valor}:00` : valor}${FUSO_PADRAO}`
       : valor;
   return Number.isNaN(Date.parse(iso)) ? null : iso;
-}
-
-/** Selo da data gravada: "sem-data", "fora-da-janela" ou nenhum. Nunca bloqueia; o servidor recalcula. */
-export function seloDaJanela(dataGravada: string | null, referencia: string | null, agora: Date) {
-  if (!dataGravada) return "sem-data";
-  const gravada = Date.parse(dataGravada);
-  const inicio = referencia ? Date.parse(referencia) - ANTES_DA_REFERENCIA_MS : Number.NEGATIVE_INFINITY;
-  return gravada < inicio || gravada > agora.getTime() + TOLERANCIA_RELOGIO_MS ? "fora-da-janela" : null;
 }

@@ -1,4 +1,7 @@
 {
+  "src/lib/guidDeterministico.ts": [
+    "guidDeterministico"
+  ],
   "src/lib/localWorkflow.ts": [
     "LocalStore",
     "VoucherValidationField",
@@ -225,6 +228,11 @@
   "src/shared/currencyInput.ts": [
     "formatCurrencyInputOnBlur",
     "sanitizeCurrencyInput"
+  ],
+  "src/shared/erroDeRede.ts": [
+    "SEM_CONEXAO_MESSAGE",
+    "ehErroDeRede",
+    "estaOnline"
   ],
   "src/shared/errorLogGrouping.ts": [
     "ErrorCause",

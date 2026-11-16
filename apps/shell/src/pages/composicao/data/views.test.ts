@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildFetchXml, buildLayoutXml, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
+import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
   { id: 'client', label: 'Cliente', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos', 'cr40f_clientes1'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }, { from: 'cr40f_clientes1id', to: 'cr40f_cliente' }], type: 'String', available: true },
@@ -97,6 +97,22 @@ describe('views nativas', () => {
     ] }, catalog)
     expect(fetchXml).toContain('<filter type="and"><filter type="or"><filter type="and">')
     expect(fetchXml).toContain('</filter><filter type="or"><condition attribute="cr40f_nomedocliente"')
+  })
+
+  it('Comprovantes fica fora dos atributos, da ordenação e do layout; Sim/Não vira link-entity any/not any no serviço', () => {
+    const comprovantes: CatalogField = { id: COMPROVANTES_ID, label: 'Comprovantes', table: 'cr40f_composicaodeprecos', attribute: COMPROVANTES_ID, path: [], type: 'Boolean', available: true }
+    const withComprovantes: ViewDefinition = {
+      columns: [...definition.columns, { id: COMPROVANTES_ID, width: 100, pinned: false }],
+      filters: [{ id: COMPROVANTES_ID, operator: 'eq', value: 'true' }],
+      filterGroups: [{ id: 'g', operator: 'or', filters: [{ id: COMPROVANTES_ID, operator: 'eq', value: 'false' }, { id: COMPROVANTES_ID, operator: 'ne', value: 'true' }] }],
+      sort: [{ id: COMPROVANTES_ID, descending: false }],
+    }
+    const fetchXml = buildFetchXml(withComprovantes, [...catalog, comprovantes])
+    const link = '<link-entity name="cr40f_anexorecebimento_v2" from="cr40f_reserva" to="cr40f_servicorelacionadogeral" link-type='
+    expect(fetchXml).toContain(`<filter type="and">${link}"any" /><filter type="and"><filter type="or">${link}"not any" />${link}"not any" /></filter></filter></filter>`)
+    expect(fetchXml).not.toContain('name="comprovantes"')
+    expect(fetchXml).not.toContain('attribute="comprovantes"')
+    expect(buildLayoutXml(withComprovantes, [...catalog, comprovantes], 10342)).not.toContain('comprovantes')
   })
 
   it('guarda ordem e largura no layout nativo e rejeita XML inválido', () => {

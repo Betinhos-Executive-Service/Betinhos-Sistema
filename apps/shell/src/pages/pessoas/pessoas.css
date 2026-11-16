@@ -9,7 +9,6 @@
 .ps-table .ps-badges, .ps-table .ps-actions { flex-wrap: nowrap; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; }
 
 .ps-filters__view { flex: 0 1 220px; min-width: 180px; }
-.ps-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 .ps-filters__select { flex: 0 1 170px; min-width: 150px; }
 
 .ps-open { display: block; max-width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
@@ -56,7 +55,7 @@
 
 @media (max-width: 560px) {
   .ps-ficha__grid, .ps-form__grid { grid-template-columns: minmax(0, 1fr); }
-  .ps-filters__view, .ps-filters__search { flex: 1 1 100%; max-width: none; }
+  .ps-filters__view { flex: 1 1 100%; max-width: none; }
   .ps-filters__select { flex: 1 1 calc(50% - var(--bt-space-2)); min-width: 0; }
   .ps-row { grid-template-columns: minmax(0, 1fr); }
 }

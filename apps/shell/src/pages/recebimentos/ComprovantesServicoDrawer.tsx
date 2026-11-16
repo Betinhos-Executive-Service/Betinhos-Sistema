@@ -4,6 +4,7 @@ import { DollarSign } from 'lucide-react'
 import { BrandLoader } from '../../app/BrandLoader'
 import { formatMoney } from '../pagantes/domain/messages'
 import '../pagantes/pagantes.css'
+import './recebimentos.css'
 import { Item } from '../despesas/components/Ficha'
 import { ComprovantesRecebimento } from './ComprovantesRecebimento'
 import type { FinanceiroServico } from './domain'
@@ -63,7 +64,7 @@ function Financeiro({ source, reservaId }: { source: RecebimentosSource; reserva
 export function ComprovantesServicoDrawer({ servico, source, mobile, onClose }: { servico: ServicoAberto | null; source: RecebimentosSource; mobile: boolean; onClose: () => void }) {
   const Painel = mobile ? Sheet : Drawer
   return (
-    <Painel open={servico != null} onClose={onClose} eyebrow="Comprovantes de recebimento" title={servico ? `Serviço ${servico.nome}` : ''}>
+    <Painel open={servico != null} onClose={onClose} eyebrow="Recebimento" title={servico ? `Serviço ${servico.nome}` : ''}>
       {servico ? (
         <div className="pg-ficha">
           <Financeiro source={source} reservaId={servico.id} />

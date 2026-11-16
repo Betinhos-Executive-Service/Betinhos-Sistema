@@ -7,6 +7,9 @@
 # - cr40f_provamidia ganha: SHA-256 do original da galeria, data gravada no arquivo e fuso, marca, modelo e software do
 #   aparelho, paginas do PDF, os dois dHash (original e com carimbo) com 4 faixas de 16 bits cada (a busca de parecidas
 #   filtra por faixa igual) e lookups opcionais para manutencao e colisao (o plugin preenche quando o id e real).
+# - cr40f_sessaoid: id da sessao da camera num registro novo (rascunho), trocado pelo id real no registrar; o reenvio na
+#   mesma sessao do mesmo motorista nao conta como repetida. cr40f_idcliente: uuid do app por prova; o registrar repetido
+#   (resposta perdida) devolve a prova existente, pela consulta idcliente + motorista.
 # - Choices: tela "Devolucao de despesa", tipo "PDF", origem "Galeria ou arquivo" e os selos fora da janela, sem data,
 #   repetida e parecida. Os valores seguem a ordem do ProvaMidiaHandler (so acrescenta no fim).
 # - Variavel de ambiente cr40f_ProvaMidiaModoRepetida (texto, nao secreta), padrao "observar". "bloquear" bloqueia tambem
@@ -43,7 +46,9 @@ $colunas = @(
   (Texto "cr40f_software" "Software" "Software do EXIF." 100),
   (Inteiro "cr40f_paginas" "P$([char]0xE1)ginas" "P$([char]0xE1)ginas do PDF." 100000),
   (Texto "cr40f_dhash" "dHash" "Impress$([char]0xE3)o visual (64 bits, hex) da imagem original." 16),
-  (Texto "cr40f_dhashcarimbo" "dHash com carimbo" "Impress$([char]0xE3)o visual da foto final da c$([char]0xE2)mera do app, j$([char]0xE1) com carimbo." 16)
+  (Texto "cr40f_dhashcarimbo" "dHash com carimbo" "Impress$([char]0xE3)o visual da foto final da c$([char]0xE2)mera do app, j$([char]0xE1) com carimbo." 16),
+  (Texto "cr40f_sessaoid" "Sess$([char]0xE3)o da c$([char]0xE2)mera" "Id provis$([char]0xF3)rio do rascunho do registro novo; o reenvio na mesma sess$([char]0xE3)o n$([char]0xE3)o conta como repetida." 100),
+  (Texto "cr40f_idcliente" "Id da prova no app" "Uuid gerado pelo app por prova; o registrar repetido devolve a prova existente." 100)
 )
 foreach ($slot in @("cr40f_dhash", "cr40f_dhashcarimbo")) {
   foreach ($i in 1..4) { $colunas += (Inteiro "${slot}faixa$i" "$slot faixa $i" "Faixa $i (16 bits) do $slot, para a busca de fotos parecidas." 65535) }

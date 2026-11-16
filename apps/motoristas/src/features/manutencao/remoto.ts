@@ -136,7 +136,7 @@ export async function createMaintenanceRequestRemote(payload: MaintenanceRequest
       manutencaoGuid: result.id,
       tipoFoto: "SOLICITACAO",
       indice: index + 1
-    });
+    }, { tabela: "cr40f_manutencoes", registroId: result.id });
     completedRequestUploads += 1;
     payload.onProgress?.(`Uploads paralelos concluídos (${completedRequestUploads}/${photos.length}).`);
     return { fileName, link, order: index + 1 };

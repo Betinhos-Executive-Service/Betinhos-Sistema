@@ -120,7 +120,16 @@ namespace Betinhos.DriverRecordSharing.Tests
         public EntityCollection RetrieveMultiple(QueryBase query)
         {
             var expression = (QueryExpression)query;
-            return new EntityCollection(Rows(expression.EntityName).Where(row => Matches(row, expression.Criteria)).ToList());
+            var rows = Rows(expression.EntityName).Where(row => Matches(row, expression.Criteria)).ToList();
+            // Paginação como o Dataverse: PageInfo.Count > 0 devolve só a página pedida e avisa se há mais.
+            var paging = expression.PageInfo;
+            if (paging == null || paging.Count <= 0) return new EntityCollection(rows);
+            var page = Math.Max(1, paging.PageNumber);
+            return new EntityCollection(rows.Skip((page - 1) * paging.Count).Take(paging.Count).ToList())
+            {
+                MoreRecords = rows.Count > page * paging.Count,
+                PagingCookie = "pagina-" + page
+            };
         }
 
         // Filtros aninhados (E/OU), como o Dataverse: a prova de mídia busca "SHA igual OU alguma faixa igual".

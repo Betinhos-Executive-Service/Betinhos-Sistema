@@ -9,7 +9,8 @@ if (([Uri]$EnvironmentUrl).Host -ne "org23b93544.crm2.dynamics.com") { throw "So
 
 # Flows do aviso ao motorista (ver apps/motoristas/docs/virada-aviso-motorista.md e vigia-janela-saida.md). O plugin
 # grava new_avisomotorista na transacao da reserva; estes flows so entregam e vigiam. Nenhum deles le a tabela audit.
-# - "Flow Aviso Motorista | Enviar": aviso em Pendente -> push (Power Apps + Web Push) -> Enviado, Falhou ou Sem app.
+# - "Flow Aviso Motorista | Enviar": aviso em Pendente -> Web Push primeiro (abre o PWA) e, so se nenhuma inscricao
+#   entregar, o push do Power Apps (abre o model-driven) -> Enviado (qualquer canal entregou), Falhou ou Sem app.
 # - "Flow Aviso Motorista | Vigia": a cada 10 min concilia Visto/Cancelado, reenvia o push ao motorista 4 h antes da
 #   saida e alerta a operacao 3 h antes (reenvio = volta o aviso para Pendente, assim o texto do push mora so no Enviar).
 # Flow novo nasce DESLIGADO; flow ligado continua ligado (a definicao e regravada desligando e religando).
@@ -26,6 +27,7 @@ $table = "new_avisomotoristas"
 $servicesTable = "cr40f_reservadeveculoses"
 $employeesTable = "cr40f_funcionarioses"
 $subscriptionsTable = "new_inscricaopushmotoristas"
+$webPushVariable = "Web_Push_Entregue"
 $tipoNovo = 100000000
 $pendente = 100000000
 $enviado = 100000001
@@ -202,6 +204,9 @@ $hasSubscriptions = @{
   expression = @{ greater = @("@length(outputs('List_subs')?['body/value'])", 0) }
   actions = @{
     Worker = $worker
+    # Entregue = alguma inscricao com 2xx no servico de push; so assim o push do Power Apps fica de fora.
+    Filter_ok = (Filter-Array "@outputs('Worker')?['body/results']" "@and(greaterOrEquals(item()?['status'], 200), less(item()?['status'], 300))" (Ok "Worker"))
+    Set_web_push_entregue = @{ type = "SetVariable"; runAfter = (Ok "Filter_ok"); inputs = @{ name = $webPushVariable; value = "@greater(length(body('Filter_ok')), 0)" } }
     Filter_gone = (Filter-Array "@outputs('Worker')?['body/results']" "@equals(item()?['gone'], true)" (Ok "Worker"))
     Select_gone = @{ type = "Select"; runAfter = (Ok "Filter_gone"); inputs = @{ from = "@body('Filter_gone')"; select = "@item()?['endpoint']" } }
     Filter_subs = (Filter-Array "@outputs('List_subs')?['body/value']" "@contains(body('Select_gone'), item()?['new_endpoint'])" (Ok "Select_gone"))
@@ -214,7 +219,7 @@ $hasSubscriptions = @{
   }
   else = @{ actions = @{} }
 }
-# Em paralelo ao push do Power Apps, como nos flows antigos: falha de um canal nao impede o outro.
+# Roda primeiro; falha do Worker (ou de qualquer passo do escopo) nao impede o push do Power Apps de reserva.
 $webPush = @{
   type = "Scope"
   runAfter = @{}
@@ -223,22 +228,29 @@ $webPush = @{
     Has_subs = $hasSubscriptions
   }
 }
+# Reserva: so quando o Web Push nao entregou (motorista sem inscricao, funcionario sem registro ou Worker falhando para todas).
+$fallbackV2 = @{
+  type = "If"
+  runAfter = @{ Web_Push_Send_push = @("Succeeded", "Failed", "TimedOut") }
+  expression = @{ equals = @("@variables('$webPushVariable')", $false) }
+  actions = @{ Send_push = $sendPush }
+  else = @{ actions = @{} }
+}
 $hasEmail = @{
   type = "If"
   runAfter = (Ok "Compose_mensagem")
   expression = @{ equals = @("@empty($email)", $false) }
   actions = @{
-    Send_push = $sendPush
-    Marcar_enviado = (Update-Notice $noticeId @{ "item/new_situacao" = $enviado; "item/new_enviadoem" = "@utcNow()"; "item/new_tentativas" = $attempts; "item/new_erro" = "@null" } (Ok "Send_push"))
-    Marcar_falhou = (Update-Notice $noticeId @{ "item/new_situacao" = $falhou; "item/new_tentativas" = $attempts; "item/new_erro" = "@{take(string(coalesce(outputs('Send_push')?['body'], actions('Send_push')?['error'], 'Falha no envio do push')), 2000)}" } @{ Send_push = @("Failed", "TimedOut") })
-    # Nome da convencao de provision-web-push-flows.ps1: com outro nome aquele script acrescentaria um 2o Web Push.
     Web_Push_Send_push = $webPush
+    Fallback_V2 = $fallbackV2
+    Marcar_enviado = (Update-Notice $noticeId @{ "item/new_situacao" = $enviado; "item/new_enviadoem" = "@utcNow()"; "item/new_tentativas" = $attempts; "item/new_erro" = "@null" } (Ok "Fallback_V2"))
+    Marcar_falhou = (Update-Notice $noticeId @{ "item/new_situacao" = $falhou; "item/new_tentativas" = $attempts; "item/new_erro" = "@{take(string(coalesce(outputs('Send_push')?['body'], actions('Send_push')?['error'], 'Falha no envio do push')), 2000)}" } @{ Fallback_V2 = @("Failed", "TimedOut") })
   }
   else = @{ actions = @{ Marcar_sem_app = (Update-Notice $noticeId @{ "item/new_situacao" = $semApp }) } }
 }
 $sendScope = @{
   type = "Scope"
-  runAfter = @{}
+  runAfter = (Ok "Init_web_push_entregue")
   actions = @{
     Get_aviso = (Dv "GetItem" @{ entityName = $table; recordId = $noticeId; '$select' = "new_situacao,new_tipo,new_tentativas,_new_reserva_value,_new_funcionario_value" })
     # O aviso pode ter virado Cancelado entre a criacao e este passo: so entrega o que ainda esta Pendente.
@@ -298,7 +310,11 @@ $sendDefinition = @{
   contentVersion = "1.0.0.0"
   parameters = $baseParameters
   triggers = @{ $sendTriggerKey = $sendTrigger }
-  actions = @{ Scope = $sendScope; Scope_erro = (Error-Scope $sendName) }
+  actions = @{
+    Init_web_push_entregue = @{ type = "InitializeVariable"; runAfter = @{}; inputs = @{ variables = @(@{ name = $webPushVariable; type = "boolean"; value = $false }) } }
+    Scope = $sendScope
+    Scope_erro = (Error-Scope $sendName)
+  }
   outputs = @{}
 }
 $sendClientData = @{

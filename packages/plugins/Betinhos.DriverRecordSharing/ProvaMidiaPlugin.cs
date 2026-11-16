@@ -66,7 +66,8 @@ namespace Betinhos.DriverRecordSharing
         private static readonly TimeSpan AntesDaReferencia = TimeSpan.FromHours(24);
         private static readonly TimeSpan ToleranciaRelogio = TimeSpan.FromMinutes(10);
 
-        // Data de referência da janela do evento, lida do registro de origem (id real). Id provisório "novo-..." usa a data
+        // Data de referência da janela do evento, lida do registro de origem pelo id real (que o app manda no registrar assim
+        // que o registro existe; a data declarada é ignorada). Id provisório "novo-..." (prova pendente antiga) usa a data
         // declarada pelo app. Despesa e devolução: data do gasto; manutenção e finalizar: abertura; colisão: data da colisão;
         // recebimento: data do serviço.
         public static readonly IReadOnlyDictionary<string, string> ColunaReferencia = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -162,10 +163,10 @@ namespace Betinhos.DriverRecordSharing
         private string Check(Dictionary<string, object> command)
         {
             var origin = Origin(command);
-            CallerDriverId();
+            var driverId = CallerDriverId();
             var sha = Sha(command, "sha256", required: true);
             var hashes = DHashes(command);
-            var found = FindDuplicate(origin, new[] { sha }, hashes);
+            var found = FindDuplicate(origin, driverId, new[] { sha }, hashes);
             var mode = Mode();
             var blocked = found.Exact || (found.Similar && mode == ProvaMidiaRepetida.ModoBloquear);
             var result = blocked ? Repetida : found.Similar ? ParecidaEmObservacao : Livre;
@@ -184,48 +185,81 @@ namespace Betinhos.DriverRecordSharing
             public DateTime? UsedAt;
         }
 
-        // SHA-256 igual (do arquivo enviado ou do original da galeria) ou dHash a até 3 bits, nos últimos 12 meses,
-        // fora do mesmo registro (tabela e id iguais). A consulta pede alguma faixa igual; a distância é calculada aqui.
-        private Duplicate FindDuplicate(OriginRecord origin, IEnumerable<string> shas, IList<ulong> hashes)
-        {
-            var shaList = shas.Where(sha => sha != null).Distinct().ToList();
-            var query = new QueryExpression(Table)
-            {
-                ColumnSet = new ColumnSet(new[] { "cr40f_sha256", "cr40f_sha256original", "cr40f_tabelaorigem", "cr40f_registroorigemid", "cr40f_recebidoem" }.Concat(ColunasDHash).ToArray())
-            };
-            query.Criteria.AddCondition("cr40f_recebidoem", ConditionOperator.GreaterThan, _utcNow().AddMonths(-ProvaMidiaRepetida.MesesConsiderados));
-            var any = new FilterExpression(LogicalOperator.Or);
-            foreach (var column in new[] { "cr40f_sha256", "cr40f_sha256original" })
-                any.AddCondition(column, ConditionOperator.In, shaList.Cast<object>().ToArray());
-            for (var band = 0; hashes.Count > 0 && band < ProvaMidiaRepetida.Faixas; band++)
-            {
-                var values = hashes.Select(hash => (object)ProvaMidiaRepetida.Faixa(hash, band)).Distinct().ToArray();
-                for (var slot = 0; slot < ColunasDHash.Length; slot++) any.AddCondition(ColunaFaixa(slot, band), ConditionOperator.In, values);
-            }
-            query.Criteria.AddFilter(any);
+        private static readonly string[] ColunasBusca = new[] { "cr40f_sha256", "cr40f_sha256original", "cr40f_tabelaorigem", "cr40f_registroorigemid", "cr40f_sessaoid", "cr40f_motorista", "cr40f_recebidoem" }.Concat(ColunasDHash).ToArray();
 
+        // SHA-256 igual (do arquivo enviado ou do original) ou dHash a até 3 bits, nos últimos 12 meses, fora do mesmo registro.
+        // Duas consultas: a do SHA (igualdade exata, sempre conferida, poucas linhas) e a das faixas, só com dHash de entropia
+        // normal (foto escura, estourada ou tampada fica só com o SHA) e com teto de PaginasMaximas x LinhasPorPagina linhas,
+        // registrado no trace. A distância é calculada aqui.
+        private Duplicate FindDuplicate(OriginRecord origin, Guid driverId, IEnumerable<string> shas, IList<ulong> hashes)
+        {
+            var shaList = shas.Where(sha => sha != null).Distinct().Cast<object>().ToArray();
             var result = new Duplicate();
             DateTime? exactAt = null, similarAt = null;
-            foreach (var row in _system.RetrieveMultiple(query).Entities)
+
+            var bySha = new FilterExpression(LogicalOperator.Or);
+            foreach (var column in new[] { "cr40f_sha256", "cr40f_sha256original" }) bySha.AddCondition(column, ConditionOperator.In, shaList);
+            foreach (var row in _system.RetrieveMultiple(Recent(bySha)).Entities)
             {
-                if (string.Equals(row.GetAttributeValue<string>("cr40f_tabelaorigem"), origin.Table, StringComparison.Ordinal)
-                    && string.Equals(row.GetAttributeValue<string>("cr40f_registroorigemid"), origin.RecordId, StringComparison.OrdinalIgnoreCase)) continue;
-                var at = row.GetAttributeValue<DateTime?>("cr40f_recebidoem");
-                if (shaList.Contains(row.GetAttributeValue<string>("cr40f_sha256")) || shaList.Contains(row.GetAttributeValue<string>("cr40f_sha256original")))
+                if (SameRecord(row, origin, driverId)) continue;
+                result.Exact = true;
+                exactAt = Earliest(exactAt, row.GetAttributeValue<DateTime?>("cr40f_recebidoem"));
+            }
+
+            var searchable = hashes.Where(hash => !ProvaMidiaRepetida.BaixaEntropia(hash)).ToList();
+            if (searchable.Count < hashes.Count) _tracing.Trace("ProvaMidia dhash de baixa entropia fora da busca: {0}", hashes.Count - searchable.Count);
+            if (searchable.Count > 0)
+            {
+                var byBand = new FilterExpression(LogicalOperator.Or);
+                for (var band = 0; band < ProvaMidiaRepetida.Faixas; band++)
                 {
-                    result.Exact = true;
-                    exactAt = Earliest(exactAt, at);
-                    continue;
+                    var values = searchable.Select(hash => (object)ProvaMidiaRepetida.Faixa(hash, band)).Distinct().ToArray();
+                    for (var slot = 0; slot < ColunasDHash.Length; slot++) byBand.AddCondition(ColunaFaixa(slot, band), ConditionOperator.In, values);
                 }
-                var stored = ColunasDHash.Select(row.GetAttributeValue<string>).Where(ProvaMidiaRepetida.IsDHash).Select(ProvaMidiaRepetida.Parse);
-                if (ProvaMidiaRepetida.MenorDistancia(hashes, stored) <= ProvaMidiaRepetida.LimiteParecida)
+                var query = Recent(byBand);
+                var read = 0;
+                var capped = false;
+                string cookie = null;
+                for (var page = 1; ; page++)
                 {
-                    result.Similar = true;
-                    similarAt = Earliest(similarAt, at);
+                    query.PageInfo = new PagingInfo { Count = ProvaMidiaRepetida.LinhasPorPagina, PageNumber = page, PagingCookie = cookie };
+                    var batch = _system.RetrieveMultiple(query);
+                    foreach (var row in batch.Entities)
+                    {
+                        read++;
+                        if (SameRecord(row, origin, driverId)) continue;
+                        var stored = ColunasDHash.Select(row.GetAttributeValue<string>).Where(ProvaMidiaRepetida.IsDHash).Select(ProvaMidiaRepetida.Parse).Where(hash => !ProvaMidiaRepetida.BaixaEntropia(hash));
+                        if (ProvaMidiaRepetida.MenorDistancia(searchable, stored) > ProvaMidiaRepetida.LimiteParecida) continue;
+                        result.Similar = true;
+                        similarAt = Earliest(similarAt, row.GetAttributeValue<DateTime?>("cr40f_recebidoem"));
+                    }
+                    if (!batch.MoreRecords) break;
+                    if (page >= ProvaMidiaRepetida.PaginasMaximas) { capped = true; break; }
+                    cookie = batch.PagingCookie;
                 }
+                _tracing.Trace("ProvaMidia faixas linhas={0} teto={1}", read, capped ? "atingido" : "nao");
             }
             result.UsedAt = result.Exact ? exactAt : similarAt;
             return result;
+        }
+
+        private QueryExpression Recent(FilterExpression any)
+        {
+            var query = new QueryExpression(Table) { ColumnSet = new ColumnSet(ColunasBusca) };
+            query.Criteria.AddCondition("cr40f_recebidoem", ConditionOperator.GreaterThan, _utcNow().AddMonths(-ProvaMidiaRepetida.MesesConsiderados));
+            query.Criteria.AddFilter(any);
+            return query;
+        }
+
+        // Mesmo registro: tabela igual e o id real ou o da sessão (rascunho de registro novo, antes de existir o id real)
+        // iguais. A sessão é um id do aparelho, então só vale para o mesmo motorista.
+        private static bool SameRecord(Entity row, OriginRecord origin, Guid driverId)
+        {
+            if (!string.Equals(row.GetAttributeValue<string>("cr40f_tabelaorigem"), origin.Table, StringComparison.Ordinal)) return false;
+            if (origin.Ids.Contains(row.GetAttributeValue<string>("cr40f_registroorigemid") ?? "", StringComparer.OrdinalIgnoreCase)) return true;
+            var session = row.GetAttributeValue<string>("cr40f_sessaoid");
+            return session != null && origin.Ids.Contains(session, StringComparer.OrdinalIgnoreCase)
+                && row.GetAttributeValue<EntityReference>("cr40f_motorista")?.Id == driverId;
         }
 
         private static DateTime? Earliest(DateTime? current, DateTime? candidate) =>
@@ -247,6 +281,10 @@ namespace Betinhos.DriverRecordSharing
             var locationState = Choice(EstadosLocalizacao, location, "estado", "Estado da localização desconhecido.");
 
             var driverId = CallerDriverId();
+            // Idempotência: o mesmo idCliente (resposta perdida e reenvio) devolve a prova já gravada sem criar outra.
+            var clientId = ClientId(command);
+            var existing = clientId == null ? null : ExistingProof(clientId, driverId);
+            if (existing != null) return existing;
             var offline = Bool(command, "semRede");
             var code = Truncate(QrChargeRules.Str(command, "codigo"), 20);
             var issuedText = QrChargeRules.Str(command, "emitidoEm");
@@ -262,7 +300,7 @@ namespace Betinhos.DriverRecordSharing
                 var signature = QrChargeRules.Str(command, "assinatura");
                 var key = ReadKey();
                 if (key == null) seals.Add(SeloNaoAssinado);
-                else if (string.IsNullOrEmpty(signature) || !IsCode(code) || issuedText == null || !SameSignature(Sign(key, driverId, origin.Screen, origin.Table, origin.RecordId, code, issuedText), signature)) seals.Add(SeloInvalido);
+                else if (string.IsNullOrEmpty(signature) || !IsCode(code) || issuedText == null || !SameSignature(Sign(key, driverId, origin.Screen, origin.Table, origin.SignedRecordId, code, issuedText), signature)) seals.Add(SeloInvalido);
             }
 
             var metadata = QrChargeRules.Dict(command, "metadados");
@@ -275,7 +313,7 @@ namespace Betinhos.DriverRecordSharing
                 else if ((reference.HasValue && recordedAt.Value < reference.Value - AntesDaReferencia) || recordedAt.Value > receivedAt + ToleranciaRelogio) seals.Add(SeloForaDaJanela);
             }
             // Recheca a repetida: quem pulou o conferir já subiu o arquivo, então a prova só ganha o selo.
-            var duplicate = FindDuplicate(origin, new[] { sha, originalSha }, hashes);
+            var duplicate = FindDuplicate(origin, driverId, new[] { sha, originalSha }, hashes);
             if (duplicate.Exact || (duplicate.Similar && Mode() == ProvaMidiaRepetida.ModoBloquear)) seals.Add(SeloRepetida);
             else if (duplicate.Similar) seals.Add(SeloParecida);
 
@@ -289,6 +327,8 @@ namespace Betinhos.DriverRecordSharing
                 ["cr40f_tela"] = new OptionSetValue(Telas[origin.Screen]),
                 ["cr40f_tabelaorigem"] = origin.Table,
                 ["cr40f_registroorigemid"] = origin.RecordId,
+                ["cr40f_sessaoid"] = origin.SessionId,
+                ["cr40f_idcliente"] = clientId,
                 ["cr40f_link"] = link,
                 ["cr40f_tipomidia"] = new OptionSetValue(mediaType),
                 ["cr40f_tamanhobytes"] = ClampInt(QrChargeRules.Long(command, "tamanhoBytes")),
@@ -312,6 +352,8 @@ namespace Betinhos.DriverRecordSharing
             for (var slot = 0; slot < hashes.Count; slot++)
             {
                 row[ColunasDHash[slot]] = hashes[slot].ToString("x16", CultureInfo.InvariantCulture);
+                // dHash de baixa entropia não ganha faixas: senão toda foto escura casaria na busca das outras.
+                if (ProvaMidiaRepetida.BaixaEntropia(hashes[slot])) continue;
                 for (var band = 0; band < ProvaMidiaRepetida.Faixas; band++) row[ColunaFaixa(slot, band)] = ProvaMidiaRepetida.Faixa(hashes[slot], band);
             }
             var pages = QrChargeRules.Long(command, "paginas");
@@ -331,6 +373,31 @@ namespace Betinhos.DriverRecordSharing
             var id = _system.Create(row);
             _tracing.Trace("ProvaMidia registrada tela={0} selos={1}", origin.Screen, seals.Count == 0 ? "-" : string.Join(",", seals));
             return QrChargeRules.Serialize(new Dictionary<string, object> { ["ok"] = true, ["provaId"] = id.ToString("D"), ["selos"] = seals });
+        }
+
+        private string ExistingProof(string clientId, Guid driverId)
+        {
+            var query = new QueryExpression(Table) { ColumnSet = new ColumnSet("cr40f_selos"), TopCount = 1 };
+            query.Criteria.AddCondition("cr40f_idcliente", ConditionOperator.Equal, clientId);
+            query.Criteria.AddCondition("cr40f_motorista", ConditionOperator.Equal, driverId);
+            var row = _system.RetrieveMultiple(query).Entities.FirstOrDefault();
+            if (row == null) return null;
+            var names = Selos.ToDictionary(pair => pair.Value, pair => pair.Key);
+            var seals = (row.GetAttributeValue<OptionSetValueCollection>("cr40f_selos") ?? new OptionSetValueCollection())
+                .Where(option => names.ContainsKey(option.Value)).Select(option => names[option.Value]).ToList();
+            _tracing.Trace("ProvaMidia registrar repetido: devolvida a prova existente");
+            return QrChargeRules.Serialize(new Dictionary<string, object> { ["ok"] = true, ["provaId"] = row.Id.ToString("D"), ["selos"] = seals });
+        }
+
+        private static readonly Regex ClientIdFormat = new Regex("^[A-Za-z0-9-]{1,100}$", RegexOptions.CultureInvariant);
+
+        // Opcional (o app da fase 1 não manda): uuid gerado pelo app por prova e guardado na fila de pendentes.
+        private static string ClientId(Dictionary<string, object> command)
+        {
+            var text = (QrChargeRules.Str(command, "idCliente") ?? "").Trim();
+            if (text.Length == 0) return null;
+            if (!ClientIdFormat.IsMatch(text)) throw new Refusal("Identificador da prova (idCliente) inválido.");
+            return text;
         }
 
         // ---------- regras ----------
@@ -422,7 +489,10 @@ namespace Betinhos.DriverRecordSharing
             if (!TableName.IsMatch(table)) throw new Refusal("Tabela de origem inválida.");
             var recordId = (QrChargeRules.Str(command, "registroId") ?? "").Trim();
             if (recordId.Length == 0 || recordId.Length > 100) throw new Refusal("Registro de origem inválido.");
-            return new OriginRecord(screen, table, recordId);
+            // sessaoId: id com que a câmera foi aberta (assinado no emitir) quando o registrar já leva o id real do registro novo.
+            var session = (QrChargeRules.Str(command, "sessaoId") ?? "").Trim();
+            if (session.Length > 100) throw new Refusal("Sessão da prova inválida.");
+            return new OriginRecord(screen, table, recordId, session.Length == 0 || string.Equals(session, recordId, StringComparison.OrdinalIgnoreCase) ? null : session);
         }
 
         private static int Choice(IReadOnlyDictionary<string, int> options, Dictionary<string, object> source, string key, string message)
@@ -483,10 +553,19 @@ namespace Betinhos.DriverRecordSharing
 
         private sealed class OriginRecord
         {
-            public OriginRecord(string screen, string table, string recordId) { Screen = screen; Table = table; RecordId = recordId; }
+            public OriginRecord(string screen, string table, string recordId, string sessionId = null)
+            {
+                Screen = screen; Table = table; RecordId = recordId; SessionId = sessionId;
+                Ids = sessionId == null ? new[] { recordId } : new[] { recordId, sessionId };
+            }
             public string Screen { get; }
             public string Table { get; }
             public string RecordId { get; }
+            /// <summary>Id da sessão da câmera, quando diferente do id real; null nos demais casos.</summary>
+            public string SessionId { get; }
+            /// <summary>Id assinado no emitir: o da sessão, se houver.</summary>
+            public string SignedRecordId => SessionId ?? RecordId;
+            public string[] Ids { get; }
         }
 
         private sealed class Refusal : Exception

@@ -28,17 +28,17 @@ export function mapRecebimento(row: Row): Recebimento {
   }
 }
 
-/** Ids válidos, sem repetição, em blocos de 15 (limite de URL do OData). */
-const blocos = (ids: string[]) => chunk([...new Set(ids.map(cleanId).filter((id) => GUID.test(id)))], 15)
-const filtro = (ids: string[]) => encodeURIComponent(ids.map((id) => `_cr40f_reserva_value eq ${id}`).join(' or '))
-/** No máximo 4 consultas ao mesmo tempo (a lista do Geral com 500 serviços daria 34 de uma vez), como em pessoas/data/queries.ts. */
-async function consultar(client: DataverseClient, reservaIds: string[], select: string) {
+/** Ids válidos, sem repetição, em blocos de `tamanho`, com no máximo 4 consultas ao mesmo tempo (a lista do Geral com 500 serviços daria 34 de uma vez), como em pessoas/data/queries.ts. */
+async function emOndas(client: DataverseClient, ids: string[], tamanho: number, url: (bloco: string[]) => string) {
   const rows: Row[] = []
-  for (const onda of chunk(blocos(reservaIds), 4)) {
-    rows.push(...(await Promise.all(onda.map((ids) => client.getAll(`${ENTITY_SET}?$select=${select}&$filter=${filtro(ids)}`)))).flat())
+  for (const onda of chunk(chunk([...new Set(ids.map(cleanId).filter((id) => GUID.test(id)))], tamanho), 4)) {
+    rows.push(...(await Promise.all(onda.map((bloco) => client.getAll(url(bloco))))).flat())
   }
   return rows
 }
+const filtro = (ids: string[]) => encodeURIComponent(ids.map((id) => `_cr40f_reserva_value eq ${id}`).join(' or '))
+/** Blocos de 15 reservas (limite de URL do OData). */
+const consultar = (client: DataverseClient, reservaIds: string[], select: string) => emOndas(client, reservaIds, 15, (ids) => `${ENTITY_SET}?$select=${select}&$filter=${filtro(ids)}`)
 
 /** Comprovantes dos serviços, com o nome do motorista pela anotação formatada do lookup. */
 export async function loadRecebimentos(client: DataverseClient, reservaIds: string[]) {
@@ -53,6 +53,24 @@ export async function contarPorReserva(client: DataverseClient, reservaIds: stri
     if (id) contagem.set(id, (contagem.get(id) ?? 0) + 1)
   }
   return contagem
+}
+
+/** FetchXML agregado: comprovantes por OP, pelo serviço (`cr40f_reserva` → `cr40f_financeiro` da reserva). */
+export function fetchContagemPorOp(opIds: string[]) {
+  const valores = opIds.map((id) => `<value>${id}</value>`).join('')
+  return '<fetch aggregate="true"><entity name="cr40f_anexorecebimento_v2">'
+    + '<attribute name="cr40f_anexorecebimento_v2id" alias="qtd" aggregate="count"/>'
+    + '<link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_reserva" alias="srv" link-type="inner">'
+    + '<attribute name="cr40f_financeiro" alias="op_id" groupby="true"/>'
+    + `<filter><condition attribute="cr40f_financeiro" operator="in">${valores}</condition></filter>`
+    + '</link-entity></entity></fetch>'
+}
+
+/** Quantos comprovantes cada OP tem (soma dos serviços); OP sem comprovante não entra no mapa (o agregado só devolve grupos com anexo).
+ * 50 ids em `<value>` cabem folgados na URL do FetchXML. */
+export async function contarPorOp(client: DataverseClient, opIds: string[]) {
+  const rows = await emOndas(client, opIds, 50, (ids) => `${ENTITY_SET}?fetchXml=${encodeURIComponent(fetchContagemPorOp(ids))}`)
+  return new Map(rows.map((row) => [cleanId(String(row.op_id ?? '')), Number(row.qtd)]))
 }
 
 /** Valor e forma de pagamento do serviço (cr40f_reservadeveculos), confirmados na metadata do DEV em 16/11/2026. */

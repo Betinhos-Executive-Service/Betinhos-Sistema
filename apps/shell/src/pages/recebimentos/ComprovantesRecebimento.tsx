@@ -3,7 +3,7 @@ import { Alert, Button, StatusBadge } from '@betinhos/ui'
 import { BrandLoader } from '../../app/BrandLoader'
 import { ComprovantesGaleria } from '../../lib/comprovantes/Galeria'
 import { formatDate } from '../pagantes/domain/messages'
-import { agruparPorServico, metaRecebimento, ordenar, tomStatus, type Recebimento } from './domain'
+import { agruparPorServico, metaRecebimento, mostraStatus, ordenar, tomStatus, type Recebimento } from './domain'
 import type { RecebimentosSource } from './source'
 
 type Estado = { lista: Recebimento[] } | { erro: string } | null
@@ -40,7 +40,7 @@ export function resumoRecebimentos(estado: Estado) {
 const seloRecebimento = (r: Recebimento) => (
   <span className="cmp-selos">
     {r.tipo ? <StatusBadge>{r.tipo}</StatusBadge> : null}
-    {r.statusTexto ? <StatusBadge tone={tomStatus(r.status)}>{r.statusTexto}</StatusBadge> : null}
+    {mostraStatus(r) ? <StatusBadge tone={tomStatus(r.status)}>{r.statusTexto}</StatusBadge> : null}
   </span>
 )
 

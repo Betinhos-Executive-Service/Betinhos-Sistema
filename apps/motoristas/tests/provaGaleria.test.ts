@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { resolveObjectURL } from "node:buffer";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
@@ -7,23 +8,31 @@ import {
   acceptDaGaleria,
   criarProvaCaptura,
   mensagemRepetida,
+  VIDEO_SEM_DURACAO,
   type Desenho,
   type EntradaProva,
   type FilaProvas
 } from "../src/features/fotos/provaCaptura.ts";
-import { dhashDaAmostra, lerExifJpeg, referenciaIso, seloDaJanela } from "../src/features/fotos/metadadosArquivo.ts";
-import { portaProvaMock, type ComandoConferencia, type ComandoRegistroProva, type PortaProva, type ResultadoConferencia } from "../src/features/fotos/provaRemota.ts";
+import { dhashDaAmostra, lerExifJpeg, referenciaIso } from "../src/features/fotos/metadadosArquivo.ts";
+import { criarPortaProvaMock, type ComandoConferencia, type ComandoRegistroProva, type PortaProva, type ResultadoConferencia } from "../src/features/fotos/provaRemota.ts";
+import { encerrarSessaoDoRascunho, sessaoDoRascunho } from "../src/features/fotos/sessaoDoRascunho.ts";
 
 const AGORA = new Date("2026-11-16T12:00:00.000Z");
 const LINK = "https://betinhos.sharepoint.com/Despesas/comprovante-1.jpg";
 const fixture = (nome: string) => readFileSync(new URL(`./fixtures/${nome}`, import.meta.url));
 const arquivo = (nome: string, tipo: string, bytes: Uint8Array = fixture(nome)) => new File([bytes], nome, { type: tipo });
 
-/** Desenho falso: a "imagem" carrega o próprio data URL, e a amostra do dHash sai dele (mesmo arquivo = mesmo dHash). */
+/** Desenho falso: a "imagem" guarda os bytes do blob URL (ou o data URL), e o dHash sai deles (mesmo arquivo = mesmo dHash). */
 function desenhoFalso() {
   const textos: string[] = [];
+  const carregados: string[] = [];
   const desenho: Desenho = {
-    carregar: async (dataUrl) => ({ largura: 4000, altura: 3000, imagem: { origem: dataUrl } as unknown as CanvasImageSource }),
+    carregar: async (src) => {
+      carregados.push(src);
+      const blob = src.startsWith("blob:") ? resolveObjectURL(src) : undefined;
+      const origem = blob ? createHash("sha256").update(new Uint8Array(await blob.arrayBuffer())).digest("hex") : src;
+      return { largura: 4000, altura: 3000, imagem: { origem } as unknown as CanvasImageSource };
+    },
     criarTela: (largura, altura) => {
       const contexto = {
         fillStyle: "", font: "10px sans-serif", textBaseline: "alphabetic" as CanvasTextBaseline,
@@ -39,7 +48,7 @@ function desenhoFalso() {
     },
     amostrar: (imagem) => createHash("sha512").update(String((imagem as unknown as { origem: string }).origem)).update("x").digest().subarray(0, 9 * 8 * 4)
   };
-  return { desenho, textos };
+  return { desenho, textos, carregados };
 }
 
 function filaMemoria() {
@@ -48,28 +57,25 @@ function filaMemoria() {
   return { fila, itens: () => lista };
 }
 
-function montar(conferir?: (comando: ComandoConferencia) => Promise<ResultadoConferencia>) {
+function montar(conferir?: (comando: ComandoConferencia) => Promise<ResultadoConferencia>, opcoes: { duracaoVideo?: (video: Blob) => Promise<number | null>; registrar?: PortaProva["registrarProvaMidia"] } = {}) {
   const registros: ComandoRegistroProva[] = [];
   const conferencias: ComandoConferencia[] = [];
-  const usados = new Map<string, string>();
+  // Servidor falso = o mock do app: o mesmo SHA em outro registro é repetida; no mesmo registro (id real ou da sessão), livre.
+  const servidor = criarPortaProvaMock();
   const porta: PortaProva = {
-    emitirProvaMidia: portaProvaMock.emitirProvaMidia,
-    registrarProvaMidia: async (comando) => { registros.push(comando); return portaProvaMock.registrarProvaMidia(comando); },
+    emitirProvaMidia: servidor.emitirProvaMidia,
+    registrarProvaMidia: async (comando) => { registros.push(comando); return (opcoes.registrar ?? servidor.registrarProvaMidia)(comando); },
     conferirProvaMidia: async (comando) => {
       conferencias.push(comando);
       if (conferir) return conferir(comando);
-      // Servidor falso: o mesmo SHA em outro registro é repetida; no mesmo registro, livre.
-      const chave = `${comando.tabela}/${comando.registroId}`;
-      const anterior = usados.get(comando.sha256);
-      if (anterior && anterior !== chave) return { resultado: "repetida", usadaEm: "2026-10-03T15:00:00.000Z" };
-      usados.set(comando.sha256, chave);
-      return { resultado: "livre", usadaEm: null };
+      const resposta = await servidor.conferirProvaMidia(comando);
+      return resposta.resultado === "repetida" ? { ...resposta, usadaEm: "2026-10-03T15:00:00.000Z" } : resposta;
     }
   };
-  const { desenho, textos } = desenhoFalso();
+  const { desenho, textos, carregados } = desenhoFalso();
   const { fila, itens } = filaMemoria();
-  const prova = criarProvaCaptura({ porta, fila, desenho, agora: () => AGORA, duracaoVideo: async () => 12 });
-  return { prova, registros, conferencias, textos, itens };
+  const prova = criarProvaCaptura({ porta, fila, desenho, agora: () => AGORA, duracaoVideo: opcoes.duracaoVideo ?? (async () => 12) });
+  return { prova, registros, conferencias, textos, itens, carregados };
 }
 
 const DESPESA = { tela: "despesa", tabela: "cr40f_despesaoperacional", registroId: "novo-1" } as const;
@@ -81,8 +87,8 @@ test("EXIF: lê data com fuso, marca, modelo e software do JPEG", () => {
   assert.equal(lerExifJpeg(fixture("foto-sem-exif.jpg")).dataGravada, null);
 });
 
-test("foto da galeria com data dentro da janela: sem selo, sem carimbo, reduzida e com SHA e dHash do original", async () => {
-  const { prova, registros, textos, conferencias } = montar();
+test("foto da galeria: sem carimbo, reduzida e com SHA, dHash e EXIF do original, aberta por blob URL", async () => {
+  const { prova, registros, textos, conferencias, carregados } = montar();
   const sessao = await prova.iniciar(DESPESA);
   const original = fixture("foto-com-exif.jpg");
 
@@ -90,7 +96,8 @@ test("foto da galeria com data dentro da janela: sem selo, sem carimbo, reduzida
 
   assert.equal(resultado.ok, true);
   if (!resultado.ok || resultado.tipo !== "foto") return;
-  assert.equal(resultado.selo, null);
+  assert.equal("selo" in resultado, false, "o selo da janela é só do servidor");
+  assert.match(carregados[0], /^blob:/, "a imagem abre pelo blob URL, sem virar base64");
   assert.equal(textos.length, 0, "foto da galeria não recebe carimbo");
   assert.equal(resultado.dados.origemCaptura, "galeria");
   assert.equal(resultado.dados.sha256Original, createHash("sha256").update(original).digest("hex"));
@@ -105,19 +112,19 @@ test("foto da galeria com data dentro da janela: sem selo, sem carimbo, reduzida
   assert.equal(registros[0].metadados?.dataGravada, "2026-11-15T14:30:00-03:00");
 });
 
-test("foto da galeria com data fora da janela entra com o selo fora-da-janela (não bloqueia)", async () => {
+test("foto da galeria com data fora da janela entra (a data nunca bloqueia; o servidor dá o selo)", async () => {
   const { prova } = montar();
   const sessao = await prova.iniciar(DESPESA);
   const resultado = await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"), { referencia: "2026-11-17" });
   assert.equal(resultado.ok, true);
-  assert.equal(resultado.ok && resultado.selo, "fora-da-janela");
+  assert.equal(resultado.ok && resultado.dados.metadados?.dataGravada, "2026-11-15T14:30:00-03:00");
 });
 
-test("foto da galeria sem EXIF entra com o selo sem-data", async () => {
+test("foto da galeria sem EXIF entra sem data gravada", async () => {
   const { prova } = montar();
   const sessao = await prova.iniciar(DESPESA);
   const resultado = await prova.prepararDaGaleria(sessao, arquivo("foto-sem-exif.jpg", "image/jpeg"), { referencia: "2026-11-16" });
-  assert.equal(resultado.ok && resultado.selo, "sem-data");
+  assert.equal(resultado.ok, true);
   assert.equal(resultado.ok && resultado.dados.metadados?.dataGravada, null);
 });
 
@@ -129,7 +136,6 @@ test("vídeo da galeria: creation_time do mvhd (época de 1904) dentro da janela
   if (!resultado.ok) return;
   assert.equal(resultado.tipo, "video");
   assert.equal(resultado.dados.metadados?.dataGravada, "2026-11-15T17:30:00.000Z");
-  assert.equal(resultado.selo, null);
   assert.equal(resultado.dados.duracaoSegundos, 12);
 });
 
@@ -137,8 +143,19 @@ test("vídeo com mvhd na época errada (segundos desde 1970) vale como sem data"
   const { prova } = montar();
   const sessao = await prova.iniciar(COLISAO);
   const resultado = await prova.prepararDaGaleria(sessao, arquivo("video-epoca-errada.mp4", "video/mp4"), { referencia: "2026-11-15T10:00" });
+  assert.equal(resultado.ok, true);
   assert.equal(resultado.ok && resultado.dados.metadados?.dataGravada, null);
-  assert.equal(resultado.ok && resultado.selo, "sem-data");
+});
+
+test("vídeo da galeria sem duração legível (null, Infinity, NaN) é recusado com o motivo", async () => {
+  for (const duracao of [null, Number.POSITIVE_INFINITY, Number.NaN]) {
+    const { prova, conferencias } = montar(undefined, { duracaoVideo: async () => duracao });
+    const sessao = await prova.iniciar(COLISAO);
+    const resultado = await prova.prepararDaGaleria(sessao, arquivo("video-mvhd.mp4", "video/mp4"));
+    assert.deepEqual(resultado, { ok: false, erro: VIDEO_SEM_DURACAO }, String(duracao));
+    assert.equal(conferencias.length, 0);
+  }
+  assert.equal(VIDEO_SEM_DURACAO, "Não consegui ler a duração do vídeo. Grave de novo pela câmera do app.");
 });
 
 test("PDF acima de 10 MB é recusado com o tamanho real", async () => {
@@ -213,11 +230,95 @@ test("sem resposta do conferir, a foto segue (o servidor reconfere ao registrar)
   assert.equal((await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"))).ok, true);
 });
 
-test("parecida em observação não bloqueia e é marcada", async () => {
+test("parecida em observação não bloqueia (o selo é do servidor)", async () => {
   const { prova } = montar(async () => ({ resultado: "parecida-em-observacao", usadaEm: null }));
   const sessao = await prova.iniciar(DESPESA);
   const resultado = await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"));
-  assert.equal(resultado.ok && resultado.parecida, true);
+  assert.equal(resultado.ok, true);
+});
+
+test("registro novo: o registrar leva o id real e o da sessão; a devolução com o mesmo comprovante passa", async () => {
+  const { prova, registros } = montar();
+  const sessao = await prova.iniciar(DESPESA);
+  const escolhida = await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"), { referencia: "2026-11-15" });
+  assert.equal(escolhida.ok && escolhida.tipo, "foto");
+  if (!escolhida.ok || escolhida.tipo !== "foto") return;
+
+  assert.equal(await prova.registrarArquivo(escolhida.dataUrl, LINK, { tabela: "cr40f_despesaoperacional", registroId: "D-1" }), "registrada");
+  assert.equal(registros[0].registroId, "D-1");
+  assert.equal(registros[0].sessaoId, "novo-1");
+
+  const devolucao = await prova.iniciar({ tela: "devolucao", tabela: "cr40f_despesaoperacional", registroId: "D-1" });
+  assert.equal((await prova.prepararDaGaleria(devolucao, arquivo("foto-com-exif.jpg", "image/jpeg"))).ok, true);
+});
+
+test("destino de outra tabela não troca o id da sessão (nota da manutenção vira despesa)", async () => {
+  const { prova, registros } = montar();
+  const sessao = await prova.iniciar({ tela: "finalizar", tabela: "cr40f_manutencoes", registroId: "M-1" });
+  const escolhida = await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"));
+  if (!escolhida.ok || escolhida.tipo !== "foto") return assert.fail("foto recusada");
+  await prova.registrarArquivo(escolhida.dataUrl, LINK, { tabela: "cr40f_despesaoperacional", registroId: "D-9" });
+  assert.equal(registros[0].registroId, "M-1");
+  assert.equal(registros[0].sessaoId, undefined);
+});
+
+test("colisão nova: o registrar leva o id real (o servidor preenche o lookup)", async () => {
+  const { prova, registros } = montar();
+  const sessao = await prova.iniciar(COLISAO);
+  const escolhida = await prova.prepararDaGaleria(sessao, arquivo("foto-sem-exif.jpg", "image/jpeg"));
+  if (!escolhida.ok || escolhida.tipo !== "foto") return assert.fail("foto recusada");
+  await prova.registrarArquivo(escolhida.dataUrl, LINK, { tabela: "cr40f_colisao_v2", registroId: "6b1f0c2e-4a5d-4e8f-9a7b-1c2d3e4f5a6b" });
+  assert.equal(registros[0].registroId, "6b1f0c2e-4a5d-4e8f-9a7b-1c2d3e4f5a6b");
+  assert.equal(registros[0].sessaoId, "novo-2");
+});
+
+test("reabrir a câmera no mesmo rascunho e escolher o mesmo arquivo passa; rascunho novo ganha outra sessão", async () => {
+  const id = sessaoDoRascunho("despesa-teste");
+  assert.equal(sessaoDoRascunho("despesa-teste"), id);
+  const { prova } = montar();
+  const primeira = await prova.iniciar({ ...DESPESA, registroId: id });
+  assert.equal((await prova.prepararDaGaleria(primeira, arquivo("foto-com-exif.jpg", "image/jpeg"))).ok, true);
+  const reaberta = await prova.iniciar({ ...DESPESA, registroId: sessaoDoRascunho("despesa-teste") });
+  assert.equal((await prova.prepararDaGaleria(reaberta, arquivo("foto-com-exif.jpg", "image/jpeg"))).ok, true);
+  encerrarSessaoDoRascunho("despesa-teste");
+  assert.notEqual(sessaoDoRascunho("despesa-teste"), id);
+  encerrarSessaoDoRascunho("despesa-teste");
+});
+
+test("o original da câmera nativa reenviado pela galeria noutro registro é recusado como repetida", async () => {
+  const { prova, registros } = montar();
+  const original = fixture("foto-com-exif.jpg");
+  const sessao = await prova.iniciar(DESPESA);
+  const foto = await prova.aplicarNaFoto(sessao, "data:image/jpeg;base64,AAAA", {}, "camera-nativa", { original: new Blob([original]) });
+  assert.equal(foto.dados.sha256Original, createHash("sha256").update(original).digest("hex"));
+  await prova.registrarArquivo(foto.dataUrl, LINK, { tabela: "cr40f_despesaoperacional", registroId: "D-1" });
+  assert.equal(registros[0].sha256Original, foto.dados.sha256Original);
+
+  const outra = await prova.iniciar({ ...DESPESA, registroId: "novo-3" });
+  const resultado = await prova.prepararDaGaleria(outra, arquivo("foto-com-exif.jpg", "image/jpeg"));
+  assert.deepEqual(resultado, { ok: false, erro: "Esta foto já foi usada em outro registro em 03/10/2026. Tire uma foto nova." });
+});
+
+test("idCliente: um por prova, guardado na fila e repetido no reenvio depois de falha", async () => {
+  let falhar = true;
+  const { prova, registros, itens } = montar(undefined, {
+    registrar: async (comando) => {
+      if (falhar) throw new TypeError("Failed to fetch");
+      return { ok: true, provaId: "p-1", selos: [] };
+    }
+  });
+  const sessao = await prova.iniciar(DESPESA);
+  const escolhida = await prova.prepararDaGaleria(sessao, arquivo("foto-com-exif.jpg", "image/jpeg"));
+  if (!escolhida.ok || escolhida.tipo !== "foto") return assert.fail("foto recusada");
+  assert.match(escolhida.dados.idCliente ?? "", /^[0-9a-f-]{36}$/);
+
+  assert.equal(await prova.registrarArquivo(escolhida.dataUrl, LINK, { tabela: "cr40f_despesaoperacional", registroId: "D-1" }), "pendente");
+  assert.equal(itens()[0].dados.idCliente, escolhida.dados.idCliente);
+  assert.equal(itens()[0].sessao.registroReal, "D-1", "o id real fica na fila para o reenvio");
+  falhar = false;
+  assert.equal(await prova.reenviarPendentes(), 1);
+  assert.equal(registros[1].idCliente, registros[0].idCliente);
+  assert.equal(registros[1].registroId, "D-1");
 });
 
 test("foto da câmera do app leva dois dHash: o da cena e o da foto final com carimbo", async () => {
@@ -235,16 +336,10 @@ test("dHash: bit 1 quando o pixel é mais claro que o da direita", () => {
   assert.equal(dhashDaAmostra(rgba), "ff00000000000000");
 });
 
-test("janela: referência de data vira horário de Brasília; 24 h antes até agora + 10 min", () => {
+test("referência declarada: data vira horário de Brasília (o servidor usa a do registro quando o id é real)", () => {
   assert.equal(referenciaIso("2026-11-15"), "2026-11-15T00:00:00-03:00");
   assert.equal(referenciaIso("2026-11-15T10:00"), "2026-11-15T10:00:00-03:00");
   assert.equal(referenciaIso(""), null);
-  const ref = "2026-11-15T00:00:00-03:00";
-  assert.equal(seloDaJanela("2026-11-14T01:00:00-03:00", ref, AGORA), null);
-  assert.equal(seloDaJanela("2026-11-13T23:00:00-03:00", ref, AGORA), "fora-da-janela");
-  assert.equal(seloDaJanela("2026-11-16T12:09:00Z", ref, AGORA), null);
-  assert.equal(seloDaJanela("2026-11-16T12:11:00Z", ref, AGORA), "fora-da-janela");
-  assert.equal(seloDaJanela(null, ref, AGORA), "sem-data");
 });
 
 test("mensagem de repetida por tipo, sem dados de outro motorista", () => {

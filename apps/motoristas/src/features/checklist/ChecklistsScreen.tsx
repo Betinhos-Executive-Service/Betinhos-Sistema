@@ -39,6 +39,9 @@ import {
   type ChecklistVeiculo
 } from "./checklists";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
+import { pedirArmazenamentoPersistente } from "../envio-pendente/armazenamentoPersistente";
+import { classificarErro } from "../envio-pendente/classificarErro";
+import { chaveDoChecklist, filaDeEnvio } from "../envio-pendente/fila";
 
 export type ChecklistsLoadStatus = "loading" | "ready" | "error";
 
@@ -246,6 +249,37 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
     const checklistId = selected.id;
     const draftKey = checklistDraftKey(checklistId);
     let working = draft;
+    // Sem conexão (ou rede caindo no envio): o checklist inteiro vai para a fila do aparelho e a lista segue. O rascunho só sai quando o envio confirmar.
+    const guardarNoAparelho = async (atual: ChecklistDraft) => {
+      void pedirArmazenamentoPersistente();
+      try {
+        await saveMediaDraft(atual, draftKey).catch(() => undefined);
+        await filaDeEnvio.adicionar({
+          id: chaveDoChecklist(checklistId),
+          detailId: checklistId,
+          detailType: "CHECKLIST",
+          dataverseId: checklistId,
+          titulo: selected.placa || selected.nome,
+          tipo: "checklist",
+          checklist: { checklistId, placa: selected.placa, solicitadoEm: selected.solicitadoEm, itens: selected.itens, draft: atual },
+          fields: {},
+          finalizadoEm: new Date().toISOString(),
+          criadoEm: new Date().toISOString(),
+          tentativas: 0,
+          estado: "pendente",
+          proximaTentativaEm: Date.now() + 15_000
+        });
+      } catch {
+        return false;
+      }
+      sendingRef.current = false;
+      if (!aliveRef.current) return true;
+      setSend(null);
+      setNotice("Salvo no aparelho. Será enviado quando a conexão voltar.");
+      if (onCloseDetail) onCloseDetail(); else onSelectedIdChange("");
+      return true;
+    };
+    if (navigator.onLine === false && await guardarNoAparelho(working)) return;
     // Envio foto a foto; o link de cada uma fica no rascunho, então uma nova tentativa continua de onde parou.
     // Fotos puras e fotos do Não OK sobem pela mesma fila.
     const queue = checklistPhotoItems(selected.itens, working)
@@ -297,6 +331,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
         payload: { fotosEnviadas: Object.keys(working.enviadas ?? {}).length },
         notifyUser: false
       });
+      if (classificarErro(cause) === "rede" && await guardarNoAparelho(working)) return;
       if (!aliveRef.current) return;
       setSend({ phase: "error", total, message: cause instanceof Error ? cause.message : "" });
       sendingRef.current = false;

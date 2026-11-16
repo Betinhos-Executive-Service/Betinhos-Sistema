@@ -58,7 +58,7 @@ export async function uploadCollisionPhotoRemote({
     tipo: kind,
     tipoMidia: isVideo ? "video" : "foto",
     indice: order
-  });
+  }, { tabela: "cr40f_colisao_v2", registroId: collisionId });
 
   onProgress?.(`Vinculando ${isVideo ? "video" : "foto"} ${order} à colisão.`);
   const recordName = `${label} ${order} - ${collisionName}`.slice(0, 100);

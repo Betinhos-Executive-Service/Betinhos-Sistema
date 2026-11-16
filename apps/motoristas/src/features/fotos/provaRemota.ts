@@ -35,6 +35,10 @@ export type ComandoRegistroProva = OrigemProva & {
   metadados?: MetadadosArquivo | null;
   /** Fase 2. Data de referência do evento declarada pelo app; o servidor prefere a do registro quando o id é real. */
   dataReferencia?: string | null;
+  /** Fase 2. Id com que a câmera foi aberta (assinado no emitir), quando registroId já é o id real do registro novo. */
+  sessaoId?: string | null;
+  /** Fase 2. Uuid da prova gerado no app e guardado na fila: o registrar repetido devolve a prova existente. */
+  idCliente?: string;
 };
 
 export type ComandoConferencia = OrigemProva & { sha256: string; dhashes: string[] };
@@ -51,18 +55,26 @@ export type PortaProva = {
 // Mock de localhost: código e hora fixos, para a prévia e os testes ficarem estáveis.
 export const PROVA_MOCK_CODIGO = "K7M2QX";
 export const PROVA_MOCK_EMITIDO_EM = "2026-11-16T12:00:00.000Z";
-// O mock lembra o que foi conferido nesta aba: o mesmo arquivo em outro registro volta "repetida" (prévia da recusa).
-const conferidasNoMock = new Map<string, OrigemProva>();
-export const portaProvaMock: PortaProva = {
-  emitirProvaMidia: async () => ({ ok: true, codigo: PROVA_MOCK_CODIGO, emitidoEm: PROVA_MOCK_EMITIDO_EM, assinatura: "mock", assinada: true }),
-  registrarProvaMidia: async (comando) => ({ ok: true, provaId: "00000000-0000-4000-8000-000000000001", selos: comando.semRede ? ["capturada-sem-rede"] : [] }),
-  conferirProvaMidia: async (comando) => {
-    const anterior = conferidasNoMock.get(comando.sha256);
-    if (anterior && (anterior.tabela !== comando.tabela || anterior.registroId !== comando.registroId)) return { resultado: "repetida", usadaEm: PROVA_MOCK_EMITIDO_EM };
-    conferidasNoMock.set(comando.sha256, { tela: comando.tela, tabela: comando.tabela, registroId: comando.registroId });
-    return { resultado: "livre", usadaEm: null };
-  }
-};
+// O mock lembra, nesta aba, o que foi conferido e registrado (como o servidor: o id real e o da sessão contam como o mesmo
+// registro): o mesmo arquivo em outro registro volta "repetida" (prévia da recusa).
+export function criarPortaProvaMock(): PortaProva {
+  const usados = new Map<string, { tabela: string; ids: string[] }>();
+  return {
+    emitirProvaMidia: async () => ({ ok: true, codigo: PROVA_MOCK_CODIGO, emitidoEm: PROVA_MOCK_EMITIDO_EM, assinatura: "mock", assinada: true }),
+    registrarProvaMidia: async (comando) => {
+      const uso = { tabela: comando.tabela, ids: [comando.registroId, comando.sessaoId ?? ""].filter(Boolean) };
+      for (const sha of [comando.sha256, comando.sha256Original]) if (sha) usados.set(sha, uso);
+      return { ok: true, provaId: "00000000-0000-4000-8000-000000000001", selos: comando.semRede ? ["capturada-sem-rede"] : [] };
+    },
+    conferirProvaMidia: async (comando) => {
+      const anterior = usados.get(comando.sha256);
+      if (anterior && (anterior.tabela !== comando.tabela || !anterior.ids.includes(comando.registroId))) return { resultado: "repetida", usadaEm: PROVA_MOCK_EMITIDO_EM };
+      if (!anterior) usados.set(comando.sha256, { tabela: comando.tabela, ids: [comando.registroId] });
+      return { resultado: "livre", usadaEm: null };
+    }
+  };
+}
+export const portaProvaMock = criarPortaProvaMock();
 
 async function runProvaCommand(command: Record<string, unknown>): Promise<Record<string, unknown>> {
   const response = await executeCustomApi("new_ProvaMidia", { new_Command: JSON.stringify(command) });

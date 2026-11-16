@@ -4,7 +4,6 @@
 .if-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .if-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
 
-.if-filters__search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 .if-filters__select { flex: 0 1 170px; min-width: 150px; }
 
 .if-open { display: block; max-width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
@@ -54,7 +53,6 @@
 
 @media (max-width: 560px) {
   .if-ficha__grid, .if-form__grid, .if-form__grid--3 { grid-template-columns: minmax(0, 1fr); }
-  .if-filters__search { flex: 1 1 100%; max-width: none; }
   .if-filters__select { flex: 1 1 calc(50% - var(--bt-space-2)); min-width: 0; }
   .if-row { grid-template-columns: minmax(0, 1fr); }
 }

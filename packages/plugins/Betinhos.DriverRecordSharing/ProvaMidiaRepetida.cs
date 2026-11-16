@@ -15,6 +15,15 @@ namespace Betinhos.DriverRecordSharing
         public const int Faixas = 4;
         public const int MesesConsiderados = 12;
 
+        // Foto escura, estourada ou tampada dá dHash quase todo 0 ou 1 e casaria com todas as outras assim: com menos de
+        // BitsMinimos ou mais de BitsMaximos bits ligados, o dHash fica fora da busca por faixas e só o SHA-256 vale.
+        public const int BitsMinimos = 8;
+        public const int BitsMaximos = 56;
+
+        // Teto da consulta por faixas: 4 páginas de 250 linhas. Acima disso o trace avisa e o resto não é lido.
+        public const int LinhasPorPagina = 250;
+        public const int PaginasMaximas = 4;
+
         public const string ModoObservar = "observar";
         public const string ModoBloquear = "bloquear";
 
@@ -30,6 +39,12 @@ namespace Betinhos.DriverRecordSharing
             var bits = 0;
             while (x != 0) { x &= x - 1; bits++; }
             return bits;
+        }
+
+        public static bool BaixaEntropia(ulong hash)
+        {
+            var bits = Distancia(hash, 0);
+            return bits < BitsMinimos || bits > BitsMaximos;
         }
 
         /// <summary>Faixa i (0 a 3) de 16 bits, da mais alta para a mais baixa: o valor gravado nas colunas indexáveis.</summary>

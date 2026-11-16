@@ -1,7 +1,6 @@
 /* Clientes: lista, ficha e formulário. Só tokens do Design System. */
 .cl-num { font-variant-numeric: tabular-nums; }
 .cl-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cl-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 
 .cl-open { display: grid; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .cl-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
@@ -37,5 +36,4 @@
 
 @media (max-width: 560px) {
   .cl-ficha__grid { grid-template-columns: minmax(0, 1fr); }
-  .cl-search { flex: 1 1 100%; max-width: none; }
 }

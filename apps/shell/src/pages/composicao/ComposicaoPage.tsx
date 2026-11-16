@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Check, LoaderCircle, SearchX, X } from 'lucide-react'
-import { Alert, ContextMenu, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
+import { Alert, ContextMenu, formatBuild, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
@@ -11,6 +11,7 @@ import { useComposicaoViewState } from './useComposicaoViewState'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
 import { CellHoverPreview } from './components/CellHoverPreview'
+import { ClientCard, RouteCard } from './components/CopyText'
 import { CommandConfirmDialog } from './components/CommandConfirmDialog'
 import { confirmDialogContent, useCompositionCommands, type CommandNotice, type CommandPhase, type RefreshOptions } from './components/useCompositionCommands'
 import { useTotalCount } from './components/useTotalCount'
@@ -29,7 +30,7 @@ import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMo
 import { withCalculatedTotals } from './data/composition-calculated'
 import { PROVISIONAL_LABELS } from './data/table-view'
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FormulaError, formulaErrorMessage, formulaExpressionFromInput, friendlyExpression, insertReferenceInFormula } from './formula'
-import { buildViews, COMPOSITION_TABLE, defaultViewDefinition, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
+import { buildViews, COMPOSITION_TABLE, COMPROVANTES_ID, defaultViewDefinition, isNativeColumn, deleteView, fetchViewRows, loadColumnCatalog, loadViews, saveView, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewFilter, type ViewRows } from './data/views'
 import { catalogCacheKey, readCachedCatalog, sameCatalog, writeCachedCatalog } from './data/catalog-cache'
 import { quandoOcioso } from '../../lib/ocioso'
 import { describeLoadFailure } from './data/load-failure'
@@ -38,6 +39,9 @@ import { readViewField } from './data/view-field-read'
 import { openGridRecord } from './data/record-navigation'
 import { relatedRecordId, type SavedFieldValue } from './data/related-field-edit'
 import { gridNumberInput } from './data/grid-field-value'
+import { recebimentosSource } from '../recebimentos/source'
+import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
+import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
 import './composicao.css'
 
 const column = createColumnHelper<DataTableFeatures, Composition>()
@@ -67,6 +71,9 @@ const formatDepartureDate = cachedFormatter((value) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : dateFormat.format(date)
 })
+/** Versão do build no rodapé da grade, a mesma do rodapé do menu lateral. */
+const BUILD = formatBuild(__APP_VERSION__, __BUILD_DATE__)
+
 let rowsVersionCounter = 0
 const SKELETON_COLUMNS = moneyFields.length + 4
 const SKELETON_ROWS = 12
@@ -304,7 +311,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   }, [selectedRowIds, visibleRows])
   const selectedCount = selectedVisibleRows.length
   const selectedIds = selectedVisibleRows.map((row) => row.id)
-  const queryColumnIds = JSON.stringify(viewDefinition.columns.map(({ id }) => id))
+  const queryColumnIds = JSON.stringify(viewDefinition.columns.filter(isNativeColumn).map(({ id }) => id))
   const commandLocked = commandPhase !== null || loading || loadingMore || exporting || Boolean(editing) || relatedFieldBusy || Object.values(saveFeedback).some((feedback) => feedback.status === 'saving')
   commandLockedRef.current = commandLocked
   const usingMockData = dataSource === 'mock'
@@ -1179,11 +1186,7 @@ function ComposicaoContent({ host }: { host: Host }) {
                 <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
                   {item.client}
                 </button>
-                <span className="lookup-preview__card" role="tooltip">
-                  <strong>{item.client}</strong>
-                  {item.clientRegistration && <span className="lookup-preview__detail"><span>Registro</span><span>{item.clientRegistration}</span></span>}
-                  {item.clientAddress && <span className="lookup-preview__detail"><span>Endereço</span><span>{item.clientAddress}</span></span>}
-                </span>
+                <ClientCard item={item} />
               </span>
             ) : <span className="grid-client-name" title={item.client}>{item.client}</span>}
           </span>
@@ -1199,16 +1202,12 @@ function ComposicaoContent({ host }: { host: Host }) {
             <button type="button" className="lookup-link grid-route" onClick={() => { void openGridRecord('cr40f_reservadeveculos', serviceId) }} aria-label={`Abrir serviço relacionado: ${item.route}`}>
               {item.route}
             </button>
-            <span className="lookup-preview__card" role="tooltip">
-              <strong>Serviço relacionado</strong>
-              <span>{item.route}</span>
-              <span>Cliente: {item.client}</span>
-              {item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}
-              {item.serviceStatus && <span>Status: {item.serviceStatus}</span>}
-              {item.serviceType && <span>Tipo: {item.serviceType}</span>}
-              {item.vehicleType && <span>Veículo: {item.vehicleType}</span>}
-              {item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}
-            </span>
+            <RouteCard item={item} />
+          </span>
+        ) : item.departureAddress || item.destination ? (
+          <span className="lookup-preview">
+            <span className="grid-route">{item.route}</span>
+            <RouteCard item={item} />
           </span>
         ) : <span className="grid-route" title={item.route}>{item.route}</span>
       },
@@ -1414,8 +1413,25 @@ function ComposicaoContent({ host }: { host: Host }) {
     if (result.refreshWarning) setNotice({ tone: 'warning', title: 'Campo salvo', detail: result.refreshWarning, retryRefresh: true })
   }, [catalog, valueKeyFor])
 
+  // Coluna Comprovantes: contagem por serviço relacionado só quando está na view; no mock a própria linha faz as vezes do serviço.
+  const recebimentos = recebimentosSource(host)
+  const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
+  const comprovantesVisible = viewShape.columns.some((item) => item.id === COMPROVANTES_ID)
+  const servicoDe = useCallback((row: Composition) => row.serviceId ?? (dataSource === 'mock' ? row.id : null), [dataSource])
+  const servicoIds = useMemo(() => comprovantesVisible ? rows.flatMap((row) => servicoDe(row) ?? []) : [], [comprovantesVisible, rows, servicoDe])
+  const contagem = useContagemRecebimentos(recebimentos, servicoIds)
+
   const displayedColumns = useMemo(() => {
     const base = new Map(columns.map((definition) => [definition.id, definition]))
+    const comprovantes = comprovantesVisible && catalog.find((field) => field.id === COMPROVANTES_ID)
+    if (comprovantes) base.set(COMPROVANTES_ID, column.display({
+      id: COMPROVANTES_ID, meta: { className: 'comprovantes-column' },
+      header: () => <ColumnHeader id={COMPROVANTES_ID} label={comprovantes.label} field={comprovantes} type={comprovantes.type} displayValue={(value) => value} {...columnHeaderPropsRef.current(COMPROVANTES_ID)} disabled={!catalogReady} />,
+      cell: ({ row }) => {
+        const servico = servicoDe(row.original)
+        return servico && <IndicadorRecebimentos quantidade={contagem.get(servico.toLowerCase())} onClick={() => setComprovantesDe({ id: servico, nome: row.original.route || row.original.client })} />
+      },
+    }))
     const layout = viewShape.columns
     const interactionProps = (rowId: string, id: string) => {
       const key = `${rowId}:${id}`
@@ -1468,15 +1484,15 @@ function ComposicaoContent({ host }: { host: Host }) {
           const target = id === 'client' ? item.clientId : id === 'route' ? item.serviceId : null
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
             <span className="grid-client-name" title={title}>{title}</span>
-            {id === 'client' && <span className="lookup-preview__card" role="tooltip"><strong>{item.client}</strong>{item.clientRegistration && <span>{item.clientRegistration}</span>}{item.clientAddress && <span>{item.clientAddress}</span>}</span>}
-            {id === 'route' && target && <span className="lookup-preview__card" role="tooltip"><strong>Serviço relacionado</strong><span>{item.route}</span><span>Cliente: {item.client}</span>{item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}{item.serviceStatus && <span>Status: {item.serviceStatus}</span>}{item.serviceType && <span>Tipo: {item.serviceType}</span>}{item.vehicleType && <span>Veículo: {item.vehicleType}</span>}{item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}</span>}
+            {id === 'client' && <ClientCard item={item} />}
+            {id === 'route' && (target || item.departureAddress || item.destination) && <RouteCard item={item} />}
           </span>
           return <EditableViewFieldCell field={field} value={value} formatted={id === 'client' ? item.client : undefined} display={display} viewFields={item.viewFields} valueKey={attribute} baseRecordId={item.id} ownerRecordId={item.serviceId} editable={dataSource === 'dataverse'} {...interactionProps(item.id, id)} onSaved={applySavedViewField} />
         },
       }))
     }
     return [base.get('select')!, ...layout.map((item) => base.get(item.id) ?? generic(item.id)).filter((item): item is NonNullable<typeof item> => Boolean(item))]
-  }, [applySavedViewField, catalog, catalogReady, columns, commitEdit, dataSource, openActive, statusColors, valueKeyFor, viewShape])
+  }, [applySavedViewField, catalog, catalogReady, columns, commitEdit, contagem, dataSource, openActive, servicoDe, statusColors, valueKeyFor, viewShape])
   const tableLayout = useMemo(() => [{ id: 'select', width: 36, pinned: true }, ...viewDefinition.columns], [viewDefinition])
   const resizeColumn = useCallback((id: string, width: number) => {
     const current = viewDefinitionRef.current
@@ -1689,6 +1705,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         onConfirm={() => void confirmPending()}
       />}
       {auditIds !== null && <AuditOverlay ids={auditIds} mock={dataSource === 'mock'} onClose={closeAudit} />}
+      <ComprovantesServicoDrawer servico={comprovantesDe} source={recebimentos} mobile={mobile} onClose={() => setComprovantesDe(null)} />
       <footer className="composition-footer">
         <span>
           {dataSource === 'mock'
@@ -1697,6 +1714,7 @@ function ComposicaoContent({ host }: { host: Host }) {
               ? `${getDataverseEnvironmentLabel()} · ${rows.length} composições reais · salva ao confirmar`
               : connectionError ? 'Dados não carregados' : 'Carregando dados…'}
         </span>
+        <span className="composition-version" title="Versão da tela publicada">{BUILD}</span>
       </footer>
     </section>
     </div>

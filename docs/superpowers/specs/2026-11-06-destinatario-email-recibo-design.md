@@ -13,10 +13,10 @@ recibo não chega à secretária que recebeu o link.
 - Com link gerado, o Gerar Pagantes permite pesquisar uma pessoa ou digitar um e-mail, mesmo sem enviar o e-mail do link.
 - Com destinatário diferente do pagante, a opção "Enviar também o recibo" vem marcada. Desmarcada, o recibo vai para o pagante.
 - O PDF continua no nome do pagante. O e-mail do recibo vai para o destinatário e para o financeiro, sem cópia ao pagante.
-- Pessoa cadastrada: saudação e idioma dela. E-mail digitado: saudação e idioma do pagante, no link e no recibo.
+- Saudação e idioma são sempre do pagante, no link e no recibo, com pessoa cadastrada ou e-mail digitado (revisto em 16/11/2026: a secretária paga pela executiva, e o e-mail precisa continuar no nome de quem é o pagante).
 - A regra vale para os dois flows. Pagante sem destinatário gravado segue como hoje.
 - Destinatário cadastrado sem e-mail na hora do recibo: o financeiro recebe o recibo com um aviso explicando o motivo.
-- No modal do recibo manual, um campo de e-mail vem com o destinatário atual. A troca vale só para aquele envio e saúda o pagante.
+- No modal do recibo manual, um campo de e-mail vem com o destinatário atual. A troca vale só para aquele envio.
 - O flow Enviar Recibo Personalizado fica de fora: já recebe o e-mail digitado.
 
 ## Entrega

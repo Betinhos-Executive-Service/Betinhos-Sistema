@@ -1,6 +1,6 @@
 import type { ToastState } from "../shared/ui/LocalToast";
 import { useEffect } from "react";
-import { SESSION_EXPIRED_EVENT, SESSION_EXPIRED_MESSAGE } from "../data/dataverse/fetchWebApi";
+import { SESSION_EXPIRED_EVENT } from "../data/dataverse/fetchWebApi";
 import type { AppErrorNotice } from "../shared/appErrorLogger";
 import type { ToastTone } from "../shared/ui/LocalToast";
 
@@ -9,14 +9,14 @@ type Options = {
   finalizeTimerRef: React.MutableRefObject<number | null>;
   lastGlobalErrorRef: React.MutableRefObject<{ id: string; at: number; }>;
   setCriticalError: (message: string) => void;
-  setCriticalErrorState: React.Dispatch<React.SetStateAction<string>>;
+  setSessionExpired: (expired: boolean) => void;
   setToastState: React.Dispatch<React.SetStateAction<ToastState | null>>;
   toast: ToastState | null;
   voucherDraftTimerRef: React.MutableRefObject<number | null>;
 };
 
-// Avisos globais: fecha o toast sozinho, repassa erros globais (logger e sessão expirada) e limpa timers ao sair.
-export function useAvisosGlobais({ completingClearTimerRef, finalizeTimerRef, lastGlobalErrorRef, setCriticalError, setCriticalErrorState, setToastState, toast, voucherDraftTimerRef }: Options) {
+// Avisos globais: fecha o toast sozinho, repassa erros globais do logger e a sessão expirada (tela cheia) e limpa timers ao sair.
+export function useAvisosGlobais({ completingClearTimerRef, finalizeTimerRef, lastGlobalErrorRef, setCriticalError, setSessionExpired, setToastState, toast, voucherDraftTimerRef }: Options) {
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToastState(null), toast.tone === "error" ? 3600 : 3000);
@@ -24,10 +24,10 @@ export function useAvisosGlobais({ completingClearTimerRef, finalizeTimerRef, la
   }, [toast]);
 
   useEffect(() => {
-    const showSessionExpiredPopup = () => setCriticalErrorState(SESSION_EXPIRED_MESSAGE);
-    window.addEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
+    const showSessionExpired = () => setSessionExpired(true);
+    window.addEventListener(SESSION_EXPIRED_EVENT, showSessionExpired);
     return () => {
-      window.removeEventListener(SESSION_EXPIRED_EVENT, showSessionExpiredPopup);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, showSessionExpired);
     };
   }, []);
 

@@ -54,6 +54,9 @@ export type Composition = {
   clientRegistration: string
   clientAddress: string
   route: string
+  /** Endereço de saída e destino completos da reserva (cr40f_endereodesada / cr40f_destino). */
+  departureAddress: string
+  destination: string
   departureAt: string
   status: 'Pendente' | 'Concluído'
   serviceStatus: string
@@ -66,31 +69,31 @@ export type Composition = {
 }
 
 const sampleRecords = [
-  ['Aurora Logística', 'Alphaville → Guarulhos', '2026-09-22T08:00:00-03:00'],
-  ['Horizonte Sistemas', 'Campinas → Congonhas', '2026-09-21T14:30:00-03:00'],
-  ['NorteSul Consultoria', 'Faria Lima → Viracopos', '2026-09-20T06:45:00-03:00'],
-  ['Estação Executiva', 'Santos → Avenida Paulista', '2026-09-19T10:15:00-03:00'],
-  ['Ponte Alta Eventos', 'Guarulhos → Expo Center Norte', '2026-09-18T17:00:00-03:00'],
-  ['Rota Clara Tecnologia', 'Jundiaí → Congonhas', '2026-09-17T09:20:00-03:00'],
-  ['Vale Sereno Partners', 'Moema → Barueri', '2026-09-16T07:10:00-03:00'],
-  ['Cais Central', 'Congonhas → Pinheiros', '2026-09-15T12:40:00-03:00'],
-  ['Pátio Verde Serviços', 'Brooklin → Guarulhos', '2026-09-14T08:25:00-03:00'],
-  ['Rumo Certo Projetos', 'Osasco → Congonhas', '2026-09-13T16:50:00-03:00'],
-  ['Ponto Leste Executiva', 'Tatuapé → Barueri', '2026-09-12T07:35:00-03:00'],
-  ['Sete Colinas Engenharia', 'Santo André → Viracopos', '2026-09-11T11:05:00-03:00'],
-  ['Orbe Consultoria', 'Pinheiros → Campinas', '2026-09-10T13:15:00-03:00'],
-  ['Praça Nova Soluções', 'Itaim → Guarulhos', '2026-09-09T08:40:00-03:00'],
-  ['Via Nobre Serviços', 'Mogi das Cruzes → Congonhas', '2026-09-08T15:10:00-03:00'],
-  ['Pórtico Azul', 'Vila Olímpia → Jundiaí', '2026-09-07T07:50:00-03:00'],
-  ['Campo Aberto Gestão', 'Santo Amaro → Campinas', '2026-09-06T11:35:00-03:00'],
-  ['Lume Centro Empresarial', 'Guarulhos → Brooklin', '2026-09-05T18:05:00-03:00'],
+  ['Aurora Logística', 'Alphaville → Guarulhos', '2026-09-22T08:00:00-03:00', 'Alameda Rio Negro, 500 - Alphaville, Barueri - SP', 'Aeroporto Internacional de Guarulhos, Terminal 3 - Guarulhos - SP'],
+  ['Horizonte Sistemas', 'Campinas → Congonhas', '2026-09-21T14:30:00-03:00', 'Av. José de Souza Campos, 900 - Cambuí, Campinas - SP', 'Aeroporto de Congonhas - Av. Washington Luís, s/n - Vila Congonhas, São Paulo - SP'],
+  ['NorteSul Consultoria', 'Faria Lima → Viracopos', '2026-09-20T06:45:00-03:00', 'Av. Brigadeiro Faria Lima, 3477 - Itaim Bibi, São Paulo - SP', 'Aeroporto Internacional de Viracopos - Rod. Santos Dumont, km 66, Campinas - SP'],
+  ['Estação Executiva', 'Santos → Avenida Paulista', '2026-09-19T10:15:00-03:00', 'Av. Ana Costa, 433 - Gonzaga, Santos - SP', 'Av. Paulista, 1578 - Bela Vista, São Paulo - SP'],
+  ['Ponte Alta Eventos', 'Guarulhos → Expo Center Norte', '2026-09-18T17:00:00-03:00', 'Aeroporto Internacional de Guarulhos, Terminal 3 - Guarulhos - SP', 'Expo Center Norte - R. José Bernardo Pinto, 333 - Vila Guilherme, São Paulo - SP'],
+  ['Rota Clara Tecnologia', 'Jundiaí → Congonhas', '2026-09-17T09:20:00-03:00', 'Av. Nove de Julho, 3333 - Anhangabaú, Jundiaí - SP', 'Aeroporto de Congonhas - Av. Washington Luís, s/n - Vila Congonhas, São Paulo - SP'],
+  ['Vale Sereno Partners', 'Moema → Barueri', '2026-09-16T07:10:00-03:00', 'Av. Ibirapuera, 2907 - Moema, São Paulo - SP', 'Av. Marcos Penteado de Ulhôa Rodrigues, 939 - Tamboré, Barueri - SP'],
+  ['Cais Central', 'Congonhas → Pinheiros', '2026-09-15T12:40:00-03:00', 'Aeroporto de Congonhas - Av. Washington Luís, s/n - Vila Congonhas, São Paulo - SP', 'R. dos Pinheiros, 870 - Pinheiros, São Paulo - SP'],
+  ['Pátio Verde Serviços', 'Brooklin → Guarulhos', '2026-09-14T08:25:00-03:00', 'Av. Eng. Luís Carlos Berrini, 1376 - Brooklin, São Paulo - SP', 'Aeroporto Internacional de Guarulhos, Terminal 3 - Guarulhos - SP'],
+  ['Rumo Certo Projetos', 'Osasco → Congonhas', '2026-09-13T16:50:00-03:00', 'Av. dos Autonomistas, 1400 - Vila Yara, Osasco - SP', 'Aeroporto de Congonhas - Av. Washington Luís, s/n - Vila Congonhas, São Paulo - SP'],
+  ['Ponto Leste Executiva', 'Tatuapé → Barueri', '2026-09-12T07:35:00-03:00', 'R. Tuiuti, 2000 - Tatuapé, São Paulo - SP', 'Av. Marcos Penteado de Ulhôa Rodrigues, 939 - Tamboré, Barueri - SP'],
+  ['Sete Colinas Engenharia', 'Santo André → Viracopos', '2026-09-11T11:05:00-03:00', 'Av. Industrial, 600 - Jardim, Santo André - SP', 'Aeroporto Internacional de Viracopos - Rod. Santos Dumont, km 66, Campinas - SP'],
+  ['Orbe Consultoria', 'Pinheiros → Campinas', '2026-09-10T13:15:00-03:00', 'R. dos Pinheiros, 870 - Pinheiros, São Paulo - SP', 'Av. José de Souza Campos, 900 - Cambuí, Campinas - SP'],
+  ['Praça Nova Soluções', 'Itaim → Guarulhos', '2026-09-09T08:40:00-03:00', 'R. Joaquim Floriano, 466 - Itaim Bibi, São Paulo - SP', 'Aeroporto Internacional de Guarulhos, Terminal 3 - Guarulhos - SP'],
+  ['Via Nobre Serviços', 'Mogi das Cruzes → Congonhas', '2026-09-08T15:10:00-03:00', 'Av. Vereador Narciso Yague Guimarães, 1001 - Mogi das Cruzes - SP', 'Aeroporto de Congonhas - Av. Washington Luís, s/n - Vila Congonhas, São Paulo - SP'],
+  ['Pórtico Azul', 'Vila Olímpia → Jundiaí', '2026-09-07T07:50:00-03:00', 'R. Funchal, 418 - Vila Olímpia, São Paulo - SP', 'Av. Nove de Julho, 3333 - Anhangabaú, Jundiaí - SP'],
+  ['Campo Aberto Gestão', 'Santo Amaro → Campinas', '2026-09-06T11:35:00-03:00', 'Av. Santo Amaro, 5000 - Santo Amaro, São Paulo - SP', 'Av. José de Souza Campos, 900 - Cambuí, Campinas - SP'],
+  ['Lume Centro Empresarial', 'Guarulhos → Brooklin', '2026-09-05T18:05:00-03:00', 'Aeroporto Internacional de Guarulhos, Terminal 3 - Guarulhos - SP', 'Av. Eng. Luís Carlos Berrini, 1376 - Brooklin, São Paulo - SP'],
 ] as const
 
 /** Clientes das três últimas linhas no mock de Clientes: o link de cliente abre a ficha dele por cima da grade. */
 const MOCK_CLIENTE_IDS = ['55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666', '77777777-7777-4777-8777-777777777777']
 
 export const initialCompositions: Composition[] = sampleRecords.map(
-  ([client, route, departureAt], index) => {
+  ([client, route, departureAt, departureAddress, destination], index) => {
     const values = {} as Record<MoneyField, DecimalString>
     moneyFields.forEach(({ key }, fieldIndex) => {
       const value = key === 'new_ajuste' ? (index % 2 ? -25 : 0) : 35 + (index + 1) * 17 + fieldIndex * 11.5
@@ -98,6 +101,6 @@ export const initialCompositions: Composition[] = sampleRecords.map(
     })
     values.new_subtotal = (920 + (index + 1) * 73.5).toFixed(2)
     values.new_valortotal = (1180 + (index + 1) * 91).toFixed(2)
-    return { id: `mock-${index + 1}`, clientId: MOCK_CLIENTE_IDS[index - (sampleRecords.length - MOCK_CLIENTE_IDS.length)] ?? null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, viewFields: { new_status: index % 2 ? 2 : 1, 'new_status@OData.Community.Display.V1.FormattedValue': index % 2 ? 'Concluído' : 'Pendente' }, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
+    return { id: `mock-${index + 1}`, clientId: MOCK_CLIENTE_IDS[index - (sampleRecords.length - MOCK_CLIENTE_IDS.length)] ?? null, serviceId: null, client, clientRegistration: '', clientAddress: '', route, departureAddress, destination, departureAt, status: index % 2 ? 'Concluído' as const : 'Pendente' as const, viewFields: { new_status: index % 2 ? 2 : 1, 'new_status@OData.Community.Display.V1.FormattedValue': index % 2 ? 'Concluído' : 'Pendente' }, serviceStatus: '', serviceType: '', vehicleType: '', passengers: [], values, formulas: {}, rowVersion: `mock-${index + 1}-0` }
   },
 )

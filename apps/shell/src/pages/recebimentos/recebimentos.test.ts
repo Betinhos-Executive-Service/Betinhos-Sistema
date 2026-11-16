@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
-import { agruparPorServico, metaRecebimento, ordenar, tomStatus, type Recebimento } from './domain'
-import { contarPorReserva, loadFinanceiro, loadRecebimentos, mapRecebimento } from './queries'
+import { agruparPorServico, metaRecebimento, mostraStatus, ordenar, tomStatus, type Recebimento } from './domain'
+import { mockContagemPorOp, mockRecebimentos } from './mock'
+import { mockServicos } from '../pagantes/data/mock'
+import { COMPROVANTES_COLUMN, temComprovante, usaComprovantes } from './colunaOp'
+import { contarPorOp, contarPorReserva, fetchContagemPorOp, loadFinanceiro, loadRecebimentos, mapRecebimento } from './queries'
 
 const ID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 const rec = (p: Partial<Recebimento>): Recebimento => ({ id: 'r', nome: 'a.jpg', url: 'https://example.com/a', midia: 'foto', reservaId: ID(1), ordem: null, enviadoEm: null, motorista: '', tipo: '', status: null, statusTexto: '', ...p })
@@ -39,6 +42,14 @@ describe('recebimentos: domínio', () => {
   })
 })
 
+describe('mostraStatus', () => {
+  it('esconde Enviado (o normal) e status vazio; mostra os outros', () => {
+    expect(mostraStatus({ status: 100000001, statusTexto: 'Enviado' })).toBe(false)
+    expect(mostraStatus({ status: null, statusTexto: '' })).toBe(false)
+    expect(mostraStatus({ status: 100000002, statusTexto: 'Falhou' })).toBe(true)
+  })
+})
+
 describe('recebimentos: consultas', () => {
   const client = (rows: (path: string) => Record<string, unknown>[]) => ({ getAll: vi.fn(async (path: string) => rows(path)) })
 
@@ -65,5 +76,49 @@ describe('loadFinanceiro', () => {
     expect(request.mock.calls[0][0]).toBe(`cr40f_reservadeveculoses(${ID(3)})?$select=cr40f_valor_a_receber,cr40f_receber,cr40f_formadepagamento`)
     request.mockResolvedValueOnce({})
     expect(await loadFinanceiro(client, ID(3))).toEqual({ valorAReceber: null, receber: null, formaPagamento: '' })
+  })
+})
+
+describe('recebimentos: contagem por OP', () => {
+  it('monta o FetchXML agregado: anexos → reserva, agrupado pela OP e filtrado pelas OPs do lote', () => {
+    const xml = fetchContagemPorOp([ID(1), ID(2)])
+    expect(xml).toContain('<fetch aggregate="true"><entity name="cr40f_anexorecebimento_v2">')
+    expect(xml).toContain('aggregate="count"')
+    expect(xml).toContain('<link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_reserva"')
+    expect(xml).toContain('<attribute name="cr40f_financeiro" alias="op_id" groupby="true"/>')
+    expect(xml).toContain(`<condition attribute="cr40f_financeiro" operator="in"><value>${ID(1)}</value><value>${ID(2)}</value></condition>`)
+  })
+
+  it('consulta em lotes de 50 OPs, ignora ids inválidos e repetidos e devolve a contagem do agregado por OP', async () => {
+    const ids = Array.from({ length: 120 }, (_, i) => ID(i + 1))
+    const getAll = vi.fn(async (path: string) => {
+      const xml = decodeURIComponent(path.split('fetchXml=')[1])
+      return xml.includes(ID(1)) ? [{ qtd: 3, op_id: ID(1).toUpperCase() }] : []
+    })
+    const contagem = await contarPorOp({ getAll } as unknown as DataverseClient, [...ids, ID(1), 'não-é-guid'])
+    expect(getAll).toHaveBeenCalledTimes(3)
+    expect(getAll.mock.calls[0][0]).toMatch(/^cr40f_anexorecebimento_v2s\?fetchXml=/)
+    expect([...contagem]).toEqual([[ID(1), 3]])
+  })
+
+  it('no mock a OP soma os comprovantes dos serviços de exemplo dela', () => {
+    const esperado = (id: string) => mockServicos(id, new Date()).reduce((n, s) => n + mockRecebimentos(s.id).length, 0)
+    const ids = ['mock-op-1', 'mock-op-2', 'mock-op-3', 'mock-op-4', 'mock-op-5', 'mock-op-6']
+    const contagem = mockContagemPorOp(ids)
+    for (const id of ids) expect(contagem.get(id) ?? 0).toBe(esperado(id))
+    expect(contagem.size).toBeGreaterThan(0)
+  })
+
+  it('o filtro Com/Sem compara a contagem carregada; a contagem só é buscada com a coluna visível ou usada', () => {
+    const contagem = new Map([['abc', 2]])
+    expect(temComprovante(contagem, 'ABC')).toBe(true)
+    expect(temComprovante(contagem, 'outra')).toBe(false)
+    const config = (visible: boolean, group?: { key: string }) => ({ v: 1, columns: [{ key: COMPROVANTES_COLUMN.key, visible }], sort: null, filters: {}, ...(group ? { group } : {}) }) as unknown as Parameters<typeof usaComprovantes>[0]
+    const semFiltro = { quick: {}, advanced: { items: [] } } as unknown as Parameters<typeof usaComprovantes>[1]
+    const comFiltro = { quick: { comprovantes: { type: 'condition', id: 'r', field: 'comprovantes', op: 'yes' } }, advanced: { items: [] } } as unknown as Parameters<typeof usaComprovantes>[1]
+    expect(usaComprovantes(config(true), semFiltro)).toBe(true)
+    expect(usaComprovantes(config(false), semFiltro)).toBe(false)
+    expect(usaComprovantes(config(false), comFiltro)).toBe(true)
+    expect(usaComprovantes(config(false, { key: 'comprovantes' }), semFiltro)).toBe(true)
   })
 })

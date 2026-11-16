@@ -1,5 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
+import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
 import type { Filters } from './filters'
 import { A_RECEBER, STATUS, hasFalha, label, reciboEnviado } from './status'
 import type { ChoiceSet, Contato, Pagante } from './types'
@@ -15,6 +16,7 @@ export const PAGANTE_SORT: ViewSort = { key: 'criado', dir: 'desc' }
 /** Colunas na ordem padrão; a primeira (Pagante) é fixa. */
 export const PAGANTE_COLUMNS: ViewColumnDef[] = [
   { key: 'pessoa', label: 'Pagante' },
+  COMPROVANTES_COLUMN,
   { key: 'codigo', label: 'Código' },
   { key: 'op', label: 'OP' },
   { key: 'valor', label: 'Valor' },
@@ -32,6 +34,7 @@ const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', lab
 export function paganteFields(choices: ChoiceSet): FilterField[] {
   return [
     { key: 'pessoa', label: 'Pagante', kind: 'text' },
+    COMPROVANTES_FIELD,
     { key: 'codigo', label: 'Código', kind: 'text' },
     { key: 'op', label: 'OP', kind: 'text' },
     { key: 'valor', label: 'Valor', kind: 'number', money: true },

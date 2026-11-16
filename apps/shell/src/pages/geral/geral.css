@@ -40,6 +40,11 @@
 /* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
 .gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
 /* Primeira carga: uma linha só com o loader, na largura visível (sem as colunas). */
+.gr-table .bt-table__row.gr-grouprow { display: block; position: sticky; left: 0; min-width: 0; content-visibility: visible; background-color: var(--bt-color-surface-soft); }
+.gr-table .bt-table__row.gr-grouprow .bt-groups__toggle { min-height: var(--gr-row-height); }
+.gr-grouprow__chevron.is-open { transform: rotate(90deg); }
+.gr-table .bt-table__row.gr-grouprow--foot { background-color: transparent; }
+.gr-grouprow__foot { display: flex; align-items: center; gap: var(--bt-space-2); min-height: 36px; padding: 0 var(--bt-space-4) 0 var(--bt-space-6); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gr-table .bt-table__row.gr-table__loading { display: block; min-width: 0; content-visibility: visible; }
 /* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
 .gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
@@ -97,7 +102,7 @@
 
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
-  /* Padding e espaçamentos padrão das listas (`.page`: 22/26/32 px; barra de comandos com 12 px até a tabela). */
+  /* Padding das listas (`.page--full`: 22/16/16 px; barra de comandos com 12 px até a tabela). */
   .page.gr-page { height: 100dvh; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
   .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
   .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
@@ -301,15 +306,3 @@
 .gr-sheet__comprovantes .cmp-comprovantes { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 .gr-sheet__comprovantes .cmp-comprovante__previa { height: 120px; }
 
-/* Indicador de comprovantes de recebimento ao lado do ID (abre o drawer do serviço). */
-.gr-recebimentos { display: inline-flex; align-items: center; gap: 3px; flex: none; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--bt-color-success) 30%, transparent); border-radius: var(--bt-radius-full); background: var(--bt-color-success-soft); color: var(--bt-color-success); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; line-height: 18px; cursor: pointer; transition: color 120ms ease-out, border-color 120ms ease-out; }
-.gr-recebimentos:hover { border-color: var(--bt-color-success); }
-.gr-recebimentos:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
-.gr-recebimentos:active { transform: scale(.97); }
-@media (pointer: coarse) { .gr-recebimentos { min-height: 32px; padding: 0 10px; } }
-/* Coluna Comprovantes estreita (o padrão): o título vira o cifrão; o nome segue no title e no aria-label do cabeçalho. */
-[role="columnheader"][data-col="comprovantes"] { container: gr-comprovantes / inline-size; }
-@container gr-comprovantes (max-width: 130px) {
-  .bt-colhead__label { font-size: 0; }
-  .bt-colhead__label::before { content: ""; display: inline-block; width: 14px; height: 14px; vertical-align: middle; background-color: var(--bt-color-success); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' x2='12' y1='2' y2='22'/%3E%3Cpath d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/%3E%3C/svg%3E") center / contain no-repeat; }
-}

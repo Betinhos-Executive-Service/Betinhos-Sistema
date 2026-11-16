@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, Dialog, EmptyState, MetricCard, SearchBox, SegmentedControl, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
 import { Clock, Copy, Paperclip, ReceiptText, RefreshCw, SearchX, UserCheck, Wallet } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
@@ -91,8 +92,9 @@ function Despesas({ host }: { host: Host }) {
   const sorted = useMemo(() => {
     const sort = view.config.sort
     return extra.sort(choices && sort ? sortDespesas(list, sort.key, sort.dir, choices, compras) : list, sort, (d) => d.id)
-  }, [list, choices, view.config.sort, compras])
-  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readDespesa, (d) => d.id)), [sorted, filters, allFields, extra])
+  }, [list, choices, view.config.sort, compras, extra])
+  const read = useMemo(() => extra.read(readDespesa, (d) => d.id), [extra])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Despesa>(despesaKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -108,6 +110,7 @@ function Despesas({ host }: { host: Host }) {
   // Os cartões de totais só valem com a lista inteira: até lá ficam carregando.
   const pending = !despesas.complete && despesas.loading
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
 
   // Grava a decisão, reflete na lista e, na revisão em lote, abre a próxima despesa esperando o gestor.
   const decidir = useCallback(async (d: Despesa, tipo: Decisao, motivo: string): Promise<boolean> => {
@@ -137,8 +140,9 @@ function Despesas({ host }: { host: Host }) {
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload(); void conciliacao.reload() }, [despesas.reload, conciliacao.reload])
   const loadingFirst = !choices
   const reloading = despesas.loading && !loadingFirst
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />, [refresh, reloading])
-  useShellHeader({ title: 'Despesas operacionais', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Despesas operacionais' })
+  const size = mobile ? 'touch' : 'default'
   const clearAll = () => { clearFilters(); setQuery('') }
   // Cada cartão de total abre a visão pronta correspondente; clicar de novo volta à visão padrão. Com a visão atual
   // alterada e não salva, pergunta antes de trocar.
@@ -161,11 +165,15 @@ function Despesas({ host }: { host: Host }) {
     const empty = pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma despesa com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Despesa[], tableFooter?: ReactNode) => (
+      <DespesasTable list={rows} choices={choices} compras={compras} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} loading={despesas.loading && !list.length} />
+    )
+    const cards = (rows: Despesa[]) => <DespesasCards list={rows} choices={choices} onOpen={setSelectedId} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <DespesasCards list={slice} choices={choices} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <DespesasTable list={slice} choices={choices} compras={compras} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} loading={despesas.loading && !list.length} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -178,12 +186,11 @@ function Despesas({ host }: { host: Host }) {
         options={[{ value: 'despesas', label: 'Despesas' }, { value: 'sem-despesa', label: `Compras sem despesa${conciliacao.loaded ? ` (${contarSemDespesa(conciliacao.transacoes)})` : ''}` }]} />
       {fila === 'sem-despesa' ? <ComprasSemDespesa data={conciliacao} source={conciliacaoSource} mobile={mobile} onOpen={setCompraId} onRefresh={() => void conciliacao.reload()} /> : (
       <>
-      <div role="toolbar" aria-label="Comandos de despesas" className="dp-barra">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
-          {/* O cabeçalho do shell (com o Atualizar de headerActions) só aparece no celular; no desktop o botão fica aqui. */}
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}
+      <div role="toolbar" aria-label="Comandos de despesas">
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {despesas.error && !choices ? null : (

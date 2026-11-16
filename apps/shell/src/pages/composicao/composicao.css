@@ -305,7 +305,10 @@
 .composicao .lookup-preview__detail { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; }
 .composicao .lookup-preview__detail > span:first-child { color: var(--bt-color-text-secondary); }
 .composicao .lookup-preview__detail > span:last-child { overflow-wrap: anywhere; }
-.composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); }
+.composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; transition-delay: 0ms; }
+/* Padrão de hover card: o ponteiro entra no cartão sem ele sumir (ponte sobre o vão e saída com atraso curto) e o texto é selecionável. */
+.composicao .lookup-preview__card { cursor: auto; user-select: text; pointer-events: auto; transition: opacity 120ms ease 100ms, transform 120ms ease 100ms, visibility 0s linear 220ms; }
+.composicao .lookup-preview__card::before { position: absolute; inset: -8px 0 100% 0; content: ''; }
 .composicao .grid-client > .lookup-preview, .composicao .grid-client > .lookup-preview .lookup-link, .composicao .grid-client-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composicao .grid-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--bt-color-warning); }
 .composicao .grid-status--done { background: var(--bt-color-success); }
@@ -322,6 +325,8 @@
 .composicao .grid-related-link { display: inline-block; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; white-space: nowrap; }
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
+/* Trajeto: o cartão abre abaixo da linha do texto, sem cobrir o trajeto sob o ponteiro. */
+.composicao .fixed-col--route .lookup-preview { display: block; max-width: 100%; }
 .composicao .grid-route { display: block; overflow: hidden; color: var(--bt-color-text-primary); text-overflow: ellipsis; white-space: nowrap; }
 .composicao .money-cell { position: relative; display: flex; width: calc(100% + 18px); height: calc(var(--composition-row-h, 38px) - 1px); margin-inline: -9px; align-items: center; justify-content: flex-end; padding: 0 9px; outline: 0; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; cursor: text; }
 .composicao .money-cell--selected { z-index: 1; background: var(--bt-color-surface-soft); outline: 1px solid var(--bt-focus-border); outline-offset: -1px; }
@@ -369,7 +374,7 @@
 .composicao .composition-empty-state button:hover { background: var(--bt-color-surface-soft); }
 .composicao .composition-empty-state button:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 2px; }
 .composicao .composition-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border-top: 1px solid var(--bt-color-canvas); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); }
-.composicao .composition-version { flex: 0 0 auto; }
+.composicao .composition-version { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composicao .cell-actions-popover { width: 190px; }
 .composicao .cell-action { width: 100%; padding: 7px 8px; border: 0; border-radius: var(--bt-radius-xs); background: transparent; color: var(--bt-color-ink-900); font-size: var(--bt-font-size-11); text-align: left; cursor: pointer; }
 .composicao .cell-action:hover, .composicao .cell-action:focus-visible { outline: 0; background: var(--bt-color-surface-soft); }
@@ -427,11 +432,48 @@
 @media (prefers-reduced-motion: reduce) { .composicao .grid-field-options { transition: none; } .composicao .grid-field-cell .cell-save-feedback { animation: none; } }
 
 /* Popup do hover da célula: texto completo ao lado do mouse; fórmula mostra o resultado em cima e a conta embaixo. */
-.composicao .cell-hover-preview { position: fixed; z-index: 60; pointer-events: none; }
-.composicao .cell-hover-preview__card { display: grid; gap: 4px; max-width: min(360px, calc(100vw - 32px)); padding: 7px 10px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-ink-900); font-size: var(--bt-font-size-12); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 1; transform: scale(1); transition: opacity 125ms cubic-bezier(0.23, 1, 0.32, 1), transform 125ms cubic-bezier(0.23, 1, 0.32, 1); }
+.composicao .cell-hover-preview { position: fixed; z-index: 60; }
+.composicao .cell-hover-preview__card { display: grid; gap: 4px; max-width: min(360px, calc(100vw - 32px)); padding: 7px 10px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-ink-900); font-size: var(--bt-font-size-12); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; cursor: auto; user-select: text; opacity: 1; transform: scale(1); transition: opacity 125ms cubic-bezier(0.23, 1, 0.32, 1), transform 125ms cubic-bezier(0.23, 1, 0.32, 1); }
 @starting-style { .composicao .cell-hover-preview__card { opacity: 0; transform: scale(0.97); } }
 .composicao .cell-hover-preview__card[data-instant] { transition-duration: 0ms; }
 .composicao .cell-hover-preview__value { font-weight: 600; font-variant-numeric: tabular-nums; }
 .composicao .cell-hover-preview__formula { display: flex; gap: 6px; align-items: baseline; padding-top: 4px; border-top: 1px solid var(--bt-color-border); color: var(--bt-color-slate-700); font-family: var(--bt-font-mono); font-size: 11px; }
 .composicao .cell-hover-preview__formula > span { color: var(--bt-color-text-secondary); font-style: italic; }
 @media (prefers-reduced-motion: reduce) { .composicao .cell-hover-preview__card { transition-property: opacity; transform: none; } }
+
+/* Texto copiável dos popups: sublinha no hover, clique copia e mostra "Copiado" na hora. */
+.composicao .copy-text { position: relative; display: inline; border-radius: 3px; cursor: copy; text-decoration: underline transparent; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: text-decoration-color 80ms ease, background-color 80ms ease; }
+.composicao .copy-text:hover, .composicao .copy-text:focus-visible { text-decoration-color: currentColor; }
+.composicao .copy-text:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 1px; }
+.composicao .copy-text:active { background: var(--bt-color-surface-soft); }
+.composicao .copy-text[data-copied] { background: var(--bt-color-success-soft); text-decoration-color: transparent; transition-duration: 0ms; }
+.composicao .copy-text__feedback:empty { display: none; }
+.composicao .copy-text__feedback { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px 0 4px; border-radius: var(--bt-radius-full); background: var(--bt-color-success); color: var(--bt-color-surface); font-size: 10px; font-weight: 600; line-height: 16px; margin-block: -4px; vertical-align: middle; white-space: nowrap; user-select: none; animation: copy-text-pop 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes copy-text-pop { from { opacity: 0; transform: scale(0.85); } }
+@media (prefers-reduced-motion: reduce) { .composicao .copy-text__feedback { animation: none; } }
+
+/* Cartão do trajeto: trajeto em destaque e saída → destino em linha do tempo. */
+.composicao .route-card { --route-ease-out: cubic-bezier(.23, 1, .32, 1); gap: 0; width: min(360px, calc(100vw - 48px)); padding: 0 0 12px; overflow: hidden; border-radius: 12px; color: var(--bt-color-text-primary); transform-origin: top left; }
+.composicao .route-card__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 0; }
+.composicao .route-card__eyebrow { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.composicao .route-card__title { padding: 4px 16px 12px; color: var(--bt-color-ink-900); font-size: var(--bt-font-size-14); font-weight: 600; line-height: 1.35; }
+.composicao .route-card__stops { position: relative; display: grid; gap: 12px; margin: 0 12px; padding: 12px 12px 12px 32px; border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); }
+.composicao .route-card__stop { position: relative; display: grid; gap: 1px; line-height: 1.4; }
+.composicao .route-card__dot { position: absolute; top: 3px; left: -20px; width: 10px; height: 10px; border: 2px solid var(--bt-color-action); border-radius: 50%; background: var(--bt-color-surface); }
+.composicao .route-card__stop--to .route-card__dot { border-color: var(--bt-color-ink-900); background: var(--bt-color-ink-900); }
+/* Linha tracejada ligando cada parada à seguinte, qualquer que seja a altura do endereço. */
+.composicao .route-card__stop:not(:last-child)::after { position: absolute; top: 15px; bottom: -13px; left: -16px; border-left: 1.5px dashed var(--bt-color-slate-400); content: ''; transform-origin: top; }
+.composicao .route-card__label { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: 500; }
+.composicao .route-card__stop .copy-text { overflow-wrap: anywhere; }
+
+/* Movimento: entra em 200 ms (ease-out) e sai em 150 ms (ease-in) depois da folga de 100 ms; as paradas entram em sequência e a linha se desenha da saída ao destino. */
+.composicao .route-card { transform: translateY(-4px) scale(.98); transition: opacity 150ms ease-in 100ms, transform 150ms ease-in 100ms, visibility 0s linear 250ms; }
+.composicao .lookup-preview:hover .route-card, .composicao .lookup-preview:focus-within .route-card { transform: none; transition: opacity 200ms var(--route-ease-out), transform 200ms var(--route-ease-out), visibility 0s; }
+.composicao .route-card__stop { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease-in, transform 120ms ease-in; }
+.composicao .route-card__stop:not(:last-child)::after { transform: scaleY(0); transition: transform 120ms ease-in; }
+.composicao .lookup-preview:hover .route-card__stop, .composicao .lookup-preview:focus-within .route-card__stop { opacity: 1; transform: none; transition: opacity 220ms var(--route-ease-out) 60ms, transform 220ms var(--route-ease-out) 60ms; }
+.composicao .lookup-preview:hover .route-card__stop--to, .composicao .lookup-preview:focus-within .route-card__stop--to { transition-delay: 140ms; }
+.composicao .lookup-preview:hover .route-card__stop:not(:last-child)::after, .composicao .lookup-preview:focus-within .route-card__stop:not(:last-child)::after { transform: scaleY(1); transition: transform 260ms var(--route-ease-out) 100ms; }
+@media (prefers-reduced-motion: reduce) {
+  .composicao .route-card, .composicao .lookup-preview:hover .route-card, .composicao .route-card__stop, .composicao .lookup-preview:hover .route-card__stop, .composicao .route-card__stop:not(:last-child)::after, .composicao .lookup-preview:hover .route-card__stop:not(:last-child)::after { transform: none; transition-property: opacity, visibility; }
+}

@@ -2,9 +2,7 @@
 .eq-num { font-variant-numeric: tabular-nums; }
 .eq-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .eq-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
-.eq-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 /* Tipos e Novo equipamento quebram de linha juntos na ViewBar. */
-.eq-acoes { display: inline-flex; flex: 0 0 auto; align-items: center; gap: var(--bt-space-2); }
 
 /* Miniatura da capa (ou ícone do tipo) ao lado da descrição, na tabela e nos cards. */
 .eq-name { display: inline-flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }

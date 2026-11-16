@@ -1,7 +1,9 @@
 import { dataUrlToBase64 } from "../../data/dataverse/arquivos.ts";
 import { reportAppError } from "../../shared/appErrorLogger.ts";
 import { PDFDocument } from "pdf-lib";
+import { getVideoDurationSecondsFromUrl } from "../../shared/camera/photoOrientation.ts";
 import { loadMediaDraft, saveMediaDraft } from "./mediaDraftStore.ts";
+import { novoIdProva } from "./sessaoDoRascunho.ts";
 import {
   BYTES_EXIF,
   DHASH_ALTURA,
@@ -11,8 +13,7 @@ import {
   leitorDeArquivo,
   lerExifJpeg,
   lerMvhd,
-  referenciaIso,
-  seloDaJanela
+  referenciaIso
 } from "./metadadosArquivo.ts";
 import {
   conferirProvaMidiaRemote,
@@ -54,10 +55,12 @@ export type SessaoProva = OrigemProva & {
   semRede: boolean;
   /** Atualizada quando o celular responde; a captura usa o que houver no momento, sem esperar. */
   localizacao: LocalizacaoProva;
+  /** Id real do registro novo, conhecido no envio; registroId continua o da sessão (assinado no emitir). */
+  registroReal?: string;
 };
 
 export type DadosProva = Pick<ComandoRegistroProva, "tipoMidia" | "tamanhoBytes" | "duracaoSegundos" | "sha256" | "origemCaptura" | "capturadoEm" | "localizacao">
-  & Pick<ComandoRegistroProva, "sha256Original" | "dhashes" | "paginas" | "metadados" | "dataReferencia">;
+  & Pick<ComandoRegistroProva, "sha256Original" | "dhashes" | "paginas" | "metadados" | "dataReferencia" | "idCliente">;
 export type ContextoCarimbo = { placa?: string; registro?: string };
 export type EntradaProva = { sessao: SessaoProva; dados: DadosProva; link?: string; criadoEm: number };
 export type FilaProvas = { carregar: () => Promise<EntradaProva[]>; gravar: (lista: EntradaProva[]) => Promise<void> };
@@ -110,8 +113,8 @@ export function acceptDaGaleria(tela: TelaProva) {
 
 export type ArquivoDaGaleria =
   | { ok: false; erro: string }
-  | { ok: true; tipo: "foto" | "pdf"; dataUrl: string; dados: DadosProva; selo: string | null; parecida: boolean }
-  | { ok: true; tipo: "video"; video: Blob; dados: DadosProva; selo: string | null; parecida: boolean };
+  | { ok: true; tipo: "foto" | "pdf"; dataUrl: string; dados: DadosProva }
+  | { ok: true; tipo: "video"; video: Blob; dados: DadosProva };
 
 const formatoDia = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -171,12 +174,20 @@ export function formatarDuracao(segundos: number) {
   return `${min} min ${seg} s`;
 }
 
-/** Motivo da recusa de um vídeo (câmera ou galeria), com o número real, ou "" quando cabe nos limites. */
-export function validarVideo(video: { duracaoSegundos: number | null; tamanhoBytes: number }) {
+export const VIDEO_SEM_DURACAO = "Não consegui ler a duração do vídeo. Grave de novo pela câmera do app.";
+
+/**
+ * Motivo da recusa de um vídeo, com o número real, ou "" quando cabe nos limites. Duração desconhecida (null, Infinity,
+ * NaN: comum no WebM do MediaRecorder) só é recusada com `exigirDuracao` (galeria); na gravação ao vivo ela vem do
+ * cronômetro do app.
+ */
+export function validarVideo(video: { duracaoSegundos: number | null; tamanhoBytes: number }, opcoes: { exigirDuracao?: boolean } = {}) {
   if (video.tamanhoBytes > VIDEO_MAX_BYTES) {
     return `Vídeo muito grande (${formatarMb(video.tamanhoBytes)}). O limite é ${formatarMb(VIDEO_MAX_BYTES)}: grave um vídeo mais curto.`;
   }
-  const duracao = video.duracaoSegundos ?? 0;
+  const conhecida = video.duracaoSegundos !== null && Number.isFinite(video.duracaoSegundos);
+  if (!conhecida && opcoes.exigirDuracao) return VIDEO_SEM_DURACAO;
+  const duracao = conhecida ? video.duracaoSegundos ?? 0 : 0;
   if (duracao > VIDEO_MAX_SEGUNDOS) return `Vídeo muito longo (${formatarDuracao(duracao)}). O limite é ${formatarDuracao(VIDEO_MAX_SEGUNDOS)}.`;
   return "";
 }
@@ -312,7 +323,8 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     return sessao;
   }
 
-  async function aplicarNaFoto(sessao: SessaoProva, fotoDataUrl: string, contexto: ContextoCarimbo, origemCaptura: OrigemCaptura, opcoes: { maxLado?: number; qualidade?: number } = {}) {
+  /** `original`: arquivo que a câmera nativa deixou na galeria; o SHA dele pega o reenvio desse arquivo pela galeria. */
+  async function aplicarNaFoto(sessao: SessaoProva, fotoDataUrl: string, contexto: ContextoCarimbo, origemCaptura: OrigemCaptura, opcoes: { maxLado?: number; qualidade?: number; original?: Blob } = {}) {
     const capturadoEm = agora();
     const original = await deps.desenho.carregar(fotoDataUrl);
     const plano = planejarFoto(original.largura, original.altura, opcoes.maxLado);
@@ -324,8 +336,9 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     // Dois dHash: o da cena (antes do carimbo) e o da foto final, para pegar quem salva a foto carimbada e reenvia da galeria.
     const dados: DadosProva = {
       tipoMidia: "foto", tamanhoBytes: bytes.length, duracaoSegundos: null, sha256: await sha256Hex(bytes),
-      origemCaptura, capturadoEm: capturadoEm.toISOString(), localizacao: sessao.localizacao,
-      dhashes: [dhashDe(deps.desenho, original.imagem), dhashDe(deps.desenho, tela.imagem)]
+      origemCaptura, capturadoEm: capturadoEm.toISOString(), localizacao: sessao.localizacao, idCliente: novoIdProva(),
+      dhashes: [dhashDe(deps.desenho, original.imagem), dhashDe(deps.desenho, tela.imagem)],
+      sha256Original: opcoes.original ? await sha256Hex(await opcoes.original.arrayBuffer()) : undefined
     };
     await guardar({ sessao, dados, criadoEm: capturadoEm.getTime() });
     return { dataUrl, dados };
@@ -335,7 +348,7 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     const capturadoEm = agora();
     const dados: DadosProva = {
       tipoMidia: "video", tamanhoBytes: video.size, duracaoSegundos: duracaoSegundos === null ? null : Math.round(duracaoSegundos * 10) / 10, sha256: await sha256Hex(await video.arrayBuffer()),
-      origemCaptura, capturadoEm: capturadoEm.toISOString(), localizacao: sessao.localizacao
+      origemCaptura, capturadoEm: capturadoEm.toISOString(), localizacao: sessao.localizacao, idCliente: novoIdProva()
     };
     await guardar({ sessao, dados, criadoEm: capturadoEm.getTime() });
     return dados;
@@ -362,7 +375,7 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     if (!tipo || !aceito) return { ok: false, erro: "Este tipo de arquivo não é aceito nesta tela." };
     const agoraCaptura = agora();
     const referencia = referenciaIso(opcoes.referencia);
-    const base = { origemCaptura: "galeria" as const, capturadoEm: agoraCaptura.toISOString(), localizacao: sessao.localizacao, dataReferencia: referencia };
+    const base = { origemCaptura: "galeria" as const, capturadoEm: agoraCaptura.toISOString(), localizacao: sessao.localizacao, dataReferencia: referencia, idCliente: novoIdProva() };
 
     if (tipo === "pdf") {
       if (arquivo.size > PDF_MAX_BYTES) return { ok: false, erro: validarPdf({ tamanhoBytes: arquivo.size, paginas: 0 }) };
@@ -375,12 +388,12 @@ export function criarProvaCaptura(deps: DependenciasProva) {
       if (conferencia?.resultado === "repetida") return { ok: false, erro: mensagemRepetida("pdf", conferencia.usadaEm) };
       const dados: DadosProva = { ...base, tipoMidia: "pdf", tamanhoBytes: bytes.length, duracaoSegundos: null, sha256, paginas, metadados: null };
       await guardar({ sessao, dados, criadoEm: agoraCaptura.getTime() });
-      return { ok: true, tipo: "pdf", dataUrl: `data:application/pdf;base64,${base64DeBytes(bytes)}`, dados, selo: null, parecida: false };
+      return { ok: true, tipo: "pdf", dataUrl: `data:application/pdf;base64,${base64DeBytes(bytes)}`, dados };
     }
 
     if (tipo === "video") {
       const duracao = deps.duracaoVideo ? await deps.duracaoVideo(arquivo).catch(() => null) : null;
-      const recusa = validarVideo({ duracaoSegundos: duracao, tamanhoBytes: arquivo.size });
+      const recusa = validarVideo({ duracaoSegundos: duracao, tamanhoBytes: arquivo.size }, { exigirDuracao: true });
       if (recusa) return { ok: false, erro: recusa };
       const metadados = await lerMvhd(leitorDeArquivo(arquivo), arquivo.size, agoraCaptura);
       const sha256 = await sha256Hex(await arquivo.arrayBuffer());
@@ -390,19 +403,22 @@ export function criarProvaCaptura(deps: DependenciasProva) {
         ...base, tipoMidia: "video", tamanhoBytes: arquivo.size, duracaoSegundos: duracao === null ? null : Math.round(duracao * 10) / 10, sha256, metadados
       };
       await guardar({ sessao, dados, criadoEm: agoraCaptura.getTime() });
-      return { ok: true, tipo: "video", video: arquivo, dados, selo: seloDaJanela(metadados.dataGravada, referencia, agoraCaptura), parecida: conferencia?.resultado === "parecida-em-observacao" };
+      return { ok: true, tipo: "video", video: arquivo, dados };
     }
 
-    // Foto: metadados antes de qualquer redução (o canvas apaga o EXIF).
-    const inicio = await leitorDeArquivo(arquivo)(0, BYTES_EXIF);
-    const metadados = inicio[0] === 0xff && inicio[1] === 0xd8 ? lerExifJpeg(inicio) : SEM_METADADOS;
+    // Foto: uma leitura só. Metadados antes de qualquer redução (o canvas apaga o EXIF); a imagem abre pelo blob URL.
     const originais = new Uint8Array(await arquivo.arrayBuffer());
+    const inicio = originais.subarray(0, BYTES_EXIF);
+    const metadados = inicio[0] === 0xff && inicio[1] === 0xd8 ? lerExifJpeg(inicio) : SEM_METADADOS;
     const sha256Original = await sha256Hex(originais);
     let original: Awaited<ReturnType<Desenho["carregar"]>>;
+    const url = URL.createObjectURL(arquivo);
     try {
-      original = await deps.desenho.carregar(`data:${arquivo.type || "image/jpeg"};base64,${base64DeBytes(originais)}`);
+      original = await deps.desenho.carregar(url);
     } catch {
       return { ok: false, erro: "Não foi possível abrir esta imagem. Escolha outra ou tire uma foto." };
+    } finally {
+      URL.revokeObjectURL(url);
     }
     const dhash = dhashDe(deps.desenho, original.imagem);
     const conferencia = await conferir(sessao, sha256Original, [dhash]);
@@ -416,14 +432,18 @@ export function criarProvaCaptura(deps: DependenciasProva) {
       ...base, tipoMidia: "foto", tamanhoBytes: bytes.length, duracaoSegundos: null, sha256: await sha256Hex(bytes), sha256Original, dhashes: [dhash], metadados
     };
     await guardar({ sessao, dados, criadoEm: agoraCaptura.getTime() });
-    return { ok: true, tipo: "foto", dataUrl, dados, selo: seloDaJanela(metadados.dataGravada, referencia, agoraCaptura), parecida: conferencia?.resultado === "parecida-em-observacao" };
+    return { ok: true, tipo: "foto", dataUrl, dados };
   }
 
   /** Registra a prova depois que o flow devolveu o link. Nunca lança: falha deixa a prova pendente. */
   async function registrar(sessao: SessaoProva, link: string, dados: DadosProva, criadoEm = agora().getTime()): Promise<"registrada" | "pendente" | "recusada"> {
+    // Registro novo: vai o id real (lookups, janela pela data do registro, reenvio no mesmo registro) e o da sessão,
+    // que o servidor usa na assinatura e para reconhecer o mesmo rascunho.
+    const real = sessao.registroReal && sessao.registroReal !== sessao.registroId ? sessao.registroReal : null;
     const comando: ComandoRegistroProva = {
-      tela: sessao.tela, tabela: sessao.tabela, registroId: sessao.registroId, codigo: sessao.codigo,
-      emitidoEm: sessao.emitidoEm, assinatura: sessao.assinatura, semRede: sessao.semRede, ...dados, link
+      tela: sessao.tela, tabela: sessao.tabela, registroId: real ?? sessao.registroId, codigo: sessao.codigo,
+      emitidoEm: sessao.emitidoEm, assinatura: sessao.assinatura, semRede: sessao.semRede, ...dados, link,
+      ...(real ? { sessaoId: sessao.registroId } : {})
     };
     try {
       const resultado = await deps.porta.registrarProvaMidia(comando);
@@ -438,15 +458,20 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     }
   }
 
-  /** Acha a prova pelo SHA-256 dos bytes enviados (o mesmo arquivo que saiu da câmera) e registra. */
-  async function registrarArquivo(dataUrl: string, link: string) {
+  /**
+   * Acha a prova pelo SHA-256 dos bytes enviados (o mesmo arquivo que saiu da câmera) e registra. `destino`: o registro
+   * que recebeu o arquivo; com a mesma tabela da sessão, o id dele vira o id real da prova (registro novo).
+   */
+  async function registrarArquivo(dataUrl: string, link: string, destino?: { tabela: string; registroId: string }) {
     try {
       const tamanho = tamanhoDoDataUrl(dataUrl);
       const candidatas = await naFila(async (lista) => ({ valor: lista.filter((item) => item.dados.tamanhoBytes === tamanho) }));
       if (!candidatas.length) return "sem-prova";
       const sha256 = await sha256Hex(bytesDoDataUrl(dataUrl));
       const entrada = candidatas.find((item) => item.dados.sha256 === sha256);
-      return entrada ? registrar(entrada.sessao, link, entrada.dados, entrada.criadoEm) : "sem-prova";
+      if (!entrada) return "sem-prova";
+      const sessao = destino?.registroId && destino.tabela === entrada.sessao.tabela ? { ...entrada.sessao, registroReal: destino.registroId } : entrada.sessao;
+      return registrar(sessao, link, entrada.dados, entrada.criadoEm);
     } catch (erro) {
       aoFalhar(erro, "registrar-arquivo");
       return "pendente";
@@ -552,16 +577,14 @@ const desenhoNavegador: Desenho = {
   }
 };
 
-function duracaoVideoNavegador(video: Blob) {
+/** Duração pelo <video>, com o tempo limite de 4,5 s do helper da câmera (sem metadados = null, nunca trava). */
+async function duracaoVideoNavegador(video: Blob) {
   const url = URL.createObjectURL(video);
-  return new Promise<number | null>((resolve) => {
-    const elemento = document.createElement("video");
-    const fim = (valor: number | null) => { URL.revokeObjectURL(url); resolve(valor); };
-    elemento.preload = "metadata";
-    elemento.onloadedmetadata = () => fim(Number.isFinite(elemento.duration) ? elemento.duration : null);
-    elemento.onerror = () => fim(null);
-    elemento.src = url;
-  });
+  try {
+    return await getVideoDurationSecondsFromUrl(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 const filaNavegador: FilaProvas = {

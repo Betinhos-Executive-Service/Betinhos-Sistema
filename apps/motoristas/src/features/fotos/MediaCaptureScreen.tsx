@@ -513,7 +513,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
           const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
           const durationSeconds = (Date.now() - recordingStartedAtRef.current) / 1000;
           // 4 Mbps x 120 s cabe em 70 MB; codificador que ignora a taxa ainda é barrado aqui.
-          const refusal = validarVideo({ duracaoSegundos: null, tamanhoBytes: blob.size });
+          const refusal = validarVideo({ duracaoSegundos: durationSeconds, tamanhoBytes: blob.size });
           if (refusal) throw new Error(refusal);
           void registrarVideo(blob, "camera-ao-vivo", durationSeconds);
           previewUrl = URL.createObjectURL(blob);
@@ -618,7 +618,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
     try {
       const dataUrl = await readPhotoFileAsDataUrl(file, 0);
-      onCapture(await finalizarFoto(dataUrl, "camera-nativa"));
+      onCapture(await finalizarFoto(dataUrl, "camera-nativa", file));
     } catch (error) {
       reportAppError(error, {
         severity: "error",
@@ -792,7 +792,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               {avisoLocalizacao ? (
                 <div className="camera-start-panel camera-location-notice" role="dialog" aria-modal="false" aria-labelledby="aviso-localizacao-titulo">
                   <strong id="aviso-localizacao-titulo">Localização</strong>
-                  <span>A localização fica registrada junto da foto como prova. Você pode negar e continuar usando a câmera.</span>
+                  <span>A localização fica registrada junto da foto como prova.</span>
                   <button type="button" onClick={() => { confirmarAvisoLocalizacao(); setAvisoLocalizacao(false); }}>Entendi</button>
                 </div>
               ) : null}

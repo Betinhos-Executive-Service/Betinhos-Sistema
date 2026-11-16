@@ -2,7 +2,8 @@ import { todaySaoPaulo } from '@betinhos/ui'
 import { moneyFields, type Composition } from './compositions'
 import type { CompositionTotalRow } from './dataverse'
 import { fetchDateRange, isDay } from './date-ranges'
-import type { CatalogField, SavedView, ViewDefinition } from './views'
+import { mockRecebimentos } from '../../recebimentos/mock'
+import { COMPROVANTES_FIELD, COMPROVANTES_ID, type CatalogField, type SavedView, type ViewDefinition } from './views'
 
 const STORAGE_KEY = 'tela-composicao-preco:mock-views:v1'
 
@@ -13,6 +14,7 @@ export function mockColumnCatalog(): CatalogField[] {
     { id: 'route', label: 'Trajeto', type: 'String' },
     { id: 'date', label: 'Data', type: 'DateTime' },
     ...moneyFields.map(({ key, label }) => ({ id: key, label, type: 'Money' })),
+    COMPROVANTES_FIELD,
   ].map((field) => ({ ...field, table: field.id === 'client' ? 'cr40f_clientes1' : field.id === 'route' ? 'cr40f_reservadeveiculos' : 'cr40f_composicaodeprecos', tableLabel: field.id === 'client' ? 'Clientes' : field.id === 'route' ? 'Reserva de Veículos' : 'Composição de Preços', attribute: field.id, path: field.id === 'client' || field.id === 'route' ? [field.id] : [], available: true, pickerEligible: true }))
 }
 
@@ -50,6 +52,7 @@ function value(row: MockViewRow, id: string): string {
   if (id === 'client') return row.client
   if (id === 'route') return row.route
   if (id === 'date' || id === 'modifiedon') return row.departureAt
+  if (id === COMPROVANTES_ID) return mockRecebimentos(row.id).length ? 'true' : 'false'
   return row.values[id as keyof typeof row.values] ?? ''
 }
 

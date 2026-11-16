@@ -1,4 +1,4 @@
-import type { StatusTone } from '@betinhos/ui'
+import type { FilterOption, StatusTone } from '@betinhos/ui'
 import type { Comprovante } from '../../lib/comprovantes/arquivo'
 import { formatDateTime } from '../pagantes/domain/messages'
 
@@ -19,7 +19,13 @@ export type Recebimento = Comprovante & {
 export type FinanceiroServico = { valorAReceber: number | null; receber: boolean | null; formaPagamento: string }
 
 /** `cr40f_status` do anexo: Pendente em aviso, Falhou e Inválido em destaque; Enviado (o normal) neutro. */
+const STATUS_ENVIADO = 100000001
 const TOM_STATUS: Record<number, StatusTone> = { 100000000: 'warning', 100000002: 'danger', 100000003: 'danger' }
+/** Enviado é o caso normal: só Pendente, Falhou e Inválido ganham etiqueta. */
+export const mostraStatus = (r: Pick<Recebimento, 'status' | 'statusTexto'>) => Boolean(r.statusTexto) && r.status !== STATUS_ENVIADO
+/** Rótulos do filtro Sim/Não da coluna Comprovantes (Geral e Composição). */
+export const COMPROVANTES_OPCOES: FilterOption[] = [{ value: '1', label: 'Com comprovante' }, { value: '0', label: 'Sem comprovante' }]
+
 export const tomStatus = (status: number | null): StatusTone => (status == null ? 'neutral' : TOM_STATUS[status] ?? 'neutral')
 
 /** Ordem do App (`cr40f_ordem`); sem ordem ou empate, o primeiro enviado primeiro. */

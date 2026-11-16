@@ -313,7 +313,8 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(0xf0f0, row["cr40f_dhashfaixa1"]);
             Assert.Equal(0xf0f0, row["cr40f_dhashfaixa4"]);
             Assert.Equal("0000000000000000", row["cr40f_dhashcarimbo"]);
-            Assert.Equal(0, row["cr40f_dhashcarimbofaixa2"]);
+            // dHash de baixa entropia é guardado, mas sem faixas: não entra na busca das outras fotos.
+            Assert.False(row.Contains("cr40f_dhashcarimbofaixa2"));
         }
 
         [Fact]
@@ -439,12 +440,153 @@ namespace Betinhos.DriverRecordSharing.Tests
             }
         }
 
-        private static Dictionary<string, object> Conferir(string sha, string dhash) => new Dictionary<string, object>
+        // ---------- revisão: dHash de baixa entropia, sessão do rascunho, id real, idempotência e câmera nativa ----------
+
+        private const string Zero = "0000000000000000";
+
+        [Fact]
+        public void DHashZeroNaoCasaComOutroDHashZeroDeArquivoDiferente()
+        {
+            var world = new World(modo: "bloquear");
+            world.Prova(OutroSha, dhash: Zero, tabela: "cr40f_colisao_v2", registro: "OUTRA");
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, Zero))["resultado"]);
+            Assert.Contains(world.Traces, line => line.Contains("baixa entropia"));
+        }
+
+        [Fact]
+        public void ShaIgualContinuaBloqueandoComDHashZero()
+        {
+            var world = new World();
+            world.Prova(Sha, dhash: Zero, tabela: "cr40f_colisao_v2", registro: "OUTRA");
+
+            Assert.Equal("repetida", world.Run(Conferir(Sha, Zero))["resultado"]);
+        }
+
+        [Fact]
+        public void ConsultaPorFaixasParaNoTetoERegistraNoTrace()
+        {
+            var world = new World(modo: "bloquear");
+            // Faixa igual, distância 4: lidas e descartadas; acima do teto o resto (incluindo a parecida) não é lido.
+            for (var i = 0; i < ProvaMidiaRepetida.LinhasPorPagina * ProvaMidiaRepetida.PaginasMaximas; i++)
+                world.Prova(OutroSha, dhash: "f0f0f0f0f0f0f0ff", tabela: "cr40f_manutencoes", registro: "OUTRA-" + i);
+            world.Prova(OutroSha, dhash: "f0f0f0f0f0f0f0f1", tabela: "cr40f_manutencoes", registro: "ALEM-DO-TETO");
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, Hash))["resultado"]);
+            Assert.Contains(world.Traces, line => line.Contains("linhas=1000 teto=atingido"));
+        }
+
+        [Fact]
+        public void RegistrarComIdRealValidaAAssinaturaPelaSessaoEGravaOsDois()
+        {
+            var world = new World();
+            var id = Guid.NewGuid().ToString();
+            var command = Registrar(world.Run(Emitir("despesa", "cr40f_despesas", "novo-abc")), registroId: id);
+            command["sessaoId"] = "novo-abc";
+
+            Assert.Empty((System.Collections.ArrayList)world.Run(command)["selos"]);
+            var row = world.Service.Created.Single();
+            Assert.Equal(id, row["cr40f_registroorigemid"]);
+            Assert.Equal("novo-abc", row["cr40f_sessaoid"]);
+        }
+
+        [Fact]
+        public void ConferirNaMesmaSessaoDoRascunhoLiberaSoParaOMesmoMotorista()
+        {
+            var world = new World(modo: "bloquear");
+            world.Prova(Sha, dhash: Hash, tabela: "cr40f_despesas", registro: Guid.NewGuid().ToString(), sessao: "novo-abc", motorista: world.Driver.Id);
+            Assert.Equal("livre", world.Run(Conferir(Sha, Hash, registroId: "novo-abc"))["resultado"]);
+
+            var other = new World(modo: "bloquear", service: world.Service, email: "bia@betinhos.com.br");
+            Assert.Equal("repetida", other.Run(Conferir(Sha, Hash, registroId: "novo-abc"))["resultado"]);
+        }
+
+        [Fact]
+        public void DevolucaoComOMesmoComprovanteDaDespesaLibera()
+        {
+            var world = new World();
+            var despesa = Guid.NewGuid().ToString();
+            world.Prova(Sha, tabela: "cr40f_despesaoperacional", registro: despesa, sessao: "novo-abc", motorista: world.Driver.Id);
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, null, "devolucao", "cr40f_despesaoperacional", despesa))["resultado"]);
+        }
+
+        [Fact]
+        public void ColisaoNovaComIdRealPreencheOLookup()
+        {
+            var world = new World();
+            var id = Guid.NewGuid();
+            var command = Registrar(world.Run(Emitir("colisao", "cr40f_colisao_v2", "novo-abc")), registroId: id.ToString());
+            command["tela"] = "colisao";
+            command["tabela"] = "cr40f_colisao_v2";
+            command["sessaoId"] = "novo-abc";
+
+            Assert.Empty((System.Collections.ArrayList)world.Run(command)["selos"]);
+            Assert.Equal(id, world.Service.Created.Single().GetAttributeValue<EntityReference>("cr40f_colisao").Id);
+        }
+
+        [Fact]
+        public void MudarADataDaDespesaDepoisDaEscolhaNaoGeraForaDaJanela()
+        {
+            var world = new World();
+            var id = Guid.NewGuid();
+            // O app declarou hoje na escolha; depois o motorista trocou a data do gasto para 3 dias atrás, que é a do registro.
+            world.Service.Rows("cr40f_despesaoperacional").Add(new Entity("cr40f_despesaoperacional", id) { ["cr40f_datagasto"] = Now.AddDays(-3) });
+            var command = Galeria(world, "despesa", "cr40f_despesaoperacional", id.ToString(), dataGravada: Iso(Now.AddDays(-3).AddHours(1)), dataReferencia: Iso(Now));
+
+            Assert.Empty((System.Collections.ArrayList)world.Run(command)["selos"]);
+        }
+
+        [Fact]
+        public void RegistrarComOMesmoIdClienteDevolveAProvaExistente()
+        {
+            var world = new World();
+            world.Prova(OutroSha, dhash: "f0f0f0f0f0f0f0f1", tabela: "cr40f_colisao_v2", registro: "OUTRA");
+            var command = Registrar(world.Run(Emitir()));
+            command["dhashes"] = new[] { Hash };
+            command["idCliente"] = "6b1f0c2e-4a5d-4e8f-9a7b-1c2d3e4f5a6b";
+
+            var first = world.Run(command);
+            var second = world.Run(command);
+
+            Assert.Single(world.Service.Created);
+            Assert.Equal(first["provaId"], second["provaId"]);
+            Assert.Equal(new[] { ProvaMidiaHandler.SeloParecida }, ((System.Collections.ArrayList)second["selos"]).Cast<string>().ToArray());
+            Assert.Equal("6b1f0c2e-4a5d-4e8f-9a7b-1c2d3e4f5a6b", world.Service.Created.Single()["cr40f_idcliente"]);
+        }
+
+        [Fact]
+        public void IdClienteMalformadoRecusa()
+        {
+            var world = new World();
+            var command = Registrar(world.Run(Emitir()));
+            command["idCliente"] = "x' or 1=1";
+
+            Assert.False((bool)world.Run(command)["ok"]);
+            Assert.Empty(world.Service.Created);
+        }
+
+        [Fact]
+        public void OriginalDaCameraNativaReenviadoPelaGaleriaNoutroRegistroERepetida()
+        {
+            var world = new World();
+            var command = Registrar(world.Run(Emitir()));
+            command["origemCaptura"] = "camera-nativa";
+            command["sha256Original"] = OutroSha;
+            world.Run(command);
+            Assert.Equal(OutroSha, world.Service.Created.Single()["cr40f_sha256original"]);
+
+            var result = world.Run(Conferir(OutroSha, null, registroId: "R-2"));
+
+            Assert.Equal("repetida", result["resultado"]);
+        }
+
+        private static Dictionary<string, object> Conferir(string sha, string dhash, string tela = "despesa", string tabela = "cr40f_despesas", string registroId = "R-1") => new Dictionary<string, object>
         {
             ["acao"] = "conferir",
-            ["tela"] = "despesa",
-            ["tabela"] = "cr40f_despesas",
-            ["registroId"] = "R-1",
+            ["tela"] = tela,
+            ["tabela"] = tabela,
+            ["registroId"] = registroId,
             ["sha256"] = sha,
             ["dhashes"] = dhash == null ? new string[0] : new[] { dhash }
         };
@@ -536,10 +678,12 @@ namespace Betinhos.DriverRecordSharing.Tests
             }
 
             /// <summary>Prova já gravada (de outro registro, salvo indicação), com o dHash e as faixas como o registrar grava.</summary>
-            public void Prova(string sha, string tabela, string registro, string dhash = null, string dhashCarimbo = null, string shaOriginal = null, DateTime? recebidoEm = null)
+            public void Prova(string sha, string tabela, string registro, string dhash = null, string dhashCarimbo = null, string shaOriginal = null, DateTime? recebidoEm = null, string sessao = null, Guid? motorista = null)
             {
                 var row = new Entity(ProvaMidiaHandler.Table, Guid.NewGuid())
                 {
+                    ["cr40f_sessaoid"] = sessao,
+                    ["cr40f_motorista"] = motorista.HasValue ? new EntityReference("cr40f_funcionarios", motorista.Value) : null,
                     ["cr40f_sha256"] = sha,
                     ["cr40f_sha256original"] = shaOriginal,
                     ["cr40f_tabelaorigem"] = tabela,
