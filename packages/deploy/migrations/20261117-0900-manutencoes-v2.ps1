@@ -76,7 +76,7 @@ if ($aprovado.Count -ne 1) { throw "cr40f_status sem a opcao 202410001." }
 if ((Rotulo $aprovado[0]) -ne "Agendado") {
   if ($Apply) {
     $body = Alvo $status "cr40f_status"
-    $body.Value = 202410001; $body.Label = (Label "Agendado"); $body.MergeLabels = $true; $body.SolutionUniqueName = $script:SolucaoDev
+    $body.Value = 202410001; $body.Label = (Label "Agendado"); $body.MergeLabels = $true
     Invoke-Dv "POST" "UpdateOptionValue" $body | Out-Null
     Write-Step "rotulo 202410001 = Agendado"
   } else { Write-Step "DRY RUN trocaria o rotulo de 202410001 para Agendado" }
