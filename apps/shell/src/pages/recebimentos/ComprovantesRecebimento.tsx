@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button } from '@betinhos/ui'
+import { Alert, Button, StatusBadge } from '@betinhos/ui'
 import { BrandLoader } from '../../app/BrandLoader'
 import { ComprovantesGaleria } from '../../lib/comprovantes/Galeria'
 import { formatDate } from '../pagantes/domain/messages'
-import { agruparPorServico, metaRecebimento, ordenar, type Recebimento } from './domain'
+import { agruparPorServico, metaRecebimento, ordenar, tomStatus, type Recebimento } from './domain'
 import type { RecebimentosSource } from './source'
 
 type Estado = { lista: Recebimento[] } | { erro: string } | null
@@ -36,6 +36,14 @@ export function resumoRecebimentos(estado: Estado) {
   return `${n} ${n === 1 ? 'comprovante' : 'comprovantes'} · ${servicos} ${servicos === 1 ? 'serviço' : 'serviços'}`
 }
 
+/** Tipo (Comprovante, Foto complementar, Outros) e status do envio do App em cada cartão. */
+const seloRecebimento = (r: Recebimento) => (
+  <span className="cmp-selos">
+    {r.tipo ? <StatusBadge>{r.tipo}</StatusBadge> : null}
+    {r.statusTexto ? <StatusBadge tone={tomStatus(r.status)}>{r.statusTexto}</StatusBadge> : null}
+  </span>
+)
+
 type ListaProps = ReturnType<typeof useRecebimentos> & {
   source: RecebimentosSource
   /** Com serviços, um grupo por serviço (na ordem recebida) sob um título com ID, data e destino. */
@@ -53,7 +61,7 @@ export function ListaRecebimentos({ estado, recarregar, source, servicos }: List
     )
   }
   if (!estado.lista.length) return <p className="cmp-vazio">Nenhum comprovante enviado pelo motorista.</p>
-  if (!servicos) return <ComprovantesGaleria anexos={estado.lista} ler={source.arquivo} meta={metaRecebimento} />
+  if (!servicos) return <ComprovantesGaleria anexos={estado.lista} ler={source.arquivo} meta={metaRecebimento} selo={seloRecebimento} />
   const grupos = agruparPorServico(servicos, estado.lista)
   const titulos = new Map(grupos.map(({ servico: s }) => [s.id.toLowerCase(), [s.codigo || 'Serviço sem ID', formatDate(s.data), s.destino || 'Sem destino'].join(' · ')]))
   return (
@@ -61,6 +69,7 @@ export function ListaRecebimentos({ estado, recarregar, source, servicos }: List
       anexos={grupos.flatMap((g) => g.comprovantes)}
       ler={source.arquivo}
       meta={metaRecebimento}
+      selo={seloRecebimento}
       grupo={(r) => ({ chave: r.reservaId, titulo: titulos.get(r.reservaId) })}
     />
   )

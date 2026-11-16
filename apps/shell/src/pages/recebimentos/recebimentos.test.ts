@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
-import { agruparPorServico, metaRecebimento, ordenar, type Recebimento } from './domain'
-import { contarPorReserva, loadRecebimentos, mapRecebimento } from './queries'
+import { agruparPorServico, metaRecebimento, ordenar, tomStatus, type Recebimento } from './domain'
+import { contarPorReserva, loadFinanceiro, loadRecebimentos, mapRecebimento } from './queries'
 
 const ID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
-const rec = (p: Partial<Recebimento>): Recebimento => ({ id: 'r', nome: 'a.jpg', url: 'https://example.com/a', midia: 'foto', reservaId: ID(1), ordem: null, enviadoEm: null, motorista: '', ...p })
+const rec = (p: Partial<Recebimento>): Recebimento => ({ id: 'r', nome: 'a.jpg', url: 'https://example.com/a', midia: 'foto', reservaId: ID(1), ordem: null, enviadoEm: null, motorista: '', tipo: '', status: null, statusTexto: '', ...p })
 
 describe('recebimentos: domínio', () => {
   it('mapeia a linha: link, tipo de mídia, motorista formatado e serviço em minúsculas', () => {
@@ -12,8 +12,12 @@ describe('recebimentos: domínio', () => {
       cr40f_anexorecebimento_v2id: 'x1', cr40f_nome: 'Comprovante 1', cr40f_nomearquivo: 'recebimento-1.mp4', cr40f_sharelink: '', cr40f_urlsharepoint: 'https://example.com/v',
       cr40f_dataenvio: '2026-11-12T12:00:00Z', cr40f_ordem: 2, cr40f_tipomidia: 100000001, _cr40f_reserva_value: ID(9).toUpperCase(),
       '_cr40f_enviadopor_value@OData.Community.Display.V1.FormattedValue': 'Carlos Souza',
+      cr40f_tipo: 100000001, 'cr40f_tipo@OData.Community.Display.V1.FormattedValue': 'Foto complementar',
+      cr40f_status: 100000002, 'cr40f_status@OData.Community.Display.V1.FormattedValue': 'Falhou',
     })
-    expect(r).toMatchObject({ id: 'x1', nome: 'recebimento-1.mp4', url: 'https://example.com/v', midia: 'video', reservaId: ID(9), ordem: 2, motorista: 'Carlos Souza' })
+    expect(r).toMatchObject({ id: 'x1', nome: 'recebimento-1.mp4', url: 'https://example.com/v', midia: 'video', reservaId: ID(9), ordem: 2, motorista: 'Carlos Souza', tipo: 'Foto complementar', status: 100000002, statusTexto: 'Falhou' })
+    expect(tomStatus(r.status)).toBe('danger')
+    expect(tomStatus(100000001)).toBe('neutral')
     expect(r.enviadoEm?.toISOString()).toBe('2026-11-12T12:00:00.000Z')
     expect(mapRecebimento({ cr40f_anexorecebimento_v2id: 'x2', cr40f_nome: 'nota.pdf', cr40f_tipomidia: 100000000 })).toMatchObject({ nome: 'nota.pdf', midia: 'pdf', url: null, ordem: null })
   })
@@ -50,5 +54,16 @@ describe('recebimentos: consultas', () => {
   it('conta por serviço', async () => {
     const c = client(() => [{ _cr40f_reserva_value: ID(1) }, { _cr40f_reserva_value: ID(1) }, { _cr40f_reserva_value: ID(2) }])
     expect(await contarPorReserva(c as unknown as DataverseClient, [ID(1), ID(2), ID(3)])).toEqual(new Map([[ID(1), 2], [ID(2), 1]]))
+  })
+})
+
+describe('loadFinanceiro', () => {
+  it('lê valor a receber, Receber e a forma de pagamento formatada do serviço', async () => {
+    const request = vi.fn(async (_path: string): Promise<Record<string, unknown>> => ({ cr40f_valor_a_receber: 450.5, cr40f_receber: true, cr40f_formadepagamento: 202410002, 'cr40f_formadepagamento@OData.Community.Display.V1.FormattedValue': 'Pix' }))
+    const client = { request } as unknown as DataverseClient
+    expect(await loadFinanceiro(client, `{${ID(3).toUpperCase()}}`)).toEqual({ valorAReceber: 450.5, receber: true, formaPagamento: 'Pix' })
+    expect(request.mock.calls[0][0]).toBe(`cr40f_reservadeveculoses(${ID(3)})?$select=cr40f_valor_a_receber,cr40f_receber,cr40f_formadepagamento`)
+    request.mockResolvedValueOnce({})
+    expect(await loadFinanceiro(client, ID(3))).toEqual({ valorAReceber: null, receber: null, formaPagamento: '' })
   })
 })

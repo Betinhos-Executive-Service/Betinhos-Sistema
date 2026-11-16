@@ -307,3 +307,9 @@
 .gr-recebimentos:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 .gr-recebimentos:active { transform: scale(.97); }
 @media (pointer: coarse) { .gr-recebimentos { min-height: 32px; padding: 0 10px; } }
+/* Coluna Comprovantes estreita (o padrão): o título vira o cifrão; o nome segue no title e no aria-label do cabeçalho. */
+[role="columnheader"][data-col="comprovantes"] { container: gr-comprovantes / inline-size; }
+@container gr-comprovantes (max-width: 130px) {
+  .bt-colhead__label { font-size: 0; }
+  .bt-colhead__label::before { content: ""; display: inline-block; width: 14px; height: 14px; vertical-align: middle; background-color: var(--bt-color-success); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='12' x2='12' y1='2' y2='22'/%3E%3Cpath d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/%3E%3C/svg%3E") center / contain no-repeat; }
+}

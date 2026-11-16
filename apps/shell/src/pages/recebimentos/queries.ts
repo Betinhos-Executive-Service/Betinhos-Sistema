@@ -1,10 +1,10 @@
 import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
-import type { Recebimento } from './domain'
+import type { FinanceiroServico, Recebimento } from './domain'
 
 /** cr40f_anexorecebimento_v2, confirmado na metadata do DEV em 13/11/2026. */
 export const ENTITY_SET = 'cr40f_anexorecebimento_v2s'
 const MIDIA_VIDEO = 100000001
-const SELECT = 'cr40f_anexorecebimento_v2id,cr40f_nome,cr40f_nomearquivo,cr40f_sharelink,cr40f_urlsharepoint,cr40f_dataenvio,cr40f_ordem,cr40f_tipomidia,_cr40f_reserva_value,_cr40f_enviadopor_value'
+const SELECT = 'cr40f_anexorecebimento_v2id,cr40f_nome,cr40f_nomearquivo,cr40f_sharelink,cr40f_urlsharepoint,cr40f_dataenvio,cr40f_ordem,cr40f_tipomidia,cr40f_tipo,cr40f_status,_cr40f_reserva_value,_cr40f_enviadopor_value'
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const texto = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
@@ -22,6 +22,9 @@ export function mapRecebimento(row: Row): Recebimento {
     ordem: typeof row.cr40f_ordem === 'number' ? row.cr40f_ordem : null,
     enviadoEm: data ? new Date(data) : null,
     motorista: formatted(row, '_cr40f_enviadopor_value'),
+    tipo: formatted(row, 'cr40f_tipo'),
+    status: typeof row.cr40f_status === 'number' ? row.cr40f_status : null,
+    statusTexto: formatted(row, 'cr40f_status'),
   }
 }
 
@@ -50,4 +53,14 @@ export async function contarPorReserva(client: DataverseClient, reservaIds: stri
     if (id) contagem.set(id, (contagem.get(id) ?? 0) + 1)
   }
   return contagem
+}
+
+/** Valor e forma de pagamento do serviço (cr40f_reservadeveculos), confirmados na metadata do DEV em 16/11/2026. */
+export async function loadFinanceiro(client: DataverseClient, reservaId: string): Promise<FinanceiroServico> {
+  const row = await client.request<Row>(`cr40f_reservadeveculoses(${cleanId(reservaId)})?$select=cr40f_valor_a_receber,cr40f_receber,cr40f_formadepagamento`)
+  return {
+    valorAReceber: typeof row.cr40f_valor_a_receber === 'number' ? row.cr40f_valor_a_receber : null,
+    receber: typeof row.cr40f_receber === 'boolean' ? row.cr40f_receber : null,
+    formaPagamento: formatted(row, 'cr40f_formadepagamento'),
+  }
 }

@@ -1,3 +1,4 @@
+import type { StatusTone } from '@betinhos/ui'
 import type { Comprovante } from '../../lib/comprovantes/arquivo'
 import { formatDateTime } from '../pagantes/domain/messages'
 
@@ -8,7 +9,18 @@ export type Recebimento = Comprovante & {
   ordem: number | null
   enviadoEm: Date | null
   motorista: string
+  /** Rótulos de `cr40f_tipo` (Comprovante, Foto complementar, Outros) e `cr40f_status` (envio do App). */
+  tipo: string
+  status: number | null
+  statusTexto: string
 }
+
+/** O que o financeiro confere no serviço ao abrir os comprovantes. */
+export type FinanceiroServico = { valorAReceber: number | null; receber: boolean | null; formaPagamento: string }
+
+/** `cr40f_status` do anexo: Pendente em aviso, Falhou e Inválido em destaque; Enviado (o normal) neutro. */
+const TOM_STATUS: Record<number, StatusTone> = { 100000000: 'warning', 100000002: 'danger', 100000003: 'danger' }
+export const tomStatus = (status: number | null): StatusTone => (status == null ? 'neutral' : TOM_STATUS[status] ?? 'neutral')
 
 /** Ordem do App (`cr40f_ordem`); sem ordem ou empate, o primeiro enviado primeiro. */
 export function ordenar(lista: Recebimento[]) {

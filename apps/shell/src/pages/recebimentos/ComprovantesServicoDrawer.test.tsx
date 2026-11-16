@@ -7,7 +7,12 @@ import type { RecebimentosSource } from './source'
 
 afterEach(cleanup)
 
-const source: RecebimentosSource = { carregar: vi.fn(async () => []), contar: async () => new Map(), arquivo: async () => { throw new Error('fora da tela') } }
+const source: RecebimentosSource = {
+  carregar: vi.fn(async () => []),
+  contar: async () => new Map(),
+  financeiro: vi.fn(async () => ({ valorAReceber: 450.5, receber: true, formaPagamento: 'Pix' })),
+  arquivo: async () => { throw new Error('fora da tela') },
+}
 
 function Lista({ quantidade }: { quantidade: number | undefined }) {
   const [aberto, setAberto] = useState<ServicoAberto | null>(null)
@@ -33,6 +38,24 @@ describe('indicador de comprovantes na lista', () => {
     expect(await screen.findByText('Serviço OS-1000')).toBeTruthy()
     expect(await screen.findByText('Nenhum comprovante enviado pelo motorista.')).toBeTruthy()
     expect(source.carregar).toHaveBeenCalledWith(['s1'])
+  })
+
+  it('mostra o financeiro do serviço (valor a receber, receber e forma) junto com os comprovantes', async () => {
+    render(<Lista quantidade={2} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 comprovantes de recebimento' }))
+    const financeiro = await screen.findByRole('region', { name: 'Financeiro' })
+    expect(await screen.findByText('Pix')).toBeTruthy()
+    expect(financeiro.textContent).toMatch(/Valor a receber\s*R\$\s*450,50/)
+    expect(financeiro.textContent).toContain('ReceberSim')
+    expect(source.financeiro).toHaveBeenCalledWith('s1')
+  })
+
+  it('falha no financeiro avisa sem esconder os comprovantes', async () => {
+    vi.mocked(source.financeiro).mockRejectedValueOnce(new Error('sem acesso'))
+    render(<Lista quantidade={2} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 comprovantes de recebimento' }))
+    expect(await screen.findByText('Não foi possível carregar o financeiro')).toBeTruthy()
+    expect(await screen.findByText('Nenhum comprovante enviado pelo motorista.')).toBeTruthy()
   })
 
   it('um só fica no singular', () => {

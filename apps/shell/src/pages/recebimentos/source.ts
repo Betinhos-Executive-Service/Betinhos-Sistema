@@ -3,15 +3,17 @@ import type { Arquivo } from '../../lib/comprovantes/arquivo'
 import { createArquivos } from '../../lib/comprovantes/leitura'
 import { createMockArquivo } from '../../lib/comprovantes/mock'
 import { latenciaMock } from '../../app/latenciaMock'
-import type { Recebimento } from './domain'
-import { contarPorReserva, loadRecebimentos } from './queries'
-import { mockRecebimentos } from './mock'
+import type { FinanceiroServico, Recebimento } from './domain'
+import { contarPorReserva, loadFinanceiro, loadRecebimentos } from './queries'
+import { mockFinanceiro, mockRecebimentos } from './mock'
 
 export type RecebimentosSource = {
   /** Comprovantes dos serviços (ids das reservas). */
   carregar: (reservaIds: string[]) => Promise<Recebimento[]>
   /** Contagem por serviço, para o indicador da lista. */
   contar: (reservaIds: string[]) => Promise<Map<string, number>>
+  /** Valor a receber, Receber e forma de pagamento do serviço (drawer do Geral). */
+  financeiro: (reservaId: string) => Promise<FinanceiroServico>
   /** Conteúdo para a prévia; cache por sessão, compartilhado entre as fichas. */
   arquivo: (r: Recebimento) => Promise<Arquivo>
 }
@@ -21,6 +23,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenc
 function createMock(): RecebimentosSource {
   return {
     carregar: async (ids) => { await wait(250); return ids.flatMap(mockRecebimentos) },
+    financeiro: async (id) => { await wait(200); return mockFinanceiro(id) },
     contar: async (ids) => new Map(ids.map((id) => [id.toLowerCase(), mockRecebimentos(id).length] as const).filter(([, n]) => n > 0)),
     async arquivo(r) {
       await wait(400)
@@ -39,6 +42,7 @@ export function recebimentosSource(host: Host): RecebimentosSource {
     source = host.mode === 'mock' ? createMock() : {
       carregar: (ids) => loadRecebimentos(host.client, ids),
       contar: (ids) => contarPorReserva(host.client, ids),
+      financeiro: (id) => loadFinanceiro(host.client, id),
       arquivo: createArquivos(host.client),
     }
     porHost.set(host, source)
