@@ -3,6 +3,7 @@ import { openGridRecord } from '../data/record-navigation'
 import { readLookupTarget } from '../data/view-field-read'
 import type { CatalogField } from '../data/views'
 import type { ReactNode } from 'react'
+import { cardEventGuard, CopyText } from './CopyText'
 
 export { EditableViewFieldCell } from './EditableViewFieldCell'
 export type ViewFieldCellProps = { field: CatalogField; value: unknown; formatted?: unknown; viewFields?: Record<string, unknown>; valueKey: string; baseRecordId: string; display?: ReactNode }
@@ -28,7 +29,7 @@ export function ViewFieldCell({ field, value, formatted, viewFields, valueKey, b
     const recordId = primaryRecordId(field, viewFields, valueKey, baseRecordId)
     if (recordId) return <span className="lookup-preview grid-related-preview">
       <button type="button" className="lookup-link grid-related-link" aria-label={`Abrir ${field.tableLabel ?? field.table}: ${value}`} onClick={() => { void openGridRecord(field.table, recordId) }}>{String(value)}</button>
-      <span className="lookup-preview__card" role="tooltip"><strong>{String(value)}</strong><span className="lookup-preview__detail"><span>Tabela</span><span>{field.tableLabel ?? field.table}</span></span></span>
+      <span className="lookup-preview__card" role="tooltip" {...cardEventGuard}><strong><CopyText text={String(value)} /></strong><span className="lookup-preview__detail"><span>Tabela</span><span>{field.tableLabel ?? field.table}</span></span></span>
     </span>
   }
   if (['Picklist', 'Status', 'State'].includes(field.type) && typeof formatted === 'string') return formatted

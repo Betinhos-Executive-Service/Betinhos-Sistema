@@ -305,7 +305,10 @@
 .composicao .lookup-preview__detail { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; }
 .composicao .lookup-preview__detail > span:first-child { color: var(--bt-color-text-secondary); }
 .composicao .lookup-preview__detail > span:last-child { overflow-wrap: anywhere; }
-.composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); }
+.composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; transition-delay: 0ms; }
+/* Padrão de hover card: o ponteiro entra no cartão sem ele sumir (ponte sobre o vão e saída com atraso curto) e o texto é selecionável. */
+.composicao .lookup-preview__card { cursor: auto; user-select: text; pointer-events: auto; transition: opacity 120ms ease 100ms, transform 120ms ease 100ms, visibility 0s linear 220ms; }
+.composicao .lookup-preview__card::before { position: absolute; inset: -8px 0 100% 0; content: ''; }
 .composicao .grid-client > .lookup-preview, .composicao .grid-client > .lookup-preview .lookup-link, .composicao .grid-client-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .composicao .grid-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--bt-color-warning); }
 .composicao .grid-status--done { background: var(--bt-color-success); }
@@ -427,11 +430,20 @@
 @media (prefers-reduced-motion: reduce) { .composicao .grid-field-options { transition: none; } .composicao .grid-field-cell .cell-save-feedback { animation: none; } }
 
 /* Popup do hover da célula: texto completo ao lado do mouse; fórmula mostra o resultado em cima e a conta embaixo. */
-.composicao .cell-hover-preview { position: fixed; z-index: 60; pointer-events: none; }
-.composicao .cell-hover-preview__card { display: grid; gap: 4px; max-width: min(360px, calc(100vw - 32px)); padding: 7px 10px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-ink-900); font-size: var(--bt-font-size-12); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 1; transform: scale(1); transition: opacity 125ms cubic-bezier(0.23, 1, 0.32, 1), transform 125ms cubic-bezier(0.23, 1, 0.32, 1); }
+.composicao .cell-hover-preview { position: fixed; z-index: 60; }
+.composicao .cell-hover-preview__card { display: grid; gap: 4px; max-width: min(360px, calc(100vw - 32px)); padding: 7px 10px; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); color: var(--bt-color-ink-900); font-size: var(--bt-font-size-12); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; cursor: auto; user-select: text; opacity: 1; transform: scale(1); transition: opacity 125ms cubic-bezier(0.23, 1, 0.32, 1), transform 125ms cubic-bezier(0.23, 1, 0.32, 1); }
 @starting-style { .composicao .cell-hover-preview__card { opacity: 0; transform: scale(0.97); } }
 .composicao .cell-hover-preview__card[data-instant] { transition-duration: 0ms; }
 .composicao .cell-hover-preview__value { font-weight: 600; font-variant-numeric: tabular-nums; }
 .composicao .cell-hover-preview__formula { display: flex; gap: 6px; align-items: baseline; padding-top: 4px; border-top: 1px solid var(--bt-color-border); color: var(--bt-color-slate-700); font-family: var(--bt-font-mono); font-size: 11px; }
 .composicao .cell-hover-preview__formula > span { color: var(--bt-color-text-secondary); font-style: italic; }
 @media (prefers-reduced-motion: reduce) { .composicao .cell-hover-preview__card { transition-property: opacity; transform: none; } }
+
+/* Texto copiável dos popups: sublinha no hover, clique copia e mostra "Copiado" na hora. */
+.composicao .copy-text { position: relative; display: inline; border-radius: 3px; cursor: copy; text-decoration: underline transparent; text-decoration-thickness: 1px; text-underline-offset: 2px; transition: text-decoration-color 80ms ease, background-color 80ms ease; }
+.composicao .copy-text:hover, .composicao .copy-text:focus-visible { text-decoration-color: currentColor; }
+.composicao .copy-text:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 1px; }
+.composicao .copy-text:active { background: var(--bt-color-surface-soft); }
+.composicao .copy-text[data-copied] { background: var(--bt-color-success-soft); text-decoration-color: transparent; transition-duration: 0ms; }
+.composicao .copy-text__feedback:empty { display: none; }
+.composicao .copy-text__feedback { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: var(--bt-radius-xs); background: var(--bt-color-success); color: var(--bt-color-surface); font-size: 10px; font-weight: 600; line-height: 16px; vertical-align: 1px; white-space: nowrap; user-select: none; }
