@@ -1,0 +1,7 @@
+[
+  {
+    "migration": "20261116-1800-prova-midia-galeria.ps1",
+    "por": "20261116-1900-prova-midia-galeria-forms.ps1",
+    "motivo": "Falhou no DEV (Deploy 43899596027) ao exigir isdefault no form principal de cr40f_manutencoes; a 1900 tem o mesmo conteudo com o form achado por tipo e estado."
+  }
+]

@@ -53,10 +53,27 @@ export function checarRemocoes(dir) {
   return erros
 }
 
+// dir: pasta migrations/. substituidas.json: cada entrada aponta para migrations que existem, a substituta vem depois na
+// ordem de nome (roda no lugar) e tem motivo; nenhuma substituta pode estar ela mesma substituída.
+export function checarSubstituidas(dir) {
+  if (!existsSync(`${dir}/substituidas.json`)) return []
+  const erros = []
+  const lista = JSON.parse(readFileSync(`${dir}/substituidas.json`, 'utf8').replace(/^\uFEFF/, ''))
+  const substituidas = new Set(lista.map((s) => s.migration))
+  for (const s of lista) {
+    if (!s.migration || !s.por || !s.motivo) erros.push(`substituidas.json: entrada incompleta (${JSON.stringify(s)}); precisa de migration, por e motivo.`)
+    else if (!existsSync(`${dir}/${s.migration}`)) erros.push(`substituidas.json: migration ${s.migration} não existe.`)
+    else if (!existsSync(`${dir}/${s.por}`)) erros.push(`substituidas.json: substituta ${s.por} não existe.`)
+    else if (s.por <= s.migration) erros.push(`substituidas.json: ${s.por} precisa vir depois de ${s.migration} na ordem de nome.`)
+    else if (substituidas.has(s.por)) erros.push(`substituidas.json: a substituta ${s.por} também está substituída.`)
+  }
+  return erros
+}
+
 // Uso: git diff --name-status -M origin/<base>...HEAD | node migrations-ci.mjs   → sai com 1 e lista os erros
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dir = fileURLToPath(new URL('./migrations', import.meta.url))
-  const erros = [...checarMudancas(readFileSync(0, 'utf8').split('\n')), ...checarRemocoes(dir)]
+  const erros = [...checarMudancas(readFileSync(0, 'utf8').split('\n')), ...checarRemocoes(dir), ...checarSubstituidas(dir)]
   for (const e of erros) console.log(`::error title=Schema por migration::${e}`)
   console.log(erros.length ? `${erros.length} problema(s) nas migrations.` : 'Migrations ok.')
   process.exitCode = erros.length ? 1 : 0

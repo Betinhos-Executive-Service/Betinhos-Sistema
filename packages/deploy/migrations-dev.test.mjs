@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MIGRATION, listarMigrations, migrationsForcadas, migrationsPendentes } from './migrations-dev.mjs'
+import { MIGRATION, lerSubstituidas, listarMigrations, migrationsForcadas, migrationsPendentes, semSubstituidas } from './migrations-dev.mjs'
 
 const aqui = fileURLToPath(new URL('.', import.meta.url))
 const P = 'packages/deploy/migrations/'
@@ -41,4 +41,15 @@ test('toda migration do repositório tem nome válido, BOM, -Apply, dot-source d
     assert.match(fonte, /org23b93544\.crm2\.dynamics\.com/, f)
   }
   assert.equal(readFileSync(join(dir, '_dv.ps1'), 'utf8').charCodeAt(0), 0xfeff, '_dv.ps1: BOM')
+})
+
+test('substituída sai da lista; a substituta continua', () => {
+  const substituidas = new Set(['20261110-1600-postos-aceita-ctf.ps1'])
+  assert.deepEqual(semSubstituidas([...existentes].sort(), substituidas), ['20261109-2300-a.ps1', '20261111-0900-b.ps1'])
+})
+test('a 1800 da prova de mídia está substituída e a 1900 continua aplicável', () => {
+  const dir = join(aqui, 'migrations')
+  const aplicaveis = semSubstituidas(listarMigrations(dir), lerSubstituidas(dir))
+  assert.ok(!aplicaveis.includes('20261116-1800-prova-midia-galeria.ps1'))
+  assert.ok(aplicaveis.includes('20261116-1900-prova-midia-galeria-forms.ps1'))
 })
