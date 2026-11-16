@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { booleanPresentation, formatViewDate, isPrimaryField, primaryRecordId } from './view-field-presentation'
+import { booleanPresentation, formatViewDate, isPrimaryField, isRouteField, primaryRecordId } from './view-field-presentation'
 import type { CatalogField } from './views'
 
 const related: CatalogField = { id: 'r1.cr40f_id', label: 'ID', table: 'cr40f_ordens', attribute: 'cr40f_id', primaryIdAttribute: 'cr40f_ordensid', primaryNameAttribute: 'cr40f_id', path: ['cr40f_ordens'], relationships: [{ from: 'cr40f_ordensid', to: 'cr40f_ordem' }], type: 'String', available: true }
@@ -19,5 +19,15 @@ describe('apresentação de campos relacionados', () => {
     expect(primaryRecordId(related, { 'r1.cr40f_ordensid': 'OS-1741' }, 'r1.cr40f_id')).toBeNull()
     expect(isPrimaryField({ ...related, attribute: 'cr40f_descricao' })).toBe(false)
     expect(primaryRecordId({ ...related, path: [], table: 'cr40f_composicaodeprecos' }, {}, 'cr40f_id', guid)).toBe(guid)
+  })
+})
+
+describe('isRouteField', () => {
+  const trajeto = { attribute: 'cr40f_trajeto', table: 'cr40f_reservadeveculos', relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }] }
+  it('reconhece o Trajeto do serviço relacionado vindo da view', () => expect(isRouteField(trajeto)).toBe(true))
+  it('campo provisório vale pelo nome do atributo', () => expect(isRouteField({ attribute: 'cr40f_trajeto', table: 'cr40f_composicaodeprecos' }, true)).toBe(true))
+  it('ignora trajeto de outro vínculo e outros campos', () => {
+    expect(isRouteField({ ...trajeto, relationships: [{ from: 'x', to: 'cr40f_outro' }] })).toBe(false)
+    expect(isRouteField({ ...trajeto, attribute: 'cr40f_destino' })).toBe(false)
   })
 })
