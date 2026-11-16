@@ -185,6 +185,12 @@ describe('pagante sem e-mail no cadastro', () => {
     expect(missingPayerEmails(state.drafts)[0]).toMatchObject({ email: 'fernanda@empresa.com.br', save: true })
   })
 
+  it('não pergunta de novo quem escolheu "Usar só neste envio"; trocar o destinatário volta a perguntar', () => {
+    const state = draftReducer(inicial(), { type: 'setRecipientEmail', key, email: 'erika@empresa.com.br', onlyThisSend: true })
+    expect(missingPayerEmails(state.drafts)).toEqual([])
+    expect(missingPayerEmails(draftReducer(state, { type: 'setRecipient', key, person: secretaria }).drafts)).toHaveLength(1)
+  })
+
   it('não copia o e-mail de destinatário cadastrado', () => {
     const state = draftReducer(inicial(), { type: 'setRecipient', key, person: secretaria })
     expect(missingPayerEmails(state.drafts)[0]).toMatchObject({ email: '', save: false })
