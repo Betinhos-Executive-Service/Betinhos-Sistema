@@ -178,7 +178,13 @@ export function textosDoConteudo(conteudo: string) {
       let nivel = 1, texto = "";
       for (i++; i < conteudo.length && nivel > 0; i++) {
         const d = conteudo[i];
-        if (d === "\\") { const e = conteudo[++i]; texto += /[0-7]/.test(e ?? "") ? String.fromCharCode(parseInt(conteudo.slice(i, i + 3).match(/^[0-7]{1,3}/)![0], 8)) : e === "n" ? "\n" : e ?? ""; continue; }
+        if (d === "\\") {
+          const octal = /^[0-7]{1,3}/.exec(conteudo.slice(i + 1, i + 4));
+          if (octal) { texto += String.fromCharCode(parseInt(octal[0], 8)); i += octal[0].length; continue; }
+          const e = conteudo[++i];
+          texto += e === "n" ? "\n" : e ?? "";
+          continue;
+        }
         if (d === "(") nivel++;
         if (d === ")" && --nivel === 0) break;
         texto += d;
@@ -208,7 +214,8 @@ export async function chaveDoPdf(bytes: Uint8Array): Promise<string | null> {
     const antes = bruto.slice(Math.max(0, achado.index - 400), achado.index);
     const dicionario = antes.slice(antes.lastIndexOf("<<"));
     // /Length direto dá o tamanho exato; sem ele (ou indireto), tira a quebra de linha antes do endstream.
-    const tamanho = /\/Length\s+(\d+)(?!\s+\d+\s+R)/.exec(dicionario);
+    // \b impede o recuo para menos dígitos ("/Length 15 0 R" não pode virar Length 1).
+    const tamanho = /\/Length\s+(\d+)\b(?!\s+\d+\s+R)/.exec(dicionario);
     let final = tamanho && inicio + Number(tamanho[1]) <= fim ? inicio + Number(tamanho[1]) : fim;
     while (!tamanho && final > inicio && (bytes[final - 1] === 0x0a || bytes[final - 1] === 0x0d)) final--;
     const corpo = bytes.subarray(inicio, final);

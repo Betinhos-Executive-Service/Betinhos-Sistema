@@ -18,9 +18,10 @@ export type NotaSheetState = { photoId: string; sugerida?: ChaveSugerida | null;
 
 type Options = {
   setExpensePhotos: React.Dispatch<React.SetStateAction<ExpensePhoto[]>>;
-  expenseDraftRef: React.MutableRefObject<ExpenseDraft>;
   /** Gasto do cartão em preenchimento: a despesa já existe e os anexos dela não contam como repetida. */
   despesaExistenteId: () => string | null;
+  /** Data do gasto já definida (motorista, leitura rápida ou cartão); null = ainda a automática, mês não conferido aqui. */
+  dataDaDespesa: () => string | null;
   setScreen: (screen: Screen) => void;
   setToast: (message: string, tone?: ToastTone) => void;
 };
@@ -42,7 +43,7 @@ export function valorAlteradoDaLeitura(draft: ExpenseDraft, filled: QuickReadFil
 
 // Chave da nota fiscal de cada comprovante da despesa: folha com os quatro caminhos, leitura do código na câmera comum,
 // chave achada no PDF e a sugerida pela leitura rápida. O plugin do anexo é o bloqueio que vale; aqui é o aviso antecipado.
-export function useNotaFiscal({ setExpensePhotos, expenseDraftRef, despesaExistenteId, setScreen, setToast }: Options) {
+export function useNotaFiscal({ setExpensePhotos, despesaExistenteId, dataDaDespesa, setScreen, setToast }: Options) {
   const [notaSheet, setNotaSheet] = useState<NotaSheetState | null>(null);
   const [codigoDica, setCodigoDica] = useState(DICA_CODIGO);
   const codigoPhotoIdRef = useRef("");
@@ -52,7 +53,7 @@ export function useNotaFiscal({ setExpensePhotos, expenseDraftRef, despesaExiste
 
   /** Confere e grava a chave no comprovante. Devolve a recusa (DV, mês, repetida) ou null. */
   const confirmarChave = async (photoId: string, chave: string, origem: OrigemChave): Promise<string | null> => {
-    const data = expenseDraftRef.current.dataGasto;
+    const data = dataDaDespesa();
     const local = data ? conferirChaveDaDespesa(chave, data) : validarChave(chave);
     if (!local.ok) return local.erro;
     try {

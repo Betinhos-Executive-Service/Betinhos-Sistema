@@ -118,15 +118,22 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   expensePhotosRef.current = expensePhotos;
   const notaFiscal = useNotaFiscal({
     setExpensePhotos,
-    expenseDraftRef,
     despesaExistenteId: () => gastoCartaoAtualRef.current?.id ?? null,
+    // Data ainda automática (hoje) e a leitura rápida sem resultado: o mês fica para o envio e para o plugin.
+    dataDaDespesa: () => (gastoCartaoAtualRef.current || expenseDateTouchedRef.current || expenseQuickReadFilled.dataGasto !== undefined ? expenseDraftRef.current.dataGasto : null),
     setScreen,
     setToast: (message, tone) => setToast(message, tone)
   });
   const leituraDaProva = (draft: ExpenseDraft) => {
     const leitura = expenseQuickReadLeituraRef.current;
     if (!leitura || !expenseQuickReadPhotoIdRef.current || gastoCartaoAtualRef.current) return null;
-    return { photoId: expenseQuickReadPhotoIdRef.current, valor: leitura.valor, data: expenseQuickReadFilled.dataGasto ?? null, alterado: valorAlteradoDaLeitura(draft, expenseQuickReadFilled) };
+    // Só o que a leitura de fato pôs no rascunho: valor digitado antes da leitura não é "valor alterado".
+    return {
+      photoId: expenseQuickReadPhotoIdRef.current,
+      valor: expenseQuickReadFilled.valor !== undefined ? leitura.valor : null,
+      data: expenseQuickReadFilled.dataGasto ?? null,
+      alterado: valorAlteradoDaLeitura(draft, expenseQuickReadFilled)
+    };
   };
 
   const isExpenseDraftBlank = (draft: ExpenseDraft) =>
@@ -182,6 +189,11 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       setExpenseRunning(submission.expenseId, false);
     }
     setExpenseUploadRows(current => ({ ...current, [submission.expenseId]: rows }));
+    for (const item of submission.items) {
+      if (!item.notaRecusada || expenseNoticeRef.current.has(`nota:${item.id}`)) continue;
+      expenseNoticeRef.current.add(`nota:${item.id}`);
+      setToast(`Comprovante ${item.order}: ${item.notaRecusada} O gasto seguiu como nota não verificada.`, "warning");
+    }
     const state = describeExpenseSubmission(submission, rows).state;
     return state === "processing" || state === "complete";
   };
@@ -375,6 +387,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       const result = completing ? { id: completing.id } : await createOne(DATAVERSE.despesasOperacionais, payload);
       createdExpenseId = result.id;
       const leituraProva = leituraDaProva(draft);
+      const notasRecusadas: string[] = [];
       if (preparedPhotosToSubmit.length) {
         let completedUploads = 0;
         setRemoteOperation({
@@ -393,6 +406,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
             order: index + 1,
             nota: photo.nota,
             extras: extrasDaProva(photo, leituraProva),
+            onNotaRecusada: (motivo) => notasRecusadas.push(`Comprovante ${index + 1}: ${motivo}`),
             onProgress: (message) => setRemoteOperation({
               title: "Registrando gasto",
               message: `Uploads paralelos: ${message}`,
@@ -450,7 +464,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         return;
       }
       setScreen("inicio");
-      setToast("Gasto registrado.");
+      setToast(notasRecusadas.length ? `Gasto registrado. ${notasRecusadas.join(" ")} Seguiu como nota não verificada.` : "Gasto registrado.", notasRecusadas.length ? "warning" : undefined);
     } catch (error) {
       if (createdExpenseId) {
         try {

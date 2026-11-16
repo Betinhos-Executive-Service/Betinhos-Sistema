@@ -177,3 +177,19 @@ test("envio exige a nota de um comprovante e recusa chave de outro mês da data 
   assert.equal(resumoDaNota({ situacao: "sem-nota" }), "Sem nota fiscal");
   assert.equal(completarCnpj("12ABC34501DE"), gerarCnpj("12ABC34501DE"));
 });
+
+test("PDF com /Length indireto (objeto 10 ou mais) e escape octal ainda acha a chave", async () => {
+  const { deflateSync } = await import("node:zlib");
+  const chave = gerarChave({ modelo: "55" });
+  const grupos = formatarChave(chave).split(" ");
+  // Primeiro grupo escrito com escapes octais de 3 dígitos ("3" vira \063), como alguns geradores fazem.
+  const primeiro = [...grupos[0]].map((c) => "\\" + c.charCodeAt(0).toString(8).padStart(3, "0")).join("");
+  const conteudo = `BT /F1 9 Tf (CHAVE DE ACESSO) Tj (${primeiro}) Tj (${grupos.slice(1).join(" ")}) Tj ET`;
+  const corpo = deflateSync(Buffer.from(conteudo, "latin1"));
+  const pdf = Buffer.concat([
+    Buffer.from("%PDF-1.4\n15 0 obj\n<< /Length 16 0 R /Filter /FlateDecode >>\nstream\n", "latin1"),
+    corpo,
+    Buffer.from(`\nendstream\nendobj\n16 0 obj\n${corpo.length}\nendobj\n%%EOF\n`, "latin1")
+  ]);
+  assert.equal(await chaveDoPdf(new Uint8Array(pdf)), chave);
+});

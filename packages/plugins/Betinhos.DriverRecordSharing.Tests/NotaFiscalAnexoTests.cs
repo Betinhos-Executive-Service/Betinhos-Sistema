@@ -197,6 +197,32 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void RepetidaNumaDespesaComFalhaNoEnvioGrava()
+        {
+            // Reenvio síncrono: a despesa A ficou com statusanexo Falha (um comprovante não subiu) e o motorista lança de novo.
+            var world = new World();
+            var chave = Chave();
+            var falhou = world.Despesa(new DateTime(2026, 11, 16));
+            falhou["cr40f_statusanexo"] = new OptionSetValue(NotaFiscalAnexo.StatusAnexoFalha);
+            world.Anexo(falhou, chave);
+            world.Rules.AoGravar(world.NovoAnexo(world.Despesa(new DateTime(2026, 11, 16)), chave), false);
+        }
+
+        [Fact]
+        public void ApagarAChaveLimpaDecomposicaoOrigemESituacao()
+        {
+            var world = new World();
+            var anexo = world.Anexo(world.Despesa(new DateTime(2026, 11, 16)), Chave());
+            var target = new Entity(NotaFiscalAnexo.Tabela, anexo.Id) { [NotaFiscalAnexo.ColunaChave] = null };
+
+            world.Rules.AoGravar(target, update: true);
+
+            Assert.Null(target["cr40f_notauf"]);
+            Assert.Null(target["cr40f_origemchave"]);
+            Assert.Null(target[NotaFiscalAnexo.ColunaSituacao]);
+        }
+
+        [Fact]
         public void MesmaChaveEmOutroComprovanteDaMesmaDespesaGrava()
         {
             var world = new World();

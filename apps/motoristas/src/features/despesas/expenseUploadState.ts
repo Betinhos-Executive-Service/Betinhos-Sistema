@@ -14,6 +14,8 @@ export type ExpenseUploadItem = {
   previousAttemptId?: string;
   /** Fase 3: o caminho da chave da nota deste comprovante (gravado no anexo; o plugin confere). */
   nota?: NotaDoComprovante;
+  /** O plugin recusou a chave (sem rede na conferência ou corrida): o anexo foi como "nota não verificada". */
+  notaRecusada?: string;
 };
 
 export type ExpenseSubmission = {

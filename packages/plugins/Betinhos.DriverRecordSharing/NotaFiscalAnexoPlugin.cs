@@ -43,6 +43,9 @@ namespace Betinhos.DriverRecordSharing
         // cr40f_statusoperacional da despesa: Recusado e Cancelado não contam como uso da nota.
         public const int StatusRecusado = 100000003;
         public const int StatusCancelado = 100000004;
+        // cr40f_statusanexo da despesa: Falha no envio (o app marca quando um comprovante não subiu e o motorista reenvia
+        // como despesa nova) também não conta, senão o comprovante que subiu bloquearia o reenvio.
+        public const int StatusAnexoFalha = 100000003;
 
         public static readonly string[] ColunasDecompostas = { "cr40f_notauf", "cr40f_notaaamm", "cr40f_notacnpjemitente", "cr40f_notamodelo", "cr40f_notanumero" };
 
@@ -74,7 +77,13 @@ namespace Betinhos.DriverRecordSharing
             if (string.IsNullOrWhiteSpace(chave))
             {
                 if (situacao == SituacaoVerificada) throw new InvalidPluginExecutionException("A nota só fica \"chave conferida\" com a chave de acesso.");
-                if (target.Contains(ColunaChave)) foreach (var coluna in ColunasDecompostas) target[coluna] = null;
+                if (target.Contains(ColunaChave))
+                {
+                    // Chave apagada: some a decomposição, a origem e a situação "verificada" que dependiam dela.
+                    foreach (var coluna in ColunasDecompostas) target[coluna] = null;
+                    target["cr40f_origemchave"] = null;
+                    if (!situacao.HasValue) target[ColunaSituacao] = null;
+                }
                 return;
             }
             // Update que não mexe na chave (reenvio do mesmo valor, troca só da situação para verificada) não revalida.
@@ -149,10 +158,11 @@ namespace Betinhos.DriverRecordSharing
         {
             criadaEm = null;
             Entity despesa;
-            try { despesa = _system.Retrieve(Despesa, despesaId, new ColumnSet("cr40f_statusoperacional", "createdon")); }
+            try { despesa = _system.Retrieve(Despesa, despesaId, new ColumnSet("cr40f_statusoperacional", "cr40f_statusanexo", "createdon")); }
             catch (Exception) { return false; }
             var status = despesa.GetAttributeValue<OptionSetValue>("cr40f_statusoperacional")?.Value;
             if (status == StatusRecusado || status == StatusCancelado) return false;
+            if (despesa.GetAttributeValue<OptionSetValue>("cr40f_statusanexo")?.Value == StatusAnexoFalha) return false;
             criadaEm = despesa.GetAttributeValue<DateTime?>("createdon");
             return true;
         }
