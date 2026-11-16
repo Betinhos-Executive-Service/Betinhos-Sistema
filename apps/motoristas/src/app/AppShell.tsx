@@ -5,7 +5,7 @@ import { LoadingOverlay, type LoadingOverlayState } from "../shared/ui/LoadingOv
 import { getVisibleLoadingOverlay } from "./overlayLayering";
 import { getScreenMotion } from "./navigation";
 import { loadActiveFleetRemote } from "../features/meu-carro/remoto";
-import { SESSION_EXPIRED_MESSAGE } from "../data/dataverse/fetchWebApi";
+import { SessaoExpiradaTela } from "../shared/ui/SessaoExpiradaTela";
 import { MOCK_FLEET } from "../lib/serviceVehicleInfleetMock";
 import { ExpenseSendOverlay, type ExpenseSendState } from "../features/despesas/ExpenseSendOverlay";
 import { VehicleChoiceDialog } from "../features/detalhe/VehicleChoiceDialog";
@@ -46,6 +46,7 @@ type Props = {
   openTourHelp: Tour["openTourHelp"];
   setAvisoTreinamentos: Treinamentos["setAvisoTreinamentos"];
   setCriticalError: (message: string) => void;
+  sessionExpired: boolean;
   setToastState: React.Dispatch<React.SetStateAction<ToastState | null>>;
   toast: ToastState | null;
   tourCandidates: Tour["tourCandidates"];
@@ -75,6 +76,7 @@ export function AppShell({
   screen,
   setAvisoTreinamentos,
   setCriticalError,
+  sessionExpired,
   setToastState,
   toast,
   tourCandidates,
@@ -112,7 +114,7 @@ export function AppShell({
           </div>
         </div>
       ) : null}
-      <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError)} />
+      <LoadingOverlay loading={getVisibleLoadingOverlay(dataLoading, criticalError || (sessionExpired ? "sessao-expirada" : ""))} />
       {remoteOperation ? <FlowProgressOverlay operation={remoteOperation} /> : null}
       {expenseSend ? <ExpenseSendOverlay state={expenseSend} onClose={closeExpenseSendError} /> : null}
       {duvidaConferencia ? <ConferenciaDuvidaDialog pergunta={duvidaConferencia.pergunta} onResponder={(texto) => duvidaConferencia.responder(texto)} onVoltar={() => duvidaConferencia.responder(null)} /> : null}
@@ -133,16 +135,13 @@ export function AppShell({
             <h2 id="critical-error-title">Processo não foi concluído</h2>
             <p>{criticalError}</p>
             <div className="critical-error-actions">
-              {criticalError === SESSION_EXPIRED_MESSAGE ? (
-                <button type="button" onClick={() => window.location.reload()}>Entrar de novo</button>
-              ) : (
-                <button type="button" onClick={() => setCriticalError("")}>Entendi</button>
-              )}
+              <button type="button" onClick={() => setCriticalError("")}>Entendi</button>
             </div>
           </div>
         </div>
       ) : null}
       {envioPendente}
+      {sessionExpired ? <SessaoExpiradaTela /> : null}
       <BuildStamp />
     </TourHelpContext.Provider>
   );

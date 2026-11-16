@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../shared/appErrorLogger";
+import { SEM_CONEXAO_MESSAGE } from "../shared/erroDeRede";
 import type { ToastState, ToastTone } from "../shared/ui/LocalToast";
 import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../types";
@@ -18,6 +19,7 @@ export function useAvisos({ screen, selectedDetail }: Options) {
   const [toast, setToastState] = useState<ToastState | null>(null);
   const [dataLoading, setDataLoading] = useState<LoadingOverlayState | null>(null);
   const [criticalError, setCriticalErrorState] = useState("");
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const logAppError = (error: unknown, action: string, phase = "") => {
     reportAppError(error, {
@@ -33,7 +35,7 @@ export function useAvisos({ screen, selectedDetail }: Options) {
 
   const setToast = (message: string, tone?: ToastTone) => {
     const trimmed = /failed to fetch|não foi possível conectar ao servidor|nao foi possivel conectar ao servidor|offline/i.test(message)
-      ? APP_OPERATION_ERROR_MESSAGE
+      ? SEM_CONEXAO_MESSAGE
       : message.trim();
     if (!trimmed) {
       setToastState(null);
@@ -70,8 +72,9 @@ export function useAvisos({ screen, selectedDetail }: Options) {
     dataLoading,
     logAppError,
     setCriticalError,
-    setCriticalErrorState,
+    sessionExpired,
     setDataLoadingState,
+    setSessionExpired,
     setToast,
     setToastState,
     toast
