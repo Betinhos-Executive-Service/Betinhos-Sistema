@@ -112,7 +112,8 @@
 .frota-classif__cat legend { padding: 0 var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
 
 /* Página compacta: cabeçalho enxuto e cards de dados menores. */
-.frota-page { padding-top: var(--bt-space-3); }
+/* Só nas abas com cabeçalho próprio; as listas ficam com o topo das outras listas, para a linha de comando cair na mesma altura. */
+.frota-page:not(.page--full) { padding-top: var(--bt-space-3); }
 .frota-page .page__header { margin-bottom: var(--bt-space-1); }
 .frota-page .frota .bt-tabs__panel { padding-top: var(--bt-space-3); }
 .frota-page .bt-page-header__row { min-height: 0; }
