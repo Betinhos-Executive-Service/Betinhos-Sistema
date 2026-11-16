@@ -295,7 +295,7 @@ namespace Betinhos.DriverRecordSharing
             return Convert.FromBase64String(text);
         }
 
-        private static bool ConstantTimeEquals(byte[] left, byte[] right)
+        internal static bool ConstantTimeEquals(byte[] left, byte[] right)
         {
             if (left.Length != right.Length) return false;
             var diff = 0;
