@@ -97,8 +97,9 @@
 
 /* Desktop: a grade ocupa a altura da janela e rola por dentro; a página não rola. O celular segue com a rolagem normal (cards). */
 @media (min-width: 821px) {
-  /* Padding e espaçamentos padrão das listas (`.page`: 22/26/32 px; barra de comandos com 12 px até a tabela). */
-  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  /* Padding mais justo que o das outras listas (`.page`: 22/26/32 px): 16 px nas laterais e embaixo, iguais, para a grade
+     ganhar largura e altura; o topo e os 12 px da barra de comandos até a tabela ficam como estão. */
+  .page.gr-page { height: 100dvh; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; padding: 22px var(--bt-space-4) var(--bt-space-4); }
   .gr-page .bt-page-toolbar__start, .gr-page .bt-page-toolbar__end { gap: var(--bt-space-3); }
   .gr-page .bt-table__footer { padding: 0; min-height: 40px; }
   .gr-page .page__header { margin-bottom: var(--bt-space-2); }
