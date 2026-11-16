@@ -411,6 +411,13 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
           });
         }}
         onSwitchCamera={() => undefined}
+        // Mesmo tamanho do shrinkPhotoDataUrl: a foto chega pronta e o hash da prova é o do arquivo enviado.
+        prova={{
+          origem: { tela: "checklist", tabela: "new_checklistveiculo", registroId: selected?.id ?? "" },
+          carimbo: { placa: selected?.placa ?? "", registro: "Checklist" },
+          maxLado: PHOTO_MAX_SIDE,
+          qualidade: PHOTO_QUALITY
+        }}
       />
     );
   }

@@ -6,7 +6,7 @@ import { DATAVERSE } from "../../data/dataverse/entidades";
 import { reportAppError } from "../../shared/appErrorLogger";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
-import type { CapturedVideoDraft, Screen } from "../../types";
+import type { Screen } from "../../types";
 import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "../fotos/envioMidia";
 import { hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
 import { useMediaDraftState } from "../fotos/useMediaDraftState";
@@ -612,17 +612,6 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     setScreen("fotoGasto");
   };
 
-  const openExpenseVideoPreview = (video: CapturedVideoDraft) => {
-    setExpensePhotoDraft("");
-    setExpensePhotoPreviewUrl(video.previewUrl);
-    setExpensePhotoPosterUrl(video.posterUrl ?? "");
-    setExpensePhotoDurationLabel(video.durationLabel ?? "");
-    setExpensePhotoRawBlob(video.rawBlob);
-    setExpensePhotoIsVideo(true);
-    setExpensePreviewPhotoId("");
-    setScreen("previewFotoGasto");
-  };
-
   const openExpensePreview = (photoId: string) => {
     const photo = expensePhotos.find((item) => item.id === photoId);
     if (!photo) return;
@@ -746,7 +735,6 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     isExpenseIdle,
     openExpenseCamera,
     openExpensePreview,
-    openExpenseVideoPreview,
     refazerLeituraCartao,
     resetExpenseQuickRead,
     retakeQuickReadPhoto,

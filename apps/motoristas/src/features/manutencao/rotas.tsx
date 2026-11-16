@@ -1,6 +1,7 @@
 import type { MaintenanceRequestVehicleOption } from "./remoto";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDosVeiculos } from "../fotos/provaCaptura";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { MaintenanceRequestScreen } from "./MaintenanceRequestScreen";
 import type { Screen } from "../../types";
@@ -64,6 +65,10 @@ export function rotasManutencao(screen: Screen, {
         }}
         onCaptureVideo={openMaintenanceRequestVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
+        prova={{
+          origem: { tela: "manutencao", tabela: "cr40f_manutencoes" },
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Manutenção" }
+        }}
       />
     );
   }

@@ -116,3 +116,16 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 
 ## Resumo da Observação final (ícones por tópico)
 - Prévia `/?dev=preview` em 390×844: clique `Finalizar Serviço` (lista), digite no textarea, `Gerar resumo`. No modo mock cada frase vira um tópico; confira que todo `li` em `.observation-review-topics` tem `svg path` (a classe `is-<tipo>` vem de `topicKind`, que nunca devolve nulo; sem palavra-chave = `is-outros`). Teste unitário: `tests/observacaoOrganizada.test.ts`.
+
+## Prova de captura de mídia (fase 1: `src/features/fotos/provaCaptura.ts`, `useProvaDaCaptura.tsx`, `MediaCaptureScreen`)
+- Testes: `node --test --experimental-strip-types tests/provaCaptura.test.ts` (com rede, sem rede, falha no registrar e reenvio, descarte > 7 dias, localização negada e lenta, carimbo e redução a 2048 px, vídeo, limites 120 s / 70 MB, despesa sem vídeo, arquivo sem prova) e `tests/dataPort.test.ts` (porta com `emitirProvaMidia` e `registrarProvaMidia`).
+- Mock (localhost): código `K7M2QX` e hora fixos (`provaRemota.ts`). Chromium com `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream`, UA Android, 390 px, permissões `camera` e `geolocation`:
+  0. Primeira abertura (localStorage limpo): `.camera-location-notice` com "A localização fica registrada junto da foto como prova..." antes do pedido do navegador; "Entendi" grava `betinhos.prova.aviso-localizacao = "1"` e o aviso não volta.
+  1. `#/foto-gasto` → sem botão "Gravar vídeo"; `[data-testid="carimbo-previa"]` mostra `dd/mm/aaaa HH:mm:ss · Despesa` e `Código K7M2QX` no rodapé da câmera.
+  2. Esperar `video.videoWidth > 0`, "Tirar foto" → prévia com a faixa escura acrescentada **abaixo** da foto (canvas = altura da imagem + faixa; nenhum pixel coberto); a imagem tem maior lado ≤ 2048. A fila no IndexedDB (`app-motoristas-media-drafts`, chave `prova-captura`) ganha a entrada com `codigo`, `sha256`, `tamanhoBytes` e `localizacao.estado = "registrada"`.
+  3. UA iPhone em `#/foto-colisao` (câmera nativa): `setInputFiles` no input de vídeo com arquivo de 71 MB e `mtime` atual (> 50 MB tem de ir por caminho de arquivo) → "Vídeo muito grande (71 MB). O limite é 70 MB: grave um vídeo mais curto.".
+  4. Antes/depois: `git stash push -u -- apps/motoristas/src`, o dev server recompila, repetir o passo 1 (antes: 1 botão de vídeo), `git stash pop`.
+- Envio: `uploadMediaWithProof` (despesas, recebimento, manutenção, finalizar, colisão e checklist) registra a prova depois do link; falha deixa a prova pendente, reenviada ao abrir o app e no evento `online`. No mock não há link real: o registro só é verificável no DEV.
+- Não verificável em mock nem na nuvem: câmera e localização reais, Custom API `new_ProvaMidia` (depende do PR do backend no DEV). No DEV, depois do envio de uma despesa: linha em `cr40f_provamidias` com o link do comprovante, o mesmo `cr40f_codigo` impresso e sem selo.
+- Limite conhecido (anterior a esta mudança): na câmera nativa, a mensagem de erro aparece sobreposta ao painel "Câmera do dispositivo".
+

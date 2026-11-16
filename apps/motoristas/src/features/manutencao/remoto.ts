@@ -2,7 +2,8 @@
 import { cleanGuid, cleanODataGuid, createOne, dataverseError, dataverseLog, dataverseWarn, getDriverCurrentVehicleId, retrieveMultiple, retrieveOne, updateOne, type DataverseRecord, type DriverContext } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { ACTIVE_VEHICLE_FILTERS, MAINTENANCE_SELECT, VEHICLE_CATEGORY, VEHICLE_STATUS, bind, getVehicleLabel } from "../../data/dataverse/registros.ts";
-import { buildMaintenancePhotoFolder, createMaintenancePhotoLinkRecord, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { buildMaintenancePhotoFolder, createMaintenancePhotoLinkRecord } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 
 export type MaintenanceRequestPayload = {
   descricao: string;
@@ -130,7 +131,7 @@ export async function createMaintenanceRequestRemote(payload: MaintenanceRequest
   const uploadResults = await Promise.allSettled(photos.map(async (photoDataUrl, index) => {
     const fileName = `foto-solicitacao-${index + 1}`;
     payload.onProgress?.(`Uploads paralelos: enviando arquivo ${index + 1}/${photos.length}.`);
-    const link = await uploadMaintenancePhoto(photoFolderPath, photoDataUrl, fileName, {
+    const link = await uploadMediaWithProof(photoFolderPath, photoDataUrl, fileName, {
       manutencaoId: maintenance.cr40f_id ?? "",
       manutencaoGuid: result.id,
       tipoFoto: "SOLICITACAO",
