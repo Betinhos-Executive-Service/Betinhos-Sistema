@@ -47,8 +47,8 @@ describe('mappers', () => {
   })
 
   it('mapeia multa com indicado booleano e datas de dia', () => {
-    const multa = mapMulta({ cr40f_multasid: 'U1', cr40f_novacoluna: 'AIT 123', cr40f_status: 202410000, cr40f_dataparaindicar: '2026-10-10', createdon: '2026-10-01T12:00:00Z' }, { cr40f_dataparaindicar: 'DateOnly' })
-    expect(multa).toMatchObject({ id: 'u1', titulo: 'AIT 123', indicado: false, dataParaIndicar: '2026-10-10', infracaoId: null })
+    const multa = mapMulta({ cr40f_multasid: 'U1', cr40f_id_multa: 'NT-1073', cr40f_novacoluna: 'AIT 123', cr40f_status: 202410000, cr40f_dataparaindicar: '2026-10-10', createdon: '2026-10-01T12:00:00Z' }, { cr40f_dataparaindicar: 'DateOnly' })
+    expect(multa).toMatchObject({ id: 'u1', codigo: 'NT-1073', titulo: 'AIT 123', indicado: false, dataParaIndicar: '2026-10-10', infracaoId: null })
   })
 
   it('mapeia colisão', () => {

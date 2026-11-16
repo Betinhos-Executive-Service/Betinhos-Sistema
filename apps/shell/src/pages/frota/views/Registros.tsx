@@ -119,7 +119,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de registros">
         <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}
-          search={<SearchBox size={size} aria-label="Buscar registro" placeholder="Buscar descrição, placa ou pessoa" value={busca} onChange={setBusca} />}
+          search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa ou pessoa' : 'Buscar descrição, placa ou pessoa'} value={busca} onChange={setBusca} />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />
             <Button size={size} icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>
