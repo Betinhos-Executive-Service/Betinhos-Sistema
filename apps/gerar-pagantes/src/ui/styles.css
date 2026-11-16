@@ -33,8 +33,10 @@ body { background: transparent; }
 
 /* Lista de pagantes */
 .payers-panel__toolbar { padding: var(--bt-space-3) var(--bt-space-4); }
-.payers-panel__toolbar .bt-page-toolbar__start { flex: 1; }
+.payers-panel__toolbar .bt-page-toolbar__start { flex: 1 1 220px; }
 .payers-panel__toolbar .bt-page-toolbar__start > * { flex: 1; min-width: 220px; }
+/* clip corta como o hidden do Surface, mas não vira área rolável: o foco não desloca o painel para o lado no celular. */
+.payers-panel { overflow: clip; }
 .payers-panel__list { display: grid; }
 .payers-panel__columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, .9fr) minmax(130px, .7fr) minmax(212px, 1fr); gap: var(--bt-space-3); min-height: 32px; align-items: center; padding: 0 var(--bt-space-4); border-top: 1px solid var(--bt-color-border); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .08em; text-transform: uppercase; }
 .payers-panel .bt-empty { margin: var(--bt-space-2) var(--bt-space-4) var(--bt-space-4); }
