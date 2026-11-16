@@ -82,4 +82,10 @@ if ((Rotulo $aprovado[0]) -ne "Agendado") {
   } else { Write-Step "DRY RUN trocaria o rotulo de 202410001 para Agendado" }
 }
 
-if ($Apply) { Publish-Tabela $table }
+# Choice global (cr40f_pagamento usa cr40f_opcoes) nao entra na publicacao da tabela: publica o optionset junto.
+if ($Apply) {
+  if ($pagamento.IsGlobal) {
+    Invoke-Dv "POST" "PublishXml" @{ ParameterXml = "<importexportxml><entities><entity>$table</entity></entities><optionsets><optionset>$($pagamento.Name)</optionset></optionsets></importexportxml>" } | Out-Null
+    Write-Step "tabela e optionset $($pagamento.Name) publicados"
+  } else { Publish-Tabela $table }
+}
