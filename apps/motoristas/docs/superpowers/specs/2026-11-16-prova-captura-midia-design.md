@@ -1,6 +1,6 @@
 # Prova de captura e limites de mídia (fase 1 de 3)
 
-Status em 16/11/2026: desenho aprovado pelo Renan na entrevista de 13 a 16/11/2026. Ainda não implementado.
+Status em 16/11/2026: implementado e publicado no DEV (PRs #492, #505 e #495). Aguarda o teste em aparelho e a publicação no PROD.
 
 As três fases do anexo seguro:
 
@@ -61,7 +61,7 @@ O motorista vê o motivo na hora, em linguagem simples.
 18. Como operação, quero saber quando o motorista negou a localização, para diferenciar "sem permissão" de "sem sinal de GPS".
 19. Como operação, quero a impressão digital do arquivo, para provar numa disputa que a foto não foi trocada depois de enviada.
 20. Como operação, quero que a prova aponte para o registro de origem (despesa, recebimento, manutenção, finalização, colisão ou checklist) e para o link do arquivo, para chegar do anexo à prova e da prova ao anexo.
-21. Como operação, quero que um código de outro motorista, adulterado ou já vencido seja marcado na prova, para identificar tentativa de fraude.
+21. Como operação, quero que um código de outro motorista, ou adulterado seja marcado na prova, para identificar tentativa de fraude.
 22. Como gestor, quero que a hora e o código venham do servidor e sejam assinados, para que mudar o relógio do celular não engane a prova.
 23. Como gestor, quero que a chave usada para assinar o código fique na tabela de segredos, como as demais, para não ficar exposta no código nem em variável de ambiente.
 24. Como desenvolvedor, quero um único módulo de prova de captura usado por todas as telas, para não repetir a lógica em seis lugares.
@@ -137,9 +137,9 @@ O motorista vê o motivo na hora, em linguagem simples.
 
 ### Carimbo
 
-- **Posição e conteúdo:** faixa no rodapé da foto, com data e hora do celular, placa, identificação curta do registro e código.
+- **Posição e conteúdo:** faixa acrescentada **abaixo** da foto (o canvas cresce; nenhum pixel do original é coberto, para o total do cupom continuar legível), com data e hora do celular, placa, identificação curta do registro e código.
 - **Sem rede:** no lugar do código entra "SEM REDE".
-- **Legibilidade:** fonte e contraste legíveis em fundo claro e escuro, sem cobrir mais de 10% da altura.
+- **Legibilidade:** fonte e contraste legíveis em fundo claro e escuro, com altura de cerca de 10% da imagem.
 - **Cobertura:** vale para foto da câmera ao vivo e da câmera nativa. A foto nativa é redesenhada em canvas, o que já descarta o EXIF original. A leitura de EXIF entra só na fase 2, para galeria.
 
 ### Limites
@@ -186,3 +186,5 @@ O motorista vê o motivo na hora, em linguagem simples.
 - **O que a prova garante:** a mídia não é anterior à emissão do código, porque o carimbo imprime um código que não existia antes, e o arquivo guardado é o mesmo que saiu do celular. Ela não impede fotografar uma tela que mostra outra imagem. Isso foi aceito ao descartar o detector de IA.
 - **Novo segredo:** o `midia.prova-captura` entra na tabela de segredos do CLAUDE.md da raiz. Cada ambiente grava o seu com o script de gravar segredo.
 - **Selos:** vão para uma coluna multi-choice para que a fase 2 acrescente valores sem mudar o contrato.
+
+- **Implementação (16/11/2026):** o código não tem prazo de validade; o atraso entre emissão e recebimento fica registrado. Antes do primeiro pedido de localização o app mostra "A localização fica registrada junto da foto como prova.". O registro da Custom API e o segredo `midia.prova-captura` no DEV foram feitos à mão (`packages/plugins/scripts/register-provamidia-customapi.ps1` e `gravar-segredo.ps1`); TEST e PROD precisam do próprio segredo.
