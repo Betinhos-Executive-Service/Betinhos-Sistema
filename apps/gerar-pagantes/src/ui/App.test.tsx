@@ -104,6 +104,37 @@ describe('criar pagantes', () => {
     expect(mocks.updatePersonEmail.mock.invocationCallOrder[0]).toBeLessThan(mocks.submitOperation.mock.invocationCallOrder[0])
     expect(mocks.submitOperation.mock.calls[0][1].pagantes).toContainEqual(expect.objectContaining({ paganteId: ana.id, email: 'ana@empresa.com.br', recipientEmail: 'ana@empresa.com.br', sendEmail: true }))
   })
+
+  it('oferece gravar o e-mail do pagante sem e-mail ao gerar', async () => {
+    await renderApp()
+    addPerson(ana.name)
+    fireEvent.click(saveButton(/gerar pagantes/i))
+    const dialog = await screen.findByRole('dialog', { name: 'Confirmar alterações' })
+    expect(within(dialog).getByText('Pagantes sem e-mail no cadastro')).toBeTruthy()
+    const checkbox = within(dialog).getByRole('checkbox', { name: /gravar no cadastro de ana paula silva/i }) as HTMLInputElement
+    expect(checkbox.checked).toBe(false)
+    const input = within(dialog).getByLabelText(/e-mail de ana paula silva/i)
+    fireEvent.change(input, { target: { value: 'ana@' } })
+    expect(checkbox.checked).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: /confirmar e salvar/i }))
+    expect(await within(dialog).findByText(/informe um e-mail válido/i)).toBeTruthy()
+    expect(mocks.submitOperation).not.toHaveBeenCalled()
+    fireEvent.change(input, { target: { value: 'ana@empresa.com.br' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /confirmar e salvar/i }))
+    await waitFor(() => expect(mocks.submitOperation).toHaveBeenCalledOnce())
+    expect(mocks.updatePersonEmail).toHaveBeenCalledWith(ana.id, 'ana@empresa.com.br')
+    expect(mocks.updatePersonEmail.mock.invocationCallOrder[0]).toBeLessThan(mocks.submitOperation.mock.invocationCallOrder[0])
+  })
+
+  it('pagante sem e-mail pode seguir sem gravar', async () => {
+    await renderApp()
+    addPerson(ana.name)
+    fireEvent.click(saveButton(/gerar pagantes/i))
+    const dialog = await screen.findByRole('dialog', { name: 'Confirmar alterações' })
+    fireEvent.click(within(dialog).getByRole('button', { name: /confirmar e salvar/i }))
+    await waitFor(() => expect(mocks.submitOperation).toHaveBeenCalledOnce())
+    expect(mocks.updatePersonEmail).not.toHaveBeenCalled()
+  })
 })
 
 describe('editar pagantes', () => {

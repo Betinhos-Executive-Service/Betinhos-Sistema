@@ -86,6 +86,9 @@ body { background: transparent; }
 .save-summary__list strong { color: var(--bt-color-text-primary); }
 .save-summary__list span:not(.bt-badge) { grid-column: 2; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
 .save-summary__effects p { margin: 0 0 var(--bt-space-1); }
+.save-summary__emails { display: grid; gap: var(--bt-space-3); margin: var(--bt-space-3) 0; padding-top: var(--bt-space-3); border-top: 1px solid var(--bt-color-border); }
+.save-summary__emails h3 { margin: 0; font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.save-summary__email { display: grid; gap: var(--bt-space-2); }
 
 /* Resultado depois de salvar */
 .result-view__list { display: grid; gap: var(--bt-space-2); margin: 0; padding: var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface-neutral); list-style: none; }
