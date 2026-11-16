@@ -1,6 +1,6 @@
 # Galeria, PDF, selos e foto repetida (fase 2 de 3)
 
-Status em 16/11/2026: desenho aprovado pelo Renan na entrevista de 13 a 16/11/2026. Ainda não implementado. Depende da fase 1 (`2026-11-16-prova-captura-midia-design.md`): a Custom API `new_ProvaMidia`, a tabela de prova de mídia e o módulo de prova de captura do app.
+Status em 16/11/2026: implementado e publicado no DEV (PRs #503, #517 e #509). Aguarda o teste em aparelho e a publicação no PROD. Depende da fase 1 (`2026-11-16-prova-captura-midia-design.md`): a Custom API `new_ProvaMidia`, a tabela de prova de mídia e o módulo de prova de captura do app.
 
 As três fases:
 
@@ -111,7 +111,7 @@ A operação também não vê no Sistema o que a fase 1 registra. Não sabe que 
     - colisão: data da colisão;
     - recebimento: data do serviço.
   - **fim:** agora, mais 10 min de tolerância de relógio.
-  - O app calcula o selo para mostrar a prévia, e o servidor recalcula na hora de registrar.
+  - Só o servidor calcula o selo, na hora de registrar, com a data gravada no registro de origem.
 - **Impressão digital visual:**
   - dHash de 64 bits, calculado sobre a imagem antes do carimbo e da redução;
   - nas fotos da câmera do app, um segundo hash sobre a imagem final, já com carimbo;
@@ -212,3 +212,11 @@ A operação também não vê no Sistema o que a fase 1 registra. Não sabe que 
   2. Sistema noutro PR.
 
   Os dois vão ao DEV antes da fase 3.
+
+- **Implementação (16/11/2026), depois da revisão de código:**
+  - Registro ainda não criado usa um id de sessão estável por rascunho (`cr40f_sessaoid`), trocado pelo id real no `registrar`; o reenvio na mesma sessão do mesmo motorista não conta como repetida.
+  - `cr40f_idcliente` torna o `registrar` idempotente: reenvio após resposta perdida devolve a prova existente.
+  - dHash de baixa entropia (popcount fora de 8 a 56, como foto escura) não entra na busca por faixas; vale só o SHA-256. A busca por faixas é paginada (250 linhas, até 4 páginas).
+  - Foto da câmera nativa grava também o SHA do original que fica na galeria.
+  - Vídeo da galeria sem duração legível é recusado.
+  - A migration `20261116-1800-prova-midia-galeria.ps1` falhou no DEV (form principal sem `isdefault`) e foi substituída pela `20261116-1900-prova-midia-galeria-forms.ps1` (`migrations/substituidas.json`).
