@@ -12,6 +12,7 @@ import { canViewManagement, localDateKey } from './domain/management'
 import { plannerNavigationWindow, plannerUrlForState, readPlannerUrlState } from './domain/plannerUrl'
 import { resolveQuoteAcceptance } from './domain/quoteScenarios'
 import { isQuoteTask, taskStatusForQuoteStatus } from './domain/quoteTaskFlow'
+import { isQuoteConflict } from './domain/quoteConflict'
 import { buildBackgroundRefreshPatch } from './domain/refreshState'
 import { installPlannerBridge } from './domain/whatsappBridge'
 import { normalizeWorkItems } from './domain/workItems'
@@ -83,6 +84,11 @@ export function usePlanner() {
   const confirmedStateRef = useRef<any>(null);
   const pendingMutationsRef = useRef<any>(new Map());
   const refreshInFlightRef = useRef<any>(false);
+  // Conta as gravações confirmadas: o refresh que começou antes de uma delas traria a
+  // versão velha da linha (ETag antiga) e é descartado.
+  const confirmedVersionRef = useRef(0);
+  const refreshQueuedRef = useRef(false);
+  const refreshInBackgroundRef = useRef<(options?: any) => Promise<void>>(async () => {});
   const noticeTimerRef = useRef<any>(null);
   const launchHandledRef = useRef<any>(false);
   const urlStateRef = useRef<any>(initialUrlStateRef.current);
@@ -189,8 +195,10 @@ export function usePlanner() {
     [applyPendingMutations],
   );
   const refreshInBackground = useCallback(async ({ silent = true }: any = {}) => {
-    if (refreshInFlightRef.current || state.loading?.core) return;
+    if (state.loading?.core) return;
+    if (refreshInFlightRef.current) { refreshQueuedRef.current = true; return; }
     refreshInFlightRef.current = true;
+    const startedAtVersion = confirmedVersionRef.current;
     setRefreshing(true);
     if (!silent) showNotice("Atualizando dados…", 5200);
     try {
@@ -200,6 +208,8 @@ export function usePlanner() {
         store.loadPhotos(core),
         store.loadContacts ? store.loadContacts(core) : Promise.resolve(core.contacts || []),
       ]);
+      // Uma gravação terminou durante a leitura: estes dados são anteriores a ela. Lê de novo.
+      if (confirmedVersionRef.current !== startedAtVersion) { refreshQueuedRef.current = true; return; }
       const current = confirmedStateRef.current || {};
       const patch = buildBackgroundRefreshPatch(
         current,
@@ -225,8 +235,13 @@ export function usePlanner() {
     } finally {
       refreshInFlightRef.current = false;
       setRefreshing(false);
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false;
+        window.setTimeout(() => { void refreshInBackgroundRef.current({ silent: true }); }, 0);
+      }
     }
   }, [mergeConfirmed, showNotice, state.loading?.core, store]);
+  refreshInBackgroundRef.current = refreshInBackground;
 
   useEffect(() => {
     if (state.loading?.core) return undefined;
@@ -351,6 +366,7 @@ export function usePlanner() {
       operation
         .then((next: any) => {
           confirmedStateRef.current = next;
+          confirmedVersionRef.current += 1;
           setState(applyPendingMutations(next));
           showNotice(message);
         })
@@ -377,6 +393,7 @@ export function usePlanner() {
         Promise.resolve(store.ensureQuoteTask(state, quote))
           .then((next) => {
             confirmedStateRef.current = next;
+            confirmedVersionRef.current += 1;
             setState(applyPendingMutations(next));
             const task = next.tasks.find(
               (item: any) => item.quoteId === quote.id && !item.parentTaskId,
@@ -420,6 +437,7 @@ export function usePlanner() {
         .then(operation)
         .then((next) => {
           confirmedStateRef.current = next;
+          confirmedVersionRef.current += 1;
           pendingMutationsRef.current.delete(mutationId);
           setState(applyPendingMutations(next));
           if (successMessage) showNotice(successMessage);
@@ -429,6 +447,13 @@ export function usePlanner() {
           pendingMutationsRef.current.delete(mutationId);
           if (confirmedStateRef.current)
             setState(applyPendingMutations(confirmedStateRef.current));
+          // Conflito de versão: repetir com os dados velhos falharia de novo até o refresh de
+          // 60 s. Relê agora; o drawer mostra "Recarregar cotação" se o negócio mudou.
+          if (isQuoteConflict(failure)) {
+            showNotice("A cotação foi alterada por outra pessoa. Recarregando os dados; confira e salve de novo.", 7000);
+            void refreshInBackground({ silent: true });
+            return false;
+          }
           showNotice(
             `Falha ao sincronizar: ${failure.message || "operação não concluída."}`,
             5200,
@@ -436,7 +461,7 @@ export function usePlanner() {
           return false;
         });
     },
-    [applyPendingMutations, showNotice],
+    [applyPendingMutations, refreshInBackground, showNotice],
   );
   const runOptimisticCreate = useCallback(
     (input: any, operation: any, message: any, parentTaskId: any = null) => {
@@ -924,6 +949,7 @@ export function usePlanner() {
     });
     if (!result?.state) throw new Error("Planner não retornou o estado após o intake WhatsApp.");
     confirmedStateRef.current = result.state;
+    confirmedVersionRef.current += 1;
     setState(applyPendingMutations(result.state));
     showNotice(result.status === "duplicate" ? "Triagem já registrada." : result.status === "updated" ? "Caso WhatsApp atualizado." : "Caso WhatsApp criado.");
     return { status: result.status, contactId: result.contactId, taskId: result.taskId };
@@ -1077,6 +1103,7 @@ export function usePlanner() {
       return Promise.resolve(operation)
         .then((next) => {
           confirmedStateRef.current = next;
+          confirmedVersionRef.current += 1;
           setState(applyPendingMutations(next));
           showNotice(input.id ? "Equipe atualizada." : "Equipe criada.");
           return true;
@@ -1092,6 +1119,7 @@ export function usePlanner() {
     (id: any) => Promise.resolve(store.deleteTeam(state, id))
       .then((next) => {
         confirmedStateRef.current = next;
+        confirmedVersionRef.current += 1;
         setState(applyPendingMutations(next));
         showNotice("Equipe apagada.");
         return true;
@@ -1106,6 +1134,7 @@ export function usePlanner() {
     (rows: any) => Promise.resolve(store.importPlannerTasks(confirmedStateRef.current || state, rows))
       .then((result) => {
         confirmedStateRef.current = result.nextState;
+        confirmedVersionRef.current += 1;
         setState(applyPendingMutations(result.nextState));
         showNotice(`${result.createdCount} tarefa(s) importada(s).`);
         return result;
@@ -1291,6 +1320,7 @@ export function usePlanner() {
     return store.sendNotificationTest(state, { ...input, actorEmployeeId: actor?.id || "", actorUserId: actor?.userId || "" }).then((result: any) => {
       const next = result?.state || result;
       confirmedStateRef.current = next;
+      confirmedVersionRef.current += 1;
       setState(applyPendingMutations(next));
       const delivery = result?.emailDispatch;
       if (delivery?.status === "sent") showNotice("Push de teste enviado.");

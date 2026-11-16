@@ -75,6 +75,7 @@ import { normalizeContact } from "../domain/contactDomain";
 import { logAppError, sanitizeDataversePath } from "./errorLogger";
 import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, waitingReturnNotices, type QuoteNotice } from "../domain/quoteNotifications";
 import { applyQuoteWaiting, QUOTE_WAITING_CLEARED, QUOTE_WAITING_STATUS } from "../domain/quoteWaiting";
+import { quoteConflictError } from "../domain/quoteConflict";
 import { createSharePointDocs, DOC_MAX_BYTES, sanitizeFileName, uniqueName } from "../../funcionarios/data/sharepoint";
 import type { Documento } from "../../funcionarios/data/types";
 import type { Employee, PersonalTag, PlannerNotification, PlannerState, QuoteData, QuoteOptionData, QuoteProposalVersion, Task, TaskAttachment, TaskHistoryItem, Team, WaitingContext, WaitingContextInput } from "../domain/types";
@@ -584,9 +585,11 @@ function dateOnly(value: unknown) {
   return value ? String(value).slice(0, 10) : "";
 }
 
-interface RequestOptions { method?: string; body?: string; headers?: Record<string, string> }
+// quietStatuses: falhas esperadas que quem chama trata (ex.: 412 que a cotação recupera); não vão ao log.
+interface RequestOptions { method?: string; body?: string; headers?: Record<string, string>; quietStatuses?: number[] }
 
-async function request(xrm: PlannerXrm, path: string, options: RequestOptions = {}): Promise<unknown> {
+async function request(xrm: PlannerXrm, path: string, requestOptions: RequestOptions = {}): Promise<unknown> {
+  const { quietStatuses = [], ...options } = requestOptions;
   const retryable = (status: number) => status === 408 || status === 429 || status >= 500;
   const method = options.method || "GET";
   const logFailure = (error: unknown, errorCode: string) => void logAppError(error, {
@@ -619,7 +622,7 @@ async function request(xrm: PlannerXrm, path: string, options: RequestOptions = 
     if (!retryable(response.status) || attempt === 2) {
       const detail = s(parsedError.message) || body || response.statusText;
       const error = new Error(`${method} ${path} falhou: ${response.status} ${detail}`);
-      logFailure(error, parsedError.code ? `${response.status} ${String(parsedError.code)}` : String(response.status));
+      if (!quietStatuses.includes(response.status)) logFailure(error, parsedError.code ? `${response.status} ${String(parsedError.code)}` : String(response.status));
       throw error;
     }
     const retryAfter = Number(response.headers.get("Retry-After"));
@@ -2501,7 +2504,7 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
   const quoteId = cleanId(id);
   const existing = (state.quotes || []).find((quote) => cleanId(quote.id) === quoteId);
   if (!existing) throw new Error("Cotação não encontrada.");
-  if (patch.etag && patch.etag !== existing.etag) throw new Error("A cotação foi alterada por outra pessoa. Recarregue antes de salvar.");
+  if (patch.etag && patch.etag !== existing.etag) throw quoteConflictError("A cotação foi alterada por outra pessoa. Recarregue antes de salvar.");
   // V2.1: entrar em Aguardando exige o que falta/de quem/retorno; sair limpa os campos.
   patch = applyQuoteWaiting(existing.status, applyDerivedStatus(existing, patch));
   const nextStatus = s(patch.status ?? existing.status);
@@ -2541,19 +2544,23 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
     else payload["cr40f_VersaoPropostaAceita@odata.bind"] = null;
   }
   const quotePath = `/${entitySetName(QUOTE_TABLE)}(${quoteId})`;
-  const patchQuote = (etag: string) => request(xrm, quotePath, { method: "PATCH", body: JSON.stringify(payload), headers: etag ? { "If-Match": etag } : {} });
+  const patchQuote = (etag: string, quietStatuses: number[] = []) => request(xrm, quotePath, { method: "PATCH", body: JSON.stringify(payload), headers: etag ? { "If-Match": etag } : {}, quietStatuses });
   try {
-    try { await patchQuote(existing.etag || ""); }
+    // O 412 da primeira tentativa só vai ao log se for conflito de verdade (abaixo).
+    try { await patchQuote(existing.etag || "", [412]); }
     catch (error) {
       if (!existing.etag || !isPreconditionFailed(error)) throw error;
       const freshEtag = await currentEtagIfBusinessUnchanged(xrm, existing);
-      if (!freshEtag) throw error;
+      if (!freshEtag) {
+        void logAppError(error, { action: "updateLiveQuote", severity: "warning", source: "planner-quotes-v2", errorCode: "QUOTE_412_CONFLICT" });
+        throw error;
+      }
       await patchQuote(freshEtag);
       void logAppError(new Error("Cotação mudou só em campos de automação; gravação repetida com a versão atual."), { action: "updateLiveQuote", severity: "info", source: "planner-quotes-v2", errorCode: "QUOTE_412_RECOVERED" });
     }
   } catch (error) {
     if (stagedOptions) { try { await deleteScenarioRows(xrm, stagedOptions.rows); } catch (cleanupError) { console.warn("[Planner] falha ao limpar opções não salvas", cleanupError); } }
-    if (isPreconditionFailed(error)) throw new Error("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
+    if (isPreconditionFailed(error)) throw quoteConflictError("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
     throw error;
   }
   const ready = readyNotice(existing, { ...existing, ...effectivePatch, status: nextStatus }, new Date().toISOString());
@@ -2609,7 +2616,7 @@ async function markLiveQuoteSent(xrm: PlannerXrm, state: LiveState, id: string, 
   const quote = (state.quotes || []).find((item) => cleanId(item.id) === cleanId(id));
   if (!quote || !QUOTE_COMPLETED_STATUSES.includes(quote.status as string)) throw new Error("Finalize a cotação antes de registrar o envio.");
   if (proposal.requestId && (quote.proposalVersions || []).some((version) => version.requestId === proposal.requestId)) return loadLiveState(xrm);
-  if (!quote.etag || (proposal.expectedEtag && proposal.expectedEtag !== quote.etag)) throw new Error("A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.");
+  if (!quote.etag || (proposal.expectedEtag && proposal.expectedEtag !== quote.etag)) throw quoteConflictError("A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.");
   const requestId = proposal.requestId || scenarioId();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId)) throw new Error("Identificador do registro de envio inválido.");
   const options = proposal.options || normalizeQuoteOptions(quote);

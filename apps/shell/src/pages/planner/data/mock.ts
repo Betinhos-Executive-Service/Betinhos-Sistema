@@ -32,6 +32,7 @@ import {
 import { isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from '../domain/quoteTaskFlow'
 import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, waitingReturnNotices, type QuoteNotice } from '../domain/quoteNotifications'
 import { applyQuoteWaiting, QUOTE_WAITING_CLEARED, QUOTE_WAITING_STATUS } from '../domain/quoteWaiting'
+import { quoteConflictError } from '../domain/quoteConflict'
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, quoteRoutePoints, validateQuoteCommercial } from '../domain/quoteDomain'
 import type { NormalizedContact } from '../domain/contactDomain'
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance } from '../domain/quoteScenarios'
@@ -1459,7 +1460,7 @@ export function syncQuoteFollowUps(state: MockState, today: string = localDateKe
 export function updateQuote(state: MockState, id: string, patchInput: QuotePatch = {}): MockState {
   const existing = (state.quotes || []).find((quote) => quote.id === id)
   if (!existing) throw new Error('Cotação não encontrada.')
-  if (patchInput.modifiedAt && patchInput.modifiedAt !== existing.modifiedAt) throw new Error('A cotação foi alterada por outra pessoa. Recarregue antes de salvar.')
+  if (patchInput.modifiedAt && patchInput.modifiedAt !== existing.modifiedAt) throw quoteConflictError('A cotação foi alterada por outra pessoa. Recarregue antes de salvar.')
   // V2.1: entrar em Aguardando exige o que falta/de quem/retorno; sair limpa os campos.
   const patch: QuotePatch = applyQuoteWaiting(existing.status, applyDerivedStatus(existing, patchInput))
   const nextStatus = patch.status ?? existing.status
@@ -1574,7 +1575,7 @@ export function markQuoteSent(state: MockState, id: string, proposal: QuoteSendP
   const quote = (state.quotes || []).find((item) => item.id === id)
   if (!quote || !QUOTE_COMPLETED_STATUSES.includes(quote.status || '')) throw new Error('Finalize a cotação antes de registrar o envio.')
   if (proposal.requestId && (quote.proposalVersions || []).some((version) => version.requestId === proposal.requestId)) return state
-  if (proposal.expectedModifiedAt && proposal.expectedModifiedAt !== quote.modifiedAt) throw new Error('A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.')
+  if (proposal.expectedModifiedAt && proposal.expectedModifiedAt !== quote.modifiedAt) throw quoteConflictError('A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.')
   const options = proposal.options || normalizeQuoteOptions(quote)
   const prepared = prepareQuoteResponse({ ...quote, ...proposal.draft, options })
   if (!prepared.valid) throw new Error(prepared.error)
