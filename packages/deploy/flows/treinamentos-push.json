@@ -8,7 +8,7 @@
           "connectionName": "shared_commondataserviceforapps"
         },
         "parameters": {
-          "subscriptionRequest/message": 4,
+          "subscriptionRequest/message": 3,
           "subscriptionRequest/filterexpression": "cr40f_pushstatus eq 100000000",
           "subscriptionRequest/filteringattributes": "cr40f_pushstatus",
           "subscriptionRequest/entityname": "cr40f_treinamentoparticipacao",
