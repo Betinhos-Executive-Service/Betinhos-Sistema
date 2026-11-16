@@ -197,7 +197,7 @@ function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos
   const selo = (a: Anexo) => <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }

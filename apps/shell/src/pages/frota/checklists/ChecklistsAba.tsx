@@ -3,6 +3,8 @@ import { useState } from 'react'
 import type { Host } from '../../../host'
 import { GestaoChecklists } from './components/GestaoChecklists'
 import { configurarDataverse } from './data/dataverse'
+import { configurarProvas } from './components/FotosChecklist'
+import { createCarregarProvas } from '../../../lib/comprovantes/provaMidia'
 import './components/gestao.css'
 
 /**
@@ -12,6 +14,7 @@ import './components/gestao.css'
 export function ChecklistsAba({ host, titulo }: { host: Host; titulo: string }) {
   // Liga o cliente antes do primeiro render: as consultas partem do efeito de carga da GestaoChecklists.
   useState(() => configurarDataverse(host.mode === 'dataverse' ? host.client : null))
+  useState(() => configurarProvas(createCarregarProvas(host)))
   useShellHeader({ title: titulo })
   return (
     <div className="page page--full frota-page">

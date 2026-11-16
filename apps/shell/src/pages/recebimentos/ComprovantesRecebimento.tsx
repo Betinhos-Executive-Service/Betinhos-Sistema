@@ -61,13 +61,13 @@ export function ListaRecebimentos({ estado, recarregar, source, servicos }: List
     )
   }
   if (!estado.lista.length) return <p className="cmp-vazio">Nenhum comprovante enviado pelo motorista.</p>
-  if (!servicos) return <ComprovantesGaleria anexos={estado.lista} ler={source.arquivo} meta={metaRecebimento} selo={seloRecebimento} />
+  if (!servicos) return <ComprovantesGaleria anexos={estado.lista} ler={source.arquivo} provas={source.provas} meta={metaRecebimento} selo={seloRecebimento} />
   const grupos = agruparPorServico(servicos, estado.lista)
   const titulos = new Map(grupos.map(({ servico: s }) => [s.id.toLowerCase(), [s.codigo || 'Serviço sem ID', formatDate(s.data), s.destino || 'Sem destino'].join(' · ')]))
   return (
     <ComprovantesGaleria
       anexos={grupos.flatMap((g) => g.comprovantes)}
-      ler={source.arquivo}
+      ler={source.arquivo} provas={source.provas}
       meta={metaRecebimento}
       selo={seloRecebimento}
       grupo={(r) => ({ chave: r.reservaId, titulo: titulos.get(r.reservaId) })}

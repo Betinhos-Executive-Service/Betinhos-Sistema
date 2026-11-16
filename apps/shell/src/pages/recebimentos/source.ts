@@ -2,6 +2,7 @@ import type { Host } from '../../host'
 import type { Arquivo } from '../../lib/comprovantes/arquivo'
 import { createArquivos } from '../../lib/comprovantes/leitura'
 import { createMockArquivo } from '../../lib/comprovantes/mock'
+import { createCarregarProvas, type CarregarProvas } from '../../lib/comprovantes/provaMidia'
 import { latenciaMock } from '../../app/latenciaMock'
 import type { FinanceiroServico, Recebimento } from './domain'
 import { contarPorReserva, loadFinanceiro, loadRecebimentos } from './queries'
@@ -16,6 +17,8 @@ export type RecebimentosSource = {
   financeiro: (reservaId: string) => Promise<FinanceiroServico>
   /** Conteúdo para a prévia; cache por sessão, compartilhado entre as fichas. */
   arquivo: (r: Recebimento) => Promise<Arquivo>
+  /** Prova de captura do App Motoristas pelo link do comprovante (selos ao lado do anexo). */
+  provas?: CarregarProvas
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
@@ -30,6 +33,7 @@ function createMock(): RecebimentosSource {
       if (r.midia === 'video') throw new Error('No modo local o vídeo não é baixado.')
       return createMockArquivo(r)
     },
+    provas: createCarregarProvas({ mode: 'mock' }),
   }
 }
 
@@ -44,6 +48,7 @@ export function recebimentosSource(host: Host): RecebimentosSource {
       contar: (ids) => contarPorReserva(host.client, ids),
       financeiro: (id) => loadFinanceiro(host.client, id),
       arquivo: createArquivos(host.client),
+      provas: createCarregarProvas(host),
     }
     porHost.set(host, source)
   }
