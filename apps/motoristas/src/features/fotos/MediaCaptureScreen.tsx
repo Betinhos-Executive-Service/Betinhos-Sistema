@@ -753,7 +753,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               {avisoLocalizacao ? (
                 <div className="camera-start-panel camera-location-notice" role="dialog" aria-modal="false" aria-labelledby="aviso-localizacao-titulo">
                   <strong id="aviso-localizacao-titulo">Localização</strong>
-                  <span>A localização fica registrada junto da foto como prova. Você pode negar e continuar usando a câmera.</span>
+                  <span>A localização fica registrada junto da foto como prova.</span>
                   <button type="button" onClick={() => { confirmarAvisoLocalizacao(); setAvisoLocalizacao(false); }}>Entendi</button>
                 </div>
               ) : null}
