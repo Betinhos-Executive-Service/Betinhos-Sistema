@@ -214,7 +214,7 @@ async function loadReservationsInBatches(api: XrmWebApi, rows: DataverseEntity[]
     const filter = batch.map((id) => `cr40f_reservadeveculosid eq ${id}`).join(' or ')
     return api.retrieveMultipleRecords(
       reservationTable,
-      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value&$filter=${encodeURIComponent(`(${filter})`)}`,
+      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_endereodesada,cr40f_destino,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value&$filter=${encodeURIComponent(`(${filter})`)}`,
     )
   }))
   pages.forEach((related) => related.entities.forEach((row) => {
@@ -286,6 +286,8 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
       clientRegistration: rowLinks ? stringValue(row[`${clientPrefix}cr40f_registro`], '') : '',
       clientAddress: rowLinks ? stringValue(row[`${clientPrefix}cr40f_endereco`], '') : '',
       route: stringValue(reservation?.cr40f_trajeto, 'Trajeto não informado'),
+      departureAddress: stringValue(reservation?.cr40f_endereodesada, ''),
+      destination: stringValue(reservation?.cr40f_destino, ''),
       departureAt: typeof date === 'string' ? date : '',
       status: typeof statusLabel === 'string' && statusLabel.toLocaleLowerCase('pt-BR').startsWith('conclu') ? 'Concluído' as const : 'Pendente' as const,
       serviceStatus: stringValue(reservation?.[`cr40f_status${formatted}`], ''),
