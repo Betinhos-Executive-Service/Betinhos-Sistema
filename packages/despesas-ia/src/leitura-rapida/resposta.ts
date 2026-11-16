@@ -11,6 +11,11 @@ export function interpretarLeitura(msg: MensagemApi): ResultadoLeitura {
   if (typeof l?.legivel !== 'boolean') return { ok: false, erro: 'Campo legivel ausente.' }
   if (l.valor !== null && !(typeof l.valor === 'number' && l.valor > 0)) return { ok: false, erro: `Valor inválido: ${l.valor}.` }
   if (l.data !== null && !/^\d{4}-\d{2}-\d{2}$/.test(l.data)) return { ok: false, erro: `Data inválida: ${l.data}.` }
+  // Chave fora do formato vira null (não derruba a leitura): o app ainda confere o DV antes de usar.
+  if (l.chave_acesso !== null && l.chave_acesso !== undefined) {
+    const chave = typeof l.chave_acesso === 'string' ? l.chave_acesso.replace(/\s/g, '').toUpperCase() : ''
+    l = { ...l, chave_acesso: /^[0-9A-Z]{44}$/.test(chave) ? chave : null }
+  } else l = { ...l, chave_acesso: null }
   if (l.legivel && (l.valor === null || l.data === null)) return { ok: true, leitura: { ...l, legivel: false, motivo_ilegivel: 'Valor ou data não identificados.' } }
   return { ok: true, leitura: l }
 }

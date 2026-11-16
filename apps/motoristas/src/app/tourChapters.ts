@@ -853,6 +853,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   meuCarro: ["meu-carro"],
   fotoReceber: ["camera"],
   fotoGasto: ["camera"],
+  codigoGasto: ["camera"],
   fotoColisao: ["camera"],
   fotoManutencao: ["camera"],
   fotoSolicitacaoManutencao: ["camera"],

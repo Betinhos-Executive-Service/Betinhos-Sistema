@@ -135,3 +135,13 @@ test('grava o CNPJ lido (só dígitos, 14) em new_cnpjposto, que dispara a compa
   const digitos = "replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', '')"
   assert.ok(ps1.includes(`"item/new_cnpjposto": "@if(equals(length(${digitos}), 14), ${digitos}, triggerOutputs()?['body/new_cnpjposto'])",`))
 })
+
+test('fase 3: Contexto leva a nota de cada comprovante (chave decomposta e situação) e os selos das provas da despesa', () => {
+  assert.ok(ps1.includes(`"notas": "@body('Notas_contexto')",`))
+  assert.ok(ps1.includes(`"provas": { "legendaSelos": "@outputs('Selos_legenda')", "itens": "@body('Provas_contexto')" }`))
+  assert.ok(ps1.includes(`cr40f_ordem,cr40f_chaveacesso,cr40f_notauf,cr40f_notaaamm,cr40f_notacnpjemitente,cr40f_notamodelo,cr40f_notanumero,cr40f_situacaonota"`))
+  assert.ok(ps1.includes(`"$filter": "cr40f_tabelaorigem eq 'cr40f_despesaoperacional' and cr40f_registroorigemid eq '@{triggerOutputs()?['body/cr40f_despesaoperacionalid']}'"`))
+  // Rótulos da situação e legenda dos selos vêm da metadata (sem valores fixos no flow).
+  assert.ok(ps1.includes(`$escopo.Situacao_nota.inputs = MapaOpcoes 'cr40f_anexodespesaoperacional' 'cr40f_situacaonota'`))
+  assert.ok(ps1.includes(`$escopo.Selos_legenda.inputs = MapaOpcoes 'cr40f_provamidia' 'cr40f_selos' 'MultiSelectPicklistAttributeMetadata'`))
+})

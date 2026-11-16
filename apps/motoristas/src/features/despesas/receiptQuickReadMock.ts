@@ -1,9 +1,18 @@
 /**
  * Leitura rápida simulada para a visualização local (fora do Dynamics), ativada só com ?mockLeitura=<modo> na URL.
  * Com ?mockLeituraValor=<reais> o modo ok devolve esse valor (conferência do comprovante de recebimento);
- * com ?mockLeituraData=<AAAA-MM-DD>, essa data.
+ * com ?mockLeituraData=<AAAA-MM-DD>, essa data; com ?mockLeituraChave=1, uma chave de NFC-e fictícia (DV válido) do mês de hoje.
  * Modos: ok (2,5 s), lento (11 s, mostra o aviso de demora), ilegivel, falha e timeout (nunca responde).
  */
+import { completarCnpj, dvDaChave } from "./chaveNotaFiscal.ts";
+import { todayInSaoPaulo } from "./receiptQuickRead.ts";
+
+/** Chave fictícia (CNPJ inventado, DV válido) de NFC-e do RJ no mês de hoje: só para a prévia local. */
+export function chaveFicticiaDoMes(hoje = todayInSaoPaulo()) {
+  const base = `33${hoje.slice(2, 4)}${hoje.slice(5, 7)}${completarCnpj("123456780001")}65001000004321112345678`;
+  return `${base}${dvDaChave(base)}`;
+}
+
 export type QuickReadMockMode = "ok" | "lento" | "ilegivel" | "falha" | "timeout";
 
 const MODES: QuickReadMockMode[] = ["ok", "lento", "ilegivel", "falha", "timeout"];
@@ -39,7 +48,8 @@ export async function readReceiptQuickMock(mode: QuickReadMockMode, categorias: 
       uf: "SP",
       categoria_sugerida: categorias.find((name) => /almo/i.test(name)) ?? null,
       forma_pagamento_sugerida: formasPagamento.find((name) => /cr[eé]dito/i.test(name)) ?? null,
-      motivo_ilegivel: null
+      motivo_ilegivel: null,
+      chave_acesso: new URLSearchParams(globalThis.location?.search ?? "").get("mockLeituraChave") === "1" ? chaveFicticiaDoMes() : null
     }
   };
 }

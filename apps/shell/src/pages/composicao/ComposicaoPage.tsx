@@ -11,6 +11,7 @@ import { useComposicaoViewState } from './useComposicaoViewState'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
 import { CellHoverPreview } from './components/CellHoverPreview'
+import { LookupHoverIntent } from './components/LookupHoverIntent'
 import { ClientCard, RouteCard } from './components/CopyText'
 import { CommandConfirmDialog } from './components/CommandConfirmDialog'
 import { confirmDialogContent, useCompositionCommands, type CommandNotice, type CommandPhase, type RefreshOptions } from './components/useCompositionCommands'
@@ -1695,6 +1696,7 @@ function ComposicaoContent({ host }: { host: Host }) {
 
       <div ref={setTableRegion} className="composition-table-region" role="region" aria-label="Tabela de composições" tabIndex={0}>
         <CellHoverPreview />
+        <LookupHoverIntent />
         {loading ? <PriceGridSkeleton />
           : connectionError && rows.length === 0 ? <LoadFailure message={connectionError} />
             : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}

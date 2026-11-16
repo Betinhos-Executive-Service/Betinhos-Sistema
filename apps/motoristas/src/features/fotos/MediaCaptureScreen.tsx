@@ -28,7 +28,14 @@ type MediaCaptureScreenProps = {
   onCaptureVideo?: (video: CapturedVideoDraft) => void;
   onSwitchCamera: () => void;
   prova?: ProvaDaCaptura;
+  /**
+   * Modo "ler código" (chave da nota fiscal): sem prova nem carimbo. Com a câmera ao vivo, cada quadro vai para lerQuadro
+   * até ele devolver true; a foto tirada (ou a da câmera nativa) chega em onCapture, como sempre, para o leitor tentar nela.
+   */
+  leitorDeCodigo?: { lerQuadro: (video: HTMLVideoElement) => Promise<boolean>; dica: string };
 };
+
+const INTERVALO_LEITURA_MS = 350;
 
 type VideoCaptureProfile = {
   label: "hdPlus" | "hd";
@@ -196,7 +203,7 @@ async function captureTrackPhotoDataUrl(stream: MediaStream) {
   return readBlobAsDataUrl(photoBlob);
 }
 
-export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo: onCaptureVideoProp, onSwitchCamera, prova }: MediaCaptureScreenProps) {
+export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo: onCaptureVideoProp, onSwitchCamera, prova, leitorDeCodigo }: MediaCaptureScreenProps) {
   // Despesa só com foto: sem o tratamento de vídeo, a tela não oferece gravar.
   const onCaptureVideo = prova && !permiteVideo(prova.origem.tela) ? undefined : onCaptureVideoProp;
   const { sessao, finalizarFoto, registrarVideo, prepararDaGaleria } = useProvaDaCaptura(prova);
@@ -693,6 +700,26 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     return () => window.clearInterval(timer);
   }, [recording]);
 
+  // Leitura do código nos quadros do vídeo ao vivo: um quadro por vez, para no primeiro código aceito.
+  const lerQuadroRef = useRef(leitorDeCodigo?.lerQuadro);
+  lerQuadroRef.current = leitorDeCodigo?.lerQuadro;
+  const comLeitor = Boolean(leitorDeCodigo);
+  useEffect(() => {
+    if (!comLeitor || !ready || !useLivePreview) return;
+    let ativo = true;
+    let lendo = false;
+    const timer = window.setInterval(() => {
+      const video = videoRef.current;
+      const ler = lerQuadroRef.current;
+      if (lendo || !video || !ler || video.readyState < 2) return;
+      lendo = true;
+      void ler(video).then((aceito) => { if (aceito && ativo) { ativo = false; window.clearInterval(timer); } })
+        .catch(() => undefined)
+        .finally(() => { lendo = false; });
+    }, INTERVALO_LEITURA_MS);
+    return () => { ativo = false; window.clearInterval(timer); };
+  }, [comLeitor, ready, useLivePreview]);
+
   useEffect(() => {
     if (defaultLaunchAttemptedRef.current) return;
     defaultLaunchAttemptedRef.current = true;
@@ -746,6 +773,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               ) : null}
 
               {prova && useLivePreview && ready ? <CarimboPrevia sessao={sessao} carimbo={prova.carimbo} /> : null}
+              {leitorDeCodigo && useLivePreview && ready ? <div className="camera-codigo-mira" aria-hidden="true" /> : null}
 
               {useLiveCamera && capturingPhoto ? <div className="camera-shutter-flash" aria-hidden="true" /> : null}
 
@@ -878,6 +906,8 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </button>
               </div>
             </div>
+
+            {leitorDeCodigo ? <p className="media-capture-dica-codigo" aria-live="polite">{leitorDeCodigo.dica}</p> : null}
 
             {galeria ? (
               <button type="button" className="camera-gallery-action" onClick={() => galeriaInputRef.current?.click()} disabled={processing || recording}>
