@@ -7,8 +7,8 @@ import type { RecebimentosSource } from './source'
 
 afterEach(cleanup)
 
-const rec = (id: string, ordem: number): Recebimento => ({ id, nome: `${id}.jpg`, url: `https://example.com/${id}`, midia: 'foto', reservaId: 's1', ordem, enviadoEm: new Date(2026, 10, 12, 9, ordem), motorista: 'Carlos Souza' })
-const fonte = (carregar: RecebimentosSource['carregar']): RecebimentosSource => ({ carregar, contar: async () => new Map(), arquivo: vi.fn(async () => { throw new Error('fora da tela') }) })
+const rec = (id: string, ordem: number): Recebimento => ({ id, nome: `${id}.jpg`, url: `https://example.com/${id}`, midia: 'foto', reservaId: 's1', ordem, enviadoEm: new Date(2026, 10, 12, 9, ordem), motorista: 'Carlos Souza', tipo: 'Comprovante', status: 100000001, statusTexto: 'Enviado' })
+const fonte = (carregar: RecebimentosSource['carregar']): RecebimentosSource => ({ carregar, contar: async () => new Map(), financeiro: async () => ({ valorAReceber: null, receber: null, formaPagamento: '' }), arquivo: vi.fn(async () => { throw new Error('fora da tela') }) })
 
 describe('comprovantes de recebimento', () => {
   it('mostra os comprovantes na ordem do App, com data e motorista', async () => {

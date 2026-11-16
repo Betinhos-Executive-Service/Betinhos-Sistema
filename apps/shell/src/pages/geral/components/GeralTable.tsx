@@ -239,6 +239,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 key={column.key}
                 className={`${index === 0 ? 'bt-table__cell gr-cell--first' : 'bt-table__cell'}${dropAt?.key === column.key ? (dropAt.after ? ' gr-drop--after' : ' gr-drop--before') : ''}`}
                 role="columnheader"
+                data-col={column.key}
                 aria-label={label}
                 title={label}
                 aria-sort={active ? (shown?.descending ? 'descending' : 'ascending') : 'none'}
