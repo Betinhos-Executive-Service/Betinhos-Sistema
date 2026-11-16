@@ -18,14 +18,21 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
   payload.onProgress?.("Preparando dados do voucher.");
   const voucherStateSelect = "$select=cr40f_status,new_linkdovoucher";
   const before = await retrieveOne(DATAVERSE.geral, dv.id, voucherStateSelect);
-  const previousLink = String(before.new_linkdovoucher ?? "").trim();
-  if (Number(before.cr40f_status) === OPERATION_STATUS.concluido && previousLink) {
+  const currentLink = String(before.new_linkdovoucher ?? "").trim();
+  const previousLink = payload.linkAnterior ?? currentLink;
+  if (Number(before.cr40f_status) === OPERATION_STATUS.concluido && currentLink) {
     return { id: payload.detail.id };
   }
+  // Reenvio depois de queda: o Flow já gerou um voucher novo, falta só concluir o serviço.
+  const flowJaRodou = payload.linkAnterior !== undefined && currentLink !== "" && currentLink !== payload.linkAnterior;
+  if (payload.linkAnterior === undefined) await payload.onLinkAnterior?.(currentLink);
+  // Reenvio da fila: o horário é o da assinatura no aparelho, não o do reenvio.
+  const finalizadoEm = payload.finalizadoEm ?? new Date().toISOString();
   payload.onProgress?.("Enviando voucher para o Flow.");
   let flowResult;
   try {
-    flowResult = await runHttpFlow(FLOW_URLS.gerarVoucher, {
+    if (flowJaRodou) flowResult = { id: payload.detail.id };
+    else flowResult = await runHttpFlow(FLOW_URLS.gerarVoucher, {
     text: record.cr40f_reservadeveculosid ?? dv.id,
     text_1: dataUrlToBase64(payload.signatureDataUrl ?? ""),
     text_2: String(payload.fields.Desvio ?? "").trim() || "Não",
@@ -39,7 +46,7 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
     text_12: formatFlowDecimal(getFieldValue(payload.fields, "Outros") || "0"),
     text_13: getFieldValue(payload.fields, "Observação Voucher", "Observacao Voucher"),
     text_14: getFieldValue(payload.fields, "Horário Final", "Horario Final"),
-    text_15: new Date().toISOString()
+    text_15: finalizadoEm
     });
   } catch (error) {
     if (!(error instanceof HttpFlowError) || error.status !== 504) throw error;
@@ -74,7 +81,7 @@ export async function saveVoucherRemote(payload: FinalizePayload) {
     ...vehiclePatch,
     new_rascunhovoucher: null,
     cr40f_status: OPERATION_STATUS.concluido,
-    new_datadefinalizacao: new Date().toISOString()
+    new_datadefinalizacao: finalizadoEm
   });
   return flowResult;
 }

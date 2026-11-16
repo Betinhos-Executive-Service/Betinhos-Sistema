@@ -1,5 +1,5 @@
 import { moneyFields, type Composition } from './compositions'
-import { viewValueKey, type CatalogField, type ViewDefinition } from './views'
+import { isNativeColumn, viewValueKey, type CatalogField, type ViewDefinition } from './views'
 import { readViewField } from './view-field-read'
 import { viewFieldText } from './view-field-presentation'
 
@@ -100,7 +100,7 @@ function cell(address: string, value: unknown, style: number, numeric = false) {
  * (na abertura, os aliases da própria view, ex. `a_67d5.campo`); o padrão serve às linhas relidas pela consulta resolvida.
  */
 export function compositionWorkbook(rows: Composition[], definition: ViewDefinition, catalog: CatalogField[], viewName: string, valueKey = (id: string) => viewValueKey(id, definition, catalog)) {
-  const columns = definition.columns.map(({ id }) => {
+  const columns = definition.columns.filter(isNativeColumn).map(({ id }) => {
     const field = catalog.find((item) => item.id === id)
     return { id, field, label: field?.label ?? moneyFields.find((field) => field.key === id)?.label ?? ({ client: 'Cliente', route: 'Trajeto', date: 'Data de saída' } as Record<string, string>)[id] ?? id }
   })

@@ -1,4 +1,5 @@
 import { getXrmHost } from './xrm'
+import { COMPROVANTES_OPCOES } from '../../recebimentos/domain'
 
 export const COMPOSITION_TABLE = 'cr40f_composicaodeprecos'
 export const VIEW_MARKER = 'TelaComposicaoPreco:v1'
@@ -95,13 +96,27 @@ export async function loadColumnCatalog(): Promise<CatalogField[]> {
   if (client) { client.pickerEligible = false; fields.push({ ...client, id: 'client', label: 'Cliente', pickerEligible: false }) }
   const date = fields.find((field) => !field.path.length && field.attribute === 'new_dataehorariodesaidacalculado')
   if (date) date.pickerEligible = false
-  fields.push({ id: 'date', label: 'Data', table: COMPOSITION_TABLE, tableLabel: fields.find((field) => field.table === COMPOSITION_TABLE)?.tableLabel, attribute: 'new_dataehorariodesaidacalculado', path: [], type: 'DateTime', available: true, pickerEligible: true })
+  const tableLabel = fields.find((field) => field.table === COMPOSITION_TABLE)?.tableLabel
+  fields.push({ id: 'date', label: 'Data', table: COMPOSITION_TABLE, tableLabel, attribute: 'new_dataehorariodesaidacalculado', path: [], type: 'DateTime', available: true, pickerEligible: true })
+  fields.push({ ...COMPROVANTES_FIELD, tableLabel })
   return fields
 }
 
 function xml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]!)
 }
+
+/**
+ * Coluna virtual "Comprovantes" (quantos comprovantes de recebimento o serviço relacionado tem), escolhida no painel de
+ * colunas como as outras. Fica só na definição salva (`new_definition`) e o filtro Sim/Não vira `link-entity`
+ * "any"/"not any" em cr40f_anexorecebimento_v2.
+ */
+export const COMPROVANTES_ID = 'comprovantes'
+/** Fora do Dataverse: não vira atributo, ordenação, célula do layoutxml nem coluna do Excel. */
+export const isNativeColumn = ({ id }: { id: string }) => id !== COMPROVANTES_ID
+/** Opções Sim/Não do filtro da coluna virtual (o DS usa os rótulos de '1'/'0'). */
+export const comprovantesOptions = (id: string) => id === COMPROVANTES_ID ? { options: COMPROVANTES_OPCOES } : {}
+export const COMPROVANTES_FIELD: CatalogField = { id: COMPROVANTES_ID, label: 'Comprovantes', table: COMPOSITION_TABLE, attribute: COMPROVANTES_ID, path: [], type: 'Boolean', available: true, pickerEligible: true }
 
 export const DEFAULT_COLUMNS: ViewColumn[] = [
   { id: 'new_status', width: 112, pinned: true },
@@ -153,8 +168,12 @@ export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[
     links.get(parentKey)!.attributes.add(field.attribute)
   }
   const baseAttributes = new Set(['cr40f_composicaodeprecosid', 'cr40f_servicorelacionadogeral'])
-  fields.filter((item) => !item.path.length).forEach((item) => baseAttributes.add(item.attribute))
+  fields.filter((item) => !item.path.length && isNativeColumn(item)).forEach((item) => baseAttributes.add(item.attribute))
   const conditionXml = (filter: ViewFilter) => {
+    if (filter.id === COMPROVANTES_ID) {
+      const com = ['true', '1'].includes(filter.value) !== (filter.operator === 'ne')
+      return `<link-entity name="cr40f_anexorecebimento_v2" from="cr40f_reserva" to="cr40f_servicorelacionadogeral" link-type="${com ? 'any' : 'not any'}" />`
+    }
     const field = fieldParts(filter.id, catalog)
     const fieldType = catalog.find((item) => item.id === filter.id)?.type
     const relation = field.path.length ? links.get(pathSignature(field.path, field.relationships)) : null
@@ -173,7 +192,7 @@ export function buildFetchXml(definition: ViewDefinition, catalog: CatalogField[
   }
   const groupedXml = (definition.filterGroups ?? []).filter((group) => group.filters.length).map((group) => `<filter type="${group.operator}">${group.filters.map(conditionXml).join('')}</filter>`).join('')
   const filterXml = definition.filters.map(conditionXml).join('') + (groupedXml ? `<filter type="${definition.groupOperator ?? 'and'}">${groupedXml}</filter>` : '')
-  const orderXml = definition.sort.map((sort) => {
+  const orderXml = definition.sort.filter(isNativeColumn).map((sort) => {
     const field = fieldParts(sort.id, catalog)
     const relation = field.path.length ? links.get(pathSignature(field.path, field.relationships)) : null
     return `<order attribute="${xml(field.attribute)}" descending="${sort.descending}"${relation ? ` entityname="${relation.alias}"` : ''} />`
@@ -205,7 +224,7 @@ export function viewValueKey(id: string, definition: ViewDefinition, catalog: Ca
 
 export function buildLayoutXml(definition: ViewDefinition, catalog: CatalogField[], objectTypeCode: number) {
   const linkAliases = aliases(definition, catalog)
-  const cells = definition.columns.map(({ id, width }) => {
+  const cells = definition.columns.filter(isNativeColumn).map(({ id, width }) => {
     const field = fieldParts(id, catalog)
     const alias = field.path.length ? `${linkAliases.get(pathSignature(field.path, field.relationships))}.` : ''
     return `<cell name="${xml(alias + field.attribute)}" width="${Math.max(60, Math.min(600, Math.round(width)))}" />`

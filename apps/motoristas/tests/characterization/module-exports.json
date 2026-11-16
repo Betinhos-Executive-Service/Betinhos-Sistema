@@ -1,4 +1,7 @@
 {
+  "src/lib/guidDeterministico.ts": [
+    "guidDeterministico"
+  ],
   "src/lib/localWorkflow.ts": [
     "LocalStore",
     "VoucherValidationField",

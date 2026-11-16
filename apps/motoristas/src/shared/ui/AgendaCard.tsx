@@ -10,6 +10,8 @@ type AgendaCardProps = {
   index?: number;
   isCompleting?: boolean;
   isQueueHighlight?: boolean;
+  /** Serviço já finalizado no aparelho, esperando a conexão para enviar. */
+  envioPendente?: boolean;
   onOpen: (item: AgendaItem) => void;
 };
 
@@ -42,7 +44,7 @@ function getTrajectory(item: AgendaItem) {
   return trajectoryField?.value || item.description || "";
 }
 
-export function AgendaCard({ item, bodyLabel, index = 0, isCompleting = false, isQueueHighlight = false, onOpen }: AgendaCardProps) {
+export function AgendaCard({ item, bodyLabel, index = 0, isCompleting = false, isQueueHighlight = false, envioPendente = false, onOpen }: AgendaCardProps) {
   const className = `agenda-card ${item.tipo.toLowerCase()} ${isCompleting ? "is-completing" : ""} ${isQueueHighlight ? "is-queue-highlight" : ""}`;
   const time = formatAgendaTime(item.time);
   const trajectory = getTrajectory(item);
@@ -91,6 +93,7 @@ export function AgendaCard({ item, bodyLabel, index = 0, isCompleting = false, i
           <div className="canceled-note">(desconsiderar este item)</div>
         </div>
       ) : null}
+      {envioPendente ? <span className="agenda-envio-pendente">Envio pendente</span> : null}
       <NotificationMarker priority={item.priority} />
     </article>
   );

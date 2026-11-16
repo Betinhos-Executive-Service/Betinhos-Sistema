@@ -1,11 +1,11 @@
 import { Button, EmptyState, PageToolbar, Skeleton, Stack, Surface } from '@betinhos-executive-service/ui'
 import { Scale, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import type { OperationData, Person, SubmitResult } from '../domain'
+import type { Guid, OperationData, Person, SubmitResult } from '../domain'
 import { getRecordIdFromLocation, loadOperation, searchDirectoryPeople, submitOperation, updatePersonEmail } from '../dataverse'
 import { logAppError } from '../errorLogger'
 import { formatCurrency } from '../money'
-import { activeDrafts, changeCount, diffDrafts, draftReducer, initialState, toSubmitPayers, validate, type DraftAction, type DraftState, type PayerDraft } from '../payerDraft'
+import { activeDrafts, changeCount, diffDrafts, draftReducer, initialState, missingPayerEmails, toSubmitPayers, validate, type DraftAction, type DraftState, type MissingEmail, type PayerDraft } from '../payerDraft'
 import { AllocationSummary } from './components/AllocationSummary'
 import { DiscardDialog } from './components/DiscardDialog'
 import { FeedbackNotice } from './components/FeedbackNotice'
@@ -57,6 +57,7 @@ export function App() {
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<Notice>(null)
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const [missingEmails, setMissingEmails] = useState<MissingEmail[]>([])
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [result, setResult] = useState<{ title: string; rows: ResultRow[] } | null>(null)
   const savedOnce = useRef(false)
@@ -165,16 +166,18 @@ export function App() {
     if (!operation || saving) return
     if (blocking) { focusFirstError(); return }
     if (!canSubmit) return
-    if (isEditMode && changeTotal > 0) { setSummaryOpen(true); return }
+    // Pagante sem e-mail no cadastro também passa pelo resumo, que oferece gravar o e-mail.
+    const missing = missingPayerEmails(drafts)
+    if (missing.length || (isEditMode && changeTotal > 0)) { setMissingEmails(missing); setSummaryOpen(true); return }
     void executeSave()
   }
 
-  async function executeSave() {
+  async function executeSave(personEmails: Record<Guid, string> = {}) {
     if (!operation) return
     setSaving(true); setNotice(null)
     try {
       // O plugin confere o e-mail do cadastro; por isso os e-mails novos são gravados antes.
-      for (const [personId, email] of Object.entries(pendingEmails)) await updatePersonEmail(personId, email)
+      for (const [personId, email] of Object.entries({ ...pendingEmails, ...personEmails })) await updatePersonEmail(personId, email)
       const response = await submitOperation(operation.id, {
         requestId: crypto.randomUUID(),
         expectedFinanceiroVersion: operation.version,
@@ -234,7 +237,7 @@ export function App() {
     {result
       ? <ResultActions failures={result.rows.filter((row) => row.error).length} onClose={isEmbedded ? () => postClose(true) : undefined} onEditAgain={() => void load()} />
       : <StickyActionBar hint={hint} ready={canSubmit} label={label} saving={saving} onSave={save} />}
-    <SaveSummaryDialog open={summaryOpen} changes={changes} emailCount={emailCount} differenceCents={difference} saving={saving} onReview={() => setSummaryOpen(false)} onConfirm={() => void executeSave()} />
+    <SaveSummaryDialog open={summaryOpen} changes={changes} missingEmails={missingEmails} emailCount={emailCount} differenceCents={difference} saving={saving} onReview={() => setSummaryOpen(false)} onConfirm={(personEmails) => void executeSave(personEmails)} />
     <DiscardDialog open={pendingAction !== null} onKeepEditing={() => setPendingAction(null)} onDiscard={discard} />
   </PopupShell>
 }

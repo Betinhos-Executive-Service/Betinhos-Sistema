@@ -37,6 +37,7 @@ type Props = {
   criticalError: string;
   dataLoading: LoadingOverlayState | null;
   duvidaConferencia: ReturnType<typeof useExpenseFlow>["duvidaConferencia"];
+  envioPendente: React.ReactNode;
   expenseSend: ExpenseSendState | null;
   previousScreen: Screen;
   remoteMode: boolean;
@@ -65,6 +66,7 @@ export function AppShell({
   criticalError,
   dataLoading,
   duvidaConferencia,
+  envioPendente,
   expenseSend,
   previousScreen,
   remoteMode,
@@ -140,6 +142,7 @@ export function AppShell({
           </div>
         </div>
       ) : null}
+      {envioPendente}
       <BuildStamp />
     </TourHelpContext.Provider>
   );
