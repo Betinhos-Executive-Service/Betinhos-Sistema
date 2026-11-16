@@ -5,10 +5,16 @@ import { isMockChecklists, type ChecklistFotoEnviada } from "../domain/checklist
 import { createFotos, createFotosMock, type CarregarFoto, type FotoCarregada } from "../data/fotosChecklist";
 import { BrandLoader } from "../../../../app/BrandLoader";
 import { Spinner } from "@betinhos/ui";
+import type { CarregarProvas } from "../../../../lib/comprovantes/provaMidia";
+import { SelosProva, useProvasMidia } from "../../../../lib/comprovantes/SelosProva";
 
 // Um carregador por sessão: o cache por link vale para o detalhe e para a aba Padrões.
 let carregador: CarregarFoto | null = null;
 const obterCarregador = () => (carregador ??= isMockChecklists() ? createFotosMock(new URLSearchParams(window.location.search).get("fotos") ?? "") : createFotos());
+
+// Prova de captura do App Motoristas (selos ao lado da foto, pelo link): a aba liga o carregador do host.
+let carregarProvas: CarregarProvas | undefined;
+export function configurarProvas(next: CarregarProvas | undefined) { carregarProvas = next; }
 
 type Estado = { status: "carregando" } | { status: "pronta"; foto: FotoCarregada } | { status: "falhou"; erro: string };
 type Resultado = { link: string; foto?: FotoCarregada; erro?: string };
@@ -86,10 +92,14 @@ export function FotosChecklist({ fotos, rotulo }: { fotos: ChecklistFotoEnviada[
     // Devolve o foco a quem abriu (a miniatura continua na tela).
     requestAnimationFrame(() => origem.current?.focus({ preventScroll: true }));
   };
+  const provas = useProvasMidia(carregarProvas, fotos.map((foto) => foto.link));
   return (
     <span className="chk-thumbs">
       {fotos.map((foto, index) => (
-        <Miniatura key={`${foto.link}-${index}`} foto={foto} alt={`${rotulo}, foto ${index + 1}`} onAbrir={(botao) => { origem.current = botao; setAberta(index); }} />
+        <span key={`${foto.link}-${index}`} className="chk-foto-prova">
+          <Miniatura foto={foto} alt={`${rotulo}, foto ${index + 1}`} onAbrir={(botao) => { origem.current = botao; setAberta(index); }} />
+          <SelosProva prova={provas.get(foto.link)} />
+        </span>
       ))}
       {aberta !== null ? <Visualizador fotos={fotos} rotulo={rotulo} indice={aberta} onIndice={setAberta} onFechar={fechar} /> : null}
     </span>

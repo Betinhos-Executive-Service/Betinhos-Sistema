@@ -3,8 +3,9 @@
 .cmp-link:focus-visible { outline: 0; border-radius: var(--bt-radius-xs); box-shadow: var(--bt-focus-ring); }
 @media (hover: hover) and (pointer: fine) { .cmp-link:hover { text-decoration: underline; } }
 .cmp-comprovantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
-.cmp-comprovante { display: grid; grid-template-rows: auto auto; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
-.cmp-comprovante__previa { display: grid; place-items: center; height: 168px; overflow: hidden; padding: 0; border: 0; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-secondary); font: inherit; }
+/* Sem overflow no cartão: os detalhes da prova de captura passam da borda. Os cantos ficam na prévia. */
+.cmp-comprovante { display: grid; grid-template-rows: auto auto; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.cmp-comprovante__previa { display: grid; place-items: center; height: 168px; overflow: hidden; padding: 0; border: 0; border-radius: var(--bt-radius-md) var(--bt-radius-md) 0 0; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface-neutral); color: var(--bt-color-text-secondary); font: inherit; }
 button.cmp-comprovante__previa { cursor: zoom-in; transition: background-color var(--bt-duration-fast) var(--bt-ease-out), transform var(--bt-duration-fast) var(--bt-ease-out); }
 button.cmp-comprovante__previa:active { transform: scale(0.99); }
 button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var(--bt-focus-ring); }
@@ -69,3 +70,4 @@ button.cmp-comprovante__previa:focus-visible { outline: 0; box-shadow: inset var
 .cmp-vazio { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
 .cmp-grupo { margin: var(--bt-space-2) 0 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
 .cmp-grupo:first-child { margin-top: 0; }
+

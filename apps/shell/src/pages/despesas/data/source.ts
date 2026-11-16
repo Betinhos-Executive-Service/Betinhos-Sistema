@@ -10,6 +10,7 @@ import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
 import { createArquivos } from '../../../lib/comprovantes/leitura'
 import { createMockAnexos, createMockDespesas } from './mock'
 import { createMockArquivo } from '../../../lib/comprovantes/mock'
+import { createCarregarProvas, type CarregarProvas } from '../../../lib/comprovantes/provaMidia'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
 import { guid } from '../../pagantes/data/queries'
@@ -26,6 +27,8 @@ export type Source = {
   anexos: (despesaId: string) => Promise<Anexo[]>
   /** Conteúdo do comprovante para a prévia (imagem ou PDF). */
   arquivo: (anexo: Anexo) => Promise<Arquivo>
+  /** Prova de captura do App Motoristas pelo link do comprovante (selos ao lado do anexo). */
+  provas?: CarregarProvas
   choices: () => Promise<DespesaChoices>
   /** Decisão do gestor num único PATCH; falha (permissão, rede) propaga e nada muda. */
   decidir: (id: string, tipo: Decisao, motivo: string) => Promise<void>
@@ -48,6 +51,7 @@ function createMockSource(): Source {
     async get(id) { await wait(200); const d = rows.find((x) => x.id === id); return d ? { ...d } : null },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
     async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
+    provas: createCarregarProvas({ mode: 'mock' }),
     choices: async () => withFallback({}),
     async decidir(id, tipo, motivo) {
       await wait(400)
@@ -87,6 +91,7 @@ export function createSource(host: Host): Source {
     },
     anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
     arquivo: createArquivos(host.client),
+    provas: createCarregarProvas(host),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {
       const [operacional, financeiro, anexo, origem, anexoTipo, anexoStatus] = await Promise.all([

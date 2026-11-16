@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, 
 import { useQueryId } from '../../nav/queryState'
 import { BrandLoader } from '../../app/BrandLoader'
 import { ehVideo, tipoPrevia, type Arquivo, type Comprovante } from './arquivo'
+import type { CarregarProvas } from './provaMidia'
+import { SelosProva, useProvasMidia } from './SelosProva'
 import './comprovantes.css'
 
 type Opcoes = { urgente?: boolean }
@@ -95,13 +97,16 @@ type Props<T extends Comprovante> = {
   selo?: (anexo: T) => ReactNode
   /** Grupo do cartão (ex.: serviço da OP): anexos seguidos com a mesma chave ficam sob um título. O visualizador navega por todos. */
   grupo?: (anexo: T) => { chave: string; titulo: ReactNode }
+  /** Prova de captura do App Motoristas, ligada pelo link do arquivo: origem, selos e detalhes. Sem prova, nada aparece. */
+  provas?: CarregarProvas
 }
 
 /** Cartões com miniatura; clicar abre o visualizador. Sem arquivo no OneDrive, só o aviso. */
-export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo, grupo }: Props<T>) {
+export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo, grupo, provas: carregarProvas }: Props<T>) {
   // A galeria só repassa a `ler` os próprios anexos (do tipo T), então o alargamento é seguro.
   const ler = lerAnexo as Ler
   const visiveis = anexos.filter(temArquivo)
+  const provas = useProvasMidia(carregarProvas, anexos.map((a) => a.url))
   const indicePorId = new Map(visiveis.map((a, i) => [a.id, i]))
   // O comprovante aberto no visualizador vive na URL (`comprovante=<id do anexo>`).
   const [abertoId, setAbertoId] = useQueryId('comprovante')
@@ -136,6 +141,7 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
                     {meta ? <span className="cmp-comprovante__meta" title={meta}>{meta}</span> : null}
                     {selo?.(a)}
                     {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} em nova aba`} title="Abrir em nova aba"><ExternalLink size={16} aria-hidden="true" /></a> : null}
+                    {a.url ? <SelosProva prova={provas.get(a.url)} /> : null}
                   </div>
                 </li>
               )
