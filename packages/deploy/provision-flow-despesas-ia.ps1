@@ -699,7 +699,7 @@ $escopo.Campos_ausentes.inputs.from = @($const.schema.required)
 # O gatilho do Dataverse não traz FormattedValue de lookup (conferido em execuções do DEV): os nomes vêm por $expand e os
 # rótulos de status (da OS e das despesas do histórico) por mapas lidos da metadata (valor -> rótulo em pt-BR).
 function MapaOpcoes([string] $entidade, [string] $atributo, [string] $tipo = 'PicklistAttributeMetadata') {
-  $meta = Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$atributo')/Microsoft.Dynamics.CRM.$tipo?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
+  $meta = Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$atributo')/Microsoft.Dynamics.CRM.$($tipo)?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
   $mapa = [ordered]@{}
   foreach ($o in @($meta.OptionSet.Options)) {
     $rotulo = @($o.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 } | ForEach-Object { $_.Label })[0]
