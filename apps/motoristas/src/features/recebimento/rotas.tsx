@@ -123,7 +123,8 @@ export function rotasRecebimento(screen: Screen, {
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
           origem: { tela: "recebimento", tabela: "cr40f_reservadeveculos", registroId: selectedDetail?.dataverse?.id ?? selectedDetail?.id ?? "" },
-          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Serviço ${String(selectedDetail?.dataverse?.record?.cr40f_id ?? "")}`.trim() }
+          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Serviço ${String(selectedDetail?.dataverse?.record?.cr40f_id ?? "")}`.trim() },
+          referencia: () => String(selectedDetail?.dataverse?.record?.cr40f_dataehorriodesada ?? "")
         }}
       />
     );

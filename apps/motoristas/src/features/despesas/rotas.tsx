@@ -1,4 +1,5 @@
 import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
+import { sessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { expenseFlowView } from "./receiptQuickRead";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { DESCRICAO_ID, ExpenseScreen } from "./ExpenseScreen";
@@ -117,8 +118,9 @@ export function rotasDespesas(screen: Screen, {
         }}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
-          origem: { tela: "despesa", tabela: "cr40f_despesaoperacional" },
-          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" }
+          origem: { tela: "despesa", tabela: "cr40f_despesaoperacional", registroId: sessaoDoRascunho("despesa") },
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" },
+          referencia: () => expenseDraft.dataGasto
         }}
       />
     );

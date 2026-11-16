@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from "react";
-import { readFileAsDataUrl } from "../../shared/camera/photoOrientation";
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
+import { acceptDaGaleria, provaCaptura, type SessaoProva } from "../fotos/provaCaptura";
 import { reportAppError } from "../../shared/appErrorLogger";
 import {
   MIN_EXPLICACAO, MOTIVO_PADRAO, dependenciasRemotas, enviarDevolucao, guardarRascunho, lerRascunho, motivoParaMotorista, validarEnvio,
@@ -110,11 +111,19 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
     setFalhou(false);
   };
 
+  // Prova de mídia (fase 2): o comprovante da devolução passa pelas regras da galeria (PDF até 10 MB e 20 páginas,
+  // data gravada, repetida recusada). A sessão é aberta uma vez por painel, no registro real da despesa.
+  const sessaoProvaRef = useRef<Promise<SessaoProva> | null>(null);
+
   const escolherFoto = async (arquivo: File | undefined) => {
     if (!arquivo) return;
     setErroFoto("");
     try {
-      setFoto({ dataUrl: await readFileAsDataUrl(arquivo), fileName: arquivo.name });
+      sessaoProvaRef.current ??= provaCaptura().iniciar({ tela: "devolucao", tabela: "cr40f_despesaoperacional", registroId: despesa.id });
+      const resultado = await provaCaptura().prepararDaGaleria(await sessaoProvaRef.current, arquivo, { referencia: despesa.data });
+      if (!resultado.ok) { setErroFoto(resultado.erro); return; }
+      if (resultado.tipo === "video") { setErroFoto("Vídeo indisponível nesta tela."); return; }
+      setFoto({ dataUrl: resultado.dataUrl, fileName: arquivo.name });
       reiniciarProgresso();
       setFalhou(false);
     } catch {
@@ -151,11 +160,11 @@ export function DevolucaoPainel({ despesa, nome, ordem, motoristaId, guardaRef, 
           Explicar
         </button>
       </div>
-      <input ref={arquivoRef} type="file" accept="image/*" hidden onChange={(event) => { void escolherFoto(event.target.files?.[0]); event.target.value = ""; }} />
+      <input ref={arquivoRef} type="file" accept={acceptDaGaleria("devolucao")} hidden onChange={(event) => { void escolherFoto(event.target.files?.[0]); event.target.value = ""; }} />
 
       {foto ? (
         <div className="dv-foto">
-          <img src={foto.dataUrl} alt="Novo comprovante escolhido" />
+          <ImagemOuPdf src={foto.dataUrl} alt="Novo comprovante escolhido" />
           <span>Novo comprovante pronto para enviar.</span>
           <button type="button" className="termo-text-button" disabled={enviando} onClick={() => { setFoto(null); reiniciarProgresso(); }}>Remover</button>
         </div>

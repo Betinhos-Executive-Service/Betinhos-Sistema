@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -337,7 +338,7 @@ function MaintenancePhotoGrid({
                 <span className="media-video-badge">Vídeo</span>
               </>
             ) : (
-              <img src={photo.dataUrl} alt={`${label} ${index + 1}`} />
+              <ImagemOuPdf src={photo.dataUrl} alt={`${label} ${index + 1}`} />
             )}
           </button>
         ))}

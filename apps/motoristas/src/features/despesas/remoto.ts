@@ -298,7 +298,7 @@ export async function uploadExpenseInvoiceRemote({
     despesaNome: expenseName,
     tipo: "COMPROVANTE",
     indice: order
-  });
+  }, { tabela: "cr40f_despesaoperacional", registroId: expenseId });
 
   onProgress?.(`Vinculando comprovante ${order} à despesa.`);
   const record: Record<string, unknown> = {

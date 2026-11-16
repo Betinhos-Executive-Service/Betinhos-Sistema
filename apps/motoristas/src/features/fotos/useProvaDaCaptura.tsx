@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
+import { novoIdProva } from "./sessaoDoRascunho";
 import { provaCaptura, textoDoCarimbo, type ContextoCarimbo, type OrigemCaptura, type OrigemProva, type SessaoProva } from "./provaCaptura";
 
 /** Prova de captura: tela e registro de origem (registroId vazio = registro ainda não criado) e o carimbo da foto. */
@@ -9,6 +10,8 @@ export type ProvaDaCaptura = {
   /** Maior lado da foto final (padrão 2048) e qualidade JPEG (padrão 0,85). */
   maxLado?: number;
   qualidade?: number;
+  /** Data de referência do evento (data do gasto, da colisão, do serviço...), lida na hora da escolha da galeria. */
+  referencia?: () => string | null | undefined;
 };
 
 const reportar = (error: unknown, action: string) =>
@@ -25,7 +28,7 @@ export function useProvaDaCaptura(prova: ProvaDaCaptura | undefined) {
   const aguardarSessao = () => {
     if (!prova) return null;
     sessaoRef.current ??= provaCaptura()
-      .iniciar({ ...prova.origem, registroId: prova.origem.registroId || `novo-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}` })
+      .iniciar({ ...prova.origem, registroId: prova.origem.registroId || `novo-${novoIdProva()}` })
       .then((iniciada) => {
         setSessao(iniciada);
         return iniciada;
@@ -37,11 +40,12 @@ export function useProvaDaCaptura(prova: ProvaDaCaptura | undefined) {
     void aguardarSessao();
   }, []);
 
-  const finalizarFoto = async (dataUrl: string, origem: OrigemCaptura) => {
+  /** `original`: arquivo da câmera nativa, que fica na galeria do celular (o SHA dele vai na prova). */
+  const finalizarFoto = async (dataUrl: string, origem: OrigemCaptura, original?: Blob) => {
     const pendente = aguardarSessao();
     if (!pendente || !prova) return dataUrl;
     try {
-      return (await provaCaptura().aplicarNaFoto(await pendente, dataUrl, prova.carimbo, origem, { maxLado: prova.maxLado, qualidade: prova.qualidade })).dataUrl;
+      return (await provaCaptura().aplicarNaFoto(await pendente, dataUrl, prova.carimbo, origem, { maxLado: prova.maxLado, qualidade: prova.qualidade, original })).dataUrl;
     } catch (error) {
       reportar(error, "aplicar-na-foto");
       return dataUrl;
@@ -58,7 +62,14 @@ export function useProvaDaCaptura(prova: ProvaDaCaptura | undefined) {
     }
   };
 
-  return { sessao, finalizarFoto, registrarVideo };
+  /** Arquivo da galeria pelo módulo de prova (null sem prova nesta tela). Lança só em falha inesperada. */
+  const prepararDaGaleria = async (arquivo: File) => {
+    const pendente = aguardarSessao();
+    if (!pendente || !prova) return null;
+    return provaCaptura().prepararDaGaleria(await pendente, arquivo, { referencia: prova.referencia?.() ?? null });
+  };
+
+  return { sessao, finalizarFoto, registrarVideo, prepararDaGaleria };
 }
 
 /** Prévia do carimbo sobre a câmera ao vivo; o relógio fica aqui para não redesenhar a tela inteira a cada segundo. */

@@ -6,7 +6,7 @@ import { loadRemoteDetailByParams, loadRemoteStore, markDetailViewedRemote } fro
 import { saveVoucherDraftRemote, saveVoucherRemote } from "../../features/voucher/remoto.ts";
 import { uploadChecklistPhotoRemote } from "../../features/checklist/remoto.ts";
 import { createIdeaRemote, loadMyIdeasRemote } from "../../features/ideias/remoto.ts";
-import { emitirProvaMidiaRemote, registrarProvaMidiaRemote } from "../../features/fotos/provaRemota.ts";
+import { conferirProvaMidiaRemote, emitirProvaMidiaRemote, registrarProvaMidiaRemote } from "../../features/fotos/provaRemota.ts";
 import type { PortaDados } from "../porta.ts";
 
 // Adaptador do web resource (Xrm.WebApi, URL direta ou mock em localhost).
@@ -33,5 +33,6 @@ export const adaptadorDataverse: PortaDados = {
   carregarIdeias: loadMyIdeasRemote,
   criarIdeia: createIdeaRemote,
   emitirProvaMidia: emitirProvaMidiaRemote,
-  registrarProvaMidia: registrarProvaMidiaRemote
+  registrarProvaMidia: registrarProvaMidiaRemote,
+  conferirProvaMidia: conferirProvaMidiaRemote
 };
