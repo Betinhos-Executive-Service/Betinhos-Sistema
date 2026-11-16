@@ -33,7 +33,7 @@ function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
     const item = data.multas.find((row) => row.id === id)
     const infracao = item?.infracaoId ? data.infracoes.find((row) => row.id === item.infracaoId) : undefined
     return !item ? null : { titulo: item.titulo, status: item.status, veiculo: item.veiculo, temMotorista: item.motorista !== null, campos: [
-      ['Motorista', texto(item.motorista?.label)], ['Data da infração', dia(item.dataHora)], ['Local', texto(item.local)],
+      ['Código', texto(item.codigo)], ['Motorista', texto(item.motorista?.label)], ['Data da infração', dia(item.dataHora)], ['Local', texto(item.local)],
       ['Infração', infracao ? `${infracao.codigo} · ${texto(infracao.descricao)}` : 'Sem código de infração'], ['Gravidade', infracao ? label(GRAVIDADE, infracao.gravidade) : NAO_INFORMADO],
       ['Valor', brl(infracao?.valor ?? null)], ['Pontos na CNH', texto(infracao?.pontos)],
       ['Prazo para indicar', formatBR(item.dataParaIndicar) || NAO_INFORMADO], ['Indicado', item.indicado ? 'Sim' : 'Não'],

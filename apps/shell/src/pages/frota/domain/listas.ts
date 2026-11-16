@@ -168,7 +168,7 @@ export const matchesRegistroKeyword = (l: Linha, query: string) => {
   const termo = query.trim().toLowerCase()
   if (!termo) return true
   let valores = textoRegistro.get(l)
-  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
+  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.codigo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
   return valores.some((valor) => valor.includes(termo))
 }
 
