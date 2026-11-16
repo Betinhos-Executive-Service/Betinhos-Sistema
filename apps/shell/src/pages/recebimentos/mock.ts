@@ -1,3 +1,4 @@
+import { mockServicos } from '../pagantes/data/mock'
 import type { FinanceiroServico, Recebimento } from './domain'
 
 const MOTORISTAS = ['Carlos Souza', 'Marcos Lima', 'Paulo Reis']
@@ -38,4 +39,14 @@ const FORMAS = ['Cartão de crédito', 'Pix', 'Pedido de compra', '']
 export function mockFinanceiro(reservaId: string): FinanceiroServico {
   const h = hash(reservaId.toLowerCase())
   return { valorAReceber: h % 5 ? 180 + (h % 900) : null, receber: h % 3 ? true : h % 2 ? false : null, formaPagamento: FORMAS[h % FORMAS.length] }
+}
+
+/** Comprovantes por OP fictícia: a soma dos serviços de exemplo dela (os mesmos da ficha); OP sem nenhum fica de fora. */
+export function mockContagemPorOp(opIds: string[]) {
+  const contagem = new Map<string, number>()
+  for (const id of opIds) {
+    const n = mockServicos(id, new Date()).reduce((soma, s) => soma + mockRecebimentos(s.id).length, 0)
+    if (n > 0) contagem.set(id.toLowerCase(), n)
+  }
+  return contagem
 }

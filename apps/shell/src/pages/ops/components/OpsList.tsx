@@ -8,7 +8,7 @@ import { opTone } from '../domain/status'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
 
 type Props = { list: Op[]; choices: OpChoices; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Op>>
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Op>> & { comprovantes?: TableColumn<Op> }
 
 /** "Fulano - telefone" por linha (texto do flow): na lista basta o nome. */
 export function passageirosCurto(texto: string) {
@@ -36,9 +36,10 @@ function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
   )
 }
 
-export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
+export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions, comprovantes }: TableProps) {
   const columns: TableColumn<Op>[] = [
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
+    ...(comprovantes ? [comprovantes] : []),
     { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span title={op.cliente || undefined}>{op.cliente || 'Sem cliente'}</span> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
     { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },

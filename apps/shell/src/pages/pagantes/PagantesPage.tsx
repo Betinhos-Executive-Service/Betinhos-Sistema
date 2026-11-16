@@ -11,6 +11,8 @@ import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
+import { ComprovantesOpDrawer, type OpAberta } from '../recebimentos/ComprovantesOpDrawer'
+import { useColunaComprovantes } from '../recebimentos/useColunaComprovantes'
 import { createSource } from './data/source'
 import { VIEWS_KEY, loadViews, total } from './domain/filters'
 import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, paganteFields, paganteKeywordText, readPagante, sortPagantes } from './domain/lista'
@@ -33,6 +35,8 @@ export function PagantesPage({ host }: { host: Host }) {
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['status', 'forma', 'recibo', 'falhas'] as const
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
+const opDoPagante = (p: Pagante): OpAberta | null => (p.opId ? { id: p.opId, nome: p.op || 'OP sem código' } : null)
 
 function Pagantes({ host }: { host: Host }) {
   const auditoria = useAuditoria()
@@ -71,7 +75,10 @@ function Pagantes({ host }: { host: Host }) {
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortPagantes(list, view.config.sort, choices) : list, view.config.sort, (p) => p.id), [list, choices, view.config.sort, extra])
-  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readPagante, (p) => p.id)), [sorted, filters, allFields, extra])
+  const comprovantes = useColunaComprovantes(source.recebimentos, view.config, filters, list, opDoPagante, mobile)
+  const { comLeitura } = comprovantes
+  const read = useMemo(() => comLeitura(extra.read(readPagante, (p) => p.id)), [extra, comLeitura])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -189,7 +196,7 @@ function Pagantes({ host }: { host: Host }) {
       <>
         {mobile
           ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
+          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} comprovantes={comprovantes.coluna} />}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -219,6 +226,7 @@ function Pagantes({ host }: { host: Host }) {
         <PaganteDrawer p={current} onClose={() => setSelected(null)} onOpen={setSelected} choices={pg.choices} contatos={pg.contatos} source={source} version={version}
           onStatus={(p, kind) => setStatusRequest({ p, kind })} onRecibo={(p) => void gerarRecibo([p])} onAbrirOp={abrirOp} busyId={busyId} />
       ) : null}
+      <ComprovantesOpDrawer op={comprovantes.aberta} source={source.recebimentos} servicos={source.servicos} mobile={mobile} onClose={comprovantes.fechar} />
       <StatusDialog request={statusRequest} contato={statusRequest ? pg.contatos.get(statusRequest.p.pessoaId) : undefined} onClose={() => setStatusRequest(null)} onConfirm={(enviar) => void confirmStatus(enviar)} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </div>

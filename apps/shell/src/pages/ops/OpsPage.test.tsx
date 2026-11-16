@@ -2,6 +2,11 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpsPage } from './OpsPage'
+import { emptyFilters } from '@betinhos/ui'
+import { encodeTableFilters } from '../../app/filtersUrl'
+import { COMPROVANTES_KEY } from '../recebimentos/colunaOp'
+import { mockContagemPorOp } from '../recebimentos/mock'
+import { createMockOps } from './data/mock'
 import { OP_STATUS } from './domain/status'
 
 configure({ asyncUtilTimeout: 8000 })
@@ -149,5 +154,40 @@ describe('Ordens de Pagamento', () => {
     fireEvent.click(pendente)
     expect(pendente.checked).toBe(false)
     expect(segundo.checked).toBe(true)
+  })
+
+  it('coluna Comprovantes: indicador com a soma dos serviços e drawer agrupado por serviço', async () => {
+    history.replaceState(null, '', '#/ops')
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    const esperado = mockContagemPorOp(createMockOps(new Date()).map((op) => op.id))
+    const [id, n] = [...esperado][0]
+    const op = createMockOps(new Date()).find((x) => x.id === id)!
+    expect(screen.queryByRole('columnheader', { name: /Comprovantes/ }) ?? await screen.findByRole('columnheader', { name: /Comprovantes/ })).toBeTruthy()
+    const linha = (await screen.findByText(op.codigo)).closest('.bt-table__row') as HTMLElement
+    const indicador = await within(linha).findByRole('button', { name: new RegExp(`^${n} comprovantes? de recebimento$`) })
+    fireEvent.click(indicador)
+    const drawer = await screen.findByRole('dialog', { name: op.codigo })
+    expect(within(drawer).getByText('Recebimento')).toBeTruthy()
+    await within(drawer).findByText(new RegExp(`^${n} comprovantes?`))
+  })
+
+  it('filtro Sim/Não da coluna Comprovantes compara a contagem em memória', async () => {
+    const todas = createMockOps(new Date())
+    const com = mockContagemPorOp(todas.map((op) => op.id))
+    const filtro = (op: 'yes' | 'no') => encodeTableFilters({ ...emptyFilters(), quick: { [COMPROVANTES_KEY]: { type: 'condition', id: 'rapido-comprovantes', field: COMPROVANTES_KEY, op } } })
+    const codigos = (tem: boolean) => todas.filter((x) => com.has(x.id) === tem).map((x) => x.codigo)
+    expect(codigos(true).length).toBeGreaterThan(0)
+    expect(codigos(false).length).toBeGreaterThan(0)
+
+    history.replaceState(null, '', `#/ops?f=${filtro('yes')}`)
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText(codigos(true)[0])
+    await waitFor(() => expect(screen.queryByText(codigos(false)[0])).toBeNull())
+    cleanup()
+
+    history.replaceState(null, '', `#/ops?f=${filtro('no')}`)
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText(codigos(false)[0])
+    await waitFor(() => expect(screen.queryByText(codigos(true)[0])).toBeNull())
   })
 })
