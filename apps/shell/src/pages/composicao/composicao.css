@@ -448,4 +448,25 @@
 .composicao .copy-text:active { background: var(--bt-color-surface-soft); }
 .composicao .copy-text[data-copied] { background: var(--bt-color-success-soft); text-decoration-color: transparent; transition-duration: 0ms; }
 .composicao .copy-text__feedback:empty { display: none; }
-.composicao .copy-text__feedback { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: var(--bt-radius-xs); background: var(--bt-color-success); color: var(--bt-color-surface); font-size: 10px; font-weight: 600; line-height: 16px; vertical-align: 1px; white-space: nowrap; user-select: none; }
+.composicao .copy-text__feedback { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px 0 4px; border-radius: var(--bt-radius-full); background: var(--bt-color-success); color: var(--bt-color-surface); font-size: 10px; font-weight: 600; line-height: 16px; vertical-align: 1px; white-space: nowrap; user-select: none; animation: copy-text-pop 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes copy-text-pop { from { opacity: 0; transform: scale(0.85); } }
+@media (prefers-reduced-motion: reduce) { .composicao .copy-text__feedback { animation: none; } }
+
+/* Cartão do trajeto: cabeçalho com status, saída → destino em linha do tempo e dados em grade. */
+.composicao .route-card { gap: 0; width: min(360px, calc(100vw - 48px)); padding: 0; overflow: hidden; border-radius: 12px; color: var(--bt-color-text-primary); }
+.composicao .route-card__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 0; }
+.composicao .route-card__eyebrow { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.composicao .route-card__status { padding: 1px 8px; border-radius: var(--bt-radius-full); background: var(--bt-color-action-soft); color: var(--bt-color-action); font-size: var(--bt-font-size-11); font-weight: 600; white-space: nowrap; }
+.composicao .route-card__title { padding: 4px 16px 12px; color: var(--bt-color-ink-900); font-size: var(--bt-font-size-14); font-weight: 600; line-height: 1.35; }
+.composicao .route-card__stops { position: relative; display: grid; gap: 12px; margin: 0 12px; padding: 12px 12px 12px 32px; border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); }
+/* Linha tracejada ligando cada parada à seguinte, qualquer que seja a altura do endereço. */
+.composicao .route-card__stop:not(:last-child)::after { position: absolute; top: 15px; bottom: -13px; left: -16px; border-left: 1.5px dashed var(--bt-color-slate-400); content: ''; }
+.composicao .route-card__stop { position: relative; display: grid; gap: 1px; line-height: 1.4; }
+.composicao .route-card__dot { position: absolute; top: 3px; left: -20px; width: 10px; height: 10px; border: 2px solid var(--bt-color-action); border-radius: 50%; background: var(--bt-color-surface); }
+.composicao .route-card__stop--to .route-card__dot { border-color: var(--bt-color-ink-900); background: var(--bt-color-ink-900); }
+.composicao .route-card__label { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: 500; }
+.composicao .route-card__stop .copy-text { overflow-wrap: anywhere; }
+.composicao .route-card__meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; padding: 12px 16px 14px; }
+.composicao .route-card__meta-item { display: grid; gap: 1px; min-width: 0; line-height: 1.4; }
+.composicao .route-card__meta-item--wide { grid-column: 1 / -1; }
+.composicao .route-card__meta-item .copy-text { overflow-wrap: anywhere; }
