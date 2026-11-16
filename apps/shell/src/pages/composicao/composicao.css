@@ -288,7 +288,7 @@
 .composicao .fixed-col--date { left: 432px; width: 138px; min-width: 138px; max-width: 138px; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
 .composicao .fixed-col--client, .composicao .fixed-col--route { box-shadow: none; }
 .composicao .fixed-col--date { box-shadow: 2px 0 0 var(--bt-color-border); }
-.composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview:has(:focus-visible)), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview:has(:focus-visible)), .composicao .price-grid tbody td:has(.grid-related-preview[data-open]), .composicao .price-grid tbody td:has(.grid-related-preview:has(:focus-visible)) { z-index: 20; }
+.composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview :focus-visible), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview :focus-visible), .composicao .price-grid tbody td:has(.grid-related-preview[data-open]), .composicao .price-grid tbody td:has(.grid-related-preview :focus-visible) { z-index: 20; }
 .composicao .money-column { width: 128px; min-width: 128px; max-width: 128px; }
 .composicao .money-column--total { color: var(--bt-color-action) !important; background: var(--bt-color-surface-soft) !important; font-weight: 700; }
 .composicao .grid-client { display: flex; align-items: center; gap: 6px; overflow: visible; color: var(--bt-color-ink-900); font-weight: 600; white-space: nowrap; }
@@ -326,7 +326,7 @@
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
 /* Trajeto vindo da view (qualquer coluna): a célula deixa o cartão sair e fica por cima das vizinhas no hover. */
 .composicao .price-grid tbody td:has(.route-card) { overflow: visible; }
-.composicao .price-grid tbody td:has(.lookup-preview.grid-route[data-open]), .composicao .price-grid tbody td:has(.lookup-preview.grid-route:has(:focus-visible)) { z-index: 20; }
+.composicao .price-grid tbody td:has(.lookup-preview.grid-route[data-open]), .composicao .price-grid tbody td:has(.lookup-preview.grid-route :focus-visible) { z-index: 20; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
 /* Trajeto: o cartão abre abaixo da linha do texto, sem cobrir o trajeto sob o ponteiro. */
 .composicao .fixed-col--route .lookup-preview { display: block; max-width: 100%; }
