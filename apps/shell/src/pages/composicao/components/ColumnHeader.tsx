@@ -4,7 +4,7 @@ import { ArrowUp } from 'lucide-react'
 import { ColumnFilter, ColumnMenu, type FilterCondition, type FilterField, type LookupSearch } from '@betinhos/ui'
 import { isFilterable, toCondition, toFilterField, toViewFilters } from '../data/column-filter'
 import { resolveFilterOption, searchFilterOptions } from '../data/filter-options'
-import type { CatalogField, ViewFilter, ViewSort } from '../data/views'
+import { isNativeColumn, type CatalogField, type ViewFilter, type ViewSort } from '../data/views'
 
 export type ActiveColumnFilter = { filter: ViewFilter; index: number; groupId?: string; groupLabel?: string }
 
@@ -85,6 +85,7 @@ export function ColumnHeader({ id, label, type, field, filters, sort, displayVal
         label={label}
         columnKey={id}
         sortIcon={sort ? <span className={`bt-colhead__sort${sort.descending ? ' is-desc' : ''}`} aria-hidden="true"><ArrowUp size={14} /></span> : undefined}
+        sortable={isNativeColumn({ id })}
         filterable={isFilterable(filterType)}
         filtered={filters.length > 0}
         canHide={canHide}

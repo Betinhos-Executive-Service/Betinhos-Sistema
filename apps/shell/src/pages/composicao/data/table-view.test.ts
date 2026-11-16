@@ -159,6 +159,7 @@ describe('colunas: definição ↔ DS', () => {
     expect(columnsFromConfig(next, definition.columns)).toEqual([{ id: 'cr40f_nome', width: 160, pinned: true }, { id: 'cr40f_data', width: 128, pinned: false }])
     expect(sortFromConfig({ key: 'cr40f_nome', dir: 'asc' }, definition.sort)).toEqual([{ id: 'cr40f_nome', descending: false }, { id: 'modifiedon', descending: true }])
     expect(sortFromConfig(null, definition.sort)).toEqual([{ id: 'modifiedon', descending: true }])
+    expect(sortFromConfig({ key: 'comprovantes', dir: 'asc' }, definition.sort)).toEqual(definition.sort)
   })
 })
 
