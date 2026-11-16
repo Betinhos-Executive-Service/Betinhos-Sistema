@@ -57,6 +57,9 @@ export const MOCK_ATTRIBUTES: AttributeMap = new Map([
   // Atualizável na metadata, como no DEV: a trava vem de READONLY (o plugin DriverRecordSharing monta o texto).
   info('cr40f_passageirosetelefonedecontato', 'Memo', 'Passageiros e telefone de contato'),
   info('createdon', 'DateTime', 'Criado em', { updatable: false }),
+  // Como no DEV: o estado vem na metadata, mas não é campo de filtro (aparece só leitura quando a visão o filtra).
+  info('statecode', 'State', 'Status', { updatable: false }),
+  info('cr40f_cr', 'String', 'CR'),
 ])
 
 const AGENDA_COLS = [
@@ -78,6 +81,8 @@ export function createMockViews(): View[] {
     { id: 'mock-agenda', nome: '🗓️Agenda', grupo: 'sistema', padrao: true, fetchxml: fetch(AGENDA_COLS, ''), layoutxml: layout(AGENDA_COLS) },
     { id: 'mock-hoje', nome: 'Hoje', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, '<condition attribute="cr40f_dataehorriodesada" operator="today" />'), layoutxml: layout(HOJE_COLS) },
     { id: 'mock-sem-motorista', nome: 'Sem motorista', grupo: 'sistema', padrao: false, fetchxml: fetch(SEM_MOTORISTA_COLS, '<condition attribute="cr40f_motorista" operator="null" />'), layoutxml: layout(SEM_MOTORISTA_COLS) },
+    // No formato de uma savedquery nativa do Dynamics ("Sem CR da Tenaris" do DEV): filtros só no FetchXML.
+    { id: 'mock-sem-cr-tenaris', nome: 'ℹ️ Sem CR da Tenaris', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, `<condition attribute="cr40f_dataehorriodesada" operator="this-month" /><condition attribute="cr40f_cr" operator="null" /><condition attribute="cr40f_cliente" operator="eq" value="${MOCK_LOOKUPS.cr40f_cliente[0].id}" uiname="Tenaris" uitype="cr40f_clientes1" />`), layoutxml: layout(HOJE_COLS) },
   ]
 }
 

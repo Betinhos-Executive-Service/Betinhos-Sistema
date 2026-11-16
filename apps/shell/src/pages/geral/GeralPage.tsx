@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
+import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction, type TableFilters } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
@@ -27,6 +27,7 @@ import { createPortalSource, type Liberacao } from './data/portal'
 import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
 import { COMPROVANTES_COLUMN, COMPROVANTES_KEY } from './domain/comprovantes'
 import { groupFields } from './domain/grouping'
+import { injectTableFilters } from './domain/tableFilters'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
 import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
@@ -54,6 +55,8 @@ export function GeralPage({ host }: { host: Host }) {
 const IDLE: CellStatus = { kind: 'idle' }
 const VIRTUAL_COLUMNS = [COMPROVANTES_COLUMN, PORTAL_COLUMN]
 const VIRTUAL_KEYS: ReadonlySet<string> = new Set(VIRTUAL_COLUMNS.map((c) => c.key))
+/** Substantivo do primário do painel Filtros ("Mostrar 16 serviços"), como o rodapé da lista. */
+const SERVICOS = { one: 'serviço', other: 'serviços' }
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
@@ -208,10 +211,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const viewPayload = useCallback(async () => {
     if (!view) throw new Error('Nenhuma visão aberta.')
     if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
-    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, geral.filterFields)
+    const fetchxml = buildViewFetch(geral.viewFilters.base, geral.filters, geral.sort, geral.filterFields)
     const layoutxml = buildLayout(dataColumns, prefs?.widths, await source.objectTypeCode())
     return { fetchxml, layoutxml }
-  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, dataColumns, prefs, source])
+  }, [view, geral.filtersIgnored, geral.viewFilters.base, geral.filters, geral.sort, geral.filterFields, dataColumns, prefs, source])
   const createView = useCallback(async (name: string) => (await source.createView({ name, ...(await viewPayload()) })).id, [source, viewPayload])
   const updateView = useCallback(async () => {
     if (!view) return
@@ -241,7 +244,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [setGeralSort, toast])
   const { state: viewState, columnDefs } = useGeralViewState({
     views: geral.views, view, viewsError: geral.viewsError, columns: allColumns, attributes, prefs: viewPrefs, setPrefs, hiddenByDefault: [PORTAL_KEY],
-    sort: geral.sort, setSort, filters, setFilters, group, setGroup, selectView, reloadViews,
+    sort: geral.sort, setSort, filters, viewFilters: geral.viewFilters.filters, setFilters, resetFilters: geral.resetFilters, group, setGroup, selectView, reloadViews,
     createView, updateView, renameView, deleteView, kv: source.kv,
   })
   const shareLink = useCallback(async () => {
@@ -674,6 +677,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
+  // Contagem do primário do painel ("Mostrar N resultados"): a mesma consulta de total, com o rascunho no lugar dos filtros.
+  const { viewFilters: { base: filtersBase }, query: geralQuery, quickFind } = geral
+  const countPreview = useCallback(async (draft: TableFilters) => {
+    if (!attributes || !view) return null
+    return source.count({ fetchxml: injectTableFilters(filtersBase, draft, filterFields), query: geralQuery, quickFind })
+  }, [attributes, view, source, filtersBase, filterFields, geralQuery, quickFind])
   const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
@@ -686,7 +695,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           view={viewState}
           columns={columnDefs}
           catalog={catalog}
-          filters={{ fields: filterFields, search: searchFilter, notApplied }}
+          filters={{ fields: filterFields, search: searchFilter, notApplied, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
           search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).

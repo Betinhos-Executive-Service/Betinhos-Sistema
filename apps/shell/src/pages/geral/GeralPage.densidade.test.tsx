@@ -249,7 +249,9 @@ describe('Geral: espaço e densidade', () => {
       await screen.findAllByText(PAGE1)
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
-      expect(within(panel).getByText('Nenhum filtro')).toBeTruthy()
+      // A condição de estado da visão (`statecode`) não é campo de filtro: aparece só leitura, sem ×.
+      expect(within(panel).getByText('Status igual a Ativo')).toBeTruthy()
+      expect(within(panel).queryByRole('button', { name: 'Remover condição da visão' })).toBeNull()
       fireEvent.click(within(panel).getByRole('button', { name: '+ Adicionar filtro' }))
       fireEvent.click(screen.getByRole('option', { name: /^ID$/, hidden: true }))
       expect(within(panel).getByText('1 filtro sem valor não entra')).toBeTruthy()
