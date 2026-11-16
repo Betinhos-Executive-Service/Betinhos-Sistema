@@ -75,15 +75,29 @@ describe('prova de captura nos anexos', () => {
     expect(screen.getByText(/Leitura tinha lido R\$\s?85,40 · 14\/11\/2026/)).toBeTruthy()
   })
 
-  it('ambiente sem as colunas da fase 3: repete a consulta só com as colunas base', async () => {
-    const getAll = vi.fn(async (path: string) => {
-      if (decodeURIComponent(path).includes('cr40f_valorlido')) throw new Error('Could not find a property named cr40f_valorlido')
-      return [{ cr40f_link: 'https://x/1.jpg', cr40f_origemcaptura: 100000000, cr40f_selos: '100000000' }]
-    })
-    const host = { mode: 'dataverse', metadata: { entities: async () => new Map([['cr40f_provamidia', { entitySetName: 'cr40f_provamidias' }]]) }, client: { getAll } } as never
-    const mapa = await createCarregarProvas(host)(['https://x/1.jpg'])
-    expect(mapa.get('https://x/1.jpg')?.selos).toEqual(['capturada-sem-rede'])
-    expect(getAll).toHaveBeenCalledTimes(2)
+  it('colunas da fase 3 só entram no $select quando a metadata as tem (uma leitura por source)', async () => {
+    const consulta = async (colunas: string[]) => {
+      const getAll = vi.fn(async () => [{ cr40f_link: 'https://x/1.jpg', cr40f_origemcaptura: 100000000, cr40f_selos: '100000000' }])
+      const attributes = vi.fn(async () => colunas.map((logicalName) => ({ logicalName })))
+      const host = { mode: 'dataverse', metadata: { entities: async () => new Map([['cr40f_provamidia', { entitySetName: 'cr40f_provamidias' }]]), attributes }, client: { getAll } } as never
+      const carregar = createCarregarProvas(host)
+      await carregar(['https://x/1.jpg'])
+      await carregar(['https://x/2.jpg'])
+      return { paths: getAll.mock.calls.map((c) => decodeURIComponent(String((c as unknown[])[0]))), attributes }
+    }
+    const sem = await consulta(['cr40f_link'])
+    expect(sem.paths).toHaveLength(2)
+    expect(sem.paths.every((p) => !p.includes('cr40f_valorlido'))).toBe(true)
+    expect(sem.attributes).toHaveBeenCalledTimes(1)
+    const com = await consulta(['cr40f_valorlido', 'cr40f_datalida'])
+    expect(com.paths.every((p) => p.includes('cr40f_valorlido,cr40f_datalida'))).toBe(true)
+  })
+
+  it('selos que a tela já mostra por outra fonte ficam ocultos', async () => {
+    const comNota: ProvaMidia = { ...prova, selos: ['nota-nao-verificada', 'repetida'] }
+    render(<ComprovantesGaleria anexos={[comProva]} ler={ler} provas={async () => new Map([[comNota.link, comNota]])} ocultarSelos={['nota-nao-verificada']} />)
+    expect(await screen.findByText('Repetida')).toBeTruthy()
+    expect(screen.queryByText('Nota não verificada')).toBeNull()
   })
 
   it('no Dataverse, tabela ausente vira mapa vazio', async () => {

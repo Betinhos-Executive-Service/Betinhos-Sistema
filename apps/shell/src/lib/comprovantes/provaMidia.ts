@@ -1,4 +1,5 @@
 import type { Host } from '../../host'
+import { colunasExistem } from './colunas'
 
 // Prova de captura de mídia do App Motoristas (tabela cr40f_provamidia, gravada só pelo plugin new_ProvaMidia).
 // O anexo e a prova se ligam pelo link do arquivo no SharePoint. Anexo sem prova (antigo ou prova pendente) não mostra nada.
@@ -67,8 +68,9 @@ export function mapProva(row: Record<string, unknown>): ProvaMidia {
 }
 
 const SELECT_BASE = ['cr40f_link', 'cr40f_origemcaptura', 'cr40f_selos', 'cr40f_datagravada', 'cr40f_marca', 'cr40f_modelo', 'cr40f_emitidoem', 'cr40f_recebidoem', 'cr40f_atrasominutos']
-// Colunas da fase 3 (migration 20261116-2100): no ambiente que ainda não as tem, a consulta cai para a base.
-const SELECT_NOTA = [...SELECT_BASE, 'cr40f_valorlido', 'cr40f_datalida']
+// Colunas da fase 3 (migration 20261116-2100): só entram no $select quando a metadata do ambiente as tem.
+const COLUNAS_LEITURA = ['cr40f_valorlido', 'cr40f_datalida']
+const SELECT_NOTA = [...SELECT_BASE, ...COLUNAS_LEITURA]
 const LOTE = 10
 
 /** Filtro OData por link, em lotes de 10 (limite de URL). */
@@ -95,17 +97,19 @@ export function provasMock(links: string[], agora = new Date()): Map<string, Pro
 export function createCarregarProvas(host: Host): CarregarProvas {
   if (host.mode === 'mock') return async (links) => provasMock(links)
   let set: Promise<string | null> | null = null
+  let colunas: Promise<string[]> | null = null
   return async (links) => {
     try {
       set ??= host.metadata.entities([ENTITY_PROVA]).then((info) => info.get(ENTITY_PROVA)?.entitySetName ?? null)
+      colunas ??= colunasExistem(host, ENTITY_PROVA, COLUNAS_LEITURA).then((tem) => (tem ? SELECT_NOTA : SELECT_BASE))
       const entitySet = await set
       if (!entitySet) return new Map()
-      const ler = (colunas?: string[]) => Promise.all(provasPaths(entitySet, links, colunas).map((path) => host.client.getAll(path)))
-      const linhas = (await ler().catch(() => ler(SELECT_BASE))).flat()
+      const linhas = (await Promise.all(provasPaths(entitySet, links, await colunas).map((path) => host.client.getAll(path)))).flat()
       return new Map(linhas.map((row) => mapProva(row as Record<string, unknown>)).map((p) => [p.link, p]))
     } catch {
       // Tabela ainda não publicada no ambiente ou sem leitura: segue sem selo.
       set = null
+      colunas = null
       return new Map()
     }
   }

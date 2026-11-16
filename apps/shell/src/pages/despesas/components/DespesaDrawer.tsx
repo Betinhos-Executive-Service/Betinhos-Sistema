@@ -21,6 +21,9 @@ import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { NotaDoAnexo } from './NotaAnexo'
 
+// A situação da nota vem do anexo (atualizada pelo plugin); o selo da prova é a foto do envio e repetiria ou contradiria.
+const SELOS_DA_NOTA = ['nota-nao-verificada', 'sem-nota-fiscal'] as const
+
 type Props = {
   despesa: Despesa | null
   onClose: () => void
@@ -204,7 +207,7 @@ function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos
   )
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} ocultarSelos={SELOS_DA_NOTA} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }

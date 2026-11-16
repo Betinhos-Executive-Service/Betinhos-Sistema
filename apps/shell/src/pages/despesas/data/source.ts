@@ -11,7 +11,8 @@ import { createArquivos } from '../../../lib/comprovantes/leitura'
 import { createMockAnexos, createMockDespesas } from './mock'
 import { createMockArquivo } from '../../../lib/comprovantes/mock'
 import { createCarregarProvas, type CarregarProvas } from '../../../lib/comprovantes/provaMidia'
-import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
+import { colunasExistem } from '../../../lib/comprovantes/colunas'
+import { ANEXO_NOTA, ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
 import { guid } from '../../pagantes/data/queries'
 
@@ -77,6 +78,7 @@ export function createSource(host: Host): Source {
     return set
   }
   const choice = (entity: string, attribute: string) => host.metadata.choices(entity, attribute).catch(() => [])
+  let comNota: Promise<boolean> | null = null
 
   return {
     mock: false,
@@ -90,10 +92,9 @@ export function createSource(host: Host): Source {
       return row ? mapDespesa(row) : null
     },
     anexos: async (id) => {
-      const set = await entitySet(ENTITY_ANEXO)
       // Ambiente sem as colunas da nota (migration 20261116-2100 ainda não chegou): lê sem elas, sem derrubar a ficha.
-      const linhas = await host.client.getAll(anexosPath(set, id)).catch(() => host.client.getAll(anexosPath(set, id, false)))
-      return linhas.map(mapAnexo)
+      comNota ??= colunasExistem(host, ENTITY_ANEXO, ANEXO_NOTA)
+      return (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id, await comNota))).map(mapAnexo)
     },
     arquivo: createArquivos(host.client),
     provas: createCarregarProvas(host),

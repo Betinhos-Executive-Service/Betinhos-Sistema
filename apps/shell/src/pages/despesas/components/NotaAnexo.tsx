@@ -5,8 +5,9 @@ import type { NotaAnexo as Nota } from '../domain/types'
 const MODELO: Record<string, string> = { '55': 'NF-e', '65': 'NFC-e', '59': 'CF-e SAT' }
 
 /** CNPJ numérico ou alfanumérico: 12.ABC.345/01DE-35. */
-export function formatarCnpj(cnpj: string) {
-  return /^[0-9A-Z]{14}$/.test(cnpj) ? `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}` : cnpj
+export function formatarCnpj(texto: string) {
+  const cnpj = texto.toUpperCase().replace(/[^0-9A-Z]/g, '')
+  return /^[0-9A-Z]{14}$/.test(cnpj) ? `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12)}` : texto
 }
 
 /** Rótulo da situação. "Chave conferida" não é confirmação da SEFAZ: nunca dizer "Nota confirmada". */

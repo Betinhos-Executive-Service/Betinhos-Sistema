@@ -32,8 +32,8 @@ export function despesasPath(entitySet: string, since: Date | null, search: stri
 }
 
 const ANEXO_SELECT = ['cr40f_anexodespesaoperacionalid', 'cr40f_nome', 'cr40f_nomearquivo', 'cr40f_tipo', 'cr40f_status', 'cr40f_sharelink', 'cr40f_urlsharepoint', 'cr40f_dataenvio', 'cr40f_driveitemid', 'createdon', '_cr40f_enviadopor_value']
-// Nota fiscal do comprovante (migration 20261116-2100). Ambiente sem as colunas: o source repete a consulta sem elas.
-const ANEXO_NOTA = ['cr40f_situacaonota', 'cr40f_notacnpjemitente', 'cr40f_notauf', 'cr40f_notamodelo', 'cr40f_notanumero']
+// Nota fiscal do comprovante (migration 20261116-2100). Só entram no $select quando a metadata do ambiente as tem.
+export const ANEXO_NOTA = ['cr40f_situacaonota', 'cr40f_notacnpjemitente', 'cr40f_notauf', 'cr40f_notamodelo', 'cr40f_notanumero']
 
 export function anexosPath(entitySet: string, despesaId: string, comNota = true) {
   const filter = `statecode eq 0 and _cr40f_despesa_value eq ${cleanId(despesaId)}`

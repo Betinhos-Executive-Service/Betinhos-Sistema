@@ -39,20 +39,33 @@ describe('nota fiscal do comprovante', () => {
   it('formata CNPJ numérico e alfanumérico', () => {
     expect(formatarCnpj('12345678000195')).toBe('12.345.678/0001-95')
     expect(formatarCnpj('12ABC34501DE35')).toBe('12.ABC.345/01DE-35')
+    expect(formatarCnpj('12abc34501de35')).toBe('12.ABC.345/01DE-35')
+    expect(formatarCnpj('123')).toBe('123')
   })
 })
 
-describe('source sem as colunas da nota', () => {
-  it('repete a leitura dos anexos sem elas, sem derrubar a ficha', async () => {
-    const getAll = vi.fn(async (path: string) => {
-      if (decodeURIComponent(path).includes('cr40f_situacaonota')) throw new Error("Could not find a property named 'cr40f_situacaonota'")
-      return [{ cr40f_anexodespesaoperacionalid: 'a1', cr40f_nomearquivo: 'cupom.jpg' }]
-    })
+describe('source e as colunas da nota', () => {
+  const montar = (colunas: string[]) => {
+    const getAll = vi.fn(async () => [{ cr40f_anexodespesaoperacionalid: 'a1', cr40f_nomearquivo: 'cupom.jpg', cr40f_situacaonota: 100000001 }])
     const entities = async () => new Map([['cr40f_despesaoperacional', { entitySetName: 'cr40f_despesaoperacionals' }], ['cr40f_anexodespesaoperacional', { entitySetName: 'cr40f_anexodespesaoperacionals' }]])
-    const host = { mode: 'dataverse', metadata: { entities, choices: async () => [] }, client: { getAll } } as never
-    const anexos = await createSource(host).anexos('d1')
-    expect(anexos).toHaveLength(1)
-    expect(anexos[0].nota).toBeNull()
+    const attributes = vi.fn(async () => colunas.map((logicalName) => ({ logicalName })))
+    const host = { mode: 'dataverse', metadata: { entities, attributes, choices: async () => [] }, client: { getAll } } as never
+    return { source: createSource(host), getAll, attributes }
+  }
+
+  it('sem as colunas no ambiente, lê os anexos sem elas numa consulta só, e a metadata uma vez', async () => {
+    const { source, getAll, attributes } = montar(['cr40f_nome'])
+    await source.anexos('d1')
+    await source.anexos('d2')
     expect(getAll).toHaveBeenCalledTimes(2)
+    expect(getAll.mock.calls.every((c) => !decodeURIComponent(String((c as unknown[])[0])).includes('cr40f_situacaonota'))).toBe(true)
+    expect(attributes).toHaveBeenCalledTimes(1)
+  })
+
+  it('com as colunas, pede a nota', async () => {
+    const { source, getAll } = montar(['cr40f_situacaonota', 'cr40f_notacnpjemitente', 'cr40f_notauf', 'cr40f_notamodelo', 'cr40f_notanumero'])
+    const [anexo] = await source.anexos('d1')
+    expect(decodeURIComponent(String((getAll.mock.calls[0] as unknown[])[0]))).toContain('cr40f_situacaonota')
+    expect(anexo.nota?.situacao).toBe('nao-verificada')
   })
 })
