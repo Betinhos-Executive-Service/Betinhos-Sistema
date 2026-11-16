@@ -27,8 +27,9 @@ a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
 /* Página do shell */
 .page { max-width: var(--bt-layout-content-max); margin: 0 auto; padding: 22px 26px var(--bt-space-8); }
 .page__header { margin-bottom: var(--bt-space-3); }
-/* Lista que usa a largura toda do conteúdo, sem o limite de 1500 px. */
-.page--full { max-width: none; }
+/* Lista que usa a largura toda do conteúdo, sem o limite de 1500 px, e padding mais justo (16 px nas laterais e
+   embaixo, iguais) para a grade ganhar largura e altura; o topo segue o de `.page`. No celular vale o padding de `.page`. */
+.page--full { max-width: none; padding-inline: var(--bt-space-4); padding-bottom: var(--bt-space-4); }
 
 /* Linha de comando das listas (ViewBar): o seletor de visão não cresce e os comandos ocupam o resto da linha. No desktop
    eles nunca descem para baixo do título: quebram dentro do próprio grupo, com o título na altura da primeira linha.
