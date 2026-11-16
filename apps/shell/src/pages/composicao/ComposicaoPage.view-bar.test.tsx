@@ -2,10 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { ComposicaoPage } from './ComposicaoPage'
-import { ReadOnlyFilters } from './components/ReadOnlyFilters'
-import type { CatalogField } from './data/views'
-
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.localStorage.clear() })
 
 it('linha de comando do DS: seleção mostra Gerar OP e Excluir, ✕ limpa e Auditoria abre a da tabela sem seleção', async () => {
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
@@ -39,12 +36,24 @@ it('linha de comando do DS: seleção mostra Gerar OP e Excluir, ✕ limpa e Aud
   expect(await screen.findByRole('dialog', { name: 'Histórico de Auditoria' })).toBeTruthy()
 })
 
-it('filtros da visão nativa e condições sem equivalente ficam visíveis só para leitura', () => {
-  const catalog = [{ id: 'cr40f_nome', label: 'Nome', table: 'cr40f_composicaodeprecos', attribute: 'cr40f_nome', path: [], type: 'String', available: true }] as CatalogField[]
-  const fetchXml = '<fetch><entity name="cr40f_composicaodeprecos"><filter type="and"><condition attribute="cr40f_nome" operator="not-like" value="%Teste%" /></filter></entity></fetch>'
-  render(<ReadOnlyFilters catalog={catalog} nativeFetchXml={fetchXml} locked={{ filters: [{ id: 'cr40f_nome', operator: 'not-begins-with', value: 'X' }], groups: [], orGroups: [] }} valueLabel={(_id, value) => value} onClear={() => undefined} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Filtros da visão (2)' }))
-  const dialog = screen.getByLabelText('Filtros originais da view')
-  expect(within(dialog).getByText('Nome · não contém · %Teste%')).toBeTruthy()
-  expect(within(dialog).getByText('Nome · não começa com · X')).toBeTruthy()
+it('condição sem equivalente no DS fica no painel Filtros como só leitura e sai sozinha no ×', async () => {
+  window.localStorage.setItem('tela-composicao-preco:mock-views:v1', JSON.stringify([{ id: 'v1', name: 'Sem Guarulhos', kind: 'personal', managed: true, definition: {
+    columns: [{ id: 'client', width: 200, pinned: false }, { id: 'route', width: 240, pinned: false }],
+    filters: [{ id: 'route', operator: 'not-begins-with', value: 'Guarulhos' }, { id: 'client', operator: 'like', value: 'a' }], sort: [],
+  } }]))
+  render(<ComposicaoPage host={{ mode: 'mock' }} />)
+  const toolbar = await screen.findByRole('toolbar', { name: 'Comandos da composição de preços' })
+  fireEvent.click(within(toolbar).getByRole('button', { name: /^Visão:/ }))
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: /Sem Guarulhos/, hidden: true }))
+  await within(toolbar).findByRole('button', { name: /^Visão: Sem Guarulhos/ })
+  expect(screen.queryByRole('button', { name: /Filtros da visão/ })).toBeNull()
+
+  fireEvent.click(within(toolbar).getByRole('button', { name: /^Filtros/ }))
+  expect(screen.getByText('Sempre')).toBeTruthy()
+  expect(screen.getByText(/Trajeto não começa com Guarulhos/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Mostrar/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Remover condição da visão' }))
+  expect(screen.queryByText(/não começa com Guarulhos/)).toBeNull()
+  expect(screen.queryByText('Sempre')).toBeNull()
 })
+
