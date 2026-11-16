@@ -26,6 +26,13 @@ public static class G
     public const string Manutencao = "cr40f_om", Categoria = "new_categoriadoitem", Veiculo = "cr40f_veiculo", Motorista = "cr40f_motorista";
     public const string Saida = "cr40f_dataehorriodesada", Status = "cr40f_status", FoiProgramado = "new_foiprogramado";
     public const string DataFinalizacao = "new_datadefinalizacao", ObservacaoFinal = "new_observacaofinal";
+    // Campos que a linha nova precisa para a Geral aceitá-la (iguais ao flow "Criar Serviço de Manutenção na Geral", descoberta).
+    public const string StatusFaturamento = "cr40f_statusdefaturamento", TipoVeiculo = "cr40f_tipodeveiculo", TipoServico = "cr40f_tipodoservico";
+    public const string Destino = "cr40f_destino", EnderecoSaida = "cr40f_endereodesada", Passageiros = "cr40f_passageirosetelefonedecontato";
+    public const string Perfil = "cr40f_perfildopassageiro", ObsFaturamento = "new_observacaodefaturamento", Trajeto = "cr40f_trajeto";
+    public const string ObsOperacao = "cr40f_obsdeoperao", ObsInterna = "cr40f_observaointerna";
+    public const string TextoManutencao = "Manutenção de Veículo", TextoTrajeto = "Serviço de manutenção do veículo";
+    public const int NaoFaturavel = 202410011, TipoVeiculoBasico = 202410000, TipoServicoManutencao = 202410006;
 
     public const int CategoriaManutencao = 100000001;
     /// <summary>Status da linha encaixada e ainda não programada. Conferido na Tarefa 1 (descoberta).</summary>
