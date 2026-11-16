@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, DollarSign, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
@@ -25,6 +25,7 @@ import { debounceSearch } from './components/useLookupSearch'
 import { LiberarPortalDrawer } from './components/LiberarPortalDrawer'
 import { createPortalSource, type Liberacao } from './data/portal'
 import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
+import { COMPROVANTES_COLUMN, COMPROVANTES_KEY } from './domain/comprovantes'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
 import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
@@ -36,6 +37,7 @@ import { splitOp } from './domain/commands'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
+import { formatCell } from './domain/format'
 import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column, type Sort } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
@@ -49,6 +51,8 @@ export function GeralPage({ host }: { host: Host }) {
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
+const VIRTUAL_COLUMNS = [COMPROVANTES_COLUMN, PORTAL_COLUMN]
+const VIRTUAL_KEYS: ReadonlySet<string> = new Set(VIRTUAL_COLUMNS.map((c) => c.key))
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const source = useMemo(() => createSource(host), [host])
@@ -95,11 +99,28 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
   const viewId = view?.id ?? null
   const prefs = useMemo(() => (viewId == null ? null : viewId in saved ? saved[viewId] : loadColumnPrefs(source.kv, viewId)), [viewId, saved, source.kv])
-  // Coluna virtual "Portal": oferecida no painel, oculta até o usuário ligar (preferência salva sem ela também a deixa oculta).
-  const allColumns = useMemo(() => [...geral.columns, PORTAL_COLUMN], [geral.columns])
-  const viewPrefs = useMemo(() => (prefs && !prefs.order.includes(PORTAL_KEY) ? { ...prefs, order: [...prefs.order, PORTAL_KEY], hidden: [...prefs.hidden, PORTAL_KEY] } : prefs), [prefs])
-  const visibleColumns = useMemo(() => applyColumnPrefs(allColumns, viewPrefs ?? { hidden: [PORTAL_KEY], order: [] }), [allColumns, viewPrefs])
-  const dataColumns = useMemo(() => visibleColumns.filter((c) => c.key !== PORTAL_KEY), [visibleColumns])
+  // Colunas virtuais: "Comprovantes" vem ligada logo depois da primeira coluna; "Portal" fica no painel, oculta até o
+  // usuário ligar. Preferência salva antes delas recebe cada uma no lugar padrão.
+  const allColumns = useMemo(() => {
+    const [first, ...rest] = geral.columns
+    return first ? [first, COMPROVANTES_COLUMN, ...rest, PORTAL_COLUMN] : []
+  }, [geral.columns])
+  const viewPrefs = useMemo(() => {
+    if (!prefs) return prefs
+    let { order, hidden } = prefs
+    if (order.length && !order.includes(COMPROVANTES_KEY)) order = [order[0], COMPROVANTES_KEY, ...order.slice(1)]
+    if (!order.includes(PORTAL_KEY)) { order = [...order, PORTAL_KEY]; hidden = [...hidden, PORTAL_KEY] }
+    return order === prefs.order ? prefs : { ...prefs, order, hidden }
+  }, [prefs])
+  // A primeira coluna é o botão que abre o serviço: coluna virtual levada para lá fica logo depois dela.
+  const visibleColumns = useMemo(() => {
+    const cols = applyColumnPrefs(allColumns, viewPrefs ?? { hidden: [PORTAL_KEY], order: [] })
+    const real = cols.findIndex((c) => !VIRTUAL_KEYS.has(c.key))
+    // Só virtuais visíveis (todas as reais ocultas): a primeira real volta, senão a coluna virtual viraria o botão.
+    if (real < 0) return allColumns.length ? [allColumns[0], ...cols] : cols
+    return real > 0 ? [cols[real], ...cols.slice(0, real), ...cols.slice(real + 1)] : cols
+  }, [allColumns, viewPrefs])
+  const dataColumns = useMemo(() => visibleColumns.filter((c) => !VIRTUAL_KEYS.has(c.key)), [visibleColumns])
   const setPrefs = useCallback((next: ColumnPrefs | null) => {
     if (viewId == null) return
     saveColumnPrefs(source.kv, viewId, next)
@@ -169,7 +190,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const keys = visibleColumns.map((c) => c.key)
     if (!keys.includes(key)) return
     const next = keys.filter((k) => k !== key)
-    next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, key)
+    let at = Math.max(0, Math.min(toIndex, next.length))
+    // A primeira coluna saindo do lugar: as virtuais que vinham logo depois dela ficam com a nova primeira, então ela
+    // vai para depois da próxima real (sem isso, Alt+→ e soltar logo depois da virtual não a moviam).
+    const lead = key === keys[0] ? next.findIndex((k) => !VIRTUAL_KEYS.has(k)) : 0
+    if (lead > 0 && at <= lead) at = Math.min(lead + 1, next.length)
+    next.splice(at, 0, key)
     const all = applyColumnPrefs(geral.columns, { ...base, hidden: [] }).map((c) => c.key)
     setPrefs({ ...base, order: [...next, ...all.filter((k) => !next.includes(k))] })
   }, [prefs, geral.columns, visibleColumns, setPrefs])
@@ -186,10 +212,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const updateView = useCallback(async () => {
     if (!view) return
     await source.updateView(view.id, await viewPayload())
-    // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
-    setPrefs(null)
+    // A visão agora carrega as colunas e larguras: das preferências locais só fica a coluna virtual oculta (não entra no layoutxml).
+    const hiddenVirtual = (prefs?.hidden ?? []).filter((k) => VIRTUAL_KEYS.has(k))
+    setPrefs(hiddenVirtual.length ? { hidden: hiddenVirtual, order: [] } : null)
     await reloadViews()
-  }, [view, source, viewPayload, setPrefs, reloadViews])
+  }, [view, source, viewPayload, prefs, setPrefs, reloadViews])
   const renameView = useCallback(async (name: string) => {
     if (!view) return
     await source.renameView(view.id, name)
@@ -202,9 +229,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     await reloadViews()
   }, [view, source, reloadViews])
   const { setSort: setGeralSort } = geral
-  // A coluna Portal não existe no FetchXML: não ordena.
+  // Colunas virtuais não existem no FetchXML: não ordenam.
   const setSort = useCallback((next: Sort) => {
-    if (next?.attribute === PORTAL_KEY) { toast({ tone: 'info', message: 'A coluna Portal não pode ser ordenada.' }); return }
+    const virtual = next && VIRTUAL_COLUMNS.find((c) => c.key === next.attribute)
+    if (virtual) { toast({ tone: 'info', message: `A coluna ${virtual.label} não pode ser ordenada.` }); return }
     setGeralSort(next)
   }, [setGeralSort, toast])
   const { state: viewState, columnDefs } = useGeralViewState({
@@ -422,10 +450,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }, [portal, portalVisible, rows, portalSeq])
   const recebimentos = recebimentosSource(host)
-  const contagem = useContagemRecebimentos(recebimentos, useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows]))
+  // Contagem só quando aparece: nos cards (ao lado do ID) ou com a coluna Comprovantes visível na tabela.
+  const comprovantesVisible = cardsLayout || visibleColumns.some((c) => c.key === COMPROVANTES_KEY)
+  const contagem = useContagemRecebimentos(recebimentos, useMemo(() => (comprovantesVisible ? rows.map((r) => String(r[ID_ATTRIBUTE])) : []), [rows, comprovantesVisible]))
   const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
-  const besideId = (id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />
-  const marcadorRecebimentos = { label: 'Comprovantes de recebimento', header: <DollarSign size={14} aria-hidden="true" />, cell: besideId }
+  const besideId = useCallback((id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />, [contagem])
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -506,6 +535,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
+    if (column.key === COMPROVANTES_KEY) return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{besideId(id, formatCell('readonly', row, 'cr40f_id'))}</div>
     if (column.key === PORTAL_KEY) {
       const st = portalStatus.get(id)
       return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{st ? <StatusBadge tone={tomStatus(st)}>{rotuloStatus(st)}</StatusBadge> : <span className="gr-cell__value">—</span>}</div>
@@ -523,7 +553,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit, portalStatus])
+  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit, portalStatus, besideId])
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
@@ -596,7 +626,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
-              marker={marcadorRecebimentos}
+              unsortable={VIRTUAL_KEYS}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
               footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}

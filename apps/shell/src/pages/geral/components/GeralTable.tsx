@@ -6,7 +6,6 @@ import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
-import { filterKindOf } from '../domain/filterKind'
 import { formatCell } from '../domain/format'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
@@ -44,9 +43,8 @@ type Props = {
   onOpen: (id: string) => void
   /** Devolve o `gridcell` completo da coluna (a primeira coluna é desenhada aqui, como botão que abre o serviço). */
   renderCell: (row: Row, column: Column) => ReactNode
-  /** Slot logo depois do botão da primeira coluna; `name` é o ID do serviço (`cr40f_id`), seja qual for a primeira coluna. */
-  /** Coluna fixa logo depois da seleção (ex.: comprovantes), igual em qualquer visão. */
-  marker?: { label: string; header: ReactNode; cell: (id: string, name: string) => ReactNode }
+  /** Colunas que não existem no FetchXML (virtuais): o menu do título não oferece ordenar. */
+  unsortable?: ReadonlySet<string>
   /** Contêiner de rolagem (`.gr-grid`): é a raiz do observador que carrega mais linhas. */
   scrollRef?: RefObject<HTMLDivElement | null>
   /** Dentro do contêiner de rolagem, logo depois da última linha (o sentinela da rolagem infinita). */
@@ -57,11 +55,9 @@ type Props = {
   density?: TableDensity
 }
 
-/** Cabe o indicador com dois dígitos ("$ 12"). */
-const MARKER_WIDTH = 52
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, marker, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense' }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -196,10 +192,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     if (fromIndex < to) to -= 1
     if (fromIndex >= 0 && to !== fromIndex) onMove(from, to)
   }
-  const fixed = marker ? 40 + MARKER_WIDTH : 40
-  const layout = () => ({ cols: `40px ${marker ? `${MARKER_WIDTH}px ` : ''}${columns.map(track).join(' ')}`, min: `${fixed + columns.reduce((sum, c) => sum + minOf(c), 0)}px` })
+  const layout = () => ({ cols: `40px ${columns.map(track).join(' ')}`, min: `${40 + columns.reduce((sum, c) => sum + minOf(c), 0)}px` })
   const { cols, min } = layout()
-  const style = { '--gr-columns': cols, '--gr-min-width': min, '--gr-first-left': `${fixed}px` } as CSSProperties
+  const style = { '--gr-columns': cols, '--gr-min-width': min } as CSSProperties
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
@@ -225,7 +220,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   return (
     <div ref={root} className={['bt-table gr-table brand-loader-host', density === 'default' && 'gr-table--confortavel', density === 'minimal' && 'gr-table--minima', !loading && rows.length === 0 && 'gr-table--empty'].filter(Boolean).join(' ')}>
       <span className="gr-sr" role="status">{announce}</span>
-      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + (marker ? 2 : 1)} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
+      <div ref={scrollRef} className="gr-grid" role="grid" aria-label="Serviços" aria-busy={loading || undefined} aria-colcount={columns.length + 1} aria-rowcount={measure ? rows.length + 1 : undefined} style={style}>
         <div className="bt-table__head" role="row">
           <div className="bt-table__cell gr-cell--select" role="columnheader">
             <Checkbox
@@ -236,7 +231,6 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
               onChange={onToggleAll}
             />
           </div>
-          {marker ? <div className="bt-table__cell gr-cell--marker" role="columnheader" aria-label={marker.label} title={marker.label}>{marker.header}</div> : null}
           {columns.map((column, index) => {
             const active = sameSort(shown, column)
             const label = columnLabel(column, attributes?.get(column.key))
@@ -260,7 +254,8 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                     label={label}
                     columnKey={column.key}
                     sortIcon={active ? (shown?.descending ? <ArrowDown size={14} /> : <ArrowUp size={14} />) : null}
-                    filterable={!column.alias && filterKindOf(column.attribute, attributes?.get(column.key)) != null}
+                    sortable={!unsortable?.has(column.key)}
+                    filterable={!column.alias && Boolean(quick?.fields.some((f) => f.key === column.attribute && !f.advancedOnly))}
                     filtered={!column.alias && filteredKeys.includes(column.attribute)}
                     canHide={columns.length > 1}
                     onSort={(descending) => onSort({ attribute: column.attribute, alias: column.alias, descending })}
@@ -308,7 +303,6 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                 <div className="bt-table__cell gr-cell--select" role="gridcell">
                   <Checkbox label={<span className="gr-sr">Selecionar serviço {formatCell('readonly', row, 'cr40f_id')}</span>} checked={isSelected} onChange={() => onToggle(id)} />
                 </div>
-                {marker ? <div className="bt-table__cell gr-cell--marker" role="gridcell">{marker.cell(id, formatCell('readonly', row, 'cr40f_id'))}</div> : null}
                 {columns.map((column, index) => {
                   if (index > 0) return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
                   const info = attributes?.get(column.key)
