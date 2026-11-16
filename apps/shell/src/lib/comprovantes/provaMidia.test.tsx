@@ -13,7 +13,7 @@ const ler = async (a: Comprovante) => ({ nome: a.nome, mime: 'image/jpeg', url: 
 
 const prova: ProvaMidia = {
   link: comProva.url!, origem: 'galeria', selos: ['fora-da-janela', 'repetida'], dataGravada: new Date('2026-11-01T13:30:00Z'),
-  aparelho: 'Apple iPhone 15', emitidoEm: new Date('2026-11-16T12:00:00Z'), recebidoEm: new Date('2026-11-16T12:04:00Z'), atrasoMinutos: 4, valorLido: null, dataLida: null,
+  aparelho: 'Apple iPhone 15', emitidoEm: new Date('2026-11-16T12:00:00Z'), recebidoEm: new Date('2026-11-16T12:04:00Z'), atrasoMinutos: 4,
 }
 
 describe('prova de captura nos anexos', () => {
@@ -59,45 +59,6 @@ describe('prova de captura nos anexos', () => {
     await Promise.resolve()
     expect(screen.queryByRole('button', { name: /Galeria\/arquivo|Câmera do app/ })).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
-  })
-
-  it('fase 3: selos da nota pela ordem das choices e valor/data lidos', () => {
-    const p = mapProva({ cr40f_link: 'l', cr40f_origemcaptura: 100000000, cr40f_selos: '100000007,100000008,100000009', cr40f_valorlido: 85.4, cr40f_datalida: '2026-11-14' })
-    expect(p.selos).toEqual(['nota-nao-verificada', 'sem-nota-fiscal', 'valor-alterado'])
-    expect(p).toMatchObject({ valorLido: 85.4, dataLida: '2026-11-14' })
-    expect(decodeURIComponent(provasPaths('cr40f_provamidias', ['l'])[0])).toContain('cr40f_valorlido,cr40f_datalida')
-  })
-
-  it('selo "Valor alterado" mostra o valor e a data que a leitura tinha lido', async () => {
-    const alterada: ProvaMidia = { ...prova, selos: ['valor-alterado'], valorLido: 85.4, dataLida: '2026-11-14' }
-    render(<ComprovantesGaleria anexos={[comProva]} ler={ler} provas={async () => new Map([[alterada.link, alterada]])} />)
-    expect(await screen.findByText('Valor alterado')).toBeTruthy()
-    expect(screen.getByText(/Leitura tinha lido R\$\s?85,40 · 14\/11\/2026/)).toBeTruthy()
-  })
-
-  it('colunas da fase 3 só entram no $select quando a metadata as tem (uma leitura por source)', async () => {
-    const consulta = async (colunas: string[]) => {
-      const getAll = vi.fn(async () => [{ cr40f_link: 'https://x/1.jpg', cr40f_origemcaptura: 100000000, cr40f_selos: '100000000' }])
-      const attributes = vi.fn(async () => colunas.map((logicalName) => ({ logicalName })))
-      const host = { mode: 'dataverse', metadata: { entities: async () => new Map([['cr40f_provamidia', { entitySetName: 'cr40f_provamidias' }]]), attributes }, client: { getAll } } as never
-      const carregar = createCarregarProvas(host)
-      await carregar(['https://x/1.jpg'])
-      await carregar(['https://x/2.jpg'])
-      return { paths: getAll.mock.calls.map((c) => decodeURIComponent(String((c as unknown[])[0]))), attributes }
-    }
-    const sem = await consulta(['cr40f_link'])
-    expect(sem.paths).toHaveLength(2)
-    expect(sem.paths.every((p) => !p.includes('cr40f_valorlido'))).toBe(true)
-    expect(sem.attributes).toHaveBeenCalledTimes(1)
-    const com = await consulta(['cr40f_valorlido', 'cr40f_datalida'])
-    expect(com.paths.every((p) => p.includes('cr40f_valorlido,cr40f_datalida'))).toBe(true)
-  })
-
-  it('selos que a tela já mostra por outra fonte ficam ocultos', async () => {
-    const comNota: ProvaMidia = { ...prova, selos: ['nota-nao-verificada', 'repetida'] }
-    render(<ComprovantesGaleria anexos={[comProva]} ler={ler} provas={async () => new Map([[comNota.link, comNota]])} ocultarSelos={['nota-nao-verificada']} />)
-    expect(await screen.findByText('Repetida')).toBeTruthy()
-    expect(screen.queryByText('Nota não verificada')).toBeNull()
   })
 
   it('no Dataverse, tabela ausente vira mapa vazio', async () => {

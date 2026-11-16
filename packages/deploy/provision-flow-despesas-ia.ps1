@@ -272,7 +272,7 @@ $definitionText = @'
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
             "parameters": {
               "entityName": "cr40f_anexodespesaoperacionals",
-              "$select": "cr40f_anexodespesaoperacionalid,cr40f_driveitemid,cr40f_mimetype,cr40f_nomearquivo,cr40f_urlsharepoint,cr40f_sharelink,cr40f_ordem,cr40f_chaveacesso,cr40f_notauf,cr40f_notaaamm,cr40f_notacnpjemitente,cr40f_notamodelo,cr40f_notanumero,cr40f_situacaonota",
+              "$select": "cr40f_anexodespesaoperacionalid,cr40f_driveitemid,cr40f_mimetype,cr40f_nomearquivo,cr40f_urlsharepoint,cr40f_sharelink,cr40f_ordem",
               "$filter": "_cr40f_despesa_value eq @{triggerOutputs()?['body/cr40f_despesaoperacionalid']} and cr40f_tipo eq 100000000 and cr40f_status eq 100000001",
               "$orderby": "createdon desc,cr40f_ordem desc",
               "$top": "@min(3, max(1, coalesce(triggerOutputs()?['body/new_uploadexpectedcount'], 3)))"
@@ -425,44 +425,8 @@ $definitionText = @'
         },
         "Valores": { "type": "Select", "runAfter": { "Referencia": ["Succeeded"] }, "inputs": { "from": "@outputs('Referencia')?['body/value']", "select": "@item()?['cr40f_valor']" } },
         "Ordenados": { "type": "Compose", "runAfter": { "Valores": ["Succeeded"] }, "inputs": "@sort(body('Valores'))" },
-        "Situacao_nota": { "type": "Compose", "runAfter": { "Ordenados": ["Succeeded"] }, "inputs": "__SITUACAO_NOTA__" },
-        "Selos_legenda": { "type": "Compose", "runAfter": { "Situacao_nota": ["Succeeded"] }, "inputs": "__SELOS_PROVA__" },
-        "Notas_contexto": {
-          "type": "Select", "runAfter": { "Selos_legenda": ["Succeeded"] },
-          "inputs": { "from": "@reverse(outputs('Comprovantes')?['body/value'])", "select": {
-            "ordem": "@item()?['cr40f_ordem']",
-            "situacao": "@if(equals(item()?['cr40f_situacaonota'], null), null, outputs('Situacao_nota')?[string(item()?['cr40f_situacaonota'])])",
-            "chave": "@item()?['cr40f_chaveacesso']",
-            "uf": "@item()?['cr40f_notauf']",
-            "aamm": "@item()?['cr40f_notaaamm']",
-            "cnpjEmitente": "@item()?['cr40f_notacnpjemitente']",
-            "modelo": "@item()?['cr40f_notamodelo']",
-            "numero": "@item()?['cr40f_notanumero']"
-          } }
-        },
-        "Provas": {
-          "type": "OpenApiConnection", "runAfter": { "Notas_contexto": ["Succeeded"] },
-          "inputs": {
-            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
-            "parameters": {
-              "entityName": "cr40f_provamidias",
-              "$select": "cr40f_selos,cr40f_valorlido,cr40f_datalida",
-              "$filter": "cr40f_tabelaorigem eq 'cr40f_despesaoperacional' and cr40f_registroorigemid eq '@{triggerOutputs()?['body/cr40f_despesaoperacionalid']}'",
-              "$top": 10
-            },
-            "authentication": "@parameters('$authentication')"
-          }
-        },
-        "Provas_contexto": {
-          "type": "Select", "runAfter": { "Provas": ["Succeeded"] },
-          "inputs": { "from": "@outputs('Provas')?['body/value']", "select": {
-            "selos": "@if(empty(string(coalesce(item()?['cr40f_selos'], ''))), json('[]'), split(string(item()?['cr40f_selos']), ','))",
-            "valorLido": "@item()?['cr40f_valorlido']",
-            "dataLida": "@item()?['cr40f_datalida']"
-          } }
-        },
         "Contexto": {
-          "type": "Compose", "runAfter": { "Provas_contexto": ["Succeeded"] },
+          "type": "Compose", "runAfter": { "Ordenados": ["Succeeded"] },
           "inputs": {
             "despesa": {
               "id": "@triggerOutputs()?['body/cr40f_despesaoperacionalid']",
@@ -486,9 +450,7 @@ $definitionText = @'
               "amostras": "@length(outputs('Ordenados'))"
             },
             "veiculo": "@outputs('Veiculo_contexto')",
-            "historico": { "motorista": "@body('Historico_motorista_contexto')", "veiculo": "@body('Historico_veiculo_contexto')" },
-            "notas": "@body('Notas_contexto')",
-            "provas": { "legendaSelos": "@outputs('Selos_legenda')", "itens": "@body('Provas_contexto')" }
+            "historico": { "motorista": "@body('Historico_motorista_contexto')", "veiculo": "@body('Historico_veiculo_contexto')" }
           }
         },
         "Texto_usuario": {
@@ -698,8 +660,8 @@ $escopo.Decisoes_validas.inputs = @($const.schema.properties.decisao.enum)
 $escopo.Campos_ausentes.inputs.from = @($const.schema.required)
 # O gatilho do Dataverse não traz FormattedValue de lookup (conferido em execuções do DEV): os nomes vêm por $expand e os
 # rótulos de status (da OS e das despesas do histórico) por mapas lidos da metadata (valor -> rótulo em pt-BR).
-function MapaOpcoes([string] $entidade, [string] $atributo, [string] $tipo = 'PicklistAttributeMetadata') {
-  $meta = Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$atributo')/Microsoft.Dynamics.CRM.$($tipo)?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
+function MapaOpcoes([string] $entidade, [string] $atributo) {
+  $meta = Dv GET "EntityDefinitions(LogicalName='$entidade')/Attributes(LogicalName='$atributo')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet(`$select=Options)"
   $mapa = [ordered]@{}
   foreach ($o in @($meta.OptionSet.Options)) {
     $rotulo = @($o.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 } | ForEach-Object { $_.Label })[0]
@@ -712,9 +674,6 @@ function MapaOpcoes([string] $entidade, [string] $atributo, [string] $tipo = 'Pi
 }
 $escopo.Status_reserva.inputs = MapaOpcoes 'cr40f_reservadeveculos' 'cr40f_status'
 $escopo.Status_despesa.inputs = MapaOpcoes 'cr40f_despesaoperacional' 'cr40f_statusoperacional'
-# Nota fiscal do comprovante (migration 20261116-2100-chave-nota-fiscal.ps1) e legenda dos selos da prova de mídia.
-$escopo.Situacao_nota.inputs = MapaOpcoes 'cr40f_anexodespesaoperacional' 'cr40f_situacaonota'
-$escopo.Selos_legenda.inputs = MapaOpcoes 'cr40f_provamidia' 'cr40f_selos' 'MultiSelectPicklistAttributeMetadata'
 # Itens do histórico no formato de ItemHistorico (packages/despesas-ia/src/contexto.ts). dataHora vem do Dataverse em ISO UTC.
 function ItemHistorico($mesmoMotorista) {
   [pscustomobject][ordered]@{
@@ -795,7 +754,6 @@ function Conferir($lido, [string] $texto) {
     'Contexto com justificativaMotorista (só texto preenchido)' = $ctx.despesa.justificativaMotorista -ceq "@if(empty(trim(coalesce(triggerOutputs()?['body/new_justificativamotorista'], ''))), null, trim(triggerOutputs()?['body/new_justificativamotorista']))"
     'Gravar_resultado grava motivo da devolução e aguardandogestor nos dois ramos' = (@($a.Gravar_resultado.actions.Gravar_resultado_com_OS, $a.Gravar_resultado.else.actions.Gravar_resultado_sem_OS) | Where-Object { $_.inputs.parameters.'item/new_motivodevolucao' -ceq $semOs.inputs.parameters.'item/new_motivodevolucao' -and $_.inputs.parameters.'item/new_aguardandogestor' -ceq $semOs.inputs.parameters.'item/new_aguardandogestor' }).Count -eq 2
     'histórico antes dos comprovantes' = (@($a.Comprovantes.runAfter.Veiculo_contexto) -join ',') -eq 'Succeeded'
-    'Contexto com notas e provas' = ($ctx.notas -ceq "@body('Notas_contexto')") -and ($ctx.provas.itens -ceq "@body('Provas_contexto')") -and ($ctx.provas.legendaSelos -ceq "@outputs('Selos_legenda')") -and ($a.Comprovantes.inputs.parameters.'$select' -like '*cr40f_chaveacesso*cr40f_situacaonota') -and (@($a.Situacao_nota.inputs.PSObject.Properties).Count -eq 3) -and (@($a.Selos_legenda.inputs.PSObject.Properties).Count -ge 10)
   }
   $falhas = @($checks.Keys | Where-Object { -not $checks[$_] })
   if ($falhas.Count) { throw "Conferência falhou: $($falhas -join '; ')" }

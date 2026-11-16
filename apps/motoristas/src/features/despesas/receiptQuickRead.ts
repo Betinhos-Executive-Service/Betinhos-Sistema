@@ -21,8 +21,6 @@ export type QuickReadLeitura = {
   categoria_sugerida: string | null;
   forma_pagamento_sugerida: string | null;
   motivo_ilegivel: string | null;
-  /** Chave de acesso lida na foto (flow a partir de 16/11/2026); o app só usa se passar na validação do DV. */
-  chave_acesso?: string | null;
 };
 
 export type QuickReadOutcome = { kind: "lido"; leitura: QuickReadLeitura } | { kind: "ilegivel" } | { kind: "falha" };

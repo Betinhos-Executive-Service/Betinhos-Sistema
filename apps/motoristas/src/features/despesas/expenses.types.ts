@@ -1,5 +1,3 @@
-import type { NotaDoComprovante } from "./chaveNotaFiscal.ts";
-
 export type ExpenseReferenceOption = {
   id: string;
   name: string;
@@ -54,8 +52,6 @@ export type ExpenseDraft = {
 
 export type ExpensePhoto = {
   id: string;
-  /** Fase 3: o caminho da chave da nota fiscal deste comprovante. */
-  nota?: NotaDoComprovante;
   dataUrl: string;
   previewUrl?: string;
   posterUrl?: string;

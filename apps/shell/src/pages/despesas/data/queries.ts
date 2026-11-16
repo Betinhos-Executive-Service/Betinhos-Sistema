@@ -2,7 +2,7 @@ import { cleanId, formatted, type Row } from '@betinhos/dataverse'
 import { andFilter, odataSearchFilter } from '../../../app/pagedLoad'
 import { safeUrl } from '../../pagantes/domain/messages'
 import type { AnaliseIA } from '../domain/ia'
-import type { Anexo, Despesa, NotaAnexo } from '../domain/types'
+import type { Anexo, Despesa } from '../domain/types'
 
 export const ENTITY_DESPESA = 'cr40f_despesaoperacional'
 export const ENTITY_ANEXO = 'cr40f_anexodespesaoperacional'
@@ -32,22 +32,10 @@ export function despesasPath(entitySet: string, since: Date | null, search: stri
 }
 
 const ANEXO_SELECT = ['cr40f_anexodespesaoperacionalid', 'cr40f_nome', 'cr40f_nomearquivo', 'cr40f_tipo', 'cr40f_status', 'cr40f_sharelink', 'cr40f_urlsharepoint', 'cr40f_dataenvio', 'cr40f_driveitemid', 'createdon', '_cr40f_enviadopor_value']
-// Nota fiscal do comprovante (migration 20261116-2100). Só entram no $select quando a metadata do ambiente as tem.
-export const ANEXO_NOTA = ['cr40f_situacaonota', 'cr40f_notacnpjemitente', 'cr40f_notauf', 'cr40f_notamodelo', 'cr40f_notanumero']
 
-export function anexosPath(entitySet: string, despesaId: string, comNota = true) {
+export function anexosPath(entitySet: string, despesaId: string) {
   const filter = `statecode eq 0 and _cr40f_despesa_value eq ${cleanId(despesaId)}`
-  const select = comNota ? [...ANEXO_SELECT, ...ANEXO_NOTA] : ANEXO_SELECT
-  return `${entitySet}?$select=${select.join(',')}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent('cr40f_ordem asc,createdon asc')}`
-}
-
-// cr40f_situacaonota (a ordem é o contrato com o App Motoristas e o NotaFiscalAnexoPlugin).
-const SITUACAO_NOTA: Record<number, NotaAnexo['situacao']> = { 100000000: 'verificada', 100000001: 'nao-verificada', 100000002: 'sem-nota' }
-
-export function mapNota(row: Row): NotaAnexo | null {
-  const situacao = typeof row.cr40f_situacaonota === 'number' ? SITUACAO_NOTA[row.cr40f_situacaonota] : undefined
-  if (!situacao) return null
-  return { situacao, cnpj: str(row.cr40f_notacnpjemitente), uf: str(row.cr40f_notauf), modelo: str(row.cr40f_notamodelo), numero: num(row.cr40f_notanumero) }
+  return `${entitySet}?$select=${ANEXO_SELECT.join(',')}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent('cr40f_ordem asc,createdon asc')}`
 }
 
 const str = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
@@ -132,6 +120,5 @@ export function mapAnexo(row: Row): Anexo {
     driveItemId: str(row.cr40f_driveitemid),
     enviadoEm: date(row.cr40f_dataenvio) ?? date(row.createdon),
     enviadoPor: row._cr40f_enviadopor_value ? formatted(row, '_cr40f_enviadopor_value') : '',
-    nota: mapNota(row),
   }
 }

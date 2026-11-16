@@ -13,8 +13,6 @@ export type LeituraRapida = {
   categoria_sugerida: string | null
   forma_pagamento_sugerida: string | null
   motivo_ilegivel: string | null
-  /** 44 posições da chave de acesso, quando impressa e legível; o app só aceita se passar na validação do DV. */
-  chave_acesso: string | null
 }
 
 export function schemaLeituraRapida(categorias: string[], formasPagamento: string[]) {
@@ -31,7 +29,6 @@ export function schemaLeituraRapida(categorias: string[], formasPagamento: strin
     categoria_sugerida: anulavel({ type: 'string', enum: [...categorias] }),
     forma_pagamento_sugerida: anulavel({ type: 'string', enum: [...formasPagamento] }),
     motivo_ilegivel: anulavel({ type: 'string' }),
-    chave_acesso: anulavel({ type: 'string' }),
   }
   return { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } as const
 }

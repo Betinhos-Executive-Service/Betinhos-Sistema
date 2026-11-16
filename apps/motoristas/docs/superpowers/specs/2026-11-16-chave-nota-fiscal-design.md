@@ -1,5 +1,7 @@
 # Chave da nota fiscal na despesa (fase 3 de 3)
 
+**Status: cancelada em 16/11/2026 por decisão do Renan (fase 3 removida; PR desta remoção, branch `chore/remover-fase3-chave-nf`).** O texto abaixo fica como histórico.
+
 Status em 16/11/2026: desenho aprovado pelo Renan na entrevista de 13 a 16/11/2026. Ainda não implementado. Depende das fases 1 (`2026-11-16-prova-captura-midia-design.md`) e 2 (`2026-11-16-galeria-pdf-repetida-design.md`): selos na prova de mídia, galeria e PDF na despesa, selos visíveis no Sistema.
 
 As três fases:

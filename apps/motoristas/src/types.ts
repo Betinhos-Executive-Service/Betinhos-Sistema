@@ -17,7 +17,6 @@ export type Screen =
   | "previewFotoReceber"
   | "fotoGasto"
   | "previewFotoGasto"
-  | "codigoGasto"
   | "colisoesInicio"
   | "colisoes"
   | "fotoColisao"

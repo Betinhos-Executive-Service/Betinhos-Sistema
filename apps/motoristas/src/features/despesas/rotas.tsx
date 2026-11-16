@@ -18,8 +18,6 @@ import { LeituraCartaoSheet } from "./LeituraCartaoSheet";
 import { GastosCartaoScreen } from "./GastosCartaoScreen";
 import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
 import { reportAppError } from "../../shared/appErrorLogger";
-import { NotaFiscalSheet } from "./NotaFiscalSheet";
-import { lerCodigo, lerCodigoDaFoto } from "./leitorCodigo";
 
 type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCartao> & {
   abrirPostosProximos: (origem: Screen) => void;
@@ -100,34 +98,8 @@ export function rotasDespesas(screen: Screen, {
   setExpensePreviewPhotoId,
   setScreen,
   setToast,
-  submitExpense,
-  notaFiscal
+  submitExpense
 }: Props): ReactNode | null {
-  if (screen === "codigoGasto") {
-    // Câmera comum no modo "ler código": sem prova nem carimbo; a foto tirada só serve para o leitor tentar nela.
-    return (
-      <MediaCaptureScreen
-        kind="NOTAFISCAL"
-        title="Ler a chave da nota"
-        onBack={() => {
-          notaFiscal.abrirNota(notaFiscal.codigoPhotoIdRef.current);
-          setScreen("gastos");
-        }}
-        onCapture={(photoDataUrl) => {
-          void lerCodigoDaFoto(photoDataUrl).catch(() => null).then(notaFiscal.aoFotografarCodigo);
-        }}
-        onSwitchCamera={() => setToast("Câmera alternada localmente.")}
-        leitorDeCodigo={{
-          dica: notaFiscal.codigoDica,
-          lerQuadro: async (video) => {
-            const lido = await lerCodigo(video);
-            return lido ? notaFiscal.aoLerCodigo(lido) : false;
-          }
-        }}
-      />
-    );
-  }
-
   if (screen === "fotoGasto") {
     return (
       <MediaCaptureScreen
@@ -208,7 +180,6 @@ export function rotasDespesas(screen: Screen, {
         }}
         onAddPhoto={openExpenseCamera}
         onPreviewPhoto={openExpensePreview}
-        onNotaFiscal={notaFiscal.abrirNota}
         onBack={() => {
           // Completando um gasto do cartão volta para a lista dele; gasto novo volta para o relatório.
           if (gastoCartaoAtual) sairGastoCartao();
@@ -224,18 +195,6 @@ export function rotasDespesas(screen: Screen, {
         cartaoGasto={Boolean(gastoCartaoAtual)}
         onPostosProximos={() => abrirPostosProximos("gastos")}
       />
-      {notaFiscal.notaSheet ? (
-        <NotaFiscalSheet
-          key={notaFiscal.notaSheet.photoId}
-          comprovante={Math.max(1, expensePhotos.findIndex((photo) => photo.id === notaFiscal.notaSheet?.photoId) + 1)}
-          sugerida={notaFiscal.notaSheet.sugerida}
-          erro={notaFiscal.notaSheet.erro}
-          onLerCodigo={() => notaFiscal.lerCodigoDaNota(notaFiscal.notaSheet!.photoId)}
-          onConfirmar={(chave, origem) => notaFiscal.confirmarChave(notaFiscal.notaSheet!.photoId, chave, origem)}
-          onSemChave={(situacao) => notaFiscal.semChave(notaFiscal.notaSheet!.photoId, situacao)}
-          onClose={() => notaFiscal.setNotaSheet(null)}
-        />
-      ) : null}
       {gastoCartaoAtual && conferenciaCartao ? (
         <LeituraCartaoSheet
           conferencia={conferenciaCartao}
