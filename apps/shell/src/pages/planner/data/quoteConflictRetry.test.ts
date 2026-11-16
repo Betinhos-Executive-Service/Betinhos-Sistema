@@ -32,10 +32,10 @@ async function setup(freshRow: Record<string, unknown>): Promise<{ store: Planne
       return ok(null)
     }
     if (method === 'GET' && url.includes(`${quotePath}?$select=`)) return ok(freshRow)
+    if (url.includes('ManyToOneRelationships')) return ok({ value: [{ ReferencingAttribute: 'cr40f_pedidocotacao', ReferencedEntity: 'cr40f_pedidodecotacao', ReferencingEntityNavigationPropertyName: 'cr40f_PedidoCotacao' }, { ReferencingAttribute: 'cr40f_opcao', ReferencedEntity: 'cr40f_cotacaoopcao', ReferencingEntityNavigationPropertyName: 'cr40f_Opcao' }] })
     if (url.includes("EntityDefinitions(LogicalName='cr40f_cotacaoopcao')")) return ok({ EntitySetName: 'cr40f_cotacaoopcaos' })
     if (url.includes("EntityDefinitions(LogicalName='cr40f_cotacaoopcaoitem')")) return ok({ EntitySetName: 'cr40f_cotacaoopcaoitems' })
     if (url.includes("EntityDefinitions(LogicalName='cr40f_cotacaopropostaversao')")) return ok({ EntitySetName: 'cr40f_cotacaopropostaversaos' })
-    if (url.includes('ManyToOneRelationships')) return ok({ value: [{ ReferencingAttribute: 'cr40f_pedidocotacao', ReferencedEntity: 'cr40f_pedidodecotacao', ReferencingEntityNavigationPropertyName: 'cr40f_PedidoCotacao' }, { ReferencingAttribute: 'cr40f_opcao', ReferencedEntity: 'cr40f_cotacaoopcao', ReferencingEntityNavigationPropertyName: 'cr40f_Opcao' }] })
     if (method === 'GET' && url.includes('/cr40f_pedidodecotacaos?')) return ok({ value: [freshRow] })
     return ok({ value: [], PrimaryNameAttribute: 'cr40f_name' })
   }
