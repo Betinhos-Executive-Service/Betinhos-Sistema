@@ -207,6 +207,262 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Contains(world.Traces, line => line.Contains("midia.prova-captura") && line.Contains("tabela"));
         }
 
+        // ---------- fase 2: conferir, repetida, janela e galeria ----------
+
+        private const string OutroSha = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+        private const string Hash = "f0f0f0f0f0f0f0f0";
+
+        [Fact]
+        public void ConferirSemProvaParecidaDevolveLivre()
+        {
+            var world = new World();
+            world.Prova(OutroSha, dhash: "0123456789abcdef", tabela: "cr40f_despesaoperacional", registro: "OUTRA");
+
+            var result = world.Run(Conferir(Sha, Hash));
+
+            Assert.True((bool)result["ok"]);
+            Assert.Equal("livre", result["resultado"]);
+            Assert.False(result.ContainsKey("usadaEm"));
+        }
+
+        [Fact]
+        public void ConferirComMesmoShaEmOutroRegistroDevolveRepetidaSoComAData()
+        {
+            var world = new World();
+            world.Prova(Sha, recebidoEm: Now.AddDays(-40), tabela: "cr40f_colisao_v2", registro: "OUTRA");
+
+            var result = world.Run(Conferir(Sha, null));
+
+            Assert.Equal("repetida", result["resultado"]);
+            Assert.Equal(Iso(Now.AddDays(-40)), result["usadaEm"]);
+            Assert.Equal(new[] { "ok", "resultado", "usadaEm" }, result.Keys.OrderBy(key => key).ToArray());
+        }
+
+        [Fact]
+        public void ConferirAchaOShaOriginalDaGaleria()
+        {
+            var world = new World();
+            world.Prova(OutroSha, shaOriginal: Sha, tabela: "cr40f_despesaoperacional", registro: "OUTRA");
+
+            Assert.Equal("repetida", world.Run(Conferir(Sha, null))["resultado"]);
+        }
+
+        [Theory]
+        [InlineData(null, "parecida-em-observacao")]
+        [InlineData("observar", "parecida-em-observacao")]
+        [InlineData("bloquear", "repetida")]
+        public void ConferirParecidaPorDHashSegueOModo(string modo, string esperado)
+        {
+            var world = new World(modo: modo);
+            // 3 bits diferentes do hash novo, guardado como hash da foto já carimbada.
+            world.Prova(OutroSha, dhashCarimbo: "f0f0f0f0f0f0f0f7", tabela: "cr40f_manutencoes", registro: "OUTRA");
+
+            var result = world.Run(Conferir(Sha, Hash));
+
+            Assert.Equal(esperado, result["resultado"]);
+            Assert.Equal(esperado == "repetida", result.ContainsKey("usadaEm"));
+        }
+
+        [Fact]
+        public void ConferirComDistanciaQuatroDevolveLivre()
+        {
+            var world = new World(modo: "bloquear");
+            world.Prova(OutroSha, dhash: "f0f0f0f0f0f0f0ff", tabela: "cr40f_manutencoes", registro: "OUTRA");
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, Hash))["resultado"]);
+        }
+
+        [Fact]
+        public void ConferirNoMesmoRegistroLiberaOReenvio()
+        {
+            var world = new World(modo: "bloquear");
+            world.Prova(Sha, dhash: Hash, tabela: "cr40f_despesas", registro: "R-1");
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, Hash))["resultado"]);
+        }
+
+        [Fact]
+        public void ConferirIgnoraProvaComMaisDe12Meses()
+        {
+            var world = new World(modo: "bloquear");
+            world.Prova(Sha, dhash: Hash, recebidoEm: Now.AddMonths(-12).AddDays(-1), tabela: "cr40f_colisao_v2", registro: "OUTRA");
+
+            Assert.Equal("livre", world.Run(Conferir(Sha, Hash))["resultado"]);
+        }
+
+        [Fact]
+        public void RegistrarSemConferirComShaRepetidoGravaSeloRepetida()
+        {
+            var world = new World();
+            world.Prova(Sha, tabela: "cr40f_colisao_v2", registro: "OUTRA");
+
+            AssertSelo(world, world.Run(Registrar(world.Run(Emitir()))), ProvaMidiaHandler.SeloRepetida);
+        }
+
+        [Fact]
+        public void RegistrarComParecidaNoModoObservarGravaSeloParecida()
+        {
+            var world = new World();
+            world.Prova(OutroSha, dhash: "f0f0f0f0f0f0f0f1", tabela: "cr40f_colisao_v2", registro: "OUTRA");
+            var command = Registrar(world.Run(Emitir()));
+            command["dhashes"] = new[] { Hash, "0000000000000000" };
+
+            AssertSelo(world, world.Run(command), ProvaMidiaHandler.SeloParecida);
+            var row = world.Service.Created.Last();
+            Assert.Equal(Hash, row["cr40f_dhash"]);
+            Assert.Equal(0xf0f0, row["cr40f_dhashfaixa1"]);
+            Assert.Equal(0xf0f0, row["cr40f_dhashfaixa4"]);
+            Assert.Equal("0000000000000000", row["cr40f_dhashcarimbo"]);
+            Assert.Equal(0, row["cr40f_dhashcarimbofaixa2"]);
+        }
+
+        [Fact]
+        public void RegistrarGaleriaComDataDentroDaJanelaGravaMetadadosSemSelo()
+        {
+            var world = new World();
+            var colisao = world.Service.Rows("cr40f_colisao_v2");
+            var id = Guid.NewGuid();
+            colisao.Add(new Entity("cr40f_colisao_v2", id) { ["cr40f_datahora"] = Now.AddHours(-30) });
+            var command = Galeria(world, "colisao", "cr40f_colisao_v2", id.ToString(), dataGravada: "2026-11-15T03:30:00-03:00");
+
+            var result = world.Run(command);
+
+            Assert.Empty((System.Collections.ArrayList)result["selos"]);
+            var row = world.Service.Created.Last();
+            Assert.Equal(100000002, row.GetAttributeValue<OptionSetValue>("cr40f_origemcaptura").Value);
+            Assert.Equal(new DateTime(2026, 11, 15, 6, 30, 0, DateTimeKind.Utc), row["cr40f_datagravada"]);
+            Assert.Equal("-03:00", row["cr40f_fusogravado"]);
+            Assert.Equal("Apple", row["cr40f_marca"]);
+            Assert.Equal("iPhone 15", row["cr40f_modelo"]);
+            Assert.Equal(id, row.GetAttributeValue<EntityReference>("cr40f_colisao").Id);
+        }
+
+        [Fact]
+        public void RegistrarRecalculaAJanelaComADataDoRegistroENaoComADeclarada()
+        {
+            var world = new World();
+            var id = Guid.NewGuid();
+            world.Service.Rows("cr40f_colisao_v2").Add(new Entity("cr40f_colisao_v2", id) { ["cr40f_datahora"] = Now.AddHours(-2) });
+            // O app declarou uma referência antiga para a foto de 3 dias atrás caber; o servidor usa a data da colisão.
+            var command = Galeria(world, "colisao", "cr40f_colisao_v2", id.ToString(), dataGravada: Iso(Now.AddDays(-3)), dataReferencia: Iso(Now.AddDays(-4)));
+
+            AssertSelo(world, world.Run(command), ProvaMidiaHandler.SeloForaDaJanela);
+        }
+
+        [Fact]
+        public void RegistrarGaleriaComIdProvisorioUsaADataDeclarada()
+        {
+            var world = new World();
+            var command = Galeria(world, "despesa", "cr40f_despesaoperacional", "novo-abc", dataGravada: Iso(Now.AddDays(-3)), dataReferencia: Iso(Now.AddDays(-4)));
+
+            Assert.Empty((System.Collections.ArrayList)world.Run(command)["selos"]);
+            Assert.False(world.Service.Created.Last().Contains("cr40f_colisao"));
+        }
+
+        [Fact]
+        public void RegistrarGaleriaComDataNoFuturoGravaForaDaJanela()
+        {
+            var world = new World();
+            var command = Galeria(world, "despesa", "cr40f_despesaoperacional", "novo-abc", dataGravada: Iso(Now.AddMinutes(20)), dataReferencia: Iso(Now));
+
+            AssertSelo(world, world.Run(command), ProvaMidiaHandler.SeloForaDaJanela);
+        }
+
+        [Fact]
+        public void RegistrarGaleriaSemDataGravaSemData()
+        {
+            var world = new World();
+            var command = Galeria(world, "despesa", "cr40f_despesaoperacional", "novo-abc", dataGravada: null, dataReferencia: Iso(Now));
+
+            AssertSelo(world, world.Run(command), ProvaMidiaHandler.SeloSemData);
+        }
+
+        [Fact]
+        public void RegistrarPdfGravaPaginasSemSeloDeData()
+        {
+            var world = new World();
+            var command = Galeria(world, "devolucao", "cr40f_despesaoperacional", Guid.NewGuid().ToString(), dataGravada: null);
+            command["tipoMidia"] = "pdf";
+            command["paginas"] = 7;
+            command.Remove("dhashes");
+
+            var result = world.Run(command);
+
+            Assert.Empty((System.Collections.ArrayList)result["selos"]);
+            var row = world.Service.Created.Last();
+            Assert.Equal(100000002, row.GetAttributeValue<OptionSetValue>("cr40f_tipomidia").Value);
+            Assert.Equal(100000006, row.GetAttributeValue<OptionSetValue>("cr40f_tela").Value);
+            Assert.Equal(7, row["cr40f_paginas"]);
+        }
+
+        [Fact]
+        public void RegistrarComManutencaoRealPreencheOLookup()
+        {
+            var world = new World();
+            var id = Guid.NewGuid();
+            var emitted = world.Run(Emitir("finalizar", "cr40f_manutencoes", id.ToString()));
+            var command = Registrar(emitted, registroId: id.ToString());
+            command["tela"] = "finalizar";
+            command["tabela"] = "cr40f_manutencoes";
+
+            Assert.Empty((System.Collections.ArrayList)world.Run(command)["selos"]);
+            Assert.Equal(id, world.Service.Created.Last().GetAttributeValue<EntityReference>("cr40f_manutencao").Id);
+        }
+
+        [Theory]
+        [InlineData("xyz")]
+        [InlineData("f0f0f0f0f0f0f0f0f0")]
+        public void DHashMalformadoRecusa(string hash)
+        {
+            var world = new World();
+            var result = world.Run(Conferir(Sha, hash));
+
+            Assert.False((bool)result["ok"]);
+            Assert.Contains("dhash", (string)result["erro"]);
+        }
+
+        [Fact]
+        public void HammingAteTresTemSempreUmaFaixaIgual()
+        {
+            var random = new Random(1611);
+            var buffer = new byte[8];
+            for (var round = 0; round < 5000; round++)
+            {
+                random.NextBytes(buffer);
+                var hash = BitConverter.ToUInt64(buffer, 0);
+                var other = hash;
+                var flips = random.Next(0, 4);
+                foreach (var bit in Enumerable.Range(0, 64).OrderBy(_ => random.Next()).Take(flips)) other ^= 1UL << bit;
+
+                Assert.True(ProvaMidiaRepetida.Distancia(hash, other) <= ProvaMidiaRepetida.LimiteParecida);
+                Assert.Contains(Enumerable.Range(0, ProvaMidiaRepetida.Faixas), band => ProvaMidiaRepetida.Faixa(hash, band) == ProvaMidiaRepetida.Faixa(other, band));
+            }
+        }
+
+        private static Dictionary<string, object> Conferir(string sha, string dhash) => new Dictionary<string, object>
+        {
+            ["acao"] = "conferir",
+            ["tela"] = "despesa",
+            ["tabela"] = "cr40f_despesas",
+            ["registroId"] = "R-1",
+            ["sha256"] = sha,
+            ["dhashes"] = dhash == null ? new string[0] : new[] { dhash }
+        };
+
+        private static Dictionary<string, object> Galeria(World world, string tela, string tabela, string registro, string dataGravada, string dataReferencia = null)
+        {
+            var command = Registrar(world.Run(Emitir(tela, tabela, registro)), registroId: registro);
+            command["tela"] = tela;
+            command["tabela"] = tabela;
+            command["origemCaptura"] = "galeria";
+            command["dhashes"] = new[] { Hash };
+            command["dataReferencia"] = dataReferencia;
+            command["metadados"] = new Dictionary<string, object> { ["dataGravada"] = dataGravada, ["offset"] = "-03:00", ["marca"] = "Apple", ["modelo"] = "iPhone 15", ["software"] = "17.1" };
+            return command;
+        }
+
+        private static string Iso(DateTime utc) => utc.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture);
+
         // ---------- apoio ----------
 
         private static void AssertSelo(World world, Dictionary<string, object> result, string seal)
@@ -218,12 +474,12 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(new[] { expected }, row.GetAttributeValue<OptionSetValueCollection>("cr40f_selos").Select(option => option.Value).ToArray());
         }
 
-        private static Dictionary<string, object> Emitir() => new Dictionary<string, object>
+        private static Dictionary<string, object> Emitir(string tela = "despesa", string tabela = "cr40f_despesas", string registroId = "R-1") => new Dictionary<string, object>
         {
             ["acao"] = "emitir",
-            ["tela"] = "despesa",
-            ["tabela"] = "cr40f_despesas",
-            ["registroId"] = "R-1"
+            ["tela"] = tela,
+            ["tabela"] = tabela,
+            ["registroId"] = registroId
         };
 
         private static Dictionary<string, object> Registrar(Dictionary<string, object> emitted, string registroId = "R-1", bool semRede = false, string capturadoEm = "2026-11-16T12:00:05.000Z", string estado = "registrada")
@@ -264,13 +520,41 @@ namespace Betinhos.DriverRecordSharing.Tests
             public readonly ProvaMidiaHandler Handler;
             private DateTime _now = Now;
 
-            public World(bool withKey = true, FakeService service = null, string email = "ana@betinhos.com.br")
+            public World(bool withKey = true, FakeService service = null, string email = "ana@betinhos.com.br", string modo = null)
             {
                 Service = service ?? new FakeService();
                 Driver = Service.Driver("Motorista " + email, email, null, null);
                 var user = Service.User(email);
                 if (withKey && service == null) Service.Rows(SecretReader.Table).Add(new Entity(SecretReader.Table, Guid.NewGuid()) { [SecretReader.NameColumn] = "midia.prova-captura", [SecretReader.ValueColumn] = Key });
+                if (modo != null)
+                {
+                    var definition = new Entity("environmentvariabledefinition", Guid.NewGuid()) { ["schemaname"] = ProvaMidiaHandler.ModoVariavel, ["defaultvalue"] = "observar" };
+                    Service.Rows("environmentvariabledefinition").Add(definition);
+                    Service.Rows("environmentvariablevalue").Add(new Entity("environmentvariablevalue", Guid.NewGuid()) { ["environmentvariabledefinitionid"] = definition.Id, ["value"] = modo });
+                }
                 Handler = new ProvaMidiaHandler(Service, user.Id, new ListTracing(Traces), () => _now);
+            }
+
+            /// <summary>Prova já gravada (de outro registro, salvo indicação), com o dHash e as faixas como o registrar grava.</summary>
+            public void Prova(string sha, string tabela, string registro, string dhash = null, string dhashCarimbo = null, string shaOriginal = null, DateTime? recebidoEm = null)
+            {
+                var row = new Entity(ProvaMidiaHandler.Table, Guid.NewGuid())
+                {
+                    ["cr40f_sha256"] = sha,
+                    ["cr40f_sha256original"] = shaOriginal,
+                    ["cr40f_tabelaorigem"] = tabela,
+                    ["cr40f_registroorigemid"] = registro,
+                    ["cr40f_recebidoem"] = recebidoEm ?? Now.AddDays(-1)
+                };
+                var hashes = new[] { dhash, dhashCarimbo };
+                for (var slot = 0; slot < hashes.Length; slot++)
+                {
+                    if (hashes[slot] == null) continue;
+                    var value = ProvaMidiaRepetida.Parse(hashes[slot]);
+                    row[ProvaMidiaHandler.ColunasDHash[slot]] = hashes[slot];
+                    for (var band = 0; band < ProvaMidiaRepetida.Faixas; band++) row[ProvaMidiaHandler.ColunaFaixa(slot, band)] = ProvaMidiaRepetida.Faixa(value, band);
+                }
+                Service.Rows(ProvaMidiaHandler.Table).Add(row);
             }
 
             public void Advance(TimeSpan delta) => _now = _now.Add(delta);

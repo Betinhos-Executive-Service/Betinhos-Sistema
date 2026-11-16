@@ -6,11 +6,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 
 namespace Betinhos.DriverRecordSharing
 {
     // Custom API new_ProvaMidia (unbound): prova de captura das fotos e vídeos do App Motoristas.
-    // Entrada new_Command (JSON com "acao": emitir | registrar), saída new_Result (JSON com "ok").
+    // Entrada new_Command (JSON com "acao": emitir | conferir | registrar), saída new_Result (JSON com "ok").
     // A chave HMAC fica na cr40f_segredo (midia.prova-captura), lida como SYSTEM; o motorista nunca a vê.
     public sealed class ProvaMidiaPlugin : IPlugin
     {
@@ -52,13 +53,48 @@ namespace Betinhos.DriverRecordSharing
         public const string SeloSemRede = "capturada-sem-rede";
         public const string SeloInvalido = "codigo-invalido";
         public const string SeloNaoAssinado = "codigo-nao-assinado";
+        public const string SeloForaDaJanela = "fora-da-janela";
+        public const string SeloSemData = "sem-data";
+        public const string SeloRepetida = "repetida";
+        public const string SeloParecida = "parecida";
 
-        // Valores das choices da migration 20261116-1400-prova-midia.ps1 (a ordem é o contrato; a fase 2 só acrescenta).
-        public static readonly IReadOnlyDictionary<string, int> Telas = Options("despesa", "recebimento", "manutencao", "finalizar", "colisao", "checklist");
-        public static readonly IReadOnlyDictionary<string, int> TiposMidia = Options("foto", "video");
-        public static readonly IReadOnlyDictionary<string, int> Origens = Options("camera-ao-vivo", "camera-nativa");
+        public const string ModoVariavel = "cr40f_ProvaMidiaModoRepetida";
+        public const string Livre = "livre";
+        public const string Repetida = "repetida";
+        public const string ParecidaEmObservacao = "parecida-em-observacao";
+
+        private static readonly TimeSpan AntesDaReferencia = TimeSpan.FromHours(24);
+        private static readonly TimeSpan ToleranciaRelogio = TimeSpan.FromMinutes(10);
+
+        // Data de referência da janela do evento, lida do registro de origem (id real). Id provisório "novo-..." usa a data
+        // declarada pelo app. Despesa e devolução: data do gasto; manutenção e finalizar: abertura; colisão: data da colisão;
+        // recebimento: data do serviço.
+        public static readonly IReadOnlyDictionary<string, string> ColunaReferencia = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["cr40f_despesaoperacional"] = "cr40f_datagasto",
+            ["cr40f_manutencoes"] = "createdon",
+            ["cr40f_colisao_v2"] = "cr40f_datahora",
+            ["cr40f_reservadeveculos"] = "cr40f_dataehorriodesada"
+        };
+
+        // Lookups da prova para os subgrids nativos de manutenção e colisão (só com id real).
+        public static readonly IReadOnlyDictionary<string, string> LookupDaOrigem = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["cr40f_manutencoes"] = "cr40f_manutencao",
+            ["cr40f_colisao_v2"] = "cr40f_colisao"
+        };
+
+        // Valores das choices das migrations 20261116-1400-prova-midia.ps1 e 20261116-1800-prova-midia-galeria.ps1
+        // (a ordem é o contrato; cada fase só acrescenta no fim).
+        public static readonly IReadOnlyDictionary<string, int> Telas = Options("despesa", "recebimento", "manutencao", "finalizar", "colisao", "checklist", "devolucao");
+        public static readonly IReadOnlyDictionary<string, int> TiposMidia = Options("foto", "video", "pdf");
+        public static readonly IReadOnlyDictionary<string, int> Origens = Options("camera-ao-vivo", "camera-nativa", "galeria");
         public static readonly IReadOnlyDictionary<string, int> EstadosLocalizacao = Options("registrada", "negada", "indisponivel");
-        public static readonly IReadOnlyDictionary<string, int> Selos = Options(SeloSemRede, SeloInvalido, SeloNaoAssinado);
+        public static readonly IReadOnlyDictionary<string, int> Selos = Options(SeloSemRede, SeloInvalido, SeloNaoAssinado, SeloForaDaJanela, SeloSemData, SeloRepetida, SeloParecida);
+
+        // Colunas do dHash: [0] imagem original (antes de carimbo e redução), [1] imagem final da câmera do app (com carimbo).
+        public static readonly string[] ColunasDHash = { "cr40f_dhash", "cr40f_dhashcarimbo" };
+        public static string ColunaFaixa(int slot, int faixa) => ColunasDHash[slot] + "faixa" + (faixa + 1).ToString(CultureInfo.InvariantCulture);
 
         private static readonly Regex TableName = new Regex("^[a-z][a-z0-9_]{0,63}$", RegexOptions.CultureInvariant);
         private static readonly Regex Sha256Hex = new Regex("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
@@ -84,6 +120,7 @@ namespace Betinhos.DriverRecordSharing
                 switch (QrChargeRules.Str(command, "acao"))
                 {
                     case "emitir": return Emit(command);
+                    case "conferir": return Check(command);
                     case "registrar": return Register(command);
                     default: throw new Refusal("Ação da prova de mídia desconhecida.");
                 }
@@ -120,6 +157,80 @@ namespace Betinhos.DriverRecordSharing
             });
         }
 
+        // ---------- conferir: antes do envio; só a repetida bloqueia, e sem dizer de quem nem onde ----------
+
+        private string Check(Dictionary<string, object> command)
+        {
+            var origin = Origin(command);
+            CallerDriverId();
+            var sha = Sha(command, "sha256", required: true);
+            var hashes = DHashes(command);
+            var found = FindDuplicate(origin, new[] { sha }, hashes);
+            var mode = Mode();
+            var blocked = found.Exact || (found.Similar && mode == ProvaMidiaRepetida.ModoBloquear);
+            var result = blocked ? Repetida : found.Similar ? ParecidaEmObservacao : Livre;
+            _tracing.Trace("ProvaMidia conferir tela={0} resultado={1} modo={2}", origin.Screen, result, mode);
+            var response = new Dictionary<string, object> { ["ok"] = true, ["resultado"] = result };
+            if (blocked && found.UsedAt.HasValue) response["usadaEm"] = Iso(found.UsedAt.Value);
+            return QrChargeRules.Serialize(response);
+        }
+
+        private string Mode() => ProvaMidiaRepetida.Modo(EnvironmentVariables.Read(_system, ModoVariavel));
+
+        private sealed class Duplicate
+        {
+            public bool Exact;
+            public bool Similar;
+            public DateTime? UsedAt;
+        }
+
+        // SHA-256 igual (do arquivo enviado ou do original da galeria) ou dHash a até 3 bits, nos últimos 12 meses,
+        // fora do mesmo registro (tabela e id iguais). A consulta pede alguma faixa igual; a distância é calculada aqui.
+        private Duplicate FindDuplicate(OriginRecord origin, IEnumerable<string> shas, IList<ulong> hashes)
+        {
+            var shaList = shas.Where(sha => sha != null).Distinct().ToList();
+            var query = new QueryExpression(Table)
+            {
+                ColumnSet = new ColumnSet(new[] { "cr40f_sha256", "cr40f_sha256original", "cr40f_tabelaorigem", "cr40f_registroorigemid", "cr40f_recebidoem" }.Concat(ColunasDHash).ToArray())
+            };
+            query.Criteria.AddCondition("cr40f_recebidoem", ConditionOperator.GreaterThan, _utcNow().AddMonths(-ProvaMidiaRepetida.MesesConsiderados));
+            var any = new FilterExpression(LogicalOperator.Or);
+            foreach (var column in new[] { "cr40f_sha256", "cr40f_sha256original" })
+                any.AddCondition(column, ConditionOperator.In, shaList.Cast<object>().ToArray());
+            for (var band = 0; hashes.Count > 0 && band < ProvaMidiaRepetida.Faixas; band++)
+            {
+                var values = hashes.Select(hash => (object)ProvaMidiaRepetida.Faixa(hash, band)).Distinct().ToArray();
+                for (var slot = 0; slot < ColunasDHash.Length; slot++) any.AddCondition(ColunaFaixa(slot, band), ConditionOperator.In, values);
+            }
+            query.Criteria.AddFilter(any);
+
+            var result = new Duplicate();
+            DateTime? exactAt = null, similarAt = null;
+            foreach (var row in _system.RetrieveMultiple(query).Entities)
+            {
+                if (string.Equals(row.GetAttributeValue<string>("cr40f_tabelaorigem"), origin.Table, StringComparison.Ordinal)
+                    && string.Equals(row.GetAttributeValue<string>("cr40f_registroorigemid"), origin.RecordId, StringComparison.OrdinalIgnoreCase)) continue;
+                var at = row.GetAttributeValue<DateTime?>("cr40f_recebidoem");
+                if (shaList.Contains(row.GetAttributeValue<string>("cr40f_sha256")) || shaList.Contains(row.GetAttributeValue<string>("cr40f_sha256original")))
+                {
+                    result.Exact = true;
+                    exactAt = Earliest(exactAt, at);
+                    continue;
+                }
+                var stored = ColunasDHash.Select(row.GetAttributeValue<string>).Where(ProvaMidiaRepetida.IsDHash).Select(ProvaMidiaRepetida.Parse);
+                if (ProvaMidiaRepetida.MenorDistancia(hashes, stored) <= ProvaMidiaRepetida.LimiteParecida)
+                {
+                    result.Similar = true;
+                    similarAt = Earliest(similarAt, at);
+                }
+            }
+            result.UsedAt = result.Exact ? exactAt : similarAt;
+            return result;
+        }
+
+        private static DateTime? Earliest(DateTime? current, DateTime? candidate) =>
+            !candidate.HasValue ? current : !current.HasValue || candidate.Value < current.Value ? candidate : current;
+
         // ---------- registrar: cria a linha; código inválido nunca bloqueia ----------
 
         private string Register(Dictionary<string, object> command)
@@ -127,8 +238,9 @@ namespace Betinhos.DriverRecordSharing
             var origin = Origin(command);
             var link = (QrChargeRules.Str(command, "link") ?? "").Trim();
             if (link.Length > 2000 || !Uri.TryCreate(link, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps) throw new Refusal("O link do arquivo precisa ser https.");
-            var sha = (QrChargeRules.Str(command, "sha256") ?? "").Trim().ToLowerInvariant();
-            if (!Sha256Hex.IsMatch(sha)) throw new Refusal("A impressão digital (sha256) do arquivo é inválida.");
+            var sha = Sha(command, "sha256", required: true);
+            var originalSha = Sha(command, "sha256Original", required: false);
+            var hashes = DHashes(command);
             var mediaType = Choice(TiposMidia, command, "tipoMidia", "Tipo de mídia desconhecido.");
             var captureOrigin = Choice(Origens, command, "origemCaptura", "Origem da captura desconhecida.");
             var location = QrChargeRules.Dict(command, "localizacao");
@@ -152,6 +264,20 @@ namespace Betinhos.DriverRecordSharing
                 if (key == null) seals.Add(SeloNaoAssinado);
                 else if (string.IsNullOrEmpty(signature) || !IsCode(code) || issuedText == null || !SameSignature(Sign(key, driverId, origin.Screen, origin.Table, origin.RecordId, code, issuedText), signature)) seals.Add(SeloInvalido);
             }
+
+            var metadata = QrChargeRules.Dict(command, "metadados");
+            var recordedAt = ParseIsoOffset(QrChargeRules.Str(metadata, "dataGravada"));
+            if (captureOrigin == Origens["galeria"] && mediaType != TiposMidia["pdf"])
+            {
+                // A data gravada no arquivo nunca bloqueia: vira selo, recalculado aqui com a referência do registro.
+                var reference = ReadReference(origin) ?? ParseIsoOffset(QrChargeRules.Str(command, "dataReferencia"));
+                if (!recordedAt.HasValue) seals.Add(SeloSemData);
+                else if ((reference.HasValue && recordedAt.Value < reference.Value - AntesDaReferencia) || recordedAt.Value > receivedAt + ToleranciaRelogio) seals.Add(SeloForaDaJanela);
+            }
+            // Recheca a repetida: quem pulou o conferir já subiu o arquivo, então a prova só ganha o selo.
+            var duplicate = FindDuplicate(origin, new[] { sha, originalSha }, hashes);
+            if (duplicate.Exact || (duplicate.Similar && Mode() == ProvaMidiaRepetida.ModoBloquear)) seals.Add(SeloRepetida);
+            else if (duplicate.Similar) seals.Add(SeloParecida);
 
             // Hora "do servidor" que não confere não é gravada como tal: o atraso passa a contar da captura.
             if (seals.Contains(SeloInvalido)) issuedAt = null;
@@ -182,6 +308,24 @@ namespace Betinhos.DriverRecordSharing
                 row["cr40f_longitude"] = Decimal(location, "longitude", -180m, 180m, 7);
                 row["cr40f_precisaometros"] = Decimal(location, "precisaoMetros", 0m, 1000000m, 1);
             }
+            if (originalSha != null && originalSha != sha) row["cr40f_sha256original"] = originalSha;
+            for (var slot = 0; slot < hashes.Count; slot++)
+            {
+                row[ColunasDHash[slot]] = hashes[slot].ToString("x16", CultureInfo.InvariantCulture);
+                for (var band = 0; band < ProvaMidiaRepetida.Faixas; band++) row[ColunaFaixa(slot, band)] = ProvaMidiaRepetida.Faixa(hashes[slot], band);
+            }
+            var pages = QrChargeRules.Long(command, "paginas");
+            if (mediaType == TiposMidia["pdf"] && pages.HasValue && pages.Value > 0 && pages.Value <= 1000) row["cr40f_paginas"] = (int)pages.Value;
+            if (metadata != null)
+            {
+                row["cr40f_datagravada"] = recordedAt;
+                row["cr40f_fusogravado"] = Truncate(QrChargeRules.Str(metadata, "offset"), 10);
+                row["cr40f_marca"] = Truncate(QrChargeRules.Str(metadata, "marca"), 100);
+                row["cr40f_modelo"] = Truncate(QrChargeRules.Str(metadata, "modelo"), 100);
+                row["cr40f_software"] = Truncate(QrChargeRules.Str(metadata, "software"), 100);
+            }
+            if (LookupDaOrigem.TryGetValue(origin.Table, out var lookup) && Guid.TryParse(origin.RecordId, out var recordGuid))
+                row[lookup] = new EntityReference(origin.Table, recordGuid);
             if (seals.Count > 0) row["cr40f_selos"] = new OptionSetValueCollection(seals.Select(seal => new OptionSetValue(Selos[seal])).ToList());
 
             var id = _system.Create(row);
@@ -220,6 +364,45 @@ namespace Betinhos.DriverRecordSharing
                 }
             }
             return new string(chars);
+        }
+
+        private static string Sha(Dictionary<string, object> command, string key, bool required)
+        {
+            var sha = (QrChargeRules.Str(command, key) ?? "").Trim().ToLowerInvariant();
+            if (sha.Length == 0 && !required) return null;
+            if (!Sha256Hex.IsMatch(sha)) throw new Refusal("A impressão digital (sha256) do arquivo é inválida.");
+            return sha;
+        }
+
+        // Até dois dHash: [0] original, [1] final com carimbo (câmera do app). Lista vazia = vídeo ou PDF.
+        private static IList<ulong> DHashes(Dictionary<string, object> command)
+        {
+            var hashes = new List<ulong>();
+            if (command == null || !command.TryGetValue("dhashes", out var raw) || raw == null) return hashes;
+            if (!(raw is System.Collections.IEnumerable items) || raw is string) throw new Refusal("Impressão visual (dhash) inválida.");
+            foreach (var item in items)
+            {
+                var text = (item as string ?? "").Trim().ToLowerInvariant();
+                if (!ProvaMidiaRepetida.IsDHash(text) || hashes.Count == ColunasDHash.Length) throw new Refusal("Impressão visual (dhash) inválida.");
+                hashes.Add(ProvaMidiaRepetida.Parse(text));
+            }
+            return hashes;
+        }
+
+        private DateTime? ReadReference(OriginRecord origin)
+        {
+            if (!ColunaReferencia.TryGetValue(origin.Table, out var column) || !Guid.TryParse(origin.RecordId, out var id)) return null;
+            try
+            {
+                var value = _system.Retrieve(origin.Table, id, new ColumnSet(column)).GetAttributeValue<DateTime?>(column);
+                return value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : (DateTime?)null;
+            }
+            catch (Exception error)
+            {
+                // Registro apagado ou sem acesso: a janela usa a data declarada pelo app.
+                _tracing.Trace("ProvaMidia referencia indisponivel tabela={0}: {1}", origin.Table, error.GetType().Name);
+                return null;
+            }
         }
 
         private string ReadKey() => SecretReader.ReadTableOrSecureConfig(_system, SecretName, null, _tracing);
@@ -276,6 +459,15 @@ namespace Betinhos.DriverRecordSharing
         {
             if (!DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var value)) return null;
             var utc = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+            return utc < MinDeclared || utc > MaxDeclared ? (DateTime?)null : utc;
+        }
+
+        // Data com fuso (ex.: data gravada no EXIF com OffsetTimeOriginal); sem fuso, vale como UTC.
+        private static DateTime? ParseIsoOffset(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var value)) return null;
+            var utc = DateTime.SpecifyKind(value.UtcDateTime, DateTimeKind.Utc);
             return utc < MinDeclared || utc > MaxDeclared ? (DateTime?)null : utc;
         }
 

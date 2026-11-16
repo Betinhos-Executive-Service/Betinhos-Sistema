@@ -120,9 +120,14 @@ namespace Betinhos.DriverRecordSharing.Tests
         public EntityCollection RetrieveMultiple(QueryBase query)
         {
             var expression = (QueryExpression)query;
-            IEnumerable<Entity> rows = Rows(expression.EntityName);
-            foreach (var condition in expression.Criteria.Conditions) rows = rows.Where(row => Matches(row, condition));
-            return new EntityCollection(rows.ToList());
+            return new EntityCollection(Rows(expression.EntityName).Where(row => Matches(row, expression.Criteria)).ToList());
+        }
+
+        // Filtros aninhados (E/OU), como o Dataverse: a prova de mídia busca "SHA igual OU alguma faixa igual".
+        private static bool Matches(Entity row, FilterExpression filter)
+        {
+            var results = filter.Conditions.Select(condition => Matches(row, condition)).Concat(filter.Filters.Select(child => Matches(row, child)));
+            return filter.FilterOperator == LogicalOperator.Or ? results.Any() && results.Any(match => match) : results.All(match => match);
         }
 
         private static bool Matches(Entity row, ConditionExpression condition)
