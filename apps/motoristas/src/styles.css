@@ -11235,8 +11235,10 @@ select,
 }
 
 /* Explicação da localização, antes do pedido do navegador: acima da câmera e do carimbo. */
+/* Fundo opaco: com a câmera do dispositivo o aviso fica sobre outro painel e o texto dele vazava. */
 .camera-location-notice {
   z-index: 5;
+  background: rgb(20, 20, 20);
 }
 
 .camera-stamp-preview span {
