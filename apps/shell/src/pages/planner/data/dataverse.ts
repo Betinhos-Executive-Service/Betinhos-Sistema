@@ -2476,6 +2476,27 @@ async function createLiveQuote(xrm: PlannerXrm, state: LiveState, input: QuotePa
   return loadLiveState(xrm);
 }
 
+function isPreconditionFailed(error: unknown) {
+  return / falhou: 412 /.test(errorMessage(error));
+}
+
+// Campos que automações gravam na cotação sem mudar o negócio. O flow legado
+// "Pedido de Cotação - Planner e Teams" grava o ID/link do MS Planner alguns
+// segundos depois da criação, e a ETag que a tela leu no POST fica velha.
+const QUOTE_AUTOMATION_KEYS = new Set(["etag", "code", "plannerTaskId", "plannerLink", "teamsLink", "creatorName"]);
+const comparableQuoteValue = (value: unknown) => (value == null || value === false ? "" : String(value));
+
+// Depois de um 412: relê a linha e devolve a ETag atual se nenhum campo de
+// negócio mudou desde a leitura da tela; senão "" (conflito de verdade).
+async function currentEtagIfBusinessUnchanged(xrm: PlannerXrm, existing: LiveQuote): Promise<string> {
+  const row = asRecord(await request(xrm, `/${entitySetName(QUOTE_TABLE)}(${cleanId(existing.id)})?$select=${await quoteSelect(xrm)}`));
+  const fresh = normalizeQuote(row);
+  if (!fresh.etag) return "";
+  const known = existing as unknown as Record<string, unknown>;
+  const changed = Object.entries(fresh).some(([key, value]) => !QUOTE_AUTOMATION_KEYS.has(key) && comparableQuoteValue(value) !== comparableQuoteValue(known[key]));
+  return changed ? "" : fresh.etag;
+}
+
 async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, patch: QuotePatch = {}): Promise<LiveState> {
   const quoteId = cleanId(id);
   const existing = (state.quotes || []).find((quote) => cleanId(quote.id) === quoteId);
@@ -2519,11 +2540,20 @@ async function updateLiveQuote(xrm: PlannerXrm, state: LiveState, id: string, pa
     if (versionId) await bindLookup(xrm, payload, QUOTE_TABLE, "cr40f_versaopropostaaceita", QUOTE_PROPOSAL_VERSION_TABLE, versionId);
     else payload["cr40f_VersaoPropostaAceita@odata.bind"] = null;
   }
+  const quotePath = `/${entitySetName(QUOTE_TABLE)}(${quoteId})`;
+  const patchQuote = (etag: string) => request(xrm, quotePath, { method: "PATCH", body: JSON.stringify(payload), headers: etag ? { "If-Match": etag } : {} });
   try {
-    await request(xrm, `/${entitySetName(QUOTE_TABLE)}(${quoteId})`, { method: "PATCH", body: JSON.stringify(payload), headers: existing.etag ? { "If-Match": existing.etag } : {} });
+    try { await patchQuote(existing.etag || ""); }
+    catch (error) {
+      if (!existing.etag || !isPreconditionFailed(error)) throw error;
+      const freshEtag = await currentEtagIfBusinessUnchanged(xrm, existing);
+      if (!freshEtag) throw error;
+      await patchQuote(freshEtag);
+      void logAppError(new Error("Cotação mudou só em campos de automação; gravação repetida com a versão atual."), { action: "updateLiveQuote", severity: "info", source: "planner-quotes-v2", errorCode: "QUOTE_412_RECOVERED" });
+    }
   } catch (error) {
     if (stagedOptions) { try { await deleteScenarioRows(xrm, stagedOptions.rows); } catch (cleanupError) { console.warn("[Planner] falha ao limpar opções não salvas", cleanupError); } }
-    if (errorMessage(error).includes("412")) throw new Error("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
+    if (isPreconditionFailed(error)) throw new Error("A cotação foi alterada por outra pessoa. Recarregue os dados antes de salvar para evitar sobrescrever a edição.");
     throw error;
   }
   const ready = readyNotice(existing, { ...existing, ...effectivePatch, status: nextStatus }, new Date().toISOString());
