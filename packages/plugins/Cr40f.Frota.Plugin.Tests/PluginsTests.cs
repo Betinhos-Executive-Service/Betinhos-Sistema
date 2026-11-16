@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Cr40f.Frota.Plugin.Manutencao;
 using Microsoft.Xrm.Sdk;
 using Xunit;
@@ -67,5 +68,13 @@ public class PluginsTests
         var pre = new Entity(G.Tabela, Guid.NewGuid()) { [G.Categoria] = new OptionSetValue(G.CategoriaManutencao), [G.Manutencao] = new EntityReference(M.Tabela, id), [G.Status] = new OptionSetValue(G.StatusAProgramar) };
         GeralManutencaoEspelhoPlugin.Aplicar(memoria, new Entity(G.Tabela, pre.Id) { [G.Motorista] = null }, pre);
         Assert.Empty(memoria.Atualizados);
+    }
+
+    [Fact]
+    public void Registrador_usa_os_atributos_da_imagem_pre_do_espelho()
+    {
+        // O registrador (net8) não referencia o plugin: o literal dele tem de acompanhar a constante.
+        var programa = File.ReadAllText(FixtureParidade.Caminho("..", "..", "..", "..", "..", "..", "packages", "plugins", "tools", "Cr40f.Frota.Registrar", "Program.cs"));
+        Assert.Contains("\"" + GeralManutencaoEspelhoPlugin.AtributosPre + "\");", programa);
     }
 }
