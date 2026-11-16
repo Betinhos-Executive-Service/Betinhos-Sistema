@@ -19,6 +19,10 @@ import { arquivoTone } from '../domain/status'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { NotaDoAnexo } from './NotaAnexo'
+
+// A situação da nota vem do anexo (atualizada pelo plugin); o selo da prova é a foto do envio e repetiria ou contradiria.
+const SELOS_DA_NOTA = ['nota-nao-verificada', 'sem-nota-fiscal'] as const
 
 type Props = {
   despesa: Despesa | null
@@ -194,10 +198,16 @@ function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos
   }
   if ('error' in anexos) return <Alert tone="danger" title="Não foi possível carregar os comprovantes">{anexos.error}</Alert>
   const meta = (a: Anexo) => [label(choices.anexoTipo, a.tipo, ''), a.enviadoEm ? formatDateTime(a.enviadoEm) : ''].filter(Boolean).join(' · ')
-  const selo = (a: Anexo) => <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
+  const selo = (a: Anexo) => (
+    // Um só item na grade do cartão (status e nota juntos), como o .cmp-selos da galeria.
+    <span className="cmp-selos">
+      <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
+      <NotaDoAnexo nota={a.nota} />
+    </span>
+  )
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} ocultarSelos={SELOS_DA_NOTA} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }

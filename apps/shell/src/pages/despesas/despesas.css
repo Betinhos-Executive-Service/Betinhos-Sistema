@@ -81,3 +81,9 @@
   .dp-kpi, .dp-kpi:active { transition: none; transform: none; }
 }
 .dp-filas { justify-self: start; max-width: 100%; }
+
+/* Nota fiscal do comprovante (App Motoristas, fase 3): situação em badge + emitente, UF, modelo e número em texto de apoio. */
+.dsp-nota { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); min-width: 0; }
+.dsp-nota__detalhe { flex: 1 1 100%; min-width: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-variant-numeric: tabular-nums; }
+/* Cada parte fica inteira enquanto couber; numa coluna estreita demais ela quebra por dentro, sem vazar. */
+.dsp-nota__parte { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
