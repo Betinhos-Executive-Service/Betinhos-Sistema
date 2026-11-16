@@ -144,7 +144,12 @@ Ficam no `Cr40f.Frota.Plugin`, que já tem registrador (`Cr40f.Frota.Registrar`)
    - Aprovado com linha da Geral → Agendado, com janela = dia da saída da linha.
    - Linha programada com motorista → Programado, com janela = dia da saída.
    - Programado sem linha da Geral, mais de uma linha ativa, ou linha sem veículo → só entra no relatório, para decisão do Renan.
-2. Retirar a regra de negócio "Aprovado" e o flow "Agendar manutenção" do DEV, e depois das soluções, para que cheguem ao PROD pelo caminho normal.
+2. Retirar do DEV, e depois das soluções (para chegar ao PROD pelo caminho normal), os três flows que o plugin substitui:
+   - "Flow Criar Serviço de Manutenção na Geral" (o "Agendar manutenção");
+   - "Flow Dar Baixa Status Manutenções -> Geral";
+   - "Flow Dar Baixa Status Geral -> Manutenções".
+
+   Os dois de sincronização usam o mesmo mapeamento do espelho e convivem com ele até a virada. As regras de negócio da manutenção já estão todas desativadas no DEV (descoberta de 16/11/2026).
 3. Atualizar `docs/auto/04-contratos-dados-shell.md` (ainda cita `new_FlowUrlClassificarManutencao` e diz que `new_fotomanutencao` não é usada) e a documentação do App.
 
 ## Entrega
