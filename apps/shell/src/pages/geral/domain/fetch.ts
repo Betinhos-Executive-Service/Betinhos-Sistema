@@ -1,8 +1,10 @@
 import type { SearchCondition } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
 import { CAMPOS_PROTEGIDOS } from './protecao'
+import { EMPTY_GROUP_ID, OTHERS_GROUP_ID } from '@betinhos/ui'
+import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR, periodRange, type GroupSpec, type GroupTarget } from './grouping'
 
-type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[] }
+type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[]; group?: GroupTarget }
 
 export function parse(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
@@ -43,11 +45,45 @@ function injectSearch(doc: Document, entity: Element, search: SearchCondition[])
   entity.appendChild(filter)
 }
 
+function addCondition(doc: Document, filter: Element, attribute: string, operator: string, value?: string | string[]) {
+  const condition = doc.createElement('condition')
+  condition.setAttribute('attribute', attribute)
+  condition.setAttribute('operator', operator)
+  if (typeof value === 'string') condition.setAttribute('value', value)
+  else for (const text of value ?? []) {
+    const item = doc.createElement('value')
+    item.textContent = text
+    condition.appendChild(item)
+  }
+  filter.appendChild(condition)
+}
+
+/** Restringe a consulta às linhas de um grupo: valor igual, vazio, o resto da relação (`not-in` dos grupos mostrados) ou o intervalo do mês/ano em São Paulo. */
+function injectGroup(doc: Document, entity: Element, { attribute, kind, id, exclude }: GroupTarget) {
+  const filter = doc.createElement('filter')
+  filter.setAttribute('type', 'and')
+  if (id === EMPTY_GROUP_ID) addCondition(doc, filter, attribute, 'null')
+  else if (id === OTHERS_GROUP_ID) addCondition(doc, filter, attribute, 'not-in', exclude ?? [])
+  else if (kind === 'date') {
+    const [start, end] = periodRange(id)
+    addCondition(doc, filter, attribute, 'ge', start)
+    addCondition(doc, filter, attribute, 'lt', end)
+  } else addCondition(doc, filter, attribute, 'eq', id)
+  entity.appendChild(filter)
+}
+
+/** FetchXML só com a condição do grupo (para quem simula a consulta, como o mock). */
+export function withGroup(fetchxml: string, group: GroupTarget) {
+  const { doc, entity } = parse(fetchxml)
+  injectGroup(doc, entity, group)
+  return new XMLSerializer().serializeToString(doc)
+}
+
 /**
  * FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto.
  * Não pede `returntotalrecordcount`: o total custaria uma contagem no servidor a cada página. Ele vem à parte (`buildCountFetch`).
  */
-export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, search }: BuildOptions) {
+export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, search, group }: BuildOptions) {
   const { doc, root, entity } = parse(fetchxml)
 
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount']) root.removeAttribute(name)
@@ -70,6 +106,7 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, sea
   if (sort) applySort(doc, entity, sort)
 
   injectSearch(doc, entity, search)
+  if (group) injectGroup(doc, entity, group)
 
   return new XMLSerializer().serializeToString(doc)
 }
@@ -87,6 +124,36 @@ export function buildCountFetch(fetchxml: string, { search }: { search: SearchCo
   total.setAttribute('alias', 'total')
   total.setAttribute('aggregate', 'count')
   entity.insertBefore(total, entity.firstChild)
+
+  injectSearch(doc, entity, search)
+  return new XMLSerializer().serializeToString(doc)
+}
+
+/**
+ * FetchXML da visão convertido em contagem por grupo (`aggregate` + `groupby`): filtros, links e busca ficam; sem paginação,
+ * ordem nem colunas. Data agrupa por ano (e mês) no fuso do usuário (`dategrouping`); o valor nulo volta como um grupo sem o apelido.
+ */
+export function buildGroupsFetch(fetchxml: string, { search, spec }: { search: SearchCondition[]; spec: Pick<GroupSpec, 'attribute' | 'kind' | 'by'> }) {
+  const { doc, root, entity } = parse(fetchxml)
+
+  for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) root.removeAttribute(name)
+  root.setAttribute('aggregate', 'true')
+  for (const node of Array.from(entity.querySelectorAll('order, attribute, all-attributes'))) node.remove()
+
+  const column = (alias: string, dategrouping?: 'year' | 'month') => {
+    const attribute = doc.createElement('attribute')
+    attribute.setAttribute('name', spec.attribute)
+    attribute.setAttribute('alias', alias)
+    attribute.setAttribute('groupby', 'true')
+    if (dategrouping) attribute.setAttribute('dategrouping', dategrouping)
+    return attribute
+  }
+  const columns = spec.kind !== 'date' ? [column(GROUP_VALUE)] : spec.by === 'year' ? [column(GROUP_YEAR, 'year')] : [column(GROUP_YEAR, 'year'), column(GROUP_MONTH, 'month')]
+  const total = doc.createElement('attribute')
+  total.setAttribute('name', ID_ATTRIBUTE)
+  total.setAttribute('alias', GROUP_TOTAL)
+  total.setAttribute('aggregate', 'count')
+  for (const node of [...columns, total].reverse()) entity.insertBefore(node, entity.firstChild)
 
   injectSearch(doc, entity, search)
   return new XMLSerializer().serializeToString(doc)

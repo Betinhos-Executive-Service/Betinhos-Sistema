@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
-  emptyFilters, sameConfig, storedFilters,
-  type TableDensity, type TableFilters, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig, type ViewSort,
+  emptyFilters, sameConfig, setGroup as withGroup, storedFilters,
+  type TableDensity, type TableFilters, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig, type ViewGroup, type ViewSort,
 } from '@betinhos/ui'
 import { applyColumnPrefs, type ColumnPrefs, type KV } from './domain/columns'
 import { fromConfigKey, toConfigKey } from './domain/extraLinks'
@@ -22,6 +22,9 @@ type Options = {
   setSort: (sort: Sort) => void
   filters: TableFilters
   setFilters: (filters: TableFilters) => void
+  /** Agrupamento no servidor: vive na tela (e na URL), não na visão do Dataverse. */
+  group: ViewGroup | null
+  setGroup: (group: ViewGroup | null) => void
   selectView: (id: string) => void
   reloadViews: (selectId?: string) => Promise<void>
   /** Gravações da visão: lançam erro em falha (a `ViewBar` avisa). */
@@ -59,11 +62,11 @@ function baselineOf(columns: Column[], hidden: Set<string>): ViewConfig {
  * Ordem e visibilidade a partir das preferências locais; largura só quando o usuário mudou. Colunas adicionadas
  * (`x__…`) aparecem com a chave `x:` e o rótulo guardado, para o painel tratá-las como adicionadas (✕ para remover).
  */
-function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filters: TableFilters, hidden: Set<string>): ViewConfig {
+function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filters: TableFilters, group: ViewGroup | null, hidden: Set<string>): ViewConfig {
   const ordered = prefs ? applyColumnPrefs(columns, { order: prefs.order, hidden: [] }) : columns
   const extras = extraKeysOf(prefs)
   const labels = new Map((prefs?.extra ?? []).map((e) => [e.key, e.label]))
-  return {
+  return withGroup({
     v: 1,
     columns: ordered.map((c) => {
       const width = prefs?.widths?.[c.key]
@@ -73,7 +76,7 @@ function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filt
     }),
     sort: toViewSort(sort, extras),
     filters: storedFilters(filters),
-  }
+  }, group)
 }
 
 const DENSITY_KEY = 'betinhos.densidade.geral'
@@ -89,7 +92,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
   const hiddenKey = (o.hiddenByDefault ?? []).join(',')
   const hidden = useMemo(() => new Set(hiddenKey ? hiddenKey.split(',') : []), [hiddenKey])
   const baseline = useMemo(() => baselineOf(o.columns.filter((c) => !extraKeys.has(c.key)), hidden), [o.columns, extraKeys, hidden])
-  const config = useMemo(() => configOf(o.columns, o.prefs, o.sort, o.filters, hidden), [o.columns, o.prefs, o.sort, o.filters, hidden])
+  const config = useMemo(() => configOf(o.columns, o.prefs, o.sort, o.filters, o.group, hidden), [o.columns, o.prefs, o.sort, o.filters, o.group, hidden])
   // Colunas adicionadas ficam fora das definições: o painel usa o rótulo guardado na visão e oferece ✕.
   const columnDefs = useMemo<ViewColumnDef[]>(() => o.columns.filter((c) => !extraKeys.has(c.key)).map((c) => ({ key: c.key, label: columnLabel(c, o.attributes?.get(c.key)) })), [o.columns, o.attributes, extraKeys])
 
@@ -104,9 +107,9 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
   }, [o.views, o.viewsError, baseline])
   const active = views.find((e) => e.id === o.view?.id) ?? views[0]
 
-  const { setPrefs, setSort, setFilters, columns, prefs, sort, filters } = o
+  const { setPrefs, setSort, setFilters, setGroup, columns, prefs, sort, filters, group } = o
   const setConfig = useCallback((update: (c: ViewConfig) => ViewConfig) => {
-    const current = configOf(columns, prefs, sort, filters, hidden)
+    const current = configOf(columns, prefs, sort, filters, group, hidden)
     const next = update(current)
     if (JSON.stringify(next.columns) !== JSON.stringify(current.columns)) {
       // Colunas `x:` que o layout da visão ainda não tem vão para `extra` (a tela as liga no FetchXML).
@@ -125,7 +128,8 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
       const raw = next.filters as Partial<TableFilters>
       setFilters(raw && raw.quick && raw.advanced ? (raw as TableFilters) : emptyFilters())
     }
-  }, [columns, prefs, sort, filters, hidden, baseline, setPrefs, setSort, setFilters])
+    if (JSON.stringify(next.group ?? null) !== JSON.stringify(current.group ?? null)) setGroup(next.group ?? null)
+  }, [columns, prefs, sort, filters, group, hidden, baseline, setPrefs, setSort, setFilters, setGroup])
 
 
   // A Geral nasceu densa (grade editável): Compacta é o padrão; Confortável fica lembrada no navegador.
@@ -141,11 +145,12 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     const padrao = views.find((e) => e.scope === 'padrao') ?? views[0]
     if (!padrao?.id) return
     if (padrao.id !== active.id) { selectView(padrao.id); return }
-    // Já na padrão: tira as mudanças da tela (colunas, ordem e filtros).
+    // Já na padrão: tira as mudanças da tela (colunas, ordem, filtros e agrupamento).
     setPrefs(null)
     setSort(null)
     setFilters(emptyFilters())
-  }, [views, active.id, selectView, setPrefs, setSort, setFilters])
+    setGroup(null)
+  }, [views, active.id, selectView, setPrefs, setSort, setFilters, setGroup])
 
   const state: TableViewState = {
     status: o.viewsError ? 'error' : o.views.length ? 'ready' : 'loading',

@@ -1,6 +1,7 @@
 import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
 import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
+import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR } from '../domain/grouping'
 import { searchConditions } from '../domain/search'
 import { mockRecebimentos } from '../../recebimentos/mock'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
@@ -219,14 +220,17 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   const listed = () => Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
   // Valor `AAAA-MM-DD` compara pelo dia (como o Dataverse faz com data); senão, como número.
   const isDayValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  // Valor ISO com horário (intervalo do grupo mês/ano) compara o instante.
+  const isInstant = /^\d{4}-\d{2}-\d{2}T/.test(value)
+  const instantOf = (text: string) => (typeof raw === 'string' && !Number.isNaN(Date.parse(raw)) ? Date.parse(raw) - Date.parse(text) : NaN)
   switch (el.getAttribute('operator')) {
     case 'eq': return equals()
     // Como no SQL, `ne` e `not-in` não devolvem vazios.
     case 'ne': return !isEmpty(raw) && !equals()
-    case 'ge': return numberOf(raw) >= Number(value)
-    case 'le': return numberOf(raw) <= Number(value)
-    case 'gt': return isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
-    case 'lt': return isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
+    case 'ge': return isInstant ? instantOf(value) >= 0 : numberOf(raw) >= Number(value)
+    case 'le': return isInstant ? instantOf(value) <= 0 : numberOf(raw) <= Number(value)
+    case 'gt': return isInstant ? instantOf(value) > 0 : isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
+    case 'lt': return isInstant ? instantOf(value) < 0 : isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
     case 'in': return !isEmpty(raw) && listed()
     case 'not-in': return !isEmpty(raw) && !listed()
     case 'on': return day === value
@@ -275,18 +279,48 @@ const sortValue = (row: Row, attribute: string): string | number => {
   return typeof value === 'number' || typeof value === 'string' ? value : ''
 }
 
-/** Simula só o que o mock precisa do FetchXML: condições da raiz, busca, `<order>` da raiz e paginação. */
-export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, quickFind, now }: MockFetchOptions): Page {
+function mockEntity(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
   const entity = Array.from(doc.documentElement.children).find((c) => c.tagName === 'entity')
   if (!entity || doc.getElementsByTagName('parsererror').length) throw new Error('FetchXML da visão inválido.')
-  const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
-  // Mesmas condições que o FetchXML real leva.
-  const search = searchConditions(query, quickFind)
+  return entity
+}
 
-  const filtered = rows.filter((row) =>
+/** Linhas da visão: condições da raiz e busca (as mesmas que o FetchXML real leva). */
+function filterRows(rows: Row[], entity: Element, { query, quickFind, now }: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>) {
+  const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
+  const search = searchConditions(query, quickFind)
+  return rows.filter((row) =>
     roots.every((root) => filter(root, row, now) !== false)
     && (!search.length || search.some(({ attribute, value }) => likeMatches(row, attribute, value))))
+}
+
+/** Simula o FetchXML agregado de `buildGroupsFetch`: uma linha por grupo, com o apelido do valor (ou ano e mês) e `total`. */
+export function applyMockGroups(rows: Row[], fetchxml: string, options: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>): Row[] {
+  const entity = mockEntity(fetchxml)
+  const attribute = Array.from(entity.children).find((c) => c.tagName === 'attribute' && c.getAttribute('groupby') === 'true')?.getAttribute('name') ?? ''
+  const key = keyOf(attribute)
+  const date = Array.from(entity.children).some((c) => c.getAttribute('dategrouping'))
+  const monthly = Array.from(entity.children).some((c) => c.getAttribute('dategrouping') === 'month')
+  const groups = new Map<string, Row>()
+  for (const row of filterRows(rows, entity, options)) {
+    const raw = row[key]
+    const day = date ? dayOf(raw) : null
+    const keyed: Row = date
+      ? day ? { [GROUP_YEAR]: Number(day.slice(0, 4)), ...(monthly ? { [GROUP_MONTH]: Number(day.slice(5, 7)) } : {}) } : {}
+      : isEmpty(raw) ? {} : { [GROUP_VALUE]: raw, [`${GROUP_VALUE}${F}`]: row[`${key}${F}`] }
+    const id = JSON.stringify(keyed)
+    const found = groups.get(id)
+    if (found) found[GROUP_TOTAL] = Number(found[GROUP_TOTAL]) + 1
+    else groups.set(id, { ...keyed, [GROUP_TOTAL]: 1 })
+  }
+  return [...groups.values()]
+}
+
+/** Simula só o que o mock precisa do FetchXML: condições da raiz, busca, `<order>` da raiz e paginação. */
+export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, quickFind, now }: MockFetchOptions): Page {
+  const entity = mockEntity(fetchxml)
+  const filtered = filterRows(rows, entity, { query, quickFind, now })
 
   const order = Array.from(entity.children).find((c) => c.tagName === 'order')
   const orderAttribute = order?.getAttribute('attribute')
