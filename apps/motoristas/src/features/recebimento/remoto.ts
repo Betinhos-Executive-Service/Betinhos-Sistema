@@ -4,7 +4,8 @@ import { parseQrChargeResponse, parseQrChargeSummary, type QrChargePayer } from 
 import { createMockQrCharge, getMockQrChargeSummary, updateMockQrCharge } from "./qrChargeMock.ts";
 import { cleanGuid, createOne, isLocalhostRuntime } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
-import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 import { bind, getClientUrl } from "../../data/dataverse/registros.ts";
 import { type LookupNavigationRequest, resolveLookupNavigationName } from "../../data/dataverse/metadados.ts";
 
@@ -34,7 +35,7 @@ export async function uploadReceiveProofRemote({
   const lookupNavigationNames = await loadReceiveAttachmentLookupNavigationNamesRemote();
 
   onProgress?.(`Enviando comprovante ${order}.`);
-  const link = await uploadMaintenancePhoto(path, dataUrl, baseName, {
+  const link = await uploadMediaWithProof(path, dataUrl, baseName, {
     reservaGuid: reservaId,
     reservaNome: reservaName,
     tipo: "COMPROVANTE_RECEBIMENTO",

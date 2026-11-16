@@ -3,6 +3,7 @@ import { createQrChargeRemote, updateQrChargeRemote } from "./remoto";
 import { QrChargeScreen } from "./QrChargeScreen";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDoDetalhe } from "../fotos/provaCaptura";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "./ReceiveScreen";
 import type { DetailData, Screen } from "../../types";
@@ -120,6 +121,10 @@ export function rotasRecebimento(screen: Screen, {
         }}
         onCaptureVideo={openReceiveVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
+        prova={{
+          origem: { tela: "recebimento", tabela: "cr40f_reservadeveculos", registroId: selectedDetail?.dataverse?.id ?? selectedDetail?.id ?? "" },
+          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Serviço ${String(selectedDetail?.dataverse?.record?.cr40f_id ?? "")}`.trim() }
+        }}
       />
     );
   }

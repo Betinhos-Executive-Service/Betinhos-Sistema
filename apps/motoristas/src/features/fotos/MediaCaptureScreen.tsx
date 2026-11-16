@@ -12,10 +12,13 @@ import {
   captureVideoFrameDataUrl,
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
+  getVideoDurationSecondsFromUrl,
   readBlobAsDataUrl,
   readPhotoFileAsDataUrl
 } from "../../shared/camera/photoOrientation";
 import type { CapturedVideoDraft, MaintenancePhotoKind } from "../../types";
+import { VIDEO_BITRATE, VIDEO_MAX_SEGUNDOS, permiteVideo, validarVideo } from "./provaCaptura";
+import { CarimboPrevia, useProvaDaCaptura, type ProvaDaCaptura } from "./useProvaDaCaptura";
 
 type MediaCaptureScreenProps = {
   kind: MaintenancePhotoKind;
@@ -24,12 +27,12 @@ type MediaCaptureScreenProps = {
   onCapture: (photoDataUrl: string) => void;
   onCaptureVideo?: (video: CapturedVideoDraft) => void;
   onSwitchCamera: () => void;
+  prova?: ProvaDaCaptura;
 };
 
 type VideoCaptureProfile = {
   label: "hdPlus" | "hd";
   frameRate: number;
-  bitRate: number;
 };
 
 type BrowserImageCapture = {
@@ -96,18 +99,10 @@ function getPreferredVideoProfile(track: MediaStreamTrack): VideoCaptureProfile 
   const highTierDevice = deviceMemory >= 8 && hardwareConcurrency >= 8;
 
   if (supportsHdPlus && highTierDevice) {
-    return {
-      label: "hdPlus",
-      frameRate: 30,
-      bitRate: 12_000_000
-    };
+    return { label: "hdPlus", frameRate: 30 };
   }
 
-  return {
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  };
+  return { label: "hd", frameRate: 30 };
 }
 
 /** Perfil reaplicado no track: mantém o 4:3 em alta resolução (foto com o quadro inteiro) e o foco contínuo quando houver. */
@@ -142,11 +137,7 @@ async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" |
     return preferredProfile;
   }
 
-  const fallbackProfile: VideoCaptureProfile = {
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  };
+  const fallbackProfile: VideoCaptureProfile = { label: "hd", frameRate: 30 };
 
   if (await applyProfile(fallbackProfile, supportsContinuousFocus)) {
     return fallbackProfile;
@@ -205,7 +196,10 @@ async function captureTrackPhotoDataUrl(stream: MediaStream) {
   return readBlobAsDataUrl(photoBlob);
 }
 
-export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo, onSwitchCamera }: MediaCaptureScreenProps) {
+export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo: onCaptureVideoProp, onSwitchCamera, prova }: MediaCaptureScreenProps) {
+  // Despesa só com foto: sem o tratamento de vídeo, a tela não oferece gravar.
+  const onCaptureVideo = prova && !permiteVideo(prova.origem.tela) ? undefined : onCaptureVideoProp;
+  const { sessao, finalizarFoto, registrarVideo } = useProvaDaCaptura(prova);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -217,11 +211,6 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const cameraRequestSequenceRef = useRef(0);
   const supportMessageTimerRef = useRef<number | null>(null);
   const captureRequestedAtRef = useRef(Date.now());
-  const activeVideoProfileRef = useRef<VideoCaptureProfile>({
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  });
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -321,7 +310,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       streamRef.current = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        activeVideoProfileRef.current = await preferTrackProfile(videoTrack, mode);
+        await preferTrackProfile(videoTrack, mode);
         setTorchSupported(supportsTorch(videoTrack));
         updateTrackContentHint(false);
         try {
@@ -446,7 +435,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
       if (!photoDataUrl) throw new Error("Não foi possível capturar a foto.");
-      onCapture(photoDataUrl);
+      onCapture(await finalizarFoto(photoDataUrl, "camera-ao-vivo"));
     } catch (error) {
       reportAppError(error, {
         severity: "error",
@@ -494,10 +483,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         mimeType
           ? {
               mimeType,
-              videoBitsPerSecond: activeVideoProfileRef.current.bitRate
+              videoBitsPerSecond: VIDEO_BITRATE
             }
           : {
-              videoBitsPerSecond: activeVideoProfileRef.current.bitRate
+              videoBitsPerSecond: VIDEO_BITRATE
             }
       );
       recorderRef.current = recorder;
@@ -517,11 +506,16 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         try {
           if (!chunks.length) throw new Error("Nenhum dado de vídeo capturado.");
           const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+          const durationSeconds = (Date.now() - recordingStartedAtRef.current) / 1000;
+          // 4 Mbps x 120 s cabe em 70 MB; codificador que ignora a taxa ainda é barrado aqui.
+          const refusal = validarVideo({ duracaoSegundos: null, tamanhoBytes: blob.size });
+          if (refusal) throw new Error(refusal);
+          void registrarVideo(blob, "camera-ao-vivo", durationSeconds);
           previewUrl = URL.createObjectURL(blob);
           onCaptureVideo({
             rawBlob: blob,
             previewUrl,
-            durationLabel: formatVideoDuration((Date.now() - recordingStartedAtRef.current) / 1000)
+            durationLabel: formatVideoDuration(durationSeconds)
           });
           previewUrl = "";
         } catch (error) {
@@ -588,6 +582,14 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
       const previewUrl = URL.createObjectURL(file);
       try {
+        const durationSeconds = await getVideoDurationSecondsFromUrl(previewUrl);
+        const refusal = validarVideo({ duracaoSegundos: durationSeconds, tamanhoBytes: file.size });
+        if (refusal) {
+          URL.revokeObjectURL(previewUrl);
+          setCameraError(refusal);
+          return;
+        }
+        void registrarVideo(file, "camera-nativa", durationSeconds);
         onCaptureVideo({ rawBlob: file, previewUrl });
         event.target.value = "";
         setProcessing(false);
@@ -611,7 +613,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
     try {
       const dataUrl = await readPhotoFileAsDataUrl(file, 0);
-      onCapture(dataUrl);
+      onCapture(await finalizarFoto(dataUrl, "camera-nativa"));
     } catch (error) {
       reportAppError(error, {
         severity: "error",
@@ -643,7 +645,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     }
 
     const timer = window.setInterval(() => {
-      setRecordingSeconds((Date.now() - recordingStartedAtRef.current) / 1000);
+      const seconds = (Date.now() - recordingStartedAtRef.current) / 1000;
+      setRecordingSeconds(seconds);
+      // Para sozinho no limite e entrega o que gravou (onstop monta o vídeo normalmente).
+      if (seconds >= VIDEO_MAX_SEGUNDOS) stopLiveRecording();
     }, 1000);
     return () => window.clearInterval(timer);
   }, [recording]);
@@ -700,12 +705,14 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </button>
               ) : null}
 
+              {prova && useLivePreview && ready ? <CarimboPrevia sessao={sessao} carimbo={prova.carimbo} /> : null}
+
               {useLiveCamera && capturingPhoto ? <div className="camera-shutter-flash" aria-hidden="true" /> : null}
 
               {useLiveCamera && recording ? (
                 <div className="camera-recording-pill" aria-live="polite">
                   <span />
-                  <strong>{formatVideoDuration(recordingSeconds)}</strong>
+                  <strong>{formatVideoDuration(recordingSeconds)} / {formatVideoDuration(VIDEO_MAX_SEGUNDOS)}</strong>
                 </div>
               ) : null}
 

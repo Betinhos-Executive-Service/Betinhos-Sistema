@@ -11,6 +11,7 @@ import type { ToastTone } from "../../shared/ui/LocalToast";
 import { FinalizeScreen } from "./FinalizeScreen";
 import { LocalCancelScreen } from "./LocalCancelScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDoDetalhe } from "../fotos/provaCaptura";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { ReceiveScreen } from "../recebimento/ReceiveScreen";
 import { prepareVideoBlobForUpload } from "../fotos/mediaDrafts";
@@ -115,6 +116,10 @@ export function rotasFinalizar(screen: Screen, {
       <MediaCaptureScreen
         kind={maintenancePhotoKind}
         onBack={() => setScreen("finalizar")}
+        prova={{
+          origem: { tela: "finalizar", tabela: "cr40f_manutencoes", registroId: selectedDetail.dataverse?.id ?? selectedDetail.id },
+          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Manutenção ${String(selectedDetail.dataverse?.record?.cr40f_id ?? "")}`.trim() }
+        }}
         onCapture={(photoDataUrl) => {
           setPhotoDraft(photoDataUrl);
           setPhotoDraftPreviewUrl("");
