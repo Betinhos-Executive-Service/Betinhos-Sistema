@@ -14200,12 +14200,15 @@ select,
   text-align: center;
 }
 
+/* O tamanho segue a largura do card (cqw), não a altura da tela: em celular
+   alto, 1.9dvh fazia "Treinamentos" e "Comunicados" vazarem para fora. */
 .concept-tile-label {
-  font-size: clamp(0.72rem, min(3.4vw, 1.9dvh), 0.9rem);
+  max-width: 100%;
+  font-size: clamp(0.66rem, min(11.5cqw, 1.9dvh), 0.9rem);
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {
