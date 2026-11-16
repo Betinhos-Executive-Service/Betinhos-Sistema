@@ -126,6 +126,30 @@ describe('criar pagantes', () => {
     expect(mocks.updatePersonEmail.mock.invocationCallOrder[0]).toBeLessThan(mocks.submitOperation.mock.invocationCallOrder[0])
   })
 
+  it('pagante sem e-mail: "Usar e cadastrar" grava o e-mail sem perguntar de novo', async () => {
+    await renderApp()
+    addPerson(ana.name)
+    fireEvent.click(within(row(ana.name)).getByRole('button', { name: /trocar destinatário/i }))
+    fireEvent.change(within(row(ana.name)).getByLabelText('Ou digite um e-mail'), { target: { value: 'ana@empresa.com.br' } })
+    fireEvent.click(within(row(ana.name)).getByRole('button', { name: 'Usar e cadastrar' }))
+    fireEvent.click(saveButton(/gerar pagantes/i))
+    await waitFor(() => expect(mocks.submitOperation).toHaveBeenCalledOnce())
+    expect(screen.queryByRole('dialog', { name: 'Confirmar alterações' })).toBeNull()
+    expect(mocks.updatePersonEmail).toHaveBeenCalledWith(ana.id, 'ana@empresa.com.br')
+  })
+
+  it('pagante sem e-mail: "Usar só neste envio" não grava nem pergunta', async () => {
+    await renderApp()
+    addPerson(ana.name)
+    fireEvent.click(within(row(ana.name)).getByRole('button', { name: /trocar destinatário/i }))
+    fireEvent.change(within(row(ana.name)).getByLabelText('Ou digite um e-mail'), { target: { value: 'secretaria@empresa.com.br' } })
+    fireEvent.click(within(row(ana.name)).getByRole('button', { name: 'Usar só neste envio' }))
+    fireEvent.click(saveButton(/gerar pagantes/i))
+    await waitFor(() => expect(mocks.submitOperation).toHaveBeenCalledOnce())
+    expect(screen.queryByRole('dialog', { name: 'Confirmar alterações' })).toBeNull()
+    expect(mocks.updatePersonEmail).not.toHaveBeenCalled()
+  })
+
   it('pagante sem e-mail pode seguir sem gravar', async () => {
     await renderApp()
     addPerson(ana.name)

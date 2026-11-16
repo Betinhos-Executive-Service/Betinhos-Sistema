@@ -49,6 +49,17 @@ describe('Ordens de Pagamento', () => {
     expect(await blobText(blobs[0])).toMatch(/OP-401/)
   })
 
+  it('seleção de uma OP só oferece Gerar pagantes; com duas, some', async () => {
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('OP-401')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Gerar pagantes' }))
+    await screen.findByText('O Gerar Pagantes só abre dentro do Dataverse.')
+
+    fireEvent.click((await screen.findByText('OP-402')).closest('.bt-table__row')!.querySelector('.pg-num')!, { shiftKey: true })
+    expect(within(faixa).queryByRole('button', { name: 'Gerar pagantes' })).toBeNull()
+  })
+
   it('Fechar mês no cabeçalho: escolhe cliente e mês, confirma e avisa', async () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Fechar mês' }))

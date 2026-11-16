@@ -40,6 +40,11 @@
 /* Linhas fora da tela não pintam: sem isto cada quadro de animação do shell (acordeão, gaveta) recompunha a grade inteira. Listas e menus das células usam a top layer e não são cortados. */
 .gr-table .bt-table__row { content-visibility: auto; contain-intrinsic-size: auto var(--gr-row-height); }
 /* Primeira carga: uma linha só com o loader, na largura visível (sem as colunas). */
+.gr-table .bt-table__row.gr-grouprow { display: block; position: sticky; left: 0; min-width: 0; content-visibility: visible; background-color: var(--bt-color-surface-soft); }
+.gr-table .bt-table__row.gr-grouprow .bt-groups__toggle { min-height: var(--gr-row-height); }
+.gr-grouprow__chevron.is-open { transform: rotate(90deg); }
+.gr-table .bt-table__row.gr-grouprow--foot { background-color: transparent; }
+.gr-grouprow__foot { display: flex; align-items: center; gap: var(--bt-space-2); min-height: 36px; padding: 0 var(--bt-space-4) 0 var(--bt-space-6); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gr-table .bt-table__row.gr-table__loading { display: block; min-width: 0; content-visibility: visible; }
 /* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
 .gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
