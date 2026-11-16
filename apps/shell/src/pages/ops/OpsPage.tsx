@@ -193,7 +193,7 @@ function Ops({ host }: { host: Host }) {
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas); o `TableGroups` faz o lote do clique direito valer para a lista inteira e o checkbox do cabeçalho, só para o grupo.
     const table = (rows: Op[], tableFooter?: ReactNode) => (
-      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+      <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
     )
     body = groups ? (
       <>

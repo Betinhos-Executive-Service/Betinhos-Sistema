@@ -107,6 +107,16 @@ describe('Ordens de Pagamento', () => {
     expect(window.location.hash).not.toMatch(/[?&]status=/)
   })
 
+  it('Agrupar pelo menu do título da coluna Status (ui ≥ 1.34.0, view.groupable)', async () => {
+    window.location.hash = '#/ops'
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-401')
+    fireEvent.click(screen.getByRole('button', { name: 'Status' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Agrupar por esta coluna', hidden: true }))
+    expect(await screen.findByRole('button', { name: /Pagamento Pendente/, expanded: false })).toBeTruthy()
+    expect(screen.queryByText('OP-401')).toBeNull()
+  })
+
   it('Agrupar por status no painel Colunas: grupos começam fechados, abrem a tabela e o rodapé soma a lista', async () => {
     window.location.hash = '#/ops'
     render(<OpsPage host={{ mode: 'mock' }} />)
