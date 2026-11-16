@@ -102,6 +102,16 @@ test('treinamentos-push.json: Web Push por funcionário do gatilho, com tag e me
   assert.deepEqual(flow.actions.Web_Push_Send_push.runAfter, { Get_treinamento: ['Succeeded'] })
 })
 
+test('treinamentos-push.json: gatilho só em alteração, senão o motorista recebe o aviso duas vezes', () => {
+  // A tela cria a participação sem status e logo depois grava Pendente (e o Lembrar também só altera). O Dataverse
+  // avalia o filtro do gatilho de forma assíncrona, já com o registro em Pendente: com "criado ou alterado" (4),
+  // a criação também passava no filtro e o flow rodava duas vezes para a mesma participação.
+  const { parameters } = ler('treinamentos-push.json').triggers.When_participation_is_queued.inputs
+  assert.equal(parameters['subscriptionRequest/message'], 3)
+  assert.equal(parameters['subscriptionRequest/filterexpression'], 'cr40f_pushstatus eq 100000000')
+  assert.equal(parameters['subscriptionRequest/filteringattributes'], 'cr40f_pushstatus')
+})
+
 test('o treinamentos-push.ps1 pega a conexão do Worker de outro flow e o sincronizador só empresta com o parâmetro e recusa conexão sem origem', () => {
   const ps1 = readFileSync(new URL('../provision-flow-treinamentos-push.ps1', import.meta.url), 'utf8')
   assert.ok(ps1.includes("-FlowDeReferencias 'Flow Push Checklist | Motoristas'"))
