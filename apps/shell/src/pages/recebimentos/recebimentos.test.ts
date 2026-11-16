@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
-import { agruparPorServico, metaRecebimento, ordenar, tomStatus, type Recebimento } from './domain'
+import { agruparPorServico, metaRecebimento, mostraStatus, ordenar, tomStatus, type Recebimento } from './domain'
 import { contarPorReserva, loadFinanceiro, loadRecebimentos, mapRecebimento } from './queries'
 
 const ID = (n: number) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -36,6 +36,14 @@ describe('recebimentos: domínio', () => {
   it('meta do cartão: data e hora do envio e motorista', () => {
     expect(metaRecebimento(rec({ enviadoEm: new Date('2026-11-12T09:05:00-03:00'), motorista: 'Carlos Souza' }))).toMatch(/12\/11\/2026.*09:05 · Carlos Souza/)
     expect(metaRecebimento(rec({}))).toBe('')
+  })
+})
+
+describe('mostraStatus', () => {
+  it('esconde Enviado (o normal) e status vazio; mostra os outros', () => {
+    expect(mostraStatus({ status: 100000001, statusTexto: 'Enviado' })).toBe(false)
+    expect(mostraStatus({ status: null, statusTexto: '' })).toBe(false)
+    expect(mostraStatus({ status: 100000002, statusTexto: 'Falhou' })).toBe(true)
   })
 })
 

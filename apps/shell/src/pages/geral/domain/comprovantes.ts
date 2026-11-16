@@ -1,4 +1,5 @@
 import type { FilterField } from '@betinhos/ui'
+import { COMPROVANTES_OPCOES } from '../../recebimentos/domain'
 import { ID_ATTRIBUTE, type Column } from './types'
 
 /**
@@ -10,7 +11,7 @@ export const COMPROVANTES_KEY = 'comprovantes'
 export const COMPROVANTES_COLUMN: Column = { key: COMPROVANTES_KEY, attribute: COMPROVANTES_KEY, alias: null, entity: null, width: 72, label: 'Comprovantes' }
 export const COMPROVANTES_FIELD: FilterField = {
   key: COMPROVANTES_KEY, label: 'Comprovantes', kind: 'bool',
-  options: [{ value: '1', label: 'Com comprovante' }, { value: '0', label: 'Sem comprovante' }],
+  options: COMPROVANTES_OPCOES,
 }
 
 /** Troca a condição Sim/Não da coluna virtual (gerada pelo DS como `eq 1/0`) pelo `link-entity` equivalente, em qualquer grupo. */

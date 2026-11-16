@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { initialCompositions, moneyFields } from './compositions'
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './mock-views'
-import { defaultViewDefinition } from './views'
+import { COMPROVANTES_ID, defaultViewDefinition } from './views'
+import { mockRecebimentos } from '../../recebimentos/mock'
 
 const base = () => defaultViewDefinition(moneyFields.map((field) => field.key))
 
@@ -35,6 +36,15 @@ describe('views locais', () => {
     const sorted = applyMockView(initialCompositions, { ...definition, filters: [] })
     expect(Number(sorted[0].values.new_valortotal)).toBeGreaterThan(Number(sorted.at(-1)!.values.new_valortotal))
     expect(initialCompositions[0].id).toBe('mock-1')
+  })
+
+  it('Comprovantes Sim/Não filtra pelos comprovantes de demonstração de cada linha', () => {
+    const com = initialCompositions.filter((row) => mockRecebimentos(row.id).length > 0).map((row) => row.id)
+    const filtrar = (value: string) => applyMockView(initialCompositions, { ...base(), filters: [{ id: COMPROVANTES_ID, operator: 'eq', value }] }).map((row) => row.id).sort()
+    expect(com.length).toBeGreaterThan(0)
+    expect(com.length).toBeLessThan(initialCompositions.length)
+    expect(filtrar('true')).toEqual([...com].sort())
+    expect(filtrar('false')).toEqual(initialCompositions.map((row) => row.id).filter((id) => !com.includes(id)).sort())
   })
 
   it('combina condições rápidas de texto e número', () => {

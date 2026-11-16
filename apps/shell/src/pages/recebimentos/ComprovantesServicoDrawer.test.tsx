@@ -36,6 +36,7 @@ describe('indicador de comprovantes na lista', () => {
     expect(botao.textContent).toBe('4')
     fireEvent.click(botao)
     expect(await screen.findByText('Serviço OS-1000')).toBeTruthy()
+    expect(screen.getByText('Recebimento')).toBeTruthy()
     expect(await screen.findByText('Nenhum comprovante enviado pelo motorista.')).toBeTruthy()
     expect(source.carregar).toHaveBeenCalledWith(['s1'])
   })
