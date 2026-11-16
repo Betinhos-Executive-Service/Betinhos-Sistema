@@ -9,7 +9,7 @@ import type { CatalogField } from './views'
  * O catálogo cru do DEV tem 16 mil campos e 8,4 milhões de caracteres, acima da cota do `localStorage`.
  * Por isso é gravado enxuto: dados de tabela e caminho uma vez por grupo e textos repetidos num dicionário.
  */
-const CACHE_VERSION = 3
+const CACHE_VERSION = 4
 const MAX_AGE_MS = 12 * 60 * 60 * 1000
 
 /** Dados de tabela e caminho, iguais em todos os campos do grupo; o JSON descarta os ausentes e mantém os nulos da metadata. */

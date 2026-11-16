@@ -46,15 +46,27 @@ function clientUrl() {
   return url.replace(/\/+$/, '')
 }
 
-type AttributeMetadata = { LogicalName: string; AttributeType: string; DisplayName?: { UserLocalizedLabel?: { Label?: string } }; IsValidForRead?: boolean; IsValidForUpdate?: boolean; IsCustomAttribute?: boolean }
+type AttributeMetadata = { LogicalName: string; SchemaName?: string; AttributeType: string; AttributeOf?: string | null; DisplayName?: { UserLocalizedLabel?: { Label?: string } }; IsValidForRead?: boolean; IsValidForUpdate?: boolean; IsCustomAttribute?: boolean }
 type RelationshipMetadata = { ReferencingEntity: string; ReferencedEntity: string; ReferencingAttribute: string; ReferencedAttribute: string; SchemaName: string }
 type EntityMetadata = { LogicalName: string; ObjectTypeCode: number; DisplayName?: { UserLocalizedLabel?: { Label?: string } }; IsCustomEntity?: boolean; PrimaryIdAttribute?: string; PrimaryNameAttribute?: string; Attributes: AttributeMetadata[]; ManyToOneRelationships: RelationshipMetadata[] }
 
 async function entityMetadata(table: string): Promise<EntityMetadata> {
-  const url = `${clientUrl()}/api/data/v9.2/EntityDefinitions(LogicalName='${encodeURIComponent(table)}')?$select=LogicalName,ObjectTypeCode,DisplayName,IsCustomEntity,PrimaryIdAttribute,PrimaryNameAttribute&$expand=Attributes($select=LogicalName,AttributeType,DisplayName,IsValidForRead,IsValidForUpdate,IsCustomAttribute),ManyToOneRelationships($select=ReferencingEntity,ReferencedEntity,ReferencingAttribute,ReferencedAttribute,SchemaName)`
+  const url = `${clientUrl()}/api/data/v9.2/EntityDefinitions(LogicalName='${encodeURIComponent(table)}')?$select=LogicalName,ObjectTypeCode,DisplayName,IsCustomEntity,PrimaryIdAttribute,PrimaryNameAttribute&$expand=Attributes($select=LogicalName,SchemaName,AttributeType,AttributeOf,DisplayName,IsValidForRead,IsValidForUpdate,IsCustomAttribute),ManyToOneRelationships($select=ReferencingEntity,ReferencedEntity,ReferencingAttribute,ReferencedAttribute,SchemaName)`
   const result = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
   if (!result.ok) throw new Error(`Metadata de ${table}: HTTP ${result.status}`)
   return result.json() as Promise<EntityMetadata>
+}
+
+/**
+ * Rótulo do campo: o nome de exibição da metadata. Quando ele é só o schema name sem o prefixo (campo criado sem nome
+ * de exibição: schema "cr40f_RepasseDefinidoManual", rótulo "RepasseDefinidoManual"), separa as palavras:
+ * "Repasse definido manual".
+ */
+export function attributeLabel(attribute: Pick<AttributeMetadata, 'LogicalName' | 'SchemaName' | 'DisplayName'>) {
+  const label = attribute.DisplayName?.UserLocalizedLabel?.Label || attribute.LogicalName
+  if (!attribute.SchemaName || label !== attribute.SchemaName.replace(/^[a-z0-9]+_/i, '') || !/[a-z][A-Z]/.test(label)) return label
+  const words = label.match(/[A-ZÀ-Ý]?[a-zà-ÿ0-9]+|[A-ZÀ-Ý]+(?![a-zà-ÿ])/g)
+  return words?.length ? words.map((word, index) => index ? word.toLocaleLowerCase('pt-BR') : word).join(' ') : label
 }
 
 const SIMPLE_TYPES = new Set(['String', 'Memo', 'Integer', 'BigInt', 'Decimal', 'Double', 'Money', 'DateTime', 'Boolean', 'Picklist', 'State', 'Status', 'Lookup', 'Uniqueidentifier'])
@@ -76,7 +88,7 @@ export async function loadColumnCatalog(): Promise<CatalogField[]> {
       const type = attribute.AttributeType ?? 'Unknown'
       const available = attribute.IsValidForRead !== false && SIMPLE_TYPES.has(type)
       const auditDate = !path.length && table === COMPOSITION_TABLE && (attribute.LogicalName === 'createdon' || attribute.LogicalName === 'modifiedon')
-      own.push({ id: relationships.length ? `${pathSignature(path, relationships)}.${attribute.LogicalName}` : attribute.LogicalName, label: auditDate ? attribute.LogicalName === 'createdon' ? 'Criado em' : 'Modificado em' : attribute.DisplayName?.UserLocalizedLabel?.Label || attribute.LogicalName, table, tableLabel: metadata.DisplayName?.UserLocalizedLabel?.Label || table, attribute: attribute.LogicalName, primaryIdAttribute: metadata.PrimaryIdAttribute, primaryNameAttribute: metadata.PrimaryNameAttribute, path, relationships, type, available, writable: attribute.IsValidForUpdate === true, pickerEligible: available && ((!path.length || path.length === 1) && customTablePath && lookupPath && attribute.IsCustomAttribute === true && attribute.LogicalName !== metadata.PrimaryIdAttribute || auditDate), reason: available ? undefined : attribute.IsValidForRead === false ? 'Campo sem leitura disponível' : `Tipo ${type} não aceito como coluna da view` })
+      own.push({ id: relationships.length ? `${pathSignature(path, relationships)}.${attribute.LogicalName}` : attribute.LogicalName, label: auditDate ? attribute.LogicalName === 'createdon' ? 'Criado em' : 'Modificado em' : attributeLabel(attribute), table, tableLabel: metadata.DisplayName?.UserLocalizedLabel?.Label || table, attribute: attribute.LogicalName, primaryIdAttribute: metadata.PrimaryIdAttribute, primaryNameAttribute: metadata.PrimaryNameAttribute, path, relationships, type, available, writable: attribute.IsValidForUpdate === true, pickerEligible: available && ((!path.length || path.length === 1) && customTablePath && lookupPath && !attribute.AttributeOf && attribute.IsCustomAttribute === true && attribute.LogicalName !== metadata.PrimaryIdAttribute || auditDate), reason: available ? undefined : attribute.IsValidForRead === false ? 'Campo sem leitura disponível' : `Tipo ${type} não aceito como coluna da view` })
     }
     if (path.length === 2) return own
     const related = await Promise.all((metadata.ManyToOneRelationships ?? []).map(async (relation) => {
