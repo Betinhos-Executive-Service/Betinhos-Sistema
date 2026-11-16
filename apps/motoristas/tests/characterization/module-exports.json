@@ -229,6 +229,11 @@
     "formatCurrencyInputOnBlur",
     "sanitizeCurrencyInput"
   ],
+  "src/shared/erroDeRede.ts": [
+    "SEM_CONEXAO_MESSAGE",
+    "ehErroDeRede",
+    "estaOnline"
+  ],
   "src/shared/errorLogGrouping.ts": [
     "ErrorCause",
     "ErrorCauseKind",

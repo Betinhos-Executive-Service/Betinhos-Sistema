@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
 import { CircleCheck, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { hrefFor } from '../../nav/useHashRoute'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
@@ -66,6 +67,7 @@ function Pendencias({ host }: Props) {
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, PENDENCIA_FIELDS, readPendencia)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
@@ -107,11 +109,15 @@ function Pendencias({ host }: Props) {
   } else {
     const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pendência' : 'pendências'} · {formatMoney(soma(visible))}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma pendência com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Pendencia[], tableFooter?: ReactNode) => (
+      <PendenciasTable list={rows} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true }} quickFilters={quickFilters} footer={tableFooter} empty={empty} {...acoes} />
+    )
+    const cards = (rows: Pendencia[]) => <PendenciasCards list={rows} onOpen={setSelectedId} {...acoes} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <PendenciasCards list={slice} onOpen={setSelectedId} {...acoes} /> : <div className="surface">{empty}</div>)
-          : <PendenciasTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} {...acoes} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

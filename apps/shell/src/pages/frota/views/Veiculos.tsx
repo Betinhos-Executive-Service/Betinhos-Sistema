@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { Button, EmptyState, SearchBox, StatusBadge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
 import { VirtualTable } from '../../../app/VirtualTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
@@ -55,13 +56,42 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
     }))
   }, [data, today])
 
+  const read = useMemo(() => extra.read(readVeiculo, byVeiculo), [extra])
   const visiveis = useMemo(
-    () => extra.sort(sortVeiculos(filterRows(linhas, filters, allFields, extra.read(readVeiculo, byVeiculo)).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort), view.config.sort, byVeiculo),
-    [linhas, filters, termo, view.config.sort],
+    () => extra.sort(sortVeiculos(filterRows(linhas, filters, allFields, read).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort), view.config.sort, byVeiculo),
+    [linhas, filters, termo, view.config.sort, read],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
   const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visiveis, lazyKey)
+  const groups = useRowGroups(visiveis, view.config.group, allFields, read)
+
+  const footer = <span className="frota-muted">{visiveis.length} de {linhas.length}</span>
+  const table = (rows: LinhaVeiculo[], tableFooter?: ReactNode) => (
+    <VirtualTable<LinhaVeiculo>
+      rows={rows}
+      rowKey={(linha) => linha.veiculo.id}
+      onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
+      view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }}
+      quickFilters={quickFilters}
+      footer={tableFooter}
+      empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}
+      columns={[
+        { key: 'foto', header: <span className="frota-sr-only">Foto</span>, label: 'Foto', defaultWidth: 84, width: '84px', hideBelow: 'mobile', cell: ({ veiculo }) => <FotoVeiculo source={source} id={veiculo.id} alt={`Foto do veículo ${veiculo.placa}`} /> },
+        { key: 'placa', header: 'Placa', label: 'Placa', sortable: true, defaultWidth: 200, width: 'minmax(150px, 1.2fr)', cell: ({ veiculo }) => <TableTitle title={veiculo.placa || 'Sem placa'} meta={[veiculo.marca, veiculo.modelo].filter(Boolean).join(' ') || undefined} /> },
+        { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 130, hideBelow: 'compact', cell: ({ veiculo }) => label(CATEGORIA, veiculo.categoria) },
+        { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
+        { key: 'motorista', header: 'Motorista atual', label: 'Motorista atual', sortable: true, defaultWidth: 200, hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
+        { key: 'pendencias', header: 'Pendências', label: 'Pendências', sortable: true, defaultWidth: 120, width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
+        { key: 'custo', header: 'Manutenção (12 meses)', label: 'Manutenção (12 meses)', sortable: true, defaultWidth: 190, hideBelow: 'compact', cell: ({ custo }) => (
+          <span className="frota-nowrap">
+            {custo.qtd === 0 ? '—' : custo.qtd === custo.semValor ? null : brl(custo.total)}
+            {custo.semValor > 0 && <span className="frota-muted">{custo.qtd === custo.semValor ? '' : ' · '}{custo.semValor} sem valor</span>}
+          </span>
+        ) },
+      ]}
+    />
+  )
 
   return (
     <div className="frota-lista">
@@ -70,30 +100,14 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
           search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>
-      <VirtualTable<LinhaVeiculo>
-        rows={slice}
-        rowKey={(linha) => linha.veiculo.id}
-        onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
-        view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }}
-        quickFilters={quickFilters}
-        footer={<span className="frota-muted">{visiveis.length} de {linhas.length}</span>}
-        empty={<EmptyState compact align="start" title="Nenhum veículo com estes filtros" action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}
-        columns={[
-          { key: 'foto', header: <span className="frota-sr-only">Foto</span>, label: 'Foto', defaultWidth: 84, width: '84px', hideBelow: 'mobile', cell: ({ veiculo }) => <FotoVeiculo source={source} id={veiculo.id} alt={`Foto do veículo ${veiculo.placa}`} /> },
-          { key: 'placa', header: 'Placa', label: 'Placa', sortable: true, defaultWidth: 200, width: 'minmax(150px, 1.2fr)', cell: ({ veiculo }) => <TableTitle title={veiculo.placa || 'Sem placa'} meta={[veiculo.marca, veiculo.modelo].filter(Boolean).join(' ') || undefined} /> },
-          { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 130, hideBelow: 'compact', cell: ({ veiculo }) => label(CATEGORIA, veiculo.categoria) },
-          { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
-          { key: 'motorista', header: 'Motorista atual', label: 'Motorista atual', sortable: true, defaultWidth: 200, hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
-          { key: 'pendencias', header: 'Pendências', label: 'Pendências', sortable: true, defaultWidth: 120, width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
-          { key: 'custo', header: 'Manutenção (12 meses)', label: 'Manutenção (12 meses)', sortable: true, defaultWidth: 190, hideBelow: 'compact', cell: ({ custo }) => (
-            <span className="frota-nowrap">
-              {custo.qtd === 0 ? '—' : custo.qtd === custo.semValor ? null : brl(custo.total)}
-              {custo.semValor > 0 && <span className="frota-muted">{custo.qtd === custo.semValor ? '' : ' · '}{custo.semValor} sem valor</span>}
-            </span>
-          ) },
-        ]}
-      />
-      <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
+      {groups ? (
+        <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
+      ) : (
+        <>
+          {table(slice, footer)}
+          <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
+        </>
+      )}
     </div>
   )
 }

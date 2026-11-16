@@ -1,14 +1,15 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader } from '@betinhos/ui'
 import { GraduationCap, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
+import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, type Linha, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
 import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
@@ -50,13 +51,14 @@ function Treinamentos({ host }: { host: Host }) {
     builtins: builtinViews,
   })
 
+  const read = useMemo(() => extra.read(readTreinamento, (t) => t.id), [extra])
   const visible = useMemo(() => {
-    const read = extra.read(readTreinamento, (t) => t.id)
     const list = data.items.filter((t) => matchesFilters(t, filters, allFields, read) && matchesKeyword(t, query))
     return extra.sort(sortTreinamentos(list, view.config.sort, data.progresso), view.config.sort, (t) => t.id)
-  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra])
+  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra, read])
   const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
   // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
@@ -99,11 +101,15 @@ function Treinamentos({ host }: { host: Host }) {
     const publicados = data.items.filter(isPublicado).length
     const footer = <span className="tr-num">{visible.length} de {data.items.length} · {publicados} {plural(publicados, 'publicado', 'publicados')}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum treinamento com estes filtros" action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery('') }}>Limpar filtros</Button>}>Tire um filtro ou mude a busca para ver mais resultados.</EmptyState>
-    body = (
+    const table = (rows: Linha[], tableFooter?: ReactNode) => (
+      <TreinamentosTable list={rows} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Linha[]) => <TreinamentosCards list={rows} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <TreinamentosCards list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, Dialog, EmptyState, Field, SearchBox, Textarea, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { CalendarClock, CheckCheck, Download, Lock, MessageCircleQuestion, RefreshCw, SearchX, ShieldCheck, Undo2, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -74,6 +75,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   }, [data.linhas, filters, allFields, query, view.config.sort])
   const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, readLinha)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   // A seleção só vale para o que está visível; cada ação usa a parte da seleção a que se aplica.
@@ -166,11 +168,15 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   } else {
     const footer = <span className="vc-num">{visible.length} de {data.linhas.length}{visiveisSel.length ? ` · ${visiveisSel.length} selecionado(s)` : ''}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum registro com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Linha[], tableFooter?: ReactNode) => (
+      <ValidacaoTable list={rows} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true }} extraCell={extra.cell} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Linha[]) => <ValidacaoCards list={rows} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <ValidacaoCards list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} /> : <div className="surface">{empty}</div>)
-          : <ValidacaoTable list={slice} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={setAberto} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true }} extraCell={extra.cell} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

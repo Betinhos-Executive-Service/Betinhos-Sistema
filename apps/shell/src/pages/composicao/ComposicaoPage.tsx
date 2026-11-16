@@ -11,6 +11,7 @@ import { useComposicaoViewState } from './useComposicaoViewState'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
 import { CellHoverPreview } from './components/CellHoverPreview'
+import { ClientCard, RouteCard } from './components/CopyText'
 import { CommandConfirmDialog } from './components/CommandConfirmDialog'
 import { confirmDialogContent, useCompositionCommands, type CommandNotice, type CommandPhase, type RefreshOptions } from './components/useCompositionCommands'
 import { useTotalCount } from './components/useTotalCount'
@@ -1182,11 +1183,7 @@ function ComposicaoContent({ host }: { host: Host }) {
                 <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
                   {item.client}
                 </button>
-                <span className="lookup-preview__card" role="tooltip">
-                  <strong>{item.client}</strong>
-                  {item.clientRegistration && <span className="lookup-preview__detail"><span>Registro</span><span>{item.clientRegistration}</span></span>}
-                  {item.clientAddress && <span className="lookup-preview__detail"><span>Endereço</span><span>{item.clientAddress}</span></span>}
-                </span>
+                <ClientCard item={item} />
               </span>
             ) : <span className="grid-client-name" title={item.client}>{item.client}</span>}
           </span>
@@ -1202,16 +1199,12 @@ function ComposicaoContent({ host }: { host: Host }) {
             <button type="button" className="lookup-link grid-route" onClick={() => { void openGridRecord('cr40f_reservadeveculos', serviceId) }} aria-label={`Abrir serviço relacionado: ${item.route}`}>
               {item.route}
             </button>
-            <span className="lookup-preview__card" role="tooltip">
-              <strong>Serviço relacionado</strong>
-              <span>{item.route}</span>
-              <span>Cliente: {item.client}</span>
-              {item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}
-              {item.serviceStatus && <span>Status: {item.serviceStatus}</span>}
-              {item.serviceType && <span>Tipo: {item.serviceType}</span>}
-              {item.vehicleType && <span>Veículo: {item.vehicleType}</span>}
-              {item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}
-            </span>
+            <RouteCard item={item} />
+          </span>
+        ) : item.departureAddress || item.destination ? (
+          <span className="lookup-preview">
+            <span className="grid-route">{item.route}</span>
+            <RouteCard item={item} />
           </span>
         ) : <span className="grid-route" title={item.route}>{item.route}</span>
       },
@@ -1488,8 +1481,8 @@ function ComposicaoContent({ host }: { host: Host }) {
           const target = id === 'client' ? item.clientId : id === 'route' ? item.serviceId : null
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
             <span className="grid-client-name" title={title}>{title}</span>
-            {id === 'client' && <span className="lookup-preview__card" role="tooltip"><strong>{item.client}</strong>{item.clientRegistration && <span>{item.clientRegistration}</span>}{item.clientAddress && <span>{item.clientAddress}</span>}</span>}
-            {id === 'route' && target && <span className="lookup-preview__card" role="tooltip"><strong>Serviço relacionado</strong><span>{item.route}</span><span>Cliente: {item.client}</span>{item.departureAt && <span>Saída: {formatDepartureDate(item.departureAt)}</span>}{item.serviceStatus && <span>Status: {item.serviceStatus}</span>}{item.serviceType && <span>Tipo: {item.serviceType}</span>}{item.vehicleType && <span>Veículo: {item.vehicleType}</span>}{item.passengers.length > 0 && <span>Passageiros: {item.passengers.join(', ')}</span>}</span>}
+            {id === 'client' && <ClientCard item={item} />}
+            {id === 'route' && (target || item.departureAddress || item.destination) && <RouteCard item={item} />}
           </span>
           return <EditableViewFieldCell field={field} value={value} formatted={id === 'client' ? item.client : undefined} display={display} viewFields={item.viewFields} valueKey={attribute} baseRecordId={item.id} ownerRecordId={item.serviceId} editable={dataSource === 'dataverse'} {...interactionProps(item.id, id)} onSaved={applySavedViewField} />
         },

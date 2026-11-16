@@ -1,8 +1,10 @@
 import type { SearchCondition } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
 import { CAMPOS_PROTEGIDOS } from './protecao'
+import { EMPTY_GROUP_ID, OTHERS_GROUP_ID } from '@betinhos/ui'
+import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR, periodRange, type GroupSpec, type GroupTarget } from './grouping'
 
-type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[] }
+type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[]; group?: GroupTarget }
 
 export function parse(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
@@ -23,31 +25,54 @@ export function applySort(doc: Document, entity: Element, sort: NonNullable<Sort
   ;(link ?? entity).appendChild(order)
 }
 
+function addCondition(doc: Document, filter: Element, attribute: string, operator: string, value?: string | string[]) {
+  const condition = doc.createElement('condition')
+  condition.setAttribute('attribute', attribute)
+  condition.setAttribute('operator', operator)
+  if (typeof value === 'string') condition.setAttribute('value', value)
+  else for (const text of value ?? []) {
+    const item = doc.createElement('value')
+    item.textContent = text
+    condition.appendChild(item)
+  }
+  filter.appendChild(condition)
+}
+
 /** Busca por palavra-chave: filtro OR com as condições de `buildSearch` (`like` em texto, `in` em choice e lookup). */
 function injectSearch(doc: Document, entity: Element, search: SearchCondition[]) {
   if (!search.length) return
   const filter = doc.createElement('filter')
   filter.setAttribute('type', 'or')
-  for (const item of search) {
-    const condition = doc.createElement('condition')
-    condition.setAttribute('attribute', item.attribute)
-    condition.setAttribute('operator', item.operator)
-    if (item.operator === 'like') condition.setAttribute('value', item.value)
-    else for (const text of item.values) {
-      const value = doc.createElement('value')
-      value.textContent = text
-      condition.appendChild(value)
-    }
-    filter.appendChild(condition)
-  }
+  for (const item of search) addCondition(doc, filter, item.attribute, item.operator, item.operator === 'like' ? item.value : item.values)
   entity.appendChild(filter)
+}
+
+/** Restringe a consulta às linhas de um grupo: valor igual, vazio, o resto da relação (`not-in` dos grupos mostrados) ou o intervalo do mês/ano (datas, no fuso do usuário). */
+function injectGroup(doc: Document, entity: Element, { attribute, kind, id, exclude }: GroupTarget) {
+  const filter = doc.createElement('filter')
+  filter.setAttribute('type', 'and')
+  if (id === EMPTY_GROUP_ID) addCondition(doc, filter, attribute, 'null')
+  else if (id === OTHERS_GROUP_ID) addCondition(doc, filter, attribute, 'not-in', exclude ?? [])
+  else if (kind === 'date') {
+    const [start, end] = periodRange(id)
+    addCondition(doc, filter, attribute, 'ge', start)
+    addCondition(doc, filter, attribute, 'lt', end)
+  } else addCondition(doc, filter, attribute, 'eq', id)
+  entity.appendChild(filter)
+}
+
+/** FetchXML só com a condição do grupo (para quem simula a consulta, como o mock). */
+export function withGroup(fetchxml: string, group: GroupTarget) {
+  const { doc, entity } = parse(fetchxml)
+  injectGroup(doc, entity, group)
+  return new XMLSerializer().serializeToString(doc)
 }
 
 /**
  * FetchXML da visão com paginação, ordenação da coluna e busca por palavra-chave injetadas; o resto fica intacto.
  * Não pede `returntotalrecordcount`: o total custaria uma contagem no servidor a cada página. Ele vem à parte (`buildCountFetch`).
  */
-export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, search }: BuildOptions) {
+export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, search, group }: BuildOptions) {
   const { doc, root, entity } = parse(fetchxml)
 
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount']) root.removeAttribute(name)
@@ -70,26 +95,50 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, sea
   if (sort) applySort(doc, entity, sort)
 
   injectSearch(doc, entity, search)
+  if (group) injectGroup(doc, entity, group)
 
   return new XMLSerializer().serializeToString(doc)
 }
 
-/** FetchXML da visão convertido em contagem total (`aggregate`): sem paginação, ordem nem atributos; filtros, links e busca ficam. */
-export function buildCountFetch(fetchxml: string, { search }: { search: SearchCondition[] }) {
+/**
+ * Base das consultas agregadas: a visão sem paginação, `distinct`, ordem nem colunas (filtros, links e busca ficam), com as
+ * colunas de `groupby` pedidas e a contagem de linhas no apelido `total`.
+ */
+function aggregateFetch(fetchxml: string, search: SearchCondition[], groupColumns: (doc: Document) => Element[] = () => []) {
   const { doc, root, entity } = parse(fetchxml)
-
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) root.removeAttribute(name)
   root.setAttribute('aggregate', 'true')
   for (const node of Array.from(entity.querySelectorAll('order, attribute, all-attributes'))) node.remove()
 
   const total = doc.createElement('attribute')
   total.setAttribute('name', ID_ATTRIBUTE)
-  total.setAttribute('alias', 'total')
+  total.setAttribute('alias', GROUP_TOTAL)
   total.setAttribute('aggregate', 'count')
-  entity.insertBefore(total, entity.firstChild)
+  for (const node of [...groupColumns(doc), total].reverse()) entity.insertBefore(node, entity.firstChild)
 
   injectSearch(doc, entity, search)
   return new XMLSerializer().serializeToString(doc)
+}
+
+/** FetchXML da visão convertido em contagem total (`aggregate`). */
+export const buildCountFetch = (fetchxml: string, { search }: { search: SearchCondition[] }) => aggregateFetch(fetchxml, search)
+
+/**
+ * FetchXML da visão convertido em contagem por grupo (`aggregate` + `groupby`). Data agrupa por ano (e mês) no fuso do
+ * usuário (`dategrouping`); o valor nulo volta como um grupo sem o apelido.
+ */
+export function buildGroupsFetch(fetchxml: string, { search, spec }: { search: SearchCondition[]; spec: Pick<GroupSpec, 'attribute' | 'kind' | 'by'> }) {
+  return aggregateFetch(fetchxml, search, (doc) => {
+    const column = (alias: string, dategrouping?: 'year' | 'month') => {
+      const attribute = doc.createElement('attribute')
+      attribute.setAttribute('name', spec.attribute)
+      attribute.setAttribute('alias', alias)
+      attribute.setAttribute('groupby', 'true')
+      if (dategrouping) attribute.setAttribute('dategrouping', dategrouping)
+      return attribute
+    }
+    return spec.kind !== 'date' ? [column(GROUP_VALUE)] : spec.by === 'year' ? [column(GROUP_YEAR, 'year')] : [column(GROUP_YEAR, 'year'), column(GROUP_MONTH, 'month')]
+  })
 }
 
 export function linkEntities(fetchxml: string) {

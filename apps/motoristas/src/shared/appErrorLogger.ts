@@ -20,6 +20,7 @@ import {
   withCauseLabel,
   type RepeatGroup
 } from "./errorLogGrouping.ts";
+import { SEM_CONEXAO_MESSAGE, ehErroDeRede, estaOnline } from "./erroDeRede.ts";
 
 // Wrapper do App Motoristas sobre o logger compartilhado (@betinhos-executive-service/ui/error-logger).
 // O pacote grava em new_appmotoristaslog e cuida de fila, retry, dedupe e usuário. Aqui ficam o que é só
@@ -57,6 +58,9 @@ export type AppErrorLogContext = {
 const APP_NAME = "App Motoristas";
 export const APP_OPERATION_ERROR_MESSAGE = "Ocorreu um erro na operação. Feche e reabra o aplicativo antes de tentar novamente.";
 export const APP_CONNECTION_LOST_MESSAGE = "A conexão com a internet foi perdida. Feche e reabra o aplicativo antes de tentar novamente.";
+/** Falha de rede com o aparelho online (sinal fraco): um aviso por janela, não um por requisição. */
+const REDE_NOTICE_INTERVAL_MS = 30000;
+let lastRedeNoticeAt = 0;
 const LEGACY_QUEUE_KEY = "app-motoristas-error-log-queue-v1";
 const PACKAGE_QUEUE_KEY = `betinhos-error-log-queue-v1:${APP_NAME}`;
 const RETRY_MS = 30000;
@@ -178,7 +182,7 @@ function buildUserFacingMessage(message: string, code: string, context: AppError
   const normalized = message.trim();
 
   if (/failed to fetch|não foi possível conectar ao servidor|nao foi possivel conectar ao servidor|offline/i.test(normalized)) {
-    return APP_OPERATION_ERROR_MESSAGE;
+    return SEM_CONEXAO_MESSAGE;
   }
   const privilegeMatch = normalized.match(/missing (prv[\w]+) privilege .* entity '([^']+)'/i);
   if (privilegeMatch) {
@@ -206,9 +210,20 @@ function buildUserFacingMessage(message: string, code: string, context: AppError
   return normalized || "Erro inesperado no app.";
 }
 
-function dispatchErrorNotice(normalized: { message: string; code: string }, context: AppErrorLogContext) {
+function dispatchErrorNotice(normalized: { message: string; code: string }, context: AppErrorLogContext, falhaDeRede = false) {
   const runtime = getWindowRuntime();
   if (!runtime) return;
+  if (falhaDeRede) {
+    // Sem rede o indicador "Sem conexão" já está na tela; o toast técnico só atrapalha. Com sinal fraco, um aviso curto.
+    if (!estaOnline()) return;
+    const now = Date.now();
+    if (now - lastRedeNoticeAt < REDE_NOTICE_INTERVAL_MS) return;
+    lastRedeNoticeAt = now;
+    runtime.dispatchEvent(new CustomEvent<AppErrorNotice>("appmotoristas:error", {
+      detail: { id: "rede|sem-conexao", severity: "info", source: context.source ?? "app", action: context.action ?? "", phase: context.phase ?? "", message: normalized.message, code: normalized.code, userMessage: SEM_CONEXAO_MESSAGE }
+    }));
+    return;
+  }
   const severity = context.severity ?? "error";
   const source = context.source ?? "app";
   const action = context.action ?? "";
@@ -277,10 +292,11 @@ export function reportAppError(error: unknown, context: AppErrorLogContext = {})
     stack: clip(String(redactSensitiveLogValue(raw.stack)), MAX_LOG_STACK_CHARS),
     code: String(redactSensitiveLogValue(raw.code))
   };
-  if (context.notifyUser !== false) dispatchErrorNotice(normalized, context);
+  const cause = classifyErrorCause(error);
+  // online=true: só falha de transporte conta aqui; erro de negócio ou de código com o aparelho offline continua avisando.
+  if (context.notifyUser !== false) dispatchErrorNotice(normalized, context, ehErroDeRede(error, true));
 
   // Mesma falha várias vezes na sessão (ex.: 40 serviços com a rede caída): só a primeira vai completa.
-  const cause = classifyErrorCause(error);
   const decision = repeatTracker.record({
     signature: buildRepeatSignature({ source: context.source, action: context.action, phase: context.phase, message: normalized.message, cause }),
     message: normalized.message,

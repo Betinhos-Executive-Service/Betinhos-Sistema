@@ -10,6 +10,7 @@ afterEach(cleanup)
 const source: RecebimentosSource = {
   carregar: vi.fn(async () => []),
   contar: async () => new Map(),
+  contarPorOp: async () => new Map(),
   financeiro: vi.fn(async () => ({ valorAReceber: 450.5, receber: true, formaPagamento: 'Pix' })),
   arquivo: async () => { throw new Error('fora da tela') },
 }

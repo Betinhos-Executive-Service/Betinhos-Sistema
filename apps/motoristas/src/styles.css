@@ -4375,6 +4375,54 @@ svg {
   backdrop-filter: blur(6px);
 }
 
+/* Sessão expirada: tela cheia opaca (não é popup); a fila e os rascunhos continuam no aparelho. */
+.sessao-expirada {
+  position: fixed;
+  inset: 0;
+  z-index: 10000; /* acima dos diálogos (9999) e dos overlays de progresso/envio (120/130) */
+  padding: 24px 20px;
+  display: grid;
+  place-items: center;
+  background: rgb(0, 26, 61);
+  color: #fff;
+}
+
+.sessao-expirada-conteudo {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: Manrope, Arial, sans-serif;
+}
+
+.sessao-expirada h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 950;
+  line-height: 1.12;
+}
+
+.sessao-expirada p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.sessao-expirada button {
+  min-height: 50px;
+  margin-top: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  color: rgb(0, 26, 61);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
 .critical-error-card {
   width: min(92vw, 560px);
   max-height: min(78vh, 620px);
@@ -14379,10 +14427,11 @@ select,
   pointer-events: auto;
 }
 
+/* Na linha da etiqueta (SERVIÇO), abaixo da seta: longe do horário, que ocupa a linha de cima. */
 .agenda-envio-pendente {
   position: absolute;
-  top: 10px;
-  right: 64px;
+  top: 46px;
+  right: 15px;
   z-index: 3;
   padding: 3px 9px;
   border-radius: 999px;

@@ -9,7 +9,7 @@ import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 
 type Props = { list: Pagante[]; choices: ChoiceSet; contatos: Map<string, Contato>; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Pagante>>
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Pagante>> & { comprovantes?: TableColumn<Pagante> }
 /** Seleção de linhas e as ações em lote do clique direito (as mesmas da faixa da seleção). */
 export type SelectionProps<Row> = { selection: TableSelection<Row>; bulkActions: (rows: Row[]) => MenuAction[] }
 
@@ -50,9 +50,10 @@ export function openOnRow(selecting: boolean) {
   return selecting ? { onDoubleClick: open } : { onClick: open }
 }
 
-export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions }: TableProps) {
+export function PagantesTable({ list, choices, contatos, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions, comprovantes }: TableProps) {
   const columns: TableColumn<Pagante>[] = [
     { key: 'pessoa', header: 'Pagante', label: 'Pagante', sortable: true, defaultWidth: 260, width: 'minmax(180px, 1.6fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
+    ...(comprovantes ? [comprovantes] : []),
     { key: 'codigo', header: 'Código', label: 'Código', sortable: true, defaultWidth: 120, width: 'minmax(90px, .7fr)', cell: (p) => p.codigo || '—' },
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 110, width: 'minmax(80px, .7fr)', hideBelow: 'compact', cell: (p) => p.op || '—' },
     { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(96px, .8fr)', cell: (p) => <span className="pg-num">{formatMoney(p.valor)}</span> },

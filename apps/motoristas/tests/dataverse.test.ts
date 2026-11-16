@@ -704,3 +704,9 @@ test("finalização com Não se aplica segue sem carro; sem escolha continua bar
   assert.deepEqual(Object.keys(patch), ["new_evidenciaveiculoinfleet"]);
   assert.throws(() => buildFinalizeServiceVehiclePatch({ vehicleResolution, vehicleChoice: null } as never), /Escolha o carro/);
 });
+
+test("entity set de cada tabela difere do nome lógico (URL direta faz fetch pelo entity set)", async () => {
+  const { ENTITY_SET_TO_ENTITY_NAME } = await import("../src/data/dataverse/entidades.ts");
+  const iguais = Object.entries(ENTITY_SET_TO_ENTITY_NAME).filter(([set, name]) => set === name);
+  assert.deepEqual(iguais, []);
+});

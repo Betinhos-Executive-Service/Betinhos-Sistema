@@ -16,7 +16,7 @@ import { GeralSheet } from './components/GeralSheet'
 import { recebimentosSource } from '../recebimentos/source'
 import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
 import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
-import { GeralTable } from './components/GeralTable'
+import { GeralTable, type Grouping } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
@@ -26,6 +26,7 @@ import { LiberarPortalDrawer } from './components/LiberarPortalDrawer'
 import { createPortalSource, type Liberacao } from './data/portal'
 import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
 import { COMPROVANTES_COLUMN, COMPROVANTES_KEY } from './domain/comprovantes'
+import { groupFields } from './domain/grouping'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
 import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
@@ -160,6 +161,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [contagemOpen, setContagemOpen] = useState(false)
   // Filtros do Design System (§10.9.2): rápidos por coluna e avançado E/OU; valem os que casam com os campos da metadata.
   const { filters, setFilters, setQuickFilter, filterFields } = geral
+  const { group, setGroup, groupSpec, buckets, groupLoads, toggleGroup, retryGroup, loadMoreGroup } = geral
+  // Cartões (celular ou modo Cartões) não agrupam: ao entrar neles o agrupamento sai, para a lista não ficar vazia com os grupos fechados.
+  useEffect(() => { if (cardsLayout && group) setGroup(null) }, [cardsLayout, group, setGroup])
   const valid = useMemo(() => readFilters(filters, filterFields), [filters, filterFields])
   const filteredKeys = useMemo(() => {
     const keys = new Set(Object.keys(valid.quick))
@@ -237,7 +241,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [setGeralSort, toast])
   const { state: viewState, columnDefs } = useGeralViewState({
     views: geral.views, view, viewsError: geral.viewsError, columns: allColumns, attributes, prefs: viewPrefs, setPrefs, hiddenByDefault: [PORTAL_KEY],
-    sort: geral.sort, setSort, filters, setFilters, selectView, reloadViews,
+    sort: geral.sort, setSort, filters, setFilters, group, setGroup, selectView, reloadViews,
     createView, updateView, renameView, deleteView, kv: source.kv,
   })
   const shareLink = useCallback(async () => {
@@ -557,9 +561,40 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
 
   const editRow = editId == null ? undefined : rowOf(editId)
 
+  const rowById = useMemo(() => new Map(rows.map((r) => [String(r[ID_ATTRIBUTE]), r])), [rows])
+  const grouping = useMemo<Grouping | undefined>(() => {
+    if (cardsLayout) return undefined
+    const fields = groupFields(filterFields)
+    return {
+      groups: groupSpec && buckets
+        ? buckets.map((bucket) => {
+          const load = groupLoads.get(bucket.id)
+          return {
+            id: bucket.id, label: bucket.label, count: bucket.count, open: load != null,
+            rows: (load?.ids ?? []).flatMap((id) => { const row = rowById.get(id); return row ? [row] : [] }),
+            more: load?.more ?? false, loading: load?.loading ?? false, error: load?.error ?? null,
+          }
+        })
+        : null,
+      onToggle: toggleGroup,
+      onLoadMore: loadMoreGroup,
+      onRetry: retryGroup,
+      menu: (column) => {
+        const field = column.alias ? undefined : fields.find((f) => f.key === column.attribute)
+        if (!field) return undefined
+        const date = field.kind === 'date'
+        return {
+          date,
+          active: group?.key !== field.key ? null : date ? group.by ?? 'month' : 'value',
+          onChange: (next) => setGroup(!next ? null : date ? { key: field.key, by: next === 'year' ? 'year' : 'month' } : { key: field.key }),
+        }
+      },
+    }
+  }, [cardsLayout, filterFields, groupSpec, buckets, groupLoads, rowById, group, toggleGroup, loadMoreGroup, retryGroup, setGroup])
+  const grouped = grouping?.groups != null
   const loadMoreProps = { more, loading, loadingMore, error: loadError, loaded: rows.length, total, onLoadMore: loadMore, onRetry: retryLoadMore, touch: mobile }
   const sentinel = more && !loading && !loadingMore && !loadError
-  const status = loading && rows.length === 0 ? null : statusText(rows.length, total, more)
+  const status = loading && rows.length === 0 && !grouped ? null : grouped ? `${total ?? 0} ${total === 1 ? 'serviço' : 'serviços'} em ${buckets?.length ?? 0} ${buckets?.length === 1 ? 'grupo' : 'grupos'}` : statusText(rows.length, total, more)
 
   const empty = (
     <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum serviço nesta visão" action={query ? <Button variant="secondary" onClick={() => setQuery('')}>Limpar busca</Button> : undefined}>
@@ -579,6 +614,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     body = (
       <>
         {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
+        {geral.groupNotice ? <Alert tone="warning">{geral.groupNotice}</Alert> : null}
         {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
         {cardsLayout
           ? (
@@ -611,6 +647,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onMove={moveColumn}
               attributes={attributes}
               rows={rows}
+              grouping={grouping}
               loading={loading}
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
@@ -629,7 +666,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               unsortable={VIRTUAL_KEYS}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
-              footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
+              footer={grouped ? <div className="gr-loadmore" role="status"><span>{status}{rows.length > 0 ? ` · ${rows.length} carregados` : ''}</span></div> : <LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
               empty={geral.pageError ? null : empty}
             />
           )}

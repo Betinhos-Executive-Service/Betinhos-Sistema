@@ -3,6 +3,8 @@ import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewB
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
+import type { Infracao } from './domain/types'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -47,15 +49,16 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const [query, setQuery] = useQueryTexto('q')
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
+  const multas = useCallback((id: string) => uso.get(id)?.length ?? 0, [uso])
+  const read = useMemo(() => extra.read((row: Infracao, key: string) => readInfracao(row, key, multas), (i) => i.id), [multas, extra])
   const visible = useMemo(() => {
-    const multas = (id: string) => uso.get(id)?.length ?? 0
-    const read = extra.read((row: (typeof data.list)[number], key: string) => readInfracao(row, key, multas), (i) => i.id)
     const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && matchesKeyword(i, query))
     return extra.sort(sortInfracoes(list, view.config.sort, multas), view.config.sort, (i) => i.id)
-  }, [data.list, filters, query, uso, view.config.sort])
+  }, [data.list, filters, allFields, query, multas, view.config.sort, read, extra])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const ativas = useMemo(() => data.list.filter((i) => i.ativo).length, [data.list])
   const usoState = data.multasError ?? (data.loading && !data.loaded ? 'loading' : 'ok')
@@ -76,11 +79,15 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
     const open = (id: string) => setTarget({ mode: 'view', id })
     const footer = <span className="if-num">{visible.length} de {data.list.length} · {ativas} ativas</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma infração com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Infracao[], tableFooter?: ReactNode) => (
+      <InfracoesTable list={rows} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Infracao[]) => <InfracoesCards list={rows} uso={uso} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

@@ -1,6 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
 import { label } from '../../pagantes/domain/status'
+import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
 import { EM_ABERTO, OP_STATUS } from './status'
 import { valorOp, type Op, type OpChoices } from './types'
 
@@ -15,6 +16,7 @@ export const OP_SORT: ViewSort = { key: 'criada', dir: 'desc' }
 /** Colunas na ordem padrão; a primeira (OP) é fixa. */
 export const OP_COLUMNS: ViewColumnDef[] = [
   { key: 'op', label: 'OP' },
+  COMPROVANTES_COLUMN,
   { key: 'cliente', label: 'Cliente' },
   { key: 'servicos', label: 'Serviços' },
   { key: 'passageiros', label: 'Passageiros' },
@@ -29,6 +31,7 @@ const options = (list: { value: number; label: string }[]): FilterOption[] => li
 export function opFields(choices: OpChoices): FilterField[] {
   return [
     { key: 'op', label: 'OP', kind: 'text' },
+    COMPROVANTES_FIELD,
     { key: 'cliente', label: 'Cliente', kind: 'text' },
     { key: 'servicos', label: 'Primeiro serviço', kind: 'date' },
     { key: 'passageiros', label: 'Passageiros', kind: 'text' },
