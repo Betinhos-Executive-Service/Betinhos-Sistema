@@ -13,7 +13,7 @@ const ler = async (a: Comprovante) => ({ nome: a.nome, mime: 'image/jpeg', url: 
 
 const prova: ProvaMidia = {
   link: comProva.url!, origem: 'galeria', selos: ['fora-da-janela', 'repetida'], dataGravada: new Date('2026-11-01T13:30:00Z'),
-  aparelho: 'Apple iPhone 15', emitidoEm: new Date('2026-11-16T12:00:00Z'), recebidoEm: new Date('2026-11-16T12:04:00Z'), atrasoMinutos: 4,
+  aparelho: 'Apple iPhone 15', emitidoEm: new Date('2026-11-16T12:00:00Z'), recebidoEm: new Date('2026-11-16T12:04:00Z'), atrasoMinutos: 4, valorLido: null, dataLida: null,
 }
 
 describe('prova de captura nos anexos', () => {
@@ -59,6 +59,31 @@ describe('prova de captura nos anexos', () => {
     await Promise.resolve()
     expect(screen.queryByRole('button', { name: /Galeria\/arquivo|Câmera do app/ })).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('fase 3: selos da nota pela ordem das choices e valor/data lidos', () => {
+    const p = mapProva({ cr40f_link: 'l', cr40f_origemcaptura: 100000000, cr40f_selos: '100000007,100000008,100000009', cr40f_valorlido: 85.4, cr40f_datalida: '2026-11-14' })
+    expect(p.selos).toEqual(['nota-nao-verificada', 'sem-nota-fiscal', 'valor-alterado'])
+    expect(p).toMatchObject({ valorLido: 85.4, dataLida: '2026-11-14' })
+    expect(decodeURIComponent(provasPaths('cr40f_provamidias', ['l'])[0])).toContain('cr40f_valorlido,cr40f_datalida')
+  })
+
+  it('selo "Valor alterado" mostra o valor e a data que a leitura tinha lido', async () => {
+    const alterada: ProvaMidia = { ...prova, selos: ['valor-alterado'], valorLido: 85.4, dataLida: '2026-11-14' }
+    render(<ComprovantesGaleria anexos={[comProva]} ler={ler} provas={async () => new Map([[alterada.link, alterada]])} />)
+    expect(await screen.findByText('Valor alterado')).toBeTruthy()
+    expect(screen.getByText(/Leitura tinha lido R\$\s?85,40 · 14\/11\/2026/)).toBeTruthy()
+  })
+
+  it('ambiente sem as colunas da fase 3: repete a consulta só com as colunas base', async () => {
+    const getAll = vi.fn(async (path: string) => {
+      if (decodeURIComponent(path).includes('cr40f_valorlido')) throw new Error('Could not find a property named cr40f_valorlido')
+      return [{ cr40f_link: 'https://x/1.jpg', cr40f_origemcaptura: 100000000, cr40f_selos: '100000000' }]
+    })
+    const host = { mode: 'dataverse', metadata: { entities: async () => new Map([['cr40f_provamidia', { entitySetName: 'cr40f_provamidias' }]]) }, client: { getAll } } as never
+    const mapa = await createCarregarProvas(host)(['https://x/1.jpg'])
+    expect(mapa.get('https://x/1.jpg')?.selos).toEqual(['capturada-sem-rede'])
+    expect(getAll).toHaveBeenCalledTimes(2)
   })
 
   it('no Dataverse, tabela ausente vira mapa vazio', async () => {

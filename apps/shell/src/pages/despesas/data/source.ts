@@ -89,7 +89,12 @@ export function createSource(host: Host): Source {
       const [row] = await host.client.getAll(despesasPath(await entitySet(ENTITY_DESPESA), null, `cr40f_despesaoperacionalid eq ${guid(id)}`))
       return row ? mapDespesa(row) : null
     },
-    anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
+    anexos: async (id) => {
+      const set = await entitySet(ENTITY_ANEXO)
+      // Ambiente sem as colunas da nota (migration 20261116-2100 ainda não chegou): lê sem elas, sem derrubar a ficha.
+      const linhas = await host.client.getAll(anexosPath(set, id)).catch(() => host.client.getAll(anexosPath(set, id, false)))
+      return linhas.map(mapAnexo)
+    },
     arquivo: createArquivos(host.client),
     provas: createCarregarProvas(host),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.

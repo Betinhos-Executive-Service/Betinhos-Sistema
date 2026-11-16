@@ -10,7 +10,7 @@ const fotos = [
   { link: 'https://betinhos.sharepoint.com/chk/frente.jpg', nomeArquivo: 'frente.jpg', caminho: '' },
   { link: 'https://betinhos.sharepoint.com/chk/traseira.jpg', nomeArquivo: 'traseira.jpg', caminho: '' },
 ]
-const prova: ProvaMidia = { link: fotos[0].link, origem: 'camera', selos: ['capturada-sem-rede'], dataGravada: null, aparelho: '', emitidoEm: null, recebidoEm: new Date('2026-11-16T12:00:00Z'), atrasoMinutos: 95 }
+const prova: ProvaMidia = { link: fotos[0].link, origem: 'camera', selos: ['capturada-sem-rede'], dataGravada: null, aparelho: '', emitidoEm: null, recebidoEm: new Date('2026-11-16T12:00:00Z'), atrasoMinutos: 95, valorLido: null, dataLida: null }
 
 describe('fotos do checklist com a prova de captura', () => {
   it('mostra origem e selo só na foto que tem prova', async () => {

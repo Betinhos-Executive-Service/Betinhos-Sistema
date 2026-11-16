@@ -6,6 +6,7 @@ import type { Host } from '../../host'
 export const ENTITY_PROVA = 'cr40f_provamidia'
 
 export type SeloProva = 'capturada-sem-rede' | 'codigo-invalido' | 'codigo-nao-assinado' | 'fora-da-janela' | 'sem-data' | 'repetida' | 'parecida'
+  | 'nota-nao-verificada' | 'sem-nota-fiscal' | 'valor-alterado'
 
 export type ProvaMidia = {
   link: string
@@ -16,13 +17,16 @@ export type ProvaMidia = {
   emitidoEm: Date | null
   recebidoEm: Date | null
   atrasoMinutos: number | null
+  /** Despesa (fase 3): valor e data que a leitura rápida preencheu; mostrados com o selo "Valor alterado". */
+  valorLido: number | null
+  dataLida: string | null
 }
 
 /** Provas por link; falha de leitura vira mapa vazio (o selo é acessório e nunca derruba a tela). */
 export type CarregarProvas = (links: string[]) => Promise<Map<string, ProvaMidia>>
 
-// Valores das choices do ProvaMidiaHandler (migrations 20261116-1400 e 20261116-1800; a ordem é o contrato).
-const SELOS: SeloProva[] = ['capturada-sem-rede', 'codigo-invalido', 'codigo-nao-assinado', 'fora-da-janela', 'sem-data', 'repetida', 'parecida']
+// Valores das choices do ProvaMidiaHandler (migrations 20261116-1400, 20261116-1800 e 20261116-2100; a ordem é o contrato).
+const SELOS: SeloProva[] = ['capturada-sem-rede', 'codigo-invalido', 'codigo-nao-assinado', 'fora-da-janela', 'sem-data', 'repetida', 'parecida', 'nota-nao-verificada', 'sem-nota-fiscal', 'valor-alterado']
 const ORIGEM_GALERIA = 100000002
 
 export const ROTULO_SELO: Record<SeloProva, string> = {
@@ -33,6 +37,9 @@ export const ROTULO_SELO: Record<SeloProva, string> = {
   'sem-data': 'Sem data',
   repetida: 'Repetida',
   parecida: 'Parecida',
+  'nota-nao-verificada': 'Nota não verificada',
+  'sem-nota-fiscal': 'Sem nota fiscal',
+  'valor-alterado': 'Valor alterado',
 }
 
 /** Selos que pedem atenção (vermelho); os demais são aviso. */
@@ -54,30 +61,34 @@ export function mapProva(row: Record<string, unknown>): ProvaMidia {
     emitidoEm: data(row.cr40f_emitidoem),
     recebidoEm: data(row.cr40f_recebidoem),
     atrasoMinutos: typeof row.cr40f_atrasominutos === 'number' ? row.cr40f_atrasominutos : null,
+    valorLido: typeof row.cr40f_valorlido === 'number' ? row.cr40f_valorlido : null,
+    dataLida: typeof row.cr40f_datalida === 'string' && /^\d{4}-\d{2}-\d{2}/.test(row.cr40f_datalida) ? row.cr40f_datalida.slice(0, 10) : null,
   }
 }
 
-const SELECT = ['cr40f_link', 'cr40f_origemcaptura', 'cr40f_selos', 'cr40f_datagravada', 'cr40f_marca', 'cr40f_modelo', 'cr40f_emitidoem', 'cr40f_recebidoem', 'cr40f_atrasominutos'].join(',')
+const SELECT_BASE = ['cr40f_link', 'cr40f_origemcaptura', 'cr40f_selos', 'cr40f_datagravada', 'cr40f_marca', 'cr40f_modelo', 'cr40f_emitidoem', 'cr40f_recebidoem', 'cr40f_atrasominutos']
+// Colunas da fase 3 (migration 20261116-2100): no ambiente que ainda não as tem, a consulta cai para a base.
+const SELECT_NOTA = [...SELECT_BASE, 'cr40f_valorlido', 'cr40f_datalida']
 const LOTE = 10
 
 /** Filtro OData por link, em lotes de 10 (limite de URL). */
-export function provasPaths(entitySet: string, links: string[]) {
+export function provasPaths(entitySet: string, links: string[], colunas: string[] = SELECT_NOTA) {
   const unicos = [...new Set(links.filter(Boolean))]
   const paths: string[] = []
   for (let i = 0; i < unicos.length; i += LOTE) {
     const filtro = unicos.slice(i, i + LOTE).map((l) => `cr40f_link eq '${l.replace(/'/g, "''")}'`).join(' or ')
-    paths.push(`${entitySet}?$select=${SELECT}&$filter=${encodeURIComponent(filtro)}`)
+    paths.push(`${entitySet}?$select=${colunas.join(',')}&$filter=${encodeURIComponent(filtro)}`)
   }
   return paths
 }
 
-/** Mock: o 1º link vem da galeria (fora da janela, parecida), o 2º da câmera sem rede; os outros sem prova. */
+/** Mock: o 1º link vem da galeria (fora da janela, parecida, valor alterado), o 2º da câmera sem rede; os outros sem prova. */
 export function provasMock(links: string[], agora = new Date()): Map<string, ProvaMidia> {
   const out = new Map<string, ProvaMidia>()
   const [primeiro, segundo] = links.filter(Boolean)
   const hora = (minutos: number) => new Date(agora.getTime() - minutos * 60_000)
-  if (primeiro) out.set(primeiro, { link: primeiro, origem: 'galeria', selos: ['fora-da-janela', 'parecida'], dataGravada: hora(60 * 24 * 9), aparelho: 'Apple iPhone 15', emitidoEm: hora(42), recebidoEm: hora(38), atrasoMinutos: 4 })
-  if (segundo) out.set(segundo, { link: segundo, origem: 'camera', selos: ['capturada-sem-rede'], dataGravada: null, aparelho: '', emitidoEm: null, recebidoEm: hora(5), atrasoMinutos: 95 })
+  if (primeiro) out.set(primeiro, { link: primeiro, origem: 'galeria', selos: ['fora-da-janela', 'parecida', 'valor-alterado'], dataGravada: hora(60 * 24 * 9), aparelho: 'Apple iPhone 15', emitidoEm: hora(42), recebidoEm: hora(38), atrasoMinutos: 4, valorLido: 85.4, dataLida: '2026-11-14' })
+  if (segundo) out.set(segundo, { link: segundo, origem: 'camera', selos: ['capturada-sem-rede'], dataGravada: null, aparelho: '', emitidoEm: null, recebidoEm: hora(5), atrasoMinutos: 95, valorLido: null, dataLida: null })
   return out
 }
 
@@ -89,7 +100,8 @@ export function createCarregarProvas(host: Host): CarregarProvas {
       set ??= host.metadata.entities([ENTITY_PROVA]).then((info) => info.get(ENTITY_PROVA)?.entitySetName ?? null)
       const entitySet = await set
       if (!entitySet) return new Map()
-      const linhas = (await Promise.all(provasPaths(entitySet, links).map((path) => host.client.getAll(path)))).flat()
+      const ler = (colunas?: string[]) => Promise.all(provasPaths(entitySet, links, colunas).map((path) => host.client.getAll(path)))
+      const linhas = (await ler().catch(() => ler(SELECT_BASE))).flat()
       return new Map(linhas.map((row) => mapProva(row as Record<string, unknown>)).map((p) => [p.link, p]))
     } catch {
       // Tabela ainda não publicada no ambiente ou sem leitura: segue sem selo.

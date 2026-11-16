@@ -6,3 +6,4 @@
 .cmp-prova__detalhe > span { display: grid; }
 .cmp-prova__detalhe strong { color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-bold); }
 .cmp-prova:hover .cmp-prova__detalhe, .cmp-prova:focus-within .cmp-prova__detalhe, .cmp-prova--aberta .cmp-prova__detalhe { display: grid; }
+.cmp-prova__lido { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }

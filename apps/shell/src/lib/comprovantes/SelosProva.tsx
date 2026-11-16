@@ -6,6 +6,13 @@ import './selosProva.css'
 
 const formato = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 const quando = (d: Date | null) => (d ? formato.format(d).replace(',', '') : '—')
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+const dia = (iso: string) => iso.split('-').reverse().join('/')
+
+/** O que a leitura rápida tinha preenchido, mostrado junto do selo "Valor alterado". */
+export function textoLido(prova: Pick<ProvaMidia, 'valorLido' | 'dataLida'>) {
+  return [prova.valorLido != null ? brl.format(prova.valorLido) : '', prova.dataLida ? dia(prova.dataLida) : ''].filter(Boolean).join(' · ')
+}
 
 /** Provas dos links dos anexos; recarrega quando a lista de links muda. Sem prova, o mapa fica vazio. */
 export function useProvasMidia(carregar: CarregarProvas | undefined, links: (string | null)[]) {
@@ -36,12 +43,14 @@ export function SelosProva({ prova }: { prova: ProvaMidia | undefined }) {
         {galeria ? 'Galeria/arquivo' : 'Câmera do app'}
       </button>
       {prova.selos.map((selo) => <StatusBadge key={selo} tone={SELO_GRAVE.has(selo) ? 'danger' : 'warning'}>{ROTULO_SELO[selo]}</StatusBadge>)}
+      {prova.selos.includes('valor-alterado') && textoLido(prova) ? <span className="cmp-prova__lido">Leitura tinha lido {textoLido(prova)}</span> : null}
       <span id={id} role="tooltip" className="cmp-prova__detalhe">
         <span><strong>Data gravada no arquivo</strong>{galeria ? (prova.dataGravada ? quando(prova.dataGravada) : 'sem data') : 'não se aplica (câmera do app)'}</span>
         <span><strong>Aparelho</strong>{prova.aparelho || '—'}</span>
         <span><strong>Câmera aberta (servidor)</strong>{quando(prova.emitidoEm)}</span>
         <span><strong>Recebida (servidor)</strong>{quando(prova.recebidoEm)}</span>
         <span><strong>Atraso</strong>{prova.atrasoMinutos == null ? '—' : `${prova.atrasoMinutos} min`}</span>
+        {textoLido(prova) ? <span><strong>Lido pela leitura rápida</strong>{textoLido(prova)}</span> : null}
       </span>
     </span>
   )
