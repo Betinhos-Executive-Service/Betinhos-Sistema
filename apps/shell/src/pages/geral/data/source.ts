@@ -4,14 +4,15 @@ import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../domain/columns'
 import { dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
-import { buildCountFetch, buildFetch, quickFindAttributes } from '../domain/fetch'
+import { buildCountFetch, buildFetch, buildGroupsFetch, quickFindAttributes, withGroup } from '../domain/fetch'
+import { bucketsFromRows, GROUPS_LIMIT_MESSAGE, isAggregateLimit, type GroupBucket, type GroupSpec, type GroupTarget } from '../domain/grouping'
 import { buildSearch, searchKind, type SearchCondition, type SearchField } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
 import { SNAPSHOT_TENARIS, type Protecao } from '../domain/protecao'
 import { parseLinkCadastroJson, pedidoAquecer, type LinkCadastroResult } from '../domain/linkCadastro'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
-import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, createMockRows, createMockViews, mockProtecao } from './mock'
+import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, applyMockGroups, createMockRows, createMockViews, mockProtecao } from './mock'
 import { auditPath, contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, lookupIdsPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
@@ -21,8 +22,9 @@ export const ERRO_OPERACIONAL_WEBRESOURCE = 'new_gestao_erros_operacionais.html'
 export const FUNCIONARIOS_ENTITY = 'cr40f_funcionarios'
 
 /** `signal` cancela a requisição quando a tela troca de contexto (visão, busca, ordem): libera a conexão para a consulta nova. */
-export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[]; signal?: AbortSignal }
+export type PageRequest = { fetchxml: string; page: number; cookie: string | null; sort: Sort; query: string; quickFind: string[]; signal?: AbortSignal; group?: GroupTarget }
 export type CountRequest = { fetchxml: string; query: string; quickFind: string[]; signal?: AbortSignal }
+export type GroupsRequest = { fetchxml: string; query: string; quickFind: string[]; spec: GroupSpec; signal?: AbortSignal }
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
 export type Source = {
@@ -41,6 +43,8 @@ export type Source = {
   page(req: PageRequest): Promise<Page>
   /** Total de linhas da visão (com a busca), numa consulta agregada à parte; `null` quando a contagem falha ou é cancelada. */
   count(req: CountRequest): Promise<number | null>
+  /** Grupos da visão (com a busca) e a contagem real de cada um, numa consulta agregada; falha ou cancelamento rejeitam. */
+  groups(req: GroupsRequest): Promise<GroupBucket[]>
   update(id: string, patch: Row): Promise<void>
   clearLookup(id: string, attribute: string): Promise<void>
   lookupBind(attribute: string): Promise<LookupBind>
@@ -175,13 +179,17 @@ function createMockSource({ latency = 1, pageSize = PAGE_SIZE }: SourceOptions =
     attributes: async (entity) => (entity === ENTITY ? new Map(MOCK_ATTRIBUTES) : new Map<string, AttributeInfo>()),
     async page(req) {
       await wait(300)
-      const page = applyMockFetch(rows, req.fetchxml, { ...req, pageSize, now: new Date() })
+      const page = applyMockFetch(rows, req.group ? withGroup(req.fetchxml, req.group) : req.fetchxml, { ...req, pageSize, now: new Date() })
       // Como no Dataverse (sem `returntotalrecordcount`), o total não vem com a página: a tela pede a contagem à parte.
       return { ...page, rows: page.rows.map((r) => ({ ...r })), total: null }
     },
     async count(req) {
       await wait(150)
       return applyMockFetch(rows, req.fetchxml, { ...req, page: 1, pageSize: Number.MAX_SAFE_INTEGER, sort: null, now: new Date() }).total
+    },
+    async groups(req) {
+      await wait(150)
+      return bucketsFromRows(applyMockGroups(rows, buildGroupsFetch(req.fetchxml, { search: [], spec: req.spec }), { ...req, now: new Date() }), req.spec)
     },
     update,
     async clearLookup(id, attribute) {
@@ -404,7 +412,7 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     attributes,
     async page(req) {
       const search = await resolveSearch(req.query, req.quickFind)
-      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, search })
+      const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, search, group: req.group })
       return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
     },
     async count(req) {
@@ -412,6 +420,15 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
         const fetchxml = buildCountFetch(req.fetchxml, { search: await resolveSearch(req.query, req.quickFind) })
         return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
       } catch { return null }
+    },
+    async groups(req) {
+      const fetchxml = buildGroupsFetch(req.fetchxml, { search: await resolveSearch(req.query, req.quickFind), spec: req.spec })
+      try {
+        const body = await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal })
+        return bucketsFromRows(body.value, req.spec)
+      } catch (error) {
+        throw isAggregateLimit(error) ? new Error(GROUPS_LIMIT_MESSAGE) : error
+      }
     },
     update: async (id, patch) => host.client.update(await entitySet(), id, patch),
     async clearLookup(id, attribute) {
