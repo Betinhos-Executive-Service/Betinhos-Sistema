@@ -2,6 +2,7 @@ import { emptyFilters, filtersToFetchXml, readFilters, type FilterCondition, typ
 import { decodeTableFilters as decodeShared } from '../../../app/filtersUrl'
 import { parse } from './fetch'
 import { decodeFilters, type Filter, type FilterSet } from './filters'
+import { COMPROVANTES_FIELD, comprovantesNoFetch } from './comprovantes'
 import { filterKindOf } from './filterKind'
 import type { AttributeMap } from './types'
 
@@ -25,6 +26,7 @@ export function geralFilterFields(attributes: AttributeMap | null, columnKeys: s
     if (kind === 'number' && info.type === 'Money') field.money = true
     fields.push(field)
   }
+  fields.push(COMPROVANTES_FIELD)
   const position = (key: string) => {
     const index = columnKeys.indexOf(key)
     return index < 0 ? Number.MAX_SAFE_INTEGER : index
@@ -98,6 +100,7 @@ export function injectTableFilters(fetchxml: string, filters: TableFilters, fiel
   if (!xml) return fetchxml
   const { doc, entity } = parse(fetchxml)
   const fragment = new DOMParser().parseFromString(xml, 'text/xml').documentElement
+  comprovantesNoFetch(fragment)
   entity.appendChild(doc.importNode(fragment, true))
   return new XMLSerializer().serializeToString(doc)
 }

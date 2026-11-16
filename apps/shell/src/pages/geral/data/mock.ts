@@ -2,6 +2,7 @@ import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
 import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
 import { searchConditions } from '../domain/search'
+import { mockRecebimentos } from '../../recebimentos/mock'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
@@ -250,9 +251,17 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   }
 }
 
+/** Filtro da coluna Comprovantes (`link-entity` any/not any em cr40f_anexorecebimento_v2), com a contagem do mock. */
+function comprovantes(el: Element, row: Row): boolean | null {
+  if (el.getAttribute('name') !== 'cr40f_anexorecebimento_v2') return null
+  const tem = mockRecebimentos(String(row[ID_ATTRIBUTE])).length > 0
+  const type = el.getAttribute('link-type')
+  return type === 'any' ? tem : type === 'not any' ? !tem : null
+}
+
 function filter(el: Element, row: Row, now: Date): boolean | null {
   const results = Array.from(el.children).flatMap((child) => {
-    const result = child.tagName === 'condition' ? condition(child, row, now) : child.tagName === 'filter' ? filter(child, row, now) : null
+    const result = child.tagName === 'condition' ? condition(child, row, now) : child.tagName === 'filter' ? filter(child, row, now) : child.tagName === 'link-entity' ? comprovantes(child, row) : null
     return result == null ? [] : [result]
   })
   if (!results.length) return null

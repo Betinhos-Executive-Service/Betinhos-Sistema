@@ -98,6 +98,35 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     expect(screen.getByText(`Coluna ${second} movida para a posição 3`)).toBeTruthy()
   })
 
+  it('Comprovantes é coluna normal: vem depois da primeira, mostra a contagem, filtra, move e não ordena', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
+    const [first] = names()
+    expect(names()[1]).toBe('Comprovantes')
+    expect(await screen.findAllByRole('button', { name: /comprovantes? de recebimento/, hidden: true })).not.toHaveLength(0)
+    const header = screen.getAllByRole('columnheader', { hidden: true }).find((h) => h.getAttribute('title') === 'Comprovantes')!
+    fireEvent.click(within(header).getByRole('button', { name: /^Comprovantes/, hidden: true }))
+    expect(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /Classificar|Ordenar|Crescente|A → Z/, hidden: true })).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    // Levada para o início, a primeira coluna (botão que abre o serviço) continua primeira.
+    fireEvent.keyDown(within(header).getByRole('button', { name: /^Comprovantes/, hidden: true }), { key: 'ArrowLeft', altKey: true })
+    await waitFor(() => expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain('comprovantes'))
+    expect(names().slice(0, 2)).toEqual([first, 'Comprovantes'])
+  })
+
+  it('a primeira coluna anda para a direita mesmo com Comprovantes logo depois dela', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
+    const [first, , second] = names()
+    const header = screen.getAllByRole('columnheader', { hidden: true }).find((h) => h.getAttribute('title') === first)!
+    fireEvent.keyDown(within(header).getByRole('button', { name: new RegExp(`^${first}`), hidden: true }), { key: 'ArrowRight', altKey: true })
+    await waitFor(() => expect(names()[0]).toBe(second))
+    expect(names().slice(0, 3)).toEqual([second, 'Comprovantes', first])
+  })
+
   const LS = 'betinhos.geral.colunas.v1'
   const open = async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
