@@ -92,6 +92,18 @@ public class CicloTests
     }
 
     [Theory]
+    [InlineData("2026-11-18T11:30:00-03:00", "2026-11-18T14:30:00Z")] // com deslocamento: converte para UTC
+    [InlineData("2026-11-18T14:30:00Z", "2026-11-18T14:30:00Z")] // já em UTC
+    [InlineData("2026-11-18T14:30:00", "2026-11-18T14:30:00Z")] // sem fuso: assume UTC
+    public void Data_hora_vira_UTC(string entrada, string esperadoUtc)
+    {
+        var data = Ciclo.LerDataHora(entrada);
+        Assert.Equal(DateTime.Parse(esperadoUtc, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal), data);
+        Assert.Equal(new DateTime(2026, 11, 18, 14, 30, 0), data);
+        Assert.Equal(DateTimeKind.Utc, data.Kind);
+    }
+
+    [Theory]
     [InlineData(M.Agendado, G.StatusProgramado, true, M.Programado)]
     [InlineData(M.Programado, G.StatusProgramado, true, null)] // já está
     [InlineData(M.Agendado, G.StatusProgramado, false, null)] // programado sem motorista não vale

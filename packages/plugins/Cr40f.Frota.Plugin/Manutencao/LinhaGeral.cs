@@ -21,6 +21,17 @@ public static class LinhaGeral
         return linhas.FirstOrDefault();
     }
 
+    /// <summary>Como Ativa, mas a linha já concluída também conta (Concluir repetido). Não filtra statecode: a concluída pode estar inativa.</summary>
+    public static Entity? AtivaOuConcluida(IOrganizationService service, Guid manutencaoId)
+    {
+        var query = new QueryExpression(G.Tabela) { ColumnSet = new ColumnSet(Colunas), TopCount = 3 };
+        query.Criteria.AddCondition(G.Manutencao, ConditionOperator.Equal, manutencaoId);
+        query.Criteria.AddCondition(G.Status, ConditionOperator.NotIn, G.StatusCancelado, G.StatusCanceladoComReservas);
+        var linhas = service.RetrieveMultiple(query).Entities;
+        if (linhas.Count > 1) throw Ciclo.Erro("Esta manutenção tem mais de uma linha ativa na Geral. Cancele as duplicadas antes de continuar.");
+        return linhas.FirstOrDefault();
+    }
+
     /// <summary>
     /// Linha encaixada e ainda não programada: sem motorista (a operação escolhe) e saída no início da janela.
     /// Os campos fixos são os que o flow antigo gravava; as observações só entram quando preenchidas.
