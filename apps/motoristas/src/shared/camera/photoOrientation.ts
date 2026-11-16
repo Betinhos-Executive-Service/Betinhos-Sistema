@@ -156,15 +156,21 @@ export function formatVideoDuration(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function getVideoDurationLabelFromUrl(sourceUrl: string) {
-  if (typeof document === "undefined" || !sourceUrl) return Promise.resolve("");
+export async function getVideoDurationLabelFromUrl(sourceUrl: string) {
+  const seconds = await getVideoDurationSecondsFromUrl(sourceUrl);
+  return seconds === null ? "" : formatVideoDuration(seconds);
+}
 
-  return new Promise<string>((resolve) => {
+/** Duração pelos metadados de um elemento <video>; null quando o navegador não informa em 4,5 s. */
+export function getVideoDurationSecondsFromUrl(sourceUrl: string) {
+  if (typeof document === "undefined" || !sourceUrl) return Promise.resolve(null);
+
+  return new Promise<number | null>((resolve) => {
     const video = document.createElement("video");
     let settled = false;
     let timeoutId = 0;
 
-    const finish = (value: string) => {
+    const finish = (value: number | null) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timeoutId);
@@ -174,14 +180,14 @@ export function getVideoDurationLabelFromUrl(sourceUrl: string) {
       resolve(value);
     };
 
-    timeoutId = window.setTimeout(() => finish(""), 4500);
+    timeoutId = window.setTimeout(() => finish(null), 4500);
     video.muted = true;
     video.playsInline = true;
     video.preload = "metadata";
     video.addEventListener("loadedmetadata", () => {
-      finish(Number.isFinite(video.duration) && video.duration > 0 ? formatVideoDuration(video.duration) : "");
+      finish(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null);
     }, { once: true });
-    video.addEventListener("error", () => finish(""), { once: true });
+    video.addEventListener("error", () => finish(null), { once: true });
     video.src = sourceUrl;
     video.load();
   });

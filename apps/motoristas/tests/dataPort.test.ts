@@ -10,6 +10,7 @@ import * as finalizar from "../src/features/finalizar/remoto.ts";
 import * as voucher from "../src/features/voucher/remoto.ts";
 import * as recibo from "../src/features/recibo/remoto.ts";
 import * as ideias from "../src/features/ideias/remoto.ts";
+import * as prova from "../src/features/fotos/provaRemota.ts";
 import { adaptadorDataverse } from "../src/data/dataverse/adaptador.ts";
 
 test("adaptador Dataverse delega cada operacao para a funcao atual, sem embrulho", () => {
@@ -33,7 +34,9 @@ test("adaptador Dataverse delega cada operacao para a funcao atual, sem embrulho
     carregarComunicado: comunicados.loadDriverComunicado,
     acaoComunicado: comunicados.executeComunicadoAction,
     carregarIdeias: ideias.loadMyIdeasRemote,
-    criarIdeia: ideias.createIdeaRemote
+    criarIdeia: ideias.createIdeaRemote,
+    emitirProvaMidia: prova.emitirProvaMidiaRemote,
+    registrarProvaMidia: prova.registrarProvaMidiaRemote
   });
 });
 

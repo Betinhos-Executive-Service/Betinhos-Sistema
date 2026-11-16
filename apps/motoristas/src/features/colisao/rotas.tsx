@@ -4,6 +4,7 @@ import type { ToastTone } from "../../shared/ui/LocalToast";
 import { CollisionScreen } from "./CollisionScreen";
 import { CollisionStartScreen } from "./CollisionStartScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDosVeiculos } from "../fotos/provaCaptura";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { getCollisionPhotoLabel } from "./collisions";
 import type { Screen } from "../../types";
@@ -72,6 +73,10 @@ export function rotasColisao(screen: Screen, {
         }}
         onCaptureVideo={openCollisionVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
+        prova={{
+          origem: { tela: "colisao", tabela: "cr40f_colisao_v2" },
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Colisão" }
+        }}
       />
     );
   }

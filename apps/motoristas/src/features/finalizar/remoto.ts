@@ -8,7 +8,8 @@ import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { mockOrganizeObservation } from "./observacaoOrganizada.ts";
 import { OPERATION_STATUS, bind, normalizeText, parseCurrencyNumber } from "../../data/dataverse/registros.ts";
 import { assertExpenseSchemaReadyRemote, loadExpenseLookupNavigationNamesRemote, loadExpenseReferenceDataRemote, uploadExpenseInvoiceRemote } from "../despesas/remoto.ts";
-import { buildMaintenancePhotoFolder, createMaintenancePhotoLinkRecord, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { buildMaintenancePhotoFolder, createMaintenancePhotoLinkRecord } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 import { EXCHANGE_SELECT, getExchangeCompletionState } from "../servicos/trocas.ts";
 
 export type FinalizePayload = {
@@ -369,7 +370,7 @@ export async function finalizeMaintenanceRemote(payload: FinalizePayload) {
     targetField: entry.targetField,
     kind: entry.kind,
     fileName: entry.fileName,
-    link: await uploadMaintenancePhoto(photoFolderPath, photos[entry.kind] ?? "", entry.fileName, {
+    link: await uploadMediaWithProof(photoFolderPath, photos[entry.kind] ?? "", entry.fileName, {
       manutencaoId: record.cr40f_id ?? "",
       manutencaoGuid: dv.id,
       geralId,

@@ -3,6 +3,7 @@ import { expenseFlowView } from "./receiptQuickRead";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { DESCRICAO_ID, ExpenseScreen } from "./ExpenseScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDosVeiculos } from "../fotos/provaCaptura";
 import { ReceiptReadingScreen } from "./ReceiptReadingScreen";
 import { ReceiptIllegibleScreen } from "./ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
@@ -81,7 +82,6 @@ export function rotasDespesas(screen: Screen, {
   maintenanceVehiclesLoading,
   openExpenseCamera,
   openExpensePreview,
-  openExpenseVideoPreview,
   remoteMode,
   remoteOperation,
   refazerLeituraCartao,
@@ -115,8 +115,11 @@ export function rotasDespesas(screen: Screen, {
           setExpensePreviewPhotoId("");
           setScreen("previewFotoGasto");
         }}
-        onCaptureVideo={openExpenseVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
+        prova={{
+          origem: { tela: "despesa", tabela: "cr40f_despesaoperacional" },
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" }
+        }}
       />
     );
   }

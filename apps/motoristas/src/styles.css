@@ -11211,6 +11211,40 @@ select,
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
+/* Prévia do texto do carimbo; na foto final a faixa é acrescentada abaixo da imagem, sem cobrir nada. */
+.camera-stamp-preview {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  max-height: 10%;
+  min-height: 34px;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* Explicação da localização, antes do pedido do navegador: acima da câmera e do carimbo. */
+.camera-location-notice {
+  z-index: 5;
+}
+
+.camera-stamp-preview span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .camera-recording-pill span {
   width: 9px;
   height: 9px;

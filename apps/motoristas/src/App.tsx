@@ -9,6 +9,7 @@ import { resetDadosLocais } from "./app/resetDadosLocais";
 import { useEstadoInicial } from "./app/useEstadoInicial";
 import { useCarregarRascunhoMidia } from "./app/useCarregarRascunhoMidia";
 import { useAvisosGlobais } from "./app/useAvisosGlobais";
+import { useReenvioProvas } from "./features/fotos/useReenvioProvas";
 import { useNavegacao } from "./app/useNavegacao";
 import { useDadosFormularios } from "./app/useDadosFormularios";
 import { useAutoRefreshAgenda } from "./features/servicos/useAutoRefreshAgenda";
@@ -269,6 +270,7 @@ function App() {
     setToast,
     store
   });
+  useReenvioProvas();
   useAvisosGlobais({
     completingClearTimerRef,
     finalizeTimerRef: finalizar.finalizeTimerRef,
