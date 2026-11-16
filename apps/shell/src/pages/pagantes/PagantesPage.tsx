@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { Download, FileText, RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
 import { SelectionBar, useRowSelection } from '../../app/Selecao'
@@ -71,7 +72,8 @@ function Pagantes({ host }: { host: Host }) {
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortPagantes(list, view.config.sort, choices) : list, view.config.sort, (p) => p.id), [list, choices, view.config.sort, extra])
-  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readPagante, (p) => p.id)), [sorted, filters, allFields, extra])
+  const read = useMemo(() => extra.read(readPagante, (p) => p.id), [extra])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
@@ -82,6 +84,7 @@ function Pagantes({ host }: { host: Host }) {
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const sel = useRowSelection(visible)
   const selecting = !mobile && sel.rows.length > 0
@@ -178,6 +181,7 @@ function Pagantes({ host }: { host: Host }) {
   } else if (pg.listComplete && !pg.loading && !pg.list.length) {
     body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante ainda">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento.</EmptyState>
   } else {
+    const loaded = pg.choices
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
     // O total só vale com a lista inteira: até lá, o rodapé avisa que ainda soma.
     const pending = !pg.listComplete && pg.loading
@@ -185,11 +189,15 @@ function Pagantes({ host }: { host: Host }) {
     const empty = pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Pagante[], tableFooter?: ReactNode) => (
+      <PagantesTable list={rows} choices={loaded} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
+    )
+    const cards = (rows: Pagante[]) => <PagantesCards list={rows} choices={loaded} contatos={pg.contatos} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} selection={sel.selection} bulkActions={(rows) => bulkActions(sel.targets(rows))} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )

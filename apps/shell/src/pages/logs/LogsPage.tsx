@@ -4,6 +4,7 @@ import { LoadingTable } from '../../app/VirtualTable'
 import { FileText, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -63,6 +64,7 @@ function Logs({ host }: { host: Host }) {
   }, [data.list, filters, fields, query, view.config.sort])
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort, periodo }), [filters, query, view.config.sort, periodo])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, fields, readLog)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('ver')
@@ -82,11 +84,15 @@ function Logs({ host }: { host: Host }) {
   } else {
     const footer = <span className="lg-num">{visible.length} de {data.list.length}{data.list.length >= MAX_LOGS ? ` (limite de ${MAX_LOGS}; reduza o período)` : ''}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum log com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: LogApp[], tableFooter?: ReactNode) => (
+      <LogsTable list={rows} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: LogApp[]) => <LogsCards list={rows} onOpen={setSelectedId} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <LogsCards list={slice} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )

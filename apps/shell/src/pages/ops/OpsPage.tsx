@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, TableGroups, ToastProvider, ViewBar, groupRows, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
 import { SelectionBar, useRowSelection } from '../../app/Selecao'
@@ -88,11 +89,7 @@ function Ops({ host }: { host: Host }) {
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
-  // Agrupar por (§10.9.1): grupos em memória sobre a lista já filtrada e buscada; lista vazia volta ao estado vazio.
-  const groups = useMemo(() => {
-    const found = groupRows(visible, view.config.group, allFields, read)
-    return found?.length ? found : null
-  }, [visible, view.config.group, allFields, read])
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const sel = useRowSelection(visible)
   const selecting = !mobile && sel.rows.length > 0
@@ -196,12 +193,8 @@ function Ops({ host }: { host: Host }) {
       <OpsTable list={rows} choices={loaded} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} />
     )
     body = groups ? (
-      <>
-        <TableGroups groups={groups} resetKey={JSON.stringify(view.config.group)} counting={pending}>
-          {(rows) => (mobile ? <GroupCards list={rows} choices={loaded} onOpen={setSelectedId} resetKey={lazyKey} pending={pending} /> : table(rows))}
-        </TableGroups>
-        {mobile ? null : <div className="op-groups__total">{footer}</div>}
-      </>
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} footer={footer}
+        cards={(rows) => <OpsCards list={rows} choices={loaded} onOpen={setSelectedId} />} />
     ) : (
       <>
         {mobile
@@ -250,13 +243,4 @@ function Ops({ host }: { host: Host }) {
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </div>
   )
-}
-
-/** Cartões de um grupo aberto no celular: a mesma rolagem infinita da lista, por grupo. */
-function GroupCards({ resetKey, pending, ...props }: Parameters<typeof OpsCards>[0] & { resetKey: string; pending: boolean }) {
-  const { slice, more, loadMore } = useLazySlice(props.list, resetKey)
-  return <>
-    <OpsCards {...props} list={slice} />
-    <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
-  </>
 }
