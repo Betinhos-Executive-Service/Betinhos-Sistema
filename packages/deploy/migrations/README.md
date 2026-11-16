@@ -12,6 +12,7 @@ o schema pelas soluções (`publicar.yml`), como qualquer outra mudança. Ningu�
 - Tem BOM UTF-8 (o Deploy usa Windows PowerShell 5.1) e comentários em ASCII.
 - Coluna ou tabela nova: crie, depois `Add-ComponenteNaSolucao <MetadataId> <tipo>` (AppBetinhos) e `Publish-Tabela`. O Deploy distribui nas 4 soluções no fim.
 - **Migration publicada é imutável**: não edite, renomeie nem apague uma que já está na base. O CI reprova. Para corrigir, crie outra.
+- **Migration publicada que falhou no DEV** volta a rodar em todo Deploy (a tag não anda) e trava as seguintes. Corrija com uma substituta: migration nova, idempotente, com o conteúdo inteiro corrigido, e uma entrada em `substituidas.json` (`migration`, `por`, `motivo`). A substituída sai das pendentes, das forçadas e do "sem base"; o CI confere que as duas existem e que a substituta vem depois.
 - Schema novo só por migration: o CI reprova `provision-*.ps1` novo que não seja `provision-flow-*`. Flow novo e `sitemap:*` continuam à mão.
 - Os `provision-*` antigos ficam como base histórica.
 
