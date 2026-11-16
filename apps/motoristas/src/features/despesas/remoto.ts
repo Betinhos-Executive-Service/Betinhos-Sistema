@@ -8,7 +8,10 @@ import { bind, getBooleanValue, getClientUrl } from "../../data/dataverse/regist
 import { FLOW_URLS, describeFlowUrl, getCurrentClientUrlKey, resolveFlowUrl, runHttpFlow } from "../../data/dataverse/flow.ts";
 import { type LookupNavigationRequest, assertEntityHasAttributes, resolveLookupNavigationName } from "../../data/dataverse/metadados.ts";
 import { assertValidBase64Payload, dataUrlToBase64, getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
-import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
+import { uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { provaCaptura } from "../fotos/provaCaptura.ts";
+import type { ExtrasDaNota } from "../fotos/provaRemota.ts";
+import { camposDaNota, type NotaDoComprovante } from "./chaveNotaFiscal.ts";
 
 let expenseReferenceDataCache: ExpenseReferenceData | null = null;
 let expenseReferenceDataPromise: Promise<ExpenseReferenceData> | null = null;
@@ -190,11 +193,11 @@ export function expenseSubmissionStorageKey(motoristaId: string) {
   return `expense-upload:${getClientUrl().toLowerCase()}:${cleanGuid(motoristaId)}`;
 }
 
-export function createExpenseUploadItem(dataUrl: string, order: number): ExpenseUploadItem {
+export function createExpenseUploadItem(dataUrl: string, order: number, nota?: NotaDoComprovante): ExpenseUploadItem {
   const mimeType = getDataUrlMimeType(dataUrl);
   const fileName = `comprovante-${order}.${getFileExtensionFromMimeType(mimeType)}`;
   assertValidBase64Payload(dataUrlToBase64(dataUrl), { fileName, mimeType });
-  return { id: crypto.randomUUID(), attemptId: crypto.randomUUID(), dataUrl, mimeType, fileName, order, dispatchStarted: false };
+  return { id: crypto.randomUUID(), attemptId: crypto.randomUUID(), dataUrl, mimeType, fileName, order, dispatchStarted: false, ...(nota ? { nota } : {}) };
 }
 
 async function expenseRequest(path: string, method = "GET", body?: Record<string, unknown>, headers: Record<string, string> = {}) {
@@ -220,6 +223,39 @@ async function ensureExpenseRecord(entitySet: string, id: string, payload: Recor
   }
 }
 
+const CODIGO_PLUGIN = /0x80040265|-2147220891/i;
+
+/**
+ * Recusa da chave pelo plugin do anexo (NotaFiscalAnexoPlugin: DV, mês, repetida), pelo código de erro de plugin e pelo
+ * texto. Devolve a mensagem em português, ou null quando o erro é outro (rede, permissão), que segue como antes.
+ */
+export function motivoDaRecusaDaNota(error: unknown): string | null {
+  const registro = (error ?? {}) as { errorCode?: unknown; code?: unknown; message?: unknown };
+  const texto = String(registro.message ?? (typeof error === "string" ? error : ""));
+  if (!CODIGO_PLUGIN.test(String(registro.errorCode ?? registro.code ?? "")) && !CODIGO_PLUGIN.test(texto)) return null;
+  let motivo = texto;
+  const inicio = texto.indexOf("{");
+  if (inicio >= 0) {
+    try { motivo = String(JSON.parse(texto.slice(inicio))?.error?.message ?? texto); } catch { /* fica o texto */ }
+  }
+  return /nota|chave/i.test(motivo) ? motivo.trim() : null;
+}
+
+/**
+ * Grava o anexo; se o plugin recusar a chave (corrida ou conferência feita sem rede), grava de novo como "nota não
+ * verificada" e devolve o motivo. É o mesmo resultado de "Não consigo ler": nada de novo a contornar, e a operação vê o selo.
+ */
+async function gravarAnexoComNota<T>(nota: NotaDoComprovante | undefined, gravar: (campos: Record<string, unknown>) => Promise<T>) {
+  try {
+    return { resultado: await gravar(camposDaNota(nota)), nota, recusa: null as string | null };
+  } catch (error) {
+    const recusa = nota?.situacao === "verificada" ? motivoDaRecusaDaNota(error) : null;
+    if (!recusa) throw error;
+    const rebaixada: NotaDoComprovante = { situacao: "nao-verificada" };
+    return { resultado: await gravar(camposDaNota(rebaixada)), nota: rebaixada, recusa };
+  }
+}
+
 export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmission) {
   if (!usesAsyncExpenseUpload()) throw new Error("Envio assíncrono de despesas não configurado neste ambiente.");
   // Fail before creating any row when the deployment/permissions are incomplete.
@@ -235,7 +271,7 @@ export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmissio
   if (!submission.items.length) return;
   const names = await loadExpenseAttachmentLookupNavigationNamesRemote();
   for (const item of submission.items) {
-    await ensureExpenseRecord(DATAVERSE.anexosDespesasOperacionais, item.id, {
+    const gravado = await gravarAnexoComNota(item.nota, (campos) => ensureExpenseRecord(DATAVERSE.anexosDespesasOperacionais, item.id, {
       // Gasto do cartão não reenvia cr40f_nome no PATCH: usa o estabelecimento.
       cr40f_nome: `Comprovante ${item.order} - ${String(submission.payload.cr40f_nome ?? (submission.draft.estabelecimento || "Despesa"))}`.slice(0, 120),
       cr40f_nomearquivo: item.fileName,
@@ -244,9 +280,12 @@ export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmissio
       cr40f_tipo: 100000000,
       cr40f_status: ATTACHMENT_STATUS.pending,
       new_uploadattemptid: item.attemptId,
+      ...campos,
       [`${names.despesa}@odata.bind`]: bind(DATAVERSE.despesasOperacionais, submission.expenseId),
       [`${names.enviadoPor}@odata.bind`]: bind(DATAVERSE.funcionarios, submission.motoristaId)
-    });
+    }));
+    // O diário é salvo logo depois do ensure: a nota rebaixada e o motivo ficam no aparelho para o aviso ao motorista.
+    if (gravado.recusa) { item.nota = gravado.nota; item.notaRecusada = gravado.recusa; }
   }
 }
 
@@ -277,7 +316,10 @@ export async function uploadExpenseInvoiceRemote({
   dataUrl,
   fileName,
   order = 1,
-  onProgress
+  nota,
+  extras,
+  onProgress,
+  onNotaRecusada
 }: {
   expenseId: string;
   expenseName: string;
@@ -285,7 +327,11 @@ export async function uploadExpenseInvoiceRemote({
   dataUrl: string;
   fileName?: string;
   order?: number;
+  nota?: NotaDoComprovante;
+  extras?: ExtrasDaNota;
   onProgress?: (message: string) => void;
+  /** O plugin recusou a chave: o anexo foi gravado como "nota não verificada" e o motivo vem aqui. */
+  onNotaRecusada?: (motivo: string) => void;
 }) {
   if (!dataUrl) return "";
   const baseName = sanitizePathSegment(fileName?.replace(/\.[^.]+$/, ""), `comprovante-${order}`);
@@ -293,12 +339,14 @@ export async function uploadExpenseInvoiceRemote({
   const path = `Despesas/${devPrefix}${sanitizePathSegment(expenseName, "Sem nome")}`;
   const lookupNavigationNames = await loadExpenseAttachmentLookupNavigationNamesRemote();
   onProgress?.(`Enviando comprovante ${order}.`);
-  const link = await uploadMediaWithProof(path, dataUrl, baseName, {
+  // Despesa: o anexo é gravado antes da prova (a prova leva a nota que ficou no anexo) e a prova é aguardada antes de o
+  // statusanexo ficar completo e disparar a análise de IA, que lê os selos. registrarArquivo nunca lança.
+  const link = await uploadMaintenancePhoto(path, dataUrl, baseName, {
     despesaGuid: expenseId,
     despesaNome: expenseName,
     tipo: "COMPROVANTE",
     indice: order
-  }, { tabela: "cr40f_despesaoperacional", registroId: expenseId });
+  });
 
   onProgress?.(`Vinculando comprovante ${order} à despesa.`);
   const record: Record<string, unknown> = {
@@ -313,7 +361,10 @@ export async function uploadExpenseInvoiceRemote({
     [`${lookupNavigationNames.despesa}@odata.bind`]: bind(DATAVERSE.despesasOperacionais, expenseId)
   };
   if (motoristaId) record[`${lookupNavigationNames.enviadoPor}@odata.bind`] = bind(DATAVERSE.funcionarios, motoristaId);
-  await createOne(DATAVERSE.anexosDespesasOperacionais, record);
+  const gravado = await gravarAnexoComNota(nota, (campos) => createOne(DATAVERSE.anexosDespesasOperacionais, { ...record, ...campos }));
+  if (gravado.recusa) onNotaRecusada?.(gravado.recusa);
+  const extrasFinais = gravado.nota ? { ...extras, notaFiscal: gravado.nota.situacao } : extras;
+  await provaCaptura().registrarArquivo(dataUrl, link, { tabela: "cr40f_despesaoperacional", registroId: expenseId }, extrasFinais);
   return link;
 }
 

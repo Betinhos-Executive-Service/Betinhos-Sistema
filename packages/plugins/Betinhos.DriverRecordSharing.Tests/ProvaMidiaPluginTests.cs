@@ -603,6 +603,110 @@ namespace Betinhos.DriverRecordSharing.Tests
             return command;
         }
 
+        // ---------- fase 3: nota fiscal da despesa ----------
+
+        private static Dictionary<string, object> NaDespesa(World world, Guid despesaId)
+        {
+            var id = despesaId.ToString("D");
+            var command = Registrar(world.Run(Emitir("despesa", "cr40f_despesaoperacional", id)), registroId: id);
+            command["tabela"] = "cr40f_despesaoperacional";
+            return command;
+        }
+
+        private static Entity DespesaGravada(World world, decimal valor, DateTime dia)
+        {
+            var despesa = new Entity("cr40f_despesaoperacional", Guid.NewGuid())
+            {
+                ["cr40f_valor"] = new Money(valor),
+                ["cr40f_datagasto"] = DateTime.SpecifyKind(dia.Date.AddHours(12), DateTimeKind.Utc)
+            };
+            world.Service.Rows("cr40f_despesaoperacional").Add(despesa);
+            return despesa;
+        }
+
+        [Theory]
+        [InlineData("nao-verificada", "nota-nao-verificada", 100000007)]
+        [InlineData("sem-nota", "sem-nota-fiscal", 100000008)]
+        public void RegistrarComNotaSemChaveGanhaOSelo(string nota, string selo, int valor)
+        {
+            var world = new World();
+            var despesa = DespesaGravada(world, 50m, new DateTime(2026, 11, 16));
+            var command = NaDespesa(world, despesa.Id);
+            command["notaFiscal"] = nota;
+
+            var result = world.Run(command);
+
+            Assert.Contains(selo, ((System.Collections.ArrayList)result["selos"]).Cast<string>());
+            Assert.Contains(world.Service.Created.Single().GetAttributeValue<OptionSetValueCollection>("cr40f_selos"), option => option.Value == valor);
+        }
+
+        [Fact]
+        public void ValorDiferenteDoLidoGanhaSeloEGravaValorEData()
+        {
+            var world = new World();
+            var despesa = DespesaGravada(world, 95.40m, new DateTime(2026, 11, 16));
+            var command = NaDespesa(world, despesa.Id);
+            command["leitura"] = new Dictionary<string, object> { ["valor"] = 85.4, ["data"] = "2026-11-16" };
+
+            var result = world.Run(command);
+
+            Assert.Contains("valor-alterado", ((System.Collections.ArrayList)result["selos"]).Cast<string>());
+            var row = world.Service.Created.Single();
+            Assert.Equal(85.4m, row["cr40f_valorlido"]);
+            Assert.Equal(new DateTime(2026, 11, 16), row["cr40f_datalida"]);
+            Assert.Contains(row.GetAttributeValue<OptionSetValueCollection>("cr40f_selos"), option => option.Value == 100000009);
+        }
+
+        [Fact]
+        public void DataDiferenteDaLidaGanhaSeloEValorIgualSemMudancaNao()
+        {
+            var world = new World();
+            var despesa = DespesaGravada(world, 85.40m, new DateTime(2026, 11, 15));
+            var command = NaDespesa(world, despesa.Id);
+            command["leitura"] = new Dictionary<string, object> { ["valor"] = 85.4, ["data"] = "2026-11-16" };
+            Assert.Contains("valor-alterado", ((System.Collections.ArrayList)world.Run(command)["selos"]).Cast<string>());
+
+            var igual = DespesaGravada(world, 85.40m, new DateTime(2026, 11, 16));
+            var semMudanca = NaDespesa(world, igual.Id);
+            semMudanca["sha256"] = "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+            semMudanca["leitura"] = new Dictionary<string, object> { ["valor"] = 85.4, ["data"] = "2026-11-16" };
+            semMudanca["valorAlterado"] = true;
+            Assert.DoesNotContain("valor-alterado", ((System.Collections.ArrayList)world.Run(semMudanca)["selos"]).Cast<string>());
+        }
+
+        [Fact]
+        public void DespesaIlegivelUsaOValorAlteradoDoApp()
+        {
+            var world = new World();
+            var command = NaDespesa(world, Guid.NewGuid());
+            command["leitura"] = new Dictionary<string, object> { ["valor"] = 85.4, ["data"] = "2026-11-16" };
+            command["valorAlterado"] = true;
+
+            Assert.Contains("valor-alterado", ((System.Collections.ArrayList)world.Run(command)["selos"]).Cast<string>());
+        }
+
+        [Fact]
+        public void ConferirChaveDizLivreRecusadaERepetida()
+        {
+            var world = new World();
+            var chave = NotaFiscalAnexoTests.Chave();
+            Dictionary<string, object> Conferir(string valor, string data = "2026-11-16") => world.Run(new Dictionary<string, object> { ["acao"] = "conferirChave", ["chave"] = valor, ["dataDespesa"] = data });
+
+            Assert.Equal("livre", Conferir(chave)["resultado"]);
+            var outroMes = Conferir(chave, "2026-12-15");
+            Assert.Equal("recusada", outroMes["resultado"]);
+            Assert.Contains("novembro de 2026", (string)outroMes["erro"]);
+            Assert.Equal("recusada", Conferir(chave.Substring(0, 43) + (chave[43] == '0' ? '1' : '0'))["resultado"]);
+
+            var antiga = new Entity("cr40f_despesaoperacional", Guid.NewGuid()) { ["cr40f_statusoperacional"] = new OptionSetValue(100000000), ["createdon"] = new DateTime(2026, 11, 10, 15, 0, 0, DateTimeKind.Utc) };
+            world.Service.Rows("cr40f_despesaoperacional").Add(antiga);
+            world.Service.Rows("cr40f_anexodespesaoperacional").Add(new Entity("cr40f_anexodespesaoperacional", Guid.NewGuid()) { ["cr40f_despesa"] = antiga.ToEntityReference(), ["cr40f_chaveacesso"] = chave });
+            var repetida = Conferir(chave);
+            Assert.Equal("repetida", repetida["resultado"]);
+            Assert.Equal("2026-11-10T15:00:00.000Z", repetida["usadaEm"]);
+            Assert.Empty(world.Service.Created);
+        }
+
         private static string Iso(DateTime utc) => utc.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.CultureInfo.InvariantCulture);
 
         // ---------- apoio ----------

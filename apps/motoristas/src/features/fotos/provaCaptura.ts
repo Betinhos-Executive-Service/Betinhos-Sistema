@@ -20,6 +20,7 @@ import {
   emitirProvaMidiaRemote,
   registrarProvaMidiaRemote,
   type ComandoRegistroProva,
+  type ExtrasDaNota,
   type LocalizacaoProva,
   type OrigemProva,
   type PortaProva,
@@ -60,7 +61,7 @@ export type SessaoProva = OrigemProva & {
 };
 
 export type DadosProva = Pick<ComandoRegistroProva, "tipoMidia" | "tamanhoBytes" | "duracaoSegundos" | "sha256" | "origemCaptura" | "capturadoEm" | "localizacao">
-  & Pick<ComandoRegistroProva, "sha256Original" | "dhashes" | "paginas" | "metadados" | "dataReferencia" | "idCliente">;
+  & Pick<ComandoRegistroProva, "sha256Original" | "dhashes" | "paginas" | "metadados" | "dataReferencia" | "idCliente"> & ExtrasDaNota;
 export type ContextoCarimbo = { placa?: string; registro?: string };
 export type EntradaProva = { sessao: SessaoProva; dados: DadosProva; link?: string; criadoEm: number };
 export type FilaProvas = { carregar: () => Promise<EntradaProva[]>; gravar: (lista: EntradaProva[]) => Promise<void> };
@@ -462,7 +463,7 @@ export function criarProvaCaptura(deps: DependenciasProva) {
    * Acha a prova pelo SHA-256 dos bytes enviados (o mesmo arquivo que saiu da câmera) e registra. `destino`: o registro
    * que recebeu o arquivo; com a mesma tabela da sessão, o id dele vira o id real da prova (registro novo).
    */
-  async function registrarArquivo(dataUrl: string, link: string, destino?: { tabela: string; registroId: string }) {
+  async function registrarArquivo(dataUrl: string, link: string, destino?: { tabela: string; registroId: string }, extras?: ExtrasDaNota) {
     try {
       const tamanho = tamanhoDoDataUrl(dataUrl);
       const candidatas = await naFila(async (lista) => ({ valor: lista.filter((item) => item.dados.tamanhoBytes === tamanho) }));
@@ -471,7 +472,8 @@ export function criarProvaCaptura(deps: DependenciasProva) {
       const entrada = candidatas.find((item) => item.dados.sha256 === sha256);
       if (!entrada) return "sem-prova";
       const sessao = destino?.registroId && destino.tabela === entrada.sessao.tabela ? { ...entrada.sessao, registroReal: destino.registroId } : entrada.sessao;
-      return registrar(sessao, link, entrada.dados, entrada.criadoEm);
+      // Extras da nota vão junto dos dados: se o registrar falhar, a prova pendente guarda e reenvia com eles.
+      return registrar(sessao, link, extras ? { ...entrada.dados, ...extras } : entrada.dados, entrada.criadoEm);
     } catch (erro) {
       aoFalhar(erro, "registrar-arquivo");
       return "pendente";

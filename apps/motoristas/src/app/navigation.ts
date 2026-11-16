@@ -27,6 +27,7 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   previewFotoReceber: "preview-foto-receber",
   fotoGasto: "foto-gasto",
   previewFotoGasto: "preview-foto-gasto",
+  codigoGasto: "codigo-gasto",
   colisoesInicio: "colisoes",
   colisoes: "registro-colisao",
   fotoColisao: "foto-colisao",
@@ -84,6 +85,7 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   fotogasto: "fotoGasto",
   "preview-foto-gasto": "previewFotoGasto",
   previewfotogasto: "previewFotoGasto",
+  "codigo-gasto": "codigoGasto",
   colisoes: "colisoesInicio",
   collisions: "colisoesInicio",
   "registro-colisao": "colisoes",
@@ -143,6 +145,7 @@ const HASH_ROUTE_RESTORE_SCREEN: Partial<Record<Screen, Screen>> = {
   // A sessão do QR vive só na memória; ao recarregar, o motorista gera de novo.
   cobrancaQr: "receber",
   previewFotoGasto: "gastos",
+  codigoGasto: "gastos",
   previewFotoColisao: "colisoes",
   previewFotoSolicitacaoManutencao: "solicitarManutencao",
   previewFotoManutencao: "finalizar"
@@ -227,6 +230,7 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   previewFotoReceber: 5,
   fotoGasto: 2,
   previewFotoGasto: 3,
+  codigoGasto: 2,
   colisoesInicio: 1,
   colisoes: 2,
   fotoColisao: 3,
@@ -291,6 +295,7 @@ const isCaptureScreen = (screenName: Screen) =>
   screenName === "previewFotoManutencao" ||
   screenName === "fotoGasto" ||
   screenName === "previewFotoGasto" ||
+  screenName === "codigoGasto" ||
   screenName === "fotoColisao" ||
   screenName === "previewFotoColisao" ||
   screenName === "fotoSolicitacaoManutencao" ||

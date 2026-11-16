@@ -39,7 +39,20 @@ export type ComandoRegistroProva = OrigemProva & {
   sessaoId?: string | null;
   /** Fase 2. Uuid da prova gerado no app e guardado na fila: o registrar repetido devolve a prova existente. */
   idCliente?: string;
+} & ExtrasDaNota;
+
+/**
+ * Fase 3, só na despesa. notaFiscal: o caminho da chave deste comprovante (nao-verificada e sem-nota viram selo).
+ * leitura: valor e data que a leitura rápida preencheu; o servidor compara com a despesa e grava o selo "valor alterado".
+ * valorAlterado: o que o app viu, usado só quando o servidor não consegue ler a despesa.
+ */
+export type ExtrasDaNota = {
+  notaFiscal?: "verificada" | "nao-verificada" | "sem-nota";
+  leitura?: { valor: number | null; data: string | null };
+  valorAlterado?: boolean;
 };
+
+export type ConferenciaChave = { resultado: "livre" | "recusada" | "repetida"; erro: string | null; usadaEm: string | null };
 
 export type ComandoConferencia = OrigemProva & { sha256: string; dhashes: string[] };
 export type ResultadoConferencia = { resultado: "livre" | "repetida" | "parecida-em-observacao"; usadaEm: string | null };
@@ -75,6 +88,27 @@ export function criarPortaProvaMock(): PortaProva {
   };
 }
 export const portaProvaMock = criarPortaProvaMock();
+
+// Mock da conferência da chave: lembra as chaves conferidas nesta aba (como se tivessem virado despesa) e, com
+// ?mockNotaRepetida=1 na URL, toda chave volta repetida (prévia do aviso).
+const chavesUsadasMock = new Map<string, string>();
+export function conferirChaveMock(chave: string, despesaId: string | null, search = globalThis.location?.search ?? ""): ConferenciaChave {
+  const usada = new URLSearchParams(search).get("mockNotaRepetida") === "1" ? PROVA_MOCK_EMITIDO_EM : chavesUsadasMock.get(chave);
+  if (usada && usada !== despesaId) return { resultado: "repetida", erro: "Esta nota já foi usada em outra despesa, lançada em 16/11/2026.", usadaEm: PROVA_MOCK_EMITIDO_EM };
+  chavesUsadasMock.set(chave, despesaId ?? PROVA_MOCK_EMITIDO_EM);
+  return { resultado: "livre", erro: null, usadaEm: null };
+}
+
+/** Aviso antecipado da nota repetida (o plugin do anexo é o bloqueio que vale). Sem resposta, segue: o servidor reconfere. */
+export async function conferirChaveNotaRemote(comando: { chave: string; dataDespesa: string | null; despesaId: string | null }): Promise<ConferenciaChave> {
+  if (isLocalhostRuntime()) return conferirChaveMock(comando.chave, comando.despesaId);
+  const result = await runProvaCommand({ acao: "conferirChave", ...comando });
+  const resultado = result.resultado;
+  if (result.ok !== true || (resultado !== "livre" && resultado !== "recusada" && resultado !== "repetida")) {
+    throw new Error(String(result.erro || "A conferência da nota não respondeu."));
+  }
+  return { resultado, erro: typeof result.erro === "string" ? result.erro : null, usadaEm: typeof result.usadaEm === "string" ? result.usadaEm : null };
+}
 
 async function runProvaCommand(command: Record<string, unknown>): Promise<Record<string, unknown>> {
   const response = await executeCustomApi("new_ProvaMidia", { new_Command: JSON.stringify(command) });

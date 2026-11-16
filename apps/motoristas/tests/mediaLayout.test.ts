@@ -87,8 +87,9 @@ test("toda camera ao vivo pede stream 4:3 em alta resolucao (quadro inteiro), se
   assert.match(mediaCaptureScreen, /buildTrackConstraints[\s\S]*getDocumentTrackConstraints\(mode, profile\.frameRate, continuousFocus\)/);
   assert.doesNotMatch(mediaCaptureScreen, /documentFraming/);
   assert.doesNotMatch(app, /documentFraming/);
-  // Pontos de entrada: comprovante de gastos, recibo, colisão, manutenção do serviço e solicitação de manutenção.
-  assert.equal(app.match(/<MediaCaptureScreen\b/g)?.length, 5);
+  // Pontos de entrada: comprovante de gastos, leitura da chave da nota (mesma câmera, modo "ler código"), recibo, colisão,
+  // manutenção do serviço e solicitação de manutenção.
+  assert.equal(app.match(/<MediaCaptureScreen\b/g)?.length, 6);
   assert.match(mediaCaptureScreen, /frameRate:\s*{\s*ideal:\s*30,\s*max:\s*30\s*}/);
   assert.match(mediaCaptureScreen, /iPhone\|iPad\|iPod/);
 });

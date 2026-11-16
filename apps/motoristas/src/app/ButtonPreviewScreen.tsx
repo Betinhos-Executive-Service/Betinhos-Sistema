@@ -738,6 +738,7 @@ export function ButtonPreviewScreen({ onShowToast }: ButtonPreviewScreenProps) {
           onDraftChange={setExpenseDraft}
           onAddPhoto={() => emitToast("Adicionar comprovante de gasto mockado.", "info")}
           onPreviewPhoto={() => openDemo("photo-preview")}
+          onNotaFiscal={() => undefined}
           onBack={() => openDemo("initial")}
           onSubmit={simulateExpenseSend}
           submitState={expenseSend ? "loading" : "idle"}
