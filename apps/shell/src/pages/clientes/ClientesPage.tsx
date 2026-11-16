@@ -61,8 +61,9 @@ function Clientes({ host }: { host: Host }) {
   const lazyKey = useMemo(() => JSON.stringify({ valid, q, sort: view.config.sort }), [valid, q, view.config.sort])
 
   const refresh = useCallback(() => { void cs.reload() }, [cs.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar clientes" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Clientes', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Clientes' })
+  const size = mobile ? 'touch' : 'default'
   const clearAll = () => { clearFilters(); setQuery('') }
   const create = () => setTarget({ mode: 'create' })
 
@@ -91,11 +92,13 @@ function Clientes({ host }: { host: Host }) {
   return (
     <div className="page page--full cl-page">
       <div role="toolbar" aria-label="Comandos de clientes">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="cl-search" value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!ready} onClick={create}>Novo cliente</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!ready} onClick={create}>Novo cliente</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {cs.error && ready ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{cs.error} A lista mostra os dados da carga anterior.</Alert> : null}

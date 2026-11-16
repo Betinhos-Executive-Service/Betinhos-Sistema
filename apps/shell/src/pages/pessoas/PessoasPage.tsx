@@ -89,8 +89,9 @@ function Pessoas({ host }: { host: Host }) {
   const groups = useRowGroups(visible, view.config.group, allFields, read)
 
   const refresh = useCallback(() => { void ps.reload() }, [ps.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pessoas" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pessoas', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pessoas' })
+  const size = mobile ? 'touch' : 'default'
   const clearAll = () => { clearFilters(); setQuery('') }
 
   let body
@@ -124,11 +125,13 @@ function Pessoas({ host }: { host: Host }) {
   return (
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="ps-filters__search" value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!choices} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!choices} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {ps.error && choices ? (

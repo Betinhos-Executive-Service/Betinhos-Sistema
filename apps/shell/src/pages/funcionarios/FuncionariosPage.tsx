@@ -1,4 +1,4 @@
-import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar, type MenuAction } from '@betinhos/ui'
 import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Host } from '../../host'
@@ -192,6 +192,10 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   }
 
   const { view, quickFilters } = lista
+  // "⋮" (Mais ações): o que é raro e não depende da seleção.
+  const moreActions: MenuAction[] = [
+    { id: 'acesso', label: 'Cadastrar acesso', icon: <KeyRound size={16} />, onSelect: () => setAcessoAberto({}) },
+  ]
   const footer = <span className="toolbar-count">{desktopVisible.length} de {views.length} · {ativos} ativos{pending ? ' · carregando o restante…' : ''}</span>
   const table = (list: FuncionarioView[], tableFooter?: ReactNode) => (
     <FuncionarioTable
@@ -210,9 +214,14 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}
+          search={<SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />}
+          more={moreActions}
+          primary={<>
+            <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Recarregar lista" title="Atualizar" loading={loading} onClick={() => void reload()} />
+            <Button icon={<Plus size={16} />} onClick={() => setSelection({ mode: 'new' })}>Novo</Button>
+          </>}>
           <EnvBadge env={source.envLabel} />
-          <SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">
             {CHIPS.map(({ kind, label, icon: Icon }) => (
               <button key={kind} type="button" className={`chip chip--${kind}`} aria-pressed={alerta === kind} disabled={!desktopCounts[kind] && alerta !== kind} title={kind === 'aniversario' ? 'Aniversários nos próximos 7 dias' : `${label} vencida ou vencendo em até 60 dias`} onClick={() => setAlerta(alerta === kind ? '' : kind)}>
@@ -222,9 +231,6 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
               </button>
             ))}
           </div>
-          <Button variant="secondary" icon={<RefreshCw size={16} className={loading ? 'spin' : ''} />} aria-label="Recarregar lista" title="Recarregar" onClick={() => void reload()} disabled={loading} />
-          <Button variant="secondary" icon={<KeyRound size={16} />} onClick={() => setAcessoAberto({})}>Cadastrar acesso</Button>
-          <Button icon={<Plus size={16} />} onClick={() => setSelection({ mode: 'new' })}>Novo</Button>
         </ViewBar>
       </div>
 

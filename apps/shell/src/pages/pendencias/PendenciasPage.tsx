@@ -79,8 +79,9 @@ function Pendencias({ host }: Props) {
   const frameUrl = gerarOpId ? pagantes.gerarPagantesUrl(gerarOpId) : null
 
   const refresh = useCallback(() => { void pend.reload() }, [pend.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pendências" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pendências', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pendências' })
+  const size = mobile ? 'touch' : 'default'
 
   const acoes = {
     onCorrigir: (p: Pendencia) => { setSelectedId(null); setCorrigir(p) },
@@ -125,10 +126,10 @@ function Pendencias({ host }: Props) {
   return (
     <div className="page page--full pd-page">
       <div role="toolbar" aria-label="Comandos de pendências">
-        <ViewBar pinnable view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pend.loading && pend.loaded} onClick={refresh} />}
+        <ViewBar pinnable view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pend.loading && pend.loaded} onClick={refresh} />}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {pend.error && pend.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pend.error} A lista mostra os dados da carga anterior.</Alert> : null}

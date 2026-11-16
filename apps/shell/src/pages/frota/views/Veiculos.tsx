@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { Button, EmptyState, SearchBox, StatusBadge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
@@ -18,11 +19,13 @@ import { TELA_VEICULOS, VEICULO_COLUMNS, VEICULO_DEFAULT_FILTERS, VEICULO_FIELDS
 import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildPendencias } from '../domain/pendencias'
 import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { useMedia } from '../../operacional/useMedia'
 
 const MOCK_HOST: Host = { mode: 'mock' }
 const byVeiculo = (linha: LinhaVeiculo) => linha.veiculo.id
 
-export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo }: { data: FrotaData; source: DataSource; host?: Host; today: string; onOpenVeiculo: (id: string) => void }) {
+export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo, onReload, loading = false }: { data: FrotaData; source: DataSource; host?: Host; today: string; onOpenVeiculo: (id: string) => void; onReload: () => void; loading?: boolean }) {
+  const size = useMedia('(max-width: 820px)') ? 'touch' : 'default'
   const auditoria = useAuditoria()
   // Visões, colunas e filtros (DS §10.9.1/§10.9.2); a Visão padrão mostra só os ativos. Busca em `q`, filtros em `f=`.
   const { view, filters, quickFilters, clearFilters, fields: allFields, extra } = useListView({
@@ -93,9 +96,9 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo 
   return (
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          <SearchBox className="frota-busca" size="compact" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />
-        </ViewBar>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>
       {groups ? (
         <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
