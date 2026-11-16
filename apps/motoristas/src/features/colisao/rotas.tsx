@@ -1,4 +1,5 @@
 import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
+import { sessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import type { DriverContext } from "../../data/dataverse/cliente";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { CollisionScreen } from "./CollisionScreen";
@@ -74,7 +75,7 @@ export function rotasColisao(screen: Screen, {
         onCaptureVideo={openCollisionVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
-          origem: { tela: "colisao", tabela: "cr40f_colisao_v2" },
+          origem: { tela: "colisao", tabela: "cr40f_colisao_v2", registroId: sessaoDoRascunho("colisao") },
           carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Colisão" },
           referencia: () => collisionDraft.dataHora
         }}

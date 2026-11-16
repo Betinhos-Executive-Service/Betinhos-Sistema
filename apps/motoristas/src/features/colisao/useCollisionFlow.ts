@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { encerrarSessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { assertCollisionSchemaReadyRemote, loadCollisionLookupNavigationNamesRemote, uploadCollisionPhotoRemote } from "./remoto";
 import { createOne, getDriverContext, getDriverCurrentVehicleId, updateOne, type DriverContext } from "../../data/dataverse/cliente";
 import { DATAVERSE } from "../../data/dataverse/entidades";
@@ -148,6 +149,7 @@ export function useCollisionFlow({ driverContext, logAppError, maintenanceCurren
       setRemoteOperation(null);
       revokePhotoPreviewUrls(collisionPhotos);
       setCollisionDraft(createEmptyCollisionDraft());
+      encerrarSessaoDoRascunho("colisao");
       setCollisionPhotos([]);
       clearCollisionPhotoDraftState();
       setCollisionPreviewPhotoId("");

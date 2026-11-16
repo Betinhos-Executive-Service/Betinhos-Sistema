@@ -31,6 +31,7 @@ import {
 } from "./receiptQuickRead";
 import { getQuickReadMockMode, readReceiptQuickMock } from "./receiptQuickReadMock";
 import { EMPTY_EXPENSE_DRAFT } from "./rascunho";
+import { encerrarSessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { useExpenseUploads } from "./useExpenseUploads";
 import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./conferenciaEnvio";
 import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, aplicarLeituraNoGastoCartao, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, conferirLeituraComCartao, isMockGastosCartao, type ConferenciaCartao, type GastoCartao } from "./gastosCartao";
@@ -203,6 +204,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
         setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT, dataGasto: new Date().toISOString().slice(0, 10) });
+        encerrarSessaoDoRascunho("despesa");
         resetExpenseQuickRead();
       };
       if (!accepted) {
@@ -396,6 +398,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       await wait(720);
       setRemoteOperation(null);
       revokePhotoPreviewUrls(expensePhotos);
+      encerrarSessaoDoRascunho("despesa");
       setExpenseDraft({
         categoriaId: "",
         veiculoId: "",
