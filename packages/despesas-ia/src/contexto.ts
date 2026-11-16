@@ -35,6 +35,23 @@ export type ContextoDespesa = {
   veiculo: { placa: string; modelo: string; capacidadeTanque: number | null } | null
   /** Outras despesas dos 7 dias anteriores ao gasto e do mesmo dia (até 30 cada, mais recentes primeiro). */
   historico: { motorista: ItemHistorico[]; veiculo: ItemHistorico[] }
+  /**
+   * Nota fiscal de cada comprovante, na ordem do envio. situacao: "Chave conferida" (chave válida, do mês e única; não é
+   * consulta à SEFAZ), "Nota não verificada" (o motorista não conseguiu ler), "Sem nota fiscal" ou null (comprovante antigo).
+   * Os demais campos saem da chave e são null sem ela; cnpjEmitente pode ser alfanumérico.
+   */
+  notas: {
+    ordem: number | null
+    situacao: string | null
+    chave: string | null
+    uf: string | null
+    aamm: string | null
+    cnpjEmitente: string | null
+    modelo: string | null
+    numero: number | null
+  }[]
+  /** Provas de mídia dos comprovantes: selos em códigos (legendaSelos traduz) e o valor e a data que a leitura rápida preencheu. */
+  provas: { legendaSelos: Record<string, string>; itens: { selos: string[]; valorLido: number | null; dataLida: string | null }[] }
 }
 
 export type Comprovante = { mime: string; base64: string }

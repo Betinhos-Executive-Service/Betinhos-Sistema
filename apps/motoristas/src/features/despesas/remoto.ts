@@ -9,6 +9,8 @@ import { FLOW_URLS, describeFlowUrl, getCurrentClientUrlKey, resolveFlowUrl, run
 import { type LookupNavigationRequest, assertEntityHasAttributes, resolveLookupNavigationName } from "../../data/dataverse/metadados.ts";
 import { assertValidBase64Payload, dataUrlToBase64, getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
 import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
+import type { ExtrasDaNota } from "../fotos/provaRemota.ts";
+import { camposDaNota, type NotaDoComprovante } from "./chaveNotaFiscal.ts";
 
 let expenseReferenceDataCache: ExpenseReferenceData | null = null;
 let expenseReferenceDataPromise: Promise<ExpenseReferenceData> | null = null;
@@ -190,11 +192,11 @@ export function expenseSubmissionStorageKey(motoristaId: string) {
   return `expense-upload:${getClientUrl().toLowerCase()}:${cleanGuid(motoristaId)}`;
 }
 
-export function createExpenseUploadItem(dataUrl: string, order: number): ExpenseUploadItem {
+export function createExpenseUploadItem(dataUrl: string, order: number, nota?: NotaDoComprovante): ExpenseUploadItem {
   const mimeType = getDataUrlMimeType(dataUrl);
   const fileName = `comprovante-${order}.${getFileExtensionFromMimeType(mimeType)}`;
   assertValidBase64Payload(dataUrlToBase64(dataUrl), { fileName, mimeType });
-  return { id: crypto.randomUUID(), attemptId: crypto.randomUUID(), dataUrl, mimeType, fileName, order, dispatchStarted: false };
+  return { id: crypto.randomUUID(), attemptId: crypto.randomUUID(), dataUrl, mimeType, fileName, order, dispatchStarted: false, ...(nota ? { nota } : {}) };
 }
 
 async function expenseRequest(path: string, method = "GET", body?: Record<string, unknown>, headers: Record<string, string> = {}) {
@@ -244,6 +246,7 @@ export async function ensureExpenseSubmissionRemote(submission: ExpenseSubmissio
       cr40f_tipo: 100000000,
       cr40f_status: ATTACHMENT_STATUS.pending,
       new_uploadattemptid: item.attemptId,
+      ...camposDaNota(item.nota),
       [`${names.despesa}@odata.bind`]: bind(DATAVERSE.despesasOperacionais, submission.expenseId),
       [`${names.enviadoPor}@odata.bind`]: bind(DATAVERSE.funcionarios, submission.motoristaId)
     });
@@ -277,6 +280,8 @@ export async function uploadExpenseInvoiceRemote({
   dataUrl,
   fileName,
   order = 1,
+  nota,
+  extras,
   onProgress
 }: {
   expenseId: string;
@@ -285,6 +290,8 @@ export async function uploadExpenseInvoiceRemote({
   dataUrl: string;
   fileName?: string;
   order?: number;
+  nota?: NotaDoComprovante;
+  extras?: ExtrasDaNota;
   onProgress?: (message: string) => void;
 }) {
   if (!dataUrl) return "";
@@ -298,7 +305,7 @@ export async function uploadExpenseInvoiceRemote({
     despesaNome: expenseName,
     tipo: "COMPROVANTE",
     indice: order
-  }, { tabela: "cr40f_despesaoperacional", registroId: expenseId });
+  }, { tabela: "cr40f_despesaoperacional", registroId: expenseId }, extras);
 
   onProgress?.(`Vinculando comprovante ${order} à despesa.`);
   const record: Record<string, unknown> = {
@@ -310,6 +317,7 @@ export async function uploadExpenseInvoiceRemote({
     cr40f_ordem: order,
     cr40f_status: 100000001,
     cr40f_tipo: 100000000,
+    ...camposDaNota(nota),
     [`${lookupNavigationNames.despesa}@odata.bind`]: bind(DATAVERSE.despesasOperacionais, expenseId)
   };
   if (motoristaId) record[`${lookupNavigationNames.enviadoPor}@odata.bind`] = bind(DATAVERSE.funcionarios, motoristaId);

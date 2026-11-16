@@ -36,6 +36,7 @@ import { useExpenseUploads } from "./useExpenseUploads";
 import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./conferenciaEnvio";
 import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, aplicarLeituraNoGastoCartao, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, conferirLeituraComCartao, isMockGastosCartao, type ConferenciaCartao, type GastoCartao } from "./gastosCartao";
 import { carregarDespesasRelatorio, type DespesaRelatorio } from "./gastosRelatorio";
+import { extrasDaProva, useNotaFiscal, valorAlteradoDaLeitura } from "./useNotaFiscal";
 
 type Options = {
   remoteMode: boolean;
@@ -74,7 +75,9 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   const [expenseReferenceError, setExpenseReferenceError] = useState("");
   const [expensePhotos, setExpensePhotos] = useState<ExpensePhoto[]>([]);
   // Conferência no envio: data/hora lidas no cupom, resultado da última conferência e o popup "Dúvida" aberto.
-  const expenseQuickReadLeituraRef = useRef<{ data: string | null; hora: string | null } | null>(null);
+  const expenseQuickReadLeituraRef = useRef<{ data: string | null; hora: string | null; valor: number | null } | null>(null);
+  // Comprovante que passou pela leitura rápida: é nele que a prova grava o valor e a data lidos.
+  const expenseQuickReadPhotoIdRef = useRef("");
   const conferenciaRef = useRef<ConferenciaEnvio | null>(null);
   const [duvidaConferencia, setDuvidaConferencia] = useState<{ pergunta: string; responder: (justificativa: string | null) => void } | null>(null);
   const {
@@ -111,6 +114,20 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     clear: clearExpensePhotoDraftState
   } = useMediaDraftState();
   const [expensePreviewPhotoId, setExpensePreviewPhotoId] = useState("");
+  const expensePhotosRef = useRef(expensePhotos);
+  expensePhotosRef.current = expensePhotos;
+  const notaFiscal = useNotaFiscal({
+    setExpensePhotos,
+    expenseDraftRef,
+    despesaExistenteId: () => gastoCartaoAtualRef.current?.id ?? null,
+    setScreen,
+    setToast: (message, tone) => setToast(message, tone)
+  });
+  const leituraDaProva = (draft: ExpenseDraft) => {
+    const leitura = expenseQuickReadLeituraRef.current;
+    if (!leitura || !expenseQuickReadPhotoIdRef.current || gastoCartaoAtualRef.current) return null;
+    return { photoId: expenseQuickReadPhotoIdRef.current, valor: leitura.valor, data: expenseQuickReadFilled.dataGasto ?? null, alterado: valorAlteradoDaLeitura(draft, expenseQuickReadFilled) };
+  };
 
   const isExpenseDraftBlank = (draft: ExpenseDraft) =>
     !draft.categoriaId && !draft.veiculoId && !draft.valor && !draft.formaPagamentoId && !draft.cidadeId &&
@@ -181,7 +198,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       const submission: ExpenseSubmission = {
         expenseId: completing?.id ?? crypto.randomUUID(), existing: Boolean(completing), expenseConfirmed: false, draft: { ...draft }, payload: {}, motoristaId: driverContext.id,
         vehicleId: draft.veiculoId || getDriverCurrentVehicleId(driverContext),
-        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1)),
+        items: photos.map((photo, index) => createExpenseUploadItem(photo.dataUrl, index + 1, photo.nota)),
         conferencia: conferenciaRef.current ? camposConferencia(conferenciaRef.current) : undefined
       };
       const total = submission.items.length;
@@ -204,6 +221,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
         setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT, dataGasto: new Date().toISOString().slice(0, 10) });
+        notaFiscal.setNotaSheet(null);
         encerrarSessaoDoRascunho("despesa");
         resetExpenseQuickRead();
       };
@@ -356,6 +374,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       if (completing) await updateOne(DATAVERSE.despesasOperacionais, completing.id, payload);
       const result = completing ? { id: completing.id } : await createOne(DATAVERSE.despesasOperacionais, payload);
       createdExpenseId = result.id;
+      const leituraProva = leituraDaProva(draft);
       if (preparedPhotosToSubmit.length) {
         let completedUploads = 0;
         setRemoteOperation({
@@ -372,6 +391,8 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
             dataUrl: photo.dataUrl,
             fileName: photo.mediaType === "video" ? `video-comprovante-${index + 1}` : `comprovante-${index + 1}`,
             order: index + 1,
+            nota: photo.nota,
+            extras: extrasDaProva(photo, leituraProva),
             onProgress: (message) => setRemoteOperation({
               title: "Registrando gasto",
               message: `Uploads paralelos: ${message}`,
@@ -406,6 +427,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       setRemoteOperation(null);
       revokePhotoPreviewUrls(expensePhotos);
       encerrarSessaoDoRascunho("despesa");
+      notaFiscal.setNotaSheet(null);
       setExpenseDraft({
         categoriaId: "",
         veiculoId: "",
@@ -515,6 +537,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   function resetExpenseQuickRead() {
     expenseQuickReadSeqRef.current++;
     expenseQuickReadLeituraRef.current = null;
+    expenseQuickReadPhotoIdRef.current = "";
     expenseRetakeTargetIdRef.current = "";
     expenseDateTouchedRef.current = false;
     setExpenseQuickRead(INITIAL_QUICK_READ);
@@ -572,10 +595,12 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         setConferenciaCartao(conferirLeituraComCartao(gastoCartao, outcome.leitura));
       } else {
         const { draft: after, filled } = applyQuickRead(before, outcome.leitura, referenceData, { replaceAutoDate: !expenseDateTouchedRef.current });
-        expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null };
+        expenseQuickReadLeituraRef.current = { data: outcome.leitura.data ?? null, hora: outcome.leitura.hora ?? null, valor: outcome.leitura.valor ?? null };
         setExpenseDraft(after);
         setExpenseQuickReadFilled(filled);
       }
+      const lida = expenseQuickReadPhotoIdRef.current;
+      notaFiscal.aoLerChaveNaFoto(lida, outcome.leitura.chave_acesso, Boolean(expensePhotosRef.current.find((photo) => photo.id === lida)?.nota));
     }
     setExpenseQuickReadFilling(false);
     setExpenseQuickRead((current) => nextQuickReadState(current, outcome));
@@ -636,6 +661,9 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     // PDF da galeria não passa pela leitura rápida (ela lê imagem); o motorista preenche à mão.
     const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && !ehPdf(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
     const quickReadDataUrl = expensePhotoDraft;
+    const newPhotoId = `expense-photo-${Date.now()}-${expensePhotos.length + 1}`;
+    const notaPhotoId = retaking ? retakeTargetId : isNewPhoto ? newPhotoId : "";
+    if (shouldQuickRead) expenseQuickReadPhotoIdRef.current = notaPhotoId;
     if (!hasMediaDraftContent({ dataUrl: expensePhotoDraft, rawBlob: expensePhotoRawBlob, mediaType: expensePhotoIsVideo ? "video" : "foto" })) {
       return setScreen("gastos");
     }
@@ -660,8 +688,10 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         current.map((photo) => {
           if (photo.id !== retakeTargetId) return photo;
           if (photo.previewUrl && photo.previewUrl !== (expensePhotoPreviewUrl || undefined)) revokePreviewUrl(photo.previewUrl);
+          // Foto nova pode ser de outro cupom: a nota do comprovante é pedida de novo.
           return {
             ...photo,
+            nota: undefined,
             dataUrl: expensePhotoDraft,
             previewUrl: expensePhotoPreviewUrl || undefined,
             posterUrl: expensePhotoPosterUrl || undefined,
@@ -675,7 +705,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       setExpensePhotos((current) => [
         ...current,
         {
-          id: `expense-photo-${Date.now()}-${current.length + 1}`,
+          id: newPhotoId,
           dataUrl: expensePhotoDraft,
           previewUrl: expensePhotoPreviewUrl || undefined,
           posterUrl: expensePhotoPosterUrl || undefined,
@@ -688,6 +718,9 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     clearExpensePhotoDraftState(true);
     setExpensePreviewPhotoId("");
     setScreen("gastos");
+    if (notaPhotoId && !expensePhotoIsVideo) {
+      void notaFiscal.aoAdicionarComprovante(notaPhotoId, quickReadDataUrl, expensePhotos.some((photo) => photo.id !== notaPhotoId && photo.nota));
+    }
     if (shouldQuickRead) void runExpenseQuickRead(quickReadDataUrl);
   };
 
@@ -698,6 +731,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         revokePreviewUrl(removed?.previewUrl);
         return current.filter((photo) => photo.id !== expensePreviewPhotoId);
       });
+      notaFiscal.aoRemoverComprovante(expensePreviewPhotoId);
     }
     clearExpensePhotoDraftState();
     setExpensePreviewPhotoId("");
@@ -705,6 +739,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
   };
 
   return {
+    notaFiscal,
     anexarDespesa,
     cancelExpenseQuickRead,
     checkReceiveProof,

@@ -1,3 +1,4 @@
+import type { NotaDoComprovante } from "./chaveNotaFiscal.ts";
 import type { ExpenseDraft } from "./expenses.types.ts";
 
 export const ATTACHMENT_STATUS = { pending: 100000000, sent: 100000001, failed: 100000002, processing: 100000004 } as const;
@@ -11,6 +12,8 @@ export type ExpenseUploadItem = {
   order: number;
   dispatchStarted: boolean;
   previousAttemptId?: string;
+  /** Fase 3: o caminho da chave da nota deste comprovante (gravado no anexo; o plugin confere). */
+  nota?: NotaDoComprovante;
 };
 
 export type ExpenseSubmission = {

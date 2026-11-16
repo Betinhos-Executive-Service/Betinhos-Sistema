@@ -269,3 +269,24 @@ test("reenvios simultâneos registram cada prova uma vez só", async () => {
   await Promise.all([prova.reenviarPendentes(), prova.reenviarPendentes()]);
   assert.equal(registros.length - antes, 1);
 });
+
+test("fase 3: a nota e a leitura rápida vão no registrar e sobrevivem à prova pendente", async () => {
+  let fora = true;
+  const { porta, registros } = portaGravando({
+    ...portaProvaMock,
+    registrarProvaMidia: async (comando) => { if (fora) throw new Error("rede caiu"); return portaProvaMock.registrarProvaMidia(comando); }
+  });
+  const { prova, itens } = montar({ porta });
+  const sessao = await prova.iniciar(ORIGEM);
+  const foto = await prova.aplicarNaFoto(sessao, "data:image/jpeg;base64,AAAA", {}, "camera-ao-vivo");
+  const extras = { notaFiscal: "nao-verificada" as const, leitura: { valor: 51.9, data: "2026-11-16" }, valorAlterado: true };
+
+  assert.equal(await prova.registrarArquivo(foto.dataUrl, LINK, undefined, extras), "pendente");
+  assert.equal(itens()[0].dados.notaFiscal, "nao-verificada");
+  fora = false;
+  await prova.reenviarPendentes();
+  const registro = registros.at(-1)!;
+  assert.equal(registro.notaFiscal, "nao-verificada");
+  assert.deepEqual(registro.leitura, { valor: 51.9, data: "2026-11-16" });
+  assert.equal(registro.valorAlterado, true);
+});
