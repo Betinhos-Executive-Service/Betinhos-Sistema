@@ -374,7 +374,7 @@
 .composicao .composition-empty-state button:hover { background: var(--bt-color-surface-soft); }
 .composicao .composition-empty-state button:focus-visible { outline: 2px solid var(--bt-focus-border); outline-offset: 2px; }
 .composicao .composition-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border-top: 1px solid var(--bt-color-canvas); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); }
-.composicao .composition-version { flex: 0 0 auto; }
+.composicao .composition-version { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .composicao .cell-actions-popover { width: 190px; }
 .composicao .cell-action { width: 100%; padding: 7px 8px; border: 0; border-radius: var(--bt-radius-xs); background: transparent; color: var(--bt-color-ink-900); font-size: var(--bt-font-size-11); text-align: left; cursor: pointer; }
 .composicao .cell-action:hover, .composicao .cell-action:focus-visible { outline: 0; background: var(--bt-color-surface-soft); }

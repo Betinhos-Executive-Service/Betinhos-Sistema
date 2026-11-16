@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { Check, LoaderCircle, SearchX, X } from 'lucide-react'
-import { Alert, ContextMenu, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
+import { Alert, ContextMenu, formatBuild, ToastProvider, useMediaQuery, useToast, type MenuAction, type TableDensity } from '@betinhos/ui'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Host } from '../../host'
 import { DataTable } from './components/DataTable'
@@ -71,6 +71,9 @@ const formatDepartureDate = cachedFormatter((value) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : dateFormat.format(date)
 })
+/** Versão do build no rodapé da grade, a mesma do rodapé do menu lateral. */
+const BUILD = formatBuild(__APP_VERSION__, __BUILD_DATE__)
+
 let rowsVersionCounter = 0
 const SKELETON_COLUMNS = moneyFields.length + 4
 const SKELETON_ROWS = 12
@@ -1711,6 +1714,7 @@ function ComposicaoContent({ host }: { host: Host }) {
               ? `${getDataverseEnvironmentLabel()} · ${rows.length} composições reais · salva ao confirmar`
               : connectionError ? 'Dados não carregados' : 'Carregando dados…'}
         </span>
+        <span className="composition-version" title="Versão da tela publicada">{BUILD}</span>
       </footer>
     </section>
     </div>
