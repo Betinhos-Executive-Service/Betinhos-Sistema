@@ -219,7 +219,6 @@ export type LockedFilters = { filters: ViewFilter[]; groups: ViewFilterGroup[]; 
 type Origin = { condition: FilterCondition; filter: ViewFilter; order: number }
 export type TableFilterState = { filters: TableFilters; locked: LockedFilters; origins: Map<string, Origin>; lockedAt: Map<ViewFilter, number> }
 
-export const lockedCount = (locked: LockedFilters) => locked.filters.length + [...locked.groups, ...locked.orGroups].reduce((total, group) => total + group.filters.length, 0)
 
 /** JSON com chaves em ordem, para saber se a condição voltou igual do painel. */
 function stable(value: unknown): string {

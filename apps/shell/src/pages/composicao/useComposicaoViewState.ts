@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { readFilters, type ColumnCatalog, type FilterField, type FilterOption, type LookupSearch, type TableDensity, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
+import { readFilters, type ColumnCatalog, type FilterField, type FilterLocked, type FilterOption, type LookupSearch, type TableDensity, type TableViewEntry, type TableViewState, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
 import { moneyFields } from './data/compositions'
 import { resolveFilterOption, searchFilterOptions } from './data/filter-options'
 import {
-  columnCatalogOf, columnDefsOf, columnIdOf, columnsFromConfig, configOf, extraColumnKey, filterFieldsOf, filterKindOf, fromTableFilters, lockedCount, sortFromConfig, toTableFilters,
-  type FilterLabel, type LockedFilters,
+  columnCatalogOf, columnDefsOf, columnIdOf, columnsFromConfig, configOf, extraColumnKey, filterFieldsOf, filterKindOf, fromTableFilters, sortFromConfig, toTableFilters,
+  type FilterLabel,
 } from './data/table-view'
+import { lockedItems, nativeLockedItems, withoutLocked } from './data/locked-labels'
 import { allViewFilters, defaultViewDefinition, type CatalogField, type SavedView, type ViewDefinition } from './data/views'
 
 type Kind = SavedView['kind']
@@ -37,9 +38,12 @@ export type ComposicaoViewState = {
   catalog: ColumnCatalog
   filterFields: FilterField[]
   search: LookupSearch
-  /** Filtros da definição sem equivalente no DS: ficam na consulta e aparecem só para leitura. */
-  lockedFilters: LockedFilters
-  clearLockedFilters: () => void
+  /**
+   * Condições que o painel do DS não edita: as da definição sem equivalente (removíveis uma a uma) e as do FetchXML de uma
+   * visão nativa não editável (sem ×). Valem na consulta e aparecem no painel "Filtros" como só leitura.
+   */
+  locked: FilterLocked[]
+  removeLockedFilter: (id: string) => void
   /** Nome de um valor de lookup ou escolha (GUID → nome), quando já lido. */
   valueLabel: FilterLabel
 }
@@ -185,11 +189,15 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     else if (active) openView('')
     else onChange(DEFAULT_DEFINITION)
   }, [active, o.locked, openView, onChange, onError])
-  const clearLockedFilters = useCallback(() => {
-    if (!lockedCount(tableFilters.locked)) return
-    const patch = fromTableFilters(tableFilters.filters, { ...tableFilters, locked: { filters: [], groups: [], orGroups: [] } }, (key) => fieldById.get(key))
-    if (!('error' in patch)) onChange({ ...definition, ...patch })
-  }, [definition, fieldById, onChange, tableFilters])
+  const removeLockedFilter = useCallback((id: string) => {
+    const next = withoutLocked(tableFilters.locked, id)
+    if (next === tableFilters.locked) return
+    const patch = fromTableFilters(tableFilters.filters, { ...tableFilters, locked: next }, (key) => fieldById.get(key))
+    if ('error' in patch) onError(patch.error)
+    else onChange({ ...definition, ...patch })
+  }, [definition, fieldById, onChange, onError, tableFilters])
+  const nativeFetchXml = active?.nativeOnly && !active.nativeFiltersEditable ? active.sourceFetchXml ?? null : null
+  const locked = useMemo(() => [...nativeLockedItems(nativeFetchXml, catalog), ...lockedItems(tableFilters.locked, byId, label)], [nativeFetchXml, catalog, tableFilters.locked, byId, label])
 
   const save = useCallback(async () => { if (!active) throw new Error('Escolha uma visão salva.'); await saveView(active.name, active.kind, true, definition) }, [active, definition, saveView])
   const saveAs = useCallback((name: string) => saveView(name, 'personal', false, definition), [definition, saveView])
@@ -207,5 +215,6 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     canPublish: true,
     setConfig, density, setDensity, select: selectView, restore, save, saveAs, rename, remove: deleteView, publish: publishView, reload: reloadViews,
   }), [status, o.viewError, views, activeEntry, config, dirty, setConfig, density, setDensity, selectView, restore, save, saveAs, rename, deleteView, publishView, reloadViews])
-  return useMemo(() => ({ state, columnDefs, catalog: columnCatalog, filterFields: fields, search, lockedFilters: tableFilters.locked, clearLockedFilters, valueLabel: label }), [state, columnDefs, columnCatalog, fields, search, tableFilters.locked, clearLockedFilters, label])
+  return useMemo(() => ({ state, columnDefs, catalog: columnCatalog, filterFields: fields, search, locked, removeLockedFilter, valueLabel: label }), [state, columnDefs, columnCatalog, fields, search, locked, removeLockedFilter, label])
+
 }
