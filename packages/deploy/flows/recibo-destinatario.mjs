@@ -31,8 +31,9 @@ function destinoRecibo(manual) {
   const semEmail = `and(empty(${digitado}), not(empty(${PAG}?['body/_cr40f_destinatariorecibo_value'])), empty(${emailPessoa}))`
   return {
     para: `@if(empty(${digitado}), ${emailPessoa}, ${digitado})`,
-    nome: `@${DEST}?['body/cr40f_nomedopassageiro']`,
-    idioma: `@${DEST}?['body/_cr40f_idioma_label']`,
+    // Saudação e idioma são sempre do pagante: o destinatário só recebe (decisão do Renan, 16/11/2026).
+    nome: `@${BD}?['body/cr40f_nomedopassageiro']`,
+    idioma: `@${BD}?['body/_cr40f_idioma_label']`,
     aviso: `@if(${semEmail}, concat('<p><strong>Atenção, financeiro:</strong> este recibo deveria ir para ', ${DEST}?['body/cr40f_nomedopassageiro'], ', mas o cadastro dessa pessoa está sem e-mail. Encaminhe o recibo ou corrija o cadastro e reenvie.</p>'), '')`,
   }
 }
@@ -46,8 +47,7 @@ export function aplicarDestinatario(definition, { manual }) {
   pessoa.runAfter = { Get_a_row_by_ID_BD: ['Succeeded'] }
   const pagante = `${PAG}?['body/_cr40f_bancodedados_value']`
   const pessoaGravada = `coalesce(${PAG}?['body/_cr40f_destinatariorecibo_value'], ${pagante})`
-  // Troca avulsa no modal saúda o pagante, como o e-mail digitado.
-  pessoa.inputs.parameters.recordId = manual ? `@if(empty(${OVERRIDE}), ${pessoaGravada}, ${pagante})` : `@${pessoaGravada}`
+  pessoa.inputs.parameters.recordId = `@${pessoaGravada}`
   escopo.Get_destinatario_recibo = pessoa
   escopo.Destino_recibo = { type: 'Compose', runAfter: { Get_destinatario_recibo: ['Succeeded'] }, inputs: destinoRecibo(manual) }
   escopo.Get_a_row_by_ID_OP.runAfter = { Destino_recibo: ['Succeeded'] }
