@@ -37,10 +37,12 @@
 .composicao .composition-heading { gap: 12px; }
 .composicao .composition-heading h1 { margin: 0; white-space: nowrap; color: var(--bt-color-brand); font-family: var(--bt-font-family-display); font-size: 28px; font-weight: 400; line-height: var(--bt-typography-heading-page-line-height); letter-spacing: var(--bt-typography-heading-page-letter-spacing); -webkit-text-stroke: var(--bt-heading-page-stroke-width) currentColor; }
 .composicao .composition-heading p { margin: 2px 0 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
-.composicao .composition-commandline { min-width: 0; padding-bottom: var(--bt-space-2); }
+.composicao .composition-commandline { min-width: 0; }
+/* Sem a faixa de chips de filtros ativos: os filtros ficam no botão "Filtros" (contador) e no painel. */
+.composicao .composition-commandline .bt-chips { display: none; }
 /* Progresso dos comandos (Verificando…, Excluindo…): região viva sempre presente; vazia não ocupa altura. */
 .composicao .composition-progress { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
-.composicao .composition-progress:not(:empty) { padding-bottom: var(--bt-space-2); }
+.composicao .composition-progress:not(:empty) { margin-bottom: var(--bt-space-2); }
 .composition-readonly-filters { display: grid; gap: var(--bt-space-3); font-size: var(--bt-font-size-13); }
 .composition-readonly-filters h3 { margin: 0 0 var(--bt-space-1); font-size: var(--bt-font-size-13); }
 .composition-readonly-filters p { margin: 0 0 var(--bt-space-2); color: var(--bt-color-text-secondary); }
@@ -49,7 +51,8 @@
 
 /* Cabeçalho do PageLayout: o título não quebra; as ações encolhem (busca) e, sem espaço, descem para a linha de baixo. */
 /* Sem cabeçalho de página: o título fica só para leitores de tela e a grade ganha a altura. */
-.composicao .composition-layout.page { width: 100%; margin: 0; padding: 12px 16px 10px; gap: 8px; }
+/* Sem gap: entre a toolbar e a tabela fica só a margem padrão do ViewBar (12 px, DS). */
+.composicao .composition-layout.page { width: 100%; margin: 0; padding: 12px 16px 10px; gap: 0; }
 .composicao .composition-title { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .composicao .command-icon--spin { animation: composicao-composition-spin 1s linear infinite; }
