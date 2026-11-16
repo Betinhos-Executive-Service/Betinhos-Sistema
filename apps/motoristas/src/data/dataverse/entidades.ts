@@ -19,7 +19,7 @@ export const DATAVERSE = {
   servicosPorPassageiro: "cr40f_servicosporpassageiros",
   posseVeiculos: "new_possedeveiculos",
   locaisBase: "new_localdebases",
-  fotosManutencao: "new_fotomanutencao",
+  fotosManutencao: "new_fotomanutencaos",
   boasIdeias: "cr40f_boasideiases",
   comunicados: "new_comunicadomotoristas",
   comunicadoDestinatarios: "new_comunicadodestinatarios",

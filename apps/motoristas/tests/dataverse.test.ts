@@ -697,3 +697,9 @@ test("modo assíncrono resolvido em um ambiente não vale para outro", async () 
   const other = mockExpenseUploadRuntime("https://orgoutro.crm2.dynamics.com", () => "");
   await withWindow(other.windowMock, async () => { assert.equal(usesAsyncExpenseUpload(), false); });
 });
+
+test("entity set de cada tabela difere do nome lógico (URL direta faz fetch pelo entity set)", async () => {
+  const { ENTITY_SET_TO_ENTITY_NAME } = await import("../src/data/dataverse/entidades.ts");
+  const iguais = Object.entries(ENTITY_SET_TO_ENTITY_NAME).filter(([set, name]) => set === name);
+  assert.deepEqual(iguais, []);
+});
