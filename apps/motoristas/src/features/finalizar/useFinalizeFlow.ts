@@ -102,7 +102,7 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
         detailType: detail.type,
         dataverseId: detail.dataverse?.id ?? "",
         titulo: tituloDoEnvio(detail),
-        tipo: isVoucher ? "voucher" : "servico",
+        tipo: isVoucher ? "voucher" : detail.type === "MANUTENCAO" ? "manutencao" : detail.type === "TROCA" ? "troca" : "servico",
         detail,
         fields,
         signatureDataUrl: store.signatures[detail.id],
@@ -120,6 +120,8 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
       return;
     }
     setRemoteOperation(null);
+    // O envio guardado leva os campos e as fotos; o formulário da manutenção começa limpo.
+    if (detail.type === "MANUTENCAO") setMaintenanceFinalizeDraft({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
     setToast("Salvo no aparelho. Será enviado quando a conexão voltar.", "info");
     setSelectedDetail(null);
     setScreen("servicos");
@@ -142,7 +144,7 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
     if (finalizeTimerRef.current) window.clearTimeout(finalizeTimerRef.current);
     if (completingClearTimerRef.current) window.clearTimeout(completingClearTimerRef.current);
 
-    if (detailToFinalize.type === "SERVICO" && navigator.onLine === false) {
+    if (navigator.onLine === false) {
       await guardarNoAparelho(detailToFinalize, finalFields, isVoucher, finalizadoEm);
       return;
     }
@@ -217,14 +219,14 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
         } else if (detailToFinalize.type === "SERVICO") {
           await dados.finalizarServico({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "MANUTENCAO") {
-          await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, finalizadoEm });
         } else if (detailToFinalize.type === "TROCA") {
-          await finalizeExchangeRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeExchangeRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, finalizadoEm });
         }
         setSuccess("Enviado com sucesso.");
         await wait(720);
       } catch (error) {
-        const classe = detailToFinalize.type === "SERVICO" ? classificarErro(error) : "negocio";
+        const classe = classificarErro(error);
         if (classe !== "negocio") {
           reportAppError(error, {
             severity: "warning", source: "app", action: "finalizeSelected", phase: "guardado-no-aparelho", screen: "finalizar",

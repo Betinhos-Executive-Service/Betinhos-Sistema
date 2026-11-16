@@ -208,7 +208,8 @@ function App() {
     setReceiveUploadedCounts: recebimento.setReceiveUploadedCounts,
     setStore,
     setToast,
-    setVoucherDrafts: finalizar.setVoucherDrafts
+    setVoucherDrafts: finalizar.setVoucherDrafts,
+    aoConcluirChecklist: () => checklistsLista.reloadChecklists()
   });
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
@@ -248,7 +249,7 @@ function App() {
 
   useComunicadoDeepLink({ comunicadosLista, setScreen, setToast });
 
-  const { agendaCarregando, refreshLocal } = useAgendaLoad({
+  const { agendaCarregando, agendaOfflineEm, refreshLocal } = useAgendaLoad({
     comunicadosDriverIdRef,
     dados,
     initialHashRouteRef,
@@ -341,7 +342,7 @@ function App() {
       criticalError={avisos.criticalError}
       dataLoading={avisos.dataLoading}
       duvidaConferencia={despesas.duvidaConferencia}
-      envioPendente={<EnvioPendenteIndicador {...envioPendente} />}
+      envioPendente={<EnvioPendenteIndicador {...envioPendente} agendaOfflineEm={agendaOfflineEm} despesasPendentes={despesas.expenseUploadStatuses.filter(e => e.status.state === "interrupted").length} />}
       expenseSend={despesas.expenseSend}
       previousScreen={previousScreenRef.current}
       remoteMode={remoteMode}

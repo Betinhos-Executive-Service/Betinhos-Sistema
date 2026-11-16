@@ -3,16 +3,20 @@ import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
 import type { EnvioPendente } from "./useEnvioPendente";
 import type { FilaItem } from "./fila";
 import { MENSAGEM_SESSAO } from "./processador";
+import { avisoAgendaOffline } from "../servicos/agendaOffline";
 
-type Props = Pick<EnvioPendente, "descartar" | "escolherCarro" | "itens" | "online" | "rodar" | "tentarDeNovo">;
+type Props = Pick<EnvioPendente, "descartar" | "escolherCarro" | "itens" | "online" | "rodar" | "tentarDeNovo"> & {
+  agendaOfflineEm?: string | null;
+  despesasPendentes?: number;
+};
 
 const rotuloPendentes = (total: number) => `${total} ${total === 1 ? "envio pendente" : "envios pendentes"}`;
 
 // Indicador fixo e discreto: só aparece sem conexão ou com envio na fila. Só os botões recebem toque.
-export function EnvioPendenteIndicador({ descartar, escolherCarro, itens, online, rodar, tentarDeNovo }: Props) {
+export function EnvioPendenteIndicador({ agendaOfflineEm = null, descartar, escolherCarro, despesasPendentes = 0, itens, online, rodar, tentarDeNovo }: Props) {
   const [descartando, setDescartando] = useState<FilaItem | null>(null);
-  const visivel = !(online && itens.length === 0);
-  const total = itens.length;
+  const total = itens.length + despesasPendentes;
+  const visivel = !(online && total === 0 && !agendaOfflineEm);
   const comAcao = itens.find((item) => item.estado === "precisa-acao" || item.estado === "falhou");
   const comAcaoVisivel = visivel && Boolean(comAcao);
 
@@ -46,10 +50,12 @@ export function EnvioPendenteIndicador({ descartar, escolherCarro, itens, online
   } else if (enviando) {
     texto = "Enviando…";
   } else if (!online) {
-    texto = total ? `Sem conexão · ${rotuloPendentes(total)}` : "Sem conexão";
-  } else {
+    texto = total ? `Sem conexão · ${rotuloPendentes(total)}` : agendaOfflineEm ? avisoAgendaOffline(agendaOfflineEm) : "Sem conexão";
+  } else if (total) {
     texto = rotuloPendentes(total);
-    acoes = <button type="button" onClick={() => rodar(true)}>Enviar agora</button>;
+    acoes = itens.length ? <button type="button" onClick={() => rodar(true)}>Enviar agora</button> : null;
+  } else {
+    texto = avisoAgendaOffline(agendaOfflineEm ?? "");
   }
 
   return (
