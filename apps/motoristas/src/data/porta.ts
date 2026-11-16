@@ -37,4 +37,5 @@ export type PortaDados = {
   criarIdeia: typeof ideias.createIdeaRemote;
   emitirProvaMidia: typeof prova.emitirProvaMidiaRemote;
   registrarProvaMidia: typeof prova.registrarProvaMidiaRemote;
+  conferirProvaMidia: typeof prova.conferirProvaMidiaRemote;
 };

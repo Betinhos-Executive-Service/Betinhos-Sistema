@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { Fuel } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
@@ -438,7 +439,7 @@ export function ExpenseScreen({
                             <span className="media-video-badge">{photo.durationLabel || "Vídeo"}</span>
                           </>
                         ) : (
-                          <img src={photo.dataUrl} alt={`Comprovante ${index + 1}`} />
+                          <ImagemOuPdf src={photo.dataUrl} alt={`Comprovante ${index + 1}`} />
                         )}
                       </button>
                     ))}

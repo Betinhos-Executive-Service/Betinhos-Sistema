@@ -9,6 +9,8 @@ export type ProvaDaCaptura = {
   /** Maior lado da foto final (padrão 2048) e qualidade JPEG (padrão 0,85). */
   maxLado?: number;
   qualidade?: number;
+  /** Data de referência do evento (data do gasto, da colisão, do serviço...), lida na hora da escolha da galeria. */
+  referencia?: () => string | null | undefined;
 };
 
 const reportar = (error: unknown, action: string) =>
@@ -58,7 +60,14 @@ export function useProvaDaCaptura(prova: ProvaDaCaptura | undefined) {
     }
   };
 
-  return { sessao, finalizarFoto, registrarVideo };
+  /** Arquivo da galeria pelo módulo de prova (null sem prova nesta tela). Lança só em falha inesperada. */
+  const prepararDaGaleria = async (arquivo: File) => {
+    const pendente = aguardarSessao();
+    if (!pendente || !prova) return null;
+    return provaCaptura().prepararDaGaleria(await pendente, arquivo, { referencia: prova.referencia?.() ?? null });
+  };
+
+  return { sessao, finalizarFoto, registrarVideo, prepararDaGaleria };
 }
 
 /** Prévia do carimbo sobre a câmera ao vivo; o relógio fica aqui para não redesenhar a tela inteira a cada segundo. */

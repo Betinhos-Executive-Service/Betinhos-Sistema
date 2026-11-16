@@ -118,7 +118,8 @@ export function rotasDespesas(screen: Screen, {
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
           origem: { tela: "despesa", tabela: "cr40f_despesaoperacional" },
-          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" }
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" },
+          referencia: () => expenseDraft.dataGasto
         }}
       />
     );

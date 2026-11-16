@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "./ImagemOuPdf";
 import { useEffect, useState } from "react";
 import { ActionBar, ActionButton } from "../../shared/ui/ActionButton";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -137,7 +138,7 @@ export function MaintenancePhotoPreviewScreen({
                   ) : null}
                 </>
               ) : photoDataUrl ? (
-                <img className="maintenance-preview-real-image" src={photoDataUrl} alt="Foto capturada" />
+                <ImagemOuPdf className="maintenance-preview-real-image" src={photoDataUrl} alt="Arquivo anexado" />
               ) : isInvoice ? (
                 <div className="mock-invoice">
                   <div />

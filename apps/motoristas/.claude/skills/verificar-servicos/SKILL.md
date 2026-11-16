@@ -127,5 +127,16 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
   4. Antes/depois: `git stash push -u -- apps/motoristas/src`, o dev server recompila, repetir o passo 1 (antes: 1 botão de vídeo), `git stash pop`.
 - Envio: `uploadMediaWithProof` (despesas, recebimento, manutenção, finalizar, colisão e checklist) registra a prova depois do link; falha deixa a prova pendente, reenviada ao abrir o app e no evento `online`. No mock não há link real: o registro só é verificável no DEV.
 - Não verificável em mock nem na nuvem: câmera e localização reais, Custom API `new_ProvaMidia` (depende do PR do backend no DEV). No DEV, depois do envio de uma despesa: linha em `cr40f_provamidias` com o link do comprovante, o mesmo `cr40f_codigo` impresso e sem selo.
-- Limite conhecido (anterior a esta mudança): na câmera nativa, a mensagem de erro aparece sobreposta ao painel "Câmera do dispositivo".
+- Corrigido na fase 2: `.camera-error` estava preso ao seletor do loader no CSS e aparecia sem o véu, sobreposto ao painel da câmera.
 
+
+## Galeria, PDF e foto repetida (fase 2: `provaCaptura.prepararDaGaleria`, `metadadosArquivo.ts`, `GALERIA_POR_TELA`)
+- Testes: `node --test --experimental-strip-types tests/provaGaleria.test.ts` (EXIF dentro/fora da janela e ausente, `mvhd` válido e com época errada, PDF > 10 MB e > 20 páginas, tela sem galeria, repetida recusada antes do envio, reenvio no mesmo registro, conferir sem rede segue, parecida marcada, dois dHash na câmera). Fixtures pequenas em `tests/fixtures/` (JPEG com e sem EXIF, MP4 mínimo, PDFs de 2 e 21 páginas).
+- Botão "Escolher da galeria ou arquivo" (`.camera-gallery-action`, input `[data-testid="galeria-input"]`): despesa e devolução (imagem e PDF), manutenção, finalizar e colisão (imagem, PDF e vídeo), recebimento (imagem e vídeo). Checklist **sem** botão.
+- Mock: `conferirProvaMidia` lembra o SHA nesta aba; a mesma foto em outra abertura da câmera (registro `novo-*` novo) volta "repetida". Roteiro Playwright (UA Android, 390 px, localStorage `betinhos.prova.aviso-localizacao = "1"`):
+  1. `/?r=1#/foto-colisao` → botão presente, `accept = image/*,application/pdf,video/*`.
+  2. `#/foto-gasto` → `setInputFiles` com `tests/fixtures/foto-com-exif.jpg` → prévia; "Tirar outra" → mesma foto → `.camera-file-error` "Esta foto já foi usada em outro registro em DD/MM/AAAA. Tire uma foto nova.".
+  3. "Voltar à câmera" → PDF de 11 MB (`buffer`, `application/pdf`) → "PDF muito grande (11 MB). O limite é 10 MB.".
+  4. `#/checklists` → "Pular" no tour → `button[aria-label^="Veículo ABC1D23 · entregue"]` → `button[aria-label^="Tirar foto"]` → nenhum `.camera-gallery-action`.
+- Chrome do sistema em headless não expõe a câmera falsa ("Nenhuma câmera foi encontrada"); para a câmera ao vivo use o Chromium do Playwright (`ms-playwright/chromium-*`).
+- Não verificável em mock: seletor real do iPhone/Android (o que cada um preserva de EXIF), `conferir`/`registrar` no Dataverse e o selo recalculado no servidor.

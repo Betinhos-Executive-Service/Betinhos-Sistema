@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { FieldError, FormField, SelectField, TextAreaField, TextInputControl, TextInputField } from "../../shared/ui/FormFields";
@@ -362,7 +363,7 @@ export function CollisionScreen({
                                   <span className="media-video-badge">{photo.durationLabel || "Vídeo"}</span>
                                 </>
                               ) : (
-                                <img src={photo.dataUrl} alt={`${requiredPhoto.label} ${index + 1}`} />
+                                <ImagemOuPdf src={photo.dataUrl} alt={`${requiredPhoto.label} ${index + 1}`} />
                               )}
                               <small>{index + 1}</small>
                             </button>
@@ -407,7 +408,7 @@ export function CollisionScreen({
                             <span className="media-video-badge">{photo.durationLabel || "Vídeo"}</span>
                           </>
                         ) : (
-                          <img src={photo.dataUrl} alt={`Foto complementar ${index + 1}`} />
+                          <ImagemOuPdf src={photo.dataUrl} alt={`Foto complementar ${index + 1}`} />
                         )}
                         <small>{index + 1}</small>
                       </button>

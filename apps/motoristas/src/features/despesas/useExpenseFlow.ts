@@ -8,7 +8,7 @@ import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
 import type { Screen } from "../../types";
 import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "../fotos/envioMidia";
-import { hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
+import { ehPdf, hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
 import { useMediaDraftState } from "../fotos/useMediaDraftState";
 import { quickReadValueCents } from "../recebimento/receiveProofCheck";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./expenseSubmission";
@@ -623,7 +623,8 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     expenseRetakeTargetIdRef.current = "";
     const isNewPhoto = !expensePreviewPhotoId;
     const retaking = isNewPhoto && Boolean(retakeTargetId) && expensePhotos.some((photo) => photo.id === retakeTargetId);
-    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
+    // PDF da galeria não passa pela leitura rápida (ela lê imagem); o motorista preenche à mão.
+    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && !ehPdf(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
     const quickReadDataUrl = expensePhotoDraft;
     if (!hasMediaDraftContent({ dataUrl: expensePhotoDraft, rawBlob: expensePhotoRawBlob, mediaType: expensePhotoIsVideo ? "video" : "foto" })) {
       return setScreen("gastos");

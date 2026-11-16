@@ -4990,12 +4990,13 @@ button:disabled {
   display: block;
 }
 
-.camera-error,
 /* Loader da marca dentro do véu escuro da câmera: sem a altura mínima do inline. */
 .camera-loading .brand-loader--inline {
   min-height: 0;
 }
 
+/* .camera-error tinha ficado preso ao seletor do loader acima e aparecia sem o véu, por cima do painel da câmera. */
+.camera-error,
 .camera-loading,
 .camera-start-panel {
   position: absolute;
@@ -11232,6 +11233,49 @@ select,
   font-weight: 600;
   line-height: 1.2;
   pointer-events: none;
+}
+
+/* Miniatura de anexo em PDF (galeria): selo no neutro do DS no lugar da imagem. */
+.media-pdf-thumb {
+  width: 100%;
+  height: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FCFCFB;
+  color: rgb(0, 14, 35);
+  border: 1px solid rgba(0, 14, 35, 0.12);
+  border-radius: inherit;
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+/* Ação secundária da câmera: arquivo da galeria, só nas telas liberadas (neutro do DS; a câmera continua a ação principal). */
+.camera-gallery-action {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border: 1px solid rgba(0, 14, 35, 0.16);
+  border-radius: 12px;
+  background: #FCFCFB;
+  color: rgb(0, 14, 35);
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.camera-gallery-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Recusa de arquivo da galeria (PDF grande, foto repetida): acima do painel da câmera. */
+.camera-file-error {
+  z-index: 4;
 }
 
 /* Explicação da localização, antes do pedido do navegador: acima da câmera e do carimbo. */

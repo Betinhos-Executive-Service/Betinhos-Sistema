@@ -67,7 +67,9 @@ export function rotasManutencao(screen: Screen, {
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
           origem: { tela: "manutencao", tabela: "cr40f_manutencoes" },
-          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Manutenção" }
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Manutenção" },
+          // A solicitação é aberta agora: a janela começa 24 h antes.
+          referencia: () => new Date().toISOString()
         }}
       />
     );

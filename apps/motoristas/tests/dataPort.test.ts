@@ -36,7 +36,8 @@ test("adaptador Dataverse delega cada operacao para a funcao atual, sem embrulho
     carregarIdeias: ideias.loadMyIdeasRemote,
     criarIdeia: ideias.createIdeaRemote,
     emitirProvaMidia: prova.emitirProvaMidiaRemote,
-    registrarProvaMidia: prova.registrarProvaMidiaRemote
+    registrarProvaMidia: prova.registrarProvaMidiaRemote,
+    conferirProvaMidia: prova.conferirProvaMidiaRemote
   });
 });
 

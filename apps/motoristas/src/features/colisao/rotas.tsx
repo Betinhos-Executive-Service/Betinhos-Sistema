@@ -75,7 +75,8 @@ export function rotasColisao(screen: Screen, {
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
         prova={{
           origem: { tela: "colisao", tabela: "cr40f_colisao_v2" },
-          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Colisão" }
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Colisão" },
+          referencia: () => collisionDraft.dataHora
         }}
       />
     );

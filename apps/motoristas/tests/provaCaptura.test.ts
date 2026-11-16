@@ -36,9 +36,11 @@ function desenhoFalso(largura: number, altura: number) {
       };
       return {
         contexto: contexto as unknown as ReturnType<Desenho["criarTela"]>["contexto"],
+        imagem: {} as CanvasImageSource,
         exportarJpeg: (qualidade) => `data:image/jpeg;base64,${Buffer.from(JSON.stringify({ w, h, qualidade, chamadas })).toString("base64")}`
       };
-    }
+    },
+    amostrar: () => new Uint8ClampedArray(9 * 8 * 4)
   };
   return { desenho, telas };
 }

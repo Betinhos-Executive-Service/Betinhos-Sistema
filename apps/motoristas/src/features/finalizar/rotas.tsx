@@ -118,7 +118,8 @@ export function rotasFinalizar(screen: Screen, {
         onBack={() => setScreen("finalizar")}
         prova={{
           origem: { tela: "finalizar", tabela: "cr40f_manutencoes", registroId: selectedDetail.dataverse?.id ?? selectedDetail.id },
-          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Manutenção ${String(selectedDetail.dataverse?.record?.cr40f_id ?? "")}`.trim() }
+          carimbo: { placa: placaDoDetalhe(selectedDetail), registro: `Manutenção ${String(selectedDetail.dataverse?.record?.cr40f_id ?? "")}`.trim() },
+          referencia: () => String(selectedDetail.dataverse?.record?.createdon ?? "")
         }}
         onCapture={(photoDataUrl) => {
           setPhotoDraft(photoDataUrl);
