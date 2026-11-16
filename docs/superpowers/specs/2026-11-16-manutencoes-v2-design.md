@@ -63,10 +63,11 @@ Todo o schema entra por migration (`packages/deploy/migrations/AAAAMMDD-HHMM-*.p
 ### `cr40f_manutencoes`
 
 - Novas colunas `cr40f_janelainicio` e `cr40f_janelafim` (só data, sem hora). Num encaixe por dia, as duas são iguais.
+- Nova coluna `cr40f_kmrealizado` (inteiro): km informado por quem conclui. `cr40f_kmatual` continua sendo o km do pedido. A preventiva passa a usar `cr40f_kmrealizado` quando existir (plano 2).
 - `cr40f_status`: o rótulo `202410001` muda de "Aprovado" para "Agendado".
-- `cr40f_pagamento`: ganha a opção "Dinheiro".
+- `cr40f_pagamento`: ganha a opção "Dinheiro" (`202410003`). Na despesa, Dinheiro vira "Particular (Reembolso)", como o Pix. Hoje o App manda Dinheiro para "Cartão de crédito".
 - `cr40f_datadaaprovacao` passa a guardar a data do encaixe, gravada por `Agendar`, depois que a regra de negócio "Aprovado" sair.
-- `new_servicosmanutencao` e `new_categoriasmanutencao` voltam a ser preenchidos, agora por quem conclui. `new_classificacaoorigem` fica Manual. Hoje essas colunas não têm script no repositório: a primeira migration as declara (idempotente, só cria se faltar), e assim o schema delas passa a constar no repositório.
+- `new_servicosmanutencao` e `new_categoriasmanutencao` voltam a ser preenchidos, agora por quem conclui. `new_classificacaoorigem` fica Manual. Hoje essas colunas não têm script no repositório. A primeira migration confere que elas existem e falha com mensagem clara se faltarem, porque o plugin depende delas.
 - `cr40f_agendarpara` deixa de ser escrito. A coluna fica, por ter histórico.
 
 ### Linha da Geral (`cr40f_reservadeveculos`)
@@ -85,7 +86,7 @@ Ficam no `Cr40f.Frota.Plugin`, que já tem registrador (`Cr40f.Frota.Registrar`)
 | `cr40f_ManutencaoAgendar` | janela início e fim, comentário opcional | Aceita Solicitado, Agendado ou Programado. Cria ou atualiza a linha da Geral: veículo, saída = início da janela, sem motorista, não programada (se estava programada, tira o motorista). Grava a janela, `cr40f_datadaaprovacao` (só no primeiro encaixe), o comentário e o status Agendado. |
 | `cr40f_ManutencaoReprovar` | comentário (obrigatório) | Só a partir de Solicitado. Grava Reprovado e cancela a linha da Geral, se houver. |
 | `cr40f_ManutencaoCancelar` | comentário | Vale em qualquer estado antes de Realizado. Grava Cancelado e cancela a linha da Geral. |
-| `cr40f_ManutencaoConcluir` | serviços (um ou mais), km, data, valor > 0, pagamento, estabelecimento, cidade, comentário, quem realizou, links da nota fiscal e das fotos finais (já enviados) | Numa só transação: grava a manutenção como Realizado (com serviços, categorias derivadas do catálogo e origem Manual), cria ou atualiza a despesa da categoria Manutenção ligada por `cr40f_manutencao` e conclui a linha da Geral. **Repetir é seguro:** se já estiver Realizado com os mesmos dados, só garante a despesa e a linha concluída. |
+| `cr40f_ManutencaoConcluir` | serviços (um ou mais), km, data, valor > 0, pagamento, estabelecimento, cidade, comentário, quem realizou, links da nota fiscal e das fotos finais (já enviados) | Numa só transação: grava a manutenção como Realizado (com serviços, categorias derivadas do catálogo e origem Manual), cria ou atualiza a despesa da categoria Manutenção ligada por `cr40f_manutencao` e conclui a linha da Geral. Devolve o id da despesa e o estado do anexo: quem chamou sobe a nota fiscal na despesa (arquivo não passa pela Custom API), como o App já faz hoje. **Repetir é seguro:** se já estiver Realizado, só garante a despesa e a linha concluída. |
 
 **Espelho da programação:** um step pós-operação no Update da linha da Geral, filtrado por `cr40f_status` e `cr40f_motorista`, só na categoria Manutenção.
 - Status Programado e motorista preenchido → a manutenção vira Programado.
