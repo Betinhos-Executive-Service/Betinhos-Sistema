@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
-import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX } from 'lucide-react'
+import { CalendarCheck, Copy, Download, FileStack, RefreshCw, SearchX, Split } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
@@ -20,6 +20,7 @@ import { VIEWS_KEY, loadViews, periodoStart, total } from './domain/filters'
 import { OP_COLUMNS, OP_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, opFields, opKeywordText, readOp, sortOps } from './domain/lista'
 import { opsQuery } from './domain/query'
 import { opsCsv, opsNumeros } from './domain/exportar'
+import { OP_STATUS } from './domain/status'
 import type { Op } from './domain/types'
 import { useOps } from './useOps'
 import { OpsCards, OpsTable } from './components/OpsList'
@@ -164,7 +165,11 @@ function Ops({ host }: { host: Host }) {
   // Ações em lote: as mesmas na faixa da seleção e no clique direito.
   const bulkActions = (rows: Op[]): MenuAction[] => {
     const semNumero = !opsNumeros(rows).length
+    // Com uma OP só, o Gerar Pagantes sai direto da lista, sem abrir a gaveta.
+    const [unica] = rows.length === 1 ? rows : []
+    const cancelada = unica?.status === OP_STATUS.cancelada
     return [
+      ...(unica ? [{ id: 'gerar', label: 'Gerar pagantes', icon: <Split size={16} />, disabled: cancelada, title: cancelada ? 'A OP está cancelada.' : undefined, onSelect: () => gerarPagantes(unica) }] : []),
       { id: 'exportar', label: 'Exportar seleção', icon: <Download size={16} />, onSelect: () => exportar(rows) },
       { id: 'copiar', label: 'Copiar números', icon: <Copy size={16} />, disabled: semNumero, title: semNumero ? 'As OPs selecionadas ainda não têm número.' : undefined, onSelect: () => void copiarNumeros(rows) },
     ]
