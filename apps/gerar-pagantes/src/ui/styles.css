@@ -70,6 +70,8 @@ body { background: transparent; }
 .payer-editor__missing { display: flex; flex-basis: 100%; align-items: flex-start; gap: var(--bt-space-2); }
 .payer-editor__missing .bt-field { flex: 1; }
 .payer-editor__missing .bt-button { margin-top: 22px; }
+.payer-editor__email-actions { display: flex; gap: var(--bt-space-2); margin-top: 22px; }
+.payer-editor__email-actions .bt-button { margin-top: 0; white-space: nowrap; }
 .payer-editor__status { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--bt-space-1) var(--bt-space-3); padding-left: 40px; }
 .payer-editor__actions { --bt-gap: 0; margin-left: auto; }
 .payer-editor__link { padding: 0; border: 0; background: none; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
@@ -121,6 +123,7 @@ body { background: transparent; }
   .payer-editor__head, .payer-editor__toggles { grid-column: 1 / -1; }
   .payer-editor__missing { flex-direction: column; align-items: stretch; }
   .payer-editor__missing .bt-button { margin-top: 0; }
+  .payer-editor__email-actions { flex-direction: column; margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .payer-editor { animation: none; }
