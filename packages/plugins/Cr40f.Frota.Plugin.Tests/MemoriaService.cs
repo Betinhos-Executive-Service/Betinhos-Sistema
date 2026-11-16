@@ -15,7 +15,12 @@ public sealed class MemoriaService : IOrganizationService
 
     public MemoriaService Com(params Entity[] linhas)
     {
-        foreach (var linha in linhas) _linhas[(linha.LogicalName, linha.Id)] = Clonar(linha);
+        foreach (var linha in linhas)
+        {
+            var copia = Clonar(linha);
+            if (!copia.Contains("statecode")) copia["statecode"] = new OptionSetValue(0); // como no Dataverse: toda linha tem estado
+            _linhas[(linha.LogicalName, linha.Id)] = copia;
+        }
         return this;
     }
 

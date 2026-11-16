@@ -15,12 +15,14 @@ public sealed partial class ManutencaoService
     {
         var id = Id(p.ManutencaoId);
         Ciclo.ValidarConclusao(p);
-        var m = _service.Retrieve(M.Tabela, id, new ColumnSet(M.Status, M.Veiculo, M.LinkNotaFiscal));
+        var m = _service.Retrieve(M.Tabela, id, new ColumnSet(M.Status, M.Veiculo, M.LinkNotaFiscal, M.Valor, M.Pagamento, M.Estabelecimento, M.DataManutencao, M.ComentarioColaborador, M.RealizadoPor));
         var status = Status(m);
         var veiculo = m.GetAttributeValue<EntityReference>(M.Veiculo) ?? throw Ciclo.Erro("A manutenção não tem veículo.");
+        var jaRealizada = status == M.Realizado;
         var realizadoPor = new EntityReference("cr40f_funcionarios", Guid.Parse(p.RealizadoPorId));
         var data = Ciclo.LerDataHora(p.Data);
-        var jaRealizada = status == M.Realizado;
+        // Repetido: a manutenção já guarda a conclusão; a despesa (se faltar) e a linha seguem o que ficou gravado, não o novo pedido.
+        if (jaRealizada) (p, data, realizadoPor) = Gravados(m, p, data, realizadoPor);
 
         if (!jaRealizada)
         {
@@ -30,7 +32,7 @@ public sealed partial class ManutencaoService
         }
 
         var linha = LinhaGeral.AtivaOuConcluida(_service, id);
-        var despesa = new DespesaManutencao(_service).Garantir(id, veiculo, realizadoPor, p, data);
+        var despesa = new DespesaManutencao(_service).Garantir(id, veiculo, realizadoPor, p, data, soCriar: jaRealizada);
         if (!jaRealizada) _service.Update(Conclusao(id, p, data, realizadoPor));
         if (linha is not null && Status(linha, G.Status) != G.StatusConcluido)
         {
@@ -42,6 +44,25 @@ public sealed partial class ManutencaoService
             });
         }
         return new ConcluirResposta { DespesaId = despesa.Id.ToString(), StatusAnexo = despesa.StatusAnexo, GeralId = linha?.Id.ToString() };
+    }
+
+    /// <summary>Valores da conclusão já gravados na manutenção; a cidade não fica nela, então vem do pedido. Coluna vazia cai no pedido.</summary>
+    static (ConcluirPedido Pedido, DateTime Data, EntityReference RealizadoPor) Gravados(Entity m, ConcluirPedido p, DateTime data, EntityReference realizadoPor)
+    {
+        var gravado = new ConcluirPedido
+        {
+            ManutencaoId = p.ManutencaoId,
+            Servicos = p.Servicos,
+            Km = p.Km,
+            Data = p.Data,
+            Valor = m.GetAttributeValue<Money>(M.Valor)?.Value ?? p.Valor,
+            Pagamento = m.GetAttributeValue<OptionSetValue>(M.Pagamento)?.Value ?? p.Pagamento,
+            Estabelecimento = string.IsNullOrWhiteSpace(m.GetAttributeValue<string>(M.Estabelecimento)) ? p.Estabelecimento : m.GetAttributeValue<string>(M.Estabelecimento),
+            CidadeId = p.CidadeId,
+            RealizadoPorId = p.RealizadoPorId,
+            Comentario = m.GetAttributeValue<string>(M.ComentarioColaborador),
+        };
+        return (gravado, m.GetAttributeValue<DateTime?>(M.DataManutencao) ?? data, m.GetAttributeValue<EntityReference>(M.RealizadoPor) ?? realizadoPor);
     }
 
     static Entity Conclusao(Guid id, ConcluirPedido p, DateTime data, EntityReference realizadoPor)
