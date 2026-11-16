@@ -17,7 +17,8 @@ description: "Verifica a Tela Gerar Pagantes (apps/gerar-pagantes), o gerador de
 5. `pnpm --filter @betinhos/gerar-pagantes exec vite --port 36491 --strictPort`, abrir `http://localhost:36491/` e conferir: a tela de pagantes da demonstração renderiza e o rodapé mostra a versão.
 
 6. Destinatário: em `/?recordId=<guid>&demo=edit`, clicar em Trocar destinatário, digitar um e-mail inválido (erro) e um válido. O chip mostra o e-mail, aparece "Enviar também o recibo" marcado, e desmarcar mantém a linha como alterada.
-7. Transformação dos flows: `node --test packages/deploy/flows/recibo-destinatario.test.mjs` e `powershell -File packages/deploy/provision-flow-recibo-destinatario.ps1 -SomenteValidar` (só leitura).
+7. Pagante sem e-mail: em `/?recordId=<guid>&demo=edit`, adicionar uma pessoa sem e-mail, informar um e-mail em "Ou digite um e-mail" e clicar em Gerar. O "Confirmar alterações" mostra "Pagantes sem e-mail no cadastro" com o e-mail sugerido e "Gravar no cadastro" marcado; e-mail inválido bloqueia "Confirmar e salvar" até corrigir, limpar ou desmarcar. Destinatário cadastrado não é copiado (campo vazio); pagante quitado ou removido não aparece.
+8. Transformação dos flows: `node --test packages/deploy/flows/recibo-destinatario.test.mjs` e `powershell -File packages/deploy/provision-flow-recibo-destinatario.ps1 -SomenteValidar` (só leitura).
 
 ## Roteiro no DEV (sessão autenticada, só com o Deploy concluído)
 1. `Tela_GerarPagantes/index.html` com descrição `vX.Y.Z <sha>` da `develop`.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Payer, Person } from './domain'
-import { changeCount, diffDrafts, draftFromPayer, draftFromPerson, draftReducer, initialState, toSubmitPayers, validate, type DraftState } from './payerDraft'
+import { changeCount, diffDrafts, draftFromPayer, draftFromPerson, draftReducer, initialState, missingPayerEmails, toSubmitPayers, validate, type DraftState } from './payerDraft'
 
 const person = (n: number, role: Person['role'] = 'Passageiro', email = `p${n}@x.com`): Person => ({ id: `00000000-0000-0000-0000-00000000000${n}`, name: `Pessoa ${n}`, email, phone: '', role })
 const saved = (n: number, amountCents: number, extra: Partial<Payer> = {}): Payer => ({ ...person(n), existingPayerId: `r${n}`, amountCents, paymentMethod: 202410000, generateLink: true, sendEmail: true, linkStatus: 'Generated', emailStatus: 'Sent', paymentStatus: 'Pendente', ...extra })
@@ -167,5 +167,32 @@ describe('destinatário do recibo', () => {
     const state = draftReducer({ drafts: [draftFromPayer(saved)], pendingEmails: {} }, { type: 'setReceipt', key: saved.existingPayerId, receiptToRecipient: false })
     expect(diffDrafts([saved], state.drafts).edited).toHaveLength(1)
     expect(toSubmitPayers(state.drafts)[0].receiptToRecipient).toBe(false)
+  })
+})
+
+describe('pagante sem e-mail no cadastro', () => {
+  const semEmail: Person = { id: '10000000-0000-4000-8000-000000000003', name: 'Fernanda', email: '', phone: '', role: 'Passageiro' }
+  const secretaria: Person = { id: '10000000-0000-4000-8000-000000000004', name: 'Erika', email: 'erika@empresa.com.br', phone: '', role: 'Passageiro' }
+  const inicial = (): DraftState => ({ drafts: [{ ...draftFromPerson(semEmail), amountCents: 100 }, { ...draftFromPerson(person(1)), amountCents: 100 }], pendingEmails: {} })
+  const key = semEmail.id
+
+  it('lista só quem não tem e-mail, vazio e desmarcado', () => {
+    expect(missingPayerEmails(inicial().drafts)).toEqual([{ personId: semEmail.id, name: 'Fernanda', email: '', save: false }])
+  })
+
+  it('sugere e marca o e-mail digitado como destinatário', () => {
+    const state = draftReducer(inicial(), { type: 'setRecipientEmail', key, email: ' fernanda@empresa.com.br ' })
+    expect(missingPayerEmails(state.drafts)[0]).toMatchObject({ email: 'fernanda@empresa.com.br', save: true })
+  })
+
+  it('não copia o e-mail de destinatário cadastrado', () => {
+    const state = draftReducer(inicial(), { type: 'setRecipient', key, person: secretaria })
+    expect(missingPayerEmails(state.drafts)[0]).toMatchObject({ email: '', save: false })
+  })
+
+  it('some quando o e-mail já foi informado na linha, quando pago ou removido', () => {
+    expect(missingPayerEmails(draftReducer(inicial(), { type: 'setPersonEmail', personId: semEmail.id, email: 'f@empresa.com.br' }).drafts)).toEqual([])
+    expect(missingPayerEmails(inicial().drafts.map((draft) => ({ ...draft, settled: true })))).toEqual([])
+    expect(missingPayerEmails(inicial().drafts.map((draft) => ({ ...draft, removed: true })))).toEqual([])
   })
 })

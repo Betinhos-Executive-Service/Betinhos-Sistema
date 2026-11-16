@@ -35,6 +35,16 @@ export const recipientIsOther = (draft: PayerDraft) => draft.recipientId !== dra
 export const recipientLabel = (draft: PayerDraft) => draft.recipientName ?? draft.recipientEmail ?? ''
 export const needsRecipient = (draft: PayerDraft) => !draft.settled && draft.generateLink && (draft.sendEmail || (recipientIsOther(draft) && draft.receiptToRecipient))
 
+/** Pagante sem e-mail no cadastro, oferecido no resumo ao salvar. */
+export interface MissingEmail { personId: Guid; name: string; email: string; save: boolean }
+
+/** O e-mail digitado como destinatário vem sugerido e marcado; destinatário cadastrado não é copiado. */
+export const missingPayerEmails = (drafts: PayerDraft[]): MissingEmail[] =>
+  activeDrafts(drafts).filter((draft) => !draft.settled && !emailValid(draft.email)).map((draft) => {
+    const typed = draft.recipientId ? '' : draft.recipientEmail?.trim() ?? ''
+    return { personId: draft.id, name: draft.name, email: typed, save: Boolean(typed) }
+  })
+
 export function draftFromPayer(payer: Payer): PayerDraft {
   const recipientId = recipientIdOf(payer)
   return {
