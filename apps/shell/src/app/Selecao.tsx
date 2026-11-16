@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Button, StatusBadge, type MenuAction, type TableSelection } from '@betinhos/ui'
+import { Button, StatusBadge, type MenuAction, type SelectionAction, type TableSelection } from '@betinhos/ui'
 import { X } from 'lucide-react'
 import './selecao.css'
 
@@ -22,6 +22,17 @@ export function useRowSelection<Row extends { id: string }>(visible: Row[]) {
   // O Table só vê as linhas desenhadas (lote e janela da rolagem): o clique direito numa selecionada age sobre a seleção inteira, como a faixa.
   const targets = (clicked: Row[]) => (clicked.some((row) => selected.has(row.id)) ? rows : clicked)
   return { selection, rows, bar, targets, clear: () => setSelected(new Set()) }
+}
+
+/** Ações do clique direito como ações da seleção do `ViewBar` (§10.9.6): na linha enquanto couberem, o resto no ⋮.
+ * `disabled` vira `blocked` com o motivo (o `title`), que o DS mostra no botão inerte. */
+export function selectionActions(actions: MenuAction[]): SelectionAction[] {
+  return actions.map(({ disabled, title, description: _description, ...action }) => ({
+    ...action,
+    label: String(action.label),
+    inline: true,
+    blocked: disabled ? (title ?? 'Indisponível agora.') : null,
+  }))
 }
 
 /** Faixa do ViewBar enquanto há linhas selecionadas: limpar, contagem e as mesmas ações do clique direito. */

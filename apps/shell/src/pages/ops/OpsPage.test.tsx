@@ -44,7 +44,7 @@ describe('Ordens de Pagamento', () => {
     expect(await blobText(blobs[0])).toMatch(/OP-401/)
   })
 
-  it('Fechar mês no cabeçalho: escolhe cliente e mês, confirma e avisa', async () => {
+  it('Fechar mês na linha de comando: escolhe cliente e mês, confirma e avisa', async () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Fechar mês' }))
     const dialog = await screen.findByRole('dialog', { name: 'Fechar mês?' })

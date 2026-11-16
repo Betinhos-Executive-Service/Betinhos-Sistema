@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Dialog, EmptyState, Field, SearchBox, Textarea, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, Field, SearchBox, Textarea, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
 import { CalendarClock, CheckCheck, Download, Lock, MessageCircleQuestion, RefreshCw, SearchX, ShieldCheck, Undo2, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -147,8 +147,13 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   }
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar validação do cliente" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Validação do cliente', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Validação do cliente' })
+  const size = mobile ? 'touch' : 'default'
+  // "⋮" (Mais ações): o que é raro e não depende da seleção.
+  const moreActions: MenuAction[] = [
+    { id: 'validadores', label: 'Validadores', icon: <Users size={16} />, disabled: !data.loaded, onSelect: () => setValidadoresOpen(true) },
+  ]
 
   const linhaAberta = aberto ? data.linhas.find((l) => l.id === aberto) ?? null : null
   let body
@@ -174,15 +179,15 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   return (
     <div className="page vc-page">
       <div role="toolbar" aria-label="Comandos da validação do cliente">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="vc-search" value={query} onChange={setQuery} placeholder="Buscar serviço, pedido, trajeto ou mensagem" aria-label="Buscar serviços" />
-          <Button variant="secondary" icon={<MessageCircleQuestion size={16} />} disabled={!data.loaded} aria-label={`Dúvidas abertas: ${duvidas}`} onClick={() => view.select('pronta:em-duvida')}>{mobile ? null : `Dúvidas (${duvidas})`}</Button>
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <span className="vc-acoes">
-            <Button variant="secondary" icon={<Users size={16} />} disabled={!data.loaded} onClick={() => setValidadoresOpen(true)}>Validadores</Button>
-            <Button icon={<Download size={16} />} disabled={!data.loaded || !data.clientes.length} onClick={() => setExportOpen(true)}>Exportar Excel do mês</Button>
-          </span>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar serviço, pedido, trajeto ou mensagem" aria-label="Buscar serviços" />}
+          more={moreActions}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Download size={16} />} disabled={!data.loaded || !data.clientes.length} onClick={() => setExportOpen(true)}>Exportar Excel do mês</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          <Button variant="secondary" size={size} icon={<MessageCircleQuestion size={16} />} disabled={!data.loaded} aria-label={`Dúvidas abertas: ${duvidas}`} onClick={() => view.select('pronta:em-duvida')}>{mobile ? null : `Dúvidas (${duvidas})`}</Button>
         </ViewBar>
       </div>
       {data.loaded && selecionaveis.length ? (

@@ -5,7 +5,7 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
-import { SelectionBar, useRowSelection } from '../../app/Selecao'
+import { selectionActions, useRowSelection } from '../../app/Selecao'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -119,11 +119,9 @@ function Ops({ host }: { host: Host }) {
     return () => { cancelled = true }
   }, [fechar.open, pendSource])
   const abrirFechar = useCallback(() => setFechar({ open: true, opcoes: null, erro: null }), [])
-  const headerActions = useMemo(() => <>
-    <Button icon={<CalendarCheck size={18} />} aria-label="Fechar mês" onClick={abrirFechar} />
-    <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar ordens de pagamento" onClick={refresh} />
-  </>, [refresh, abrirFechar])
-  useShellHeader({ title: 'Ordens de Pagamento', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Ordens de Pagamento' })
+  const size = mobile ? 'touch' : 'default'
 
   async function confirmCancel(op: Op) {
     if (busyId) return
@@ -215,16 +213,16 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <div {...sel.bar}>
-          <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-            {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
-              {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-              <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />
-              {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />}
-              {mobile ? null : <Button icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>}
-            </>}
-          </ViewBar>
-        </div>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />
+            <Button size={size} icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>
+          </>}
+          // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
+          selection={{ count: selecting ? sel.rows.length : 0, onClear: sel.clear, actions: selectionActions(bulkActions(sel.rows)) }}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        </ViewBar>
       </div>
       {ops.error && ops.choices ? (
         <Alert tone="danger" title={ops.complete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>

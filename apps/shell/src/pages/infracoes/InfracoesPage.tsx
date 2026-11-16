@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
@@ -63,7 +63,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const [target, setTarget] = useQueryAlvo()
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar infrações" onClick={refresh} />, [refresh])
+  const size = mobile ? 'touch' : 'default'
 
   let body
   if (data.error && !data.loaded) {
@@ -88,13 +88,16 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
 
   return (
     <div className={embutido ? 'if-page' : 'page page--full if-page'}>
-      {embutido ? null : <CabecalhoShell actions={headerActions} />}
+      {/* "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete. */}
+      {embutido ? null : <CabecalhoShell />}
       <div role="toolbar" aria-label="Comandos de infrações">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
+          </>}>
+          {source.mock && !embutido && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
@@ -106,7 +109,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
 }
 
 /** Só a página solta registra o cabeçalho do celular; embutida, quem registra é a Frota. */
-function CabecalhoShell({ actions }: { actions: ReactNode }) {
-  useShellHeader({ title: 'Infrações de trânsito', actions })
+function CabecalhoShell() {
+  useShellHeader({ title: 'Infrações de trânsito' })
   return null
 }

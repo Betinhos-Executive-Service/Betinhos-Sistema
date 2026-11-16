@@ -92,7 +92,8 @@ describe('Pagantes', () => {
     fireEvent.click((await screen.findByText('PAG-1203')).closest('.bt-table__row')!.querySelector('.pg-num')!, { ctrlKey: true })
     const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
     expect(within(faixa).getByText('2 selecionados')).toBeTruthy()
-    expect(screen.queryByRole('searchbox', { name: 'Buscar pagantes' })).toBeNull()
+    // Como na Geral, a busca continua na linha de comando durante a seleção.
+    expect(screen.getByRole('searchbox', { name: 'Buscar pagantes' })).toBeTruthy()
 
     fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
     await screen.findByText('2 pagantes exportados.')

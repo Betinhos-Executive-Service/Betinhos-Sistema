@@ -137,8 +137,9 @@ function Despesas({ host }: { host: Host }) {
   const refresh = useCallback(() => { setVersion((v) => v + 1); void despesas.reload(); void conciliacao.reload() }, [despesas.reload, conciliacao.reload])
   const loadingFirst = !choices
   const reloading = despesas.loading && !loadingFirst
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />, [refresh, reloading])
-  useShellHeader({ title: 'Despesas operacionais', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Despesas operacionais' })
+  const size = mobile ? 'touch' : 'default'
   const clearAll = () => { clearFilters(); setQuery('') }
   // Cada cartão de total abre a visão pronta correspondente; clicar de novo volta à visão padrão. Com a visão atual
   // alterada e não salva, pergunta antes de trocar.
@@ -178,12 +179,11 @@ function Despesas({ host }: { host: Host }) {
         options={[{ value: 'despesas', label: 'Despesas' }, { value: 'sem-despesa', label: `Compras sem despesa${conciliacao.loaded ? ` (${contarSemDespesa(conciliacao.transacoes)})` : ''}` }]} />
       {fila === 'sem-despesa' ? <ComprasSemDespesa data={conciliacao} source={conciliacaoSource} mobile={mobile} onOpen={setCompraId} onRefresh={() => void conciliacao.reload()} /> : (
       <>
-      <div role="toolbar" aria-label="Comandos de despesas" className="dp-barra">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />
-          {/* O cabeçalho do shell (com o Atualizar de headerActions) só aparece no celular; no desktop o botão fica aqui. */}
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}
+      <div role="toolbar" aria-label="Comandos de despesas">
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {despesas.error && !choices ? null : (

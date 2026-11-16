@@ -59,8 +59,9 @@ function Treinamentos({ host }: { host: Host }) {
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar treinamentos" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Treinamentos', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Treinamentos' })
+  const size = mobile ? 'touch' : 'default'
 
   const goHome = useCallback(() => setTarget(null), [setTarget])
   const startNew = useCallback(() => { setModelo(null); setCreateKey((n) => n + 1); setTarget({ mode: 'create' }) }, [setTarget])
@@ -111,11 +112,13 @@ function Treinamentos({ host }: { host: Host }) {
   return (
     <div className="page tr-page">
       <div role="toolbar" aria-label="Comandos de treinamentos">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="tr-search" value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={startNew}>Novo treinamento</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={startNew}>Novo treinamento</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}

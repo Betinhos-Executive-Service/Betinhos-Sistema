@@ -5,7 +5,7 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
-import { SelectionBar, useRowSelection } from '../../app/Selecao'
+import { selectionActions, useRowSelection } from '../../app/Selecao'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -103,8 +103,9 @@ function Pagantes({ host }: { host: Host }) {
   // O gerador de recibo chama o refresh minutos depois: usa sempre o mais recente (período atual).
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pagantes" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pagantes', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pagantes' })
+  const size = mobile ? 'touch' : 'default'
 
   async function confirmStatus(enviarRecibo: boolean) {
     const request = statusRequest
@@ -163,7 +164,7 @@ function Pagantes({ host }: { host: Host }) {
   const bulkActions = (rows: Pagante[]): MenuAction[] => {
     const aptos = rows.some(canGerarRecibo)
     return [
-      { id: 'recibos', label: rows.length === 1 ? 'Gerar recibo' : 'Gerar recibos', icon: <FileText size={16} />, disabled: !aptos || Boolean(busyId), title: aptos ? undefined : 'Pagante cancelado não gera recibo.', onSelect: () => void gerarRecibo(rows) },
+      { id: 'recibos', label: rows.length === 1 ? 'Gerar recibo' : 'Gerar recibos', icon: <FileText size={16} />, disabled: !aptos || Boolean(busyId), title: !aptos ? 'Pagante cancelado não gera recibo.' : busyId ? 'Aguarde o recibo em andamento.' : undefined, onSelect: () => void gerarRecibo(rows) },
       { id: 'exportar', label: 'Exportar seleção', icon: <Download size={16} />, onSelect: () => exportar(rows) },
     ]
   }
@@ -198,15 +199,13 @@ function Pagantes({ host }: { host: Host }) {
   return (
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
-        <div {...sel.bar}>
-          <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-            {selecting ? <SelectionBar count={sel.rows.length} onClear={sel.clear} actions={bulkActions(sel.rows)} /> : <>
-              {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-              <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
-              {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
-            </>}
-          </ViewBar>
-        </div>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
+          // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
+          selection={{ count: selecting ? sel.rows.length : 0, onClear: sel.clear, actions: selectionActions(bulkActions(sel.rows)) }}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+        </ViewBar>
       </div>
       {pg.error && pg.choices ? (
         <Alert tone="danger" title={pg.listComplete ? 'A última atualização falhou' : 'A carga parou no meio'} action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>
