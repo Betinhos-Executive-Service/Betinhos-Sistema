@@ -89,8 +89,24 @@
                 },
                 "Has_subs_Send_push": {
                   "actions": {
-                    "Worker_Send_push": {
+                    "Select_subs_Send_push": {
                       "runAfter": {},
+                      "type": "Select",
+                      "inputs": {
+                        "from": "@outputs('List_subs_Send_push')?['body/value']",
+                        "select": {
+                          "endpoint": "@item()?['new_endpoint']",
+                          "p256dh": "@item()?['new_chavep256dh']",
+                          "auth": "@item()?['new_chaveauth']"
+                        }
+                      }
+                    },
+                    "Worker_Send_push": {
+                      "runAfter": {
+                        "Select_subs_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
                       "type": "OpenApiConnection",
                       "inputs": {
                         "host": {
@@ -102,7 +118,7 @@
                           "body/payload/tag": "new_termomulta-@{triggerOutputs()?['body/new_termomultaid']}",
                           "body/payload/body": "@{if(empty(triggerOutputs()?['body/new_ultimolembreteem']), 'Multa para assinar', if(empty(triggerOutputs()?['body/new_enviadoem']), 'Lembrete: multa para assinar', concat('Lembrete: multa para assinar até ', formatDateTime(convertFromUtc(addDays(triggerOutputs()?['body/new_enviadoem'], 7), 'E. South America Standard Time'), 'dd/MM'))))}\nToque para ver o termo e assinar.",
                           "body/payload/title": "App Motoristas",
-                          "body/subscriptions": "@select(outputs('List_subs_Send_push')?['body/value'], json(concat('{\"endpoint\":\"', item()?['new_endpoint'], '\",\"p256dh\":\"', item()?['new_chavep256dh'], '\",\"auth\":\"', item()?['new_chaveauth'], '\"}')))",
+                          "body/subscriptions": "@body('Select_subs_Send_push')",
                           "body/payload/url": "/WebResources/new_app-motoristas-v2?termoMultaId=@{triggerOutputs()?['body/new_termomultaid']}"
                         },
                         "authentication": "@parameters('$authentication')"

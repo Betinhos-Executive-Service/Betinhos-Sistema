@@ -65,6 +65,19 @@ for (const { arquivo, status } of FLOWS) {
     assert.match(worker.inputs.parameters['body/payload/url'], /^\/WebResources\/new_app-motoristas-v2\?\w+Id=@\{triggerOutputs\(\)\?\['body\/\w+'\]\}$/)
   })
 
+  test(`${arquivo}: as inscrições vão ao Worker por uma ação Select (a linguagem de expressões não tem select())`, () => {
+    const [[, select, irmas]] = achar(flow, (n) => n === 'Select_subs_Send_push')
+    assert.equal(select.type, 'Select')
+    assert.equal(select.inputs.from, "@outputs('List_subs_Send_push')?['body/value']")
+    assert.deepEqual(select.inputs.select, {
+      endpoint: "@item()?['new_endpoint']",
+      p256dh: "@item()?['new_chavep256dh']",
+      auth: "@item()?['new_chaveauth']",
+    })
+    assert.deepEqual(irmas.Worker_Send_push.runAfter, { Select_subs_Send_push: ['Succeeded'] })
+    assert.equal(irmas.Worker_Send_push.inputs.parameters['body/subscriptions'], "@body('Select_subs_Send_push')")
+  })
+
   if (status) {
     test(`${arquivo}: Enviado se qualquer canal entregou; Falhou só se o Web Push não entregou e o V2 falhou`, () => {
       const sent = flow.actions.Mark_sent
@@ -107,6 +120,9 @@ test('Aviso Motorista | Enviar: Web Push primeiro, V2 em Fallback_V2, Enviado/Fa
   assert.ok(ps1.includes('Set_web_push_entregue'))
   assert.ok(ps1.includes('Init_web_push_entregue = @{ type = "InitializeVariable"'))
   assert.ok(ps1.includes('runAfter = (Ok "Init_web_push_entregue")'))
+  assert.ok(ps1.includes('"body/subscriptions" = "@body(\'Select_subs\')"'))
+  assert.ok(ps1.includes('runAfter = (Ok "Select_subs")'))
+  assert.ok(ps1.includes('Select_subs = $selectSubs'))
   // O V2 da Vigia (operadores internos) continua como estava, sem Web Push.
   assert.ok(ps1.includes('connectionName = "shared_powerappsnotificationv2"; operationId = "SendPushNotificationV2"'))
 })
@@ -118,5 +134,16 @@ test('nenhum JSON de flow com push do Power Apps ao motorista fica sem o escopo 
     const v2 = achar(flow, (_, a) => a.inputs?.host?.operationId === 'SendPushNotificationV2')
     if (!v2.length) continue
     assert.ok(achar(flow, (n) => n === 'Web_Push_Send_push').length > 0, `${arquivo} tem V2 sem escopo Web Push`)
+  }
+})
+
+test('nenhum flow usa select() como função de expressão (não existe no Power Automate: InvalidTemplate na execução)', () => {
+  const dir = new URL('./', import.meta.url)
+  const fontes = readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => [f, readFileSync(new URL(f, dir), 'utf8')])
+  for (const ps1 of readdirSync(new URL('../', import.meta.url)).filter((f) => /^provision-flow-.*\.ps1$/.test(f))) {
+    fontes.push([ps1, readFileSync(new URL(`../${ps1}`, import.meta.url), 'utf8')])
+  }
+  for (const [nome, texto] of fontes) {
+    assert.doesNotMatch(texto, /[@{(,\s]select\(/, `${nome} chama select() numa expressão`)
   }
 })

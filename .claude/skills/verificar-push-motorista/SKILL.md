@@ -9,7 +9,7 @@ description: "Verifica os avisos push ao motorista (Web Push primeiro, Power App
 - Regra: escopo `Web_Push_Send_push` roda primeiro (Worker `EnviarPush`); `Fallback_V2` (V2) roda só se a variável `Web_Push_Entregue` ficou falsa (sem funcionário, sem inscrição ou nenhuma inscrição com 2xx). `Mark_sent`/`Marcar_enviado` depois do `Fallback_V2` Succeeded; `Mark_failed`/`Marcar_falhou` quando o `Fallback_V2` falha.
 
 ## Local (sem Dataverse)
-1. `node --test packages/deploy/flows/push-motorista-web-push-primeiro.test.mjs packages/deploy/flows-dev.test.mjs` → passam (V2 só dentro de `Fallback_V2` com `runAfter` no escopo Web Push; Init da variável no topo; Filter 2xx; status; deep links).
+1. `node --test packages/deploy/flows/push-motorista-web-push-primeiro.test.mjs packages/deploy/flows-dev.test.mjs` → passam (V2 só dentro de `Fallback_V2` com `runAfter` no escopo Web Push; Init da variável no topo; Filter 2xx; status; deep links; inscrições montadas pela ação `Select_subs*`, nunca `select()` em expressão).
 2. `python3 -m json.tool <json>` em cada JSON alterado.
 3. `node scripts/dados-pessoais.mjs` → sem dados pessoais (repo público: nada de e-mail, `sig=`, segredo).
 
@@ -23,4 +23,5 @@ description: "Verifica os avisos push ao motorista (Web Push primeiro, Power App
 
 ## Cuidados
 - O Worker é chamado por conector; o segredo fica na conexão, nunca no flow.
+- A linguagem de expressões do Power Automate não tem `select()`: usada em `body/subscriptions`, o Worker falha com `InvalidTemplate` e todo aviso cai no V2 (bug de 10/11 a 16/11/2026). A lista de inscrições sai da ação Select.
 - Pendente (fora deste PR): "Flow Notificação Serviço Editado | Interno e Motoristas" ainda manda V2 e Web Push em paralelo (sem provision no repo).
