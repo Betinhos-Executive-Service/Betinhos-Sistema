@@ -63,10 +63,10 @@ public static class Mapper
         HodometroEm = e.GetAttributeValue<DateTime?>("cr40f_hodometroem")?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
     };
 
-    public static Manutencao Manutencao(Entity e)
+    public static ManutencaoRegistro Manutencao(Entity e)
     {
         var veiculo = e.GetAttributeValue<EntityReference>("cr40f_placa_carro");
-        return new Manutencao
+        return new ManutencaoRegistro
         {
             Id = e.Id.ToString(),
             Descricao = e.GetAttributeValue<string>("cr40f_descricao") ?? "",

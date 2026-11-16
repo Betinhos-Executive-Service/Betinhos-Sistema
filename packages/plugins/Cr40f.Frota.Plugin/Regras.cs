@@ -37,7 +37,7 @@ public static class Regras
         return new Resultado { Hoje = hoje, Total = ordenada.Count, Pendencias = ordenada };
     }
 
-    public static int? PrioridadeParada(Manutencao m, string hoje)
+    public static int? PrioridadeParada(ManutencaoRegistro m, string hoje)
     {
         if ((m.Grau ?? 0) < Limiares.PrioridadeGrauMinimo) return null;
         var dias = Dias(m.CriadoEm, hoje);
@@ -46,9 +46,9 @@ public static class Regras
         return null;
     }
 
-    private static string DiaDe(Manutencao m) => m.DataManutencao ?? m.CriadoEm;
+    private static string DiaDe(ManutencaoRegistro m) => m.DataManutencao ?? m.CriadoEm;
 
-    public static IEnumerable<Pendencia> Reincidencias(IEnumerable<Manutencao> manutencoes, string hoje)
+    public static IEnumerable<Pendencia> Reincidencias(IEnumerable<ManutencaoRegistro> manutencoes, string hoje)
     {
         var grupos = manutencoes
             .Where(m => m.VeiculoId != null && !(m.Status is int s && Anuladas.Contains(s)))
@@ -103,9 +103,9 @@ public static class Regras
         }
     }
 
-    private static (decimal? km, string? data) UltimaExecucao(ItemPlano item, List<Manutencao> doVeiculo, Baseline? baseline)
+    private static (decimal? km, string? data) UltimaExecucao(ItemPlano item, List<ManutencaoRegistro> doVeiculo, Baseline? baseline)
     {
-        Manutencao? melhor = null;
+        ManutencaoRegistro? melhor = null;
         if (item.Servico is int srv)
             foreach (var m in doVeiculo.Where(m => m.Status == Codigos.Realizado && m.Servicos.Contains(srv)))
                 if (melhor == null || string.CompareOrdinal(DiaDe(m), DiaDe(melhor)) > 0) melhor = m;
@@ -121,7 +121,7 @@ public static class Regras
 
     private static bool Ativo(Veiculo v) => v.Status != Codigos.VeiculoVendido;
 
-    public static IEnumerable<Pendencia> CustoForaDaCurva(List<Veiculo> veiculos, List<Manutencao> manutencoes, string hoje)
+    public static IEnumerable<Pendencia> CustoForaDaCurva(List<Veiculo> veiculos, List<ManutencaoRegistro> manutencoes, string hoje)
     {
         var porVeiculo = manutencoes
             .Where(m => m.Status == Codigos.Realizado && m.VeiculoId != null && m.Valor is > 0)

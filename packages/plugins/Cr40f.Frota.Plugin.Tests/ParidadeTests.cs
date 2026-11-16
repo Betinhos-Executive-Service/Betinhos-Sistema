@@ -15,7 +15,7 @@ public sealed class FixtureParidade
     [DataMember(Name = "hoje")] public string Hoje { get; set; } = "";
     [DataMember(Name = "agora")] public string Agora { get; set; } = "";
     [DataMember(Name = "veiculos")] public List<Veiculo> Veiculos { get; set; } = new();
-    [DataMember(Name = "manutencoes")] public List<Manutencao> Manutencoes { get; set; } = new();
+    [DataMember(Name = "manutencoes")] public List<ManutencaoRegistro> Manutencoes { get; set; } = new();
     [DataMember(Name = "itens")] public List<ItemPlano> Itens { get; set; } = new();
     [DataMember(Name = "baselines")] public List<Baseline> Baselines { get; set; } = new();
     [DataMember(Name = "esperado")] public List<string> Esperado { get; set; } = new();

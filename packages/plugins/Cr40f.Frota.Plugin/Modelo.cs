@@ -34,7 +34,7 @@ public sealed class Veiculo
 }
 
 [DataContract]
-public sealed class Manutencao
+public sealed class ManutencaoRegistro
 {
     [DataMember(Name = "id")] public string Id { get; set; } = "";
     [DataMember(Name = "descricao")] public string Descricao { get; set; } = "";
@@ -78,7 +78,7 @@ public sealed class Baseline
 public sealed class DadosFrota
 {
     [DataMember(Name = "veiculos")] public List<Veiculo> Veiculos { get; set; } = new();
-    [DataMember(Name = "manutencoes")] public List<Manutencao> Manutencoes { get; set; } = new();
+    [DataMember(Name = "manutencoes")] public List<ManutencaoRegistro> Manutencoes { get; set; } = new();
     [DataMember(Name = "itens")] public List<ItemPlano> Itens { get; set; } = new();
     [DataMember(Name = "baselines")] public List<Baseline> Baselines { get; set; } = new();
 }
