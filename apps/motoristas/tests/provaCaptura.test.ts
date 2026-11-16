@@ -164,37 +164,40 @@ test("localização lenta não atrasa a captura: sai como indisponível", async 
   assert.equal(registros[0].localizacao.estado, "indisponivel");
 });
 
-test("foto: reduzida a 2048 px no maior lado, JPEG 0,85, com faixa do carimbo no rodapé de até 10% da altura", async () => {
+test("foto: reduzida a 2048 px, JPEG 0,85, e a faixa do carimbo acrescentada abaixo sem cobrir a imagem", async () => {
   const { prova, telas } = montar({ largura: 4032, altura: 3024 });
   const sessao = await prova.iniciar(ORIGEM);
   const foto = await prova.aplicarNaFoto(sessao, "data:image/jpeg;base64,AAAA", { placa: "ABC1D23", registro: "DESP-12" }, "camera-ao-vivo");
 
   const tela = telas[0];
-  assert.equal(Math.max(tela.largura, tela.altura), FOTO_MAX_LADO);
-  assert.equal(tela.largura, 2048);
-  assert.equal(tela.altura, 1536);
-  assert.equal(JSON.parse(Buffer.from(foto.dataUrl.split(",")[1], "base64").toString()).qualidade, 0.85);
+  const imagem = tela.chamadas.find((c) => c.metodo === "drawImage")?.args as number[];
+  assert.deepEqual(imagem.slice(1), [0, 0, 2048, 1536], "imagem inteira, reduzida a 2048 px no maior lado");
+  assert.equal(Math.max(imagem[3], imagem[4]), FOTO_MAX_LADO);
   const faixa = tela.chamadas.find((c) => c.metodo === "fillRect")?.args as number[];
-  assert.equal(faixa[0], 0);
-  assert.equal(faixa[2], 2048);
-  assert.equal(faixa[1] + faixa[3], 1536, "faixa encostada no rodapé");
-  assert.ok(faixa[3] <= 1536 * 0.1);
-  const textos = tela.chamadas.filter((c) => c.metodo === "fillText").map((c) => String(c.args[0]));
-  assert.equal(textos[0], "16/11/2026 09:00:05 · ABC1D23 · DESP-12");
-  assert.equal(textos[1], `Código ${PROVA_MOCK_CODIGO}`);
+  assert.deepEqual(faixa.slice(0, 3), [0, 1536, 2048], "faixa começa onde a imagem termina");
+  assert.equal(tela.altura, 1536 + faixa[3], "canvas mais alto: a faixa vem por fora");
+  assert.equal(tela.largura, 2048);
+  assert.equal(JSON.parse(Buffer.from(foto.dataUrl.split(",")[1], "base64").toString()).qualidade, 0.85);
+  const textos = tela.chamadas.filter((c) => c.metodo === "fillText");
+  assert.equal(String(textos[0].args[0]), "16/11/2026 09:00:05 · ABC1D23 · DESP-12");
+  assert.equal(String(textos[1].args[0]), `Código ${PROVA_MOCK_CODIGO}`);
+  assert.ok(textos.every((c) => Number(c.args[2]) > 1536), "texto só na faixa, abaixo da imagem");
   assert.equal(foto.dados.tipoMidia, "foto");
   assert.equal(foto.dados.duracaoSegundos, null);
 });
 
-test("foto pequena não é ampliada e o carimbo cabe em 10% mesmo em retrato estreito", async () => {
+test("foto pequena não é ampliada e ganha a faixa abaixo com altura mínima legível", async () => {
   const { prova, telas } = montar({ largura: 480, altura: 640 });
   const sessao = await prova.iniciar(ORIGEM);
   await prova.aplicarNaFoto(sessao, "data:image/jpeg;base64,AAAA", { placa: "ABC1D23", registro: "DESP-123456" }, "camera-nativa");
 
   const tela = telas[0];
-  assert.deepEqual([tela.largura, tela.altura], [480, 640]);
+  const imagem = tela.chamadas.find((c) => c.metodo === "drawImage")?.args as number[];
+  assert.deepEqual(imagem.slice(1), [0, 0, 480, 640]);
   const faixa = tela.chamadas.find((c) => c.metodo === "fillRect")?.args as number[];
-  assert.ok(faixa[3] <= 64);
+  assert.equal(faixa[1], 640);
+  assert.equal(faixa[3], 40);
+  assert.deepEqual([tela.largura, tela.altura], [480, 680]);
 });
 
 test("vídeo: dados com hash e tamanho do arquivo, sem carimbo", async () => {
@@ -214,8 +217,9 @@ test("vídeo: dados com hash e tamanho do arquivo, sem carimbo", async () => {
 
 test("limites de vídeo: recusa acima de 120 s ou de 70 MB", () => {
   assert.equal(validarVideo({ duracaoSegundos: 119, tamanhoBytes: VIDEO_MAX_BYTES }), "");
-  assert.equal(validarVideo({ duracaoSegundos: 121, tamanhoBytes: 10 }), "Vídeo muito longo. Grave até 2 minutos.");
-  assert.equal(validarVideo({ duracaoSegundos: 30, tamanhoBytes: VIDEO_MAX_BYTES + 1 }), "Vídeo muito grande. Grave até 1 minuto e meio.");
+  assert.equal(validarVideo({ duracaoSegundos: 160, tamanhoBytes: 10 }), "Vídeo muito longo (2 min 40 s). O limite é 2 minutos.");
+  assert.equal(validarVideo({ duracaoSegundos: 30, tamanhoBytes: 85 * 1024 * 1024 }), "Vídeo muito grande (85 MB). O limite é 70 MB: grave um vídeo mais curto.");
+  assert.equal(validarVideo({ duracaoSegundos: 30, tamanhoBytes: VIDEO_MAX_BYTES + 1 }), "Vídeo muito grande (71 MB). O limite é 70 MB: grave um vídeo mais curto.");
   assert.equal(validarVideo({ duracaoSegundos: null, tamanhoBytes: 10 }), "");
 });
 

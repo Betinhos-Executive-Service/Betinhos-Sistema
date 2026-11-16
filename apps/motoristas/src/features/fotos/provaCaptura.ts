@@ -70,10 +70,30 @@ export function permiteVideo(tela: TelaProva) {
   return !TELAS_SEM_VIDEO.has(tela);
 }
 
-/** Motivo da recusa de um vídeo da câmera nativa, ou "" quando cabe nos limites. */
+const MB = 1024 * 1024;
+
+/** "85 MB", arredondado para cima: 70,2 MB não pode aparecer como "70 MB" na recusa. */
+function formatarMb(bytes: number) {
+  return `${Math.ceil(bytes / MB)} MB`;
+}
+
+/** "2 min 40 s", "2 minutos" (sem segundos sobrando) ou "45 s". */
+export function formatarDuracao(segundos: number) {
+  const total = Math.ceil(segundos);
+  const min = Math.floor(total / 60);
+  const seg = total % 60;
+  if (!min) return `${seg} s`;
+  if (!seg) return min === 1 ? "1 minuto" : `${min} minutos`;
+  return `${min} min ${seg} s`;
+}
+
+/** Motivo da recusa de um vídeo (câmera ou galeria), com o número real, ou "" quando cabe nos limites. */
 export function validarVideo(video: { duracaoSegundos: number | null; tamanhoBytes: number }) {
-  if (video.tamanhoBytes > VIDEO_MAX_BYTES) return "Vídeo muito grande. Grave até 1 minuto e meio.";
-  if ((video.duracaoSegundos ?? 0) > VIDEO_MAX_SEGUNDOS) return "Vídeo muito longo. Grave até 2 minutos.";
+  if (video.tamanhoBytes > VIDEO_MAX_BYTES) {
+    return `Vídeo muito grande (${formatarMb(video.tamanhoBytes)}). O limite é ${formatarMb(VIDEO_MAX_BYTES)}: grave um vídeo mais curto.`;
+  }
+  const duracao = video.duracaoSegundos ?? 0;
+  if (duracao > VIDEO_MAX_SEGUNDOS) return `Vídeo muito longo (${formatarDuracao(duracao)}). O limite é ${formatarDuracao(VIDEO_MAX_SEGUNDOS)}.`;
   return "";
 }
 
@@ -93,13 +113,17 @@ export function placaDoDetalhe(detalhe: { fields: Array<{ label: string; value: 
   return placaDoTexto(detalhe?.fields.find((campo) => /ve[ií]culo|placa/i.test(campo.label))?.value);
 }
 
-/** Dimensões finais (maior lado até 2048 px) e a faixa do carimbo (no máximo 10% da altura). */
+/**
+ * Dimensões da imagem reduzida (maior lado até 2048 px) e a faixa do carimbo, acrescentada abaixo dela: o canvas
+ * fica com altura + faixa e nenhum pixel da foto é coberto (o total do cupom costuma estar no rodapé).
+ */
 export function planejarFoto(largura: number, altura: number, maxLado = FOTO_MAX_LADO) {
   const escala = Math.min(1, maxLado / Math.max(largura, altura));
   const w = Math.max(1, Math.round(largura * escala));
   const h = Math.max(1, Math.round(altura * escala));
-  const faixa = Math.min(Math.floor(h * 0.1), Math.max(24, Math.round(h * 0.075)));
-  return { largura: w, altura: h, faixa };
+  // A faixa acompanha a largura, que é onde o texto precisa caber.
+  const faixa = Math.max(40, Math.round(w * 0.08));
+  return { largura: w, altura: h, faixa, alturaTotal: h + faixa };
 }
 
 const formatoHora = new Intl.DateTimeFormat("pt-BR", {
@@ -111,9 +135,10 @@ export function textoDoCarimbo(sessao: Pick<SessaoProva, "semRede" | "codigo">, 
   return [linha1, sessao.semRede ? "SEM REDE" : `Código ${sessao.codigo}`];
 }
 
-function desenharCarimbo(ctx: Contexto2D, largura: number, altura: number, faixa: number, linhas: string[]) {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
-  ctx.fillRect(0, altura - faixa, largura, faixa);
+/** Faixa opaca de `topo` até `topo + faixa`, abaixo da foto. */
+function desenharCarimbo(ctx: Contexto2D, largura: number, topo: number, faixa: number, linhas: string[]) {
+  ctx.fillStyle = "#111111";
+  ctx.fillRect(0, topo, largura, faixa);
   const margem = Math.round(faixa * 0.25);
   let fonte = Math.max(8, Math.floor(faixa * 0.36));
   const caber = () => linhas.every((linha) => ctx.measureText(linha).width <= largura - margem * 2);
@@ -124,7 +149,7 @@ function desenharCarimbo(ctx: Contexto2D, largura: number, altura: number, faixa
   }
   ctx.fillStyle = "#FFFFFF";
   ctx.textBaseline = "middle";
-  linhas.forEach((linha, indice) => ctx.fillText(linha, margem, altura - faixa + (faixa * (indice + 0.5)) / linhas.length));
+  linhas.forEach((linha, indice) => ctx.fillText(linha, margem, topo + (faixa * (indice + 0.5)) / linhas.length));
 }
 
 function bytesDoDataUrl(dataUrl: string) {
@@ -196,7 +221,7 @@ export function criarProvaCaptura(deps: DependenciasProva) {
     const capturadoEm = agora();
     const original = await deps.desenho.carregar(fotoDataUrl);
     const plano = planejarFoto(original.largura, original.altura, opcoes.maxLado);
-    const tela = deps.desenho.criarTela(plano.largura, plano.altura);
+    const tela = deps.desenho.criarTela(plano.largura, plano.alturaTotal);
     tela.contexto.drawImage(original.imagem, 0, 0, plano.largura, plano.altura);
     desenharCarimbo(tela.contexto, plano.largura, plano.altura, plano.faixa, textoDoCarimbo(sessao, contexto, capturadoEm));
     const dataUrl = tela.exportarJpeg(opcoes.qualidade ?? FOTO_QUALIDADE);
@@ -281,6 +306,34 @@ export type ProvaCaptura = ReturnType<typeof criarProvaCaptura>;
 
 // ---------- implementação do navegador ----------
 
+const AVISO_LOCALIZACAO_CHAVE = "betinhos.prova.aviso-localizacao";
+let liberarLocalizacao: (() => void) | null = null;
+let avisoLocalizacaoVisto = (() => {
+  try {
+    return globalThis.localStorage?.getItem(AVISO_LOCALIZACAO_CHAVE) === "1";
+  } catch {
+    return false;
+  }
+})();
+// A localização só é pedida ao navegador depois que o motorista leu a explicação (uma vez por aparelho).
+const explicacaoLida = avisoLocalizacaoVisto ? Promise.resolve() : new Promise<void>((resolve) => { liberarLocalizacao = resolve; });
+
+/** true enquanto a explicação da localização ainda não foi mostrada neste aparelho. */
+export function precisaAvisoLocalizacao() {
+  return !avisoLocalizacaoVisto && Boolean(globalThis.navigator?.geolocation);
+}
+
+/** O motorista leu a explicação: grava (sem travar se o armazenamento falhar) e libera o pedido de localização. */
+export function confirmarAvisoLocalizacao() {
+  avisoLocalizacaoVisto = true;
+  try {
+    globalThis.localStorage?.setItem(AVISO_LOCALIZACAO_CHAVE, "1");
+  } catch {
+    // Sem armazenamento a explicação volta na próxima abertura do app; a câmera segue normal.
+  }
+  liberarLocalizacao?.();
+}
+
 export function localizarNavegador(timeoutMs = 5000): Promise<LocalizacaoProva> {
   const geolocation = globalThis.navigator?.geolocation;
   if (!geolocation) return Promise.resolve(SEM_LOCALIZACAO);
@@ -328,7 +381,7 @@ export function provaCaptura() {
     porta: { emitirProvaMidia: emitirProvaMidiaRemote, registrarProvaMidia: registrarProvaMidiaRemote },
     fila: filaNavegador,
     desenho: desenhoNavegador,
-    localizar: () => localizarNavegador(),
+    localizar: () => explicacaoLida.then(() => localizarNavegador()),
     // A prova nunca derruba o envio: falha vira aviso no log, sem toast para o motorista.
     aoFalhar: (erro, acao) => reportAppError(erro, { severity: "warning", source: "prova-captura", action: acao, component: "provaCaptura", notifyUser: false })
   });

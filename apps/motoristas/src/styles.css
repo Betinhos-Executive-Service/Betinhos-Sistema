@@ -11211,7 +11211,7 @@ select,
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
-/* Prévia do carimbo da prova de captura: a mesma faixa escura que vai impressa no rodapé da foto. */
+/* Prévia do texto do carimbo; na foto final a faixa é acrescentada abaixo da imagem, sem cobrir nada. */
 .camera-stamp-preview {
   position: absolute;
   left: 0;
@@ -11232,6 +11232,11 @@ select,
   font-weight: 600;
   line-height: 1.2;
   pointer-events: none;
+}
+
+/* Explicação da localização, antes do pedido do navegador: acima da câmera e do carimbo. */
+.camera-location-notice {
+  z-index: 5;
 }
 
 .camera-stamp-preview span {

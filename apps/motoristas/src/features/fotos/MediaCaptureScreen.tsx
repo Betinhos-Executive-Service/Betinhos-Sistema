@@ -17,7 +17,7 @@ import {
   readPhotoFileAsDataUrl
 } from "../../shared/camera/photoOrientation";
 import type { CapturedVideoDraft, MaintenancePhotoKind } from "../../types";
-import { VIDEO_BITRATE, VIDEO_MAX_SEGUNDOS, permiteVideo, validarVideo } from "./provaCaptura";
+import { VIDEO_BITRATE, VIDEO_MAX_SEGUNDOS, confirmarAvisoLocalizacao, permiteVideo, precisaAvisoLocalizacao, validarVideo } from "./provaCaptura";
 import { CarimboPrevia, useProvaDaCaptura, type ProvaDaCaptura } from "./useProvaDaCaptura";
 
 type MediaCaptureScreenProps = {
@@ -224,6 +224,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const torchOnRef = useRef(false);
+  const [avisoLocalizacao, setAvisoLocalizacao] = useState(() => Boolean(prova) && precisaAvisoLocalizacao());
 
   const useLiveCamera = shouldUseLiveCameraCapture();
   const useAppleMobile = isAppleMobileDevice();
@@ -746,6 +747,14 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                   <BrandLoader variant="inline" size="md" label="Abrindo câmera" />
                   <span aria-hidden="true">Abrindo câmera...</span>
                   {showSupportMessage ? <span>A câmera não respondeu. Fale com o suporte de TI da Betinhos.</span> : null}
+                </div>
+              ) : null}
+
+              {avisoLocalizacao ? (
+                <div className="camera-start-panel camera-location-notice" role="dialog" aria-modal="false" aria-labelledby="aviso-localizacao-titulo">
+                  <strong id="aviso-localizacao-titulo">Localização</strong>
+                  <span>A localização fica registrada junto da foto como prova. Você pode negar e continuar usando a câmera.</span>
+                  <button type="button" onClick={() => { confirmarAvisoLocalizacao(); setAvisoLocalizacao(false); }}>Entendi</button>
                 </div>
               ) : null}
 
