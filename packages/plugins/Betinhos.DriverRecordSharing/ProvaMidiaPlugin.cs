@@ -57,9 +57,6 @@ namespace Betinhos.DriverRecordSharing
         public const string SeloSemData = "sem-data";
         public const string SeloRepetida = "repetida";
         public const string SeloParecida = "parecida";
-        public const string SeloNotaNaoVerificada = "nota-nao-verificada";
-        public const string SeloSemNotaFiscal = "sem-nota-fiscal";
-        public const string SeloValorAlterado = "valor-alterado";
 
         public const string ModoVariavel = "cr40f_ProvaMidiaModoRepetida";
         public const string Livre = "livre";
@@ -88,14 +85,13 @@ namespace Betinhos.DriverRecordSharing
             ["cr40f_colisao_v2"] = "cr40f_colisao"
         };
 
-        // Valores das choices das migrations 20261116-1400-prova-midia.ps1, 20261116-1800-prova-midia-galeria.ps1 e
-        // 20261116-2100-chave-nota-fiscal.ps1
+        // Valores das choices das migrations 20261116-1400-prova-midia.ps1 e 20261116-1800-prova-midia-galeria.ps1
         // (a ordem é o contrato; cada fase só acrescenta no fim).
         public static readonly IReadOnlyDictionary<string, int> Telas = Options("despesa", "recebimento", "manutencao", "finalizar", "colisao", "checklist", "devolucao");
         public static readonly IReadOnlyDictionary<string, int> TiposMidia = Options("foto", "video", "pdf");
         public static readonly IReadOnlyDictionary<string, int> Origens = Options("camera-ao-vivo", "camera-nativa", "galeria");
         public static readonly IReadOnlyDictionary<string, int> EstadosLocalizacao = Options("registrada", "negada", "indisponivel");
-        public static readonly IReadOnlyDictionary<string, int> Selos = Options(SeloSemRede, SeloInvalido, SeloNaoAssinado, SeloForaDaJanela, SeloSemData, SeloRepetida, SeloParecida, SeloNotaNaoVerificada, SeloSemNotaFiscal, SeloValorAlterado);
+        public static readonly IReadOnlyDictionary<string, int> Selos = Options(SeloSemRede, SeloInvalido, SeloNaoAssinado, SeloForaDaJanela, SeloSemData, SeloRepetida, SeloParecida);
 
         // Colunas do dHash: [0] imagem original (antes de carimbo e redução), [1] imagem final da câmera do app (com carimbo).
         public static readonly string[] ColunasDHash = { "cr40f_dhash", "cr40f_dhashcarimbo" };
@@ -127,7 +123,6 @@ namespace Betinhos.DriverRecordSharing
                     case "emitir": return Emit(command);
                     case "conferir": return Check(command);
                     case "registrar": return Register(command);
-                    case "conferirChave": return CheckKey(command);
                     default: throw new Refusal("Ação da prova de mídia desconhecida.");
                 }
             }
@@ -373,73 +368,11 @@ namespace Betinhos.DriverRecordSharing
             }
             if (LookupDaOrigem.TryGetValue(origin.Table, out var lookup) && Guid.TryParse(origin.RecordId, out var recordGuid))
                 row[lookup] = new EntityReference(origin.Table, recordGuid);
-            if (origin.Table == DespesaTabela) ApplyNote(command, origin, row, seals);
             if (seals.Count > 0) row["cr40f_selos"] = new OptionSetValueCollection(seals.Select(seal => new OptionSetValue(Selos[seal])).ToList());
 
             var id = _system.Create(row);
             _tracing.Trace("ProvaMidia registrada tela={0} selos={1}", origin.Screen, seals.Count == 0 ? "-" : string.Join(",", seals));
             return QrChargeRules.Serialize(new Dictionary<string, object> { ["ok"] = true, ["provaId"] = id.ToString("D"), ["selos"] = seals });
-        }
-
-        // ---------- nota fiscal da despesa (fase 3) ----------
-
-        public const string DespesaTabela = "cr40f_despesaoperacional";
-
-        // "notaFiscal" (nao-verificada | sem-nota) vira selo; "leitura" (valor e data que a leitura rápida preencheu) é
-        // gravada e comparada com a despesa já criada. Despesa ainda ilegível (id provisório): vale o "valorAlterado" do app.
-        private void ApplyNote(Dictionary<string, object> command, OriginRecord origin, Entity row, List<string> seals)
-        {
-            var note = QrChargeRules.Str(command, "notaFiscal");
-            if (note == "nao-verificada") seals.Add(SeloNotaNaoVerificada);
-            else if (note == "sem-nota") seals.Add(SeloSemNotaFiscal);
-
-            var reading = QrChargeRules.Dict(command, "leitura");
-            if (reading == null) return;
-            var readValue = Decimal(reading, "valor", 0m, 1000000m, 2);
-            var readDate = ParseDay(QrChargeRules.Str(reading, "data"));
-            if (!readValue.HasValue && !readDate.HasValue) return;
-            row["cr40f_valorlido"] = readValue;
-            row["cr40f_datalida"] = readDate;
-            var expense = ReadExpense(origin);
-            var changed = expense == null
-                ? Bool(command, "valorAlterado")
-                : (readValue.HasValue && expense.Item1.HasValue && Math.Round(expense.Item1.Value, 2) != readValue.Value)
-                  || (readDate.HasValue && expense.Item2.HasValue && expense.Item2.Value != readDate.Value);
-            if (changed) seals.Add(SeloValorAlterado);
-        }
-
-        private Tuple<decimal?, DateTime?> ReadExpense(OriginRecord origin)
-        {
-            if (!Guid.TryParse(origin.RecordId, out var id)) return null;
-            try
-            {
-                var expense = _system.Retrieve(DespesaTabela, id, new ColumnSet("cr40f_valor", "cr40f_datagasto"));
-                var date = expense.GetAttributeValue<DateTime?>("cr40f_datagasto");
-                return Tuple.Create(expense.GetAttributeValue<Money>("cr40f_valor")?.Value, date.HasValue ? ChaveNotaFiscal.DiaDaOperacao(date.Value) : (DateTime?)null);
-            }
-            catch (Exception error)
-            {
-                _tracing.Trace("ProvaMidia despesa ilegivel para o valor alterado: {0}", error.GetType().Name);
-                return null;
-            }
-        }
-
-        private static DateTime? ParseDay(string text) =>
-            DateTime.TryParseExact(text ?? "", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) && day >= MinDeclared && day < MaxDeclared
-                ? DateTime.SpecifyKind(day, DateTimeKind.Unspecified) : (DateTime?)null;
-
-        // conferirChave: aviso antecipado do app (o plugin do anexo é o bloqueio que vale). Mesmas regras, sem gravar nada.
-        private string CheckKey(Dictionary<string, object> command)
-        {
-            CallerDriverId();
-            var expenseId = Guid.TryParse(QrChargeRules.Str(command, "despesaId") ?? "", out var parsed) ? parsed : (Guid?)null;
-            var day = ParseDay(QrChargeRules.Str(command, "dataDespesa"));
-            var check = new NotaFiscalAnexo(_system, _tracing).Conferir(QrChargeRules.Str(command, "chave") ?? "", expenseId, day, null);
-            _tracing.Trace("ProvaMidia conferirChave resultado={0}", check.Erro == null ? "livre" : check.Repetida ? "repetida" : "recusada");
-            var response = new Dictionary<string, object> { ["ok"] = true, ["resultado"] = check.Erro == null ? "livre" : check.Repetida ? "repetida" : "recusada" };
-            if (check.Erro != null) response["erro"] = check.Erro;
-            if (check.UsadaEm.HasValue) response["usadaEm"] = Iso(check.UsadaEm.Value);
-            return QrChargeRules.Serialize(response);
         }
 
         private string ExistingProof(string clientId, Guid driverId)

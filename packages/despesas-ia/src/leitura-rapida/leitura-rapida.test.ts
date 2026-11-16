@@ -53,7 +53,7 @@ describe('montarRequisicaoLeitura', () => {
 
 import { interpretarLeitura } from './resposta.ts'
 
-const base = { legivel: true, valor: 85.4, data: '2026-10-12', hora: '14:32', estabelecimento: 'Posto X', cnpj: null, litros: 32.5, cidade: 'Taubaté', uf: 'SP', categoria_sugerida: 'Abastecimento', forma_pagamento_sugerida: null, motivo_ilegivel: null, chave_acesso: null }
+const base = { legivel: true, valor: 85.4, data: '2026-10-12', hora: '14:32', estabelecimento: 'Posto X', cnpj: null, litros: 32.5, cidade: 'Taubaté', uf: 'SP', categoria_sugerida: 'Abastecimento', forma_pagamento_sugerida: null, motivo_ilegivel: null }
 const msg = (o: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-haiku-5-5', content: [{ type: 'text', text: JSON.stringify(o) }] })
 
 describe('interpretarLeitura', () => {
@@ -65,19 +65,6 @@ describe('interpretarLeitura', () => {
   it('falha quando stop_reason não é end_turn', () => expect(interpretarLeitura(msg(base, 'max_tokens')).ok).toBe(false))
   it('legível sem valor vira ilegível', () => {
     expect(interpretarLeitura(msg({ ...base, valor: null }))).toEqual({ ok: true, leitura: { ...base, valor: null, legivel: false, motivo_ilegivel: 'Valor ou data não identificados.' } })
-  })
-  // Chave gerada (repositório público): 44 posições; o DV é conferido no app, não aqui.
-  const CHAVE = '33261112345678000195650010000043211123456780'
-  it('resposta com chave devolve a chave sem espaços', () => {
-    expect(interpretarLeitura(msg({ ...base, chave_acesso: CHAVE.match(/.{4}/g)!.join(' ') }))).toEqual({ ok: true, leitura: { ...base, chave_acesso: CHAVE } })
-  })
-  it('resposta sem chave (ou sem o campo, nas antigas) fica com chave null', () => {
-    const { chave_acesso: _, ...antiga } = base
-    expect(interpretarLeitura(msg(antiga))).toEqual({ ok: true, leitura: base })
-  })
-  it('chave fora do formato vira null sem derrubar a leitura', () => {
-    expect(interpretarLeitura(msg({ ...base, chave_acesso: '3326 1112 3456' }))).toEqual({ ok: true, leitura: base })
-    expect(interpretarLeitura(msg({ ...base, chave_acesso: 123 }))).toEqual({ ok: true, leitura: base })
   })
   it('valor negativo ou data fora de AAAA-MM-DD falha', () => {
     expect(interpretarLeitura(msg({ ...base, valor: -1 })).ok).toBe(false)

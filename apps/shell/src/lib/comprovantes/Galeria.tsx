@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, FileText, ImageOff, 
 import { useQueryId } from '../../nav/queryState'
 import { BrandLoader } from '../../app/BrandLoader'
 import { ehVideo, tipoPrevia, type Arquivo, type Comprovante } from './arquivo'
-import type { CarregarProvas, SeloProva } from './provaMidia'
+import type { CarregarProvas } from './provaMidia'
 import { SelosProva, useProvasMidia } from './SelosProva'
 import './comprovantes.css'
 
@@ -99,12 +99,10 @@ type Props<T extends Comprovante> = {
   grupo?: (anexo: T) => { chave: string; titulo: ReactNode }
   /** Prova de captura do App Motoristas, ligada pelo link do arquivo: origem, selos e detalhes. Sem prova, nada aparece. */
   provas?: CarregarProvas
-  /** Selos da prova que a tela já mostra por outra fonte (ex.: a situação da nota, que vem do anexo nas despesas). */
-  ocultarSelos?: readonly SeloProva[]
 }
 
 /** Cartões com miniatura; clicar abre o visualizador. Sem arquivo no OneDrive, só o aviso. */
-export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo, grupo, provas: carregarProvas, ocultarSelos }: Props<T>) {
+export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAnexo, meta: metaDe, selo, grupo, provas: carregarProvas }: Props<T>) {
   // A galeria só repassa a `ler` os próprios anexos (do tipo T), então o alargamento é seguro.
   const ler = lerAnexo as Ler
   const visiveis = anexos.filter(temArquivo)
@@ -143,7 +141,7 @@ export function ComprovantesGaleria<T extends Comprovante>({ anexos, ler: lerAne
                     {meta ? <span className="cmp-comprovante__meta" title={meta}>{meta}</span> : null}
                     {selo?.(a)}
                     {a.url ? <a className="cmp-link" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={`Abrir ${a.nome} em nova aba`} title="Abrir em nova aba"><ExternalLink size={16} aria-hidden="true" /></a> : null}
-                    {a.url ? <SelosProva prova={provas.get(a.url)} ocultar={ocultarSelos} /> : null}
+                    {a.url ? <SelosProva prova={provas.get(a.url)} /> : null}
                   </div>
                 </li>
               )

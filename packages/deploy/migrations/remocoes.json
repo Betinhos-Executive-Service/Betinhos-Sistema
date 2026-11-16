@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_chaveacesso",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_notauf",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_notaaamm",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_notacnpjemitente",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_notamodelo",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_notanumero",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_origemchave",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_anexodespesaoperacional.cr40f_situacaonota",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_provamidia.cr40f_valorlido",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_provamidia.cr40f_datalida",
+    "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
+    "decisao": "Renan, 16/11/2026"
+  }
+]

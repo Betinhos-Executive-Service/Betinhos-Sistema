@@ -88,20 +88,14 @@ export function createMockDespesas(now: Date, extra = mockVolume()): Despesa[] {
 
 export function createMockAnexos(d: Despesa): Anexo[] {
   if (d.statusAnexo === ANEXO.sem) return []
-  const base = { enviadoEm: d.criadoEm, enviadoPor: d.motorista, nota: null }
-  // Nota fictícia (CNPJ inventado): conferida no combustível e na hospedagem, sem nota no estacionamento e no pedágio,
-  // não verificada na alimentação. Lavagem fica como comprovante antigo, sem nota.
-  const nota: Anexo['nota'] = d.categoria === 'Combustível' || d.categoria === 'Hospedagem'
-    ? { situacao: 'verificada', cnpj: d.categoria === 'Hospedagem' ? '12ABC34501DE35' : '12345678000195', uf: 'RJ', modelo: d.categoria === 'Hospedagem' ? '55' : '65', numero: 4321 }
-    : d.categoria === 'Estacionamento' || d.categoria === 'Pedágio' ? { situacao: 'sem-nota', cnpj: '', uf: '', modelo: '', numero: null }
-      : { situacao: 'nao-verificada', cnpj: '', uf: '', modelo: '', numero: null }
+  const base = { enviadoEm: d.criadoEm, enviadoPor: d.motorista }
   const falhou = d.statusAnexo === ANEXO.falhou
   const comprovante: Anexo = {
     id: `${d.id}-a1`, nome: d.categoria === 'Hospedagem' ? `nota-${d.protocolo.toLowerCase()}.pdf` : `cupom-${d.protocolo.toLowerCase()}.jpg`,
-    tipo: 100000000, status: falhou ? 100000002 : 100000001, url: falhou ? null : 'https://example.com/comprovante', driveItemId: falhou ? '' : `drive-${d.id}-1`, ...base, nota,
+    tipo: 100000000, status: falhou ? 100000002 : 100000001, url: falhou ? null : 'https://example.com/comprovante', driveItemId: falhou ? '' : `drive-${d.id}-1`, ...base,
   }
   // Comprovante antigo do App Motoristas: só o link, e o nome sem extensão.
-  if (d.categoria === 'Lavagem') return [{ ...comprovante, nome: 'comprovante-1', driveItemId: '', url: 'https://example.com/compartilhado', nota: null }]
+  if (d.categoria === 'Lavagem') return [{ ...comprovante, nome: 'comprovante-1', driveItemId: '', url: 'https://example.com/compartilhado' }]
   return d.categoria === 'Combustível'
     ? [comprovante, { id: `${d.id}-a2`, nome: 'painel-km.jpg', tipo: 100000001, status: 100000001, url: 'https://example.com/painel', driveItemId: `drive-${d.id}-2`, ...base }]
     : [comprovante]

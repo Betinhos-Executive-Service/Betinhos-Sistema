@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@betinhos-executive-service/ui": "1.18.0",
-    "@zxing/library": "0.21.3",
     "chart.js": "4.4.1",
     "chartjs-plugin-datalabels": "2.2.0",
     "lucide-react": "0.468.0",

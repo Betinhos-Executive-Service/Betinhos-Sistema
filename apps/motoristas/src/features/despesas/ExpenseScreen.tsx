@@ -22,7 +22,6 @@ import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
 import { parseCurrencyInput } from "./expenses";
 import type { ExpenseSubmissionStatus } from "./expenseUploadState";
 import { validarDescricao } from "./gastosCartao";
-import { resumoDaNota, validarNotasDaDespesa } from "./chaveNotaFiscal";
 import { SystemIcon, type SystemIconName } from "../../shared/ui/icons/SystemIcon";
 
 export type ExpenseUploadListItem = {
@@ -57,8 +56,6 @@ type ExpenseScreenProps = {
   onDraftChange: (draft: ExpenseDraft) => void;
   onAddPhoto: () => void;
   onPreviewPhoto: (photoId: string) => void;
-  /** Abre a folha da chave da nota fiscal do comprovante. */
-  onNotaFiscal: (photoId: string) => void;
   onBack: () => void;
   onSubmit: (draft: ExpenseDraft) => void;
   submitState: ActionButtonState;
@@ -94,7 +91,6 @@ export function ExpenseScreen({
   onDraftChange,
   onAddPhoto,
   onPreviewPhoto,
-  onNotaFiscal,
   onBack,
   onSubmit,
   submitState,
@@ -176,10 +172,7 @@ export function ExpenseScreen({
 
   const submit = () => {
     if (isSubmitting || submitDisabled) return;
-    const validatedDraft = validateExpenseDraft(draft, photos, referenceData);
-    // Chave da nota: pelo menos um comprovante passou pelos quatro caminhos e a chave é do mês da data do gasto.
-    const erroNota = validatedDraft.photos ? "" : validarNotasDaDespesa(photos.filter((photo) => !isVideo(photo)).map((photo) => photo.nota), draft.dataGasto);
-    const validated = erroNota ? { ...validatedDraft, photos: erroNota } : validatedDraft;
+    const validated = validateExpenseDraft(draft, photos, referenceData);
     // Valor, data e forma vêm do banco e ficam travados no modo cartão: não podem travar o envio.
     const nextErrors = cartaoGasto ? { ...validated, valor: undefined, dataGasto: undefined, formaPagamentoId: undefined } : validated;
     setErrors(nextErrors);
@@ -452,23 +445,6 @@ export function ExpenseScreen({
                     ))}
                     <PhotoAddButton disabled={isSubmitting} onClick={addPhoto} ariaLabel="Adicionar comprovante" />
                   </div>
-                  {photos.some((photo) => !isVideo(photo)) ? (
-                    <div className="nota-fiscal-lista" data-testid="nota-fiscal-lista">
-                      {photos.map((photo, index) => isVideo(photo) ? null : (
-                        <button
-                          type="button"
-                          key={photo.id}
-                          className={`nota-fiscal-item ${photo.nota ? "" : "is-pendente"}`.trim()}
-                          disabled={isSubmitting}
-                          onClick={() => { clearError("photos"); onNotaFiscal(photo.id); }}
-                          aria-label={`Nota fiscal do comprovante ${index + 1}: ${resumoDaNota(photo.nota)}`}
-                        >
-                          <span>{index + 1}. {resumoDaNota(photo.nota)}</span>
-                          <span>{photo.nota ? "Alterar" : "Informar"}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               </FormField>
             </fieldset>

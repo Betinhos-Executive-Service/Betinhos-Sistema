@@ -58,20 +58,6 @@ export type Anexo = {
   driveItemId: string
   enviadoEm: Date | null
   enviadoPor: string
-  /** Nota fiscal do comprovante (fase 3 do App Motoristas); null em comprovante antigo. */
-  nota: NotaAnexo | null
-}
-
-/**
- * Situação da chave da nota: "verificada" = chave válida, do mês e única (não é consulta à SEFAZ). Os demais campos
- * saem da chave (CNPJ pode ser alfanumérico) e só existem com ela.
- */
-export type NotaAnexo = {
-  situacao: 'verificada' | 'nao-verificada' | 'sem-nota'
-  cnpj: string
-  uf: string
-  modelo: string
-  numero: number | null
 }
 
 export type { Arquivo } from '../../../lib/comprovantes/arquivo'
