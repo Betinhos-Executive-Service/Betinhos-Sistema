@@ -38,6 +38,28 @@ describe('Geral', () => {
     }
   })
 
+  it('visão nativa com filtros só no FetchXML: o painel mostra as condições dela e conta no primário', async () => {
+    window.location.hash = '#/geral?view=mock-sem-cr-tenaris'
+    try {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await waitFor(() => expect(viewTrigger().textContent).toContain('Sem CR da Tenaris'))
+      await findDataRows()
+      // O botão já conta as condições da visão.
+      fireEvent.click(screen.getByRole('button', { name: /^Filtros/ }))
+      const panel = await screen.findByRole('dialog', { name: 'Filtros' })
+      expect(within(panel).queryByText('Nenhum filtro')).toBeNull()
+      expect(within(panel).getByText('Status igual a Ativo')).toBeTruthy()
+      expect(within(panel).getAllByText(/Tenaris/).length).toBeGreaterThan(0)
+      expect(within(panel).getAllByText(/^CR$/).length).toBeGreaterThan(0)
+      expect(await within(panel).findByText(/^Mostrar \d+ /)).toBeTruthy()
+      // Os filtros são os da visão: nada de "Alterada" nem `f=` na URL.
+      expect(viewTrigger().textContent).not.toContain('Alterada')
+      expect(window.location.hash).toBe('#/geral?view=mock-sem-cr-tenaris')
+    } finally {
+      window.location.hash = ''
+    }
+  }, 60_000)
+
   it('troca de visão e busca por palavra-chave', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)

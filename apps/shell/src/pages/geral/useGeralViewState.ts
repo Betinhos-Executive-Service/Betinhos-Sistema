@@ -21,7 +21,11 @@ type Options = {
   sort: Sort
   setSort: (sort: Sort) => void
   filters: TableFilters
+  /** Filtros que a própria visão traz (lidos do FetchXML): são a base de "Alterada" e o que "Restaurar" devolve. */
+  viewFilters?: TableFilters
   setFilters: (filters: TableFilters) => void
+  /** Volta aos filtros da própria visão. */
+  resetFilters?: () => void
   /** Agrupamento no servidor: vive na tela (e na URL), não na visão do Dataverse. */
   group: ViewGroup | null
   setGroup: (group: ViewGroup | null) => void
@@ -53,9 +57,9 @@ function fromViewSort(sort: ViewSort, columns: Column[]): Sort {
   return { attribute: column.attribute, alias: column.alias, descending: sort.dir === 'desc' }
 }
 
-/** Configuração da visão como ela veio do Dataverse: colunas do layout, ordem da própria visão, sem filtros avulsos. */
-function baselineOf(columns: Column[], hidden: Set<string>): ViewConfig {
-  return { v: 1, columns: columns.map((c) => ({ key: c.key, visible: !hidden.has(c.key) })), sort: null, filters: {} }
+/** Configuração da visão como ela veio do Dataverse: colunas do layout, ordem e filtros da própria visão. */
+function baselineOf(columns: Column[], hidden: Set<string>, filters: TableFilters | undefined): ViewConfig {
+  return { v: 1, columns: columns.map((c) => ({ key: c.key, visible: !hidden.has(c.key) })), sort: null, filters: filters ? storedFilters(filters) : {} }
 }
 
 /**
@@ -91,7 +95,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
   const extraKeys = useMemo(() => extraKeysOf(o.prefs), [o.prefs])
   const hiddenKey = (o.hiddenByDefault ?? []).join(',')
   const hidden = useMemo(() => new Set(hiddenKey ? hiddenKey.split(',') : []), [hiddenKey])
-  const baseline = useMemo(() => baselineOf(o.columns.filter((c) => !extraKeys.has(c.key)), hidden), [o.columns, extraKeys, hidden])
+  const baseline = useMemo(() => baselineOf(o.columns.filter((c) => !extraKeys.has(c.key)), hidden, o.viewFilters), [o.columns, extraKeys, hidden, o.viewFilters])
   const config = useMemo(() => configOf(o.columns, o.prefs, o.sort, o.filters, o.group, hidden), [o.columns, o.prefs, o.sort, o.filters, o.group, hidden])
   // Colunas adicionadas ficam fora das definições: o painel usa o rótulo guardado na visão e oferece ✕.
   const columnDefs = useMemo<ViewColumnDef[]>(() => o.columns.filter((c) => !extraKeys.has(c.key)).map((c) => ({ key: c.key, label: columnLabel(c, o.attributes?.get(c.key)) })), [o.columns, o.attributes, extraKeys])
@@ -140,7 +144,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     try { kv.setItem(DENSITY_KEY, next) } catch { /* sem armazenamento: só não lembra */ }
   }, [kv])
 
-  const { selectView, reloadViews, createView, updateView, renameView, deleteView } = o
+  const { selectView, reloadViews, createView, updateView, renameView, deleteView, resetFilters } = o
   const restore = useCallback(() => {
     const padrao = views.find((e) => e.scope === 'padrao') ?? views[0]
     if (!padrao?.id) return
@@ -148,9 +152,10 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     // Já na padrão: tira as mudanças da tela (colunas, ordem, filtros e agrupamento).
     setPrefs(null)
     setSort(null)
-    setFilters(emptyFilters())
+    if (resetFilters) resetFilters()
+    else setFilters(emptyFilters())
     setGroup(null)
-  }, [views, active.id, selectView, setPrefs, setSort, setFilters, setGroup])
+  }, [views, active.id, selectView, setPrefs, setSort, setFilters, resetFilters, setGroup])
 
   const state: TableViewState = {
     status: o.viewsError ? 'error' : o.views.length ? 'ready' : 'loading',

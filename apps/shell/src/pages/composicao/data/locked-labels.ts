@@ -1,20 +1,9 @@
 import type { FilterLocked } from '@betinhos/ui'
 import { columnLabel, type FilterLabel, type LockedFilters } from './table-view'
 import type { CatalogField, ViewFilter, ViewFilterGroup } from './views'
+import { LOCKED_REASON, lockedSentence as sentence } from '../../../app/viewFetchFilters'
 
-const OPERATORS: Record<string, string> = {
-  eq: 'igual a', ne: 'diferente de', in: 'é um de', 'not-in': 'não é nenhum de', between: 'entre', like: 'contém', 'not-like': 'não contém',
-  'begins-with': 'começa com', 'not-begins-with': 'não começa com', 'ends-with': 'termina com', 'not-ends-with': 'não termina com',
-  gt: 'maior que', ge: 'maior ou igual a', lt: 'menor que', le: 'menor ou igual a', null: 'está vazio', 'not-null': 'está preenchido',
-  on: 'em', 'on-or-after': 'a partir de', 'on-or-before': 'até', today: 'hoje', tomorrow: 'amanhã', yesterday: 'ontem', 'this-week': 'esta semana',
-  'this-month': 'este mês', 'last-month': 'mês passado', 'next-x-days': 'nos próximos dias', 'last-x-days': 'nos últimos dias',
-}
-export const operatorLabel = (operator: string) => OPERATORS[operator] ?? operator
-
-/** Motivo do "só leitura" no painel de filtros. */
-export const LOCKED_REASON = "Condição da visão que esta tela não sabe editar. Ela continua valendo; para mudar, edite a visão no Dynamics ou use 'Salvar como'."
-
-const sentence = (field: string, operator: string, value: string) => [field, operatorLabel(operator), value].filter(Boolean).join(' ')
+export { LOCKED_REASON, operatorLabel } from '../../../app/viewFetchFilters'
 
 /** "Trajeto não começa com GRU": nome de exibição do catálogo e o valor já com nome (lookup/escolha). */
 export function describeLockedFilter(filter: ViewFilter, catalog: Map<string, CatalogField>, valueLabel: FilterLabel): string {

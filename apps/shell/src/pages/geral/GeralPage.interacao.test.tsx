@@ -251,8 +251,9 @@ describe('Geral: visões pessoais e link compartilhável', () => {
 
     await saveAs('Confirmados')
     expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
-    await waitFor(() => expect(screen.queryByText('Status de Operação: Confirmado')).toBeNull())
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
+    // Reaberta, a visão devolve o filtro dela ao painel (editável), sem `f=` na URL.
+    expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
