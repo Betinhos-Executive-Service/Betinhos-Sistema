@@ -111,6 +111,18 @@ public class ConcluirTests
     }
 
     [Fact]
+    public void Repetir_por_outra_origem_nao_muda_a_origem_da_despesa_existente()
+    {
+        var memoria = Base(M.Agendado, Linha());
+        var primeira = Servico(memoria).Concluir(Pedido()); // App: App Motoristas
+
+        Servico(memoria).Concluir(Pedido(p => p.Origem = "shell"));
+
+        var despesa = memoria.Linha(D.Tabela, Guid.Parse(primeira.DespesaId));
+        Assert.Equal(D.OrigemApp, despesa.GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Fact]
     public void Dinheiro_vira_Particular_na_despesa()
     {
         var memoria = Base(M.Programado);
