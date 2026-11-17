@@ -6,7 +6,7 @@ import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CarregandoRegistro } from '../../../app/BrandLoader'
 import { todaySP } from '../data/dates'
 import { NAO_INFORMADO } from '../data/format'
-import { LIMITE, MANUT } from '../data/schema'
+import { LIMITE, MANUT, TIPO_REPARO, label } from '../data/schema'
 import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal, errorMessage } from '../data/xrm'
@@ -173,16 +173,20 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   }
 
   /**
-   * Outra pessoa mudou a manutenção (passo do guia ou exceção aberta). Recarrega e decide pelo estado novo: se a exceção
-   * aberta ainda está no "⋯" da etapa nova, o formulário fica com o que foi digitado e o aviso pede para confirmar de novo;
-   * se não está, volta ao guia e o aviso diz que o digitado foi descartado.
+   * Outra pessoa mudou a manutenção (passo do guia ou exceção aberta). Recarrega e decide pelo estado novo: com exceção
+   * aberta, vale se ela ainda está no "⋯" da etapa nova; sem exceção, vale se o passo do guia é o mesmo. Se vale, o que foi
+   * digitado fica e o aviso pede para confirmar de novo; se não, volta ao guia e o aviso diz que o digitado foi descartado.
    */
   async function desatualizada() {
     const aberto = extra
+    const antes = ultimo.current
     onChanged()
     const leitura = await carregar()
     const aviso = comPontoFinal(new StaleError().message)
-    const naoVale = leitura.tipo === 'ok' && (leitura.detalhe === null || (aberto !== null && !avaliar(leitura.detalhe, hoje).extras.includes(aberto)))
+    const depois = leitura.tipo === 'ok' ? leitura.detalhe : undefined
+    const naoVale = depois === null || (!!depois && (aberto !== null
+      ? !avaliar(depois, hoje).extras.includes(aberto)
+      : !!antes && avaliar(antes, hoje).passo !== avaliar(depois, hoje).passo))
     if (naoVale) {
       setExtra(null)
       notify('error', `${aviso} O que você digitou foi descartado porque a ação não se aplica mais.`)
@@ -216,7 +220,6 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       </Drawer>
     )
   }
-
 
   const voltar = () => setExtra(null)
   let formulario: ReactNode = null
@@ -266,6 +269,8 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
           <p className="frota-muted">
             Descrição do motorista: {m.descricao || NAO_INFORMADO}
             {m.km !== null ? ` · Km no pedido: ${m.km.toLocaleString('pt-BR')} km` : ''}
+            {m.tipo !== null ? ` · Tipo de reparo: ${label(TIPO_REPARO, m.tipo)}` : ''}
+            {m.comentarioAoMotorista ? ` · Comentário ao motorista: ${m.comentarioAoMotorista}` : ''}
             {m.veiculo && onOpenVeiculo ? <> · <button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>Ver o veículo {placa}</button></> : null}
           </p>
           <Arquivos titulo="Fotos do pedido" links={m.fotosPedido} />

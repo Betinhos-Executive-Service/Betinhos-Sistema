@@ -39,6 +39,25 @@ describe('GavetaManutencao', () => {
     expect(within(g).getByText('As alterações uma a uma ficam na auditoria, no botão do alto da gaveta.')).toBeTruthy()
   })
 
+  it('a linha do pedido traz o tipo de reparo e o comentário ao motorista só quando existem', async () => {
+    const source = createMockSource()
+    const original = source.detalheManutencao.bind(source)
+    vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => { const d = await original(i); return d && { ...d, comentarioAoMotorista: 'Levar cedo' } })
+    montar('m1', source)
+    const g = await gaveta(M1)
+    expect(within(g).getByText(/Tipo de reparo: Preventiva sistemática/)).toBeTruthy()
+    expect(within(g).getByText(/Comentário ao motorista: Levar cedo/)).toBeTruthy()
+    cleanup()
+    const semNada = createMockSource()
+    const lido = semNada.detalheManutencao.bind(semNada)
+    vi.spyOn(semNada, 'detalheManutencao').mockImplementation(async (i) => { const d = await lido(i); return d && { ...d, tipo: null } })
+    montar('m1', semNada)
+    const g2 = await gaveta(M1)
+    // Só a linha do pedido: o passo Agendar tem um campo "Comentário ao motorista".
+    const pedido = within(g2).getByText(/^Descrição do motorista:/).textContent
+    expect(pedido).not.toMatch(/Tipo de reparo|Comentário ao motorista/)
+  })
+
   it('Agendar pelo guia grava, recarrega e avisa quem abriu', async () => {
     const source = createMockSource()
     const agendar = vi.spyOn(source, 'agendarManutencao')
@@ -149,6 +168,25 @@ describe('GavetaManutencao: registro mudou com uma exceção aberta', () => {
     expect((within(g).getByLabelText(/Motivo do cancelamento/) as HTMLTextAreaElement).value).toBe('Sem verba')
     await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' })) })
     await waitFor(() => expect(cancelar).toHaveBeenCalledWith('m1', 'Sem verba'))
+  })
+
+  it('sem exceção aberta e o passo mudou: o digitado no passo foi descartado', async () => {
+    const source = createMockSource()
+    mudarParaStatus(source, MANUT.AGENDADO) // Solicitado -> Agendado: o passo Agendar vira Programar
+    montar('m1', source)
+    const g = await gaveta(M1)
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Agendar' })) })
+    expect(await screen.findByText(/descartado porque a ação não se aplica mais/)).toBeTruthy()
+    expect(within(g).getByRole('heading', { name: 'Quem leva e quando sai?' })).toBeTruthy()
+  })
+
+  it('sem exceção aberta e o mesmo passo: pede para conferir e confirmar de novo', async () => {
+    const source = createMockSource()
+    vi.spyOn(source, 'currentStatus').mockResolvedValueOnce(MANUT.AGENDADO) // o servidor respondeu outro status, o detalhe relido continua Solicitado
+    montar('m1', source)
+    const g = await gaveta(M1)
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Agendar' })) })
+    expect(await screen.findByText(/alterado por outra pessoa.*Confira e confirme de novo/)).toBeTruthy()
   })
 
   it('a exceção não vale mais: volta ao guia e diz que o que foi digitado foi descartado', async () => {

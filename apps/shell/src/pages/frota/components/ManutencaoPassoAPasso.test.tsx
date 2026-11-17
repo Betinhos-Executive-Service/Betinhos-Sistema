@@ -48,7 +48,9 @@ describe('ManutencaoPassoAPasso', () => {
     expect(screen.queryByText('Quem leva e quando sai?')).toBeNull()
     expect(within(screen.getByRole('list', { name: 'Etapas' })).getByText('Agendar').closest('li')?.getAttribute('aria-current')).toBe('step')
     expect(screen.getByText('há 3 dias')).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('TST4D44 · Revisão fictícia')
+    // O título é o da gaveta; o guia não repete placa e descrição.
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
+    expect(screen.getByText('Média · pedido por Motorista Fictício')).toBeTruthy()
   })
 
   it('Agendar chama a API com o grau escolhido', async () => {

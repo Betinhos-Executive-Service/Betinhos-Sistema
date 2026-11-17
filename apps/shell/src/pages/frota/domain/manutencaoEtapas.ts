@@ -41,6 +41,8 @@ function feitosDe(m: DetalheManutencao): string[] {
     // Montado de início/fim (o rotuloJanela começa em maiúscula e não traz o artigo, e outras telas o usam como está).
     const quando = modoDe(janela) === 'dia' ? `o dia ${formatBR(janela.inicio)}` : `a semana de ${ddmm(janela.inicio)} a ${formatBR(janela.fim)}`
     linhas.push(`Agendada em ${formatBR(m.dataAprovacao)} para ${quando} · ${label(GRAU, m.grau)}`)
+  } else if (m.agendarPara && !m.janelaInicio && m.status !== MANUT.SOLICITADO && m.status !== MANUT.REPROVADO) {
+    linhas.push(`Agendada para ${formatBR(m.agendarPara)} (antes das manutenções v2)`)
   }
   const p = m.programacao
   if (p?.motorista && p.saida && (m.status === MANUT.PROGRAMADO || m.status === MANUT.REALIZADO || m.status === MANUT.CANCELADO)) linhas.push(`Programada: ${p.motorista.label}, saída ${textoSaida(p.saida)}`)

@@ -60,8 +60,8 @@ export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizad
   return (
     <div className="frota-guia">
       <header className="frota-guia__topo">
+        {/* Placa e descrição ficam no título da gaveta; o guia mostra só o subtítulo. */}
         <div className="frota-guia__id">
-          <h2>{texto(m.veiculo?.label)} · {texto(m.descricao)}</h2>
           <span className="frota-muted">{subtitulo}</span>
         </div>
         {situacao.prazo && (
