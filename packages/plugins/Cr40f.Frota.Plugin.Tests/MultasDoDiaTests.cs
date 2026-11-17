@@ -43,6 +43,25 @@ public class MultasDoDiaTests
     }
 
     [Fact]
+    public void Indicada_pela_Senatran_com_aceite_pendente_depois_do_prazo_fica_em_Aceite_e_avisa_o_prazo()
+    {
+        var multas = new[]
+        {
+            M("V1", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-01", DataIndicacao = "2026-11-05", Canal = MultaCodigos.Senatran, DataParaIndicar = "2026-11-10" }),
+            // Indicada ontem: o prazo passado basta para entrar em Aceite (sem esperar os 2 dias).
+            M("V2", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-01", DataIndicacao = "2026-11-16", Canal = MultaCodigos.Senatran, DataParaIndicar = "2026-11-12" }),
+            M("V3", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-01", DataParaIndicar = "2026-11-10" }),
+        };
+
+        var r = MultasDoDia.Montar(multas, Hoje);
+
+        Assert.Equal(new[] { "V1", "V2" }, r.Aceite.Select(l => l.Auto));
+        Assert.All(r.Aceite, l => Assert.Equal("Conferir o aceite na CNH Digital (prazo de indicação vencido)", l.Passo));
+        Assert.Equal(new[] { "V3" }, r.PrazoVencido.Select(l => l.Auto));
+        Assert.Equal("Prazo vencido: responder", r.PrazoVencido[0].Passo);
+    }
+
+    [Fact]
     public void Pagar_inclui_guias_ja_vencidas_e_deixa_de_fora_as_de_mais_de_5_dias()
     {
         var multas = new[]

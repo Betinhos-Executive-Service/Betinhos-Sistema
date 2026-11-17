@@ -70,7 +70,7 @@ Nas multas antigas, o responsável vazio é mostrado a partir do `cr40f_motorist
 
 Quando o responsável é Empresa, o passo `AvisarMotorista` não existe e o canal de indicação não é pedido: a etapa 2 é pulada e a multa vai direto para Pagar. Ao registrar o pagamento de uma multa da Empresa, o acerto ("empresa assume", com o motivo que já está gravado) é preenchido automaticamente e a multa encerra sem passar pelo passo de acerto.
 
-**Prazo vencido.** O passo é obrigatório. Ele aparece quando a etapa é 1 ou 2 e `cr40f_dataparaindicar` é anterior a hoje (fuso de Brasília). Enquanto ele não for respondido, é o único passo aceito, e tem duas saídas:
+**Prazo vencido.** O passo é obrigatório. Ele aparece quando a etapa é 1 ou 2, a multa **não tem indicação registrada** (`cr40f_datadaindicacao` vazia) e `cr40f_dataparaindicar` é anterior a hoje (fuso de Brasília). Com a indicação já registrada e o aceite pendente depois do prazo, o passo continua sendo `RegistrarAceite` (a indicação cumpriu o prazo; o aceite é conferido na CNH Digital); no e-mail essa multa fica em "Aceite pendente" com o passo "Conferir o aceite na CNH Digital (prazo de indicação vencido)". Enquanto ele não for respondido, é o único passo aceito, e tem duas saídas:
 - `PrazoVencido{indicou: true, data, canal}`: grava a indicação e segue para Pagar.
 - `PrazoVencido{indicou: false}`: grava responsável Empresa com motivo "prazo perdido" e segue para Pagar, porque a empresa paga a guia.
 

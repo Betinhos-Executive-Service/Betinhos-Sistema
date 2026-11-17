@@ -39,13 +39,14 @@ public static class MultasDoDia
         {
             var e = m.Estado;
             var s = MultaEtapas.Avaliar(e, hoje);
-            if (s.PrazoVencido) r.PrazoVencido.Add(Linha(m, s));
-            else if (s.Etapa == MultaEtapas.Indicar && MultaEtapas.AceitePendente(e) && Regras.Dias(e.DataIndicacao!, hoje) >= 2)
-                r.Aceite.Add(Linha(m, s));
+            var prazoPassado = e.DataParaIndicar != null && string.CompareOrdinal(e.DataParaIndicar, hoje) < 0;
+            if (s.PrazoVencido) r.PrazoVencido.Add(Linha(m, s, prazoPassado));
+            else if (s.Etapa == MultaEtapas.Indicar && MultaEtapas.AceitePendente(e) && (prazoPassado || Regras.Dias(e.DataIndicacao!, hoje) >= 2))
+                r.Aceite.Add(Linha(m, s, prazoPassado));
             else if ((s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && (e.DataParaIndicar == null || Regras.Dias(hoje, e.DataParaIndicar) <= 7))
-                r.Indicar.Add(Linha(m, s));
+                r.Indicar.Add(Linha(m, s, prazoPassado));
             else if (s.Etapa == MultaEtapas.Pagar && e.Vencimento != null && Regras.Dias(hoje, e.Vencimento) <= 5)
-                r.Pagar.Add(Linha(m, s));
+                r.Pagar.Add(Linha(m, s, prazoPassado));
             else if (s.Etapa == MultaEtapas.Acertar) r.AguardandoAcerto++;
         }
         foreach (var lista in new[] { r.PrazoVencido, r.Indicar, r.Aceite, r.Pagar })
@@ -58,20 +59,22 @@ public static class MultasDoDia
         return r;
     }
 
-    private static LinhaMultaDia Linha(MultaResumo m, MultaSituacao s) => new()
+    private static LinhaMultaDia Linha(MultaResumo m, MultaSituacao s, bool prazoPassado) => new()
     {
         Id = m.Id.ToString("D"),
         Auto = m.Auto,
         Placa = m.Placa,
         Responsavel = MultaEtapas.ResponsavelEfetivo(m.Estado) == MultaCodigos.Empresa ? "Empresa" : m.Motorista ?? "Sem responsável",
         Prazo = s.ProximoPrazo,
-        Passo = PassoDaLinha(s),
+        Passo = PassoDaLinha(s, prazoPassado),
     };
 
     /// <summary>Nunca deixa a linha sem passo (multa na etapa sem pendência) nem esconde a falta do prazo.</summary>
-    private static string PassoDaLinha(MultaSituacao s)
+    private static string PassoDaLinha(MultaSituacao s, bool prazoPassado)
     {
         var passo = string.IsNullOrEmpty(s.ProximoPasso) ? "Conferir a etapa" : s.ProximoPasso;
+        // Indicada (só falta o aceite) depois do prazo: a multa não cai em "Prazo vencido", mas o e-mail avisa que o prazo passou.
+        if (s.Etapa == MultaEtapas.Indicar && !s.PrazoVencido && prazoPassado) return passo + " (prazo de indicação vencido)";
         return (s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && s.ProximoPrazo == null ? passo + " (sem prazo informado)" : passo;
     }
 }

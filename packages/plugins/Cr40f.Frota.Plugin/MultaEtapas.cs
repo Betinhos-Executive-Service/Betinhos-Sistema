@@ -145,7 +145,8 @@ public static class MultaEtapas
     public static bool PrazoVencido(MultaEstado m, string hoje)
     {
         var etapa = Etapa(m.Status);
-        return (etapa == Identificar || etapa == Indicar) && m.DataParaIndicar != null && string.CompareOrdinal(m.DataParaIndicar, hoje) < 0;
+        // Com a indicação já registrada o prazo cumpriu o papel: sobra o aceite, que segue como passo normal.
+        return (etapa == Identificar || etapa == Indicar) && m.DataIndicacao == null && m.DataParaIndicar != null && string.CompareOrdinal(m.DataParaIndicar, hoje) < 0;
     }
 
     /// <summary>Indicação da Senatran registrada e ainda sem aceite na CNH Digital (mesma regra do passo RegistrarAceite).</summary>

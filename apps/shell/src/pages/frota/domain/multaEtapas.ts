@@ -66,7 +66,8 @@ export const responsavelEfetivo = (m: MultaEstado): number | null => m.responsav
 
 export function prazoVencido(m: MultaEstado, hoje: string) {
   const etapa = etapaDe(m.status)
-  return (etapa === 'identificar' || etapa === 'indicar') && m.dataParaIndicar != null && m.dataParaIndicar < hoje
+  // Com a indicação já registrada o prazo cumpriu o papel: sobra o aceite, que segue como passo normal.
+  return (etapa === 'identificar' || etapa === 'indicar') && m.dataIndicacao == null && m.dataParaIndicar != null && m.dataParaIndicar < hoje
 }
 
 export function avaliar(m: MultaEstado, hoje: string): Situacao {
