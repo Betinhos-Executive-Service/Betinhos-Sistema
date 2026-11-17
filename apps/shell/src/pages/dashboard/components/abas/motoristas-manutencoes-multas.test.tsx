@@ -180,7 +180,7 @@ describe('MultasTab', () => {
   const dados = () => dadosVazios({
     multas: [
       multa({ dia: '2026-10-02', status: MULTA_NOTIFICAR, statusLabel: 'Notificar o Condutor', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
-      multa({ dia: '2026-10-04', statusLabel: 'Pago', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
+      multa({ dia: '2026-10-04', status: 202410005, statusLabel: 'Encerrada', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
       multa({ dia: '2026-10-09', statusLabel: 'Indicada', motorista: 'Beto' }),
     ],
   })

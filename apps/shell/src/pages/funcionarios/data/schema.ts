@@ -1,3 +1,5 @@
+import { STATUS_OPTIONS } from '../../frota/data/schema'
+
 // Metadata conferida em cr40f_funcionarios (PROD e DEV idênticos, 2026-10-01).
 export const TABLE = 'cr40f_funcionarios'
 export const ENTITY_SET = 'cr40f_funcionarioses'
@@ -22,15 +24,8 @@ export const VINCULO: Option[] = [
   { value: 0, label: 'Colaborador' },
   { value: 1, label: 'Terceiro' },
 ]
-export const MULTA_STATUS: Option[] = [
-  { value: 202410000, label: 'Notificar o Condutor' },
-  { value: 202410001, label: 'Indicada' },
-  { value: 202410002, label: 'Recurso' },
-  { value: 202410003, label: 'Descontado' },
-  { value: 202410004, label: 'Condutor Notificado' },
-  { value: 202410005, label: 'Finalizado' },
-  { value: 202410006, label: 'Pago' },
-]
+/** Rótulos das etapas da multa: vêm da Frota (um lugar só). */
+export const MULTA_STATUS: Option[] = STATUS_OPTIONS.multa
 
 export type FieldKind = 'text' | 'textarea' | 'cpf' | 'phone' | 'email' | 'url' | 'date' | 'choice' | 'bool'
 export type FieldGroup = 'pessoais' | 'vinculo' | 'contato' | 'detalhes' | 'assinatura'

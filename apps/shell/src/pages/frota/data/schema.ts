@@ -55,14 +55,16 @@ export const STATUS_OPTIONS: Record<Kind, Option[]> = {
     { value: MANUT.REPROVADO, label: 'Reprovado' },
     { value: MANUT.CANCELADO, label: 'Cancelado' },
   ],
+  // Rótulos das etapas da fase 1 (spec §3). Os valores são os de sempre; Descontado fica só para as multas antigas.
   multa: [
-    { value: MULTA.NOTIFICAR, label: 'Notificar o Condutor' },
-    { value: MULTA.NOTIFICADO, label: 'Condutor Notificado' },
-    { value: MULTA.INDICADA, label: 'Indicada' },
-    { value: MULTA.RECURSO, label: 'Recurso' },
-    { value: MULTA.DESCONTADO, label: 'Descontado' },
-    { value: MULTA.PAGO, label: 'Pago' },
-    { value: MULTA.FINALIZADO, label: 'Finalizado' },
+    { value: MULTA.NOTIFICAR, label: '1. Identificar o responsável' },
+    { value: MULTA.NOTIFICADO, label: '2. Indicar no órgão' },
+    { value: MULTA.INDICADA, label: '3. Pagar' },
+    { value: MULTA.PAGO, label: '4. Acertar' },
+    { value: MULTA.FINALIZADO, label: 'Encerrada' },
+    { value: MULTA.RECURSO, label: 'Em recurso' },
+    { value: MULTA.CANCELADA, label: 'Cancelada' },
+    { value: MULTA.DESCONTADO, label: 'Descontado (antigo)' },
   ],
   colisao: [
     { value: COLISAO.ENVIADO, label: 'Enviado' },
@@ -74,7 +76,7 @@ export const STATUS_OPTIONS: Record<Kind, Option[]> = {
 
 export const TONE: Record<Kind, Record<number, Tone>> = {
   manutencao: { [MANUT.SOLICITADO]: 'warning', [MANUT.APROVADO]: 'info', [MANUT.PROGRAMADO]: 'info', [MANUT.REALIZADO]: 'success', [MANUT.REPROVADO]: 'danger', [MANUT.CANCELADO]: 'neutral' },
-  multa: { [MULTA.NOTIFICAR]: 'warning', [MULTA.NOTIFICADO]: 'info', [MULTA.INDICADA]: 'info', [MULTA.RECURSO]: 'warning', [MULTA.DESCONTADO]: 'success', [MULTA.PAGO]: 'success', [MULTA.FINALIZADO]: 'neutral' },
+  multa: { [MULTA.NOTIFICAR]: 'warning', [MULTA.NOTIFICADO]: 'info', [MULTA.INDICADA]: 'info', [MULTA.PAGO]: 'info', [MULTA.FINALIZADO]: 'success', [MULTA.RECURSO]: 'warning', [MULTA.CANCELADA]: 'neutral', [MULTA.DESCONTADO]: 'neutral' },
   colisao: { [COLISAO.ENVIADO]: 'warning', [COLISAO.ANALISE]: 'info', [COLISAO.RESOLVIDO]: 'success', [COLISAO.CANCELADO]: 'neutral' },
 }
 
