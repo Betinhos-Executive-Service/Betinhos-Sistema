@@ -7,4 +7,8 @@ describe('cabeçalhos da página de consentimento', () => {
     expect(PAGE_SECURITY_HEADERS['Content-Security-Policy']).toMatch(/default-src 'none'.*frame-ancestors 'none'/)
     expect(PAGE_SECURITY_HEADERS['Cache-Control']).toBe('no-store')
   })
+
+  it('não usa no-referrer (o Chrome mandaria Origin: null no POST e a trava de origem recusaria)', () => {
+    expect(PAGE_SECURITY_HEADERS['Referrer-Policy']).toBe('same-origin')
+  })
 })
