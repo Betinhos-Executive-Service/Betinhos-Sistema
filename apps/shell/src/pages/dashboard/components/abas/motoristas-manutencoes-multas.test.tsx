@@ -153,7 +153,9 @@ describe('ManutencoesTab', () => {
     const prazo = kpi('Prazo médio')
     expect(prazo.querySelector('.dash-kpi__valor')?.textContent).toBe('—')
     expect(within(prazo).queryByText('s/dado')).toBeNull()
-    expect(within(prazo).getByText('Ano anterior').parentElement?.textContent).toContain('—')
+    // Comparativo sem medição não aparece (nem "Ano anterior —").
+    expect(within(prazo).queryByText('Ano anterior')).toBeNull()
+    expect(within(prazo).queryByText('Mês anterior')).toBeNull()
     const categorias = card('Categorias com metas')
     expect(within(linhaDe(categorias, 'Preventiva programada')).getByText('Sem medição')).toBeTruthy()
     expect(within(categorias).queryByText('s/dado')).toBeNull()

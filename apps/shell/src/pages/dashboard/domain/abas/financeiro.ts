@@ -3,7 +3,7 @@ import { agrupar, soma } from '../base'
 import { SEM_CLIENTE } from '../codes'
 import { comparar, servicosAnteriores, type ChipAnterior } from '../comparar'
 import { brlS, int, normL } from '../format'
-import { comparacao, recebimentoStats, ticketStats, type Contexto } from '../kpis'
+import { comparacao, recebimentoStats, ticketOuNulo, type Contexto } from '../kpis'
 import { DIA_MS, mesRotulo } from '../periodo'
 import type { Pagante, Reserva } from '../types'
 
@@ -57,7 +57,7 @@ export type LinhaStatusFat = Distribuicao & { status: string }
 export type LinhaForma = Distribuicao & { forma: string }
 export type LinhaStatusPag = Distribuicao & { status: string }
 export type LinhaClienteFin = {
-  cliente: string; servicos: number; faturamento: number; ticket: number
+  cliente: string; servicos: number; faturamento: number; ticket: number | null
   /** Participação no faturamento (barra do `tbFat`). */
   pct: number
   /** Participação nos serviços (coluna de quantidade do `tbFat`). */
@@ -125,7 +125,7 @@ function clientes(rv: Reserva[], meses: string[]): LinhaClienteFin[] {
     .map(([cliente, rows]): LinhaClienteFin => {
       const faturamento = soma(rows)
       return {
-        cliente, servicos: rows.length, faturamento, ticket: ticketStats(rows).ticket,
+        cliente, servicos: rows.length, faturamento, ticket: ticketOuNulo(rows),
         pct: fat > 0 ? (faturamento / fat) * 100 : 0,
         pctServicos: rv.length ? (rows.length / rv.length) * 100 : 0,
         meses: mesesComDelta(rows, meses),

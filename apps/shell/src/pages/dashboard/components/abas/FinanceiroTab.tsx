@@ -1,5 +1,6 @@
 import { useId, useMemo } from 'react'
-import { Button, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import { Button, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { calcularFinanceiro, type CicloFinanceiro, type Financeiro, type LinhaClienteFin, type LinhaForma, type LinhaStatusFat, type LinhaStatusPag } from '../../domain/abas/financeiro'
 import type { Delta } from '../../domain/analises'
 import { brl, brlS, dec, int, normL } from '../../domain/format'
@@ -9,7 +10,7 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
@@ -77,7 +78,7 @@ function StatusFaturamentoCard({ linhas, periodo }: { linhas: LinhaStatusFat[]; 
     <AnaliseCard
       titulo="Status de faturamento" periodo={periodo} unidade="serviços e R$" valor={topo?.status ?? '—'}
       sub={topo ? `${pct(topo.pct)} dos serviços com saída a partir de 01/04/2026` : 'serviços com saída a partir de 01/04/2026'}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.status} empty={<Vazio titulo="Nenhum serviço com saída a partir de 01/04/2026" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.status} empty={<Vazio titulo="Nenhum serviço com saída a partir de 01/04/2026" />} />}
       copiar={tabelaCopia(linhas, [['Status', (l) => l.status], ['Serviços', (l) => l.qtd], ['Faturamento', (l) => brl(l.valor)], ['Participação', (l) => pct(l.pct)]])}
     />
   )
@@ -103,7 +104,7 @@ function TabelaDistribuicao({ coluna, linhas, badge, mobile }: { coluna: string;
       { key: 'v', header: 'Valor', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
-  return <Table columns={colunas} rows={linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhum pagamento registrado" />} />
+  return <Tabela columns={colunas} rows={linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhum pagamento registrado" />} />
 }
 
 /**
@@ -184,7 +185,7 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
       },
     ]
   const top = useTopCelular(fi.clientes, mobile, 'clientes')
-  const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
+  const tabela = <Tabela className={mobile ? undefined : 'dash-tabela-detalhe'} columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
       titulo="Clientes" periodo={periodo} unidade="R$ e serviços por cliente" valor={int(fi.kpis.clientesAtivos)}
@@ -216,12 +217,12 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
       : `${int(k.pagamentosMedidos)} de ${int(k.pagamentosRecebidos)} pagamentos com data confiável · ${HISTORICO}`
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)} tom="action"><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)} tom="brand"><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} tom="success" apoio="serviços com faturamento pago" />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} tom="action" apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom="warning" apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[5]} valor={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} tom="brand" apoio={tempoApoio} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)}><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)}><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} apoio="serviços com faturamento pago" />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom={tomAtencao(k.atrasados)} apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[5]} valor={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} apoio={tempoApoio} />
     </KpiLinha>
     <div className="dash-grade">
       <CicloCard ciclo={fi.ciclo} indisponivel={indisponivel} periodo={periodo} />

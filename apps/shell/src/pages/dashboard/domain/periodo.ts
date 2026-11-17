@@ -106,5 +106,13 @@ export function mesRotulo(mes: string) {
   return `${MESES_CURTOS[Number(m) - 1] ?? m}/${y.slice(2)}`
 }
 
+/** Todos os meses (AAAA-MM) de `inicio` a `fim` (AAAA-MM ou AAAA-MM-DD), inclusive os sem registro, para o eixo não pular meses. */
+export function mesesEntre(inicio: string, fim: string) {
+  const indice = (s: string) => { const { y, m } = parseDia(s); return y * 12 + m }
+  const meses: string[] = []
+  for (let i = indice(inicio), f = indice(fim); i <= f; i++) meses.push(`${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`)
+  return meses
+}
+
 /** Os 12 meses (AAAA-MM) de um ano. */
 export const mesesDoAno = (ano: number) => Array.from({ length: 12 }, (_, i) => `${ano}-${String(i + 1).padStart(2, '0')}`)

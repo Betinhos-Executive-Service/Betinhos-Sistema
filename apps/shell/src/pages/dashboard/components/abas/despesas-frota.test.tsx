@@ -54,11 +54,11 @@ describe('DespesasTab', () => {
     }
     expect(kpi('Despesa realizada')).toContain('R$ 200,00')
     // Anterior R$ 50 → +300%: subir é desfavorável, dito em texto.
-    expect(kpi('Despesa realizada')).toMatch(/ANT\..*R\$ 50,00.*\+300,0%.*desfavorável/)
+    expect(kpi('Despesa realizada')).toMatch(/Ant\.Período anterior.*R\$ 50,00.*\+300,0%.*desfavorável/)
     expect(kpi('Sem comprovante')).toMatch(/^Sem comprovante1/)
     expect(kpi('Média hospedagem')).toContain('R$ 140,00')
     expect(kpi('Média hospedagem')).toContain('Dentro da meta')
-    expect(kpi('Média hospedagem')).not.toContain('ANT.')
+    expect(kpi('Média hospedagem')).not.toContain('Período anterior')
     expect(screen.getByRole('heading', { name: 'Por motorista' })).toBeTruthy()
     expect(screen.getByText('Ana Souza')).toBeTruthy()
   })

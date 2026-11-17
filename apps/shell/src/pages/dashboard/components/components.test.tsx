@@ -73,7 +73,8 @@ const detalheDe = (botao: HTMLElement) => document.getElementById(botao.getAttri
 describe('componentes do Dashboard', () => {
   it('chip comparativo mostra rótulo, valor anterior, sinal e percentual, com seta', () => {
     const { container } = render(<KpiChip chip={{ rotulo: 'LM', tipo: 'valor', anterior: 'R$ 2,0k', variacao: -12.34 }} />)
-    expect(container.textContent).toBe('LM R$ 2,0k −12,3%')
+    expect(container.textContent).toBe('Mês ant.Mesmo período do mês anterior R$ 2,0k −12,3%')
+    expect(container.firstElementChild?.getAttribute('title')).toBe('Mesmo período do mês anterior')
     expect(container.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
     cleanup()
     render(<KpiChip chip={{ rotulo: 'LY', tipo: 'sem-dado' }} />)
@@ -123,14 +124,14 @@ describe('componentes do Dashboard', () => {
     semAvisoDeGrafico(() => render(<KpiGrid kpis={kpis} />))
     const card = screen.getByRole('article', { name: 'Faturamento' })
     expect(within(card).getByText('R$ 10,0k')).toBeTruthy()
-    expect(within(card).getByText('R$ 9,0k').parentElement?.textContent).toBe('LM R$ 9,0k +11,1%')
+    expect(within(card).getByText('R$ 9,0k').parentElement?.textContent).toBe('Mês ant.Mesmo período do mês anterior R$ 9,0k +11,1%')
     expect(within(card).getByText('Previsão')).toBeTruthy()
     expect(card.lastElementChild?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('s/dado tem uma regra só: o valor do KPI e o do bloco viram "s/dado" em tom secundário, e o bloco traz o motivo', () => {
     render(<>
-      <KpiCard rotulo="Multas" valor={null} tom="brand" />
+      <KpiCard rotulo="Multas" valor={null} />
       <SemDadoBloco titulo="Por infração" periodo={PERIODO} unidade="multas" motivo="A tabela de multas não respondeu nesta carga." />
     </>)
     const kpi = screen.getByRole('article', { name: 'Multas' })

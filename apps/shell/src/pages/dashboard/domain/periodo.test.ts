@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { atalho, cargaDesde, dayKey, diasNoMes, entre, hojeBR, mesRotulo, periodoAnoAnterior, periodoMesAnterior, periodoNoAno, mostrarLM } from './periodo'
+import { atalho, cargaDesde, dayKey, diasNoMes, entre, hojeBR, mesRotulo, periodoAnoAnterior, periodoMesAnterior, periodoNoAno, mostrarLM, mesesEntre } from './periodo'
 
 const NOW = new Date('2026-10-15T15:00:00Z') // 12:00 em Brasília
 
 describe('período', () => {
+  it('mesesEntre: todos os meses do intervalo, virando o ano e inclusive os sem registro', () => {
+    expect(mesesEntre('2025-11-20', '2026-02-03')).toEqual(['2025-11', '2025-12', '2026-01', '2026-02'])
+    expect(mesesEntre('2026-10-01', '2026-10-15')).toEqual(['2026-10'])
+    expect(mesesEntre('2026-10-01', '2026-09-30')).toEqual([])
+    expect(mesesEntre('2026-11', '2027-01')).toEqual(['2026-11', '2026-12', '2027-01'])
+  })
+
   it('dia e mês em Brasília (UTC-3), data pura passa direto', () => {
     expect(dayKey('2026-10-01T02:00:00Z')).toBe('2026-09-30')
     expect(dayKey('2026-10-01T03:00:00Z')).toBe('2026-10-01')

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import type { TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { BarraChart } from '../../charts/Charts'
 import { calcularServicos, type LinhaParticipacao, type Servicos } from '../../domain/abas/servicos'
 import { brl, brlS, int } from '../../domain/format'
@@ -10,7 +11,7 @@ import { StatusServicosCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, pct } from '../Celulas'
 import { Emergenciais } from '../Emergenciais'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from '../Linhas'
 import { ProducaoPropriaTerceira } from '../ProducaoPropriaTerceira'
@@ -35,7 +36,7 @@ function PorMesCard({ dados, periodo }: { dados: Servicos; periodo: string }) {
       grafico={dados.porMes.length
         ? <BarraChart descricao={`Serviços por mês, ${periodo}`} nome="Serviços" formatar={int} larguraEixo={36} dados={dados.porMes.map((m) => ({ rotulo: m.rotulo, valor: m.qtd }))} />
         : <Vazio titulo="Nenhum serviço no período" />}
-      tabela={dados.porMes.length ? <Table columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
+      tabela={dados.porMes.length ? <Tabela columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
       copiar={tabelaCopia(dados.porMes, [['Mês', (m) => m.rotulo], ['Serviços', (m) => m.qtd]])}
     />
   )
@@ -60,7 +61,7 @@ function ParticipacaoCard({ titulo, coluna, linhas, periodo }: { titulo: string;
     <AnaliseCard
       titulo={titulo} periodo={periodo} unidade="serviços e R$" valor={!topo ? '—' : topo.tipo === '—' ? 'Sem tipo informado' : topo.tipo}
       sub={topo ? `${pct(topo.pctFat)} do faturamento · ${int(topo.qtd)} serviços` : 'nenhum serviço no período'}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
       copiar={tabelaCopia(linhas, [[coluna, (l) => l.tipo], ['Serviços', (l) => l.qtd], ['% dos serviços', (l) => pct(l.pctQtd)], ['Faturamento', (l) => brl(l.fat)], ['% do faturamento', (l) => pct(l.pctFat)]])}
     />
   )
@@ -80,10 +81,10 @@ function ServicosAba({ ctx, dados, periodo }: DadosAba) {
   const { kpis } = sv
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={4}>
-      <KpiCard rotulo={ROTULOS_SERVICOS[0]} valor={int(kpis.total)} tom="brand" serie={sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd }))}><ChipAnt chip={sv.ant.total} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[1]} valor={int(kpis.concluidos.valor)} tom="success" apoio={`${pct(kpis.concluidos.pct)} do total`}><ChipAnt chip={sv.ant.concluidos} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[2]} valor={int(kpis.cancelados.valor)} tom="warning" apoio={`${pct(kpis.cancelados.pct)} do total`}><ChipAnt chip={sv.ant.cancelados} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[3]} valor={int(kpis.emergenciais.valor)} tom="action" apoio={`${pct(kpis.emergenciais.pct)} do total`}><ChipAnt chip={sv.ant.emergenciais} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[0]} valor={int(kpis.total)} serie={sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd }))}><ChipAnt chip={sv.ant.total} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[1]} valor={int(kpis.concluidos.valor)} apoio={`${pct(kpis.concluidos.pct)} do total`}><ChipAnt chip={sv.ant.concluidos} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[2]} valor={int(kpis.cancelados.valor)} tom={tomAtencao(kpis.cancelados.valor)} apoio={`${pct(kpis.cancelados.pct)} do total`}><ChipAnt chip={sv.ant.cancelados} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_SERVICOS[3]} valor={int(kpis.emergenciais.valor)} apoio={`${pct(kpis.emergenciais.pct)} do total`}><ChipAnt chip={sv.ant.emergenciais} /></KpiCard>
     </KpiLinha>
     <div className="dash-grade">
       <PorMesCard dados={sv} periodo={periodo} />
