@@ -13,7 +13,7 @@ public static class M
     public const string Servicos = "new_servicosmanutencao", Categorias = "new_categoriasmanutencao", Origem = "new_classificacaoorigem";
     public const string LinkNotaFiscal = "new_linkdanotafiscal", LinkFotoFinal1 = "new_linkdafotofinal1", LinkFotoFinal2 = "new_linkdafotofinal2", LinkFotoFinal3 = "new_linkdafotofinal3";
 
-    public const int Solicitado = Codigos.Solicitado, Agendado = Codigos.Aprovado, Programado = Codigos.Programado;
+    public const int Solicitado = Codigos.Solicitado, Agendado = Codigos.Agendado, Programado = Codigos.Programado;
     public const int Realizado = Codigos.Realizado, Reprovado = Codigos.Reprovado, Cancelado = Codigos.Cancelado;
     public const int PagamentoCartao = 202410000, PagamentoPedidoCompra = 202410001, PagamentoPix = 202410002, PagamentoDinheiro = 202410003;
     public const int OrigemManual = 100000001;

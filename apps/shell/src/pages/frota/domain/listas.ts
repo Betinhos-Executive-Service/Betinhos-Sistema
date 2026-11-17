@@ -221,7 +221,7 @@ export function registroLegacy(q: URLSearchParams, kind: Kind, opcoes: { veiculo
 export function registroBuiltins(kind: Kind): StoredView[] {
   const view = builtin(registroColumns(kind), REGISTRO_SORT)
   const status = (values: number[]) => withQuick([quick('status', 'in', pick(STATUS_OPTIONS[kind], values))])
-  if (kind === 'manutencao') return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]))]
+  if (kind === 'manutencao') return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO]))]
   const termo = (valor: keyof typeof TERMO_ROTULO) => withQuick([quick('termo', 'in', TERMO_OPCOES.filter((o) => o.value === valor))])
   if (kind === 'multa') return [view('notificar', 'A notificar', 1, status([MULTA.NOTIFICAR])), view('termos-pendentes', 'Termos pendentes', 2, termo('pendente')), view('contestados', 'Contestados', 3, termo('contestado'))]
   return [view('andamento', 'Em andamento', 1, status([COLISAO.ENVIADO, COLISAO.ANALISE]))]

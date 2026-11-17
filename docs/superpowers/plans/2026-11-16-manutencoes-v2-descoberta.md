@@ -117,3 +117,58 @@ Ele **não filtra categoria**: uma linha de manutenção Programada com motorist
   - convivem até a virada, com o efeito em dobro idempotente;
   - **saem na virada (plano 5)**, junto com o "Criar Serviço de Manutenção na Geral";
   - até lá, Reprovar apaga a linha da Geral pelo flow, depois de o plugin cancelá-la.
+
+## 6. Plano 2 (17/11/2026)
+
+Leitura apenas (GET), feita pela Tarefa 1 do plano `2026-11-17-manutencoes-v2-2-frota.md`, no DEV (`org23b93544`).
+
+### Tamanho das colunas de texto
+
+| Tabela.coluna | Tipo | MaxLength |
+|---|---|---|
+| `cr40f_manutencoes.cr40f_comentariosdoaprovador` | Texto | 100 |
+| `cr40f_manutencoes.cr40f_comentariosaomotorista` | Texto | 1000 |
+| `cr40f_manutencoes.cr40f_estabelecimento` | Texto | 100 |
+| `cr40f_manutencoes.cr40f_servicorealizado` | Texto | 100 |
+| `cr40f_manutencoes.new_comentariosdocolaborador` | Memo | 4000 |
+| `cr40f_manutencoes.cr40f_descricao` | Texto | 4000 |
+| `cr40f_reservadeveculos.new_observacaofinal` | Memo | 40000 |
+| `cr40f_reservadeveculos.cr40f_obsdeoperao` | Memo | 40000 |
+
+### Privilégios (1 Basic, 2 Local, 4 Deep, 8 Global; 0 = não tem)
+
+Os dois papéis do escritório têm exatamente o mesmo conjunto. Todos os privilégios existem no DEV. Nas linhas que agrupam vários privilégios, cada um foi conferido um a um (`roleprivilegescollection` do papel) e todos têm o mesmo valor por papel; o agrupamento é só da apresentação.
+
+| Privilégio | `Acesso-Betinhos-MDA` | `DEV - Usuário` | `Acesso-Motoristas` |
+|---|---|---|---|
+| Read / Write / Create / Append / AppendTo `cr40f_manutencoes` | 8 | 8 | 1 |
+| Read / Write / Create / Append / AppendTo `cr40f_reservadeveculos` (a Geral) | 8 | 8 | 1 |
+| Read / Write / Create / Append / AppendTo `cr40f_despesaoperacional` | **0** | **0** | 1 |
+| Read / Create / Append `cr40f_anexodespesaoperacional` | **0** | **0** | 1 |
+| Read / Create / Append `new_fotomanutencao` | **0** | **0** | 1 |
+| Read / AppendTo `cr40f_veiculos` | 8 | 8 | 8 |
+| Read / AppendTo `cr40f_funcionarios` | 8 | 8 | 1 |
+| Read / AppendTo `cr40f_cidade` | **0** | **0** | 8 |
+| Read / AppendTo `cr40f_categoriadespesaoperacional` | **0** | **0** | 8 |
+| Read / AppendTo `cr40f_formapagamentodespesa` | **0** | **0** | 8 |
+
+Papéis que têm Create/Write em `cr40f_despesaoperacional`, Create em `cr40f_anexodespesaoperacional` e Create em `new_fotomanutencao`: consulta à parte, também só leitura (para cada um desses privilégios, GET em `roleprivilegescollection?$filter=privilegeid eq <id>` e, para cada `roleid`, GET em `roles(<id>)`, mantendo só os papéis raiz, sem `_parentroleid_value`). Resultado: `Acesso-Motoristas` (1), `Administrador do Sistema`, `Gravador de Serviços` e `System Customizer` (8). Nenhum papel do escritório. A mesma consulta para `prvReadcr40f_cidade` listou também `Leitor de Serviços` e `Usuário de Suporte`.
+
+### Agente
+
+- Opção 100000018 de `cr40f_agenteproposta.cr40f_tipo`: rótulo atual `FrotaAgendadaVencida`; choice global: não (opção local da coluna).
+- `executeprivilegename` das 4 Custom APIs da manutenção (`cr40f_ManutencaoAgendar`, `Reprovar`, `Cancelar`, `Concluir`): vazio nas quatro (`isprivate` falso).
+
+### Decisões
+
+- Privilégios do escritório: **falta** o que a "Concluir" pelo shell grava como o chamador e o que os lookups da despesa exigem. Para `Acesso-Betinhos-MDA` e `DEV - Usuário`: Read/Write/Create/Append/AppendTo em `cr40f_despesaoperacional`; Read/Create/Append em `cr40f_anexodespesaoperacional` e `new_fotomanutencao`; Read/AppendTo em `cr40f_cidade`, `cr40f_categoriadespesaoperacional` e `cr40f_formapagamentodespesa`. Create na Geral e Write em `cr40f_manutencoes` já existem (global) → Tarefa 2 **entra**, só com o que falta.
+- `Acesso-Motoristas` tem `prvCreatecr40f_reservadeveculos`: **sim** (Basic, 1) → o ponto 1 para o Renan fica sem candidato: `ExecutePrivilegeName` nas APIs de gestor não separaria o motorista do escritório.
+- `LIMITE` do shell: **troca o padrão do plano** para `{ comentarioAprovador: 100, comentarioAoMotorista: 1000, estabelecimento: 100, servicoRealizado: 100, comentarioColaborador: 4000, descricao: 4000 }` (valores do plano que diferem do DEV: `comentarioAoMotorista` 100 → 1000, `comentarioColaborador` 500 → 4000 e `descricao` 2000 → 4000; `comentarioAprovador`, `estabelecimento` e `servicoRealizado` já eram 100 e batem). O comentário ao motorista também vai para `cr40f_obsdeoperao` (memo, 40000), então o limite efetivo é o de `cr40f_comentariosaomotorista`.
+- Rótulo da opção 100000018 (D8): ainda é `FrotaAgendadaVencida` → a migration `20261117-1010-agente-frota-atrasada.ps1` (`UpdateOptionValue`) é necessária.
+
+### Colunas da despesa que a conclusão grava (conferência da revisão final, só leitura no DEV)
+
+- `cr40f_despesaoperacional.cr40f_observacao`: memo, **4000** (a conclusão grava o comentário, até 4000: igual ao `LIMITE.comentarioColaborador`).
+- `cr40f_despesaoperacional.cr40f_estabelecimento`: texto, **200** (a conclusão grava o estabelecimento, até 100 no shell: o limite da manutenção, 100, é o menor).
+- Resultado: nenhum `LIMITE` do shell muda; os dois limites do shell já são o menor entre a manutenção e a despesa.
+

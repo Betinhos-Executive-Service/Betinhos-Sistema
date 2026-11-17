@@ -5,7 +5,7 @@ export const TIPOS_POR_AGENTE = {
   financeiro: ['OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca'],
   logistica: ['ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual'],
   pessoas: ['CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido', 'TreinamentoPendente'],
-  frota: ['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro'],
+  frota: ['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAtrasada', 'FrotaCustoAlto', 'FrotaHodometro'],
 } as const
 export type TipoProposta = (typeof TIPOS_POR_AGENTE)[Agente][number]
 
@@ -31,7 +31,7 @@ export const TODOS_OS_TIPOS = [
   'SemRecibo', 'OPPendenteAntiga', 'RepasseAguardando', 'MargemNegativa', 'OSSemCobranca',
   'ServicoSemMotorista', 'ServicoSemVeiculo', 'ConflitoHorario', 'MotoristaSemVeiculoAtual',
   'CNHVencendo', 'ASOVencendo', 'DocumentoVencido', 'Aniversario', 'MultaSemMotorista', 'ComunicadoSugerido',
-  'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro',
+  'FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAtrasada', 'FrotaCustoAlto', 'FrotaHodometro',
   'TreinamentoPendente',
 ] as const satisfies readonly (TipoProposta | (typeof TIPOS_APOSENTADOS)[number])[]
 export const TODAS_AS_ACOES: readonly TipoAcao[] = ['CriarPendencia', 'AtribuirMotorista', 'AtribuirVeiculo', 'CriarComunicadoRascunho']

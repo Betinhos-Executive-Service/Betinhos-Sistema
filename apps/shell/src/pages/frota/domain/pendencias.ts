@@ -2,24 +2,25 @@ import { daysBetween } from '../data/dates'
 import { COLISAO, MANUT, MULTA } from '../data/schema'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { custoForaDaCurva, hodometrosAtrasados, prioridadeParada, reincidencias, type Ocorrencia } from './alertas'
+import { diasEsperando } from './fila'
+import { fimDaJanela } from './janela'
 import { calcularPreventivas, type EstadoPreventiva, type Preventiva } from './preventiva'
 
-export type PendenciaTipo = 'prioridade' | 'reincidencia' | 'aprovar' | 'preventiva' | 'programar' | 'agendada' | 'notificar' | 'indicar' | 'colisao' | 'hodometro' | 'custo'
+export type PendenciaTipo = 'prioridade' | 'reincidencia' | 'encaixar' | 'preventiva' | 'atrasada' | 'notificar' | 'indicar' | 'colisao' | 'hodometro' | 'custo'
 export type CriterioPreventiva = 'km' | 'data'
 /** `estado` e `criterio` só existem na preventiva (null nos outros tipos); `criterio` é a regra que decide o badge. */
 /** `detalhe` e `ocorrencias` só nas regras proativas (reincidência, custo, hodômetro, prioridade). */
 export type Pendencia = { detalhe?: string; ocorrencias?: Ocorrencia[]; tipo: PendenciaTipo; kind: Kind | 'preventiva' | 'veiculo'; id: string; titulo: string; veiculo: Ref | null; veiculoId: string | null; pessoa: Ref | null; prazo: string | null; dias: number | null; faltamKm: number | null; peso: number; estado: EstadoPreventiva | null; criterio: CriterioPreventiva | null }
 
-export const PENDENCIA_ORDEM: PendenciaTipo[] = ['prioridade', 'reincidencia', 'aprovar', 'preventiva', 'programar', 'agendada', 'notificar', 'indicar', 'colisao', 'custo', 'hodometro']
+export const PENDENCIA_ORDEM: PendenciaTipo[] = ['prioridade', 'reincidencia', 'encaixar', 'preventiva', 'atrasada', 'notificar', 'indicar', 'colisao', 'custo', 'hodometro']
 export const PENDENCIA_LABEL: Record<PendenciaTipo, string> = {
-  prioridade: 'Manutenções de prioridade Alta ou Urgente paradas (solicitadas há mais de 2 dias ou aprovadas sem data há mais de 5)',
+  prioridade: 'Manutenções de prioridade Alta ou Urgente paradas (solicitadas há mais de 2 dias sem encaixe ou encaixadas há mais de 5 sem programação)',
   reincidencia: 'Mesmo serviço repetido no mesmo veículo (3 vezes em 120 dias ou 5 em 12 meses): vale investigar a causa raiz',
   custo: 'Veículos com custo de manutenção nos últimos 90 dias acima de 1,5× a mediana da frota',
   hodometro: 'Hodômetro sem atualização do Infleet há mais de 48 horas: preventivas por km podem estar erradas',
-  aprovar: 'Manutenções aguardando aprovação',
+  encaixar: 'Manutenções solicitadas esperando encaixe num dia ou numa semana',
   preventiva: 'Preventivas vencidas ou a vencer (plano da frota)',
-  programar: 'Manutenções aprovadas sem data',
-  agendada: 'Manutenções aprovadas ou programadas vencidas ou para os próximos 7 dias',
+  atrasada: 'Manutenções encaixadas ou programadas com a janela vencida e ainda não realizadas',
   notificar: 'Multas: notificar o condutor',
   indicar: 'Multas com prazo de indicação vencido ou em até 7 dias',
   colisao: 'Colisões em aberto',
@@ -55,15 +56,16 @@ export function buildPendencias(data: Pick<FrotaData, 'manutencoes' | 'multas' |
     const base = { kind: 'manutencao' as const, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, veiculoId: item.veiculo?.id ?? null, faltamKm: null, ...SEM_PREVENTIVA }
     const parada = prioridadeParada(item, today)
     if (parada !== null) {
-      // Substitui aprovar/programar para não listar a mesma manutenção duas vezes.
-      result.push({ ...base, tipo: 'prioridade', prazo: null, dias: null, peso: -(item.grau ?? 0) * 1000 - parada, detalhe: `${item.status === MANUT.SOLICITADO ? 'Aguardando aprovação' : 'Aprovada sem data'} há ${parada} dias` })
+      // Substitui "A encaixar" e "Atrasada" para não listar a mesma manutenção duas vezes (a Custom API faz igual).
+      result.push({ ...base, tipo: 'prioridade', prazo: null, dias: null, peso: -(item.grau ?? 0) * 1000 - parada, detalhe: `${item.status === MANUT.SOLICITADO ? 'Aguardando encaixe' : 'Encaixada sem programação'} há ${parada} dias` })
       continue
     }
-    if (item.status === MANUT.SOLICITADO) result.push({ ...base, tipo: 'aprovar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
-    if (item.status === MANUT.APROVADO && !item.agendarPara) result.push({ ...base, tipo: 'programar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
-    if ((item.status === MANUT.APROVADO || item.status === MANUT.PROGRAMADO) && item.agendarPara) {
-      const dias = daysBetween(today, item.agendarPara)
-      if (dias <= JANELA_DIAS) result.push({ ...base, tipo: 'agendada', prazo: item.agendarPara, dias, peso: dias })
+    // Mesma ordem da fila "A encaixar": grau maior primeiro e, no mesmo grau, a mais antiga.
+    if (item.status === MANUT.SOLICITADO) result.push({ ...base, tipo: 'encaixar', prazo: null, dias: null, peso: -(item.grau ?? 0) * 100_000 - diasEsperando(item, today) })
+    const fim = fimDaJanela(item)
+    if ((item.status === MANUT.AGENDADO || item.status === MANUT.PROGRAMADO) && fim) {
+      const dias = daysBetween(today, fim)
+      if (dias < 0) result.push({ ...base, tipo: 'atrasada', prazo: fim, dias, peso: dias })
     }
   }
 

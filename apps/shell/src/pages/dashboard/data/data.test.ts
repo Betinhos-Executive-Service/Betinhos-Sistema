@@ -483,7 +483,7 @@ describe('conjuntos das abas', () => {
     expect(ENTITIES).toMatchObject({ itemPlano: 'cr40f_itemplanopreventivo', baseline: 'cr40f_baselinepreventiva' })
     expect(itensPlanoPath('itp')).toBe('itp?$select=cr40f_itemplanopreventivoid,cr40f_name,cr40f_servico,cr40f_intervalokm,cr40f_intervalomeses,cr40f_avisokm,cr40f_avisodias&$filter=statecode eq 0')
     expect(baselinesPath('bas')).toBe('bas?$select=cr40f_baselinepreventivaid,_cr40f_veiculo_value,_cr40f_item_value,cr40f_km,cr40f_data')
-    expect(manutencoesPreventivaPath('man')).toBe('man?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)')
+    expect(manutencoesPreventivaPath('man')).toBe('man?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,cr40f_kmrealizado,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)')
   })
 
   it('carrega as preventivas reaproveitando os veículos; qualquer das 4 consultas que falha marca só preventivas', async () => {
@@ -502,7 +502,7 @@ describe('conjuntos das abas', () => {
     expect(lidos.filter((p) => p.startsWith('vei?'))).toHaveLength(1)
     expect(ok.preventivas).toEqual({
       veiculos: [{ id: 'v1', placa: 'ABC1D23', status: 202410001, categoria: 100000000, hodometro: 21000, hodometroEm: '2026-10-14T12:00:00Z' }],
-      manutencoes: [{ id: 'm1', status: 202410002, dataManutencao: '2026-02-01T12:00:00Z', criadoEm: '2026-02-01T12:00:00Z', km: 12000, veiculo: { id: 'v1', label: '' }, servicos: [7, 9] }],
+      manutencoes: [{ id: 'm1', status: 202410002, dataManutencao: '2026-02-01T12:00:00Z', criadoEm: '2026-02-01T12:00:00Z', km: 12000, kmRealizado: null, veiculo: { id: 'v1', label: '' }, servicos: [7, 9] }],
       itens: [{ id: 'i1', nome: 'Troca de óleo', servico: 7, intervaloKm: 10000, intervaloMeses: 6, avisoKm: 1000, avisoDias: 30, ativo: true }],
       baselines: [{ id: 'b1', veiculo: { id: 'v1', label: 'ABC1D23' }, item: { id: 'i1', label: '' }, km: 10000, data: '2026-01-10' }],
     })

@@ -1,6 +1,6 @@
 import type { DateBehavior } from './dates'
 import type { Acordo } from '../domain/termoMulta'
-import type { FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
+import type { DetalheManutencao, FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -9,7 +9,7 @@ export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: []
 /** Classificação da manutenção, aplicada na tela sem recarregar tudo. */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
 
-export type FlowId = 'aprovarManutencao' | 'notificarCondutor' | 'gerarContrato'
+export type FlowId = 'notificarCondutor' | 'gerarContrato'
 export type FlowResult = { message: string | null; shareUrl: string | null }
 
 /** O Flow pode ter rodado no servidor mesmo sem resposta (tempo esgotado ou falha de rede). */
@@ -22,7 +22,56 @@ export class FlowIncertoError extends Error {
 
 export type ItemPlanoInput = { nome: string; servico: number; intervaloKm: number | null; intervaloMeses: number | null; avisoKm: number; avisoDias: number }
 
-export interface DataSource {
+/** Pedidos e respostas das Custom APIs cr40f_Manutencao* (packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs). */
+export type PedidoAgendar = { manutencaoId: string; inicio: string; fim: string; comentario: string | null }
+export type PedidoConclusao = {
+  manutencaoId: string; servicos: number[]; km: number
+  /** ISO 8601 com fuso (`2026-11-17T10:00:00-03:00`). */
+  data: string
+  valor: number; pagamento: number; estabelecimento: string; cidadeId: string; realizadoPorId: string
+  servicoRealizado: string | null; comentario: string | null
+  linkNotaFiscal: string | null; linkFotoFinal1: string | null; linkFotoFinal2: string | null; linkFotoFinal3: string | null
+}
+/** `statusAnexo` 100000001 (ANEXO_DESPESA.PENDENTE): quem chamou ainda sobe a nota fiscal na despesa. */
+export type RespostaConclusao = { despesaId: string; statusAnexo: number; geralId: string | null }
+export type NovaManutencao = { veiculoId: string; descricao: string; grau: number; tipo: number | null; km: number; solicitanteId: string | null }
+
+/** Ações da manutenção pela gaveta (Custom APIs, no contexto de quem chama) e o detalhe que ela mostra. */
+export interface ComandosManutencao {
+  /** Detalhe atual no servidor; null = a manutenção não existe mais. */
+  detalheManutencao(id: string): Promise<DetalheManutencao | null>
+  /** Cria a manutenção Solicitada e devolve o id. */
+  criarManutencao(input: NovaManutencao): Promise<string>
+  /** cr40f_ManutencaoAgendar: encaixa ou reagenda (cria ou reabre a linha da Geral). */
+  agendarManutencao(pedido: PedidoAgendar): Promise<void>
+  /** cr40f_ManutencaoReprovar: só Solicitado, comentário obrigatório. */
+  reprovarManutencao(id: string, comentario: string): Promise<void>
+  /** cr40f_ManutencaoCancelar: qualquer estado antes de Realizado. */
+  cancelarManutencao(id: string, comentario: string | null): Promise<void>
+  /** cr40f_ManutencaoConcluir: manutenção, despesa e linha da Geral numa transação; repetir é seguro. */
+  concluirManutencao(pedido: PedidoConclusao): Promise<RespostaConclusao>
+}
+
+/** Origem do arquivo em new_fotomanutencao (mesmos valores do App). */
+export type OrigemArquivo = 'NOTA_FISCAL' | 'POS_MANUTENCAO'
+export type ArquivoEnviado = { link: string; nomeArquivo: string; caminho: string }
+export type OpcaoBusca = { id: string; nome: string }
+/** O que o envio precisa saber da manutenção para montar a pasta do App. */
+export type AlvoArquivo = Pick<DetalheManutencao, 'id' | 'codigo' | 'veiculo'>
+
+/** Arquivos da conclusão (mesmo flow e pastas do App) e as buscas da gaveta. */
+export interface ArquivosManutencao {
+  /** Sobe na pasta da manutenção e registra o vínculo em new_fotomanutencao; devolve o link de compartilhamento. */
+  enviarArquivoManutencao(alvo: AlvoArquivo, arquivo: File, origem: OrigemArquivo, ordem: number): Promise<ArquivoEnviado>
+  /** Sobe a nota na pasta da despesa, cria os anexos e grava cr40f_statusanexo (enviado; em falha, falhou). */
+  anexarNotaFiscalDespesa(despesaId: string, arquivos: File[], enviadoPorId: string): Promise<void>
+  /** Funcionários ativos pelo nome (até 50). Texto vazio = os primeiros por ordem alfabética. */
+  buscarFuncionarios(texto: string): Promise<OpcaoBusca[]>
+  /** Cidades ativas pelo nome (até 50), como "São José dos Campos - SP". */
+  buscarCidades(texto: string): Promise<OpcaoBusca[]>
+}
+
+export interface DataSource extends ComandosManutencao, ArquivosManutencao {
   mode: 'xrm' | 'mock'
   envLabel: string
   /** Carrega todas as tabelas. Tabela que falhar vem vazia e com a mensagem em `errors`. */

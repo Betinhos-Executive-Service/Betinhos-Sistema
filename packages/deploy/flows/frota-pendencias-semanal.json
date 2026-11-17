@@ -54,7 +54,7 @@
             "Rotulos": {
               "type": "Compose",
               "runAfter": {},
-              "inputs": { "prioridade": "Prioridade alta parada", "reincidencia": "Manutenção reincidente", "preventiva": "Preventiva vencida ou a vencer", "agendada": "Agendada e não realizada", "custo": "Custo fora da curva", "hodometro": "Hodômetro desatualizado" }
+              "inputs": { "prioridade": "Prioridade alta parada", "reincidencia": "Manutenção reincidente", "preventiva": "Preventiva vencida ou a vencer", "atrasada": "Manutenção atrasada", "custo": "Custo fora da curva", "hodometro": "Hodômetro desatualizado" }
             },
             "Linhas": {
               "type": "Select",
