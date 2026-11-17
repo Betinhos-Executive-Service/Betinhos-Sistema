@@ -207,14 +207,14 @@ Notas sobre a regra:
 
 - Ativas: **233**. Manutenção: **5**. Sem categoria: **0**. Filtro de desligado (`ne 100000001` ou `null`): **228**.
 - 228 + 5 = 233: **fecha** (D4 confirmada).
-- Manutenção sem `cr40f_om`: **1** (OS-1957, status Concluído, com motorista). É linha legada sem manutenção ligada: com o liga/desliga ligado ela vira linha de manutenção **sem** dados do `bt_manut`; o domínio da Tarefa 3 precisa tolerar o link vazio.
+- Manutenção sem `cr40f_om`: **1** (OS-1957, status Concluído, com motorista). É linha legada sem manutenção ligada: não há gaveta para abrir, então a Tarefa 3 não a trata como linha de manutenção (`ehLinhaDeManutencao` exige `cr40f_om`) e ela aparece como linha comum. Link vazio com `cr40f_om` preenchido também é tolerado (rótulos legíveis no lugar).
 
 ### Link `bt_manut`
 
 Chaves devolvidas pelo link `outer` (3 linhas de manutenção mais recentes pela saída):
 
 - `bt_manut.cr40f_id`, `bt_manut.cr40f_descricao`, `bt_manut.cr40f_graudamanutencao` (número), `bt_manut.cr40f_status` (número) e `bt_manut.cr40f_agendarpara`; cada uma com a anotação `@OData.Community.Display.V1.FormattedValue` quando é choice ou data.
-- `bt_manut.cr40f_janelainicio` e `bt_manut.cr40f_janelafim` **não vieram**: nenhuma manutenção do DEV tem janela preenchida (nem lendo `cr40f_manutencoes` direto, nem pelo link). O formato real das janelas em dado não foi observado; vale a metadata (`DateOnly`).
+- `bt_manut.cr40f_janelainicio` e `bt_manut.cr40f_janelafim` **não vieram**: nenhuma manutenção do DEV tem janela preenchida (nem lendo `cr40f_manutencoes` direto, nem pelo link). O formato das janelas é o esperado pela metadata `DateOnly` (`YYYY-MM-DD`); não observado no DEV (nenhuma manutenção tinha janela).
 - Linha sem manutenção ligada (OS-1957): nenhuma chave `bt_manut.*` (o link outer não devolve nada).
 - `cr40f_om` vem como `_cr40f_om_value` (GUID, com o `cr40f_id` da manutenção na anotação).
 - Exemplo (sem GUIDs): `bt_manut.cr40f_id = "OM-1200"`, `bt_manut.cr40f_status = 202410001` (Agendado), `bt_manut.cr40f_graudamanutencao = 2` (Média), `bt_manut.cr40f_agendarpara = "2026-10-09T03:00:00Z"` (anotação `09/10/2026`).
@@ -231,5 +231,5 @@ Chaves devolvidas pelo link `outer` (3 linhas de manutenção mais recentes pela
 
 - Exceções candidatas a `PADRAO_POR_VISAO` (ponto 1 para o Renan): `💲A receber` → desligado (é de cobrança). Dúvida: `📲 Visualização Mobile` → hoje desligada pela regra; só vira exceção (ligada) se o Renan quiser ver manutenções do dia no celular. As visões pessoais sem marca não foram listadas (a leitura cobre só as do sistema).
 - Filtro de desligado: fecha o total (233 = 228 + 5).
-- `toDateOnly` das janelas: DateOnly pela metadata (chega `YYYY-MM-DD`); sem dado de DEV para confirmar. `cr40f_agendarpara` é UserLocal e chega em UTC.
+- `toDateOnly` das janelas: formato esperado pela metadata `DateOnly` (`YYYY-MM-DD`); não observado no DEV (nenhuma manutenção tinha janela). `cr40f_agendarpara` é UserLocal e chega em UTC.
 - Origem "Model-driven" (100000001): **existe** (ponto 2 para o Renan).
