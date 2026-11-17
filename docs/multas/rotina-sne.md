@@ -1,6 +1,6 @@
 # Rotina do SNE: roteiro da skill de multas (versão da fase 1, 17/11/2026)
 
-Este é o texto que o Júnior copia para a skill dele no claude.ai (Claude in Chrome com o conector Dataverse PROD).
+Este é o texto que o Júnior copia para a skill dele no claude.ai (Claude in Chrome com o conector "Dataverse Betinhos" do claude.ai).
 Mudou aqui, copie de novo para a skill. Spec: `docs/superpowers/specs/2026-11-17-multas-fase1-design.md`, §8.
 
 ---
@@ -59,7 +59,7 @@ Para cada notificação de autuação que aparecer no SNE:
    achados nas buscas dos itens 2 e 3 (o nome de navegação distingue maiúsculas e minúsculas):
    - placa: `"cr40f_Placa@odata.bind": "/cr40f_veiculoses(<GUID do veículo>)"`;
    - infração: `"cr40f_Codigodainfracao@odata.bind": "/cr40f_infracaodetransitos(<GUID da infração>)"`.
-   Para criar com `@odata.bind`, use a ferramenta `create_record` do conector MCP do Dataverse, com a tabela `cr40f_multas`
+   Para criar com `@odata.bind`, use a ferramenta `create_record` do conector "Dataverse Betinhos" do claude.ai (o conector MCP do Dataverse), com a tabela `cr40f_multas`
    e os campos do item 4 (inclusive as duas chaves `@odata.bind`) no corpo do registro; não invente outros parâmetros.
    Exemplo com GUIDs fictícios:
    `"cr40f_Placa@odata.bind": "/cr40f_veiculoses(00000000-0000-4000-8000-000000000001)"`. Não grave

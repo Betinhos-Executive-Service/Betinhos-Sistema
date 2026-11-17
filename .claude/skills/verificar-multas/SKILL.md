@@ -30,7 +30,7 @@ Suba o shell em mock (`pnpm --filter @betinhos/shell dev`, porta 36472) e passe 
 Prints de antes e depois do drawer, da lista e da tarefa no Planner vão para o chat.
 
 ## 3. Dataverse DEV
-Esta seção é para a pessoa com acesso ao DEV, a partir do checkout principal na develop atualizada. Sessão de código ou cloud não roda os scripts com `-Apply`, nem `pnpm push`/`provision-*`, nem grava no Dataverse; nunca use o conector do PROD.
+Esta seção é para a pessoa com acesso ao DEV, a partir do checkout principal na develop atualizada. Sessão de código ou cloud não roda os scripts com `-Apply`, nem `pnpm push`/`provision-*`, nem grava no Dataverse; nunca use os conectores do claude.ai que gravam no PROD (ex.: Dataverse Betinhos).
 
 Pré-requisitos: Deploy da `develop` verde (migration, plugin da frota, DriverRecordSharing, tela), `packages/plugins/scripts/register-dossiemulta-customapi.ps1 -Apply` e o flow criado à mão (`provision-flow-multas-do-dia.ps1 -Remetente <noreply>`), os dois do checkout principal.
 1. **Schema**: `cr40f_multas.cr40f_status` com os rótulos novos e a opção 202410007 Cancelada; colunas novas; `cr40f_MultasTravaModo` = `observar`.

@@ -15,7 +15,7 @@ O processo de multas foi revisto do zero com o Júnior, que é dono do processo 
 
 Os números ficam só no documento do processo, que é privado.
 
-O Júnior vê as multas no portal da Senatran 1 ou 2 vezes por semana. A rotina dele no Claude in Chrome (uma skill na conta dele) cadastra as multas pelo MCP do Dataverse do PROD. O aviso ao motorista é feito pelo WhatsApp, com um dossiê: serviço do dia, rastreador e notificação.
+O Júnior vê as multas no portal da Senatran 1 ou 2 vezes por semana. A rotina dele no Claude in Chrome (uma skill na conta dele) cadastra as multas pelo conector Dataverse Betinhos do claude.ai. O aviso ao motorista é feito pelo WhatsApp, com um dossiê: serviço do dia, rastreador e notificação.
 
 A prioridade dele é **nunca perder prazo**. Ele recebe avisos por e-mail diário. O Renan pediu passo a passo "sem pra onde fugir" e uma tarefa automática no Planner para cada multa.
 
