@@ -107,6 +107,30 @@ public class PassoMultaTests
     }
 
     [Fact]
+    public void DadosJson_null_vale_dados_vazios_e_a_regra_recusa_sem_estourar()
+    {
+        var mundo = new FakeMundo();
+        var multa = Multa(mundo, MultaCodigos.Identificar);
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() => PassoMultaPlugin.Executar(mundo, multa.Id, Passos.DefinirResponsavel, "null", Hoje));
+        Assert.Equal("Escolha o responsável: motorista ou empresa.", erro.Message);
+        Assert.Empty(mundo.Atualizados);
+    }
+
+    [Fact]
+    public void Falha_tecnica_vira_mensagem_fixa_e_o_detalhe_fica_so_no_trace()
+    {
+        var mundo = new FakeMundo();
+        var inexistente = Guid.NewGuid();
+        var ctx = Contexto.Api(PassoMultaPlugin.Mensagem, new Dictionary<string, object> { ["MultaId"] = inexistente, ["Passo"] = Passos.AvisarMotorista, ["DadosJson"] = "{}" });
+
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() => Contexto.Rodar(new PassoMultaPlugin(), ctx, mundo));
+
+        Assert.Equal("Não foi possível gravar o passo da multa. Recarregue a tela e tente de novo.", erro.Message);
+        Assert.DoesNotContain(inexistente.ToString(), erro.Message);
+        Assert.Contains(mundo.Traces, t => t.Contains(inexistente.ToString()));
+    }
+
+    [Fact]
     public void Plugin_le_as_entradas_e_preenche_MultaJson()
     {
         var mundo = new FakeMundo();

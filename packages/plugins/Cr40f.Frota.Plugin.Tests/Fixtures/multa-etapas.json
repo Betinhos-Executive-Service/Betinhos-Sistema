@@ -30,6 +30,8 @@
     { "nome": "indicação com data no futuro", "multa": { "status": 202410004, "dataAviso": "2026-11-10" }, "passo": "RegistrarIndicacao", "dados": { "canal": "senatran", "data": "2026-11-18" }, "erro": "A data não pode ser no futuro." },
     { "nome": "pagamento sem vencimento", "multa": { "status": 202410001 }, "passo": "RegistrarPagamento", "dados": { "data": "2026-11-15", "valorPago": 100 }, "erro": "A penalidade ainda não chegou: grave o vencimento antes de registrar o pagamento." },
     { "nome": "pagamento sem valor", "multa": { "status": 202410001, "vencimento": "2026-11-20" }, "passo": "RegistrarPagamento", "dados": { "data": "2026-11-15" }, "erro": "Informe o valor pago." },
+    { "nome": "acerto na folha com mês 00", "multa": { "status": 202410006 }, "passo": "RegistrarAcerto", "dados": { "acerto": "folha", "competencia": "2026-00" }, "erro": "Informe o mês do desconto." },
+    { "nome": "acerto na folha com mês 13", "multa": { "status": 202410006 }, "passo": "RegistrarAcerto", "dados": { "acerto": "folha", "competencia": "2026-13-01" }, "erro": "Informe o mês do desconto." },
     { "nome": "acerto na folha sem mês", "multa": { "status": 202410006 }, "passo": "RegistrarAcerto", "dados": { "acerto": "folha" }, "erro": "Informe o mês do desconto." },
     { "nome": "prazo vencido sem resposta", "multa": { "status": 202410004, "dataParaIndicar": "2026-11-01" }, "passo": "PrazoVencido", "dados": {}, "erro": "Responda se a multa foi indicada." },
     { "nome": "prazo vencido antes do prazo", "multa": { "status": 202410000, "dataParaIndicar": "2026-11-30" }, "passo": "PrazoVencido", "dados": { "indicou": false }, "erro": "O prazo de indicação ainda não venceu." },

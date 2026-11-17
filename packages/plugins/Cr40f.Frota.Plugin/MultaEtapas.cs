@@ -98,7 +98,7 @@ public static class MultaEtapas
     public const string Identificar = "identificar", Indicar = "indicar", Pagar = "pagar", Acertar = "acertar";
     public const string Encerrada = "encerrada", Recurso = "recurso", Cancelada = "cancelada";
     private static readonly Regex DiaIso = new(@"^\d{4}-\d{2}-\d{2}$");
-    private static readonly Regex MesIso = new(@"^\d{4}-\d{2}(-01)?$");
+    private static readonly Regex MesIso = new(@"^\d{4}-(0[1-9]|1[0-2])(-01)?$");
 
     public static readonly IReadOnlyDictionary<string, string> RotuloPasso = new Dictionary<string, string>
     {

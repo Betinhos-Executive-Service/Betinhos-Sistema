@@ -143,7 +143,7 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
     case 'RegistrarPagamento':
       return dataRuim(d.data, hoje, 'Informe a data do pagamento.') ?? (typeof d.valorPago === 'number' && d.valorPago > 0 ? null : 'Informe o valor pago.')
     case 'RegistrarAcerto':
-      if (d.acerto === 'folha') return d.competencia && /^\d{4}-\d{2}(-01)?$/.test(d.competencia) ? null : 'Informe o mês do desconto.'
+      if (d.acerto === 'folha') return d.competencia && /^\d{4}-(0[1-9]|1[0-2])(-01)?$/.test(d.competencia) ? null : 'Informe o mês do desconto.'
       if (d.acerto === 'empresa') return motivoDe(d.motivo) === null ? 'Escolha o motivo de a empresa assumir.' : null
       return 'Escolha: lancei na folha ou empresa assume.'
     case 'ResultadoRecurso':
