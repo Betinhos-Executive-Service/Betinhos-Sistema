@@ -116,8 +116,11 @@ public class PassoMultaTests
             ["MultaId"] = multa.Id, ["Passo"] = Passos.RegistrarAcerto, ["DadosJson"] = "{\"acerto\":\"empresa\",\"motivo\":\"culpa-empresa\"}",
         });
 
-        Contexto.Rodar(new PassoMultaPlugin(), ctx, mundo);
+        var provedor = Contexto.Rodar(new PassoMultaPlugin(), ctx, mundo);
 
+        // Grava como quem chama (não SYSTEM nem o usuário iniciador).
+        Assert.Equal(new Guid?[] { ctx.UserId }, provedor.UsuariosPedidos);
+        Assert.NotEqual(ctx.UserId, ctx.InitiatingUserId);
         Assert.Contains("\"etapa\":\"encerrada\"", (string)ctx.OutputParameters["MultaJson"]);
         Assert.Equal(MultaCodigos.Encerrada, mundo.Atualizados.Single().GetAttributeValue<OptionSetValue>("cr40f_status").Value);
     }

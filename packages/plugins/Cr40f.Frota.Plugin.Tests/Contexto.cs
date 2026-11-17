@@ -11,7 +11,9 @@ public sealed class Provedor : IServiceProvider, IOrganizationServiceFactory, IT
     public Provedor(IPluginExecutionContext ctx, FakeMundo mundo) { _ctx = ctx; _mundo = mundo; }
     public object? GetService(Type tipo) =>
         tipo == typeof(IPluginExecutionContext) ? _ctx : tipo == typeof(IOrganizationServiceFactory) || tipo == typeof(ITracingService) ? this : null;
-    public IOrganizationService CreateOrganizationService(Guid? userId) => _mundo;
+    /// <summary>Usuários para os quais o plugin pediu um service (null = SYSTEM).</summary>
+    public List<Guid?> UsuariosPedidos { get; } = new();
+    public IOrganizationService CreateOrganizationService(Guid? userId) { UsuariosPedidos.Add(userId); return _mundo; }
     public void Trace(string format, params object[] args) => _mundo.Traces.Add(args.Length == 0 ? format : string.Format(format, args));
 }
 
@@ -36,5 +38,10 @@ public static class Contexto
         return ctx;
     }
 
-    public static void Rodar(IPlugin plugin, RemoteExecutionContext ctx, FakeMundo mundo) => plugin.Execute(new Provedor(ctx, mundo));
+    public static Provedor Rodar(IPlugin plugin, RemoteExecutionContext ctx, FakeMundo mundo)
+    {
+        var provedor = new Provedor(ctx, mundo);
+        plugin.Execute(provedor);
+        return provedor;
+    }
 }
