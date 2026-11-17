@@ -90,6 +90,55 @@ describe('detalhe e criação', () => {
     expect(m).toMatchObject({ id: LIMPO, status: 202410001, janelaInicio: '2026-11-23', janelaFim: '2026-11-29', fotosPedido: ['https://x.invalid/1'] })
   })
 
+  it('detalhe traz a linha ativa da Geral e a despesa', async () => {
+    const { d, webApi } = criarDeps()
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_manutencoesid: LIMPO, cr40f_status: 202410005 })
+    webApi.retrieveMultipleRecords
+      .mockResolvedValueOnce({ entities: [{ cr40f_reservadeveculosid: 'g1', _cr40f_motorista_value: 'f1', '_cr40f_motorista_value@OData.Community.Display.V1.FormattedValue': 'Motorista Fictício', cr40f_dataehorriodesada: '2026-11-24T13:00:00.000Z' }] })
+      .mockResolvedValueOnce({ entities: [{ cr40f_despesaoperacionalid: 'd1', cr40f_statusoperacional: 100000000, cr40f_statusanexo: 100000002 }] })
+    const detalhe = await criarComandosXrm(d).detalheManutencao(ID)
+    expect(detalhe?.programacao).toEqual({ geralId: 'g1', motorista: { id: 'f1', label: 'Motorista Fictício' }, saida: '2026-11-24T13:00:00.000Z' })
+    expect(detalhe?.despesa).toEqual({ id: 'd1', statusOperacional: 100000000, statusAnexo: 100000002 })
+    expect(webApi.retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_reservadeveculos', expect.stringContaining(`_cr40f_om_value eq ${LIMPO}`))
+    expect(webApi.retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_despesaoperacional', expect.stringContaining(`_cr40f_manutencao_value eq ${LIMPO}`))
+  })
+
+  it('detalhe sem linha nem despesa: null nos dois', async () => {
+    const { d, webApi } = criarDeps()
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_manutencoesid: LIMPO, cr40f_status: 0 })
+    const detalhe = await criarComandosXrm(d).detalheManutencao(ID)
+    expect(detalhe?.programacao).toBeNull()
+    expect(detalhe?.despesa).toBeNull()
+  })
+
+  it('detalhe continua quando a leitura da Geral falha (programacao undefined)', async () => {
+    const { d, webApi } = criarDeps()
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_manutencoesid: LIMPO, cr40f_status: 202410001 })
+    webApi.retrieveMultipleRecords.mockRejectedValueOnce(new Error('falha de rede'))
+    const detalhe = await criarComandosXrm(d).detalheManutencao(ID)
+    expect(detalhe).not.toBeNull()
+    expect(detalhe?.programacao).toBeUndefined()
+    expect(detalhe?.despesa).toBeNull()
+  })
+
+  it('agendar manda o grau quando informado', async () => {
+    const f = resposta(true, 200, { ResponseJson: JSON.stringify({ geralId: 'g1' }) })
+    vi.stubGlobal('fetch', f)
+    await criarComandosXrm(criarDeps().d).agendarManutencao({ manutencaoId: ID, inicio: '2026-11-23', fim: '2026-11-29', comentario: null, grau: 3 })
+    expect(JSON.parse(corpo(f).RequestJson)).toMatchObject({ grau: 3 })
+  })
+
+  it('programar grava motorista, saída e o patch do Disparar na linha da Geral', async () => {
+    const { d, webApi } = criarDeps()
+    await criarComandosXrm(d).programarManutencao({ manutencaoId: ID, geralId: '{CCCCCCCC-1111-2222-3333-444444444444}', motoristaId: '{DDDDDDDD-1111-2222-3333-444444444444}', saida: '2026-11-24T13:00:00.000Z' })
+    expect(webApi.updateRecord).toHaveBeenCalledWith('cr40f_reservadeveculos', 'cccccccc-1111-2222-3333-444444444444', {
+      'cr40f_Motorista@odata.bind': '/cr40f_funcionarioses(dddddddd-1111-2222-3333-444444444444)',
+      cr40f_dataehorriodesada: '2026-11-24T13:00:00.000Z',
+      cr40f_status: 202410005,
+      new_foiprogramado: true,
+    })
+  })
+
   it('detalhe de registro que não existe devolve null', async () => {
     const { d, webApi } = criarDeps()
     webApi.retrieveRecord.mockRejectedValueOnce(new Error(`cr40f_manutencoes With Id = ${LIMPO} Does Not Exist`))

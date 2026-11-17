@@ -27,6 +27,7 @@ export function manutencaoFalsa(): ComandosManutencao & ArquivosManutencao {
     detalheManutencao: vi.fn(async () => null),
     criarManutencao: vi.fn(async () => 'nova'),
     agendarManutencao: vi.fn(async () => {}),
+    programarManutencao: vi.fn(async () => {}),
     reprovarManutencao: vi.fn(async () => {}),
     cancelarManutencao: vi.fn(async () => {}),
     concluirManutencao: vi.fn(async () => ({ despesaId: 'd1', statusAnexo: 100000002, geralId: null })),

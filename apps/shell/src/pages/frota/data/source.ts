@@ -23,7 +23,8 @@ export class FlowIncertoError extends Error {
 export type ItemPlanoInput = { nome: string; servico: number; intervaloKm: number | null; intervaloMeses: number | null; avisoKm: number; avisoDias: number }
 
 /** Pedidos e respostas das Custom APIs cr40f_Manutencao* (packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs). */
-export type PedidoAgendar = { manutencaoId: string; inicio: string; fim: string; comentario: string | null }
+export type PedidoAgendar = { manutencaoId: string; inicio: string; fim: string; comentario: string | null; grau?: number }
+export type PedidoProgramar = { manutencaoId: string; geralId: string; motoristaId: string; saida: string /* ISO UTC */ }
 export type PedidoConclusao = {
   manutencaoId: string; servicos: number[]; km: number
   /** ISO 8601 com fuso (`2026-11-17T10:00:00-03:00`). */
@@ -44,6 +45,8 @@ export interface ComandosManutencao {
   criarManutencao(input: NovaManutencao): Promise<string>
   /** cr40f_ManutencaoAgendar: encaixa ou reagenda (cria ou reabre a linha da Geral). */
   agendarManutencao(pedido: PedidoAgendar): Promise<void>
+  /** Grava motorista e saída na linha da Geral e marca Programado (mesmo patch do Disparar); o espelho leva a manutenção a Programado. */
+  programarManutencao(pedido: PedidoProgramar): Promise<void>
   /** cr40f_ManutencaoReprovar: só Solicitado, comentário obrigatório. */
   reprovarManutencao(id: string, comentario: string): Promise<void>
   /** cr40f_ManutencaoCancelar: qualquer estado antes de Realizado. */

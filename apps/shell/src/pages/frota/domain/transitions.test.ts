@@ -281,9 +281,16 @@ describe('ações da manutenção (Custom APIs)', () => {
 
   it('oferece as ações do ciclo novo por status', () => {
     expect(acoesManutencao(MANUT.SOLICITADO)).toEqual(['encaixar', 'reprovar', 'cancelar', 'concluir'])
-    expect(acoesManutencao(MANUT.AGENDADO)).toEqual(['encaixar', 'cancelar', 'concluir'])
+    expect(acoesManutencao(MANUT.AGENDADO)).toEqual(['encaixar', 'programar', 'cancelar', 'concluir'])
     expect(acoesManutencao(MANUT.PROGRAMADO)).toEqual(['encaixar', 'cancelar', 'concluir'])
     for (const status of [MANUT.REALIZADO, MANUT.REPROVADO, MANUT.CANCELADO, null]) expect(acoesManutencao(status)).toEqual([])
+  })
+
+  it('programar só em Agendado', () => {
+    expect(acoesManutencao(MANUT.AGENDADO)).toEqual(['encaixar', 'programar', 'cancelar', 'concluir'])
+    expect(acoesManutencao(MANUT.PROGRAMADO)).not.toContain('programar')
+    expect(acoesManutencao(MANUT.SOLICITADO)).not.toContain('programar')
+    expect(rotuloAcao('programar', MANUT.AGENDADO)).toBe('Programar')
   })
 
   it('encaixar vira Reagendar depois do encaixe', () => {

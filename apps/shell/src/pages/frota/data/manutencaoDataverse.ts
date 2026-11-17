@@ -2,11 +2,18 @@
 import { carimboDeEnvio, exigirFormato, exigirSucessoDoFlow, extensaoDe, linkDoFlow, nomeArquivoEnvio, pastaDespesa, pastaManutencao, tipoFoto, VAR_FLOW_ARQUIVOS } from './arquivosManutencao'
 import { chamarCustomApi } from './customApi'
 import type { DateBehavior } from './dates'
-import { cleanId, guid, mapDetalheManutencao, SELECT_DETALHE_MANUTENCAO } from './mappers'
+import { programarPatch } from '../../geral/domain/commands'
+import { cleanId, guid, mapDetalheManutencao, ref, SELECT_DETALHE_MANUTENCAO } from './mappers'
 import { ANEXO_DESPESA, ENTITY_SET, MANUT, TABLE } from './schema'
 import { FOTO_MAX_BYTES, fileToBase64 } from './sharepoint'
 import type { ArquivosManutencao, ComandosManutencao } from './source'
+import type { DespesaDaManutencao, ProgramacaoManutencao } from './types'
 import { errorMessage, type XrmWebApi } from './xrm'
+
+const TABELA_DESPESA = 'cr40f_despesaoperacional'
+/** Linha da Geral (cr40f_reservadeveculos) e a navegação do motorista para o bind (descoberta, seção 8). */
+const GERAL = 'cr40f_reservadeveculos'
+const NAV_MOTORISTA = 'cr40f_Motorista'
 
 /** O que as fábricas da manutenção precisam do `createXrmSource`: Web API, URL, ambiente, variáveis e metadata. */
 export type DepsXrm = {
@@ -35,6 +42,36 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
     }
   }
 
+  /** Linha ativa da Geral da manutenção; null = não há; undefined = a leitura falhou (a gaveta não cai por isso). */
+  async function programacaoDe(id: string): Promise<ProgramacaoManutencao | null | undefined> {
+    try {
+      const r = await api.retrieveMultipleRecords(GERAL, `?$select=cr40f_reservadeveculosid,_cr40f_motorista_value,cr40f_dataehorriodesada&$filter=_cr40f_om_value eq ${guid(id)} and statecode eq 0&$top=1`)
+      const row = r.entities[0]
+      if (!row) return null
+      return {
+        geralId: cleanId(String(row.cr40f_reservadeveculosid)),
+        // O nome vem na anotação de valor formatado, como nas outras listas da Frota (`ref` em mappers.ts).
+        motorista: ref(row, '_cr40f_motorista_value'),
+        saida: typeof row.cr40f_dataehorriodesada === 'string' ? row.cr40f_dataehorriodesada : null,
+      }
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Despesa ligada à manutenção; null = não há; undefined = a leitura falhou. */
+  async function despesaDe(id: string): Promise<DespesaDaManutencao | null | undefined> {
+    try {
+      const r = await api.retrieveMultipleRecords(TABELA_DESPESA, `?$select=cr40f_despesaoperacionalid,cr40f_statusoperacional,cr40f_statusanexo&$filter=_cr40f_manutencao_value eq ${guid(id)} and statecode eq 0&$orderby=createdon desc&$top=1`)
+      const row = r.entities[0]
+      if (!row) return null
+      const num = (v: unknown) => (typeof v === 'number' ? v : null)
+      return { id: cleanId(String(row.cr40f_despesaoperacionalid)), statusOperacional: num(row.cr40f_statusoperacional), statusAnexo: num(row.cr40f_statusanexo) }
+    } catch {
+      return undefined
+    }
+  }
+
   return {
     async detalheManutencao(id) {
       let row: Record<string, unknown>
@@ -44,7 +81,9 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
         if (/does not exist|não existe/i.test(errorMessage(reason))) return null
         throw reason
       }
-      return mapDetalheManutencao(row, await deps.comportamentos())
+      const detalhe = mapDetalheManutencao(row, await deps.comportamentos())
+      const [programacao, despesa] = await Promise.all([programacaoDe(id), despesaDe(id)])
+      return { ...detalhe, programacao, despesa }
     },
 
     async criarManutencao(input) {
@@ -62,7 +101,15 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
     },
 
     async agendarManutencao(p) {
-      await comando('cr40f_ManutencaoAgendar', { manutencaoId: guid(p.manutencaoId), inicio: p.inicio, fim: p.fim, comentario: p.comentario }, 'Não foi possível encaixar a manutenção')
+      await comando('cr40f_ManutencaoAgendar', { manutencaoId: guid(p.manutencaoId), inicio: p.inicio, fim: p.fim, comentario: p.comentario, ...(p.grau ? { grau: p.grau } : {}) }, 'Não foi possível agendar a manutenção')
+    },
+
+    async programarManutencao(p) {
+      await api.updateRecord(GERAL, guid(p.geralId), {
+        [`${NAV_MOTORISTA}@odata.bind`]: `/${ENTITY_SET.funcionarios}(${guid(p.motoristaId)})`,
+        cr40f_dataehorriodesada: p.saida,
+        ...programarPatch(),
+      })
     },
 
     async reprovarManutencao(id, comentario) {
@@ -84,7 +131,6 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
 
 const TABELA_FOTO = 'new_fotomanutencao'
 const TABELA_ANEXO = 'cr40f_anexodespesaoperacional'
-const TABELA_DESPESA = 'cr40f_despesaoperacional'
 /** Mesmos valores que o App grava no anexo do comprovante (uploadExpenseInvoiceRemote). */
 const ANEXO_STATUS_ENVIADO = 100000001
 const ANEXO_TIPO_COMPROVANTE = 100000000

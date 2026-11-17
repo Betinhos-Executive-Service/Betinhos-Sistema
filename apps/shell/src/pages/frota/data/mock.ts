@@ -5,7 +5,7 @@ import { addMonths, todaySP } from './dates'
 import { ANEXO_DESPESA, COLISAO, MANUT, MULTA, PAGAMENTO, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, FlowId, OpcaoBusca } from './source'
-import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
+import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, ProgramacaoManutencao, Ref, TelemetriaKm, TermoMulta } from './types'
 import { latenciaMock } from '../../../app/latenciaMock'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
@@ -146,6 +146,12 @@ export function createMockSource(): DataSource {
   }
   const encerrada = (status: number | null) => status === MANUT.REALIZADO || status === MANUT.REPROVADO || status === MANUT.CANCELADO
   const pessoas: Ref[] = [ana, bruno]
+  // Linha da Geral de cada manutenção encaixada (o que o Agendar cria no Dataverse). As já encaixadas no seed ganham a delas.
+  const linhas = new Map<string, ProgramacaoManutencao>(
+    data.manutencoes
+      .filter((m) => m.status === MANUT.AGENDADO || m.status === MANUT.PROGRAMADO)
+      .map((m) => [m.id, { geralId: `g-${m.id}`, motorista: m.status === MANUT.PROGRAMADO ? bruno : null, saida: m.status === MANUT.PROGRAMADO && m.janelaInicio ? `${m.janelaInicio}T12:00:00.000Z` : null }]),
+  )
   const CIDADES: OpcaoBusca[] = [{ id: 'c1', nome: 'São José dos Campos - SP' }, { id: 'c2', nome: 'São Paulo - SP' }, { id: 'c3', nome: 'Taubaté - SP' }]
   const contem = (nome: string, texto: string) => nome.toLowerCase().includes(texto.trim().toLowerCase())
 
@@ -277,7 +283,8 @@ export function createMockSource(): DataSource {
       await delay()
       const m = data.manutencoes.find((item) => item.id === id)
       if (!m) return null
-      return structuredClone({ ...m, comentarioAoMotorista: null, comentarioColaborador: null, pagamento: null, realizadoPor: null, fotosPedido: [], linkNotaFiscal: null, fotosFinais: [], ...extras.get(id) })
+      const despesa = m.status === MANUT.REALIZADO ? { id: `d-${id}`, statusOperacional: 100000000, statusAnexo: 100000002 } : null
+      return structuredClone({ ...m, comentarioAoMotorista: null, comentarioColaborador: null, pagamento: null, realizadoPor: null, fotosPedido: [], linkNotaFiscal: null, fotosFinais: [], ...extras.get(id), programacao: linhas.get(id) ?? null, despesa })
     },
     async criarManutencao(input) {
       await delay()
@@ -287,14 +294,25 @@ export function createMockSource(): DataSource {
       data.manutencoes.unshift(manut(id, { id: veiculo.id, label: veiculo.placa }, { descricao: input.descricao, grau: input.grau, tipo: input.tipo, km: input.km, solicitante: pessoas.find((p) => p.id === input.solicitanteId) ?? null, criadoEm: new Date().toISOString() }))
       return id
     },
-    async agendarManutencao({ manutencaoId, inicio, fim, comentario }) {
+    async agendarManutencao({ manutencaoId, inicio, fim, comentario, grau }) {
       await delay()
       const m = manutencaoDoMock(manutencaoId)
       if (!janelaValida({ inicio, fim })) throw new Error('A janela precisa ser um dia ou uma semana de segunda a domingo.')
       if (m.status !== MANUT.SOLICITADO && m.status !== MANUT.AGENDADO && m.status !== MANUT.PROGRAMADO) throw new Error('Só dá para encaixar uma manutenção em aberto.')
       if (!m.veiculo) throw new Error('A manutenção não tem veículo. Informe o veículo antes de encaixar.')
       Object.assign(m, { status: MANUT.AGENDADO, janelaInicio: inicio, janelaFim: fim, dataAprovacao: m.dataAprovacao ?? todaySP() })
+      if (grau) m.grau = grau
       if (comentario) extra(manutencaoId).comentarioAoMotorista = comentario
+      // Como o Agendar no Dataverse: cria a linha da Geral, ou a zera (sem motorista nem saída) num reagendamento.
+      linhas.set(manutencaoId, { geralId: linhas.get(manutencaoId)?.geralId ?? `g-${manutencaoId}`, motorista: null, saida: null })
+    },
+    async programarManutencao({ manutencaoId, geralId, motoristaId, saida }) {
+      await delay()
+      const m = manutencaoDoMock(manutencaoId)
+      if (m.status !== MANUT.AGENDADO) throw new Error('Só dá para programar uma manutenção agendada.')
+      const motorista = pessoas.find((p) => p.id === motoristaId) ?? { id: motoristaId, label: '' }
+      linhas.set(manutencaoId, { geralId, motorista, saida })
+      m.status = MANUT.PROGRAMADO
     },
     async reprovarManutencao(id, comentario) {
       await delay()
