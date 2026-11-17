@@ -1,0 +1,27 @@
+{
+  // Servidor MCP remoto do Dataverse (claude.ai > Conectores personalizados).
+  // Segredos (nunca no repositório): npx wrangler secret put ENTRA_CLIENT_SECRET
+  //                                  npx wrangler secret put COOKIE_ENCRYPTION_KEY   (32+ caracteres aleatórios)
+  // Local: copiar .dev.vars.example para .dev.vars (não versionado).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mcp-dataverse",
+  "main": "src/index.ts",
+  "account_id": "a26e65df1496d9808e12a495bc47cd80",
+  "workers_dev": true,
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "MCP_OBJECT", "class_name": "DataverseMcp" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DataverseMcp"] }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "TROCAR_PELO_ID_DO_KV" }],
+  "vars": {
+    "ENTRA_TENANT_ID": "bed8b3ad-d487-4193-a748-09e16f0e0327",
+    "ENTRA_CLIENT_ID": "95d58342-4382-4315-940f-9277dc687d4f",
+    "MCP_RESOURCE": "https://mcp-dataverse.betinhosexecutiveservice.workers.dev/mcp",
+    "ALLOWED_EMAIL_DOMAIN": "betinhos.com.br",
+    "DV_URL_DEV": "https://org23b93544.crm2.dynamics.com",
+    "DV_URL_TEST": "https://appbetinhostest.crm2.dynamics.com",
+    "DV_URL_PROD": "https://orgf261ae8e.crm2.dynamics.com"
+  }
+}
