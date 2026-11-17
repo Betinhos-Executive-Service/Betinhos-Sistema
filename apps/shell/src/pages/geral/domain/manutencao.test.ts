@@ -95,7 +95,7 @@ describe('FetchXML da consulta', () => {
     expect(links[0].getAttribute('from')).toBe('cr40f_manutencoesid')
     expect(links[0].getAttribute('to')).toBe('cr40f_om')
     expect(links[0].getAttribute('link-type')).toBe('outer')
-    expect(Array.from(links[0].querySelectorAll('attribute')).map((a) => a.getAttribute('name'))).toEqual(['cr40f_id', 'cr40f_descricao', 'cr40f_graudamanutencao', 'cr40f_status', 'cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_agendarpara'])
+    expect(Array.from(links[0].querySelectorAll('attribute')).map((a) => a.getAttribute('name'))).toEqual(['cr40f_descricao', 'cr40f_graudamanutencao', 'cr40f_status', 'cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_agendarpara'])
     for (const nome of ['new_categoriadoitem', 'cr40f_om', 'cr40f_veiculo', 'cr40f_motorista', 'cr40f_dataehorriodesada']) expect(doc.querySelectorAll(`entity > attribute[name="${nome}"]`).length).toBe(1)
     expect(doc.querySelector(MARCA)).toBeNull()
   })
@@ -142,7 +142,7 @@ describe('linha de manutenção', () => {
 
   it('lê o resumo: veículo, problema, grau, status, janela', () => {
     expect(lerLinhaManutencao(linha(), HOJE)).toEqual({
-      manutencaoId: 'm1', codigo: 'M-1', veiculo: 'ABC1D23', descricao: 'Freio com ruído', grau: 'Urgente',
+      manutencaoId: 'm1', veiculo: 'ABC1D23', descricao: 'Freio com ruído', grau: 'Urgente',
       status: 202410001, statusRotulo: 'Agendado', statusTom: 'info',
       janela: { inicio: '2026-11-23', fim: '2026-11-29' }, janelaRotulo: 'Semana de 23/11 a 29/11/2026',
       atrasada: false, foraDaJanela: false,

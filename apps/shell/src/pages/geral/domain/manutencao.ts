@@ -23,7 +23,7 @@ const TABELA_MANUTENCAO = 'cr40f_manutencoes'
 const ID_MANUTENCAO = 'cr40f_manutencoesid'
 const LIGACAO = 'cr40f_om'
 /** Colunas da manutenção que o desenho da linha usa. */
-export const COLUNAS_MANUTENCAO = ['cr40f_id', 'cr40f_descricao', 'cr40f_graudamanutencao', 'cr40f_status', 'cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_agendarpara'] as const
+export const COLUNAS_MANUTENCAO = ['cr40f_descricao', 'cr40f_graudamanutencao', 'cr40f_status', 'cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_agendarpara'] as const
 /** Campos da própria linha que o desenho usa mesmo quando a visão não mostra a coluna. */
 export const CAMPOS_DA_LINHA = [CATEGORIA_ITEM, LIGACAO, 'cr40f_veiculo', MOTORISTA, SAIDA] as const
 
@@ -156,7 +156,6 @@ const valorNumero = (v: unknown) => (typeof v === 'number' ? v : typeof v === 's
 /** O que o desenho da linha de manutenção mostra (tabela e cards). */
 export type LinhaManutencao = {
   manutencaoId: string
-  codigo: string | null
   veiculo: string
   descricao: string
   grau: string | null
@@ -188,7 +187,6 @@ export function lerLinhaManutencao(row: Row, hoje: string): LinhaManutencao | nu
   const saida = diaSP(valorTexto(row[SAIDA]))
   return {
     manutencaoId: String(row[`_${LIGACAO}_value`]).replace(/[{}]/g, ''),
-    codigo: valorTexto(row[doLink('cr40f_id')]),
     veiculo: valorTexto(row[`_cr40f_veiculo_value${F}`]) ?? 'Sem veículo',
     descricao: valorTexto(row[doLink('cr40f_descricao')]) ?? 'Sem descrição',
     grau: grau == null ? null : label(GRAU, grau, valorTexto(row[`${doLink('cr40f_graudamanutencao')}${F}`]) ?? String(grau)),
