@@ -335,7 +335,7 @@
 .gr-manut__alerta--perigo { color: var(--bt-color-danger); }
 .gr-manut__alerta--aviso { color: color-mix(in srgb, var(--bt-color-warning) 70%, black); }
 /* Coluna Status de Op. estreita: o alerta desce para baixo da etiqueta em vez de ser cortado. */
-.gr-manut__trecho--status .gr-manut__selos { flex-direction: column; align-items: flex-start; gap: var(--bt-space-0-5); }
+.gr-manut__trecho--status .gr-manut__selos { flex-direction: column; align-items: flex-start; gap: 0; }
 .gr-table--minima .gr-manut__trecho--status .gr-manut__selos { flex-direction: row; align-items: center; }
 .gr-manut__trecho--status { overflow: hidden; }
 .gr-manut__trecho--veiculo .gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
