@@ -10,6 +10,7 @@ public static class M
     public const string DataManutencao = "cr40f_datamanutencao", Valor = "cr40f_valor", Estabelecimento = "cr40f_estabelecimento";
     public const string ServicoRealizado = "cr40f_servicorealizado", Pagamento = "cr40f_pagamento", RealizadoPor = "cr40f_realizado_por_nome";
     public const string ComentarioColaborador = "new_comentariosdocolaborador";
+    public const string Grau = "cr40f_graudamanutencao";
     public const string Servicos = "new_servicosmanutencao", Categorias = "new_categoriasmanutencao", Origem = "new_classificacaoorigem";
     public const string LinkNotaFiscal = "new_linkdanotafiscal", LinkFotoFinal1 = "new_linkdafotofinal1", LinkFotoFinal2 = "new_linkdafotofinal2", LinkFotoFinal3 = "new_linkdafotofinal3";
 

@@ -176,4 +176,41 @@ public class AgendarTests
         Assert.Equal(G.StatusCancelado, memoria.Linha(G.Tabela, linha.Id).GetAttributeValue<OptionSetValue>(G.Status).Value);
         Assert.Equal(M.Tabela, memoria.Atualizados.First().LogicalName); // espelho vê a manutenção já encerrada
     }
+
+    [Fact]
+    public void Agendar_com_grau_grava_o_grau()
+    {
+        var memoria = new MemoriaService().Com(Manutencao(M.Solicitado));
+        var pedido = Semana();
+        pedido.Grau = 3;
+
+        Servico(memoria).Agendar(pedido);
+
+        Assert.Equal(3, memoria.Linha(M.Tabela, _manutencaoId).GetAttributeValue<OptionSetValue>(M.Grau).Value);
+    }
+
+    [Fact]
+    public void Agendar_sem_grau_nao_mexe_no_grau()
+    {
+        var m = Manutencao(M.Solicitado);
+        m[M.Grau] = new OptionSetValue(2);
+        var memoria = new MemoriaService().Com(m);
+
+        Servico(memoria).Agendar(Semana());
+
+        Assert.Equal(2, memoria.Linha(M.Tabela, _manutencaoId).GetAttributeValue<OptionSetValue>(M.Grau).Value);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public void Agendar_com_grau_invalido_recusa(int grau)
+    {
+        var memoria = new MemoriaService().Com(Manutencao(M.Solicitado));
+        var pedido = Semana();
+        pedido.Grau = grau;
+
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() => Servico(memoria).Agendar(pedido));
+        Assert.Equal("Grau inválido.", erro.Message);
+    }
 }
