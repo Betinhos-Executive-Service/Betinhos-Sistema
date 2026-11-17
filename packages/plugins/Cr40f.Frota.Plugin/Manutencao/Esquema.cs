@@ -33,6 +33,9 @@ public static class G
     public const string ObsOperacao = "cr40f_obsdeoperao", ObsInterna = "cr40f_observaointerna";
     public const string TextoManutencao = "Manutenção de Veículo", TextoTrajeto = "Serviço de manutenção do veículo";
     public const int NaoFaturavel = 202410011, TipoVeiculoBasico = 202410000, TipoServicoManutencao = 202410006;
+    // Origem do veículo da linha (new_origemveiculo): Manual = escolha do gestor, que o DriverRecordSharing respeita.
+    public const string OrigemVeiculo = "new_origemveiculo";
+    public const int OrigemVeiculoManual = 100000001;
 
     public const int CategoriaManutencao = 100000001;
     /// <summary>Status da linha encaixada e ainda não programada. Conferido na Tarefa 1 (descoberta).</summary>
