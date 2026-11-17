@@ -39,6 +39,9 @@ type Options = {
   kv: KV
   /** Colunas virtuais que o painel oferece, mas que só aparecem quando o usuário liga (ex.: Portal). */
   hiddenByDefault?: string[]
+  /** "Mostrar manutenções" mudado na tela: conta como "Alterada"; "Restaurar" volta ao da visão. */
+  manutencoesAlteradas: boolean
+  resetManutencoes: () => void
 }
 
 const sortKey = (column: { attribute: string; alias: string | null }) => (column.alias ? `${column.alias}.${column.attribute}` : column.attribute)
@@ -144,7 +147,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     try { kv.setItem(DENSITY_KEY, next) } catch { /* sem armazenamento: só não lembra */ }
   }, [kv])
 
-  const { selectView, reloadViews, createView, updateView, renameView, deleteView, resetFilters } = o
+  const { selectView, reloadViews, createView, updateView, renameView, deleteView, resetFilters, resetManutencoes } = o
   const restore = useCallback(() => {
     const padrao = views.find((e) => e.scope === 'padrao') ?? views[0]
     if (!padrao?.id) return
@@ -155,7 +158,8 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     if (resetFilters) resetFilters()
     else setFilters(emptyFilters())
     setGroup(null)
-  }, [views, active.id, selectView, setPrefs, setSort, setFilters, resetFilters, setGroup])
+    resetManutencoes()
+  }, [views, active.id, selectView, setPrefs, setSort, setFilters, resetFilters, setGroup, resetManutencoes])
 
   const state: TableViewState = {
     status: o.viewsError ? 'error' : o.views.length ? 'ready' : 'loading',
@@ -164,7 +168,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     active,
     config,
     // O agrupamento é da tela (não é gravado na visão): fica fora de "Alterada", senão Salvar pareceria não ter efeito.
-    dirty: !sameConfig(withGroup(config, null), baseline),
+    dirty: !sameConfig(withGroup(config, null), baseline) || o.manutencoesAlteradas,
     canPublish: false,
     setConfig,
     density,

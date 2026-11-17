@@ -12,7 +12,7 @@ import { SNAPSHOT_TENARIS, type Protecao } from '../domain/protecao'
 import { parseLinkCadastroJson, pedidoAquecer, type LinkCadastroResult } from '../domain/linkCadastro'
 import { formatDateTime, formatMoney } from '../domain/format'
 import { ENTITY, ID_ATTRIBUTE, PAGE_SIZE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
-import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, applyMockGroups, createMockRows, createMockViews, mockProtecao } from './mock'
+import { MOCK_ATTRIBUTES, MOCK_BINDS, MOCK_LOOKUPS, applyMockFetch, applyMockGroups, createMockManutencoes, createMockRows, createMockViews, mockProtecao } from './mock'
 import { auditPath, contagemPath, copyPath, envVarDefaultPath, envVarPath, motoristasPath, fetchPath, lookupIdsPath, mapViews, parseCount, parsePage, quickFindPath, relationshipPath, reloadPath, searchPath, viewsPaths, type FetchResponse } from './queries'
 
 export const FORM_WEBRESOURCE = 'new_formulario_geral.html'
@@ -101,13 +101,15 @@ const LOOKUP_IDS = 10
  * Opções do mock. `latency` multiplica as esperas simuladas (1 = as de `pnpm dev`; 0 = resposta imediata, para testes).
  * `pageSize` troca o tamanho da página só no mock: os testes de tela usam páginas menores, porque no jsdom renderizar e
  * consultar por papel 100 linhas custa caro e a maioria dos testes não precisa de tantas.
+ * `manutencoes` acrescenta as linhas de manutenção (OS-9001 a OS-9004; manutenções v2, plano 3). A tela liga; os testes
+ * que contam linhas ficam sem elas.
  */
-export type SourceOptions = { latency?: number; pageSize?: number }
+export type SourceOptions = { latency?: number; pageSize?: number; manutencoes?: boolean }
 
-function createMockSource({ latency = 1, pageSize = PAGE_SIZE }: SourceOptions = {}): Source {
+function createMockSource({ latency = 1, pageSize = PAGE_SIZE, manutencoes = false }: SourceOptions = {}): Source {
   const wait = (ms: number) => (latency === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms * latency)))
   const now = new Date()
-  const rows = createMockRows(now)
+  const rows = [...createMockRows(now), ...(manutencoes ? createMockManutencoes(now) : [])]
   const find = (id: string) => rows.find((r) => same(String(r.cr40f_reservadeveculosid), id))
   const binds = Object.entries(MOCK_BINDS)
   // Visões pessoais vivem em memória enquanto a tela estiver aberta.

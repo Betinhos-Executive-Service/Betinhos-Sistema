@@ -111,6 +111,18 @@ public class ConcluirTests
     }
 
     [Fact]
+    public void Repetir_por_outra_origem_nao_muda_a_origem_da_despesa_existente()
+    {
+        var memoria = Base(M.Agendado, Linha());
+        var primeira = Servico(memoria).Concluir(Pedido()); // App: App Motoristas
+
+        Servico(memoria).Concluir(Pedido(p => p.Origem = "shell"));
+
+        var despesa = memoria.Linha(D.Tabela, Guid.Parse(primeira.DespesaId));
+        Assert.Equal(D.OrigemApp, despesa.GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Fact]
     public void Dinheiro_vira_Particular_na_despesa()
     {
         var memoria = Base(M.Programado);
@@ -178,6 +190,40 @@ public class ConcluirTests
         Assert.Equal("Auto Center Centro", memoria.Linha(M.Tabela, _manutencaoId).GetAttributeValue<string>(M.Estabelecimento));
         Assert.Equal(atualizadosAntes, memoria.Atualizados.Count); // nenhuma gravação nova
     }
+
+    [Fact]
+    public void Despesa_do_shell_nasce_com_origem_Model_driven_e_a_do_App_com_App_Motoristas()
+    {
+        var shell = Base(M.Programado, Linha());
+        Servico(shell).Concluir(Pedido(p => p.Origem = "shell"));
+        Assert.Equal(D.OrigemModelDriven, shell.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+
+        var app = Base(M.Programado, Linha());
+        Servico(app).Concluir(Pedido());
+        Assert.Equal(D.OrigemApp, app.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Fact]
+    public void Reparo_sem_despesa_do_shell_mantem_a_origem_de_quem_chamou()
+    {
+        var memoria = Base(M.Realizado);
+        var m = memoria.Linha(M.Tabela, _manutencaoId);
+        m[M.Valor] = new Money(250m);
+        m[M.Pagamento] = new OptionSetValue(M.PagamentoDinheiro);
+        m[M.Estabelecimento] = "Oficina";
+        m[M.DataManutencao] = new DateTime(2026, 11, 10, 15, 0, 0, DateTimeKind.Utc);
+
+        Servico(memoria).Concluir(Pedido(p => p.Origem = "shell"));
+
+        Assert.Equal(D.OrigemModelDriven, memoria.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Theory]
+    [InlineData("shell", 100000001)]
+    [InlineData(" Shell ", 100000001)]
+    [InlineData(null, 100000000)]
+    [InlineData("app", 100000000)]
+    public void OrigemDe_so_reconhece_o_shell(string? origem, int esperado) => Assert.Equal(esperado, DespesaManutencao.OrigemDe(origem));
 
     [Fact]
     public void Reparo_sem_despesa_cria_com_os_valores_gravados_na_manutencao()

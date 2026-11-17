@@ -172,3 +172,64 @@ Papéis que têm Create/Write em `cr40f_despesaoperacional`, Create em `cr40f_an
 - `cr40f_despesaoperacional.cr40f_estabelecimento`: texto, **200** (a conclusão grava o estabelecimento, até 100 no shell: o limite da manutenção, 100, é o menor).
 - Resultado: nenhum `LIMITE` do shell muda; os dois limites do shell já são o menor entre a manutenção e a despesa.
 
+
+## 7. Plano 3 (17/11/2026)
+
+Leitura apenas (GET), feita pela Tarefa 1 do plano `2026-11-17-manutencoes-v2-3-geral.md`, no DEV (`org23b93544`). Rodou nesta máquina, por pedido do Renan, com `az account get-access-token` (sem alterar nada). O script do plano precisou de um ajuste: `$orderby=name asc` sem codificar o espaço quebra a URL (usar `name%20asc`).
+
+### Visões do sistema da Geral e o padrão de "Mostrar manutenções" (regra D2)
+
+13 visões ativas (`savedquery`, `querytype = 0`). Nenhuma tem condição de `new_categoriadoitem`.
+
+| Id | Visão | Padrão | Motorista | Faturamento | Condição de categoria | Ligado |
+|---|---|---|---|---|---|---|
+| 837476d8-2ef3-4449-8c13-6ea4ff274e47 | 🗓️ Agenda (Todos serviços) | não | sim | não | — | sim |
+| bfe2c525-c71c-f111-8341-7ced8db0ece7 | 🗓️ Dia posterior | não | sim | não | — | sim |
+| 0e8566e1-bffb-f011-8406-7ced8db10eca | 📤 Disparar | não | sim | não | — | sim |
+| 56d43157-ca1c-f111-8341-7ced8db0ece7 | 🗓️ Final de semana e próxima segunda | não | sim | não | — | sim |
+| 91b79045-c91c-f111-8341-7ced8db0ece7 | 🗓️ Hoje | não | sim | não | — | sim |
+| fc9c63ee-f826-f111-88b4-7ced8da87663 | ℹ️ Sem CR da Tenaris | não | sim | não | — | sim |
+| 0a8e5497-fa18-f111-8341-6045bd3c7605 | 📲 Visualização Mobile | não | não | não | — | **não** |
+| c0a3edcc-4b1d-f111-8341-7ced8db131cd | 💲A receber | não | sim | não | — | sim (**exceção candidata**) |
+| 8a9cf206-0c1e-f111-88b1-7ced8da7d478 | 🗓️Agenda | **sim** | sim | não | — | sim |
+| fa8ae859-c91c-f111-8341-7ced8db0ece7 | 🚫Pedidos sem motorista designado | não | sim | não | — | sim |
+| 7ccbf486-fc26-f111-88b4-7ced8da87663 | ⚠️Requer análise | não | sim | não | — | sim |
+| b39a64fe-8a06-f111-8406-7ced8da8aedd | 💰View Composição de Preços | não | não | não (só no layout) | — | **não** |
+| 2327de8c-5203-f111-8406-7ced8db12edc | Visualização Padrão | não | sim | não | — | sim |
+
+Notas sobre a regra:
+- A coluna "Faturamento" olha só as **condições** do FetchXML (D2). `🗓️Agenda` e `💰View Composição de Preços` mostram `cr40f_statusdefaturamento` no layout, mas não filtram por ele; a regra não olha o layout, então continuam como mostrado acima.
+- `💲A receber` filtra `cr40f_receber = 1` e `cr40f_dataehorriodesada next-x-days 15`, e mostra `cr40f_motorista`. A regra liga, mas a visão é de cobrança, não de programação.
+- `📲 Visualização Mobile` (saída hoje, 6 colunas, sem motorista) fica desligada pela regra. Não tem motorista para programar; se o Renan quiser ver as manutenções do dia no celular, é exceção para ligado.
+- `🚫Pedidos sem motorista designado` filtra o motorista vazio sem mostrar a coluna, como previsto na D2: ligada.
+
+### Linhas ativas por categoria
+
+- Ativas: **233**. Manutenção: **5**. Sem categoria: **0**. Filtro de desligado (`ne 100000001` ou `null`): **228**.
+- 228 + 5 = 233: **fecha** (D4 confirmada).
+- Manutenção sem `cr40f_om`: **1** (OS-1957, status Concluído, com motorista). É linha legada sem manutenção ligada: não há gaveta para abrir, então a Tarefa 3 não a trata como linha de manutenção (`ehLinhaDeManutencao` exige `cr40f_om`) e ela aparece como linha comum. Link vazio com `cr40f_om` preenchido também é tolerado (rótulos legíveis no lugar).
+
+### Link `bt_manut`
+
+Chaves devolvidas pelo link `outer` (3 linhas de manutenção mais recentes pela saída):
+
+- `bt_manut.cr40f_id`, `bt_manut.cr40f_descricao`, `bt_manut.cr40f_graudamanutencao` (número), `bt_manut.cr40f_status` (número) e `bt_manut.cr40f_agendarpara`; cada uma com a anotação `@OData.Community.Display.V1.FormattedValue` quando é choice ou data.
+- `bt_manut.cr40f_janelainicio` e `bt_manut.cr40f_janelafim` **não vieram**: nenhuma manutenção do DEV tem janela preenchida (nem lendo `cr40f_manutencoes` direto, nem pelo link). O formato das janelas é o esperado pela metadata `DateOnly` (`YYYY-MM-DD`); não observado no DEV (nenhuma manutenção tinha janela).
+- Linha sem manutenção ligada (OS-1957): nenhuma chave `bt_manut.*` (o link outer não devolve nada).
+- `cr40f_om` vem como `_cr40f_om_value` (GUID, com o `cr40f_id` da manutenção na anotação).
+- Exemplo (sem GUIDs): `bt_manut.cr40f_id = "OM-1200"`, `bt_manut.cr40f_status = 202410001` (Agendado), `bt_manut.cr40f_graudamanutencao = 2` (Média), `bt_manut.cr40f_agendarpara = "2026-10-09T03:00:00Z"` (anotação `09/10/2026`).
+
+### Datas e opções
+
+- `DateTimeBehavior`: `cr40f_janelainicio` = **DateOnly**; `cr40f_janelafim` = **DateOnly**; `cr40f_agendarpara` = **UserLocal**.
+- `cr40f_agendarpara` chega em UTC com `Z`: meia-noite de São Paulo vira `T03:00:00Z`. Quem compara com o fim da janela (`atrasada()`, "Fora da janela") precisa converter para a data de São Paulo antes de cortar em `YYYY-MM-DD`; cortar a string UTC erra só quando a hora passa das 21h local, mas a conversão evita o erro.
+- Grau (`cr40f_graudamanutencao`): 1 Baixa, 2 Média, 3 Alta, 4 Urgente.
+- Status da manutenção: 0 Solicitado, 202410001 Agendado, 202410005 Programado, 202410002 Realizado, 100000002 Reprovado, 100000001 Cancelado.
+- Origem da despesa (`cr40f_despesaoperacional.cr40f_origem`): 100000000 App Motoristas, **100000001 Model-driven**, 100000002 Flow, 100000003 Importação.
+
+### Decisões
+
+- Exceções candidatas a `PADRAO_POR_VISAO` (ponto 1 para o Renan): `💲A receber` → desligado (é de cobrança). Dúvida: `📲 Visualização Mobile` → hoje desligada pela regra; só vira exceção (ligada) se o Renan quiser ver manutenções do dia no celular. As visões pessoais sem marca não foram listadas (a leitura cobre só as do sistema).
+- Filtro de desligado: fecha o total (233 = 228 + 5).
+- `toDateOnly` das janelas: formato esperado pela metadata `DateOnly` (`YYYY-MM-DD`); não observado no DEV (nenhuma manutenção tinha janela). `cr40f_agendarpara` é UserLocal e chega em UTC.
+- Origem "Model-driven" (100000001): **existe** (ponto 2 para o Renan).

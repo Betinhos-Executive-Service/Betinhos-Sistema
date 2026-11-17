@@ -52,4 +52,6 @@ public static class D
     public const string Observacao = "cr40f_observacao", Estabelecimento = "cr40f_estabelecimento";
     public const string Motorista = "cr40f_motorista", Categoria = "cr40f_categoria", Forma = "cr40f_formapagamento", Cidade = "cr40f_cidade", Veiculo = "cr40f_veiculo";
     public const int StatusInicial = 100000000, OrigemApp = 100000000, AnexoPendente = 100000001, AnexoEnviado = 100000002;
+    /// <summary>cr40f_origem 100000001 "Model-driven": a despesa nasceu do Concluir feito no Sistema Betinhos (shell), não no App Motoristas.</summary>
+    public const int OrigemModelDriven = 100000001;
 }

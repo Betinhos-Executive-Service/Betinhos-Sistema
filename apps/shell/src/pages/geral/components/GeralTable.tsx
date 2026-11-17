@@ -7,10 +7,12 @@ import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { formatCell } from '../domain/format'
+import { desenhoDaManutencao, type LinhaManutencao } from '../domain/manutencao'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { LoadSentinel } from './LoadMore'
+import { ManutencaoAbrir, ManutencaoResumo, ManutencaoSelos } from './ManutencaoResumo'
 
 /** Um grupo do servidor: rótulo e contagem reais; `rows` só tem o que já carregou (abre sob demanda, 100 por vez). */
 export type GroupView = { id: string; label: string; count: number; open: boolean; rows: Row[]; more: boolean; loading: boolean; error: string | null }
@@ -70,11 +72,13 @@ type Props = {
   density?: TableDensity
   /** Agrupamento no servidor: cabeçalhos recolhíveis com a contagem e as linhas de cada grupo aberto no lugar de `rows` na grade. */
   grouping?: Grouping
+  /** Linhas de manutenção (manutenções v2): desenho próprio; motorista e saída usam `renderCell`, o resto vira o resumo. */
+  manutencao?: { ler: (row: Row) => LinhaManutencao | null; abrir: (m: LinhaManutencao) => void }
 }
 
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense', grouping }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense', grouping, manutencao }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
@@ -204,6 +208,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
+  // Desenho da linha de manutenção: depende só das colunas visíveis, igual para todas as linhas. Uma célula por coluna,
+  // cada informação na coluna de mesmo sentido; sem coluna para o problema, ele vai dentro da primeira, abaixo do botão.
+  const desenho = useMemo(() => desenhoDaManutencao(columns), [columns])
   // Clique em qualquer lugar da linha seleciona; botões, campos, o painel de um Select e a célula em edição ficam de fora.
   const rowClick = (id: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
@@ -343,6 +350,38 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
             const { row } = item
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
+            const m = manutencao?.ler(row) ?? null
+            if (m && manutencao) {
+              const abrir = () => manutencao.abrir(m)
+              return (
+                <div key={id} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className={isSelected ? 'bt-table__row gr-row--manutencao is-selected' : 'bt-table__row gr-row--manutencao'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
+                  <div className="bt-table__cell gr-cell--select" role="gridcell">
+                    <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={isSelected} onChange={() => onToggle(id)} />
+                  </div>
+                  {desenho.primeiraEditavel
+                    // A primeira coluna da visão é motorista ou saída: continua sendo o campo editável; o botão vai para `botaoEm`.
+                    ? <Fragment key={columns[0].key}>{renderCell(row, columns[0])}</Fragment>
+                    : (
+                      <div className={desenho.resumoNoBotao ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
+                        <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} />
+                      </div>
+                    )}
+                  {desenho.celulas.map(({ tipo, column }, indice) => {
+                    if (tipo === 'campo') return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
+                    const comBotao = indice === desenho.botaoEm
+                    return (
+                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}${comBotao ? ' gr-manut__primeira' : ''}`}>
+                        {comBotao ? <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} /> : null}
+                        {tipo === 'status' ? <ManutencaoSelos m={m} /> : null}
+                        {tipo === 'veiculo' ? <span className="gr-cell__value" title={m.veiculo}>{m.veiculo}</span> : null}
+                        {/* Mesmo destino do botão da placa: um alvo acessível só por linha (fora do Tab e dos leitores de tela). */}
+                        {tipo === 'problema' ? <button type="button" tabIndex={-1} aria-hidden="true" className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} status={desenho.statusNoProblema} /></button> : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
             return (
               <div key={id} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
                 <div className="bt-table__cell gr-cell--select" role="gridcell">

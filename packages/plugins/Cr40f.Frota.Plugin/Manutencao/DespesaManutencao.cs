@@ -47,7 +47,7 @@ public sealed class DespesaManutencao
             dados[D.StatusOperacional] = new OptionSetValue(D.StatusInicial);
             dados[D.StatusFinanceiro] = new OptionSetValue(D.StatusInicial);
             dados[D.StatusAnexo] = new OptionSetValue(D.AnexoPendente);
-            dados[D.Origem] = new OptionSetValue(D.OrigemApp);
+            dados[D.Origem] = new OptionSetValue(OrigemDe(p.Origem));
             return (_service.Create(dados), D.AnexoPendente);
         }
         dados.Id = existente.Id;
@@ -56,6 +56,9 @@ public sealed class DespesaManutencao
     }
 
     static int StatusAnexoDe(Entity despesa) => despesa.GetAttributeValue<OptionSetValue>(D.StatusAnexo)?.Value ?? D.AnexoPendente;
+
+    /// <summary>"shell" (Concluir pelo Sistema Betinhos) vira Model-driven; o resto, inclusive ausente (App), App Motoristas.</summary>
+    public static int OrigemDe(string? origem) => string.Equals(origem?.Trim(), "shell", StringComparison.OrdinalIgnoreCase) ? D.OrigemModelDriven : D.OrigemApp;
 
     /// <summary>Mesmos nomes do App (mapMaintenancePaymentToExpensePaymentNames), com Dinheiro como reembolso.</summary>
     public static string[] NomesForma(int pagamento) => pagamento switch

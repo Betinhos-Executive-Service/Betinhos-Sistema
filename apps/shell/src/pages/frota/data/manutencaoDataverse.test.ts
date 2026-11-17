@@ -62,7 +62,7 @@ describe('Custom APIs da manutenção', () => {
     const r = await criarComandosXrm(criarDeps().d).concluirManutencao(pedido)
     expect(r).toEqual({ despesaId: 'cccccccc-1111-2222-3333-444444444444', statusAnexo: 100000001, geralId: null })
     expect(f.mock.calls[0][0]).toBe(`${API}/cr40f_ManutencaoConcluir`)
-    expect(JSON.parse(corpo(f).RequestJson)).toEqual({ ...pedido, manutencaoId: LIMPO, cidadeId: 'dddddddd-1111-2222-3333-444444444444', realizadoPorId: 'eeeeeeee-1111-2222-3333-444444444444' })
+    expect(JSON.parse(corpo(f).RequestJson)).toEqual({ ...pedido, origem: 'shell', manutencaoId: LIMPO, cidadeId: 'dddddddd-1111-2222-3333-444444444444', realizadoPorId: 'eeeeeeee-1111-2222-3333-444444444444' })
   })
 
   it('concluir sem a despesa na resposta é erro', async () => {

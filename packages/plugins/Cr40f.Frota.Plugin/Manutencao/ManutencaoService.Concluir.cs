@@ -60,6 +60,7 @@ public sealed partial class ManutencaoService
             Estabelecimento = string.IsNullOrWhiteSpace(m.GetAttributeValue<string>(M.Estabelecimento)) ? p.Estabelecimento : m.GetAttributeValue<string>(M.Estabelecimento),
             CidadeId = p.CidadeId,
             RealizadoPorId = p.RealizadoPorId,
+            Origem = p.Origem,
             Comentario = m.GetAttributeValue<string>(M.ComentarioColaborador),
         };
         return (gravado, m.GetAttributeValue<DateTime?>(M.DataManutencao) ?? data, m.GetAttributeValue<EntityReference>(M.RealizadoPor) ?? realizadoPor);

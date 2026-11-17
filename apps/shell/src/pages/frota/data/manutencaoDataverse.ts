@@ -74,7 +74,7 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
     },
 
     async concluirManutencao(p) {
-      const r = await comando('cr40f_ManutencaoConcluir', { ...p, manutencaoId: guid(p.manutencaoId), cidadeId: guid(p.cidadeId), realizadoPorId: guid(p.realizadoPorId) }, 'Não foi possível concluir a manutenção')
+      const r = await comando('cr40f_ManutencaoConcluir', { ...p, origem: 'shell', manutencaoId: guid(p.manutencaoId), cidadeId: guid(p.cidadeId), realizadoPorId: guid(p.realizadoPorId) }, 'Não foi possível concluir a manutenção')
       const despesaId = typeof r.despesaId === 'string' && r.despesaId ? cleanId(r.despesaId) : ''
       if (!despesaId) throw new Error('A conclusão não devolveu a despesa. Recarregue antes de tentar de novo')
       return { despesaId, statusAnexo: Number(r.statusAnexo), geralId: typeof r.geralId === 'string' && r.geralId ? cleanId(r.geralId) : null }

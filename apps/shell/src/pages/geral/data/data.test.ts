@@ -2,7 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Host } from '../../../host'
 import { auditPath, fetchPath, mapViews, parseCount, parsePage, reloadPath, searchPath } from './queries'
-import { applyMockFetch, createMockRows, createMockViews, MOCK_ATTRIBUTES, MOCK_ROW_COUNT } from './mock'
+import { applyMockFetch, createMockManutencoes, createMockRows, createMockViews, MOCK_ATTRIBUTES, MOCK_MANUTENCOES, MOCK_ROW_COUNT } from './mock'
+import { aplicarManutencoes } from '../domain/manutencao'
 import type { FilterSet } from '../domain/filters'
 import { fromLegacy, geralFilterFields, injectTableFilters } from '../domain/tableFilters'
 import { PAGE_SIZE } from '../domain/types'
@@ -512,5 +513,37 @@ describe('comandos (caminhos e fonte)', () => {
       expect(await source.openErroOperacional(id)).toBe('external')
       expect(open.mock.calls[0][0]).toBe('https://org.crm.dynamics.com/WebResources/new_gestao_erros_operacionais.html?data=reservaId%3Dabcdef01-2345-4678-89ab-cdef01234567')
     } finally { vi.unstubAllGlobals() }
+  })
+})
+
+describe('mock — linhas de manutenção (manutenções v2, plano 3)', () => {
+  it('m2 a programar e m3 programada, ligadas às manutenções do mock da Frota', () => {
+    const [m2, m3] = createMockManutencoes(new Date('2026-11-18T15:00:00Z'))
+    expect(createMockManutencoes(new Date()).length).toBe(MOCK_MANUTENCOES)
+    expect(m2).toMatchObject({ cr40f_id: 'OS-9001', new_categoriadoitem: 100000001, _cr40f_om_value: 'm2', _cr40f_motorista_value: null, cr40f_status: 202410001, cr40f_dataehorriodesada: '2026-11-23T03:00:00.000Z', 'bt_manut.cr40f_janelainicio': '2026-11-23', 'bt_manut.cr40f_janelafim': '2026-11-29', 'bt_manut.cr40f_status': 202410001 })
+    expect(m3).toMatchObject({ cr40f_id: 'OS-9002', _cr40f_om_value: 'm3', cr40f_status: 202410005, new_foiprogramado: true, 'bt_manut.cr40f_janelafim': '2026-11-15', 'bt_manut.cr40f_status': 202410005 })
+  })
+
+  it('cobre os casos dos prints: Agendada atrasada (sem motorista) e linha sem os dados do link', () => {
+    const linhas = createMockManutencoes(new Date('2026-11-18T15:00:00Z'))
+    const atrasada = linhas.find((r) => r.cr40f_id === 'OS-9003')!
+    expect(atrasada).toMatchObject({ new_categoriadoitem: 100000001, _cr40f_motorista_value: null, 'bt_manut.cr40f_status': 202410001, 'bt_manut.cr40f_janelainicio': '2026-11-09', 'bt_manut.cr40f_janelafim': '2026-11-15' })
+    const semLink = linhas.find((r) => r.cr40f_id === 'OS-9004')!
+    expect(semLink).toMatchObject({ new_categoriadoitem: 100000001, _cr40f_om_value: 'm8' })
+    expect(Object.keys(semLink).filter((k) => k.startsWith('bt_manut.'))).toEqual([])
+  })
+
+  it('só entram com `manutencoes: true`, e o filtro de desligado as tira', async () => {
+    const sem = createSource({ mode: 'mock' }, { latency: 0 })
+    const com = createSource({ mode: 'mock' }, { latency: 0, manutencoes: true })
+    const agenda = (await com.views()).find((v) => v.padrao)!
+    expect(await sem.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
+    expect(await com.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT + MOCK_MANUTENCOES)
+    expect(await com.count({ fetchxml: aplicarManutencoes(agenda.fetchxml, false), query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
+  })
+
+  it('a visão de faturamento filtra o status de faturamento (vem com manutenções desligadas)', async () => {
+    const views = await createSource({ mode: 'mock' }, { latency: 0 }).views()
+    expect(views.find((v) => v.id === 'mock-faturamento')?.fetchxml).toContain('cr40f_statusdefaturamento')
   })
 })

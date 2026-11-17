@@ -112,9 +112,9 @@ Ficam no `Cr40f.Frota.Plugin`, que já tem registrador (`Cr40f.Frota.Registrar`)
 
 ### Geral (`apps/shell/src/pages/geral`)
 
-- As linhas de categoria Manutenção são desenhadas diferente: barra e fundo laranja, ícone, "Manutenção · veículo", problema, grau, janela e status. Os dados da manutenção vêm de um `link-entity` por `cr40f_om`, que o código acrescenta à visão.
-- O motorista e a data/hora de saída ficam editáveis como nos serviços. Os demais campos de serviço não aparecem nessas linhas.
-- Selo **"atrasada"** quando a janela passou.
+- As linhas de categoria Manutenção são desenhadas diferente, com **colunas com sentido** (decisão do Renan, 17/11/2026, ao rever a UI): barra e fundo na cor de aviso, ícone de chave, a placa e "Manutenção" na primeira coluna (na densidade mínima, só a placa), o status da manutenção em Status de Op., a placa em Veículo, e o problema com "grau · janela" no Trajeto ou na coluna livre mais larga. Cada dado fica debaixo do cabeçalho que o descreve. Os dados da manutenção vêm de um `link-entity` por `cr40f_om`, que o código acrescenta à consulta.
+- O motorista e a data/hora de saída ficam editáveis como nos serviços. Os demais campos de serviço ficam vazios nessas linhas.
+- Alerta **"● Atrasada"** em texto, embaixo do status, quando a janela passou; **"● Fora da janela"** quando a saída programada sai da janela.
 - Clicar na linha abre a gaveta da manutenção.
 - **"Mostrar manutenções"**: liga/desliga salvo na visão, que entra no FetchXML como condição de `new_categoriadoitem`. Vem ligado nas visões de programação e desligado nas demais (faturamento, por exemplo).
 - Ordenação, paginação, contagem e "Agrupar por" não mudam.
