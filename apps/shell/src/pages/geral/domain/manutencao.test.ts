@@ -31,6 +31,11 @@ describe('padrão de "Mostrar manutenções"', () => {
     expect(padraoManutencoes(visao(comLink('cr40f_motorista'), layoutDe('cr40f_id', 'cr40f_trajeto')))).toBe(false)
     // Faturamento só no link: não é visão de faturamento.
     expect(padraoManutencoes(visao(comLink('cr40f_statusdefaturamento')))).toBe(true)
+    // link-entity "any" / "not any" dentro de um filtro da raiz também é de outra tabela.
+    for (const tipo of ['any', 'not any']) {
+      const aninhado = `<filter type="and"><link-entity name="cr40f_outra" from="x" to="y" link-type="${tipo}"><filter><condition attribute="cr40f_statusdefaturamento" operator="eq" value="1" /></filter></link-entity></filter>`
+      expect(padraoManutencoes(visao(fetchDe(aninhado))), tipo).toBe(true)
+    }
     // Filtro aninhado na raiz continua valendo.
     expect(padraoManutencoes(visao(fetchDe('<filter type="or"><condition attribute="cr40f_statusdefaturamento" operator="eq" value="1" /></filter>')))).toBe(false)
   })
