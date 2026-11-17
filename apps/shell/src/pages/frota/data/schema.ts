@@ -32,7 +32,11 @@ export const STATUS_FIELD: Record<Kind, string> = { manutencao: 'cr40f_status', 
 export const KIND_LABEL: Record<Kind, string> = { manutencao: 'Manutenção', multa: 'Multa', colisao: 'Colisão' }
 
 export const MANUT = { SOLICITADO: 0, APROVADO: 202410001, PROGRAMADO: 202410005, REALIZADO: 202410002, REPROVADO: 100000002, CANCELADO: 100000001 } as const
-export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006 } as const
+export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006, CANCELADA: 202410007 } as const
+/** Choices novos da multa (fase 1), iguais a MultaCodigos de packages/plugins/Cr40f.Frota.Plugin/MultaEtapas.cs. */
+export const RESPONSAVEL = { MOTORISTA: 100000000, EMPRESA: 100000001 } as const
+export const MOTIVO_EMPRESA = { PRAZO_PERDIDO: 100000000, CULPA_EMPRESA: 100000001 } as const
+export const CANAL = { SENATRAN: 100000000, DSV: 100000001, PREFEITURA: 100000002 } as const
 /** Termo de multa (Task A1): choices de new_termomulta. */
 export const TERMO_TABLE = 'new_termomulta'
 export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contestado: 100000002, expirado: 100000003, cancelado: 100000004 } as const
