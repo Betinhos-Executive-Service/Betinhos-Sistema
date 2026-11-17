@@ -52,6 +52,25 @@ export interface ComandosManutencao {
   concluirManutencao(pedido: PedidoConclusao): Promise<RespostaConclusao>
 }
 
+/** Origem do arquivo em new_fotomanutencao (mesmos valores do App). */
+export type OrigemArquivo = 'NOTA_FISCAL' | 'POS_MANUTENCAO'
+export type ArquivoEnviado = { link: string; nomeArquivo: string; caminho: string }
+export type OpcaoBusca = { id: string; nome: string }
+/** O que o envio precisa saber da manutenção para montar a pasta do App. */
+export type AlvoArquivo = Pick<DetalheManutencao, 'id' | 'codigo' | 'veiculo'>
+
+/** Arquivos da conclusão (mesmo flow e pastas do App) e as buscas da gaveta. */
+export interface ArquivosManutencao {
+  /** Sobe na pasta da manutenção e registra o vínculo em new_fotomanutencao; devolve o link de compartilhamento. */
+  enviarArquivoManutencao(alvo: AlvoArquivo, arquivo: File, origem: OrigemArquivo, ordem: number): Promise<ArquivoEnviado>
+  /** Sobe a nota na pasta da despesa, cria os anexos e grava cr40f_statusanexo (enviado; em falha, falhou). */
+  anexarNotaFiscalDespesa(despesaId: string, arquivos: File[], enviadoPorId: string): Promise<void>
+  /** Funcionários ativos pelo nome (até 50). Texto vazio = os primeiros por ordem alfabética. */
+  buscarFuncionarios(texto: string): Promise<OpcaoBusca[]>
+  /** Cidades ativas pelo nome (até 50), como "São José dos Campos - SP". */
+  buscarCidades(texto: string): Promise<OpcaoBusca[]>
+}
+
 export interface DataSource {
   mode: 'xrm' | 'mock'
   envLabel: string

@@ -1,7 +1,7 @@
 // apps/shell/src/pages/frota/data/manutencaoDataverse.test.ts
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { criarComandosXrm, type DepsXrm } from './manutencaoDataverse'
+import { criarArquivosXrm, criarComandosXrm, type DepsXrm } from './manutencaoDataverse'
 
 const ID = '{AAAAAAAA-1111-2222-3333-444444444444}'
 const LIMPO = 'aaaaaaaa-1111-2222-3333-444444444444'
@@ -19,6 +19,7 @@ function criarDeps() {
     lerVariavel: vi.fn(async (_schemaName: string) => 'https://flow.invalid/arquivos?sig=SEGREDO'),
     metadata: vi.fn(async () => ({ value: [] })) as unknown as DepsXrm['metadata'],
     comportamentos: async () => ({ cr40f_janelainicio: 'DateOnly', cr40f_janelafim: 'DateOnly' }),
+    agora: () => new Date('2026-11-17T13:00:00Z'), // 10:00:00 em São Paulo
   }
   return { d, webApi }
 }
@@ -112,5 +113,99 @@ describe('detalhe e criação', () => {
     const enviado = webApi.createRecord.mock.calls[0][1]
     expect(enviado).not.toHaveProperty('cr40f_tipodoreparo')
     expect(enviado).not.toHaveProperty('cr40f_Solicitado_por@odata.bind')
+  })
+})
+
+describe('arquivos, anexo da despesa e buscas', () => {
+  const arquivo = (nome: string, tipo = 'image/jpeg') => new File(['conteudo'], nome, { type: tipo })
+  const alvo = { id: ID, codigo: 'MAN-0042', veiculo: { id: '{11111111-1111-4111-8111-111111111111}', label: 'ABC1D23' } }
+  const DESPESA = '{CCCCCCCC-1111-2222-3333-444444444444}'
+  const DESPESA_LIMPA = 'cccccccc-1111-2222-3333-444444444444'
+  const PESSOA = '{EEEEEEEE-1111-2222-3333-444444444444}'
+  const navegacao = vi.fn(async () => ({ value: [
+    { ReferencingAttribute: 'cr40f_despesa', ReferencingEntityNavigationPropertyName: 'cr40f_Despesa' },
+    { ReferencingAttribute: 'cr40f_enviadopor', ReferencingEntityNavigationPropertyName: 'cr40f_EnviadoPor' },
+  ] })) as unknown as DepsXrm['metadata']
+
+  it('envia pelo flow do OneDrive na pasta do App e registra o vínculo da foto', async () => {
+    const f = resposta(true, 200, { shareLink: 'https://1drv.ms/nf1' })
+    vi.stubGlobal('fetch', f)
+    const { d, webApi } = criarDeps()
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_modelo: 'Corolla', cr40f_placa: 'ABC1D23' })
+    const r = await criarArquivosXrm(d).enviarArquivoManutencao(alvo, arquivo('nota.jpg'), 'NOTA_FISCAL', 1)
+    expect(r).toEqual({ link: 'https://1drv.ms/nf1', nomeArquivo: 'nota-fiscal-1-20261117-100000.jpg', caminho: 'Manutenções/DEV/Corolla - ABC1D23/MAN-0042' })
+    expect(d.lerVariavel).toHaveBeenCalledWith('new_FlowURLFlowSalvarArquivosOnedrive')
+    expect(f.mock.calls[0][0]).toBe('https://flow.invalid/arquivos?sig=SEGREDO')
+    expect(f.mock.calls[0][1]).not.toHaveProperty('credentials')
+    expect(corpo(f)).toMatchObject({ caminhoCompleto: 'Manutenções/DEV/Corolla - ABC1D23/MAN-0042', nomeArquivo: 'nota-fiscal-1-20261117-100000.jpg', mimeType: 'image/jpeg', metadados: { manutencaoId: 'MAN-0042', manutencaoGuid: LIMPO, tipoFoto: 'NOTAFISCAL', origem: 'TELA_FROTA' } })
+    expect(corpo(f).conteudoBase64).toBe(btoa('conteudo'))
+    expect(webApi.createRecord).toHaveBeenCalledWith('new_fotomanutencao', {
+      new_name: 'MAN-0042 - NOTA_FISCAL - 1', new_tipofoto: 'NOTAFISCAL', new_origem: 'NOTA_FISCAL', new_link: 'https://1drv.ms/nf1',
+      new_caminho: 'Manutenções/DEV/Corolla - ABC1D23/MAN-0042', new_nomearquivo: 'nota-fiscal-1-20261117-100000.jpg', new_ordem: 1,
+      'new_Manutencao@odata.bind': `/cr40f_manutencoeses(${LIMPO})`,
+    })
+  })
+
+  it('arquivo acima de 10 MB é recusado antes de subir', async () => {
+    const f = resposta(true, 200, {})
+    vi.stubGlobal('fetch', f)
+    const grande = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'grande.jpg', { type: 'image/jpeg' })
+    await expect(criarArquivosXrm(criarDeps().d).enviarArquivoManutencao({ ...alvo, veiculo: null }, grande, 'POS_MANUTENCAO', 1)).rejects.toThrow('grande.jpg passa de 10 MB')
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('flow sem link: erro e nenhum vínculo gravado', async () => {
+    vi.stubGlobal('fetch', resposta(true, 200, { status: 'Sucesso' }))
+    const { d, webApi } = criarDeps()
+    await expect(criarArquivosXrm(d).enviarArquivoManutencao({ ...alvo, veiculo: null }, arquivo('f.jpg'), 'POS_MANUTENCAO', 1)).rejects.toThrow(/não devolveu o link/)
+    expect(webApi.createRecord).not.toHaveBeenCalled()
+  })
+
+  it('variável do flow vazia: mensagem de configuração, sem chamar nada', async () => {
+    const f = resposta(true, 200, {})
+    vi.stubGlobal('fetch', f)
+    const { d } = criarDeps()
+    d.lerVariavel = vi.fn(async () => null)
+    await expect(criarArquivosXrm(d).enviarArquivoManutencao({ ...alvo, veiculo: null }, arquivo('f.jpg'), 'POS_MANUTENCAO', 1)).rejects.toThrow('Envio de arquivos não configurado neste ambiente (variável new_FlowURLFlowSalvarArquivosOnedrive)')
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('anexa a nota na pasta da despesa com os vínculos lidos na metadata e marca o anexo como enviado', async () => {
+    const f = resposta(true, 200, { shareLink: 'https://1drv.ms/d1' })
+    vi.stubGlobal('fetch', f)
+    const { d, webApi } = criarDeps()
+    d.metadata = navegacao
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_nome: 'Manutenção ABC1D23' })
+    await criarArquivosXrm(d).anexarNotaFiscalDespesa(DESPESA, [arquivo('nf.pdf', 'application/pdf')], PESSOA)
+    expect(corpo(f)).toMatchObject({ caminhoCompleto: 'Despesas/DEV/Manutenção ABC1D23', nomeArquivo: 'nota-fiscal-manutencao-1-20261117-100000.pdf', mimeType: 'application/pdf', metadados: { despesaGuid: DESPESA_LIMPA, despesaNome: 'Manutenção ABC1D23', tipo: 'COMPROVANTE', indice: 1 } })
+    expect(webApi.createRecord).toHaveBeenCalledWith('cr40f_anexodespesaoperacional', expect.objectContaining({
+      cr40f_nome: 'Comprovante 1 - Manutenção ABC1D23', cr40f_nomearquivo: 'nota-fiscal-manutencao-1-20261117-100000', cr40f_urlsharepoint: 'https://1drv.ms/d1', cr40f_sharelink: 'https://1drv.ms/d1',
+      cr40f_ordem: 1, cr40f_status: 100000001, cr40f_tipo: 100000000,
+      'cr40f_Despesa@odata.bind': `/cr40f_despesaoperacionals(${DESPESA_LIMPA})`, 'cr40f_EnviadoPor@odata.bind': '/cr40f_funcionarioses(eeeeeeee-1111-2222-3333-444444444444)',
+    }))
+    expect(webApi.updateRecord).toHaveBeenCalledWith('cr40f_despesaoperacional', DESPESA_LIMPA, { cr40f_statusanexo: 100000002 })
+  })
+
+  it('falha ao anexar marca o anexo da despesa como falhou e repassa o erro', async () => {
+    vi.stubGlobal('fetch', resposta(false, 500, {}))
+    const { d, webApi } = criarDeps()
+    d.metadata = navegacao
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_nome: 'Manutenção' })
+    await expect(criarArquivosXrm(d).anexarNotaFiscalDespesa(DESPESA, [arquivo('nf.jpg')], PESSOA)).rejects.toThrow('O envio do arquivo falhou (HTTP 500)')
+    expect(webApi.updateRecord).toHaveBeenCalledWith('cr40f_despesaoperacional', DESPESA_LIMPA, { cr40f_statusanexo: 100000003 })
+  })
+
+  it('busca funcionários ativos e cidades ativas pelo nome, com aspas escapadas', async () => {
+    const { d, webApi } = criarDeps()
+    webApi.retrieveMultipleRecords.mockResolvedValueOnce({ entities: [{ cr40f_funcionariosid: '{F1}', cr40f_nomecompleto: "Ana D'Ávila" }] })
+    webApi.retrieveMultipleRecords.mockResolvedValueOnce({ entities: [{ cr40f_cidadeid: 'C1', cr40f_nome: 'São José dos Campos', cr40f_uf: 'SP' }] })
+    const arquivos = criarArquivosXrm(d)
+    expect(await arquivos.buscarFuncionarios("d'á")).toEqual([{ id: 'f1', nome: "Ana D'Ávila" }])
+    expect(await arquivos.buscarCidades('são')).toEqual([{ id: 'c1', nome: 'São José dos Campos - SP' }])
+    expect(webApi.retrieveMultipleRecords.mock.calls[0][0]).toBe('cr40f_funcionarios')
+    expect(webApi.retrieveMultipleRecords.mock.calls[0][1]).toContain(`contains(cr40f_nomecompleto,'${encodeURIComponent("d''á")}')`)
+    expect(webApi.retrieveMultipleRecords.mock.calls[0][1]).toContain('statecode eq 0 and cr40f_status eq 0')
+    expect(webApi.retrieveMultipleRecords.mock.calls[1][0]).toBe('cr40f_cidade')
+    expect(webApi.retrieveMultipleRecords.mock.calls[1][1]).toContain('cr40f_ativa eq true')
   })
 })
