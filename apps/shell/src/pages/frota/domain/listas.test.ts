@@ -81,6 +81,15 @@ describe('lista de multas (fase 1)', () => {
     expect(MULTA_FILTROS_PADRAO.advanced.items).toMatchObject([{ field: 'situacao', op: 'in', values: [{ value: 'comigo' }] }])
     expect(registroBuiltins('multa').map((v) => v.name)).toEqual(['Prazo vencido', 'Aguardando penalidade', 'Aguardando acerto', 'Encerradas e canceladas', 'Todas'])
   })
+
+  it('Manutenções: Em aberto e A encaixar', () => {
+    // Manutenções: "Em aberto" continua a padrão (ordem 1); "A encaixar" (ex-sub-aba) filtra Solicitado, a mais antiga primeiro.
+    const [abertas, encaixar] = registroBuiltins('manutencao')
+    expect([abertas.name, abertas.ordem, encaixar.id, encaixar.name, encaixar.ordem]).toEqual(['Em aberto', 1, 'encaixar', 'A encaixar', 2])
+    const config = JSON.parse(encaixar.config)
+    expect(config.filters.quick.status.values.map((v: { value: string }) => v.value)).toEqual([String(MANUT.SOLICITADO)])
+    expect(config.sort).toEqual({ key: 'data', dir: 'asc' })
+  })
 })
 
 describe('toCsv', () => {

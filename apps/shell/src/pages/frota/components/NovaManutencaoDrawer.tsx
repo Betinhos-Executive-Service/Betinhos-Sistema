@@ -82,7 +82,7 @@ export function NovaManutencaoDrawer({ source, veiculos, hoje = todaySP(), onClo
       const encaixada = await desfechoDaAcao(() => executarAcaoManutencao(source, { id, status: MANUT.SOLICITADO }, 'encaixar', () => source.agendarManutencao({ manutencaoId: id, inicio: janela.inicio, fim: janela.fim, comentario })))
       if (encaixada.tipo === 'feito') notify('success', `Manutenção criada e encaixada: ${rotuloJanela(janela)}.`)
       else notify('error', `A manutenção foi criada, mas o encaixe falhou: ${comPontoFinal(encaixada.tipo === 'falha' ? encaixada.mensagem : new StaleError().message)} Encaixe pela gaveta dela.`)
-    } else notify('success', 'Manutenção criada. Ela está na fila A encaixar.')
+    } else notify('success', 'Manutenção criada. Ela está na visão A encaixar.')
     emCurso.current = false
     setSalvando(false)
     onCriada(id)

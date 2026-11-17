@@ -17,8 +17,6 @@ import { EMPTY_DATA, type Classificacao, type DataSource } from './data/source'
 import type { Kind, TableKey } from './data/types'
 import { errorMessage } from './data/xrm'
 import { createDocsSource, type DocsSource } from '../documentos/data/source'
-import { filaEncaixe } from './domain/fila'
-import { FilaEncaixe } from './views/FilaEncaixe'
 import { Indicadores } from './views/Indicadores'
 import { Pendencias } from './views/Pendencias'
 import { PlanoPreventivo } from './views/PlanoPreventivo'
@@ -48,8 +46,6 @@ const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
   { id: 'checklists', label: 'Checklists de Veículos', tables: [] },
 ]
 type SubMultas = 'multas' | 'infracoes'
-/** Manutenções: a fila "A encaixar" (padrão) ou a lista de todas (`?sub=todas`). */
-type SubManutencoes = 'encaixar' | 'todas'
 /** Páginas de lista não usam `PageHeader` (DS §11.2): o seletor de visão faz o papel de título. */
 const LISTAS: readonly Tab[] = ['veiculos', 'manutencoes', 'multas', 'colisoes']
 
@@ -61,20 +57,19 @@ const FILTROS_DAS_VISOES = ['q', 'f', 'status', 'tipo', 'veiculo', 'pessoa', 'ca
 function useFrotaRota(tab: Tab) {
   const query = useHashQuery()
   const sub = lerOpcao<SubMultas>(query, 'sub', ['multas', 'infracoes'], 'multas')
-  // Link antigo com filtro de lista (q, status, f...) e sem `sub` é da lista: abre em "Todas". `novo` não conta (é a gaveta nova).
-  const temFiltroDeLista = FILTROS_DAS_VISOES.some((chave) => chave !== 'novo' && query.has(chave))
-  const subManut = lerOpcao<SubManutencoes>(query, 'sub', ['encaixar', 'todas'], temFiltroDeLista ? 'todas' : 'encaixar')
+  // Manutenções não tem sub-abas: link antigo `?sub=encaixar` abre a visão "A encaixar"; `?sub=todas` é ignorado.
+  const visaoManut = tab === 'manutencoes' && query.get('sub') === 'encaixar' ? 'pronta:encaixar' : undefined
   const veiculo = query.get('ficha') || null
   const [kind, id] = (query.get('registro') ?? '').split(':')
   const registro = KINDS.find((item) => item === kind) && id ? { kind: kind as Kind, id } : null
   const secao = query.get('secao') === 'preventivas' ? ('preventivas' as const) : null
   const novaManutencao = query.get('novo') === 'manutencao'
-  return { tab, sub, subManut, veiculo, registro, secao, novaManutencao }
+  return { tab, sub, visaoManut, veiculo, registro, secao, novaManutencao }
 }
 const abrirSub = (sub: SubMultas) => patchHashQuery({ sub: sub === 'multas' ? null : sub, ficha: null, registro: null, secao: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
 
-const abrirSubManut = (sub: SubManutencoes) => patchHashQuery({ sub: sub === 'encaixar' ? null : sub, ficha: null, registro: null, secao: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
 const abrirNovaManutencao = () => patchHashQuery({ novo: 'manutencao' })
+const limparSubManut = () => patchHashQuery({ sub: null })
 
 export function FrotaPage({ host, aba = 'pendencias' }: { host: Host; aba?: Tab }) {
   if (aba === 'checklists') return <Suspense fallback={<Carregando />}><ChecklistsAba host={host} titulo={TABS.find((item) => item.id === aba)!.label} /></Suspense>
@@ -131,11 +126,7 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
       {route.tab === 'pendencias' && <Pendencias data={data} errors={errors} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
       {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} onReload={onReload} loading={loading} />}
       {route.tab === 'manutencoes' && (
-        <Tabs aria-label="Manutenções" tabs={[{ value: 'encaixar', label: `A encaixar (${filaEncaixe(data.manutencoes).length})` }, { value: 'todas', label: 'Todas' }]} value={route.subManut} onChange={abrirSubManut}>
-          {route.subManut === 'encaixar'
-            ? <FilaEncaixe manutencoes={data.manutencoes} hoje={today} onOpen={(id) => onOpen('manutencao', id)} onNovo={abrirNovaManutencao} />
-            : <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} onNovo={abrirNovaManutencao} />}
-        </Tabs>
+        <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} onNovo={abrirNovaManutencao} visaoInicial={route.visaoManut} onVisaoAplicada={limparSubManut} />
       )}
       {route.tab === 'multas' && route.sub === 'multas' && <Registros key="multas" kinds={['multa']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
       {route.tab === 'colisoes' && <Registros key="colisoes" kinds={['colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}

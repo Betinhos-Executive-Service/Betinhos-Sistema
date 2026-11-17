@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { Frota, type Tab } from './FrotaPage'
 import { MANUT, PROPRIO, VEICULO } from './data/schema'
 import { EMPTY_DATA, type DataSource, type LoadResult } from './data/source'
 import { createMockSource } from './data/mock'
-import { manutencaoFalsa } from './testUtils'
+import { linhasDaTabela, manutencaoFalsa } from './testUtils'
+
+/** Botão do seletor de visões da barra (DS §10.9.1). */
+const viewTrigger = () => screen.getByRole('button', { name: /^Visão: /, hidden: true })
 
 function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
   return {
@@ -107,25 +110,40 @@ describe('Frota', () => {
     expect(location.hash).not.toContain('secao=')
   })
 
-  it('Manutenções abre na fila A encaixar; a linha abre a gaveta única da manutenção', async () => {
+  it('Manutenções é só a tabela, sem sub-abas: barra de visões e a linha abre a gaveta única', async () => {
     history.replaceState(null, '', '#/frota-manutencoes')
     renderFrota(createMockSource(), 'manutencoes')
-    expect(await screen.findByRole('tab', { name: 'A encaixar (3)' })).toBeTruthy()
-    fireEvent.click(await screen.findByRole('button', { name: /Freio com ruído \(fictício\)/ }))
-    const gaveta = await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })
-    expect(gaveta).toBeTruthy()
+    fireEvent.click(await screen.findByText('Freio com ruído (fictício)', {}, { timeout: 8000 }))
+    expect(screen.queryByRole('tablist', { name: 'Manutenções' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
+    expect(viewTrigger().textContent).toContain('Visão padrão') // a padrão continua a de hoje: todas as manutenções
+    expect(await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })).toBeTruthy()
     expect(location.hash).toContain('registro=')
   })
 
-  it('Todas mostra a lista; "Novo registro" abre a Nova manutenção, não o formulário nativo', async () => {
+  it('"Novo registro" abre a Nova manutenção, não o formulário nativo', async () => {
     const source = createMockSource()
     const openForm = vi.spyOn(source, 'openForm')
-    history.replaceState(null, '', '#/frota-manutencoes?sub=todas')
+    history.replaceState(null, '', '#/frota-manutencoes')
     renderFrota(source, 'manutencoes')
-    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(await screen.findByRole('button', { name: 'Novo registro' }))
     expect(await screen.findByRole('dialog', { name: 'Nova manutenção' })).toBeTruthy()
     expect(openForm).not.toHaveBeenCalled()
+  })
+
+  it('link antigo ?sub=encaixar abre a visão A encaixar (só Solicitado); ?sub=todas abre a tabela normal', async () => {
+    history.replaceState(null, '', '#/frota-manutencoes?sub=encaixar')
+    renderFrota(createMockSource(), 'manutencoes')
+    await waitFor(() => expect(viewTrigger().textContent).toContain('A encaixar'), { timeout: 8000 })
+    await waitFor(() => expect(linhasDaTabela()).toHaveLength(3))
+    expect(linhasDaTabela().every((linha) => linha?.includes('Solicitado'))).toBe(true)
+    await waitFor(() => expect(location.hash).not.toContain('sub='))
+    cleanup()
+    window.localStorage.clear() // a lista lembra a última visão aberta
+    history.replaceState(null, '', '#/frota-manutencoes?sub=todas')
+    renderFrota(createMockSource(), 'manutencoes')
+    await waitFor(() => expect(viewTrigger().textContent).toContain('Visão padrão'), { timeout: 8000 })
+    expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
   })
 
   it('?novo=manutencao só abre a Nova manutenção na aba Manutenções, não em Multas nem em Colisões', async () => {
@@ -138,18 +156,10 @@ describe('Frota', () => {
     }
   })
 
-  it('link antigo de Manutenções com filtro de lista e sem sub abre a sub-aba Todas; só com novo, a fila', async () => {
-    history.replaceState(null, '', '#/frota-manutencoes?q=freio')
-    renderFrota(createMockSource(), 'manutencoes')
-    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
-    cleanup()
-    history.replaceState(null, '', '#/frota-manutencoes?status=0')
-    renderFrota(createMockSource(), 'manutencoes')
-    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
-    cleanup()
+  it('?novo=manutencao abre a Nova manutenção sobre a tabela', async () => {
     history.replaceState(null, '', '#/frota-manutencoes?novo=manutencao')
     renderFrota(createMockSource(), 'manutencoes')
-    expect((await screen.findByRole('tab', { name: /A encaixar/ })).getAttribute('aria-selected')).toBe('true')
     expect(await screen.findByRole('dialog', { name: 'Nova manutenção' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
   })
 })
