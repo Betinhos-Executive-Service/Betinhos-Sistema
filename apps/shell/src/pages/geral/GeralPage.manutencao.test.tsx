@@ -70,15 +70,15 @@ describe('Geral › linhas de manutenção', () => {
     await waitFor(() => expect(window.location.hash).toContain('m=1'))
   })
 
-  it('Salvar como e Salvar gravam "Mostrar manutenções" na visão: reaberta, volta como foi salva, sem Alterada nem m= na URL', async () => {
+  it('Nova visão e Salvar gravam "Mostrar manutenções" na visão: reaberta, volta como foi salva, sem Alterada nem m= na URL', async () => {
     render(<GeralPage host={host} />)
     await abrirDe('Manutenção fictícia m3')
-    // Salvar como: desligado.
+    // Nova visão: desligado.
     fireEvent.click(chave())
     await waitFor(() => expect(nenhumaManutencao()).toBe(true))
     fireEvent.click(viewTrigger())
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Salvar como…', hidden: true }))
-    const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Nova visão…', hidden: true }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nova visão' })
     fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: 'Sem manutenções' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
     await waitFor(() => expect(viewTrigger().textContent).toContain('Sem manutenções'))
