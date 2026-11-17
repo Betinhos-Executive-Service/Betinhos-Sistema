@@ -66,6 +66,7 @@ import {
   validateWaitingContext,
   waitingContextSummary,
 } from "../domain/domain";
+import { isMultaTask, multaFechada, MULTA_TASK_DONE_BLOCKED } from "../domain/multaTaskFlow";
 import { clientDecisionWaitingContext, isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from "../domain/quoteTaskFlow";
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, parseQuoteMoney, QUOTE_COMPLETED_STATUSES, QUOTE_VEHICLE_VALUES, quoteRoutePoints, validateQuoteCommercial, validateQuoteRoute } from "../domain/quoteDomain";
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance, type QuoteSend } from "../domain/quoteScenarios";
@@ -393,7 +394,7 @@ const ENTITY_SETS: Readonly<Record<string, string>> = Object.freeze({
   systemuser: "systemusers",
   team: "teams",
 });
-const ORIGIN_VALUES: Record<string, number> = { manual: 100000000, quote: 100000001, quality: 100000002 };
+const ORIGIN_VALUES: Record<string, number> = { manual: 100000000, quote: 100000001, quality: 100000002, multa: 100000003 };
 const STATUS_VALUES: Record<string, number> = { todo: 100000000, doing: 100000001, waiting: 100000002, done: 100000003, cancelled: 100000004 };
 const PRIORITY_VALUES: Record<string, number> = { low: 100000000, medium: 100000001, high: 100000002, urgent: 100000003 };
 const STATUS_BY_VALUE: Record<string, string> = Object.fromEntries(Object.entries(STATUS_VALUES).map(([key, value]) => [value, key]));
@@ -655,7 +656,7 @@ async function retrieveOptional(xrm: PlannerXrm, table: string, query: string, l
   }
 }
 
-function plannerTaskQuery(includeTeamLookup = true, includeWaitingContext = true) {
+function plannerTaskQuery(includeTeamLookup = true, includeWaitingContext = true, includeMulta = false) {
   const fields = [
     "cr40f_plannertarefaid",
     "cr40f_name",
@@ -676,6 +677,7 @@ function plannerTaskQuery(includeTeamLookup = true, includeWaitingContext = true
     "_cr40f_pedidocotacao_value",
     "_cr40f_errooperacional_value",
     "_cr40f_acaooperacional_value",
+    ...(includeMulta ? ["_cr40f_multa_value"] : []),
     "cr40f_origem",
     "cr40f_codigoorigem",
   ];
@@ -683,6 +685,11 @@ function plannerTaskQuery(includeTeamLookup = true, includeWaitingContext = true
 }
 
 async function retrievePlannerTasks(xrm: PlannerXrm): Promise<Row[]> {
+  try {
+    return await retrieveMany(xrm, TASK_TABLE, plannerTaskQuery(true, true, true));
+  } catch (multaError) {
+    console.warn("[Planner] lookup da multa indisponível; carregando tarefas sem ele", multaError);
+  }
   try {
     return await retrieveMany(xrm, TASK_TABLE, plannerTaskQuery(true));
   } catch (error) {
@@ -1511,10 +1518,12 @@ function normalizeTask(row: Row, events: Row[] = [], assignees: AssigneeProfile[
     quoteId: s(row._cr40f_pedidocotacao_value) || null,
     quoteCode: s(row.quoteCode),
     quoteTitle: s(row.quoteTitle),
+    multaId: s(row._cr40f_multa_value) || null,
+    multaCode: s(row["_cr40f_multa_value@OData.Community.Display.V1.FormattedValue"]),
     sourceType: origin,
-    sourceId: s(row._cr40f_pedidocotacao_value || row._cr40f_errooperacional_value || row._cr40f_acaooperacional_value) || null,
+    sourceId: s(row._cr40f_pedidocotacao_value || row._cr40f_errooperacional_value || row._cr40f_acaooperacional_value || row._cr40f_multa_value) || null,
     sourceCode: s(row.cr40f_codigoorigem),
-    sourceLabel: origin === "quote" ? "Pedido de cotação" : origin === "quality" ? "Qualidade" : "Tarefa manual",
+    sourceLabel: origin === "quote" ? "Pedido de cotação" : origin === "quality" ? "Qualidade" : origin === "multa" ? "Multa" : "Tarefa manual",
     comments,
     returns,
     attachments,
@@ -1964,6 +1973,10 @@ async function updateLiveTask(xrm: PlannerXrm, state: LiveState, id: string, pat
   // `quote` existe sempre que `quoteTask` é verdadeiro (mesmo acesso direto do JS original).
   const quote = linkedQuote as LiveQuote;
   if (quoteTask && !patch.suppressQuoteSync && patch.status === "done" && !isQuoteTerminalStatus(quote.status)) throw new Error(QUOTE_TASK_DONE_BLOCKED);
+  if (existing && isMultaTask(existing) && existing.multaId && patch.status === "done" && existing.status !== "done") {
+    const multa = asRecord(await request(xrm, `/cr40f_multases(${cleanId(existing.multaId)})?$select=cr40f_status`));
+    if (!multaFechada(multa?.cr40f_status)) throw new Error(MULTA_TASK_DONE_BLOCKED);
+  }
   const previousStatus = existing?.status || "";
   const previousDueDate = existing?.dueDate || "";
   const previousAssigneeIds = existing?.assigneeIds || [];
