@@ -21,8 +21,9 @@ foreach ($t in @("cr40f_manutencoes", "cr40f_reservadeveculos", "cr40f_despesaop
   $pedido["prvRead$t"] = "Global"; $pedido["prvWrite$t"] = "Global"; $pedido["prvCreate$t"] = "Basic"
   $pedido["prvAppend$t"] = "Global"; $pedido["prvAppendTo$t"] = "Global"
 }
+# Anexo da despesa e foto da manutencao: o escritorio le so o que ele mesmo criou (Read em Basic); Create e Append como no motorista.
 foreach ($t in @("cr40f_anexodespesaoperacional", "new_fotomanutencao")) {
-  $pedido["prvRead$t"] = "Global"; $pedido["prvCreate$t"] = "Basic"; $pedido["prvAppend$t"] = "Global"
+  $pedido["prvRead$t"] = "Basic"; $pedido["prvCreate$t"] = "Basic"; $pedido["prvAppend$t"] = "Global"
 }
 foreach ($t in @("cr40f_veiculos", "cr40f_funcionarios", "cr40f_cidade", "cr40f_categoriadespesaoperacional", "cr40f_formapagamentodespesa")) {
   $pedido["prvRead$t"] = "Global"; $pedido["prvAppendTo$t"] = "Global"
