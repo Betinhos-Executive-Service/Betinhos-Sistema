@@ -95,6 +95,10 @@ export const ENTRADAS = [
     arquivos: [script('lembrete-pagamento'), flowsDir('lembrete-pagamento\\.ps1')],
   },
   {
+    nome: 'multas-do-dia', script: 'provision-flow-multas-do-dia.ps1', flows: ['Multas | Multas de hoje'], args: [['Remetente', 'FLOW_FROTA_REMETENTE']],
+    arquivos: [script('multas-do-dia'), flowsDir('multas-do-dia\\.json')],
+  },
+  {
     nome: 'recibo-destinatario', script: 'provision-flow-recibo-destinatario.ps1', flows: ['Flow Enviar Recibo Automático', 'Flow Gerar Recibo Manual'],
     arquivos: [script('recibo-destinatario'), flowsDir('recibo-destinatario\\.mjs')],
   },

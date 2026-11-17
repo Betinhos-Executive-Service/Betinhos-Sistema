@@ -62,6 +62,8 @@ test('mudança no script ou no JSON publica só aquele flow', () => {
   assert.deepEqual(nomes(['packages/deploy/flows/aniversariantes-diario.json']), ['aniversariantes'])
   assert.deepEqual(nomes(['packages/deploy/flows/portal-cliente-emails/codigo.html']), ['portal-cliente-emails'])
   assert.deepEqual(nomes(['packages/deploy/flows/lembrete-pagamento.ps1']), ['lembrete-pagamento'])
+  assert.deepEqual(nomes(['packages/deploy/flows/multas-do-dia.json']), ['multas-do-dia'])
+  assert.deepEqual(nomes(['packages/deploy/provision-flow-multas-do-dia.ps1']), ['multas-do-dia'])
   assert.deepEqual(nomes(['packages/deploy/flows/conciliacao-cartao-tempo-real.mjs']), ['conciliacao-cartao'])
 })
 
