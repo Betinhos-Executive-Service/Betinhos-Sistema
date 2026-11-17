@@ -12,7 +12,7 @@ description: "Verifica o servidor MCP remoto do Dataverse (apps/mcp-dataverse, C
 Em `apps/mcp-dataverse`:
 1. `pnpm typecheck` sem erros.
 2. `pnpm test` verde (fetch simulado: resolução de EntitySet, OData/FetchXML, trava `confirmar` do PROD, truncamento, validação de tenant/domínio, troca e renovação de token, erros do Dataverse).
-3. `npx wrangler deploy --dry-run --outdir <pasta temporária>` conclui; confira o tamanho gzip (limite do plano gratuito: 3 MB) e que o KV ainda mostra o id real (não `TROCAR_PELO_ID_DO_KV`) antes do deploy de verdade.
+3. `npx wrangler deploy --dry-run --outdir <pasta temporária>` conclui; confira o tamanho gzip (limite do plano gratuito: 3 MB) e que o KV ainda mostra o id real (não `TROCAR_PELO_ID_DO_KV`) antes do deploy de verdade. O binding `RL_USER` (ratelimits) é criado no deploy; `observability` está ligado.
 
 ## 2. Deploy (só pelo Renan, do checkout principal)
 1. `npx wrangler kv namespace create OAUTH_KV`; gravar o id em `wrangler.jsonc`.
@@ -35,6 +35,7 @@ PROD (somente leitura, exceto o teste abaixo, que o Renan precisa pedir e acompa
 3. Escrita real, só com o Renan junto: no registro `f9a9d2b2-4818-430f-9630-01e6629a0dc3`, gravar `.` em `cr40f_observaointerna` com `confirmar: true`, ler de volta, e depois remover o `.` (restaurar o valor original lido antes; se estava vazio, enviar `null`). Pedir ao Renan que confira a auditoria do registro (quem alterou deve ser ele, não uma conta de serviço).
 
 ## Falhas conhecidas e onde olhar
+- Conferir no `npx wrangler tail` uma linha JSON por chamada (`evento: tool`) sem filtros nem dados; exclusão no PROD sem `confirmacao_texto` deve voltar BLOQUEADO.
 - Login volta com `invalid_grant`/`AADSTS`: redirect do Entra faltando ou secret expirado (`npx wrangler tail`; os logs nunca trazem token).
 - `401` repetido nas ferramentas: sessão Microsoft expirada; remover e adicionar o conector de novo.
 - `search` falha: Dataverse Search desligado no ambiente.

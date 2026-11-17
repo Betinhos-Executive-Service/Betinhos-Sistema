@@ -9,6 +9,8 @@ export type Ambiente = (typeof AMBIENTES)[number]
 export interface AppEnv {
   OAUTH_KV: KVNamespace
   OAUTH_PROVIDER: OAuthHelpers
+  /** Limite de chamadas de ferramenta por usuário (binding `ratelimits`; ausente = sem limite). */
+  RL_USER?: RateLimit
   MCP_OBJECT: DurableObjectNamespace<DataverseMcp>
   // vars
   ENTRA_TENANT_ID: string

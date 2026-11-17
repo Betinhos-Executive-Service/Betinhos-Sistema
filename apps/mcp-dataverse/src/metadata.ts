@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isGuid, isLogicalName } from './dataverse'
 
 /** Idioma padrão dos rótulos (pt-BR). */
 export const DEFAULT_LANGUAGE = 1046
@@ -14,23 +15,18 @@ export const label = (text: string, language = DEFAULT_LANGUAGE) => ({
 export const labelText = (l: any): string | undefined => l?.UserLocalizedLabel?.Label ?? l?.LocalizedLabels?.[0]?.Label
 
 export const columnSchema = z.object({
-  tipo: z
-    .enum(['texto', 'memo', 'inteiro', 'decimal', 'moeda', 'data', 'booleano', 'choice', 'lookup'])
-    .describe('Tipo da coluna.'),
-  nomeSchema: z.string().describe('Nome de esquema com prefixo do publisher, ex.: cr40f_observacao (minúsculas no nome lógico).'),
-  rotulo: z.string().describe('Rótulo exibido.'),
+  tipo: z.enum(['texto', 'memo', 'inteiro', 'decimal', 'moeda', 'data', 'booleano', 'choice', 'lookup']),
+  nomeSchema: z.string().refine(isLogicalName, 'Nome de esquema inválido (letras, números e _)').describe('Com prefixo do publisher, ex.: cr40f_observacao.'),
+  rotulo: z.string(),
   descricao: z.string().optional(),
-  obrigatoria: z.boolean().optional().describe('Se true, obrigatória no app (ApplicationRequired).'),
-  tamanhoMaximo: z.number().int().optional().describe('texto (padrão 100) e memo (padrão 2000).'),
-  casasDecimais: z.number().int().min(0).max(10).optional().describe('decimal (padrão 2).'),
-  somenteData: z.boolean().optional().describe('data: true = só data (DateOnly); padrão false = data e hora (fuso do usuário).'),
-  opcoes: z
-    .array(z.object({ valor: z.number().int().optional(), rotulo: z.string() }))
-    .optional()
-    .describe('choice local: lista de opções; sem valor, numera a partir de 100000000.'),
-  rotuloVerdadeiro: z.string().optional().describe('booleano (padrão "Sim").'),
-  rotuloFalso: z.string().optional().describe('booleano (padrão "Não").'),
-  tabelaAlvo: z.string().optional().describe('lookup: nome lógico da tabela referenciada.'),
+  obrigatoria: z.boolean().optional(),
+  tamanhoMaximo: z.number().int().optional().describe('texto (100) e memo (2000).'),
+  casasDecimais: z.number().int().min(0).max(10).optional().describe('decimal (2).'),
+  somenteData: z.boolean().optional().describe('data: true = só data.'),
+  opcoes: z.array(z.object({ valor: z.number().int().optional(), rotulo: z.string() })).optional().describe('choice; sem valor, numera de 100000000.'),
+  rotuloVerdadeiro: z.string().optional().describe('booleano (Sim).'),
+  rotuloFalso: z.string().optional().describe('booleano (Não).'),
+  tabelaAlvo: z.string().refine(isLogicalName, 'Nome de tabela inválido').optional().describe('lookup: tabela referenciada.'),
 })
 export type ColumnInput = z.infer<typeof columnSchema>
 
@@ -142,22 +138,42 @@ export function buildTable(p: {
   }
 }
 
-/** Chave alternativa/primária em `entitySet(k='v',k2=2)`. */
-export function keyPath(keys: Record<string, string | number | boolean>): string {
-  const parts = Object.entries(keys).map(([k, v]) => `${k}=${typeof v === 'string' ? `'${v.replace(/'/g, "''")}'` : v}`)
-  if (!parts.length) throw new Error('Informe ao menos uma chave.')
-  return parts.join(',')
+/**
+ * Chave alternativa/primária em `entitySet(k='v',k2=2)`. Texto é escapado (aspas dobradas) e codificado para a URL;
+ * nome de coluna só com letras, números e _. Chave única igual à primária com GUID vai sem aspas.
+ */
+export function keyPath(keys: Record<string, string | number | boolean>, primaryId?: string): string {
+  const entries = Object.entries(keys)
+  if (!entries.length) throw new Error('Informe ao menos uma chave.')
+  for (const [k] of entries) if (!isLogicalName(k)) throw new Error(`Nome de coluna inválido na chave: "${k.slice(0, 60)}".`)
+  if (entries.length === 1 && primaryId && entries[0][0].toLowerCase() === primaryId && typeof entries[0][1] === 'string' && isGuid(entries[0][1])) {
+    return entries[0][1]
+  }
+  return entries
+    .map(([k, v]) => `${k}=${typeof v === 'string' ? `'${encodeURIComponent(v.replace(/'/g, "''"))}'` : v}`)
+    .join(',')
 }
 
 const xmlEscape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
-/** Põe page/count/paging-cookie na tag `<fetch>` (substituindo os que já existirem). */
+/** O Dataverse pode devolver o paging cookie com percent-encoding; o atributo precisa do XML puro (depois escapado). */
+const rawCookie = (cookie: string) => {
+  let out = cookie
+  for (let i = 0; i < 2 && /^%3c/i.test(out); i++) out = decodeURIComponent(out)
+  return out
+}
+
+/** Põe page/count/paging-cookie na tag `<fetch>` (substituindo os que já existirem; sem count/page se houver `top`). */
 export function applyFetchPaging(xml: string, p: { page?: number; count?: number; pagingCookie?: string }): string {
   return xml.replace(/<fetch\b([^>]*?)(\/?)>/i, (_m, attrs: string, selfClose: string) => {
-    let a = attrs.replace(/\s(page|count|paging-cookie)\s*=\s*("[^"]*"|'[^']*')/gi, '')
-    if (p.count) a += ` count="${p.count}"`
-    if (p.page) a += ` page="${p.page}"`
-    if (p.pagingCookie) a += ` paging-cookie="${xmlEscape(p.pagingCookie)}"`
+    // Só troca o que foi pedido: um `count` do próprio XML continua valendo quando não vem count novo.
+    const drop = [p.page ? 'page' : '', p.count ? 'count' : '', p.pagingCookie ? 'paging-cookie' : ''].filter(Boolean).join('|')
+    let a = drop ? attrs.replace(new RegExp(`\\s(${drop})\\s*=\\s*("[^"]*"|'[^']*')`, 'gi'), '') : attrs
+    if (!/\stop\s*=/i.test(a)) {
+      if (p.count) a += ` count="${p.count}"`
+      if (p.page) a += ` page="${p.page}"`
+      if (p.pagingCookie) a += ` paging-cookie="${xmlEscape(rawCookie(p.pagingCookie))}"`
+    }
     return `<fetch${a}${selfClose}>`
   })
 }

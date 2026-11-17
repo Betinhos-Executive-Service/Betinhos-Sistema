@@ -18,6 +18,10 @@ export default new OAuthProvider<AppEnv>({
   authorizeEndpoint: '/authorize',
   tokenEndpoint: '/token',
   clientRegistrationEndpoint: '/register',
+  // Access token de 1 h; refresh de no máx. 90 dias (limite do Entra) e 30 dias sem uso.
+  accessTokenTTL: 3600,
+  refreshTokenTTL: 90 * 86400,
+  refreshTokenIdleTTL: 30 * 86400,
   resourceMetadata: { resource: appEnv.MCP_RESOURCE },
   // O refresh token do Entra gira junto com o do conector: renova e regrava nas props.
   async tokenExchangeCallback({ grantType, props, env }) {

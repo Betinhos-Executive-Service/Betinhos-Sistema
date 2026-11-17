@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { DataverseError } from './dataverse'
 import { EntraError } from './entra'
 
@@ -17,14 +18,31 @@ export const text = (value: string, isError = false): ToolResult => ({
   ...(isError ? { isError: true } : {}),
 })
 
-/** Remove ruído de OData que só gasta tokens. */
+const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
+const LOOKUP_TABLE = '@Microsoft.Dynamics.CRM.lookuplogicalname'
+const DROPPED = new Set(['@odata.context', '@odata.etag'])
+
+/**
+ * Compacta o que sai do Dataverse para gastar menos tokens: sem `@odata.context`/`@odata.etag`, sem campos nulos,
+ * `campo@txt` no lugar do FormattedValue (só quando difere do valor) e `campo@tab` no lugar do lookuplogicalname.
+ */
 export function clean<T>(value: T): T {
   if (Array.isArray(value)) return value.map(clean) as T
   if (value && typeof value === 'object') {
+    const src = value as Record<string, unknown>
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value)) {
-      if (k === '@odata.context' || k === '@odata.etag') continue
-      out[k] = clean(v)
+    for (const [k, v] of Object.entries(src)) {
+      if (DROPPED.has(k) || v === null || v === undefined) continue
+      if (k.endsWith(FORMATTED)) {
+        const base = k.slice(0, -FORMATTED.length)
+        if (String(src[base]) !== String(v)) out[`${base}@txt`] = v
+      } else if (k.endsWith(LOOKUP_TABLE)) {
+        out[`${k.slice(0, -LOOKUP_TABLE.length)}@tab`] = v
+      } else if (k.includes('@Microsoft.Dynamics.CRM.associatednavigationproperty')) {
+        continue
+      } else {
+        out[k] = clean(v)
+      }
     }
     return out as T
   }
@@ -36,15 +54,12 @@ export function clean<T>(value: T): T {
  * avisa; senão corta o texto. `_truncado` e `_aviso` sinalizam o corte.
  */
 export function limitJson(payload: Record<string, unknown> | unknown[], max = MAX_CHARS): string {
-  let json = JSON.stringify(payload)
+  const json = JSON.stringify(payload)
   if (json.length <= max) return json
   const listKey = Array.isArray(payload) ? null : ['value', 'itens', 'colunas'].find((k) => Array.isArray(payload[k]))
   if (listKey && !Array.isArray(payload)) {
-    const rows = [...(payload[listKey] as unknown[])]
+    const rows = payload[listKey] as unknown[]
     const total = rows.length
-    // Busca binária pelo maior prefixo que cabe.
-    let lo = 0
-    let hi = total
     const build = (n: number) =>
       JSON.stringify({
         ...payload,
@@ -52,15 +67,17 @@ export function limitJson(payload: Record<string, unknown> | unknown[], max = MA
         _truncado: true,
         _aviso: `Resposta cortada em ${n} de ${total} itens por tamanho (limite ${max} caracteres). Use $select, filtros ou a página seguinte.`,
       })
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2)
-      if (build(mid).length <= max) lo = mid
-      else hi = mid - 1
-    }
-    return build(lo)
+    // Cada linha é serializada uma vez (CPU do plano gratuito): estima o prefixo que cabe e confere com uma montagem real.
+    const sizes = rows.map((r) => JSON.stringify(r).length + 1)
+    const overhead = build(0).length + 16
+    let n = 0
+    let used = overhead
+    while (n < total && used + sizes[n] <= max) used += sizes[n++]
+    let out = build(n)
+    while (out.length > max && n > 0) out = build(--n)
+    return out
   }
-  json = json.slice(0, max)
-  return `${json}\n[TRUNCADO: resposta cortada em ${max} caracteres. Refine a consulta.]`
+  return `${json.slice(0, max)}\n[TRUNCADO: resposta cortada em ${max} caracteres. Refine a consulta.]`
 }
 
 export const ok = (payload: Record<string, unknown> | unknown[]): ToolResult => text(limitJson(clean(payload)))
@@ -73,6 +90,9 @@ export function redact(message: string): string {
 }
 
 export function errorResult(error: unknown): ToolResult {
+  if (error instanceof z.ZodError) {
+    return text(`Entrada inválida: ${error.issues.map((i) => `${i.path.join('.') || 'entrada'}: ${i.message}`).join('; ')}`, true)
+  }
   if (error instanceof DataverseError) return text(redact(error.toString()), true)
   if (error instanceof EntraError) return text(redact(`${error.message} (HTTP ${error.status})`), true)
   return text(redact(`Erro: ${error instanceof Error ? error.message : String(error)}`), true)

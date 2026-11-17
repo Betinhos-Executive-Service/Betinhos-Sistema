@@ -1,6 +1,7 @@
 import { AuthorizationError, CimdFetchError, authorizationErrorRedirect, type AuthRequest } from '@cloudflare/workers-oauth-provider'
 import { SERVER_NAME, SERVER_VERSION } from './mcp'
 import type { AppEnv } from './env'
+import { PAGE_SECURITY_HEADERS } from './seguranca'
 import { EntraError, authorizeUrl, exchangeCode, newVerifier, pkceChallenge, validateIdentity } from './entra'
 
 export const escapeHtml = (value: string) =>
@@ -12,9 +13,11 @@ const PAGE_CSS =
   'button.ok{background:#1a1a1a;color:#fff}.warn{background:#fff4d6;padding:.6rem;border-radius:.4rem}' +
   '@media(prefers-color-scheme:dark){body{background:#111;color:#eee}button{background:#222;color:#eee}button.ok{background:#eee;color:#111}.warn{background:#4a3b10}}'
 
+
 function page(title: string, body: string, status = 200, headers?: Headers): Response {
   const h = new Headers(headers)
   h.set('Content-Type', 'text/html; charset=utf-8')
+  for (const [k, v] of Object.entries(PAGE_SECURITY_HEADERS)) h.set(k, v)
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${PAGE_CSS}</style></head><body>${body}</body></html>`
   return new Response(html, { status, headers: h })
 }
@@ -53,6 +56,9 @@ async function redirectToEntra(request: Request, env: AppEnv, authRequest: AuthR
 
 async function authorize(request: Request, env: AppEnv): Promise<Response> {
   if (request.method === 'POST') {
+    // Defesa em profundidade além do cookie de transação da biblioteca: POST só da própria origem.
+    const origin = request.headers.get('Origin')
+    if (origin && origin !== new URL(request.url).origin) return errorPage('Origem não permitida.', 403)
     const form = await request.formData()
     const handle = String(form.get('handle') ?? '')
     if (form.get('action') === 'deny') {

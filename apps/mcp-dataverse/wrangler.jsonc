@@ -14,6 +14,10 @@
     "bindings": [{ "name": "MCP_OBJECT", "class_name": "DataverseMcp" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DataverseMcp"] }],
+  // Workers Logs (grátis): uma linha JSON por chamada de ferramenta (sem dados, filtros ou tokens).
+  "observability": { "enabled": true },
+  // Limite por usuário (e-mail): 120 chamadas de ferramenta por minuto.
+  "ratelimits": [{ "name": "RL_USER", "namespace_id": "4210", "simple": { "limit": 120, "period": 60 } }],
   "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "30a6569379c94ef0ae796a834a2c5701" }],
   "vars": {
     "ENTRA_TENANT_ID": "bed8b3ad-d487-4193-a748-09e16f0e0327",

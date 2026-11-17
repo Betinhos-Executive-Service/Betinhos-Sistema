@@ -143,3 +143,62 @@ describe('erros do Dataverse', () => {
     await expect(new DataverseSession(env, 'rt').api('DEV', 'GET', 'x')).rejects.toMatchObject({ status: 502, message: 'Bad gateway' })
   })
 })
+
+describe('confiabilidade', () => {
+  const noSleep = { sleep: async () => {} }
+
+  it('repete 429 respeitando Retry-After e termina com sucesso', async () => {
+    let n = 0
+    const waits: number[] = []
+    mockFetch(baseRoute((c) => (c.url.includes('/api/data/') && n++ === 0 ? json({ error: { message: 'x' } }, 429, { 'Retry-After': '2' }) : json({ value: [] }))))
+    const s = new DataverseSession(env, 'rt', Date.now, { sleep: async (ms) => void waits.push(ms) })
+    await s.api('DEV', 'GET', 'cr40f_reservas')
+    expect(waits).toEqual([2000])
+  })
+
+  it('desiste após 2 repetições', async () => {
+    const calls = mockFetch(baseRoute((c) => (c.url.includes('/api/data/') ? json({ error: { message: 'x' } }, 503) : undefined)))
+    const s = new DataverseSession(env, 'rt', Date.now, noSleep)
+    await expect(s.api('DEV', 'GET', 'cr40f_reservas')).rejects.toMatchObject({ status: 503 })
+    expect(calls.filter((c) => c.url.includes('/api/data/'))).toHaveLength(3)
+  })
+
+  it('504 não é repetido em POST', async () => {
+    const calls = mockFetch(baseRoute((c) => (c.url.includes('/api/data/') ? json({ error: { message: 'x' } }, 504) : undefined)))
+    const s = new DataverseSession(env, 'rt', Date.now, noSleep)
+    await expect(s.api('DEV', 'POST', 'cr40f_reservas', { body: {} })).rejects.toMatchObject({ status: 504 })
+    expect(calls.filter((c) => c.url.includes('/api/data/'))).toHaveLength(1)
+  })
+
+  it('refresh token expirado dá mensagem de reconexão', async () => {
+    mockFetch((c) => (c.url.includes('login.') ? json({ error: 'invalid_grant', error_description: 'AADSTS70008' }, 400) : json({})))
+    await expect(new DataverseSession(env, 'rt').api('DEV', 'GET', 'x')).rejects.toMatchObject({ code: 'reauth_required' })
+  })
+
+  it('token de acesso persiste no store e evita novo refresh', async () => {
+    const { MemoryStore } = await import('./store')
+    const store = new MemoryStore()
+    const calls = mockFetch(baseRoute((c) => (c.url.includes('/api/data/v9.2/a') ? json({}) : undefined)))
+    await new DataverseSession(env, 'rt', Date.now, { store }).api('DEV', 'GET', 'a')
+    await new DataverseSession(env, 'rt', Date.now, { store }).api('DEV', 'GET', 'a')
+    expect(calls.filter((c) => c.url.includes('login.'))).toHaveLength(1)
+  })
+
+  it('metadata de entidade vem do store e invalidateSchema limpa', async () => {
+    const { MemoryStore } = await import('./store')
+    const store = new MemoryStore()
+    const calls = mockFetch(baseRoute(() => undefined))
+    await new DataverseSession(env, 'rt', Date.now, { store }).entity('DEV', 'cr40f_reserva')
+    const s2 = new DataverseSession(env, 'rt', Date.now, { store })
+    await s2.entity('DEV', 'cr40f_reserva')
+    expect(calls.filter((c) => c.url.includes('EntityDefinitions'))).toHaveLength(1)
+    await s2.invalidateSchema('DEV')
+    await new DataverseSession(env, 'rt', Date.now, { store }).entity('DEV', 'cr40f_reserva')
+    expect(calls.filter((c) => c.url.includes('EntityDefinitions'))).toHaveLength(2)
+  })
+
+  it('rejeita nome lógico inválido (path traversal)', async () => {
+    mockFetch(baseRoute(() => undefined))
+    await expect(new DataverseSession(env, 'rt').entity('DEV', '../x')).rejects.toBeTruthy()
+  })
+})

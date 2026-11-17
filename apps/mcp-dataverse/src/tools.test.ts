@@ -101,9 +101,9 @@ describe('trava do PROD (confirmar)', () => {
     ['update_table', { tabela: 'cr40f_reserva', rotulo: 'Reserva' }],
     ['delete_table', { tabela: 'cr40f_reserva' }],
     ['execute_action', { nome: 'cr40f_MinhaApi', parametros: {} }],
-    ['associate', { tabela: 'cr40f_reserva', id: 'a', relacao: 'rel', tabelaAlvo: 'cr40f_reserva', idAlvo: 'b' }],
-    ['disassociate', { tabela: 'cr40f_reserva', id: 'a', relacao: 'rel', tabelaAlvo: 'cr40f_reserva', idAlvo: 'b' }],
-    ['execute_prompt', { promptId: 'a' }],
+    ['associate', { tabela: 'cr40f_reserva', id: '11111111-1111-1111-1111-111111111111', relacao: 'rel', tabelaAlvo: 'cr40f_reserva', idAlvo: '22222222-2222-2222-2222-222222222222' }],
+    ['disassociate', { tabela: 'cr40f_reserva', id: '11111111-1111-1111-1111-111111111111', relacao: 'rel', tabelaAlvo: 'cr40f_reserva', idAlvo: '22222222-2222-2222-2222-222222222222' }],
+    ['execute_prompt', { promptId: '11111111-1111-1111-1111-111111111111' }],
   ]
 
   it.each(writes)('%s no PROD sem confirmar devolve prévia e não escreve', async (name, args) => {
@@ -159,9 +159,9 @@ describe('upsert_record e delete_record', () => {
 
   it('delete_record no DEV chama DELETE', async () => {
     const calls = mockFetch(baseRoute((c) => (c.method === 'DELETE' ? new Response(null, { status: 204 }) : undefined)))
-    const r = await tools()('delete_record').handler({ tabela: 'cr40f_reserva', id: 'abc' })
+    const r = await tools()('delete_record').handler({ tabela: 'cr40f_reserva', id: '11111111-1111-1111-1111-111111111111' })
     expect(r.isError).toBeFalsy()
-    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('cr40f_reservas(abc)'))).toBe(true)
+    expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('cr40f_reservas(11111111-1111-1111-1111-111111111111)'))).toBe(true)
   })
 })
 
@@ -198,10 +198,10 @@ describe('schema', () => {
 describe('associate / execute_action', () => {
   it('associate usa $ref com @odata.id do mesmo ambiente', async () => {
     const calls = mockFetch(baseRoute((c) => (c.method === 'POST' ? new Response(null, { status: 204 }) : undefined)))
-    await tools()('associate').handler({ tabela: 'cr40f_reserva', id: 'a', relacao: 'cr40f_rel', tabelaAlvo: 'cr40f_reserva', idAlvo: 'b' })
+    await tools()('associate').handler({ tabela: 'cr40f_reserva', id: '11111111-1111-1111-1111-111111111111', relacao: 'cr40f_rel', tabelaAlvo: 'cr40f_reserva', idAlvo: '22222222-2222-2222-2222-222222222222' })
     const post = calls.find((c) => c.method === 'POST' && c.url.endsWith('/$ref'))!
-    expect(post.url).toContain('cr40f_reservas(a)/cr40f_rel/$ref')
-    expect(post.body['@odata.id']).toBe('https://dev.crm.test/api/data/v9.2/cr40f_reservas(b)')
+    expect(post.url).toContain('cr40f_reservas(11111111-1111-1111-1111-111111111111)/cr40f_rel/$ref')
+    expect(post.body['@odata.id']).toBe('https://dev.crm.test/api/data/v9.2/cr40f_reservas(22222222-2222-2222-2222-222222222222)')
   })
 
   it('função com parâmetros usa GET com aliases', async () => {
@@ -222,5 +222,40 @@ describe('search', () => {
     expect(call.method).toBe('POST')
     expect(call.body.search).toBe('maria')
     expect(JSON.parse(textOf(r)).total).toBe(1)
+  })
+})
+
+describe('confirmação digitada e validação', () => {
+  const id = '11111111-1111-1111-1111-111111111111'
+
+  it('delete_record no PROD com confirmar mas sem confirmacao_texto bloqueia', async () => {
+    const calls = mockFetch(baseRoute(() => json({})))
+    const r = await tools()('delete_record').handler({ ambiente: 'PROD', tabela: 'cr40f_reserva', id, confirmar: true })
+    expect(r.isError).toBe(true)
+    expect(textOf(r)).toMatch(/BLOQUEADO/)
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false)
+  })
+
+  it('delete_record no PROD com texto igual ao id exclui', async () => {
+    const calls = mockFetch(baseRoute((c) => (c.method === 'DELETE' ? new Response(null, { status: 204 }) : undefined)))
+    const r = await tools()('delete_record').handler({ ambiente: 'PROD', tabela: 'cr40f_reserva', id, confirmar: true, confirmacao_texto: id })
+    expect(r.isError).toBeFalsy()
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(true)
+  })
+
+  it('delete_table no PROD exige o nome lógico', async () => {
+    const calls = mockFetch(baseRoute((c) => (c.method === 'DELETE' ? new Response(null, { status: 204 }) : undefined)))
+    const bad = await tools()('delete_table').handler({ ambiente: 'PROD', tabela: 'cr40f_reserva', confirmar: true, confirmacao_texto: 'outra' })
+    expect(bad.isError).toBe(true)
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false)
+    const good = await tools()('delete_table').handler({ ambiente: 'PROD', tabela: 'cr40f_reserva', confirmar: true, confirmacao_texto: 'cr40f_reserva' })
+    expect(good.isError).toBeFalsy()
+  })
+
+  it('rejeita id que não é GUID (sem chamar a API de dados)', async () => {
+    const calls = mockFetch(baseRoute(() => json({})))
+    const r = await tools()('delete_record').handler({ tabela: 'cr40f_reserva', id: '../x' })
+    expect(r.isError).toBe(true)
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false)
   })
 })
