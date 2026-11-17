@@ -16,12 +16,12 @@ Status e valores continuam os do plano 1: Solicitado 0, Agendado 202410001, Prog
 
 - **D1. Três etapas: Agendar · Programar · Realizar.** A etapa sai do status: Solicitado → Agendar, Agendado → Programar, Programado → Realizar e Realizado → fim. Reprovado e Cancelado são fins negativos.
 - **D2. Um passo por vez.** O corpo mostra só o passo pendente da etapa atual, com os campos obrigatórios dele e um botão. Os passos já feitos aparecem em leitura, em lista ("Agendada em 17/11 para a semana de 23 a 29/11 · Média"). As exceções ficam no menu "⋯" do passo:
-  - **Agendar:** Reprovar (motivo obrigatório) e Cancelar.
-  - **Programar:** Reagendar e Cancelar.
+  - **Agendar:** Reprovar (motivo obrigatório), Cancelar e "Já foi feita: concluir".
+  - **Programar:** Reagendar, Cancelar e "Já foi feita: concluir".
   - **Realizar:** Concluir por ele, Reagendar e Cancelar.
   - **Fim (Realizado):** Corrigir classificação.
 
-  "Abrir formulário" continua no rodapé em todas as etapas.
+  "Já foi feita: concluir" (P1, 17/11/2026) cobre a manutenção que o motorista fez sem passar pelo ciclo: abre o mesmo `ConcluirManutencaoForm` do "Concluir por ele". "Abrir formulário" continua no rodapé em todas as etapas.
 - **D3. Agendar pede grau e quando.** O grau (Alta, Média ou Baixa) vem preenchido com o do pedido e pode ser corrigido. "Quando" é Num dia ou Numa semana (segunda a domingo), mais a data. O comentário ao motorista é opcional. Grava pela `cr40f_ManutencaoAgendar`, que ganha o campo opcional `grau` no `RequestJson`. Sem o campo, o grau não muda, então o App e as chamadas antigas não mudam.
 - **D4. Programar pede motorista e saída.**
   - **Gravação:** grava na linha da Geral da manutenção (a `geralId` do espelho, buscada por `cr40f_om`) com o mesmo `programarPatch` do Disparar. O espelho do plano 1 leva a manutenção a Programado.
@@ -30,7 +30,7 @@ Status e valores continuam os do plano 1: Solicitado 0, Agendado 202410001, Prog
 - **D5. Realizar é do motorista.** O passo mostra "Aguardando o motorista concluir no App", com o motorista e a saída. "Concluir por ele" (no "⋯") abre o formulário de conclusão que já existe (`ConcluirManutencaoForm`), com `origem: "shell"`. A classificação dos serviços acontece só na conclusão.
 - **D6. Reagendar volta para Programar.** A janela muda, e motorista e saída são limpos. É o comportamento atual da `cr40f_ManutencaoAgendar` sobre uma manutenção Agendada ou Programada.
 - **D7. O topo destaca placa, problema e prazo.**
-  - **Título:** "placa · problema"; embaixo, o grau e quem pediu.
+  - **Título:** "placa · problema" é o título da gaveta (o guia não tem título próprio, para não repetir); no guia, embaixo, o grau e quem pediu (ou o motorista e a saída, na etapa Realizar).
   - **À direita, conforme a etapa:**
     - antes de agendar: "Esperando há N dias", contados da solicitação;
     - depois de agendar: a janela ("23 a 29/11");
@@ -38,12 +38,12 @@ Status e valores continuam os do plano 1: Solicitado 0, Agendado 202410001, Prog
     - realizada: o valor.
 - **D8. O fim mostra o resumo e a despesa.** Na Realizada aparecem em leitura:
   - serviços por categoria;
-  - km, data, valor, pagamento, estabelecimento e cidade;
+  - km, data, valor, pagamento, estabelecimento e quem realizou (sem a cidade: o detalhe da manutenção não a lê);
   - nota e fotos;
   - o estado da despesa ligada (pendente de anexo, em análise pela IA ou conferida), com link que abre a despesa.
 
   Nenhuma ação, a não ser "Corrigir classificação" no "⋯".
-- **D9. Fim negativo.** Na Reprovada e na Cancelada, a barra fica cinza na etapa onde parou e um quadro mostra "Reprovada em <data>: <motivo>". Nenhuma ação, a não ser "Abrir formulário".
+- **D9. Fim negativo.** Na Reprovada e na Cancelada, a barra fica cinza na etapa onde parou e um quadro mostra "Reprovada: <motivo>" (ou "Cancelada: <motivo>"), sem data: não há coluna com a data da reprovação ou do cancelamento. Nenhuma ação, a não ser "Abrir formulário".
 - **D10. Quem não é dono do passo vê, mas não age.** Os comandos do servidor já recusam quem não tem privilégio. A gaveta mostra a mensagem do servidor, sem esconder o passo.
 
 ## Arquitetura (abordagem A, escolhida pelo Renan)
