@@ -100,9 +100,12 @@ describe('formulário', () => {
 
   it('valida nome, celular, e-mail, obrigatórios e nascimento', () => {
     const e = validateForm({ ...emptyForm(), nome: 'A', telefone: '123', email: 'x@', idioma: '', nascimento: '2999-01-01' }, new Date('2026-10-07'))
-    expect(Object.keys(e).sort()).toEqual(['email', 'idioma', 'nascimento', 'nome', 'telefone'])
-    expect(validateForm({ ...emptyForm(), nome: 'Ana Lima' })).toEqual({})
-    const legado = { ...emptyForm(), nome: 'Ana Lima', telefone: 'ramal 22', email: 'sem email' }
+    expect(Object.keys(e).sort()).toEqual(['clienteId', 'email', 'idioma', 'nascimento', 'nome', 'telefone'])
+    expect(validateForm({ ...emptyForm(), nome: 'Ana Lima', clienteId: 'c1' })).toEqual({})
+    // Cliente vale também na edição: cadastro antigo sem cliente só salva depois de escolher um (o RD Station usa o nome).
+    const semCliente = { ...emptyForm(), nome: 'Ana Lima' }
+    expect(Object.keys(validateForm({ ...semCliente, departamento: 'RH' }, new Date(), semCliente))).toEqual(['clienteId'])
+    const legado = { ...emptyForm(), nome: 'Ana Lima', clienteId: 'c1', telefone: 'ramal 22', email: 'sem email' }
     expect(validateForm({ ...legado, departamento: 'RH' }, new Date(), legado)).toEqual({})
     expect(Object.keys(validateForm({ ...legado, telefone: 'ramal 23' }, new Date(), legado))).toEqual(['telefone'])
   })
