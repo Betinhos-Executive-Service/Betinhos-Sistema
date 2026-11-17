@@ -49,4 +49,4 @@ Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace
 - Só prova o DEV. O PROD recebe tudo pelo "Publicar soluções" (ensaio no TEST e aprovação do Renan).
 - Bypass de administrador (correção de dados) usa o bypass nativo de lógica customizada; não é coberto aqui.
 - O termo de multa fica escondido nesta fase (skills `verificar-termo-multa` e `verificar-app-termo-multa`).
-- A rotina do SNE grava a placa e a infração por `@odata.bind` (`cr40f_Placa`, `cr40f_Codigodainfracao`), nomes ainda não confirmados em uso real; a conferência está no roteiro da rotina.
+- A rotina do SNE grava a placa e a infração por `@odata.bind` (`cr40f_Placa`, `cr40f_Codigodainfracao`) (nomes de navegação confirmados na metadata do PROD, para `cr40f_veiculoses` e `cr40f_infracaodetransitos`); a conferência da primeira multa criada continua no roteiro da rotina, como boa prática.

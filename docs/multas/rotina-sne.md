@@ -24,11 +24,17 @@ Betinhos, nunca por esta rotina.
   feita por fora dos campos de passo com a mensagem "Os campos de passo da multa só mudam pelo passo a passo do Sistema
   Betinhos (...)". O `cr40f_indicado` não tem essa recusa, mas também não é seu: o sistema calcula esse campo a partir
   das etapas.
-- **Duplicata:** enquanto a trava estiver em modo "observar" (o modo de partida), o servidor **não** recusa uma multa
-  repetida, só registra. A busca pelo número do auto antes de criar (passo 1, item 1) é a única proteção e é obrigatória.
+- **Duplicata:** o Dataverse tem a chave alternativa `cr40f_ChaveNotificacaodaMulta` em `cr40f_novacoluna` e recusa número
+  de auto repetido em qualquer modo da trava (observar ou travar). Mesmo assim, a busca pelo número do auto antes de criar
+  (passo 1, item 1) continua obrigatória: evita o erro e mantém o resumo limpo. Se a criação for recusada por duplicata, a
+  mensagem pode vir da plataforma (violação da chave alternativa) além da mensagem da trava.
 - Toda multa nova começa sozinha na etapa "1. Identificar o responsável" e ganha uma tarefa no Planner para a equipe
   Frota. Não precisa (nem pode) informar a etapa.
-- Datas sem hora no formato `AAAA-MM-DD`. Data e hora da infração com o fuso de Brasília (`AAAA-MM-DDTHH:MM:00-03:00`).
+- Formato das datas:
+  - `cr40f_dataparaindicar` é DateOnly com comportamento UserLocal no PROD: gravar `AAAA-MM-DD` vira 00:00Z e a tela
+    mostra o dia anterior. Grave sempre `AAAA-MM-DDT12:00:00Z` (meio-dia UTC, o mesmo padrão das datas de passo);
+  - `cr40f_vencimento` é DateOnly puro (comportamento DateOnly, sem fuso): grave `AAAA-MM-DD`, sem hora;
+  - data e hora da infração (`cr40f_dataehorario`) com o fuso de Brasília (`AAAA-MM-DDTHH:MM:00-03:00`).
 
 ## Passo 1: multas novas
 
@@ -50,7 +56,8 @@ Para cada notificação de autuação que aparecer no SNE:
    - `cr40f_localdainfracao`: local;
    - infração: a infração do item 3, como lookup (idem). Se não achou no item 3, deixe de fora;
    - `new_valorguia`: valor da multa;
-   - `cr40f_dataparaindicar`: data-limite para indicar o condutor (é ela que define o prazo no Sistema Betinhos).
+   - `cr40f_dataparaindicar`: data-limite para indicar o condutor (é ela que define o prazo no Sistema Betinhos), no
+     formato `AAAA-MM-DDT12:00:00Z`;
    Se faltar no próprio SNE algum dado obrigatório desta lista (número do auto, órgão autuador, data e hora, local,
    valor ou data para indicar), não invente: anote o que faltou e não crie a multa. A infração fora do cadastro do
    Sistema Betinhos não entra nessa regra: aquela multa é criada.
@@ -64,8 +71,9 @@ Para cada notificação de autuação que aparecer no SNE:
    Exemplo com GUIDs fictícios:
    `"cr40f_Placa@odata.bind": "/cr40f_veiculoses(00000000-0000-4000-8000-000000000001)"`. Não grave
    `cr40f_placa` nem `cr40f_codigodainfracao` com o GUID direto: o lookup só grava pelo `@odata.bind`.
-   **Conferência obrigatória da primeira multa criada em cada execução.** Os nomes de navegação `cr40f_Placa` e
-   `cr40f_Codigodainfracao` ainda não foram confirmados em uso real. Logo depois de criar a primeira multa da execução,
+   **Conferência da primeira multa criada em cada execução (boa prática).** Os nomes de navegação `cr40f_Placa` (para
+   `cr40f_veiculoses`) e `cr40f_Codigodainfracao` (para `cr40f_infracaodetransitos`) estão confirmados no PROD pela
+   metadata da tabela. Mesmo assim, logo depois de criar a primeira multa da execução,
    abra o registro criado (ferramenta de leitura do conector, pelo id devolvido na criação) e confirme que a placa e, se
    o item 3 achou a infração, a infração ficaram preenchidas. Se não ficaram, **pare a rotina**: não crie mais nenhuma
    multa, não faça o passo 2 e avise o Júnior com o auto, o que foi enviado e o que voltou. Se ficaram, siga para as
@@ -85,7 +93,7 @@ Para cada notificação de autuação que aparecer no SNE:
    (etapas 1, 2 e 3), trazendo `cr40f_multasid`, `cr40f_novacoluna` e `_cr40f_placa_value`.
 2. Para cada uma, procure no SNE a notificação de penalidade do mesmo auto. Se ainda não saiu, pule.
 3. Se saiu, **atualize só estes campos**:
-   - `cr40f_vencimento`: vencimento da guia;
+   - `cr40f_vencimento`: vencimento da guia, no formato `AAAA-MM-DD` (sem hora);
    - `cr40f_valorcomdesconto`: valor com os 40% do SNE;
    - e anexe o PDF da penalidade na coluna de arquivo `cr40f_pdfpenalidade`.
    Não mexa em `new_valorguia`, nem na etapa, nem em nenhuma data de passo.
