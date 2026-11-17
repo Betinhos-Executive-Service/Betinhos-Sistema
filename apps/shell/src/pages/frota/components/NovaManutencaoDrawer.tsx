@@ -34,6 +34,8 @@ export function NovaManutencaoDrawer({ source, veiculos, hoje = todaySP(), onClo
   const [erros, setErros] = useState<ErrosNova>({})
   const [falha, setFalha] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  /** O km atual veio do hodômetro do veículo e o gestor ainda não mexeu nele. */
+  const [kmAutomatico, setKmAutomatico] = useState(false)
   // Guarda contra dois envios no mesmo instante: o estado só vale depois da próxima renderização, o ref vale já.
   const emCurso = useRef(false)
   const [solicitante, setSolicitante] = useState<OpcaoBusca | null>(null)
@@ -44,10 +46,17 @@ export function NovaManutencaoDrawer({ source, veiculos, hoje = todaySP(), onClo
   )
   const set = (patch: Partial<ValoresNova>) => setValores((atual) => ({ ...atual, ...patch }))
 
+  /**
+   * Com hodômetro do Infleet, o km do pedido já vem preenchido (o gestor pode corrigir). Enquanto o km for o automático
+   * (ou estiver vazio), trocar de veículo o substitui pelo do novo veículo, ou o limpa se ele não tem hodômetro; um km
+   * digitado pelo gestor nunca é trocado.
+   */
   function escolherVeiculo(id: string | null) {
     const veiculo = veiculos.find((v) => v.id === id)
-    // Com hodômetro do Infleet, o km do pedido já vem preenchido (o gestor pode corrigir).
-    setValores((atual) => ({ ...atual, veiculoId: id ?? '', ...(veiculo?.hodometro && !atual.km ? { km: String(Math.round(veiculo.hodometro)) } : {}) }))
+    if (valores.km !== '' && !kmAutomatico) { set({ veiculoId: id ?? '' }); return }
+    const hodometro = veiculo?.hodometro ? String(Math.round(veiculo.hodometro)) : ''
+    set({ veiculoId: id ?? '', km: hodometro })
+    setKmAutomatico(hodometro !== '')
   }
 
   async function criar() {
@@ -106,7 +115,7 @@ export function NovaManutencaoDrawer({ source, veiculos, hoje = todaySP(), onClo
             <Select options={OPCOES_TIPO} searchable={false} clearable placeholder="Opcional" value={valores.tipo || null} onChange={(v) => set({ tipo: v ?? '' })} />
           </Field>
           <Field label="Km atual" required error={erros.km} disabled={salvando}>
-            <Input type="number" inputMode="numeric" min={1} step={1} suffix="km" value={valores.km} onChange={(event) => set({ km: event.target.value })} />
+            <Input type="number" inputMode="numeric" min={1} step={1} suffix="km" value={valores.km} onChange={(event) => { setKmAutomatico(false); set({ km: event.target.value }) }} />
           </Field>
           <Field label="Quem pediu" disabled={salvando}>
             <Select options={pessoas.opcoes} searchable clearable placeholder="Opcional" loading={pessoas.carregando} onSearchChange={pessoas.onSearch} value={valores.solicitanteId || null}
