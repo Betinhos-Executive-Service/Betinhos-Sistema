@@ -553,6 +553,13 @@ function ComposicaoContent({ host }: { host: Host }) {
     setLoading(true)
     loadedPagesRef.current = 1
   }, [activeView, dataSource, listViews, removeView])
+  const deleteViewById = useCallback(async (id: string) => {
+    if (id === activeView?.id) return deleteCurrentView()
+    const view = views.find((item) => item.id === id)
+    if (!view || view.kind !== 'personal') throw new Error('Só visões pessoais vão para a lixeira.')
+    await removeView(view)
+    setViews(await listViews())
+  }, [activeView?.id, deleteCurrentView, listViews, removeView, views])
   const publishCurrentView = useCallback(async () => {
     const personal = activeView
     if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
@@ -1606,7 +1613,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   const showViewError = useCallback((message: string) => toast({ tone: 'danger', message }), [toast])
   const viewBar = useComposicaoViewState({
     catalog, ready: viewReady, mock: usingMockData, views, active: activeView, definition: viewDefinition, viewError, locked: commandLocked,
-    onChange: applyViewDefinition, selectView, saveView: saveCurrentView, deleteView: deleteCurrentView, publishView: publishCurrentView, reloadViews,
+    onChange: applyViewDefinition, selectView, saveView: saveCurrentView, deleteView: deleteCurrentView, deleteViewById, publishView: publishCurrentView, reloadViews,
     onError: showViewError,
   })
   // Sem dados ou com comando em andamento, as ações ficam inertes com o motivo (o antigo botão desabilitado).
