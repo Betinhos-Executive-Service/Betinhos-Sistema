@@ -60,6 +60,22 @@ describe('lista de multas (fase 1)', () => {
     expect(readRegistro(porId.a, 'situacao')).toEqual(['comigo', 'prazo-vencido'])
   })
 
+  it('Comigo: status legado ou desconhecido e responsável vazio entram; Descontado, Encerrada e Cancelada ficam fora', () => {
+    const lista: FrotaData = {
+      ...data,
+      multas: [
+        { ...base, id: 'sem-status', status: null, responsavel: null, motorista: null },
+        { ...base, id: 'desconhecido', status: 999, responsavel: null },
+        { ...base, id: 'recurso', status: 202410002 },
+        { ...base, id: 'descontado', status: 202410003 },
+        { ...base, id: 'encerrada', status: 202410005 },
+        { ...base, id: 'cancelada', status: 202410007 },
+      ],
+    }
+    const comigo = linhas('multa', lista, hoje).filter((l) => l.situacoes?.includes('comigo')).map((l) => l.id).sort()
+    expect(comigo).toEqual(['desconhecido', 'recurso', 'sem-status'])
+  })
+
   it('visões: Comigo é a padrão; depois Prazo vencido, Aguardando penalidade, Aguardando acerto, Encerradas e canceladas, Todas', () => {
     expect(MULTA_VISAO_PADRAO).toBe('Comigo')
     expect(MULTA_FILTROS_PADRAO.advanced.items).toMatchObject([{ field: 'situacao', op: 'in', values: [{ value: 'comigo' }] }])

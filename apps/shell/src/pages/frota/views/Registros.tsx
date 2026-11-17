@@ -19,7 +19,7 @@ import type { DataSource } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { linhas, type Linha } from '../domain/linhas'
-import { EXTRA, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
+import { EXTRA, LARGURAS, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
 import { urgenciaDoPrazo } from '../domain/multaEstado'
 import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
@@ -98,7 +98,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   const footer = <span className="frota-muted">{visiveis.length} de {todas.length}</span>
   const titulo = (key: string) => columns.find((c) => c.key === key)?.label ?? key
   const hoje = todaySP()
-  const multa = kind === 'multa'
+  const largura = (key: string, padrao: number) => LARGURAS[kind][key] ?? padrao
   const table = (rows: Linha[], tableFooter?: ReactNode) => (
     <VirtualTable<Linha>
       rows={rows}
@@ -109,15 +109,15 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
       footer={tableFooter}
       empty={<EmptyState compact align="start" title={`Nenhum registro de ${KIND_LABEL[kind].toLowerCase()} com estes filtros`} action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}
       columns={[
-        { key: 'descricao', header: titulo('descricao'), label: titulo('descricao'), sortable: true, defaultWidth: multa ? 160 : 300, width: 'minmax(180px, 2fr)', cell: (linha) => <TableTitle title={linha.titulo} meta={linha.categorias.length > 0 ? categoriasTexto(linha.categorias) : undefined} /> },
-        { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: multa ? 104 : 120, width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
-        { key: 'veiculo', header: titulo('veiculo'), label: titulo('veiculo'), sortable: true, defaultWidth: multa ? 96 : 120, width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
-        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: multa ? 160 : 190, hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
+        { key: 'descricao', header: titulo('descricao'), label: titulo('descricao'), sortable: true, defaultWidth: largura('descricao', 300), width: 'minmax(180px, 2fr)', cell: (linha) => <TableTitle title={linha.titulo} meta={linha.categorias.length > 0 ? categoriasTexto(linha.categorias) : undefined} /> },
+        { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: largura('data', 120), width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
+        { key: 'veiculo', header: titulo('veiculo'), label: titulo('veiculo'), sortable: true, defaultWidth: largura('veiculo', 120), width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
+        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: largura('pessoa', 190), hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
         ...(kind === 'multa' ? [] : [{ key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact' as const, cell: (linha: Linha) => <span className="frota-nowrap">{linha.extra}</span> }]),
-        { key: 'status', header: titulo('status'), label: titulo('status'), sortable: true, defaultWidth: multa ? 170 : 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
+        { key: 'status', header: titulo('status'), label: titulo('status'), sortable: true, defaultWidth: largura('status', 160), width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
         ...(kind === 'multa' ? [
-          { key: 'proximoPasso', header: 'Próximo passo', label: 'Próximo passo', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => linha.proximoPasso || '—' },
-          { key: 'proximoPrazo', header: 'Próximo prazo', label: 'Próximo prazo', sortable: true, defaultWidth: 130, width: 'minmax(100px, .7fr)', cell: (linha: Linha) => (linha.proximoPrazo
+          { key: 'proximoPasso', header: 'Próximo passo', label: 'Próximo passo', sortable: true, defaultWidth: largura('proximoPasso', 190), width: 'minmax(140px, 1fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => linha.proximoPasso || '—' },
+          { key: 'proximoPrazo', header: 'Próximo prazo', label: 'Próximo prazo', sortable: true, defaultWidth: largura('proximoPrazo', 130), width: 'minmax(100px, .7fr)', cell: (linha: Linha) => (linha.proximoPrazo
             ? <span className="frota-prazo frota-nowrap" data-urgencia={urgenciaDoPrazo(linha.proximoPrazo, (linha.situacoes ?? []).includes('prazo-vencido'), hoje)}>{formatBR(linha.proximoPrazo)}</span>
             : <span className="frota-muted">—</span>) },
         ] : []),

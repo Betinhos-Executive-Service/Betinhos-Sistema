@@ -132,6 +132,12 @@ export const registroColumns = (kind: Kind): ViewColumnDef[] => kind === 'multa'
     { key: 'extra', label: EXTRA[kind] }, { key: 'status', label: 'Status' },
   ]
 
+/** Larguras padrão (px) das colunas da multa: em 1280 px Auto, Etapa, Próximo passo e Próximo prazo cabem inteiros, sem rolar. */
+export const LARGURAS: Record<Kind, Record<string, number>> = {
+  manutencao: {}, colisao: {},
+  multa: { descricao: 124, data: 92, veiculo: 84, pessoa: 130, status: 200, proximoPasso: 220, proximoPrazo: 132 },
+}
+
 export const SITUACAO_OPCOES: FilterOption[] = [
   { value: 'comigo', label: 'Com passo a dar' }, { value: 'prazo-vencido', label: 'Prazo vencido' }, { value: 'aguardando-penalidade', label: 'Aguardando penalidade' },
   { value: 'aguardando-acerto', label: 'Aguardando acerto' }, { value: 'encerradas', label: 'Encerradas e canceladas' },
