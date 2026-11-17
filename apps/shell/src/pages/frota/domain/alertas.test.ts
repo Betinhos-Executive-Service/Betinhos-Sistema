@@ -6,7 +6,7 @@ import { buildPendencias } from './pendencias'
 
 const today = '2026-10-20'
 const A = { id: 'v1', label: 'ABC1D23' }
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `M ${id}`, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: A, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `M ${id}`, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: A, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const veic = (id: string, extra: Partial<Veiculo> = {}): Veiculo => ({ id, placa: id.toUpperCase(), marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: PROPRIO, motorista: null, hodometro: null, hodometroEm: null, ...extra })
 
 describe('reincidencias', () => {

@@ -91,7 +91,7 @@ describe('Frota', () => {
       ...EMPTY_DATA,
       veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: PROPRIO, motorista: null, hodometro: 171000, hodometroEm: dia }],
       planoPreventivo: [{ id: 'i1', nome: 'Troca de óleo', servico: 100000000, intervaloKm: 10000, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true }],
-      manutencoes: [{ id: 'm1', codigo: 'M1', descricao: 'Óleo', status: MANUT.REALIZADO, grau: null, tipo: null, agendarPara: null, dataManutencao: dia, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 160000, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: `${dia}T12:00:00Z`, servicos: [100000000], categorias: [], origemClassificacao: null, confiancaIa: null }],
+      manutencoes: [{ id: 'm1', codigo: 'M1', descricao: 'Óleo', status: MANUT.REALIZADO, grau: null, tipo: null, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: dia, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 160000, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: `${dia}T12:00:00Z`, servicos: [100000000], categorias: [], origemClassificacao: null, confiancaIa: null }],
     }, errors: {} }))
     history.replaceState(null, '', '#/frota')
     renderFrota(source)

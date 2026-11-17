@@ -8,7 +8,7 @@ import type { Colisao, FrotaData, Manutencao, Multa } from '../data/types'
 import { linhasDaTabela } from '../testUtils'
 import { Registros } from './Registros'
 
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manut('a', {}), manut('b', { status: MANUT.REALIZADO, veiculo: { id: 'v2', label: 'TST2B22' }, solicitante: { id: 'f2', label: 'Bruno' }, criadoEm: '2026-06-01T12:00:00Z' })] }
 const source = { openForm: vi.fn(async () => {}) } as unknown as DataSource
 const rows = linhasDaTabela

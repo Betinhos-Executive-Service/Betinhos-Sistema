@@ -21,7 +21,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
   }
 }
 
-const manutencao: Manutencao = { id: 'm1', codigo: 'M-1', descricao: 'Freio com ruído', status: MANUT.SOLICITADO, grau: null, tipo: null, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC-1234' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null }
+const manutencao: Manutencao = { id: 'm1', codigo: 'M-1', descricao: 'Freio com ruído', status: MANUT.SOLICITADO, grau: null, tipo: null, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC-1234' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null }
 const multa: Multa = { id: 'u1', codigo: 'NT-1073', titulo: 'Multa sem condutor', status: MULTA.NOTIFICAR, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC-1234' }, motorista: null, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
 const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa] }
 

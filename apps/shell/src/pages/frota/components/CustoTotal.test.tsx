@@ -7,7 +7,7 @@ import type { DespesaCombustivel, FrotaData, Manutencao } from '../data/types'
 import { CustoTotal } from './CustoTotal'
 
 const v1 = { id: 'v1', label: 'TST1A11' }
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-09-20T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: v1, solicitante: null, criadoEm: '2026-09-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: '2026-09-20T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: v1, solicitante: null, criadoEm: '2026-09-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const desp = (id: string, extra: Partial<DespesaCombustivel>): DespesaCombustivel => ({ id, dia: '2026-09-05', valor: null, veiculo: v1, manutencao: null, categoria: 'combustivel', ...extra })
 
 const data: FrotaData = {
