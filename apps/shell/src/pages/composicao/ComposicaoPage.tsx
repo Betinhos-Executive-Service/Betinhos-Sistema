@@ -1428,7 +1428,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   const comprovantesVisible = viewShape.columns.some((item) => item.id === COMPROVANTES_ID)
   const servicoDe = useCallback((row: Composition) => row.serviceId ?? (dataSource === 'mock' ? row.id : null), [dataSource])
   const servicoIds = useMemo(() => comprovantesVisible ? rows.flatMap((row) => servicoDe(row) ?? []) : [], [comprovantesVisible, rows, servicoDe])
-  const contagem = useContagemRecebimentos(recebimentos, servicoIds)
+  const { contagem } = useContagemRecebimentos(recebimentos, servicoIds)
 
   const displayedColumns = useMemo(() => {
     const base = new Map(columns.map((definition) => [definition.id, definition]))
