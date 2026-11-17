@@ -22,7 +22,7 @@ export const columnSchema = z.object({
   obrigatoria: z.boolean().optional(),
   tamanhoMaximo: z.number().int().optional().describe('texto (100) e memo (2000).'),
   casasDecimais: z.number().int().min(0).max(10).optional().describe('decimal (2).'),
-  somenteData: z.boolean().optional().describe('data: true = só data.'),
+  somenteData: z.boolean().optional().describe('data: padrão data e hora (UserLocal); true = só data (DateOnly).'),
   opcoes: z.array(z.object({ valor: z.number().int().optional(), rotulo: z.string() })).optional().describe('choice (valor opcional).'),
   rotuloVerdadeiro: z.string().optional().describe('booleano (Sim).'),
   rotuloFalso: z.string().optional().describe('booleano (Não).'),

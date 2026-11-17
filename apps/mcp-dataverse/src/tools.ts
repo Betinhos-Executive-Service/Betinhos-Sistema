@@ -14,7 +14,7 @@ import {
   labelText,
   validateXml,
 } from './metadata'
-import { EMPTY_FILTER_HINT, FILTER_HELP, OPERATOR_HINT, applyHint, expandNames, filterSyntaxError, nullColumns, numericEqColumns, propertyMissing, searchDisabled, suggest, wrongOperators, type Candidate } from './dicas'
+import { AGGREGATE_HINT, EMPTY_FILTER_HINT, FILTER_HELP, OPERATOR_HINT, OUTER_HINT, applyHint, dropCurrencyAux, expandNames, fold, outerWithoutNullCheck, promptSummary, filterSyntaxError, nullColumns, numericEqColumns, propertyMissing, searchDisabled, suggest, wrongOperators, type Candidate } from './dicas'
 
 export interface ToolContext {
   session: DataverseSession
@@ -41,6 +41,7 @@ type Explain = (error: unknown, raw: unknown, tool: string) => Promise<string | 
 const WRITE_TOOLS = new Set(['create_record', 'update_record', 'upsert_record'])
 /** Colunas que o sistema preenche sozinho (fora de somenteObrigatorias). */
 const AUTO_COLUMNS = new Set(['ownerid', 'owninguser', 'owningbusinessunit', 'owningteam', 'transactioncurrencyid', 'exchangerate'])
+const SYSTEM_LOOKUPS = new Set(['createdby', 'createdonbehalfby', 'modifiedby', 'modifiedonbehalfby', 'owninguser', 'owningbusinessunit', 'owningteam', 'transactioncurrencyid'])
 const AGGREGATE_RE = /\b(groupby|aggregate)\s*\(/i
 
 function makeTool<S extends z.ZodRawShape>(
@@ -104,6 +105,16 @@ function prodGuard(a: { ambiente: Ambiente; confirmar?: boolean }, what: string,
 function typedConfirmation(a: { ambiente: Ambiente; confirmacao_texto?: string }, expected: string): ToolResult | null {
   if (a.ambiente !== 'PROD' || a.confirmacao_texto?.trim().toLowerCase() === expected.toLowerCase()) return null
   return text(`BLOQUEADO, nada foi executado: no PROD, para excluir repita "${expected}" em confirmacao_texto.`, true)
+}
+
+/** Hora atual em UTC e em America/Sao_Paulo (para datas relativas: hoje, amanhã, mês passado). */
+export function nowInfo(d = new Date()) {
+  const tz = 'America/Sao_Paulo'
+  return {
+    utc: d.toISOString(),
+    saoPaulo: `${d.toLocaleString('sv-SE', { timeZone: tz }).replace(' ', 'T')}-03:00`,
+    diaDaSemana: d.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: tz }),
+  }
 }
 
 const clampPage = (n?: number) => Math.min(Math.max(n ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE)
@@ -170,15 +181,18 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       return "Se for função (WhoAmI, Retrieve*, Get*) use tipo:'function'; senão confira o nome exato (Custom API: prefixo e maiúsculas, ex.: cr40f_MinhaApi)."
     }
     if (tool === 'delete_table' && (/0x8004f01f/i.test(error.code) || /cannot be deleted because it is referenced/i.test(error.message))) {
-      let deps = ''
+      let deps = ' Não há ferramenta para excluir só a coluna ou a relação.'
       if (typeof args.tabela === 'string') {
         // 1 chamada barata: relações personalizadas que apontam para a tabela (lookups de outras tabelas).
         const e = await session.entity(amb, args.tabela)
         const r = await api(amb, 'GET', `EntityDefinitions(LogicalName='${e.logicalName}')/OneToManyRelationships${buildQuery({ $select: 'ReferencingEntity,ReferencingAttribute', $filter: 'IsCustomRelationship eq true' })}`).catch(() => undefined)
-        const list = ((r?.data?.value as any[]) ?? []).slice(0, 8).map((x) => `${x.ReferencingEntity}.${x.ReferencingAttribute}`)
-        if (list.length) deps = ` Lookups que apontam para ela: ${list.join(', ')}.`
+        const list = ((r?.data?.value as any[]) ?? []).filter((x) => x.ReferencingEntity !== e.logicalName).slice(0, 8)
+        if (list.length) deps = ` ${list.map((x) => `Apague primeiro a tabela ${x.ReferencingEntity} (a que tem o lookup ${x.ReferencingAttribute})`).join('; ')}. Não há ferramenta para excluir só a coluna ou a relação.`
       }
       return `Apague antes a tabela ou a relação que depende dela (lookup).${deps}`
+    }
+    if (tool === 'update_table' && /already exists/i.test(error.message)) {
+      return 'A coluna já existe: adicionarColunas só cria. Para mudar rótulo/descrição use alterarColunas:[{nomeSchema, rotulo, descricao}]; para acrescentar opção a choice local, alterarColunas:[{nomeSchema, adicionarOpcoes:[{rotulo}]}].'
     }
     if (WRITE_TOOLS.has(tool) && error.status === 400 && typeof args.tabela === 'string' && args.dados && typeof args.dados === 'object') {
       const hint = await writeHint(amb, args.tabela, args.dados as Record<string, unknown>, error.message)
@@ -262,6 +276,39 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   const optionsText = (options: { valor: number; rotulo?: string }[]) =>
     `${options.slice(0, 12).map((o) => `${o.valor}=${o.rotulo ?? '?'}`).join(', ')}${options.length > 12 ? ', ...' : ''}`
 
+  /** Choices da tabela (cache de describe_table ou 1 chamada, cacheada por 1 h): { coluna: opções }. */
+  async function picklists(amb: Ambiente, e: EntityInfo): Promise<Record<string, { valor: number; rotulo?: string }[]>> {
+    const known = cachedCols(amb, e)
+    if (known) return Object.fromEntries(known.filter((c) => c.tipo === 'Picklist' && c.escolhas).map((c) => [c.nome, c.escolhas]))
+    return session.cached(`pick:${amb}:${e.logicalName}`, METADATA_TTL_MS, async () => {
+      const r = await api(amb, 'GET', `EntityDefinitions(LogicalName='${e.logicalName}')/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata${buildQuery({ $select: 'LogicalName', $expand: 'OptionSet($select=Options)' })}`)
+      return Object.fromEntries((r.data.value as any[]).map((c) => [c.LogicalName, ((c.OptionSet?.Options ?? []) as any[]).map((o) => ({ valor: o.Value, rotulo: labelText(o.Label) }))]))
+    })
+  }
+
+  /** Choice escrito pelo rótulo vira o valor, só quando o rótulo casa exato e único (sem maiúsculas e acentos); senão o erro do servidor continua valendo. */
+  async function resolveChoices(amb: Ambiente, e: EntityInfo, dados: Record<string, unknown>): Promise<{ dados: Record<string, unknown>; resolvidos: string[] }> {
+    const keys = Object.keys(dados).filter((k) => typeof dados[k] === 'string' && !k.includes('@') && !k.startsWith('_') && isLogicalName(k))
+    if (!keys.length) return { dados, resolvidos: [] }
+    let map: Record<string, { valor: number; rotulo?: string }[]>
+    try {
+      map = await picklists(amb, e)
+    } catch {
+      return { dados, resolvidos: [] }
+    }
+    const out = { ...dados }
+    const resolvidos: string[] = []
+    for (const k of keys) {
+      const wanted = fold(dados[k] as string)
+      const hits = (map[k.toLowerCase()] ?? []).filter((o) => o.rotulo && fold(o.rotulo) === wanted)
+      if (hits.length === 1) {
+        out[k] = hits[0].valor
+        resolvidos.push(`${k}: '${dados[k]}' → ${hits[0].valor}`)
+      }
+    }
+    return { dados: out, resolvidos }
+  }
+
   /** Como usar um lookup: gravar com @odata.bind (escrita) ou _col_value/expand (leitura). */
   async function lookupAdvice(amb: Ambiente, write: boolean, c: { nome: string; alvos?: string[]; navegacao?: string }): Promise<string> {
     if (!write) return `"${c.nome}" é lookup: use _${c.nome}_value em select/filter${c.navegacao ? ` e ${c.navegacao}($select=colunas) em expand` : ''}.`
@@ -332,7 +379,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'whoami',
-      'Usuário, unidade de negócio e organização logados no ambiente.',
+      'Usuário, unidade, organização e hora atual (agora) do ambiente.',
       { ambiente },
       READ,
       async (a) => {
@@ -341,6 +388,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           await api(a.ambiente, 'GET', `systemusers(${who.UserId})${buildQuery({ $select: 'fullname,internalemailaddress,domainname' })}`)
         ).data
         return ok({
+          agora: nowInfo(),
           ambiente: a.ambiente,
           url: session.baseUrl(a.ambiente),
           conta: ctx.identity,
@@ -389,7 +437,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
             if (error instanceof DataverseError && (error.status === 400 || error.status === 404)) return [] as any[]
             throw error
           })
-        const [header, attrs, picklists, multis, statuses, states, bools, lookups, m2o, o2m, m2m, keys] = await Promise.all([
+        const [header, attrs, picklists, multis, statuses, states, bools, lookups, m2o, o2m, m2m, keys, dates] = await Promise.all([
           api(ambiente, 'GET', `${base}${buildQuery({ $select: 'SchemaName,DisplayName,Description,IsCustomEntity,OwnershipType' })}`).then((r) => r.data),
           get(`Attributes${buildQuery({ $select: 'LogicalName,AttributeType,DisplayName,RequiredLevel,IsValidForCreate,IsValidForUpdate,IsCustomAttribute', $filter: 'AttributeOf eq null' })}`),
           opt(`Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata${buildQuery({ $select: 'LogicalName', $expand: 'OptionSet($select=Options),GlobalOptionSet($select=Options)' })}`),
@@ -398,10 +446,11 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           opt(`Attributes/Microsoft.Dynamics.CRM.StateAttributeMetadata${buildQuery({ $select: 'LogicalName', $expand: 'OptionSet($select=Options)' })}`),
           opt(`Attributes/Microsoft.Dynamics.CRM.BooleanAttributeMetadata${buildQuery({ $select: 'LogicalName', $expand: 'OptionSet($select=TrueOption,FalseOption)' })}`),
           opt(`Attributes/Microsoft.Dynamics.CRM.LookupAttributeMetadata${buildQuery({ $select: 'LogicalName,Targets' })}`),
-          opt(`ManyToOneRelationships${buildQuery({ $select: 'SchemaName,ReferencedEntity,ReferencingAttribute,ReferencingEntityNavigationPropertyName' })}`),
-          opt(`OneToManyRelationships${buildQuery({ $select: 'SchemaName,ReferencingEntity,ReferencingAttribute,ReferencedEntityNavigationPropertyName' })}`),
-          opt(`ManyToManyRelationships${buildQuery({ $select: 'SchemaName,Entity1LogicalName,Entity2LogicalName,Entity1NavigationPropertyName,Entity2NavigationPropertyName' })}`),
+          opt(`ManyToOneRelationships${buildQuery({ $select: 'SchemaName,ReferencedEntity,ReferencingAttribute,ReferencingEntityNavigationPropertyName,IsCustomRelationship' })}`),
+          opt(`OneToManyRelationships${buildQuery({ $select: 'SchemaName,ReferencingEntity,ReferencingAttribute,ReferencedEntityNavigationPropertyName,IsCustomRelationship' })}`),
+          opt(`ManyToManyRelationships${buildQuery({ $select: 'SchemaName,Entity1LogicalName,Entity2LogicalName,Entity1NavigationPropertyName,Entity2NavigationPropertyName,IsCustomRelationship' })}`),
           opt(`Keys${buildQuery({ $select: 'SchemaName,KeyAttributes' })}`),
+          opt(`Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata${buildQuery({ $select: 'LogicalName,Format,DateTimeBehavior' })}`),
         ])
 
         const options = new Map<string, { valor: number; rotulo?: string }[]>()
@@ -417,6 +466,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           if (t) options.set(r.LogicalName, [t.FalseOption, t.TrueOption].filter(Boolean).map((o: any) => ({ valor: o.Value, rotulo: labelText(o.Label) })))
         }
         const targets = new Map<string, string[]>(lookups.map((r) => [r.LogicalName, r.Targets]))
+        const formats = new Map<string, string>(dates.map((r) => [r.LogicalName, `${r.Format}/${r.DateTimeBehavior?.Value}`]))
         const nav = new Map<string, string>(m2o.map((r) => [r.ReferencingAttribute, r.ReferencingEntityNavigationPropertyName]))
 
         const colunas = attrs
@@ -429,6 +479,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
             ...(c.IsValidForUpdate === false ? { atualizar: false } : {}),
             ...(c.IsCustomAttribute ? { personalizada: true } : {}),
             ...(options.has(c.LogicalName) ? { escolhas: options.get(c.LogicalName) } : {}),
+            ...(formats.has(c.LogicalName) ? { formato: formats.get(c.LogicalName) } : {}),
             ...(targets.has(c.LogicalName)
               ? { alvos: targets.get(c.LogicalName), navegacao: nav.get(c.LogicalName), colunaFiltro: `_${c.LogicalName}_value` }
               : {}),
@@ -447,9 +498,9 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           chavesAlternativas: keys.map((k) => ({ nome: k.SchemaName, colunas: k.KeyAttributes })),
           colunas,
           relacoes: {
-            muitosParaUm: m2o.map((r) => ({ nome: r.SchemaName, alvo: r.ReferencedEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencingEntityNavigationPropertyName })),
-            umParaMuitos: o2m.map((r) => ({ nome: r.SchemaName, tabela: r.ReferencingEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencedEntityNavigationPropertyName })),
-            muitosParaMuitos: m2m.map((r) => ({ nome: r.SchemaName, tabela1: r.Entity1LogicalName, tabela2: r.Entity2LogicalName, navegacao1: r.Entity1NavigationPropertyName, navegacao2: r.Entity2NavigationPropertyName })),
+            muitosParaUm: m2o.map((r) => ({ nome: r.SchemaName, alvo: r.ReferencedEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencingEntityNavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
+            umParaMuitos: o2m.map((r) => ({ nome: r.SchemaName, tabela: r.ReferencingEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencedEntityNavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
+            muitosParaMuitos: m2m.map((r) => ({ nome: r.SchemaName, tabela1: r.Entity1LogicalName, tabela2: r.Entity2LogicalName, navegacao1: r.Entity1NavigationPropertyName, navegacao2: r.Entity2NavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
           },
         }
   }
@@ -501,11 +552,21 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         const relacoes = a.somenteObrigatorias
           ? { muitosParaUm: r.muitosParaUm.filter((x: any) => cols.some((c) => c.nome === x.coluna)) }
           : {
-              muitosParaUm: r.muitosParaUm.filter((x: any) => has(x.nome, x.alvo, x.coluna, x.navegacao)),
-              umParaMuitos: r.umParaMuitos.filter((x: any) => has(x.nome, x.tabela, x.coluna, x.navegacao)),
-              muitosParaMuitos: r.muitosParaMuitos.filter((x: any) => has(x.nome, x.tabela1, x.tabela2, x.navegacao1, x.navegacao2)),
+              // Com filtro, as relações de sistema (createdby, ownerid, moeda...) ficam de fora; casa também pelo rótulo do lookup.
+              muitosParaUm: r.muitosParaUm.filter((x: any) => !(term && x.sistema) && has(x.nome, x.alvo, x.coluna, x.navegacao, (full.colunas as any[]).find((c) => c.nome === x.coluna)?.rotulo)),
+              umParaMuitos: r.umParaMuitos.filter((x: any) => !(term && x.sistema) && has(x.nome, x.tabela, x.coluna, x.navegacao)),
+              muitosParaMuitos: r.muitosParaMuitos.filter((x: any) => !(term && x.sistema) && has(x.nome, x.tabela1, x.tabela2, x.navegacao1, x.navegacao2)),
             }
-        return ok({ ...full, colunas, relacoes, ...(term && !colunas.length ? { _aviso: `Nenhuma coluna casa com '${a.filtroColuna}' (${full.colunas.length} colunas); tente outro trecho.` } : {}) })
+        let aviso: string | undefined
+        if (term && !colunas.length) {
+          const all = full.colunas as any[]
+          const show = (c: any) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`
+          const near = suggest(a.filtroColuna ?? '', all.map((c) => ({ nome: c.nome, rotulo: c.rotulo })), 10).map((c) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`)
+          const lookups = all.filter((c) => c.alvos && !SYSTEM_LOOKUPS.has(c.nome)).slice(0, 15).map(show)
+          const money = all.filter((c) => c.tipo === 'Money' && !c.nome.endsWith('_base')).slice(0, 15).map(show)
+          aviso = `Nenhuma coluna casa com '${a.filtroColuna}' (${all.length} colunas); tente outro trecho.${near.length ? ` Mais próximas: ${near.join(', ')}.` : ''}${lookups.length ? ` Lookups: ${lookups.join(', ')}.` : ''}${money.length ? ` Money: ${money.join(', ')}.` : ''}`
+        }
+        return ok({ ...full, colunas, relacoes, ...(aviso ? { _aviso: aviso } : {}) })
       },
     ),
   )
@@ -552,9 +613,9 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           const more = r.data['@Microsoft.Dynamics.CRM.morerecords']
           const hasTop = /<fetch\b[^>]*?\stop\s*=/i.test(a.fetchXml)
           const aggregate = /<fetch\b[^>]*?\saggregate\s*=\s*["']true["']/i.test(a.fetchXml)
+          const aliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bgroupby\s*=\s*["']true["'][^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
           if (aggregate) {
             // Grupo sem valor (lookup/choice vazio) vem sem a chave: torna-o explícito (null + "(vazio)").
-            const aliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bgroupby\s*=\s*["']true["'][^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
             for (const row of rows as Record<string, unknown>[]) {
               for (const g of aliases) {
                 if (row[g] == null) {
@@ -564,6 +625,8 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
               }
             }
           }
+          const outer = !aggregate && rows.length ? outerWithoutNullCheck(a.fetchXml) : []
+          const dica = !rows.length && !(a.pagina && a.pagina > 1) && /<(filter|link-entity)\b/i.test(a.fetchXml) ? EMPTY_FILTER_HINT : outer.length ? OUTER_HINT(outer[0]) : aggregate && aliases.length ? AGGREGATE_HINT : undefined
           return ok(
             {
               tabela: e.logicalName,
@@ -571,7 +634,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
               // Sem a anotação e com a página cheia, não afirme que acabou.
               maisRegistros: more ?? (!hasTop && !aggregate && rows.length >= count),
               pagingCookie: r.data['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'],
-              ...(!rows.length && !(a.pagina && a.pagina > 1) && /<(filter|link-entity)\b/i.test(a.fetchXml) ? { _dica: EMPTY_FILTER_HINT } : {}),
+              ...(dica ? { _dica: dica } : {}),
             },
             { keepNulls: aggregate },
           )
@@ -591,6 +654,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         })}`
         const r = await api(a.ambiente, 'GET', path, { headers: a.apply ? {} : { Prefer: preferPage(size) } })
         const page = pageResult(r.data)
+        if (!aggregating && Array.isArray(page.value)) page.value = dropCurrencyAux(page.value as Record<string, unknown>[], a.select)
         const rows = page.value as unknown[]
         const notes: Record<string, unknown> = {}
         if (aggregating && a.select) notes._aviso = 'select ignorado: com apply só valem as colunas do groupby/aggregate.'
@@ -649,7 +713,13 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       async (a) => {
         const e = await session.entity(a.ambiente, a.tabela)
         const r = await api(a.ambiente, 'GET', `${e.entitySet}(${a.id})${buildQuery({ $select: a.colunas, $expand: a.expand })}`)
-        return ok({ tabela: e.logicalName, registro: r.data })
+        let registro: Record<string, unknown> = r.data
+        if (a.colunas) {
+          registro = dropCurrencyAux([registro], a.colunas)[0]
+          // Coluna pedida e vazia: null explícito, não omitida.
+          for (const c of a.colunas.split(',').map((x) => x.trim()).filter(Boolean)) if (!(c in registro)) registro[c] = null
+        }
+        return ok({ tabela: e.logicalName, registro }, { keepNulls: !!a.colunas })
       },
     ),
   )
@@ -657,15 +727,16 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'create_record',
-      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = valor numérico. PROD exige confirmar.',
+      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = número ou rótulo exato. PROD exige confirmar.',
       { ambiente, tabela, dados: z.record(z.string(), z.unknown()).describe('Colunas e valores.'), confirmar },
       WRITE_RW,
       async (a) => {
         const e = await session.entity(a.ambiente, a.tabela)
-        const blocked = prodGuard(a, `criar registro em ${e.logicalName}`, a.dados)
+        const { dados, resolvidos } = await resolveChoices(a.ambiente, e, a.dados)
+        const blocked = prodGuard(a, `criar registro em ${e.logicalName}`, dados)
         if (blocked) return blocked
-        const r = await api(a.ambiente, 'POST', e.entitySet, { body: a.dados, headers: { Prefer: 'return=minimal' } })
-        return ok({ criado: true, tabela: e.logicalName, id: idFromEntityHeader(r.headers) })
+        const r = await api(a.ambiente, 'POST', e.entitySet, { body: dados, headers: { Prefer: 'return=minimal' } })
+        return ok({ criado: true, tabela: e.logicalName, id: idFromEntityHeader(r.headers), ...(resolvidos.length ? { resolvidos } : {}) })
       },
     ),
   )
@@ -679,10 +750,11 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       async (a) => {
         if (!Object.keys(a.dados).length) return text('"dados" está vazio: informe ao menos uma coluna a alterar. Nada foi enviado.', true)
         const e = await session.entity(a.ambiente, a.tabela)
-        const blocked = prodGuard(a, `atualizar ${e.logicalName}(${a.id})`, a.dados)
+        const { dados, resolvidos } = await resolveChoices(a.ambiente, e, a.dados)
+        const blocked = prodGuard(a, `atualizar ${e.logicalName}(${a.id})`, dados)
         if (blocked) return blocked
-        await api(a.ambiente, 'PATCH', `${e.entitySet}(${a.id})`, { body: a.dados, headers: { 'If-Match': '*', Prefer: 'return=minimal' } })
-        return ok({ atualizado: true, tabela: e.logicalName, id: a.id })
+        await api(a.ambiente, 'PATCH', `${e.entitySet}(${a.id})`, { body: dados, headers: { 'If-Match': '*', Prefer: 'return=minimal' } })
+        return ok({ atualizado: true, tabela: e.logicalName, id: a.id, ...(resolvidos.length ? { resolvidos } : {}) })
       },
     ),
   )
@@ -694,7 +766,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       {
         ambiente,
         tabela,
-        chaves: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe('Chave alternativa, ex.: {"cr40f_codigo":"ABC"}.'),
+        chaves: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).describe('Chave alternativa ({"cr40f_codigo":"ABC"}) ou a primária <tabela>id (GUID).'),
         dados: z.record(z.string(), z.unknown()),
         modo: z.enum(['upsert', 'criar', 'atualizar']).default('upsert'),
         confirmar,
@@ -702,15 +774,16 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       WRITE_RW,
       async (a) => {
         const e = await session.entity(a.ambiente, a.tabela)
-        const blocked = prodGuard(a, `${a.modo} em ${e.logicalName} por chave ${JSON.stringify(a.chaves)}`, a.dados)
+        const { dados, resolvidos } = await resolveChoices(a.ambiente, e, a.dados)
+        const blocked = prodGuard(a, `${a.modo} em ${e.logicalName} por chave ${JSON.stringify(a.chaves)}`, dados)
         if (blocked) return blocked
         // return=representation: o upsert devolve 201 (criou) ou 200 (atualizou); com return=minimal os dois viram 204/201 ambíguos.
         const headers: Record<string, string> = { Prefer: 'return=representation' }
         if (a.modo === 'criar') headers['If-None-Match'] = '*'
         if (a.modo === 'atualizar') headers['If-Match'] = '*'
-        const r = await api(a.ambiente, 'PATCH', `${e.entitySet}(${keyPath(a.chaves, e.primaryId)})`, { body: a.dados, headers })
+        const r = await api(a.ambiente, 'PATCH', `${e.entitySet}(${keyPath(a.chaves, e.primaryId)})`, { body: dados, headers })
         const id = idFromEntityHeader(r.headers) ?? (typeof r.data?.[e.primaryId] === 'string' ? r.data[e.primaryId] : undefined)
-        return ok({ resultado: r.status === 201 ? 'criado' : r.status === 200 ? 'atualizado' : 'gravado (criado ou atualizado)', tabela: e.logicalName, id })
+        return ok({ resultado: r.status === 201 ? 'criado' : r.status === 200 ? 'atualizado' : 'gravado (criado ou atualizado)', tabela: e.logicalName, id, ...(resolvidos.length ? { resolvidos } : {}) })
       },
     ),
   )
@@ -734,7 +807,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'create_table',
-      'Cria tabela personalizada com coluna principal de texto. O schema do PROD vem das soluções: lá só em exceção, com confirmar. Prefixo do publisher (cr40f_); rótulos em pt-BR.',
+      'Cria tabela personalizada com coluna principal de texto. O schema do PROD vem das soluções: lá só em exceção, com confirmar. Prefixo cr40f_; rótulos em pt-BR. 30 a 70 s.',
       {
         ambiente,
         nomeSchema: z.string().refine(isLogicalName, 'Nome de esquema inválido (letras, números e _)').describe('Ex.: cr40f_Equipamento.'),
@@ -764,7 +837,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'update_table',
-      'Altera rótulos e/ou adiciona colunas (texto, memo, inteiro, decimal, moeda, data, booleano, choice, lookup). No PROD o schema vem das soluções; exige confirmar.',
+      'Altera rótulos, adiciona colunas (texto, memo, inteiro, decimal, moeda, data, booleano, choice, lookup) e altera as existentes. 30 a 70 s. PROD: schema vem das soluções; exige confirmar.',
       {
         ambiente,
         tabela,
@@ -772,6 +845,17 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         rotuloPlural: z.string().optional(),
         descricao: z.string().optional(),
         adicionarColunas: z.array(columnSchema).optional(),
+        alterarColunas: z
+          .array(
+            z.object({
+              nomeSchema: z.string().refine(isLogicalName, 'Nome de coluna inválido'),
+              rotulo: z.string().optional(),
+              descricao: z.string().optional(),
+              adicionarOpcoes: z.array(z.object({ valor: z.number().int().optional(), rotulo: z.string() })).optional(),
+            }),
+          )
+          .optional()
+          .describe('Colunas existentes: rótulo, descrição, opções.'),
         solucao: z.string().optional().describe('Nome único da solução que recebe as colunas.'),
         idioma: z.number().int().default(1046),
         confirmar,
@@ -782,6 +866,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         const plan = {
           renomear: { rotulo: a.rotulo, rotuloPlural: a.rotuloPlural, descricao: a.descricao },
           colunas: a.adicionarColunas?.map((c) => ({ tipo: c.tipo, nome: c.nomeSchema })),
+          alterar: a.alterarColunas,
         }
         const blocked = prodGuard(a, `alterar a tabela ${e.logicalName}`, plan)
         if (blocked) return blocked
@@ -812,6 +897,36 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
                 : metadataApi(a.ambiente, 'POST', `EntityDefinitions(LogicalName='${e.logicalName}')/Attributes`, { body: buildAttribute(c, a.idioma), headers }),
           })
         }
+        for (const c of a.alterarColunas ?? []) {
+          const col = c.nomeSchema.toLowerCase()
+          if (c.rotulo || c.descricao) {
+            steps.push({
+              nome: `rótulo/descrição de ${col}`,
+              run: async () => {
+                const type = (await metadataApi(a.ambiente, 'GET', attrPath(e, col) + buildQuery({ $select: 'AttributeType' }))).data.AttributeType as string
+                const cast = `Microsoft.Dynamics.CRM.${type === 'Customer' ? 'Lookup' : type}AttributeMetadata`
+                const current = (await metadataApi(a.ambiente, 'GET', attrPath(e, col, `/${cast}`))).data
+                const next = {
+                  ...current,
+                  '@odata.type': cast,
+                  ...(c.rotulo ? { DisplayName: label(c.rotulo, a.idioma) } : {}),
+                  ...(c.descricao ? { Description: label(c.descricao, a.idioma) } : {}),
+                }
+                await metadataApi(a.ambiente, 'PUT', attrPath(e, col), { body: next, headers: { ...headers, 'MSCRM.MergeLabels': 'true' } })
+              },
+            })
+          }
+          for (const o of c.adicionarOpcoes ?? []) {
+            steps.push({
+              nome: `opção '${o.rotulo}' em ${col}`,
+              run: () =>
+                metadataApi(a.ambiente, 'POST', 'InsertOptionValue', {
+                  body: { EntityLogicalName: e.logicalName, AttributeLogicalName: col, ...(o.valor !== undefined ? { Value: o.valor } : {}), Label: label(o.rotulo, a.idioma) },
+                  headers,
+                }),
+            })
+          }
+        }
         const done: string[] = []
         for (const [i, step] of steps.entries()) {
           try {
@@ -829,7 +944,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           }
         }
         if (done.length) session.invalidateSchema(a.ambiente)
-        return ok({ tabela: e.logicalName, feito: done.map((d) => (d.startsWith('coluna ') ? `${d} criada` : `${d} atualizados`)) })
+        return ok({ tabela: e.logicalName, feito: done.map((d) => (d.startsWith('coluna ') ? `${d} criada` : d.startsWith('rótulos/') ? `${d} atualizados` : `${d} alterada`)) })
       },
     ),
   )
@@ -837,7 +952,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'delete_table',
-      'EXCLUI tabela e todos os dados (irreversível). PROD exige confirmar:true e confirmacao_texto = nome lógico; só com decisão explícita.',
+      'EXCLUI tabela e todos os dados (irreversível; 30 a 70 s). PROD exige confirmar:true e confirmacao_texto = nome lógico; só com decisão explícita.',
       { ambiente, tabela, confirmar, confirmacao_texto: confirmacaoTexto },
       WRITE_DESTRUCTIVE,
       async (a) => {
@@ -855,7 +970,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'list_prompts',
-      'Lista prompts do AI Builder com `entradas` (variáveis do execute_prompt; só os 15 primeiros: use filtro). Melhor esforço.',
+      'Prompts do AI Builder, ativos primeiro, com `entradas` (variáveis do execute_prompt) e `descricao`; só os 15 primeiros: use filtro.',
       {
         ambiente,
         filtro: z.string().optional().describe('Trecho do nome.'),
@@ -866,27 +981,37 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         const r = await api(a.ambiente, 'GET', `msdyn_aimodels${buildQuery({ $select: 'msdyn_aimodelid,msdyn_name,statecode,_msdyn_templateid_value', $orderby: 'msdyn_name', $top: 200 })}`)
         const fv = '@OData.Community.Display.V1.FormattedValue'
         const term = a.filtro?.toLowerCase()
-        const itens: { id: string; nome?: string; ativo: boolean; modelo?: string; entradas?: string[] }[] = (r.data.value as any[])
+        const itens: { id: string; nome?: string; ativo: boolean; modelo?: string; descricao?: string; entradas?: string[] }[] = (r.data.value as any[])
           .map((m) => ({ id: m.msdyn_aimodelid, nome: m.msdyn_name, ativo: m.statecode === 0, modelo: m[`_msdyn_templateid_value${fv}`] as string | undefined }))
           .filter((m) => a.todosOsModelos || !m.modelo || /gpt|prompt/i.test(m.modelo))
           .filter((m) => !term || m.nome?.toLowerCase().includes(term))
+          .sort((x, y) => Number(y.ativo) - Number(x.ativo))
         // Variáveis de entrada: vêm do JSON da configuração de execução (msdyn_aiconfiguration, tipo RunConfiguration).
         const withInputs = itens.slice(0, PROMPT_INPUTS_MAX)
         if (withInputs.length) {
           try {
             const filter = `msdyn_type eq 190690001 and (${withInputs.map((m) => `_msdyn_aimodelid_value eq ${m.id}`).join(' or ')})`
             const cfg = await api(a.ambiente, 'GET', `msdyn_aiconfigurations${buildQuery({ $select: '_msdyn_aimodelid_value,msdyn_customconfiguration', $filter: filter })}`)
-            const byModel = new Map<string, string[]>()
+            const byModel = new Map<string, { ids: string[]; resumo?: string }>()
             for (const c of cfg.data.value as any[]) {
               const ids = promptInputs(c.msdyn_customconfiguration)
-              if (ids.length) byModel.set(c._msdyn_aimodelid_value, ids)
+              const resumo = promptSummary(c.msdyn_customconfiguration)
+              if (ids.length || resumo) byModel.set(c._msdyn_aimodelid_value, { ids, resumo })
             }
-            for (const m of withInputs) if (byModel.has(m.id)) m.entradas = byModel.get(m.id)
+            for (const m of withInputs) {
+              const info = byModel.get(m.id)
+              if (info?.ids.length) m.entradas = info.ids
+              if (info?.resumo) m.descricao = info.resumo
+            }
           } catch {
             // melhor esforço: sem as entradas a lista continua útil
           }
         }
-        return ok({ itens, ...(itens.length > PROMPT_INPUTS_MAX ? { _aviso: `Entradas só nos ${PROMPT_INPUTS_MAX} primeiros; use filtro.` } : {}) })
+        const avisos = [
+          ...(itens.length && !itens.some((m) => m.ativo) ? ['nenhum ativo: execute_prompt deve falhar.'] : []),
+          ...(itens.length > PROMPT_INPUTS_MAX ? [`Entradas só nos ${PROMPT_INPUTS_MAX} primeiros; use filtro.`] : []),
+        ]
+        return ok({ itens, ...(avisos.length ? { _aviso: avisos.join(' ') } : {}) })
       },
     ),
   )

@@ -131,3 +131,49 @@ export const OPERATOR_HINT = 'Use eq/ne/and/or, não = == <> != && ||. Ex.: cr40
 /** apply agrupando por lookup falha no OData: o caminho que funciona é o FetchXML aggregate. */
 export const applyHint = (table: string, id: string) =>
   `$apply não agrupa por lookup (nem _col_value nem Nav/coluna). Use fetchXml: <fetch aggregate="true"><entity name="${table}"><attribute name="<lookup>" groupby="true" alias="g"/><attribute name="${id}" aggregate="count" alias="total"/><order alias="total" descending="true"/></entity></fetch> (ranking: top no <fetch>). Grupo nulo = linha sem a chave. No OData, groupby só em colunas simples e orderby/top não vão dentro do apply.`
+
+/** Aliases de `<link-entity link-type="outer">` sem `<condition entityname="alias" ... operator="null"/>`: a junção externa devolve todas as linhas da raiz. */
+export function outerWithoutNullCheck(xml: string): string[] {
+  const conditions = [...xml.matchAll(/<condition\b[^>]*>/gi)].map((m) => m[0])
+  const out: string[] = []
+  for (const m of xml.matchAll(/<link-entity\b[^>]*>/gi)) {
+    if (!/\blink-type\s*=\s*["']outer["']/i.test(m[0])) continue
+    const alias = m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1] ?? m[0].match(/\bname\s*=\s*["']([^"']+)["']/i)?.[1]
+    if (!alias) continue
+    const checked = conditions.some((c) => new RegExp(`\\bentityname\\s*=\\s*["']${alias.replace(/[^\w]/g, '.')}["']`, 'i').test(c) && /\boperator\s*=\s*["']null["']/i.test(c))
+    if (!checked) out.push(alias)
+  }
+  return out
+}
+
+export const OUTER_HINT = (alias: string) =>
+  `link-entity outer "${alias}" sem condição null: devolve TODAS as linhas da raiz, com ou sem vínculo. Para "quem NÃO tem": no filtro da raiz, <condition entityname="${alias}" attribute="<id do alvo>" operator="null"/>.`
+
+export const AGGREGATE_HINT =
+  'Grupo "(vazio)" = registros sem esse vínculo. Quem não tem nenhum registro não aparece na agregação: para listar quem NÃO tem, use link-type="outer" + <condition entityname="<alias>" attribute="<id>" operator="null"/> no filtro da raiz.'
+
+/** Tira colunas de moeda que o Dataverse devolve sem pedido (`_transactioncurrencyid_value*`, `exchangerate`). */
+export function dropCurrencyAux<T extends Record<string, unknown>>(rows: T[], select: string | undefined): T[] {
+  if (!select) return rows
+  const wanted = new Set(select.split(',').map((c) => c.trim().toLowerCase()))
+  const dropKeys = (k: string) =>
+    (!wanted.has('_transactioncurrencyid_value') && k.startsWith('_transactioncurrencyid_value')) || (!wanted.has('exchangerate') && k === 'exchangerate')
+  return rows.map((r) => {
+    if (!r || typeof r !== 'object' || !Object.keys(r).some(dropKeys)) return r
+    return Object.fromEntries(Object.entries(r).filter(([k]) => !dropKeys(k))) as T
+  })
+}
+
+/** Resumo (até 100 caracteres) do texto de um prompt do AI Builder, com as variáveis entre chaves. */
+export function promptSummary(raw: unknown): string | undefined {
+  try {
+    const parts = (JSON.parse(String(raw)) as { prompt?: { type?: string; text?: string }[] }).prompt ?? []
+    const t = parts.filter((p) => p.text).map((p) => (p.type === 'inputVariable' ? `{${p.text}}` : p.text)).join('').replace(/\s+/g, ' ').trim()
+    return t ? (t.length > 100 ? `${t.slice(0, 97)}...` : t) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Texto sem acento e em minúsculas, para casar rótulos de choice. */
+export const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()

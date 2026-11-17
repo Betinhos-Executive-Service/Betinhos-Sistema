@@ -288,7 +288,7 @@ export class DataverseSession {
   /** Esquema mudou (tabela criada, alterada ou excluída): descarta metadata em cache do ambiente. */
   invalidateSchema(ambiente: Ambiente) {
     for (const key of this.entities.keys()) if (key.startsWith(`${ambiente}:`)) this.entities.delete(key)
-    for (const prefix of ['ent:', 'desc:', 'tables:']) this.store.deletePrefix(`${prefix}${ambiente}`)
+    for (const prefix of ['ent:', 'desc:', 'tables:', 'pick:']) this.store.deletePrefix(`${prefix}${ambiente}`)
   }
 
   /** Resolve nome lógico ou EntitySetName para a tabela (cache em memória e no store, por ambiente). */

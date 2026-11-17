@@ -3,9 +3,9 @@ import { DataverseSession } from './dataverse'
 import { clean, limitJson } from './format'
 import { env, json, mockFetch, tokenReply, type Call } from './helpers.test-util'
 import { INSTRUCTIONS } from './instrucoes'
-import { nullColumns, suggest, wrongOperators } from './dicas'
-import { validateXml } from './metadata'
-import { buildTools, promptInputs, type ToolDef } from './tools'
+import { AGGREGATE_HINT, dropCurrencyAux, nullColumns, outerWithoutNullCheck, promptSummary, suggest, wrongOperators } from './dicas'
+import { columnSchema, validateXml } from './metadata'
+import { buildTools, nowInfo, promptInputs, type ToolDef } from './tools'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -505,7 +505,7 @@ describe('escrita: veracidade e erros', () => {
   it('delete_table com dependências: manda apagar a relação antes e lista os lookups', async () => {
     mockFetch(route((c) => (c.method === 'DELETE' ? json({ error: { code: '0x8004f01f', message: 'The Entity(1) component cannot be deleted because it is referenced by 5 other components.' } }, 400) : undefined)))
     const r = await tools()('delete_table').handler({ tabela: 'cr40f_reserva' })
-    expect(textOf(r)).toMatch(/Apague antes a tabela ou a relação que depende dela \(lookup\)\. Lookups que apontam para ela: cr40f_outra\.cr40f_reserva/)
+    expect(textOf(r)).toMatch(/Apague primeiro a tabela cr40f_outra \(a que tem o lookup cr40f_reserva\)\. Não há ferramenta para excluir só a coluna/)
   })
 
   it('update_record com dados vazios é recusado sem chamar a API', async () => {
@@ -551,7 +551,7 @@ describe('leitura: avisos da rodada 3', () => {
     mockFetch(route())
     const r = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'xyzqq' })))
     expect(r.colunas).toEqual([])
-    expect(r._aviso).toBe("Nenhuma coluna casa com 'xyzqq' (7 colunas); tente outro trecho.")
+    expect(r._aviso).toMatch(/^Nenhuma coluna casa com 'xyzqq' \(7 colunas\); tente outro trecho\./)
   })
 
   it('FetchXML aggregate: grupo sem valor sai como null e "(vazio)"', async () => {
@@ -566,5 +566,139 @@ describe('leitura: avisos da rodada 3', () => {
     mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ cr40f_nome: 'a', cr40f_Cliente: null }, { cr40f_nome: 'b', cr40f_Cliente: null }] }) : undefined)))
     const r = JSON.parse(textOf(await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_nome', expand: 'cr40f_Cliente($select=cr40f_nomedocliente)' })))
     expect(r._nulas).toEqual(['cr40f_Cliente'])
+  })
+})
+
+describe('rodada 4', () => {
+  const OUTER = '<fetch><entity name="cr40f_reserva"><attribute name="cr40f_nome"/><link-entity name="cr40f_x" from="a" to="b" link-type="outer" alias="s"/></entity></fetch>'
+  const OUTER_OK = '<fetch><entity name="cr40f_reserva"><attribute name="cr40f_nome"/><link-entity name="cr40f_x" from="a" to="b" link-type="outer" alias="s"/><filter><condition entityname="s" attribute="cr40f_xid" operator="null"/></filter></entity></fetch>'
+  const dados = (c: Call) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ cr40f_nome: 'a' }] }) : undefined)
+
+  it('A1: outer sem condição null avisa; com a condição não avisa', async () => {
+    expect(outerWithoutNullCheck(OUTER)).toEqual(['s'])
+    expect(outerWithoutNullCheck(OUTER_OK)).toEqual([])
+    mockFetch(route(dados))
+    const bad = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: OUTER })))
+    expect(bad._dica).toMatch(/outer "s" sem condição null/)
+    const ok = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: OUTER_OK })))
+    expect(ok._dica).toBeUndefined()
+  })
+
+  it('A2, A4, A7, A8 e A3 (linha): instruções com os fatos confirmados', () => {
+    expect(INSTRUCTIONS).toMatch(/bancodedados/)
+    expect(INSTRUCTIONS).toMatch(/new_clientedaop/)
+    expect(INSTRUCTIONS).toMatch(/202410002/)
+    expect(INSTRUCTIONS).toMatch(/202410010/)
+    expect(INSTRUCTIONS).toMatch(/cr40f_valor_a_receber/)
+    expect(INSTRUCTIONS).toMatch(/Search está desativado no DEV/)
+    expect(INSTRUCTIONS).toMatch(/Passageiro1 a 4/)
+    expect(INSTRUCTIONS).toMatch(/whoami \(agora\)/)
+    expect(INSTRUCTIONS).toMatch(/Quem NÃO tem/)
+  })
+
+  it('A3: nowInfo traz UTC, São Paulo e dia da semana', () => {
+    expect(nowInfo(new Date('2026-11-17T14:14:13Z'))).toEqual({ utc: '2026-11-17T14:14:13.000Z', saoPaulo: '2026-11-17T11:14:13-03:00', diaDaSemana: 'terça-feira' })
+  })
+
+  it('A5: list_prompts põe ativos primeiro, com descrição e aviso quando nenhum está ativo', async () => {
+    const modelos = (ativo: boolean) =>
+      route((c) => {
+        if (c.url.includes('msdyn_aimodels?')) return json({ value: [{ msdyn_aimodelid: 'a', msdyn_name: 'A', statecode: 1 }, { msdyn_aimodelid: 'b', msdyn_name: 'B', statecode: ativo ? 0 : 1 }] })
+        if (c.url.includes('msdyn_aiconfigurations?')) return json({ value: [{ _msdyn_aimodelid_value: 'b', msdyn_customconfiguration: JSON.stringify({ prompt: [{ type: 'literal', text: 'Oi ' }, { type: 'inputVariable', text: 'nome', id: 'nome' }] }) }] })
+        return undefined
+      })
+    mockFetch(modelos(true))
+    const a = JSON.parse(textOf(await tools()('list_prompts').handler({})))
+    expect(a.itens.map((i: { nome: string }) => i.nome)).toEqual(['B', 'A'])
+    expect(a.itens[0].descricao).toBe('Oi {nome}')
+    expect(a._aviso).toBeUndefined()
+    mockFetch(modelos(false))
+    const n = JSON.parse(textOf(await tools()('list_prompts').handler({})))
+    expect(n._aviso).toMatch(/nenhum ativo: execute_prompt deve falhar/)
+    expect(promptSummary('{{')).toBeUndefined()
+  })
+
+  it('A6: agregação com grupo explica o "(vazio)"', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ total: 2 }] }) : undefined)))
+    const xml = '<fetch aggregate="true"><entity name="cr40f_reserva"><attribute name="cr40f_cliente" groupby="true" alias="c"/><attribute name="cr40f_valor" aggregate="sum" alias="total"/></entity></fetch>'
+    const r = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: xml })))
+    expect(r._dica).toBe(AGGREGATE_HINT)
+  })
+
+  it('A9: filtroColuna sem resultado lista Lookup e Money', async () => {
+    mockFetch(route())
+    const r = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'xyzqq' })))
+    expect(r._aviso).toMatch(/Lookups: .*cr40f_cliente/)
+    expect(r._aviso).toMatch(/Money: .*cr40f_valor/)
+  })
+
+  it('A10: colunas auxiliares de moeda só saem se pedidas', async () => {
+    const row = { cr40f_valor: 1, _transactioncurrencyid_value: 'g', '_transactioncurrencyid_value@OData.Community.Display.V1.FormattedValue': 'BRL', exchangerate: 1 }
+    expect(dropCurrencyAux([row], 'cr40f_valor')).toEqual([{ cr40f_valor: 1 }])
+    expect(dropCurrencyAux([row], 'cr40f_valor,_transactioncurrencyid_value')[0]).toHaveProperty('_transactioncurrencyid_value')
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [row] }) : undefined)))
+    const r = JSON.parse(textOf(await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valor' })))
+    expect(r.value[0]).toEqual({ cr40f_valor: 1 })
+  })
+
+  it('B1: alterarColunas faz PUT com MergeLabels e InsertOptionValue; "já existe" diz como', async () => {
+    const inner = route((c) => (c.method === 'POST' || c.method === 'PUT' ? new Response(null, { status: 204 }) : undefined))
+    const calls = mockFetch((c) => {
+      const m = decodeURIComponent(c.url).match(/Attributes\(LogicalName='([^']+)'\)\/Microsoft\.Dynamics\.CRM\.(?!Lookup)\w+AttributeMetadata/)
+      return c.method === 'GET' && m ? json({ LogicalName: m[1], AttributeType: 'String', DisplayName: { LocalizedLabels: [] } }) : inner(c)
+    })
+    const r = await tools()('update_table').handler({
+      tabela: 'cr40f_reserva',
+      alterarColunas: [{ nomeSchema: 'cr40f_valor', rotulo: 'Valor novo', descricao: 'd' }, { nomeSchema: 'cr40f_status', adicionarOpcoes: [{ rotulo: 'Pendente' }] }],
+    })
+    expect(textOf(r)).not.toMatch(/falhou/)
+    const put = calls.find((c) => c.method === 'PUT' && c.url.includes("LogicalName='cr40f_valor'"))!
+    expect(JSON.stringify(put.headers ?? {})).toMatch(/MSCRM\.MergeLabels/i)
+    expect(JSON.stringify(put.body)).toMatch(/Valor novo/)
+    const ins = calls.find((c) => c.method === 'POST' && c.url.includes('InsertOptionValue'))!
+    expect(JSON.stringify(ins.body)).toMatch(/cr40f_status/)
+    expect(JSON.stringify(ins.body)).toMatch(/Pendente/)
+    mockFetch(route((c) => (c.method === 'POST' ? json({ error: { code: '0x80048403', message: 'Attribute with the same name already exists' } }, 400) : undefined)))
+    const dup = await tools()('update_table').handler({ tabela: 'cr40f_reserva', adicionarColunas: [{ tipo: 'texto', nomeSchema: 'cr40f_valor', rotulo: 'V' }] })
+    expect(textOf(dup)).toMatch(/Para mudar rótulo\/descrição use alterarColunas/)
+  })
+
+  it('B2, B5 e B6: descrições das ferramentas', () => {
+    const t = tools()
+    for (const n of ['create_table', 'update_table', 'delete_table']) expect(t(n).description).toMatch(/30 a 70 s/)
+    expect((t('upsert_record').schema.chaves as { description?: string }).description).toMatch(/<tabela>id/)
+    expect(columnSchema.shape.somenteData.description).toMatch(/padrão data e hora/)
+  })
+
+  it('B4: choice por rótulo vira valor e informa; ambíguo ou desconhecido mantém o erro', async () => {
+    const opcoes = (c: Call) => {
+      if (!decodeURIComponent(c.url).includes('/Attributes/Microsoft.Dynamics.CRM.PicklistAttributeMetadata')) return undefined
+      const Label = (l: string) => ({ UserLocalizedLabel: { Label: l } })
+      return json({ value: [{ LogicalName: 'cr40f_status', OptionSet: { Options: [{ Value: 100, Label: Label('Aberto') }, { Value: 200, Label: Label('Fechado') }] } }] })
+    }
+    const inner = route((c) => (c.method === 'POST' && c.url.includes('/cr40f_reservas') ? json({ cr40f_reservaid: GUID }) : undefined))
+    const calls = mockFetch((c) => opcoes(c) ?? inner(c))
+    const out = textOf(await tools()('create_record').handler({ tabela: 'cr40f_reserva', dados: { cr40f_status: 'fechado' } }))
+    const r = JSON.parse(out)
+    expect(r.resolvidos).toEqual(["cr40f_status: 'fechado' → 200"])
+    expect((calls.find((c) => c.method === 'POST' && c.url.includes('/cr40f_reservas'))!.body as { cr40f_status: number }).cr40f_status).toBe(200)
+    mockFetch(route((c) => (c.method === 'POST' && c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x1', message: "Cannot convert the literal 'Zzz' to the expected type 'Edm.Int32'." } }, 400) : undefined)))
+    const bad = await tools()('create_record').handler({ tabela: 'cr40f_reserva', dados: { cr40f_status: 'Zzz' } })
+    expect(bad.isError).toBe(true)
+    expect(textOf(bad)).not.toMatch(/resolvidos/)
+  })
+
+  it('B7: com filtroColuna, relações de sistema ficam fora e o lookup casa pelo nome', async () => {
+    mockFetch(route())
+    const r = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'cliente' })))
+    expect(r.relacoes.muitosParaUm.map((x: { coluna: string }) => x.coluna)).toEqual(['cr40f_cliente'])
+    expect(r.relacoes.umParaMuitos).toEqual([])
+  })
+
+  it('B8: fetch com colunas devolve null explícito', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas(') ? json({ cr40f_reservaid: GUID, cr40f_nome: 'a' }) : undefined)))
+    const r = JSON.parse(textOf(await tools()('fetch').handler({ tabela: 'cr40f_reserva', id: GUID, colunas: 'cr40f_nome,_cr40f_cliente_value' })))
+    expect(r.registro._cr40f_cliente_value).toBeNull()
+    expect(r.registro.cr40f_nome).toBe('a')
   })
 })
