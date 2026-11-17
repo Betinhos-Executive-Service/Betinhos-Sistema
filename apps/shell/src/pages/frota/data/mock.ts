@@ -6,6 +6,7 @@ import { aplicarPasso, avaliar, validarPasso, type MultaEstado } from '../domain
 import { CANAL, COLISAO, MANUT, MOTIVO_EMPRESA, MULTA, RESPONSAVEL, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, FlowId } from './source'
+import { ApiError } from './xrm'
 import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
 import { latenciaMock } from '../../../app/latenciaMock'
 
@@ -276,7 +277,7 @@ export function createMockSource(): DataSource {
       const hoje = todaySP()
       const antes = estadoDaMulta(item)
       const erro = validarPasso(antes, passo, dados, hoje)
-      if (erro) throw new Error(erro)
+      if (erro) throw new ApiError(erro, 400)
       const depois = aplicarPasso(antes, passo, dados, hoje)
       aplicarNaMulta(item, depois, [ana, bruno])
       return avaliar(depois, hoje)

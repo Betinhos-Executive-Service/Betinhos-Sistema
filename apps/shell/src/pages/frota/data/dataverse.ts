@@ -7,7 +7,7 @@ import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase
 import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
 import { EMPTY_DATA, FlowIncertoError, type ArquivoMulta, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
 import type { DespesaCombustivel, Dossie, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
-import { errorMessage, type XrmHost, type XrmWebApi } from './xrm'
+import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
 type Row = Record<string, unknown>
 type Behaviors = Record<string, DateBehavior>
@@ -70,7 +70,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     } catch { /* 204 ou corpo vazio */ }
     if (!response.ok) {
       const erro = payload.error as { message?: unknown } | undefined
-      throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`)
+      throw new ApiError(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`, response.status)
     }
     return payload
   }
@@ -411,7 +411,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         headers: { 'Content-Type': 'application/octet-stream', 'x-ms-file-name': nome, 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
         body: file,
       })
-      if (!response.ok) throw new Error(`Não foi possível enviar o arquivo (${response.status})`)
+      if (!response.ok) throw new ApiError(`Não foi possível enviar o arquivo (${response.status})`, response.status)
     },
   }
 }

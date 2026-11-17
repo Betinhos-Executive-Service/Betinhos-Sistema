@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { MULTA } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
+import { ApiError } from '../data/xrm'
 import type { Dossie, FrotaData, Multa } from '../data/types'
 import { dadosSemVazios, MultaPassoAPasso, opcoesMotoristas } from './MultaPassoAPasso'
 
@@ -48,11 +49,42 @@ describe('MultaPassoAPasso', () => {
   })
 
   it('mostra a recusa do servidor como está', async () => {
-    const source = fonte({ passoMulta: vi.fn(async () => { throw new Error('Os campos de passo da multa só mudam pelo passo a passo do Sistema Betinhos (cr40f_status).') }) })
+    const source = fonte({ passoMulta: vi.fn(async () => { throw new ApiError('Os campos de passo da multa só mudam pelo passo a passo do Sistema Betinhos (cr40f_status).', 400) }) })
     renderPasso(source)
     fireEvent.click(screen.getByLabelText('Empresa (culpa da empresa)'))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirmar responsável' })) })
     expect(await screen.findByText('Os campos de passo da multa só mudam pelo passo a passo do Sistema Betinhos (cr40f_status).')).toBeTruthy()
+  })
+
+  it.each([
+    ['falha de rede', new Error('Failed to fetch')],
+    ['erro 500 do servidor', new ApiError('Unhandled exception: NullReferenceException', 500)],
+  ])('%s não vaza para a tela: mostra a mensagem genérica', async (_nome, falha) => {
+    renderPasso(fonte({ passoMulta: vi.fn(async () => { throw falha }) }))
+    fireEvent.click(screen.getByLabelText('Empresa (culpa da empresa)'))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirmar responsável' })) })
+    expect(await screen.findByText('Não foi possível gravar o passo. Tente de novo.')).toBeTruthy()
+    expect(screen.queryByText(/Failed to fetch|Unhandled/)).toBeNull()
+  })
+
+  it('falha no envio do comprovante mostra a mensagem do arquivo e não grava o pagamento', async () => {
+    const source = fonte({ enviarArquivoMulta: vi.fn(async () => { throw new Error('Failed to fetch') }) })
+    renderPasso(source, { ...multa, status: MULTA.INDICADA, responsavel: 100000000, motorista: ana, vencimento: '2026-12-01' })
+    fireEvent.change(screen.getByLabelText(/Data do pagamento/), { target: { value: '2026-11-16' } })
+    fireEvent.change(screen.getByLabelText(/Valor pago/), { target: { value: '130.16' } })
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [new File(['x'], 'comprovante.pdf', { type: 'application/pdf' })] } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar pagamento' })) })
+    expect(await screen.findByText('Não foi possível enviar o arquivo. Tente de novo.')).toBeTruthy()
+    expect(source.passoMulta).not.toHaveBeenCalled()
+  })
+
+  it('o que o gestor escolheu não some quando a multa recarrega com os mesmos valores', () => {
+    const m = { ...multa, motorista: ana }
+    const { rerender } = render(<ToastProvider><MultaPassoAPasso source={fonte()} multa={m} data={{ ...EMPTY_DATA, multas: [m] }} onChanged={vi.fn()} hoje={HOJE} /></ToastProvider>)
+    fireEvent.click(screen.getByLabelText('Empresa (culpa da empresa)'))
+    const recarregada = { ...m, motorista: { ...ana } }
+    rerender(<ToastProvider><MultaPassoAPasso source={fonte()} multa={recarregada} data={{ ...EMPTY_DATA, multas: [recarregada] }} onChanged={vi.fn()} hoje={HOJE} /></ToastProvider>)
+    expect((screen.getByLabelText('Empresa (culpa da empresa)') as HTMLInputElement).checked).toBe(true)
   })
 
   it('prazo vencido ocupa o passo inteiro com as duas saídas e esconde o menu Mais', () => {
@@ -118,6 +150,13 @@ describe('MultaPassoAPasso', () => {
     const texto = screen.getByLabelText('Mensagem para o WhatsApp') as HTMLTextAreaElement
     expect(texto.value).toContain('Rastreador: indisponível no momento.')
     expect(texto.value).not.toContain('Token da Infleet')
+  })
+
+  it('falha ao montar o dossiê mostra a mensagem do dossiê, sem o erro técnico', async () => {
+    renderPasso(fonte({ dossieMulta: vi.fn(async () => { throw new Error('Failed to fetch') }) }), { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
+    expect(await screen.findByText('Não foi possível montar o dossiê. Tente de novo.')).toBeTruthy()
+    expect(screen.queryByText(/Failed to fetch/)).toBeNull()
   })
 
   it('aguardando penalidade não tem passo e explica o porquê', () => {

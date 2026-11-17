@@ -20,3 +20,16 @@ export function errorMessage(error: unknown) {
   const message = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error)
   return message.replace(/\.+$/, '')
 }
+
+/** Erro de Custom API com o status HTTP: 400 é a recusa de regra do plugin (texto escrito para o usuário); o resto é falha técnica. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+/** Só a recusa de regra (HTTP 400) aparece como veio; qualquer outro erro vira a mensagem genérica da ação. */
+export function mensagemDaAcao(error: unknown, generica: string) {
+  return error instanceof ApiError && error.status === 400 ? error.message : generica
+}

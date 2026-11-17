@@ -6,7 +6,7 @@ import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, RESPONSAVEL } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { FrotaData, Multa, Ref } from '../data/types'
-import { errorMessage } from '../data/xrm'
+import { mensagemDaAcao } from '../data/xrm'
 import { estadoDaMulta, responsavelDaMulta, urgenciaDoPrazo } from '../domain/multaEstado'
 import { aberta, avaliar, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
 import { mensagemWhatsApp } from '../domain/multaMensagem'
@@ -60,7 +60,9 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const estado = useMemo(() => estadoDaMulta(multa), [multa])
   const situacao = useMemo(() => avaliar(estado, hoje), [estado, hoje])
   const responsavel = responsavelDaMulta(multa)
-  const motoristas = useMemo(() => opcoesMotoristas(data, multa.motorista), [data, multa.motorista])
+  const motoristaId = multa.motorista?.id ?? null
+  const motoristaNome = multa.motorista?.label ?? ''
+  const motoristas = useMemo(() => opcoesMotoristas(data, motoristaId ? { id: motoristaId, label: motoristaNome } : null), [data, motoristaId, motoristaNome])
   const [extra, setExtra] = useState<'Cancelar' | 'Recorrer' | null>(null)
   const passo: Passo | null = extra ?? situacao.pendentes[0] ?? null
   const [dados, setDados] = useState<DadosPasso>({})
@@ -75,10 +77,10 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
 
   // Passo novo começa limpo; o responsável já sugere o motorista que veio no cadastro da multa.
   useEffect(() => {
-    setDados(passo === 'DefinirResponsavel' && multa.motorista ? { responsavel: 'motorista', motoristaId: multa.motorista.id } : {})
+    setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : {})
     setArquivo(null)
     setErro(null)
-  }, [passo, multa.id, multa.motorista])
+  }, [passo, multa.id, motoristaId])
 
   const set = (patch: DadosPasso) => setDados((atual) => ({ ...atual, ...patch }))
   const envio = useMemo(() => dadosSemVazios(dados), [dados])
@@ -96,13 +98,20 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
     setSalvando(true)
     setErro(null)
     try {
-      if (passo === 'RegistrarPagamento' && arquivo) await source.enviarArquivoMulta(multa.id, 'cr40f_comprovantepagamento', arquivo)
+      if (passo === 'RegistrarPagamento' && arquivo) {
+        try {
+          await source.enviarArquivoMulta(multa.id, 'cr40f_comprovantepagamento', arquivo)
+        } catch {
+          setErro('Não foi possível enviar o arquivo. Tente de novo.')
+          return
+        }
+      }
       await source.passoMulta(multa.id, passo, envio)
       notify('success', `${ROTULO_PASSO[passo]}: feito.`)
       setExtra(null)
       onChanged()
     } catch (reason) {
-      setErro(reason instanceof Error ? reason.message : errorMessage(reason))
+      setErro(mensagemDaAcao(reason, 'Não foi possível gravar o passo. Tente de novo.'))
     } finally {
       setSalvando(false)
     }
@@ -119,7 +128,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       // A mensagem do motorista esconde o erro do InFleet; o gestor vê o detalhe aqui.
       setErroRastreador(dossie.infleet.erro?.trim() || null)
     } catch (reason) {
-      notify('error', errorMessage(reason))
+      notify('error', mensagemDaAcao(reason, 'Não foi possível montar o dossiê. Tente de novo.'))
       setMontando(false)
       return
     }

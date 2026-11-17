@@ -187,3 +187,6 @@
 .frota-prazo[data-urgencia="atencao"] { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
 .frota-prazo[data-urgencia="vencido"] { color: var(--bt-color-danger); font-weight: var(--bt-font-weight-bold); }
 @media (max-width: 560px) { .multa-etapas li { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } .multa-topo { flex-wrap: wrap; } }
+/* O :indeterminate do navegador pega todo rádio de grupo sem escolha e o choice.css do DS pinta como checkbox indeterminado ("–" azul). */
+.multa-passos .bt-choice--radio .bt-choice__input:indeterminate:not(:checked) + .bt-choice__control { border-color: var(--bt-color-text-secondary); background-color: var(--bt-color-surface); }
+.multa-passos .bt-choice--radio .bt-choice__input:indeterminate:not(:checked) + .bt-choice__control::after { content: none; }

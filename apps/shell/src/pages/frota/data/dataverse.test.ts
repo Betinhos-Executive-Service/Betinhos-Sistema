@@ -524,6 +524,13 @@ describe('passo a passo da multa (Custom APIs)', () => {
     await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', { canal: 'dsv', data: '2026-11-15' })).rejects.toThrow('Avise o motorista antes de registrar a indicação.')
   })
 
+  it('a recusa do servidor chega com o status HTTP para a tela decidir o que mostrar', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Recusa de regra.' } }))
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Recusa de regra.' })
+    vi.stubGlobal('fetch', resposta(false, 500, { error: { message: 'Unhandled exception' } }))
+    await expect(createXrmSource(host().xrm).dossieMulta(MULTA_ID)).rejects.toMatchObject({ name: 'ApiError', status: 500 })
+  })
+
   it('dossieMulta lê o new_DossieJson', async () => {
     const dossie = { multa: { id: 'x', auto: 'AIT 1', placa: 'TST1A11', dataHora: null, local: null, orgao: null, dataParaIndicar: null, infracao: null }, servicos: [], infleet: { erro: 'Sem token' } }
     const fetchMock = resposta(true, 200, { new_DossieJson: JSON.stringify(dossie) })
