@@ -61,7 +61,7 @@ public sealed partial class ManutencaoService
             CidadeId = p.CidadeId,
             RealizadoPorId = p.RealizadoPorId,
             Origem = p.Origem,
-            Comentario =m.GetAttributeValue<string>(M.ComentarioColaborador),
+            Comentario = m.GetAttributeValue<string>(M.ComentarioColaborador),
         };
         return (gravado, m.GetAttributeValue<DateTime?>(M.DataManutencao) ?? data, m.GetAttributeValue<EntityReference>(M.RealizadoPor) ?? realizadoPor);
     }
