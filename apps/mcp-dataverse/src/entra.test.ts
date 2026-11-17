@@ -21,7 +21,7 @@ describe('validateIdentity', () => {
     expect(() => validateIdentity(env, idToken({ aud: 'x' }))).toThrowError(expect.objectContaining({ code: 'wrong_audience' }))
   })
   it('recusa domínio de e-mail diferente (inclusive sufixo enganoso)', () => {
-    expect(() => validateIdentity(env, idToken({ email: 'a@gmail.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
+    expect(() => validateIdentity(env, idToken({ email: 'ana@exemplo.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
     expect(() => validateIdentity(env, idToken({ email: 'a@evilbetinhos.com.br' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
   })
 
