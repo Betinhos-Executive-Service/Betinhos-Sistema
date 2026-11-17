@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { GavetaRegistro } from './GavetaRegistro'
-import { abrirGavetaRegistro, fecharGavetaRegistro, gavetaRegistroAberta } from './registroAberto'
+import { abrirGavetaRegistro, avisarRegistroAlterado, fecharGavetaRegistro, gavetaRegistroAberta, REGISTRO_ALTERADO, useRegistroAlterado } from './registroAberto'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -84,4 +84,36 @@ it('Esc durante o carregamento desiste da abertura', () => {
   act(() => abrirGavetaRegistro('cr40f_clientes1', '11111111-1111-4111-8111-111111111111'))
   fireEvent.keyDown(window, { key: 'Escape' })
   expect(gavetaRegistroAberta()).toBeNull()
+})
+
+it('ação na gaveta da manutenção avisa a lista que está atrás (REGISTRO_ALTERADO), uma vez por ação', async () => {
+  const ouvido = vi.fn()
+  const ouvir = (event: Event) => ouvido((event as CustomEvent).detail)
+  window.addEventListener(REGISTRO_ALTERADO, ouvir)
+  try {
+    // Host novo: a fonte da Frota é guardada por host, e o teste anterior já cancelou a m1 no host do arquivo.
+    render(<GavetaRegistro host={{ mode: 'mock' }} />)
+    act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
+    const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+    expect(ouvido).not.toHaveBeenCalled()
+    fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' }))
+    await act(async () => { fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' })) })
+    await waitFor(() => expect(ouvido).toHaveBeenCalledWith({ table: 'cr40f_manutencoes', id: 'm1' }))
+    expect(ouvido).toHaveBeenCalledTimes(1)
+  } finally {
+    window.removeEventListener(REGISTRO_ALTERADO, ouvir)
+  }
+})
+
+it('useRegistroAlterado chama só para a tabela pedida, com o id do registro, e para ao desmontar', () => {
+  const chamado = vi.fn()
+  function Ouvinte() { useRegistroAlterado('cr40f_manutencoes', chamado); return null }
+  const { unmount } = render(<Ouvinte />)
+  act(() => avisarRegistroAlterado('cr40f_veiculos', 'v1'))
+  act(() => avisarRegistroAlterado('cr40f_manutencoes', 'm2'))
+  expect(chamado).toHaveBeenCalledTimes(1)
+  expect(chamado).toHaveBeenCalledWith('m2')
+  unmount()
+  act(() => avisarRegistroAlterado('cr40f_manutencoes', 'm3'))
+  expect(chamado).toHaveBeenCalledTimes(1)
 })
