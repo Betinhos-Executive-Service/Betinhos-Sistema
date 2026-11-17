@@ -1,3 +1,5 @@
+import { MULTA } from '../../frota/data/schema'
+
 /** Códigos de option set e datas de corte usados pelo legado (Dashboard.html L10206, L10403, L13661–13687). */
 export const CAT_ITEM_SERVICO = 100000000
 export const CP_PENDENTE = 100000000
@@ -5,7 +7,9 @@ export const CP_CONCLUIDA = 100000001
 export const FAT_PAGO = 202410010
 export const FAT_PAGANTE_EM_VIAGEM = 202410006
 export const FAT_MENSAL = 202410008
-export const MULTA_NOTIFICAR = 202410000
+export const MULTA_NOTIFICAR = MULTA.NOTIFICAR
+/** Multa que não pede mais nada: Encerrada, Descontado (antigo) e Cancelada. Decide pelo valor, não pelo rótulo. */
+export const MULTA_RESOLVIDA: ReadonlySet<number> = new Set([MULTA.FINALIZADO, MULTA.DESCONTADO, MULTA.CANCELADA])
 /** Confirmado, Programado e Concluído: o alerta "Sem motorista" só olha estes. */
 export const STATUS_SEM_MOTORISTA: ReadonlySet<number> = new Set([202410001, 202410005, 202410008])
 export const VEICULO_PROPRIO = '100000000'

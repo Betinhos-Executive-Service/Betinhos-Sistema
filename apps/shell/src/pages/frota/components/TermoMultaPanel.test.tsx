@@ -20,6 +20,7 @@ function fake(overrides: Partial<DataSource> = {}) {
     baixarPdfTermo: vi.fn(async () => ({ nome: 'Termo-1.pdf', blob: new Blob(['%PDF']) })),
     lembrarTermoMulta: vi.fn(async () => {}),
     listarParcelasTermo: vi.fn(async () => []),
+    passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
     update: vi.fn(async () => {}),
     ...overrides,
   } as unknown as DataSource & Record<string, ReturnType<typeof vi.fn>>

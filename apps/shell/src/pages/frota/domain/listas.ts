@@ -1,11 +1,10 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { CATEGORIA, COLISAO, MANUT, MULTA, STATUS_OPTIONS, VEICULO, VEICULO_STATUS, label, type Option } from '../data/schema'
+import { CATEGORIA, COLISAO, MANUT, STATUS_OPTIONS, VEICULO, VEICULO_STATUS, label, type Option } from '../data/schema'
 import type { Kind, Veiculo } from '../data/types'
 import type { custoVeiculo } from './indicadores'
 import type { Linha } from './linhas'
 import { CATEGORIAS_MANUT } from './manutencaoCatalogo'
-import { TERMO_ROTULO } from './termoMulta'
 
 /**
  * Listas da Frota no padrão do Design System (§10.9.1 e §10.9.2): Veículos e os registros de cada tipo (manutenções,
@@ -118,25 +117,53 @@ export function veiculoBuiltins(): StoredView[] {
 // ---------- Registros (manutenções, multas e colisões) ----------
 
 export const telaRegistros = (kind: Kind) => `frota.${kind}`
-export const PESSOA: Record<Kind, string> = { manutencao: 'Solicitante', multa: 'Motorista', colisao: 'Motorista' }
+export const PESSOA: Record<Kind, string> = { manutencao: 'Solicitante', multa: 'Responsável', colisao: 'Motorista' }
 export const EXTRA: Record<Kind, string> = { manutencao: 'Valor / grau', multa: 'Valor', colisao: 'Terceiro' }
 export const REGISTRO_SORT: ViewSort = { key: 'data', dir: 'desc' }
 
-/** Colunas na ordem padrão; a primeira (Descrição) é fixa. */
-export const registroColumns = (kind: Kind): ViewColumnDef[] => [
-  { key: 'descricao', label: 'Descrição' },
-  { key: 'data', label: 'Data' },
-  { key: 'veiculo', label: 'Veículo' },
-  { key: 'pessoa', label: PESSOA[kind] },
-  // Termo logo depois do motorista: é o que o gestor procura na lista de multas e fica visível sem rolar em 1280 px.
-  ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo' }] : []),
-  { key: 'extra', label: EXTRA[kind] },
-  { key: 'status', label: 'Status' },
-]
+/** Colunas na ordem padrão; a primeira (Descrição ou Auto) é fixa. */
+export const registroColumns = (kind: Kind): ViewColumnDef[] => kind === 'multa'
+  ? [
+    { key: 'descricao', label: 'Auto' }, { key: 'data', label: 'Data' }, { key: 'veiculo', label: 'Placa' }, { key: 'pessoa', label: 'Responsável' },
+    { key: 'status', label: 'Etapa' }, { key: 'proximoPasso', label: 'Próximo passo' }, { key: 'proximoPrazo', label: 'Próximo prazo' },
+  ]
+  : [
+    { key: 'descricao', label: 'Descrição' }, { key: 'data', label: 'Data' }, { key: 'veiculo', label: 'Veículo' }, { key: 'pessoa', label: PESSOA[kind] },
+    { key: 'extra', label: EXTRA[kind] }, { key: 'status', label: 'Status' },
+  ]
 
-const TERMO_OPCOES: FilterOption[] = Object.entries(TERMO_ROTULO).map(([value, label]) => ({ value, label }))
+/** Larguras padrão (px) das colunas da multa: em 1280 px Auto, Etapa, Próximo passo e Próximo prazo cabem inteiros, sem rolar. */
+export const LARGURAS: Record<Kind, Record<string, number>> = {
+  manutencao: {}, colisao: {},
+  multa: { descricao: 124, data: 92, veiculo: 84, pessoa: 130, status: 200, proximoPasso: 220, proximoPrazo: 132 },
+}
+
+export const SITUACAO_OPCOES: FilterOption[] = [
+  { value: 'comigo', label: 'Com passo a dar' }, { value: 'prazo-vencido', label: 'Prazo vencido' }, { value: 'aguardando-penalidade', label: 'Aguardando penalidade' },
+  { value: 'aguardando-acerto', label: 'Aguardando acerto' }, { value: 'encerradas', label: 'Encerradas e canceladas' },
+]
+const filaMulta = (valor: string): TableFilters => {
+  const filtros = emptyFilters()
+  filtros.advanced.items.push({ type: 'condition', id: `situacao-${valor}`, field: 'situacao', op: 'in', values: SITUACAO_OPCOES.filter((o) => o.value === valor) })
+  return filtros
+}
+/** Visão padrão da lista de multas ("Comigo"): o que tem passo a dar. */
+export const MULTA_VISAO_PADRAO = 'Comigo'
+export const MULTA_FILTROS_PADRAO = filaMulta('comigo')
 
 export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; pessoas: FilterOption[] }): FilterField[] {
+  if (kind === 'multa') {
+    return [
+      { key: 'descricao', label: 'Auto', kind: 'text' },
+      { key: 'data', label: 'Data', kind: 'date' },
+      { key: 'veiculo', label: 'Placa', kind: 'choice', options: opcoes.veiculos },
+      { key: 'pessoa', label: 'Responsável', kind: 'choice', options: opcoes.pessoas },
+      { key: 'status', label: 'Etapa', kind: 'choice', options: options(STATUS_OPTIONS.multa) },
+      { key: 'proximoPasso', label: 'Próximo passo', kind: 'text' },
+      { key: 'proximoPrazo', label: 'Próximo prazo', kind: 'date' },
+      { key: 'situacao', label: 'Situação', kind: 'choice', options: SITUACAO_OPCOES, advancedOnly: true },
+    ]
+  }
   return [
     { key: 'descricao', label: 'Descrição', kind: 'text' },
     { key: 'data', label: 'Data', kind: 'date' },
@@ -144,7 +171,6 @@ export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; p
     { key: 'pessoa', label: PESSOA[kind], kind: 'choice', options: opcoes.pessoas },
     { key: 'extra', label: EXTRA[kind], kind: 'text' },
     { key: 'status', label: 'Status', kind: 'choice', options: options(STATUS_OPTIONS[kind]) },
-    ...(kind === 'multa' ? [{ key: 'termo', label: 'Termo', kind: 'choice' as const, options: TERMO_OPCOES }] : []),
     ...(kind === 'manutencao' ? [{ key: 'categoria', label: 'Categoria', kind: 'choice' as const, options: options(CATEGORIAS_MANUT), advancedOnly: true }] : []),
   ]
 }
@@ -158,7 +184,9 @@ export function readRegistro(l: Linha, key: string): unknown {
     case 'extra': return l.extra
     case 'status': return l.status == null ? null : String(l.status)
     case 'categoria': return l.categorias.map(String)
-    case 'termo': return l.termoStatus
+    case 'proximoPasso': return l.proximoPasso ?? null
+    case 'proximoPrazo': return l.proximoPrazo ?? null
+    case 'situacao': return l.situacoes ?? []
     default: return null
   }
 }
@@ -181,7 +209,8 @@ export function sortRegistros(list: Linha[], kind: Kind, sort: ViewSort | null) 
       case 'veiculo': return l.veiculo?.label
       case 'pessoa': return l.pessoa?.label
       case 'status': return l.status == null ? null : label(STATUS_OPTIONS[kind], l.status)
-      case 'termo': return l.termo || null
+      case 'proximoPasso': return l.proximoPasso ?? null
+      case 'proximoPrazo': return l.proximoPrazo ?? null
       default: return null
     }
   }, sort.dir)
@@ -227,7 +256,12 @@ export function registroBuiltins(kind: Kind): StoredView[] {
     const encaixar = builtin(registroColumns(kind), { key: 'data', dir: 'asc' })('encaixar', 'A encaixar', 2, status([MANUT.SOLICITADO]))
     return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO])), encaixar]
   }
-  const termo = (valor: keyof typeof TERMO_ROTULO) => withQuick([quick('termo', 'in', TERMO_OPCOES.filter((o) => o.value === valor))])
-  if (kind === 'multa') return [view('notificar', 'A notificar', 1, status([MULTA.NOTIFICAR])), view('termos-pendentes', 'Termos pendentes', 2, termo('pendente')), view('contestados', 'Contestados', 3, termo('contestado'))]
+  if (kind === 'multa') return [
+    view('prazo-vencido', 'Prazo vencido', 1, filaMulta('prazo-vencido')),
+    view('aguardando-penalidade', 'Aguardando penalidade', 2, filaMulta('aguardando-penalidade')),
+    view('aguardando-acerto', 'Aguardando acerto', 3, filaMulta('aguardando-acerto')),
+    view('encerradas', 'Encerradas e canceladas', 4, filaMulta('encerradas')),
+    view('todas', 'Todas', 5, emptyFilters()),
+  ]
   return [view('andamento', 'Em andamento', 1, status([COLISAO.ENVIADO, COLISAO.ANALISE]))]
 }

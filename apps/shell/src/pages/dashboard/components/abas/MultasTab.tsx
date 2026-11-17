@@ -39,10 +39,10 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
       <KpiCard rotulo={KPIS[0]} valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom={tomAtencao(k?.pendentes)} valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
+      <KpiCard rotulo={KPIS[1]} tom={tomAtencao(k?.pendentes)} valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Identificar o responsável', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
         {mu.ant ? <ChipAnt chip={mu.ant.pendentes} /> : undefined}
       </KpiCard>
-      <KpiCard rotulo={KPIS[2]} valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Pago, Descontado ou Finalizado' }, ...parte(k.resolvidas)] : []} />
+      <KpiCard rotulo={KPIS[2]} valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : []} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">

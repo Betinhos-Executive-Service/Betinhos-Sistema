@@ -1,0 +1,159 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+    "$connections": { "defaultValue": {}, "type": "Object" },
+    "URL do Sistema Betinhos (new_URLSistemaBetinhos)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": { "schemaName": "new_URLSistemaBetinhos", "description": "Endereço do Sistema Betinhos usado nos links dos e-mails." }
+    },
+    "E-mail do administrador dos avisos (new_EmailAdminAvisos)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": { "schemaName": "new_EmailAdminAvisos", "description": "Recebe o aviso quando o e-mail das multas falha." }
+    }
+  },
+  "triggers": {
+    "Dias_uteis_7h": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Week",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "startTime": "2026-11-18T07:00:00",
+        "schedule": { "weekDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "hours": ["7"], "minutes": [0] }
+      }
+    }
+  },
+  "actions": {
+    "Try": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Multas_do_dia": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "PerformUnboundAction" },
+            "parameters": { "actionName": "cr40f_MultasDoDia" },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Dados": {
+          "type": "Compose",
+          "runAfter": { "Multas_do_dia": ["Succeeded"] },
+          "inputs": "@json(outputs('Multas_do_dia')?['body/MultasJson'])"
+        },
+        "Tem_itens": {
+          "type": "If",
+          "runAfter": { "Dados": ["Succeeded"] },
+          "expression": { "and": [ { "greater": [ "@int(outputs('Dados')?['total'])", 0 ] } ] },
+          "actions": {
+            "Url": { "type": "Compose", "runAfter": {}, "inputs": "@{parameters('URL do Sistema Betinhos (new_URLSistemaBetinhos)')}" },
+            "Cabecalho": {
+              "type": "Compose",
+              "runAfter": { "Url": ["Succeeded"] },
+              "inputs": "<tr><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Auto</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Placa</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Responsável</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Prazo</th><th align=\"left\" style=\"padding:6px 10px;border-bottom:2px solid #D1D5DB\">Passo que falta</th></tr>"
+            },
+            "Linhas_prazo": {
+              "type": "Select",
+              "runAfter": { "Cabecalho": ["Succeeded"] },
+              "inputs": { "from": "@outputs('Dados')?['prazoVencido']", "select": "@concat('<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\"><a href=\"', outputs('Url'), '#/frota-multas?registro=multa:', item()?['id'], '\">', coalesce(item()?['auto'], 'sem número'), '</a></td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', coalesce(item()?['placa'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['responsavel'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', if(empty(item()?['prazo']), '—', formatDateTime(item()?['prazo'], 'dd/MM/yyyy')), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['passo'], ''), '</td></tr>')" }
+            },
+            "Linhas_indicar": {
+              "type": "Select",
+              "runAfter": { "Linhas_prazo": ["Succeeded"] },
+              "inputs": { "from": "@outputs('Dados')?['indicar']", "select": "@concat('<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\"><a href=\"', outputs('Url'), '#/frota-multas?registro=multa:', item()?['id'], '\">', coalesce(item()?['auto'], 'sem número'), '</a></td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', coalesce(item()?['placa'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['responsavel'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', if(empty(item()?['prazo']), '—', formatDateTime(item()?['prazo'], 'dd/MM/yyyy')), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['passo'], ''), '</td></tr>')" }
+            },
+            "Linhas_aceite": {
+              "type": "Select",
+              "runAfter": { "Linhas_indicar": ["Succeeded"] },
+              "inputs": { "from": "@outputs('Dados')?['aceite']", "select": "@concat('<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\"><a href=\"', outputs('Url'), '#/frota-multas?registro=multa:', item()?['id'], '\">', coalesce(item()?['auto'], 'sem número'), '</a></td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', coalesce(item()?['placa'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['responsavel'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', if(empty(item()?['prazo']), '—', formatDateTime(item()?['prazo'], 'dd/MM/yyyy')), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['passo'], ''), '</td></tr>')" }
+            },
+            "Linhas_pagar": {
+              "type": "Select",
+              "runAfter": { "Linhas_aceite": ["Succeeded"] },
+              "inputs": { "from": "@outputs('Dados')?['pagar']", "select": "@concat('<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\"><a href=\"', outputs('Url'), '#/frota-multas?registro=multa:', item()?['id'], '\">', coalesce(item()?['auto'], 'sem número'), '</a></td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', coalesce(item()?['placa'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['responsavel'], '—'), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;white-space:nowrap\">', if(empty(item()?['prazo']), '—', formatDateTime(item()?['prazo'], 'dd/MM/yyyy')), '</td><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">', coalesce(item()?['passo'], ''), '</td></tr>')" }
+            },
+            "Corpo": {
+              "type": "Compose",
+              "runAfter": { "Linhas_pagar": ["Succeeded"] },
+              "inputs": "@concat('<div style=\"font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1F2937\"><p>Multas de hoje (', formatDateTime(outputs('Dados')?['hoje'], 'dd/MM/yyyy'), '): <b>', string(outputs('Dados')?['total']), '</b> pedem atenção.</p>', if(empty(body('Linhas_prazo')), '', concat('<h3 style=\"color:#B91C1C\">1. Prazo vencido: responda</h3><table style=\"border-collapse:collapse\">', outputs('Cabecalho'), join(body('Linhas_prazo'), ''), '</table>')), if(empty(body('Linhas_indicar')), '', concat('<h3>2. Indicar em até 7 dias</h3><table style=\"border-collapse:collapse\">', outputs('Cabecalho'), join(body('Linhas_indicar'), ''), '</table>')), if(empty(body('Linhas_aceite')), '', concat('<h3>3. Aceite pendente na CNH Digital</h3><table style=\"border-collapse:collapse\">', outputs('Cabecalho'), join(body('Linhas_aceite'), ''), '</table>')), if(empty(body('Linhas_pagar')), '', concat('<h3>4. Pagar com 40% em até 5 dias</h3><table style=\"border-collapse:collapse\">', outputs('Cabecalho'), join(body('Linhas_pagar'), ''), '</table>')), if(equals(int(outputs('Dados')?['aguardandoAcerto']), 0), '', concat('<h3>5. Aguardando acerto</h3><p><b>', string(outputs('Dados')?['aguardandoAcerto']), '</b> multas pagas esperam o acerto. <a href=\"', outputs('Url'), '#/frota-multas?status=202410006\">Abrir a lista</a></p>')), '</div>')"
+            },
+            "Destinatarios": {
+              "type": "OpenApiConnection",
+              "runAfter": { "Corpo": ["Succeeded"] },
+              "inputs": {
+                "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
+                "parameters": {
+                  "entityName": "cr40f_funcionarioses",
+                  "$select": "cr40f_emailbetinhos",
+                  "$filter": "statecode eq 0 and cr40f_status eq 0 and cr40f_recebeemailmultas eq true and cr40f_emailbetinhos ne null",
+                  "$top": 50
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Enviar": {
+              "type": "Foreach",
+              "foreach": "@outputs('Destinatarios')?['body/value']",
+              "runAfter": { "Destinatarios": ["Succeeded"] },
+              "actions": {
+                "E_mail": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+                    "parameters": {
+                      "emailMessage/From": "__REMETENTE__",
+                      "emailMessage/To": "@{trim(items('Enviar')?['cr40f_emailbetinhos'])}",
+                      "emailMessage/Subject": "Multas | @{outputs('Dados')?['total']} para hoje | @{formatDateTime(outputs('Dados')?['hoje'], 'dd/MM/yyyy')}",
+                      "emailMessage/Body": "@{outputs('Corpo')}",
+                      "emailMessage/Importance": "Normal"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          },
+          "else": { "actions": {} }
+        }
+      }
+    },
+    "Catch": {
+      "type": "Scope",
+      "runAfter": { "Try": ["Failed", "TimedOut"] },
+      "actions": {
+        "Falhas": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": { "from": "@result('Try')", "where": "@not(equals(item()?['status'], 'Succeeded'))" }
+        },
+        "Avisar_admin": {
+          "type": "OpenApiConnection",
+          "runAfter": { "Falhas": ["Succeeded"] },
+          "inputs": {
+            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365", "connectionName": "shared_office365", "operationId": "SendEmailV2" },
+            "parameters": {
+              "emailMessage/From": "__REMETENTE__",
+              "emailMessage/To": "@{parameters('E-mail do administrador dos avisos (new_EmailAdminAvisos)')}",
+              "emailMessage/Subject": "Multas | E-mail de hoje falhou",
+              "emailMessage/Body": "@{concat('<p>O e-mail Multas de hoje falhou na execução ', workflow()?['run']?['name'], '.</p><p>Etapas com problema:</p><pre>', string(body('Falhas')), '</pre>')}",
+              "emailMessage/Importance": "High"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Marcar_falha": {
+          "type": "Terminate",
+          "runAfter": { "Avisar_admin": ["Succeeded", "Failed"] },
+          "inputs": { "runStatus": "Failed", "runError": { "code": "MultasDoDiaFalhou", "message": "O e-mail Multas de hoje falhou; o administrador foi avisado." } }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

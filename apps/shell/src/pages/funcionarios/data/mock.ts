@@ -37,7 +37,7 @@ function person(id: string, nome: string, apelido: string, extra: Partial<Funcio
     values: {
       cr40f_nomecompleto: nome, new_apelido: apelido, cr40f_status: 0, cr40f_funcao: 202410000, cr40f_nomedaempresa: 202410000, cr40f_tipodevinculo: 0,
       cr40f_telefonecorporativo: '+55 12 99000-0000', cr40f_datadeadmissao: '2022-03-01', cr40f_validadedacnh: offset(400), cr40f_datadoaso: addMonths(offset(200), -12),
-      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, new_notificacoesfrota: false, cr40f_gerarrecibopersonalizado: false,
+      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, new_notificacoesfrota: false, cr40f_recebeemailmultas: false, cr40f_gerarrecibopersonalizado: false,
       ...extra,
     },
     veiculo,
@@ -158,7 +158,7 @@ export function createMockSource(): DataSource {
       rows = rows.map((row) => (row.id === id ? { ...row, loginsesenhas: html } : row))
       await delay(null)
     },
-    multas: (id) => delay(id === 'm1' ? [{ id: 'x1', titulo: 'Excesso de velocidade', status: 'Indicada', dataHora: new Date().toISOString(), placa: 'ABC1D23', local: 'Rod. Dutra km 150' }] : []),
+    multas: (id) => delay(id === 'm1' ? [{ id: 'x1', titulo: 'Excesso de velocidade', status: 202410001, dataHora: new Date().toISOString(), placa: 'ABC1D23', local: 'Rod. Dutra km 150' }] : []),
     posses: (id) => delay(id === 'm1' ? [{ id: 'p1', veiculo: 'ABC1D23', inicio: '2026-01-10T09:00:00Z', fim: null }, { id: 'p2', veiculo: 'EFG4H56', inicio: '2025-05-01T09:00:00Z', fim: '2026-01-10T08:00:00Z' }] : []),
     // Mesmos itens de #/equipamentos (m1 tem a maquininha; m6, desligado, o celular de plantão); baixado fica de fora.
     equipamentos: (id) => delay(createMockEquipamentos()

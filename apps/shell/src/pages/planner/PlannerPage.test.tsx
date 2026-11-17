@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Substitui mountApp.test e quoteRoute (parte de rota) do Tela Planner: a tela monta no shell em modo mock
 // e os deep links antigos abrem o registro certo.
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { PlannerPage } from './PlannerPage'
 
@@ -32,5 +32,13 @@ describe('PlannerPage no shell', () => {
     history.replaceState(null, '', '#/planner?taskId=task-1')
     render(<PlannerPage />)
     await waitFor(() => expect(document.querySelector('.task-drawer')).not.toBeNull(), { timeout: 10_000 })
+  })
+
+  it('tarefa de multa tem "Abrir multa", que leva para a multa na Frota', async () => {
+    history.replaceState(null, '', '#/planner?taskId=task-multa-1')
+    render(<PlannerPage />)
+    const abrir = await screen.findByRole('button', { name: /Abrir multa/ }, { timeout: 10_000 })
+    fireEvent.click(abrir)
+    expect(window.location.hash).toBe('#/frota-multas?registro=multa:u1')
   })
 })

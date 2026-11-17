@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ToastProvider } from '@betinhos/ui'
+import { CONFIG_VERSION, emptyFilters, ToastProvider } from '@betinhos/ui'
 import { MANUT } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { Colisao, FrotaData, Manutencao, Multa } from '../data/types'
 import { linhasDaTabela } from '../testUtils'
+import { viewStoreFor } from '../../../app/viewStore'
 import { Registros } from './Registros'
 
 const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
@@ -75,24 +76,34 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('sem o resumo dos termos (falha na leitura), a lista avisa discretamente', async () => {
+  it('multas abrem na visão Comigo, sem a coluna Termo', async () => {
     window.location.hash = '#/frota-multas'
-    const semResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: undefined }, { ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={semResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText(/Coluna Termo indisponível/)).toBeTruthy()
-    cleanup()
-    const comResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={comResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    await waitFor(() => expect(rows()).toHaveLength(1))
-    expect(screen.queryByText(/Coluna Termo indisponível/)).toBeNull()
+    const lista: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), status: 202410000 }, { ...multa('m2', 'v1'), status: 202410005 }] }
+    render(<Registros kinds={['multa']} data={lista} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Multa m1')).toBeTruthy()
+    expect(screen.queryByText('Multa m2')).toBeNull()
+    expect(screen.getAllByText('Próximo passo').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Coluna Termo/)).toBeNull()
   })
 
-  it('multas mostram a coluna Termo com o rótulo do último termo', async () => {
+  it('visões salvas antigas (coluna e filtro termo, ids de visão antigos) carregam sem erro e sem zerar as linhas', async () => {
     window.location.hash = '#/frota-multas'
-    const comTermo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: { status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' } }, { ...multa('m2', 'v1'), termo: { status: 'contestado', enviadoEm: null } }] }
-    render(<Registros kinds={['multa']} data={comTermo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
-    expect(screen.getByText('Contestado')).toBeTruthy()
+    const filtros = emptyFilters()
+    filtros.quick = { termo: { type: 'condition', id: 'rapido-termo', field: 'termo', op: 'in', values: [{ value: 'pendente', label: 'Pendente' }] } }
+    const config = JSON.stringify({
+      v: CONFIG_VERSION, sort: { key: 'termo', dir: 'asc' }, filters: filtros,
+      columns: ['descricao', 'data', 'veiculo', 'pessoa', 'termo', 'extra', 'status'].map((key) => ({ key, visible: true })),
+    })
+    const store = viewStoreFor({ mode: 'mock' })
+    for (const nome of ['A notificar', 'Termos pendentes', 'Contestados']) await store.create('frota.multa', nome, config)
+    const lista: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), status: 202410000 }, { ...multa('m2', 'v1'), status: 202410005 }] }
+    render(<Registros kinds={['multa']} data={lista} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Multa m1')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Comigo/ }))
+    fireEvent.click(await screen.findByText('Termos pendentes'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Termos pendentes/ })).toBeTruthy())
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(screen.queryByText(/Coluna Termo/)).toBeNull()
   })
 
   it('com onNovo, "Novo registro" abre a gaveta da tela e não o formulário nativo', () => {

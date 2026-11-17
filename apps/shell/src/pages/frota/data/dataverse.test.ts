@@ -241,222 +241,6 @@ describe('plano preventivo, baselines, despesas e telemetria', () => {
   })
 })
 
-describe('runFlow', () => {
-  const GUID = '3f2c1a9e-5b7d-4c8e-9a1b-0d2e4f6a8b1c'
-  const FAKE_URL = 'https://flow.invalid/x?sig=SEGREDO'
-
-  function flowHost(value: string | null = FAKE_URL) {
-    const retrieveMultipleRecords = vi.fn(async (entity: string, _options?: string) => {
-      if (entity === 'environmentvariablevalue') return { entities: value ? [{ value }] : [] }
-      return { entities: [] }
-    })
-    return { ...host({ retrieveMultipleRecords }), retrieveMultipleRecords }
-  }
-
-  function stubFetch(status: number, body: unknown = {}) {
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => ({
-      status,
-      ok: status >= 200 && status < 300,
-      json: async () => {
-        if (body === undefined) throw new SyntaxError('Unexpected token')
-        return body
-      },
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-    return fetchMock
-  }
-
-  async function messageOf(promise: Promise<unknown>) {
-    try {
-      await promise
-    } catch (error) {
-      return (error as Error).message
-    }
-    throw new Error('Era esperado que runFlow rejeitasse')
-  }
-
-  it.each([
-    ['notificarCondutor', { guids: GUID }],
-    ['gerarContrato', { GUID_MULTA: GUID }],
-  ] as const)('chama o Flow %s com POST e o corpo certo', async (flow, expectedBody) => {
-    const fetchMock = stubFetch(200, { message: 'ok', shareUrl: 'https://example.invalid/c.pdf' })
-    const { xrm } = flowHost()
-    const result = await createXrmSource(xrm).runFlow(flow, GUID)
-    expect(result).toEqual({ message: 'ok', shareUrl: 'https://example.invalid/c.pdf' })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe(FAKE_URL)
-    expect(init?.method).toBe('POST')
-    expect(init?.headers).toEqual({ 'Content-Type': 'application/json' })
-    expect(init).not.toHaveProperty('credentials')
-    expect(JSON.parse(init?.body as string)).toEqual(expectedBody)
-  })
-
-  it('lê a variável de ambiente pelo schemaname de cada Flow', async () => {
-    stubFetch(200)
-    const { xrm, retrieveMultipleRecords } = flowHost()
-    const source = createXrmSource(xrm)
-    await source.runFlow('notificarCondutor', GUID)
-    await source.runFlow('gerarContrato', GUID)
-    const options = retrieveMultipleRecords.mock.calls.map((call) => call[1])
-    expect(options[0]).toContain("schemaname eq 'new_FlowUrlNotificarMotoristaMultas'")
-    expect(options[1]).toContain("schemaname eq 'new_FlowUrlGerarContratoMultas'")
-  })
-
-  it('usa o valor padrão da definição quando não há valor sobrescrito', async () => {
-    const fetchMock = stubFetch(200)
-    const retrieveMultipleRecords = vi.fn(async (entity: string) =>
-      entity === 'environmentvariabledefinition' ? { entities: [{ defaultvalue: FAKE_URL }] } : { entities: [] })
-    const { xrm } = host({ retrieveMultipleRecords })
-    await createXrmSource(xrm).runFlow('notificarCondutor', GUID)
-    expect(retrieveMultipleRecords.mock.calls.map((call) => call[0])).toEqual(['environmentvariablevalue', 'environmentvariabledefinition'])
-    expect(fetchMock.mock.calls[0][0]).toBe(FAKE_URL)
-  })
-
-  it('guarda a URL em memória: a segunda chamada não relê a variável', async () => {
-    stubFetch(200)
-    const { xrm, retrieveMultipleRecords } = flowHost()
-    const source = createXrmSource(xrm)
-    await source.runFlow('gerarContrato', GUID)
-    await source.runFlow('gerarContrato', GUID)
-    expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
-  })
-
-  it('valor sobrescrito vazio cai no valor padrão da definição', async () => {
-    const fetchMock = stubFetch(200)
-    const retrieveMultipleRecords = vi.fn(async (entity: string) => {
-      if (entity === 'environmentvariablevalue') return { entities: [{ value: '' }] }
-      if (entity === 'environmentvariabledefinition') return { entities: [{ defaultvalue: FAKE_URL }] }
-      return { entities: [] }
-    })
-    const { xrm } = host({ retrieveMultipleRecords })
-    await createXrmSource(xrm).runFlow('notificarCondutor', GUID)
-    expect(fetchMock.mock.calls[0][0]).toBe(FAKE_URL)
-  })
-
-  it('prepareFlow com a variável vazia rejeita com a mensagem de configuração e não chama o Flow', async () => {
-    const fetchMock = stubFetch(200)
-    const { xrm } = flowHost(null)
-    const message = await messageOf(createXrmSource(xrm).prepareFlow('gerarContrato'))
-    expect(message).toBe('URL do Flow "Gerar contrato" não configurada (variável new_FlowUrlGerarContratoMultas)')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('prepareFlow resolve sem chamar o Flow e runFlow depois não relê a variável', async () => {
-    const fetchMock = stubFetch(200)
-    const { xrm, retrieveMultipleRecords } = flowHost()
-    const source = createXrmSource(xrm)
-    await source.prepareFlow('gerarContrato')
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
-    await source.runFlow('gerarContrato', GUID)
-    expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('prepareFlow não devolve a URL', async () => {
-    stubFetch(200)
-    const { xrm } = flowHost()
-    expect(await createXrmSource(xrm).prepareFlow('gerarContrato')).toBeUndefined()
-  })
-
-  it('devolve nulos quando o corpo não é JSON', async () => {
-    stubFetch(200, undefined)
-    const { xrm } = flowHost()
-    expect(await createXrmSource(xrm).runFlow('gerarContrato', GUID)).toEqual({ message: null, shareUrl: null })
-  })
-
-  it('recusa identificador que não é GUID sem chamar nada', async () => {
-    const fetchMock = stubFetch(200)
-    const { xrm, retrieveMultipleRecords } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', "x'; drop"))
-    expect(message).toBe('Identificador inválido')
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(retrieveMultipleRecords).not.toHaveBeenCalled()
-  })
-
-  it('falha com mensagem clara quando a variável está vazia', async () => {
-    const fetchMock = stubFetch(200)
-    const { xrm } = flowHost(null)
-    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', GUID))
-    expect(message).toBe('URL do Flow "Gerar contrato" não configurada (variável new_FlowUrlGerarContratoMultas)')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('notificarCondutor com 400 e noDriver informa que a multa não tem motorista', async () => {
-    stubFetch(400, { noDriver: 1 })
-    const { xrm } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))
-    expect(message).toBe('A multa não tem motorista. Nada foi enviado')
-    expect(message).not.toContain('SEGREDO')
-  })
-
-  it('notificarCondutor com 207 e noDriver informa que a multa não tem motorista', async () => {
-    stubFetch(207, { noDriver: 2 })
-    const { xrm } = flowHost()
-    expect(await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))).toBe('A multa não tem motorista. Nada foi enviado')
-  })
-
-  it('207 sem noDriver é erro de status, não sucesso', async () => {
-    stubFetch(207, {})
-    const { xrm } = flowHost()
-    expect(await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))).toBe('O Flow "Notificar condutor" respondeu 207. Confira o registro antes de tentar de novo')
-  })
-
-  it('status 500 vira erro sem a URL', async () => {
-    stubFetch(500, {})
-    const { xrm } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', GUID))
-    expect(message).toBe('O Flow "Gerar contrato" respondeu 500. Confira o registro antes de tentar de novo')
-    expect(message).not.toContain('SEGREDO')
-  })
-
-  it('status 500 não é resultado incerto', async () => {
-    stubFetch(500, {})
-    const { xrm } = flowHost()
-    const error = await createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
-    expect(error).toBeInstanceOf(Error)
-    expect(error).not.toBeInstanceOf(FlowIncertoError)
-  })
-
-  it('falha de rede vira erro incerto sem a URL, mesmo que o erro original a contenha', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => { throw new TypeError(`Failed to fetch ${url}`) }))
-    const { xrm } = flowHost()
-    const error = await createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
-    expect(error).toBeInstanceOf(FlowIncertoError)
-    const message = (error as Error).message
-    expect(message).toBe('Não foi possível chamar o Flow "Gerar contrato" (rede ou bloqueio do navegador)')
-    expect(message).not.toContain('SEGREDO')
-  })
-
-  it('estoura o tempo do Flow e aborta a chamada', async () => {
-    vi.useFakeTimers()
-    try {
-      let signal: AbortSignal | undefined
-      const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<never>((_resolve, reject) => {
-        signal = init?.signal ?? undefined
-        signal?.addEventListener('abort', () => reject(new DOMException(`Aborted ${_url}`, 'AbortError')))
-      }))
-      vi.stubGlobal('fetch', fetchMock)
-      const { xrm } = flowHost()
-      const pending = createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
-      await vi.advanceTimersByTimeAsync(0)
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(39_999)
-      expect(signal?.aborted).toBe(false)
-      await vi.advanceTimersByTimeAsync(1)
-      const error = await pending
-      expect(error).toBeInstanceOf(FlowIncertoError)
-      const message = (error as Error).message
-      expect(signal?.aborted).toBe(true)
-      expect(message).toBe('O Flow "Gerar contrato" não respondeu em 40 s. Confira o registro antes de tentar de novo')
-      expect(message).not.toContain('SEGREDO')
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-})
-
 describe('termo de multa (Custom APIs)', () => {
   const MULTA_ID = '{AAAAAAAA-1111-2222-3333-444444444444}'
   const TERMO_ID = '{BBBBBBBB-1111-2222-3333-444444444444}'
@@ -522,5 +306,55 @@ describe('termo de multa (Custom APIs)', () => {
 
   it('temAditivo valida o GUID', async () => {
     await expect(createXrmSource(host().xrm).temAditivo('x')).rejects.toThrow('Identificador inválido')
+  })
+})
+
+describe('passo a passo da multa (Custom APIs)', () => {
+  const MULTA_ID = '{AAAAAAAA-1111-2222-3333-444444444444}'
+  const resposta = (ok: boolean, status: number, body: unknown) => vi.fn(async (_url: string, _init?: RequestInit) => ({ ok, status, json: async () => body }))
+
+  it('passoMulta chama cr40f_PassoMulta com MultaId limpo, Passo e DadosJson e devolve a situação', async () => {
+    const situacao = { etapa: 'indicar', pendentes: ['RegistrarIndicacao'], proximoPasso: 'Indicar no órgão', proximoPrazo: '2026-11-30', prazoVencido: false, aguardandoPenalidade: false }
+    const fetchMock = resposta(true, 200, { MultaJson: JSON.stringify(situacao) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).toEqual(situacao)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_PassoMulta')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ MultaId: 'aaaaaaaa-1111-2222-3333-444444444444', Passo: 'AvisarMotorista', DadosJson: '{}' })
+  })
+
+  it('passoMulta repassa a recusa do servidor como está', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Avise o motorista antes de registrar a indicação.' } }))
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', { canal: 'dsv', data: '2026-11-15' })).rejects.toThrow('Avise o motorista antes de registrar a indicação.')
+  })
+
+  it('a recusa do servidor chega com o status HTTP para a tela decidir o que mostrar', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Recusa de regra.' } }))
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Recusa de regra.' })
+    vi.stubGlobal('fetch', resposta(false, 500, { error: { message: 'Unhandled exception' } }))
+    await expect(createXrmSource(host().xrm).dossieMulta(MULTA_ID)).rejects.toMatchObject({ name: 'ApiError', status: 500 })
+  })
+
+  it('dossieMulta lê o new_DossieJson', async () => {
+    const dossie = { multa: { id: 'x', auto: 'AIT 1', placa: 'TST1A11', dataHora: null, local: null, orgao: null, dataParaIndicar: null, infracao: null }, servicos: [], infleet: { erro: 'Sem token' } }
+    const fetchMock = resposta(true, 200, { new_DossieJson: JSON.stringify(dossie) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createXrmSource(host().xrm).dossieMulta(MULTA_ID)).toEqual(dossie)
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ new_MultaId: 'aaaaaaaa-1111-2222-3333-444444444444' })
+  })
+
+  it('enviarArquivoMulta faz PATCH binário na coluna de arquivo com o nome sem acento', async () => {
+    const fetchMock = resposta(true, 204, {})
+    vi.stubGlobal('fetch', fetchMock)
+    await createXrmSource(host().xrm).enviarArquivoMulta(MULTA_ID, 'cr40f_comprovantepagamento', new File(['x'], 'comprovante pagamento março.pdf', { type: 'application/pdf' }))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_multases(aaaaaaaa-1111-2222-3333-444444444444)/cr40f_comprovantepagamento')
+    expect(init?.method).toBe('PATCH')
+    expect((init?.headers as Record<string, string>)['x-ms-file-name']).toBe('comprovante pagamento marco.pdf')
+  })
+
+  it('urlArquivoMulta aponta para o /$value da coluna de arquivo e recusa id inválido', () => {
+    const source = createXrmSource(host().xrm)
+    expect(source.urlArquivoMulta(MULTA_ID, 'cr40f_autodainfracao')).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_multases(aaaaaaaa-1111-2222-3333-444444444444)/cr40f_autodainfracao/$value')
+    expect(() => source.urlArquivoMulta('nao-e-guid', 'cr40f_pdfpenalidade')).toThrow('Identificador inválido')
   })
 })

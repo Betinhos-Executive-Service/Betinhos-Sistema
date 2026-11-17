@@ -1,3 +1,5 @@
+import { STATUS_OPTIONS } from '../../frota/data/schema'
+
 // Metadata conferida em cr40f_funcionarios (PROD e DEV idênticos, 2026-10-01).
 export const TABLE = 'cr40f_funcionarios'
 export const ENTITY_SET = 'cr40f_funcionarioses'
@@ -22,15 +24,8 @@ export const VINCULO: Option[] = [
   { value: 0, label: 'Colaborador' },
   { value: 1, label: 'Terceiro' },
 ]
-export const MULTA_STATUS: Option[] = [
-  { value: 202410000, label: 'Notificar o Condutor' },
-  { value: 202410001, label: 'Indicada' },
-  { value: 202410002, label: 'Recurso' },
-  { value: 202410003, label: 'Descontado' },
-  { value: 202410004, label: 'Condutor Notificado' },
-  { value: 202410005, label: 'Finalizado' },
-  { value: 202410006, label: 'Pago' },
-]
+/** Rótulos das etapas da multa: vêm da Frota (um lugar só). */
+export const MULTA_STATUS: Option[] = STATUS_OPTIONS.multa
 
 export type FieldKind = 'text' | 'textarea' | 'cpf' | 'phone' | 'email' | 'url' | 'date' | 'choice' | 'bool'
 export type FieldGroup = 'pessoais' | 'vinculo' | 'contato' | 'detalhes' | 'assinatura'
@@ -82,6 +77,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'new_notificacoesoperacionais', label: 'Notificações operacionais', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesfinanceiras', label: 'Notificações financeiras', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesfrota', label: 'Notificações de frota', kind: 'bool', group: 'detalhes', hint: 'Recebe o resumo semanal de pendências da frota (quarta, 08:00).' },
+  { key: 'cr40f_recebeemailmultas', label: 'E-mail diário de multas', kind: 'bool', group: 'detalhes', hint: 'Recebe o e-mail "Multas de hoje" (dias úteis, 07:00).' },
   { key: 'cr40f_gerarrecibopersonalizado', label: 'Gerar recibo personalizado', kind: 'bool', group: 'detalhes' },
   { key: 'cr40f_identificadordocolaborador', label: 'ID SharePoint', kind: 'text', group: 'detalhes', readonly: true },
   { key: 'new_aditivoassinaturaem', label: 'Aditivo assinado em', kind: 'date', group: 'assinatura' },

@@ -40,7 +40,7 @@ const TELAS: Tela[] = [
   ['Infrações', '#/infracoes', InfracoesPage, 'Gravidade'],
   ['Equipamentos', '#/equipamentos', EquipamentosPage, 'Status'],
   ['Frota › Veículos', '#/frota-veiculos', frota('veiculos'), 'Status'],
-  ['Frota › Registros', '#/frota-multas', frota('multas'), 'Status'],
+  ['Frota › Registros', '#/frota-multas', frota('multas'), 'Etapa'],
   ['Clientes', '#/clientes', ClientesPage, 'Registro'],
   ['Logs', '#/logs', LogsPage, 'Severidade'],
   ['Treinamentos', '#/treinamentos', TreinamentosPage, 'Situação'],

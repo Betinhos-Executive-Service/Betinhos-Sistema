@@ -69,12 +69,12 @@ export function detalheCnh(funcionarios: Funcionario[], now: Date): Detalhe {
   return { tipo: 'cnh', titulo: 'CNH em atenção', descricao: `Motoristas ativos com CNH vencida ou com validade em até ${JANELA_DIAS} dias.`, linhas }
 }
 
-/** "Multas pendentes": status Notificar o condutor, pela data da multa no período. */
+/** "Multas pendentes": etapa 1 (identificar o responsável), pela data da multa no período. */
 export function detalheMultasPendentes(multas: Multa[], p: Periodo): Detalhe {
   const linhas = multasPendentes(multas.filter((m) => entre(m.dia, p.inicio, p.fim)))
     .sort((a, b) => a.dia.localeCompare(b.dia))
     .map((m): LinhaMultaDetalhe => ({ id: m.id, dia: m.dia, motorista: m.motorista, infracao: infracaoDe(m), status: m.statusLabel || '—' }))
-  return { tipo: 'multas', titulo: 'Multas pendentes', descricao: 'Multas com status Notificar o condutor, pela data da multa no período.', linhas }
+  return { tipo: 'multas', titulo: 'Multas pendentes', descricao: 'Multas na etapa 1. Identificar o responsável, pela data da multa no período.', linhas }
 }
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

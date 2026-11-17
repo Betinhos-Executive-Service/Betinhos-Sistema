@@ -33,7 +33,7 @@ ${REGRAS_COMUNS}
 Contexto enviado:
 - funcionarios: colaboradores ativos (funcao 202410000 = Motorista). Datas em AAAA-MM-DD; vazia = sem dado.
 - documentos: documentos vigentes de funcionários com validade nos próximos 90 dias ou já vencida.
-- multas: multas com status "Notificar o Condutor" (sem condutor indicado), com prazo de indicação.
+- multas: multas na etapa "1. Identificar o responsável" (sem condutor indicado), com prazo de indicação.
 - comunicados: comunicados ativos na home, para você não repetir assunto.
 - treinamentos: treinamentos publicados pelo RH com validade (prazo para concluir) vencida ou nos próximos 7 dias; pendentes = funcionários ativos que ainda não concluíram (use o número como está).
 

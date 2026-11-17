@@ -42,7 +42,7 @@ test("cria e atualiza tarefa sem alterar a referência original", () => {
   const created = next.tasks.at(-1);
   const updated = updateTask(next, created!.id, { status: "done" });
   assert.equal(updated.tasks.at(-1)!.status, "done");
-  assert.equal(initial.tasks.length, 44);
+  assert.equal(initial.tasks.length, 45);
 });
 
 test("persiste o flag de visibilidade restrita no mock durante criação e edição", () => {
@@ -152,7 +152,7 @@ test("exclui somente a tarefa selecionada no mock", () => {
   const next = deleteTask(initial, "task-1");
   assert.equal(next.tasks.some((taskItem) => taskItem.id === "task-1"), false);
   assert.equal(next.tasks.length, initial.tasks.length - 1);
-  assert.equal(initial.tasks.length, 44);
+  assert.equal(initial.tasks.length, 45);
 });
 
 test("cria tarefa principal para cotação sem duplicar", () => {
@@ -590,7 +590,7 @@ test("exige relato e permissão para registrar retorno", () => {
 test("semeia cenário operacional amplo e variado", () => {
   const state = seedState();
   assert.equal(state.quotes.length, 17);
-  assert.equal(state.tasks.length, 44);
+  assert.equal(state.tasks.length, 45);
   assert.equal(state.employees.length, 7);
   assert.equal(state.quality!.length, 8);
   assert.ok(state.tasks.some((item) => item.status === "waiting"));

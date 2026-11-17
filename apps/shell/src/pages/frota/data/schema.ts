@@ -44,7 +44,11 @@ export const PAGAMENTO_MANUT: Option[] = [
 export const ANEXO_DESPESA = { PENDENTE: 100000001, ENVIADO: 100000002, FALHOU: 100000003 } as const
 /** Tamanho máximo dos textos gravados (MaxLength do DEV, lido na Tarefa 1 do plano 2). O comentarioColaborador vale o menor entre new_comentariosdocolaborador (4000) e new_observacaofinal (40000), porque o Concluir grava o mesmo texto nas duas. */
 export const LIMITE = { comentarioAprovador: 100, comentarioAoMotorista: 1000, estabelecimento: 100, servicoRealizado: 100, comentarioColaborador: 4000, descricao: 4000 } as const
-export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006 } as const
+export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006, CANCELADA: 202410007 } as const
+/** Choices novos da multa (fase 1), iguais a MultaCodigos de packages/plugins/Cr40f.Frota.Plugin/MultaEtapas.cs. */
+export const RESPONSAVEL = { MOTORISTA: 100000000, EMPRESA: 100000001 } as const
+export const MOTIVO_EMPRESA = { PRAZO_PERDIDO: 100000000, CULPA_EMPRESA: 100000001 } as const
+export const CANAL = { SENATRAN: 100000000, DSV: 100000001, PREFEITURA: 100000002 } as const
 /** Termo de multa (Task A1): choices de new_termomulta. */
 export const TERMO_TABLE = 'new_termomulta'
 export const TERMO_STATUS = { pendente: 100000000, assinado: 100000001, contestado: 100000002, expirado: 100000003, cancelado: 100000004 } as const
@@ -63,14 +67,16 @@ export const STATUS_OPTIONS: Record<Kind, Option[]> = {
     { value: MANUT.REPROVADO, label: 'Reprovado' },
     { value: MANUT.CANCELADO, label: 'Cancelado' },
   ],
+  // Rótulos das etapas da fase 1 (spec §3). Os valores são os de sempre; Descontado fica só para as multas antigas.
   multa: [
-    { value: MULTA.NOTIFICAR, label: 'Notificar o Condutor' },
-    { value: MULTA.NOTIFICADO, label: 'Condutor Notificado' },
-    { value: MULTA.INDICADA, label: 'Indicada' },
-    { value: MULTA.RECURSO, label: 'Recurso' },
-    { value: MULTA.DESCONTADO, label: 'Descontado' },
-    { value: MULTA.PAGO, label: 'Pago' },
-    { value: MULTA.FINALIZADO, label: 'Finalizado' },
+    { value: MULTA.NOTIFICAR, label: '1. Identificar o responsável' },
+    { value: MULTA.NOTIFICADO, label: '2. Indicar no órgão' },
+    { value: MULTA.INDICADA, label: '3. Pagar' },
+    { value: MULTA.PAGO, label: '4. Acertar' },
+    { value: MULTA.FINALIZADO, label: 'Encerrada' },
+    { value: MULTA.RECURSO, label: 'Em recurso' },
+    { value: MULTA.CANCELADA, label: 'Cancelada' },
+    { value: MULTA.DESCONTADO, label: 'Descontado (antigo)' },
   ],
   colisao: [
     { value: COLISAO.ENVIADO, label: 'Enviado' },
@@ -82,7 +88,7 @@ export const STATUS_OPTIONS: Record<Kind, Option[]> = {
 
 export const TONE: Record<Kind, Record<number, Tone>> = {
   manutencao: { [MANUT.SOLICITADO]: 'warning', [MANUT.AGENDADO]: 'info', [MANUT.PROGRAMADO]: 'info', [MANUT.REALIZADO]: 'success', [MANUT.REPROVADO]: 'danger', [MANUT.CANCELADO]: 'neutral' },
-  multa: { [MULTA.NOTIFICAR]: 'warning', [MULTA.NOTIFICADO]: 'info', [MULTA.INDICADA]: 'info', [MULTA.RECURSO]: 'warning', [MULTA.DESCONTADO]: 'success', [MULTA.PAGO]: 'success', [MULTA.FINALIZADO]: 'neutral' },
+  multa: { [MULTA.NOTIFICAR]: 'warning', [MULTA.NOTIFICADO]: 'info', [MULTA.INDICADA]: 'info', [MULTA.PAGO]: 'info', [MULTA.FINALIZADO]: 'success', [MULTA.RECURSO]: 'warning', [MULTA.CANCELADA]: 'neutral', [MULTA.DESCONTADO]: 'neutral' },
   colisao: { [COLISAO.ENVIADO]: 'warning', [COLISAO.ANALISE]: 'info', [COLISAO.RESOLVIDO]: 'success', [COLISAO.CANCELADO]: 'neutral' },
 }
 

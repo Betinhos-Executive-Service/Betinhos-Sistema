@@ -1,8 +1,8 @@
 ﻿# Somente DEV. Cria (ou atualiza) o flow "Flow Alertas | Resumo diário" na solução AppBetinhos. O flow nasce DESLIGADO.
 #
-# Todo dia útil às 07:00 (America/Sao_Paulo) manda UM e-mail à operação com as pendências de hoje: CNH vencida e ASO vencido
-# de motorista escalado hoje, documento vigente vencido de veículo escalado hoje e multa sem condutor com prazo de indicação
-# em até 3 dias. Sem itens, o flow termina sem enviar. Sem tabela, sem Worker, sem segredo no repositório.
+# Todo dia util as 07:00 (America/Sao_Paulo) manda UM e-mail a operacao com as pendencias de hoje: CNH vencida e ASO vencido
+# de motorista escalado hoje e documento vigente vencido de veiculo escalado hoje. As multas sairam daqui em 17/11/2026 e vao
+# no e-mail "Multas | Multas de hoje" (provision-flow-multas-do-dia.ps1). Sem itens, o flow termina sem enviar. Sem tabela, sem Worker, sem segredo no repositorio.
 #
 # Destinatários: funcionários ativos com "Notificações operacionais" marcado e "E-mail Betinhos" preenchido (cadastro de
 # funcionários, editável na tela Funcionários do Sistema Betinhos). Sem ninguém marcado, a execução falha com o motivo.
@@ -130,9 +130,8 @@ $definitionText = @'
         "Inicio_hoje": { "type": "Compose", "runAfter": { "Hoje": ["Succeeded"] }, "inputs": "@convertToUtc(concat(outputs('Hoje'), 'T00:00:00'), 'E. South America Standard Time')" },
         "Fim_hoje": { "type": "Compose", "runAfter": { "Inicio_hoje": ["Succeeded"] }, "inputs": "@addToTime(outputs('Inicio_hoje'), 1, 'Day')" },
         "Limite_aso": { "type": "Compose", "runAfter": { "Fim_hoje": ["Succeeded"] }, "inputs": "@formatDateTime(addToTime(outputs('Hoje'), -12, 'Month'), 'yyyy-MM-dd')" },
-        "Limite_multa": { "type": "Compose", "runAfter": { "Limite_aso": ["Succeeded"] }, "inputs": "@formatDateTime(addToTime(outputs('Hoje'), 3, 'Day'), 'yyyy-MM-dd')" },
         "Escalados": {
-          "type": "OpenApiConnection", "runAfter": { "Limite_multa": ["Succeeded"] },
+          "type": "OpenApiConnection", "runAfter": { "Limite_aso": ["Succeeded"] },
           "inputs": {
             "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
             "parameters": {
@@ -185,25 +184,12 @@ $definitionText = @'
             "authentication": "@parameters('$authentication')"
           }
         },
-        "Multas": {
-          "type": "OpenApiConnection", "runAfter": { "Docs": ["Succeeded"] },
-          "inputs": {
-            "host": { "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
-            "parameters": {
-              "entityName": "cr40f_multases",
-              "$select": "cr40f_multasid,cr40f_id_multa,cr40f_dataparaindicar",
-              "$filter": "statecode eq 0 and cr40f_status eq 202410000 and _cr40f_motorista_value eq null and cr40f_dataparaindicar le @{outputs('Limite_multa')}",
-              "$top": 150
-            },
-            "authentication": "@parameters('$authentication')"
-          }
-        },
-        "Cnh_escalados": { "type": "Query", "runAfter": { "Multas": ["Succeeded"] }, "inputs": { "from": "@outputs('Cnh')?['body/value']", "where": "@contains(body('Ids_motoristas'), toLower(item()?['cr40f_funcionariosid']))" } },
+        "Cnh_escalados": { "type": "Query", "runAfter": { "Docs": ["Succeeded"] }, "inputs": { "from": "@outputs('Cnh')?['body/value']", "where": "@contains(body('Ids_motoristas'), toLower(item()?['cr40f_funcionariosid']))" } },
         "Aso_escalados": { "type": "Query", "runAfter": { "Cnh_escalados": ["Succeeded"] }, "inputs": { "from": "@outputs('Aso')?['body/value']", "where": "@contains(body('Ids_motoristas'), toLower(item()?['cr40f_funcionariosid']))" } },
         "Docs_escalados": { "type": "Query", "runAfter": { "Aso_escalados": ["Succeeded"] }, "inputs": { "from": "@outputs('Docs')?['body/value']", "where": "@contains(body('Ids_veiculos'), toLower(item()?['_cr40f_veiculo_value']))" } },
         "Total": {
           "type": "Compose", "runAfter": { "Docs_escalados": ["Succeeded"] },
-          "inputs": "@add(add(length(body('Cnh_escalados')), length(body('Aso_escalados'))), add(length(body('Docs_escalados')), length(outputs('Multas')?['body/value'])))"
+          "inputs": "@add(add(length(body('Cnh_escalados')), length(body('Aso_escalados'))), length(body('Docs_escalados')))"
         },
         "Sem_itens": {
           "type": "If", "runAfter": { "Total": ["Succeeded"] },
@@ -234,10 +220,9 @@ $definitionText = @'
         "Linhas_cnh": { "type": "Select", "runAfter": { "Sem_destinatarios": ["Succeeded"] }, "inputs": { "from": "@body('Cnh_escalados')", "select": "@concat('CNH vencida: ', item()?['new_apelido'], ' (validade ', formatDateTime(item()?['cr40f_validadedacnh'], 'dd/MM/yyyy'), ')')" } },
         "Linhas_aso": { "type": "Select", "runAfter": { "Linhas_cnh": ["Succeeded"] }, "inputs": { "from": "@body('Aso_escalados')", "select": "@concat('ASO vencido: ', item()?['new_apelido'], ' (ASO de ', formatDateTime(item()?['cr40f_datadoaso'], 'dd/MM/yyyy'), ')')" } },
         "Linhas_docs": { "type": "Select", "runAfter": { "Linhas_aso": ["Succeeded"] }, "inputs": { "from": "@body('Docs_escalados')", "select": "@concat('Documento vencido do veículo ', coalesce(item()?['_cr40f_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), ': ', item()?['cr40f_name'], ' (validade ', formatDateTime(item()?['cr40f_validade'], 'dd/MM/yyyy'), ')')" } },
-        "Linhas_multas": { "type": "Select", "runAfter": { "Linhas_docs": ["Succeeded"] }, "inputs": { "from": "@outputs('Multas')?['body/value']", "select": "@concat('Multa sem condutor: ', item()?['cr40f_id_multa'], ' (indicar até ', formatDateTime(item()?['cr40f_dataparaindicar'], 'dd/MM/yyyy'), ')')" } },
         "Resumo_html": {
-          "type": "Compose", "runAfter": { "Linhas_multas": ["Succeeded"] },
-          "inputs": "@concat('<p><b>Pendências da operação para hoje (', formatDateTime(outputs('Hoje'), 'dd/MM'), ')</b></p><ul><li>', join(union(body('Linhas_cnh'), body('Linhas_aso'), body('Linhas_docs'), body('Linhas_multas')), '</li><li>'), '</li></ul>')"
+          "type": "Compose", "runAfter": { "Linhas_docs": ["Succeeded"] },
+          "inputs": "@concat('<p><b>Pendências da operação para hoje (', formatDateTime(outputs('Hoje'), 'dd/MM'), ')</b></p><ul><li>', join(union(body('Linhas_cnh'), body('Linhas_aso'), body('Linhas_docs')), '</li><li>'), '</li></ul>')"
         },
         "Enviar_email": {
           "type": "OpenApiConnection", "runAfter": { "Resumo_html": ["Succeeded"] },
@@ -274,7 +259,6 @@ function Conferir($lido, [string] $texto) {
   $cnh = & $ler $a.Cnh
   $aso = & $ler $a.Aso
   $doc = & $ler $a.Docs
-  $mul = & $ler $a.Multas
   $mail = $a.Enviar_email
   $checks = [ordered]@{
     'gatilho Recurrence semanal, intervalo 1' = $t.type -eq 'Recurrence' -and $r.frequency -eq 'Week' -and $r.interval -eq 1
@@ -285,7 +269,7 @@ function Conferir($lido, [string] $texto) {
     'Cnh: motoristas ativos com validade anterior a hoje, top 150' = $cnh.entityName -ceq 'cr40f_funcionarioses' -and $cnh.'$filter' -clike '*cr40f_status eq 0 and cr40f_funcao eq 202410000 and cr40f_validadedacnh lt*' -and $cnh.'$top' -eq 150
     'Aso: motoristas ativos com ASO anterior ao limite de 12 meses, top 150' = $aso.entityName -ceq 'cr40f_funcionarioses' -and $aso.'$filter' -clike '*cr40f_datadoaso lt @{outputs(''Limite_aso'')}*' -and $aso.'$top' -eq 150
     'Docs: situação Vigente, veículo preenchido, validade anterior a hoje, top 150' = $doc.entityName -ceq 'cr40f_documentos' -and $doc.'$filter' -clike '*cr40f_situacao eq 100000000 and _cr40f_veiculo_value ne null and cr40f_validade lt*' -and $doc.'$top' -eq 150
-    'Multas: Notificar o Condutor, sem motorista, prazo até o limite de 3 dias, top 150' = $mul.entityName -ceq 'cr40f_multases' -and $mul.'$filter' -clike '*cr40f_status eq 202410000 and _cr40f_motorista_value eq null and cr40f_dataparaindicar le*' -and $mul.'$top' -eq 150
+    'sem multas (foram para o e-mail Multas de hoje)' = -not ($pa -contains 'Multas') -and -not ($pa -contains 'Linhas_multas') -and -not ($pa -contains 'Limite_multa')
     'Sem_itens encerra com Succeeded quando o total é 0' = $a.Sem_itens.type -eq 'If' -and $a.Sem_itens.actions.Encerrar_sem_itens.type -eq 'Terminate' -and $a.Sem_itens.actions.Encerrar_sem_itens.inputs.runStatus -eq 'Succeeded'
     'Destinatarios: funcionários ativos com Notificações operacionais e e-mail, top 50' = $a.Destinatarios.inputs.parameters.entityName -ceq 'cr40f_funcionarioses' -and $a.Destinatarios.inputs.parameters.'$filter' -ceq 'statecode eq 0 and cr40f_status eq 0 and new_notificacoesoperacionais eq true and cr40f_emailbetinhos ne null' -and $a.Destinatarios.inputs.parameters.'$top' -eq 50
     'Destinatarios só roda quando há itens' = (@($a.Destinatarios.runAfter.Sem_itens) -join ',') -eq 'Succeeded'
@@ -324,7 +308,7 @@ if ($flows.Count) {
     Apply $flows[0] $clientData
   } else { Write-Host '[resumo-diario] definição já atualizada; nada a gravar.' }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia útil às 07:00 (America/Sao_Paulo) envia um e-mail à operação com CNH vencida, ASO vencido, documento do veículo vencido (de quem está escalado hoje) e multa sem condutor. Sem itens, não envia.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia útil às 07:00 (America/Sao_Paulo) envia um e-mail à operação com CNH vencida, ASO vencido, documento do veículo vencido (de quem está escalado hoje). Sem itens, não envia.' } | Out-Null
   $flowId = @(FlowRows)[0].workflowid
 }
 Include $flowId 29

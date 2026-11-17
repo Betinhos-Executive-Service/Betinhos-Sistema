@@ -5,6 +5,7 @@ import { useQueryTexto } from '../../../nav/queryState'
 import { formatBR } from '../data/dates'
 import type { LoadResult } from '../data/source'
 import type { FrotaData, Kind } from '../data/types'
+import { ROTULO_ETAPA } from '../domain/multaEtapas'
 import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
 
 const CURTO: Record<PendenciaTipo, string> = {
@@ -15,8 +16,8 @@ const CURTO: Record<PendenciaTipo, string> = {
   encaixar: 'A encaixar',
   preventiva: 'Preventiva do plano',
   atrasada: 'Manutenção atrasada',
-  notificar: 'Notificar condutor',
-  indicar: 'Indicar condutor',
+  notificar: ROTULO_ETAPA.identificar,
+  indicar: ROTULO_ETAPA.indicar,
   colisao: 'Colisão em aberto',
 }
 

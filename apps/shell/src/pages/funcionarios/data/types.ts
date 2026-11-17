@@ -28,7 +28,7 @@ export type Draft = {
 export type Multa = {
   id: string
   titulo: string
-  status: string
+  status: number | null
   dataHora: string | null
   placa: string
   local: string
