@@ -60,6 +60,59 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void ReservaCanceladaNaoEntraComoServico()
+        {
+            var s = Cenario();
+            s.Reserva(Infracao.AddHours(-1), Infracao.AddHours(2), "S-300", "Cliente Cancelado (fictício)", "Cancelado", 202410002);
+            s.Reserva(Infracao.AddHours(-1), Infracao.AddHours(2), "S-301", "Cliente Ressalva (fictício)", "Cancelado com Ressalvas", 202410010);
+            s.Reserva(Infracao.AddMinutes(-30), Infracao.AddHours(1), "S-302", "Cliente Ativo (fictício)", "Em Execução", 202410006);
+
+            var servico = (Dictionary<string, object>)((object[])Ler(DossieMultaPlugin.Montar(s, s.Multa.Id, s))["servicos"]).Single();
+
+            Assert.Equal("S-302", servico["codigo"]);
+            Assert.Equal(true, servico["noHorario"]);
+        }
+
+        [Fact]
+        public void SoReservaCanceladaNaJanelaDeixaServicosVazio()
+        {
+            var s = Cenario();
+            s.Reserva(Infracao.AddHours(-1), Infracao.AddHours(2), "S-300", "Cliente Cancelado (fictício)", "Cancelado", 202410002);
+
+            Assert.Empty((object[])Ler(DossieMultaPlugin.Montar(s, s.Multa.Id, s))["servicos"]);
+        }
+
+        [Fact]
+        public void FalhaNaAgendaDevolveServicosVaziosEOResto()
+        {
+            var s = Cenario();
+            s.AgendaFalha = true;
+            var tracing = new Rastro();
+
+            var d = Ler(DossieMultaPlugin.Montar(s, s.Multa.Id, s, tracing));
+
+            Assert.Empty((object[])d["servicos"]);
+            Assert.Equal("1A2B3C", ((Dictionary<string, object>)d["multa"])["auto"]);
+            Assert.NotNull(((Dictionary<string, object>)d["infleet"])["viagens"]);
+            Assert.Contains(tracing.Linhas, l => l.Contains("agenda"));
+        }
+
+        [Fact]
+        public void ErroInesperadoDoInfleetNaoVazaNoDossieEVaiParaOTrace()
+        {
+            var s = Cenario();
+            s.InfleetErroInesperado = true;
+            var tracing = new Rastro();
+
+            var json = DossieMultaPlugin.Montar(s, s.Multa.Id, s, tracing);
+            var d = Ler(json);
+
+            Assert.Equal("Não foi possível consultar o InFleet.", ((Dictionary<string, object>)d["infleet"])["erro"]);
+            Assert.DoesNotContain("token-secreto", json);
+            Assert.Contains(tracing.Linhas, l => l.Contains("token-secreto"));
+        }
+
+        [Fact]
         public void PluginDevolveODossieNaSaida()
         {
             var s = Cenario();
@@ -88,6 +141,12 @@ namespace Betinhos.DriverRecordSharing.Tests
             return s;
         }
 
+        private sealed class Rastro : ITracingService
+        {
+            public readonly List<string> Linhas = new List<string>();
+            public void Trace(string format, params object[] args) => Linhas.Add(args.Length == 0 ? format : string.Format(format, args));
+        }
+
         private sealed class Provider : IServiceProvider, IOrganizationServiceFactory, ITracingService
         {
             private readonly IPluginExecutionContext ctx; private readonly Mundo mundo;
@@ -101,7 +160,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             private readonly Dictionary<string, List<Entity>> tabelas = new Dictionary<string, List<Entity>>();
             public Entity Veiculo, Multa;
-            public bool InfleetFalha;
+            public bool InfleetFalha, InfleetErroInesperado, AgendaFalha;
 
             public Entity Add(Entity e)
             {
@@ -111,19 +170,20 @@ namespace Betinhos.DriverRecordSharing.Tests
                 return e;
             }
 
-            public void Reserva(DateTime saida, DateTime? retorno, string codigo, string cliente, string status)
+            public void Reserva(DateTime saida, DateTime? retorno, string codigo, string cliente, string status, int statusCodigo = 202410008)
             {
                 var r = Add(new Entity("cr40f_reservadeveculos")
                 {
                     ["cr40f_veiculo"] = Veiculo.ToEntityReference(), ["cr40f_dataehorriodesada"] = saida, ["cr40f_horrioprevistoderetorno"] = retorno,
                     ["cr40f_idnovo"] = codigo, ["cr40f_cliente"] = new EntityReference("cr40f_clientes1", Guid.NewGuid()) { Name = cliente },
-                    ["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid()) { Name = "Ana Souza (fictício)" }, ["cr40f_status"] = new OptionSetValue(202410008),
+                    ["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid()) { Name = "Ana Souza (fictício)" }, ["cr40f_status"] = new OptionSetValue(statusCodigo),
                 });
                 r.FormattedValues["cr40f_status"] = status;
             }
 
             public Dictionary<string, object> Coletar(string placa, DateTime infracaoUtc)
             {
+                if (InfleetErroInesperado) throw new InvalidOperationException("falha com token-secreto");
                 if (InfleetFalha) throw new InfleetUnavailableException("Infleet fora do ar.");
                 return new Dictionary<string, object>
                 {
@@ -137,6 +197,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             public EntityCollection RetrieveMultiple(QueryBase query)
             {
                 var q = (QueryExpression)query;
+                if (AgendaFalha && q.EntityName == "cr40f_reservadeveculos") throw new InvalidOperationException("agenda fora");
                 IEnumerable<Entity> linhas = tabelas.TryGetValue(q.EntityName, out var lista) ? lista : new List<Entity>();
                 foreach (var c in q.Criteria.Conditions) linhas = linhas.Where(e => Casa(e, c)).ToList();
                 return new EntityCollection(linhas.ToList());

@@ -8,6 +8,8 @@
 # O Deploy so troca o conteudo do assembly (push-driverrecordsharing-plugin.ps1); tipo de plugin e Custom API novos deste
 # assembly continuam a mao, como a new_ProvaMidia. O PROD recebe pelas solucoes.
 # Rode do checkout principal na develop atualizada, DEPOIS que o Deploy publicar o assembly com a classe nova.
+# A API exige o privilegio de gravar multa (prvWritecr40f_multas, o mesmo da cr40f_PassoMulta): o plugin le agenda, funcionarios
+# e InFleet como SYSTEM, entao so quem pode editar multa recebe o dossie. O nome exato vem do Dataverse; se nao houver um unico, falha.
 # Idempotente: confere o que existe antes de criar; nunca exclui. Sem -Apply so mostra o plano. Somente DEV.
 # Uso: powershell -NoProfile -ExecutionPolicy Bypass -File packages/plugins/scripts/register-dossiemulta-customapi.ps1 [-Apply]
 
@@ -21,6 +23,11 @@ $Api = [pscustomobject]@{ Id = "d0edc9b5-8387-4e82-9b72-67cd48ce0b54"; Name = "n
 $Request = [pscustomobject]@{ Id = "09947544-efe3-4219-a662-bcf2ed2ee2d0"; Name = "new_MultaId" }
 $Response = [pscustomobject]@{ Id = "145eec65-d3aa-4804-bb09-65becb61ab80"; Name = "new_DossieJson" }
 
+$Privilegio = "prvWritecr40f_multas"
+$privilegioAtual = @(Get-Rows "privileges" "name" "name eq '$Privilegio'")
+if ($privilegioAtual.Count -ne 1) { throw "Privilegio $Privilegio nao encontrado (esperado exatamente um, achou $($privilegioAtual.Count)). A tabela cr40f_multas existe neste ambiente?" }
+$Privilegio = [string]$privilegioAtual[0].name
+
 $assemblyAtual = @(Get-Rows "pluginassemblies" "pluginassemblyid" "name eq '$Assembly'")
 if ($assemblyAtual.Count -ne 1) { throw "Assembly $Assembly nao encontrado no DEV." }
 
@@ -36,11 +43,11 @@ if ($type.Count -eq 0) {
 }
 $typeId = if ($type.Count -eq 1) { [string]$type[0].plugintypeid } else { $null }
 
-$apiAtual = @(Get-Rows "customapis" "customapiid,allowedcustomprocessingsteptype,bindingtype,_plugintypeid_value" "uniquename eq '$($Api.Name)'")
+$apiAtual = @(Get-Rows "customapis" "customapiid,allowedcustomprocessingsteptype,bindingtype,_plugintypeid_value,executeprivilegename" "uniquename eq '$($Api.Name)'")
 if ($apiAtual.Count -eq 1 -and [string]$apiAtual[0].customapiid -ne $Api.Id) { throw "$($Api.Name) existe com id $($apiAtual[0].customapiid), diferente do fixo $($Api.Id)." }
 if ($apiAtual.Count -eq 1 -and ([int]$apiAtual[0].allowedcustomprocessingsteptype -ne 0 -or [int]$apiAtual[0].bindingtype -ne 0)) { throw "$($Api.Name) existe fora do desenho (tipo de step ou binding)." }
 if (-not $Apply) {
-  Write-Step $(if ($apiAtual.Count -eq 1) { "DRY RUN $($Api.Name) ja existe; conferiria plugin type, parametro e resposta." } else { "DRY RUN criaria $($Api.Name) com $($Request.Name) (Guid) e $($Response.Name) (string)." })
+  Write-Step $(if ($apiAtual.Count -eq 1) { "DRY RUN $($Api.Name) ja existe; conferiria plugin type, privilegio (atual: '$($apiAtual[0].executeprivilegename)', esperado: '$Privilegio'), parametro e resposta." } else { "DRY RUN criaria $($Api.Name) com $($Request.Name) (Guid) e $($Response.Name) (string)." })
   Write-Step "dry-run: nada gravado."
   return
 }
@@ -48,7 +55,7 @@ if ($apiAtual.Count -eq 0) {
   Invoke-Dv "POST" "customapis" @{
     customapiid = $Api.Id; uniquename = $Api.Name; name = $Api.Name; displayname = "Multas | Dossi$([char]0xEA) para o WhatsApp"
     description = "Servico da agenda, viagens do InFleet e dados da notificacao da multa. Somente leitura."; bindingtype = 0; isfunction = $false; isprivate = $false
-    allowedcustomprocessingsteptype = 0; workflowsdkstepenabled = $false; "PluginTypeId@odata.bind" = "/plugintypes($typeId)"
+    allowedcustomprocessingsteptype = 0; executeprivilegename = $Privilegio; workflowsdkstepenabled = $false; "PluginTypeId@odata.bind" = "/plugintypes($typeId)"
   } | Out-Null
   Write-Step "criada $($Api.Name)"
 } elseif ([string]$apiAtual[0]._plugintypeid_value -ne $typeId) {

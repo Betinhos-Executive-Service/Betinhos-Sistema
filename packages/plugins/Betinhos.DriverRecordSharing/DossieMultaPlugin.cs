@@ -15,6 +15,8 @@ namespace Betinhos.DriverRecordSharing
     public sealed class DossieMultaPlugin : IPlugin
     {
         public const string MessageName = "new_DossieMulta";
+        // cr40f_reservadeveculos.cr40f_status: Cancelado e Cancelado com Ressalvas (apps/shell/src/pages/geral/domain/cells.ts).
+        private static readonly int[] StatusCancelados = { 202410002, 202410010 };
         private readonly Func<IOrganizationService, ITracingService, ITermoInfleet> infleet;
 
         public DossieMultaPlugin() : this((string)null, (string)null) { }
@@ -39,7 +41,7 @@ namespace Betinhos.DriverRecordSharing
                     throw new InvalidPluginExecutionException("Informe a multa.");
                 factory.CreateOrganizationService(context.InitiatingUserId).Retrieve("cr40f_multas", id, new ColumnSet("cr40f_multasid"));
                 var system = factory.CreateOrganizationService(null);
-                context.OutputParameters["new_DossieJson"] = Montar(system, id, infleet(system, tracing));
+                context.OutputParameters["new_DossieJson"] = Montar(system, id, infleet(system, tracing), tracing);
             }
             catch (InvalidPluginExecutionException) { throw; }
             catch (Exception error)
@@ -49,7 +51,7 @@ namespace Betinhos.DriverRecordSharing
             }
         }
 
-        public static string Montar(IOrganizationService system, Guid multaId, ITermoInfleet infleet)
+        public static string Montar(IOrganizationService system, Guid multaId, ITermoInfleet infleet, ITracingService tracing = null)
         {
             var multa = system.Retrieve("cr40f_multas", multaId, new ColumnSet("cr40f_novacoluna", "cr40f_dataehorario", "cr40f_localdainfracao", "cr40f_placa", "cr40f_codigodainfracao", "cr40f_dataparaindicar", "cr40f_nomedoorgaoautuador"));
             var placaRef = multa.GetAttributeValue<EntityReference>("cr40f_placa");
@@ -63,7 +65,13 @@ namespace Betinhos.DriverRecordSharing
             else
             {
                 try { viagens = infleet.Coletar(placa, utc.Value); NomearMotoristas(system, viagens); }
-                catch (Exception error) { viagens = new Dictionary<string, object> { ["erro"] = error.Message }; }
+                catch (InfleetUnavailableException error) { tracing?.Trace("DossieMulta: InFleet indisponível: {0}", error.Message); viagens = new Dictionary<string, object> { ["erro"] = error.Message }; }
+                catch (Exception error)
+                {
+                    // Só a mensagem do InfleetUnavailableException é segura para o gestor; o resto fica no trace.
+                    tracing?.Trace("DossieMulta: falha ao consultar o InFleet: {0}", error);
+                    viagens = new Dictionary<string, object> { ["erro"] = "Não foi possível consultar o InFleet." };
+                }
             }
 
             var dossie = new Dictionary<string, object>
@@ -84,10 +92,21 @@ namespace Betinhos.DriverRecordSharing
                         ["valor"] = infracao.GetAttributeValue<Money>("cr40f_valordamulta")?.Value,
                     },
                 },
-                ["servicos"] = placaRef != null && utc.HasValue ? Servicos(system, placaRef.Id, utc.Value).Cast<object>().ToArray() : new object[0],
+                ["servicos"] = placaRef != null && utc.HasValue ? ServicosOuVazio(system, placaRef.Id, utc.Value, tracing) : new object[0],
                 ["infleet"] = viagens,
             };
             return new JavaScriptSerializer { MaxJsonLength = 1000000 }.Serialize(dossie);
+        }
+
+        // Falha ao ler a agenda não derruba o dossiê: vai para o trace e os serviços saem vazios.
+        private static object[] ServicosOuVazio(IOrganizationService system, Guid veiculoId, DateTime infracaoUtc, ITracingService tracing)
+        {
+            try { return Servicos(system, veiculoId, infracaoUtc).Cast<object>().ToArray(); }
+            catch (Exception error)
+            {
+                tracing?.Trace("DossieMulta: falha ao ler a agenda: {0}", error);
+                return new object[0];
+            }
         }
 
         // Serviço que cobre o horário (saída <= infração <= retorno; sem retorno, 12 h depois da saída). Sem nenhum, os que saíram
@@ -104,7 +123,9 @@ namespace Betinhos.DriverRecordSharing
             q.Criteria.AddCondition("cr40f_dataehorriodesada", ConditionOperator.GreaterEqual, infracaoUtc.AddHours(-24));
             q.Criteria.AddCondition("cr40f_dataehorriodesada", ConditionOperator.LessEqual, infracaoUtc.AddHours(6));
             q.AddOrder("cr40f_dataehorriodesada", OrderType.Ascending);
-            var linhas = system.RetrieveMultiple(q).Entities.Where(l => Utc(l, "cr40f_dataehorriodesada").HasValue).ToList();
+            // A agenda cancela por cr40f_status (não por statecode): Cancelado e Cancelado com Ressalvas não contam como serviço.
+            var linhas = system.RetrieveMultiple(q).Entities
+                .Where(l => Utc(l, "cr40f_dataehorriodesada").HasValue && !StatusCancelados.Contains(l.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value ?? 0)).ToList();
             var durante = linhas.Where(l =>
             {
                 var saida = Utc(l, "cr40f_dataehorriodesada").Value;
