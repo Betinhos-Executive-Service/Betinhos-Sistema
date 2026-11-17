@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
+import { Alert, Button, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
@@ -93,17 +93,6 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const filterColumn = filterAt ? columns.find((c) => c.key === filterAt) : undefined
   const filterField = filterColumn && !filterColumn.alias ? quick?.fields.find((f) => f.key === filterColumn.attribute && !f.advancedOnly) : undefined
   const closeFilter = useCallback(() => setFilterAt(null), [])
-  // O chip de filtro ativo (ViewBar) pede para reabrir o painel "Filtrar por" da coluna: o evento chega no gatilho do título.
-  useEffect(() => {
-    const el = root.current
-    if (!el) return
-    const open = (event: Event) => {
-      const key = (event.target as HTMLElement).closest<HTMLElement>('.bt-colhead')?.dataset.col
-      if (key && columns.some((c) => c.key === key)) { event.preventDefault(); setFilterAt(key) }
-    }
-    el.addEventListener(COLUMN_FILTER_EVENT, open)
-    return () => el.removeEventListener(COLUMN_FILTER_EVENT, open)
-  }, [columns])
   useEffect(() => {
     const key = refocus.current
     if (!key) return

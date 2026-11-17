@@ -247,13 +247,13 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
-    await screen.findByText('Status de Operação: Confirmado')
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     await saveAs('Confirmados')
     expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
     // Reaberta, a visão devolve o filtro dela ao painel (editável), sem `f=` na URL.
-    expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
+    expect(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ }).textContent).toContain('1')
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))

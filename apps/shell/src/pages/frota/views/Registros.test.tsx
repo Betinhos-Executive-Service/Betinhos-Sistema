@@ -63,7 +63,7 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('filtro por um veículo que saiu dos dados após recarga continua visível e pode ser limpo', async () => {
+  it('filtro por um veículo que saiu dos dados após recarga continua valendo e pode ser limpo', async () => {
     window.location.hash = '#/frota?aba=ocorrencias&veiculo=v2'
     const antes: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m2', 'v2')] }
     const depois: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m3', 'v1')] }
@@ -71,8 +71,7 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(1))
     rerender(<Registros kinds={['multa']} data={depois} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(await screen.findByText(/Nenhum registro de multa com estes filtros/)).toBeTruthy()
-    expect(screen.getByText(/Veículo: V2/)).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
