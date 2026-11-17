@@ -228,23 +228,23 @@ describe('Geral: visões pessoais e link compartilhável', () => {
 
   async function saveAs(name: string) {
     openMenu()
-    await choose('Salvar como…')
-    const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
+    await choose('Nova visão…')
+    const dialog = await screen.findByRole('dialog', { name: 'Nova visão' })
     fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: name } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
     await waitFor(() => expect(viewName()).toContain(name))
   }
 
-  it('visão do sistema só oferece salvar como; as visões aparecem agrupadas', async () => {
+  it('visão do sistema só oferece nova visão; as visões aparecem agrupadas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…'])
+    expect(await actions()).toEqual(['Nova visão…'])
     expect(screen.getByRole('menuitemradio', { name: /Agenda/, hidden: true }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'Sem motorista', hidden: true })).toBeTruthy()
   }, 60_000)
 
-  it('salvar como cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
+  it('nova visão cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
@@ -264,7 +264,7 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
+    expect(await actions()).toEqual(['Nova visão…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
     await choose('Renomear…')
     const rename = await screen.findByRole('dialog', { name: 'Renomear visão' })
     fireEvent.change(within(rename).getByLabelText(/Nome da visão/), { target: { value: 'Só confirmados' } })
