@@ -6,6 +6,8 @@ export type Servico = Option & { categoria: number }
 
 export const CATEGORIAS_MANUT: Option[] = catalogo.categorias
 export const SERVICOS_MANUT: Servico[] = catalogo.servicos.map(({ value, label, categoria }) => ({ value, label, categoria }))
+/** Serviços agrupados por categoria, na ordem do catálogo: a única fonte dos grupos (grade de escolha e leitura da classificação). */
+export const GRUPOS_MANUT = CATEGORIAS_MANUT.map((categoria) => ({ ...categoria, servicos: SERVICOS_MANUT.filter((servico) => servico.categoria === categoria.value) }))
 export const ORIGEM = { IA: 100000000, MANUAL: 100000001, REVISAR: 100000002 } as const
 
 export const CAMPO = { servicos: 'new_servicosmanutencao', categorias: 'new_categoriasmanutencao', origem: 'new_classificacaoorigem', confianca: 'new_confiancaia', descricao: 'cr40f_descricao' } as const
