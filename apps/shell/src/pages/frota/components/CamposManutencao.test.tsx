@@ -84,6 +84,18 @@ describe('useOpcoesBusca', () => {
     expect(result.current.lista.map((o) => o.id)).toEqual(['f2', 'f1'])
   })
 
+  it('se a carga inicial falhou, abrir o painel (texto vazio) tenta de novo', async () => {
+    const buscar = vi.fn().mockRejectedValueOnce(new Error('rede')).mockResolvedValue([ana])
+    const { result } = renderHook(() => useOpcoesBusca(buscar, null))
+    await waitFor(() => expect(buscar).toHaveBeenCalledTimes(1))
+    expect(result.current.lista).toEqual([])
+    act(() => result.current.onSearch(''))
+    await waitFor(() => expect(result.current.lista).toEqual([ana]))
+    expect(buscar).toHaveBeenCalledTimes(2)
+    act(() => result.current.onSearch('')) // já carregou: não busca de novo
+    expect(buscar).toHaveBeenCalledTimes(2)
+  })
+
   it('sem escolhida, a lista é a do servidor', async () => {
     const buscar = vi.fn(async () => [ana])
     const { result } = renderHook(() => useOpcoesBusca(buscar, null))

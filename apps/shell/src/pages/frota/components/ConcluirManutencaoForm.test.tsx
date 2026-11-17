@@ -79,4 +79,44 @@ describe('ConcluirManutencaoForm', () => {
     expect(source.enviarArquivoManutencao).not.toHaveBeenCalled()
     expect(source.concluirManutencao).not.toHaveBeenCalled()
   })
+
+  it('falha do servidor: o alerta aparece com a mensagem dele e o que foi preenchido continua lá', async () => {
+    const { source, onConcluida } = await montar()
+    vi.spyOn(source, 'concluirManutencao').mockRejectedValue(new Error('Informe o valor pago.'))
+    await preencher(new File(['nf'], 'nota.jpg', { type: 'image/jpeg' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Concluir manutenção' })) })
+    const alerta = await screen.findByText(/Informe o valor pago\. O que você preencheu foi mantido\./)
+    expect(alerta).toBeTruthy()
+    expect(onConcluida).not.toHaveBeenCalled()
+    expect((screen.getByLabelText(/Km do veículo/) as HTMLInputElement).value).toBe('51000')
+    expect((screen.getByLabelText(/Valor pago/) as HTMLInputElement).value).toBe('350.5')
+    expect((screen.getByLabelText(/^Estabelecimento/) as HTMLInputElement).value).toBe('Oficina Teste')
+    expect((screen.getByRole('checkbox', { name: 'Pastilhas de freio' }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('button', { name: 'Concluir manutenção' }) as HTMLButtonElement).disabled).toBe(false) // dá para tentar de novo
+  })
+
+  it('dois envios no mesmo instante, com a primeira chamada ainda pendente, chamam a Custom API uma única vez', async () => {
+    const { source } = await montar()
+    let terminar: (valor: { despesaId: string; statusAnexo: number; geralId: string | null }) => void = () => {}
+    const concluir = vi.spyOn(source, 'concluirManutencao').mockImplementation(() => new Promise((resolve) => { terminar = resolve }))
+    await preencher(new File(['nf'], 'nota.jpg', { type: 'image/jpeg' }))
+    const formulario = screen.getByRole('button', { name: 'Concluir manutenção' }).closest('form') as HTMLFormElement
+    await act(async () => {
+      fireEvent.submit(formulario)
+      fireEvent.submit(formulario) // mesmo tick: o estado ainda não re-renderizou
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(concluir).toHaveBeenCalledTimes(1)
+    await act(async () => { terminar({ despesaId: 'd-m2', statusAnexo: 100000002, geralId: null }) })
+  })
+
+  it('o rótulo dos serviços nomeia a grade e o erro dela fica ligado a ela', async () => {
+    await montar()
+    const grade = screen.getByRole('group', { name: /Serviços realizados/ })
+    expect(grade.getAttribute('aria-describedby')).toBeNull()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Concluir manutenção' })) })
+    const ligado = grade.getAttribute('aria-describedby')
+    expect(ligado).toBeTruthy()
+    expect(document.getElementById(ligado as string)?.textContent).toBe('Escolha pelo menos um serviço realizado')
+  })
 })

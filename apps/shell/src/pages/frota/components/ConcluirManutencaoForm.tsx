@@ -1,5 +1,5 @@
 // apps/shell/src/pages/frota/components/ConcluirManutencaoForm.tsx
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import { Alert, Button, Field, Input, Select, Textarea, Upload, type UploadFile } from '@betinhos/ui'
 import { ACCEPT_FOTO, ACCEPT_NOTA } from '../data/arquivosManutencao'
 import { LIMITE, PAGAMENTO_MANUT } from '../data/schema'
@@ -32,6 +32,9 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
   const [aviso, setAviso] = useState<string | null>(null)
   const [falha, setFalha] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  // Guarda contra dois envios no mesmo instante: o estado só vale depois da próxima renderização, o ref vale já.
+  const emCurso = useRef(false)
+  const rotuloServicosId = useId()
   const [cidade, setCidade] = useState<OpcaoBusca | null>(null)
   const [pessoa, setPessoa] = useState<OpcaoBusca | null>(detalhe.realizadoPor ? { id: detalhe.realizadoPor.id, nome: detalhe.realizadoPor.label } : null)
   const cidades = useOpcoesBusca(useCallback((texto: string) => source.buscarCidades(texto), [source]), cidade)
@@ -46,15 +49,17 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
   const fotosUpload = paraUpload(valores.fotos)
 
   async function concluir() {
-    if (salvando) return
+    if (emCurso.current) return
     const leitura = validarConclusao(valores, { manutencaoId: detalhe.id, kmPedido: detalhe.km, temNotaGravada: Boolean(detalhe.linkNotaFiscal) })
     setErros(leitura.erros)
     setAviso(leitura.aviso)
     const pedido = leitura.pedido
     if (!pedido) return
+    emCurso.current = true
     setSalvando(true)
     setFalha(null)
     const desfecho = await desfechoDaAcao(() => executarAcaoManutencao(source, { id: detalhe.id, status: detalhe.status }, 'concluir', () => concluirPeloShell(source, detalhe, pedido, { notas: valores.notas, fotos: valores.fotos })))
+    emCurso.current = false
     setSalvando(false)
     if (desfecho.tipo === 'feito') onConcluida(desfecho.valor.avisoNota)
     else if (desfecho.tipo === 'desatualizada') onDesatualizada()
@@ -69,8 +74,8 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
       {aviso ? <Alert tone="warning">{aviso}</Alert> : null}
       <div className="frota-fields">
         <div className="frota-fields__wide frota-stack">
-          <span className="frota-campo__rotulo">Serviços realizados *</span>
-          <GradeServicos selecionados={valores.servicos} onChange={(servicos) => set({ servicos })} disabled={salvando} erro={erros.servicos} />
+          <span id={rotuloServicosId} className="frota-campo__rotulo">Serviços realizados *</span>
+          <GradeServicos selecionados={valores.servicos} onChange={(servicos) => set({ servicos })} disabled={salvando} erro={erros.servicos} rotuloId={rotuloServicosId} />
         </div>
         <Field label="Km do veículo" required error={erros.km} disabled={salvando} hint={detalhe.km !== null ? `No pedido: ${detalhe.km.toLocaleString('pt-BR')} km` : undefined}>
           <Input type="number" inputMode="numeric" min={1} step={1} suffix="km" value={valores.km} onChange={texto('km')} />
