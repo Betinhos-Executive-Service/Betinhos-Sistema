@@ -2,8 +2,10 @@ import type { Row } from '@betinhos/dataverse'
 import { diaSP, formatBR, toDateOnly } from '../../frota/data/dates'
 import { GRAU, MANUT, STATUS_OPTIONS, TONE, label, type Tone } from '../../frota/data/schema'
 import { atrasada, rotuloJanela, type Janela } from '../../frota/domain/janela'
+import { COMPROVANTES_KEY } from './comprovantes'
 import { parse } from './fetch'
 import { parseLayout } from './layout'
+import { PORTAL_KEY } from './portal'
 import type { Column, View } from './types'
 
 /**
@@ -223,17 +225,20 @@ export type DesenhoManutencao = { celulas: CelulaManutencao[]; resumoNaPrimeira:
 const STATUS_DA_LINHA = 'cr40f_status'
 const VEICULO = 'cr40f_veiculo'
 const TRAJETO = 'cr40f_trajeto'
+/** Colunas que não existem no FetchXML (montadas pela tela): não recebem o problema. */
+const VIRTUAIS: ReadonlySet<string> = new Set([COMPROVANTES_KEY, PORTAL_KEY])
 
 /**
  * Cada informação da manutenção na coluna de mesmo sentido. O problema vai no Trajeto (o texto livre da linha) ou, sem
- * ele, na coluna comum mais larga; sem nenhuma, dentro da primeira coluna.
+ * ele, na coluna livre mais larga (da própria linha, nem virtual nem de tabela ligada); sem nenhuma, dentro da primeira coluna.
  */
 export function desenhoDaManutencao(columns: Column[]): DesenhoManutencao {
   const resto = columns.slice(1)
   const propria = (c: Column, attribute: string) => !c.alias && c.attribute === attribute
   const status = resto.find((c) => propria(c, STATUS_DA_LINHA))
   const veiculo = resto.find((c) => propria(c, VEICULO))
-  const comuns = resto.filter((c) => !editavelNaManutencao(c) && c !== status && c !== veiculo)
+  // Candidatas ao problema: colunas da própria linha (sem alias de tabela ligada), que não são virtuais nem já têm uso.
+  const comuns = resto.filter((c) => !editavelNaManutencao(c) && c !== status && c !== veiculo && !c.alias && !VIRTUAIS.has(c.key))
   const problema = comuns.find((c) => propria(c, TRAJETO)) ?? comuns.reduce<Column | undefined>((maior, c) => (!maior || c.width > maior.width ? c : maior), undefined)
   const tipo = (c: Column): CelulaManutencao['tipo'] => (editavelNaManutencao(c) ? 'campo' : c === status ? 'status' : c === veiculo ? 'veiculo' : c === problema ? 'problema' : 'vazio')
   return { celulas: resto.map((column) => ({ tipo: tipo(column), column })), resumoNaPrimeira: columns.length > 0 && !problema, statusNoProblema: !status }

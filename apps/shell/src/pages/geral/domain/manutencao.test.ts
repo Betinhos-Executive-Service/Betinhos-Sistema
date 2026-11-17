@@ -204,6 +204,15 @@ describe('linha de manutenção', () => {
     expect(d).toMatchObject({ resumoNaPrimeira: false, statusNoProblema: true })
   })
 
+  it('colunas virtuais (Portal, Comprovantes) e de tabela ligada não recebem o problema', () => {
+    const portal = { ...coluna('portal', 170), label: 'Portal' }
+    const comCliente = desenhoDaManutencao([coluna('cr40f_id'), portal, coluna('cr40f_dataehorriodesada'), coluna('cr40f_cliente', 140), coluna('cr40f_motorista')])
+    expect(comCliente.celulas.map((c) => c.tipo)).toEqual(['vazio', 'campo', 'problema', 'campo'])
+    const semLivre = desenhoDaManutencao([coluna('cr40f_id'), portal, coluna('comprovantes', 72), coluna('a_1.new_valortotal', 300), coluna('cr40f_motorista')])
+    expect(semLivre.celulas.map((c) => c.tipo)).toEqual(['vazio', 'vazio', 'vazio', 'campo'])
+    expect(semLivre.resumoNaPrimeira).toBe(true)
+  })
+
   it('visão sem coluna para o problema: o resumo vai dentro da primeira coluna e nenhuma célula sobra', () => {
     expect(desenhoDaManutencao([coluna('cr40f_id')])).toEqual({ celulas: [], resumoNaPrimeira: true, statusNoProblema: true })
     const d = desenhoDaManutencao([coluna('cr40f_id'), coluna('cr40f_status'), coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')])
