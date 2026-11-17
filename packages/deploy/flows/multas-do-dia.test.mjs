@@ -31,6 +31,8 @@ test('seções na ordem da spec, cada linha com auto, placa, responsável, prazo
   for (const lista of ['Linhas_prazo', 'Linhas_indicar', 'Linhas_aceite', 'Linhas_pagar']) {
     const sel = tem.actions[lista].inputs.select
     for (const campo of ["item()?['auto']", "item()?['placa']", "item()?['responsavel']", "item()?['prazo']", "item()?['passo']", '#/frota-multas?registro=multa:']) assert.ok(sel.includes(campo), `${lista}: ${campo}`)
+    assert.match(sel, /if\(empty\(item\(\)\?\['prazo'\]\), '—', formatDateTime\(item\(\)\?\['prazo'\], 'dd\/MM\/yyyy'\)\)/, `${lista}: prazo sem guarda de vazio`)
+    for (const campo of ['auto', 'placa', 'responsavel', 'passo']) assert.match(sel, new RegExp(`coalesce\\(item\\(\\)\\?\\['${campo}'\\]`), `${lista}: ${campo} sem coalesce`)
   }
   assert.match(corpo, /#\/frota-multas\?status=202410006/)
 })
