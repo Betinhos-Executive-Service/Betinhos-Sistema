@@ -10,6 +10,8 @@ public sealed class AgendarPedido
     [DataMember(Name = "inicio")] public string Inicio { get; set; } = "";
     [DataMember(Name = "fim")] public string Fim { get; set; } = "";
     [DataMember(Name = "comentario")] public string? Comentario { get; set; }
+    /// <summary>Grau corrigido pelo gestor ao agendar (cr40f_graudamanutencao: 1 Baixa, 2 Média, 3 Alta, 4 Urgente). Ausente = não muda.</summary>
+    [DataMember(Name = "grau")] public int? Grau { get; set; }
 }
 
 [DataContract]

@@ -157,12 +157,12 @@ export async function applyTransition(source: DataSource, kind: Kind, record: Re
 
 // ---------- Manutenção (Custom APIs cr40f_Manutencao*, plano 1 das manutenções v2) ----------
 
-export type AcaoManutencao = 'encaixar' | 'reprovar' | 'cancelar' | 'concluir'
+export type AcaoManutencao = 'encaixar' | 'reprovar' | 'cancelar' | 'concluir' | 'programar'
 
 /** Ciclo novo (spec 2026-11-16-manutencoes-v2): encaixar é aprovar; reprovar só antes do encaixe; concluir também lança depois do fato. */
 const ACOES_MANUTENCAO: Partial<Record<number, AcaoManutencao[]>> = {
   [MANUT.SOLICITADO]: ['encaixar', 'reprovar', 'cancelar', 'concluir'],
-  [MANUT.AGENDADO]: ['encaixar', 'cancelar', 'concluir'],
+  [MANUT.AGENDADO]: ['encaixar', 'programar', 'cancelar', 'concluir'],
   [MANUT.PROGRAMADO]: ['encaixar', 'cancelar', 'concluir'],
 }
 
@@ -170,7 +170,7 @@ export function acoesManutencao(status: number | null): AcaoManutencao[] {
   return status === null ? [] : ACOES_MANUTENCAO[status] ?? []
 }
 
-const ROTULO_ACAO: Record<Exclude<AcaoManutencao, 'encaixar'>, string> = { reprovar: 'Reprovar', cancelar: 'Cancelar manutenção', concluir: 'Concluir' }
+const ROTULO_ACAO: Record<Exclude<AcaoManutencao, 'encaixar'>, string> = { reprovar: 'Reprovar', cancelar: 'Cancelar manutenção', concluir: 'Concluir', programar: 'Programar' }
 
 export function rotuloAcao(acao: AcaoManutencao, status: number | null): string {
   if (acao === 'encaixar') return status === MANUT.SOLICITADO ? 'Encaixar' : 'Reagendar'

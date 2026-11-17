@@ -5,7 +5,16 @@ export type Veiculo = { id: string; placa: string; marca: string | null; modelo:
 /** `agendarPara` (cr40f_agendarpara) é só leitura: histórico de antes das manutenções v2. A janela (início e fim, `YYYY-MM-DD`) é a do encaixe; `dataAprovacao` é o dia do primeiro encaixe; `kmRealizado`, o km de quem concluiu. */
 export type Manutencao = { id: string; codigo: string; descricao: string; status: number | null; grau: number | null; tipo: number | null; agendarPara: string | null; janelaInicio: string | null; janelaFim: string | null; dataAprovacao: string | null; kmRealizado: number | null; dataManutencao: string | null; valor: number | null; estabelecimento: string | null; servicoRealizado: string | null; comentarioAprovador: string | null; km: number | null; veiculo: Ref | null; solicitante: Ref | null; criadoEm: string; servicos: number[]; categorias: number[]; origemClassificacao: number | null; confiancaIa: number | null }
 /** Manutenção aberta na gaveta: a linha da lista mais o que só a gaveta mostra (lido do servidor quando ela abre). */
-export type DetalheManutencao = Manutencao & { comentarioAoMotorista: string | null; comentarioColaborador: string | null; pagamento: number | null; realizadoPor: Ref | null; fotosPedido: string[]; linkNotaFiscal: string | null; fotosFinais: string[] }
+export type ProgramacaoManutencao = { geralId: string; motorista: Ref | null; saida: string | null /* ISO UTC */ }
+export type DespesaDaManutencao = { id: string; statusOperacional: number | null; statusAnexo: number | null }
+export type DetalheManutencao = Manutencao & {
+  comentarioAoMotorista: string | null; comentarioColaborador: string | null; pagamento: number | null; realizadoPor: Ref | null
+  fotosPedido: string[]; linkNotaFiscal: string | null; fotosFinais: string[]
+  /** Linha ativa da Geral; null = não há; undefined = não foi possível ler. */
+  programacao?: ProgramacaoManutencao | null
+  /** Despesa ligada; null = não há; undefined = não foi possível ler. */
+  despesa?: DespesaDaManutencao | null
+}
 export type Multa = { id: string; /** cr40f_id_multa (ex.: NT-1073), o código citado no resumo diário. */ codigo: string | null; titulo: string; status: number | null; dataHora: string | null; local: string | null; dataParaIndicar: string | null; indicado: boolean; dataAviso: string | null; dataIndicacao: string | null; veiculo: Ref | null; motorista: Ref | null; infracaoId: string | null; criadoEm: string; valorGuia: number | null; recursoPendente: boolean; termoVigente: Ref | null; /** undefined = resumo dos termos não carregou; null = sem termo. */ termo?: ResumoTermo | null }
 export type TermoStatus = 'pendente' | 'assinado' | 'contestado' | 'expirado' | 'cancelado'
 /** Último termo da multa, para a coluna Termo da lista. */

@@ -18,6 +18,34 @@ describe('mock das manutenções', () => {
     expect(await source.detalheManutencao('nao-existe')).toBeNull()
   })
 
+  it('mock: programar leva a Programado e o detalhe mostra a programação', async () => {
+    const source = createMockSource()
+    const antes = await source.detalheManutencao('m2') // m2 é Agendado nos fixtures
+    expect(antes?.programacao).toMatchObject({ geralId: 'g-m2', motorista: null, saida: null })
+    expect(antes?.despesa).toBeNull()
+    await source.programarManutencao({ manutencaoId: 'm2', geralId: antes!.programacao!.geralId, motoristaId: 'f1', saida: '2026-11-24T13:00:00.000Z' })
+    const depois = await source.detalheManutencao('m2')
+    expect(depois?.status).toBe(MANUT.PROGRAMADO)
+    expect(depois?.programacao).toEqual({ geralId: 'g-m2', motorista: { id: 'f1', label: 'Ana Souza (fictício)' }, saida: '2026-11-24T13:00:00.000Z' })
+    // Programado não programa de novo (só Agendado).
+    await expect(source.programarManutencao({ manutencaoId: 'm2', geralId: 'g-m2', motoristaId: 'f2', saida: '2026-11-24T13:00:00.000Z' })).rejects.toThrow('Só dá para programar uma manutenção agendada.')
+  })
+
+  it('mock: a linha da Geral cancelada junto com a manutenção não volta como programação', async () => {
+    const source = createMockSource()
+    await source.cancelarManutencao('m2', null)
+    expect((await source.detalheManutencao('m2'))?.programacao).toBeNull()
+  })
+
+  it('mock: agendar cria ou zera a linha, aplica o grau e o detalhe da realizada traz a despesa', async () => {
+    const source = createMockSource()
+    const inicio = segundaDe(somarDias(todaySP(), 7))
+    await source.agendarManutencao({ manutencaoId: 'm1', inicio, fim: somarDias(inicio, 6), comentario: null, grau: 2 })
+    const m1 = await source.detalheManutencao('m1')
+    expect(m1).toMatchObject({ status: MANUT.AGENDADO, grau: 2, programacao: { geralId: 'g-m1', motorista: null, saida: null } })
+    expect((await source.detalheManutencao('m4'))?.despesa).toEqual({ id: 'd-m4', statusOperacional: 100000000, statusAnexo: 100000002 })
+  })
+
   it('encaixa só janela válida e grava a data do encaixe e o comentário', async () => {
     const source = createMockSource()
     await expect(source.agendarManutencao({ manutencaoId: 'm1', inicio: '2026-11-17', fim: '2026-11-23', comentario: null })).rejects.toThrow('A janela precisa ser um dia ou uma semana de segunda a domingo.')

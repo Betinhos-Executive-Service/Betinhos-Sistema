@@ -1,60 +1,28 @@
 // apps/shell/src/pages/frota/components/GavetaManutencao.tsx
 import { ExternalLink } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, EmptyState, Field, StatusBadge as Badge, Textarea } from '@betinhos/ui'
+import { Alert, Button, Drawer, EmptyState, Field, Textarea } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CarregandoRegistro } from '../../../app/BrandLoader'
-import { diaSP, formatBR, todaySP } from '../data/dates'
-import { brl, NAO_INFORMADO } from '../data/format'
-import { GRAU, LIMITE, MANUT, PAGAMENTO_MANUT, TIPO_REPARO, label } from '../data/schema'
+import { todaySP } from '../data/dates'
+import { NAO_INFORMADO } from '../data/format'
+import { LIMITE, MANUT, TIPO_REPARO, label } from '../data/schema'
 import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal, errorMessage } from '../data/xrm'
-import { atrasada, lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
-import { acoesManutencao, desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError, type AcaoManutencao } from '../domain/transitions'
+import { lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
+import { avaliar, chavePasso, type Extra } from '../domain/manutencaoEtapas'
+import { desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
 import { JanelaCampos } from './JanelaCampos'
+import { Arquivos, ManutencaoPassoAPasso } from './ManutencaoPassoAPasso'
 import { useNotify } from './Toasts'
-import { StatusBadge } from './Ui'
 
-const texto = (valor: string | number | null | undefined) => (valor === null || valor === undefined || valor === '' ? NAO_INFORMADO : String(valor))
-const dia = (iso: string | null) => formatBR(diaSP(iso)) || NAO_INFORMADO
-const km = (valor: number | null) => (valor !== null ? `${valor.toLocaleString('pt-BR')} km` : NAO_INFORMADO)
 const janelaDe = (m: DetalheManutencao): Janela | null => (m.janelaInicio && m.janelaFim ? { inicio: m.janelaInicio, fim: m.janelaFim } : null)
-const linksDe = (valor: string | null) => (valor ?? '').split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\//i.test(l))
 
-type Linha = [string, ReactNode]
 type Leitura = { tipo: 'ok'; detalhe: DetalheManutencao | null } | { tipo: 'falha' } | { tipo: 'ignorada' }
 type Estado = { tipo: 'carregando' } | { tipo: 'erro'; mensagem: string } | { tipo: 'ok'; detalhe: DetalheManutencao | null }
-
-function Secao({ id, titulo, children }: { id: string; titulo: string; children: ReactNode }) {
-  return (
-    <section className="frota-group" aria-labelledby={id}>
-      <h3 id={id} className="frota-group__title">{titulo}</h3>
-      {children}
-    </section>
-  )
-}
-
-function Linhas({ linhas }: { linhas: Linha[] }) {
-  return <dl className="frota-detail">{linhas.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}</dl>
-}
-
-/** Fotos e nota como links do OneDrive (abrem em outra aba); ver D10 do plano 2. */
-function Arquivos({ titulo, links }: { titulo: string; links: string[] }) {
-  if (!links.length) return <p className="frota-muted">{titulo}: nenhum arquivo.</p>
-  return (
-    <p className="frota-cluster frota-fotos">
-      <span className="frota-muted">{titulo}:</span>
-      {links.map((link, i) => (
-        <a key={`${link}-${i}`} className="frota-link" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${titulo}, arquivo ${i + 1} (abre em outra aba)`}>
-          Arquivo {i + 1}<ExternalLink size={12} aria-hidden />
-        </a>
-      ))}
-    </p>
-  )
-}
 
 type FormProps = { source: DataSource; m: DetalheManutencao; onFeito: (mensagem: string) => void; onDesatualizada: () => void; onVoltar: () => void }
 
@@ -136,23 +104,24 @@ function MotivoForm({ source, m, acao, onFeito, onDesatualizada, onVoltar }: For
 type Props = {
   source: DataSource
   id: string
-  /** `YYYY-MM-DD`. Padrão: hoje em São Paulo. Serve ao selo "Atrasada" e à janela do encaixe. */
+  /** `YYYY-MM-DD`. Padrão: hoje em São Paulo. Serve ao prazo "Atrasada" e à janela do encaixe. */
   hoje?: string
   onClose: () => void
-  /** Depois de gravar (ação, classificação sem `onClassificado`, formulário nativo): quem abriu recarrega a lista. */
+  /** Depois de gravar (passo, exceção, classificação sem `onClassificado`, formulário nativo): quem abriu recarrega a lista. */
   onChanged: () => void
   onClassificado?: (id: string, classificacao: Classificacao) => void
   onOpenVeiculo?: (id: string) => void
 }
 
 /**
- * Gaveta única da manutenção (Frota e, no plano 3, Geral): pedido, encaixe, conclusão, classificação e histórico, e as
- * ações do ciclo novo pelas Custom APIs. Lê o detalhe no servidor ao abrir e de novo depois de cada gravação.
+ * Gaveta única da manutenção (Frota, Pendências, hospedeiro e Geral): o guia passo a passo e, pelo "⋯", as exceções
+ * (Reagendar, Reprovar, Cancelar, Concluir, Corrigir classificação) com os formulários de sempre. Lê o detalhe no
+ * servidor ao abrir e de novo depois de cada gravação.
  */
 export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChanged, onClassificado, onOpenVeiculo }: Props) {
   const notify = useNotify()
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' })
-  const [acao, setAcao] = useState<AcaoManutencao | null>(null)
+  const [extra, setExtra] = useState<Extra | null>(null)
   const vivo = useRef(true)
   useEffect(() => {
     vivo.current = true
@@ -186,36 +155,40 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   }, [source, id])
   useEffect(() => { void carregar() }, [carregar])
 
-  // Foco: ao abrir um formulário, no primeiro campo; ao voltar, no botão da ação que o abriu.
-  const areaAcoes = useRef<HTMLDivElement>(null)
-  const acaoAnterior = useRef<AcaoManutencao | null>(null)
+  // Foco: ao abrir uma exceção, no primeiro campo; ao voltar ao guia, no "Mais ações" que a abriu.
+  const corpo = useRef<HTMLDivElement>(null)
+  const extraAnterior = useRef<Extra | null>(null)
   useEffect(() => {
-    const area = areaAcoes.current
-    if (acao) area?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])')?.focus()
-    else if (acaoAnterior.current) (area?.querySelector<HTMLElement>(`[data-acao="${acaoAnterior.current}"]`) ?? area?.querySelector<HTMLElement>('button'))?.focus()
-    acaoAnterior.current = acao
-  }, [acao])
+    const area = corpo.current
+    if (extra) area?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])')?.focus()
+    else if (extraAnterior.current) area?.querySelector<HTMLElement>('[aria-label="Mais ações"]')?.focus()
+    extraAnterior.current = extra
+  }, [extra])
 
   function gravado(mensagem: string) {
     notify('success', mensagem)
-    setAcao(null)
+    setExtra(null)
     void carregar()
     onChanged()
   }
 
   /**
-   * Outra pessoa mudou a manutenção com um formulário aberto. Recarrega e decide pelo estado novo: se a ação ainda vale, o
-   * formulário fica aberto com o que foi digitado (ele não é desmontado) e o aviso pede para confirmar de novo; se não vale
-   * mais, fecha e o aviso diz que o digitado foi descartado.
+   * Outra pessoa mudou a manutenção (passo do guia ou exceção aberta). Recarrega e decide pelo estado novo: com exceção
+   * aberta, vale se ela ainda está no "⋯" da etapa nova; sem exceção, vale se a chave do passo não mudou (ele não remontou). Se vale, o que foi
+   * digitado fica e o aviso pede para confirmar de novo; se não, volta ao guia e o aviso diz que o digitado foi descartado.
    */
   async function desatualizada() {
-    const aberta = acao
+    const aberto = extra
+    const antes = ultimo.current
     onChanged()
     const leitura = await carregar()
     const aviso = comPontoFinal(new StaleError().message)
-    const naoVale = leitura.tipo === 'ok' && (leitura.detalhe === null || (aberta !== null && !acoesManutencao(leitura.detalhe.status).includes(aberta)))
+    const depois = leitura.tipo === 'ok' ? leitura.detalhe : undefined
+    const naoVale = depois === null || (!!depois && (aberto !== null
+      ? !avaliar(depois, hoje).extras.includes(aberto)
+      : !!antes && chavePasso(antes) !== chavePasso(depois)))
     if (naoVale) {
-      setAcao(null)
+      setExtra(null)
       notify('error', `${aviso} O que você digitou foi descartado porque a ação não se aplica mais.`)
     } else notify('error', `${aviso} Confira e confirme de novo.`)
   }
@@ -248,98 +221,61 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
     )
   }
 
-  const janela = janelaDe(m)
-  const acoes = acoesManutencao(m.status)
-  const veiculo = !m.veiculo ? NAO_INFORMADO
-    : onOpenVeiculo ? <button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>{m.veiculo.label || NAO_INFORMADO}</button>
-    : m.veiculo.label || NAO_INFORMADO
-  const encaixe: Linha[] = [
-    ...(janela ? [['Janela', rotuloJanela(janela)] as Linha] : m.agendarPara ? [['Agendada para (antes das manutenções v2)', formatBR(m.agendarPara)] as Linha] : []),
-    ['Comentário ao motorista', texto(m.comentarioAoMotorista)],
-  ]
-
+  const voltar = () => setExtra(null)
   let formulario: ReactNode = null
-  if (acao === 'encaixar') formulario = <EncaixeForm source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onVoltar={() => setAcao(null)} />
-  else if (acao === 'reprovar' || acao === 'cancelar') formulario = <MotivoForm source={source} m={m} acao={acao} onFeito={gravado} onDesatualizada={desatualizada} onVoltar={() => setAcao(null)} />
-  else if (acao === 'concluir') {
+  if (extra === 'reagendar') formulario = <EncaixeForm source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onVoltar={voltar} />
+  else if (extra === 'reprovar' || extra === 'cancelar') formulario = <MotivoForm source={source} m={m} acao={extra} onFeito={gravado} onDesatualizada={desatualizada} onVoltar={voltar} />
+  else if (extra === 'concluir') {
     formulario = (
-      <ConcluirManutencaoForm source={source} detalhe={m} onVoltar={() => setAcao(null)} onDesatualizada={desatualizada}
+      <ConcluirManutencaoForm source={source} detalhe={m} onVoltar={voltar} onDesatualizada={desatualizada}
         onConcluida={(avisoNota) => { gravado('Manutenção concluída. A despesa foi criada.'); if (avisoNota) notify('error', avisoNota) }} />
+    )
+  } else if (extra === 'corrigirClassificacao') {
+    formulario = (
+      <div className="frota-stack">
+        <ClassificacaoManutencao
+          key={`${m.id}-${m.servicos.join(',')}-${m.origemClassificacao}`}
+          source={source}
+          item={m}
+          onClassificado={(c) => {
+            setEstado({ tipo: 'ok', detalhe: { ...m, servicos: c.servicos, categorias: c.categorias, origemClassificacao: c.origem, confiancaIa: c.confianca } })
+            if (onClassificado) onClassificado(m.id, c)
+            else onChanged()
+          }}
+        />
+        <div className="frota-cluster"><Button variant="secondary" onClick={voltar}>Voltar</Button></div>
+      </div>
     )
   }
 
+  const placa = m.veiculo?.label || NAO_INFORMADO
   return (
     <Drawer
       open
       size="wide"
       onClose={onClose}
       eyebrow={m.codigo ? `Manutenção ${m.codigo}` : 'Manutenção'}
-      title={m.descricao || 'Manutenção'}
+      title={<span className="frota-gaveta__titulo">{placa} · {m.descricao || 'Manutenção'}</span>}
       actions={<BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />}
       footer={<>
         <span className="frota-muted">Edição completa no formulário do Dataverse.</span>
         <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => void abrirFormulario()}>Abrir formulário</Button>
       </>}
     >
-      <div className="frota-drawer">
-        <div className="frota-drawer__status frota-cluster">
-          <StatusBadge kind="manutencao" value={m.status} />
-          {atrasada(m, hoje) ? <Badge tone="danger">Atrasada</Badge> : null}
-        </div>
+      <div className="frota-drawer" ref={corpo}>
+        {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
 
-        <Secao id={`${m.id}-acoes`} titulo="Ações">
-          <div ref={areaAcoes}>
-            {formulario ?? (acoes.length === 0 ? <p className="frota-muted">Sem ações para esta manutenção.</p> : (
-              <div className="frota-cluster">
-                {acoes.map((a) => <Button key={a} data-acao={a} variant={a === 'encaixar' ? 'primary' : 'secondary'} onClick={() => setAcao(a)}>{rotuloAcao(a, m.status)}</Button>)}
-              </div>
-            ))}
-          </div>
-        </Secao>
-
-        <Secao id={`${m.id}-pedido`} titulo="Pedido">
-          <Linhas linhas={[
-            ['Veículo', veiculo], ['Solicitante', texto(m.solicitante?.label)], ['Grau', label(GRAU, m.grau)], ['Tipo de reparo', label(TIPO_REPARO, m.tipo)],
-            ['Km no pedido', km(m.km)], ['Descrição', texto(m.descricao)],
-          ]} />
+        <div className="frota-stack">
+          <p className="frota-muted">
+            Descrição do motorista: {m.descricao || NAO_INFORMADO}
+            {m.km !== null ? ` · Km no pedido: ${m.km.toLocaleString('pt-BR')} km` : ''}
+            {m.tipo !== null ? ` · Tipo de reparo: ${label(TIPO_REPARO, m.tipo)}` : ''}
+            {m.comentarioAoMotorista ? ` · Comentário ao motorista: ${m.comentarioAoMotorista}` : ''}
+          </p>
+          {m.veiculo && onOpenVeiculo ? <p className="frota-muted"><button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>Ver o veículo {placa}</button></p> : null}
           <Arquivos titulo="Fotos do pedido" links={m.fotosPedido} />
-        </Secao>
-
-        {janela || m.agendarPara || m.comentarioAoMotorista ? (
-          <Secao id={`${m.id}-encaixe`} titulo="Encaixe"><Linhas linhas={encaixe} /></Secao>
-        ) : null}
-
-        {m.status === MANUT.REALIZADO ? (
-          <Secao id={`${m.id}-conclusao`} titulo="Conclusão">
-            <Linhas linhas={[
-              ['Km na realização', km(m.kmRealizado)], ['Valor', brl(m.valor)], ['Pagamento', label(PAGAMENTO_MANUT, m.pagamento)], ['Estabelecimento', texto(m.estabelecimento)],
-              ['Quem realizou', texto(m.realizadoPor?.label)], ['Serviço realizado', texto(m.servicoRealizado)], ['Comentário', texto(m.comentarioColaborador)],
-            ]} />
-            <Arquivos titulo="Nota fiscal" links={linksDe(m.linkNotaFiscal)} />
-            <Arquivos titulo="Fotos da manutenção" links={m.fotosFinais} />
-          </Secao>
-        ) : null}
-
-        <Secao id={`${m.id}-classif`} titulo="Serviços e categorias">
-          <ClassificacaoManutencao
-            key={`${m.id}-${m.servicos.join(',')}-${m.origemClassificacao}`}
-            source={source}
-            item={m}
-            onClassificado={(c) => {
-              setEstado({ tipo: 'ok', detalhe: { ...m, servicos: c.servicos, categorias: c.categorias, origemClassificacao: c.origem, confiancaIa: c.confianca } })
-              if (onClassificado) onClassificado(m.id, c)
-              else onChanged()
-            }}
-          />
-        </Secao>
-
-        <Secao id={`${m.id}-historico`} titulo="Histórico">
-          <Linhas linhas={[
-            ['Solicitada em', dia(m.criadoEm)], ['Encaixada em', m.dataAprovacao ? formatBR(m.dataAprovacao) : NAO_INFORMADO],
-            ['Realizada em', dia(m.dataManutencao)], ['Comentário do gestor', texto(m.comentarioAprovador)],
-          ]} />
           <p className="frota-muted">As alterações uma a uma ficam na auditoria, no botão do alto da gaveta.</p>
-        </Secao>
+        </div>
       </div>
     </Drawer>
   )

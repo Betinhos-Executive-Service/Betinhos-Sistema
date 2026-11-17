@@ -23,6 +23,7 @@ public sealed partial class ManutencaoService
     {
         var id = Id(pedido.ManutencaoId);
         var (inicio, fim) = Ciclo.ValidarJanela(pedido.Inicio, pedido.Fim);
+        if (pedido.Grau is int g && (g < 1 || g > 4)) throw Ciclo.Erro("Grau inválido.");
         var m = _service.Retrieve(M.Tabela, id, new ColumnSet(M.Status, M.Veiculo, M.DataAprovacao, M.ComentarioAprovador));
         Ciclo.ExigirAgendavel(Status(m));
         var veiculo = m.GetAttributeValue<EntityReference>(M.Veiculo) ?? throw Ciclo.Erro("A manutenção não tem veículo. Informe o veículo antes de encaixar.");
@@ -46,6 +47,7 @@ public sealed partial class ManutencaoService
         };
         if (m.GetAttributeValue<DateTime?>(M.DataAprovacao) is null) patch[M.DataAprovacao] = _agoraUtc();
         if (!string.IsNullOrWhiteSpace(pedido.Comentario)) patch[M.ComentarioAoMotorista] = pedido.Comentario!.Trim();
+        if (pedido.Grau is int grau) patch[M.Grau] = new OptionSetValue(grau);
         _service.Update(patch);
         return new AgendarResposta { GeralId = geralId.ToString() };
     }

@@ -112,7 +112,7 @@ describe('Frota', () => {
     renderFrota(createMockSource(), 'manutencoes')
     expect(await screen.findByRole('tab', { name: 'A encaixar (3)' })).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: /Freio com ruído \(fictício\)/ }))
-    const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+    const gaveta = await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })
     expect(gaveta).toBeTruthy()
     expect(location.hash).toContain('registro=')
   })

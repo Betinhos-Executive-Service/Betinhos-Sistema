@@ -233,3 +233,11 @@ Chaves devolvidas pelo link `outer` (3 linhas de manutenção mais recentes pela
 - Filtro de desligado: fecha o total (233 = 228 + 5).
 - `toDateOnly` das janelas: formato esperado pela metadata `DateOnly` (`YYYY-MM-DD`); não observado no DEV (nenhuma manutenção tinha janela). `cr40f_agendarpara` é UserLocal e chega em UTC.
 - Origem "Model-driven" (100000001): **existe** (ponto 2 para o Renan).
+
+## 8. Gaveta passo a passo (17/11/2026)
+
+Leitura apenas (GET), feita pela Tarefa 1 do plano `2026-11-17-manutencoes-gaveta-passo-a-passo.md`, no DEV (`org23b93544`).
+
+- Geral: entity set `cr40f_reservadeveculoses`; navegação do motorista `cr40f_Motorista` (bind `cr40f_Motorista@odata.bind`: `/cr40f_funcionarioses(<id>)`).
+- Despesa: `cr40f_manutencao` é Lookup; filtro `_cr40f_manutencao_value eq <id>`.
+- Grau (`cr40f_graudamanutencao`): 1 Baixa, 2 Média, 3 Alta, 4 Urgente.
