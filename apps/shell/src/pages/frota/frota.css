@@ -160,9 +160,7 @@
 
 /* Passo a passo da multa (modelo visual: barra de etapas do QuoteManagementDrawer). */
 .multa-passos { display: grid; gap: var(--bt-space-3); }
-.multa-topo { display: flex; align-items: center; gap: var(--bt-space-3); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-left: var(--bt-border-width-severity) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
-.multa-topo[data-urgencia="atencao"] { border-left-color: var(--bt-color-warning); }
-.multa-topo[data-urgencia="vencido"] { border-left-color: var(--bt-color-danger); }
+.multa-topo { display: flex; align-items: center; gap: var(--bt-space-3); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
 .multa-topo__id { flex: 1; display: grid; min-width: 0; }
 .multa-topo__id strong { font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
 .multa-topo__id span, .multa-topo__prazo small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
