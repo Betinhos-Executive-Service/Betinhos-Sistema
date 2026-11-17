@@ -19,7 +19,7 @@ export const ESTADO_ORDEM: EstadoPreventiva[] = ['vencido', 'a_vencer', 'em_dia'
 export const ESTADO_LABEL: Record<EstadoPreventiva, string> = { vencido: 'Vencido', a_vencer: 'A vencer', em_dia: 'Em dia', sem_base: 'Sem base' }
 export const ESTADO_TONE: Record<EstadoPreventiva, 'danger' | 'warning' | 'success' | 'neutral'> = { vencido: 'danger', a_vencer: 'warning', em_dia: 'success', sem_base: 'neutral' }
 
-const EM_ANDAMENTO: number[] = [MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]
+const EM_ANDAMENTO: number[] = [MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO]
 
 /** Km atual do veículo: hodômetro Infleet; sem ele, o maior km das manutenções (estimado). */
 export function kmAtualDe(veiculo: VeiculoPrev, manutencoes: ManutencaoPrev[]): { km: number | null; estimado: boolean } {

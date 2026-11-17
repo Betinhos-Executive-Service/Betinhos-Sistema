@@ -49,6 +49,7 @@ describe('calcularManutencoes', () => {
     const mans = ['Solicitado', 'Aprovado', 'Programado', 'Realizado', 'Cancelado', 'Reprovado', 'APROVADO'].map((statusLabel) => manutencao({ statusLabel }))
     expect(calcularManutencoes(ctxDe(), dadosCom(mans)).kpis?.emAndamento).toBe(4)
     expect(manutencaoEmAndamento(' Programado ')).toBe(true)
+    expect(manutencaoEmAndamento('Agendado')).toBe(true) // rótulo novo do 202410001 (manutenções v2)
     expect(manutencaoEmAndamento('Reprovado')).toBe(false)
     expect(manutencaoEmAndamento('')).toBe(false)
   })

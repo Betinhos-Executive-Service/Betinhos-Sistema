@@ -40,10 +40,10 @@ describe('reincidencias', () => {
 describe('prioridadeParada', () => {
   it('Alta solicitada há 3 dias e Urgente aprovada sem data há 6 entram; Média e recentes não', () => {
     expect(prioridadeParada(manut('a', { grau: 3, status: MANUT.SOLICITADO, criadoEm: '2026-10-17T12:00:00Z' }), today)).toBe(3)
-    expect(prioridadeParada(manut('b', { grau: 4, status: MANUT.APROVADO, criadoEm: '2026-10-14T12:00:00Z' }), today)).toBe(6)
+    expect(prioridadeParada(manut('b', { grau: 4, status: MANUT.AGENDADO, criadoEm: '2026-10-14T12:00:00Z' }), today)).toBe(6)
     expect(prioridadeParada(manut('c', { grau: 2, status: MANUT.SOLICITADO, criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
     expect(prioridadeParada(manut('d', { grau: 4, status: MANUT.SOLICITADO, criadoEm: '2026-10-19T12:00:00Z' }), today)).toBeNull()
-    expect(prioridadeParada(manut('e', { grau: 4, status: MANUT.APROVADO, agendarPara: '2026-10-25', criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
+    expect(prioridadeParada(manut('e', { grau: 4, status: MANUT.AGENDADO, agendarPara: '2026-10-25', criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
   })
 })
 

@@ -54,7 +54,7 @@ export function prioridadeParada(m: Manutencao, today: string): number | null {
   if ((m.grau ?? 0) < LIMIARES.prioridadeGrauMinimo) return null
   const dias = daysBetween(diaSP(m.criadoEm) ?? m.criadoEm.slice(0, 10), today)
   if (m.status === MANUT.SOLICITADO && dias > LIMIARES.solicitadoParadoDias) return dias
-  if (m.status === MANUT.APROVADO && !m.agendarPara && dias > LIMIARES.aprovadoSemDataDias) return dias
+  if (m.status === MANUT.AGENDADO && !m.agendarPara && dias > LIMIARES.aprovadoSemDataDias) return dias
   return null
 }
 

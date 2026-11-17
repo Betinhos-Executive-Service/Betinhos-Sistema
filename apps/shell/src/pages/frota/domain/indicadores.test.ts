@@ -13,7 +13,7 @@ const manutencoes = [
   manut('b', { dataManutencao: '2026-10-01T12:00:00Z', valor: 250, veiculo: { id: 'v2', label: 'EFG4H56' }, tipo: 2 }),
   manut('semValor', { dataManutencao: '2026-10-01T12:00:00Z' }),
   manut('fora', { dataManutencao: '2026-07-01T12:00:00Z', valor: 999 }),
-  manut('aberta', { status: MANUT.APROVADO, valor: 500 }),
+  manut('aberta', { status: MANUT.AGENDADO, valor: 500 }),
 ]
 
 describe('indicadores', () => {

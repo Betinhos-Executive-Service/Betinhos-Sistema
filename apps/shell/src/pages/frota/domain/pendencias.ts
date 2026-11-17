@@ -60,8 +60,8 @@ export function buildPendencias(data: Pick<FrotaData, 'manutencoes' | 'multas' |
       continue
     }
     if (item.status === MANUT.SOLICITADO) result.push({ ...base, tipo: 'aprovar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
-    if (item.status === MANUT.APROVADO && !item.agendarPara) result.push({ ...base, tipo: 'programar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
-    if ((item.status === MANUT.APROVADO || item.status === MANUT.PROGRAMADO) && item.agendarPara) {
+    if (item.status === MANUT.AGENDADO && !item.agendarPara) result.push({ ...base, tipo: 'programar', prazo: null, dias: null, peso: -(item.grau ?? 0) })
+    if ((item.status === MANUT.AGENDADO || item.status === MANUT.PROGRAMADO) && item.agendarPara) {
       const dias = daysBetween(today, item.agendarPara)
       if (dias <= JANELA_DIAS) result.push({ ...base, tipo: 'agendada', prazo: item.agendarPara, dias, peso: dias })
     }

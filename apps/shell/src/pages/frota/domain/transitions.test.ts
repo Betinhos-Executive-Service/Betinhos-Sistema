@@ -12,7 +12,7 @@ const registro = (status: number | null, extra: Partial<RegistroStatus> = {}): R
 describe('transitionsFor', () => {
   it('lista só as transições permitidas de manutenção', () => {
     expect(ids('manutencao', MANUT.SOLICITADO)).toEqual(['aprovar', 'reprovar', 'cancelar'])
-    expect(ids('manutencao', MANUT.APROVADO)).toEqual(['programar', 'concluir', 'cancelar'])
+    expect(ids('manutencao', MANUT.AGENDADO)).toEqual(['programar', 'concluir', 'cancelar'])
     expect(ids('manutencao', MANUT.PROGRAMADO)).toEqual(['concluir', 'cancelar'])
     expect(ids('manutencao', MANUT.REALIZADO)).toEqual([])
     expect(ids('manutencao', null)).toEqual([])
@@ -37,7 +37,7 @@ describe('transitionsFor', () => {
     expect(pick('multa', MULTA.NOTIFICAR, 'notificado').flow).toBe('notificarCondutor')
     expect(pick('multa', MULTA.NOTIFICADO, 'indicar').flow).toBe('gerarContrato')
     expect(pick('manutencao', MANUT.SOLICITADO, 'reprovar').flow).toBeUndefined()
-    expect(pick('manutencao', MANUT.APROVADO, 'programar').flow).toBeUndefined()
+    expect(pick('manutencao', MANUT.AGENDADO, 'programar').flow).toBeUndefined()
   })
 })
 
@@ -62,7 +62,7 @@ describe('validate', () => {
   })
 
   it('exige os quatro campos ao concluir e recusa valor inválido', () => {
-    const concluir = pick('manutencao', MANUT.APROVADO, 'concluir')
+    const concluir = pick('manutencao', MANUT.AGENDADO, 'concluir')
     expect(Object.keys(validate(concluir, {}))).toEqual(['cr40f_datamanutencao', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_servicorealizado'])
     expect(validate(concluir, { cr40f_datamanutencao: '2026-10-02T10:00', cr40f_valor: '-1', cr40f_estabelecimento: 'Oficina', cr40f_servicorealizado: 'Óleo' })).toEqual({ cr40f_valor: 'Informe um valor válido' })
   })
@@ -92,7 +92,7 @@ describe('buildPatch', () => {
   })
 
   it('nenhuma transição de manutenção grava a data da aprovação', () => {
-    for (const status of [MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]) {
+    for (const status of [MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO]) {
       for (const transition of transitionsFor('manutencao', status)) {
         const values = Object.fromEntries(transition.fields.map((field) => [field.key, field.type === 'date' ? '2026-10-09' : field.type === 'datetime' ? '2026-10-02T10:00' : field.type === 'money' ? '10' : 'x']))
         const patch = buildPatch('manutencao', transition, values, { now: ctx.now, dateBehaviors: { cr40f_agendarpara: 'DateOnly' } })
@@ -102,9 +102,9 @@ describe('buildPatch', () => {
   })
 
   it('programar grava a data conforme o comportamento da coluna', () => {
-    expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, ctx)).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09' })
+    expect(buildPatch('manutencao', pick('manutencao', MANUT.AGENDADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, ctx)).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09' })
     expect(buildPatch('multa', pick('multa', MULTA.INDICADA, 'recurso'), {}, ctx)).toEqual({ cr40f_status: MULTA.RECURSO, new_recursopendente: true })
-    expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: { cr40f_agendarpara: 'UserLocal' } })).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09T03:00:00Z' })
+    expect(buildPatch('manutencao', pick('manutencao', MANUT.AGENDADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: { cr40f_agendarpara: 'UserLocal' } })).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09T03:00:00Z' })
   })
 
   it('concluir converte data e hora de São Paulo para UTC e valor para número', () => {
@@ -122,7 +122,7 @@ describe('buildPatch', () => {
   })
 
   it('recusa gravar data sem o comportamento da coluna', () => {
-    expect(() => buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: {} })).toThrow('Metadata de data indisponível para cr40f_agendarpara')
+    expect(() => buildPatch('manutencao', pick('manutencao', MANUT.AGENDADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: {} })).toThrow('Metadata de data indisponível para cr40f_agendarpara')
   })
 })
 
@@ -144,8 +144,8 @@ describe('applyTransition', () => {
   beforeEach(() => liberarFlows())
 
   it('transição direta grava o status e não chama Flow', async () => {
-    const source = fakeSource(MANUT.APROVADO)
-    const result = await applyTransition(source, 'manutencao', registro(MANUT.APROVADO), pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' })
+    const source = fakeSource(MANUT.AGENDADO)
+    const result = await applyTransition(source, 'manutencao', registro(MANUT.AGENDADO), pick('manutencao', MANUT.AGENDADO, 'programar'), { cr40f_agendarpara: '2026-10-09' })
     expect(result).toBeNull()
     expect(source.update).toHaveBeenCalledWith('manutencao', 'r1', { cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09' })
     expect(source.runFlow).not.toHaveBeenCalled()
@@ -164,8 +164,8 @@ describe('applyTransition', () => {
   })
 
   it('transição direta não resolve o Flow', async () => {
-    const source = fakeSource(MANUT.APROVADO)
-    await applyTransition(source, 'manutencao', registro(MANUT.APROVADO), pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' })
+    const source = fakeSource(MANUT.AGENDADO)
+    await applyTransition(source, 'manutencao', registro(MANUT.AGENDADO), pick('manutencao', MANUT.AGENDADO, 'programar'), { cr40f_agendarpara: '2026-10-09' })
     expect(source.prepareFlow).not.toHaveBeenCalled()
   })
 

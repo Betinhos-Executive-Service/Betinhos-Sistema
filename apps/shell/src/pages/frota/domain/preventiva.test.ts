@@ -104,7 +104,7 @@ describe('preventiva', () => {
       veiculos: [veic('a'), veic('b'), veic('c'), veic('d'), veic('e')],
       manutencoes: [
         manut('sa', { veiculo: ref('a'), status: MANUT.SOLICITADO, servicos: [1] }),
-        manut('ap', { veiculo: ref('b'), status: MANUT.APROVADO, servicos: [1] }),
+        manut('ap', { veiculo: ref('b'), status: MANUT.AGENDADO, servicos: [1] }),
         manut('pr', { veiculo: ref('c'), status: MANUT.PROGRAMADO, servicos: [1] }),
         manut('outroServico', { veiculo: ref('d'), status: MANUT.SOLICITADO, servicos: [2] }),
         manut('cancelada', { veiculo: ref('e'), status: MANUT.CANCELADO, servicos: [1] }),
@@ -119,7 +119,7 @@ describe('preventiva', () => {
       veiculos: [veic('semb'), veic('emdia', { hodometro: 161000 }), veic('av18', { hodometro: 161000 }), veic('av5', { hodometro: 161000 }), veic('venc', { hodometro: 171000 }), veic('vencand', { hodometro: 161000 })],
       manutencoes: [
         m('emdia', '2026-08-01'), m('av18', '2026-05-01'), m('av5', '2026-04-19'), m('venc', '2026-06-01'), m('vencand', '2026-03-01'),
-        manut('aberta', { veiculo: ref('vencand'), status: MANUT.APROVADO, servicos: [1] }),
+        manut('aberta', { veiculo: ref('vencand'), status: MANUT.AGENDADO, servicos: [1] }),
       ],
     }), today)
     expect(lista.map((p) => [p.veiculo.id, p.estado, p.faltamDias, p.emAndamento])).toEqual([

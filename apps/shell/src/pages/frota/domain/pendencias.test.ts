@@ -20,8 +20,8 @@ describe('buildPendencias', () => {
 
   it('aponta aprovadas sem data e programadas vencidas ou em até 7 dias', () => {
     const result = build({ manutencoes: [
-      manut('semData', { status: MANUT.APROVADO }),
-      manut('comData', { status: MANUT.APROVADO, agendarPara: '2026-10-20' }),
+      manut('semData', { status: MANUT.AGENDADO }),
+      manut('comData', { status: MANUT.AGENDADO, agendarPara: '2026-10-20' }),
       manut('vencida', { status: MANUT.PROGRAMADO, agendarPara: '2026-09-30' }),
       manut('semana', { status: MANUT.PROGRAMADO, agendarPara: '2026-10-09' }),
       manut('longe', { status: MANUT.PROGRAMADO, agendarPara: '2026-10-10' }),
@@ -31,9 +31,9 @@ describe('buildPendencias', () => {
 
   it('manutenção aprovada com data vencida ou próxima entra em agendada; aprovada com data distante não aparece', () => {
     const result = build({ manutencoes: [
-      manut('vencidaAprovada', { status: MANUT.APROVADO, agendarPara: '2026-09-30' }),
-      manut('proximaAprovada', { status: MANUT.APROVADO, agendarPara: '2026-10-05' }),
-      manut('distanteAprovada', { status: MANUT.APROVADO, agendarPara: '2026-11-01' }),
+      manut('vencidaAprovada', { status: MANUT.AGENDADO, agendarPara: '2026-09-30' }),
+      manut('proximaAprovada', { status: MANUT.AGENDADO, agendarPara: '2026-10-05' }),
+      manut('distanteAprovada', { status: MANUT.AGENDADO, agendarPara: '2026-11-01' }),
     ] })
     expect(result.map((item) => [item.tipo, item.id, item.dias])).toEqual([['agendada', 'vencidaAprovada', -2], ['agendada', 'proximaAprovada', 3]])
   })
@@ -63,7 +63,7 @@ describe('buildPendencias', () => {
         veiculos: [...veiculos, veic('v3', 'CCC3C33', 100)],
         planoPreventivo,
         baselines: [base('v1', 'oleo', 9000), base('v2', 'oleo', 4500), base('v3', 'oleo', 0)],
-        manutencoes: [manut('ap', { grau: 1 }), manut('sd', { status: MANUT.APROVADO })],
+        manutencoes: [manut('ap', { grau: 1 }), manut('sd', { status: MANUT.AGENDADO })],
       })
       expect(result.map((p) => [p.tipo, p.id])).toEqual([['aprovar', 'ap'], ['preventiva', 'v1:oleo'], ['preventiva', 'v2:oleo'], ['programar', 'sd']])
     })

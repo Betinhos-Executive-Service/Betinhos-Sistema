@@ -15,7 +15,7 @@ public static class Regras
     private static readonly CultureInfo PtBr = new("pt-BR");
     private static readonly int[] Anuladas = { Codigos.Cancelado, Codigos.Reprovado };
     public static readonly string[] Ordem = { "prioridade", "reincidencia", "preventiva", "agendada", "custo", "hodometro" };
-    private static readonly int[] EmAndamento = { Codigos.Solicitado, Codigos.Aprovado, Codigos.Programado };
+    private static readonly int[] EmAndamento = { Codigos.Solicitado, Codigos.Agendado, Codigos.Programado };
 
     public static Resultado Avaliar(DadosFrota dados, string hoje, DateTime agoraUtc)
     {
@@ -25,7 +25,7 @@ public static class Regras
             var parada = PrioridadeParada(m, hoje);
             if (parada is int dias)
                 lista.Add(new Pendencia { Tipo = "prioridade", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"{(m.Status == Codigos.Solicitado ? "Aguardando aprovação" : "Aprovada sem data")} há {dias} dias" });
-            else if ((m.Status == Codigos.Aprovado || m.Status == Codigos.Programado) && m.AgendarPara != null && Dias(hoje, m.AgendarPara) < 0)
+            else if ((m.Status == Codigos.Agendado || m.Status == Codigos.Programado) && m.AgendarPara != null && Dias(hoje, m.AgendarPara) < 0)
                 lista.Add(new Pendencia { Tipo = "agendada", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"Agendada para {Br(m.AgendarPara)} e ainda não realizada" });
         }
         lista.AddRange(Reincidencias(dados.Manutencoes, hoje));
@@ -42,7 +42,7 @@ public static class Regras
         if ((m.Grau ?? 0) < Limiares.PrioridadeGrauMinimo) return null;
         var dias = Dias(m.CriadoEm, hoje);
         if (m.Status == Codigos.Solicitado && dias > Limiares.SolicitadoParadoDias) return dias;
-        if (m.Status == Codigos.Aprovado && m.AgendarPara == null && dias > Limiares.AprovadoSemDataDias) return dias;
+        if (m.Status == Codigos.Agendado && m.AgendarPara == null && dias > Limiares.AprovadoSemDataDias) return dias;
         return null;
     }
 

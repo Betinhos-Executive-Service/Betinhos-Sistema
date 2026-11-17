@@ -57,7 +57,7 @@ function seed(): FrotaData {
     ],
     manutencoes: [
       manut('m1', v1, { grau: 4, descricao: 'Freio com ruído (fictício)', servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.IA, confiancaIa: 0.93 }),
-      manut('m2', v2, { status: MANUT.APROVADO, comentarioAprovador: 'Ok' }),
+      manut('m2', v2, { status: MANUT.AGENDADO, comentarioAprovador: 'Ok' }),
       manut('m3', v1, { status: MANUT.PROGRAMADO, agendarPara: offset(-1) }),
       manut('m4', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-40), valor: 480.9, estabelecimento: 'Oficina Teste', servicoRealizado: 'Troca de óleo', criadoEm: iso(-45), km: 160000, servicos: [100000000, 100000001], categorias: [100000000], origemClassificacao: ORIGEM.MANUAL }),
       // Reincidência fictícia: com m1, 3ª vez do mesmo serviço de freio no v1 em 120 dias.
@@ -198,7 +198,7 @@ export function createMockSource(): DataSource {
       const kind: Kind = flow === 'aprovarManutencao' ? 'manutencao' : 'multa'
       const record = find(kind, id) as Record<string, unknown> | undefined
       if (!record) throw new Error('Registro não encontrado no mock.')
-      if (flow === 'aprovarManutencao') record.status = MANUT.APROVADO
+      if (flow === 'aprovarManutencao') record.status = MANUT.AGENDADO
       else if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
       else record.status = MULTA.INDICADA
       return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }

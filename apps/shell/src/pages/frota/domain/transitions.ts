@@ -46,12 +46,12 @@ const finalizar: Transition = { id: 'finalizar', to: MULTA.FINALIZADO, label: 'F
 const RULES: Record<Kind, Record<number, Transition[]>> = {
   manutencao: {
     [MANUT.SOLICITADO]: [
-      { id: 'aprovar', to: MANUT.APROVADO, label: 'Aprovar e agendar', fields: [agendarPara, comentario(false)], flow: 'aprovarManutencao', requires: 'veiculo' },
+      { id: 'aprovar', to: MANUT.AGENDADO, label: 'Aprovar e agendar', fields: [agendarPara, comentario(false)], flow: 'aprovarManutencao', requires: 'veiculo' },
       // Não grava cr40f_datadaaprovacao: a regra de negócio "Aprovado" troca o status para Aprovado quando essa data é gravada.
       { id: 'reprovar', to: MANUT.REPROVADO, label: 'Reprovar', fields: [comentario(true)], danger: true },
       cancelarManutencao,
     ],
-    [MANUT.APROVADO]: [{ id: 'programar', to: MANUT.PROGRAMADO, label: 'Programar', fields: [agendarPara] }, concluir, cancelarManutencao],
+    [MANUT.AGENDADO]: [{ id: 'programar', to: MANUT.PROGRAMADO, label: 'Programar', fields: [agendarPara] }, concluir, cancelarManutencao],
     [MANUT.PROGRAMADO]: [concluir, cancelarManutencao],
   },
   multa: {

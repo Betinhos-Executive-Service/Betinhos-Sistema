@@ -3,10 +3,10 @@ using System.Runtime.Serialization;
 
 namespace Cr40f.Frota.Plugin;
 
-/// <summary>Códigos de choice, iguais a apps/shell/src/pages/frota/data/schema.ts.</summary>
+/// <summary>Códigos de choice, iguais a apps/shell/src/pages/frota/data/schema.ts. 202410001 era "Aprovado"; agora é "Agendado".</summary>
 public static class Codigos
 {
-    public const int Solicitado = 0, Aprovado = 202410001, Programado = 202410005, Realizado = 202410002, Reprovado = 100000002, Cancelado = 100000001;
+    public const int Solicitado = 0, Agendado = 202410001, Programado = 202410005, Realizado = 202410002, Reprovado = 100000002, Cancelado = 100000001;
     public const int VeiculoVendido = 202410000, VeiculoAtivo = 202410001, Proprio = 100000000;
     public const int AvisoKmPadrao = 1000, AvisoDiasPadrao = 30;
 }
