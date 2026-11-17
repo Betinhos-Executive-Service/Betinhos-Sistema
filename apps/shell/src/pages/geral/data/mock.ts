@@ -2,7 +2,9 @@ import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
 import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
 import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR } from '../domain/grouping'
+import { ALIAS_MANUTENCAO, CATEGORIA_MANUTENCAO } from '../domain/manutencao'
 import { searchConditions } from '../domain/search'
+import { segundaDe, somarDias } from '../../frota/domain/janela'
 import { mockRecebimentos } from '../../recebimentos/mock'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
@@ -69,6 +71,7 @@ const AGENDA_COLS = [
 ]
 const HOJE_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao']
 const SEM_MOTORISTA_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_cliente', 'cr40f_solicitante', 'cr40f_trajeto', 'cr40f_tipodeveiculo', 'cr40f_cotao']
+const FATURAMENTO_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_motorista', 'cr40f_statusdefaturamento', 'cr40f_cotao']
 
 const ACTIVE = '<condition attribute="statecode" operator="eq" value="0" />'
 const fetch = (cols: string[], conditions: string, order = '<order attribute="cr40f_dataehorriodesada" descending="false" />') =>
@@ -83,6 +86,9 @@ export function createMockViews(): View[] {
     { id: 'mock-sem-motorista', nome: 'Sem motorista', grupo: 'sistema', padrao: false, fetchxml: fetch(SEM_MOTORISTA_COLS, '<condition attribute="cr40f_motorista" operator="null" />'), layoutxml: layout(SEM_MOTORISTA_COLS) },
     // No formato de uma savedquery nativa do Dynamics ("Sem CR da Tenaris" do DEV): filtros só no FetchXML.
     { id: 'mock-sem-cr-tenaris', nome: 'ℹ️ Sem CR da Tenaris', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, `<condition attribute="cr40f_dataehorriodesada" operator="this-month" /><condition attribute="cr40f_cr" operator="null" /><condition attribute="cr40f_cliente" operator="eq" value="${MOCK_LOOKUPS.cr40f_cliente[0].id}" uiname="Tenaris" uitype="cr40f_clientes1" />`), layoutxml: layout(HOJE_COLS) },
+    // Visão de faturamento: filtra o status de faturamento, então "Mostrar manutenções" vem desligado (plano 3, D2),
+    // mesmo com a coluna Motorista. Pendente e Não Faturável: com o liga/desliga ligado, as manutenções aparecem nela.
+    { id: 'mock-faturamento', nome: '💲 Faturamento', grupo: 'sistema', padrao: false, fetchxml: fetch(FATURAMENTO_COLS, '<condition attribute="cr40f_statusdefaturamento" operator="in"><value>202410005</value><value>202410011</value></condition>'), layoutxml: layout(FATURAMENTO_COLS) },
   ]
 }
 
@@ -159,6 +165,84 @@ export function createMockRows(now: Date): Row[] {
     rows.push(row)
   }
   return rows
+}
+
+/** Linhas de manutenção do mock (OS-9001 a OS-9004). */
+export const MOCK_MANUTENCOES = 4
+
+/**
+ * Linhas da Geral de categoria Manutenção (manutenções v2, plano 3), com as colunas do link `bt_manut` já preenchidas,
+ * como a consulta ligada devolve. OS-9001 e OS-9002 apontam para m2 e m3 do mock da Frota, para a gaveta abrir o registro
+ * certo. OS-9003 é Agendada com a janela vencida (atrasada, sem motorista) e OS-9004 é uma linha com `cr40f_om` sem os
+ * dados do link (`bt_manut.*` vazio), para ver os rótulos de reserva; as duas apontam para manutenções da Frota que lá
+ * estão Solicitadas, então a gaveta delas mostra outro status.
+ */
+export function createMockManutencoes(now: Date): Row[] {
+  const hoje = spDay(now)
+  const proxima = segundaDe(somarDias(hoje, 7))
+  const passada = somarDias(hoje, -3)
+  const semanaPassada = segundaDe(somarDias(hoje, -7))
+  const m = (campo: string) => `${ALIAS_MANUTENCAO}.${campo}`
+  const linha = (n: number, saida: string, extra: Row): Row => ({
+    [ID_ATTRIBUTE]: `aaaaaaaa-0000-4000-8000-9${String(n).padStart(11, '0')}`,
+    cr40f_id: `OS-${9000 + n}`,
+    statecode: 0,
+    statuscode: 1,
+    new_categoriadoitem: CATEGORIA_MANUTENCAO,
+    [`new_categoriadoitem${F}`]: 'Manutenção',
+    cr40f_dataehorriodesada: saida,
+    [`cr40f_dataehorriodesada${F}`]: formatDateTime(saida),
+    createdon: saida,
+    [`createdon${F}`]: formatDateTime(saida),
+    cr40f_trajeto: 'Serviço de manutenção do veículo',
+    cr40f_endereodesada: 'Manutenção de Veículo',
+    cr40f_destino: 'Manutenção de Veículo',
+    cr40f_passageirosetelefonedecontato: 'Manutenção de Veículo',
+    cr40f_statusdefaturamento: 202410011,
+    [`cr40f_statusdefaturamento${F}`]: 'Não Faturável',
+    cr40f_tipodeveiculo: 202410000,
+    [`cr40f_tipodeveiculo${F}`]: 'Básico',
+    ...extra,
+  })
+  const doLink = (grau: number, rotuloGrau: string, status: number, rotuloStatus: string, id: string, descricao: string, inicio: string, fim: string): Row => ({
+    [m('cr40f_id')]: id, [m('cr40f_descricao')]: descricao,
+    [m('cr40f_graudamanutencao')]: grau, [`${m('cr40f_graudamanutencao')}${F}`]: rotuloGrau,
+    [m('cr40f_status')]: status, [`${m('cr40f_status')}${F}`]: rotuloStatus,
+    [m('cr40f_janelainicio')]: inicio, [m('cr40f_janelafim')]: fim,
+  })
+  const carlos = MOCK_LOOKUPS.cr40f_motorista[0]
+  return [
+    // m2 da Frota: encaixada na semana que vem e ainda a programar (sem motorista; saída no início da janela).
+    linha(1, `${proxima}T03:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm2', [`_cr40f_om_value${F}`]: 'M2',
+      _cr40f_veiculo_value: 'v2', [`_cr40f_veiculo_value${F}`]: 'TST2B22',
+      _cr40f_motorista_value: null,
+      ...doLink(2, 'Média', 202410001, 'Agendado', 'M2', 'Manutenção fictícia m2', proxima, somarDias(proxima, 6)),
+    }),
+    // m3 da Frota: programada com motorista num dia que já passou e sem conclusão, ou seja, atrasada.
+    linha(2, `${passada}T12:00:00.000Z`, {
+      cr40f_status: 202410005, [`cr40f_status${F}`]: 'Programado', new_foiprogramado: true,
+      _cr40f_om_value: 'm3', [`_cr40f_om_value${F}`]: 'M3',
+      _cr40f_veiculo_value: 'v1', [`_cr40f_veiculo_value${F}`]: 'TST1A11',
+      _cr40f_motorista_value: carlos.id, [`_cr40f_motorista_value${F}`]: carlos.nome,
+      ...doLink(2, 'Média', 202410005, 'Programado', 'M3', 'Manutenção fictícia m3', passada, passada),
+    }),
+    // Agendada com a semana da janela já vencida e ainda sem motorista: atrasada, a programar.
+    linha(3, `${semanaPassada}T03:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm7', [`_cr40f_om_value${F}`]: 'M7',
+      _cr40f_veiculo_value: 'v2', [`_cr40f_veiculo_value${F}`]: 'TST2B22',
+      _cr40f_motorista_value: null,
+      ...doLink(3, 'Alta', 202410001, 'Agendado', 'M7', 'Ar-condicionado sem gelar (fictício)', semanaPassada, somarDias(semanaPassada, 6)),
+    }),
+    // Ligada à manutenção (`cr40f_om`), mas sem nenhuma coluna do link: a linha mostra os rótulos de reserva.
+    linha(4, `${proxima}T15:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm8', [`_cr40f_om_value${F}`]: 'M8',
+      _cr40f_motorista_value: null,
+    }),
+  ]
 }
 
 /**
