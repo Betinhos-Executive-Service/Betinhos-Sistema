@@ -30,14 +30,16 @@ Suba o shell em mock (`pnpm --filter @betinhos/shell dev`, porta 36472) e passe 
 Prints de antes e depois do drawer, da lista e da tarefa no Planner vão para o chat.
 
 ## 3. Dataverse DEV
-Pré-requisitos: Deploy da `develop` verde (migration, plugin da frota, DriverRecordSharing, tela), `register-dossiemulta-customapi.ps1 -Apply` e o flow criado à mão (`provision-flow-multas-do-dia.ps1 -Remetente <noreply>`), os dois do checkout principal.
+Esta seção é para a pessoa com acesso ao DEV, a partir do checkout principal na develop atualizada. Sessão de código ou cloud não roda os scripts com `-Apply`, nem `pnpm push`/`provision-*`, nem grava no Dataverse; nunca use o conector do PROD.
+
+Pré-requisitos: Deploy da `develop` verde (migration, plugin da frota, DriverRecordSharing, tela), `packages/plugins/scripts/register-dossiemulta-customapi.ps1 -Apply` e o flow criado à mão (`provision-flow-multas-do-dia.ps1 -Remetente <noreply>`), os dois do checkout principal.
 1. **Schema**: `cr40f_multas.cr40f_status` com os rótulos novos e a opção 202410007 Cancelada; colunas novas; `cr40f_MultasTravaModo` = `observar`.
 2. **Registro**: `dotnet run --project packages/plugins/tools/Cr40f.Frota.Registrar -- --environmentUrl https://org23b93544.crm2.dynamics.com --testar-multas` imprime o MultasJson com `hoje`, `total` e as cinco seções.
 3. **Multa nova**: crie uma multa de teste pelo formulário nativo (auto `TESTE-<data>`, placa de teste, data para indicar daqui a 2 dias). Esperado: status "1. Identificar o responsável"; em até 1 min uma tarefa no Planner `Multa TESTE-... · <placa> · Definir o responsável`, prioridade urgente, equipe Frota, sininho do principal.
 4. **Passo a passo no DEV**: dê os passos na tela até Encerrada. A cada etapa a tarefa muda o título, o prazo, o checklist e ganha um evento "Multa: ... → ..."; encerrada, a tarefa vai para Concluída. Conclua a tarefa à mão com outra multa aberta: o Planner recusa; com a multa aberta e a tarefa concluída por fora, o próximo passo a reabre.
 5. **Trava em observar**: grave `cr40f_status` direto pela Web API numa multa de teste. Esperado: a gravação passa e o log de plugins (`plugintracelogs?$filter=typename eq 'Cr40f.Frota.Plugin.MultaTravaPlugin'&$orderby=createdon desc&$top=5`) tem `Recusaria multa <id> (Update): ... | origem: gravação direta, usuário <id>`.
 6. **Duplicata**: crie outra multa com o mesmo auto. Em observar, passa e o trace diz `Já existe multa com o auto ...`; com a variável em `travar` (só no DEV, voltar para `observar` no fim), a criação é recusada com essa mensagem.
-7. **Dossiê**: na multa de teste, "Copiar mensagem" traz o serviço da agenda da placa no horário e as viagens do InFleet (ou "Rastreador: indisponível (...)" sem quebrar).
+7. **Dossiê**: na multa de teste, "Copiar mensagem" traz o serviço da agenda da placa no horário e as viagens do InFleet (ou, com o InFleet fora do ar, exatamente "Rastreador: indisponível no momento." sem quebrar).
 8. **E-mail**: com `cr40f_recebeemailmultas` marcado só para quem testa, rode o flow "Multas | Multas de hoje" à mão: um e-mail com as seções na ordem; sem itens, a execução termina sem enviar.
 
 ## Evidência obrigatória
