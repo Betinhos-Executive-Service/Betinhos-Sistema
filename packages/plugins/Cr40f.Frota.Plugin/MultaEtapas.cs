@@ -190,7 +190,10 @@ public static class MultaEtapas
                 if (!s.PrazoVencido) return "O prazo de indicação ainda não venceu.";
                 if (d.Indicou is not bool indicou) return "Responda se a multa foi indicada.";
                 if (!indicou) return null;
-                return CanalDe(d.Canal) == null ? "Escolha o canal da indicação." : DataRuim(d.Data, hoje, "Informe a data da indicação.");
+                var ruim = CanalDe(d.Canal) == null ? "Escolha o canal da indicação." : DataRuim(d.Data, hoje, "Informe a data da indicação.");
+                if (ruim != null) return ruim;
+                // Sem responsável efetivo (multa nova no prazo vencido da etapa 1) a indicação precisa dizer quem foi indicado.
+                return ResponsavelEfetivo(m) == null && string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista que foi indicado." : null;
             case Passos.Cancelar:
                 if (!Aberta(s.Etapa)) return "Esta multa já está encerrada.";
                 var motivo = d.MotivoTexto?.Trim() ?? "";
