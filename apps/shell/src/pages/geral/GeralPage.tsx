@@ -293,7 +293,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [selectedIds, rowOf])
 
   // Linhas de manutenção (manutenções v2, plano 3): desenho próprio; abrem a gaveta da manutenção pelo hospedeiro.
-  const hoje = useMemo(() => todaySP(), [])
+  // "Hoje" em São Paulo a cada render (barato): com a tela aberta na virada do dia, "Atrasada" passa a valer sem recarregar.
+  const hoje = todaySP()
   const lerManutencao = useCallback((row: Row) => lerLinhaManutencao(row, hoje), [hoje])
   const abrirManutencao = useCallback((m: LinhaManutencao) => abrirGavetaRegistro('cr40f_manutencoes', m.manutencaoId), [])
   const manutencao = useMemo(() => ({ ler: lerManutencao, abrir: abrirManutencao }), [lerManutencao, abrirManutencao])
