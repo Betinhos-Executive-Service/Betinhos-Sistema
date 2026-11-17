@@ -63,6 +63,14 @@ describe('RegistroDrawer', () => {
     expect(screen.queryByRole('button', { name: 'Gerar contrato de indicação' })).toBeNull()
   })
 
+  it('multa mostra o passo a passo e deixa os dados recolhidos', () => {
+    renderDrawer(fakeSource(), 'multa', 'u1')
+    expect(screen.getByRole('list', { name: 'Etapas da multa' })).toBeTruthy()
+    const dados = screen.getByText('Dados e arquivos').closest('details') as HTMLDetailsElement
+    expect(dados.open).toBe(false)
+    expect(screen.queryByText('Termo de acordo')).toBeNull()
+  })
+
   it('mostra a classificação da IA e grava a correção manual dos serviços', async () => {
     const update = vi.fn(async () => {})
     const classificada = { ...manutencao, servicos: [100000007], categorias: [100000001], origemClassificacao: 100000000, confiancaIa: 0.93 }

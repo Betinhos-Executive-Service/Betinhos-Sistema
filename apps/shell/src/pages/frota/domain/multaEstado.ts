@@ -1,3 +1,4 @@
+import { daysBetween } from '../data/dates'
 import { RESPONSAVEL } from '../data/schema'
 import type { Multa, Ref } from '../data/types'
 import { avaliar, responsavelEfetivo, type MultaEstado, type Situacao } from './multaEtapas'
@@ -23,4 +24,10 @@ export const EMPRESA: Ref = { id: 'empresa', label: 'Empresa' }
 /** Quem responde pela multa: Empresa, ou o motorista (nas antigas sem responsável, o do lookup). */
 export function responsavelDaMulta(m: Multa): Ref | null {
   return responsavelEfetivo(estadoDaMulta(m)) === RESPONSAVEL.EMPRESA ? EMPRESA : m.motorista
+}
+
+/** Cor do próximo prazo (spec §7): vermelho quando vencido, âmbar com 7 dias ou menos. */
+export function urgenciaDoPrazo(prazo: string | null, vencido: boolean, hoje: string): 'vencido' | 'atencao' | 'normal' {
+  if (vencido || (prazo !== null && daysBetween(hoje, prazo) < 0)) return 'vencido'
+  return prazo !== null && daysBetween(hoje, prazo) <= 7 ? 'atencao' : 'normal'
 }

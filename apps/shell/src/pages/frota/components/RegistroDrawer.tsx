@@ -4,13 +4,13 @@ import { Button, Drawer, EmptyState } from '@betinhos/ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
-import { GRAU, GRAVIDADE, KIND_LABEL, KIND_TABLE, label, TIPO_COLISAO, TIPO_REPARO } from '../data/schema'
+import { CANAL, GRAU, GRAVIDADE, KIND_LABEL, KIND_TABLE, label, TIPO_COLISAO, TIPO_REPARO } from '../data/schema'
 import type { Classificacao, DataSource, FlowResult } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { StatusPanel } from './StatusPanel'
-import { TermoMultaPanel } from './TermoMultaPanel'
+import { MultaPassoAPasso } from './MultaPassoAPasso'
 import { useNotify } from './Toasts'
 import { StatusBadge } from './Ui'
 
@@ -35,9 +35,10 @@ function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
     return !item ? null : { titulo: item.titulo, status: item.status, veiculo: item.veiculo, temMotorista: item.motorista !== null, campos: [
       ['Motorista', texto(item.motorista?.label)], ['Data da infração', dia(item.dataHora)], ['Local', texto(item.local)],
       ['Infração', infracao ? `${infracao.codigo} · ${texto(infracao.descricao)}` : 'Sem código de infração'], ['Gravidade', infracao ? label(GRAVIDADE, infracao.gravidade) : NAO_INFORMADO],
-      ['Valor', brl(infracao?.valor ?? null)], ['Pontos na CNH', texto(infracao?.pontos)],
-      ['Prazo para indicar', formatBR(item.dataParaIndicar) || NAO_INFORMADO], ['Indicado', item.indicado ? 'Sim' : 'Não'],
-      ['Aviso ao condutor', formatBR(item.dataAviso) || NAO_INFORMADO], ['Data de indicação', formatBR(item.dataIndicacao) || NAO_INFORMADO],
+      ['Valor', brl(item.valorGuia ?? infracao?.valor ?? null)], ['Pontos na CNH', texto(infracao?.pontos)],
+      ['Prazo para indicar', formatBR(item.dataParaIndicar) || NAO_INFORMADO], ['Vencimento da guia', formatBR(item.vencimento ?? null) || NAO_INFORMADO],
+      ['Valor com desconto', brl(item.valorComDesconto ?? null)], ['Canal da indicação', item.canal === CANAL.SENATRAN ? 'Senatran' : item.canal === CANAL.DSV ? 'DSV Digital' : item.canal === CANAL.PREFEITURA ? 'Prefeitura' : NAO_INFORMADO],
+      ['Notificação de autuação', texto(item.arquivos?.autuacao)], ['PDF da penalidade', texto(item.arquivos?.penalidade)], ['Comprovante', texto(item.arquivos?.comprovante)],
     ] }
   }
   const item = data.colisoes.find((row) => row.id === id)
@@ -53,7 +54,6 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
   const registro = detalhe(kind, id, data)
   const manutencao = kind === 'manutencao' ? data.manutencoes.find((row) => row.id === id) : undefined
   const multa = kind === 'multa' ? data.multas.find((row) => row.id === id) : undefined
-  const valorCatalogo = multa?.infracaoId ? data.infracoes.find((row) => row.id === multa.infracaoId)?.valor ?? null : null
   useEffect(() => { setShareUrl(null) }, [kind, id])
 
   async function abrirFormulario() {
@@ -87,39 +87,52 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
       {!registro ? <EmptyState compact align="start" title="Este registro não está mais na lista">Recarregue a tela.</EmptyState> : (
         <div className="frota-drawer">
           <div className="frota-drawer__status"><StatusBadge kind={kind} value={registro.status} /></div>
-          <section className="frota-group" aria-labelledby={`${id}-acoes`}>
-            <h3 id={`${id}-acoes`} className="frota-group__title">Ações de status</h3>
-            {shareUrl && /^https?:\/\//i.test(shareUrl) && <p><a className="frota-link" href={shareUrl} target="_blank" rel="noreferrer">Abrir contrato gerado</a></p>}
-            <StatusPanel
-              key={`${id}-${registro.status}`}
-              source={source}
-              kind={kind}
-              record={{ id, status: registro.status, temVeiculo: registro.veiculo !== null, temMotorista: registro.temMotorista }}
-              initial={registro.initial}
-              onDone={concluido}
-              onReload={onChanged}
-            />
-          </section>
+          {multa ? (
+            <section className="frota-group" aria-labelledby={`${id}-passos`}>
+              <h3 id={`${id}-passos`} className="frota-group__title">Passo a passo</h3>
+              <MultaPassoAPasso key={`${id}-${multa.status}`} source={source} multa={multa} data={data} onChanged={onChanged} />
+            </section>
+          ) : (
+            <section className="frota-group" aria-labelledby={`${id}-acoes`}>
+              <h3 id={`${id}-acoes`} className="frota-group__title">Ações de status</h3>
+              {shareUrl && /^https?:\/\//i.test(shareUrl) && <p><a className="frota-link" href={shareUrl} target="_blank" rel="noreferrer">Abrir contrato gerado</a></p>}
+              <StatusPanel
+                key={`${id}-${registro.status}`}
+                source={source}
+                kind={kind}
+                record={{ id, status: registro.status, temVeiculo: registro.veiculo !== null, temMotorista: registro.temMotorista }}
+                initial={registro.initial}
+                onDone={concluido}
+                onReload={onChanged}
+              />
+            </section>
+          )}
           {manutencao && (
             <section className="frota-group" aria-labelledby={`${id}-classif`}>
               <h3 id={`${id}-classif`} className="frota-group__title">Serviços e categorias</h3>
               <ClassificacaoManutencao key={`${id}-${manutencao.servicos.join(',')}-${manutencao.origemClassificacao}`} source={source} item={manutencao} onClassificado={(c) => (onClassificado ? onClassificado(id, c) : onChanged())} />
             </section>
           )}
-          {multa && (
-            <section className="frota-group" aria-labelledby={`${id}-termo`}>
-              <h3 id={`${id}-termo`} className="frota-group__title">Termo de acordo</h3>
-              <TermoMultaPanel key={id} source={source} multa={multa} valorCatalogo={valorCatalogo} onChanged={onChanged} />
-            </section>
-          )}
-          <section className="frota-group" aria-labelledby={`${id}-dados`}>
-            <h3 id={`${id}-dados`} className="frota-group__title">Dados</h3>
-            <dl className="frota-detail">
-              <dt>Veículo</dt>
-              <dd>{registro.veiculo ? <button type="button" className="frota-link" onClick={() => onOpenVeiculo(registro.veiculo!.id)}>{registro.veiculo.label || NAO_INFORMADO}</button> : NAO_INFORMADO}</dd>
-              {registro.campos.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
-            </dl>
-          </section>
+          {(() => {
+            const corpo = (
+              <dl className="frota-detail">
+                <dt>Veículo</dt>
+                <dd>{registro.veiculo ? <button type="button" className="frota-link" onClick={() => onOpenVeiculo(registro.veiculo!.id)}>{registro.veiculo.label || NAO_INFORMADO}</button> : NAO_INFORMADO}</dd>
+                {registro.campos.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
+              </dl>
+            )
+            return multa ? (
+              <details className="frota-group multa-dados">
+                <summary className="frota-group__title">Dados e arquivos</summary>
+                {corpo}
+              </details>
+            ) : (
+              <section className="frota-group" aria-labelledby={`${id}-dados`}>
+                <h3 id={`${id}-dados`} className="frota-group__title">Dados</h3>
+                {corpo}
+              </section>
+            )
+          })()}
         </div>
       )}
     </Drawer>
