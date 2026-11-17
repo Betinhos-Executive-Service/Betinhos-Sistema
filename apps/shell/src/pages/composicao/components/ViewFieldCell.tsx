@@ -33,5 +33,6 @@ export function ViewFieldCell({ field, value, formatted, viewFields, valueKey, b
     </span>
   }
   if (['Picklist', 'Status', 'State'].includes(field.type) && typeof formatted === 'string') return formatted
+  if (typeof value === 'string' && /^https?:\/\/\S+$/i.test(value.trim())) return <a className="lookup-link grid-related-link" href={value.trim()} target="_blank" rel="noopener noreferrer" title={value}>{value}</a>
   return String(value)
 }
