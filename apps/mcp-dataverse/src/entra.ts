@@ -121,7 +121,11 @@ export function validateIdentity(env: AppEnv, idToken: string | undefined): Iden
   if (claims.aud !== env.ENTRA_CLIENT_ID) {
     throw new EntraError('id_token emitido para outro aplicativo.', 'wrong_audience', 403)
   }
-  const email = String(claims.email ?? claims.preferred_username ?? claims.upn ?? '').toLowerCase()
+  // E-mail não é verificado pelo Entra: o login vem de preferred_username/upn. Convidado (B2B) não entra.
+  const email = String(claims.preferred_username ?? claims.upn ?? claims.email ?? '').toLowerCase()
+  if (`${claims.preferred_username ?? ''} ${claims.upn ?? ''}`.includes('#EXT#') || Number(claims.acct) === 1) {
+    throw new EntraError('Contas convidadas não são aceitas.', 'guest_not_allowed', 403)
+  }
   // Lista separada por vírgula (ex.: betinhos.com.br,betinhos.onmicrosoft.com).
   const domains = env.ALLOWED_EMAIL_DOMAIN.split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean)
   if (!domains.some((d) => email.endsWith(`@${d}`))) {

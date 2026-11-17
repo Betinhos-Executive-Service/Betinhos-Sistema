@@ -140,7 +140,7 @@ describe('erros do Dataverse', () => {
 
   it('corpo que não é JSON vira mensagem de texto', async () => {
     mockFetch((call) => (call.url.includes('login.') ? tokenReply() : new Response('Bad gateway', { status: 502 })))
-    await expect(new DataverseSession(env, 'rt').api('DEV', 'GET', 'x')).rejects.toMatchObject({ status: 502, message: 'Bad gateway' })
+    await expect(new DataverseSession(env, 'rt').api('DEV', 'GET', 'x')).rejects.toMatchObject({ status: 502, message: expect.stringMatching(/^Bad gateway/) })
   })
 })
 
@@ -200,5 +200,54 @@ describe('confiabilidade', () => {
   it('rejeita nome lógico inválido (path traversal)', async () => {
     mockFetch(baseRoute(() => undefined))
     await expect(new DataverseSession(env, 'rt').entity('DEV', '../x')).rejects.toBeTruthy()
+  })
+})
+
+describe('rodada 6: falhas transitórias e resposta inválida', () => {
+  const noSleep = { sleep: async () => {} }
+  const data = (c: { url: string }) => c.url.includes('/api/data/')
+
+  it('GET com erro de rede repete uma vez e depois diz "falha transitória"', async () => {
+    let n = 0
+    mockFetch(baseRoute((c) => { if (data(c)) { n++; throw new TypeError('boom') } return undefined }))
+    const err = await new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'GET', 'cr40f_reservas').catch((e) => e)
+    expect(n).toBe(2)
+    expect(err).toMatchObject({ status: 502, code: 'rede' })
+    expect(err.message).toMatch(/falha transitória, tente de novo/)
+  })
+
+  it('GET com rede que volta na segunda tentativa tem sucesso', async () => {
+    let n = 0
+    mockFetch(baseRoute((c) => { if (!data(c)) return undefined; if (n++ === 0) throw new TypeError('boom'); return json({ value: [] }) }))
+    await expect(new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'GET', 'cr40f_reservas')).resolves.toBeTruthy()
+    expect(n).toBe(2)
+  })
+
+  it('POST com erro de rede não repete e avisa que a escrita pode ter sido aplicada', async () => {
+    let n = 0
+    mockFetch(baseRoute((c) => { if (data(c)) { n++; throw new TypeError('boom') } return undefined }))
+    const err = await new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'POST', 'cr40f_reservas', { body: {} }).catch((e) => e)
+    expect(n).toBe(1)
+    expect(err.message).toMatch(/a escrita pode ter sido aplicada; confira com read_query antes de repetir/)
+  })
+
+  it('POST com 504 também avisa que a escrita pode ter sido aplicada', async () => {
+    mockFetch(baseRoute((c) => (data(c) ? new Response('gateway timeout', { status: 504 }) : undefined)))
+    const err = await new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'POST', 'cr40f_reservas', { body: {} }).catch((e) => e)
+    expect(err.status).toBe(504)
+    expect(err.message).toMatch(/a escrita pode ter sido aplicada/)
+  })
+
+  it('GET com 502 repete uma vez', async () => {
+    let n = 0
+    mockFetch(baseRoute((c) => (data(c) ? (n++ === 0 ? new Response('bad', { status: 502 }) : json({ value: [1] })) : undefined)))
+    const r = await new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'GET', 'cr40f_reservas')
+    expect(n).toBe(2)
+    expect((r.data as any).value).toEqual([1])
+  })
+
+  it('2xx com corpo que não é JSON vira 502 resposta_invalida', async () => {
+    mockFetch(baseRoute((c) => (data(c) ? new Response('<html>oi</html>', { status: 200, headers: { 'Content-Type': 'application/json' } }) : undefined)))
+    await expect(new DataverseSession(env, 'rt', Date.now, noSleep).api('DEV', 'GET', 'cr40f_reservas')).rejects.toMatchObject({ status: 502, code: 'resposta_invalida' })
   })
 })

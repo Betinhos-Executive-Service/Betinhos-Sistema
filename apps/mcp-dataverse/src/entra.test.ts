@@ -14,6 +14,16 @@ describe('validateIdentity', () => {
   it('usa preferred_username/upn quando não há email', () => {
     expect(validateIdentity(env, idToken({ email: undefined, preferred_username: 'Bia@Betinhos.com.br' })).email).toBe('bia@betinhos.com.br')
   })
+  it('prefere preferred_username e upn ao email (que não é verificado)', () => {
+    expect(validateIdentity(env, idToken({ email: 'outra@betinhos.com.br', preferred_username: 'bia@betinhos.com.br' })).email).toBe('bia@betinhos.com.br')
+    expect(validateIdentity(env, idToken({ email: 'outra@betinhos.com.br', upn: 'cad@betinhos.com.br' })).email).toBe('cad@betinhos.com.br')
+    expect(() => validateIdentity(env, idToken({ email: 'ana@betinhos.com.br', preferred_username: 'x@exemplo.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
+  })
+  it('recusa convidado (#EXT# ou acct 1) com guest_not_allowed 403', () => {
+    for (const claims of [{ preferred_username: 'x_betinhos.com.br#EXT#@betinhos.onmicrosoft.com' }, { upn: 'x#EXT#@betinhos.com.br' }, { acct: 1 }]) {
+      expect(() => validateIdentity(env, idToken(claims))).toThrowError(expect.objectContaining({ code: 'guest_not_allowed', status: 403 }))
+    }
+  })
   it('recusa outro tenant', () => {
     expect(() => validateIdentity(env, idToken({ tid: 'outro' }))).toThrowError(expect.objectContaining({ code: 'wrong_tenant' }))
   })

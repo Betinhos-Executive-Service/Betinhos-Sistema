@@ -13,7 +13,9 @@ describe('truncamento', () => {
     expect(parsed.value.length).toBeLessThan(2000)
     expect(parsed.value.length).toBeGreaterThan(100)
     expect(parsed._aviso).toMatch(/cortada/i)
-    expect(parsed.proximaPagina).toBe('https://dev.crm.test/next')
+    expect(parsed.proximaPagina).toBeUndefined()
+    expect(parsed.maisRegistros).toBe(true)
+    expect(parsed._aviso).toMatch(/resposta cortada: \d+ de \d+ linhas; reduza tamanhoPagina ou select/)
   })
 
   it('não marca nada quando cabe', () => {

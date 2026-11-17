@@ -1,7 +1,7 @@
 import { AuthorizationError, CimdFetchError, authorizationErrorRedirect, type AuthRequest } from '@cloudflare/workers-oauth-provider'
 import { SERVER_NAME, SERVER_VERSION } from './mcp'
 import type { AppEnv } from './env'
-import { PAGE_SECURITY_HEADERS } from './seguranca'
+import { LOGIN_DENIED_TEXT, PAGE_SECURITY_HEADERS, loginDenialLog } from './seguranca'
 import { EntraError, authorizeUrl, exchangeCode, newVerifier, pkceChallenge, validateIdentity } from './entra'
 
 export const escapeHtml = (value: string) =>
@@ -80,7 +80,9 @@ async function callback(request: Request, env: AppEnv): Promise<Response> {
   const entraError = url.searchParams.get('error')
   if (entraError) {
     const headers = new Headers(resumed.headers)
-    headers.set('Location', authorizationErrorRedirect(resumed.request, 'access_denied', url.searchParams.get('error_description') ?? entraError))
+    // O texto do Entra não volta ao cliente (pode trazer detalhes do tenant); só o log leva a primeira linha.
+    console.log(JSON.stringify(loginDenialLog(entraError, url.searchParams.get('error_description'))))
+    headers.set('Location', authorizationErrorRedirect(resumed.request, 'access_denied', LOGIN_DENIED_TEXT))
     return new Response(null, { status: 302, headers })
   }
   const code = url.searchParams.get('code')

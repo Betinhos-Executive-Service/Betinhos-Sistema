@@ -209,6 +209,11 @@ export class DataverseSession {
     let renewed = false
     let retries = 0
     let waited = 0
+    let transient = false // GET: uma repetição automática em falha de rede ou 502
+    const timeoutMs = options.timeoutMs ?? CALL_TIMEOUT_MS
+    const timedOut = () =>
+      new DataverseError(504, 'timeout', safe ? `O Dataverse não respondeu em ${timeoutMs / 1000} s; reduza a consulta ou tente de novo.` : `O Dataverse não respondeu em ${timeoutMs / 1000} s: a escrita pode ter sido aplicada; confira com read_query antes de repetir.`)
+    const isTimeout = (e: unknown) => e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')
     for (;;) {
       const token = await this.accessToken(ambiente, renewed)
       this.calls++
@@ -226,18 +231,25 @@ export class DataverseSession {
             ...options.headers,
           },
           body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-          signal: AbortSignal.timeout(options.timeoutMs ?? CALL_TIMEOUT_MS),
+          signal: AbortSignal.timeout(timeoutMs),
         })
       } catch (error) {
         this.lastStatus = 0
-        if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-          throw new DataverseError(504, 'timeout', `O Dataverse não respondeu em ${(options.timeoutMs ?? CALL_TIMEOUT_MS) / 1000} s; reduza a consulta ou tente de novo.`)
+        if (isTimeout(error)) throw timedOut()
+        if (safe && !transient) {
+          transient = true
+          continue
         }
-        throw new DataverseError(502, 'rede', 'Falha de rede ao chamar o Dataverse.')
+        throw new DataverseError(502, 'rede', safe ? 'Falha de rede ao chamar o Dataverse (falha transitória, tente de novo).' : 'Falha de rede ao chamar o Dataverse: a escrita pode ter sido aplicada; confira com read_query antes de repetir.')
       }
       this.lastStatus = response.status
       if (response.status === 401 && !renewed) {
         renewed = true // renova o token uma vez
+        await response.body?.cancel()
+        continue
+      }
+      if (response.status === 502 && safe && !transient) {
+        transient = true
         await response.body?.cancel()
         continue
       }
@@ -251,9 +263,24 @@ export class DataverseSession {
           continue
         }
       }
-      if (!response.ok) throw await toError(response)
-      const text = await response.text()
-      return { status: response.status, data: text ? JSON.parse(text) : null, headers: response.headers }
+      if (!response.ok) {
+        const err = await toError(response)
+        if (response.status === 502 && safe) err.message = `${err.message} (falha transitória, tente de novo)`
+        if (response.status === 504 && !safe) err.message = `${err.message} (a escrita pode ter sido aplicada; confira com read_query antes de repetir)`
+        throw err
+      }
+      let text: string
+      try {
+        text = await response.text()
+      } catch (error) {
+        if (isTimeout(error)) throw timedOut()
+        throw new DataverseError(502, 'resposta_invalida', 'O Dataverse interrompeu a resposta.' + (safe ? '' : ' A escrita pode ter sido aplicada; confira com read_query antes de repetir.'))
+      }
+      try {
+        return { status: response.status, data: text ? JSON.parse(text) : null, headers: response.headers }
+      } catch {
+        throw new DataverseError(502, 'resposta_invalida', 'O Dataverse devolveu uma resposta que não é JSON.' + (safe ? '' : ' A escrita pode ter sido aplicada; confira com read_query antes de repetir.'))
+      }
     }
   }
 

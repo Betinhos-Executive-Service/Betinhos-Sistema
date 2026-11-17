@@ -8,3 +8,7 @@ export const PAGE_SECURITY_HEADERS: Record<string, string> = {
   'Cache-Control': 'no-store',
   'Strict-Transport-Security': 'max-age=31536000',
 }
+
+export const LOGIN_DENIED_TEXT = 'Login recusado pela Microsoft.'
+/** Entrada de log do login recusado: código e primeira linha da descrição (sem trace). */
+export const loginDenialLog = (error: string, description: string | null) => ({ evento: 'login_recusado', erro: error.slice(0, 80), detalhe: (description ?? '').split(/\r?\n/)[0].slice(0, 200) })

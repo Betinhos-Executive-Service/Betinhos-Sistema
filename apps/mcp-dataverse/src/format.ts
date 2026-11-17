@@ -65,13 +65,15 @@ export function limitJson(payload: Record<string, unknown> | unknown[], max = MA
   if (listKey && !Array.isArray(payload)) {
     const rows = payload[listKey] as unknown[]
     const total = rows.length
+    // Cortou por tamanho: a página seguinte pularia as linhas cortadas, então some o token de continuação.
+    const { proximaPagina, ...rest } = payload as Record<string, unknown>
     const build = (n: number) =>
       JSON.stringify({
-        ...payload,
+        ...rest,
         [listKey]: rows.slice(0, n),
-        ...(!Array.isArray(payload) && 'maisRegistros' in payload ? { maisRegistros: true } : {}),
+        ...('maisRegistros' in payload || proximaPagina != null ? { maisRegistros: true } : {}),
         _truncado: true,
-        _aviso: `Resposta cortada em ${n} de ${total} itens por tamanho (limite ${max} caracteres). Use $select, filtros ou a página seguinte.`,
+        _aviso: `resposta cortada: ${n} de ${total} linhas; reduza tamanhoPagina ou select, ou refine o filtro (limite ${max} caracteres). Não há página seguinte para as linhas cortadas.`,
       })
     // Cada linha é serializada uma vez (CPU do plano gratuito): estima o prefixo que cabe e confere com uma montagem real.
     const sizes = rows.map((r) => JSON.stringify(r).length + 1)
@@ -89,7 +91,7 @@ export function limitJson(payload: Record<string, unknown> | unknown[], max = MA
   do {
     out = JSON.stringify({
       _truncado: true,
-      _aviso: `Resposta maior que ${max} caracteres; só o início vem em "parcial". Refine: select menor, filtro, top ou página seguinte.`,
+      _aviso: `Resposta maior que ${max} caracteres; só o início vem em "parcial". Refine: select menor, filtro ou top.`,
       parcial: json.slice(0, Math.max(keep, 0)),
     })
     keep = Math.floor(keep * 0.85)

@@ -197,7 +197,7 @@ export const OUTER_HINT = (alias: string) =>
   `link-entity outer "${alias}" sem condição null: devolve TODAS as linhas da raiz, com ou sem vínculo. Para "quem NÃO tem": no filtro da raiz, <condition entityname="${alias}" attribute="<id do alvo>" operator="null"/>.`
 
 export const AGGREGATE_HINT =
-  'Grupo "(vazio)" = registros sem esse vínculo. Quem não tem nenhum registro não aparece na agregação: para listar quem NÃO tem, use link-type="outer" + <condition entityname="<alias>" attribute="<id>" operator="null"/> no filtro da raiz.'
+  'Ranking/"qual teve mais": ordene pelo alias do agregado, <order alias="total" descending="true"/>, e limite com top="1" (ou top="N") no <fetch>; para só contar, aggregate="count". Grupo "(vazio)" = registros sem esse vínculo. Quem não tem nenhum registro não aparece na agregação: para listar quem NÃO tem, use link-type="outer" + <condition entityname="<alias>" attribute="<id>" operator="null"/> no filtro da raiz.'
 
 /** Tira colunas de moeda que o Dataverse devolve sem pedido (`_transactioncurrencyid_value*`, `exchangerate`). */
 export function dropCurrencyAux<T extends Record<string, unknown>>(rows: T[], select: string | undefined): T[] {

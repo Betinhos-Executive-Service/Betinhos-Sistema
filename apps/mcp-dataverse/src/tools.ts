@@ -80,7 +80,7 @@ const ambiente = z
   .enum(AMBIENTES)
   .default('DEV')
 const confirmar = z.boolean().optional()
-const confirmacaoTexto = z.string().optional().describe('PROD: repita o nome/GUID exato do alvo.')
+const confirmacaoTexto = z.string().optional().describe('PROD/TEST: repita o nome/GUID exato do alvo.')
 const atualizar = z.boolean().default(false).describe('Ignora o cache.')
 // Sem refine: nome inválido (ex.: rótulo) chega em session.entity, que erra com o valor e a ferramenta sugere tabelas parecidas.
 const tabela = z.string().describe('Nome lógico ou EntitySetName.')
@@ -93,20 +93,70 @@ const WRITE_RW = { readOnlyHint: false, destructiveHint: false, openWorldHint: f
 const WRITE_DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, openWorldHint: false } as const
 const READ = { readOnlyHint: true, openWorldHint: false } as const
 
-/** Trava do PROD: sem `confirmar: true` devolve só a prévia (isError) e nada é executado. */
+/** Trava de TEST e PROD (TEST é cópia do PROD, com dados reais): sem `confirmar: true` devolve só a prévia (isError) e nada é executado. */
 function prodGuard(a: { ambiente: Ambiente; confirmar?: boolean }, what: string, details: unknown, typed?: string): ToolResult | null {
-  if (a.ambiente !== 'PROD' || a.confirmar) return null
+  if (a.ambiente === 'DEV' || a.confirmar) return null
   return text(
-    `PRÉVIA, nada foi executado: ${what} no PROD.\n${limitJson({ detalhes: details } as Record<string, unknown>, 4000)}\n` +
+    `PRÉVIA, nada foi executado: ${what} no ${a.ambiente}.\n${limitJson({ detalhes: details } as Record<string, unknown>, 4000)}\n` +
       `Para executar de verdade, repita a chamada com "confirmar": true${typed ? ` e "confirmacao_texto": "${typed}"` : ''}.`,
     true,
   )
 }
 
-/** Exclusões no PROD: além de `confirmar`, o texto de confirmação tem de repetir o alvo (nome lógico ou GUID). */
+/** Exclusões fora do DEV: além de `confirmar`, o texto de confirmação tem de repetir o alvo (nome lógico ou GUID). */
 function typedConfirmation(a: { ambiente: Ambiente; confirmacao_texto?: string }, expected: string): ToolResult | null {
-  if (a.ambiente !== 'PROD' || a.confirmacao_texto?.trim().toLowerCase() === expected.toLowerCase()) return null
-  return text(`BLOQUEADO, nada foi executado: no PROD, para excluir repita "${expected}" em confirmacao_texto.`, true)
+  if (a.ambiente === 'DEV' || a.confirmacao_texto?.trim().toLowerCase() === expected.toLowerCase()) return null
+  return text(`BLOQUEADO, nada foi executado: no ${a.ambiente}, para excluir repita "${expected}" em confirmacao_texto.`, true)
+}
+
+const ACAO_DESTRUTIVA = /^(Delete|BulkDelete|Execute(?:Multiple|Transaction|Async)|Purge|Merge|Associate|Disassociate)/i
+const ACAO_METADATA = /^(EntityDefinitions|RelationshipDefinitions|GlobalOptionSetDefinitions|AttributeDefinitions)/i
+/** Ações destrutivas ou de lote genéricas têm ferramenta própria (com prévia, confirmação e escopo); Custom API cr40f_/new_ segue. */
+export function acaoBloqueada(nome: string): string | undefined {
+  // Sem o namespace (Microsoft.Dynamics.CRM. ou o alias mscrm.): o Dataverse aceita os dois.
+  const base = nome.replace(/^.*\./, '')
+  if (/^(cr40f_|new_)/i.test(base)) return undefined
+  if (ACAO_METADATA.test(base)) return `"${nome}" mexe em metadata: use create_table, update_table ou delete_table.`
+  const m = base.match(ACAO_DESTRUTIVA)
+  if (!m) return undefined
+  const dedicada = /^Associate/i.test(m[1]) ? 'associate'
+    : /^Disassociate/i.test(m[1]) ? 'disassociate'
+    : /^Merge/i.test(m[1]) ? 'update_record (não há ferramenta de merge)'
+    : /^DeleteEntity/i.test(base) ? 'delete_table (com confirmação)'
+    : /^Delete(Attribute|OptionValue|Relationship)/i.test(base) ? 'update_table (alterarColunas) ou peça ao usuário para fazer no Power Apps'
+    : 'delete_record (um registro por vez, com confirmação)'
+  return `a ação "${nome}" é destrutiva ou de lote genérica e não roda aqui; use ${dedicada}.`
+}
+
+/** Aliases dos `<attribute>` do FetchXML que têm o atributo casado por `attr` (groupby, dategrouping, aggregate). */
+function fetchAliases(xml: string, attr: RegExp): string[] {
+  return [...xml.matchAll(/<attribute\b[^>]*>/gi)]
+    .filter((m) => attr.test(m[0]))
+    .map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1])
+    .filter((x): x is string => !!x)
+}
+
+/** Intervalos prontos `{ge, lt}` em UTC para datas relativas no fuso America/Sao_Paulo (UTC-3 fixo, sem horário de verão). */
+export function intervalosSp(d = new Date()) {
+  const H = 3 * 3600_000
+  const day = 86400_000
+  const local = new Date(d.getTime() - H) // relógio de São Paulo lido como UTC
+  const y = local.getUTCFullYear()
+  const m = local.getUTCMonth()
+  const startOfDay = Date.UTC(y, m, local.getUTCDate())
+  const dow = (local.getUTCDay() + 6) % 7 // segunda = 0
+  const week = startOfDay - dow * day
+  const iv = (ge: number, lt: number) => ({ ge: new Date(ge + H).toISOString(), lt: new Date(lt + H).toISOString() })
+  return {
+    hoje: iv(startOfDay, startOfDay + day),
+    ontem: iv(startOfDay - day, startOfDay),
+    semanaAtual: iv(week, week + 7 * day),
+    semanaPassada: iv(week - 7 * day, week),
+    mesAtual: iv(Date.UTC(y, m, 1), Date.UTC(y, m + 1, 1)),
+    mesPassado: iv(Date.UTC(y, m - 1, 1), Date.UTC(y, m, 1)),
+    ultimos30dias: iv(startOfDay - 29 * day, startOfDay + day),
+    anoAtual: iv(Date.UTC(y, 0, 1), Date.UTC(y + 1, 0, 1)),
+  }
 }
 
 /** Hora atual em UTC e em America/Sao_Paulo (para datas relativas: hoje, amanhã, mês passado). */
@@ -116,6 +166,7 @@ export function nowInfo(d = new Date()) {
     utc: d.toISOString(),
     saoPaulo: `${d.toLocaleString('sv-SE', { timeZone: tz }).replace(' ', 'T')}-03:00`,
     diaDaSemana: d.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: tz }),
+    intervalos: intervalosSp(d),
   }
 }
 
@@ -172,6 +223,13 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       return near.length
         ? `Tabelas parecidas: ${near.map((t) => `${t.nome}${t.rotulo ? ` ("${t.rotulo}")` : ''}`).join(', ')}. Use list_tables(filtro) para confirmar o nome lógico.`
         : 'Nenhuma tabela parecida. Use list_tables(filtro) com um trecho do nome ou do rótulo.'
+    }
+    const noEntity = error.message.match(/Could not find an entity with specified entity logicalname:?\s*'?([A-Za-z0-9_]+)/i)
+    if (noEntity) {
+      const near = suggest(noEntity[1], await loadTables(amb).catch(() => [] as TableRow[]), 3)
+      return near.length
+        ? `A tabela "${noEntity[1]}" não existe em ${amb}. Quis dizer ${near.map((t) => t.nome).join(' ou ')}? Confirme com list_tables(filtro).`
+        : `A tabela "${noEntity[1]}" não existe em ${amb}. Use list_tables(filtro) com um trecho do nome ou do rótulo.`
     }
     if (searchDisabled(error.code, error.message)) {
       const names: string[] = Array.isArray(args.tabelas) ? args.tabelas.slice(0, 5) : []
@@ -232,6 +290,14 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       }
       const exact = full.colunas.find((c: any) => c.nome.toLowerCase() === want)
       if (exact) return `Use exatamente "${exact.nome}" (nome lógico em minúsculas).`
+      if (tool === 'read_query' && typeof args.expand === 'string' && expandNames(args.expand).some((n) => n.toLowerCase() === want)) {
+        const navs = [
+          ...(full.colunas as any[]).filter((c) => c.navegacao).map((c) => ({ nome: String(c.navegacao), rotulo: c.rotulo })),
+          ...((full.relacoes?.umParaMuitos as any[]) ?? []).filter((r) => r.navegacao).map((r) => ({ nome: String(r.navegacao), rotulo: r.tabela })),
+        ]
+        const nav = suggest(miss.property, navs, 3)
+        if (nav.length) return `Navegação "${miss.property}" não existe em ${e.logicalName}. Use ${nav.map((n) => n.nome).join(' ou ')} (sensível a maiúsculas) em expand=<navegação>($select=colunas).`
+      }
       const near = suggest(miss.property, full.colunas.map((c: any) => ({ nome: c.nome, rotulo: c.rotulo })), 3)
       return `${e.logicalName} não tem a coluna "${miss.property}". ${near.length ? `Parecidas: ${near.map((c) => c.nome).join(', ')}. ` : ''}Coluna principal: ${e.primaryName}. Veja describe_table(tabela:"${e.logicalName}", filtroColuna:"trecho").`
     }
@@ -577,14 +643,14 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
             }
         let aviso: string | undefined
         const nRel = ((relacoes as any).muitosParaUm?.length ?? 0) + ((relacoes as any).umParaMuitos?.length ?? 0) + ((relacoes as any).muitosParaMuitos?.length ?? 0)
-        if (term && !colunas.length && nRel) aviso = `Nenhuma coluna casa com '${a.filtroColuna}'; relações abaixo.`
+        if (term && !colunas.length && nRel) aviso = `Nenhuma coluna casa com '${a.filtroColuna}'; relações abaixo. Regra de negócio (faturamento, valor do serviço, a receber): glossario.`
         else if (term && !colunas.length) {
           const all = full.colunas as any[]
           const show = (c: any) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`
           const near = suggest(a.filtroColuna ?? '', all.map((c) => ({ nome: c.nome, rotulo: c.rotulo })), 10).map((c) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`)
           const lookups = all.filter((c) => c.alvos && !SYSTEM_LOOKUPS.has(c.nome)).slice(0, 15).map(show)
           const money = all.filter((c) => c.tipo === 'Money' && !c.nome.endsWith('_base')).slice(0, 15).map(show)
-          aviso = `Nenhuma coluna casa com '${a.filtroColuna}' (${all.length} colunas); tente outro trecho.${near.length ? ` Mais próximas: ${near.join(', ')}.` : ''}${lookups.length ? ` Lookups: ${lookups.join(', ')}.` : ''}${money.length ? ` Money: ${money.join(', ')}.` : ''}`
+          aviso = `Nenhuma coluna casa com '${a.filtroColuna}' (${all.length} colunas); tente outro trecho. Regra de negócio (faturamento, valor do serviço, a receber): glossario.${near.length ? ` Mais próximas: ${near.join(', ')}.` : ''}${lookups.length ? ` Lookups: ${lookups.join(', ')}.` : ''}${money.length ? ` Money: ${money.join(', ')}.` : ''}`
         }
         return ok({ ...full, colunas, relacoes, ...(aviso ? { _aviso: aviso } : {}) })
       },
@@ -633,11 +699,14 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           const rows: unknown[] = Array.isArray(r.data.value) ? r.data.value : []
           const more = r.data['@Microsoft.Dynamics.CRM.morerecords']
           const hasTop = /<fetch\b[^>]*?\stop\s*=/i.test(a.fetchXml)
-          const aliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bgroupby\s*=\s*["']true["'][^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
+          const aliases = fetchAliases(a.fetchXml, /\bgroupby\s*=\s*["']true["']/i)
           if (aggregate) {
             // Ano/mês agrupados vêm formatados como "2.026": o @txt só atrapalha.
-            const dateAliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bdategrouping\s*=[^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
+            const dateAliases = fetchAliases(a.fetchXml, /\bdategrouping\s*=/i)
             for (const row of rows as Record<string, unknown>[]) for (const d of dateAliases) delete row[`${d}@OData.Community.Display.V1.FormattedValue`]
+            // Grupo sem valor na soma/média/etc. também vem sem a chave: devolve o alias com null explícito.
+            const aggAliases = fetchAliases(a.fetchXml, /\baggregate\s*=\s*["'][^"']+["']/i)
+            for (const row of rows as Record<string, unknown>[]) for (const g of aggAliases) if (row[g] == null) row[g] = null
             // Grupo sem valor (lookup/choice vazio) vem sem a chave: torna-o explícito (null + "(vazio)").
             for (const row of rows as Record<string, unknown>[]) {
               for (const g of aliases) {
@@ -682,7 +751,8 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         if (a.expand && Array.isArray(rows) && cleanExpandChildren(rows as Record<string, unknown>[], expandNames(a.expand), e.primaryId)) {
           notes._dica = 'há mais filhos: consulte a tabela filha com filter _col_value eq <id>.'
         }
-        if (aggregating && a.select) notes._aviso = 'select ignorado: com apply só valem as colunas do groupby/aggregate.'
+        if (page.total === 5000) notes._aviso = 'o Dataverse limita a contagem a 5000; o total pode ser maior; use agregação (FetchXML aggregate count).'
+        if (aggregating && a.select) notes._aviso = [notes._aviso, 'select ignorado: com apply só valem as colunas do groupby/aggregate.'].filter(Boolean).join(' ')
         const nulas = nullColumns(rows, [select, ...expandNames(a.expand)].filter(Boolean).join(','))
         if (nulas.length) notes._nulas = nulas
         if (!rows.length && !page.proximaPagina && (a.filter || a.apply)) {
@@ -754,7 +824,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'create_record',
-      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = número ou rótulo exato. Decimal/moeda: número com ponto (12.5). PROD exige confirmar.',
+      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = número ou rótulo exato. Decimal/moeda: número com ponto (12.5). PROD/TEST exigem confirmar.',
       { ambiente, tabela, dados: z.record(z.string(), z.unknown()).describe('Colunas e valores.'), confirmar },
       WRITE_RW,
       async (a) => {
@@ -771,7 +841,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'update_record',
-      'Atualiza colunas (PATCH; não cria). Lookup: "<navegação>@odata.bind" (navegação exata, sensível a maiúsculas); limpar: disassociate com valorUnico. Decimal: número com ponto (12.5). PROD exige confirmar.',
+      'Atualiza colunas (PATCH; não cria). Lookup: "<navegação>@odata.bind" (navegação exata, sensível a maiúsculas); limpar: disassociate com valorUnico. Decimal: número com ponto (12.5). PROD/TEST exigem confirmar.',
       { ambiente, tabela, id: recordId, dados: z.record(z.string(), z.unknown()).describe('Só as colunas a alterar.'), confirmar },
       WRITE_RW,
       async (a) => {
@@ -789,7 +859,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'upsert_record',
-      'Cria ou atualiza por chave alternativa (lookup: @odata.bind, navegação exata e sensível a maiúsculas). modo: upsert (padrão), criar (falha se existe), atualizar (falha se não existe). PROD exige confirmar.',
+      'Cria ou atualiza por chave alternativa (lookup: @odata.bind, navegação exata e sensível a maiúsculas). modo: upsert (padrão), criar (falha se existe), atualizar (falha se não existe). PROD/TEST exigem confirmar.',
       {
         ambiente,
         tabela,
@@ -818,7 +888,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'delete_record',
-      'Exclui registro (irreversível). PROD exige confirmar:true e confirmacao_texto = o GUID.',
+      'Exclui registro (irreversível). PROD/TEST exigem confirmar:true e confirmacao_texto = o GUID.',
       { ambiente, tabela, id: recordId, confirmar, confirmacao_texto: confirmacaoTexto },
       WRITE_DESTRUCTIVE,
       async (a) => {
@@ -979,7 +1049,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'delete_table',
-      'EXCLUI tabela e todos os dados (irreversível; 30 a 70 s). PROD exige confirmar:true e confirmacao_texto = nome lógico; só com decisão explícita.',
+      'EXCLUI tabela e todos os dados (irreversível; 30 a 70 s). PROD/TEST exigem confirmar:true e confirmacao_texto = nome lógico; só com decisão explícita.',
       { ambiente, tabela, confirmar, confirmacao_texto: confirmacaoTexto },
       WRITE_DESTRUCTIVE,
       async (a) => {
@@ -1046,7 +1116,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'execute_prompt',
-      'Executa prompt do AI Builder (Predict). Melhor esforço; consome créditos. PROD exige confirmar.',
+      'Executa prompt do AI Builder (Predict). Melhor esforço; consome créditos. PROD/TEST exigem confirmar.',
       {
         ambiente,
         promptId: recordId.describe('GUID do msdyn_aimodel (list_prompts).'),
@@ -1057,7 +1127,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       async (a) => {
         const blocked = prodGuard(a, `executar o prompt ${a.promptId}`, a.entradas)
         if (blocked) return blocked
-        const body = { version: '2.0', requestv2: { '@odata.type': '#Microsoft.Dynamics.CRM.expando', ...a.entradas } }
+        const body = { version: '2.0', requestv2: { ...a.entradas, '@odata.type': '#Microsoft.Dynamics.CRM.expando' } }
         const r = await api(a.ambiente, 'POST', `msdyn_aimodels(${a.promptId})/Microsoft.Dynamics.CRM.Predict`, { body })
         return ok({ resposta: r.data })
       },
@@ -1067,7 +1137,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'execute_action',
-      'Executa ação (POST), função (GET, só leitura) ou Custom API, solta ou vinculada (tabela + id). PROD exige confirmar nas ações. Função: texto entre aspas; GUID/número sem.',
+      'Executa ação (POST), função (GET, só leitura) ou Custom API, solta ou vinculada (tabela + id). PROD/TEST exigem confirmar nas ações. Função: texto entre aspas; GUID/número sem.',
       {
         ambiente,
         nome: z.string().refine(isQualifiedName, 'Nome inválido').describe('Ex.: WhoAmI ou cr40f_MinhaApi.'),
@@ -1079,6 +1149,9 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       },
       WRITE_DESTRUCTIVE,
       async (a) => {
+        if (!!a.tabela !== !!a.id) throw new Error('Informe tabela e id juntos (ação vinculada) ou nenhum dos dois (ação solta).')
+        const perigo = acaoBloqueada(a.nome)
+        if (perigo) return text(`BLOQUEADO, nada foi executado: ${perigo}`, true)
         const bound = a.tabela && a.id ? `${(await session.entity(a.ambiente, a.tabela)).entitySet}(${a.id})/` : ''
         const name = bound && !a.nome.includes('.') ? `Microsoft.Dynamics.CRM.${a.nome}` : a.nome
         if (a.tipo === 'function') {
@@ -1108,7 +1181,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'associate',
-      'Associa registros por relação N:N ou 1:N (POST $ref). PROD exige confirmar.',
+      'Associa registros por relação N:N ou 1:N (POST $ref). PROD/TEST exigem confirmar.',
       { ...relationSchema, ...target },
       WRITE_RW,
       async (a) => {
@@ -1126,7 +1199,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'disassociate',
-      'Remove associação (DELETE $ref). Lookup de valor único: valorUnico true, sem alvo. PROD exige confirmar.',
+      'Remove associação (DELETE $ref). Lookup de valor único: valorUnico true, sem alvo. PROD/TEST exigem confirmar.',
       {
         ...relationSchema,
         tabelaAlvo: tabela.optional(),

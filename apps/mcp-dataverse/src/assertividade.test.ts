@@ -598,7 +598,7 @@ describe('rodada 4', () => {
   })
 
   it('A3: nowInfo traz UTC, São Paulo e dia da semana', () => {
-    expect(nowInfo(new Date('2026-11-17T14:14:13Z'))).toEqual({ utc: '2026-11-17T14:14:13.000Z', saoPaulo: '2026-11-17T11:14:13-03:00', diaDaSemana: 'terça-feira' })
+    expect(nowInfo(new Date('2026-11-17T14:14:13Z'))).toMatchObject({ utc: '2026-11-17T14:14:13.000Z', saoPaulo: '2026-11-17T11:14:13-03:00', diaDaSemana: 'terça-feira' })
   })
 
   it('A5: list_prompts põe ativos primeiro, com descrição e aviso quando nenhum está ativo', async () => {
@@ -867,5 +867,145 @@ describe('rodada 5', () => {
 
   it('B14: contagem barata documentada', () => {
     expect(tools()('read_query').description).toMatch(/contar:true com top:1/)
+  })
+})
+
+describe('rodada 6', () => {
+  const calls = (cs: Call[]) => cs.filter((c) => c.url.includes('/api/data/') && !c.url.includes('EntityDefinitions'))
+
+  it('1: execute_action recusa ação destrutiva ou genérica em qualquer ambiente e aponta a ferramenta certa', async () => {
+    const cs = mockFetch(route())
+    for (const nome of ['DeleteMultiple', 'mscrm.BulkDelete', 'Microsoft.Dynamics.CRM.Merge', 'BulkDelete', 'ExecuteMultiple', 'ExecuteTransaction', 'ExecuteAsync', 'PurgeRecords', 'Merge', 'Associate', 'Disassociate', 'EntityDefinitions', 'RelationshipDefinitions', 'GlobalOptionSetDefinitions']) {
+      const r = await tools()('execute_action').handler({ nome, parametros: {} })
+      expect(r.isError, nome).toBe(true)
+      expect(textOf(r), nome).toMatch(/^BLOQUEADO, nada foi executado/)
+    }
+    expect(textOf(await tools()('execute_action').handler({ nome: 'Associate' }))).toMatch(/associate/)
+    expect(textOf(await tools()('execute_action').handler({ nome: 'DeleteMultiple', ambiente: 'PROD', confirmar: true }))).toMatch(/BLOQUEADO/)
+    expect(calls(cs).filter((c) => c.method !== 'GET')).toHaveLength(0)
+  })
+
+  it('1: Custom API própria (cr40f_/new_) e ação não destrutiva seguem', async () => {
+    const cs = mockFetch(route((c) => (c.method === 'POST' && c.url.includes('/api/data/') ? json({ ok: 1 }) : undefined)))
+    const r = await tools()('execute_action').handler({ nome: 'cr40f_DeleteAlgo', parametros: {} })
+    expect(r.isError).toBeFalsy()
+    const r2 = await tools()('execute_action').handler({ nome: 'new_ExecuteAlgo', parametros: {} })
+    expect(r2.isError).toBeFalsy()
+    expect(calls(cs).filter((c) => c.method === 'POST')).toHaveLength(2)
+  })
+
+  it('2: execute_action exige tabela e id juntos', async () => {
+    const cs = mockFetch(route())
+    const id = '11111111-1111-1111-1111-111111111111'
+    for (const args of [{ nome: 'cr40f_X', tabela: 'cr40f_reserva' }, { nome: 'cr40f_X', id }]) {
+      const r = await tools()('execute_action').handler(args)
+      expect(r.isError).toBe(true)
+      expect(textOf(r)).toMatch(/Informe tabela e id juntos/)
+    }
+    expect(calls(cs)).toHaveLength(0)
+  })
+
+  it('3: TEST tem a mesma trava do PROD (prévia, confirmar e texto digitado); DEV segue direto', async () => {
+    const cs = mockFetch(route((c) => (c.method !== 'GET' && c.url.includes('/api/data/') ? new Response(null, { status: 204 }) : undefined)))
+    const id = GUID
+    const prev = await tools()('update_record').handler({ ambiente: 'TEST', tabela: 'cr40f_reserva', id, dados: { cr40f_valor: 1 } })
+    expect(prev.isError).toBe(true)
+    expect(textOf(prev)).toMatch(/PRÉVIA/)
+    expect(textOf(prev)).toMatch(/no TEST/)
+    const del = await tools()('delete_record').handler({ ambiente: 'TEST', tabela: 'cr40f_reserva', id, confirmar: true })
+    expect(del.isError).toBe(true)
+    expect(textOf(del)).toMatch(/no TEST/)
+    expect(calls(cs).filter((c) => c.method !== 'GET')).toHaveLength(0)
+    const dev = await tools()('update_record').handler({ ambiente: 'DEV', tabela: 'cr40f_reserva', id, dados: { cr40f_valor: 1 } })
+    expect(dev.isError).toBeFalsy()
+    expect(tools()('update_record').description).toMatch(/PROD\/TEST exigem confirmar/)
+  })
+
+  it('5: contagem exatamente 5000 avisa do limite e manda agregar', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ value: [], '@odata.count': 5000 }) : undefined)))
+    const r = JSON.parse(textOf(await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valor', contar: true, top: 1 })))
+    expect(r.total).toBe(5000)
+    expect(r._aviso).toMatch(/limita a contagem a 5000; o total pode ser maior; use agregação \(FetchXML aggregate count\)/)
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ value: [], '@odata.count': 4999 }) : undefined)))
+    const ok = JSON.parse(textOf(await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valor', contar: true, top: 1 })))
+    expect(ok._aviso).toBeUndefined()
+  })
+
+  it('7: execute_prompt não deixa a entrada sobrescrever @odata.type', async () => {
+    const cs = mockFetch(route((c) => (c.method === 'POST' ? json({ ok: 1 }) : undefined)))
+    await tools()('execute_prompt').handler({ promptId: GUID, entradas: { texto: 'oi', '@odata.type': '#Outro' } })
+    const post = cs.find((c) => c.method === 'POST' && c.url.includes('Predict'))!
+    expect(post.body.requestv2['@odata.type']).toBe('#Microsoft.Dynamics.CRM.expando')
+    expect(post.body.requestv2.texto).toBe('oi')
+  })
+
+  it('11: whoami devolve intervalos prontos em UTC para America/Sao_Paulo', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-11-17T02:30:00Z')) // 16/11/2026 23:30 em São Paulo (segunda)
+      const i = nowInfo().intervalos
+      expect(i.hoje).toEqual({ ge: '2026-11-16T03:00:00.000Z', lt: '2026-11-17T03:00:00.000Z' })
+      expect(i.ontem).toEqual({ ge: '2026-11-15T03:00:00.000Z', lt: '2026-11-16T03:00:00.000Z' })
+      expect(i.semanaAtual).toEqual({ ge: '2026-11-16T03:00:00.000Z', lt: '2026-11-23T03:00:00.000Z' })
+      expect(i.semanaPassada).toEqual({ ge: '2026-11-09T03:00:00.000Z', lt: '2026-11-16T03:00:00.000Z' })
+      expect(i.mesAtual).toEqual({ ge: '2026-11-01T03:00:00.000Z', lt: '2026-12-01T03:00:00.000Z' })
+      expect(i.mesPassado).toEqual({ ge: '2026-10-01T03:00:00.000Z', lt: '2026-11-01T03:00:00.000Z' })
+      expect(i.ultimos30dias).toEqual({ ge: '2026-10-18T03:00:00.000Z', lt: '2026-11-17T03:00:00.000Z' })
+      expect(i.anoAtual).toEqual({ ge: '2026-01-01T03:00:00.000Z', lt: '2027-01-01T03:00:00.000Z' })
+      vi.setSystemTime(new Date('2027-01-03T12:00:00Z')) // domingo: semana começa na segunda anterior; mês passado cruza o ano
+      const j = nowInfo().intervalos
+      expect(j.semanaAtual.ge).toBe('2026-12-28T03:00:00.000Z')
+      expect(j.mesPassado).toEqual({ ge: '2026-12-01T03:00:00.000Z', lt: '2027-01-01T03:00:00.000Z' })
+      mockFetch(route((c) => (c.url.includes('WhoAmI') ? json({ UserId: 'u', BusinessUnitId: 'b', OrganizationId: 'o' }) : c.url.includes('systemusers') ? json({ fullname: 'Ana', internalemailaddress: 'a@b.c' }) : undefined)))
+      const w = JSON.parse(textOf(await tools()('whoami').handler({})))
+      expect(w.agora.intervalos.hoje.ge).toBe('2027-01-03T03:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('12: describe_table sem coluna que case manda para o glossario', async () => {
+    mockFetch(route())
+    const r = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'xyzqq' })))
+    expect(r._aviso).toMatch(/regra de negócio \(faturamento, valor do serviço, a receber\): glossario/i)
+  })
+
+  it('13: glossário traz o FetchXML de faturamento e marca o que o Sistema não define', () => {
+    const g = glossario()
+    expect(g).toMatch(/<fetch aggregate="true"><entity name="cr40f_reservadeveculos">.*new_valortotal" aggregate="sum"/)
+    expect(g).toMatch(/link-entity name="cr40f_composicaodeprecos" from="cr40f_composicaodeprecosid" to="new_composicaodepreco"/)
+    expect(g).toMatch(/new_categoriadoitem" operator="eq" value="100000000"/)
+    expect(g).toMatch(/Total "a receber do motorista": não definido no Sistema: pergunte ao usuário/)
+    expect(g).toMatch(/"Concluído na semana".*não definido no Sistema: pergunte ao usuário/)
+    expect(g).toMatch(/Total filtrado" soma cr40f_valor de todas as linhas/)
+    expect(g).toMatch(/cr40f_clienteempresa.*cr40f_cliente/)
+    expect(g).toMatch(/tabela cr40f_manutencoes.*cr40f_placa_carro/)
+  })
+
+  it('14: dica de agregação ensina ordenar pelo alias e top; grupo sem o agregado ganha o alias com null', async () => {
+    expect(AGGREGATE_HINT).toMatch(/<order alias="total" descending="true"\/>/)
+    expect(AGGREGATE_HINT).toMatch(/top="1"/)
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ c: 'a', total: 3 }, { c: 'b' }] }) : undefined)))
+    const xml = '<fetch aggregate="true"><entity name="cr40f_reserva"><attribute name="cr40f_cliente" groupby="true" alias="c"/><attribute name="cr40f_valor" aggregate="sum" alias="total"/></entity></fetch>'
+    const r = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: xml })))
+    expect(r.value[1]).toHaveProperty('total', null)
+    expect(r.value[0].total).toBe(3)
+  })
+
+  it('15: expand com navegação errada sugere o nome exato do lookup (describe em cache)', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ error: { code: '0x0', message: "Could not find a property named 'cr40f_Clientee' on type 'Microsoft.Dynamics.CRM.cr40f_reserva'." } }, 400) : undefined)))
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const r = await t('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valor', expand: 'cr40f_Clientee($select=cr40f_nome)' })
+    expect(textOf(r)).toMatch(/Use cr40f_Cliente \(sensível a maiúsculas\)/)
+  })
+
+  it('16: tabela inexistente na mensagem do Dataverse sugere até 3 nomes parecidos', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ error: { code: '0x0', message: 'Could not find an entity with specified entity logicalname: cr40f_cliente1' } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valor' })
+    const m = textOf(r).match(/Quis dizer ([^?]+)\?/)
+    expect(m).toBeTruthy()
+    expect(m![1]).toMatch(/cr40f_clientes1/)
+    expect(m![1].split(' ou ').length).toBeLessThanOrEqual(3)
   })
 })
