@@ -21,6 +21,7 @@ O web resource continua apenas gravando o evento no Dataverse. O plugin selecion
 - O registro é relido com o usuário iniciador; o `Target` não é tratado como fonte confiável.
 - Só são aceitos os oito campos `notification:*` usados pelo Planner.
 - `actorEmployeeId` deve corresponder ao usuário que criou o evento quando presente; cobrança diária e teste controlado são exceções sem ator.
+- Terceira exceção sem ator: `notification:assignment` da tarefa de multa (`sourceType` "multa"), criada pelo step assíncrono `MultaTarefaPlugin` do `Cr40f.Frota.Plugin`. Esse evento chega com `Depth` 2 (só ele passa do `Depth` 1; `Depth` 3 ou mais é sempre ignorado) e só vale se a tarefa for de origem Multa (100000003) com `cr40f_codigoorigem` igual ao `sourceCode` (`MULTA:<id>`). Nesse caso o evento e o título são lidos também com o usuário do passo, porque o usuário que editou a multa pode não ler o evento gravado pelo sistema.
 - Tarefa, funcionário e usuário precisam ser registros ativos; há limite de 50 destinatários e 4.000 caracteres no corpo.
 - Cada envio é isolado em `try/catch`; falha de uma notificação não desfaz o evento nem quebra a operação da tarefa. O job assíncrono fica disponível para diagnóstico/reprocessamento.
 
