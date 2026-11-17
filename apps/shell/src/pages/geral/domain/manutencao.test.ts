@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
+import type { Row } from '@betinhos/dataverse'
 import { describe, expect, it } from 'vitest'
 import { buildCountFetch, buildFetch } from './fetch'
-import { aplicarManutencoes, gravarManutencoesNaVisao, lerManutencoesDaVisao, padraoManutencoes } from './manutencao'
+import { aplicarManutencoes, avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, lerManutencoesDaVisao, padraoManutencoes, trechosDaManutencao } from './manutencao'
+import type { Column } from './types'
 
 const ENT = 'cr40f_reservadeveculos'
 const fetchDe = (filtro = '') => `<fetch version="1.0" mapping="logical"><entity name="${ENT}"><attribute name="cr40f_id" /><order attribute="cr40f_dataehorriodesada" descending="false" /><filter type="and"><condition attribute="statecode" operator="eq" value="0" />${filtro}</filter></entity></fetch>`
@@ -97,5 +99,90 @@ describe('FetchXML da consulta', () => {
     expect(contagem.querySelector('link-entity[alias="bt_manut"]')).toBeTruthy()
     expect(contagem.querySelector('link-entity[alias="bt_manut"] > attribute')).toBeNull()
     expect(contagem.querySelectorAll('entity > attribute').length).toBe(1)
+  })
+})
+
+const F = '@OData.Community.Display.V1.FormattedValue'
+const HOJE = '2026-11-18'
+const linha = (extra: Row = {}): Row => ({
+  cr40f_reservadeveculosid: 'r1', new_categoriadoitem: 100000001, _cr40f_om_value: '{m1}', [`_cr40f_veiculo_value${F}`]: 'ABC1D23',
+  cr40f_dataehorriodesada: '2026-11-23T03:00:00Z',
+  'bt_manut.cr40f_id': 'M-1', 'bt_manut.cr40f_descricao': 'Freio com ruído', 'bt_manut.cr40f_graudamanutencao': 4,
+  'bt_manut.cr40f_status': 202410001, 'bt_manut.cr40f_janelainicio': '2026-11-23', 'bt_manut.cr40f_janelafim': '2026-11-29',
+  ...extra,
+})
+const coluna = (key: string, width = 120): Column => {
+  const dot = key.indexOf('.')
+  return { key, attribute: dot < 0 ? key : key.slice(dot + 1), alias: dot < 0 ? null : key.slice(0, dot), entity: null, width }
+}
+
+describe('linha de manutenção', () => {
+  it('reconhece a linha pela categoria e pela ligação com a manutenção', () => {
+    expect(ehLinhaDeManutencao(linha())).toBe(true)
+    expect(ehLinhaDeManutencao(linha({ new_categoriadoitem: 100000000 }))).toBe(false)
+    expect(ehLinhaDeManutencao(linha({ _cr40f_om_value: null }))).toBe(false)
+    expect(lerLinhaManutencao({ new_categoriadoitem: 100000000 }, HOJE)).toBeNull()
+  })
+
+  it('lê o resumo: veículo, problema, grau, status, janela', () => {
+    expect(lerLinhaManutencao(linha(), HOJE)).toEqual({
+      manutencaoId: 'm1', codigo: 'M-1', veiculo: 'ABC1D23', descricao: 'Freio com ruído', grau: 'Urgente',
+      status: 202410001, statusRotulo: 'Agendado', statusTom: 'info',
+      janela: { inicio: '2026-11-23', fim: '2026-11-29' }, janelaRotulo: 'Semana de 23/11 a 29/11/2026',
+      atrasada: false, foraDaJanela: false,
+    })
+  })
+
+  it('atrasada: janela vencida em Agendado ou Programado; registro antigo usa a data de agendamento', () => {
+    const programada = lerLinhaManutencao(linha({ 'bt_manut.cr40f_status': 202410005, 'bt_manut.cr40f_janelainicio': '2026-11-15', 'bt_manut.cr40f_janelafim': '2026-11-15', cr40f_dataehorriodesada: '2026-11-15T12:00:00Z' }), HOJE)
+    expect(programada).toMatchObject({ statusRotulo: 'Programado', janelaRotulo: '15/11/2026', atrasada: true, foraDaJanela: false })
+    const antiga = lerLinhaManutencao(linha({ 'bt_manut.cr40f_janelainicio': null, 'bt_manut.cr40f_janelafim': null, 'bt_manut.cr40f_agendarpara': '2026-11-10T03:00:00Z' }), HOJE)
+    expect(antiga).toMatchObject({ janela: null, janelaRotulo: 'Agendada para 10/11/2026', atrasada: true })
+    expect(lerLinhaManutencao(linha({ 'bt_manut.cr40f_status': 202410002, 'bt_manut.cr40f_janelafim': '2026-11-01' }), HOJE)?.atrasada).toBe(false)
+  })
+
+  it('cr40f_agendarpara (UserLocal, UTC) vale pela data de São Paulo, não pelo corte da string UTC', () => {
+    // 02:00Z de 18/11 é 23h de 17/11 em São Paulo: o dia 17 já passou em 18/11 (atrasada); o corte UTC daria 18 (não atrasada).
+    const noite = lerLinhaManutencao(linha({ 'bt_manut.cr40f_janelainicio': null, 'bt_manut.cr40f_janelafim': null, 'bt_manut.cr40f_agendarpara': '2026-11-18T02:00:00Z' }), HOJE)
+    expect(noite).toMatchObject({ janelaRotulo: 'Agendada para 17/11/2026', atrasada: true })
+    // 03:00Z é a meia-noite de São Paulo: o mesmo dia.
+    const meiaNoite = lerLinhaManutencao(linha({ 'bt_manut.cr40f_janelainicio': null, 'bt_manut.cr40f_janelafim': null, 'bt_manut.cr40f_agendarpara': '2026-11-18T03:00:00Z' }), HOJE)
+    expect(meiaNoite).toMatchObject({ janelaRotulo: 'Agendada para 18/11/2026', atrasada: false })
+  })
+
+  it('sem dados da manutenção (link vazio), rótulos legíveis no lugar', () => {
+    const vazia = lerLinhaManutencao({ new_categoriadoitem: 100000001, _cr40f_om_value: 'm9' }, HOJE)
+    expect(vazia).toMatchObject({ veiculo: 'Sem veículo', descricao: 'Sem descrição', grau: null, status: null, statusRotulo: 'Sem status', statusTom: 'neutral', janelaRotulo: 'Sem janela', atrasada: false, foraDaJanela: false })
+  })
+
+  it('fora da janela: selo na linha e aviso que não bloqueia', () => {
+    const fora = lerLinhaManutencao(linha({ cr40f_dataehorriodesada: '2026-11-18T13:00:00Z' }), HOJE)!
+    expect(fora.foraDaJanela).toBe(true)
+    expect(avisoForaDaJanela('2026-11-18T13:00:00Z', fora)).toBe('A saída de 18/11/2026 ficou fora da janela da manutenção (Semana de 23/11 a 29/11/2026). A data foi gravada; confira com o gestor de frota.')
+    expect(avisoForaDaJanela('2026-11-25T13:00:00Z', fora)).toBeNull()
+    expect(avisoForaDaJanela(null, fora)).toBeNull()
+    expect(avisoForaDaJanela('2026-11-18T13:00:00Z', { janela: null, janelaRotulo: 'Sem janela' })).toBeNull()
+  })
+
+  it('trechos: motorista e saída na própria coluna; o resto junta, o primeiro trecho com o resumo', () => {
+    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto', 'x__cr40f_Motorista.cr40f_motorista'].map((k) => coluna(k))
+    expect(trechosDaManutencao(cols)).toEqual([
+      { tipo: 'resumo', key: 'cr40f_status', span: 2 },
+      { tipo: 'campo', column: cols[3] },
+      { tipo: 'campo', column: cols[4] },
+      { tipo: 'vazio', key: 'cr40f_trajeto', span: 2 },
+    ])
+  })
+
+  it('visão sem coluna para o resumo: o resumo cai na primeira coluna visível (id), antes dos campos', () => {
+    expect(trechosDaManutencao([coluna('cr40f_id')])).toEqual([{ tipo: 'resumo', key: 'cr40f_id', span: 1 }])
+    expect(trechosDaManutencao([coluna('cr40f_id'), coluna('cr40f_motorista')])).toEqual([{ tipo: 'resumo', key: 'cr40f_id', span: 1 }, { tipo: 'campo', column: coluna('cr40f_motorista') }])
+    expect(trechosDaManutencao([coluna('cr40f_id'), coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')]).map((t) => t.tipo)).toEqual(['resumo', 'campo', 'campo'])
+    expect(trechosDaManutencao([])).toEqual([])
+  })
+
+  it('colunas da edição no celular: as da visão, ou criadas quando a visão não tem', () => {
+    const motorista = coluna('cr40f_motorista', 200)
+    expect(colunasDaManutencao([coluna('cr40f_id'), motorista])).toEqual([motorista, { key: 'cr40f_dataehorriodesada', attribute: 'cr40f_dataehorriodesada', alias: null, entity: null, width: 160 }])
   })
 })
