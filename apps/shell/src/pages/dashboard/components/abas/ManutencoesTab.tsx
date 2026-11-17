@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Manutencoes, type StatusMeta } from '../../domain/abas/manutencoes'
@@ -93,7 +94,7 @@ function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total:
     <AnaliseCard
       titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
       grafico={pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
-      tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Custo', (p) => brl(p.valor)]])}
       tabelaSobDemanda={pontos.length > 0}
     />
@@ -116,7 +117,7 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
     <AnaliseCard
       titulo="Por tipo de reparo" periodo={periodo} unidade="registros e R$"
       valor={maior ? maior.tipo : undefined} sub={maior ? `Mais frequente · ${int(maior.qtd)} registros · ${pct(maior.pct)} do custo` : undefined}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
       copiar={tabelaCopia(linhas, [['Tipo de reparo', (l) => l.tipo], ['Registros', (l) => l.qtd], ['% dos registros', (l) => pct(l.pctQtd)], ['Custo', (l) => brl(l.valor)], ['Participação no custo', (l) => pct(l.pct)]])}
     />
   )
@@ -153,7 +154,7 @@ function CategoriasCard({ linhas, lmNoPeriodo, periodo }: { linhas: LinhaCategor
       largo titulo="Categorias com metas" periodo={periodo} unidade="registros por categoria"
       valor={fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
       sub={`Corretiva crítica: ${META_MANUTENCAO.corretivaCritica ? `até ${META_MANUTENCAO.corretivaCritica}` : 'zero'} · Corretiva não crítica: até ${META_MANUTENCAO.naoCriticaPorMes} por mês · Preventiva programada: da aprovação à data em até ${META_MANUTENCAO.preventivaDias} dias`}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
       copiar={tabelaCopia(linhas, [
         ['Categoria', (l) => l.categoria], ['Registros', (l) => l.qtd], ...(mostrarLM ? [['Mês anterior', (l: LinhaCategoria) => anterior(l.lm)] as const] : []),
         ...(mostrarLY ? [['Ano anterior', (l: LinhaCategoria) => anterior(l.ly)] as const] : []), ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],

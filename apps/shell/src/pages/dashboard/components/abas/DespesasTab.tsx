@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Button, PageToolbar, Select, StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Button, PageToolbar, Select, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { AlertTriangle, CircleCheck, X } from 'lucide-react'
 import { LinhaChart } from '../../charts/Charts'
 import {
@@ -124,7 +125,7 @@ function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { l
           series={[{ chave: 'valor', nome: 'Despesa total', cor: 'action' }, { chave: 'alimentacao', nome: 'Alimentação', cor: 'brand', tracejada: true }]}
         />
       ) : <Vazio titulo="Nenhuma despesa no período" />}
-      tabela={linhas.length ? <Table columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
+      tabela={linhas.length ? <Tabela columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
       tabelaSobDemanda
       copiar={tabelaCopia(linhas, [['Mês', (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['Despesa', (l) => brl(l.valor)], ['Alimentação', (l) => brl(l.alimentacao)]])}
     />
@@ -138,7 +139,7 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
     ? [{ key: 'r', header: coluna, cell: (l) => l.rotulo }, { key: 'resto', header: 'Valores', width: COLUNA_LARGA, cell: (l) => juntar(`${int(l.lancamentos)} lançamentos`, brl(l.valor), `Participação ${pct(l.participacao)}`) }]
     : [
       { key: 'r', header: coluna, width: 'minmax(0, 1.2fr)', cell: (l) => <Nome texto={l.rotulo} /> },
-      { key: 'q', header: 'Lançamentos', width: 'minmax(0, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
+      { key: 'q', header: 'Lançamentos', width: 'minmax(88px, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
       { key: 'v', header: 'Valor', cell: (l) => forte(brl(l.valor)) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.participacao} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
@@ -149,7 +150,7 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
       valor={topo ? topo.rotulo : '—'}
       sub={topo ? `Maior participação: ${pct(topo.participacao)} · ${brl(topo.valor)}` : `Nenhuma despesa no período`}
       apoio={resumo ? [{ rotulo: 'Mostrando', texto: resumo }] : []}
-      tabela={<Table columns={colunas} rows={dist.linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhuma despesa no período" />} />}
+      tabela={<Tabela columns={colunas} rows={dist.linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhuma despesa no período" />} />}
       copiar={tabelaCopia(dist.linhas, [[coluna, (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['% dos lançamentos', (l) => pct(l.pctLancamentos)], ['Valor', (l) => brl(l.valor)], ['Participação', (l) => pct(l.participacao)]])}
     />
   )
@@ -176,7 +177,7 @@ function PorMotoristaCard({ linhas, periodo, mobile }: Bloco & { linhas: LinhaMo
       { key: 't', header: 'Total', cell: (l) => forte(brl(l.total)) },
     ]
   const top = useTopCelular(linhas, mobile, 'despesas')
-  const tabela = <><Table columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>
+  const tabela = <><Tabela columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>
   return (
     <AnaliseCard
       titulo="Por motorista" periodo={periodo} unidade="R$ por motorista" largo

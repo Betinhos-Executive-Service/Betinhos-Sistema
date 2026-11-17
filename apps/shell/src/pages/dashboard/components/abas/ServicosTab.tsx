@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import type { TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { BarraChart } from '../../charts/Charts'
 import { calcularServicos, type LinhaParticipacao, type Servicos } from '../../domain/abas/servicos'
 import { brl, brlS, int } from '../../domain/format'
@@ -35,7 +36,7 @@ function PorMesCard({ dados, periodo }: { dados: Servicos; periodo: string }) {
       grafico={dados.porMes.length
         ? <BarraChart descricao={`Serviços por mês, ${periodo}`} nome="Serviços" formatar={int} larguraEixo={36} dados={dados.porMes.map((m) => ({ rotulo: m.rotulo, valor: m.qtd }))} />
         : <Vazio titulo="Nenhum serviço no período" />}
-      tabela={dados.porMes.length ? <Table columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
+      tabela={dados.porMes.length ? <Tabela columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
       copiar={tabelaCopia(dados.porMes, [['Mês', (m) => m.rotulo], ['Serviços', (m) => m.qtd]])}
     />
   )
@@ -60,7 +61,7 @@ function ParticipacaoCard({ titulo, coluna, linhas, periodo }: { titulo: string;
     <AnaliseCard
       titulo={titulo} periodo={periodo} unidade="serviços e R$" valor={!topo ? '—' : topo.tipo === '—' ? 'Sem tipo informado' : topo.tipo}
       sub={topo ? `${pct(topo.pctFat)} do faturamento · ${int(topo.qtd)} serviços` : 'nenhum serviço no período'}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
       copiar={tabelaCopia(linhas, [[coluna, (l) => l.tipo], ['Serviços', (l) => l.qtd], ['% dos serviços', (l) => pct(l.pctQtd)], ['Faturamento', (l) => brl(l.fat)], ['% do faturamento', (l) => pct(l.pctFat)]])}
     />
   )

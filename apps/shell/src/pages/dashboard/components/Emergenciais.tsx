@@ -1,4 +1,5 @@
-import { Table, type TableColumn } from '@betinhos/ui'
+import type { TableColumn } from '@betinhos/ui'
+import { Tabela } from './Tabela'
 import type { Emergenciais as Dados } from '../domain/destaques'
 import { dec, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
@@ -57,7 +58,7 @@ export function Emergenciais({ dados, periodo }: { dados: Dados; periodo: string
         cell: (m: Mes) => (m.ranking[i] ? <span className="dash-celula-nome" title={m.ranking[i].cliente}><Duplo valor={m.ranking[i].cliente} apoio={`${int(m.ranking[i].qtd)} serv.`} /></span> : '—'),
       })),
     ]
-  const tabela = <Table className="dash-tabela--densa" columns={colunas} rows={dados.meses} rowKey={(m) => m.mes} empty="Nenhum serviço emergencial no período." style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
+  const tabela = <Tabela className="dash-tabela--densa" columns={colunas} rows={dados.meses} rowKey={(m) => m.mes} empty="Nenhum serviço emergencial no período." style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
       titulo="Serviços emergenciais"
