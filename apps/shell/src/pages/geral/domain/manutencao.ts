@@ -201,9 +201,9 @@ export function lerLinhaManutencao(row: Row, hoje: string): LinhaManutencao | nu
 }
 
 /** Texto do aviso depois de gravar uma saída fora da janela; `null` quando está dentro, não há janela ou a manutenção já não está Agendada nem Programada (como o selo). */
-export function avisoForaDaJanela(saidaIso: string | null, m: Pick<LinhaManutencao, 'janela' | 'janelaRotulo'> & { status?: number | null }): string | null {
+export function avisoForaDaJanela(saidaIso: string | null, m: Pick<LinhaManutencao, 'janela' | 'janelaRotulo' | 'status'>): string | null {
   const dia = diaSP(saidaIso)
-  if (m.status !== undefined && !emProgramacao(m.status)) return null
+  if (!emProgramacao(m.status)) return null
   if (!dia || !m.janela || (dia >= m.janela.inicio && dia <= m.janela.fim)) return null
   return `A saída de ${formatBR(dia)} ficou fora da janela da manutenção (${m.janelaRotulo}). A data foi gravada; confira com o gestor de frota.`
 }

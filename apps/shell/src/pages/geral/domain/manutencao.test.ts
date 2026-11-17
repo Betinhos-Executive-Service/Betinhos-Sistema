@@ -177,7 +177,7 @@ describe('linha de manutenção', () => {
     expect(avisoForaDaJanela('2026-11-18T13:00:00Z', fora)).toBe('A saída de 18/11/2026 ficou fora da janela da manutenção (Semana de 23/11 a 29/11/2026). A data foi gravada; confira com o gestor de frota.')
     expect(avisoForaDaJanela('2026-11-25T13:00:00Z', fora)).toBeNull()
     expect(avisoForaDaJanela(null, fora)).toBeNull()
-    expect(avisoForaDaJanela('2026-11-18T13:00:00Z', { janela: null, janelaRotulo: 'Sem janela' })).toBeNull()
+    expect(avisoForaDaJanela('2026-11-18T13:00:00Z', { janela: null, janelaRotulo: 'Sem janela', status: 202410001 })).toBeNull()
   })
 
   it('o aviso de fora da janela segue o selo: só com a manutenção Agendada ou Programada', () => {
