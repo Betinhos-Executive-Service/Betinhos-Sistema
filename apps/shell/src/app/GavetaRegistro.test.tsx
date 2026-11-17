@@ -16,6 +16,13 @@ afterEach(() => { cleanup(); act(() => fecharGavetaRegistro()); vi.unstubAllGlob
 
 const host = { mode: 'mock' } as const
 
+/** Cancela a manutenção pelo "⋯" do guia (o menu usa popover, oculto no jsdom). */
+async function cancelarPeloMenu(gaveta: HTMLElement) {
+  fireEvent.click(within(gaveta).getByRole('button', { name: 'Mais ações' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Cancelar manutenção', hidden: true }))
+  await act(async () => { fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' })) })
+}
+
 it('abre a gaveta da tabela do registro por cima da lista e fechar limpa o estado sem trocar a rota', async () => {
   render(<GavetaRegistro host={host} />)
   expect(screen.queryByRole('dialog')).toBeNull()
@@ -31,19 +38,18 @@ it('abre a gaveta da tabela do registro por cima da lista e fechar limpa o estad
 it('manutenção abre a gaveta única da Frota por cima da lista, sem trocar a rota', async () => {
   render(<GavetaRegistro host={host} />)
   act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
-  const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
-  expect(within(gaveta).getByRole('button', { name: 'Encaixar' })).toBeTruthy()
+  const gaveta = await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })
+  expect(within(gaveta).getByRole('heading', { name: 'Quando vai ser?' })).toBeTruthy()
   expect(window.location.hash).toBe('#/geral?q=ana')
 })
 
 it('a gaveta da manutenção tem o ToastProvider do hospedeiro: a ação grava e o aviso aparece', async () => {
   render(<GavetaRegistro host={host} />)
   act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
-  const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
-  fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' }))
-  await act(async () => { fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' })) })
+  const gaveta = await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })
+  await cancelarPeloMenu(gaveta)
   expect(await screen.findByText('Manutenção cancelada.')).toBeTruthy()
-  expect(await within(gaveta).findByText('Cancelado')).toBeTruthy()
+  expect((await within(gaveta).findAllByText(/Cancelada/)).length).toBeGreaterThan(0)
 })
 
 it('manutenção que não existe mostra o aviso na própria gaveta', async () => {
@@ -94,10 +100,9 @@ it('ação na gaveta da manutenção avisa a lista que está atrás (REGISTRO_AL
     // Host novo: a fonte da Frota é guardada por host, e o teste anterior já cancelou a m1 no host do arquivo.
     render(<GavetaRegistro host={{ mode: 'mock' }} />)
     act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
-    const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+    const gaveta = await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })
     expect(ouvido).not.toHaveBeenCalled()
-    fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' }))
-    await act(async () => { fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' })) })
+    await cancelarPeloMenu(gaveta)
     await waitFor(() => expect(ouvido).toHaveBeenCalledWith({ table: 'cr40f_manutencoes', id: 'm1' }))
     expect(ouvido).toHaveBeenCalledTimes(1)
   } finally {

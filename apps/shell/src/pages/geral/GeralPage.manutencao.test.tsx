@@ -32,7 +32,7 @@ describe('Geral › linhas de manutenção', () => {
     // Agendada com a janela da semana passada: atrasada, sem motorista.
     expect(within(await linhaDe('Ar-condicionado sem gelar')).getByText('Atrasada')).toBeTruthy()
     fireEvent.click(await abrirDe('Manutenção fictícia m3'))
-    expect(await screen.findByRole('dialog', { name: 'Manutenção fictícia m3' }, { timeout: 20_000 })).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: 'TST1A11 · Manutenção fictícia m3' }, { timeout: 20_000 })).toBeTruthy()
   })
 
   it('a linha ligada à manutenção mas sem os dados do link mostra os rótulos de reserva e abre a gaveta', async () => {
@@ -172,7 +172,7 @@ describe('Geral › linhas de manutenção', () => {
       render(<><GeralPage host={host} /><GavetaRegistro host={host} /></>)
       await selecionar('Manutenção fictícia m3')
       await acao('Editar')
-      expect(await screen.findByRole('dialog', { name: 'Manutenção fictícia m3' }, { timeout: 20_000 })).toBeTruthy()
+      expect(await screen.findByRole('dialog', { name: 'TST1A11 · Manutenção fictícia m3' }, { timeout: 20_000 })).toBeTruthy()
     })
   })
 
