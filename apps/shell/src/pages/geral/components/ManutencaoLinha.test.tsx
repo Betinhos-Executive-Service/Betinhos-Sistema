@@ -110,6 +110,16 @@ describe('tabela com linha de manutenção', () => {
     expect(celulas[1].classList.contains('gr-cell--editable')).toBe(true)
     expect(within(celulas[2]).getByRole('button', { name: /^TST1A11 · Manutenção, abrir:/ })).toBeTruthy()
     expect(within(celulas[2]).getByText('Programado')).toBeTruthy()
+    // A célula que recebe o botão empilha botão e selos, como a primeira coluna (lado a lado eles seriam cortados).
+    expect(celulas[2].classList.contains('gr-manut__primeira')).toBe(true)
+  })
+
+  it('o alerta tem o texto no title e num texto que o leitor de tela lê (a densidade mínima mostra só o ponto)', () => {
+    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_motorista'].map((k) => coluna(k))
+    const { container } = tabela(cols, [m3])
+    const alerta = container.querySelector<HTMLElement>('.gr-row--manutencao .gr-manut__alerta')!
+    expect(alerta.getAttribute('title')).toBe('Atrasada')
+    expect(alerta.querySelector('.gr-manut__alerta-texto')?.textContent).toBe('Atrasada')
   })
 
   it('visão sem coluna para o resumo: o resumo aparece na primeira coluna, abaixo do botão, e não desalinha as colunas', () => {

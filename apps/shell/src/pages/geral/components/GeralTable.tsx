@@ -381,7 +381,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                     if (tipo === 'campo') return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
                     const comBotao = indice === desenho.botaoEm
                     return (
-                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}${comBotao && desenho.resumoNoBotao ? ' gr-manut__primeira' : ''}`}>
+                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}${comBotao ? ' gr-manut__primeira' : ''}`}>
                         {comBotao ? <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} /> : null}
                         {tipo === 'status' ? <ManutencaoSelos m={m} /> : null}
                         {tipo === 'veiculo' ? <span className="gr-cell__value" title={m.veiculo}>{m.veiculo}</span> : null}

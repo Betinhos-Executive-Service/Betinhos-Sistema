@@ -10,8 +10,8 @@ export function ManutencaoSelos({ m }: { m: LinhaManutencao }) {
   return (
     <span className="gr-manut__selos">
       <StatusBadge tone={m.statusTom}>{m.statusRotulo}</StatusBadge>
-      {m.atrasada ? <span className="gr-manut__alerta gr-manut__alerta--perigo">Atrasada</span> : null}
-      {m.foraDaJanela ? <span className="gr-manut__alerta gr-manut__alerta--aviso">Fora da janela</span> : null}
+      {m.atrasada ? <span className="gr-manut__alerta gr-manut__alerta--perigo" title="Atrasada"><span className="gr-manut__alerta-texto">Atrasada</span></span> : null}
+      {m.foraDaJanela ? <span className="gr-manut__alerta gr-manut__alerta--aviso" title="Fora da janela"><span className="gr-manut__alerta-texto">Fora da janela</span></span> : null}
     </span>
   )
 }

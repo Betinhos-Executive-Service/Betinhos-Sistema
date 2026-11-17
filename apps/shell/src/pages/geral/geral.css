@@ -337,6 +337,8 @@
 /* Coluna Status de Op. estreita: o alerta desce para baixo da etiqueta em vez de ser cortado. */
 .gr-manut__trecho--status .gr-manut__selos { flex-direction: column; align-items: flex-start; gap: 0; }
 .gr-table--minima .gr-manut__trecho--status .gr-manut__selos { flex-direction: row; align-items: center; }
+/* Densidade mínima: o alerta vira só o ponto colorido; o texto fica no title e para o leitor de tela (como .gr-sr). */
+.gr-table--minima .gr-manut__alerta-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .gr-manut__trecho--status { overflow: hidden; }
 .gr-manut__trecho--veiculo .gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-manut__detalhes > .gr-manut__frase { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -359,6 +361,7 @@
 .gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__detalhes { order: 1; flex: 0 0 auto; }
 .gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__descricao { order: 2; flex: 1 1 0; font-weight: var(--bt-font-weight-medium); }
 .gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__frase { display: none; }
+.gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__detalhes:not(:has(.gr-manut__selos)) { display: none; }
 .gr-card.gr-card--manutencao { box-shadow: inset 3px 0 0 var(--bt-color-warning); }
 .gr-card.gr-card--manutencao:not(.is-selected) { background-color: color-mix(in srgb, var(--bt-color-warning-soft) 55%, var(--bt-color-surface)); }
 .gr-manut-chave { display: inline-flex; flex: 0 0 auto; align-items: center; }
