@@ -9,6 +9,15 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const field: CatalogField = { id: 'r1.cr40f_id', label: 'ID', table: 'cr40f_ordens', tableLabel: 'Ordens', attribute: 'cr40f_id', primaryIdAttribute: 'cr40f_ordensid', primaryNameAttribute: 'cr40f_id', path: ['cr40f_ordens'], relationships: [{ from: 'cr40f_ordensid', to: 'cr40f_ordem' }], type: 'String', available: true }
 
 describe('célula de coluna dinâmica', () => {
+  it('mostra URL como link que abre em nova aba', () => {
+    const url = 'https://betinhos-my.sharepoint.com/:b:/g/voucher.pdf'
+    render(<ViewFieldCell field={{ ...field, id: 'r1.cr40f_linkvoucher', attribute: 'cr40f_linkvoucher' }} value={url} valueKey="r1.cr40f_linkvoucher" baseRecordId="base-id" />)
+    const link = screen.getByRole('link', { name: url })
+    expect(link.getAttribute('href')).toBe(url)
+    expect(link.getAttribute('target')).toBe('_blank')
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
   it('abre a coluna primária da tabela relacionada pelo GUID, mantendo o código visível', () => {
     const openForm = vi.fn(async () => undefined)
     vi.stubGlobal('Xrm', { Navigation: { openForm } })
