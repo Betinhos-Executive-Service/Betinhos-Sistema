@@ -15,8 +15,8 @@ describe('validateIdentity', () => {
     expect(validateIdentity(env, idToken({ email: undefined, preferred_username: 'Bia@Betinhos.com.br' })).email).toBe('bia@betinhos.com.br')
   })
   it('prefere preferred_username e upn ao email (que não é verificado)', () => {
-    expect(validateIdentity(env, idToken({ email: 'outra@betinhos.com.br', preferred_username: 'bia@betinhos.com.br' })).email).toBe('bia@betinhos.com.br')
-    expect(validateIdentity(env, idToken({ email: 'outra@betinhos.com.br', upn: 'cad@betinhos.com.br' })).email).toBe('cad@betinhos.com.br')
+    expect(validateIdentity(env, idToken({ email: 'maria@betinhos.com.br', preferred_username: 'bia@betinhos.com.br' })).email).toBe('bia@betinhos.com.br')
+    expect(validateIdentity(env, idToken({ email: 'maria@betinhos.com.br', upn: 'joao@betinhos.com.br' })).email).toBe('joao@betinhos.com.br')
     expect(() => validateIdentity(env, idToken({ email: 'ana@betinhos.com.br', preferred_username: 'x@exemplo.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
   })
   it('recusa convidado (#EXT# ou acct 1) com guest_not_allowed 403', () => {
