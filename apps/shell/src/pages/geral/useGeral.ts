@@ -181,14 +181,14 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const groupKey = groupSpec ? `${groupSpec.attribute}|${groupSpec.kind}|${groupSpec.by}` : ''
   /** Com filtros ou agrupamento e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
   const filtersPending = view != null && (filtersOverride != null || group != null) && attributes == null && attributesError == null
-  /**
-   * FetchXML da visão com os filtros do painel. Sem mudança do usuário (ou sem metadata) é o da própria visão, com os
-   * filtros dela intactos: dá o mesmo resultado e não refaz a consulta quando a metadata chega.
-   */
   /** FetchXML de consulta com "Mostrar manutenções": ligado leva o link da manutenção; desligado, o filtro que as tira. */
   const comManutencoes = useCallback((fetchxml: string) => {
     try { return aplicarManutencoes(fetchxml, mostrarManutencoes) } catch { return fetchxml }
   }, [mostrarManutencoes])
+  /**
+   * FetchXML da visão com os filtros do painel. Sem mudança do usuário (ou sem metadata) é o da própria visão, com os
+   * filtros dela intactos: dá o mesmo resultado e não refaz a consulta quando a metadata chega.
+   */
   const effectiveFetch = useMemo(() => {
     if (!view) return null
     const comFiltros = (() => {
