@@ -27,6 +27,8 @@ type Options = {
   selectView: (id: string) => void
   saveView: (name: string, kind: Kind, overwrite: boolean, definition: ViewDefinition) => Promise<void>
   deleteView: () => Promise<void>
+  /** Lixeira de uma visão pessoal pelo id, sem abri-la (o `ViewBar` confirma antes). */
+  deleteViewById: (id: string) => Promise<void>
   publishView: () => Promise<void>
   reloadViews: () => Promise<void>
   onError: (message: string) => void
@@ -183,6 +185,7 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
   const selectView = useCallback((id: string) => { if (o.locked) onError(LOCK_MESSAGE); else openView(id) }, [o.locked, openView, onError])
   const saveView = useMemo(() => unlocked(o.saveView), [unlocked, o.saveView])
   const deleteView = useMemo(() => unlocked(o.deleteView), [unlocked, o.deleteView])
+  const removeView = useMemo(() => unlocked(o.deleteViewById), [unlocked, o.deleteViewById])
   const publishView = useMemo(() => unlocked(o.publishView), [unlocked, o.publishView])
   const restore = useCallback(() => {
     if (o.locked) onError(LOCK_MESSAGE)
@@ -213,8 +216,8 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     status, error: o.viewError, views, active: activeEntry, config, dirty,
     // Hoje qualquer usuário cria view pública pela tela; o Dataverse recusa quem não tem privilégio (a barra avisa o erro).
     canPublish: true,
-    setConfig, density, setDensity, select: selectView, restore, save, saveAs, rename, remove: deleteView, publish: publishView, reload: reloadViews,
-  }), [status, o.viewError, views, activeEntry, config, dirty, setConfig, density, setDensity, selectView, restore, save, saveAs, rename, deleteView, publishView, reloadViews])
+    setConfig, density, setDensity, select: selectView, restore, save, saveAs, rename, remove: deleteView, removeView, publish: publishView, reload: reloadViews,
+  }), [status, o.viewError, views, activeEntry, config, dirty, setConfig, density, setDensity, selectView, restore, save, saveAs, rename, deleteView, removeView, publishView, reloadViews])
   return useMemo(() => ({ state, columnDefs, catalog: columnCatalog, filterFields: fields, search, locked, removeLockedFilter, valueLabel: label }), [state, columnDefs, columnCatalog, fields, search, locked, removeLockedFilter, label])
 
 }
