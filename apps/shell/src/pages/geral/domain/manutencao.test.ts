@@ -24,6 +24,17 @@ describe('padrão de "Mostrar manutenções"', () => {
     expect(padraoManutencoes(visao(fetchDe(), layoutDe('cr40f_id', 'cr40f_cotao')))).toBe(false)
   })
 
+  it('só as condições da entidade raiz contam: filtro dentro de link-entity não liga nem desliga', () => {
+    const link = (atributo: string) => `<link-entity name="cr40f_outra" from="x" to="y" alias="a"><filter><condition attribute="${atributo}" operator="eq" value="1" /></filter></link-entity>`
+    const comLink = (atributo: string) => fetchDe().replace('</entity>', `${link(atributo)}</entity>`)
+    // Motorista só no link: a visão não é de programação.
+    expect(padraoManutencoes(visao(comLink('cr40f_motorista'), layoutDe('cr40f_id', 'cr40f_trajeto')))).toBe(false)
+    // Faturamento só no link: não é visão de faturamento.
+    expect(padraoManutencoes(visao(comLink('cr40f_statusdefaturamento')))).toBe(true)
+    // Filtro aninhado na raiz continua valendo.
+    expect(padraoManutencoes(visao(fetchDe('<filter type="or"><condition attribute="cr40f_statusdefaturamento" operator="eq" value="1" /></filter>')))).toBe(false)
+  })
+
   it('a exceção pelo id da visão vence a regra', () => {
     expect(padraoManutencoes(visao(fetchDe(), undefined, 'ABC'), { abc: false })).toBe(false)
     expect(padraoManutencoes(visao(fetchDe(), layoutDe('cr40f_id'), 'abc'), { abc: true })).toBe(true)

@@ -71,7 +71,8 @@ export function padraoManutencoes(view: Pick<View, 'id' | 'fetchxml' | 'layoutxm
   const excecao = excecoes[view.id.toLowerCase()]
   if (excecao !== undefined) return excecao
   const { entity } = parse(view.fetchxml)
-  const filtra = (attribute: string) => entity.querySelector(`condition[attribute="${attribute}"]`) != null
+  // Só as condições da entidade raiz (filtros dela, aninhados ou não): condição dentro de um link-entity é de outra tabela.
+  const filtra = (attribute: string) => entity.querySelector(`:scope > filter condition[attribute="${attribute}"]`) != null
   const mostraMotorista = parseLayout(view.layoutxml).some((c) => !c.alias && c.attribute === MOTORISTA)
   return (mostraMotorista || filtra(MOTORISTA)) && !filtra(FATURAMENTO)
 }

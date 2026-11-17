@@ -9,6 +9,7 @@ import { defaultSort, linkEntities } from './domain/fetch'
 import { emptyFilters, type FilterCondition, type FilterField, type TableFilters, type ViewGroup } from '@betinhos/ui'
 import { GROUPS_LIMIT_MESSAGE, isAggregateLimit, resolveGroup, sameViewGroup, type GroupBucket, type GroupSpec, type GroupTarget } from './domain/grouping'
 import { geralFilterFields, hasActiveFilters, injectTableFilters } from './domain/tableFilters'
+import { aplicarManutencoes, lerManutencoesDaVisao } from './domain/manutencao'
 import { splitViewFilters, type ViewFetchFilters } from '../../app/viewFetchFilters'
 import { formatDateTime } from './domain/format'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
@@ -65,6 +66,10 @@ export type GeralState = {
   filterFields: FilterField[]
   selected: Set<string>
   cells: Map<string, CellStatus>
+  /** "Mostrar manutenções" valendo na tela: o gravado na visão, o padrão dela ou a mudança do usuário. */
+  mostrarManutencoes: boolean
+  /** O usuário mudou o liga/desliga em relação à visão (conta como "Alterada" e vai para a URL). */
+  manutencoesAlteradas: boolean
 }
 
 /** Aplica o valor otimista (cru e anotação formatada) na chave da linha da Web API. */
@@ -119,10 +124,19 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [layoutColumns, setColumns] = useState<Column[]>([])
   /** Colunas adicionadas pelo painel: viram `link-entity` no FetchXML e colunas no fim do layout. */
   const [extras, setExtras] = useState<ResolvedLinkColumn[]>([])
+  /** "Mostrar manutenções" da visão (marca gravada ou o padrão dela) e o FetchXML sem a marca: é dele que filtros, busca e consulta partem. */
+  const manutencoesDaVisao = useMemo(() => (baseView ? lerManutencoesDaVisao(baseView) : null), [baseView])
+  const mostrarDaVisao = manutencoesDaVisao?.mostrar ?? false
+  /** `null` = o da visão; mudar na tela vira um valor próprio (como os filtros) até trocar de visão ou regravá-la. */
+  const [manutencoesOverride, setManutencoesState] = useState<boolean | null>(null)
+  const mostrarManutencoes = manutencoesOverride ?? mostrarDaVisao
+  const manutencoesAlteradas = manutencoesOverride != null && manutencoesOverride !== mostrarDaVisao
   const view = useMemo(() => {
-    if (!baseView || !extras.length) return baseView
-    try { return { ...baseView, fetchxml: addExtraLinks(baseView.fetchxml, extras) } } catch { return baseView }
-  }, [baseView, extras])
+    if (!baseView || !manutencoesDaVisao) return baseView
+    const semMarca = manutencoesDaVisao.fetchxml === baseView.fetchxml ? baseView : { ...baseView, fetchxml: manutencoesDaVisao.fetchxml }
+    if (!extras.length) return semMarca
+    try { return { ...semMarca, fetchxml: addExtraLinks(semMarca.fetchxml, extras) } } catch { return semMarca }
+  }, [baseView, manutencoesDaVisao, extras])
   const columns = useMemo(() => {
     if (!extras.length) return layoutColumns
     const known = new Set(layoutColumns.map((c) => c.key))
@@ -171,12 +185,19 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
    * FetchXML da visão com os filtros do painel. Sem mudança do usuário (ou sem metadata) é o da própria visão, com os
    * filtros dela intactos: dá o mesmo resultado e não refaz a consulta quando a metadata chega.
    */
+  /** FetchXML de consulta com "Mostrar manutenções": ligado leva o link da manutenção; desligado, o filtro que as tira. */
+  const comManutencoes = useCallback((fetchxml: string) => {
+    try { return aplicarManutencoes(fetchxml, mostrarManutencoes) } catch { return fetchxml }
+  }, [mostrarManutencoes])
   const effectiveFetch = useMemo(() => {
     if (!view) return null
-    if (!attributes || !filtersOverride) return view.fetchxml
-    if (!hasActiveFilters(filtersOverride)) return viewFilters.base
-    try { return injectTableFilters(viewFilters.base, filtersOverride, filterFields) } catch { return view.fetchxml }
-  }, [view, attributes, filtersOverride, filterFields, viewFilters.base])
+    const comFiltros = (() => {
+      if (!attributes || !filtersOverride) return view.fetchxml
+      if (!hasActiveFilters(filtersOverride)) return viewFilters.base
+      try { return injectTableFilters(viewFilters.base, filtersOverride, filterFields) } catch { return view.fetchxml }
+    })()
+    return comManutencoes(comFiltros)
+  }, [view, attributes, filtersOverride, filterFields, viewFilters.base, comManutencoes])
   const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
   // Espelhos síncronos: callbacks (save, carga de páginas) leem o valor corrente, não o do último render.
@@ -250,6 +271,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setView(next)
     setColumns(parseLayout(next.layoutxml))
     setExtras([])
+    setManutencoesState(null)
     // Sem ordenação própria, a consulta mantém todos os `<order>` da visão (inclusive os secundários).
     setSortState(null)
     setCells(new Map())
@@ -276,6 +298,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
             if (initial.sort) setSortState(initial.sort)
             if (initial.filters) setFiltersState(initial.filters)
             if (initial.group) setGroupState(initial.group)
+            if (initial.manutencoes != null) setManutencoesState(initial.manutencoes)
           }
         } else setLoadingFlag(false)
       },
@@ -619,6 +642,10 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const clearFilters = useCallback(() => setFiltersState((current) => (hasActiveFilters(current ?? viewFiltersRef.current) ? emptyFilters() : current)), [])
   /** Volta aos filtros da própria visão. */
   const resetFilters = useCallback(() => setFiltersState(null), [])
+  /** Liga ou desliga "Mostrar manutenções" na tela; vale até trocar de visão, e "Salvar" grava na visão. */
+  const setMostrarManutencoes = useCallback((next: boolean) => setManutencoesState(next), [])
+  /** Volta ao "Mostrar manutenções" da visão. */
+  const resetManutencoes = useCallback(() => setManutencoesState(null), [])
 
   // Avisa quem guarda o estado (a URL) sempre que visão, busca, ordem ou filtros mudam. Só depois de existir uma visão.
   const viewId = view?.id
@@ -630,8 +657,10 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     // Só o que o usuário mudou: sem `f=` a visão abre com os filtros dela.
     if (filtersOverride && hasActiveFilters(filtersOverride)) state.filters = filtersOverride
     if (group) state.group = group
+    // Só quando difere da visão (a URL abre a visão no padrão dela).
+    if (manutencoesAlteradas) state.manutencoes = mostrarManutencoes
     onStateChange.current?.(state)
-  }, [viewId, query, sort, filtersOverride, group])
+  }, [viewId, query, sort, filtersOverride, group, manutencoesAlteradas, mostrarManutencoes])
 
   // Última linha clicada: ponto de partida da seleção por intervalo (Shift+clique).
   const anchor = useRef<string | null>(null)
@@ -728,8 +757,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, group, reload, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells, mostrarManutencoes, manutencoesAlteradas }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = filtersOverride != null && hasActiveFilters(filtersOverride) && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
 }
