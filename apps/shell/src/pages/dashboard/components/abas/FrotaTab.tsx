@@ -84,19 +84,19 @@ function KpisFrota({ frota }: { frota: Frota }) {
   const cadastro = `Frota cadastrada: ${int(k.cadastrados)} · ${int(k.vendidos)} ${k.vendidos === 1 ? 'vendido' : 'vendidos'}`
   return (
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} tom="brand" apoio={fora ? SEM_VEICULOS : cadastro} />
-      <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} tom="success" apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
-      <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} tom="brand" apoio={parte(k.blindados)} />
+      <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} apoio={fora ? SEM_VEICULOS : cadastro} />
+      <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
+      <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} apoio={parte(k.blindados)} />
       <KpiCard
-        rotulo={ROTULOS_KPI[3]} valor={valor(k.emManutencao)} tom="warning"
+        rotulo={ROTULOS_KPI[3]} valor={valor(k.emManutencao)}
         apoio={fora ? undefined : k.emManutencao == null ? naoRespondeu('A tabela de manutenções') : 'com manutenção em andamento no período'}
       />
       <KpiCard
-        rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} tom="action" serie={serieUso}
+        rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} serie={serieUso}
         apoio={fora ? undefined : k.usoMedioPropria == null ? 'sem próprios ativos com dias no período' : `média diária desde ${dataBR(CORTE_USO_FROTA)}`}
       />
       <KpiCard
-        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev?.vencidas ? 'warning' : 'success'}
+        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev == null ? 'brand' : prev.vencidas ? 'warning' : 'success'}
         apoio={prev ? `${int(prev.aVencer)} a vencer` : naoRespondeu('O plano preventivo')}
         acao={{ texto: 'Abrir frota', onAbrir: () => { location.hash = '#/frota' } }}
       />

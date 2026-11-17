@@ -11,7 +11,7 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
@@ -55,17 +55,17 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   const k = ma.kpis
   const prazo = ma.prazo
   const apoioPrazo: Apoio[] = prazo?.ate10 != null ? [{ rotulo: `Até ${META_MANUTENCAO.preventivaDias} dias`, texto: pct(prazo.ate10) }] : []
-  if (prazo && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
-  if (prazo) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
+  if (prazo?.lm != null && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
+  if (prazo?.ly != null) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{ma.ant ? <ChipAnt chip={ma.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
+      <KpiCard rotulo={KPIS[0]} valor={k ? int(k.total) : null}>{ma.ant ? <ChipAnt chip={ma.ant.total} /> : undefined}</KpiCard>
+      <KpiCard rotulo={KPIS[1]} valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
         {ma.ant ? <ChipAnt chip={ma.ant.custoTotal} /> : undefined}
       </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, agendadas ou programadas' : undefined} />
-      <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
-      <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
+      <KpiCard rotulo={KPIS[2]} tom={tomAtencao(k?.emAndamento)} valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, agendadas ou programadas' : undefined} />
+      <KpiCard rotulo={KPIS[3]} valor={k ? brl(k.custoMedio) : null} />
+      <KpiCard rotulo={KPIS[4]} valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -77,7 +77,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
       <div className="dash-grade">
         <CustoMesCard pontos={ma.custoPorMes} total={k.custoTotal} periodo={periodo} />
         <TipoReparoCard linhas={ma.porTipoReparo} periodo={periodo} />
-        <CategoriasCard linhas={ma.categorias} mostrarLM={ma.mostrarLM} periodo={periodo} />
+        <CategoriasCard linhas={ma.categorias} lmNoPeriodo={ma.mostrarLM} periodo={periodo} />
       </div>
     )}
   </>
@@ -123,9 +123,12 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
 }
 
 /** Categorias (por palavra-chave do tipo de reparo) com a meta de cada uma e o selo Dentro/Fora da meta em texto. */
-function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria[]; mostrarLM: boolean; periodo: string }) {
+function CategoriasCard({ linhas, lmNoPeriodo, periodo }: { linhas: LinhaCategoria[]; lmNoPeriodo: boolean; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
-  const comparativo = (l: LinhaCategoria) => [mostrarLM ? `Mês anterior ${anterior(l.lm)}` : '', `Ano anterior ${anterior(l.ly)}`].filter(Boolean)
+  // Comparativo todo "—" (nenhum registro no mês ou no ano anterior) não vira coluna nem texto.
+  const mostrarLM = lmNoPeriodo && linhas.some((l) => l.lm)
+  const mostrarLY = linhas.some((l) => l.ly)
+  const comparativo = (l: LinhaCategoria) => [mostrarLM ? `Mês anterior ${anterior(l.lm)}` : '', mostrarLY ? `Ano anterior ${anterior(l.ly)}` : ''].filter(Boolean)
   const colunas: TableColumn<LinhaCategoria>[] = mobile
     ? [
       { key: 'c', header: 'Categoria', cell: (l) => l.categoria },
@@ -140,7 +143,7 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
       { key: 'c', header: 'Categoria', width: 'minmax(160px, 1.3fr)', cell: (l) => forte(l.categoria) },
       { key: 'q', header: 'Registros', width: 'minmax(72px, .6fr)', cell: (l) => int(l.qtd) },
       ...(mostrarLM ? [{ key: 'lm', header: 'Mês anterior', width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.lm) }] : []),
-      { key: 'ly', header: 'Ano anterior', width: 'minmax(92px, .7fr)', cell: (l) => anterior(l.ly) },
+      ...(mostrarLY ? [{ key: 'ly', header: 'Ano anterior', width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.ly) }] : []),
       { key: 'm', header: <span className="dash-col-part">Meta</span>, width: 'minmax(180px, 1.6fr)', cell: (l) => <span className="dash-col-part">{l.meta ?? '—'}</span> },
       { key: 's', header: 'Status', width: 'minmax(132px, .9fr)', cell: (l) => <Selo status={l.status} /> },
     ]
@@ -153,7 +156,7 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
       tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
       copiar={tabelaCopia(linhas, [
         ['Categoria', (l) => l.categoria], ['Registros', (l) => l.qtd], ...(mostrarLM ? [['Mês anterior', (l: LinhaCategoria) => anterior(l.lm)] as const] : []),
-        ['Ano anterior', (l) => anterior(l.ly)], ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],
+        ...(mostrarLY ? [['Ano anterior', (l: LinhaCategoria) => anterior(l.ly)] as const] : []), ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],
       ])}
     />
   )

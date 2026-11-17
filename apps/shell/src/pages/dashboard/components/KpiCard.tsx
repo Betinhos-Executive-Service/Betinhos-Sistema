@@ -8,12 +8,13 @@ import { Chips } from './KpiChip'
 
 /* Card de KPI único de todas as abas: borda superior na cor do indicador, valor, extras (chips, apoio, faixas) e sparkline na base. */
 
-export type TomKpi = 'action' | 'brand' | 'success' | 'warning'
+/** Cor do KPI: brand por padrão; warning quando o número pede ação; success só para estado bom verificável (ex.: nenhuma preventiva vencida). */
+type TomKpi = 'brand' | 'success' | 'warning'
+export const tomAtencao = (n: number | null | undefined): TomKpi => (n ? 'warning' : 'brand')
 export type ColunasKpi = 3 | 4 | 5 | 6
 
 /** Sparkline de cada tom: linha na cor do indicador e área no tom suave do mesmo papel. */
 const SPARK: Record<TomKpi, { linha: CorToken; area: CorToken }> = {
-  action: { linha: 'action', area: 'actionSoft' },
   brand: { linha: 'brand', area: 'border' },
   success: { linha: 'success', area: 'successSoft' },
   warning: { linha: 'warning', area: 'warningSoft' },
@@ -23,18 +24,18 @@ type KpiCardProps = {
   rotulo: string
   /** null = s/dado: o conjunto da tabela não respondeu. Nunca número provisório. */
   valor: string | null
-  tom: TomKpi
+  tom?: TomKpi
   chips?: Chip[]
   /** Apoios rotulados (chip ou linha) ou uma linha de texto simples. */
   apoio?: Apoio[] | string
   serie?: PontoSerie[]
   /** Extras próprios da aba (chip ANT., faixa da hospedagem), depois dos chips e apoios. */
   children?: ReactNode
-  /** Drill-down: o card inteiro abre a lista por trás do número (botão com o texto, ex.: "Ver serviços"). */
-  acao?: { texto: string; onAbrir: () => void }
+  /** Drill-down: o card inteiro abre a lista por trás do número (texto padrão "Ver detalhes"; "Abrir <tela>" quando leva a outra tela). */
+  acao?: { texto?: string; onAbrir: () => void }
 }
 
-export function KpiCard({ rotulo, valor, tom, chips = [], apoio = [], serie = [], children, acao }: KpiCardProps) {
+export function KpiCard({ rotulo, valor, tom = 'brand', chips = [], apoio = [], serie = [], children, acao }: KpiCardProps) {
   const apoios = typeof apoio === 'string' ? [] : apoio
   const linha = typeof apoio === 'string' && apoio ? apoio : null
   const extras = chips.length > 0 || apoios.length > 0 || linha != null || children != null
@@ -53,7 +54,7 @@ export function KpiCard({ rotulo, valor, tom, chips = [], apoio = [], serie = []
       ) : null}
       {acao ? (
         <Button className="dash-abre" variant="ghost" size="compact" iconEnd={<ChevronRight size={14} aria-hidden="true" />} onClick={acao.onAbrir}>
-          {acao.texto}{' '}<span className="dash-sr">de {rotulo}</span>
+          {acao.texto ?? 'Ver detalhes'}{' '}<span className="dash-sr">de {rotulo}</span>
         </Button>
       ) : null}
       {serie.length > 1 ? <Sparkline dados={serie} linha={SPARK[tom].linha} area={SPARK[tom].area} /> : null}

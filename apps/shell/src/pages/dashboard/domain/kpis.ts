@@ -12,6 +12,8 @@ export function ticketStats(rows: Reserva[]) {
   const value = soma(eleg)
   return { value, count: eleg.length, ticket: eleg.length ? value / eleg.length : 0 }
 }
+/** Ticket de uma linha de tabela: null (mostra "—") quando nenhum serviço é elegível, em vez de R$ 0,00 para quem faturou. */
+export const ticketOuNulo = (rows: Reserva[]) => { const t = ticketStats(rows); return t.count ? t.ticket : null }
 
 export function recebimentoStats(rows: Reserva[]) {
   const recebido = soma(rows.filter((r) => r.fatStatus === FAT_PAGO && r.valor > 0))

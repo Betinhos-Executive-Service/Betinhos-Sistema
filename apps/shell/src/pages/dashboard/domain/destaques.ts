@@ -1,6 +1,6 @@
 import { SEM_CLIENTE, SEM_MOTORISTA } from './codes'
-import { agrupar } from './base'
-import { mesRotulo } from './periodo'
+import { agrupar, mesesComDados } from './base'
+import { mesesEntre, mesRotulo } from './periodo'
 import type { CategoriaVeiculo, Reserva, Veiculo } from './types'
 
 export type TopMotorista = { key: string; nome: string; qtd: number; fat: number }
@@ -11,7 +11,10 @@ export function producaoPropriaTerceira(rv: Reserva[], veiculos: Veiculo[]): Pro
   // Só Própria e Terceirizada contam (como o legado); Aluguel e sem categoria ficam de fora do total e do gráfico.
   const classificados = rv.map((r) => ({ r, kind: (tipo.get(r.veiculoId) ?? '') as CategoriaVeiculo })).filter((x) => x.kind === 'Propria' || x.kind === 'Terceirizada')
   // O legado usa o mês do texto bruto (UTC), sem fuso.
-  const meses = [...new Set(classificados.map(({ r }) => r.saidaRaw.slice(0, 7)).filter(Boolean))].sort()
+  const comDados = [...new Set(classificados.map(({ r }) => r.saidaRaw.slice(0, 7)).filter(Boolean))].sort()
+  // Eixo contínuo do primeiro ao último mês com serviço (o mesmo alcance do "Total produzido"); mês sem classificado vale 0.
+  const todos = [...mesesComDados(rv), ...comDados].sort()
+  const meses = comDados.length ? mesesEntre(todos[0], todos[todos.length - 1]) : []
   const conta = (mes: string, kind: CategoriaVeiculo) => classificados.filter((x) => x.kind === kind && x.r.saidaRaw.slice(0, 7) === mes).length
   const ranking = (kind: CategoriaVeiculo) => {
     const grupos = new Map<string, TopMotorista>()

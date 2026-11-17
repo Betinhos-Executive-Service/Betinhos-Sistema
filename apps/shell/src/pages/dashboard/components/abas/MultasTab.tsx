@@ -10,7 +10,7 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
@@ -33,15 +33,15 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const mu = useMemo(() => calcularMultas(ctx, dados), [ctx, dados])
   const k = mu.kpis
   const abrir = useDetalhe()
-  const verPendentes = abrir && k?.pendentes ? { texto: 'Ver multas', onAbrir: () => abrir('multas') } : undefined
+  const verPendentes = abrir && k?.pendentes ? { onAbrir: () => abrir('multas') } : undefined
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom="warning" valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
+      <KpiCard rotulo={KPIS[0]} valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
+      <KpiCard rotulo={KPIS[1]} tom={tomAtencao(k?.pendentes)} valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
         {mu.ant ? <ChipAnt chip={mu.ant.pendentes} /> : undefined}
       </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom="success" valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Pago, Descontado ou Finalizado' }, ...parte(k.resolvidas)] : []} />
+      <KpiCard rotulo={KPIS[2]} valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Pago, Descontado ou Finalizado' }, ...parte(k.resolvidas)] : []} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -87,7 +87,7 @@ function PorMotoristaCard({ linhas, periodo }: { linhas: LinhaMultaMotorista[]; 
     : [
       { key: 'n', header: 'Motorista', width: 'minmax(0, 1.3fr)', cell: (l) => forte(l.motorista) },
       { key: 'q', header: 'Multas', width: 'minmax(56px, .5fr)', cell: (l) => int(l.qtd) },
-      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.4fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.motorista}`} tom="warning" /></span> },
+      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.4fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.motorista}`} /></span> },
     ]
   const [maior] = linhas
   return (
@@ -107,7 +107,7 @@ function PorInfracaoCard({ linhas, periodo }: { linhas: LinhaMultaInfracao[]; pe
     : [
       { key: 'i', header: 'Infração (código e descrição)', width: 'minmax(0, 2.4fr)', cell: (l) => <span className="dash-mu-infracao">{l.infracao}</span> },
       { key: 'q', header: 'Multas', width: 'minmax(64px, .4fr)', cell: (l) => int(l.qtd) },
-      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.infracao}`} tom="warning" /></span> },
+      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.infracao}`} /></span> },
     ]
   const [maior] = linhas
   return (

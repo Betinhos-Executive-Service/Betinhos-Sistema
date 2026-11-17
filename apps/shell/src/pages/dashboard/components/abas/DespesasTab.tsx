@@ -13,7 +13,7 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
-import { KpiCard, KpiLinha, type TomKpi } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar, useTopCelular } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -24,7 +24,8 @@ import './abas-despesas-frota.css'
 export type FiltrosDespesaProprios = { categorias: string[]; formas: string[]; empresas: string[] }
 export const FILTROS_DESPESA_VAZIOS: FiltrosDespesaProprios = { categorias: [], formas: [], empresas: [] }
 
-const TOM_KPI: Record<KpiDespesaId, TomKpi> = { despesa: 'action', alimentacao: 'brand', aguardando: 'warning', ticket: 'brand', semComprovante: 'warning', hospedagem: 'brand' }
+/** Indicadores que pedem ação (aguardando, sem comprovante): warning só quando há algum. */
+const ATENCAO: ReadonlySet<KpiDespesaId> = new Set(['aguardando', 'semComprovante'])
 const TOM_FAIXA: Record<Tom, StatusTone> = { ok: 'success', warn: 'warning', danger: 'danger', neutral: 'neutral' }
 const ROTULO_KPIS = 'Indicadores de despesas'
 const ROTULOS_KPI = ['Despesa realizada', 'Alimentação', 'Aguardando pagamento', 'Ticket médio', 'Sem comprovante', 'Média hospedagem']
@@ -46,7 +47,7 @@ function KpiDespesaCartao({ k, indisponivel }: { k: KpiDespesa; indisponivel: bo
       <span className="dash-apoio">{k.faixa.apoio}</span>
     </> : null}
   </> : undefined
-  return <KpiCard rotulo={k.rotulo} valor={formatarKpi(k, indisponivel)} tom={TOM_KPI[k.id]} serie={k.serie}>{extras}</KpiCard>
+  return <KpiCard rotulo={k.rotulo} valor={formatarKpi(k, indisponivel)} tom={ATENCAO.has(k.id) ? tomAtencao(k.valor) : 'brand'} serie={k.serie}>{extras}</KpiCard>
 }
 
 type Proprios = { proprios: FiltrosDespesaProprios; onProprios: (f: FiltrosDespesaProprios) => void }

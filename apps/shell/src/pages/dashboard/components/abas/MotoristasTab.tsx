@@ -14,7 +14,7 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, VER_RANKING, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { dataBR, forte, resto } from './MoMaMuComum'
@@ -50,16 +50,16 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
   const semInfleet = mo.kpis.score == null
   const semFuncionarios = mo.kpis.total == null
   const abrir = useDetalhe()
-  const verCnh = abrir && mo.kpis.cnhAtencao ? { texto: 'Ver motoristas', onAbrir: () => abrir('cnh') } : undefined
+  const verCnh = abrir && mo.kpis.cnhAtencao ? { onAbrir: () => abrir('cnh') } : undefined
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
+      <KpiCard rotulo={KPIS[0]} valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
       <KpiCard
-        rotulo={KPIS[1]} tom="warning" valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
+        rotulo={KPIS[1]} tom={tomAtencao(mo.kpis.cnhAtencao)} valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
         apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: `vencida ou em até ${JANELA_DIAS} dias`, atencao: true }] : []} acao={verCnh}
       />
       <KpiCard
-        rotulo={KPIS[2]} tom="success" valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
+        rotulo={KPIS[2]} valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
         apoio={mo.kpis.score ? [{ rotulo: 'Notas válidas', texto: int(mo.kpis.score.validas) }] : []}
       />
     </KpiLinha>
@@ -143,7 +143,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
     ]
   const vazioRanking = <Vazio titulo={filtro === 'todos' ? 'Nenhum motorista ativo' : 'Nenhum motorista neste filtro'} />
   const top = useTopCelular(linhas, mobile, 'ranking')
-  const tabela = <><Table className="dash-mo-ranking" columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
+  const tabela = <><Table className={mobile ? undefined : 'dash-tabela-detalhe'} columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
   const filtroFrota = (
     <div className="dash-mo-filtro">
       <SegmentedControl

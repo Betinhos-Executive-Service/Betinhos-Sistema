@@ -75,7 +75,7 @@ describe('calcularMotoristas', () => {
     expect(ana.pct).toBeCloseTo(60, 10)
     expect(caio).toMatchObject({ key: 'c', servicos: 1, faturamento: 200, ticket: 200, propria: false, cnhDia: '2027-03-10', pct: 20 })
     expect(ze).toMatchObject({ key: 'nome:ze', servicos: 1, faturamento: 80, propria: null })
-    expect(sem).toMatchObject({ key: 'x', servicos: 0, faturamento: 0, ticket: 0, pct: 0, propria: null })
+    expect(sem).toMatchObject({ key: 'x', servicos: 0, faturamento: 0, ticket: null, pct: 0, propria: null })
   })
 
   it('ranking: meses com serviço no recorte, quantidade e % do mês; mesesBase para a média por mês', () => {

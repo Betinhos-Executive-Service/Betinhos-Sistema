@@ -190,7 +190,7 @@ describe('calcularFinanceiro: clientes', () => {
       ],
     })
     expect(beta.meses).toEqual([{ mes: '2026-09', valor: 0, delta: { tipo: 'nada' } }, { mes: '2026-10', valor: 3000, delta: { tipo: 'novo' } }])
-    expect(gama).toMatchObject({ servicos: 1, faturamento: 0, ticket: 0, pct: 0 })
+    expect(gama).toMatchObject({ servicos: 1, faturamento: 0, ticket: null, pct: 0 })
     expect(sem).toMatchObject({ servicos: 1, faturamento: 5000, pct: 50 })
   })
 

@@ -24,7 +24,7 @@ export function AlertaCard({ valor, rotulo, status, tom, onAbrir }: { valor: str
       </span>
       {onAbrir ? (
         <Button className="dash-abre dash-alerta__abre" variant="ghost" size="compact" iconEnd={<ChevronRight size={14} aria-hidden="true" />} onClick={onAbrir}>
-          Ver lista{' '}<span className="dash-sr">de {rotulo}</span>
+          Ver detalhes{' '}<span className="dash-sr">de {rotulo}</span>
         </Button>
       ) : null}
     </li>

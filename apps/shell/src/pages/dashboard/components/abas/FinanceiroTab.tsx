@@ -9,7 +9,7 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
@@ -184,7 +184,7 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
       },
     ]
   const top = useTopCelular(fi.clientes, mobile, 'clientes')
-  const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
+  const tabela = <Table className={mobile ? undefined : 'dash-tabela-detalhe'} columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
       titulo="Clientes" periodo={periodo} unidade="R$ e serviços por cliente" valor={int(fi.kpis.clientesAtivos)}
@@ -216,12 +216,12 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
       : `${int(k.pagamentosMedidos)} de ${int(k.pagamentosRecebidos)} pagamentos com data confiável · ${HISTORICO}`
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)} tom="action"><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)} tom="brand"><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} tom="success" apoio="serviços com faturamento pago" />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} tom="action" apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom="warning" apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[5]} valor={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} tom="brand" apoio={tempoApoio} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)}><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)}><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} apoio="serviços com faturamento pago" />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom={tomAtencao(k.atrasados)} apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />
+      <KpiCard rotulo={ROTULOS_FINANCEIRO[5]} valor={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} apoio={tempoApoio} />
     </KpiLinha>
     <div className="dash-grade">
       <CicloCard ciclo={fi.ciclo} indisponivel={indisponivel} periodo={periodo} />

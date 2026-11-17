@@ -86,6 +86,15 @@ describe('destaques', () => {
     expect(p.topPropria).toEqual([{ key: 'm1', nome: 'Ana', qtd: 2, fat: 200 }])
   })
 
+  it('produção própria × terceirizada: eixo contínuo, mês sem classificado vale zero', () => {
+    const rv = [
+      reserva({ veiculoId: 'v1', saidaRaw: '2026-07-10T15:00:00Z' }),
+      reserva({ veiculoId: 'v1', saidaRaw: '2026-09-10T15:00:00Z' }),
+    ]
+    const p = producaoPropriaTerceira(rv, [veiculo({ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' })])
+    expect(p.meses.map((m) => [m.mes, m.propria])).toEqual([['2026-07', 1], ['2026-08', 0], ['2026-09', 1]])
+  })
+
   it('produção própria × terceirizada: veículo de aluguel não entra nos classificados', () => {
     const rv = [
       reserva({ veiculoId: 'v1', motorista: 'Ana', motoristaKey: 'm1', valor: 100 }),
