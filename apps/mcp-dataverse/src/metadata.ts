@@ -180,3 +180,57 @@ export function applyFetchPaging(xml: string, p: { page?: number; count?: number
 
 /** Nome da tabela principal (`<entity name="...">`) de um FetchXML. */
 export const fetchXmlEntity = (xml: string): string | undefined => xml.match(/<entity\s+name\s*=\s*["']([^"']+)["']/i)?.[1]
+
+const XML_TAG = /<(\/)?([A-Za-z_][\w.:-]*)((?:\s+[\w.:-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/)?>/y
+const BAD_AMP = /&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);)/i
+
+/**
+ * Checagem mínima de XML (tags balanceadas, atributos entre aspas, `&` escapado, raiz `<fetch>`), sem dependência.
+ * Devolve a causa com linha e coluna, ou undefined se estiver bem formado.
+ */
+export function validateXml(xml: string): string | undefined {
+  const where = (i: number) => {
+    const before = xml.slice(0, i)
+    return `linha ${before.split('\n').length}, coluna ${i - before.lastIndexOf('\n')}`
+  }
+  const stack: { name: string; at: number }[] = []
+  let rootSeen = false
+  let i = 0
+  while (i < xml.length) {
+    const lt = xml.indexOf('<', i)
+    if (lt < 0) break
+    const skip = (open: string, close: string, what: string) => {
+      const end = xml.indexOf(close, lt + open.length)
+      return end < 0 ? `${what} aberto em ${where(lt)} e nunca fechado` : (i = end + close.length, undefined)
+    }
+    let err: string | undefined
+    if (xml.startsWith('<!--', lt)) err = skip('<!--', '-->', 'comentário')
+    else if (xml.startsWith('<![CDATA[', lt)) err = skip('<![CDATA[', ']]>', 'CDATA')
+    else if (xml.startsWith('<?', lt)) err = skip('<?', '?>', 'declaração')
+    else {
+      XML_TAG.lastIndex = lt
+      const m = XML_TAG.exec(xml)
+      if (!m) return `tag malformada em ${where(lt)} (perto de "${xml.slice(lt, lt + 40).replace(/\s+/g, ' ')}"): confira o fechamento com ">" e se os atributos estão entre aspas.`
+      const [full, closing, name, attrs, selfClose] = m
+      if (BAD_AMP.test(attrs)) return `"&" sem escape em atributo na tag <${name}> (${where(lt)}); use &amp;, &lt; e &gt;.`
+      if (closing) {
+        const top = stack.pop()
+        if (!top) return `</${name}> em ${where(lt)} não tem tag de abertura.`
+        if (top.name !== name) return `</${name}> em ${where(lt)} fecha fora de ordem: a tag aberta era <${top.name}> (${where(top.at)}); falta </${top.name}> ou "/>" nela.`
+      } else {
+        if (!stack.length) {
+          if (rootSeen) return `mais de um elemento raiz (<${name}> em ${where(lt)}).`
+          if (name.toLowerCase() !== 'fetch') return `a raiz do FetchXML deve ser <fetch>, não <${name}> (${where(lt)}).`
+          rootSeen = true
+        }
+        if (!selfClose) stack.push({ name, at: lt })
+      }
+      i = lt + full.length
+    }
+    if (err) return err
+  }
+  const open = stack.pop()
+  if (open) return `<${open.name}> aberta em ${where(open.at)} nunca foi fechada (falta </${open.name}> ou "/>").`
+  if (!rootSeen) return 'FetchXML sem elemento <fetch>.'
+  return undefined
+}

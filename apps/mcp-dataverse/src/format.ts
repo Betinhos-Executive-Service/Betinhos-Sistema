@@ -24,15 +24,20 @@ const DROPPED = new Set(['@odata.context', '@odata.etag'])
 
 /**
  * Compacta o que sai do Dataverse para gastar menos tokens: sem `@odata.context`/`@odata.etag`, sem campos nulos,
- * `campo@txt` no lugar do FormattedValue (só quando difere do valor) e `campo@tab` no lugar do lookuplogicalname.
+ * (com `keepNull`, nulos ficam como null; usado em agregações) `campo@txt` no lugar do FormattedValue (só quando difere do valor) e `campo@tab` no lugar do lookuplogicalname.
  */
-export function clean<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(clean) as T
+export function clean<T>(value: T, keepNull = false): T {
+  if (Array.isArray(value)) return value.map((v) => clean(v, keepNull)) as T
   if (value && typeof value === 'object') {
     const src = value as Record<string, unknown>
     const out: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(src)) {
-      if (DROPPED.has(k) || v === null || v === undefined) continue
+      if (DROPPED.has(k) || v === undefined) continue
+      if (v === null) {
+        // Agregações mantêm o grupo nulo explícito (senão a linha parece sem a coluna do grupo).
+        if (keepNull && !k.includes('@')) out[k] = null
+        continue
+      }
       if (k.endsWith(FORMATTED)) {
         const base = k.slice(0, -FORMATTED.length)
         if (String(src[base]) !== String(v)) out[`${base}@txt`] = v
@@ -41,7 +46,7 @@ export function clean<T>(value: T): T {
       } else if (k.includes('@Microsoft.Dynamics.CRM.associatednavigationproperty')) {
         continue
       } else {
-        out[k] = clean(v)
+        out[k] = clean(v, keepNull)
       }
     }
     return out as T
@@ -64,6 +69,7 @@ export function limitJson(payload: Record<string, unknown> | unknown[], max = MA
       JSON.stringify({
         ...payload,
         [listKey]: rows.slice(0, n),
+        ...(!Array.isArray(payload) && 'maisRegistros' in payload ? { maisRegistros: true } : {}),
         _truncado: true,
         _aviso: `Resposta cortada em ${n} de ${total} itens por tamanho (limite ${max} caracteres). Use $select, filtros ou a página seguinte.`,
       })
@@ -75,12 +81,24 @@ export function limitJson(payload: Record<string, unknown> | unknown[], max = MA
     while (n < total && used + sizes[n] <= max) used += sizes[n++]
     let out = build(n)
     while (out.length > max && n > 0) out = build(--n)
-    return out
+    if (out.length <= max) return out
   }
-  return `${json.slice(0, max)}\n[TRUNCADO: resposta cortada em ${max} caracteres. Refine a consulta.]`
+  // Sem lista para cortar: devolve JSON válido com um trecho do início.
+  let keep = max - 300
+  let out = ''
+  do {
+    out = JSON.stringify({
+      _truncado: true,
+      _aviso: `Resposta maior que ${max} caracteres; só o início vem em "parcial". Refine: select menor, filtro, top ou página seguinte.`,
+      parcial: json.slice(0, Math.max(keep, 0)),
+    })
+    keep = Math.floor(keep * 0.85)
+  } while (out.length > max && keep > 0)
+  return out
 }
 
-export const ok = (payload: Record<string, unknown> | unknown[]): ToolResult => text(limitJson(clean(payload)))
+export const ok = (payload: Record<string, unknown> | unknown[], opts: { keepNulls?: boolean } = {}): ToolResult =>
+  text(limitJson(clean(payload, opts.keepNulls)))
 
 /** Nunca devolva token: troca qualquer coisa com cara de JWT/Bearer. */
 export function redact(message: string): string {
@@ -89,11 +107,13 @@ export function redact(message: string): string {
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}(\.[A-Za-z0-9_-]*)?/g, '[token oculto]')
 }
 
-export function errorResult(error: unknown): ToolResult {
+/** `extra` = dica que ensina a corrigir a chamada (montada por `explainError` em tools.ts). */
+export function errorResult(error: unknown, extra?: string): ToolResult {
+  const tip = extra ? `\n${extra}` : ''
   if (error instanceof z.ZodError) {
-    return text(`Entrada inválida: ${error.issues.map((i) => `${i.path.join('.') || 'entrada'}: ${i.message}`).join('; ')}`, true)
+    return text(`Entrada inválida: ${error.issues.map((i) => `${i.path.join('.') || 'entrada'}: ${i.message}`).join('; ')}${tip}`, true)
   }
-  if (error instanceof DataverseError) return text(redact(error.toString()), true)
+  if (error instanceof DataverseError) return text(redact(error.toString() + tip), true)
   if (error instanceof EntraError) return text(redact(`${error.message} (HTTP ${error.status})`), true)
-  return text(redact(`Erro: ${error instanceof Error ? error.message : String(error)}`), true)
+  return text(redact(`Erro: ${error instanceof Error ? error.message : String(error)}${tip}`), true)
 }

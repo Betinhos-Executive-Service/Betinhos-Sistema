@@ -30,6 +30,8 @@ export class DataverseError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Entrada que originou o erro (ex.: nome de tabela digitado), para a dica de correção. */
+    readonly meta: { tabela?: string } = {},
   ) {
     super(message)
   }
@@ -268,6 +270,17 @@ export class DataverseSession {
     return value
   }
 
+  /** Valor em cache (JSON) sem carregar nada; undefined se ausente. */
+  peek<T>(key: string): T | undefined {
+    const hit = this.store.get(key)
+    if (hit === undefined) return undefined
+    try {
+      return JSON.parse(hit) as T
+    } catch {
+      return undefined
+    }
+  }
+
   /** Esquema mudou (tabela criada, alterada ou excluída): descarta metadata em cache do ambiente. */
   invalidateSchema(ambiente: Ambiente) {
     for (const key of this.entities.keys()) if (key.startsWith(`${ambiente}:`)) this.entities.delete(key)
@@ -277,7 +290,7 @@ export class DataverseSession {
   /** Resolve nome lógico ou EntitySetName para a tabela (cache em memória e no store, por ambiente). */
   async entity(ambiente: Ambiente, nameOrSet: string): Promise<EntityInfo> {
     const name = nameOrSet.toLowerCase()
-    if (!isLogicalName(name)) throw new DataverseError(400, 'nome_invalido', `Nome de tabela inválido: use só letras, números e _ (recebido "${nameOrSet.slice(0, 60)}").`)
+    if (!isLogicalName(name)) throw new DataverseError(400, 'nome_invalido', `Nome de tabela inválido: use o nome lógico (letras minúsculas, números e _), não o rótulo (recebido "${nameOrSet.slice(0, 60)}").`, { tabela: nameOrSet })
     const key = `${ambiente}:${name}`
     const hit = this.entities.get(key)
     if (hit) return hit
@@ -302,7 +315,7 @@ export class DataverseSession {
       ).data?.value
       row = found?.[0]
     }
-    if (!row) throw new DataverseError(404, 'tabela_nao_encontrada', `Tabela "${nameOrSet}" não encontrada em ${ambiente}.`)
+    if (!row) throw new DataverseError(404, 'tabela_nao_encontrada', `Tabela "${nameOrSet}" não encontrada em ${ambiente}.`, { tabela: nameOrSet })
     const info: EntityInfo = {
       logicalName: row.LogicalName,
       entitySet: row.EntitySetName,
@@ -323,6 +336,9 @@ export class DataverseSession {
   }
 }
 
+/** Ruído do Dataverse sem valor para o modelo: índice e id da organização. */
+const NOISE_RE = /\s*[\[(]?\s*(?:orgIndex|org\s*id|organization\s*id)\s*[:=]\s*[\w-]+\s*[\])]?/gi
+
 async function toError(response: Response): Promise<DataverseError> {
   const text = await response.text()
   let code = ''
@@ -336,6 +352,7 @@ async function toError(response: Response): Promise<DataverseError> {
   } catch {
     // corpo não JSON: usa o texto cru
   }
+  message = message.replace(NOISE_RE, '').trim()
   if (response.status === 429) {
     const wait = retryAfterMs(response.headers)
     message = `Limite de proteção do Dataverse (429)${wait !== undefined ? `; tente de novo em ${Math.ceil(wait / 1000)} s` : ''}. ${message}`
