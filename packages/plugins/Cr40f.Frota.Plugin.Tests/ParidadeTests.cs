@@ -15,7 +15,7 @@ public sealed class FixtureParidade
     [DataMember(Name = "hoje")] public string Hoje { get; set; } = "";
     [DataMember(Name = "agora")] public string Agora { get; set; } = "";
     [DataMember(Name = "veiculos")] public List<Veiculo> Veiculos { get; set; } = new();
-    [DataMember(Name = "manutencoes")] public List<Manutencao> Manutencoes { get; set; } = new();
+    [DataMember(Name = "manutencoes")] public List<ManutencaoRegistro> Manutencoes { get; set; } = new();
     [DataMember(Name = "itens")] public List<ItemPlano> Itens { get; set; } = new();
     [DataMember(Name = "baselines")] public List<Baseline> Baselines { get; set; } = new();
     [DataMember(Name = "esperado")] public List<string> Esperado { get; set; } = new();
@@ -61,6 +61,14 @@ public class ParidadeTests
         var catalogo = Json.Ler<CatalogoJson>(json);
         Assert.Equal(catalogo.Servicos.ToDictionary(s => s.Value, s => s.Label), Catalogo.Servicos.ToDictionary(k => k.Key, k => k.Value));
     }
+
+    [Fact]
+    public void Categoria_de_cada_servico_igual_ao_json_do_shell()
+    {
+        var json = File.ReadAllText(FixtureParidade.Caminho("..", "..", "..", "..", "..", "..", "apps", "shell", "src", "pages", "frota", "domain", "manutencaoCatalogo.json"));
+        var catalogo = Json.Ler<CatalogoJson>(json);
+        Assert.Equal(catalogo.Servicos.ToDictionary(s => s.Value, s => s.Categoria), Catalogo.CategoriaPorServico.ToDictionary(k => k.Key, k => k.Value));
+    }
 }
 
 [DataContract]
@@ -74,4 +82,5 @@ public sealed class ServicoJson
 {
     [DataMember(Name = "value")] public int Value { get; set; }
     [DataMember(Name = "label")] public string Label { get; set; } = "";
+    [DataMember(Name = "categoria")] public int Categoria { get; set; }
 }

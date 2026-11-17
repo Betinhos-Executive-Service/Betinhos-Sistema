@@ -5,7 +5,8 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
-// Registra o plugin das pendências da frota e a Custom API global cr40f_FrotaPendencias.
+// Registra o plugin da frota: Custom API global cr40f_FrotaPendencias, as Custom APIs das manutenções
+// (cr40f_ManutencaoAgendar/Reprovar/Cancelar/Concluir) e o step do espelho da programação no Update da Geral.
 // Modo de verificação: --testar [yyyy-MM-dd] chama a Custom API e imprime o PendenciasJson.
 var options = Arguments.Parse(args);
 var environmentUrl = options.Require("environmentUrl");
@@ -15,9 +16,19 @@ var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos"
 var publish = options.Has("publish");
 if (dllPath.Length > 0 && !File.Exists(dllPath)) throw new FileNotFoundException("DLL do plugin nao encontrada.", dllPath);
 
-const string PluginTypeName = "Cr40f.Frota.Plugin.FrotaPendenciasPlugin";
+const string PendenciasType = "Cr40f.Frota.Plugin.FrotaPendenciasPlugin";
+const string ComandoType = "Cr40f.Frota.Plugin.ManutencaoComandoPlugin";
+const string EspelhoType = "Cr40f.Frota.Plugin.GeralManutencaoEspelhoPlugin";
 const string CustomApiName = "cr40f_FrotaPendencias";
 const int PluginAssemblyComponentType = 91;
+
+var apisManutencao = new (string Nome, string Exibicao, string Descricao)[]
+{
+    ("cr40f_ManutencaoAgendar", "Manutenção | Agendar", "Encaixa (ou reagenda) a manutenção num dia ou numa semana de segunda a domingo e cria ou reabre a linha dela na Geral."),
+    ("cr40f_ManutencaoReprovar", "Manutenção | Reprovar", "Reprova uma manutenção solicitada (comentário obrigatório) e cancela a linha da Geral."),
+    ("cr40f_ManutencaoCancelar", "Manutenção | Cancelar", "Cancela uma manutenção em aberto e a linha dela na Geral."),
+    ("cr40f_ManutencaoConcluir", "Manutenção | Concluir", "Conclui a manutenção (serviços, km, valor, pagamento), cria ou atualiza a despesa e conclui a linha da Geral, numa transação."),
+};
 
 Log("autenticando no Dataverse");
 var tokenCacheDirectory = Path.Combine(Path.GetTempPath(), "Betinhos", "Dataverse");
@@ -48,16 +59,25 @@ if (testar)
 var assemblyInfo = AssemblyInfo.Read(dllPath);
 if (assemblyInfo.PublicKeyToken.Length == 0) throw new InvalidOperationException("DLL sem assinatura forte.");
 var assemblyId = UpsertAssembly(service, assemblyInfo, Convert.ToBase64String(File.ReadAllBytes(dllPath)));
-var pluginTypeId = UpsertPluginType(service, assemblyId);
+var pendenciasTypeId = UpsertPluginType(service, assemblyId, PendenciasType);
+var comandoTypeId = UpsertPluginType(service, assemblyId, ComandoType);
+var espelhoTypeId = UpsertPluginType(service, assemblyId, EspelhoType);
 EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyComponentType);
-EnsureCustomApi(service, pluginTypeId, solutionUniqueName);
+EnsureCustomApi(service, pendenciasTypeId, solutionUniqueName);
+foreach (var api in apisManutencao)
+    EnsureComandoApi(service, comandoTypeId, solutionUniqueName, api.Nome, api.Exibicao, api.Descricao);
+// A imagem pre é a lista de GeralManutencaoEspelhoPlugin.AtributosPre (o registrador não referencia o projeto do plugin;
+// PluginsTests.Registrador_usa_os_atributos_da_imagem_pre_do_espelho confere que as duas são iguais).
+EnsureStep(service, espelhoTypeId, "Update", "cr40f_reservadeveculos", 40, "cr40f_status,cr40f_motorista",
+    "Cr40f.Frota: espelho da manutenção (Update Geral)", solutionUniqueName,
+    "new_categoriadoitem,cr40f_om,cr40f_status,cr40f_motorista");
 
 if (publish)
 {
     Log("publicando customizacoes");
     service.Execute(new OrganizationRequest("PublishAllXml"));
 }
-Log("plugin das pendências da frota registrado");
+Log("plugin da frota registrado");
 
 static void Log(string message) => Console.WriteLine($"[frota:plugin] {message}");
 static EntityReference Ref(string logicalName, Guid id) => new(logicalName, id);
@@ -85,20 +105,21 @@ static Guid UpsertAssembly(ServiceClient service, AssemblyInfo info, string cont
     });
 }
 
-static Guid UpsertPluginType(ServiceClient service, Guid assemblyId)
+static Guid UpsertPluginType(ServiceClient service, Guid assemblyId, string typeName)
 {
-    var existing = FindSingleOrNone(service, "plugintype", ("typename", PluginTypeName), ("pluginassemblyid", assemblyId));
+    var existing = FindSingleOrNone(service, "plugintype", ("typename", typeName), ("pluginassemblyid", assemblyId));
     if (existing is not null)
     {
-        Log($"reutilizando tipo {PluginTypeName}");
+        Log($"reutilizando tipo {typeName}");
         return existing.Id;
     }
-    Log($"criando tipo {PluginTypeName}");
+    Log($"criando tipo {typeName}");
+    var curto = typeName.Split('.').Last();
     return service.Create(new Entity("plugintype")
     {
-        ["name"] = "FrotaPendenciasPlugin",
-        ["friendlyname"] = "FrotaPendenciasPlugin",
-        ["typename"] = PluginTypeName,
+        ["name"] = curto,
+        ["friendlyname"] = curto,
+        ["typename"] = typeName,
         ["pluginassemblyid"] = Ref("pluginassembly", assemblyId),
     });
 }
@@ -170,6 +191,53 @@ static void EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string sol
     }
 }
 
+static void EnsureComandoApi(ServiceClient service, Guid pluginTypeId, string solution, string nome, string exibicao, string descricao)
+{
+    Guid customApiId;
+    var existing = FindSingleOrNone(service, "customapi", ("uniquename", nome));
+    if (existing is not null)
+    {
+        var update = new UpdateRequest { Target = new Entity("customapi", existing.Id) { ["plugintypeid"] = Ref("plugintype", pluginTypeId) } };
+        update["SolutionUniqueName"] = solution;
+        service.Execute(update);
+        customApiId = existing.Id;
+        Log($"reutilizando Custom API {nome}");
+    }
+    else
+    {
+        var create = new CreateRequest
+        {
+            Target = new Entity("customapi")
+            {
+                ["uniquename"] = nome, ["name"] = nome, ["displayname"] = exibicao, ["description"] = descricao,
+                ["bindingtype"] = new OptionSetValue(0), ["isfunction"] = false, ["isprivate"] = false,
+                ["allowedcustomprocessingsteptype"] = new OptionSetValue(0),
+                ["plugintypeid"] = Ref("plugintype", pluginTypeId),
+                ["iscustomizable"] = new BooleanManagedProperty(false),
+            },
+        };
+        create["SolutionUniqueName"] = solution;
+        customApiId = ((CreateResponse)service.Execute(create)).id;
+        Log($"criando Custom API {nome}");
+    }
+
+    if (!ChildExists(service, "customapirequestparameter", customApiId, "RequestJson"))
+        CreateInSolution(service, new Entity("customapirequestparameter")
+        {
+            ["customapiid"] = Ref("customapi", customApiId), ["uniquename"] = "RequestJson", ["name"] = $"{nome}.RequestJson",
+            ["displayname"] = "Pedido JSON", ["description"] = "Contrato em packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs.",
+            ["type"] = new OptionSetValue(10), ["isoptional"] = false, ["iscustomizable"] = new BooleanManagedProperty(false),
+        }, solution);
+
+    if (!ChildExists(service, "customapiresponseproperty", customApiId, "ResponseJson"))
+        CreateInSolution(service, new Entity("customapiresponseproperty")
+        {
+            ["customapiid"] = Ref("customapi", customApiId), ["uniquename"] = "ResponseJson", ["name"] = $"{nome}.ResponseJson",
+            ["displayname"] = "Resposta JSON", ["description"] = "Contrato em packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs.",
+            ["type"] = new OptionSetValue(10), ["iscustomizable"] = new BooleanManagedProperty(false),
+        }, solution);
+}
+
 static bool ChildExists(ServiceClient service, string logicalName, Guid customApiId, string uniqueName)
 {
     var query = new QueryExpression(logicalName) { ColumnSet = new ColumnSet(false), TopCount = 1 };
@@ -183,6 +251,45 @@ static void CreateInSolution(ServiceClient service, Entity entity, string soluti
     var request = new CreateRequest { Target = entity };
     request["SolutionUniqueName"] = solution;
     service.Execute(request);
+}
+
+static void EnsureStep(ServiceClient service, Guid pluginTypeId, string messageName, string entity, int stage, string? filter, string name, string solutionUniqueName, string? preImageAttributes = null)
+{
+    Guid stepId;
+    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
+    {
+        stepId = existing.Id;
+        service.Update(new Entity("sdkmessageprocessingstep", stepId) { ["filteringattributes"] = filter, ["stage"] = new OptionSetValue(stage), ["mode"] = new OptionSetValue(0) });
+        Log($"step reconciliado: {name}");
+    }
+    else
+    {
+        var message = FindSingleOrNone(service, "sdkmessage", ("name", messageName)) ?? throw new InvalidOperationException($"sdkmessage {messageName} não encontrada.");
+        var filterRow = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
+        {
+            ColumnSet = new ColumnSet("sdkmessagefilterid"),
+            Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, entity) } },
+        }).Entities.Single();
+        stepId = service.Create(new Entity("sdkmessageprocessingstep")
+        {
+            ["name"] = name, ["mode"] = new OptionSetValue(0), ["stage"] = new OptionSetValue(stage), ["rank"] = 20,
+            ["supporteddeployment"] = new OptionSetValue(0), ["filteringattributes"] = filter,
+            ["sdkmessageid"] = Ref("sdkmessage", message.Id), ["sdkmessagefilterid"] = Ref("sdkmessagefilter", filterRow.Id),
+            ["eventhandler"] = Ref("plugintype", pluginTypeId), ["asyncautodelete"] = false,
+        });
+        Log($"step criado: {name}");
+    }
+    EnsureSolutionComponent(service, stepId, solutionUniqueName, 92);
+    if (preImageAttributes is null) return;
+    var image = FindSingleOrNone(service, "sdkmessageprocessingstepimage", ("sdkmessageprocessingstepid", stepId), ("entityalias", "pre"));
+    var dados = new Entity("sdkmessageprocessingstepimage")
+    {
+        ["name"] = "pre", ["entityalias"] = "pre", ["imagetype"] = new OptionSetValue(0),
+        ["messagepropertyname"] = "Target", ["attributes"] = preImageAttributes,
+        ["sdkmessageprocessingstepid"] = Ref("sdkmessageprocessingstep", stepId),
+    };
+    if (image is null) { service.Create(dados); Log($"imagem pre criada: {name}"); }
+    else { dados.Id = image.Id; service.Update(dados); Log($"imagem pre reconciliada: {name}"); }
 }
 
 static void EnsureSolutionComponent(ServiceClient service, Guid componentId, string solution, int componentType)
