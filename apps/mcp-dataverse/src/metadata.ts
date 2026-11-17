@@ -16,17 +16,17 @@ export const labelText = (l: any): string | undefined => l?.UserLocalizedLabel?.
 
 export const columnSchema = z.object({
   tipo: z.enum(['texto', 'memo', 'inteiro', 'decimal', 'moeda', 'data', 'booleano', 'choice', 'lookup']),
-  nomeSchema: z.string().refine(isLogicalName, 'Nome de esquema inválido (letras, números e _)').describe('Com prefixo do publisher, ex.: cr40f_observacao.'),
+  nomeSchema: z.string().refine(isLogicalName, 'Nome de esquema inválido (letras, números e _)').describe('Com prefixo, ex.: cr40f_observacao.'),
   rotulo: z.string(),
   descricao: z.string().optional(),
   obrigatoria: z.boolean().optional(),
   tamanhoMaximo: z.number().int().optional().describe('texto (100) e memo (2000).'),
   casasDecimais: z.number().int().min(0).max(10).optional().describe('decimal (2).'),
   somenteData: z.boolean().optional().describe('data: true = só data.'),
-  opcoes: z.array(z.object({ valor: z.number().int().optional(), rotulo: z.string() })).optional().describe('choice; sem valor, numera de 100000000.'),
+  opcoes: z.array(z.object({ valor: z.number().int().optional(), rotulo: z.string() })).optional().describe('choice (valor opcional).'),
   rotuloVerdadeiro: z.string().optional().describe('booleano (Sim).'),
   rotuloFalso: z.string().optional().describe('booleano (Não).'),
-  tabelaAlvo: z.string().refine(isLogicalName, 'Nome de tabela inválido').optional().describe('lookup: tabela referenciada.'),
+  tabelaAlvo: z.string().refine(isLogicalName, 'Nome de tabela inválido').optional().describe('lookup: tabela alvo.'),
 })
 export type ColumnInput = z.infer<typeof columnSchema>
 

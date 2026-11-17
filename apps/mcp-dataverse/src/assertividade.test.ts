@@ -3,7 +3,7 @@ import { DataverseSession } from './dataverse'
 import { clean, limitJson } from './format'
 import { env, json, mockFetch, tokenReply, type Call } from './helpers.test-util'
 import { INSTRUCTIONS } from './instrucoes'
-import { nullColumns, suggest } from './dicas'
+import { nullColumns, suggest, wrongOperators } from './dicas'
 import { validateXml } from './metadata'
 import { buildTools, promptInputs, type ToolDef } from './tools'
 
@@ -38,6 +38,7 @@ const route = (extra?: (c: Call) => Response | undefined) => (call: Call): Respo
           { LogicalName: 'statecode', AttributeType: 'State', RequiredLevel: { Value: 'SystemRequired' } },
           { LogicalName: 'cr40f_data', AttributeType: 'DateTime', RequiredLevel: { Value: 'ApplicationRequired' } },
           { LogicalName: 'createdon', AttributeType: 'DateTime', RequiredLevel: { Value: 'SystemRequired' }, IsValidForCreate: false },
+          { LogicalName: 'ownerid', AttributeType: 'Owner', RequiredLevel: { Value: 'SystemRequired' } },
         ],
       })
     }
@@ -75,7 +76,9 @@ describe('erros que ensinam', () => {
         c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x80060888', message: "Could not find a property named 'cr40f_cliente' on type 'Microsoft.Dynamics.CRM.cr40f_reserva'." } }, 400) : undefined,
       ),
     )
-    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_cliente' })
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const r = await t('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_cliente' })
     expect(textOf(r)).toMatch(/"cr40f_cliente" é lookup: use _cr40f_cliente_value em select\/filter e cr40f_Cliente\(\$select=colunas\) em expand/)
   })
 
@@ -85,10 +88,53 @@ describe('erros que ensinam', () => {
         c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x80060888', message: "Could not find a property named 'cr40f_valr' on type 'Microsoft.Dynamics.CRM.cr40f_reserva'." } }, 400) : undefined,
       ),
     )
-    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valr' })
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const r = await t('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valr' })
     expect(textOf(r)).toMatch(/Parecidas: cr40f_valor/)
     expect(textOf(r)).toMatch(/Coluna principal: cr40f_nome/)
     expect(textOf(r)).toMatch(/describe_table\(tabela:"cr40f_reserva", filtroColuna/)
+  })
+
+  it('sem metadata em cache a dica de coluna é genérica e não faz as 13 chamadas de describe', async () => {
+    const calls = mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x80060888', message: "Could not find a property named 'cr40f_valr' on type 'Microsoft.Dynamics.CRM.cr40f_reserva'." } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_valr' })
+    expect(textOf(r)).toMatch(/Se for lookup, use _col_value/)
+    expect(textOf(r)).toMatch(/Coluna principal: cr40f_nome/)
+    expect(calls.some((c) => decodeURIComponent(c.url).includes('/Attributes'))).toBe(false)
+  })
+
+  it('escrita com lookup errado ensina a navegação@odata.bind com o entitySet do alvo', async () => {
+    mockFetch(route((c) => (c.method === 'POST' && c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x80060888', message: "Could not find a property named 'cr40f_cliente' on type 'Microsoft.Dynamics.CRM.cr40f_reserva'." } }, 400) : undefined)))
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const r = await t('create_record').handler({ tabela: 'cr40f_reserva', dados: { cr40f_cliente: '5d2b2f3a-0000-4000-8000-000000000001' } })
+    expect(textOf(r)).toContain('"cr40f_Cliente@odata.bind":"/cr40f_clientes1s(<guid>)"')
+    expect(textOf(r)).not.toMatch(/_cr40f_cliente_value/)
+  })
+
+  it('propriedade não declarada na escrita também é reconhecida (sem cache: dica de @odata.bind)', async () => {
+    mockFetch(route((c) => (c.method === 'POST' && c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x0', message: "An undeclared property 'cr40f_cliente' which only has property annotations in the payload but no property value was found." } }, 400) : undefined)))
+    const r = await tools()('create_record').handler({ tabela: 'cr40f_reserva', dados: { cr40f_cliente: 'x' } })
+    expect(textOf(r)).toMatch(/grave "<Navegacao>@odata.bind"/)
+  })
+
+  it('apply agrupando por lookup: dica de FetchXML aggregate, não de _x_value', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x80041103', message: "'cr40f_Reserva' entity doesn't contain attribute with Name = '_cr40f_cliente_value' and NameMapping = 'Platform'." } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', apply: 'groupby((_cr40f_cliente_value),aggregate($count as total))' })
+    expect(textOf(r)).toMatch(/fetchXml: <fetch aggregate="true"><entity name="cr40f_reserva">.*groupby="true".*<order alias="total" descending="true"\/>/)
+    expect(textOf(r)).not.toMatch(/use _cr40f_cliente_value em select/)
+  })
+
+  it.each(['cr40f_status = 1', 'a == 1', 'a <> 1', 'a != 1', 'a eq 1 && b eq 2'])('filtro %s: dica específica de operadores', async (filter) => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ error: { code: '0x1', message: 'Bad request' } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', filter })
+    expect(textOf(r)).toMatch(/Use eq\/ne\/and\/or/)
+  })
+
+  it('filtro correto com "=" dentro de texto não aciona a dica de operadores', () => {
+    expect(wrongOperators("nome eq 'a=b' and x eq 1")).toBe(false)
+    expect(wrongOperators('x ge 1')).toBe(false)
   })
 
   it('erro de sintaxe no filtro acrescenta a dica de operadores', async () => {
@@ -113,6 +159,7 @@ describe('erros que ensinam', () => {
     const r = await tools()('search').handler({ consulta: "o'brien", tabelas: ['cr40f_reserva'] })
     expect(textOf(r)).toMatch(/desativado/)
     expect(textOf(r)).toMatch(/contains\(cr40f_nome,'o''brien'\)/)
+    expect(textOf(r)).toMatch(/cliente = cr40f_clientes1 \/ cr40f_nomedocliente; passageiro = cr40f_bancodedados \/ cr40f_nomedopassageiro/)
   })
 
   it('GUID inválido mostra o valor recebido (truncado)', async () => {
@@ -169,11 +216,37 @@ describe('read_query: resultado', () => {
     expect(JSON.parse(textOf(semFiltro))._dica).toBeUndefined()
   })
 
+  it('apply só com filter mantém o select (não é agregação)', async () => {
+    const calls = mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ a: 1 }] }) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'a', apply: 'filter(a eq 1)' })
+    expect(decodeURIComponent(calls.find((c) => c.url.includes('/cr40f_reservas'))!.url)).toContain('$select=a')
+    expect(JSON.parse(textOf(r))._aviso).toBeUndefined()
+  })
+
+  it('fetch de registro único não emite _nulas', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas(') ? json({ a: 1, b: null }) : undefined)))
+    const r = await tools()('fetch').handler({ tabela: 'cr40f_reserva', id: '5d2b2f3a-0000-4000-8000-000000000001', colunas: 'a,b' })
+    expect(JSON.parse(textOf(r))._nulas).toBeUndefined()
+  })
+
   const xml = '<fetch><entity name="cr40f_reserva"><attribute name="a"/></entity></fetch>'
   it('FetchXML: página cheia sem a anotação não vira maisRegistros false', async () => {
     mockFetch(route((c) => (c.url.includes('fetchXml') ? json({ value: Array.from({ length: 50 }, (_, i) => ({ i })) }) : undefined)))
     const r = await tools()('read_query').handler({ fetchXml: xml })
     expect(JSON.parse(textOf(r)).maisRegistros).toBe(true)
+  })
+
+  it('FetchXML agregado sem a anotação morerecords: maisRegistros false mesmo com página cheia', async () => {
+    mockFetch(route((c) => (c.url.includes('fetchXml') ? json({ value: Array.from({ length: 50 }, (_, i) => ({ i })) }) : undefined)))
+    const agg = '<fetch aggregate="true"><entity name="cr40f_reserva"><attribute name="a" groupby="true" alias="g"/></entity></fetch>'
+    expect(JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: agg }))).maisRegistros).toBe(false)
+  })
+
+  it('FetchXML: sem _dica de vazio a partir da página 2', async () => {
+    mockFetch(route((c) => (c.url.includes('fetchXml') ? json({ value: [] }) : undefined)))
+    const f = '<fetch><entity name="cr40f_reserva"><filter><condition attribute="a" operator="eq" value="1"/></filter></entity></fetch>'
+    expect(JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: f }))) ._dica).toMatch(/UTC/)
+    expect(JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: f, pagina: 2 })))._dica).toBeUndefined()
   })
 
   it('FetchXML: página incompleta sem anotação e anotação explícita false continuam false', async () => {
@@ -211,6 +284,7 @@ describe('describe_table', () => {
     expect(out.colunas.map((c: any) => c.nome).sort()).toEqual(['cr40f_cliente', 'cr40f_data'])
     expect(out.relacoes.muitosParaUm).toHaveLength(1)
     expect(out.relacoes.umParaMuitos).toBeUndefined()
+    expect(out.colunas.some((c: any) => c.nome === 'ownerid')).toBe(false)
   })
 
   it('obrigatórias primeiro, statecode por último e marcado como sistema', async () => {
@@ -220,6 +294,7 @@ describe('describe_table', () => {
     expect(names.slice(0, 4)).toEqual(['cr40f_reservaid', 'cr40f_cliente', 'cr40f_data', 'createdon'])
     expect(names.at(-1)).toBe('statecode')
     expect(out.colunas.at(-1).sistema).toBe(true)
+    expect(out.colunas.find((c: any) => c.nome === 'ownerid').automatico).toBe(true)
   })
 
   it('filtroColuna também filtra as relações', async () => {
@@ -231,10 +306,9 @@ describe('describe_table', () => {
     expect(hit.relacoes.muitosParaUm).toHaveLength(1)
   })
 
-  it('alvoEntitySet entra nos lookups quando a lista de tabelas já está em cache', async () => {
+  it('alvoEntitySet entra nos lookups (a lista de tabelas é carregada uma vez e fica em cache)', async () => {
     mockFetch(route())
     const t = tools()
-    await t('list_tables').handler({})
     const out = JSON.parse(textOf(await t('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'cliente' })))
     expect(out.colunas[0].alvoEntitySet).toBe('cr40f_clientes1s')
   })
@@ -302,6 +376,7 @@ describe('auxiliares', () => {
     expect(INSTRUCTIONS).toMatch(/DEV/)
     expect(INSTRUCTIONS).toMatch(/confirmar/)
     expect(INSTRUCTIONS).toMatch(/UTC-3/)
+    for (const c of ['cr40f_nomecompleto', 'cr40f_placa', 'cr40f_titulo', 'cr40f_statuscotacao', 'cr40f_Passageiro1', 'cr40f_Veiculo', 'FetchXML aggregate']) expect(INSTRUCTIONS).toContain(c)
     for (const t of ['cr40f_reservadeveculos', 'cr40f_bancodedados', 'cr40f_clientes1', 'cr40f_funcionarios', 'cr40f_veiculos', 'cr40f_pagantes', 'cr40f_despesaoperacional', 'cr40f_pedidodecotacao']) {
       expect(INSTRUCTIONS).toContain(t)
     }

@@ -45,6 +45,7 @@ export interface Candidate {
 
 /** Até `max` candidatos parecidos com `query` (nome lógico ou rótulo): substring, palavras em comum, depois distância de edição. */
 export function suggest<T extends Candidate>(query: string, items: T[], max = 5): T[] {
+  query = query.slice(0, 80)
   const q = norm(query)
   if (!q) return []
   const unprefixed = query.replace(/^[a-z0-9]+_/i, '')
@@ -76,9 +77,10 @@ export function suggest<T extends Candidate>(query: string, items: T[], max = 5)
 export const propertyMissing = (message: string): { property: string; type?: string } | undefined => {
   const m =
     message.match(/Could not find a property named '([^']+)' on type '([^']+)'/i) ??
-    message.match(/The property '([^']+)' does not exist on type '([^']+)'/i)
+    message.match(/The property '([^']+)' does not exist on type '([^']+)'/i) ??
+    message.match(/undeclared property '([^']+)'()/i)
   if (!m) return undefined
-  return { property: m[1], type: m[2].replace(/^Microsoft\.Dynamics\.CRM\./, '') }
+  return { property: m[1], type: m[2] ? m[2].replace(/^Microsoft\.Dynamics\.CRM\./, '') : undefined }
 }
 
 export const searchDisabled = (code: string, message: string) => /0x80048d0b/i.test(code + message) || /Search feature is disabled/i.test(message)
@@ -92,3 +94,13 @@ export function nullColumns(rows: unknown[], select?: string): string[] {
   const cols = [...new Set(select.split(',').map((c) => c.trim()).filter((c) => /^[A-Za-z0-9_]+$/.test(c)))]
   return cols.filter((c) => rows.every((r) => (r as Record<string, unknown>)?.[c] == null))
 }
+
+/** Operadores de outras linguagens no filtro (fora de textos entre aspas): `=`, `==`, `<>`, `!=`, `&&`, `||`. */
+export const wrongOperators = (filter?: string): boolean =>
+  !!filter && /(^|[^<>!=])=(?!=)|==|<>|!=|&&|\|\|/.test(filter.replace(/'[^']*'/g, "''"))
+
+export const OPERATOR_HINT = 'Use eq/ne/and/or, não = == <> != && ||. Ex.: cr40f_status eq 1 and statecode eq 0.'
+
+/** apply agrupando por lookup falha no OData: o caminho que funciona é o FetchXML aggregate. */
+export const applyHint = (table: string, id: string) =>
+  `$apply não agrupa por lookup (nem _col_value nem Nav/coluna). Use fetchXml: <fetch aggregate="true"><entity name="${table}"><attribute name="<lookup>" groupby="true" alias="g"/><attribute name="${id}" aggregate="count" alias="total"/><order alias="total" descending="true"/></entity></fetch> (ranking: top no <fetch>). Grupo nulo = linha sem a chave. No OData, groupby só em colunas simples e orderby/top não vão dentro do apply.`
