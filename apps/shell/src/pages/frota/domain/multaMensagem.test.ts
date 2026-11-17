@@ -27,7 +27,9 @@ describe('mensagemWhatsApp', () => {
     const texto = mensagemWhatsApp({ ...dossie, servicos: [], infleet: { erro: 'Token da Infleet não configurado.' } }, null)
     expect(texto).toContain('Olá. Chegou uma notificação')
     expect(texto).toContain('Agenda: nenhum serviço desse veículo no horário.')
-    expect(texto).toContain('Rastreador: indisponível (Token da Infleet não configurado.)')
+    expect(texto).toContain('Rastreador: indisponível no momento.')
+    expect(texto).not.toContain('Token da Infleet')
+    expect(texto).not.toMatch(/undefined|null/)
   })
 
   it('serviço fora do horário aparece como próximo e viagem nenhuma é dita', () => {

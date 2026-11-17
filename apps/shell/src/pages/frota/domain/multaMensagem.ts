@@ -14,7 +14,7 @@ function linhasServico(servicos: DossieServico[]) {
 }
 
 function linhasRastreador(infleet: Dossie['infleet']) {
-  if (infleet.erro) return [`Rastreador: indisponível (${infleet.erro})`]
+  if (infleet.erro) return ['Rastreador: indisponível no momento.']
   const viagens = infleet.viagens ?? []
   if (!viagens.length) return ['Rastreador: nenhuma viagem 30 minutos antes ou depois.']
   return viagens.map((v) => `Rastreador: viagem ${horaSP(v.inicio)}–${horaSP(v.fim)}${v.motorista ? ` com ${v.motorista}` : ''}`)
