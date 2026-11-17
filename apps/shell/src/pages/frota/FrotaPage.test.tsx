@@ -5,10 +5,12 @@ import { ToastProvider } from '@betinhos/ui'
 import { Frota, type Tab } from './FrotaPage'
 import { MANUT, PROPRIO, VEICULO } from './data/schema'
 import { EMPTY_DATA, type DataSource, type LoadResult } from './data/source'
+import { manutencaoFalsa } from './testUtils'
 
 function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
   return {
     mode, envLabel,
+    ...manutencaoFalsa(),
     load: vi.fn(async () => ({ data: EMPTY_DATA, errors: {} })),
     currentStatus: async () => null,
     dateBehaviors: async () => ({}),

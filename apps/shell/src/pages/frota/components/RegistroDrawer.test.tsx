@@ -6,10 +6,12 @@ import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { Colisao, FrotaData, Kind, Manutencao, Multa } from '../data/types'
 import { RegistroDrawer } from './RegistroDrawer'
 import { ToastProvider } from '@betinhos/ui'
+import { manutencaoFalsa } from '../testUtils'
 
 function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
   return {
     mode: 'mock', envLabel: 'TEST',
+    ...manutencaoFalsa(),
     load: async () => ({ data: EMPTY_DATA, errors: {} }),
     currentStatus: async () => COLISAO.ENVIADO,
     dateBehaviors: async () => ({}),

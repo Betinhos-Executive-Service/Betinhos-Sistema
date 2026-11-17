@@ -1,6 +1,7 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
 import { chamarCustomApi } from './customApi'
+import { criarArquivosXrm, criarComandosXrm, type DepsXrm } from './manutencaoDataverse'
 import { cleanId, GUID, guid, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
@@ -169,9 +170,13 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     telemetriaKm: async () => (await retrieveAll('telemetriaKm', `new_data ge ${addMonths(todaySP(), -12)}`)).map(mapTelemetriaKm).filter((item): item is TelemetriaKm => item !== null),
   }
 
+  const deps: DepsXrm = { api, apiUrl, envLabel, lerVariavel: readEnvVar, metadata: getJson, comportamentos: () => loadBehaviors(TABLE.manutencoes) }
+
   return {
     mode: 'xrm',
     envLabel,
+    ...criarComandosXrm(deps),
+    ...criarArquivosXrm(deps),
 
     async load(): Promise<LoadResult> {
       const keys = Object.keys(loaders) as TableKey[]

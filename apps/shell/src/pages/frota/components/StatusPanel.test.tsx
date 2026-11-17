@@ -7,10 +7,12 @@ import type { Kind } from '../data/types'
 import { liberarFlows, type RegistroStatus } from '../domain/transitions'
 import { StatusPanel } from './StatusPanel'
 import { ToastProvider } from '@betinhos/ui'
+import { manutencaoFalsa } from '../testUtils'
 
 function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
   return {
     mode: 'mock', envLabel: 'TEST',
+    ...manutencaoFalsa(),
     load: async () => ({ data: EMPTY_DATA, errors: {} }),
     currentStatus: async () => COLISAO.ENVIADO,
     dateBehaviors: async () => ({}),

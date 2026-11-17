@@ -71,7 +71,7 @@ export interface ArquivosManutencao {
   buscarCidades(texto: string): Promise<OpcaoBusca[]>
 }
 
-export interface DataSource {
+export interface DataSource extends ComandosManutencao, ArquivosManutencao {
   mode: 'xrm' | 'mock'
   envLabel: string
   /** Carrega todas as tabelas. Tabela que falhar vem vazia e com a mensagem em `errors`. */

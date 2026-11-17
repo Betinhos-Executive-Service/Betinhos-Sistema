@@ -1,0 +1,68 @@
+// apps/shell/src/pages/frota/data/mock.test.ts
+import { describe, expect, it } from 'vitest'
+import { segundaDe, somarDias } from '../domain/janela'
+import { todaySP } from './dates'
+import { createMockSource } from './mock'
+import { ANEXO_DESPESA, MANUT } from './schema'
+import type { PedidoConclusao } from './source'
+
+const pedido = (id: string, extra: Partial<PedidoConclusao> = {}): PedidoConclusao => ({ manutencaoId: id, servicos: [100000007], km: 51000, data: '2026-11-17T10:00:00-03:00', valor: 350.5, pagamento: 202410003, estabelecimento: 'Oficina Teste', cidadeId: 'c1', realizadoPorId: 'f1', servicoRealizado: null, comentario: null, linkNotaFiscal: 'https://example.invalid/nf', linkFotoFinal1: null, linkFotoFinal2: null, linkFotoFinal3: null, ...extra })
+
+describe('mock das manutenções', () => {
+  it('a fila de exemplo tem pedidos de graus diferentes, e o detalhe do m1 tem fotos', async () => {
+    const source = createMockSource()
+    const { data } = await source.load()
+    expect(data.manutencoes.filter((m) => m.status === MANUT.SOLICITADO).map((m) => m.id)).toEqual(expect.arrayContaining(['m1', 'm7', 'm8']))
+    expect(data.manutencoes.find((m) => m.id === 'm3')).toMatchObject({ status: MANUT.PROGRAMADO })
+    expect((await source.detalheManutencao('m1'))?.fotosPedido).toHaveLength(2)
+    expect(await source.detalheManutencao('nao-existe')).toBeNull()
+  })
+
+  it('encaixa só janela válida e grava a data do encaixe e o comentário', async () => {
+    const source = createMockSource()
+    await expect(source.agendarManutencao({ manutencaoId: 'm1', inicio: '2026-11-17', fim: '2026-11-23', comentario: null })).rejects.toThrow('A janela precisa ser um dia ou uma semana de segunda a domingo.')
+    const inicio = segundaDe(somarDias(todaySP(), 7))
+    await source.agendarManutencao({ manutencaoId: 'm1', inicio, fim: somarDias(inicio, 6), comentario: 'Levar cedo' })
+    expect(await source.detalheManutencao('m1')).toMatchObject({ status: MANUT.AGENDADO, janelaInicio: inicio, janelaFim: somarDias(inicio, 6), dataAprovacao: todaySP(), comentarioAoMotorista: 'Levar cedo' })
+  })
+
+  it('reprova só Solicitado e exige o motivo', async () => {
+    const source = createMockSource()
+    await expect(source.reprovarManutencao('m2', 'Sem verba')).rejects.toThrow('Só dá para reprovar uma manutenção que ainda não foi encaixada.')
+    await expect(source.reprovarManutencao('m8', ' ')).rejects.toThrow('Escreva o motivo da reprovação.')
+    await source.reprovarManutencao('m8', 'Sem verba')
+    expect(await source.detalheManutencao('m8')).toMatchObject({ status: MANUT.REPROVADO, comentarioAprovador: 'Sem verba' })
+  })
+
+  it('conclui com a nota, devolve a despesa com anexo pendente e grava a classificação manual', async () => {
+    const source = createMockSource()
+    await expect(source.concluirManutencao(pedido('m2', { linkNotaFiscal: null }))).rejects.toThrow('Falta a foto da nota fiscal.')
+    expect(await source.concluirManutencao(pedido('m2'))).toEqual({ despesaId: 'd-m2', statusAnexo: ANEXO_DESPESA.PENDENTE, geralId: null })
+    expect(await source.detalheManutencao('m2')).toMatchObject({ status: MANUT.REALIZADO, servicos: [100000007], categorias: [100000001], kmRealizado: 51000, valor: 350.5, pagamento: 202410003, realizadoPor: { id: 'f1' }, linkNotaFiscal: 'https://example.invalid/nf' })
+  })
+
+  it('recusa como o servidor: conclusão sem os dados obrigatórios e ação em manutenção já encerrada', async () => {
+    const source = createMockSource()
+    await expect(source.concluirManutencao(pedido('m2', { servicos: [] }))).rejects.toThrow('Escolha pelo menos um serviço realizado.')
+    await expect(source.concluirManutencao(pedido('m2', { km: 0 }))).rejects.toThrow('Informe o km do veículo.')
+    await expect(source.concluirManutencao(pedido('m2', { valor: 0 }))).rejects.toThrow('Informe o valor pago.')
+    await expect(source.concluirManutencao(pedido('m2', { pagamento: 1 }))).rejects.toThrow('Escolha a forma de pagamento.')
+    await expect(source.concluirManutencao(pedido('m2', { estabelecimento: ' ' }))).rejects.toThrow('Informe o estabelecimento.')
+    await source.reprovarManutencao('m8', 'Sem verba')
+    await expect(source.cancelarManutencao('m8', null)).rejects.toThrow('Esta manutenção já foi encerrada.')
+    await expect(source.concluirManutencao(pedido('m8'))).rejects.toThrow('Esta manutenção já foi encerrada.')
+    await expect(source.agendarManutencao({ manutencaoId: 'm8', inicio: '2026-11-23', fim: '2026-11-29', comentario: null })).rejects.toThrow('Só dá para encaixar uma manutenção em aberto.')
+  })
+
+  it('cria a manutenção Solicitada no veículo escolhido', async () => {
+    const source = createMockSource()
+    const id = await source.criarManutencao({ veiculoId: 'v2', descricao: 'Pneu furado', grau: 3, tipo: null, km: 40000, solicitanteId: null })
+    expect(await source.detalheManutencao(id)).toMatchObject({ descricao: 'Pneu furado', status: MANUT.SOLICITADO, veiculo: { id: 'v2', label: 'TST2B22' }, solicitante: null, km: 40000, grau: 3 })
+  })
+
+  it('buscas devolvem pessoas e cidades de exemplo pelo nome', async () => {
+    const source = createMockSource()
+    expect((await source.buscarFuncionarios('ana')).map((o) => o.id)).toEqual(['f1'])
+    expect((await source.buscarCidades('')).length).toBeGreaterThan(1)
+  })
+})

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { COLISAO, MANUT, MULTA } from '../data/schema'
 import type { DataSource, FlowResult } from '../data/source'
 import { EMPTY_DATA, FlowIncertoError } from '../data/source'
+import { manutencaoFalsa } from '../testUtils'
 import { acoesManutencao, applyTransition, bloqueio, buildPatch, executarAcaoManutencao, liberarFlows, rotuloAcao, StaleError, transitionsFor, validate, type RegistroStatus, type Transition } from './transitions'
 
 const ctx = { now: new Date('2026-10-02T15:00:00Z'), dateBehaviors: { cr40f_prazo: 'DateOnly' } as const }
@@ -24,6 +25,7 @@ const comCampos: Transition = {
 function fakeSource(current: number | null) {
   return {
     mode: 'mock', envLabel: 'TEST',
+    ...manutencaoFalsa(),
     load: async () => ({ data: EMPTY_DATA, errors: {} }),
     currentStatus: vi.fn(async () => current),
     dateBehaviors: async () => ({}),
