@@ -108,12 +108,12 @@ export function redact(message: string): string {
 }
 
 /** `extra` = dica que ensina a corrigir a chamada (montada por `explainError` em tools.ts). */
-export function errorResult(error: unknown, extra?: string): ToolResult {
+export function errorResult(error: unknown, extra?: string, hintFirst = false): ToolResult {
   const tip = extra ? `\n${extra}` : ''
   if (error instanceof z.ZodError) {
     return text(`Entrada inválida: ${error.issues.map((i) => `${i.path.join('.') || 'entrada'}: ${i.message}`).join('; ')}${tip}`, true)
   }
-  if (error instanceof DataverseError) return text(redact(error.toString() + tip), true)
+  if (error instanceof DataverseError) return text(redact(extra && hintFirst ? `${extra}\n${error.toString()}` : error.toString() + tip), true)
   if (error instanceof EntraError) return text(redact(`${error.message} (HTTP ${error.status})`), true)
   return text(redact(`Erro: ${error instanceof Error ? error.message : String(error)}${tip}`), true)
 }

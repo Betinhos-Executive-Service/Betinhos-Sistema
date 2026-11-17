@@ -9,6 +9,8 @@ const TOKEN_MARGIN_MS = 5 * 60_000
 export const ENTITY_TTL_MS = 6 * 3600_000
 /** Timeout de cada chamada ao Dataverse. */
 export const CALL_TIMEOUT_MS = 25_000
+/** Operações de metadata (criar/alterar/excluir tabela) demoram; o fetch do Worker não tem limite de relógio enquanto o cliente espera. */
+export const METADATA_TIMEOUT_MS = 110_000
 /** Novas tentativas para 429/503/504 e o teto de espera (por tentativa e somado). */
 const MAX_RETRIES = 2
 const MAX_WAIT_MS = 10_000
@@ -50,6 +52,8 @@ export interface EntityInfo {
 export interface ApiOptions {
   body?: unknown
   headers?: Record<string, string>
+  /** Substitui CALL_TIMEOUT_MS (operações de metadata). */
+  timeoutMs?: number
 }
 
 export interface ApiResult {
@@ -222,12 +226,12 @@ export class DataverseSession {
             ...options.headers,
           },
           body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-          signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+          signal: AbortSignal.timeout(options.timeoutMs ?? CALL_TIMEOUT_MS),
         })
       } catch (error) {
         this.lastStatus = 0
         if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-          throw new DataverseError(504, 'timeout', `O Dataverse não respondeu em ${CALL_TIMEOUT_MS / 1000} s; reduza a consulta ou tente de novo.`)
+          throw new DataverseError(504, 'timeout', `O Dataverse não respondeu em ${(options.timeoutMs ?? CALL_TIMEOUT_MS) / 1000} s; reduza a consulta ou tente de novo.`)
         }
         throw new DataverseError(502, 'rede', 'Falha de rede ao chamar o Dataverse.')
       }
@@ -339,6 +343,9 @@ export class DataverseSession {
 /** Ruído do Dataverse sem valor para o modelo: índice e id da organização. */
 const NOISE_RE = /\s*[\[(]?\s*(?:orgIndex|org\s*id|organization\s*id)\s*[:=]\s*[\w-]+\s*[\])]?/gi
 
+/** Prefixo verboso dos erros de payload (entidade, link de ajuda e tipo da exceção). */
+const PAYLOAD_PREFIX_RE = /^Error identified in Payload provided by the user for Entity\s*:'[^']*',\s*For more information.*?\s+---->\s+InnerException\s*:\s*(?:[\w.]+Exception:\s*)?/i
+
 async function toError(response: Response): Promise<DataverseError> {
   const text = await response.text()
   let code = ''
@@ -352,7 +359,12 @@ async function toError(response: Response): Promise<DataverseError> {
   } catch {
     // corpo não JSON: usa o texto cru
   }
-  message = message.replace(NOISE_RE, '').trim()
+  message = message
+    .replace(NOISE_RE, '')
+    .replace(PAYLOAD_PREFIX_RE, '')
+    .split(/\r?\n\s*(?:at\s|---)/)[0] // sem stack trace
+    .split(/\s+--->\s+/)[0] // só a causa mais externa
+    .trim()
   if (response.status === 429) {
     const wait = retryAfterMs(response.headers)
     message = `Limite de proteção do Dataverse (429)${wait !== undefined ? `; tente de novo em ${Math.ceil(wait / 1000)} s` : ''}. ${message}`

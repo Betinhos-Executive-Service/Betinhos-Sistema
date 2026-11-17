@@ -78,7 +78,8 @@ export const propertyMissing = (message: string): { property: string; type?: str
   const m =
     message.match(/Could not find a property named '([^']+)' on type '([^']+)'/i) ??
     message.match(/The property '([^']+)' does not exist on type '([^']+)'/i) ??
-    message.match(/undeclared property '([^']+)'()/i)
+    message.match(/undeclared property '([^']+)'()/i) ??
+    message.match(/Invalid property '([^']+)' was found in entity '([^']+)'/i)
   if (!m) return undefined
   return { property: m[1], type: m[2] ? m[2].replace(/^Microsoft\.Dynamics\.CRM\./, '') : undefined }
 }
@@ -93,6 +94,32 @@ export function nullColumns(rows: unknown[], select?: string): string[] {
   if (!select || !rows.length) return []
   const cols = [...new Set(select.split(',').map((c) => c.trim()).filter((c) => /^[A-Za-z0-9_]+$/.test(c)))]
   return cols.filter((c) => rows.every((r) => (r as Record<string, unknown>)?.[c] == null))
+}
+
+/** Nomes das navegações do $expand de primeiro nível (`A($select=x),B` -> A, B). */
+export function expandNames(expand?: string): string[] {
+  if (!expand) return []
+  const out: string[] = []
+  let depth = 0
+  let cur = ''
+  for (const ch of `${expand},`) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === ',' && depth === 0) {
+      const name = cur.match(/^\s*([A-Za-z0-9_]+)/)?.[1]
+      if (name) out.push(name)
+      cur = ''
+    } else cur += ch
+  }
+  return out
+}
+
+/** Colunas `col eq <número>` do filtro (fora de textos entre aspas), sem repetir. */
+export function numericEqColumns(filter?: string): { col: string; valor: number }[] {
+  if (!filter) return []
+  const found = new Map<string, number>()
+  for (const m of filter.replace(/'[^']*'/g, "''").matchAll(/\b([A-Za-z][A-Za-z0-9_]*)\s+eq\s+(-?\d+)\b/g)) found.set(m[1], Number(m[2]))
+  return [...found].map(([col, valor]) => ({ col, valor }))
 }
 
 /** Operadores de outras linguagens no filtro (fora de textos entre aspas): `=`, `==`, `<>`, `!=`, `&&`, `||`. */
