@@ -181,6 +181,25 @@ describe('GavetaManutencao: registro mudou com uma exceção aberta', () => {
     expect(within(g).getByRole('heading', { name: 'Quem leva e quando sai?' })).toBeTruthy()
   })
 
+  it('em Programar, outra pessoa reagendou (mesmo passo, janela nova): o digitado foi descartado', async () => {
+    const source = createMockSource()
+    const original = source.detalheManutencao.bind(source)
+    let leituras = 0
+    vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => {
+      leituras += 1
+      const d = await original(i)
+      return leituras === 1 || !d ? d : { ...d, janelaInicio: '2026-12-07', janelaFim: '2026-12-13' }
+    })
+    vi.spyOn(source, 'currentStatus').mockResolvedValueOnce(MANUT.PROGRAMADO) // a gravação vê outro status e recusa
+    montar('m2', source)
+    const g = await gaveta(M2)
+    fireEvent.click(within(g).getByRole('combobox', { name: 'Motorista' }))
+    fireEvent.click(await screen.findByRole('option', { name: /Ana Souza/, hidden: true }))
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Programar' })) })
+    expect(await screen.findByText(/descartado porque a ação não se aplica mais/)).toBeTruthy()
+    expect(within(g).getByRole('heading', { name: 'Quem leva e quando sai?' })).toBeTruthy()
+  })
+
   it('sem exceção aberta e o mesmo passo: pede para conferir e confirmar de novo', async () => {
     const source = createMockSource()
     vi.spyOn(source, 'currentStatus').mockResolvedValueOnce(MANUT.AGENDADO) // o servidor respondeu outro status, o detalhe relido continua Solicitado

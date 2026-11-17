@@ -8,7 +8,7 @@ import { GRAU, PAGAMENTO_MANUT, label } from '../data/schema'
 import type { DataSource, OpcaoBusca } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
-import { avaliar, ETAPAS, lerAgendar, lerProgramar, rotuloExtra, textoDespesa, textoSaida, valoresAgendarIniciais, type Extra, type Situacao, type ValoresAgendar } from '../domain/manutencaoEtapas'
+import { avaliar, chavePasso, ETAPAS, lerAgendar, lerProgramar, rotuloExtra, textoDespesa, textoSaida, valoresAgendarIniciais, type Extra, type Situacao, type ValoresAgendar } from '../domain/manutencaoEtapas'
 import { rotuloJanela } from '../domain/janela'
 import { desfechoDaAcao, executarAcaoManutencao } from '../domain/transitions'
 import { JanelaCampos } from './JanelaCampos'
@@ -78,7 +78,7 @@ export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizad
       <Barra situacao={situacao} />
 
       {/* A chave remonta o passo quando os dados de partida mudam (ex.: reagendou e continua em Programar). */}
-      <Passo key={`${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}`} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
+      <Passo key={chavePasso(m)} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
 
       {!parada && situacao.feitos.length > 0 && (
         <ul className="frota-guia__feitos">{situacao.feitos.map((f) => <li key={f}>{f}</li>)}</ul>

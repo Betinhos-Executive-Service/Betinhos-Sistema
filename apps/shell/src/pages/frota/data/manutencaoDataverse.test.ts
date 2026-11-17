@@ -100,6 +100,8 @@ describe('detalhe e criação', () => {
     expect(detalhe?.programacao).toEqual({ geralId: 'g1', motorista: { id: 'f1', label: 'Motorista Fictício' }, saida: '2026-11-24T13:00:00.000Z' })
     expect(detalhe?.despesa).toEqual({ id: 'd1', statusOperacional: 100000000, statusAnexo: 100000002 })
     expect(webApi.retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_reservadeveculos', expect.stringContaining(`_cr40f_om_value eq ${LIMPO}`))
+    // Mesma regra do LinhaGeral.Ativa do plugin: linha ativa e fora de Cancelado (202410002) e Cancelado com reservas (202410010), a mais nova primeiro.
+    expect(webApi.retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_reservadeveculos', expect.stringContaining(`$filter=_cr40f_om_value eq ${LIMPO} and statecode eq 0 and cr40f_status ne 202410002 and cr40f_status ne 202410010&$orderby=createdon desc&$top=1`))
     expect(webApi.retrieveMultipleRecords).toHaveBeenCalledWith('cr40f_despesaoperacional', expect.stringContaining(`_cr40f_manutencao_value eq ${LIMPO}`))
   })
 

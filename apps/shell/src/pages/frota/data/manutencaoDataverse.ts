@@ -43,9 +43,10 @@ export function criarComandosXrm(deps: DepsXrm): ComandosManutencao {
   }
 
   /** Linha ativa da Geral da manutenção; null = não há; undefined = a leitura falhou (a gaveta não cai por isso). */
+  // Linha ativa da Geral, como o LinhaGeral.Ativa do plugin: fora de Cancelado (202410002) e Cancelado com reservas (202410010), a mais nova.
   async function programacaoDe(id: string): Promise<ProgramacaoManutencao | null | undefined> {
     try {
-      const r = await api.retrieveMultipleRecords(GERAL, `?$select=cr40f_reservadeveculosid,_cr40f_motorista_value,cr40f_dataehorriodesada&$filter=_cr40f_om_value eq ${guid(id)} and statecode eq 0&$top=1`)
+      const r = await api.retrieveMultipleRecords(GERAL, `?$select=cr40f_reservadeveculosid,_cr40f_motorista_value,cr40f_dataehorriodesada&$filter=_cr40f_om_value eq ${guid(id)} and statecode eq 0 and cr40f_status ne 202410002 and cr40f_status ne 202410010&$orderby=createdon desc&$top=1`)
       const row = r.entities[0]
       if (!row) return null
       return {

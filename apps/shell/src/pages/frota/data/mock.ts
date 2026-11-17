@@ -327,6 +327,7 @@ export function createMockSource(): DataSource {
       if (encerrada(m.status)) throw new Error('Esta manutenção já foi encerrada.')
       m.status = MANUT.CANCELADO
       if (comentario?.trim()) m.comentarioAprovador = comentario.trim()
+      linhas.delete(id) // a linha da Geral é cancelada junto e deixa de ser a programação
     },
     async concluirManutencao(p) {
       await delay()

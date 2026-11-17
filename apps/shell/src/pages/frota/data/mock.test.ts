@@ -31,6 +31,12 @@ describe('mock das manutenções', () => {
     await expect(source.programarManutencao({ manutencaoId: 'm2', geralId: 'g-m2', motoristaId: 'f2', saida: '2026-11-24T13:00:00.000Z' })).rejects.toThrow('Só dá para programar uma manutenção agendada.')
   })
 
+  it('mock: a linha da Geral cancelada junto com a manutenção não volta como programação', async () => {
+    const source = createMockSource()
+    await source.cancelarManutencao('m2', null)
+    expect((await source.detalheManutencao('m2'))?.programacao).toBeNull()
+  })
+
   it('mock: agendar cria ou zera a linha, aplica o grau e o detalhe da realizada traz a despesa', async () => {
     const source = createMockSource()
     const inicio = segundaDe(somarDias(todaySP(), 7))

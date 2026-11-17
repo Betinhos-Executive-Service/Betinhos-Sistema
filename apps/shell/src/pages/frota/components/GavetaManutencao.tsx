@@ -11,7 +11,7 @@ import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal, errorMessage } from '../data/xrm'
 import { lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
-import { avaliar, type Extra } from '../domain/manutencaoEtapas'
+import { avaliar, chavePasso, type Extra } from '../domain/manutencaoEtapas'
 import { desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
@@ -174,7 +174,7 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
 
   /**
    * Outra pessoa mudou a manutenção (passo do guia ou exceção aberta). Recarrega e decide pelo estado novo: com exceção
-   * aberta, vale se ela ainda está no "⋯" da etapa nova; sem exceção, vale se o passo do guia é o mesmo. Se vale, o que foi
+   * aberta, vale se ela ainda está no "⋯" da etapa nova; sem exceção, vale se a chave do passo não mudou (ele não remontou). Se vale, o que foi
    * digitado fica e o aviso pede para confirmar de novo; se não, volta ao guia e o aviso diz que o digitado foi descartado.
    */
   async function desatualizada() {
@@ -186,7 +186,7 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
     const depois = leitura.tipo === 'ok' ? leitura.detalhe : undefined
     const naoVale = depois === null || (!!depois && (aberto !== null
       ? !avaliar(depois, hoje).extras.includes(aberto)
-      : !!antes && avaliar(antes, hoje).passo !== avaliar(depois, hoje).passo))
+      : !!antes && chavePasso(antes) !== chavePasso(depois)))
     if (naoVale) {
       setExtra(null)
       notify('error', `${aviso} O que você digitou foi descartado porque a ação não se aplica mais.`)
