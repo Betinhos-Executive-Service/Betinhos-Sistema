@@ -15,7 +15,7 @@ import { useNotify } from './Toasts'
 import { StatusBadge } from './Ui'
 
 type Campo = [string, string]
-type Detalhe = { titulo: string; status: number | null; veiculo: Ref | null; temMotorista: boolean; initial?: Record<string, string>; campos: Campo[] }
+type Detalhe = { titulo: string; status: number | null; veiculo: Ref | null; temMotorista: boolean; campos: Campo[] }
 
 const texto = (value: string | number | null | undefined) => (value === null || value === undefined || value === '' ? NAO_INFORMADO : String(value))
 const dia = (iso: string | null) => formatBR(diaSP(iso)) || NAO_INFORMADO
@@ -23,7 +23,7 @@ const dia = (iso: string | null) => formatBR(diaSP(iso)) || NAO_INFORMADO
 function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
   if (kind === 'manutencao') {
     const item = data.manutencoes.find((row) => row.id === id)
-    return !item ? null : { titulo: item.descricao, status: item.status, veiculo: item.veiculo, temMotorista: true, initial: { cr40f_agendarpara: item.agendarPara ?? '' }, campos: [
+    return !item ? null : { titulo: item.descricao, status: item.status, veiculo: item.veiculo, temMotorista: true, campos: [
       ['Solicitante', texto(item.solicitante?.label)], ['Grau', label(GRAU, item.grau)], ['Tipo de reparo', label(TIPO_REPARO, item.tipo)], ['KM', texto(item.km)],
       ['Solicitada em', dia(item.criadoEm)], ['Agendada para', formatBR(item.agendarPara) || NAO_INFORMADO], ['Realizada em', dia(item.dataManutencao)],
       ['Valor', brl(item.valor)], ['Estabelecimento', texto(item.estabelecimento)], ['Serviço realizado', texto(item.servicoRealizado)], ['Comentário do aprovador', texto(item.comentarioAprovador)],
@@ -95,7 +95,6 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
               source={source}
               kind={kind}
               record={{ id, status: registro.status, temVeiculo: registro.veiculo !== null, temMotorista: registro.temMotorista }}
-              initial={registro.initial}
               onDone={concluido}
               onReload={onChanged}
             />

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MANUT, MULTA } from '../data/schema'
+import { COLISAO, MANUT, MULTA } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
-import type { FrotaData, Multa, Manutencao } from '../data/types'
+import type { Colisao, FrotaData, Kind, Manutencao, Multa } from '../data/types'
 import { RegistroDrawer } from './RegistroDrawer'
 import { ToastProvider } from '@betinhos/ui'
 
@@ -11,7 +11,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
   return {
     mode: 'mock', envLabel: 'TEST',
     load: async () => ({ data: EMPTY_DATA, errors: {} }),
-    currentStatus: async () => MANUT.SOLICITADO,
+    currentStatus: async () => COLISAO.ENVIADO,
     dateBehaviors: async () => ({}),
     update: vi.fn(async () => {}),
     openForm: vi.fn(async () => {}),
@@ -23,9 +23,10 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
 
 const manutencao: Manutencao = { id: 'm1', codigo: 'M-1', descricao: 'Freio com ruído', status: MANUT.SOLICITADO, grau: null, tipo: null, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC-1234' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null }
 const multa: Multa = { id: 'u1', codigo: 'NT-1073', titulo: 'Multa sem condutor', status: MULTA.NOTIFICAR, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC-1234' }, motorista: null, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
-const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa] }
+const colisao: Colisao = { id: 'c1', titulo: 'Batida leve', status: COLISAO.ENVIADO, tipo: null, dataHora: null, local: null, descricao: null, houveTerceiro: false, veiculo: { id: 'v1', label: 'ABC-1234' }, motorista: null, criadoEm: '2026-10-01T12:00:00Z' }
+const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa], colisoes: [colisao] }
 
-function renderDrawer(source: DataSource, kind: 'manutencao' | 'multa', id: string) {
+function renderDrawer(source: DataSource, kind: Kind, id: string) {
   const onClose = vi.fn()
   const onChanged = vi.fn()
   render(<ToastProvider><RegistroDrawer source={source} kind={kind} id={id} data={data} onClose={onClose} onChanged={onChanged} onOpenVeiculo={() => {}} /></ToastProvider>)
@@ -36,8 +37,8 @@ afterEach(cleanup)
 
 describe('RegistroDrawer', () => {
   it('fecha com Esc (cancel do dialog nativo) mesmo depois que o botão focado saiu da tela', () => {
-    const { onClose } = renderDrawer(fakeSource(), 'manutencao', 'm1')
-    fireEvent.click(screen.getByRole('button', { name: 'Reprovar' }))
+    const { onClose } = renderDrawer(fakeSource(), 'colisao', 'c1')
+    fireEvent.click(screen.getByRole('button', { name: 'Colocar em análise' }))
     expect(screen.getByRole('button', { name: 'Confirmar' })).toBeTruthy()
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -45,14 +46,14 @@ describe('RegistroDrawer', () => {
 
   it('mostra o erro e não recarrega quando o formulário não abre', async () => {
     const source = fakeSource({ openForm: vi.fn(async () => { throw new Error('Formulário indisponível') }) })
-    const { onChanged } = renderDrawer(source, 'manutencao', 'm1')
+    const { onChanged } = renderDrawer(source, 'colisao', 'c1')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Abrir formulário/ })) })
     await waitFor(() => expect(screen.getByText(/Formulário indisponível/)).toBeTruthy())
     expect(onChanged).not.toHaveBeenCalled()
   })
 
   it('recarrega depois que o formulário fecha', async () => {
-    const { onChanged } = renderDrawer(fakeSource(), 'manutencao', 'm1')
+    const { onChanged } = renderDrawer(fakeSource(), 'colisao', 'c1')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Abrir formulário/ })) })
     expect(onChanged).toHaveBeenCalledTimes(1)
   })

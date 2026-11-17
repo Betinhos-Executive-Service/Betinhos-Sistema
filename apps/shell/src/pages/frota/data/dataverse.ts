@@ -36,7 +36,6 @@ const PAGE_SIZE = 5000
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
-  aprovarManutencao: { envVar: 'new_FlowUrlManutencao', body: (id) => ({ guids: id }), timeoutMs: 60_000, nome: 'Agendar manutenção' },
   notificarCondutor: { envVar: 'new_FlowUrlNotificarMotoristaMultas', body: (id) => ({ guids: id }), timeoutMs: 30_000, nome: 'Notificar condutor' },
   gerarContrato: { envVar: 'new_FlowUrlGerarContratoMultas', body: (id) => ({ GUID_MULTA: id }), timeoutMs: 40_000, nome: 'Gerar contrato' },
 }

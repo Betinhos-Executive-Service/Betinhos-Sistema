@@ -9,7 +9,7 @@ export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: []
 /** Classificação da manutenção, aplicada na tela sem recarregar tudo. */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
 
-export type FlowId = 'aprovarManutencao' | 'notificarCondutor' | 'gerarContrato'
+export type FlowId = 'notificarCondutor' | 'gerarContrato'
 export type FlowResult = { message: string | null; shareUrl: string | null }
 
 /** O Flow pode ter rodado no servidor mesmo sem resposta (tempo esgotado ou falha de rede). */

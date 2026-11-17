@@ -22,19 +22,6 @@ export type Transition = {
 
 export type RegistroStatus = { id: string; status: number | null; temVeiculo: boolean; temMotorista: boolean }
 
-const agendarPara: FieldSpec = { key: 'cr40f_agendarpara', label: 'Agendar para', type: 'date', required: true }
-const comentario = (required: boolean): FieldSpec => ({ key: 'cr40f_comentariosdoaprovador', label: 'Comentário do aprovador', type: 'text', required, maxLength: 100 })
-
-const concluir: Transition = {
-  id: 'concluir', to: MANUT.REALIZADO, label: 'Concluir',
-  fields: [
-    { key: 'cr40f_datamanutencao', label: 'Data e hora da manutenção', type: 'datetime', required: true },
-    { key: 'cr40f_valor', label: 'Valor (R$)', type: 'money', required: true },
-    { key: 'cr40f_estabelecimento', label: 'Estabelecimento', type: 'text', required: true, maxLength: 100 },
-    { key: 'cr40f_servicorealizado', label: 'Serviço realizado', type: 'textarea', required: true, maxLength: 100 },
-  ],
-}
-const cancelarManutencao: Transition = { id: 'cancelar', to: MANUT.CANCELADO, label: 'Cancelar manutenção', fields: [], danger: true }
 const cancelarColisao: Transition = { id: 'cancelar', to: COLISAO.CANCELADO, label: 'Cancelar colisão', fields: [], danger: true }
 const desfechosMulta: Transition[] = [
   { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { [MULTA_CAMPO.recursoPendente]: true } },
@@ -44,16 +31,8 @@ const desfechosMulta: Transition[] = [
 const finalizar: Transition = { id: 'finalizar', to: MULTA.FINALIZADO, label: 'Finalizar', fields: [] }
 
 const RULES: Record<Kind, Record<number, Transition[]>> = {
-  manutencao: {
-    [MANUT.SOLICITADO]: [
-      { id: 'aprovar', to: MANUT.AGENDADO, label: 'Aprovar e agendar', fields: [agendarPara, comentario(false)], flow: 'aprovarManutencao', requires: 'veiculo' },
-      // Não grava cr40f_datadaaprovacao: a regra de negócio "Aprovado" troca o status para Aprovado quando essa data é gravada.
-      { id: 'reprovar', to: MANUT.REPROVADO, label: 'Reprovar', fields: [comentario(true)], danger: true },
-      cancelarManutencao,
-    ],
-    [MANUT.AGENDADO]: [{ id: 'programar', to: MANUT.PROGRAMADO, label: 'Programar', fields: [agendarPara] }, concluir, cancelarManutencao],
-    [MANUT.PROGRAMADO]: [concluir, cancelarManutencao],
-  },
+  // Manutenção não passa pelo StatusPanel: as ações dela são Custom APIs (acoesManutencao / executarAcaoManutencao, abaixo).
+  manutencao: {},
   multa: {
     [MULTA.NOTIFICAR]: [{ id: 'notificado', to: MULTA.NOTIFICADO, label: 'Notificar condutor', fields: [], flow: 'notificarCondutor', requires: 'motorista' }],
     [MULTA.NOTIFICADO]: [{ id: 'indicar', to: MULTA.INDICADA, label: 'Gerar contrato de indicação', fields: [], flow: 'gerarContrato', requires: 'motorista' }, ...desfechosMulta],
@@ -172,5 +151,48 @@ export async function applyTransition(source: DataSource, kind: Kind, record: Re
     }
   } finally {
     flowsEmCurso.delete(chave)
+  }
+}
+
+// ---------- Manutenção (Custom APIs cr40f_Manutencao*, plano 1 das manutenções v2) ----------
+
+export type AcaoManutencao = 'encaixar' | 'reprovar' | 'cancelar' | 'concluir'
+
+/** Ciclo novo (spec 2026-11-16-manutencoes-v2): encaixar é aprovar; reprovar só antes do encaixe; concluir também lança depois do fato. */
+const ACOES_MANUTENCAO: Partial<Record<number, AcaoManutencao[]>> = {
+  [MANUT.SOLICITADO]: ['encaixar', 'reprovar', 'cancelar', 'concluir'],
+  [MANUT.AGENDADO]: ['encaixar', 'cancelar', 'concluir'],
+  [MANUT.PROGRAMADO]: ['encaixar', 'cancelar', 'concluir'],
+}
+
+export function acoesManutencao(status: number | null): AcaoManutencao[] {
+  return status === null ? [] : ACOES_MANUTENCAO[status] ?? []
+}
+
+const ROTULO_ACAO: Record<Exclude<AcaoManutencao, 'encaixar'>, string> = { reprovar: 'Reprovar', cancelar: 'Cancelar manutenção', concluir: 'Concluir' }
+
+export function rotuloAcao(acao: AcaoManutencao, status: number | null): string {
+  if (acao === 'encaixar') return status === MANUT.SOLICITADO ? 'Encaixar' : 'Reagendar'
+  return ROTULO_ACAO[acao]
+}
+
+/** Manutenções com uma ação em execução agora (uma por vez, como nos Flows). */
+const acoesEmCurso = new Set<string>()
+
+/**
+ * Relê o status no servidor e só executa se ele ainda for o que a tela mostrava (senão, StaleError). A reserva da vez é
+ * síncrona, antes de qualquer await: dois cliques seguidos não disparam duas chamadas.
+ */
+export async function executarAcaoManutencao<T>(source: Pick<DataSource, 'currentStatus'>, record: { id: string; status: number | null }, acao: AcaoManutencao, executar: () => Promise<T>): Promise<T> {
+  if (!acoesManutencao(record.status).includes(acao)) throw new Error('Esta ação não está disponível para o status atual da manutenção')
+  const chave = `manutencao:${record.id}`
+  if (acoesEmCurso.has(chave)) throw new Error('Já há uma ação em andamento para esta manutenção. Aguarde')
+  acoesEmCurso.add(chave)
+  try {
+    const atual = await source.currentStatus('manutencao', record.id)
+    if (atual !== record.status) throw new StaleError()
+    return await executar()
+  } finally {
+    acoesEmCurso.delete(chave)
   }
 }

@@ -195,11 +195,9 @@ export function createMockSource(): DataSource {
     },
     async runFlow(flow: FlowId, id: string) {
       await delay()
-      const kind: Kind = flow === 'aprovarManutencao' ? 'manutencao' : 'multa'
-      const record = find(kind, id) as Record<string, unknown> | undefined
+      const record = find('multa', id) as Record<string, unknown> | undefined
       if (!record) throw new Error('Registro não encontrado no mock.')
-      if (flow === 'aprovarManutencao') record.status = MANUT.AGENDADO
-      else if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
+      if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
       else record.status = MULTA.INDICADA
       return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }
     },
