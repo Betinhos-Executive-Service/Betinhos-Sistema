@@ -28,13 +28,14 @@ namespace Betinhos.Planner.Notifications
         private const string MultaCodePrefix = "MULTA:";
         private const int MultaOrigin = 100000003;
         private const int MaxDepth = 1;
-        private const int MaxDepthMulta = 2;
+        private const int MultaStepDepth = 2;
+        private const string ResponsibleTable = "cr40f_plannertarearesponsavel";
 
         public void Execute(IServiceProvider serviceProvider)
         {
             var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
             var context = (IPluginExecutionContext)serviceProvider.GetService(typeof(IPluginExecutionContext));
-            if (context == null || context.Depth > MaxDepthMulta || !string.Equals(context.MessageName, "Create", StringComparison.OrdinalIgnoreCase)) return;
+            if (context == null || context.Depth > MultaStepDepth || !string.Equals(context.MessageName, "Create", StringComparison.OrdinalIgnoreCase)) return;
             if (!context.InputParameters.Contains("Target") || !(context.InputParameters["Target"] is Entity)) return;
 
             var target = (Entity)context.InputParameters["Target"];
@@ -44,8 +45,8 @@ namespace Betinhos.Planner.Notifications
             var initiatingService = factory.CreateOrganizationService(context.InitiatingUserId);
             var service = factory.CreateOrganizationService(context.UserId);
             var eventRow = LoadAuthorizedEvent(initiatingService, target.Id);
-            // O evento da multa é gravado pelo sistema: o usuário que editou a multa pode não ler o evento. Só no Depth 2 lê com o usuário do step,
-            // e abaixo o evento só segue se for mesmo a atribuição da tarefa de multa.
+            // O evento da multa é gravado pelo sistema (step assíncrono, Depth 2): o usuário que editou a multa pode não ler o evento. Só no
+            // Depth 2 lê com o usuário do step, e abaixo o evento só segue se for mesmo a atribuição da tarefa de multa.
             if (eventRow == null && context.Depth > MaxDepth) eventRow = LoadAuthorizedEvent(service, target.Id);
             if (eventRow == null) return;
 
@@ -55,7 +56,7 @@ namespace Betinhos.Planner.Notifications
             if (!IsSupportedField(field) || !HasValidEventShape(eventRow, contextJson)) return;
 
             var actorEmployeeId = ReadGuid(contextJson, "actorEmployeeId");
-            var multaAssignment = !actorEmployeeId.HasValue && IsMultaAssignment(service, eventRow, field, contextJson);
+            var multaAssignment = !actorEmployeeId.HasValue && context.Depth == MultaStepDepth && IsMultaAssignment(service, tracing, eventRow, field, contextJson);
             if (context.Depth > MaxDepth && !multaAssignment) return;
             if (actorEmployeeId.HasValue)
             {
@@ -110,10 +111,12 @@ namespace Betinhos.Planner.Notifications
         }
 
         /// <summary>
-        /// Atribuição da tarefa de multa, gerada pelo sistema (sem ator): o contexto diz sourceType "multa" e a tarefa confere
-        /// (origem Multa e cr40f_codigoorigem igual ao sourceCode, "MULTA:&lt;id&gt;").
+        /// Atribuição da tarefa de multa, gerada pelo sistema (sem ator), só no Depth do step assíncrono (quem chama confere): o contexto diz
+        /// sourceType "multa", a tarefa confere (origem Multa e cr40f_codigoorigem igual ao sourceCode, "MULTA:&lt;id&gt;") e todos os
+        /// assigneeIds já são responsáveis da tarefa (cr40f_plannertarearesponsavel). Sem isso, um usuário comum forjaria o evento para
+        /// notificar quem quisesse. Lê com o service do step.
         /// </summary>
-        private static bool IsMultaAssignment(IOrganizationService service, Entity eventRow, string field, JObject context)
+        private static bool IsMultaAssignment(IOrganizationService service, ITracingService tracing, Entity eventRow, string field, JObject context)
         {
             if (!field.Equals("notification:assignment", StringComparison.OrdinalIgnoreCase)) return false;
             if (!string.Equals(context["sourceType"]?.ToString(), MultaSourceType, StringComparison.OrdinalIgnoreCase)) return false;
@@ -125,11 +128,24 @@ namespace Betinhos.Planner.Notifications
             {
                 var row = service.Retrieve(TaskTable, task.Id, new ColumnSet("cr40f_origem", "cr40f_codigoorigem"));
                 var origin = row.GetAttributeValue<OptionSetValue>("cr40f_origem");
-                return origin != null && origin.Value == MultaOrigin
-                    && string.Equals(row.GetAttributeValue<string>("cr40f_codigoorigem"), sourceCode, StringComparison.Ordinal);
+                if (origin == null || origin.Value != MultaOrigin
+                    || !string.Equals(row.GetAttributeValue<string>("cr40f_codigoorigem"), sourceCode, StringComparison.Ordinal)) return false;
+                var assignees = new HashSet<Guid>();
+                AddIds(assignees, context, "assigneeIds");
+                if (assignees.Count == 0) return false;
+                var responsibles = new HashSet<Guid>();
+                var query = new QueryExpression(ResponsibleTable) { ColumnSet = new ColumnSet("cr40f_funcionario") };
+                query.Criteria.AddCondition("cr40f_tarefa", ConditionOperator.Equal, task.Id);
+                foreach (var link in service.RetrieveMultiple(query).Entities)
+                {
+                    var employee = link.GetAttributeValue<EntityReference>("cr40f_funcionario");
+                    if (employee != null) responsibles.Add(employee.Id);
+                }
+                return assignees.IsSubsetOf(responsibles);
             }
-            catch
+            catch (Exception error)
             {
+                tracing?.Trace("Planner notification: evento da multa recusado ao conferir a tarefa {0}: {1}", task.Id, error);
                 return false;
             }
         }

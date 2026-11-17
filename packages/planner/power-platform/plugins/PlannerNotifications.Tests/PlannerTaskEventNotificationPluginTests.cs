@@ -60,6 +60,7 @@ namespace Betinhos.Planner.Notifications.Tests
                 if (c.AttributeName == "statecode" && v == null) v = new OptionSetValue(0);
                 if (c.AttributeName == "isdisabled" && v == null) v = false;
                 if (v is OptionSetValue o) v = o.Value;
+                if (v is EntityReference er) v = er.Id;
                 var valores = c.Values.Select(x => x is OptionSetValue ov ? (object)ov.Value : x);
                 return valores.Any(x => Equals(x, v));
             }
@@ -92,7 +93,7 @@ namespace Betinhos.Planner.Notifications.Tests
         }
 
         /// <summary>Evento cr40f_plannertarefaevento já gravado e contexto de Create (post-operation assíncrono).</summary>
-        private static Cena Montar(string campo, string valorNovo, int depth, int origemTarefa = 100000003)
+        private static Cena Montar(string campo, string valorNovo, int depth, int origemTarefa = 100000003, bool juniorResponsavel = true)
         {
             var ctx = new RemoteExecutionContext
             {
@@ -109,6 +110,8 @@ namespace Betinhos.Planner.Notifications.Tests
                 ["cr40f_titulo"] = TituloTarefa, ["cr40f_origem"] = new OptionSetValue(origemTarefa),
                 ["cr40f_codigoorigem"] = Codigo, ["statecode"] = new OptionSetValue(0),
             });
+            if (juniorResponsavel)
+                mundo.Add(new Entity("cr40f_plannertarearesponsavel") { ["cr40f_tarefa"] = tarefa.ToEntityReference(), ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", Junior) });
             var evento = mundo.Add(new Entity("cr40f_plannertarefaevento")
             {
                 ["cr40f_tarefa"] = tarefa.ToEntityReference(), ["cr40f_campo"] = campo, ["cr40f_valornovo"] = valorNovo, ["cr40f_descricao"] = "Responsáveis atribuídos.",
@@ -148,11 +151,37 @@ namespace Betinhos.Planner.Notifications.Tests
         }
 
         [Fact]
-        public void Atribuicao_da_multa_no_depth_1_tambem_funciona()
+        public void Atribuicao_da_multa_sem_ator_no_depth_1_e_ignorada_para_nao_ser_forjavel_por_usuario_comum()
         {
             var c = Montar("notification:assignment", Contexto("multa", Codigo), depth: 1);
             Rodar(c);
-            Assert.Single(c.Mundo.Notificacoes);
+            Assert.Empty(c.Mundo.Notificacoes);
+        }
+
+        [Fact]
+        public void Atribuicao_da_multa_para_quem_nao_e_responsavel_da_tarefa_e_ignorada()
+        {
+            var c = Montar("notification:assignment", Contexto("multa", Codigo), depth: 2, juniorResponsavel: false);
+            Rodar(c);
+            Assert.Empty(c.Mundo.Notificacoes);
+        }
+
+        [Fact]
+        public void Atribuicao_da_multa_com_um_assignee_fora_dos_responsaveis_e_ignorada_por_inteiro()
+        {
+            var valor = "{\"assigneeIds\":[\"" + Junior + "\",\"" + Autor + "\"],\"sourceType\":\"multa\",\"sourceCode\":\"" + Codigo + "\"}";
+            var c = Montar("notification:assignment", valor, depth: 2);
+            Rodar(c);
+            Assert.Empty(c.Mundo.Notificacoes);
+        }
+
+        [Fact]
+        public void Titulo_da_tarefa_so_e_lido_com_o_service_do_step_no_caso_da_multa_valida()
+        {
+            var c = Montar("notification:assignment", Contexto("multa", Codigo), depth: 2);
+            c.Mundo.SemLeitura.Add(c.Ctx.InitiatingUserId);
+            Rodar(c);
+            Assert.Equal(TituloTarefa, Assert.Single(c.Mundo.Notificacoes)["Body"]);
         }
 
         [Fact]
