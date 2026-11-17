@@ -1,6 +1,7 @@
 import { daysBetween } from '../data/dates'
 import { COLISAO, MANUT, MULTA } from '../data/schema'
 import type { FrotaData, Kind, Ref } from '../data/types'
+import { ROTULO_ETAPA } from './multaEtapas'
 import { custoForaDaCurva, hodometrosAtrasados, prioridadeParada, reincidencias, type Ocorrencia } from './alertas'
 import { diasEsperando } from './fila'
 import { fimDaJanela } from './janela'
@@ -21,8 +22,8 @@ export const PENDENCIA_LABEL: Record<PendenciaTipo, string> = {
   encaixar: 'Manutenções solicitadas esperando encaixe num dia ou numa semana',
   preventiva: 'Preventivas vencidas ou a vencer (plano da frota)',
   atrasada: 'Manutenções encaixadas ou programadas com a janela vencida e ainda não realizadas',
-  notificar: 'Multas: notificar o condutor',
-  indicar: 'Multas com prazo de indicação vencido ou em até 7 dias',
+  notificar: `Multas na etapa ${ROTULO_ETAPA.identificar}`,
+  indicar: `Multas na etapa ${ROTULO_ETAPA.indicar} com prazo vencido ou em até 7 dias`,
   colisao: 'Colisões em aberto',
 }
 

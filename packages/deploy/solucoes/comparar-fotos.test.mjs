@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { INFORMATIVO, PERDA, compararFotos, temPerda } from './comparar-fotos.mjs'
 
 const foto = (extra = {}) => ({
@@ -212,4 +213,23 @@ test('remoção declarada: tabela com registros e o componente dela viram inform
 test('remoção declarada não perdoa queda de registros de outra tabela nem alvo de coluna', () => {
   assert.equal(temPerda(compararFotos(foto(), foto({ registros: { cr40f_a: 9, cr40f_b: 5 } }), { remocoes: ['cr40f_b'] })), true)
   assert.equal(temPerda(compararFotos(foto(), foto({ registros: { cr40f_a: 10 } }), { remocoes: ['cr40f_b.coluna'] })), true)
+})
+
+test('fluxo aposentado e removido que some não é perda: vai para fluxosAposentados e o componente não conta', () => {
+  const antes = foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 1 }, f2: { nome: 'Flow Gerar Contrato', estado: 0 } }, componentes: { c1: ['AppBetinhos'], f2: ['BetinhosAutomacao'] } })
+  const depois = foto({ fluxos: { f1: { nome: 'Fluxo 1', estado: 1 } }, componentes: { c1: ['AppBetinhos'] } })
+  const d = compararFotos(antes, depois, { aposentados: ['Flow Gerar Contrato'], removidos: ['Flow Gerar Contrato'] })
+  assert.deepEqual(d.fluxosAposentados, [{ id: 'f2', nome: 'Flow Gerar Contrato', antes: 0, depois: null }])
+  assert.deepEqual(d.fluxosSumiram, [])
+  assert.deepEqual(d.componentesSumiram, [])
+  assert.equal(temPerda(d), false)
+  assert.equal(temPerda(compararFotos(antes, depois, { aposentados: ['Flow Gerar Contrato'] })), true)
+})
+
+test('fluxos-aposentados.json: cada entrada tem nome, substituto e decisão; removido só como true', () => {
+  const lista = JSON.parse(readFileSync(new URL('./fluxos-aposentados.json', import.meta.url), 'utf8'))
+  for (const a of lista) {
+    assert.ok(a.nome && a.substituto && a.decisao, JSON.stringify(a))
+    if ('removido' in a) assert.equal(a.removido, true, a.nome)
+  }
 })

@@ -1,5 +1,6 @@
 // apps/shell/src/pages/frota/data/customApi.ts
-/** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse (payload.error.message). */
+import { ApiError } from './xrm'
+/** Chama uma Custom API não vinculada; erro do servidor sai como ApiError com a mensagem do Dataverse (payload.error.message) e o status HTTP (400 = recusa de regra). */
 export async function chamarCustomApi(apiUrl: string, nome: string, body: Record<string, unknown>, falha: string): Promise<Record<string, unknown>> {
   const response = await fetch(`${apiUrl}/${nome}`, {
     method: 'POST',
@@ -14,7 +15,7 @@ export async function chamarCustomApi(apiUrl: string, nome: string, body: Record
   } catch { /* 204 ou corpo vazio */ }
   if (!response.ok) {
     const erro = payload.error as { message?: unknown } | undefined
-    throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`)
+    throw new ApiError(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`, response.status)
   }
   return payload
 }

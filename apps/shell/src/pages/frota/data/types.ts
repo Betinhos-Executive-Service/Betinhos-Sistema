@@ -15,7 +15,21 @@ export type DetalheManutencao = Manutencao & {
   /** Despesa ligada; null = não há; undefined = não foi possível ler. */
   despesa?: DespesaDaManutencao | null
 }
-export type Multa = { id: string; /** cr40f_id_multa (ex.: NT-1073), o código citado no resumo diário. */ codigo: string | null; titulo: string; status: number | null; dataHora: string | null; local: string | null; dataParaIndicar: string | null; indicado: boolean; dataAviso: string | null; dataIndicacao: string | null; veiculo: Ref | null; motorista: Ref | null; infracaoId: string | null; criadoEm: string; valorGuia: number | null; recursoPendente: boolean; termoVigente: Ref | null; /** undefined = resumo dos termos não carregou; null = sem termo. */ termo?: ResumoTermo | null }
+export type ArquivosMulta = { autuacao: string | null; penalidade: string | null; comprovante: string | null }
+/** Campos novos da fase 1 são opcionais: fixtures antigos continuam válidos e o mapper sempre os preenche. */
+export type Multa = { id: string; /** cr40f_id_multa (ex.: NT-1073), o código citado no resumo diário. */ codigo: string | null; titulo: string; status: number | null; dataHora: string | null; local: string | null; dataParaIndicar: string | null; indicado: boolean; dataAviso: string | null; dataIndicacao: string | null; veiculo: Ref | null; motorista: Ref | null; infracaoId: string | null; criadoEm: string; valorGuia: number | null; recursoPendente: boolean; termoVigente: Ref | null; /** undefined = resumo dos termos não carregou; null = sem termo. */ termo?: ResumoTermo | null
+  responsavel?: number | null; motivoEmpresa?: number | null; canal?: number | null; aceiteEm?: string | null; vencimento?: string | null
+  valorComDesconto?: number | null; valorPago?: number | null; pagaEm?: string | null; competencia?: string | null; acertoEm?: string | null
+  encerradaEm?: string | null; canceladaEm?: string | null; motivoCancelamento?: string | null; arquivos?: ArquivosMulta
+}
+/** Retorno da Custom API new_DossieMulta (plugin DossieMultaPlugin). */
+export type DossieServico = { id: string; codigo: string | null; cliente: string | null; saida: string; retorno: string | null; motorista: string | null; status: string | null; noHorario: boolean }
+export type DossieViagem = { inicio: string; fim: string; motoristaInfleet: string | null; motorista?: string | null }
+export type Dossie = {
+  multa: { id: string; auto: string | null; placa: string | null; dataHora: string | null; local: string | null; orgao: string | null; dataParaIndicar: string | null; infracao: { codigo: string | null; descricao: string | null; valor: number | null } | null }
+  servicos: DossieServico[]
+  infleet: { veiculoId?: string; viagens?: DossieViagem[]; erro?: string }
+}
 export type TermoStatus = 'pendente' | 'assinado' | 'contestado' | 'expirado' | 'cancelado'
 /** Último termo da multa, para a coluna Termo da lista. */
 export type ResumoTermo = { status: TermoStatus; enviadoEm: string | null }

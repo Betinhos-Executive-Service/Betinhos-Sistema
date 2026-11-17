@@ -1,18 +1,40 @@
-import { diaSP } from '../data/dates'
+import { diaSP, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { GRAU, label } from '../data/schema'
 import type { FrotaData, Kind, Ref, TermoStatus } from '../data/types'
-import { rotuloTermo } from './termoMulta'
+import { responsavelDaMulta, situacaoDaMulta } from './multaEstado'
+import type { Situacao } from './multaEtapas'
 
-export type Linha = { kind: Kind; id: string; titulo: string; veiculo: Ref | null; pessoa: Ref | null; status: number | null; dia: string | null; extra: string; categorias: number[]; termo: string; termoStatus: TermoStatus | null; termoIndisponivel?: boolean; codigo?: string | null }
+export type Linha = {
+  kind: Kind; id: string; titulo: string; veiculo: Ref | null; pessoa: Ref | null; status: number | null; dia: string | null; extra: string; categorias: number[]
+  termo: string; termoStatus: TermoStatus | null; termoIndisponivel?: boolean
+  /** cr40f_id_multa (ex.: NT-1073) só nas multas. */
+  codigo?: string | null
+  /** Só multa: próximo passo, próximo prazo e filas das visões. */
+  proximoPasso?: string; proximoPrazo?: string | null; situacoes?: string[]
+}
 
-export function linhas(kind: Kind, data: FrotaData): Linha[] {
+/** Filas das visões da lista de multas (spec §7). Uma multa pode estar em mais de uma: Comigo e Prazo vencido, por exemplo. */
+export function filasDaMulta(s: Situacao): string[] {
+  const filas: string[] = []
+  if (s.pendentes.length) filas.push('comigo')
+  if (s.prazoVencido) filas.push('prazo-vencido')
+  if (s.aguardandoPenalidade) filas.push('aguardando-penalidade')
+  if (s.etapa === 'acertar') filas.push('aguardando-acerto')
+  if (s.etapa === 'encerrada' || s.etapa === 'cancelada') filas.push('encerradas')
+  return filas
+}
+
+export function linhas(kind: Kind, data: FrotaData, hoje = todaySP()): Linha[] {
   const infracoes = new Map(data.infracoes.map((item) => [item.id, item]))
   const result: Linha[] =
     kind === 'manutencao'
       ? data.manutencoes.map((item) => ({ kind, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, status: item.status, dia: diaSP(item.dataManutencao ?? item.criadoEm), extra: item.valor !== null ? brl(item.valor) : label(GRAU, item.grau), categorias: item.categorias, termo: '', termoStatus: null }))
       : kind === 'multa'
-        ? data.multas.map((item) => ({ kind, id: item.id, codigo: item.codigo, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: rotuloTermo(item.termo), termoStatus: item.termo?.status ?? null, termoIndisponivel: item.termo === undefined }))
+        ? data.multas.map((item) => {
+          const s = situacaoDaMulta(item, hoje)
+          return { kind, id: item.id, codigo: item.codigo, titulo: item.titulo, veiculo: item.veiculo, pessoa: responsavelDaMulta(item), status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: '', termoStatus: null, proximoPasso: s.proximoPasso, proximoPrazo: s.proximoPrazo, situacoes: filasDaMulta(s) }
+        })
         : data.colisoes.map((item) => ({ kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: item.houveTerceiro ? 'Com terceiro' : 'Sem terceiro', categorias: [], termo: '', termoStatus: null }))
   return result.sort((a, b) => (b.dia ?? '').localeCompare(a.dia ?? ''))
 }

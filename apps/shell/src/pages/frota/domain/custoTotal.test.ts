@@ -31,6 +31,11 @@ const entrada: EntradaCusto = {
 }
 
 describe('custoTotalVeiculo', () => {
+  it('multa cancelada não entra no custo (nem na quantidade), mesmo com valor de infração', () => {
+    const comCancelada = { ...entrada, multas: [...entrada.multas, multa('cancelada', { infracaoId: 'i1', status: MULTA.CANCELADA })] }
+    expect(custoTotalVeiculo(comCancelada, 'v1', periodo).porFonte.multas).toEqual({ valor: 130.16, qtd: 2, semValor: 1, indisponivel: false })
+  })
+
   it('soma as quatro fontes com semValor por fonte, ignorando multa finalizada sem valor e combustível fora do período', () => {
     const r = custoTotalVeiculo(entrada, 'v1', periodo)
     expect(r.porFonte.manutencao).toEqual({ valor: 150.55, qtd: 3, semValor: 1, indisponivel: false })

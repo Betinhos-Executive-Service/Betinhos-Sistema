@@ -2,7 +2,8 @@ import { multasPendentes } from '../alertas'
 import { topByShare } from '../analises'
 import { agrupar } from '../base'
 import { anteriorDe, comparar, type ChipAnterior } from '../comparar'
-import { int, normL } from '../format'
+import { MULTA_RESOLVIDA } from '../codes'
+import { int } from '../format'
 import type { Contexto } from '../kpis'
 import { entre, mesesEntre, mesRotulo } from '../periodo'
 import type { Dados, Multa } from '../types'
@@ -22,15 +23,8 @@ export type Multas = {
 
 /** `multaTipo` do legado: "código - descrição" (cada parte só se houver), senão "Sem tipo". */
 export const infracaoDe = (m: Multa) => [m.infracaoCodigo, m.infracaoDescricao].filter(Boolean).join(' - ') || 'Sem tipo'
-/**
- * Multa resolvida. Divergência consciente (spec §6): o legado só olhava "pago", "resolvid" e "conclu"; os status reais encerrados são
- * Pago, Descontado e Finalizado (em PROD, Pago e Descontado somam 164 de 260), então Descontado e Finalizado passam a contar.
- * Rótulo comparado sem acento e sem caixa.
- */
-const resolvida = (m: Multa) => {
-  const k = normL(m.statusLabel)
-  return k.includes('pago') || k.includes('descontado') || k.includes('finaliz') || k.includes('resolvid') || k.includes('conclu')
-}
+/** Multa resolvida pelo valor do status (spec da fase 1 das multas, §7): Encerrada, Descontado (antigo) e Cancelada. */
+const resolvida = (m: Multa) => m.status !== null && MULTA_RESOLVIDA.has(m.status)
 
 /** `tblMulMot`/`tblMulTipo`: chaves por quantidade desc (ordem estável), % sobre o total e `topByShare` sobre a quantidade. */
 function distribuicao(muls: Multa[], chave: (m: Multa) => string) {
