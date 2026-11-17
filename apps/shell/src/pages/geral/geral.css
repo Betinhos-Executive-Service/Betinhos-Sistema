@@ -6,7 +6,7 @@
 /* Células editáveis. As regras de posição vêm antes das colunas fixas (.gr-cell--first/select) para elas prevalecerem. */
 .gr-cell { position: relative; display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; outline: 0; }
 .gr-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--bt-focus-border); }
-.gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; color: var(--bt-color-text-primary); }
+.gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; color: var(--bt-color-text-primary); }
 /* Lookup com registro: link azul sublinhado que abre o registro no painel lateral (como a grade antiga do model-driven).
    Ocupa só o texto, para o resto da célula continuar recebendo o duplo clique de edição. */
 .gr-lookup { flex: 0 1 auto; max-width: 100%; padding: 0; border: 0; border-radius: var(--bt-radius-xs); background: none; color: var(--bt-color-action); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; cursor: pointer; }
@@ -30,6 +30,7 @@
 
 /* O contêiner rola nos dois eixos; cabeçalho, seleção e primeira coluna ficam fixos. */
 .gr-grid { overflow: auto; }
+/* Como a Composição de Preço: só linhas separam, sem divisória entre colunas, e o conteúdo encosta à esquerda da célula. */
 /* Densidade "tabela densa" (DS 1.5.0 §5.2/§10.9): linha 44 px via --bt-table-row-dense, cabeçalho 32 px. */
 .gr-table { --gr-row-height: var(--bt-table-row-dense); }
 .gr-table.gr-table--confortavel { --gr-row-height: 56px; }
@@ -49,12 +50,12 @@
 /* Shift+clique seleciona linhas, não texto; só a célula em edição permite selecionar. */
 .gr-table .gr-cell--editing, .gr-table .gr-cell--editing * { user-select: text; -webkit-user-select: text; }
 .gr-table .bt-table__row.is-selected { background-color: var(--bt-color-action-soft); }
-.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); border-right: var(--bt-border-width-default) solid var(--bt-color-border); }
+.gr-table .bt-table__cell { padding: 0 var(--bt-space-3); min-height: calc(var(--gr-row-height) - var(--bt-border-width-default)); }
 .gr-table .bt-table__head, .gr-table .bt-table__head .bt-table__cell { min-height: 32px; }
 .gr-cell--select { position: sticky; left: 0; z-index: 1; justify-content: center; background-color: var(--bt-color-surface); }
 /* O DS põe position: relative em toda célula do cabeçalho (especificidade maior): sem esta regra a caixa "Selecionar carregados" rolava embora enquanto as caixas das linhas ficavam fixas. */
 .gr-table .bt-table__head .bt-table__cell.gr-cell--select { position: sticky; }
-.gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); box-shadow: 1px 0 0 var(--bt-color-border); }
+.gr-cell--first { position: sticky; left: 40px; z-index: 1; background-color: var(--bt-color-surface); }
 .gr-table .bt-table__row.is-selected .gr-cell--select, .gr-table .bt-table__row.is-selected .gr-cell--first { background-color: var(--bt-color-action-soft); }
 .gr-table .bt-table__head .gr-cell--select, .gr-table .bt-table__head .gr-cell--first { background-color: var(--bt-color-surface-neutral); }
 .gr-table .gr-cell--select { padding: 0; }
@@ -153,8 +154,6 @@
 .gr-sheet__line strong { font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); white-space: pre-line; }
 /* Campo protegido da sincronização da Tenaris: cadeado discreto; azul só no foco. */
 .gr-protecao { flex: 0 0 auto; display: inline-flex; }
-/* Na célula o escudo fica no canto direito, também quando o valor é um selo de status (que não ocupa a largura). */
-.gr-cell > .gr-protecao { margin-left: auto; }
 /* Selo do DS não encolhe (min-width: auto): em coluna estreita empurrava o escudo para fora da célula, sobre a borda. Com min-width: 0 o texto do selo corta com reticências e o escudo fica dentro. */
 .gr-cell > .bt-badge { min-width: 0; }
 .gr-protecao__trigger { display: inline-grid; place-items: center; width: 20px; height: 20px; margin: -4px 0; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }

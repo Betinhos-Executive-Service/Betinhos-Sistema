@@ -726,7 +726,6 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     if (!attributes || !view) return null
     return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery, quickFind })
   }, [attributes, view, source, filtersBase, filterFields, geralQuery, quickFind, comManutencoes])
-  const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
 
   return (
     <ProtecaoContext.Provider value={protecao}>
@@ -738,7 +737,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           view={viewState}
           columns={columnDefs}
           catalog={catalog}
-          filters={{ fields: filterFields, search: searchFilter, notApplied, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
+          filters={{ fields: filterFields, search: searchFilter, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
           search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
