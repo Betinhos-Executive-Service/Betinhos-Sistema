@@ -209,7 +209,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       return rows.map((row) => ({
         id: cleanId(String(row.cr40f_multasid)),
         titulo: String(row.cr40f_novacoluna ?? 'Multa'),
-        status: String(row[`cr40f_status${FORMATTED}`] ?? ''),
+        status: typeof row.cr40f_status === 'number' ? row.cr40f_status : null,
         dataHora: typeof row.cr40f_dataehorario === 'string' ? row.cr40f_dataehorario : null,
         placa: String(row[`_cr40f_placa_value${FORMATTED}`] ?? ''),
         local: String(row.cr40f_localdainfracao ?? ''),
