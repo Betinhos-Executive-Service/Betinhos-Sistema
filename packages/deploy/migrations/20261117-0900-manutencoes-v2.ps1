@@ -49,7 +49,11 @@ function Get-OptionSet([string] $Coluna) {
   $r = Invoke-Dv "GET" "EntityDefinitions(LogicalName='$table')/Attributes(LogicalName='$Coluna')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?`$select=LogicalName&`$expand=OptionSet"
   return $r.OptionSet
 }
-function Rotulo($Opcao) { return @($Opcao.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 })[0].Label }
+function Rotulo($Opcao) {
+  $l = @($Opcao.Label.LocalizedLabels | Where-Object { $_.LanguageCode -eq 1046 })
+  if ($l.Count -eq 0) { return "" }
+  return $l[0].Label
+}
 # Choice global usa OptionSetName; local usa tabela e coluna.
 function Alvo($OptionSet, [string] $Coluna) {
   if ($OptionSet.IsGlobal) { return @{ OptionSetName = $OptionSet.Name } }

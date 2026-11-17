@@ -75,7 +75,9 @@ public static class Ciclo
     public static int? Espelho(int statusManutencao, int? statusGeral, bool temMotorista)
     {
         if (statusManutencao is not (M.Agendado or M.Programado)) return null;
-        if (statusGeral is G.StatusConcluido or G.StatusCancelado or G.StatusCanceladoComReservas) return null;
+        // Só a programação mexe na manutenção. Outros status da Geral (Requer Análise, Em Execução, Concluído, Cancelado...)
+        // têm dono próprio (App, Concluir, Cancelar) e o espelho não os desfaz.
+        if (statusGeral is not (G.StatusAProgramar or G.StatusProgramado)) return null;
         var programada = statusGeral == G.StatusProgramado && temMotorista;
         if (programada && statusManutencao == M.Agendado) return M.Programado;
         if (!programada && statusManutencao == M.Programado) return M.Agendado;

@@ -7,7 +7,8 @@ namespace Cr40f.Frota.Plugin;
 
 /// <summary>
 /// Step pós-operação síncrono no Update de cr40f_reservadeveculos (filtro: cr40f_status, cr40f_motorista; imagem "pre").
-/// Programar a linha de manutenção na Geral põe a manutenção em Programado; tirar da programação volta a Agendado.
+/// Programar a linha de manutenção na Geral põe a manutenção em Programado; voltar para a programar (Confirmado)
+/// ou ficar Programado sem motorista volta a Agendado. Outros status da Geral não mexem na manutenção.
 /// Grava como SYSTEM: quem programa é a operação, que não precisa de escrita na tabela de manutenções.
 /// </summary>
 public sealed class GeralManutencaoEspelhoPlugin : IPlugin
@@ -35,8 +36,9 @@ public sealed class GeralManutencaoEspelhoPlugin : IPlugin
 
     public static void Aplicar(IOrganizationService service, Entity target, Entity? pre)
     {
-        if (Final<OptionSetValue>(target, pre, G.Categoria)?.Value != G.CategoriaManutencao) return;
-        var manutencao = Final<EntityReference>(target, pre, G.Manutencao);
+        // Categoria e manutenção vêm só da imagem pre (o que a linha era): um Update que as troque não faz o SYSTEM mexer em outra manutenção.
+        if (pre?.GetAttributeValue<OptionSetValue>(G.Categoria)?.Value != G.CategoriaManutencao) return;
+        var manutencao = pre.GetAttributeValue<EntityReference>(G.Manutencao);
         if (manutencao is null) return;
         var statusGeral = Final<OptionSetValue>(target, pre, G.Status)?.Value;
         var temMotorista = Final<EntityReference>(target, pre, G.Motorista) is not null;

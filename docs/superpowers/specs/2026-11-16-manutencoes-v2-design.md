@@ -90,7 +90,7 @@ Ficam no `Cr40f.Frota.Plugin`, que já tem registrador (`Cr40f.Frota.Registrar`)
 
 **Espelho da programação:** um step pós-operação no Update da linha da Geral, filtrado por `cr40f_status` e `cr40f_motorista`, só na categoria Manutenção.
 - Status Programado e motorista preenchido → a manutenção vira Programado.
-- Saiu de Programado (sem estar concluída nem cancelada) → a manutenção volta a Agendado.
+- Voltou para a programar (Confirmado) ou ficou Programado sem motorista → a manutenção volta a Agendado. Outros status da Geral (Requer Análise, Em Execução, Concluído, Cancelado…) não mexem na manutenção; categoria e ligação com a manutenção vêm da imagem anterior (pre) da linha.
 - Não muda manutenção Realizada, Reprovada ou Cancelada.
 
 **Programar fora da janela:** a Geral avisa, mas não bloqueia.

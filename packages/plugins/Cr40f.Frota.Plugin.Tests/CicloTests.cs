@@ -112,6 +112,10 @@ public class CicloTests
     [InlineData(M.Programado, G.StatusCancelado, true, null)] // cancelamento é do Cancelar
     [InlineData(M.Realizado, G.StatusProgramado, true, null)] // encerrada não muda
     [InlineData(M.Solicitado, G.StatusProgramado, true, null)] // sem encaixe não espelha
+    [InlineData(M.Programado, G.StatusProgramado, false, M.Agendado)] // programado sem motorista volta
+    [InlineData(M.Programado, 100000001, true, null)] // Requer Análise (App cancela no local): não mexe
+    [InlineData(M.Programado, 202410006, true, null)] // Em Execução: não mexe
+    [InlineData(M.Programado, 100000001, false, null)] // outro status da Geral nunca espelha
     public void Espelho_da_programacao(int manutencao, int geral, bool motorista, int? esperado)
         => Assert.Equal(esperado, Ciclo.Espelho(manutencao, geral, motorista));
 
