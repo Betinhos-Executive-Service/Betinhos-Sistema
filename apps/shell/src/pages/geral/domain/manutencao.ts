@@ -209,32 +209,32 @@ export function avisoForaDaJanela(saidaIso: string | null, m: Pick<LinhaManutenc
 /** Na linha de manutenção só o motorista e a saída da própria linha editam (spec). */
 export const editavelNaManutencao = (column: Column) => !column.alias && (column.attribute === MOTORISTA || column.attribute === SAIDA)
 
-/** Célula da linha de manutenção depois da primeira coluna: um campo editável ou um trecho que junta colunas vizinhas. */
-export type Trecho = { tipo: 'campo'; column: Column } | { tipo: 'resumo' | 'vazio'; key: string; span: number }
+/**
+ * Célula da linha de manutenção depois da primeira coluna, uma por coluna da visão (o cabeçalho sempre diz a verdade):
+ * `campo` (motorista e saída, editáveis), `status` (status da manutenção e selos, no Status de Op.), `veiculo` (a placa),
+ * `problema` (o problema, o grau e a janela) e `vazio`.
+ */
+export type CelulaManutencao = { tipo: 'campo' | 'status' | 'veiculo' | 'problema' | 'vazio'; column: Column }
+/** `resumoNaPrimeira`: sem coluna para o problema, ele vai dentro da primeira coluna. `statusNoProblema`: sem Status de Op., o status vai junto do problema. */
+export type DesenhoManutencao = { celulas: CelulaManutencao[]; resumoNaPrimeira: boolean; statusNoProblema: boolean }
+
+const STATUS_DA_LINHA = 'cr40f_status'
+const VEICULO = 'cr40f_veiculo'
+const TRAJETO = 'cr40f_trajeto'
 
 /**
- * Motorista e saída na própria coluna; as colunas vizinhas restantes viram um trecho só, e o primeiro trecho leva o
- * resumo, sempre antes dos campos editáveis. Quando não há coluna comum antes do primeiro campo (só a primeira, ou a
- * primeira seguida de campos), o resumo ganha um trecho de `span` 1 com a chave da primeira coluna, na frente: quem
- * desenha o põe dentro da primeira coluna (não é uma célula a mais) e as colunas comuns que sobram viram `vazio`.
+ * Cada informação da manutenção na coluna de mesmo sentido. O problema vai no Trajeto (o texto livre da linha) ou, sem
+ * ele, na coluna comum mais larga; sem nenhuma, dentro da primeira coluna.
  */
-export function trechosDaManutencao(columns: Column[]): Trecho[] {
-  const trechos: Trecho[] = []
-  // Um campo antes de qualquer coluna comum: o resumo não pode ficar depois dele, então vai para a primeira coluna.
+export function desenhoDaManutencao(columns: Column[]): DesenhoManutencao {
   const resto = columns.slice(1)
-  const primeiraComum = resto.findIndex((c) => !editavelNaManutencao(c))
-  const primeiroCampo = resto.findIndex(editavelNaManutencao)
-  const resumoNaPrimeira = primeiraComum === -1 || (primeiroCampo !== -1 && primeiroCampo < primeiraComum)
-  let comResumo = resumoNaPrimeira
-  for (const column of columns.slice(1)) {
-    if (editavelNaManutencao(column)) { trechos.push({ tipo: 'campo', column }); continue }
-    const ultimo = trechos[trechos.length - 1]
-    if (ultimo && ultimo.tipo !== 'campo') { ultimo.span += 1; continue }
-    trechos.push({ tipo: comResumo ? 'vazio' : 'resumo', key: column.key, span: 1 })
-    comResumo = true
-  }
-  if (resumoNaPrimeira && columns.length) trechos.unshift({ tipo: 'resumo', key: columns[0].key, span: 1 })
-  return trechos
+  const propria = (c: Column, attribute: string) => !c.alias && c.attribute === attribute
+  const status = resto.find((c) => propria(c, STATUS_DA_LINHA))
+  const veiculo = resto.find((c) => propria(c, VEICULO))
+  const comuns = resto.filter((c) => !editavelNaManutencao(c) && c !== status && c !== veiculo)
+  const problema = comuns.find((c) => propria(c, TRAJETO)) ?? comuns.reduce<Column | undefined>((maior, c) => (!maior || c.width > maior.width ? c : maior), undefined)
+  const tipo = (c: Column): CelulaManutencao['tipo'] => (editavelNaManutencao(c) ? 'campo' : c === status ? 'status' : c === veiculo ? 'veiculo' : c === problema ? 'problema' : 'vazio')
+  return { celulas: resto.map((column) => ({ tipo: tipo(column), column })), resumoNaPrimeira: columns.length > 0 && !problema, statusNoProblema: !status }
 }
 
 /** Colunas da edição da manutenção no celular: motorista e saída da visão, ou criadas aqui quando a visão não as tem. */

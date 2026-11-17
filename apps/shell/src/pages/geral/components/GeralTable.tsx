@@ -7,12 +7,12 @@ import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { formatCell } from '../domain/format'
-import { trechosDaManutencao, type LinhaManutencao } from '../domain/manutencao'
+import { desenhoDaManutencao, type LinhaManutencao } from '../domain/manutencao'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { LoadSentinel } from './LoadMore'
-import { ManutencaoResumo } from './ManutencaoResumo'
+import { ManutencaoResumo, ManutencaoRotulo, ManutencaoSelos } from './ManutencaoResumo'
 
 /** Um grupo do servidor: rótulo e contagem reais; `rows` só tem o que já carregou (abre sob demanda, 100 por vez). */
 export type GroupView = { id: string; label: string; count: number; open: boolean; rows: Row[]; more: boolean; loading: boolean; error: string | null }
@@ -219,10 +219,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
-  // Trechos da linha de manutenção: dependem só das colunas visíveis, iguais para todas as linhas. O resumo que cai na
-  // primeira coluna (visão sem coluna para ele) é desenhado dentro dela, abaixo do botão, e não é uma célula a mais.
-  const trechos = useMemo(() => trechosDaManutencao(columns), [columns])
-  const resumoNaPrimeira = trechos.some((t) => t.tipo === 'resumo' && t.key === columns[0]?.key)
+  // Desenho da linha de manutenção: depende só das colunas visíveis, igual para todas as linhas. Uma célula por coluna,
+  // cada informação na coluna de mesmo sentido; sem coluna para o problema, ele vai dentro da primeira, abaixo do botão.
+  const desenho = useMemo(() => desenhoDaManutencao(columns), [columns])
   // Clique em qualquer lugar da linha seleciona; botões, campos, o painel de um Select e a célula em edição ficam de fora.
   const rowClick = (id: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
@@ -370,16 +369,17 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                   <div className="bt-table__cell gr-cell--select" role="gridcell">
                     <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={isSelected} onChange={() => onToggle(id)} />
                   </div>
-                  <div className={resumoNaPrimeira ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
-                    <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} title={m.descricao} onClick={abrir}><Wrench size={14} aria-hidden="true" /><span>Manutenção · {m.veiculo}</span></button>
-                    {resumoNaPrimeira ? <ManutencaoResumo m={m} quebra /> : null}
+                  <div className={desenho.resumoNaPrimeira ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
+                    <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} title={m.descricao} onClick={abrir}><Wrench size={14} aria-hidden="true" /><ManutencaoRotulo m={m} /></button>
+                    {desenho.resumoNaPrimeira ? <ManutencaoResumo m={m} quebra status={desenho.statusNoProblema} /> : null}
                   </div>
-                  {trechos.map((t) => {
-                    if (t.tipo === 'campo') return <Fragment key={t.column.key}>{renderCell(row, t.column)}</Fragment>
-                    if (t.tipo === 'resumo' && t.key === columns[0]?.key) return null
+                  {desenho.celulas.map(({ tipo, column }) => {
+                    if (tipo === 'campo') return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
                     return (
-                      <div key={t.key} role="gridcell" aria-colspan={t.span} className="bt-table__cell gr-cell gr-manut__trecho" style={{ gridColumn: `span ${t.span}` }}>
-                        {t.tipo === 'resumo' ? <button type="button" tabIndex={-1} className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} /></button> : null}
+                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}`}>
+                        {tipo === 'status' ? <ManutencaoSelos m={m} /> : null}
+                        {tipo === 'veiculo' ? <span className="gr-cell__value" title={m.veiculo}>{m.veiculo}</span> : null}
+                        {tipo === 'problema' ? <button type="button" tabIndex={-1} className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} status={desenho.statusNoProblema} /></button> : null}
                       </div>
                     )
                   })}

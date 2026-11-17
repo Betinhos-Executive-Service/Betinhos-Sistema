@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Row } from '@betinhos/dataverse'
 import { createMockManutencoes, createMockRows } from '../data/mock'
-import { lerLinhaManutencao, trechosDaManutencao } from '../domain/manutencao'
+import { lerLinhaManutencao } from '../domain/manutencao'
 import type { AttributeInfo, Column } from '../domain/types'
 import { Cell } from './Cell'
 import { GeralCards } from './GeralCards'
@@ -59,23 +59,6 @@ describe('linha de manutenção', () => {
   })
 })
 
-describe('trechos: o resumo vem antes dos campos editáveis', () => {
-  it('[id, saída, motorista, cliente]: sem coluna antes dos campos, o resumo vai para a primeira coluna', () => {
-    const cols = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_cliente'].map((k) => coluna(k))
-    expect(trechosDaManutencao(cols)).toEqual([
-      { tipo: 'resumo', key: 'cr40f_id', span: 1 },
-      { tipo: 'campo', column: cols[1] },
-      { tipo: 'campo', column: cols[2] },
-      { tipo: 'vazio', key: 'cr40f_cliente', span: 1 },
-    ])
-  })
-
-  it('com uma coluna comum antes dos campos, o resumo fica nela', () => {
-    const cols = ['cr40f_id', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto'].map((k) => coluna(k))
-    expect(trechosDaManutencao(cols).map((t) => t.tipo)).toEqual(['resumo', 'campo', 'campo', 'vazio'])
-  })
-})
-
 const INFO = { type: 'String', updatable: true, options: [] } as unknown as AttributeInfo
 function tabela(cols: Column[], rows: Row[], abrir = vi.fn()) {
   const view = render(
@@ -106,17 +89,34 @@ describe('tabela com linha de manutenção', () => {
     expect(abrir).toHaveBeenCalledWith(expect.objectContaining({ manutencaoId: 'm2' }))
   })
 
-  it('com colunas comuns, o resumo vai no trecho que junta as colunas vizinhas e só aparece uma vez', () => {
-    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista'].map((k) => coluna(k))
-    const { container } = tabela(cols, [m2])
+  it('colunas com sentido: uma célula por coluna, status no Status de Op., placa no Veículo e o problema no Trajeto', () => {
+    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_trajeto'].map((k) => coluna(k))
+    const { container, abrir } = tabela(cols, [m3])
     const linha = container.querySelector<HTMLElement>('.gr-row--manutencao')!
     const celulas = within(linha).getAllByRole('gridcell')
-    expect(celulas).toHaveLength(5) // seleção, primeira, trecho (status + cliente), saída, motorista
-    expect(celulas[2].getAttribute('aria-colspan')).toBe('2')
-    expect(celulas[2].style.gridColumn).toBe('span 2')
-    expect(within(celulas[2]).getByText('Manutenção fictícia m2')).toBeTruthy()
-    expect(within(linha).getAllByText('Manutenção fictícia m2')).toHaveLength(1)
-    expect(celulas[1].classList.contains('gr-cell--first')).toBe(true)
+    expect(celulas).toHaveLength(cols.length + 1) // seleção + uma por coluna: o cabeçalho de cada coluna vale para a linha
+    expect(celulas.some((c) => c.hasAttribute('aria-colspan'))).toBe(false)
+    const [, primeira, status, cliente, , , veiculo, trajeto] = celulas
+    expect(primeira.classList.contains('gr-cell--first')).toBe(true)
+    expect(within(status).getByText('Programado')).toBeTruthy()
+    expect(within(status).getByText('Atrasada')).toBeTruthy()
+    expect(cliente.textContent).toBe('')
+    expect(veiculo.textContent).toBe('TST1A11')
+    expect(within(trajeto).getByText('Manutenção fictícia m3')).toBeTruthy()
+    expect(within(trajeto).getByText('Média')).toBeTruthy()
+    expect(within(trajeto).queryByText('Programado')).toBeNull() // o status já está na coluna dele
+    expect(within(linha).getAllByText('Manutenção fictícia m3')).toHaveLength(1)
+    fireEvent.click(within(trajeto).getByText('Manutenção fictícia m3'))
+    expect(abrir).toHaveBeenCalledWith(expect.objectContaining({ manutencaoId: 'm3' }))
+  })
+
+  it('sem Status de Op. na visão, o status e os selos vão junto com o problema', () => {
+    const cols = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto'].map((k) => coluna(k))
+    const { container } = tabela(cols, [m3])
+    const trajeto = within(container.querySelector<HTMLElement>('.gr-row--manutencao')!).getAllByRole('gridcell')[4]
+    expect(within(trajeto).getByText('Manutenção fictícia m3')).toBeTruthy()
+    expect(within(trajeto).getByText('Programado')).toBeTruthy()
+    expect(within(trajeto).getByText('Atrasada')).toBeTruthy()
   })
 
   it('setas para cima e para baixo entre serviço e manutenção levam à célula editável mais próxima', () => {

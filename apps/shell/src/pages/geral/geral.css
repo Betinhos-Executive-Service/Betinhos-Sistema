@@ -308,18 +308,58 @@
 
 
 /* Linhas de manutenção (manutenções v2, plano 3): barra e fundo no laranja de aviso do DS, ícone Wrench e resumo da manutenção. */
-.gr-table .bt-table__row.gr-row--manutencao:not(.is-selected) .bt-table__cell { background-color: var(--bt-color-warning-soft); }
-.gr-table .bt-table__row.gr-row--manutencao .gr-cell--select { box-shadow: inset 4px 0 0 var(--bt-color-warning); }
+/* Tinta suave (metade do aviso do DS sobre a superfície): marca a linha sem virar uma faixa pesada; a barra de 3 px faz o resto. */
+.gr-table .bt-table__row.gr-row--manutencao:not(.is-selected) .bt-table__cell { background-color: color-mix(in srgb, var(--bt-color-warning-soft) 55%, var(--bt-color-surface)); }
+.gr-table .bt-table__row.gr-row--manutencao .gr-cell--select { box-shadow: inset 3px 0 0 var(--bt-color-warning); }
 .gr-manut__abrir { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-weight: 600; }
 .gr-manut__abrir svg { flex: 0 0 auto; color: var(--bt-color-warning); }
+/* Rótulo: na tabela, a placa em destaque e "Manutenção" embaixo, pequeno; em cards, uma linha; na densidade mínima, só a placa (o ícone já diz que é manutenção). */
+.gr-manut__rotulo { display: inline-flex; min-width: 0; }
+.gr-table .gr-manut__rotulo { flex-direction: column-reverse; align-items: flex-start; line-height: 1.2; }
+.gr-manut__sep { margin: 0 0.25em; }
+.gr-table .gr-manut__sep { display: none; }
+.gr-table .gr-manut__tipo { font-size: var(--bt-font-size-11); font-weight: 500; color: var(--bt-color-text-secondary); }
+.gr-table--minima .gr-manut__tipo, .gr-table--minima .gr-manut__sep { display: none; }
 .gr-manut__primeira { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--bt-space-1); }
-.gr-manut__trecho { min-width: 0; }
+.gr-manut__trecho { min-width: 0; container-type: inline-size; }
 .gr-manut__resumo-botao { display: flex; align-items: center; width: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.gr-manut__resumo { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; overflow: hidden; white-space: nowrap; }
-.gr-manut__resumo--quebra { flex-wrap: wrap; white-space: normal; }
-.gr-manut__descricao { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--bt-color-text-primary); }
-.gr-manut__meta { flex: 0 0 auto; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.gr-card.gr-card--manutencao { box-shadow: inset 4px 0 0 var(--bt-color-warning); }
-.gr-card.gr-card--manutencao:not(.is-selected) { background-color: var(--bt-color-warning-soft); }
+/* Resumo: o problema em cima, os detalhes (status, selos, grau, janela) embaixo. */
+.gr-manut__resumo { display: flex; flex-direction: column; justify-content: center; gap: 2px; width: 100%; min-width: 0; overflow: hidden; }
+.gr-manut__descricao { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; line-height: 1.25; color: var(--bt-color-text-primary); }
+.gr-manut__detalhes { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; overflow: hidden; white-space: nowrap; }
+.gr-manut__detalhes > * { flex: 0 0 auto; }
+.gr-manut__selos { display: inline-flex; align-items: center; gap: var(--bt-space-2); white-space: nowrap; }
+/* Alerta: texto pequeno com ponto, na cor do tom; o ponto carrega a cor para quem lê rápido. */
+.gr-manut__alerta { display: inline-flex; align-items: center; gap: 4px; font-size: var(--bt-font-size-12); font-weight: 600; }
+.gr-manut__alerta::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.gr-manut__alerta--perigo { color: var(--bt-color-danger); }
+.gr-manut__alerta--aviso { color: color-mix(in srgb, var(--bt-color-warning) 70%, black); }
+/* Coluna Status de Op. estreita: o alerta desce para baixo da etiqueta em vez de ser cortado. */
+.gr-manut__trecho--status .gr-manut__selos { flex-direction: column; align-items: flex-start; gap: 1px; }
+.gr-table--minima .gr-manut__trecho--status .gr-manut__selos { flex-direction: row; align-items: center; }
+.gr-manut__trecho--status { overflow: hidden; }
+.gr-manut__trecho--veiculo .gr-cell__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gr-manut__detalhes > .gr-manut__frase { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gr-manut__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+/* Grau e janela formam uma frase só ("Alta · Semana de …"), separada dos selos. */
+.gr-manut__meta + .gr-manut__meta::before { content: "·"; margin: 0 var(--bt-space-1); color: var(--bt-color-text-secondary); }
+/* O resumo abre a gaveta: sublinha o problema ao passar o mouse e mostra o foco do teclado. */
+@media (hover: hover) and (pointer: fine) { .gr-manut__resumo-botao:hover .gr-manut__descricao { text-decoration: underline; text-underline-offset: 2px; } }
+.gr-manut__resumo-botao:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border); border-radius: var(--bt-radius-xs); }
+.gr-manut__resumo--quebra { overflow: visible; }
+.gr-manut__resumo--quebra .gr-manut__descricao { overflow: visible; white-space: normal; }
+.gr-manut__resumo--quebra .gr-manut__detalhes { flex-wrap: wrap; overflow: visible; white-space: normal; row-gap: 2px; }
+.gr-manut__resumo--quebra .gr-manut__detalhes > .gr-manut__frase { flex: 0 1 auto; overflow: visible; white-space: normal; }
+/* Coluna estreita: o problema e os selos ficam; grau e janela saem (estão na gaveta). */
+@container (max-width: 190px) {
+  .gr-manut__frase { display: none; }
+}
+/* Densidade mínima (32 px): uma linha, status e selos primeiro e depois o problema. */
+.gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) { flex-direction: row; align-items: center; gap: var(--bt-space-2); }
+.gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__detalhes { order: 1; flex: 0 0 auto; }
+.gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__descricao { order: 2; flex: 1 1 0; font-weight: 500; }
+.gr-table--minima .gr-manut__resumo:not(.gr-manut__resumo--quebra) .gr-manut__frase { display: none; }
+.gr-card.gr-card--manutencao { box-shadow: inset 3px 0 0 var(--bt-color-warning); }
+.gr-card.gr-card--manutencao:not(.is-selected) { background-color: color-mix(in srgb, var(--bt-color-warning-soft) 55%, var(--bt-color-surface)); }
 .gr-manut-chave { display: inline-flex; flex: 0 0 auto; align-items: center; }
 .gr-manut-chave--celular { padding: 0 var(--bt-space-1) var(--bt-space-2); }

@@ -2,7 +2,7 @@
 import type { Row } from '@betinhos/dataverse'
 import { describe, expect, it } from 'vitest'
 import { buildCountFetch, buildFetch } from './fetch'
-import { aplicarManutencoes, avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, lerManutencoesDaVisao, padraoManutencoes, trechosDaManutencao } from './manutencao'
+import { aplicarManutencoes, avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, lerManutencoesDaVisao, padraoManutencoes, desenhoDaManutencao } from './manutencao'
 import type { Column } from './types'
 
 const ENT = 'cr40f_reservadeveculos'
@@ -184,21 +184,27 @@ describe('linha de manutenção', () => {
     expect(avisoForaDaJanela('2026-11-18T13:00:00Z', lerLinhaManutencao(linha({ 'bt_manut.cr40f_status': 202410002 }), HOJE)!)).toBeNull()
   })
 
-  it('trechos: motorista e saída na própria coluna; o resto junta, o primeiro trecho com o resumo', () => {
-    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto', 'x__cr40f_Motorista.cr40f_motorista'].map((k) => coluna(k))
-    expect(trechosDaManutencao(cols)).toEqual([
-      { tipo: 'resumo', key: 'cr40f_status', span: 2 },
-      { tipo: 'campo', column: cols[3] },
-      { tipo: 'campo', column: cols[4] },
-      { tipo: 'vazio', key: 'cr40f_trajeto', span: 2 },
-    ])
+  it('colunas com sentido: status no Status de Op., placa no Veículo, o problema no Trajeto, saída e motorista editam', () => {
+    const cols = ['cr40f_id', 'comprovantes', 'cr40f_status', 'cr40f_statusdefaturamento', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_cliente', 'cr40f_trajeto', 'x__cr40f_Motorista.cr40f_motorista'].map((k) => coluna(k))
+    const d = desenhoDaManutencao(cols)
+    expect(d.celulas.map((c) => c.tipo)).toEqual(['vazio', 'status', 'vazio', 'campo', 'campo', 'veiculo', 'vazio', 'problema', 'vazio'])
+    expect(d.celulas.map((c) => c.column)).toEqual(cols.slice(1))
+    expect(d).toMatchObject({ resumoNaPrimeira: false, statusNoProblema: false })
   })
 
-  it('visão sem coluna para o resumo: o resumo cai na primeira coluna visível (id), antes dos campos', () => {
-    expect(trechosDaManutencao([coluna('cr40f_id')])).toEqual([{ tipo: 'resumo', key: 'cr40f_id', span: 1 }])
-    expect(trechosDaManutencao([coluna('cr40f_id'), coluna('cr40f_motorista')])).toEqual([{ tipo: 'resumo', key: 'cr40f_id', span: 1 }, { tipo: 'campo', column: coluna('cr40f_motorista') }])
-    expect(trechosDaManutencao([coluna('cr40f_id'), coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')]).map((t) => t.tipo)).toEqual(['resumo', 'campo', 'campo'])
-    expect(trechosDaManutencao([])).toEqual([])
+  it('sem Trajeto, o problema vai na coluna comum mais larga; sem Status de Op., o status vai junto com o problema', () => {
+    const cols = [coluna('cr40f_id'), coluna('comprovantes', 90), coluna('cr40f_dataehorriodesada'), coluna('cr40f_cliente', 140), coluna('cr40f_motorista'), coluna('cr40f_statusdefaturamento', 140)]
+    const d = desenhoDaManutencao(cols)
+    expect(d.celulas.map((c) => c.tipo)).toEqual(['vazio', 'campo', 'problema', 'campo', 'vazio'])
+    expect(d).toMatchObject({ resumoNaPrimeira: false, statusNoProblema: true })
+  })
+
+  it('visão sem coluna para o problema: o resumo vai dentro da primeira coluna e nenhuma célula sobra', () => {
+    expect(desenhoDaManutencao([coluna('cr40f_id')])).toEqual({ celulas: [], resumoNaPrimeira: true, statusNoProblema: true })
+    const d = desenhoDaManutencao([coluna('cr40f_id'), coluna('cr40f_status'), coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')])
+    expect(d.celulas.map((c) => c.tipo)).toEqual(['status', 'campo', 'campo'])
+    expect(d).toMatchObject({ resumoNaPrimeira: true, statusNoProblema: false })
+    expect(desenhoDaManutencao([])).toEqual({ celulas: [], resumoNaPrimeira: false, statusNoProblema: true })
   })
 
   it('colunas da edição no celular: as da visão, ou criadas quando a visão não tem', () => {

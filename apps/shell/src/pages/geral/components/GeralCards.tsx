@@ -8,7 +8,7 @@ import { rowKey } from '../domain/layout'
 import type { LinhaManutencao } from '../domain/manutencao'
 import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
-import { ManutencaoResumo } from './ManutencaoResumo'
+import { ManutencaoResumo, ManutencaoRotulo } from './ManutencaoResumo'
 
 type Props = {
   rows: Row[]
@@ -60,7 +60,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
                   <span className="gr-card__check">
                     <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />
                   </span>
-                  <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} onClick={() => manutencao.abrir(m)}><Wrench size={14} aria-hidden="true" /><span>Manutenção · {m.veiculo}</span></button>
+                  <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} onClick={() => manutencao.abrir(m)}><Wrench size={14} aria-hidden="true" /><ManutencaoRotulo m={m} /></button>
                 </div>
                 <p className="gr-card__line"><strong>{formatCell('datetime', row, DATA)}</strong></p>
                 <ManutencaoResumo m={m} quebra />
