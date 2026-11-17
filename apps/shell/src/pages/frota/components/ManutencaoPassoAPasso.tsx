@@ -75,7 +75,8 @@ export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizad
 
       <Barra situacao={situacao} />
 
-      <Passo source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} />
+      {/* A chave remonta o passo quando os dados de partida mudam (ex.: reagendou e continua em Programar). */}
+      <Passo key={`${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}`} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} />
 
       {!parada && situacao.feitos.length > 0 && (
         <ul className="frota-guia__feitos">{situacao.feitos.map((f) => <li key={f}>{f}</li>)}</ul>
@@ -91,9 +92,11 @@ function Barra({ situacao }: { situacao: Situacao }) {
       {ETAPAS.map((e, i) => {
         const feita = situacao.atual === null || i < situacao.atual
         const atual = situacao.atual === i
+        const parou = parada && atual
         return (
-          <li key={e.chave} className="frota-etapas__item" data-feita={feita ? '' : undefined} data-parada={parada && atual ? '' : undefined} aria-current={atual && !parada ? 'step' : undefined}>
+          <li key={e.chave} className="frota-etapas__item" data-feita={feita ? '' : undefined} data-parada={parou ? '' : undefined} aria-current={atual && !parada ? 'step' : undefined}>
             <b aria-hidden="true">{feita ? '✓' : i + 1}</b><span>{e.rotulo}</span>
+            {feita ? <span className="frota-sr-only">, concluída</span> : parou ? <span className="frota-sr-only">, parou aqui</span> : null}
           </li>
         )
       })}
@@ -126,10 +129,15 @@ function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra }:
 function useGravar(onDesatualizada: () => void) {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  // Trava síncrona: o 2º clique antes do render (o botão ainda não está em loading) não grava nem mostra falha.
+  const emCurso = useRef(false)
   const gravar = useCallback(async (executar: () => Promise<unknown>, sucesso: () => void) => {
+    if (emCurso.current) return
+    emCurso.current = true
     setSalvando(true)
     setErro(null)
     const desfecho = await desfechoDaAcao(executar)
+    emCurso.current = false
     setSalvando(false)
     if (desfecho.tipo === 'feito') sucesso()
     else if (desfecho.tipo === 'desatualizada') onDesatualizada()

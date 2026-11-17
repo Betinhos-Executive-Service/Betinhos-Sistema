@@ -26,6 +26,7 @@ describe('avaliar', () => {
     const s = avaliar(agendada, HOJE)
     expect(s).toMatchObject({ etapa: 'programar', passo: 'Programar', atual: 1, prazo: { rotulo: 'Janela', perigo: false } })
     expect(s.prazo?.texto).toBe('23 a 29/11')
+    expect(avaliar(m({ ...agendada, janelaInicio: '2026-11-30', janelaFim: '2026-12-06' }), HOJE).prazo?.texto).toBe('30/11 a 06/12')
     expect(s.feitos).toEqual(['Agendada em 17/11/2026 para a semana de 23/11 a 29/11/2026 · Média'])
     expect(s.extras).toEqual(['reagendar', 'cancelar', 'concluir'])
   })

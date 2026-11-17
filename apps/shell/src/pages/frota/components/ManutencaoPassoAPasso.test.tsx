@@ -3,8 +3,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MANUT } from '../data/schema'
 import type { DetalheManutencao } from '../data/types'
+import { abrirGavetaRegistro } from '../../../app/registroAberto'
 import { ManutencaoPassoAPasso } from './ManutencaoPassoAPasso'
 
+vi.mock('../../../app/registroAberto', async (importOriginal) => ({ ...(await importOriginal<object>()), abrirGavetaRegistro: vi.fn() }))
 afterEach(cleanup)
 
 const HOJE = '2026-11-17'
@@ -129,6 +131,46 @@ describe('ManutencaoPassoAPasso', () => {
     expect(screen.getByText(/não tem linha na Geral/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Reagendar' }))
     expect(props.onExtra).toHaveBeenCalledWith('reagendar')
+  })
+
+  it('m novo com o mesmo passo: a Saída parte da janela nova (o passo remonta)', () => {
+    const props = { source: fonte(), hoje: HOJE, onFeito: vi.fn(), onDesatualizada: vi.fn(), onExtra: vi.fn() }
+    const { rerender } = render(<ManutencaoPassoAPasso {...props} m={agendada} />)
+    expect((screen.getByLabelText(/^Saída/) as HTMLInputElement).value).toBe('2026-11-23T08:00')
+    rerender(<ManutencaoPassoAPasso {...props} m={{ ...agendada, janelaInicio: '2026-11-30', janelaFim: '2026-12-06' }} />)
+    expect((screen.getByLabelText(/^Saída/) as HTMLInputElement).value).toBe('2026-11-30T08:00')
+  })
+
+  it('dois cliques antes de renderizar gravam uma vez só', async () => {
+    const props = montar(base)
+    fireEvent.click(screen.getByRole('radio', { name: 'Alta' }))
+    // O clique do DOM já esbarra no botão desabilitado depois do 1º render; aqui o handler roda duas vezes antes de qualquer render.
+    const botao = screen.getByRole('button', { name: 'Agendar' }) as unknown as Record<string, { onClick: () => void }>
+    const reactProps = botao[Object.keys(botao).find((k) => k.startsWith('__reactProps'))!]
+    await act(async () => { reactProps.onClick(); reactProps.onClick() })
+    await waitFor(() => expect(props.onFeito).toHaveBeenCalled())
+    expect(props.source.agendarManutencao).toHaveBeenCalledTimes(1)
+    // A trava de executarAcaoManutencao já barrava o 2º; sem a trava do passo ele virava o alerta "Já há uma ação em andamento".
+    expect(screen.queryByText('Não foi possível gravar')).toBeNull()
+  })
+
+  it('a barra diz ao leitor de tela qual etapa foi concluída e onde parou', () => {
+    montar({ ...agendada, status: MANUT.CANCELADO })
+    const itens = within(screen.getByRole('list', { name: 'Etapas' })).getAllByRole('listitem')
+    expect(itens[0].textContent).toContain('concluída')
+    expect(itens[1].textContent).toContain('parou aqui')
+    expect(itens[2].textContent).not.toMatch(/concluída|parou aqui/)
+  })
+
+  it('"abrir despesa" abre a gaveta da despesa', () => {
+    montar({ ...programada, status: MANUT.REALIZADO, despesa: { id: 'd1', statusOperacional: 100000000, statusAnexo: 100000002 } })
+    fireEvent.click(screen.getByRole('button', { name: 'abrir despesa' }))
+    expect(abrirGavetaRegistro).toHaveBeenCalledWith('cr40f_despesaoperacional', 'd1')
+  })
+
+  it('despesa ilegível: avisa que não foi possível ler', () => {
+    montar({ ...programada, status: MANUT.REALIZADO, despesa: undefined })
+    expect(screen.getByText('Não foi possível ler a despesa')).toBeTruthy()
   })
 
   it('programação ilegível: aviso para reabrir a gaveta', () => {

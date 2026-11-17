@@ -27,7 +27,8 @@ function prazoDe(m: DetalheManutencao, etapa: Etapa, hoje: string): Prazo | null
     return { rotulo: 'Esperando', texto: `há ${dias} ${dias === 1 ? 'dia' : 'dias'}`, perigo: false }
   }
   if (m.janelaInicio && m.janelaFim) {
-    const texto = m.janelaInicio === m.janelaFim ? ddmm(m.janelaInicio) : `${m.janelaInicio.slice(8, 10)} a ${ddmm(m.janelaFim)}`
+    const mesmoMes = m.janelaInicio.slice(0, 7) === m.janelaFim.slice(0, 7)
+    const texto = m.janelaInicio === m.janelaFim ? ddmm(m.janelaInicio) : `${mesmoMes ? m.janelaInicio.slice(8, 10) : ddmm(m.janelaInicio)} a ${ddmm(m.janelaFim)}`
     return { rotulo: 'Janela', texto, perigo: false }
   }
   return null
