@@ -45,6 +45,13 @@ export function valoresConclusaoIniciais(m: DetalheManutencao, agora = new Date(
 
 const numeroBR = (n: number) => n.toLocaleString('pt-BR')
 
+/** Aviso (não bloqueia) de km informado menor que o do pedido. Serve ao campo, ao digitar, e ao envio. */
+export function avisoKmMenor(kmTexto: string, kmPedido: number | null): string | null {
+  const km = lerKm(kmTexto)
+  if (km === null || kmPedido === null || km >= kmPedido) return null
+  return `O km informado (${numeroBR(km)}) é menor que o km do pedido (${numeroBR(kmPedido)}). Confira antes de concluir.`
+}
+
 /** Mesma lista de formatos da camada de dados (`exigirFormato`): o erro aparece na tela antes de tentar enviar. */
 function primeiroErroDeFormato(arquivos: File[], tipo: TipoArquivo): string | undefined {
   for (const arquivo of arquivos) {
@@ -79,7 +86,7 @@ export function validarConclusao(v: ValoresConclusao, ctx: ContextoConclusao): L
   if (v.fotos.length > MAX_FOTOS_FINAIS) erros.fotos = `No máximo ${MAX_FOTOS_FINAIS} fotos`
   else erros.fotos = primeiroErroDeFormato(v.fotos, 'foto')
   for (const campo of ['notas', 'fotos'] as const) if (!erros[campo]) delete erros[campo]
-  const aviso = km !== null && ctx.kmPedido !== null && km < ctx.kmPedido ? `O km informado (${numeroBR(km)}) é menor que o km do pedido (${numeroBR(ctx.kmPedido)}). Confira antes de concluir.` : null
+  const aviso = avisoKmMenor(v.km, ctx.kmPedido)
   if (Object.keys(erros).length || !data || km === null) return { erros, aviso, pedido: null }
   return {
     erros, aviso,

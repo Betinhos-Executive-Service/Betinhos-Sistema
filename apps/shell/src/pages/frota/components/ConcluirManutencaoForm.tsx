@@ -7,7 +7,7 @@ import { FOTO_MAX_BYTES } from '../data/sharepoint'
 import type { DataSource, OpcaoBusca } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal } from '../data/xrm'
-import { concluirPeloShell, MAX_FOTOS_FINAIS, validarConclusao, valoresConclusaoIniciais, type ErrosConclusao, type ValoresConclusao } from '../domain/conclusao'
+import { avisoKmMenor, concluirPeloShell, MAX_FOTOS_FINAIS, validarConclusao, valoresConclusaoIniciais, type ErrosConclusao, type ValoresConclusao } from '../domain/conclusao'
 import { desfechoDaAcao, executarAcaoManutencao } from '../domain/transitions'
 import { GradeServicos } from './GradeServicos'
 import { useOpcoesBusca } from './useOpcoesBusca'
@@ -30,7 +30,6 @@ type Props = {
 export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar, onDesatualizada }: Props) {
   const [valores, setValores] = useState<ValoresConclusao>(() => valoresConclusaoIniciais(detalhe))
   const [erros, setErros] = useState<ErrosConclusao>({})
-  const [aviso, setAviso] = useState<string | null>(null)
   const [falha, setFalha] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   // Guarda contra dois envios no mesmo instante: o estado só vale depois da próxima renderização, o ref vale já.
@@ -40,6 +39,8 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
   const [pessoa, setPessoa] = useState<OpcaoBusca | null>(detalhe.realizadoPor ? { id: detalhe.realizadoPor.id, nome: detalhe.realizadoPor.label } : null)
   const cidades = useOpcoesBusca(useCallback((texto: string) => source.buscarCidades(texto), [source]), cidade)
   const pessoas = useOpcoesBusca(useCallback((texto: string) => source.buscarFuncionarios(texto), [source]), pessoa)
+  // O aviso de km aparece no campo, ao digitar (e não só ao enviar).
+  const avisoKm = avisoKmMenor(valores.km, detalhe.km)
   const set = (patch: Partial<ValoresConclusao>) => setValores((atual) => ({ ...atual, ...patch }))
   const texto = (campo: CampoTexto) => (event: { target: { value: string } }) => set({ [campo]: event.target.value })
 
@@ -53,7 +54,6 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
     if (emCurso.current) return
     const leitura = validarConclusao(valores, { manutencaoId: detalhe.id, kmPedido: detalhe.km, temNotaGravada: Boolean(detalhe.linkNotaFiscal) })
     setErros(leitura.erros)
-    setAviso(leitura.aviso)
     const pedido = leitura.pedido
     if (!pedido) return
     emCurso.current = true
@@ -72,13 +72,12 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
       <strong>Concluir</strong>
       <p className="frota-muted">Os mesmos campos do App. Ao concluir, a despesa da manutenção é criada e a linha da Geral é concluída.</p>
       {falha ? <Alert tone="danger" title="Não foi possível concluir">{comPontoFinal(falha)} O que você preencheu foi mantido.</Alert> : null}
-      {aviso ? <Alert tone="warning">{aviso}</Alert> : null}
       <div className="frota-fields">
         <div className="frota-fields__wide frota-stack">
           <span id={rotuloServicosId} className="frota-campo__rotulo">Serviços realizados *</span>
           <GradeServicos selecionados={valores.servicos} onChange={(servicos) => set({ servicos })} disabled={salvando} erro={erros.servicos} rotuloId={rotuloServicosId} />
         </div>
-        <Field label="Km do veículo" required error={erros.km} disabled={salvando} hint={detalhe.km !== null ? `No pedido: ${detalhe.km.toLocaleString('pt-BR')} km` : undefined}>
+        <Field label="Km do veículo" required error={erros.km} disabled={salvando} hint={avisoKm ?? (detalhe.km !== null ? `No pedido: ${detalhe.km.toLocaleString('pt-BR')} km` : undefined)}>
           <Input type="number" inputMode="numeric" min={1} step={1} suffix="km" value={valores.km} onChange={texto('km')} />
         </Field>
         <Field label="Data e hora da manutenção" required error={erros.data} disabled={salvando}>

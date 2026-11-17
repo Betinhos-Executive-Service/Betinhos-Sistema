@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ANEXO_DESPESA, MANUT, PAGAMENTO } from '../data/schema'
 import type { DetalheManutencao } from '../data/types'
-import { agoraLocalSP, concluirPeloShell, validarConclusao, valoresConclusaoIniciais, type ValoresConclusao } from './conclusao'
+import { agoraLocalSP, avisoKmMenor, concluirPeloShell, validarConclusao, valoresConclusaoIniciais, type ValoresConclusao } from './conclusao'
 
 const detalhe = (extra: Partial<DetalheManutencao> = {}): DetalheManutencao => ({ id: 'm1', codigo: 'MAN-1', descricao: 'Freio', status: MANUT.AGENDADO, grau: 3, tipo: null, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 85000, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-11-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, comentarioAoMotorista: null, comentarioColaborador: null, pagamento: null, realizadoPor: null, fotosPedido: [], linkNotaFiscal: null, fotosFinais: [], ...extra })
 const nota = new File(['nf'], 'nf.jpg', { type: 'image/jpeg' })
@@ -46,6 +46,11 @@ describe('validarConclusao', () => {
     expect(validarConclusao(validos({ notas: [heic] }), ctx).erros).toEqual({ notas: 'nf.heic: formato não aceito (use JPG, PNG, WEBP ou PDF)' })
     expect(validarConclusao(validos({ fotos: [pdf] }), ctx).erros).toEqual({ fotos: 'foto.pdf: formato não aceito (use JPG, PNG ou WEBP)' })
     expect(validarConclusao(validos({ notas: [new File(['x'], 'nf.pdf', { type: 'application/pdf' })] }), ctx).erros).toEqual({}) // PDF vale como nota
+  })
+
+  it('avisoKmMenor: só com km válido menor que o do pedido (serve ao campo, ao digitar)', () => {
+    expect(avisoKmMenor('84000', 85000)).toBe('O km informado (84.000) é menor que o km do pedido (85.000). Confira antes de concluir.')
+    for (const [texto, pedido] of [['85000', 85000], ['86000', 85000], ['', 85000], ['abc', 85000], ['84000', null]] as const) expect(avisoKmMenor(texto, pedido), `${texto}/${pedido}`).toBeNull()
   })
 
   it('km menor que o do pedido avisa, sem bloquear', () => {

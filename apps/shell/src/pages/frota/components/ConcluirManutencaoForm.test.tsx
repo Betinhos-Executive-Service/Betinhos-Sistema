@@ -49,11 +49,18 @@ describe('ConcluirManutencaoForm', () => {
     expect(source.concluirManutencao).not.toHaveBeenCalled()
   })
 
-  it('avisa, sem bloquear, quando o km é menor que o do pedido', async () => {
+  it('avisa no próprio campo, ao digitar, quando o km é menor que o do pedido; some quando deixa de ser menor; não bloqueia', async () => {
     await montar()
-    fireEvent.change(screen.getByLabelText(/Km do veículo/), { target: { value: '40000' } })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Concluir manutenção' })) })
+    const campo = screen.getByLabelText(/Km do veículo/)
+    expect(screen.queryByText(/é menor que o km do pedido/)).toBeNull()
+    fireEvent.change(campo, { target: { value: '40000' } }) // sem clicar em Concluir
     expect(screen.getByText(/O km informado \(40\.000\) é menor que o km do pedido \(50\.000\)/)).toBeTruthy()
+    fireEvent.change(campo, { target: { value: '50000' } })
+    expect(screen.queryByText(/é menor que o km do pedido/)).toBeNull()
+    expect(screen.getByText(/No pedido: 50\.000 km/)).toBeTruthy()
+    fireEvent.change(campo, { target: { value: '49999' } })
+    expect(screen.getByText(/O km informado \(49\.999\)/)).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Concluir manutenção' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('conclui: sobe a nota, chama a Custom API com Dinheiro e anexa a nota na despesa', async () => {
