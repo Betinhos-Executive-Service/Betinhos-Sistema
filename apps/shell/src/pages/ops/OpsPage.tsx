@@ -83,16 +83,18 @@ function Ops({ host }: { host: Host }) {
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortOps(list, view.config.sort, choices) : list, view.config.sort, (op) => op.id), [list, choices, view.config.sort, extra])
   const recebimentos = source.pagantes.recebimentos
-  const comprovantes = useColunaComprovantes(recebimentos, view.config, filters, list, opDaLinha, mobile)
-  const { comLeitura } = comprovantes
+  const [version, setVersion] = useState(0)
+  const comprovantes = useColunaComprovantes(recebimentos, view.config, filters, list, opDaLinha, mobile, version)
+  const { comLeitura, contada } = comprovantes
   const read = useMemo(() => comLeitura(extra.read(readOp, (op) => op.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
   const visible = useMemo(() => {
     if (!choices) return []
     const words = searchWords(q)
-    return words.length ? filtered.filter((op) => index.matches(op, words)) : filtered
-  }, [filtered, index, q, choices])
+    if (!contada && !words.length) return filtered
+    return filtered.filter((op) => (!contada || contada(op)) && (!words.length || index.matches(op, words)))
+  }, [filtered, index, q, choices, contada])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
@@ -109,7 +111,6 @@ function Ops({ host }: { host: Host }) {
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
   const frameUrl = gerarOpId ? source.pagantes.gerarPagantesUrl(gerarOpId) : null
-  const [version, setVersion] = useState(0)
 
   const refresh = useCallback(() => { setVersion((v) => v + 1); void ops.reload() }, [ops.reload])
   // Fechar mês: as opções são as pendências tipo 4 (cliente + mês com serviços mensais sem OP) dos últimos 12 meses.
@@ -194,8 +195,10 @@ function Ops({ host }: { host: Host }) {
     const pending = !ops.complete && ops.loading
     // A closure perde o narrowing de `choices`; aqui ela já está carregada.
     const loaded = ops.choices
-    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
-    const empty = pending
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'OP' : 'OPs'} · {pending || comprovantes.aguardando ? 'somando valores…' : formatMoney(total(visible))}</span>
+    const empty = comprovantes.aguardando
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title={comprovantes.aguardando} />
+      : pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma OP com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     // Agrupada, cada grupo tem sua tabela (virtualizada acima de 100 linhas); o `TableGroups` faz o lote do clique direito valer para a lista inteira e o checkbox do cabeçalho, só para o grupo.
@@ -234,6 +237,7 @@ function Ops({ host }: { host: Host }) {
           {ops.error} {ops.complete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só as OPs que chegaram; busca, filtros e total valem para elas.'}
         </Alert>
       ) : null}
+      {comprovantes.aviso}
       {body}
       {ops.choices ? (
         <OpDrawer op={current} onClose={() => setSelectedId(null)} choices={ops.choices} source={source} version={version}
