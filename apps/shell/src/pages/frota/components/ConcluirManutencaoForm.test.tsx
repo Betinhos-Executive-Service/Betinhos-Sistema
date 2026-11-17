@@ -97,17 +97,19 @@ describe('ConcluirManutencaoForm', () => {
 
   it('dois envios no mesmo instante, com a primeira chamada ainda pendente, chamam a Custom API uma única vez', async () => {
     const { source } = await montar()
-    let terminar: (valor: { despesaId: string; statusAnexo: number; geralId: string | null }) => void = () => {}
-    const concluir = vi.spyOn(source, 'concluirManutencao').mockImplementation(() => new Promise((resolve) => { terminar = resolve }))
+    // A releitura do status é a primeira espera do envio: segurando-a, a primeira chamada fica pendente sem depender de tempo.
+    let liberar: (status: number | null) => void = () => {}
+    const releitura = vi.spyOn(source, 'currentStatus').mockImplementation(() => new Promise((resolve) => { liberar = resolve }))
+    const concluir = vi.spyOn(source, 'concluirManutencao')
     await preencher(new File(['nf'], 'nota.jpg', { type: 'image/jpeg' }))
     const formulario = screen.getByRole('button', { name: 'Concluir manutenção' }).closest('form') as HTMLFormElement
     await act(async () => {
       fireEvent.submit(formulario)
       fireEvent.submit(formulario) // mesmo tick: o estado ainda não re-renderizou
-      await new Promise((resolve) => setTimeout(resolve, 20))
     })
-    expect(concluir).toHaveBeenCalledTimes(1)
-    await act(async () => { terminar({ despesaId: 'd-m2', statusAnexo: 100000002, geralId: null }) })
+    expect(releitura).toHaveBeenCalledTimes(1) // o segundo envio nem chegou à releitura: a guarda o barrou
+    await act(async () => { liberar(MANUT.AGENDADO) })
+    await waitFor(() => expect(concluir).toHaveBeenCalledTimes(1))
   })
 
   it('o rótulo dos serviços nomeia a grade e o erro dela fica ligado a ela', async () => {
