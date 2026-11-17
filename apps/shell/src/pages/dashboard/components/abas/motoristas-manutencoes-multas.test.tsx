@@ -142,6 +142,7 @@ describe('ManutencoesTab', () => {
     expect(within(kpi('Custo total')).getByText(/1\.500,00/)).toBeTruthy()
     expect(within(kpi('Custo total')).getByText('15,0%')).toBeTruthy()
     expect(within(kpi('Em andamento')).getByText('1')).toBeTruthy()
+    expect(within(kpi('Em andamento')).getByText('solicitadas, agendadas ou programadas')).toBeTruthy()
     expect(within(kpi('Custo médio')).getByText(/750,00/)).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('10,0 dias')).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('50,0%')).toBeTruthy()

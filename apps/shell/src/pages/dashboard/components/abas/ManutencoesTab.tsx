@@ -63,7 +63,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
       <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
         {ma.ant ? <ChipAnt chip={ma.ant.custoTotal} /> : undefined}
       </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, aprovadas ou programadas' : undefined} />
+      <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, agendadas ou programadas' : undefined} />
       <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
       <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
     </KpiLinha>
