@@ -46,12 +46,20 @@ public sealed class MultaTarefa
     private readonly IOrganizationService _s;
     private readonly string _hoje;
     private readonly string _url;
+    private readonly Action<string> _trace;
+    private static readonly string[] ColunasTarefa =
+    {
+        "cr40f_status", "cr40f_titulo", "cr40f_descricao", "cr40f_checklistjson", "cr40f_prioridade", "cr40f_prazo",
+        "cr40f_equipeplanner", "cr40f_cr40f_funcionarioresponsavel",
+    };
 
-    public MultaTarefa(IOrganizationService system, string hoje, string? urlSistema)
+    /// <param name="trace">Aviso para o trace do plugin (equipe Frota ausente ou vazia); sem ele, os avisos se perdem.</param>
+    public MultaTarefa(IOrganizationService system, string hoje, string? urlSistema, Action<string>? trace = null)
     {
         _s = system;
         _hoje = hoje;
         _url = (urlSistema ?? "").Trim().TrimEnd('#');
+        _trace = trace ?? (_ => { });
     }
 
     public static string Codigo(Guid multaId) => "MULTA:" + multaId.ToString("D");
@@ -80,7 +88,7 @@ public sealed class MultaTarefa
 
     private Entity? Buscar(Guid multaId)
     {
-        var q = new QueryExpression(Tarefas) { ColumnSet = new ColumnSet("cr40f_status"), TopCount = 1 };
+        var q = new QueryExpression(Tarefas) { ColumnSet = new ColumnSet(ColunasTarefa), TopCount = 1 };
         q.Criteria.AddCondition("cr40f_codigoorigem", ConditionOperator.Equal, Codigo(multaId));
         return _s.RetrieveMultiple(q).Entities.FirstOrDefault();
     }
@@ -96,8 +104,6 @@ public sealed class MultaTarefa
 
     private void Criar(MultaResumo m, MultaSituacao s)
     {
-        var equipe = EquipeFrota();
-        var responsaveis = equipe == null ? new List<Guid>() : Ordenar(MembrosDa(equipe.Id), equipe.GetAttributeValue<EntityReference>("cr40f_responsavelprincipal")?.Id);
         var t = new Entity(Tarefas)
         {
             ["cr40f_status"] = new OptionSetValue(MultaEtapas.Aberta(s.Etapa) ? Afazer : Concluida),
@@ -106,31 +112,27 @@ public sealed class MultaTarefa
             ["cr40f_multa"] = new EntityReference(MultaMapper.Tabela, m.Id),
         };
         Preencher(t, m, s);
-        if (equipe != null) t["cr40f_equipeplanner"] = equipe.ToEntityReference();
-        if (responsaveis.Count > 0) t["cr40f_cr40f_funcionarioresponsavel"] = new EntityReference("cr40f_funcionarios", responsaveis[0]);
         var id = _s.Create(t);
-        var tarefa = new EntityReference(Tarefas, id);
-        foreach (var f in responsaveis)
-            _s.Create(new Entity(Responsaveis) { ["cr40f_tarefa"] = tarefa, ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", f), ["cr40f_name"] = $"{id}-{f}" });
-        if (equipe != null)
-            _s.Create(new Entity(TarefaEquipes) { ["cr40f_tarefa"] = tarefa, ["cr40f_equipe"] = equipe.ToEntityReference(), ["cr40f_name"] = $"{id}-{equipe.Id}" });
         Evento(id, 100000000, "Tarefa criada.", "", "", "");
-        if (responsaveis.Count > 0)
-        {
-            var contexto = new ContextoAtribuicao { AssigneeIds = responsaveis.Select(g => g.ToString("D")).ToList(), SourceCode = Codigo(m.Id) };
-            Evento(id, 100000003, "Responsáveis atribuídos.", "notification:assignment", "", Json.Serializar(contexto));
-        }
+        // Equipe, responsáveis e evento de atribuição saem do mesmo reparo que completa uma criação interrompida.
+        var u = new Entity(Tarefas, id);
+        Reparar(new Entity(Tarefas, id), m, u);
+        if (u.Attributes.Count > 0) _s.Update(u);
     }
 
     private void Atualizar(Entity tarefa, MultaResumo m, MultaSituacao s, int? statusAnterior)
     {
+        var desejado = new Entity(Tarefas);
+        Preencher(desejado, m, s);
         var u = new Entity(Tarefas, tarefa.Id);
-        Preencher(u, m, s);
+        foreach (var a in desejado.Attributes)
+            if (!Igual(tarefa, a.Key, a.Value)) u[a.Key] = a.Value;
         var atual = tarefa.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value ?? Afazer;
         var aberta = MultaEtapas.Aberta(s.Etapa);
         int? novo = !aberta && atual != Concluida ? Concluida : aberta && (atual == Concluida || atual == Cancelada) ? Afazer : null;
         if (novo is int n) u["cr40f_status"] = new OptionSetValue(n);
-        _s.Update(u);
+        Reparar(tarefa, m, u);
+        if (u.Attributes.Count > 0) _s.Update(u);
         if (statusAnterior is int antes && MultaEtapas.Etapa(antes) != s.Etapa)
         {
             var de = MultaEtapas.Etapa(antes);
@@ -138,6 +140,82 @@ public sealed class MultaTarefa
         }
         if (novo == Concluida) Evento(tarefa.Id, 100000002, "Tarefa concluída: a multa foi encerrada.", "status", ChaveStatus[atual], "done");
         else if (novo == Afazer) Evento(tarefa.Id, 100000002, "Tarefa reaberta: a multa ainda está aberta.", "status", ChaveStatus[atual], "todo");
+    }
+
+    /// <summary>Texto igual ignora a quebra de linha (o Dataverse devolve CRLF em colunas de várias linhas).</summary>
+    private static object? Normalizar(object? v) => v switch
+    {
+        OptionSetValue o => o.Value,
+        EntityReference r => r.Id,
+        string s => s.Replace("\r\n", "\n"),
+        _ => v,
+    };
+
+    private static bool Igual(Entity atual, string coluna, object? desejado) =>
+        Equals(atual.Contains(coluna) ? Normalizar(atual[coluna]) : null, Normalizar(desejado));
+
+    /// <summary>
+    /// Completa o que uma criação interrompida deixou faltando (a criação não é transacional): relação com a equipe e lookup da equipe,
+    /// responsáveis (com o principal) e o evento de atribuição que dispara o sininho. Só completa o que está vazio: o que alguém mudou
+    /// depois no Planner (trocar responsável, por exemplo) não é refeito. Sem equipe Frota, ou sem ninguém nela, avisa no trace e a
+    /// tarefa fica sem responsável até a equipe ganhar gente; a sincronia seguinte completa.
+    /// </summary>
+    private void Reparar(Entity tarefa, MultaResumo m, Entity u)
+    {
+        var responsaveis = Ids(Responsaveis, "cr40f_funcionario", tarefa.Id);
+        var temRelacaoEquipe = Ids(TarefaEquipes, "cr40f_equipe", tarefa.Id).Count > 0;
+        var semLookupEquipe = tarefa.GetAttributeValue<EntityReference>("cr40f_equipeplanner") == null;
+        if (responsaveis.Count == 0 || !temRelacaoEquipe || semLookupEquipe)
+        {
+            var equipe = EquipeFrota();
+            if (equipe == null) _trace($"MultaTarefa {m.Id}: equipe Planner \"Frota\" não encontrada; a tarefa da multa fica sem responsável até a equipe existir.");
+            else
+            {
+                if (semLookupEquipe) u["cr40f_equipeplanner"] = equipe.ToEntityReference();
+                if (!temRelacaoEquipe)
+                    _s.Create(new Entity(TarefaEquipes) { ["cr40f_tarefa"] = new EntityReference(Tarefas, tarefa.Id), ["cr40f_equipe"] = equipe.ToEntityReference(), ["cr40f_name"] = $"{tarefa.Id}-{equipe.Id}" });
+                if (responsaveis.Count == 0) responsaveis = AdicionarResponsaveis(tarefa, m, equipe, u);
+            }
+        }
+        if (responsaveis.Count > 0 && !TemEvento(tarefa.Id, "notification:assignment"))
+        {
+            var contexto = new ContextoAtribuicao { AssigneeIds = responsaveis.Select(g => g.ToString("D")).ToList(), SourceCode = Codigo(m.Id) };
+            Evento(tarefa.Id, 100000003, "Responsáveis atribuídos.", "notification:assignment", "", Json.Serializar(contexto));
+        }
+    }
+
+    private List<Guid> AdicionarResponsaveis(Entity tarefa, MultaResumo m, Entity equipe, Entity u)
+    {
+        var principal = equipe.GetAttributeValue<EntityReference>("cr40f_responsavelprincipal")?.Id;
+        var membros = MembrosDa(equipe.Id);
+        var novos = Ordenar(membros, principal);
+        if (novos.Count == 0)
+        {
+            _trace($"MultaTarefa {m.Id}: a equipe Planner \"Frota\" não tem membros nem responsável principal; a tarefa da multa fica sem responsável até a equipe ganhar gente.");
+            return novos;
+        }
+        if (principal is Guid p && !membros.Contains(p))
+            _trace($"MultaTarefa {m.Id}: o responsável principal da equipe \"Frota\" não está entre os membros; foi incluído mesmo assim.");
+        if (tarefa.GetAttributeValue<EntityReference>("cr40f_cr40f_funcionarioresponsavel") == null)
+            u["cr40f_cr40f_funcionarioresponsavel"] = new EntityReference("cr40f_funcionarios", novos[0]);
+        foreach (var f in novos)
+            _s.Create(new Entity(Responsaveis) { ["cr40f_tarefa"] = new EntityReference(Tarefas, tarefa.Id), ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", f), ["cr40f_name"] = $"{tarefa.Id}-{f}" });
+        return novos;
+    }
+
+    private List<Guid> Ids(string tabela, string coluna, Guid tarefaId)
+    {
+        var q = new QueryExpression(tabela) { ColumnSet = new ColumnSet(coluna) };
+        q.Criteria.AddCondition("cr40f_tarefa", ConditionOperator.Equal, tarefaId);
+        return _s.RetrieveMultiple(q).Entities.Select(e => e.GetAttributeValue<EntityReference>(coluna)).Where(r => r != null).Select(r => r!.Id).ToList();
+    }
+
+    private bool TemEvento(Guid tarefaId, string campo)
+    {
+        var q = new QueryExpression(Eventos) { ColumnSet = new ColumnSet("cr40f_campo"), TopCount = 1 };
+        q.Criteria.AddCondition("cr40f_tarefa", ConditionOperator.Equal, tarefaId);
+        q.Criteria.AddCondition("cr40f_campo", ConditionOperator.Equal, campo);
+        return _s.RetrieveMultiple(q).Entities.Count > 0;
     }
 
     public static List<ItemChecklist> Checklist(MultaEstado m, MultaSituacao s)
@@ -188,7 +266,7 @@ public sealed class MultaTarefa
     }
 
     private static List<Guid> Ordenar(List<Guid> membros, Guid? principal) =>
-        principal is Guid p && membros.Contains(p) ? new[] { p }.Concat(membros.Where(m => m != p)).ToList() : membros;
+        principal is Guid p ? new[] { p }.Concat(membros.Where(m => m != p)).ToList() : membros;
 
     private void Evento(Guid tarefaId, int tipo, string descricao, string campo, string anterior, string novo) =>
         _s.Create(new Entity(Eventos)

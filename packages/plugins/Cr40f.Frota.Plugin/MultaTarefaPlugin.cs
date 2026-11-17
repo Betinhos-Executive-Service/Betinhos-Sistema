@@ -21,7 +21,7 @@ public sealed class MultaTarefaPlugin : IPlugin
             var pre = context.PreEntityImages.Contains("pre") ? context.PreEntityImages["pre"] : null;
             var anterior = pre?.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value;
             var hoje = FrotaPendenciasPlugin.ResolverHoje(null, DateTime.UtcNow);
-            new MultaTarefa(system, hoje, Variaveis.Ler(system, "new_URLSistemaBetinhos")).Sincronizar(context.PrimaryEntityId, context.MessageName == "Create", anterior);
+            new MultaTarefa(system, hoje, Variaveis.Ler(system, "new_URLSistemaBetinhos"), aviso => tracing.Trace("{0}", aviso)).Sincronizar(context.PrimaryEntityId, context.MessageName == "Create", anterior);
         }
         catch (Exception error)
         {

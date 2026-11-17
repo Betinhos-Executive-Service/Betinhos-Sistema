@@ -12,12 +12,19 @@ public class MultaTarefaTests
     private const string Hoje = "2026-11-17";
     private static readonly Guid Junior = Guid.NewGuid(), Outro = Guid.NewGuid();
 
-    private static (FakeMundo Mundo, Entity Multa) Cenario(int status = MultaCodigos.Identificar)
+    private static Entity AddEquipe(FakeMundo mundo, Guid? principal, params Guid[] membros)
+    {
+        var equipe = mundo.Add(new Entity("cr40f_plannerequipe") { ["cr40f_nome"] = "Frota" });
+        if (principal is Guid p) equipe["cr40f_responsavelprincipal"] = new EntityReference("cr40f_funcionarios", p);
+        foreach (var m in membros)
+            mundo.Add(new Entity("cr40f_plannerequipemembro") { ["cr40f_equipe"] = equipe.ToEntityReference(), ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", m) });
+        return equipe;
+    }
+
+    private static (FakeMundo Mundo, Entity Multa) Cenario(int status = MultaCodigos.Identificar, bool comEquipe = true)
     {
         var mundo = new FakeMundo();
-        var equipe = mundo.Add(new Entity("cr40f_plannerequipe") { ["cr40f_nome"] = "Frota", ["cr40f_responsavelprincipal"] = new EntityReference("cr40f_funcionarios", Junior) });
-        mundo.Add(new Entity("cr40f_plannerequipemembro") { ["cr40f_equipe"] = equipe.ToEntityReference(), ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", Outro) });
-        mundo.Add(new Entity("cr40f_plannerequipemembro") { ["cr40f_equipe"] = equipe.ToEntityReference(), ["cr40f_funcionario"] = new EntityReference("cr40f_funcionarios", Junior) });
+        if (comEquipe) AddEquipe(mundo, Junior, Outro, Junior);
         var multa = mundo.Add(new Entity(MultaMapper.Tabela, Guid.NewGuid())
         {
             ["cr40f_novacoluna"] = "1A2B3C",
@@ -28,7 +35,8 @@ public class MultaTarefaTests
         return (mundo, multa);
     }
 
-    private static MultaTarefa Tarefa(FakeMundo mundo) => new(mundo, Hoje, "https://exemplo.invalid/sistema/");
+    private static MultaTarefa Tarefa(FakeMundo mundo) => new(mundo, Hoje, "https://exemplo.invalid/sistema/", mundo.Traces.Add);
+    private static List<Guid> Ids(FakeMundo mundo, string tabela, string coluna) => mundo.Linhas(tabela).Select(r => r.GetAttributeValue<EntityReference>(coluna).Id).ToList();
     private static Entity UnicaTarefa(FakeMundo mundo) => mundo.Linhas(MultaTarefa.Tarefas).Single();
     private static List<Entity> Eventos(FakeMundo mundo) => mundo.Linhas(MultaTarefa.Eventos);
 
@@ -110,6 +118,120 @@ public class MultaTarefaTests
         Tarefa(mundo).Sincronizar(multa.Id, false, MultaCodigos.Encerrada);
         Assert.Equal(MultaTarefa.Afazer, UnicaTarefa(mundo).GetAttributeValue<OptionSetValue>("cr40f_status").Value);
         Assert.Contains(Eventos(mundo), e => (string)e["cr40f_descricao"] == "Tarefa reaberta: a multa ainda está aberta.");
+    }
+
+    [Fact]
+    public void Segunda_sincronizacao_igual_nao_grava_nada()
+    {
+        var (mundo, multa) = Cenario();
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+        var criados = mundo.Criados.Count;
+        mundo.Atualizados.Clear();
+
+        Tarefa(mundo).Sincronizar(multa.Id, false, MultaCodigos.Identificar);
+
+        Assert.Empty(mundo.Atualizados);
+        Assert.Equal(criados, mundo.Criados.Count);
+    }
+
+    [Fact]
+    public void So_grava_o_que_mudou()
+    {
+        var (mundo, multa) = Cenario();
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+        mundo.Atualizados.Clear();
+        mundo.Update(new Entity(MultaMapper.Tabela, multa.Id) { ["cr40f_dataparaindicar"] = new DateTime(2026, 12, 20, 0, 0, 0, DateTimeKind.Utc) });
+        mundo.Atualizados.Clear();
+
+        Tarefa(mundo).Sincronizar(multa.Id, false, MultaCodigos.Identificar);
+
+        var u = Assert.Single(mundo.Atualizados);
+        Assert.Equal(new[] { "cr40f_prazo", "cr40f_prioridade" }, u.Attributes.Select(a => a.Key).OrderBy(k => k).ToArray());
+    }
+
+    [Fact]
+    public void Repara_a_tarefa_criada_sem_relacoes_nem_evento_de_atribuicao()
+    {
+        var (mundo, multa) = Cenario();
+        var tarefa = mundo.Add(new Entity(MultaTarefa.Tarefas)
+        {
+            ["cr40f_codigoorigem"] = MultaTarefa.Codigo(multa.Id), ["cr40f_origem"] = new OptionSetValue(MultaTarefa.OrigemMulta),
+            ["cr40f_status"] = new OptionSetValue(MultaTarefa.Afazer),
+        });
+
+        Tarefa(mundo).Sincronizar(multa.Id, false, null);
+
+        Assert.Equal(new[] { Junior, Outro }, Ids(mundo, MultaTarefa.Responsaveis, "cr40f_funcionario"));
+        Assert.Single(mundo.Linhas(MultaTarefa.TarefaEquipes));
+        Assert.NotNull(tarefa.GetAttributeValue<EntityReference>("cr40f_equipeplanner"));
+        Assert.Equal(Junior, tarefa.GetAttributeValue<EntityReference>("cr40f_cr40f_funcionarioresponsavel").Id);
+        var atribuicao = Eventos(mundo).Single(e => (string)e["cr40f_campo"] == "notification:assignment");
+        Assert.Contains(Junior.ToString(), (string)atribuicao["cr40f_valornovo"]);
+
+        var criados = mundo.Criados.Count;
+        Tarefa(mundo).Sincronizar(multa.Id, false, null);
+        Assert.Equal(criados, mundo.Criados.Count);
+    }
+
+    [Fact]
+    public void Repara_so_o_evento_quando_a_criacao_parou_depois_das_relacoes()
+    {
+        var (mundo, multa) = Cenario();
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+        mundo.Linhas(MultaTarefa.Eventos).RemoveAll(e => (string)e["cr40f_campo"] == "notification:assignment");
+
+        Tarefa(mundo).Sincronizar(multa.Id, false, null);
+
+        Assert.Equal(2, mundo.Linhas(MultaTarefa.Responsaveis).Count);
+        Assert.Single(Eventos(mundo), e => (string)e["cr40f_campo"] == "notification:assignment");
+    }
+
+    [Fact]
+    public void Equipe_ausente_cria_a_tarefa_sem_responsavel_avisa_no_trace_e_completa_quando_a_equipe_aparece()
+    {
+        var (mundo, multa) = Cenario(comEquipe: false);
+
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+
+        var t = UnicaTarefa(mundo);
+        Assert.Null(t.GetAttributeValue<EntityReference>("cr40f_cr40f_funcionarioresponsavel"));
+        Assert.Empty(mundo.Linhas(MultaTarefa.Responsaveis));
+        Assert.DoesNotContain(Eventos(mundo), e => (string)e["cr40f_campo"] == "notification:assignment");
+        Assert.Contains(mundo.Traces, x => x.Contains("equipe Planner \"Frota\" não encontrada"));
+
+        AddEquipe(mundo, Junior, Outro);
+        Tarefa(mundo).Sincronizar(multa.Id, false, null);
+
+        Assert.Equal(new[] { Junior, Outro }, Ids(mundo, MultaTarefa.Responsaveis, "cr40f_funcionario"));
+        Assert.Single(Eventos(mundo), e => (string)e["cr40f_campo"] == "notification:assignment");
+    }
+
+    [Fact]
+    public void Equipe_vazia_cria_a_tarefa_sem_responsavel_e_avisa_no_trace()
+    {
+        var (mundo, multa) = Cenario(comEquipe: false);
+        AddEquipe(mundo, null);
+
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+
+        Assert.Single(mundo.Linhas(MultaTarefa.Tarefas));
+        Assert.Empty(mundo.Linhas(MultaTarefa.Responsaveis));
+        Assert.Single(mundo.Linhas(MultaTarefa.TarefaEquipes));
+        Assert.Contains(mundo.Traces, x => x.Contains("não tem membros nem responsável principal"));
+        Assert.DoesNotContain(Eventos(mundo), e => (string)e["cr40f_campo"] == "notification:assignment");
+    }
+
+    [Fact]
+    public void Principal_fora_dos_membros_entra_primeiro_com_aviso()
+    {
+        var (mundo, multa) = Cenario(comEquipe: false);
+        AddEquipe(mundo, Junior, Outro);
+
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+
+        Assert.Equal(new[] { Junior, Outro }, Ids(mundo, MultaTarefa.Responsaveis, "cr40f_funcionario"));
+        Assert.Equal(Junior, UnicaTarefa(mundo).GetAttributeValue<EntityReference>("cr40f_cr40f_funcionarioresponsavel").Id);
+        Assert.Contains(mundo.Traces, x => x.Contains("não está entre os membros"));
     }
 
     [Theory]
