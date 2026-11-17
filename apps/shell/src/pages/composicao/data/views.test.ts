@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
+import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, deleteView, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
   { id: 'client', label: 'Cliente', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos', 'cr40f_clientes1'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }, { from: 'cr40f_clientes1id', to: 'cr40f_cliente' }], type: 'String', available: true },
@@ -224,4 +224,14 @@ it('lê de volta os operadores que a ViewBar grava: not-in, atalhos de data e pr
   ])
   // Atalho de data em campo que não é data não é aceito.
   expect(parseNativeFilters('<fetch><entity name="cr40f_composicaodeprecos"><filter><condition attribute="new_valortotal" operator="today" /></filter></entity></fetch>', catalog)).toBeNull()
+})
+
+it('exclui visão pessoal criada no Dynamics e mantém a trava nas públicas de fora da tela', async () => {
+  const deleteRecord = vi.fn(async () => undefined)
+  const retrieveMultipleRecords = vi.fn(async () => ({ entities: [] }))
+  vi.stubGlobal('window', { Xrm: { WebApi: { deleteRecord, retrieveMultipleRecords } } })
+  await deleteView({ id: 'dyn', kind: 'personal', name: 'Do Dynamics', managed: false, definition })
+  expect(deleteRecord).toHaveBeenCalledWith('userquery', 'dyn')
+  await expect(deleteView({ id: 'pub', kind: 'public', name: 'Pública', managed: false, definition })).rejects.toThrow('não pode ser excluída')
+  vi.unstubAllGlobals()
 })
