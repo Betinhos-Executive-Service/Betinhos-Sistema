@@ -446,7 +446,8 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
 }
 
 export async function deleteView(view: SavedView) {
-  if (!view.managed) throw new Error('Esta view existente não pode ser excluída por esta tela.')
+  // Visão pessoal criada no Dynamics (sem a marca da tela) é do próprio usuário: pode ir para a lixeira.
+  if (!view.managed && view.kind !== 'personal') throw new Error('Esta view existente não pode ser excluída por esta tela.')
   const webApi = api()
   await webApi.deleteRecord(view.kind === 'personal' ? 'userquery' : 'savedquery', view.id)
   const pins = await webApi.retrieveMultipleRecords(PIN_TABLE, `?$select=new_configuracaovisualizacaocomposicaoid&$filter=new_viewid eq '${view.id}'`)
