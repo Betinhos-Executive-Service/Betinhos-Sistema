@@ -121,12 +121,12 @@ Ficam no `Cr40f.Frota.Plugin`, que já tem registrador (`Cr40f.Frota.Registrar`)
 
 ### Pendências, e-mail semanal e agente
 
-- "Aprovar" vira **"A encaixar"**.
-- "Agendada" (vencida ou nos próximos 7 dias) vira **"Atrasada"** (janela vencida).
+- "Aprovar" vira **"A encaixar"**, e é só da tela: a Custom API `cr40f_FrotaPendencias` continua só com as regras proativas (prioridade, reincidência, preventiva, atrasada, custo e hodômetro). A fila "A encaixar" é a fila diária da tela, como "Aprovar" era; o e-mail e o agente não ganham tipo novo.
+- "Agendada" (vencida ou nos próximos 7 dias) vira **"Atrasada"** (janela vencida). O fim da janela é `cr40f_janelafim` e, na falta dela (registro anterior às manutenções v2, até a conversão), `cr40f_agendarpara`. Vale para Agendado e Programado.
 - "Programar" sai. É tarefa da operação, na Geral.
-- "Prioridade parada" conta a partir de `createdon` enquanto Solicitado, e de `cr40f_datadaaprovacao` depois do encaixe.
-- A tela (`domain/pendencias.ts`) e a Custom API (`Regras.cs`) passam a contar igual, com a paridade conferida em `Fixtures/paridade.json`. O tipo de proposta `FrotaAgendadaVencida` do agente passa a se chamar `FrotaAtrasada`.
-- A preventiva continua como está. Ela volta a funcionar porque `new_servicosmanutencao` passa a ser preenchido na conclusão.
+- "Prioridade parada" conta a partir de `createdon` enquanto Solicitado (mais de 2 dias). Depois do encaixe, vale só para **Agendado** e conta de `cr40f_datadaaprovacao` (mais de 5 dias sem programação); sem essa data (registro antigo), a manutenção não marca. Programado já tem dia e motorista, então não entra.
+- A tela (`domain/pendencias.ts`) e a Custom API (`Regras.cs`) contam igual **nos tipos que as duas têm**, com a paridade conferida em `Fixtures/paridade.json`. O tipo de proposta `FrotaAgendadaVencida` do agente passa a se chamar `FrotaAtrasada`.
+- A preventiva usa `cr40f_kmrealizado` quando ele existir (`kmRealizado ?? km`), na última execução e no km estimado, na tela, no Dashboard e na Custom API. Ela volta a funcionar porque `new_servicosmanutencao` passa a ser preenchido na conclusão.
 
 ## App Motoristas
 
