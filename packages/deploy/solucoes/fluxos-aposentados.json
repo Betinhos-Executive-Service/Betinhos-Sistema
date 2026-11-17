@@ -3,5 +3,23 @@
     "nome": "Flow Notificação Serviço Não Visualizado | Interno e Motoristas",
     "substituto": "Flow Aviso Motorista | Vigia",
     "decisao": "Renan, 10/11/2026: a Vigia pela janela da saída (reenvio 4 h, alerta 3 h) substitui o alerta 1 h antes"
+  },
+  {
+    "nome": "Flow  Notificar Condutor Multas",
+    "substituto": "Multas | Multas de hoje",
+    "removido": true,
+    "decisao": "Renan e Júnior, 17/11/2026 (spec multas fase 1, §9): o aviso ao motorista vira o passo AvisarMotorista do passo a passo; o flow sai pelas soluções"
+  },
+  {
+    "nome": "Flow Gerar Contrato",
+    "substituto": "Multas | Multas de hoje",
+    "removido": true,
+    "decisao": "Renan e Júnior, 17/11/2026 (spec multas fase 1, §9): a indicação vira o passo RegistrarIndicacao; o flow sai pelas soluções"
+  },
+  {
+    "nome": "Flow Notificação Email Multa não Indicada",
+    "substituto": "Multas | Multas de hoje",
+    "removido": true,
+    "decisao": "Renan e Júnior, 17/11/2026 (spec multas fase 1, §9): o e-mail diário Multas de hoje cobre a multa ainda não indicada; o flow sai pelas soluções"
   }
 ]
