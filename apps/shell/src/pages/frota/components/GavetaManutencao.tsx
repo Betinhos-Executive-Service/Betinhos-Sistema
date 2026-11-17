@@ -15,6 +15,7 @@ import { acoesManutencao, desfechoDaAcao, executarAcaoManutencao, rotuloAcao, St
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
 import { JanelaCampos } from './JanelaCampos'
+import { Arquivos } from './ManutencaoPassoAPasso'
 import { useNotify } from './Toasts'
 import { StatusBadge } from './Ui'
 
@@ -39,21 +40,6 @@ function Secao({ id, titulo, children }: { id: string; titulo: string; children:
 
 function Linhas({ linhas }: { linhas: Linha[] }) {
   return <dl className="frota-detail">{linhas.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}</dl>
-}
-
-/** Fotos e nota como links do OneDrive (abrem em outra aba); ver D10 do plano 2. */
-function Arquivos({ titulo, links }: { titulo: string; links: string[] }) {
-  if (!links.length) return <p className="frota-muted">{titulo}: nenhum arquivo.</p>
-  return (
-    <p className="frota-cluster frota-fotos">
-      <span className="frota-muted">{titulo}:</span>
-      {links.map((link, i) => (
-        <a key={`${link}-${i}`} className="frota-link" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${titulo}, arquivo ${i + 1} (abre em outra aba)`}>
-          Arquivo {i + 1}<ExternalLink size={12} aria-hidden />
-        </a>
-      ))}
-    </p>
-  )
 }
 
 type FormProps = { source: DataSource; m: DetalheManutencao; onFeito: (mensagem: string) => void; onDesatualizada: () => void; onVoltar: () => void }

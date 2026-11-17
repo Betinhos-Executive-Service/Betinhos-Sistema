@@ -163,3 +163,25 @@
 .frota-campo__rotulo { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
 .frota-fotos { margin: 0; font-size: var(--bt-font-size-13); }
 .frota-fotos .frota-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
+
+/* Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): topo, barra de três etapas, um passo por vez. */
+.frota-guia { display: grid; gap: var(--bt-space-4); min-width: 0; }
+.frota-guia__topo { display: flex; align-items: flex-start; gap: var(--bt-space-3); min-width: 0; }
+.frota-guia__id { display: grid; gap: var(--bt-space-1); flex: 1 1 auto; min-width: 0; }
+.frota-guia__id h2 { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+.frota-guia__prazo { display: grid; justify-items: end; flex: 0 0 auto; text-align: right; }
+.frota-guia__prazo small { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.frota-guia__prazo b { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); }
+.frota-guia__prazo[data-perigo] small, .frota-guia__prazo[data-perigo] b { color: var(--bt-color-danger); }
+.frota-guia__passo { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.frota-guia__passo h3 { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); }
+.frota-guia__feitos { display: grid; gap: var(--bt-space-1); margin: 0; padding-left: var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.frota-etapas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.frota-etapas__item { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-2); border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.frota-etapas__item b { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: var(--bt-font-size-11); }
+.frota-etapas__item[data-feita] { color: var(--bt-color-success); }
+.frota-etapas__item[data-feita] b { border-color: var(--bt-color-success); background-color: var(--bt-color-success); color: var(--bt-color-white); }
+.frota-etapas__item[aria-current="step"] { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
+.frota-etapas__item[aria-current="step"] b { border-color: var(--bt-color-action); }
+.frota-etapas__item[data-parada] { color: var(--bt-color-text-secondary); border-bottom-color: var(--bt-color-border); }
+@media (max-width: 560px) { .frota-etapas__item { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } .frota-guia__topo { flex-wrap: wrap; } }
