@@ -2,7 +2,7 @@ import { daysBetween, diaSP, formatBR, horaSP } from '../data/dates'
 import { brl } from '../data/format'
 import { GRAU, LIMITE, MANUT, label } from '../data/schema'
 import type { DespesaDaManutencao, DetalheManutencao } from '../data/types'
-import { atrasada, fimDaJanela, lerJanela, rotuloJanela, valoresJanelaIniciais, type ValoresJanela } from './janela'
+import { atrasada, fimDaJanela, lerJanela, modoDe, valoresJanelaIniciais, type ValoresJanela } from './janela'
 
 /** Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): três etapas, um passo por vez. */
 export type Etapa = 'agendar' | 'programar' | 'realizar' | 'realizada' | 'reprovada' | 'cancelada'
@@ -35,7 +35,12 @@ function prazoDe(m: DetalheManutencao, etapa: Etapa, hoje: string): Prazo | null
 
 function feitosDe(m: DetalheManutencao): string[] {
   const linhas: string[] = []
-  if (m.dataAprovacao && m.janelaInicio && m.janelaFim) linhas.push(`Agendada em ${formatBR(m.dataAprovacao)} para ${rotuloJanela({ inicio: m.janelaInicio, fim: m.janelaFim }).toLowerCase()} · ${label(GRAU, m.grau)}`)
+  if (m.dataAprovacao && m.janelaInicio && m.janelaFim) {
+    const janela = { inicio: m.janelaInicio, fim: m.janelaFim }
+    // Montado de início/fim (o rotuloJanela começa em maiúscula e não traz o artigo, e outras telas o usam como está).
+    const quando = modoDe(janela) === 'dia' ? `o dia ${formatBR(janela.inicio)}` : `a semana de ${ddmm(janela.inicio)} a ${formatBR(janela.fim)}`
+    linhas.push(`Agendada em ${formatBR(m.dataAprovacao)} para ${quando} · ${label(GRAU, m.grau)}`)
+  }
   const p = m.programacao
   if (p?.motorista && p.saida && (m.status === MANUT.PROGRAMADO || m.status === MANUT.REALIZADO || m.status === MANUT.CANCELADO)) linhas.push(`Programada: ${p.motorista.label}, saída ${textoSaida(p.saida)}`)
   if (m.status === MANUT.REALIZADO && m.dataManutencao) linhas.push(`Realizada em ${formatBR(diaSP(m.dataManutencao))}`)

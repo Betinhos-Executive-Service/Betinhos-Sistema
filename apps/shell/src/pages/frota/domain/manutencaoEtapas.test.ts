@@ -26,7 +26,7 @@ describe('avaliar', () => {
     const s = avaliar(agendada, HOJE)
     expect(s).toMatchObject({ etapa: 'programar', passo: 'Programar', atual: 1, prazo: { rotulo: 'Janela', perigo: false } })
     expect(s.prazo?.texto).toBe('23 a 29/11')
-    expect(s.feitos).toEqual(['Agendada em 17/11/2026 para semana de 23/11 a 29/11/2026 · Média'])
+    expect(s.feitos).toEqual(['Agendada em 17/11/2026 para a semana de 23/11 a 29/11/2026 · Média'])
     expect(s.extras).toEqual(['reagendar', 'cancelar', 'concluir'])
   })
   it('Programado: etapa realizar, aguardando conclusão, feito da programação', () => {
@@ -34,6 +34,10 @@ describe('avaliar', () => {
     expect(s).toMatchObject({ etapa: 'realizar', passo: 'AguardarConclusao', atual: 2 })
     expect(s.feitos[1]).toBe('Programada: Outro Fictício, saída 24/11/2026 10:00')
     expect(s.extras).toEqual(['concluir', 'reagendar', 'cancelar'])
+  })
+  it('agendada para um dia: o feito diz o dia', () => {
+    const s = avaliar(m({ ...agendada, janelaInicio: '2026-11-15', janelaFim: '2026-11-15' }), HOJE)
+    expect(s.feitos[0]).toBe('Agendada em 17/11/2026 para o dia 15/11/2026 · Média')
   })
   it('janela vencida: prazo Atrasada desde o fim, em perigo', () => {
     const s = avaliar(m({ ...agendada, janelaInicio: '2026-11-09', janelaFim: '2026-11-15' }), HOJE)
