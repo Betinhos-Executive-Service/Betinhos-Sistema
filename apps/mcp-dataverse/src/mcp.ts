@@ -1,5 +1,6 @@
 import { McpAgent } from 'agents/mcp'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker-provider.js'
 import pkg from '../package.json'
 import { DataverseSession } from './dataverse'
 import type { AppEnv, Props } from './env'
@@ -12,7 +13,8 @@ export const SERVER_VERSION: string = pkg.version
 
 /** Servidor MCP (um Durable Object por sessão); as chamadas ao Dataverse usam o refresh token da pessoa. */
 export class DataverseMcp extends McpAgent<AppEnv, unknown, Props> {
-  server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION })
+  // Validador explícito: o padrão do SDK (ajv) é aliasado para stub no wrangler.jsonc para reduzir o pacote.
+  server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION }, { jsonSchemaValidator: new CfWorkerJsonSchemaValidator() })
 
   async init() {
     const props = this.props

@@ -6,6 +6,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mcp-dataverse",
   "main": "src/index.ts",
+  "minify": true,
+  "alias": { "ajv": "./stubs/ajv.js", "ajv-formats": "./stubs/ajv-formats.js", "mime-db": "./stubs/empty.js" },
   "account_id": "a26e65df1496d9808e12a495bc47cd80",
   "workers_dev": true,
   "compatibility_date": "2026-06-01",
