@@ -103,7 +103,7 @@ describe('KPIs', () => {
 describe('previsão', () => {
   const rv = [reserva({ saidaRaw: '2026-10-01T12:00:00Z', valor: 1000 }), reserva({ saidaRaw: '2026-10-10T12:00:00Z', valor: 2000 })]
   it('mês aberto: realizado + média diária × dias restantes', () => {
-    expect(previsao(rv, '2026-10-01', '2026-10-15', NOW)).toEqual({ rotulo: 'Previsão até fim do mês', texto: 'R$\u00a06,2k' })
+    expect(previsao(rv, '2026-10-01', '2026-10-15', NOW)).toEqual({ rotulo: 'Previsão do mês', texto: 'R$\u00a06,2k' })
   })
   it('estados encerrado, futuro e sem base', () => {
     expect(previsao(rv, '2026-09-01', '2026-09-30', NOW).texto).toBe('período encerrado')
@@ -112,6 +112,6 @@ describe('previsão', () => {
   })
   it('anual só quando o filtro começa em 1º/jan e termina depois de hoje (paridade: "Este ano" até hoje é previsão do mês)', () => {
     expect(previsao(rv, '2026-01-01', '2026-12-31', NOW)).toEqual({ rotulo: 'Previsão anual', texto: 'R$\u00a03,8k' })
-    expect(previsao(rv, '2026-01-01', '2026-10-15', NOW).rotulo).toBe('Previsão até fim do mês')
+    expect(previsao(rv, '2026-01-01', '2026-10-15', NOW).rotulo).toBe('Previsão do mês')
   })
 })

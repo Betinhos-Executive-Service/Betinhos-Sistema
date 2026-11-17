@@ -16,7 +16,7 @@ export function previsao(rv: Reserva[], inicio: string, fim: string, now: Date) 
   const selFim = inicioMs(fim) + DIA_MS - 1000
   const anual = selIni === anoIni && selFim >= hojeFim
   const estado = selIni > hojeFim ? 'future' : selFim < hojeIni ? 'closed' : 'open'
-  const rotulo = anual ? 'Previsão anual' : 'Previsão até fim do mês'
+  const rotulo = anual ? 'Previsão anual' : 'Previsão do mês'
   if (estado === 'closed') return { rotulo, texto: 'período encerrado' }
   if (estado === 'future') return { rotulo, texto: 'sem base futura' }
 

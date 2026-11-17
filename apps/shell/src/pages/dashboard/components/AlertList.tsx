@@ -1,7 +1,8 @@
 import { useId, type ReactNode } from 'react'
-import { Button, StatusBadge, type StatusTone } from '@betinhos/ui'
-import { AlertTriangle, ChevronRight, CircleCheck } from 'lucide-react'
+import { StatusBadge, type StatusTone } from '@betinhos/ui'
+import { AlertTriangle, CircleCheck } from 'lucide-react'
 import type { AlertaItem, Tom } from '../domain/types'
+import { BotaoAbrir } from './BotaoAbrir'
 
 export type TomAlerta = 'danger' | 'warning' | 'success' | 'neutral' | 'brand'
 const TOM: Record<Tom, TomAlerta> = { ok: 'success', warn: 'warning', danger: 'danger', neutral: 'neutral' }
@@ -22,11 +23,7 @@ export function AlertaCard({ valor, rotulo, status, tom, onAbrir }: { valor: str
           {prefixo && !status.startsWith(prefixo) ? <span className="dash-sr">{prefixo}: </span> : null}{status}
         </StatusBadge>
       </span>
-      {onAbrir ? (
-        <Button className="dash-abre dash-alerta__abre" variant="ghost" size="compact" iconEnd={<ChevronRight size={14} aria-hidden="true" />} onClick={onAbrir}>
-          Ver detalhes{' '}<span className="dash-sr">de {rotulo}</span>
-        </Button>
-      ) : null}
+      {onAbrir ? <BotaoAbrir texto="Ver detalhes" rotulo={rotulo} onAbrir={onAbrir} /> : null}
     </li>
   )
 }

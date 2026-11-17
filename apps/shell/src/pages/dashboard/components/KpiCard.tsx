@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-import { Button } from '@betinhos/ui'
-import { ChevronRight } from 'lucide-react'
 import { Sparkline } from '../charts/Charts'
 import type { CorToken } from '../charts/tokens'
 import type { Apoio, Chip, PontoSerie } from '../domain/types'
 import { Chips } from './KpiChip'
+import { BotaoAbrir } from './BotaoAbrir'
 
 /* Card de KPI único de todas as abas: borda superior na cor do indicador, valor, extras (chips, apoio, faixas) e sparkline na base. */
 
@@ -41,21 +40,21 @@ export function KpiCard({ rotulo, valor, tom = 'brand', chips = [], apoio = [], 
   const extras = chips.length > 0 || apoios.length > 0 || linha != null || children != null
   return (
     <article className={`dash-kpi dash-kpi--${tom}${acao ? ' dash-kpi--abre' : ''}`} aria-label={rotulo}>
-      <span className="dash-kpi__rotulo">{rotulo}</span>
-      {valor == null
-        ? <strong className="dash-kpi__valor dash-kpi__valor--semdado">s/dado</strong>
-        : <strong className="dash-kpi__valor">{valor}</strong>}
+      <div className="dash-kpi__topo">
+        <span className="dash-kpi__rotulo">{rotulo}</span>
+        {acao ? <BotaoAbrir texto={acao.texto ?? 'Ver detalhes'} rotulo={rotulo} onAbrir={acao.onAbrir} /> : null}
+      </div>
+      <div className="dash-kpi__caixa">
+        {valor == null
+          ? <strong className="dash-kpi__valor dash-kpi__valor--semdado">s/dado</strong>
+          : <strong className="dash-kpi__valor">{valor}</strong>}
+      </div>
       {extras ? (
         <div className="dash-kpi__extras">
           <Chips chips={chips} apoio={apoios} />
           {linha != null ? <span className="dash-apoio">{linha}</span> : null}
           {children}
         </div>
-      ) : null}
-      {acao ? (
-        <Button className="dash-abre" variant="ghost" size="compact" iconEnd={<ChevronRight size={14} aria-hidden="true" />} onClick={acao.onAbrir}>
-          {acao.texto ?? 'Ver detalhes'}{' '}<span className="dash-sr">de {rotulo}</span>
-        </Button>
       ) : null}
       {serie.length > 1 ? <Sparkline dados={serie} linha={SPARK[tom].linha} area={SPARK[tom].area} /> : null}
     </article>

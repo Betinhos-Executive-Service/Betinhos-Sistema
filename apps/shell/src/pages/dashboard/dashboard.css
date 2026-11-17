@@ -30,6 +30,7 @@
 /* Celular: 2 KPIs por linha a partir de 340px; com número ímpar, o último ocupa a linha toda (sem meia linha vazia). */
 @container dash (min-width: 340px) { .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container dash (min-width: 340px) and (max-width: 539px) { .dash-kpis > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@container dash (min-width: 540px) and (max-width: 799px) { .dash-kpis:not(.dash-kpis--3) > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @container dash (min-width: 540px) {
   .dash-kpis--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -42,37 +43,39 @@
   .dash-kpis--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
-.dash-kpi { --dash-kpi-cor: var(--bt-color-brand); container-type: inline-size; position: relative; display: flex; flex-direction: column; gap: var(--bt-space-1-5); min-width: 0; min-height: 96px; padding: var(--bt-space-3); overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+.dash-kpi { --dash-kpi-cor: var(--bt-color-brand); position: relative; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-3); overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
 /* Borda superior de 3 px na cor do indicador, recortada pelo raio do card. */
 .dash-kpi::before { content: ''; position: absolute; inset: 0 0 auto; height: var(--bt-border-width-severity); background-color: var(--dash-kpi-cor); }
 .dash-kpi--success { --dash-kpi-cor: var(--bt-color-success); }
 .dash-kpi--warning { --dash-kpi-cor: var(--bt-color-warning); }
-.dash-kpi__rotulo { margin-top: var(--bt-space-0-5); }
-/* Com 2+ cards por fileira, o rótulo reserva 2 linhas: um rótulo longo não desce o valor em relação aos vizinhos. */
-@container dash (min-width: 340px) { .dash-kpi__rotulo { min-height: 2lh; } }
-.dash-kpi__valor { font-size: clamp(var(--bt-font-size-20), 17cqi, var(--bt-font-size-26)); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Cada KPI ocupa 4 trilhas da linha (rótulo, valor, extras, sparkline) por subgrid: um rótulo de 2 linhas ou mais chips
+   alinham os vizinhos da mesma fileira sem reservar espaço nos demais. O contêiner do valor (cqi) fica na `__caixa`:
+   no card, a contenção de layout anularia o subgrid. */
+.dash-kpi__topo { grid-row: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-1); margin-top: var(--bt-space-0-5); }
+.dash-kpi__caixa { grid-row: 2; container-type: inline-size; min-width: 0; }
+.dash-kpi__valor { display: block; font-size: clamp(var(--bt-font-size-20), 17cqi, var(--bt-font-size-26)); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* Até 540px (2 KPIs por linha) o valor encolhe; vem depois da regra base para vencer na cascata. */
 @container dash (max-width: 539px) { .dash-kpi__valor { font-size: clamp(var(--bt-font-size-17), 14cqi, var(--bt-font-size-26)); } }
 /* "s/dado" no lugar do número (KPI, card e lista): mesmo lugar, tom secundário, para não parecer um zero. */
 .dash-kpi__valor--semdado, .dash-card__valor--semdado, .dash-lista__valor--semdado { color: var(--bt-color-text-secondary); }
 .dash-lista__valor--semdado { font-size: var(--bt-font-size-14); }
-.dash-kpi__extras { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.dash-kpi__extras { grid-row: 3; align-self: start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
 .dash-kpi__extras > .dash-apoio { flex-basis: 100%; }
 /* Sparkline encostada na base e nas laterais do card. */
-.dash-kpi .dash-spark { flex: 0 0 auto; display: block; width: auto; height: 44px; margin: auto calc(-1 * var(--bt-space-3)) calc(-1 * var(--bt-space-3)); border-radius: 0; pointer-events: none; }
+.dash-kpi .dash-spark { grid-row: 4; display: block; width: auto; height: 28px; margin: auto calc(-1 * var(--bt-space-3)) calc(-1 * var(--bt-space-3)); border-radius: 0; pointer-events: none; }
 
 /* ---------- Drill-down (KPI, alerta e linha abrem o Drawer com a lista) ---------- */
 /* O botão "Ver …" estica o alvo pelo card inteiro (::after), sem aninhar elementos interativos. */
-.dash-kpi--abre, .dash-alerta--abre { position: relative; }
-.dash-abre { align-self: flex-start; margin-left: calc(-1 * var(--bt-space-2)); }
+/* Chevron no canto (28 px; o alvo de toque é o card inteiro): sem linha própria, o card não cresce. */
+.bt-button.dash-abre { flex: 0 0 auto; height: 28px; min-height: 28px; color: var(--bt-color-action); }
+.dash-kpi__topo .dash-abre { margin: calc(-1 * var(--bt-space-1-5)) calc(-1 * var(--bt-space-1-5)) calc(-1 * var(--bt-space-1-5)) 0; }
 .dash-abre::after { content: ''; position: absolute; inset: 0; border-radius: var(--bt-radius-lg); }
+/* Sem o "afundar" do DS: o transform no :active faria do botão o contêiner do ::after, e o mouseup fora dele perderia o clique (levar ao DS quando houver variante "esticada"). */
+.bt-button.dash-abre:active:not(:disabled) { transform: none; }
 .dash-abre:focus-visible::after { box-shadow: var(--bt-focus-ring); }
 @media (hover: hover) and (pointer: fine) {
   .dash-kpi--abre:hover, .dash-alerta--abre:hover { border-color: var(--bt-color-action); }
 }
-/* Link na linha de baixo, sob o texto: número, rótulo e selo ficam na mesma altura dos alertas vizinhos sem link. */
-.dash-alerta.dash-alerta--abre { grid-template-areas: "valor rotulo" "valor selo" ". abre"; }
-.dash-alerta .dash-alerta__abre { grid-area: abre; justify-self: start; margin-left: calc(-1 * var(--bt-space-2)); }
 /* Nome do motorista no ranking: botão sem aparência própria, sublinhado no hover. */
 .dash-link-linha { display: grid; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
 .dash-link-linha:hover .bt-table__title strong { color: var(--bt-color-action); text-decoration: underline; }
@@ -108,12 +111,14 @@
 .dash-faixas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
 @container dash (min-width: 900px) { .dash-faixas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .dash-faixa { container: dash-faixa / inline-size; display: grid; align-content: start; gap: var(--bt-space-2); min-width: 0; }
-/* Fileiras da faixa com a mesma altura (a do card com "Ver detalhes"): as duas faixas lado a lado ficam alinhadas. */
+/* Fileiras da faixa com a mesma altura: as duas faixas lado a lado ficam alinhadas. */
 /* Cards da faixa pela largura da própria faixa: 1 coluna no estreito, 2 (2 × 2) a partir de ~400 px e 4 numa faixa larga. */
 .dash-faixa__lista { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; gap: var(--bt-space-2) var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
 @container dash-faixa (min-width: 400px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container dash-faixa (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.dash-alerta { --dash-tom: var(--bt-color-brand); display: grid; grid-template-columns: minmax(4ch, max-content) minmax(0, 1fr); grid-template-areas: "valor rotulo" "valor selo"; align-content: start; align-items: center; column-gap: var(--bt-space-3); row-gap: var(--bt-space-1); min-width: 0; min-height: 64px; padding: var(--bt-space-2-5) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+.dash-alerta { --dash-tom: var(--bt-color-brand); display: grid; grid-template-columns: minmax(4ch, max-content) minmax(0, 1fr); grid-template-areas: "valor rotulo" "valor selo"; align-content: start; align-items: center; column-gap: var(--bt-space-3); row-gap: var(--bt-space-1); min-width: 0; min-height: 56px; padding: var(--bt-space-2) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); box-shadow: var(--bt-shadow-surface); font-family: var(--bt-font-family-sans); }
+/* A coluna do chevron só existe quando há detalhe para abrir. */
+.dash-alerta--abre { position: relative; grid-template-columns: minmax(4ch, max-content) minmax(0, 1fr) auto; grid-template-areas: "valor rotulo abre" "valor selo abre"; }
 .dash-alerta--danger { --dash-tom: var(--bt-color-danger); }
 .dash-alerta--warning { --dash-tom: var(--bt-color-warning); }
 .dash-alerta--success { --dash-tom: var(--bt-color-success); }
@@ -121,6 +126,7 @@
 .dash-alerta__valor { grid-area: valor; min-width: 2ch; font-size: var(--bt-font-size-20); font-weight: var(--bt-font-weight-extrabold); line-height: 1; color: var(--dash-tom); font-variant-numeric: tabular-nums; }
 .dash-alerta__rotulo { grid-area: rotulo; align-self: end; min-width: 0; color: var(--bt-color-text-primary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .06em; text-transform: uppercase; }
 .dash-alerta__selo { grid-area: selo; align-self: start; display: flex; min-width: 0; }
+.dash-alerta .dash-abre { grid-area: abre; align-self: center; margin-right: calc(-1 * var(--bt-space-1-5)); }
 
 /* ---------- Grade de cards (destaques e análises) ---------- */
 .dash-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }

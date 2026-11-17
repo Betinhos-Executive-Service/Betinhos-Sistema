@@ -15,7 +15,9 @@ export function producaoPropriaTerceira(rv: Reserva[], veiculos: Veiculo[]): Pro
   // Eixo contínuo do primeiro ao último mês com serviço (o mesmo alcance do "Total produzido"); mês sem classificado vale 0.
   const todos = [...mesesComDados(rv), ...comDados].sort()
   const meses = comDados.length ? mesesEntre(todos[0], todos[todos.length - 1]) : []
-  const conta = (mes: string, kind: CategoriaVeiculo) => classificados.filter((x) => x.kind === kind && x.r.saidaRaw.slice(0, 7) === mes).length
+  const porMesKind = new Map<string, number>()
+  for (const { r, kind } of classificados) { const k = `${r.saidaRaw.slice(0, 7)}|${kind}`; porMesKind.set(k, (porMesKind.get(k) ?? 0) + 1) }
+  const conta = (mes: string, kind: CategoriaVeiculo) => porMesKind.get(`${mes}|${kind}`) ?? 0
   const ranking = (kind: CategoriaVeiculo) => {
     const grupos = new Map<string, TopMotorista>()
     for (const { r } of classificados.filter((x) => x.kind === kind && x.r.motorista && x.r.motorista !== SEM_MOTORISTA)) {
