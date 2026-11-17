@@ -71,28 +71,18 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(1))
     rerender(<Registros kinds={['multa']} data={depois} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(await screen.findByText(/Nenhum registro de multa com estes filtros/)).toBeTruthy()
-    expect(screen.getByText(/Veículo: V2/)).toBeTruthy()
+    expect(screen.getByText(/Placa: V2/)).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('sem o resumo dos termos (falha na leitura), a lista avisa discretamente', async () => {
+  it('multas abrem na visão Comigo, sem a coluna Termo', async () => {
     window.location.hash = '#/frota-multas'
-    const semResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: undefined }, { ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={semResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText(/Coluna Termo indisponível/)).toBeTruthy()
-    cleanup()
-    const comResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={comResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    await waitFor(() => expect(rows()).toHaveLength(1))
-    expect(screen.queryByText(/Coluna Termo indisponível/)).toBeNull()
-  })
-
-  it('multas mostram a coluna Termo com o rótulo do último termo', async () => {
-    window.location.hash = '#/frota-multas'
-    const comTermo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: { status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' } }, { ...multa('m2', 'v1'), termo: { status: 'contestado', enviadoEm: null } }] }
-    render(<Registros kinds={['multa']} data={comTermo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
-    expect(screen.getByText('Contestado')).toBeTruthy()
+    const lista: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), status: 202410000 }, { ...multa('m2', 'v1'), status: 202410005 }] }
+    render(<Registros kinds={['multa']} data={lista} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Multa m1')).toBeTruthy()
+    expect(screen.queryByText('Multa m2')).toBeNull()
+    expect(screen.getAllByText('Próximo passo').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Coluna Termo/)).toBeNull()
   })
 })

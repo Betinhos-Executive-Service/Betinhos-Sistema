@@ -1,6 +1,6 @@
 import { Plus, RefreshCw } from 'lucide-react'
 import { useMemo, type ReactNode } from 'react'
-import { Button, EmptyState, SearchBox, SegmentedControl, StatusBadge as Badge, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, SearchBox, SegmentedControl, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
@@ -13,15 +13,15 @@ import { patchHashQuery, useHashQuery } from '../../../nav/useHashRoute'
 import { useMedia } from '../../operacional/useMedia'
 import { useNotify } from '../components/Toasts'
 import { StatusBadge } from '../components/Ui'
-import { formatBR } from '../data/dates'
+import { formatBR, todaySP } from '../data/dates'
 import { KIND_LABEL, KIND_TABLE } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { linhas, type Linha } from '../domain/linhas'
-import { EXTRA, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
+import { EXTRA, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
-import { TERMO_TOM } from '../domain/termoMulta'
+import { urgenciaDoPrazo } from '../domain/multaEstado'
 import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const PLURAL: Record<Kind, string> = { manutencao: 'Manutenções', multa: 'Multas', colisao: 'Colisões' }
@@ -63,6 +63,8 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     tela: telaRegistros(kind),
     columns,
     defaultSort: REGISTRO_SORT,
+    defaultFilters: kind === 'multa' ? MULTA_FILTROS_PADRAO : undefined,
+    defaultName: kind === 'multa' ? MULTA_VISAO_PADRAO : undefined,
     fields,
     ready: true,
     builtins: () => registroBuiltins(kind),
@@ -93,7 +95,10 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     onReload()
   }
 
-  const footer = <span className="frota-muted">{visiveis.length} de {todas.length}{kind === 'multa' && todas.some((linha) => linha.termoIndisponivel) ? ' · Coluna Termo indisponível: não foi possível ler os termos' : ''}</span>
+  const footer = <span className="frota-muted">{visiveis.length} de {todas.length}</span>
+  const titulo = (key: string) => columns.find((c) => c.key === key)?.label ?? key
+  const hoje = todaySP()
+  const multa = kind === 'multa'
   const table = (rows: Linha[], tableFooter?: ReactNode) => (
     <VirtualTable<Linha>
       rows={rows}
@@ -104,13 +109,18 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
       footer={tableFooter}
       empty={<EmptyState compact align="start" title={`Nenhum registro de ${KIND_LABEL[kind].toLowerCase()} com estes filtros`} action={<Button variant="secondary" size="compact" onClick={() => { clearFilters(); setBusca('') }}>Limpar filtros</Button>} />}
       columns={[
-        { key: 'descricao', header: 'Descrição', label: 'Descrição', sortable: true, defaultWidth: 300, width: 'minmax(180px, 2fr)', cell: (linha) => <TableTitle title={linha.titulo} meta={linha.categorias.length > 0 ? categoriasTexto(linha.categorias) : undefined} /> },
-        { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 120, width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
-        { key: 'veiculo', header: 'Veículo', label: 'Veículo', sortable: true, defaultWidth: 120, width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
-        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: 190, hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
-        ...(kind === 'multa' ? [{ key: 'termo', header: 'Termo', label: 'Termo', sortable: true, defaultWidth: 180, width: 'minmax(120px, .9fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.termoStatus ? <Badge tone={TERMO_TOM[linha.termoStatus]}>{linha.termo}</Badge> : <span className="frota-muted">—</span>) }] : []),
-        { key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact', cell: (linha) => <span className="frota-nowrap">{linha.extra}</span> },
-        { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
+        { key: 'descricao', header: titulo('descricao'), label: titulo('descricao'), sortable: true, defaultWidth: multa ? 160 : 300, width: 'minmax(180px, 2fr)', cell: (linha) => <TableTitle title={linha.titulo} meta={linha.categorias.length > 0 ? categoriasTexto(linha.categorias) : undefined} /> },
+        { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: multa ? 104 : 120, width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
+        { key: 'veiculo', header: titulo('veiculo'), label: titulo('veiculo'), sortable: true, defaultWidth: multa ? 96 : 120, width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
+        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: multa ? 160 : 190, hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
+        ...(kind === 'multa' ? [] : [{ key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact' as const, cell: (linha: Linha) => <span className="frota-nowrap">{linha.extra}</span> }]),
+        { key: 'status', header: titulo('status'), label: titulo('status'), sortable: true, defaultWidth: multa ? 170 : 160, width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
+        ...(kind === 'multa' ? [
+          { key: 'proximoPasso', header: 'Próximo passo', label: 'Próximo passo', sortable: true, defaultWidth: 190, width: 'minmax(140px, 1fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => linha.proximoPasso || '—' },
+          { key: 'proximoPrazo', header: 'Próximo prazo', label: 'Próximo prazo', sortable: true, defaultWidth: 130, width: 'minmax(100px, .7fr)', cell: (linha: Linha) => (linha.proximoPrazo
+            ? <span className="frota-prazo frota-nowrap" data-urgencia={urgenciaDoPrazo(linha.proximoPrazo, (linha.situacoes ?? []).includes('prazo-vencido'), hoje)}>{formatBR(linha.proximoPrazo)}</span>
+            : <span className="frota-muted">—</span>) },
+        ] : []),
       ]}
     />
   )
