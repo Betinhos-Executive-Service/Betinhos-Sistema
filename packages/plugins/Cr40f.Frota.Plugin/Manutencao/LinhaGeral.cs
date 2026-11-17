@@ -43,6 +43,7 @@ public static class LinhaGeral
             [G.Categoria] = new OptionSetValue(G.CategoriaManutencao),
             [G.Manutencao] = new EntityReference(M.Tabela, manutencaoId),
             [G.Veiculo] = veiculo,
+            [G.OrigemVeiculo] = new OptionSetValue(G.OrigemVeiculoManual), // veja Reabrir
             [G.Saida] = saidaUtc,
             [G.Status] = new OptionSetValue(G.StatusAProgramar),
             [G.FoiProgramado] = false,
@@ -64,9 +65,12 @@ public static class LinhaGeral
     /// <summary>Reagendamento: volta a "a programar" e tira o motorista (o DriverNoticePlugin avisa quem saiu).</summary>
     public static Entity Reabrir(Guid geralId, EntityReference veiculo, DateTime saidaUtc, string? comentarioMotorista)
     {
+        // O veículo da linha de manutenção é escolha do gestor. Com origem Automático e sem motorista, o ServiceVehicleSynchronizer
+        // (DriverRecordSharing, step "Servicos Create") zera o veículo; Manual faz o sincronizador pular a linha.
         var linha = new Entity(G.Tabela, geralId)
         {
             [G.Veiculo] = veiculo,
+            [G.OrigemVeiculo] = new OptionSetValue(G.OrigemVeiculoManual),
             [G.Saida] = saidaUtc,
             [G.Motorista] = null,
             [G.Status] = new OptionSetValue(G.StatusAProgramar),
