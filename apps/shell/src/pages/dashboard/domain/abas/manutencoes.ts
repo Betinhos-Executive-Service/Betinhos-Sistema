@@ -29,8 +29,11 @@ export function categoriaManutencao(tipo: string): CategoriaManutencao {
   return 'Corretiva não crítica'
 }
 
-/** Status reais de `cr40f_manutencoes.cr40f_status` que contam como em andamento (metadata DEV; spec §6). */
-const STATUS_EM_ANDAMENTO: ReadonlySet<string> = new Set(['solicitado', 'aprovado', 'programado'])
+/**
+ * Status reais de `cr40f_manutencoes.cr40f_status` que contam como em andamento (metadata DEV; spec §6). O 202410001 se chama
+ * "Agendado" desde a migration 20261117-0900 (manutenções v2); "Aprovado" fica enquanto o PROD não recebe a migration.
+ */
+const STATUS_EM_ANDAMENTO: ReadonlySet<string> = new Set(['solicitado', 'aprovado', 'agendado', 'programado'])
 /**
  * Manutenção em andamento. Divergência consciente (spec §6): o legado só olhava "andamento", "aberto" e "pend", que nenhum status real
  * contém (Solicitado, Aprovado, Programado, Realizado, Cancelado, Reprovado), e o card ficava sempre em 0. Agora Solicitado, Aprovado e
