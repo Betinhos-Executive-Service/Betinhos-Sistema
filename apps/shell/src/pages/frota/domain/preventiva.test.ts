@@ -5,13 +5,22 @@ import { calcularPreventivas, kmAtualDe, preventivasDoVeiculo, resumoPreventivas
 
 const today = '2026-10-14'
 const veic = (id: string, extra: Partial<VeiculoPrev> = {}): VeiculoPrev => ({ id, placa: id.toUpperCase(), status: VEICULO.ATIVO, categoria: PROPRIO, hodometro: null, hodometroEm: null, ...extra })
-const manut = (id: string, extra: Partial<ManutencaoPrev> = {}): ManutencaoPrev => ({ id, status: MANUT.REALIZADO, dataManutencao: null, criadoEm: '2026-01-01T12:00:00Z', km: null, veiculo: null, servicos: [], ...extra })
+const manut = (id: string, extra: Partial<ManutencaoPrev> = {}): ManutencaoPrev => ({ id, status: MANUT.REALIZADO, dataManutencao: null, criadoEm: '2026-01-01T12:00:00Z', km: null, kmRealizado: null, veiculo: null, servicos: [], ...extra })
 const item = (id: string, extra: Partial<ItemPlano> = {}): ItemPlano => ({ id, nome: `Item ${id}`, servico: 1, intervaloKm: 10000, intervaloMeses: 6, avisoKm: 1000, avisoDias: 30, ativo: true, ...extra })
 const ref = (id: string) => ({ id, label: id.toUpperCase() })
 const base = (veiculoId: string, itemId: string, extra: Partial<Baseline> = {}): Baseline => ({ id: `b-${veiculoId}-${itemId}`, veiculo: ref(veiculoId), item: ref(itemId), km: null, data: null, ...extra })
 const entrada = (parts: Partial<EntradaPreventiva>): EntradaPreventiva => ({ veiculos: [], manutencoes: [], itens: [item('oleo')], baselines: [], ...parts })
 
 describe('preventiva', () => {
+  it('o km de quem concluiu vale mais que o km do pedido (última execução e km estimado)', () => {
+    const [p] = calcularPreventivas(entrada({
+      veiculos: [veic('a')],
+      manutencoes: [manut('feita', { veiculo: ref('a'), servicos: [1], dataManutencao: '2026-09-05', km: 150000, kmRealizado: 158000 })],
+    }), today)
+    expect(p.ultima).toMatchObject({ km: 158000, manutencaoId: 'feita', complementadaPorBaseline: false })
+    expect(p).toMatchObject({ kmAtual: 158000, kmEstimado: true, kmProxima: 168000, faltamKm: 10000 })
+  })
+
   it('última execução vem da manutenção realizada mais recente que contém o serviço', () => {
     const result = calcularPreventivas(entrada({
       veiculos: [veic('a', { hodometro: 165000 })],
