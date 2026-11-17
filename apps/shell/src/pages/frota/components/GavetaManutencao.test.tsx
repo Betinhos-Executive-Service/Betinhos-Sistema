@@ -134,3 +134,109 @@ describe('GavetaManutencao', () => {
     expect(await gaveta('Manutenção não encontrada')).toBeTruthy()
   })
 })
+
+/** Simula "outra pessoa mudou a manutenção": o servidor passa a dizer `novo` e o detalhe, depois da primeira leitura, também. */
+function mudarParaStatus(source: DataSource, novo: number) {
+  const original = source.detalheManutencao.bind(source)
+  let leituras = 0
+  vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => {
+    leituras += 1
+    const d = await original(i)
+    return leituras === 1 || !d ? d : { ...d, status: novo }
+  })
+  vi.spyOn(source, 'currentStatus').mockResolvedValue(novo)
+}
+
+describe('GavetaManutencao: registro mudou com um formulário aberto', () => {
+  it('a ação ainda vale: o formulário fica aberto com o que foi digitado, o aviso pede para confirmar de novo e a nova confirmação grava', async () => {
+    const source = createMockSource()
+    mudarParaStatus(source, MANUT.AGENDADO) // Solicitado -> Agendado: cancelar continua valendo
+    const cancelar = vi.spyOn(source, 'cancelarManutencao')
+    montar('m1', source)
+    const g = await gaveta('Freio com ruído (fictício)')
+    fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' }))
+    fireEvent.change(within(g).getByLabelText(/Motivo do cancelamento/), { target: { value: 'Sem verba' } })
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' })) })
+    expect(await screen.findByText(/alterado por outra pessoa.*Confira e confirme de novo/)).toBeTruthy()
+    expect(cancelar).not.toHaveBeenCalled()
+    expect((within(g).getByLabelText(/Motivo do cancelamento/) as HTMLTextAreaElement).value).toBe('Sem verba')
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' })) })
+    await waitFor(() => expect(cancelar).toHaveBeenCalledWith('m1', 'Sem verba'))
+  })
+
+  it('a ação não vale mais: fecha o formulário e diz que o que foi digitado foi descartado', async () => {
+    const source = createMockSource()
+    mudarParaStatus(source, MANUT.AGENDADO) // Solicitado -> Agendado: reprovar não existe mais
+    montar('m1', source)
+    const g = await gaveta('Freio com ruído (fictício)')
+    fireEvent.click(within(g).getByRole('button', { name: 'Reprovar' }))
+    fireEvent.change(within(g).getByLabelText(/Motivo da reprovação/), { target: { value: 'Sem verba' } })
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Reprovar' })) })
+    expect(await screen.findByText(/descartado porque a ação não se aplica mais/)).toBeTruthy()
+    expect(within(g).queryByLabelText(/Motivo da reprovação/)).toBeNull()
+    expect(within(g).getByText('Agendado')).toBeTruthy()
+  })
+})
+
+describe('GavetaManutencao: foco e texto dos formulários', () => {
+  it('abrir um formulário leva o foco ao primeiro campo e Voltar devolve o foco ao botão da ação', async () => {
+    montar('m1')
+    const g = await gaveta('Freio com ruído (fictício)')
+    fireEvent.click(within(g).getByRole('button', { name: 'Reprovar' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(g).getByLabelText(/Motivo da reprovação/)))
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(g).getByRole('button', { name: 'Reprovar' })))
+  })
+
+  it('o aviso da linha da Geral aparece só em Cancelar, não em Reprovar', async () => {
+    montar('m1')
+    const g = await gaveta('Freio com ruído (fictício)')
+    fireEvent.click(within(g).getByRole('button', { name: 'Reprovar' }))
+    expect(within(g).queryByText(/linha na Geral/)).toBeNull()
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' }))
+    expect(within(g).getByText(/Se já houver linha na Geral, ela é cancelada/)).toBeTruthy()
+  })
+})
+
+describe('GavetaManutencao: recarga depois de gravar', () => {
+  it('recarga que falha depois de uma gravação boa mantém o último detalhe e avisa por toast', async () => {
+    const source = createMockSource()
+    const original = source.detalheManutencao.bind(source)
+    let leituras = 0
+    vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => { leituras += 1; if (leituras > 1) throw new Error('A rede caiu'); return original(i) })
+    const cancelar = vi.spyOn(source, 'cancelarManutencao')
+    montar('m1', source)
+    const g = await gaveta('Freio com ruído (fictício)')
+    fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' }))
+    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: 'Cancelar manutenção' })) })
+    await waitFor(() => expect(cancelar).toHaveBeenCalled())
+    expect(await screen.findByText(/Não foi possível atualizar a gaveta \(A rede caiu\)/)).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'Freio com ruído (fictício)' })).toBeTruthy() // a gaveta continua, com o último detalhe
+  })
+
+  it('resposta de recarga que chega fora de ordem não sobrescreve a mais nova', async () => {
+    const source = createMockSource()
+    const original = source.detalheManutencao.bind(source)
+    const pendentes: ((titulo: string) => void)[] = []
+    let leituras = 0
+    vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => {
+      leituras += 1
+      if (leituras === 1) return original(i)
+      const d = await original(i)
+      const titulo = await new Promise<string>((resolve) => { pendentes.push(resolve) })
+      return d ? { ...d, descricao: titulo } : d
+    })
+    montar('m1', source)
+    const g = await gaveta('Freio com ruído (fictício)')
+    const abrir = () => within(g).getByRole('button', { name: /Abrir formulário/ })
+    await act(async () => { fireEvent.click(abrir()) })
+    await act(async () => { fireEvent.click(abrir()) })
+    await waitFor(() => expect(pendentes).toHaveLength(2))
+    await act(async () => { pendentes[1]('NOVO') }) // a segunda recarga responde primeiro
+    expect(await screen.findByRole('dialog', { name: 'NOVO' })).toBeTruthy()
+    await act(async () => { pendentes[0]('ANTIGO') }) // a primeira chega tarde
+    expect(screen.getByRole('dialog', { name: 'NOVO' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'ANTIGO' })).toBeNull()
+  })
+})

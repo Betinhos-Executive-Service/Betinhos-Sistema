@@ -10,6 +10,7 @@ import { GRAU, LIMITE, MANUT, PAGAMENTO_MANUT, TIPO_REPARO, label } from '../dat
 import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { errorMessage } from '../data/xrm'
+import { comPontoFinal } from '../data/xrm'
 import { atrasada, lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
 import { acoesManutencao, desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError, type AcaoManutencao } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
@@ -25,6 +26,7 @@ const janelaDe = (m: DetalheManutencao): Janela | null => (m.janelaInicio && m.j
 const linksDe = (valor: string | null) => (valor ?? '').split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\//i.test(l))
 
 type Linha = [string, ReactNode]
+type Leitura = { tipo: 'ok'; detalhe: DetalheManutencao | null } | { tipo: 'falha' } | { tipo: 'ignorada' }
 type Estado = { tipo: 'carregando' } | { tipo: 'erro'; mensagem: string } | { tipo: 'ok'; detalhe: DetalheManutencao | null }
 
 function Secao({ id, titulo, children }: { id: string; titulo: string; children: ReactNode }) {
@@ -47,7 +49,7 @@ function Arquivos({ titulo, links }: { titulo: string; links: string[] }) {
     <p className="frota-cluster frota-fotos">
       <span className="frota-muted">{titulo}:</span>
       {links.map((link, i) => (
-        <a key={link} className="frota-link" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${titulo}, arquivo ${i + 1} (abre em outra aba)`}>
+        <a key={`${link}-${i}`} className="frota-link" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${titulo}, arquivo ${i + 1} (abre em outra aba)`}>
           Arquivo {i + 1}<ExternalLink size={12} aria-hidden />
         </a>
       ))}
@@ -119,7 +121,7 @@ function MotivoForm({ source, m, acao, onFeito, onDesatualizada, onVoltar }: For
   return (
     <form className="frota-stack" noValidate onSubmit={(event) => { event.preventDefault(); void confirmar() }}>
       <strong>{rotulo}</strong>
-      <p className="frota-muted">{reprovar ? 'O pedido não será feito.' : 'A manutenção sai do ciclo.'} Se já houver linha na Geral, ela é cancelada.</p>
+      <p className="frota-muted">{reprovar ? 'O pedido não será feito.' : 'A manutenção sai do ciclo. Se já houver linha na Geral, ela é cancelada.'}</p>
       {falha ? <Alert tone="danger" title="Não foi possível gravar">{falha}</Alert> : null}
       <Field label={reprovar ? 'Motivo da reprovação' : 'Motivo do cancelamento'} required={reprovar} error={erro} disabled={salvando}>
         <Textarea rows={2} maxLength={LIMITE.comentarioAprovador} value={comentario} onChange={(event) => setComentario(event.target.value)} />
@@ -158,15 +160,42 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
     return () => { vivo.current = false }
   }, [])
 
-  const carregar = useCallback(async () => {
+  // O aviso de toast fica num ref: `carregar` precisa ser estável (ele dispara a leitura inicial).
+  const notifyRef = useRef(notify)
+  notifyRef.current = notify
+  const requisicao = useRef(0)
+  const ultimo = useRef<DetalheManutencao | null>(null)
+
+  /**
+   * Lê o detalhe no servidor. A resposta que chega depois de outra leitura mais nova é ignorada (contador). Se a leitura
+   * falha e já há um detalhe na tela, ele fica e o toast avisa; só a leitura inicial troca a gaveta por erro.
+   */
+  const carregar = useCallback(async (): Promise<Leitura> => {
+    const minha = ++requisicao.current
     try {
       const detalhe = await source.detalheManutencao(id)
-      if (vivo.current) setEstado({ tipo: 'ok', detalhe })
+      if (!vivo.current || minha !== requisicao.current) return { tipo: 'ignorada' }
+      ultimo.current = detalhe
+      setEstado({ tipo: 'ok', detalhe })
+      return { tipo: 'ok', detalhe }
     } catch (reason) {
-      if (vivo.current) setEstado({ tipo: 'erro', mensagem: errorMessage(reason) })
+      if (!vivo.current || minha !== requisicao.current) return { tipo: 'ignorada' }
+      if (ultimo.current) notifyRef.current('error', `Não foi possível atualizar a gaveta (${errorMessage(reason)}). O que aparece pode estar desatualizado.`)
+      else setEstado({ tipo: 'erro', mensagem: errorMessage(reason) })
+      return { tipo: 'falha' }
     }
   }, [source, id])
   useEffect(() => { void carregar() }, [carregar])
+
+  // Foco: ao abrir um formulário, no primeiro campo; ao voltar, no botão da ação que o abriu.
+  const areaAcoes = useRef<HTMLDivElement>(null)
+  const acaoAnterior = useRef<AcaoManutencao | null>(null)
+  useEffect(() => {
+    const area = areaAcoes.current
+    if (acao) area?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])')?.focus()
+    else if (acaoAnterior.current) (area?.querySelector<HTMLElement>(`[data-acao="${acaoAnterior.current}"]`) ?? area?.querySelector<HTMLElement>('button'))?.focus()
+    acaoAnterior.current = acao
+  }, [acao])
 
   function gravado(mensagem: string) {
     notify('success', mensagem)
@@ -175,11 +204,21 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
     onChanged()
   }
 
-  function desatualizada() {
-    notify('error', new StaleError().message)
-    setAcao(null)
-    void carregar()
+  /**
+   * Outra pessoa mudou a manutenção com um formulário aberto. Recarrega e decide pelo estado novo: se a ação ainda vale, o
+   * formulário fica aberto com o que foi digitado (ele não é desmontado) e o aviso pede para confirmar de novo; se não vale
+   * mais, fecha e o aviso diz que o digitado foi descartado.
+   */
+  async function desatualizada() {
+    const aberta = acao
     onChanged()
+    const leitura = await carregar()
+    const aviso = comPontoFinal(new StaleError().message)
+    const naoVale = leitura.tipo === 'ok' && (leitura.detalhe === null || (aberta !== null && !acoesManutencao(leitura.detalhe.status).includes(aberta)))
+    if (naoVale) {
+      setAcao(null)
+      notify('error', `${aviso} O que você digitou foi descartado porque a ação não se aplica mais.`)
+    } else notify('error', `${aviso} Confira e confirme de novo.`)
   }
 
   async function abrirFormulario() {
@@ -250,11 +289,13 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
         </div>
 
         <Secao id={`${m.id}-acoes`} titulo="Ações">
-          {formulario ?? (acoes.length === 0 ? <p className="frota-muted">Sem ações para esta manutenção.</p> : (
-            <div className="frota-cluster">
-              {acoes.map((a) => <Button key={a} variant={a === 'encaixar' ? 'primary' : 'secondary'} onClick={() => setAcao(a)}>{rotuloAcao(a, m.status)}</Button>)}
-            </div>
-          ))}
+          <div ref={areaAcoes}>
+            {formulario ?? (acoes.length === 0 ? <p className="frota-muted">Sem ações para esta manutenção.</p> : (
+              <div className="frota-cluster">
+                {acoes.map((a) => <Button key={a} data-acao={a} variant={a === 'encaixar' ? 'primary' : 'secondary'} onClick={() => setAcao(a)}>{rotuloAcao(a, m.status)}</Button>)}
+              </div>
+            ))}
+          </div>
         </Secao>
 
         <Secao id={`${m.id}-pedido`} titulo="Pedido">
