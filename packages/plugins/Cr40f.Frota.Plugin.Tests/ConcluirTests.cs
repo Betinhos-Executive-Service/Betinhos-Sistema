@@ -180,6 +180,40 @@ public class ConcluirTests
     }
 
     [Fact]
+    public void Despesa_do_shell_nasce_com_origem_Model_driven_e_a_do_App_com_App_Motoristas()
+    {
+        var shell = Base(M.Programado, Linha());
+        Servico(shell).Concluir(Pedido(p => p.Origem = "shell"));
+        Assert.Equal(D.OrigemModelDriven, shell.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+
+        var app = Base(M.Programado, Linha());
+        Servico(app).Concluir(Pedido());
+        Assert.Equal(D.OrigemApp, app.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Fact]
+    public void Reparo_sem_despesa_do_shell_mantem_a_origem_de_quem_chamou()
+    {
+        var memoria = Base(M.Realizado);
+        var m = memoria.Linha(M.Tabela, _manutencaoId);
+        m[M.Valor] = new Money(250m);
+        m[M.Pagamento] = new OptionSetValue(M.PagamentoDinheiro);
+        m[M.Estabelecimento] = "Oficina";
+        m[M.DataManutencao] = new DateTime(2026, 11, 10, 15, 0, 0, DateTimeKind.Utc);
+
+        Servico(memoria).Concluir(Pedido(p => p.Origem = "shell"));
+
+        Assert.Equal(D.OrigemModelDriven, memoria.Todas(D.Tabela).Single().GetAttributeValue<OptionSetValue>(D.Origem).Value);
+    }
+
+    [Theory]
+    [InlineData("shell", 100000001)]
+    [InlineData(" Shell ", 100000001)]
+    [InlineData(null, 100000000)]
+    [InlineData("app", 100000000)]
+    public void OrigemDe_so_reconhece_o_shell(string? origem, int esperado) => Assert.Equal(esperado, DespesaManutencao.OrigemDe(origem));
+
+    [Fact]
     public void Reparo_sem_despesa_cria_com_os_valores_gravados_na_manutencao()
     {
         var memoria = Base(M.Realizado);

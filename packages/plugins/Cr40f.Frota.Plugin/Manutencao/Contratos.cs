@@ -38,6 +38,8 @@ public sealed class ConcluirPedido
     [DataMember(Name = "linkFotoFinal1")] public string? LinkFotoFinal1 { get; set; }
     [DataMember(Name = "linkFotoFinal2")] public string? LinkFotoFinal2 { get; set; }
     [DataMember(Name = "linkFotoFinal3")] public string? LinkFotoFinal3 { get; set; }
+    /// <summary>Quem chamou: "shell" (Sistema Betinhos) ou ausente (App Motoristas). Só vale para a despesa nova.</summary>
+    [DataMember(Name = "origem")] public string? Origem { get; set; }
 }
 
 [DataContract]
