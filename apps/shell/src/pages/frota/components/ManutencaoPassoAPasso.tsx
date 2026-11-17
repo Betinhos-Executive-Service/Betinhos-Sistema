@@ -25,6 +25,8 @@ type Props = {
   onDesatualizada: () => void
   /** Item do "⋯": a gaveta abre o formulário da exceção (Reagendar, Reprovar, Cancelar, Concluir, Corrigir classificação). */
   onExtra: AbrirExtra
+  /** Foco no 1º campo do passo ao montar. A gaveta desliga ao voltar de uma exceção (o foco volta ao "Mais ações"). */
+  autoFoco?: boolean
 }
 
 /** Grau por rádio, do mais urgente ao mais leve (valores de GRAU). */
@@ -48,7 +50,7 @@ export function Arquivos({ titulo, links }: { titulo: string; links: string[] })
 }
 
 /** Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): barra de três etapas e um passo por vez. */
-export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizada, onExtra }: Props) {
+export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizada, onExtra, autoFoco = true }: Props) {
   const situacao = useMemo(() => avaliar(m, hoje), [m, hoje])
   const parada = situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada'
   const mais: MenuAction[] = situacao.extras.map((extra) => ({ id: extra, label: rotuloExtra(extra, situacao.etapa), onSelect: () => onExtra(extra) }))
@@ -76,7 +78,7 @@ export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizad
       <Barra situacao={situacao} />
 
       {/* A chave remonta o passo quando os dados de partida mudam (ex.: reagendou e continua em Programar). */}
-      <Passo key={`${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}`} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} />
+      <Passo key={`${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}`} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
 
       {!parada && situacao.feitos.length > 0 && (
         <ul className="frota-guia__feitos">{situacao.feitos.map((f) => <li key={f}>{f}</li>)}</ul>
@@ -106,9 +108,9 @@ function Barra({ situacao }: { situacao: Situacao }) {
 
 type PassoProps = Omit<Props, 'onExtra'> & { situacao: Situacao; onExtra: AbrirExtra }
 
-function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra }: PassoProps) {
-  if (situacao.passo === 'Agendar') return <PassoAgendar source={source} m={m} hoje={hoje} onFeito={onFeito} onDesatualizada={onDesatualizada} />
-  if (situacao.passo === 'Programar') return <PassoProgramar source={source} m={m} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} />
+function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra, autoFoco }: PassoProps) {
+  if (situacao.passo === 'Agendar') return <PassoAgendar source={source} m={m} hoje={hoje} onFeito={onFeito} onDesatualizada={onDesatualizada} autoFoco={autoFoco} />
+  if (situacao.passo === 'Programar') return <PassoProgramar source={source} m={m} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
   if (situacao.passo === 'AguardarConclusao') {
     const p = m.programacao
     return (
@@ -146,12 +148,12 @@ function useGravar(onDesatualizada: () => void) {
   return { salvando, erro, gravar }
 }
 
-function PassoAgendar({ source, m, hoje, onFeito, onDesatualizada }: Pick<Props, 'source' | 'm' | 'hoje' | 'onFeito' | 'onDesatualizada'>) {
+function PassoAgendar({ source, m, hoje, onFeito, onDesatualizada, autoFoco }: Pick<Props, 'source' | 'm' | 'hoje' | 'onFeito' | 'onDesatualizada' | 'autoFoco'>) {
   const [valores, setValores] = useState<ValoresAgendar>(() => valoresAgendarIniciais(m, hoje))
   const [tentou, setTentou] = useState(false)
   const { salvando, erro, gravar } = useGravar(onDesatualizada)
   const primeiro = useRef<HTMLDivElement>(null)
-  useEffect(() => { primeiro.current?.querySelector<HTMLInputElement>('input')?.focus() }, [m.id])
+  useEffect(() => { if (autoFoco) primeiro.current?.querySelector<HTMLInputElement>('input')?.focus() }, [m.id, autoFoco])
   const leitura = lerAgendar(valores, hoje)
   const erros = tentou ? leitura.erros : {}
 
@@ -180,7 +182,7 @@ function PassoAgendar({ source, m, hoje, onFeito, onDesatualizada }: Pick<Props,
   )
 }
 
-function PassoProgramar({ source, m, onFeito, onDesatualizada, onExtra }: Pick<Props, 'source' | 'm' | 'onFeito' | 'onDesatualizada' | 'onExtra'>) {
+function PassoProgramar({ source, m, onFeito, onDesatualizada, onExtra, autoFoco }: Pick<Props, 'source' | 'm' | 'onFeito' | 'onDesatualizada' | 'onExtra' | 'autoFoco'>) {
   const p = m.programacao
   const [motorista, setMotorista] = useState<OpcaoBusca | null>(p?.motorista ? { id: p.motorista.id, nome: p.motorista.label } : null)
   const [saida, setSaida] = useState(m.janelaInicio ? `${m.janelaInicio}T08:00` : '')
@@ -188,7 +190,7 @@ function PassoProgramar({ source, m, onFeito, onDesatualizada, onExtra }: Pick<P
   const { salvando, erro, gravar } = useGravar(onDesatualizada)
   const pessoas = useOpcoesBusca(useCallback((t: string) => source.buscarFuncionarios(t), [source]), motorista)
   const campo = useRef<HTMLDivElement>(null)
-  useEffect(() => { campo.current?.querySelector<HTMLElement>('[role="combobox"], input')?.focus() }, [m.id])
+  useEffect(() => { if (autoFoco) campo.current?.querySelector<HTMLElement>('[role="combobox"], input')?.focus() }, [m.id, autoFoco])
   const leitura = lerProgramar({ motoristaId: motorista?.id ?? null, saida }, m)
   const erros = tentou ? leitura.erros : {}
   const janela = m.janelaInicio && m.janelaFim ? rotuloJanela({ inicio: m.janelaInicio, fim: m.janelaFim }) : null

@@ -1,6 +1,7 @@
 // apps/shell/src/pages/frota/components/GavetaManutencao.test.tsx
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { todaySP } from '../data/dates'
@@ -209,6 +210,14 @@ describe('GavetaManutencao: foco e texto dos formulários', () => {
     const g = await gaveta(M1)
     await mais(g, 'Reprovar')
     await waitFor(() => expect(document.activeElement).toBe(within(g).getByLabelText(/Motivo da reprovação/)))
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(g).getByRole('button', { name: 'Mais ações' })))
+  })
+
+  it('com StrictMode (o dev roda os efeitos duas vezes), Voltar deixa o foco no "Mais ações", não no campo do passo', async () => {
+    render(<StrictMode><ToastProvider><GavetaManutencao source={createMockSource()} id="m2" hoje={hoje} onClose={() => {}} onChanged={() => {}} /></ToastProvider></StrictMode>)
+    const g = await gaveta(M2)
+    await mais(g, 'Reagendar')
     fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
     await waitFor(() => expect(document.activeElement).toBe(within(g).getByRole('button', { name: 'Mais ações' })))
   })

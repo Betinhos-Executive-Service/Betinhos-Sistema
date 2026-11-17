@@ -91,6 +91,8 @@ describe('lerProgramar', () => {
   it('converte o horário de São Paulo para UTC e diz se ficou fora da janela', () => {
     expect(lerProgramar({ motoristaId: 'p2', saida: '2026-11-24T10:00' }, agendada)).toEqual({ erros: {}, saidaIso: '2026-11-24T13:00:00.000Z', foraDaJanela: false })
     expect(lerProgramar({ motoristaId: 'p2', saida: '2026-11-30T10:00' }, agendada).foraDaJanela).toBe(true)
+    // O aviso aparece assim que a saída é digitada, antes de escolher o motorista.
+    expect(lerProgramar({ motoristaId: null, saida: '2026-11-30T10:00' }, agendada)).toMatchObject({ saidaIso: null, foraDaJanela: true })
   })
 })
 

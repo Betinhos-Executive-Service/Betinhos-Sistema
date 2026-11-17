@@ -255,7 +255,7 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       size="wide"
       onClose={onClose}
       eyebrow={m.codigo ? `Manutenção ${m.codigo}` : 'Manutenção'}
-      title={`${placa} · ${m.descricao || 'Manutenção'}`}
+      title={<span className="frota-gaveta__titulo">{placa} · {m.descricao || 'Manutenção'}</span>}
       actions={<BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />}
       footer={<>
         <span className="frota-muted">Edição completa no formulário do Dataverse.</span>
@@ -263,7 +263,7 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       </>}
     >
       <div className="frota-drawer" ref={corpo}>
-        {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} />}
+        {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
 
         <div className="frota-stack">
           <p className="frota-muted">
@@ -271,8 +271,8 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
             {m.km !== null ? ` · Km no pedido: ${m.km.toLocaleString('pt-BR')} km` : ''}
             {m.tipo !== null ? ` · Tipo de reparo: ${label(TIPO_REPARO, m.tipo)}` : ''}
             {m.comentarioAoMotorista ? ` · Comentário ao motorista: ${m.comentarioAoMotorista}` : ''}
-            {m.veiculo && onOpenVeiculo ? <> · <button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>Ver o veículo {placa}</button></> : null}
           </p>
+          {m.veiculo && onOpenVeiculo ? <p className="frota-muted"><button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>Ver o veículo {placa}</button></p> : null}
           <Arquivos titulo="Fotos do pedido" links={m.fotosPedido} />
           <p className="frota-muted">As alterações uma a uma ficam na auditoria, no botão do alto da gaveta.</p>
         </div>

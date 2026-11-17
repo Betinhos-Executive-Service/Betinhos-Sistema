@@ -90,9 +90,10 @@ export function lerProgramar(v: ValoresProgramar, m: Pick<DetalheManutencao, 'ja
   if (!v.motoristaId) erros.motorista = 'Escolha o motorista'
   const data = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v.saida) ? new Date(`${v.saida}:00-03:00`) : null
   if (!data || Number.isNaN(data.getTime())) erros.saida = 'Informe a data e hora de saída'
-  if (Object.keys(erros).length || !data) return { erros, saidaIso: null, foraDaJanela: false }
+  // O aviso vale assim que a saída é válida, mesmo sem motorista ainda.
   const dia = v.saida.slice(0, 10)
-  const foraDaJanela = !!m.janelaInicio && !!m.janelaFim && (dia < m.janelaInicio || dia > m.janelaFim)
+  const foraDaJanela = !erros.saida && !!m.janelaInicio && !!m.janelaFim && (dia < m.janelaInicio || dia > m.janelaFim)
+  if (Object.keys(erros).length || !data) return { erros, saidaIso: null, foraDaJanela }
   return { erros, saidaIso: data.toISOString(), foraDaJanela }
 }
 

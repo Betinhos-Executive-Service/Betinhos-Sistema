@@ -185,3 +185,6 @@
 .frota-etapas__item[aria-current="step"] b { border-color: var(--bt-color-action); }
 .frota-etapas__item[data-parada] { color: var(--bt-color-text-secondary); border-bottom-color: var(--bt-color-border); }
 @media (max-width: 560px) { .frota-etapas__item { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } .frota-guia__topo { flex-wrap: wrap; } }
+/* Gaveta da manutenção: o título "placa · descrição" quebra linha em vez de cortar (no celular a descrição sumia). */
+.bt-drawer__title:has(> .frota-gaveta__titulo) { white-space: normal; }
+.bt-drawer__head:has(.frota-gaveta__titulo) { padding-block: var(--bt-space-2); }
