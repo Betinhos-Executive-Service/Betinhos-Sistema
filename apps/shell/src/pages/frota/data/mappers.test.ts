@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { FORMATTED, mapBaseline, mapColisao, mapDespesaCombustivel, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, ref } from './mappers'
 
 describe('mappers', () => {
+  it('multa: lê responsável, canal, datas dos passos, valores e nomes dos arquivos', () => {
+    const m = mapMulta({
+      cr40f_multasid: '{U1}', cr40f_novacoluna: 'AIT 1', cr40f_status: 202410001, cr40f_responsavel: 100000001, cr40f_motivoempresa: 100000000,
+      cr40f_canalindicacao: 100000000, cr40f_vencimento: '2026-11-20', cr40f_valorcomdesconto: 105.53, cr40f_valorpago: 175.88, cr40f_pagaem: '2026-11-16',
+      cr40f_competenciadesconto: '2026-12-01', cr40f_motivocancelamento: null, cr40f_autodainfracao_name: 'auto.pdf', cr40f_comprovantepagamento_name: 'comprovante.pdf',
+    }, { cr40f_vencimento: 'DateOnly', cr40f_pagaem: 'DateOnly', cr40f_competenciadesconto: 'DateOnly' })
+    expect(m).toMatchObject({
+      responsavel: 100000001, motivoEmpresa: 100000000, canal: 100000000, vencimento: '2026-11-20', valorComDesconto: 105.53, valorPago: 175.88,
+      pagaEm: '2026-11-16', competencia: '2026-12-01', motivoCancelamento: null, arquivos: { autuacao: 'auto.pdf', penalidade: null, comprovante: 'comprovante.pdf' },
+    })
+  })
   it('mapeia veículo com hodômetro', () => {
     const v = mapVeiculo({ cr40f_veiculosid: 'V1', cr40f_placa: 'ABC1D23', cr40f_hodometro: 175233, cr40f_hodometroem: '2026-10-14T13:37:38Z' })
     expect(v.hodometro).toBe(175233); expect(v.hodometroEm).toBe('2026-10-14T13:37:38Z')

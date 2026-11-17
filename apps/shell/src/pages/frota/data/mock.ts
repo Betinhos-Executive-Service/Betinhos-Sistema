@@ -1,7 +1,9 @@
 import { mockVolume } from '../../../app/mockVolume'
 import { CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP } from './dates'
-import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
+import { estadoDaMulta } from '../domain/multaEstado'
+import { aplicarPasso, avaliar, validarPasso, type MultaEstado } from '../domain/multaEtapas'
+import { CANAL, COLISAO, MANUT, MOTIVO_EMPRESA, MULTA, RESPONSAVEL, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, FlowId } from './source'
 import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
@@ -24,7 +26,7 @@ function manut(id: string, veiculo: Ref, extra: Partial<Manutencao>): Manutencao
   return { id, codigo: id.toUpperCase(), descricao: `Manutenção fictícia ${id}`, status: MANUT.SOLICITADO, grau: 2, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 50000, veiculo, solicitante: ana, criadoEm: iso(-3), servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra }
 }
 function multa(id: string, extra: Partial<Multa>): Multa {
-  return { id, titulo: `AIT fictício ${id}`, status: MULTA.NOTIFICAR, dataHora: iso(-20), local: 'Av. de Teste, 100', dataParaIndicar: offset(5), indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: bruno, infracaoId: 'i1', criadoEm: iso(-10), valorGuia: null, recursoPendente: false, termoVigente: null, ...extra }
+  return { id, titulo: `AIT fictício ${id}`, status: MULTA.NOTIFICAR, dataHora: iso(-20), local: 'Av. de Teste, 100', dataParaIndicar: offset(5), indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: bruno, infracaoId: 'i1', criadoEm: iso(-10), valorGuia: null, recursoPendente: false, termoVigente: null, responsavel: null, motivoEmpresa: null, canal: null, aceiteEm: null, vencimento: null, valorComDesconto: null, valorPago: null, pagaEm: null, competencia: null, acertoEm: null, encerradaEm: null, canceladaEm: null, motivoCancelamento: null, arquivos: { autuacao: `auto-${id}.pdf`, penalidade: null, comprovante: null }, ...extra }
 }
 function colisao(id: string, status: number): Colisao {
   return { id, titulo: `Colisão fictícia ${id}`, status, tipo: 100000001, dataHora: iso(-6), local: 'Rua de Teste, 50', descricao: 'Batida leve na traseira.', houveTerceiro: true, veiculo: v2, motorista: ana, criadoEm: iso(-6) }
@@ -67,11 +69,18 @@ function seed(): FrotaData {
       manut('m6', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-70), tipo: 2, criadoEm: iso(-72) }),
       ...volumeManutencoes(mockVolume(), v1, v2),
     ],
+    // Uma multa em cada etapa, uma com prazo vencido e uma aguardando penalidade (spec §7, Mock).
     multas: [
       multa('u1', {}),
-      multa('u2', { status: MULTA.NOTIFICADO, dataAviso: offset(-2), dataParaIndicar: offset(2), motorista: ana }),
-      multa('u3', { status: MULTA.DESCONTADO, indicado: true, dataHora: iso(-90) }),
-      multa('u4', { status: MULTA.PAGO, infracaoId: null, veiculo: v2, dataHora: iso(-150) }),
+      multa('u2', { status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, dataAviso: offset(-2), dataParaIndicar: offset(2), motorista: ana }),
+      multa('u3', { status: MULTA.FINALIZADO, responsavel: RESPONSAVEL.MOTORISTA, indicado: true, canal: CANAL.DSV, dataAviso: offset(-80), dataIndicacao: offset(-78), pagaEm: offset(-40), valorPago: 130.16, competencia: `${addMonths(todaySP(), -1).slice(0, 7)}-01`, acertoEm: offset(-30), encerradaEm: offset(-30), dataHora: iso(-90) }),
+      multa('u4', { status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: ana, infracaoId: null, veiculo: v2, dataHora: iso(-150), pagaEm: offset(-3), valorPago: 130.16, arquivos: { autuacao: 'auto-u4.pdf', penalidade: 'penalidade-u4.pdf', comprovante: 'comprovante-u4.pdf' } }),
+      multa('u5', { dataParaIndicar: offset(-1), dataHora: iso(-35) }),
+      multa('u6', { status: MULTA.INDICADA, responsavel: RESPONSAVEL.EMPRESA, motivoEmpresa: MOTIVO_EMPRESA.PRAZO_PERDIDO, dataParaIndicar: offset(-10), dataHora: iso(-50) }),
+      multa('u7', { status: MULTA.INDICADA, responsavel: RESPONSAVEL.MOTORISTA, motorista: ana, canal: CANAL.DSV, dataAviso: offset(-20), dataIndicacao: offset(-18), indicado: true, vencimento: offset(4), valorComDesconto: 78.1, dataHora: iso(-45) }),
+      multa('u8', { status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, canal: CANAL.SENATRAN, dataAviso: offset(-5), dataIndicacao: offset(-3), indicado: true, dataParaIndicar: offset(6) }),
+      multa('u9', { status: MULTA.CANCELADA, canceladaEm: offset(-7), motivoCancelamento: 'Multa duplicada no portal (fictício).' }),
+      multa('u10', { status: MULTA.RECURSO, responsavel: RESPONSAVEL.MOTORISTA, recursoPendente: true, veiculo: v2 }),
     ],
     infracoes: [{ id: 'i1', codigo: '7455-0', descricao: 'Velocidade superior à máxima em até 20%', gravidade: 1, pontos: 4, valor: 130.16 }],
     colisoes: [colisao('c1', COLISAO.ENVIADO), colisao('c2', COLISAO.RESOLVIDO)],
@@ -106,6 +115,17 @@ const FIELD_TO_PROP: Record<string, string> = {
 }
 
 const MULTI_TO_PROP: Record<string, string> = { [CAMPO.servicos]: 'servicos', [CAMPO.categorias]: 'categorias' }
+
+/** Leva o estado novo do passo para a multa do mock; o motorista escolhido vira Ref pelas pessoas fictícias. */
+function aplicarNaMulta(m: Multa, e: MultaEstado, pessoas: Ref[]) {
+  Object.assign(m, {
+    status: e.status ?? null, responsavel: e.responsavel ?? null, motivoEmpresa: e.motivoEmpresa ?? null, dataAviso: e.dataAviso || null,
+    canal: e.canal ?? null, dataIndicacao: e.dataIndicacao || null, indicado: e.indicado ?? false, aceiteEm: e.aceiteEm || null,
+    pagaEm: e.pagaEm || null, valorPago: e.valorPago ?? null, competencia: e.competencia || null, acertoEm: e.acertoEm || null,
+    encerradaEm: e.encerradaEm || null, canceladaEm: e.canceladaEm || null, motivoCancelamento: e.motivoCancelamento || null, recursoPendente: e.recursoPendente ?? false,
+  })
+  if (e.motoristaId && e.motoristaId !== m.motorista?.id) m.motorista = pessoas.find((p) => p.id === e.motoristaId) ?? m.motorista
+}
 
 export function createMockSource(): DataSource {
   const data = seed()
@@ -195,13 +215,11 @@ export function createMockSource(): DataSource {
     },
     async runFlow(flow: FlowId, id: string) {
       await delay()
-      const kind: Kind = flow === 'aprovarManutencao' ? 'manutencao' : 'multa'
-      const record = find(kind, id) as Record<string, unknown> | undefined
+      if (flow !== 'aprovarManutencao') throw new Error('Flow desconhecido no mock.')
+      const record = find('manutencao', id) as Record<string, unknown> | undefined
       if (!record) throw new Error('Registro não encontrado no mock.')
-      if (flow === 'aprovarManutencao') record.status = MANUT.APROVADO
-      else if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
-      else record.status = MULTA.INDICADA
-      return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }
+      record.status = MANUT.APROVADO
+      return { message: 'Mock: Flow simulado.', shareUrl: null }
     },
     async temAditivo(funcionarioId) {
       return temAditivo(funcionarioId)
@@ -250,6 +268,38 @@ export function createMockSource(): DataSource {
     async listarParcelasTermo(termoId) {
       await delay()
       return structuredClone(parcelas.get(termoId) ?? [])
+    },
+    async passoMulta(multaId, passo, dados) {
+      await delay()
+      const item = data.multas.find((row) => row.id === multaId)
+      if (!item) throw new Error('Registro não encontrado no mock.')
+      const hoje = todaySP()
+      const antes = estadoDaMulta(item)
+      const erro = validarPasso(antes, passo, dados, hoje)
+      if (erro) throw new Error(erro)
+      const depois = aplicarPasso(antes, passo, dados, hoje)
+      aplicarNaMulta(item, depois, [ana, bruno])
+      return avaliar(depois, hoje)
+    },
+    async dossieMulta(multaId) {
+      await delay()
+      const item = data.multas.find((row) => row.id === multaId)
+      if (!item) throw new Error('Registro não encontrado no mock.')
+      const infracao = data.infracoes.find((row) => row.id === item.infracaoId)
+      const quando = Date.parse(item.dataHora ?? iso(-20))
+      const em = (minutos: number) => new Date(quando + minutos * 60_000).toISOString()
+      return {
+        multa: { id: item.id, auto: item.titulo, placa: item.veiculo?.label ?? null, dataHora: item.dataHora, local: item.local, orgao: 'DSV (fictício)', dataParaIndicar: item.dataParaIndicar, infracao: infracao ? { codigo: infracao.codigo, descricao: infracao.descricao, valor: infracao.valor } : null },
+        servicos: [{ id: 's1', codigo: 'S-1001', cliente: 'Cliente Alfa (fictício)', saida: em(-60), retorno: em(120), motorista: item.motorista?.label ?? null, status: 'Concluído', noHorario: true }],
+        infleet: { viagens: [{ inicio: em(-20), fim: em(20), motoristaInfleet: 'drv-ficticio', motorista: item.motorista?.label ?? null }] },
+      }
+    },
+    async enviarArquivoMulta(multaId, coluna, file) {
+      await delay()
+      const item = data.multas.find((row) => row.id === multaId)
+      if (!item) throw new Error('Registro não encontrado no mock.')
+      const atuais = item.arquivos ?? { autuacao: null, penalidade: null, comprovante: null }
+      item.arquivos = { ...atuais, [coluna === 'cr40f_comprovantepagamento' ? 'comprovante' : 'penalidade']: file.name }
     },
   }
 }

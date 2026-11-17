@@ -4,8 +4,9 @@ import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, m
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
-import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
-import type { DespesaCombustivel, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
+import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
+import { EMPTY_DATA, FlowIncertoError, type ArquivoMulta, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
+import type { DespesaCombustivel, Dossie, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
 import { errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
 type Row = Record<string, unknown>
@@ -37,8 +38,6 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
   aprovarManutencao: { envVar: 'new_FlowUrlManutencao', body: (id) => ({ guids: id }), timeoutMs: 60_000, nome: 'Agendar manutenção' },
-  notificarCondutor: { envVar: 'new_FlowUrlNotificarMotoristaMultas', body: (id) => ({ guids: id }), timeoutMs: 30_000, nome: 'Notificar condutor' },
-  gerarContrato: { envVar: 'new_FlowUrlGerarContratoMultas', body: (id) => ({ GUID_MULTA: id }), timeoutMs: 40_000, nome: 'Gerar contrato' },
 }
 
 export function createXrmSource(xrm: XrmHost): DataSource {
@@ -280,7 +279,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       } catch { /* Corpo vazio ou não JSON. */ } finally { clearTimeout(timer) }
 
       const status = response.status
-      if (flow === 'notificarCondutor' && (status === 207 || status === 400) && Number(payload.noDriver) > 0) throw new Error('A multa não tem motorista. Nada foi enviado')
       if (status < 200 || status > 299 || status === 207) throw new Error(`O Flow "${nome}" respondeu ${status}. Confira o registro antes de tentar de novo`)
       return { message: typeof payload.message === 'string' ? payload.message : null, shareUrl: typeof payload.shareUrl === 'string' ? payload.shareUrl : null }
     },
@@ -388,6 +386,32 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     async listarParcelasTermo(termoId: string) {
       const result = await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA.join(',')}&$filter=_new_termo_value eq ${guid(termoId)}&$orderby=new_numero asc`)
       return result.entities.map(mapParcelaTermo)
+    },
+
+    async passoMulta(multaId: string, passo: Passo, dados: DadosPasso): Promise<Situacao> {
+      const payload = await customApi('cr40f_PassoMulta', { MultaId: guid(multaId), Passo: passo, DadosJson: JSON.stringify(dados) }, 'Não foi possível gravar o passo')
+      const json = typeof payload.MultaJson === 'string' ? payload.MultaJson : ''
+      if (!json) throw new Error('O servidor não devolveu a situação da multa. Recarregue a tela')
+      return JSON.parse(json) as Situacao
+    },
+
+    async dossieMulta(multaId: string): Promise<Dossie> {
+      const payload = await customApi('new_DossieMulta', { new_MultaId: guid(multaId) }, 'Não foi possível montar o dossiê da multa')
+      const json = typeof payload.new_DossieJson === 'string' ? payload.new_DossieJson : ''
+      if (!json) throw new Error('O servidor não devolveu o dossiê da multa')
+      return JSON.parse(json) as Dossie
+    },
+
+    async enviarArquivoMulta(multaId: string, coluna: ArquivoMulta, file: File) {
+      // x-ms-file-name só aceita ASCII: tira acentos e o que sobrar fora da faixa imprimível.
+      const nome = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '') || 'arquivo.pdf'
+      const response = await fetch(`${apiUrl}/cr40f_multases(${guid(multaId)})/${coluna}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/octet-stream', 'x-ms-file-name': nome, 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
+        body: file,
+      })
+      if (!response.ok) throw new Error(`Não foi possível enviar o arquivo (${response.status})`)
     },
   }
 }

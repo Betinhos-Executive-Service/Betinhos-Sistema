@@ -277,8 +277,6 @@ describe('runFlow', () => {
 
   it.each([
     ['aprovarManutencao', { guids: GUID }],
-    ['notificarCondutor', { guids: GUID }],
-    ['gerarContrato', { GUID_MULTA: GUID }],
   ] as const)('chama o Flow %s com POST e o corpo certo', async (flow, expectedBody) => {
     const fetchMock = stubFetch(200, { message: 'ok', shareUrl: 'https://example.invalid/c.pdf' })
     const { xrm } = flowHost()
@@ -293,17 +291,11 @@ describe('runFlow', () => {
     expect(JSON.parse(init?.body as string)).toEqual(expectedBody)
   })
 
-  it('lê a variável de ambiente pelo schemaname de cada Flow', async () => {
+  it('lê a variável de ambiente pelo schemaname do Flow', async () => {
     stubFetch(200)
     const { xrm, retrieveMultipleRecords } = flowHost()
-    const source = createXrmSource(xrm)
-    await source.runFlow('aprovarManutencao', GUID)
-    await source.runFlow('notificarCondutor', GUID)
-    await source.runFlow('gerarContrato', GUID)
-    const options = retrieveMultipleRecords.mock.calls.map((call) => call[1])
-    expect(options[0]).toContain("schemaname eq 'new_FlowUrlManutencao'")
-    expect(options[1]).toContain("schemaname eq 'new_FlowUrlNotificarMotoristaMultas'")
-    expect(options[2]).toContain("schemaname eq 'new_FlowUrlGerarContratoMultas'")
+    await createXrmSource(xrm).runFlow('aprovarManutencao', GUID)
+    expect(retrieveMultipleRecords.mock.calls[0][1]).toContain("schemaname eq 'new_FlowUrlManutencao'")
   })
 
   it('usa o valor padrão da definição quando não há valor sobrescrito', async () => {
@@ -311,7 +303,7 @@ describe('runFlow', () => {
     const retrieveMultipleRecords = vi.fn(async (entity: string) =>
       entity === 'environmentvariabledefinition' ? { entities: [{ defaultvalue: FAKE_URL }] } : { entities: [] })
     const { xrm } = host({ retrieveMultipleRecords })
-    await createXrmSource(xrm).runFlow('notificarCondutor', GUID)
+    await createXrmSource(xrm).runFlow('aprovarManutencao', GUID)
     expect(retrieveMultipleRecords.mock.calls.map((call) => call[0])).toEqual(['environmentvariablevalue', 'environmentvariabledefinition'])
     expect(fetchMock.mock.calls[0][0]).toBe(FAKE_URL)
   })
@@ -320,8 +312,8 @@ describe('runFlow', () => {
     stubFetch(200)
     const { xrm, retrieveMultipleRecords } = flowHost()
     const source = createXrmSource(xrm)
-    await source.runFlow('gerarContrato', GUID)
-    await source.runFlow('gerarContrato', GUID)
+    await source.runFlow('aprovarManutencao', GUID)
+    await source.runFlow('aprovarManutencao', GUID)
     expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
   })
 
@@ -333,15 +325,15 @@ describe('runFlow', () => {
       return { entities: [] }
     })
     const { xrm } = host({ retrieveMultipleRecords })
-    await createXrmSource(xrm).runFlow('notificarCondutor', GUID)
+    await createXrmSource(xrm).runFlow('aprovarManutencao', GUID)
     expect(fetchMock.mock.calls[0][0]).toBe(FAKE_URL)
   })
 
   it('prepareFlow com a variável vazia rejeita com a mensagem de configuração e não chama o Flow', async () => {
     const fetchMock = stubFetch(200)
     const { xrm } = flowHost(null)
-    const message = await messageOf(createXrmSource(xrm).prepareFlow('gerarContrato'))
-    expect(message).toBe('URL do Flow "Gerar contrato" não configurada (variável new_FlowUrlGerarContratoMultas)')
+    const message = await messageOf(createXrmSource(xrm).prepareFlow('aprovarManutencao'))
+    expect(message).toBe('URL do Flow "Agendar manutenção" não configurada (variável new_FlowUrlManutencao)')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -381,29 +373,15 @@ describe('runFlow', () => {
   it('falha com mensagem clara quando a variável está vazia', async () => {
     const fetchMock = stubFetch(200)
     const { xrm } = flowHost(null)
-    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', GUID))
-    expect(message).toBe('URL do Flow "Gerar contrato" não configurada (variável new_FlowUrlGerarContratoMultas)')
+    const message = await messageOf(createXrmSource(xrm).runFlow('aprovarManutencao', GUID))
+    expect(message).toBe('URL do Flow "Agendar manutenção" não configurada (variável new_FlowUrlManutencao)')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('notificarCondutor com 400 e noDriver informa que a multa não tem motorista', async () => {
-    stubFetch(400, { noDriver: 1 })
-    const { xrm } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))
-    expect(message).toBe('A multa não tem motorista. Nada foi enviado')
-    expect(message).not.toContain('SEGREDO')
-  })
-
-  it('notificarCondutor com 207 e noDriver informa que a multa não tem motorista', async () => {
-    stubFetch(207, { noDriver: 2 })
-    const { xrm } = flowHost()
-    expect(await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))).toBe('A multa não tem motorista. Nada foi enviado')
-  })
-
-  it('207 sem noDriver é erro de status, não sucesso', async () => {
+  it('207 é erro de status, não sucesso', async () => {
     stubFetch(207, {})
     const { xrm } = flowHost()
-    expect(await messageOf(createXrmSource(xrm).runFlow('notificarCondutor', GUID))).toBe('O Flow "Notificar condutor" respondeu 207. Confira o registro antes de tentar de novo')
+    expect(await messageOf(createXrmSource(xrm).runFlow('aprovarManutencao', GUID))).toBe('O Flow "Agendar manutenção" respondeu 207. Confira o registro antes de tentar de novo')
   })
 
   it('status 500 vira erro sem a URL', async () => {
@@ -425,10 +403,10 @@ describe('runFlow', () => {
   it('falha de rede vira erro incerto sem a URL, mesmo que o erro original a contenha', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => { throw new TypeError(`Failed to fetch ${url}`) }))
     const { xrm } = flowHost()
-    const error = await createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
+    const error = await createXrmSource(xrm).runFlow('aprovarManutencao', GUID).catch((reason: unknown) => reason)
     expect(error).toBeInstanceOf(FlowIncertoError)
     const message = (error as Error).message
-    expect(message).toBe('Não foi possível chamar o Flow "Gerar contrato" (rede ou bloqueio do navegador)')
+    expect(message).toBe('Não foi possível chamar o Flow "Agendar manutenção" (rede ou bloqueio do navegador)')
     expect(message).not.toContain('SEGREDO')
   })
 
@@ -525,5 +503,42 @@ describe('termo de multa (Custom APIs)', () => {
 
   it('temAditivo valida o GUID', async () => {
     await expect(createXrmSource(host().xrm).temAditivo('x')).rejects.toThrow('Identificador inválido')
+  })
+})
+
+describe('passo a passo da multa (Custom APIs)', () => {
+  const MULTA_ID = '{AAAAAAAA-1111-2222-3333-444444444444}'
+  const resposta = (ok: boolean, status: number, body: unknown) => vi.fn(async (_url: string, _init?: RequestInit) => ({ ok, status, json: async () => body }))
+
+  it('passoMulta chama cr40f_PassoMulta com MultaId limpo, Passo e DadosJson e devolve a situação', async () => {
+    const situacao = { etapa: 'indicar', pendentes: ['RegistrarIndicacao'], proximoPasso: 'Indicar no órgão', proximoPrazo: '2026-11-30', prazoVencido: false, aguardandoPenalidade: false }
+    const fetchMock = resposta(true, 200, { MultaJson: JSON.stringify(situacao) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).toEqual(situacao)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_PassoMulta')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ MultaId: 'aaaaaaaa-1111-2222-3333-444444444444', Passo: 'AvisarMotorista', DadosJson: '{}' })
+  })
+
+  it('passoMulta repassa a recusa do servidor como está', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Avise o motorista antes de registrar a indicação.' } }))
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', { canal: 'dsv', data: '2026-11-15' })).rejects.toThrow('Avise o motorista antes de registrar a indicação.')
+  })
+
+  it('dossieMulta lê o new_DossieJson', async () => {
+    const dossie = { multa: { id: 'x', auto: 'AIT 1', placa: 'TST1A11', dataHora: null, local: null, orgao: null, dataParaIndicar: null, infracao: null }, servicos: [], infleet: { erro: 'Sem token' } }
+    const fetchMock = resposta(true, 200, { new_DossieJson: JSON.stringify(dossie) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createXrmSource(host().xrm).dossieMulta(MULTA_ID)).toEqual(dossie)
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ new_MultaId: 'aaaaaaaa-1111-2222-3333-444444444444' })
+  })
+
+  it('enviarArquivoMulta faz PATCH binário na coluna de arquivo com o nome sem acento', async () => {
+    const fetchMock = resposta(true, 204, {})
+    vi.stubGlobal('fetch', fetchMock)
+    await createXrmSource(host().xrm).enviarArquivoMulta(MULTA_ID, 'cr40f_comprovantepagamento', new File(['x'], 'comprovante pagamento março.pdf', { type: 'application/pdf' }))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_multases(aaaaaaaa-1111-2222-3333-444444444444)/cr40f_comprovantepagamento')
+    expect(init?.method).toBe('PATCH')
+    expect((init?.headers as Record<string, string>)['x-ms-file-name']).toBe('comprovante pagamento marco.pdf')
   })
 })

@@ -17,7 +17,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
     update: vi.fn(async () => {}),
     openForm: async () => {},
     prepareFlow: vi.fn(async () => {}),
-    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [],
+    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
     ...overrides,
   }
 }
@@ -109,13 +109,6 @@ describe('StatusPanel', () => {
     expect((screen.getByRole('button', { name: 'Reprovar' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('desabilita as ações de multa que exigem motorista', () => {
-    renderPanel(fakeSource(), MULTA.NOTIFICAR, { kind: 'multa', record: { temMotorista: false } })
-    const notificar = screen.getByRole('button', { name: 'Notificar condutor' }) as HTMLButtonElement
-    expect(notificar.disabled).toBe(true)
-    expect(notificar.title).toBe('Informe o motorista no formulário antes desta ação')
-  })
-
   it('começa os campos com o valor inicial informado', () => {
     renderPanel(fakeSource(), MANUT.SOLICITADO, { initial: { cr40f_agendarpara: '2026-10-15' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aprovar e agendar' }))
@@ -147,14 +140,14 @@ describe('StatusPanel', () => {
   })
 
   it('usa a mensagem padrão quando o Flow não devolve texto', async () => {
-    const source = fakeSource({ currentStatus: async () => MULTA.NOTIFICAR })
-    const { onDone } = renderPanel(source, MULTA.NOTIFICAR, { kind: 'multa' })
-    fireEvent.click(screen.getByRole('button', { name: 'Notificar condutor' }))
+    const source = fakeSource()
+    const { onDone } = renderPanel(source, MANUT.SOLICITADO)
+    fireEvent.click(screen.getByRole('button', { name: 'Aprovar e agendar' }))
+    fireEvent.change(screen.getByLabelText(/Agendar para/), { target: { value: '2026-10-15' } })
     await confirmar()
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
-    expect(source.runFlow).toHaveBeenCalledWith('notificarCondutor', 'm1')
-    expect(source.update).not.toHaveBeenCalled()
-    expect(await screen.findByText('Notificar condutor: concluído.')).toBeTruthy()
+    expect(source.runFlow).toHaveBeenCalledWith('aprovarManutencao', 'm1')
+    expect(await screen.findByText('Aprovar e agendar: concluído.')).toBeTruthy()
   })
 
   it('durante o Flow mostra a espera e desabilita os controles', async () => {

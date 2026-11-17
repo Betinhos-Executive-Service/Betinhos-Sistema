@@ -18,12 +18,8 @@ describe('transitionsFor', () => {
     expect(ids('manutencao', null)).toEqual([])
   })
 
-  it('lista só as transições permitidas de multa', () => {
-    expect(ids('multa', MULTA.NOTIFICAR)).toEqual(['notificado'])
-    expect(ids('multa', MULTA.NOTIFICADO)).toEqual(['indicar', 'recurso', 'descontado', 'pago'])
-    expect(ids('multa', MULTA.INDICADA)).toEqual(['recurso', 'descontado', 'pago'])
-    expect(ids('multa', MULTA.PAGO)).toEqual(['finalizar'])
-    expect(ids('multa', MULTA.RECURSO)).toEqual([])
+  it('multa não tem transição de status: o passo a passo grava pela cr40f_PassoMulta', () => {
+    for (const status of Object.values(MULTA)) expect(ids('multa', status)).toEqual([])
   })
 
   it('lista só as transições permitidas de colisão', () => {
@@ -34,18 +30,14 @@ describe('transitionsFor', () => {
 
   it('marca quais transições chamam Flow', () => {
     expect(pick('manutencao', MANUT.SOLICITADO, 'aprovar').flow).toBe('aprovarManutencao')
-    expect(pick('multa', MULTA.NOTIFICAR, 'notificado').flow).toBe('notificarCondutor')
-    expect(pick('multa', MULTA.NOTIFICADO, 'indicar').flow).toBe('gerarContrato')
     expect(pick('manutencao', MANUT.SOLICITADO, 'reprovar').flow).toBeUndefined()
     expect(pick('manutencao', MANUT.APROVADO, 'programar').flow).toBeUndefined()
   })
 })
 
 describe('bloqueio', () => {
-  it('exige veículo para aprovar e motorista para notificar e gerar contrato', () => {
+  it('exige veículo para aprovar', () => {
     expect(bloqueio(pick('manutencao', MANUT.SOLICITADO, 'aprovar'), registro(MANUT.SOLICITADO, { temVeiculo: false }))).toBe('Informe o veículo no formulário antes desta ação')
-    expect(bloqueio(pick('multa', MULTA.NOTIFICAR, 'notificado'), registro(MULTA.NOTIFICAR, { temMotorista: false }))).toBe('Informe o motorista no formulário antes desta ação')
-    expect(bloqueio(pick('multa', MULTA.NOTIFICADO, 'indicar'), registro(MULTA.NOTIFICADO, { temMotorista: false }))).toBe('Informe o motorista no formulário antes desta ação')
   })
 
   it('não bloqueia quando o requisito existe nem transições sem requisito', () => {
@@ -70,11 +62,6 @@ describe('validate', () => {
   it('respeita o tamanho máximo do campo', () => {
     const aprovar = pick('manutencao', MANUT.SOLICITADO, 'aprovar')
     expect(validate(aprovar, { cr40f_agendarpara: '2026-10-09', cr40f_comentariosdoaprovador: 'x'.repeat(101) })).toEqual({ cr40f_comentariosdoaprovador: 'Máximo de 100 caracteres' })
-  })
-
-  it('não exige campo nas transições de multa feitas por Flow', () => {
-    expect(validate(pick('multa', MULTA.NOTIFICAR, 'notificado'), {})).toEqual({})
-    expect(validate(pick('multa', MULTA.NOTIFICADO, 'indicar'), {})).toEqual({})
   })
 })
 
@@ -103,18 +90,12 @@ describe('buildPatch', () => {
 
   it('programar grava a data conforme o comportamento da coluna', () => {
     expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, ctx)).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09' })
-    expect(buildPatch('multa', pick('multa', MULTA.INDICADA, 'recurso'), {}, ctx)).toEqual({ cr40f_status: MULTA.RECURSO, new_recursopendente: true })
     expect(buildPatch('manutencao', pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' }, { now: ctx.now, dateBehaviors: { cr40f_agendarpara: 'UserLocal' } })).toEqual({ cr40f_status: MANUT.PROGRAMADO, cr40f_agendarpara: '2026-10-09T03:00:00Z' })
   })
 
   it('concluir converte data e hora de São Paulo para UTC e valor para número', () => {
     const patch = buildPatch('manutencao', pick('manutencao', MANUT.PROGRAMADO, 'concluir'), { cr40f_datamanutencao: '2026-10-02T10:00', cr40f_valor: '350.5', cr40f_estabelecimento: 'Oficina', cr40f_servicorealizado: 'Óleo' }, ctx)
     expect(patch).toEqual({ cr40f_status: MANUT.REALIZADO, cr40f_datamanutencao: '2026-10-02T13:00:00.000Z', cr40f_valor: 350.5, cr40f_estabelecimento: 'Oficina', cr40f_servicorealizado: 'Óleo' })
-  })
-
-  it('transições de multa por Flow não gravam nada pela tela', () => {
-    expect(buildPatch('multa', pick('multa', MULTA.NOTIFICAR, 'notificado'), {}, ctx)).toEqual({})
-    expect(buildPatch('multa', pick('multa', MULTA.NOTIFICADO, 'indicar'), {}, ctx)).toEqual({})
   })
 
   it('colisão grava no campo de status operacional', () => {
@@ -137,7 +118,7 @@ describe('applyTransition', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: 'OM reservada.', shareUrl: null })),
       openForm: async () => {},
-      fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [],
+      fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
     } satisfies DataSource
   }
 
@@ -183,14 +164,6 @@ describe('applyTransition', () => {
     expect(source.prepareFlow).not.toHaveBeenCalled()
   })
 
-  it('notificar condutor só chama o Flow, sem gravar pela tela', async () => {
-    const source = fakeSource(MULTA.NOTIFICAR)
-    await applyTransition(source, 'multa', registro(MULTA.NOTIFICAR), pick('multa', MULTA.NOTIFICAR, 'notificado'), {})
-    expect(source.update).not.toHaveBeenCalled()
-    expect(source.runFlow).toHaveBeenCalledWith('notificarCondutor', 'r1')
-    expect(source.runFlow).toHaveBeenCalledTimes(1)
-  })
-
   it('não grava nem chama Flow quando outra pessoa mudou o status', async () => {
     const source = fakeSource(MANUT.CANCELADO)
     await expect(applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO), pick('manutencao', MANUT.SOLICITADO, 'aprovar'), { cr40f_agendarpara: '2026-10-09' })).rejects.toBeInstanceOf(StaleError)
@@ -199,8 +172,8 @@ describe('applyTransition', () => {
   })
 
   it('não consulta nem chama nada quando falta o requisito', async () => {
-    const source = fakeSource(MULTA.NOTIFICAR)
-    await expect(applyTransition(source, 'multa', registro(MULTA.NOTIFICAR, { temMotorista: false }), pick('multa', MULTA.NOTIFICAR, 'notificado'), {})).rejects.toThrow('Informe o motorista no formulário antes desta ação')
+    const source = fakeSource(MANUT.SOLICITADO)
+    await expect(applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO, { temVeiculo: false }), pick('manutencao', MANUT.SOLICITADO, 'aprovar'), { cr40f_agendarpara: '2026-10-09' })).rejects.toThrow('Informe o veículo no formulário antes desta ação')
     expect(source.currentStatus).not.toHaveBeenCalled()
     expect(source.runFlow).not.toHaveBeenCalled()
   })
@@ -221,8 +194,8 @@ describe('applyTransition', () => {
   })
 
   it('rejeita transição que não está disponível no status atual', async () => {
-    const source = fakeSource(MULTA.NOTIFICAR)
-    await expect(applyTransition(source, 'multa', registro(MULTA.NOTIFICAR), pick('multa', MULTA.NOTIFICADO, 'indicar'), {})).rejects.toThrow('Esta ação não está disponível para o status atual do registro')
+    const source = fakeSource(MANUT.SOLICITADO)
+    await expect(applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO), pick('manutencao', MANUT.APROVADO, 'programar'), { cr40f_agendarpara: '2026-10-09' })).rejects.toThrow('Esta ação não está disponível para o status atual do registro')
     expect(source.currentStatus).not.toHaveBeenCalled()
     expect(source.update).not.toHaveBeenCalled()
     expect(source.runFlow).not.toHaveBeenCalled()
@@ -251,7 +224,7 @@ describe('Flow já em andamento', () => {
       prepareFlow: vi.fn(async () => {}),
       runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })),
       openForm: async () => {},
-      fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [],
+      fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
     } satisfies DataSource
   }
   const aprovar = (source: DataSource, id = 'r1') => applyTransition(source, 'manutencao', registro(MANUT.SOLICITADO, { id }), pick('manutencao', MANUT.SOLICITADO, 'aprovar'), dados)

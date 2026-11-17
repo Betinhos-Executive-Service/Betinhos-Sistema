@@ -1,5 +1,5 @@
 import { toDataverseDate, type DateBehavior } from '../data/dates'
-import { COLISAO, MANUT, MULTA, MULTA_CAMPO, STATUS_FIELD } from '../data/schema'
+import { COLISAO, MANUT, STATUS_FIELD } from '../data/schema'
 import { FlowIncertoError, type DataSource, type FlowId, type FlowResult } from '../data/source'
 import type { Kind } from '../data/types'
 
@@ -36,13 +36,6 @@ const concluir: Transition = {
 }
 const cancelarManutencao: Transition = { id: 'cancelar', to: MANUT.CANCELADO, label: 'Cancelar manutenção', fields: [], danger: true }
 const cancelarColisao: Transition = { id: 'cancelar', to: COLISAO.CANCELADO, label: 'Cancelar colisão', fields: [], danger: true }
-const desfechosMulta: Transition[] = [
-  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { [MULTA_CAMPO.recursoPendente]: true } },
-  { id: 'descontado', to: MULTA.DESCONTADO, label: 'Marcar como descontado', fields: [] },
-  { id: 'pago', to: MULTA.PAGO, label: 'Marcar como pago', fields: [] },
-]
-const finalizar: Transition = { id: 'finalizar', to: MULTA.FINALIZADO, label: 'Finalizar', fields: [] }
-
 const RULES: Record<Kind, Record<number, Transition[]>> = {
   manutencao: {
     [MANUT.SOLICITADO]: [
@@ -54,13 +47,8 @@ const RULES: Record<Kind, Record<number, Transition[]>> = {
     [MANUT.APROVADO]: [{ id: 'programar', to: MANUT.PROGRAMADO, label: 'Programar', fields: [agendarPara] }, concluir, cancelarManutencao],
     [MANUT.PROGRAMADO]: [concluir, cancelarManutencao],
   },
-  multa: {
-    [MULTA.NOTIFICAR]: [{ id: 'notificado', to: MULTA.NOTIFICADO, label: 'Notificar condutor', fields: [], flow: 'notificarCondutor', requires: 'motorista' }],
-    [MULTA.NOTIFICADO]: [{ id: 'indicar', to: MULTA.INDICADA, label: 'Gerar contrato de indicação', fields: [], flow: 'gerarContrato', requires: 'motorista' }, ...desfechosMulta],
-    [MULTA.INDICADA]: desfechosMulta,
-    [MULTA.DESCONTADO]: [finalizar],
-    [MULTA.PAGO]: [finalizar],
-  },
+  // Multa anda pelo passo a passo (MultaPassoAPasso → cr40f_PassoMulta); não tem transição de status aqui.
+  multa: {},
   colisao: {
     [COLISAO.ENVIADO]: [{ id: 'analisar', to: COLISAO.ANALISE, label: 'Colocar em análise', fields: [] }, cancelarColisao],
     [COLISAO.ANALISE]: [{ id: 'resolver', to: COLISAO.RESOLVIDO, label: 'Marcar como resolvido', fields: [] }, cancelarColisao],

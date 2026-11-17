@@ -16,7 +16,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
     update: vi.fn(async () => {}),
     openForm: vi.fn(async () => {}),
     prepareFlow: vi.fn(async () => {}),
-    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async () => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [],
+    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async () => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
     ...overrides,
   }
 }
@@ -57,10 +57,10 @@ describe('RegistroDrawer', () => {
     expect(onChanged).toHaveBeenCalledTimes(1)
   })
 
-  it('multa sem motorista: Notificar condutor desabilitado com o motivo visível', () => {
+  it('multa não oferece mais Notificar condutor nem Gerar contrato', () => {
     renderDrawer(fakeSource(), 'multa', 'u1')
-    expect((screen.getByRole('button', { name: 'Notificar condutor' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText('Informe o motorista no formulário antes desta ação')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Notificar condutor' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Gerar contrato de indicação' })).toBeNull()
   })
 
   it('mostra a classificação da IA e grava a correção manual dos serviços', async () => {

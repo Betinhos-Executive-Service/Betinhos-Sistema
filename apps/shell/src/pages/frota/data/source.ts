@@ -1,6 +1,7 @@
 import type { DateBehavior } from './dates'
 import type { Acordo } from '../domain/termoMulta'
-import type { FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
+import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
+import type { Dossie, FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -9,7 +10,10 @@ export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: []
 /** Classificação da manutenção, aplicada na tela sem recarregar tudo. */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
 
-export type FlowId = 'aprovarManutencao' | 'notificarCondutor' | 'gerarContrato'
+/** "Notificar condutor" e "Gerar contrato de indicação" saíram na fase 1 das multas: a multa anda pela cr40f_PassoMulta. */
+export type FlowId = 'aprovarManutencao'
+/** Colunas de arquivo livres da multa que a tela grava. */
+export type ArquivoMulta = 'cr40f_comprovantepagamento' | 'cr40f_pdfpenalidade'
 export type FlowResult = { message: string | null; shareUrl: string | null }
 
 /** O Flow pode ter rodado no servidor mesmo sem resposta (tempo esgotado ou falha de rede). */
@@ -64,4 +68,10 @@ export interface DataSource {
   baixarPdfTermo(termoId: string): Promise<{ nome: string; blob: Blob }>
   /** Parcelas de desconto em folha do termo, na ordem. */
   listarParcelasTermo(termoId: string): Promise<ParcelaTermo[]>
+  /** Custom API cr40f_PassoMulta: valida e grava o passo no servidor; a recusa vem com a mensagem do servidor. */
+  passoMulta(multaId: string, passo: Passo, dados: DadosPasso): Promise<Situacao>
+  /** Custom API new_DossieMulta: serviço da agenda, viagens do InFleet e dados da notificação, para a mensagem do WhatsApp. */
+  dossieMulta(multaId: string): Promise<Dossie>
+  /** Grava um arquivo numa coluna livre da multa (comprovante de pagamento ou PDF da penalidade). */
+  enviarArquivoMulta(multaId: string, coluna: ArquivoMulta, file: File): Promise<void>
 }
