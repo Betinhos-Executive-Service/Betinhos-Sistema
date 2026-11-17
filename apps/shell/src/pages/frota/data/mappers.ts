@@ -28,6 +28,15 @@ export function cleanId(value: unknown) {
   return String(value).replace(/[{}]/g, '').toLowerCase()
 }
 
+export const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Guid sem chaves e minúsculo; rejeita o que não for Guid (nada vai ao servidor). Único ponto de validação de ids da Frota. */
+export function guid(value: string) {
+  const id = cleanId(value)
+  if (!GUID.test(id)) throw new Error('Identificador inválido')
+  return id
+}
+
 const str = (value: unknown) => (typeof value === 'string' && value ? value : null)
 const num = (value: unknown) => (typeof value === 'number' ? value : null)
 

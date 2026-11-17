@@ -1,6 +1,7 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { chamarCustomApi } from './customApi'
+import { cleanId, GUID, guid, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
@@ -33,7 +34,6 @@ const ORDER: Record<TableKey, string> = {
 
 const PAGE_SIZE = 5000
 
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
   notificarCondutor: { envVar: 'new_FlowUrlNotificarMotoristaMultas', body: (id) => ({ guids: id }), timeoutMs: 30_000, nome: 'Notificar condutor' },
@@ -48,32 +48,8 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   // A URL do Flow tem assinatura: fica só aqui, em memória, e nunca sai em mensagem, log ou retorno.
   const flowUrls = new Map<FlowId, string>()
 
-  /** Guid sem chaves e minúsculo; rejeita o que não for Guid. */
-  function guid(value: string) {
-    const id = cleanId(value)
-    if (!GUID.test(id)) throw new Error('Identificador inválido')
-    return id
-  }
-
   /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
-  async function customApi(nome: string, body: Record<string, unknown>, falha: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${apiUrl}/${nome}`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
-      body: JSON.stringify(body),
-    })
-    let payload: Record<string, unknown> = {}
-    try {
-      const parsed: unknown = await response.json()
-      if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
-    } catch { /* 204 ou corpo vazio */ }
-    if (!response.ok) {
-      const erro = payload.error as { message?: unknown } | undefined
-      throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`)
-    }
-    return payload
-  }
+  const customApi = (nome: string, body: Record<string, unknown>, falha: string) => chamarCustomApi(apiUrl, nome, body, falha)
 
   async function getJson<T>(path: string): Promise<T> {
     const response = await fetch(`${apiUrl}/${path}`, { credentials: 'same-origin', headers: { Accept: 'application/json', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' } })
