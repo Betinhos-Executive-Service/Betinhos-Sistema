@@ -5,7 +5,7 @@ import { anteriorDe, comparar, type ChipAnterior } from '../comparar'
 import { MULTA_RESOLVIDA } from '../codes'
 import { int } from '../format'
 import type { Contexto } from '../kpis'
-import { entre, mesRotulo } from '../periodo'
+import { entre, mesesEntre, mesRotulo } from '../periodo'
 import type { Dados, Multa } from '../types'
 
 export type LinhaMultaMotorista = { motorista: string; qtd: number; /** % das multas do período. */ pct: number }
@@ -52,7 +52,7 @@ export function calcularMultas(ctx: Contexto, dados: Dados): Multas {
     },
     porMotorista: distribuicao(muls, (m) => m.motorista || '—').map(({ rotulo, qtd, pct }) => ({ motorista: rotulo, qtd, pct })),
     porInfracao: distribuicao(muls, infracaoDe).map(({ rotulo, qtd, pct }) => ({ infracao: rotulo, qtd, pct })),
-    porMes: [...porMes.keys()].sort().map((mes) => {
+    porMes: (muls.length ? mesesEntre(f.inicio, f.fim) : []).map((mes) => {
       const rows = porMes.get(mes) ?? []
       return { mes, rotulo: mesRotulo(mes), qtd: rows.length, pendentes: multasPendentes(rows).length }
     }),

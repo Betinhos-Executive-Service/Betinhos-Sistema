@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react'
-import { Drawer, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import { Drawer, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Tabela } from './Tabela'
 import { ExternalLink } from 'lucide-react'
 import { linkRegistro, type Detalhe, type Entidade, type LinhaCnhDetalhe, type LinhaMultaDetalhe, type LinhaServicoDetalhe } from '../domain/detalhes'
 import { brl, int } from '../domain/format'
@@ -92,7 +93,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
     if (comLink) colunas.push(linkCol<LinhaServicoDetalhe>('reserva', (l) => `serviço ${codigo(l)} de ${dataBR(l.dia)}`))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'serviço', 'serviços')} · {brl(total)}</p>
-      <Table columns={colunas} rows={rows<LinhaServicoDetalhe>()} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
+      <Tabela columns={colunas} rows={rows<LinhaServicoDetalhe>()} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
       {top.botao}
     </>
   }
@@ -111,7 +112,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
     if (comLink) colunas.push(linkCol<LinhaCnhDetalhe>('funcionario', (l) => l.motorista))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'motorista', 'motoristas')}</p>
-      <Table columns={colunas} rows={rows<LinhaCnhDetalhe>()} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
+      <Tabela columns={colunas} rows={rows<LinhaCnhDetalhe>()} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
       {top.botao}
     </>
   }
@@ -126,7 +127,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
   if (comLink) colunas.push(linkCol<LinhaMultaDetalhe>('multa', (l) => `multa de ${dataBR(l.dia)}`))
   return <>
     <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'multa', 'multas')}</p>
-    <Table columns={colunas} rows={rows<LinhaMultaDetalhe>()} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
+    <Tabela columns={colunas} rows={rows<LinhaMultaDetalhe>()} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
     {top.botao}
   </>
 }

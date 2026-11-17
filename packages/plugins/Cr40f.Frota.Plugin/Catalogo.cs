@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Cr40f.Frota.Plugin;
 
@@ -49,6 +50,55 @@ public static class Catalogo
         [100000040] = "Ruído ou diagnóstico geral",
         [100000036] = "Outros serviços",
     };
+
+    /// <summary>Categoria (new_categoriasmanutencao) de cada serviço, do mesmo JSON do shell (ParidadeTests confere).</summary>
+    public static readonly IReadOnlyDictionary<int, int> CategoriaPorServico = new Dictionary<int, int>
+    {
+        [100000000] = 100000000,
+        [100000001] = 100000000,
+        [100000002] = 100000000,
+        [100000003] = 100000000,
+        [100000004] = 100000000,
+        [100000005] = 100000000,
+        [100000006] = 100000000,
+        [100000007] = 100000001,
+        [100000008] = 100000001,
+        [100000009] = 100000001,
+        [100000010] = 100000001,
+        [100000011] = 100000001,
+        [100000012] = 100000002,
+        [100000013] = 100000002,
+        [100000014] = 100000002,
+        [100000015] = 100000002,
+        [100000016] = 100000002,
+        [100000017] = 100000003,
+        [100000018] = 100000003,
+        [100000019] = 100000003,
+        [100000020] = 100000004,
+        [100000021] = 100000004,
+        [100000022] = 100000005,
+        [100000023] = 100000005,
+        [100000024] = 100000005,
+        [100000025] = 100000005,
+        [100000026] = 100000006,
+        [100000027] = 100000006,
+        [100000028] = 100000006,
+        [100000029] = 100000007,
+        [100000030] = 100000007,
+        [100000031] = 100000007,
+        [100000032] = 100000008,
+        [100000033] = 100000008,
+        [100000034] = 100000008,
+        [100000035] = 100000009,
+        [100000037] = 100000003,
+        [100000038] = 100000007,
+        [100000039] = 100000005,
+        [100000040] = 100000011,
+        [100000036] = 100000010,
+    };
+
+    public static int[] Categorias(IEnumerable<int> servicos)
+        => servicos.Where(CategoriaPorServico.ContainsKey).Select(s => CategoriaPorServico[s]).Distinct().OrderBy(c => c).ToArray();
 
     public static string Rotulo(int servico) => Servicos.TryGetValue(servico, out var r) ? r : "Serviço " + servico;
 }

@@ -9,7 +9,7 @@ import type { Dossie, FrotaData, Multa } from '../data/types'
 import { dadosSemVazios, MultaPassoAPasso, opcoesMotoristas, penalidadeFaltando } from './MultaPassoAPasso'
 
 const HOJE = '2026-11-17'
-const multa: Multa = { id: 'u1', titulo: 'AIT 1A2B3C', status: MULTA.NOTIFICAR, dataHora: '2026-11-10T16:00:00Z', local: 'Av. de Teste, 100', dataParaIndicar: '2026-11-30', indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'TST1A11' }, motorista: null, infracaoId: null, criadoEm: '2026-11-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
+const multa: Multa = { id: 'u1', codigo: 'NT-1073', titulo: 'AIT 1A2B3C', status: MULTA.NOTIFICAR, dataHora: '2026-11-10T16:00:00Z', local: 'Av. de Teste, 100', dataParaIndicar: '2026-11-30', indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'TST1A11' }, motorista: null, infracaoId: null, criadoEm: '2026-11-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
 const dossie: Dossie = { multa: { id: 'u1', auto: '1A2B3C', placa: 'TST1A11', dataHora: '2026-11-10T16:00:00Z', local: 'Av. de Teste, 100', orgao: null, dataParaIndicar: '2026-11-30', infracao: null }, servicos: [], infleet: { viagens: [] } }
 const ana = { id: 'f1', label: 'Ana Souza (fictício)' }
 

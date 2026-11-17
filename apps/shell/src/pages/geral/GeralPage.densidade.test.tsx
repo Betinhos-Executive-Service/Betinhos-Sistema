@@ -2,7 +2,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MOCK_ROW_COUNT } from './data/mock'
-import { encodeFilters } from './domain/filters'
 import { GeralPage } from './GeralPage'
 import { colFilter, columnMenu, dataRows, FakeObserver, hooks, openColumnFilter, usarAmbienteGeral, viewTrigger } from './testUtils'
 
@@ -182,7 +181,9 @@ describe('Geral: espaço e densidade', () => {
   })
   describe('filtros (DS §10.9.2)', () => {
     const header = (name: RegExp) => screen.getByRole('columnheader', { name, hidden: true })
-    const chips = () => screen.queryByRole('group', { name: 'Filtros ativos' })
+    // Sem faixa de chips (DS 2.0.0): o filtro ativo aparece no número do botão Filtros e no título da coluna.
+    const noChips = () => expect(screen.queryByRole('group', { name: 'Filtros ativos' })).toBeNull()
+    const filtersButton = () => within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ })
 
     it('o menu da coluna abre e ordena', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
@@ -193,7 +194,7 @@ describe('Geral: espaço e densidade', () => {
       await waitFor(() => expect(header(/Trajeto/).getAttribute('aria-sort')).toBe('descending'))
     }, 60_000)
 
-    it('filtrar Status por Confirmado no painel da coluna reduz as linhas e cria o chip; remover restaura', async () => {
+    it('filtrar Status por Confirmado no painel da coluna reduz as linhas e conta no botão; Limpar filtro da coluna restaura', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
       const panel = await openColumnFilter(/^Status de Operação$/, 'Status de Operação')
@@ -203,12 +204,14 @@ describe('Geral: espaço e densidade', () => {
       fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
       fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
       await waitFor(() => expect(colFilter()).toBeNull())
-      expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
       await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
+      expect(filtersButton().textContent).toContain('1')
+      noChips()
       expect(viewTrigger().textContent).toContain('Alterada')
-      fireEvent.click(screen.getByRole('button', { name: 'Remover filtro Status de Operação: Confirmado' }))
+      fireEvent.click(screen.getByRole('button', { name: /^Status de Operação$/, hidden: true }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Limpar filtro', hidden: true }))
       await screen.findAllByText(PAGE1)
-      expect(chips()).toBeNull()
+      expect(filtersButton().textContent).not.toContain('1')
       expect(viewTrigger().textContent).not.toContain('Alterada')
     }, 60_000)
 
@@ -225,8 +228,8 @@ describe('Geral: espaço e densidade', () => {
       fireEvent.change(text, { target: { value: 'Galeão' } })
       fireEvent.keyDown(text, { key: 'Enter' })
       await waitFor(() => expect(colFilter()).toBeNull())
-      expect(await screen.findByText('Trajeto: começa com Galeão')).toBeTruthy()
       await waitFor(() => expect(window.location.hash).toContain('f='))
+      noChips()
       expect(document.activeElement?.textContent).toContain('Trajeto')
       // Reabrir: mostra o filtro ativo e a condição já preenchida.
       panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
@@ -236,29 +239,35 @@ describe('Geral: espaço e densidade', () => {
       // Esc fecha sem mexer no filtro.
       fireEvent.keyDown(panel, { key: 'Escape' })
       await waitFor(() => expect(colFilter()).toBeNull())
-      expect(screen.getByText('Trajeto: começa com Galeão')).toBeTruthy()
+      expect(window.location.hash).toContain('f=')
       // Limpar tira o filtro e fecha.
       panel = await openColumnFilter(/^Trajeto$/, 'Trajeto')
       fireEvent.click(within(panel).getByRole('button', { name: 'Limpar', hidden: true }))
       await waitFor(() => expect(colFilter()).toBeNull())
-      await waitFor(() => expect(screen.queryByText('Trajeto: começa com Galeão')).toBeNull())
+      await waitFor(() => expect(window.location.hash).not.toContain('f='))
     }, 60_000)
 
-    it('o painel Filtros aplica uma condição avançada, conta no botão e Limpar filtros tira tudo', async () => {
+    it('o painel Filtros aplica uma condição, conta no botão e o Limpar do painel tira tudo', async () => {
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByText(PAGE1)
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
-      fireEvent.click(within(panel).getByRole('tab', { name: /^Avançado/ }))
-      fireEvent.click(within(panel).getByRole('button', { name: 'Condição' }))
-      expect(within(panel).getByText('Digite um texto.')).toBeTruthy()
-      fireEvent.change(within(panel).getByRole('textbox', { name: 'Texto de ID' }), { target: { value: 'OS-1005' } })
-      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar' }))
-      expect(await screen.findByText('ID: OS-1005')).toBeTruthy()
-      await waitFor(() => expect(screen.getByRole('button', { name: /^Filtros/ }).textContent).toContain('1'))
-      fireEvent.click(within(chips() as HTMLElement).getByRole('button', { name: 'Limpar filtros' }))
+      // A condição de estado da visão (`statecode`) não é campo de filtro: aparece só leitura, sem ×.
+      expect(within(panel).getByText('Status igual a Ativo')).toBeTruthy()
+      expect(within(panel).queryByRole('button', { name: 'Remover condição da visão' })).toBeNull()
+      fireEvent.click(within(panel).getByRole('button', { name: '+ Adicionar filtro' }))
+      fireEvent.click(screen.getByRole('option', { name: /^ID$/, hidden: true }))
+      expect(within(panel).getByText('1 filtro sem valor não entra')).toBeTruthy()
+      fireEvent.change(screen.getByRole('textbox', { name: 'Texto de ID', hidden: true }), { target: { value: 'OS-1005' } })
+      fireEvent.click(within(panel).getByRole('button', { name: /^Mostrar/ }))
+      await waitFor(() => expect(filtersButton().textContent).toContain('1'))
+      noChips()
+      fireEvent.click(filtersButton())
+      const again = await screen.findByRole('dialog', { name: 'Filtros' })
+      fireEvent.click(within(again).getByRole('button', { name: 'Limpar' }))
+      fireEvent.click(within(again).getByRole('button', { name: /^Mostrar/ }))
       await screen.findAllByText(PAGE1)
-      expect(chips()).toBeNull()
+      expect(filtersButton().textContent).not.toContain('1')
     }, 60_000)
 
     it('fechar o painel com rascunho pede confirmação', async () => {
@@ -266,8 +275,8 @@ describe('Geral: espaço e densidade', () => {
       await screen.findAllByText(PAGE1)
       fireEvent.click(screen.getByRole('button', { name: 'Filtros' }))
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
-      fireEvent.click(within(panel).getByRole('tab', { name: /^Avançado/ }))
-      fireEvent.click(within(panel).getByRole('button', { name: 'Condição' }))
+      fireEvent.click(within(panel).getByRole('button', { name: '+ Adicionar filtro' }))
+      fireEvent.click(screen.getByRole('option', { name: /^ID$/, hidden: true }))
       fireEvent(panel, new Event('cancel', { cancelable: true }))
       const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
       fireEvent.click(within(confirm).getByRole('button', { name: 'Continuar editando' }))
@@ -275,18 +284,10 @@ describe('Geral: espaço e densidade', () => {
       fireEvent(panel, new Event('cancel', { cancelable: true }))
       fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
       await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filtros' })).toBeNull())
-      expect(chips()).toBeNull()
+      expect(filtersButton().textContent).not.toContain('1')
     }, 60_000)
 
-    it('sem metadata o filtro restaurado da URL (link antigo) aparece como não aplicado', async () => {
-      hooks.attributes = () => Promise.reject(new Error('sem metadata'))
-      window.location.hash = '#/geral?f=' + encodeFilters({ cr40f_trajeto: { kind: 'text', op: 'contains', value: 'Galeão' } })
-      render(<GeralPage host={{ mode: 'mock' }} />)
-      expect(await screen.findByRole('img', { name: 'Filtro não aplicado', hidden: true })).toBeTruthy()
-      expect(within(chips() as HTMLElement).getByText(/não aplicado/)).toBeTruthy()
-    }, 60_000)
-
-    it('no celular o botão Filtros tem tamanho de toque e o painel aplica por coluna', async () => {
+    it('no celular o botão Filtros tem tamanho de toque e o painel aplica um filtro de coluna', async () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
       render(<GeralPage host={{ mode: 'mock' }} />)
       await screen.findAllByRole('listitem')
@@ -294,10 +295,13 @@ describe('Geral: espaço e densidade', () => {
       expect(button.classList.contains('bt-button--touch')).toBe(true)
       fireEvent.click(button)
       const panel = await screen.findByRole('dialog', { name: 'Filtros' })
-      fireEvent.click(within(panel).getByRole('combobox', { name: 'Filtrar Status de Operação', hidden: true }))
-      fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
-      fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar' }))
-      expect(within(await screen.findByRole('group', { name: 'Filtros ativos' })).getByText('Status de Operação: Confirmado')).toBeTruthy()
+      fireEvent.click(within(panel).getByRole('button', { name: '+ Adicionar filtro', hidden: true }))
+      fireEvent.click(await screen.findByRole('option', { name: /^Status de Operação$/, hidden: true }))
+      fireEvent.click(await screen.findByRole('checkbox', { name: 'Confirmado', hidden: true }))
+      fireEvent.click(within(panel).getByRole('button', { name: /^Mostrar/, hidden: true }))
+
+      await waitFor(() => expect(filtersButton().textContent).toContain('1'))
+      noChips()
     }, 60_000)
   })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
+import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, deleteView, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
   { id: 'client', label: 'Cliente', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos', 'cr40f_clientes1'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }, { from: 'cr40f_clientes1id', to: 'cr40f_cliente' }], type: 'String', available: true },
@@ -175,6 +175,35 @@ describe('views nativas', () => {
     expect(fields.find((field) => field.table === 'cr40f_clientes1' && field.id !== 'client')?.pickerEligible).toBe(false)
   })
 
+  it('esconde o nome formatado dos lookups e usa rótulo legível quando o nome de exibição é o schema name', async () => {
+    // Formato da metadata do DEV (16/11/2026): o *name tem AttributeOf e nenhum nome de exibição; os campos de repasse
+    // foram criados com o nome de exibição igual ao schema name sem prefixo.
+    const label = (text?: string) => ({ UserLocalizedLabel: text ? { Label: text } : null })
+    const attribute = (LogicalName: string, SchemaName: string, AttributeType: string, display?: string, AttributeOf?: string) => ({ LogicalName, SchemaName, AttributeType, AttributeOf: AttributeOf ?? null, DisplayName: label(display), IsValidForRead: true, IsCustomAttribute: true })
+    const metadata = { LogicalName: 'cr40f_composicaodeprecos', ObjectTypeCode: 10342, IsCustomEntity: true, PrimaryIdAttribute: 'cr40f_composicaodeprecosid', DisplayName: label('Composição de Preços'), ManyToOneRelationships: [], Attributes: [
+      attribute('cr40f_pagamentoaterceiro', 'cr40f_PagamentoaTerceiro', 'Lookup', 'Pagamento a Terceiro'),
+      attribute('cr40f_pagamentoaterceironame', 'cr40f_pagamentoaterceiroName', 'String', undefined, 'cr40f_pagamentoaterceiro'),
+      attribute('cr40f_terceirofavorecido', 'cr40f_TerceiroFavorecido', 'Lookup', 'TerceiroFavorecido'),
+      attribute('cr40f_terceirofavorecidoname', 'cr40f_terceirofavorecidoName', 'String', undefined, 'cr40f_terceirofavorecido'),
+      attribute('cr40f_repassedefinidomanual', 'cr40f_RepasseDefinidoManual', 'Boolean', 'RepasseDefinidoManual'),
+      attribute('cr40f_valorrepasseterceiro', 'cr40f_ValorRepasseTerceiro', 'Money', 'ValorRepasseTerceiro'),
+      attribute('cr40f_ajuste', 'cr40f_Ajuste', 'Money', 'Ajuste'),
+    ] }
+    vi.stubGlobal('window', { Xrm: { Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm.dynamics.com' }) } } })
+    const fetchMock = vi.fn(async (_url: string) => ({ ok: true, json: async () => metadata }))
+    vi.stubGlobal('fetch', fetchMock)
+    const fields = await loadColumnCatalog()
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('Attributes($select=LogicalName,SchemaName,AttributeType,AttributeOf,')
+    const byId = (id: string) => fields.find((field) => field.id === id)
+    expect(byId('cr40f_pagamentoaterceironame')?.pickerEligible).toBe(false)
+    expect(byId('cr40f_terceirofavorecidoname')?.pickerEligible).toBe(false)
+    expect(byId('cr40f_pagamentoaterceiro')).toMatchObject({ label: 'Pagamento a Terceiro', pickerEligible: true })
+    expect(byId('cr40f_terceirofavorecido')).toMatchObject({ label: 'Terceiro favorecido', pickerEligible: true })
+    expect(byId('cr40f_repassedefinidomanual')?.label).toBe('Repasse definido manual')
+    expect(byId('cr40f_valorrepasseterceiro')?.label).toBe('Valor repasse terceiro')
+    expect(byId('cr40f_ajuste')?.label).toBe('Ajuste')
+  })
+
   it('reverte criação nativa quando a configuração da fixação falha', async () => {
     const createRecord = vi.fn(async () => ({ id: 'view-id' }))
     const retrieveMultipleRecords = vi.fn(async () => { throw new Error('Sem acesso à configuração') })
@@ -195,4 +224,14 @@ it('lê de volta os operadores que a ViewBar grava: not-in, atalhos de data e pr
   ])
   // Atalho de data em campo que não é data não é aceito.
   expect(parseNativeFilters('<fetch><entity name="cr40f_composicaodeprecos"><filter><condition attribute="new_valortotal" operator="today" /></filter></entity></fetch>', catalog)).toBeNull()
+})
+
+it('exclui visão pessoal criada no Dynamics e mantém a trava nas públicas de fora da tela', async () => {
+  const deleteRecord = vi.fn(async () => undefined)
+  const retrieveMultipleRecords = vi.fn(async () => ({ entities: [] }))
+  vi.stubGlobal('window', { Xrm: { WebApi: { deleteRecord, retrieveMultipleRecords } } })
+  await deleteView({ id: 'dyn', kind: 'personal', name: 'Do Dynamics', managed: false, definition })
+  expect(deleteRecord).toHaveBeenCalledWith('userquery', 'dyn')
+  await expect(deleteView({ id: 'pub', kind: 'public', name: 'Pública', managed: false, definition })).rejects.toThrow('não pode ser excluída')
+  vi.unstubAllGlobals()
 })

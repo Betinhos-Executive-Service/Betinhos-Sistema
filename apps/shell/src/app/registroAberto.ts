@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 
 /**
  * Tabelas que têm tela no shell: o lookup de uma lista (Geral, Composição) abre a gaveta dessa tela por cima da lista,
@@ -13,6 +13,7 @@ export const TABELAS_COM_GAVETA = [
   'cr40f_financeiro',
   'cr40f_pagantes',
   'cr40f_despesaoperacional',
+  'cr40f_manutencoes',
 ] as const
 
 export type TabelaComGaveta = (typeof TABELAS_COM_GAVETA)[number]
@@ -41,4 +42,30 @@ export const gavetaRegistroAberta = () => aberto
 
 export function useGavetaRegistro() {
   return useSyncExternalStore(assinar, gavetaRegistroAberta, gavetaRegistroAberta)
+}
+
+/**
+ * Evento de janela: uma gaveta gravou num registro (ação da manutenção, por exemplo). A lista que está atrás relê; o
+ * padrão é o de `DOCUMENTOS_ALTERADOS`. `detail` é `{ table, id }`.
+ */
+export const REGISTRO_ALTERADO = 'betinhos:registro-alterado'
+export type RegistroAlterado = RegistroAberto
+
+export function avisarRegistroAlterado(table: TabelaComGaveta, id: string) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(new CustomEvent<RegistroAlterado>(REGISTRO_ALTERADO, { detail: { table, id } }))
+}
+
+/** Chama `callback(id)` quando uma gaveta grava num registro da tabela; `callback` pode mudar a cada render. */
+export function useRegistroAlterado(table: TabelaComGaveta, callback: (id: string) => void) {
+  const atual = useRef(callback)
+  atual.current = callback
+  useEffect(() => {
+    const ouvir = (event: Event) => {
+      const detalhe = (event as CustomEvent<RegistroAlterado>).detail
+      if (detalhe?.table === table) atual.current(detalhe.id)
+    }
+    window.addEventListener(REGISTRO_ALTERADO, ouvir)
+    return () => window.removeEventListener(REGISTRO_ALTERADO, ouvir)
+  }, [table])
 }

@@ -158,10 +158,6 @@
 }
 
 /* Atalho na tela Registrar gasto. */
-.expense-postos { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin:0 0 10px; padding:0 14px; border:1px solid #cfdcf6; border-radius:10px; background:#edf3ff; color:#2159d2; font-size:.9rem; font-weight:800; cursor:pointer; }
-.expense-postos svg { width:18px; height:18px; }
-.expense-postos:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); }
-.expense-postos:disabled { opacity:.55; cursor:default; }
 
 /* Aviso do limite de 200 postos: pílula discreta, sem ponto pulsante. */
 .pp-status--limite { font-weight:600; font-size:.72rem; min-height:26px; color:#64748b; }

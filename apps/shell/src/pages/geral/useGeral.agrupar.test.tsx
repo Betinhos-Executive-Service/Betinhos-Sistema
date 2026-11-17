@@ -146,7 +146,7 @@ describe('agrupamento e visões', () => {
       views: g.views, view: g.view, viewsError: null, columns: g.columns, attributes: g.attributes, prefs: null, setPrefs: () => undefined,
       sort: null, setSort: () => undefined, filters, setFilters: () => undefined, group, setGroup: () => undefined,
       selectView: () => undefined, reloadViews: async () => undefined, createView: async () => 'x', updateView: async () => undefined,
-      renameView: async () => undefined, deleteView: async () => undefined, kv: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+      renameView: async () => undefined, deleteView: async () => undefined, manutencoesAlteradas: false, resetManutencoes: () => undefined, kv: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
     }), { initialProps: { group: null as typeof STATUS | null } })
     expect(state.result.current.state.dirty).toBe(false)
     state.rerender({ group: STATUS })

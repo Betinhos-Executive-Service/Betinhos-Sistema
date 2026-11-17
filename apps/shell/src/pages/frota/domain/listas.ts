@@ -196,7 +196,7 @@ export const matchesRegistroKeyword = (l: Linha, query: string) => {
   const termo = query.trim().toLowerCase()
   if (!termo) return true
   let valores = textoRegistro.get(l)
-  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
+  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.codigo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
   return valores.some((valor) => valor.includes(termo))
 }
 
@@ -250,7 +250,7 @@ export function registroLegacy(q: URLSearchParams, kind: Kind, opcoes: { veiculo
 export function registroBuiltins(kind: Kind): StoredView[] {
   const view = builtin(registroColumns(kind), REGISTRO_SORT)
   const status = (values: number[]) => withQuick([quick('status', 'in', pick(STATUS_OPTIONS[kind], values))])
-  if (kind === 'manutencao') return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]))]
+  if (kind === 'manutencao') return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO]))]
   if (kind === 'multa') return [
     view('prazo-vencido', 'Prazo vencido', 1, filaMulta('prazo-vencido')),
     view('aguardando-penalidade', 'Aguardando penalidade', 2, filaMulta('aguardando-penalidade')),

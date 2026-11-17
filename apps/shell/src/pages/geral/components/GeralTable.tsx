@@ -1,16 +1,18 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
+import { Alert, Button, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
 import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
 import { columnLabel, rowKey } from '../domain/layout'
 import { formatCell } from '../domain/format'
+import { desenhoDaManutencao, type LinhaManutencao } from '../domain/manutencao'
 import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { LoadSentinel } from './LoadMore'
+import { ManutencaoAbrir, ManutencaoResumo, ManutencaoSelos } from './ManutencaoResumo'
 
 /** Um grupo do servidor: rótulo e contagem reais; `rows` só tem o que já carregou (abre sob demanda, 100 por vez). */
 export type GroupView = { id: string; label: string; count: number; open: boolean; rows: Row[]; more: boolean; loading: boolean; error: string | null }
@@ -70,17 +72,19 @@ type Props = {
   density?: TableDensity
   /** Agrupamento no servidor: cabeçalhos recolhíveis com a contagem e as linhas de cada grupo aberto no lugar de `rows` na grade. */
   grouping?: Grouping
+  /** Linhas de manutenção (manutenções v2): desenho próprio; motorista e saída usam `renderCell`, o resto vira o resumo. */
+  manutencao?: { ler: (row: Row) => LinhaManutencao | null; abrir: (m: LinhaManutencao) => void }
 }
 
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 /** Grid editável com rolagem horizontal, seleção por linha e a primeira coluna fixa. As classes visuais são as da tabela do DS. */
-export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense', grouping }: Props) {
+export function GeralTable({ columns, attributes, rows, loading, sort, defaultSort, onSort, filteredKeys, quick, onClearFilter, onHide, customWidths, onResize, onMove, selected, onToggle, onSelectRow, onRowContextMenu, onToggleAll, onOpen, renderCell, unsortable, scrollRef, tail, footer, empty, density = 'dense', grouping, manutencao }: Props) {
   // Trilhas crescem na proporção da largura da visão (fr) e nunca ficam abaixo do mínimo; a largura mínima total
   // garante que cabeçalho e linhas compartilhem as mesmas trilhas quando a soma dos mínimos excede o contêiner.
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
   const BOOLEAN_WIDTH = 96
   // Durante o arraste a largura vive em `drag` e vai direto para o estilo da grade (um quadro por vez), sem renderizar a tabela; ao soltar é gravada nas preferências.
-  const drag = useRef<{ key: string; start: number; width: number; frame: number; done: () => void } | null>(null)
+  const drag = useRef<{ key: string; start: number; drawn: number; x: number; width: number; frame: number; done: () => void } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -93,17 +97,6 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const filterColumn = filterAt ? columns.find((c) => c.key === filterAt) : undefined
   const filterField = filterColumn && !filterColumn.alias ? quick?.fields.find((f) => f.key === filterColumn.attribute && !f.advancedOnly) : undefined
   const closeFilter = useCallback(() => setFilterAt(null), [])
-  // O chip de filtro ativo (ViewBar) pede para reabrir o painel "Filtrar por" da coluna: o evento chega no gatilho do título.
-  useEffect(() => {
-    const el = root.current
-    if (!el) return
-    const open = (event: Event) => {
-      const key = (event.target as HTMLElement).closest<HTMLElement>('.bt-colhead')?.dataset.col
-      if (key && columns.some((c) => c.key === key)) { event.preventDefault(); setFilterAt(key) }
-    }
-    el.addEventListener(COLUMN_FILTER_EVENT, open)
-    return () => el.removeEventListener(COLUMN_FILTER_EVENT, open)
-  }, [columns])
   useEffect(() => {
     const key = refocus.current
     if (!key) return
@@ -134,16 +127,16 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     window.addEventListener('keydown', esc, true)
     document.documentElement.classList.add('gr-resizing')
     const done = () => { window.removeEventListener('keydown', esc, true); document.documentElement.classList.remove('gr-resizing') }
-    drag.current = { key: column.key, start: column.width, width: column.width, frame: 0, done }
+    // Mede a borda desenhada uma vez, ao apertar: trilhas `fr` ficam mais largas que a largura declarada (partir dela
+    // fazia a borda fugir do cursor), e medir a cada movimento forçava um reflow por evento, logo depois do quadro anterior.
+    const drawn = handle.parentElement?.getBoundingClientRect().width || column.width
+    drag.current = { key: column.key, start: column.width, drawn, x: e.clientX, width: column.width, frame: 0, done }
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
-    const cell = e.currentTarget.parentElement
-    if (!d || !cell || e.buttons === 0) return
-    // Mede a borda desenhada: trilhas `fr` ficam mais largas que a largura declarada, e partir dela fazia a coluna encolher e a borda fugir do cursor.
-    const rect = cell.getBoundingClientRect()
-    d.width = clampW(rect.width + e.clientX - rect.right)
-    const grid = cell.closest<HTMLElement>('.gr-grid')
+    if (!d || e.buttons === 0) return
+    d.width = clampW(d.drawn + e.clientX - d.x)
+    const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
     if (!grid || d.frame) return
     d.frame = requestAnimationFrame(() => {
       d.frame = 0
@@ -215,6 +208,9 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   const ids = rows.map((r) => String(r[ID_ATTRIBUTE]))
   const all = ids.length > 0 && ids.every((id) => selected.has(id))
   const some = !all && ids.some((id) => selected.has(id))
+  // Desenho da linha de manutenção: depende só das colunas visíveis, igual para todas as linhas. Uma célula por coluna,
+  // cada informação na coluna de mesmo sentido; sem coluna para o problema, ele vai dentro da primeira, abaixo do botão.
+  const desenho = useMemo(() => desenhoDaManutencao(columns), [columns])
   // Clique em qualquer lugar da linha seleciona; botões, campos, o painel de um Select e a célula em edição ficam de fora.
   const rowClick = (id: string) => (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement
@@ -354,6 +350,38 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
             const { row } = item
             const id = String(row[ID_ATTRIBUTE])
             const isSelected = selected.has(id)
+            const m = manutencao?.ler(row) ?? null
+            if (m && manutencao) {
+              const abrir = () => manutencao.abrir(m)
+              return (
+                <div key={id} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className={isSelected ? 'bt-table__row gr-row--manutencao is-selected' : 'bt-table__row gr-row--manutencao'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
+                  <div className="bt-table__cell gr-cell--select" role="gridcell">
+                    <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={isSelected} onChange={() => onToggle(id)} />
+                  </div>
+                  {desenho.primeiraEditavel
+                    // A primeira coluna da visão é motorista ou saída: continua sendo o campo editável; o botão vai para `botaoEm`.
+                    ? <Fragment key={columns[0].key}>{renderCell(row, columns[0])}</Fragment>
+                    : (
+                      <div className={desenho.resumoNoBotao ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
+                        <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} />
+                      </div>
+                    )}
+                  {desenho.celulas.map(({ tipo, column }, indice) => {
+                    if (tipo === 'campo') return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
+                    const comBotao = indice === desenho.botaoEm
+                    return (
+                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}${comBotao ? ' gr-manut__primeira' : ''}`}>
+                        {comBotao ? <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} /> : null}
+                        {tipo === 'status' ? <ManutencaoSelos m={m} /> : null}
+                        {tipo === 'veiculo' ? <span className="gr-cell__value" title={m.veiculo}>{m.veiculo}</span> : null}
+                        {/* Mesmo destino do botão da placa: um alvo acessível só por linha (fora do Tab e dos leitores de tela). */}
+                        {tipo === 'problema' ? <button type="button" tabIndex={-1} aria-hidden="true" className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} status={desenho.statusNoProblema} /></button> : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
             return (
               <div key={id} ref={measure} data-index={start + offset} aria-rowindex={measure ? start + offset + 2 : undefined} className={isSelected ? 'bt-table__row is-selected' : 'bt-table__row'} role="row" aria-selected={isSelected} onClick={rowClick(id)} onContextMenu={onRowContextMenu ? (event) => onRowContextMenu(id, event) : undefined}>
                 <div className="bt-table__cell gr-cell--select" role="gridcell">

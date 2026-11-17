@@ -7,9 +7,6 @@
   .dash-mo-filtro { justify-items: start; }
   .dash-mo-filtro__nota { max-width: none; text-align: left; }
 }
-/* Coluna do detalhe (trilha de 0 px): fechada, a célula vazia some; aberta, ocupa a linha inteira abaixo dos números. */
-.dash-mo-ranking .bt-table__head > :last-child, .dash-mo-ranking .bt-table__row > .bt-table__cell:last-child:empty { display: none; }
-.dash-mo-ranking .bt-table__row > .bt-table__cell:last-child:not(:empty) { grid-column: 1 / -1; position: static; margin: 0; padding: 0 0 var(--bt-space-1); box-shadow: none; }
 .dash-mo-meses { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--bt-space-2); width: 100%; margin: 0; padding: 0; list-style: none; }
 .dash-mo-meses__item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--bt-space-2); padding: var(--bt-space-2) var(--bt-space-2-5); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); font-variant-numeric: tabular-nums; }
 .dash-mo-meses__mes { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .05em; text-transform: uppercase; }

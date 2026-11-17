@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Button, PageToolbar, Select, StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Button, PageToolbar, Select, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { AlertTriangle, CircleCheck, X } from 'lucide-react'
 import { LinhaChart } from '../../charts/Charts'
 import {
@@ -13,7 +14,7 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
-import { KpiCard, KpiLinha, type TomKpi } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { ChipAnt } from '../KpiChip'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar, useTopCelular } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -24,7 +25,8 @@ import './abas-despesas-frota.css'
 export type FiltrosDespesaProprios = { categorias: string[]; formas: string[]; empresas: string[] }
 export const FILTROS_DESPESA_VAZIOS: FiltrosDespesaProprios = { categorias: [], formas: [], empresas: [] }
 
-const TOM_KPI: Record<KpiDespesaId, TomKpi> = { despesa: 'action', alimentacao: 'brand', aguardando: 'warning', ticket: 'brand', semComprovante: 'warning', hospedagem: 'brand' }
+/** Indicadores que pedem ação (aguardando, sem comprovante): warning só quando há algum. */
+const ATENCAO: ReadonlySet<KpiDespesaId> = new Set(['aguardando', 'semComprovante'])
 const TOM_FAIXA: Record<Tom, StatusTone> = { ok: 'success', warn: 'warning', danger: 'danger', neutral: 'neutral' }
 const ROTULO_KPIS = 'Indicadores de despesas'
 const ROTULOS_KPI = ['Despesa realizada', 'Alimentação', 'Aguardando pagamento', 'Ticket médio', 'Sem comprovante', 'Média hospedagem']
@@ -46,7 +48,7 @@ function KpiDespesaCartao({ k, indisponivel }: { k: KpiDespesa; indisponivel: bo
       <span className="dash-apoio">{k.faixa.apoio}</span>
     </> : null}
   </> : undefined
-  return <KpiCard rotulo={k.rotulo} valor={formatarKpi(k, indisponivel)} tom={TOM_KPI[k.id]} serie={k.serie}>{extras}</KpiCard>
+  return <KpiCard rotulo={k.rotulo} valor={formatarKpi(k, indisponivel)} tom={ATENCAO.has(k.id) ? tomAtencao(k.valor) : 'brand'} serie={k.serie}>{extras}</KpiCard>
 }
 
 type Proprios = { proprios: FiltrosDespesaProprios; onProprios: (f: FiltrosDespesaProprios) => void }
@@ -123,7 +125,7 @@ function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { l
           series={[{ chave: 'valor', nome: 'Despesa total', cor: 'action' }, { chave: 'alimentacao', nome: 'Alimentação', cor: 'brand', tracejada: true }]}
         />
       ) : <Vazio titulo="Nenhuma despesa no período" />}
-      tabela={linhas.length ? <Table columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
+      tabela={linhas.length ? <Tabela columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
       tabelaSobDemanda
       copiar={tabelaCopia(linhas, [['Mês', (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['Despesa', (l) => brl(l.valor)], ['Alimentação', (l) => brl(l.alimentacao)]])}
     />
@@ -137,7 +139,7 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
     ? [{ key: 'r', header: coluna, cell: (l) => l.rotulo }, { key: 'resto', header: 'Valores', width: COLUNA_LARGA, cell: (l) => juntar(`${int(l.lancamentos)} lançamentos`, brl(l.valor), `Participação ${pct(l.participacao)}`) }]
     : [
       { key: 'r', header: coluna, width: 'minmax(0, 1.2fr)', cell: (l) => <Nome texto={l.rotulo} /> },
-      { key: 'q', header: 'Lançamentos', width: 'minmax(0, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
+      { key: 'q', header: 'Lançamentos', width: 'minmax(88px, .8fr)', cell: (l) => <Duplo valor={int(l.lancamentos)} apoio={pct(l.pctLancamentos)} /> },
       { key: 'v', header: 'Valor', cell: (l) => forte(brl(l.valor)) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.participacao} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
@@ -148,7 +150,7 @@ function DistribuicaoCard({ titulo, coluna, plural, dist, periodo, mobile }: Blo
       valor={topo ? topo.rotulo : '—'}
       sub={topo ? `Maior participação: ${pct(topo.participacao)} · ${brl(topo.valor)}` : `Nenhuma despesa no período`}
       apoio={resumo ? [{ rotulo: 'Mostrando', texto: resumo }] : []}
-      tabela={<Table columns={colunas} rows={dist.linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhuma despesa no período" />} />}
+      tabela={<Tabela columns={colunas} rows={dist.linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhuma despesa no período" />} />}
       copiar={tabelaCopia(dist.linhas, [[coluna, (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['% dos lançamentos', (l) => pct(l.pctLancamentos)], ['Valor', (l) => brl(l.valor)], ['Participação', (l) => pct(l.participacao)]])}
     />
   )
@@ -175,7 +177,7 @@ function PorMotoristaCard({ linhas, periodo, mobile }: Bloco & { linhas: LinhaMo
       { key: 't', header: 'Total', cell: (l) => forte(brl(l.total)) },
     ]
   const top = useTopCelular(linhas, mobile, 'despesas')
-  const tabela = <><Table columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>
+  const tabela = <><Tabela columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={<Vazio titulo="Nenhuma despesa com motorista no período" />} />{top.botao}</>
   return (
     <AnaliseCard
       titulo="Por motorista" periodo={periodo} unidade="R$ por motorista" largo

@@ -9,6 +9,8 @@ import { defaultSort, linkEntities } from './domain/fetch'
 import { emptyFilters, type FilterCondition, type FilterField, type TableFilters, type ViewGroup } from '@betinhos/ui'
 import { GROUPS_LIMIT_MESSAGE, isAggregateLimit, resolveGroup, sameViewGroup, type GroupBucket, type GroupSpec, type GroupTarget } from './domain/grouping'
 import { geralFilterFields, hasActiveFilters, injectTableFilters } from './domain/tableFilters'
+import { aplicarManutencoes, lerManutencoesDaVisao } from './domain/manutencao'
+import { splitViewFilters, type ViewFetchFilters } from '../../app/viewFetchFilters'
 import { formatDateTime } from './domain/format'
 import { columnLabel, parseLayout, rowKey } from './domain/layout'
 import type { UrlState } from './domain/urlState'
@@ -64,6 +66,10 @@ export type GeralState = {
   filterFields: FilterField[]
   selected: Set<string>
   cells: Map<string, CellStatus>
+  /** "Mostrar manutenções" valendo na tela: o gravado na visão, o padrão dela ou a mudança do usuário. */
+  mostrarManutencoes: boolean
+  /** O usuário mudou o liga/desliga em relação à visão (conta como "Alterada" e vai para a URL). */
+  manutencoesAlteradas: boolean
 }
 
 /** Aplica o valor otimista (cru e anotação formatada) na chave da linha da Web API. */
@@ -118,10 +124,19 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [layoutColumns, setColumns] = useState<Column[]>([])
   /** Colunas adicionadas pelo painel: viram `link-entity` no FetchXML e colunas no fim do layout. */
   const [extras, setExtras] = useState<ResolvedLinkColumn[]>([])
+  /** "Mostrar manutenções" da visão (marca gravada ou o padrão dela) e o FetchXML sem a marca: é dele que filtros, busca e consulta partem. */
+  const manutencoesDaVisao = useMemo(() => (baseView ? lerManutencoesDaVisao(baseView) : null), [baseView])
+  const mostrarDaVisao = manutencoesDaVisao?.mostrar ?? false
+  /** `null` = o da visão; mudar na tela vira um valor próprio (como os filtros) até trocar de visão ou regravá-la. */
+  const [manutencoesOverride, setManutencoesState] = useState<boolean | null>(null)
+  const mostrarManutencoes = manutencoesOverride ?? mostrarDaVisao
+  const manutencoesAlteradas = manutencoesOverride != null && manutencoesOverride !== mostrarDaVisao
   const view = useMemo(() => {
-    if (!baseView || !extras.length) return baseView
-    try { return { ...baseView, fetchxml: addExtraLinks(baseView.fetchxml, extras) } } catch { return baseView }
-  }, [baseView, extras])
+    if (!baseView || !manutencoesDaVisao) return baseView
+    const semMarca = manutencoesDaVisao.fetchxml === baseView.fetchxml ? baseView : { ...baseView, fetchxml: manutencoesDaVisao.fetchxml }
+    if (!extras.length) return semMarca
+    try { return { ...semMarca, fetchxml: addExtraLinks(semMarca.fetchxml, extras) } } catch { return semMarca }
+  }, [baseView, manutencoesDaVisao, extras])
   const columns = useMemo(() => {
     if (!extras.length) return layoutColumns
     const known = new Set(layoutColumns.map((c) => c.key))
@@ -140,7 +155,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [sort, setSortState] = useState<Sort>(null)
   const [query, setQueryState] = useState('')
-  const [filters, setFiltersState] = useState<TableFilters>(emptyFilters)
+  // `null` = os filtros da própria visão (lidos do FetchXML dela); qualquer mudança no painel vira um conjunto próprio.
+  const [filtersOverride, setFiltersState] = useState<TableFilters | null>(null)
   const [group, setGroupState] = useState<ViewGroup | null>(null)
   const [buckets, setBuckets] = useState<GroupBucket[] | null>(null)
   const [groupNotice, setGroupNotice] = useState<string | null>(null)
@@ -150,19 +166,38 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   // A visão como veio do Dataverse (sem as colunas adicionadas): base para comparar ao reler as visões.
   const viewRef = useRef<View | null>(null)
   viewRef.current = baseView
-  const hasFilters = useMemo(() => hasActiveFilters(filters), [filters])
   const filterFields = useMemo(() => geralFilterFields(attributes, columns.map((c) => c.key)), [attributes, columns])
+  /** Filtros que a visão já traz: os que a tela edita saem do FetchXML base; o resto fica nele, só leitura. */
+  const viewFilters = useMemo<ViewFetchFilters>(() => {
+    if (!view || !attributes) return { base: view?.fetchxml ?? '', filters: emptyFilters(), locked: [] }
+    return splitViewFilters(view.fetchxml, filterFields, (key) => attributes.get(key)?.label || undefined)
+  }, [view, attributes, filterFields])
+  const filters = filtersOverride ?? viewFilters.filters
+  const viewFiltersRef = useRef(viewFilters.filters)
+  viewFiltersRef.current = viewFilters.filters
+  const hasFilters = useMemo(() => hasActiveFilters(filters), [filters])
   const groupSpec = useMemo(() => resolveGroup(group, filterFields), [group, filterFields])
   // `filterFields` recalcula (nova identidade) sem o agrupamento mudar: o efeito da primeira página depende desta chave, não do objeto.
   const groupKey = groupSpec ? `${groupSpec.attribute}|${groupSpec.kind}|${groupSpec.by}` : ''
   /** Com filtros ou agrupamento e a metadata ainda a caminho a consulta espera: pedir antes devolveria a lista sem filtrar. */
-  const filtersPending = view != null && (hasFilters || group != null) && attributes == null && attributesError == null
-  /** FetchXML da visão com os filtros por coluna; sem metadata (ou sem filtros) é o da própria visão. */
+  const filtersPending = view != null && (filtersOverride != null || group != null) && attributes == null && attributesError == null
+  /** FetchXML de consulta com "Mostrar manutenções": ligado leva o link da manutenção; desligado, o filtro que as tira. */
+  const comManutencoes = useCallback((fetchxml: string) => {
+    try { return aplicarManutencoes(fetchxml, mostrarManutencoes) } catch { return fetchxml }
+  }, [mostrarManutencoes])
+  /**
+   * FetchXML da visão com os filtros do painel. Sem mudança do usuário (ou sem metadata) é o da própria visão, com os
+   * filtros dela intactos: dá o mesmo resultado e não refaz a consulta quando a metadata chega.
+   */
   const effectiveFetch = useMemo(() => {
     if (!view) return null
-    if (!attributes || !hasFilters) return view.fetchxml
-    try { return injectTableFilters(view.fetchxml, filters, filterFields) } catch { return view.fetchxml }
-  }, [view, attributes, filters, hasFilters, filterFields])
+    const comFiltros = (() => {
+      if (!attributes || !filtersOverride) return view.fetchxml
+      if (!hasActiveFilters(filtersOverride)) return viewFilters.base
+      try { return injectTableFilters(viewFilters.base, filtersOverride, filterFields) } catch { return view.fetchxml }
+    })()
+    return comManutencoes(comFiltros)
+  }, [view, attributes, filtersOverride, filterFields, viewFilters.base, comManutencoes])
   const defaultOrder = useMemo<Sort>(() => { try { return view ? defaultSort(view.fetchxml) : null } catch { return null } }, [view])
 
   // Espelhos síncronos: callbacks (save, carga de páginas) leem o valor corrente, não o do último render.
@@ -236,6 +271,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setView(next)
     setColumns(parseLayout(next.layoutxml))
     setExtras([])
+    setManutencoesState(null)
     // Sem ordenação própria, a consulta mantém todos os `<order>` da visão (inclusive os secundários).
     setSortState(null)
     setCells(new Map())
@@ -262,6 +298,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
             if (initial.sort) setSortState(initial.sort)
             if (initial.filters) setFiltersState(initial.filters)
             if (initial.group) setGroupState(initial.group)
+            if (initial.manutencoes != null) setManutencoesState(initial.manutencoes)
           }
         } else setLoadingFlag(false)
       },
@@ -557,21 +594,21 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     if (!next) return
     enterView(next)
     // Filtros são da visão: trocar de visão recomeça sem eles, como a ordenação.
-    setFiltersState((current) => (hasActiveFilters(current) ? emptyFilters() : current))
+    setFiltersState(null)
     setGroupState(null)
     setGroupNotice(null)
   }, [views, enterView])
 
   /**
    * Relê a lista de visões. Com `selectId` abre essa visão; sem ele mantém a atual (renomeada, regravada ou, se sumiu, a padrão).
-   * Visão que mudou de conteúdo recomeça sem os filtros avulsos: eles já estão dentro dela. Erros sobem para quem chamou.
+   * Visão que mudou de conteúdo recomeça com os filtros dela (os avulsos já estão dentro dela). Erros sobem para quem chamou.
    */
   const reloadViews = useCallback(async (selectId?: string) => {
     const list = await source.views()
     setViews(list)
     const current = viewRef.current
     // O agrupamento é da tela, não da visão: Salvar e Salvar como o mantêm; só trocar de visão (ou a atual sumir) o limpa.
-    const open = (next: View) => { enterView(next); setFiltersState((f) => (hasActiveFilters(f) ? emptyFilters() : f)) }
+    const open = (next: View) => { enterView(next); setFiltersState(null) }
     const target = selectId ? list.find((v) => v.id === selectId) : undefined
     if (target) { open(target); return }
     const same = current ? list.find((v) => v.id === current.id) : undefined
@@ -588,7 +625,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const setQuery = useCallback((next: string) => setQueryState(next), [])
   const setFilters = useCallback((next: TableFilters) => setFiltersState(next), [])
   /** Filtro rápido de uma coluna; `null` remove. */
-  const setQuickFilter = useCallback((attribute: string, condition: FilterCondition | null) => setFiltersState((current) => {
+  const setQuickFilter = useCallback((attribute: string, condition: FilterCondition | null) => setFiltersState((override) => {
+    const current = override ?? viewFiltersRef.current
     if (!condition) {
       if (!(attribute in current.quick)) return current
       const { [attribute]: _removed, ...quick } = current.quick
@@ -601,7 +639,13 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     if (next) setGroupNotice(null)
     setGroupState((current) => (sameViewGroup(current, next) ? current : next))
   }, [])
-  const clearFilters = useCallback(() => setFiltersState((current) => (hasActiveFilters(current) ? emptyFilters() : current)), [])
+  const clearFilters = useCallback(() => setFiltersState((current) => (hasActiveFilters(current ?? viewFiltersRef.current) ? emptyFilters() : current)), [])
+  /** Volta aos filtros da própria visão. */
+  const resetFilters = useCallback(() => setFiltersState(null), [])
+  /** Liga ou desliga "Mostrar manutenções" na tela; vale até trocar de visão, e "Salvar" grava na visão. */
+  const setMostrarManutencoes = useCallback((next: boolean) => setManutencoesState(next), [])
+  /** Volta ao "Mostrar manutenções" da visão. */
+  const resetManutencoes = useCallback(() => setManutencoesState(null), [])
 
   // Avisa quem guarda o estado (a URL) sempre que visão, busca, ordem ou filtros mudam. Só depois de existir uma visão.
   const viewId = view?.id
@@ -610,10 +654,13 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     const state: UrlState = { view: viewId }
     if (query) state.q = query
     if (sort) state.sort = sort
-    if (hasFilters) state.filters = filters
+    // Só o que o usuário mudou: sem `f=` a visão abre com os filtros dela.
+    if (filtersOverride && hasActiveFilters(filtersOverride)) state.filters = filtersOverride
     if (group) state.group = group
+    // Só quando difere da visão (a URL abre a visão no padrão dela).
+    if (manutencoesAlteradas) state.manutencoes = mostrarManutencoes
     onStateChange.current?.(state)
-  }, [viewId, query, sort, filters, hasFilters, group])
+  }, [viewId, query, sort, filtersOverride, group, manutencoesAlteradas, mostrarManutencoes])
 
   // Última linha clicada: ponto de partida da seleção por intervalo (Shift+clique).
   const anchor = useRef<string | null>(null)
@@ -710,8 +757,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, group, reload, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells, mostrarManutencoes, manutencoesAlteradas }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
-  const filtersIgnored = hasFilters && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  const filtersIgnored = filtersOverride != null && hasActiveFilters(filtersOverride) && attributes == null && attributesError != null
+  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
 }

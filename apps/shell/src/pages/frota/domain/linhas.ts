@@ -8,6 +8,8 @@ import type { Situacao } from './multaEtapas'
 export type Linha = {
   kind: Kind; id: string; titulo: string; veiculo: Ref | null; pessoa: Ref | null; status: number | null; dia: string | null; extra: string; categorias: number[]
   termo: string; termoStatus: TermoStatus | null; termoIndisponivel?: boolean
+  /** cr40f_id_multa (ex.: NT-1073) só nas multas. */
+  codigo?: string | null
   /** Só multa: próximo passo, próximo prazo e filas das visões. */
   proximoPasso?: string; proximoPrazo?: string | null; situacoes?: string[]
 }
@@ -31,7 +33,7 @@ export function linhas(kind: Kind, data: FrotaData, hoje = todaySP()): Linha[] {
       : kind === 'multa'
         ? data.multas.map((item) => {
           const s = situacaoDaMulta(item, hoje)
-          return { kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: responsavelDaMulta(item), status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: '', termoStatus: null, proximoPasso: s.proximoPasso, proximoPrazo: s.proximoPrazo, situacoes: filasDaMulta(s) }
+          return { kind, id: item.id, codigo: item.codigo, titulo: item.titulo, veiculo: item.veiculo, pessoa: responsavelDaMulta(item), status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: valorMulta(item.valorGuia, item.infracaoId ? infracoes.get(item.infracaoId)?.valor ?? null : null, item.infracaoId), categorias: [], termo: '', termoStatus: null, proximoPasso: s.proximoPasso, proximoPrazo: s.proximoPrazo, situacoes: filasDaMulta(s) }
         })
         : data.colisoes.map((item) => ({ kind, id: item.id, titulo: item.titulo, veiculo: item.veiculo, pessoa: item.motorista, status: item.status, dia: diaSP(item.dataHora ?? item.criadoEm), extra: item.houveTerceiro ? 'Com terceiro' : 'Sem terceiro', categorias: [], termo: '', termoStatus: null }))
   return result.sort((a, b) => (b.dia ?? '').localeCompare(a.dia ?? ''))

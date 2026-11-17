@@ -22,7 +22,7 @@ type TextOptions = Omit<InputProps, 'value' | 'onChange' | 'name'> & { name: For
 const toOptions = (list: { value: number; label: string }[]): SelectOption[] => list.map((o) => ({ value: String(o.value), label: o.label }))
 
 /** Cliente por busca no servidor (a base de clientes não é carregada inteira). */
-function ClientePicker({ source, value, label, onChange, disabled }: { source: Source; value: string; label: string; onChange: (c: Cliente | null) => void; disabled: boolean }) {
+function ClientePicker({ source, value, label, onChange, disabled, invalid }: { source: Source; value: string; label: string; onChange: (c: Cliente | null) => void; disabled: boolean; invalid?: string }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,7 @@ function ClientePicker({ source, value, label, onChange, disabled }: { source: S
   const options: SelectOption[] = results.map((c) => ({ value: c.id, label: c.nome }))
   if (value && !options.some((o) => o.value === value)) options.unshift({ value, label: label || 'Cliente atual' })
   return (
-    <Field label="Cliente" error={error ? `Não foi possível buscar clientes. ${error}` : undefined}>
+    <Field label="Cliente" required error={[error && `Não foi possível buscar clientes. ${error}`, invalid].filter(Boolean).join(' ') || undefined}>
       <Select options={options} value={value || null} clearable searchable disabled={disabled} placeholder="Buscar cliente"
         searchPlaceholder="Digite o nome do cliente" onSearchChange={setQuery} loading={loading} emptyText="Nenhum cliente encontrado"
         onChange={(id) => { if (!id) { onChange(null); return } const hit = results.find((c) => c.id === id) ?? (id === value ? { id, nome: label } : null); onChange(hit) }} />
@@ -86,8 +86,8 @@ export function PessoaForm({ formId, form, errors, onChange, onSubmit, choices, 
         <legend className="ps-form__legend">Identificação</legend>
         <div className="ps-form__grid">
           {text({ name: 'nome', label: 'Nome', required: true, wide: true, autoComplete: 'name' })}
-          <div className="ps-form__wide">
-            <ClientePicker source={source} value={form.clienteId} label={form.clienteNome} disabled={disabled}
+          <div className="ps-form__wide" data-field="clienteId">
+            <ClientePicker source={source} value={form.clienteId} label={form.clienteNome} disabled={disabled} invalid={errors.clienteId}
               onChange={(c) => onChange({ ...form, clienteId: c?.id ?? '', clienteNome: c?.nome ?? '' })} />
           </div>
           {choice('cargo', 'Cargo', toOptions(choices.cargo))}

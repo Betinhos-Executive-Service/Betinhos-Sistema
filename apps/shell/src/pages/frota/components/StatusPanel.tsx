@@ -12,14 +12,13 @@ type Props = {
   source: DataSource
   kind: Kind
   record: RegistroStatus
-  initial?: Record<string, string>
   /** Só em sucesso: resultado do Flow, ou null em transição direta. */
   onDone: (result: FlowResult | null) => void
   /** Registro desatualizado ou Flow que falhou: a tela precisa mostrar o estado real. */
   onReload: () => void
 }
 
-export function StatusPanel({ source, kind, record, initial, onDone, onReload }: Props) {
+export function StatusPanel({ source, kind, record, onDone, onReload }: Props) {
   const notify = useNotify()
   const options = transitionsFor(kind, record.status)
   const [active, setActive] = useState<Transition | null>(null)
@@ -31,13 +30,8 @@ export function StatusPanel({ source, kind, record, initial, onDone, onReload }:
   if (!options.length) return <p className="frota-muted">Sem ações de status para este registro.</p>
 
   function pick(transition: Transition) {
-    const start: Record<string, string> = {}
-    for (const field of transition.fields) {
-      const value = initial?.[field.key]
-      if (value) start[field.key] = value
-    }
     setActive(transition)
-    setValues(start)
+    setValues({})
     setErrors({})
   }
 

@@ -1,5 +1,6 @@
 import { useId, useMemo } from 'react'
-import { Button, SegmentedControl, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import { Button, SegmentedControl, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { LinhaChart } from '../../charts/Charts'
 import { calcularMotoristas, type CnhVencendo, type LinhaRankingMotorista, type LinhaScoreMotorista, type Motoristas } from '../../domain/abas/motoristas'
@@ -14,7 +15,7 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
 import { Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, VER_RANKING, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { dataBR, forte, resto } from './MoMaMuComum'
@@ -50,16 +51,16 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
   const semInfleet = mo.kpis.score == null
   const semFuncionarios = mo.kpis.total == null
   const abrir = useDetalhe()
-  const verCnh = abrir && mo.kpis.cnhAtencao ? { texto: 'Ver motoristas', onAbrir: () => abrir('cnh') } : undefined
+  const verCnh = abrir && mo.kpis.cnhAtencao ? { onAbrir: () => abrir('cnh') } : undefined
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
+      <KpiCard rotulo={KPIS[0]} valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
       <KpiCard
-        rotulo={KPIS[1]} tom="warning" valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
+        rotulo={KPIS[1]} tom={tomAtencao(mo.kpis.cnhAtencao)} valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
         apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: `vencida ou em até ${JANELA_DIAS} dias`, atencao: true }] : []} acao={verCnh}
       />
       <KpiCard
-        rotulo={KPIS[2]} tom="success" valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
+        rotulo={KPIS[2]} valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
         apoio={mo.kpis.score ? [{ rotulo: 'Notas válidas', texto: int(mo.kpis.score.validas) }] : []}
       />
     </KpiLinha>
@@ -97,13 +98,13 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
       { key: 'n', header: 'Motorista', cell: (l) => l.nome },
       resto('Ranking', (l) => {
         const ver = verServicos(l)
-        return <>
+        return (
           <Expansivel
             resumo={juntar(`${int(l.servicos)} serviços (${porMes(l)}/mês)`, `Faturamento ${brlS(l.faturamento)}`, `Ticket ${brl(l.ticket)}`, `Participação ${pct(l.pct)}`, `CNH ${dataBR(l.cnhDia)}`)}
             itens={mesesTexto(l)} rotulos={VER_MESES} aberta={abertas.aberta(l.key)} onAlternar={() => abertas.alternar(l.key)}
+            acao={ver ? <Button className="dash-expansivel__botao" variant="ghost" size="touch" onClick={ver}>Ver serviços{' '}<span className="dash-sr">de {l.nome}</span></Button> : undefined}
           />
-          {ver ? <Button className="dash-expansivel__botao" variant="ghost" size="touch" onClick={ver}>Ver serviços{' '}<span className="dash-sr">de {l.nome}</span></Button> : null}
-        </>
+        )
       }),
     ]
     : [
@@ -115,10 +116,10 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
         },
       },
       { key: 's', header: 'Serviços', width: 'minmax(84px, .8fr)', cell: (l) => <Duplo valor={int(l.servicos)} apoio={`${porMes(l)}/mês`} /> },
-      { key: 'f', header: 'Faturamento', cell: (l) => forte(brl(l.faturamento)) },
+      { key: 'f', header: 'Faturamento', width: 'minmax(104px, 1fr)', cell: (l) => forte(brl(l.faturamento)) },
       { key: 't', header: 'Ticket', hideBelow: 'compact', cell: (l) => brl(l.ticket) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(140px, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.nome}`} /></span> },
-      { key: 'c', header: 'CNH', width: 'minmax(92px, .7fr)', cell: (l) => dataBR(l.cnhDia) },
+      { key: 'c', header: 'CNH', width: 'minmax(92px, .7fr)', hideBelow: 'compact', cell: (l) => dataBR(l.cnhDia) },
       {
         key: 'm', header: <span className="dash-sr">Meses</span>, width: 'minmax(124px, auto)', cell: (l) => (l.meses.length ? (
           <Button variant="ghost" size="compact" aria-expanded={abertas.aberta(l.key)} aria-controls={abertas.aberta(l.key) ? idMeses(l) : undefined} aria-label={`${abertas.aberta(l.key) ? VER_MESES[1] : VER_MESES[0]} de ${l.nome}`} onClick={() => abertas.alternar(l.key)}>
@@ -143,7 +144,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
     ]
   const vazioRanking = <Vazio titulo={filtro === 'todos' ? 'Nenhum motorista ativo' : 'Nenhum motorista neste filtro'} />
   const top = useTopCelular(linhas, mobile, 'ranking')
-  const tabela = <><Table className="dash-mo-ranking" columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
+  const tabela = <><Tabela className={mobile ? undefined : 'dash-tabela-detalhe'} columns={colunas} rows={top.linhas} rowKey={(l) => l.key} empty={vazioRanking} />{top.botao}</>
   const filtroFrota = (
     <div className="dash-mo-filtro">
       <SegmentedControl
@@ -163,7 +164,7 @@ function RankingCard({ mo, rv, periodo, frota, onFrota }: { mo: Motoristas; rv: 
         ['Motorista', (l) => l.nome], ['Função', (l) => l.funcao], ['Frota', (l) => frotaDe(l.propria) ?? '—'], ['Serviços', (l) => l.servicos], ['Serviços por mês', (l) => porMes(l)],
         ['Faturamento', (l) => brl(l.faturamento)], ['Ticket', (l) => brl(l.ticket)], ['Participação', (l) => pct(l.pct)], ['CNH', (l) => dataBR(l.cnhDia)],
       ])}
-      tabela={mobile || linhas.length <= 10 ? tabela : <Rolagem rotulo="Ranking de motoristas" alturaMax={620}>{tabela}</Rolagem>}
+      tabela={mobile ? tabela : <Rolagem rotulo="Ranking de motoristas" alturaMax={620}>{tabela}</Rolagem>}
     />
   )
 }
@@ -213,7 +214,7 @@ function NotaMesCard({ pontos, mo, periodo }: { pontos: NotaMes[]; mo: Motorista
         <LinhaChart descricao={`Nota média de condução por mês, ${periodo}`} formatar={(v) => int(Math.round(v))} larguraEixo={36}
           dados={pontos.map((p) => ({ rotulo: p.rotulo, nota: Math.round(p.nota * 10) / 10 }))} series={[{ chave: 'nota', nome: 'Nota média', cor: 'action' }]} />
       ) : undefined}
-      tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Sem notas válidas no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Sem notas válidas no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Nota média', (p) => nota(p.nota)], ['Notas válidas', (p) => p.validas]])}
       tabelaSobDemanda={pontos.length > 0}
     />
@@ -239,7 +240,7 @@ function ScoreMesCard({ linhas, periodo }: { linhas: LinhaScoreMotorista[]; peri
       { key: 'o', header: 'Ocioso', width: trilhas[5].width, cell: (l) => taxa(l.taxaOcioso) },
     ]
   const top = useTopCelular(linhas, mobile, 'score')
-  const tabela = <Table columns={colunas} rows={top.linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />
+  const tabela = <Tabela columns={colunas} rows={top.linhas} rowKey={(l) => `${l.motoristaId}-${l.mes}`} empty={<Vazio titulo="Sem viagens do Infleet no período" />} style={mobile ? undefined : { minWidth: larguraMinima(trilhas, 12) }} />
   return (
     <AnaliseCard
       titulo="Score por motorista e mês" periodo={periodo} unidade="nota de 0 a 100 · eventos e minutos ociosos por 100 km"
@@ -272,7 +273,7 @@ function RankingMensalCard({ meses, periodo }: { meses: RankingMes[]; periodo: s
       { key: 'r', header: 'Top 5', width: 'minmax(0, 2fr)', cell: (m) => <Linhas itens={posicao(m)} /> },
     ]
   const [ultimo] = linhas
-  const tabela = <Table columns={colunas} rows={linhas} rowKey={(m) => m.mes} empty={<Vazio titulo="Sem notas válidas no período" />} />
+  const tabela = <Tabela columns={colunas} rows={linhas} rowKey={(m) => m.mes} empty={<Vazio titulo="Sem notas válidas no período" />} />
   return (
     <AnaliseCard
       titulo="Ranking mensal" periodo={periodo} unidade="nota de 0 a 100"

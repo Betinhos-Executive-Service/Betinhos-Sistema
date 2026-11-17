@@ -17,9 +17,8 @@ export const TABLE: Record<TableKey, string> = {
   telemetriaKm: 'new_telemetriadiariainfleet',
 }
 
-/** Entity sets usados nos @odata.bind. */
-// confirmar no DEV após provisionar
-export const ENTITY_SET = { veiculos: 'cr40f_veiculoses', planoPreventivo: 'cr40f_itemplanopreventivos' } as const
+/** Entity sets usados nos @odata.bind (os mesmos do App Motoristas, `data/dataverse/entidades.ts`). */
+export const ENTITY_SET = { veiculos: 'cr40f_veiculoses', planoPreventivo: 'cr40f_itemplanopreventivos', manutencoes: 'cr40f_manutencoeses', funcionarios: 'cr40f_funcionarioses', despesas: 'cr40f_despesaoperacionals' } as const
 
 export const CATEGORIA_DESPESA_TABLE = 'cr40f_categoriadespesaoperacional'
 export const ITEM_PLANO = { nome: 'cr40f_name', servico: 'cr40f_servico', intervaloKm: 'cr40f_intervalokm', intervaloMeses: 'cr40f_intervalomeses', avisoKm: 'cr40f_avisokm', avisoDias: 'cr40f_avisodias' } as const
@@ -31,7 +30,20 @@ export const KIND_ID: Record<Kind, string> = { manutencao: 'cr40f_manutencoesid'
 export const STATUS_FIELD: Record<Kind, string> = { manutencao: 'cr40f_status', multa: 'cr40f_status', colisao: 'cr40f_statusoperacional' }
 export const KIND_LABEL: Record<Kind, string> = { manutencao: 'Manutenção', multa: 'Multa', colisao: 'Colisão' }
 
-export const MANUT = { SOLICITADO: 0, APROVADO: 202410001, PROGRAMADO: 202410005, REALIZADO: 202410002, REPROVADO: 100000002, CANCELADO: 100000001 } as const
+/** 202410001 era "Aprovado"; desde as manutenções v2 é "Agendado" (encaixado num dia ou numa semana), mesmo valor. */
+export const MANUT = { SOLICITADO: 0, AGENDADO: 202410001, PROGRAMADO: 202410005, REALIZADO: 202410002, REPROVADO: 100000002, CANCELADO: 100000001 } as const
+/** cr40f_pagamento (choice global cr40f_opcoes). 202410001 aparece como "Boleto" no DEV; App e shell chamam de "Pedido de compra". */
+export const PAGAMENTO = { CARTAO: 202410000, PEDIDO_COMPRA: 202410001, PIX: 202410002, DINHEIRO: 202410003 } as const
+export const PAGAMENTO_MANUT: Option[] = [
+  { value: PAGAMENTO.CARTAO, label: 'Cartão de crédito' },
+  { value: PAGAMENTO.PEDIDO_COMPRA, label: 'Pedido de compra' },
+  { value: PAGAMENTO.PIX, label: 'Pix' },
+  { value: PAGAMENTO.DINHEIRO, label: 'Dinheiro' },
+]
+/** cr40f_statusanexo da despesa: pendente = quem concluiu ainda sobe a nota fiscal na despesa. */
+export const ANEXO_DESPESA = { PENDENTE: 100000001, ENVIADO: 100000002, FALHOU: 100000003 } as const
+/** Tamanho máximo dos textos gravados (MaxLength do DEV, lido na Tarefa 1 do plano 2). O comentarioColaborador vale o menor entre new_comentariosdocolaborador (4000) e new_observacaofinal (40000), porque o Concluir grava o mesmo texto nas duas. */
+export const LIMITE = { comentarioAprovador: 100, comentarioAoMotorista: 1000, estabelecimento: 100, servicoRealizado: 100, comentarioColaborador: 4000, descricao: 4000 } as const
 export const MULTA = { NOTIFICAR: 202410000, INDICADA: 202410001, RECURSO: 202410002, DESCONTADO: 202410003, NOTIFICADO: 202410004, FINALIZADO: 202410005, PAGO: 202410006, CANCELADA: 202410007 } as const
 /** Choices novos da multa (fase 1), iguais a MultaCodigos de packages/plugins/Cr40f.Frota.Plugin/MultaEtapas.cs. */
 export const RESPONSAVEL = { MOTORISTA: 100000000, EMPRESA: 100000001 } as const
@@ -49,7 +61,7 @@ export const VEICULO = { VENDIDO: 202410000, ATIVO: 202410001 } as const
 export const STATUS_OPTIONS: Record<Kind, Option[]> = {
   manutencao: [
     { value: MANUT.SOLICITADO, label: 'Solicitado' },
-    { value: MANUT.APROVADO, label: 'Aprovado' },
+    { value: MANUT.AGENDADO, label: 'Agendado' },
     { value: MANUT.PROGRAMADO, label: 'Programado' },
     { value: MANUT.REALIZADO, label: 'Realizado' },
     { value: MANUT.REPROVADO, label: 'Reprovado' },
@@ -75,7 +87,7 @@ export const STATUS_OPTIONS: Record<Kind, Option[]> = {
 }
 
 export const TONE: Record<Kind, Record<number, Tone>> = {
-  manutencao: { [MANUT.SOLICITADO]: 'warning', [MANUT.APROVADO]: 'info', [MANUT.PROGRAMADO]: 'info', [MANUT.REALIZADO]: 'success', [MANUT.REPROVADO]: 'danger', [MANUT.CANCELADO]: 'neutral' },
+  manutencao: { [MANUT.SOLICITADO]: 'warning', [MANUT.AGENDADO]: 'info', [MANUT.PROGRAMADO]: 'info', [MANUT.REALIZADO]: 'success', [MANUT.REPROVADO]: 'danger', [MANUT.CANCELADO]: 'neutral' },
   multa: { [MULTA.NOTIFICAR]: 'warning', [MULTA.NOTIFICADO]: 'info', [MULTA.INDICADA]: 'info', [MULTA.PAGO]: 'info', [MULTA.FINALIZADO]: 'success', [MULTA.RECURSO]: 'warning', [MULTA.CANCELADA]: 'neutral', [MULTA.DESCONTADO]: 'neutral' },
   colisao: { [COLISAO.ENVIADO]: 'warning', [COLISAO.ANALISE]: 'info', [COLISAO.RESOLVIDO]: 'success', [COLISAO.CANCELADO]: 'neutral' },
 }

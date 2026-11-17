@@ -8,7 +8,7 @@ import type { DataSource } from '../data/source'
 import type { Multa, TermoMulta } from '../data/types'
 import { TermoMultaPanel } from './TermoMultaPanel'
 
-const multa: Multa = { id: 'u1', titulo: 'AIT 1', status: MULTA.NOTIFICADO, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC1234' }, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: 300.01, recursoPendente: false, termoVigente: null }
+const multa: Multa = { id: 'u1', codigo: 'NT-1073', titulo: 'AIT 1', status: MULTA.NOTIFICADO, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC1234' }, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: 300.01, recursoPendente: false, termoVigente: null }
 const termo = (extra: Partial<TermoMulta>): TermoMulta => ({ id: 't1', status: 'pendente', forma: 'folha', parcelas: 3, valorTotal: 300.01, primeiraCompetencia: '2026-11-01', enviadoEm: '2026-10-20T13:00:00Z', assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: '2026-10-20T13:00:00Z', ...extra })
 
 function fake(overrides: Partial<DataSource> = {}) {

@@ -6,7 +6,9 @@ using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 
 // Registra o assembly Cr40f.Frota.Plugin: Custom APIs globais cr40f_FrotaPendencias, cr40f_PassoMulta e cr40f_MultasDoDia,
-// a trava das multas (pre-operation síncrona em Create e Update de cr40f_multas) e a tarefa no Planner (post-operation assíncrona).
+// as Custom APIs das manutenções (cr40f_ManutencaoAgendar/Reprovar/Cancelar/Concluir), a trava das multas (pre-operation
+// síncrona em Create e Update de cr40f_multas), a tarefa no Planner (post-operation assíncrona) e o step do espelho da
+// programação no Update da Geral.
 // Verificação: --testar [yyyy-MM-dd] imprime o PendenciasJson; --testar-multas [yyyy-MM-dd] imprime o MultasJson.
 var options = Arguments.Parse(args);
 var environmentUrl = options.Require("environmentUrl");
@@ -17,6 +19,7 @@ var solutionUniqueName = options.Optional("solutionUniqueName") ?? "appbetinhos"
 var publish = options.Has("publish");
 if (dllPath.Length > 0 && !File.Exists(dllPath)) throw new FileNotFoundException("DLL do plugin nao encontrada.", dllPath);
 
+const string ComandoType = "Cr40f.Frota.Plugin.ManutencaoComandoPlugin";
 const int PluginAssemblyComponentType = 91;
 const int StepComponentType = 92;
 const int TipoDateTime = 1, TipoString = 10, TipoGuid = 12;
@@ -45,14 +48,28 @@ var apis = new[]
         new[] { new Param("MultasJson", TipoString, "{hoje, total, prazoVencido, indicar, aceite, pagar, aguardandoAcerto}") }),
 };
 
+// A imagem pre é a lista de GeralManutencaoEspelhoPlugin.AtributosPre (o registrador não referencia o projeto do plugin;
+// PluginsTests.Registrador_usa_os_atributos_da_imagem_pre_do_espelho confere que as duas são iguais).
+var espelho = new Step("Cr40f.Frota.Plugin.GeralManutencaoEspelhoPlugin", "Cr40f.Frota: espelho da manutenção (Update Geral)", "Update", "cr40f_reservadeveculos", 40, 0, "cr40f_status,cr40f_motorista",
+    Rank: 20, Imagem: "new_categoriadoitem,cr40f_om,cr40f_status,cr40f_motorista");
+
 // A tarefa sincroniza em todo Update da multa que tenha tarefa (precisa reabrir tarefa concluída por fora): sem filtro de atributos,
 // com imagem "pre" só de cr40f_status (o plugin usa o status anterior).
 var steps = new[]
 {
-    new Step("Cr40f.Frota.Plugin.MultaTravaPlugin", "Cr40f.Frota: trava da multa (Create)", "Create", 20, 0, null, null),
-    new Step("Cr40f.Frota.Plugin.MultaTravaPlugin", "Cr40f.Frota: trava da multa (Update)", "Update", 20, 0, CamposDePasso, CamposDePasso),
-    new Step("Cr40f.Frota.Plugin.MultaTarefaPlugin", "Cr40f.Frota: tarefa da multa no Planner (Create)", "Create", 40, 1, null, null),
-    new Step("Cr40f.Frota.Plugin.MultaTarefaPlugin", "Cr40f.Frota: tarefa da multa no Planner (Update)", "Update", 40, 1, null, "cr40f_status"),
+    new Step("Cr40f.Frota.Plugin.MultaTravaPlugin", "Cr40f.Frota: trava da multa (Create)", "Create", Multas, 20, 0, null, null),
+    new Step("Cr40f.Frota.Plugin.MultaTravaPlugin", "Cr40f.Frota: trava da multa (Update)", "Update", Multas, 20, 0, CamposDePasso, CamposDePasso),
+    new Step("Cr40f.Frota.Plugin.MultaTarefaPlugin", "Cr40f.Frota: tarefa da multa no Planner (Create)", "Create", Multas, 40, 1, null, null),
+    new Step("Cr40f.Frota.Plugin.MultaTarefaPlugin", "Cr40f.Frota: tarefa da multa no Planner (Update)", "Update", Multas, 40, 1, null, "cr40f_status"),
+    espelho,
+};
+
+var apisManutencao = new (string Nome, string Exibicao, string Descricao)[]
+{
+    ("cr40f_ManutencaoAgendar", "Manutenção | Agendar", "Encaixa (ou reagenda) a manutenção num dia ou numa semana de segunda a domingo e cria ou reabre a linha dela na Geral."),
+    ("cr40f_ManutencaoReprovar", "Manutenção | Reprovar", "Reprova uma manutenção solicitada (comentário obrigatório) e cancela a linha da Geral."),
+    ("cr40f_ManutencaoCancelar", "Manutenção | Cancelar", "Cancela uma manutenção em aberto e a linha dela na Geral."),
+    ("cr40f_ManutencaoConcluir", "Manutenção | Concluir", "Conclui a manutenção (serviços, km, valor, pagamento), cria ou atualiza a despesa e conclui a linha da Geral, numa transação."),
 };
 
 Log("autenticando no Dataverse");
@@ -90,6 +107,9 @@ foreach (var api in apis)
     var privilegio = api.Privilegio is null ? null : NomePrivilegio(service, api.Privilegio);
     EnsureCustomApi(service, api, UpsertPluginType(service, assemblyId, api.TypeName), privilegio, solutionUniqueName);
 }
+var comandoTypeId = UpsertPluginType(service, assemblyId, ComandoType);
+foreach (var api in apisManutencao)
+    EnsureComandoApi(service, comandoTypeId, solutionUniqueName, api.Nome, api.Exibicao, api.Descricao);
 foreach (var step in steps) EnsureStep(service, UpsertPluginType(service, assemblyId, step.TypeName), step, solutionUniqueName);
 
 if (publish)
@@ -97,7 +117,7 @@ if (publish)
     Log("publicando customizacoes");
     service.Execute(new OrganizationRequest("PublishAllXml"));
 }
-Log("plugin da frota registrado (pendencias e multas)");
+Log("plugin da frota registrado (pendencias, manutencoes e multas)");
 
 static void Log(string message) => Console.WriteLine($"[frota:plugin] {message}");
 static EntityReference Ref(string logicalName, Guid id) => new(logicalName, id);
@@ -132,10 +152,20 @@ static Guid UpsertAssembly(ServiceClient service, AssemblyInfo info, string cont
 static Guid UpsertPluginType(ServiceClient service, Guid assemblyId, string typeName)
 {
     var existing = FindSingleOrNone(service, "plugintype", ("typename", typeName), ("pluginassemblyid", assemblyId));
-    if (existing is not null) return existing.Id;
+    if (existing is not null)
+    {
+        Log($"reutilizando tipo {typeName}");
+        return existing.Id;
+    }
     Log($"criando tipo {typeName}");
-    var shortName = typeName[(typeName.LastIndexOf('.') + 1)..];
-    return service.Create(new Entity("plugintype") { ["name"] = shortName, ["friendlyname"] = shortName, ["typename"] = typeName, ["pluginassemblyid"] = Ref("pluginassembly", assemblyId) });
+    var curto = typeName.Split('.').Last();
+    return service.Create(new Entity("plugintype")
+    {
+        ["name"] = curto,
+        ["friendlyname"] = curto,
+        ["typename"] = typeName,
+        ["pluginassemblyid"] = Ref("pluginassembly", assemblyId),
+    });
 }
 
 static void EnsureCustomApi(ServiceClient service, Api api, Guid pluginTypeId, string? privilegio, string solution)
@@ -194,7 +224,7 @@ static void EnsureStep(ServiceClient service, Guid pluginTypeId, Step step, stri
 {
     var dados = new Entity("sdkmessageprocessingstep")
     {
-        ["stage"] = new OptionSetValue(step.Stage), ["mode"] = new OptionSetValue(step.Mode), ["rank"] = 1, ["filteringattributes"] = step.Filtro,
+        ["stage"] = new OptionSetValue(step.Stage), ["mode"] = new OptionSetValue(step.Mode), ["rank"] = step.Rank, ["filteringattributes"] = step.Filtro,
         ["eventhandler"] = Ref("plugintype", pluginTypeId), ["asyncautodelete"] = step.Mode == 1,
     };
     Guid stepId;
@@ -211,7 +241,7 @@ static void EnsureStep(ServiceClient service, Guid pluginTypeId, Step step, stri
         var filtro = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
         {
             ColumnSet = new ColumnSet("sdkmessagefilterid"),
-            Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, Multas) } },
+            Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, step.Entidade) } },
         }).Entities.Single();
         dados["name"] = step.Nome;
         dados["supporteddeployment"] = new OptionSetValue(0);
@@ -233,6 +263,53 @@ static void EnsureStep(ServiceClient service, Guid pluginTypeId, Step step, stri
         service.Update(imagem);
     }
     else service.Create(imagem);
+}
+
+static void EnsureComandoApi(ServiceClient service, Guid pluginTypeId, string solution, string nome, string exibicao, string descricao)
+{
+    Guid customApiId;
+    var existing = FindSingleOrNone(service, "customapi", ("uniquename", nome));
+    if (existing is not null)
+    {
+        var update = new UpdateRequest { Target = new Entity("customapi", existing.Id) { ["plugintypeid"] = Ref("plugintype", pluginTypeId) } };
+        update["SolutionUniqueName"] = solution;
+        service.Execute(update);
+        customApiId = existing.Id;
+        Log($"reutilizando Custom API {nome}");
+    }
+    else
+    {
+        var create = new CreateRequest
+        {
+            Target = new Entity("customapi")
+            {
+                ["uniquename"] = nome, ["name"] = nome, ["displayname"] = exibicao, ["description"] = descricao,
+                ["bindingtype"] = new OptionSetValue(0), ["isfunction"] = false, ["isprivate"] = false,
+                ["allowedcustomprocessingsteptype"] = new OptionSetValue(0),
+                ["plugintypeid"] = Ref("plugintype", pluginTypeId),
+                ["iscustomizable"] = new BooleanManagedProperty(false),
+            },
+        };
+        create["SolutionUniqueName"] = solution;
+        customApiId = ((CreateResponse)service.Execute(create)).id;
+        Log($"criando Custom API {nome}");
+    }
+
+    if (!ChildExists(service, "customapirequestparameter", customApiId, "RequestJson"))
+        CreateInSolution(service, new Entity("customapirequestparameter")
+        {
+            ["customapiid"] = Ref("customapi", customApiId), ["uniquename"] = "RequestJson", ["name"] = $"{nome}.RequestJson",
+            ["displayname"] = "Pedido JSON", ["description"] = "Contrato em packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs.",
+            ["type"] = new OptionSetValue(10), ["isoptional"] = false, ["iscustomizable"] = new BooleanManagedProperty(false),
+        }, solution);
+
+    if (!ChildExists(service, "customapiresponseproperty", customApiId, "ResponseJson"))
+        CreateInSolution(service, new Entity("customapiresponseproperty")
+        {
+            ["customapiid"] = Ref("customapi", customApiId), ["uniquename"] = "ResponseJson", ["name"] = $"{nome}.ResponseJson",
+            ["displayname"] = "Resposta JSON", ["description"] = "Contrato em packages/plugins/Cr40f.Frota.Plugin/Manutencao/Contratos.cs.",
+            ["type"] = new OptionSetValue(10), ["iscustomizable"] = new BooleanManagedProperty(false),
+        }, solution);
 }
 
 static bool ChildExists(ServiceClient service, string logicalName, Guid customApiId, string uniqueName)
@@ -277,7 +354,7 @@ static Entity? FindSingleOrNone(ServiceClient service, string logicalName, param
 
 internal sealed record Param(string Nome, int Tipo, string Descricao, bool Opcional = false);
 internal sealed record Api(string TypeName, string Nome, string Rotulo, string Descricao, string? Privilegio, Param[] Entradas, Param[] Saidas);
-internal sealed record Step(string TypeName, string Nome, string Mensagem, int Stage, int Mode, string? Filtro, string? Imagem);
+internal sealed record Step(string TypeName, string Nome, string Mensagem, string Entidade, int Stage, int Mode, string? Filtro, string? Imagem, int Rank = 1);
 
 internal sealed record AssemblyInfo(string Name, string Version, string Culture, string PublicKeyToken)
 {

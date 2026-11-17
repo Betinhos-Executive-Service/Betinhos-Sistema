@@ -38,15 +38,10 @@
 .composicao .composition-heading h1 { margin: 0; white-space: nowrap; color: var(--bt-color-brand); font-family: var(--bt-font-family-display); font-size: 28px; font-weight: 400; line-height: var(--bt-typography-heading-page-line-height); letter-spacing: var(--bt-typography-heading-page-letter-spacing); -webkit-text-stroke: var(--bt-heading-page-stroke-width) currentColor; }
 .composicao .composition-heading p { margin: 2px 0 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
 .composicao .composition-commandline { min-width: 0; }
-/* Sem a faixa de chips de filtros ativos: os filtros ficam no botão "Filtros" (contador) e no painel. */
-.composicao .composition-commandline .bt-chips { display: none; }
 /* Progresso dos comandos (Verificando…, Excluindo…): região viva sempre presente; vazia não ocupa altura. */
 .composicao .composition-progress { margin: 0; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
 .composicao .composition-progress:not(:empty) { margin-bottom: var(--bt-space-2); }
-.composition-readonly-filters { display: grid; gap: var(--bt-space-3); font-size: var(--bt-font-size-13); }
-.composition-readonly-filters h3 { margin: 0 0 var(--bt-space-1); font-size: var(--bt-font-size-13); }
-.composition-readonly-filters p { margin: 0 0 var(--bt-space-2); color: var(--bt-color-text-secondary); }
-.composition-readonly-filters ul { margin: 0; padding-left: 18px; }
+
 .composicao .composition-count { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); white-space: nowrap; }
 
 /* Cabeçalho do PageLayout: o título não quebra; as ações encolhem (busca) e, sem espaço, descem para a linha de baixo. */
@@ -288,12 +283,12 @@
 .composicao .fixed-col--date { left: 432px; width: 138px; min-width: 138px; max-width: 138px; color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
 .composicao .fixed-col--client, .composicao .fixed-col--route { box-shadow: none; }
 .composicao .fixed-col--date { box-shadow: 2px 0 0 var(--bt-color-border); }
-.composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview:hover), .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview:focus-within), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview:hover), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview:focus-within), .composicao .price-grid tbody td:has(.grid-related-preview:hover), .composicao .price-grid tbody td:has(.grid-related-preview:focus-within) { z-index: 20; }
+.composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--client:has(.lookup-preview :focus-visible), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview[data-open]), .composicao .price-grid tbody td.fixed-col--route:has(.lookup-preview :focus-visible), .composicao .price-grid tbody td:has(.grid-related-preview[data-open]), .composicao .price-grid tbody td:has(.grid-related-preview :focus-visible) { z-index: 20; }
 .composicao .money-column { width: 128px; min-width: 128px; max-width: 128px; }
 .composicao .money-column--total { color: var(--bt-color-action) !important; background: var(--bt-color-surface-soft) !important; font-weight: 700; }
 .composicao .grid-client { display: flex; align-items: center; gap: 6px; overflow: visible; color: var(--bt-color-ink-900); font-weight: 600; white-space: nowrap; }
 .composicao .lookup-preview { position: relative; min-width: 0; }
-.composicao .lookup-preview:hover, .composicao .lookup-preview:focus-within { z-index: 20; }
+.composicao .lookup-preview[data-open], .composicao .lookup-preview:has(:focus-visible) { z-index: 20; }
 .composicao .lookup-link { display: block; max-width: 146px; min-height: var(--bt-control-height-compact); overflow: hidden; padding: 4px 0; border: 0; background: none; color: var(--bt-color-action); font: inherit; text-align: left; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 2px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .composicao .lookup-link:hover, .composicao .lookup-link:focus-visible { color: var(--bt-color-brand-hover); text-decoration-color: currentColor; }
 .composicao .lookup-link:active { transform: scale(.98); }
@@ -305,7 +300,7 @@
 .composicao .lookup-preview__detail { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; }
 .composicao .lookup-preview__detail > span:first-child { color: var(--bt-color-text-secondary); }
 .composicao .lookup-preview__detail > span:last-child { overflow-wrap: anywhere; }
-.composicao .lookup-preview:hover .lookup-preview__card, .composicao .lookup-preview:focus-within .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; transition-delay: 0ms; }
+.composicao .lookup-preview[data-open] .lookup-preview__card, .composicao .lookup-preview:has(:focus-visible) .lookup-preview__card { opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto; transition-delay: 0ms; }
 /* Padrão de hover card: o ponteiro entra no cartão sem ele sumir (ponte sobre o vão e saída com atraso curto) e o texto é selecionável. */
 .composicao .lookup-preview__card { cursor: auto; user-select: text; pointer-events: auto; transition: opacity 120ms ease 100ms, transform 120ms ease 100ms, visibility 0s linear 220ms; }
 .composicao .lookup-preview__card::before { position: absolute; inset: -8px 0 100% 0; content: ''; }
@@ -326,7 +321,7 @@
 .composicao .price-grid tbody td:has(.grid-related-preview) { overflow: visible; }
 /* Trajeto vindo da view (qualquer coluna): a célula deixa o cartão sair e fica por cima das vizinhas no hover. */
 .composicao .price-grid tbody td:has(.route-card) { overflow: visible; }
-.composicao .price-grid tbody td:has(.lookup-preview.grid-route:hover), .composicao .price-grid tbody td:has(.lookup-preview.grid-route:focus-within) { z-index: 20; }
+.composicao .price-grid tbody td:has(.lookup-preview.grid-route[data-open]), .composicao .price-grid tbody td:has(.lookup-preview.grid-route :focus-visible) { z-index: 20; }
 .composicao .grid-related-preview { display: block; max-width: 100%; }
 /* Trajeto: o cartão abre abaixo da linha do texto, sem cobrir o trajeto sob o ponteiro. */
 .composicao .fixed-col--route .lookup-preview { display: block; max-width: 100%; }
@@ -475,12 +470,12 @@
 
 /* Movimento: entra em 200 ms (ease-out) e sai em 150 ms (ease-in) depois da folga de 100 ms; as paradas entram em sequência e a linha se desenha da saída ao destino. */
 .composicao .route-card { transform: translateY(-4px) scale(.98); transition: opacity 150ms ease-in 100ms, transform 150ms ease-in 100ms, visibility 0s linear 250ms; }
-.composicao .lookup-preview:hover .route-card, .composicao .lookup-preview:focus-within .route-card { transform: none; transition: opacity 200ms var(--route-ease-out), transform 200ms var(--route-ease-out), visibility 0s; }
+.composicao .lookup-preview[data-open] .route-card, .composicao .lookup-preview:has(:focus-visible) .route-card { transform: none; transition: opacity 200ms var(--route-ease-out), transform 200ms var(--route-ease-out), visibility 0s; }
 .composicao .route-card__stop { opacity: 0; transform: translateY(4px); transition: opacity 120ms ease-in, transform 120ms ease-in; }
 .composicao .route-card__stop:not(:last-child)::after { transform: scaleY(0); transition: transform 120ms ease-in; }
-.composicao .lookup-preview:hover .route-card__stop, .composicao .lookup-preview:focus-within .route-card__stop { opacity: 1; transform: none; transition: opacity 220ms var(--route-ease-out) 60ms, transform 220ms var(--route-ease-out) 60ms; }
-.composicao .lookup-preview:hover .route-card__stop--to, .composicao .lookup-preview:focus-within .route-card__stop--to { transition-delay: 140ms; }
-.composicao .lookup-preview:hover .route-card__stop:not(:last-child)::after, .composicao .lookup-preview:focus-within .route-card__stop:not(:last-child)::after { transform: scaleY(1); transition: transform 260ms var(--route-ease-out) 100ms; }
+.composicao .lookup-preview[data-open] .route-card__stop, .composicao .lookup-preview:has(:focus-visible) .route-card__stop { opacity: 1; transform: none; transition: opacity 220ms var(--route-ease-out) 60ms, transform 220ms var(--route-ease-out) 60ms; }
+.composicao .lookup-preview[data-open] .route-card__stop--to, .composicao .lookup-preview:has(:focus-visible) .route-card__stop--to { transition-delay: 140ms; }
+.composicao .lookup-preview[data-open] .route-card__stop:not(:last-child)::after, .composicao .lookup-preview:has(:focus-visible) .route-card__stop:not(:last-child)::after { transform: scaleY(1); transition: transform 260ms var(--route-ease-out) 100ms; }
 @media (prefers-reduced-motion: reduce) {
-  .composicao .route-card, .composicao .lookup-preview:hover .route-card, .composicao .route-card__stop, .composicao .lookup-preview:hover .route-card__stop, .composicao .route-card__stop:not(:last-child)::after, .composicao .lookup-preview:hover .route-card__stop:not(:last-child)::after { transform: none; transition-property: opacity, visibility; }
+  .composicao .route-card, .composicao .lookup-preview[data-open] .route-card, .composicao .route-card__stop, .composicao .lookup-preview[data-open] .route-card__stop, .composicao .route-card__stop:not(:last-child)::after, .composicao .lookup-preview[data-open] .route-card__stop:not(:last-child)::after { transform: none; transition-property: opacity, visibility; }
 }

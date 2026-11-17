@@ -78,4 +78,11 @@ describe('calcularMultas', () => {
       { mes: '2026-10', rotulo: 'out/26', qtd: 2, pendentes: 1 },
     ])
   })
+
+  it('por mês: mês do período sem multa entra com zero (eixo não pula meses)', () => {
+    expect(calcularMultas(ctx, dadosCom([multa({ dia: '2026-10-09' })])).porMes).toEqual([
+      { mes: '2026-09', rotulo: 'set/26', qtd: 0, pendentes: 0 },
+      { mes: '2026-10', rotulo: 'out/26', qtd: 1, pendentes: 0 },
+    ])
+  })
 })

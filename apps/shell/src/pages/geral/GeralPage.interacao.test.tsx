@@ -45,8 +45,13 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const before = px(track(/Trajeto/))
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    // Mede a borda só ao apertar: medir a cada movimento forçaria um reflow por evento.
+    const headMeasures = () => (HTMLElement.prototype.getBoundingClientRect as unknown as { mock: { contexts: HTMLElement[] } }).mock.contexts.filter((el) => el.getAttribute('role') === 'columnheader').length
+    const measured = headMeasures()
+    fireEvent.pointerMove(handle, { clientX: 130, pointerId: 1, buttons: 1 })
     fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
     await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(headMeasures()).toBe(measured)
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)
@@ -223,23 +228,23 @@ describe('Geral: visões pessoais e link compartilhável', () => {
 
   async function saveAs(name: string) {
     openMenu()
-    await choose('Salvar como…')
-    const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
+    await choose('Nova visão…')
+    const dialog = await screen.findByRole('dialog', { name: 'Nova visão' })
     fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: name } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
     await waitFor(() => expect(viewName()).toContain(name))
   }
 
-  it('visão do sistema só oferece salvar como; as visões aparecem agrupadas', async () => {
+  it('visão do sistema só oferece nova visão; as visões aparecem agrupadas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…'])
+    expect(await actions()).toEqual(['Nova visão…'])
     expect(screen.getByRole('menuitemradio', { name: /Agenda/, hidden: true }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'Sem motorista', hidden: true })).toBeTruthy()
   }, 60_000)
 
-  it('salvar como cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
+  it('nova visão cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
@@ -247,18 +252,19 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
-    await screen.findByText('Status de Operação: Confirmado')
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     await saveAs('Confirmados')
     expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
-    await waitFor(() => expect(screen.queryByText('Status de Operação: Confirmado')).toBeNull())
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
+    // Reaberta, a visão devolve o filtro dela ao painel (editável), sem `f=` na URL.
+    expect(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ }).textContent).toContain('1')
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
+    expect(await actions()).toEqual(['Nova visão…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
     await choose('Renomear…')
     const rename = await screen.findByRole('dialog', { name: 'Renomear visão' })
     fireEvent.change(within(rename).getByLabelText(/Nome da visão/), { target: { value: 'Só confirmados' } })

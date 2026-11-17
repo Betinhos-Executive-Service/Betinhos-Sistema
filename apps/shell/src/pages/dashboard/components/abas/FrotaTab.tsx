@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import type { TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { BarrasChart, LinhaChart, type SerieBarra } from '../../charts/Charts'
 import { CORTE_USO_FROTA, calcularFrota, type EventosMes, type Frota, type TelemetriaFrota, type UsoMes } from '../../domain/abas/frota'
 import { dec, int } from '../../domain/format'
@@ -84,19 +85,19 @@ function KpisFrota({ frota }: { frota: Frota }) {
   const cadastro = `Frota cadastrada: ${int(k.cadastrados)} · ${int(k.vendidos)} ${k.vendidos === 1 ? 'vendido' : 'vendidos'}`
   return (
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} tom="brand" apoio={fora ? SEM_VEICULOS : cadastro} />
-      <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} tom="success" apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
-      <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} tom="brand" apoio={parte(k.blindados)} />
+      <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} apoio={fora ? SEM_VEICULOS : cadastro} />
+      <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
+      <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} apoio={parte(k.blindados)} />
       <KpiCard
-        rotulo={ROTULOS_KPI[3]} valor={valor(k.emManutencao)} tom="warning"
+        rotulo={ROTULOS_KPI[3]} valor={valor(k.emManutencao)}
         apoio={fora ? undefined : k.emManutencao == null ? naoRespondeu('A tabela de manutenções') : 'com manutenção em andamento no período'}
       />
       <KpiCard
-        rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} tom="action" serie={serieUso}
+        rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} serie={serieUso}
         apoio={fora ? undefined : k.usoMedioPropria == null ? 'sem próprios ativos com dias no período' : `média diária desde ${dataBR(CORTE_USO_FROTA)}`}
       />
       <KpiCard
-        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev?.vencidas ? 'warning' : 'success'}
+        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev == null ? 'brand' : prev.vencidas ? 'warning' : 'success'}
         apoio={prev ? `${int(prev.aVencer)} a vencer` : naoRespondeu('O plano preventivo')}
         acao={{ texto: 'Abrir frota', onAbrir: () => { location.hash = '#/frota' } }}
       />
@@ -150,7 +151,7 @@ function KmPorDiaCard({ dias, periodo, mobile }: { dias: Frota['kmPorDia']; peri
       grafico={dias.length ? (
         <LinhaChart descricao={`Quilômetros rodados por dia, ${periodo}`} formatar={(v) => num(v, 0)} larguraEixo={48} dados={dias.map((d) => ({ rotulo: diaMes(d.dia), valor: d.km }))} series={[{ chave: 'valor', nome: 'Km', cor: 'action' }]} />
       ) : <Vazio titulo="Sem telemetria no período" />}
-      tabela={dias.length ? <Rolagem rotulo="Km por dia" alturaMax={320}><Table columns={colunas} rows={dias} rowKey={(d) => d.dia} /></Rolagem> : undefined}
+      tabela={dias.length ? <Rolagem rotulo="Km por dia" alturaMax={320}><Tabela columns={colunas} rows={dias} rowKey={(d) => d.dia} /></Rolagem> : undefined}
       tabelaSobDemanda
       copiar={tabelaCopia(dias, [['Dia', (d) => dataBR(d.dia)], ['Km', (d) => num(d.km)]])}
     />
@@ -189,7 +190,7 @@ function UsoCard({ frota, filtros, periodo, mobile }: { frota: Frota; filtros: F
           dados={meses.map((m) => ({ rotulo: m.rotulo, uteis: m.usoUteis, fds: m.usoFds }))} series={SERIES_USO}
         />
       ) : <Vazio titulo={antesDoCorte ? `O uso da frota é medido a partir de ${dataBR(CORTE_USO_FROTA)}` : 'Sem dias no período'} />}
-      tabela={meses.length ? <Table className="dash-tabela--densa dash-fr-uso" columns={colunas} rows={meses} rowKey={(m) => m.mes} /> : undefined}
+      tabela={meses.length ? <Tabela className="dash-tabela--densa dash-fr-uso" columns={colunas} rows={meses} rowKey={(m) => m.mes} /> : undefined}
       copiar={tabelaCopia(meses, [
         ['Mês', (m) => m.rotulo], ['Uso dias úteis', (m) => (m.usoUteis == null ? '—' : pct(m.usoUteis))], ['Uso fim de semana', (m) => (m.usoFds == null ? '—' : pct(m.usoFds))],
         ['Usados por dia', (m) => dec(m.usados, 1)], ['Ociosos por dia', (m) => dec(m.ociosos, 1)], ['Terceiros por dia', (m) => dec(m.terceiros, 1)], ['Aluguel por dia', (m) => dec(m.aluguel, 1)],
@@ -232,7 +233,7 @@ function EventosCard({ meses, periodo, mobile }: { meses: EventosMes[]; periodo:
       },
     ]
     : colunasDesk.map(({ min: _min, ...c }) => c)
-  const tabela = <Table className="dash-tabela--densa" columns={colunas} rows={meses} rowKey={(m) => m.mes} style={mobile ? undefined : { minWidth: larguraMinima(colunasDesk, 8) }} />
+  const tabela = <Tabela className="dash-tabela--densa" columns={colunas} rows={meses} rowKey={(m) => m.mes} style={mobile ? undefined : { minWidth: larguraMinima(colunasDesk, 8) }} />
   return (
     <AnaliseCard
       titulo="Eventos de condução por mês" periodo={periodo} unidade="eventos e eventos por 1.000 km"

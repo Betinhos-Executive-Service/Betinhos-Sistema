@@ -45,17 +45,48 @@ function focusCell(target: Element | undefined) {
   else target.querySelector<HTMLElement>('button, input, [tabindex]')?.focus()
 }
 
-/** Setas: move o foco para a célula vizinha, na mesma coluna (cima e baixo) ou na mesma linha. */
+const LINHA_MANUTENCAO = 'gr-row--manutencao'
+const TRECHO = 'gr-manut__trecho'
+
+/**
+ * Célula de destino ao subir ou descer. Entre serviços, a de mesmo índice. Se uma das linhas é de manutenção (menos
+ * células: o resumo junta colunas), o índice não vale: vai para a célula da mesma coluna (`data-col`) e, quando a
+ * coluna não existe lá, para a célula editável de coluna mais próxima.
+ */
+function celulaVertical(from: HTMLElement, atual: Element, destino: Element, index: number): Element | undefined {
+  const celulas = cellsOf(destino)
+  if (!atual.classList.contains(LINHA_MANUTENCAO) && !destino.classList.contains(LINHA_MANUTENCAO)) return celulas[index]
+  const coluna = from.dataset.col
+  if (!coluna) return celulas[index]
+  const igual = celulas.find((c) => c instanceof HTMLElement && c.dataset.col === coluna)
+  if (igual) return igual
+  const posicoes = Array.from(from.closest('[role="grid"]')?.querySelectorAll<HTMLElement>('[role="columnheader"][data-col]') ?? []).map((h) => h.dataset.col)
+  const origem = posicoes.indexOf(coluna)
+  let melhor: Element | undefined
+  let distancia = Infinity
+  for (const c of celulas) {
+    if (!(c instanceof HTMLElement) || !c.matches('.gr-cell--editable') || !c.dataset.col) continue
+    const d = Math.abs(posicoes.indexOf(c.dataset.col) - origem)
+    if (d < distancia) { melhor = c; distancia = d }
+  }
+  return melhor ?? celulas.find((c) => c instanceof HTMLElement && c.dataset.col && !c.classList.contains(TRECHO)) ?? celulas[index]
+}
+
+/** Setas: move o foco para a célula vizinha, na mesma coluna (cima e baixo) ou na mesma linha (pulando o resumo da manutenção). */
 function moveFocus(from: HTMLElement, rows: number, columns: number) {
   const row = from.closest('[role="row"]')
   if (!row) return
-  const index = cellsOf(row).indexOf(from)
-  let target: Element | null = row
-  if (rows !== 0) {
-    target = rows > 0 ? row.nextElementSibling : row.previousElementSibling
-    while (target && target.getAttribute('role') !== 'row') target = rows > 0 ? target.nextElementSibling : target.previousElementSibling
+  const celulas = cellsOf(row)
+  const index = celulas.indexOf(from)
+  if (rows === 0) {
+    let i = index + columns
+    while (celulas[i]?.classList.contains(TRECHO)) i += columns
+    focusCell(celulas[i])
+    return
   }
-  if (target) focusCell(cellsOf(target)[index + columns])
+  let target: Element | null = rows > 0 ? row.nextElementSibling : row.previousElementSibling
+  while (target && target.getAttribute('role') !== 'row') target = rows > 0 ? target.nextElementSibling : target.previousElementSibling
+  if (target) focusCell(celulaVertical(from, row, target, index))
 }
 
 /** Próxima (ou anterior) célula editável da mesma linha. */
@@ -296,6 +327,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
       ref={rootRef}
       className={classes}
       role="gridcell"
+      data-col={column.key}
       tabIndex={0}
       aria-busy={status.kind === 'saving' || undefined}
       aria-invalid={message ? true : undefined}

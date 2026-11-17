@@ -1,7 +1,7 @@
 import { lerMulti } from '../domain/manutencaoCatalogo'
 import { diaSP, toDateOnly, type DateBehavior } from './dates'
 import { AVISO_PADRAO, FORMA_PAGAMENTO, TERMO_STATUS_DE } from './schema'
-import type { Baseline, Colisao, DespesaCombustivel, Infracao, ItemPlano, Manutencao, Multa, ParcelaTermo, Posse, Ref, ResumoTermo, TelemetriaKm, TermoMulta, Veiculo } from './types'
+import type { Baseline, Colisao, DespesaCombustivel, DetalheManutencao, Infracao, ItemPlano, Manutencao, Multa, ParcelaTermo, Posse, Ref, ResumoTermo, TelemetriaKm, TermoMulta, Veiculo } from './types'
 
 export const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
@@ -10,8 +10,8 @@ type Behaviors = Record<string, DateBehavior>
 
 export const SELECT = {
   veiculos: ['cr40f_veiculosid', 'cr40f_placa', 'cr40f_marca', 'cr40f_modelo', 'cr40f_cor', 'cr40f_anodemodelo', 'cr40f_statusdoveiculo', 'new_categoriadoveiculo', '_cr40f_motoristaatual_value', 'cr40f_hodometro', 'cr40f_hodometroem'],
-  manutencoes: ['cr40f_manutencoesid', 'cr40f_id', 'cr40f_descricao', 'cr40f_status', 'cr40f_graudamanutencao', 'cr40f_tipodoreparo', 'cr40f_agendarpara', 'cr40f_datamanutencao', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_servicorealizado', 'cr40f_comentariosdoaprovador', 'cr40f_kmatual', '_cr40f_placa_carro_value', '_cr40f_solicitado_por_value', 'createdon', 'new_servicosmanutencao', 'new_categoriasmanutencao', 'new_classificacaoorigem', 'new_confiancaia'],
-  multas: ['cr40f_multasid', 'cr40f_novacoluna', 'cr40f_status', 'cr40f_dataehorario', 'cr40f_localdainfracao', 'cr40f_dataparaindicar', 'cr40f_indicado', 'cr40f_datadeavisoaocondutor', 'cr40f_datadeindicacao', '_cr40f_placa_value', '_cr40f_motorista_value', '_cr40f_codigodainfracao_value', 'createdon', 'new_valorguia', 'new_recursopendente', '_new_termovigente_value',
+  manutencoes: ['cr40f_manutencoesid', 'cr40f_id', 'cr40f_descricao', 'cr40f_status', 'cr40f_graudamanutencao', 'cr40f_tipodoreparo', 'cr40f_agendarpara', 'cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_datadaaprovacao', 'cr40f_kmrealizado', 'cr40f_datamanutencao', 'cr40f_valor', 'cr40f_estabelecimento', 'cr40f_servicorealizado', 'cr40f_comentariosdoaprovador', 'cr40f_kmatual', '_cr40f_placa_carro_value', '_cr40f_solicitado_por_value', 'createdon', 'new_servicosmanutencao', 'new_categoriasmanutencao', 'new_classificacaoorigem', 'new_confiancaia'],
+  multas: ['cr40f_multasid', 'cr40f_id_multa', 'cr40f_novacoluna', 'cr40f_status', 'cr40f_dataehorario', 'cr40f_localdainfracao', 'cr40f_dataparaindicar', 'cr40f_indicado', 'cr40f_datadeavisoaocondutor', 'cr40f_datadeindicacao', '_cr40f_placa_value', '_cr40f_motorista_value', '_cr40f_codigodainfracao_value', 'createdon', 'new_valorguia', 'new_recursopendente', '_new_termovigente_value',
     'cr40f_responsavel', 'cr40f_motivoempresa', 'cr40f_canalindicacao', 'cr40f_aceiteem', 'cr40f_vencimento', 'cr40f_valorcomdesconto', 'cr40f_valorpago', 'cr40f_pagaem', 'cr40f_competenciadesconto', 'cr40f_acertoem', 'cr40f_encerradaem', 'cr40f_canceladaem', 'cr40f_motivocancelamento',
     'cr40f_autodainfracao_name', 'cr40f_pdfpenalidade_name', 'cr40f_comprovantepagamento_name'],
   infracoes: ['cr40f_infracaodetransitoid', 'cr40f_codigodainfracao', 'cr40f_descricaodainfracao', 'cr40f_gravidadedainfracao', 'cr40f_pontosnacnh', 'cr40f_valordamulta'],
@@ -28,6 +28,15 @@ export const SELECT_VEICULOS_SEM_HODOMETRO = SELECT.veiculos.filter((campo) => c
 
 export function cleanId(value: unknown) {
   return String(value).replace(/[{}]/g, '').toLowerCase()
+}
+
+export const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Guid sem chaves e minúsculo; rejeita o que não for Guid (nada vai ao servidor). Único ponto de validação de ids da Frota. */
+export function guid(value: string) {
+  const id = cleanId(value)
+  if (!GUID.test(id)) throw new Error('Identificador inválido')
+  return id
 }
 
 const str = (value: unknown) => (typeof value === 'string' && value ? value : null)
@@ -63,6 +72,10 @@ export function mapManutencao(row: Row, behaviors: Behaviors = {}): Manutencao {
     grau: num(row.cr40f_graudamanutencao),
     tipo: num(row.cr40f_tipodoreparo),
     agendarPara: toDateOnly(row.cr40f_agendarpara, behaviors.cr40f_agendarpara),
+    janelaInicio: toDateOnly(row.cr40f_janelainicio, behaviors.cr40f_janelainicio),
+    janelaFim: toDateOnly(row.cr40f_janelafim, behaviors.cr40f_janelafim),
+    dataAprovacao: toDateOnly(row.cr40f_datadaaprovacao, behaviors.cr40f_datadaaprovacao),
+    kmRealizado: num(row.cr40f_kmrealizado),
     dataManutencao: str(row.cr40f_datamanutencao),
     valor: num(row.cr40f_valor),
     estabelecimento: str(row.cr40f_estabelecimento),
@@ -79,9 +92,29 @@ export function mapManutencao(row: Row, behaviors: Behaviors = {}): Manutencao {
   }
 }
 
+/** Colunas da gaveta da manutenção: as da lista mais fotos, nota fiscal, pagamento, comentários e quem realizou. */
+export const SELECT_DETALHE_MANUTENCAO = [...SELECT.manutencoes, 'cr40f_comentariosaomotorista', 'new_comentariosdocolaborador', 'cr40f_pagamento', '_cr40f_realizado_por_nome_value', 'cr40f_foto01', 'cr40f_linkdaevidencia', 'cr40f_foto03', 'new_linkdanotafiscal', 'new_linkdafotofinal1', 'new_linkdafotofinal2', 'new_linkdafotofinal3'] as const
+
+/** Links http(s) das colunas; a nota fiscal com vários arquivos guarda um link por linha (como o App grava). */
+const links = (...valores: unknown[]) => valores.flatMap((v) => (typeof v === 'string' ? v.split('\n') : [])).map((v) => v.trim()).filter((v) => /^https?:\/\//i.test(v))
+
+export function mapDetalheManutencao(row: Row, behaviors: Behaviors = {}): DetalheManutencao {
+  return {
+    ...mapManutencao(row, behaviors),
+    comentarioAoMotorista: str(row.cr40f_comentariosaomotorista),
+    comentarioColaborador: str(row.new_comentariosdocolaborador),
+    pagamento: num(row.cr40f_pagamento),
+    realizadoPor: ref(row, '_cr40f_realizado_por_nome_value'),
+    fotosPedido: links(row.cr40f_foto01, row.cr40f_linkdaevidencia, row.cr40f_foto03),
+    linkNotaFiscal: str(row.new_linkdanotafiscal),
+    fotosFinais: links(row.new_linkdafotofinal1, row.new_linkdafotofinal2, row.new_linkdafotofinal3),
+  }
+}
+
 export function mapMulta(row: Row, behaviors: Behaviors = {}): Multa {
   return {
     id: cleanId(row.cr40f_multasid),
+    codigo: str(row.cr40f_id_multa),
     titulo: String(row.cr40f_novacoluna ?? 'Multa'),
     status: num(row.cr40f_status),
     dataHora: str(row.cr40f_dataehorario),

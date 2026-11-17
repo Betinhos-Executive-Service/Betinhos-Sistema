@@ -1,7 +1,7 @@
 import { cnhEmAtencao } from '../alertas'
 import { agrupar, mesesComDados, soma } from '../base'
 import { normL, stL } from '../format'
-import { ticketStats, type Contexto } from '../kpis'
+import { ticketOuNulo, type Contexto } from '../kpis'
 import { DIA_MS, hojeBR, mesRotulo } from '../periodo'
 import { linhasScore, notaPorMes, ordenarLinhasScore, rankingMensal, scoreMotoristas, type LinhaScore, type NotaMes, type RankingMes, type ResultadoScore } from '../score'
 import type { Dados, Funcionario, Reserva } from '../types'
@@ -18,7 +18,7 @@ export type LinhaRankingMotorista = {
   propria: boolean | null
   servicos: number
   faturamento: number
-  ticket: number
+  ticket: number | null
   /** Participação nos serviços do recorte (%). */
   pct: number
   /** Validade da CNH (AAAA-MM-DD; '' sem validade). */
@@ -90,7 +90,7 @@ export function calcularMotoristas(ctx: Contexto, dados: Dados): Motoristas {
       propria: propriaDe(srvs, categoria),
       servicos: srvs.length,
       faturamento: soma(srvs),
-      ticket: ticketStats(srvs).ticket,
+      ticket: ticketOuNulo(srvs),
       pct: rv.length ? (srvs.length / rv.length) * 100 : 0,
       cnhDia: diaDaCnh(fu.cnhMs),
       meses: meses.map((mes) => {

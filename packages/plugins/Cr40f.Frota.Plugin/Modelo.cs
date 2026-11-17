@@ -3,10 +3,10 @@ using System.Runtime.Serialization;
 
 namespace Cr40f.Frota.Plugin;
 
-/// <summary>Códigos de choice, iguais a apps/shell/src/pages/frota/data/schema.ts.</summary>
+/// <summary>Códigos de choice, iguais a apps/shell/src/pages/frota/data/schema.ts. 202410001 era "Aprovado"; agora é "Agendado".</summary>
 public static class Codigos
 {
-    public const int Solicitado = 0, Aprovado = 202410001, Programado = 202410005, Realizado = 202410002, Reprovado = 100000002, Cancelado = 100000001;
+    public const int Solicitado = 0, Agendado = 202410001, Programado = 202410005, Realizado = 202410002, Reprovado = 100000002, Cancelado = 100000001;
     public const int VeiculoVendido = 202410000, VeiculoAtivo = 202410001, Proprio = 100000000;
     public const int AvisoKmPadrao = 1000, AvisoDiasPadrao = 30;
 }
@@ -16,7 +16,7 @@ public static class Limiares
 {
     public const int ReincidenciaCurtaVezes = 3, ReincidenciaCurtaDias = 120;
     public const int ReincidenciaLongaVezes = 5, ReincidenciaLongaDias = 365;
-    public const int PrioridadeGrauMinimo = 3, SolicitadoParadoDias = 2, AprovadoSemDataDias = 5;
+    public const int PrioridadeGrauMinimo = 3, SolicitadoParadoDias = 2, AgendadoParadoDias = 5;
     public const int HodometroHoras = 48, CustoJanelaDias = 90, CustoMinimoVeiculos = 3;
     public const decimal CustoFatorMediana = 1.5m;
 }
@@ -34,17 +34,23 @@ public sealed class Veiculo
 }
 
 [DataContract]
-public sealed class Manutencao
+public sealed class ManutencaoRegistro
 {
     [DataMember(Name = "id")] public string Id { get; set; } = "";
     [DataMember(Name = "descricao")] public string Descricao { get; set; } = "";
     [DataMember(Name = "status")] public int? Status { get; set; }
     [DataMember(Name = "grau")] public int? Grau { get; set; }
-    /// <summary>Dias yyyy-MM-dd já no fuso de São Paulo.</summary>
+    /// <summary>Dias yyyy-MM-dd já no fuso de São Paulo. Data antiga de agendamento: vale só para registro sem janela (antes da conversão).</summary>
     [DataMember(Name = "agendarPara")] public string? AgendarPara { get; set; }
+    /// <summary>Último dia da janela do encaixe (cr40f_janelafim).</summary>
+    [DataMember(Name = "janelaFim")] public string? JanelaFim { get; set; }
+    /// <summary>Dia do primeiro encaixe (cr40f_datadaaprovacao).</summary>
+    [DataMember(Name = "dataAprovacao")] public string? DataAprovacao { get; set; }
     [DataMember(Name = "dataManutencao")] public string? DataManutencao { get; set; }
     [DataMember(Name = "criadoEm")] public string CriadoEm { get; set; } = "";
     [DataMember(Name = "km")] public decimal? Km { get; set; }
+    /// <summary>Km informado por quem concluiu (cr40f_kmrealizado); na preventiva vale mais que o km do pedido.</summary>
+    [DataMember(Name = "kmRealizado")] public decimal? KmRealizado { get; set; }
     [DataMember(Name = "valor")] public decimal? Valor { get; set; }
     [DataMember(Name = "estabelecimento")] public string? Estabelecimento { get; set; }
     [DataMember(Name = "veiculoId")] public string? VeiculoId { get; set; }
@@ -78,7 +84,7 @@ public sealed class Baseline
 public sealed class DadosFrota
 {
     [DataMember(Name = "veiculos")] public List<Veiculo> Veiculos { get; set; } = new();
-    [DataMember(Name = "manutencoes")] public List<Manutencao> Manutencoes { get; set; } = new();
+    [DataMember(Name = "manutencoes")] public List<ManutencaoRegistro> Manutencoes { get; set; } = new();
     [DataMember(Name = "itens")] public List<ItemPlano> Itens { get; set; } = new();
     [DataMember(Name = "baselines")] public List<Baseline> Baselines { get; set; } = new();
 }

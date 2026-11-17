@@ -22,6 +22,9 @@ public class RepositoryTests
             ["cr40f_valor"] = new Money(150m),
             ["createdon"] = new DateTime(2026, 10, 20, 1, 30, 0, DateTimeKind.Utc), // 19/10 22:30 em São Paulo
             ["cr40f_agendarpara"] = new DateTime(2026, 10, 25, 0, 0, 0, DateTimeKind.Utc), // somente data
+            ["cr40f_janelafim"] = new DateTime(2026, 10, 26, 0, 0, 0, DateTimeKind.Utc), // somente data
+            ["cr40f_datadaaprovacao"] = new DateTime(2026, 10, 14, 13, 0, 0, DateTimeKind.Utc), // 14/10 10:00 em São Paulo
+            ["cr40f_kmrealizado"] = 85200,
         };
         var service = new FakeService().Com(m, new Entity("cr40f_veiculos", veiculoId) { ["cr40f_placa"] = "ABC1A11", ["cr40f_statusdoveiculo"] = new OptionSetValue(Codigos.VeiculoAtivo) });
         var dados = new FrotaRepository(service).Carregar("2026-10-20");
@@ -32,6 +35,9 @@ public class RepositoryTests
         Assert.Equal(150m, manut.Valor);
         Assert.Equal("2026-10-19", manut.CriadoEm);
         Assert.Equal("2026-10-25", manut.AgendarPara);
+        Assert.Equal("2026-10-26", manut.JanelaFim);
+        Assert.Equal("2026-10-14", manut.DataAprovacao);
+        Assert.Equal(85200m, manut.KmRealizado);
         Assert.Equal(4, service.Consultas.Count);
         Assert.Equal(Codigos.VeiculoAtivo, dados.Veiculos.Single().Status);
     }

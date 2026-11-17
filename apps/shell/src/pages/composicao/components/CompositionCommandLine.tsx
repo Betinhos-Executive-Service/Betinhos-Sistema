@@ -2,9 +2,7 @@ import { memo, type RefObject } from 'react'
 import { Download, FilePlus2, RefreshCw, Trash2 } from 'lucide-react'
 import { Button, SearchBox, StatusBadge, ViewBar, type MenuAction, type SelectionAction } from '@betinhos/ui'
 import type { ComposicaoViewState } from '../useComposicaoViewState'
-import type { CatalogField } from '../data/views'
 import type { CommandPhase } from './useCompositionCommands'
-import { ReadOnlyFilters } from './ReadOnlyFilters'
 
 /** Comandos que mudam a cada render da página: lidos na hora do clique, sem renderizar a linha de novo. */
 export type CommandLineActions = {
@@ -20,9 +18,6 @@ type Props = {
   view: ComposicaoViewState
   actions: RefObject<CommandLineActions>
   onSearch: (value: string) => void
-  catalog: CatalogField[]
-  /** FetchXML da view nativa com filtros originais não editáveis aqui. */
-  nativeFetchXml: string | null
   ready: boolean
   mock: boolean
   mobile: boolean
@@ -43,7 +38,10 @@ type Props = {
  * "⋮" com Extrair para Excel e Atualizar na primária. Gerar OP e Excluir são ações da seleção. Memoizada: a `ViewBar` mede a
  * linha a cada render, e a página renderiza a cada tecla na grade.
  */
-export const CompositionCommandLine = memo(function CompositionCommandLine(p: Props) {
+const NOUN = { one: 'composição', other: 'composições' }
+
+export const CompositionCommandLine = memo(
+function CompositionCommandLine(p: Props) {
   const size = p.mobile ? 'touch' : 'default'
   const run = (name: keyof CommandLineActions) => () => p.actions.current[name]()
   const selectionActions: SelectionAction[] = [
@@ -63,7 +61,8 @@ export const CompositionCommandLine = memo(function CompositionCommandLine(p: Pr
         columns={p.view.columnDefs}
         catalog={p.ready && !p.mock ? p.view.catalog : undefined}
         pinnable
-        filters={p.ready ? { fields: p.view.filterFields, search: p.view.search } : undefined}
+        // Condições que o painel não edita (da definição e do FetchXML nativo) entram nele como só leitura, com "Sempre".
+        filters={p.ready ? { fields: p.view.filterFields, search: p.view.search, locked: p.view.locked, onRemoveLocked: p.view.removeLockedFilter, noun: NOUN } : undefined}
         // Sem seleção, a auditoria da tabela; com seleção, a das composições marcadas.
         onAudit={run('audit')}
         search={<SearchBox size={size} value={p.search} onChange={p.onSearch} disabled={!p.ready} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />}
@@ -74,7 +73,6 @@ export const CompositionCommandLine = memo(function CompositionCommandLine(p: Pr
       >
         <span className="composition-count" aria-label={p.countLabel}>{p.countText}</span>
         {p.mock && !p.mobile ? <StatusBadge tone="info">Modo local</StatusBadge> : null}
-        {p.ready ? <ReadOnlyFilters catalog={p.catalog} nativeFetchXml={p.nativeFetchXml} valueLabel={p.view.valueLabel} locked={p.view.lockedFilters} onClear={p.view.clearLockedFilters} /> : null}
       </ViewBar>
     </div>
   )

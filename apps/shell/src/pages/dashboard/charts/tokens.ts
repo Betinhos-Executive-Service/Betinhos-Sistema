@@ -1,7 +1,6 @@
 /** Cores dos gráficos lidas dos tokens do Design System; o valor reserva é o mesmo do design-tokens.css. */
 const TOKENS = {
   action: ['--bt-color-action', '#2159d2'],
-  actionSoft: ['--bt-color-action-soft', '#edf3ff'],
   brand: ['--bt-color-brand', '#001a3d'],
   success: ['--bt-color-success', '#147a4b'],
   successSoft: ['--bt-color-success-soft', '#eaf8f1'],

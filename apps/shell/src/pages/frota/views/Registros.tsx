@@ -35,7 +35,8 @@ function opcoes(refs: (Ref | null)[]) {
 
 const categoriasTexto = (valores: number[]) => valores.map((value) => CATEGORIAS_MANUT.find((option) => option.value === value)?.label).filter(Boolean).join(' · ')
 
-type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean }
+/** `onNovo`: a tela abre a gaveta própria de criação (Manutenções); sem ele, "Novo registro" abre o formulário nativo. */
+type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean; onNovo?: () => void }
 
 /** Abas de registros; cada tipo tem sua lista (visões, colunas e filtros próprios). */
 export function Registros(props: Props) {
@@ -43,7 +44,7 @@ export function Registros(props: Props) {
   return <Lista key={kind} kind={kind} {...props} />
 }
 
-function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false }: Props & { kind: Kind }) {
+function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false, onNovo }: Props & { kind: Kind }) {
   const size = useMedia('(max-width: 820px)') ? 'touch' : 'default'
   const auditoria = useAuditoria()
   const notify = useNotify()
@@ -86,6 +87,10 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   }
 
   async function novo() {
+    if (onNovo) {
+      onNovo()
+      return
+    }
     try {
       await source.openForm(kind)
     } catch (reason) {
@@ -129,7 +134,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     <div className="frota-lista">
       <div role="toolbar" aria-label="Comandos de registros">
         <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}
-          search={<SearchBox size={size} aria-label="Buscar registro" placeholder="Buscar descrição, placa ou pessoa" value={busca} onChange={setBusca} />}
+          search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa ou pessoa' : 'Buscar descrição, placa ou pessoa'} value={busca} onChange={setBusca} />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />
             <Button size={size} icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>

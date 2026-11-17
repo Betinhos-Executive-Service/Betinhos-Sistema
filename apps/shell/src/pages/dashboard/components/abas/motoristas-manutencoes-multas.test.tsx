@@ -142,6 +142,7 @@ describe('ManutencoesTab', () => {
     expect(within(kpi('Custo total')).getByText(/1\.500,00/)).toBeTruthy()
     expect(within(kpi('Custo total')).getByText('15,0%')).toBeTruthy()
     expect(within(kpi('Em andamento')).getByText('1')).toBeTruthy()
+    expect(within(kpi('Em andamento')).getByText('solicitadas, agendadas ou programadas')).toBeTruthy()
     expect(within(kpi('Custo médio')).getByText(/750,00/)).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('10,0 dias')).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('50,0%')).toBeTruthy()
@@ -152,7 +153,9 @@ describe('ManutencoesTab', () => {
     const prazo = kpi('Prazo médio')
     expect(prazo.querySelector('.dash-kpi__valor')?.textContent).toBe('—')
     expect(within(prazo).queryByText('s/dado')).toBeNull()
-    expect(within(prazo).getByText('Ano anterior').parentElement?.textContent).toContain('—')
+    // Comparativo sem medição não aparece (nem "Ano anterior —").
+    expect(within(prazo).queryByText('Ano anterior')).toBeNull()
+    expect(within(prazo).queryByText('Mês anterior')).toBeNull()
     const categorias = card('Categorias com metas')
     expect(within(linhaDe(categorias, 'Preventiva programada')).getByText('Sem medição')).toBeTruthy()
     expect(within(categorias).queryByText('s/dado')).toBeNull()

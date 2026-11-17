@@ -11,6 +11,7 @@ import { useComposicaoViewState } from './useComposicaoViewState'
 import { ColumnHeader, type ActiveColumnFilter } from './components/ColumnHeader'
 import { AuditOverlay } from './components/AuditOverlay'
 import { CellHoverPreview } from './components/CellHoverPreview'
+import { LookupHoverIntent } from './components/LookupHoverIntent'
 import { ClientCard, RouteCard } from './components/CopyText'
 import { CommandConfirmDialog } from './components/CommandConfirmDialog'
 import { confirmDialogContent, useCompositionCommands, type CommandNotice, type CommandPhase, type RefreshOptions } from './components/useCompositionCommands'
@@ -44,6 +45,8 @@ import { recebimentosSource } from '../recebimentos/source'
 import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
 import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
 import './composicao.css'
+
+const CHOICE_TYPES = new Set(['Picklist', 'State', 'Status'])
 
 const column = createColumnHelper<DataTableFeatures, Composition>()
 const SAVE_FEEDBACK_DURATION = 1600
@@ -229,7 +232,9 @@ function ComposicaoContent({ host }: { host: Host }) {
   const [activeView, setActiveView] = useState<SavedView | null>(null)
   const [viewDefinition, setViewDefinition] = useState<ViewDefinition>(() => defaultViewDefinition(moneyFields.map((field) => field.key)))
   const [viewError, setViewError] = useState<string | null>(null)
-  const [statusColors, setStatusColors] = useState<Record<string, string>>({})
+  // Cor de cada opção das colunas de escolha visíveis (Status, Status de Operação…), por `tabela.coluna`, lida da metadata.
+  const [choiceColors, setChoiceColors] = useState<Record<string, Record<string, string>>>({})
+  const choiceColorsRequested = useRef(new Set<string>())
   const [dataSource, setDataSource] = useState<'dataverse' | 'mock' | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -310,6 +315,20 @@ function ComposicaoContent({ host }: { host: Host }) {
   const viewShapeKey = JSON.stringify({ ...viewDefinition, columns: viewDefinition.columns.map(({ width: _width, ...column }) => column) })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const viewShape = useMemo(() => viewDefinition, [viewShapeKey])
+  useEffect(() => {
+    const currentHost = hostRef.current
+    if (currentHost.mode !== 'dataverse') return
+    for (const { id } of viewShape.columns) {
+      const field = catalog.find((item) => item.id === id)
+      if (!field || !CHOICE_TYPES.has(field.type)) continue
+      const key = `${field.table}.${field.attribute}`
+      if (choiceColorsRequested.current.has(key)) continue
+      choiceColorsRequested.current.add(key)
+      void currentHost.metadata.choices(field.table, field.attribute, field.type as 'Picklist' | 'State' | 'Status').then((options) => {
+        setChoiceColors((all) => ({ ...all, [key]: Object.fromEntries(options.filter((option) => option.color).map((option) => [String(option.value), option.color as string])) }))
+      }, () => { choiceColorsRequested.current.delete(key) })
+    }
+  }, [catalog, viewShape])
   rowsRef.current = rows
   visibleRowsRef.current = visibleRows
   viewColumnsRef.current = viewDefinition.columns
@@ -379,11 +398,6 @@ function ComposicaoContent({ host }: { host: Host }) {
     const request = ++viewRequestRef.current
     const current = () => alive && request === viewRequestRef.current
     const currentHost = hostRef.current
-    if (currentHost.mode === 'dataverse') {
-      void currentHost.metadata.choices('cr40f_composicaodeprecos', 'new_status').then((options) => {
-        if (alive) setStatusColors(Object.fromEntries(options.filter((option) => option.color).map((option) => [String(option.value), option.color as string])))
-      }).catch(() => undefined)
-    }
     let cacheKey: string | null = null
     try { cacheKey = catalogCacheKey(currentHost.mode === 'dataverse' ? currentHost.clientUrl : getDataverseUrl()) } catch { cacheKey = null }
     const cached = cacheKey ? readCachedCatalog(cacheKey) : null
@@ -539,6 +553,13 @@ function ComposicaoContent({ host }: { host: Host }) {
     setLoading(true)
     loadedPagesRef.current = 1
   }, [activeView, dataSource, listViews, removeView])
+  const deleteViewById = useCallback(async (id: string) => {
+    if (id === activeView?.id) return deleteCurrentView()
+    const view = views.find((item) => item.id === id)
+    if (!view || view.kind !== 'personal') throw new Error('Só visões pessoais vão para a lixeira.')
+    await removeView(view)
+    setViews(await listViews())
+  }, [activeView?.id, deleteCurrentView, listViews, removeView, views])
   const publishCurrentView = useCallback(async () => {
     const personal = activeView
     if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
@@ -1427,7 +1448,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   const comprovantesVisible = viewShape.columns.some((item) => item.id === COMPROVANTES_ID)
   const servicoDe = useCallback((row: Composition) => row.serviceId ?? (dataSource === 'mock' ? row.id : null), [dataSource])
   const servicoIds = useMemo(() => comprovantesVisible ? rows.flatMap((row) => servicoDe(row) ?? []) : [], [comprovantesVisible, rows, servicoDe])
-  const contagem = useContagemRecebimentos(recebimentos, servicoIds)
+  const { contagem } = useContagemRecebimentos(recebimentos, servicoIds)
 
   const displayedColumns = useMemo(() => {
     const base = new Map(columns.map((definition) => [definition.id, definition]))
@@ -1467,10 +1488,10 @@ function ComposicaoContent({ host }: { host: Host }) {
           : <ColumnHeader id={id} label={field.label} field={field} type={field.type} displayValue={columnFilterLabelsRef.current(id, (row) => String(readViewField(row.viewFields, valueKey).value ?? ''), (row) => readViewField(row.viewFields, valueKey).formatted)} {...columnHeaderPropsRef.current(id)} disabled={!catalogReady} />,
         cell: ({ getValue, row }) => {
           const value = getValue()
-          if (id === 'new_status' && value !== null && value !== undefined && value !== '') {
+          const color = CHOICE_TYPES.has(field.type) ? choiceColors[`${field.table}.${field.attribute}`]?.[String(value)] : undefined
+          if ((id === 'new_status' || color) && value !== null && value !== undefined && value !== '') {
             const formattedValue = readViewField(row.original.viewFields, valueKey).formatted
             const title = typeof formattedValue === 'string' && formattedValue ? formattedValue : String(value)
-            const color = statusColors[String(value)]
             return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className={`grid-choice-badge${color ? '' : title.toLocaleLowerCase('pt-BR').startsWith('conclu') ? ' grid-choice-badge--done' : ' grid-choice-badge--pending'}`} style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
           }
           const formatted = readViewField(row.original.viewFields, valueKey).formatted
@@ -1505,7 +1526,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       }))
     }
     return [base.get('select')!, ...layout.map((item) => base.get(item.id) ?? generic(item.id)).filter((item): item is NonNullable<typeof item> => Boolean(item))]
-  }, [applySavedViewField, catalog, catalogReady, columns, commitEdit, contagem, dataSource, openActive, servicoDe, statusColors, valueKeyFor, viewShape])
+  }, [applySavedViewField, catalog, catalogReady, columns, choiceColors, commitEdit, contagem, dataSource, openActive, servicoDe, valueKeyFor, viewShape])
   const tableLayout = useMemo(() => [{ id: 'select', width: 36, pinned: true }, ...viewDefinition.columns], [viewDefinition])
   const resizeColumn = useCallback((id: string, width: number) => {
     const current = viewDefinitionRef.current
@@ -1592,7 +1613,7 @@ function ComposicaoContent({ host }: { host: Host }) {
   const showViewError = useCallback((message: string) => toast({ tone: 'danger', message }), [toast])
   const viewBar = useComposicaoViewState({
     catalog, ready: viewReady, mock: usingMockData, views, active: activeView, definition: viewDefinition, viewError, locked: commandLocked,
-    onChange: applyViewDefinition, selectView, saveView: saveCurrentView, deleteView: deleteCurrentView, publishView: publishCurrentView, reloadViews,
+    onChange: applyViewDefinition, selectView, saveView: saveCurrentView, deleteView: deleteCurrentView, deleteViewById, publishView: publishCurrentView, reloadViews,
     onError: showViewError,
   })
   // Sem dados ou com comando em andamento, as ações ficam inertes com o motivo (o antigo botão desabilitado).
@@ -1615,7 +1636,8 @@ function ComposicaoContent({ host }: { host: Host }) {
     <div className="page page--full composition-layout">
       <h1 className="composition-title">Composição de preços</h1>
       <CompositionCommandLine
-        view={viewBar} actions={commandLineActions} onSearch={setSearch} catalog={catalog} nativeFetchXml={activeView?.nativeOnly && !activeView.nativeFiltersEditable ? activeView.sourceFetchXml ?? null : null} ready={viewReady} mock={usingMockData} mobile={mobile} search={search}
+        view={viewBar} actions={commandLineActions} onSearch={setSearch} ready=
+{viewReady} mock={usingMockData} mobile={mobile} search={search}
         commandPhase={commandPhase} commandLocked={commandLocked} commandBlock={commandBlock} exporting={exporting} selectedCount={selectedCount}
         exportBlocked={!dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)}
         countText={nextLink
@@ -1694,6 +1716,7 @@ function ComposicaoContent({ host }: { host: Host }) {
 
       <div ref={setTableRegion} className="composition-table-region" role="region" aria-label="Tabela de composições" tabIndex={0}>
         <CellHoverPreview />
+        <LookupHoverIntent />
         {loading ? <PriceGridSkeleton />
           : connectionError && rows.length === 0 ? <LoadFailure message={connectionError} />
             : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
