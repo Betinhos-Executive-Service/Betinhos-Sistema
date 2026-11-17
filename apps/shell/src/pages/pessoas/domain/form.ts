@@ -55,6 +55,7 @@ export function maskPhone(raw: string) {
 /**
  * Valida o formulário. Nome curto, celular, e-mail e nascimento só são checados quando mudaram
  * em relação a `base`: cadastro antigo fora do padrão não pode impedir salvar outra alteração.
+ * Cliente é exceção: vale também na edição (o RD Station usa o nome do cliente).
  */
 export function validateForm(f: PessoaForm, today = new Date(), base: PessoaForm | null = null): FormErrors {
   const e: FormErrors = {}
@@ -63,6 +64,7 @@ export function validateForm(f: PessoaForm, today = new Date(), base: PessoaForm
   else if (changed('nome') && f.nome.trim().length < 3) e.nome = 'Nome muito curto.'
   if (changed('telefone') && f.telefone.trim() && !phoneKey(f.telefone)) e.telefone = 'Celular com DDD: 10 ou 11 dígitos.'
   if (changed('email') && f.email.trim() && !emailKey(f.email)) e.email = 'E-mail inválido.'
+  if (!f.clienteId) e.clienteId = 'Escolha o cliente.'
   if (!f.idioma) e.idioma = 'Escolha o idioma.'
   if (!f.status) e.status = 'Escolha o status.'
   if (changed('nascimento') && f.nascimento) {

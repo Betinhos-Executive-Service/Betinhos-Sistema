@@ -176,7 +176,7 @@ export function PessoaDrawer({ target, onTarget, list, dups, choices, source, on
     const found = validateForm(form, new Date(), target?.mode === 'edit' ? base : null)
     setErrors(found)
     const first = Object.keys(found)[0]
-    if (first) { document.querySelector<HTMLElement>(`.ps-form [name="${first}"]`)?.focus(); return }
+    if (first) { document.querySelector<HTMLElement>(`.ps-form [name="${first}"], .ps-form [data-field="${first}"] [role="combobox"]`)?.focus(); return }
     setSaving(true)
     try {
       const bind = await source.clienteBind()
