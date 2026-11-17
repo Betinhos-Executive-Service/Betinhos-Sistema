@@ -95,4 +95,13 @@ describe('Registros', () => {
     expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
     expect(screen.getByText('Contestado')).toBeTruthy()
   })
+
+  it('com onNovo, "Novo registro" abre a gaveta da tela e não o formulário nativo', () => {
+    const onNovo = vi.fn()
+    const nativo = { openForm: vi.fn(async () => {}) } as unknown as DataSource
+    render(<Registros kinds={['manutencao']} data={data} source={nativo} onOpen={() => {}} onReload={() => {}} onNovo={onNovo} />)
+    fireEvent.click(screen.getByRole('button', { name: /Novo/ }))
+    expect(onNovo).toHaveBeenCalledTimes(1)
+    expect(nativo.openForm).not.toHaveBeenCalled()
+  })
 })

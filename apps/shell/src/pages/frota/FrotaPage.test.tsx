@@ -5,6 +5,7 @@ import { ToastProvider } from '@betinhos/ui'
 import { Frota, type Tab } from './FrotaPage'
 import { MANUT, PROPRIO, VEICULO } from './data/schema'
 import { EMPTY_DATA, type DataSource, type LoadResult } from './data/source'
+import { createMockSource } from './data/mock'
 import { manutencaoFalsa } from './testUtils'
 
 function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
@@ -104,5 +105,26 @@ describe('Frota', () => {
     expect(location.hash).toContain('secao=preventivas')
     fireEvent.click(screen.getByRole('button', { name: /fechar/i }))
     expect(location.hash).not.toContain('secao=')
+  })
+
+  it('Manutenções abre na fila A encaixar; a linha abre a gaveta única da manutenção', async () => {
+    history.replaceState(null, '', '#/frota-manutencoes')
+    renderFrota(createMockSource(), 'manutencoes')
+    expect(await screen.findByRole('tab', { name: 'A encaixar (3)' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: /Freio com ruído \(fictício\)/ }))
+    const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+    expect(gaveta).toBeTruthy()
+    expect(location.hash).toContain('registro=')
+  })
+
+  it('Todas mostra a lista; "Novo registro" abre a Nova manutenção, não o formulário nativo', async () => {
+    const source = createMockSource()
+    const openForm = vi.spyOn(source, 'openForm')
+    history.replaceState(null, '', '#/frota-manutencoes?sub=todas')
+    renderFrota(source, 'manutencoes')
+    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo registro' }))
+    expect(await screen.findByRole('dialog', { name: 'Nova manutenção' })).toBeTruthy()
+    expect(openForm).not.toHaveBeenCalled()
   })
 })
