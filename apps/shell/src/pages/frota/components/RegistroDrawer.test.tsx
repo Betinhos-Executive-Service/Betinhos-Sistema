@@ -16,7 +16,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
     update: vi.fn(async () => {}),
     openForm: vi.fn(async () => {}),
     prepareFlow: vi.fn(async () => {}),
-    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async () => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {},
+    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async () => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank',
     ...overrides,
   }
 }
@@ -24,6 +24,8 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
 const manutencao: Manutencao = { id: 'm1', codigo: 'M-1', descricao: 'Freio com ruído', status: MANUT.SOLICITADO, grau: null, tipo: null, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC-1234' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null }
 const multa: Multa = { id: 'u1', titulo: 'Multa sem condutor', status: MULTA.NOTIFICAR, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC-1234' }, motorista: null, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
 const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa, { ...multa, id: 'u2', titulo: 'Multa com condutor', status: MULTA.NOTIFICADO, motorista: { id: 'f1', label: 'Ana' }, dataAviso: '2026-10-02' }] }
+
+const arquivos = { autuacao: 'auto-1.pdf', penalidade: 'penalidade-1.pdf', comprovante: null }
 
 function renderDrawer(source: DataSource, kind: 'manutencao' | 'multa', id: string) {
   const onClose = vi.fn()
@@ -120,5 +122,21 @@ describe('RegistroDrawer', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Salvar correção' })) })
     expect(update).toHaveBeenCalledWith('manutencao', 'm1', { new_servicosmanutencao: '100000007', new_categoriasmanutencao: '100000001', new_classificacaoorigem: 100000001, new_confiancaia: null })
     expect(onClassificado).toHaveBeenCalledWith('m1', { servicos: [100000007], categorias: [100000001], origem: 100000001, confianca: null })
+  })
+  it('multa: arquivos viram links que baixam; sem arquivo não há link', () => {
+    const urlArquivoMulta = vi.fn((id: string, coluna: string) => `https://dv.test/api/data/v9.2/cr40f_multases(${id})/${coluna}/$value`)
+    const comArquivos: FrotaData = { ...data, multas: [{ ...multa, id: 'u3', titulo: 'Multa com arquivos', arquivos }] }
+    render(<ToastProvider><RegistroDrawer source={fakeSource({ urlArquivoMulta })} kind="multa" id="u3" data={comArquivos} onClose={() => {}} onChanged={() => {}} onOpenVeiculo={() => {}} /></ToastProvider>)
+    const auto = screen.getByRole('link', { name: /auto-1\.pdf/ })
+    expect(auto.getAttribute('href')).toBe('https://dv.test/api/data/v9.2/cr40f_multases(u3)/cr40f_autodainfracao/$value')
+    expect(auto.getAttribute('download')).toBe('auto-1.pdf')
+    expect(screen.getByRole('link', { name: /penalidade-1\.pdf/ }).getAttribute('href')).toContain('/cr40f_pdfpenalidade/$value')
+    expect(urlArquivoMulta).not.toHaveBeenCalledWith('u3', 'cr40f_comprovantepagamento')
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('multa sem arquivos não mostra link de download', () => {
+    renderDrawer(fakeSource(), 'multa', 'u1')
+    expect(screen.queryByRole('link')).toBeNull()
   })
 })

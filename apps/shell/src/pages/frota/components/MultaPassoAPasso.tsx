@@ -1,7 +1,7 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Field, Input, Menu, Radio, Select, Textarea, type MenuAction } from '@betinhos/ui'
-import { daysBetween, formatBR, todaySP } from '../data/dates'
+import { daysBetween, formatBR, toDataverseDate, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, RESPONSAVEL } from '../data/schema'
 import type { DataSource } from '../data/source'
@@ -55,6 +55,13 @@ function feitos(e: MultaEstado, responsavel: Ref | null): [string, string][] {
   return linhas
 }
 
+/** O que falta para gravar a penalidade (vencimento obrigatório; valor, se vier, maior que zero). */
+export function penalidadeFaltando(p: { vencimento: string; valor: string }): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.vencimento)) return 'Informe o vencimento da guia.'
+  if (p.valor !== '' && !(Number(p.valor) > 0)) return 'O valor com desconto precisa ser maior que zero.'
+  return null
+}
+
 export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todaySP() }: Props) {
   const notify = useNotify()
   const estado = useMemo(() => estadoDaMulta(multa), [multa])
@@ -69,6 +76,8 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [penalidade, setPenalidade] = useState({ vencimento: '', valor: '' })
+  const [pdfPenalidade, setPdfPenalidade] = useState<File | null>(null)
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [copiaFalhou, setCopiaFalhou] = useState(false)
   const [erroRastreador, setErroRastreador] = useState<string | null>(null)
@@ -79,6 +88,8 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   useEffect(() => {
     setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : {})
     setArquivo(null)
+    setPenalidade({ vencimento: '', valor: '' })
+    setPdfPenalidade(null)
     setErro(null)
   }, [passo, multa.id, motoristaId])
 
@@ -86,6 +97,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const envio = useMemo(() => dadosSemVazios(dados), [dados])
   const faltando = passo ? validarPasso(estado, passo, envio, hoje) : null
   const semResponsavel = responsavelEfetivo(estado) === null
+  const faltaPenalidade = penalidadeFaltando(penalidade)
   const dias = situacao.proximoPrazo ? daysBetween(hoje, situacao.proximoPrazo) : null
   const urgencia = urgenciaDoPrazo(situacao.proximoPrazo, situacao.prazoVencido, hoje)
   const mais: MenuAction[] = situacao.prazoVencido || extra ? [] : [
@@ -112,6 +124,33 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       onChanged()
     } catch (reason) {
       setErro(mensagemDaAcao(reason, 'Não foi possível gravar o passo. Tente de novo.'))
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  /** Penalidade que chegou antes da rotina do SNE: vencimento e valor são campos livres (a trava não os bloqueia), então vão direto na multa. */
+  async function gravarPenalidade() {
+    if (faltaPenalidade || salvando) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      if (pdfPenalidade) {
+        try {
+          await source.enviarArquivoMulta(multa.id, 'cr40f_pdfpenalidade', pdfPenalidade)
+        } catch {
+          setErro('Não foi possível enviar o arquivo. Tente de novo.')
+          return
+        }
+      }
+      const comportamento = (await source.dateBehaviors('multa')).cr40f_vencimento ?? 'DateOnly'
+      const patch: Record<string, unknown> = { cr40f_vencimento: toDataverseDate(penalidade.vencimento, comportamento) }
+      if (penalidade.valor !== '') patch.cr40f_valorcomdesconto = Number(penalidade.valor)
+      await source.update('multa', multa.id, patch)
+      notify('success', 'Penalidade registrada.')
+      onChanged()
+    } catch (reason) {
+      setErro(mensagemDaAcao(reason, 'Não foi possível registrar a penalidade. Tente de novo.'))
     } finally {
       setSalvando(false)
     }
@@ -276,12 +315,32 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           {campos()}
           {erro && <Alert tone="danger">{erro}</Alert>}
           <div className="frota-cluster">
-            <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
+            <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null} aria-describedby={faltando ? `${multa.id}-falta` : undefined} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
             {extra && <Button variant="secondary" disabled={salvando} onClick={() => setExtra(null)}>Voltar</Button>}
           </div>
+          {faltando && <p id={`${multa.id}-falta`} className="frota-muted">{faltando}</p>}
+        </section>
+      ) : situacao.aguardandoPenalidade ? (
+        <section className="multa-passo" aria-labelledby={`${multa.id}-penalidade`}>
+          <h3 id={`${multa.id}-penalidade`}>Registrar penalidade</h3>
+          <p className="frota-muted">Aguardando a penalidade. A rotina do SNE grava o vencimento e o valor com desconto; se você já tem a guia, registre aqui e a multa segue para o pagamento com 40%.</p>
+          <div className="frota-fields">
+            <Field label="Vencimento da guia" required><Input type="date" disabled={salvando} value={penalidade.vencimento} onChange={(e: { target: { value: string } }) => setPenalidade((p) => ({ ...p, vencimento: e.target.value }))} /></Field>
+            <Field label="Valor com desconto (R$)">
+              <Input type="number" step="0.01" min="0" disabled={salvando} value={penalidade.valor} onChange={(e: { target: { value: string } }) => setPenalidade((p) => ({ ...p, valor: e.target.value }))} />
+            </Field>
+            <Field label="PDF da penalidade (opcional)">
+              <input type="file" accept="application/pdf" disabled={salvando} onChange={(e) => setPdfPenalidade(e.target.files?.[0] ?? null)} />
+            </Field>
+          </div>
+          {erro && <Alert tone="danger">{erro}</Alert>}
+          <div className="frota-cluster">
+            <Button variant="primary" loading={salvando} disabled={faltaPenalidade !== null} aria-describedby={faltaPenalidade ? `${multa.id}-falta` : undefined} onClick={() => void gravarPenalidade()}>Registrar penalidade</Button>
+          </div>
+          {faltaPenalidade && <p id={`${multa.id}-falta`} className="frota-muted">{faltaPenalidade}</p>}
         </section>
       ) : (
-        <p className="frota-muted">{situacao.aguardandoPenalidade ? 'Aguardando a penalidade: a rotina do SNE grava o vencimento e o valor com desconto.' : situacao.etapa === 'cancelada' ? 'Multa cancelada.' : 'Multa encerrada. Nada a fazer.'}</p>
+        <p className="frota-muted">{situacao.etapa === 'cancelada' ? 'Multa cancelada.' : 'Multa encerrada. Nada a fazer.'}</p>
       )}
 
       {lista.length > 0 && (

@@ -111,7 +111,7 @@ function seed(): FrotaData {
 const COLLECTION: Record<Kind, 'manutencoes' | 'multas' | 'colisoes'> = { manutencao: 'manutencoes', multa: 'multas', colisao: 'colisoes' }
 const FIELD_TO_PROP: Record<string, string> = {
   cr40f_agendarpara: 'agendarPara', cr40f_datamanutencao: 'dataManutencao', cr40f_valor: 'valor', cr40f_estabelecimento: 'estabelecimento', cr40f_servicorealizado: 'servicoRealizado', cr40f_comentariosdoaprovador: 'comentarioAprovador',
-  cr40f_datadeavisoaocondutor: 'dataAviso', cr40f_datadeindicacao: 'dataIndicacao', cr40f_indicado: 'indicado', new_valorguia: 'valorGuia', new_recursopendente: 'recursoPendente',
+  cr40f_datadeavisoaocondutor: 'dataAviso', cr40f_datadeindicacao: 'dataIndicacao', cr40f_indicado: 'indicado', new_valorguia: 'valorGuia', new_recursopendente: 'recursoPendente', cr40f_vencimento: 'vencimento', cr40f_valorcomdesconto: 'valorComDesconto',
   [CAMPO.origem]: 'origemClassificacao', [CAMPO.confianca]: 'confiancaIa', [CAMPO.descricao]: 'descricao',
 }
 
@@ -294,6 +294,9 @@ export function createMockSource(): DataSource {
         servicos: [{ id: 's1', codigo: 'S-1001', cliente: 'Cliente Alfa (fictício)', saida: em(-60), retorno: em(120), motorista: item.motorista?.label ?? null, status: 'Concluído', noHorario: true }],
         infleet: { viagens: [{ inicio: em(-20), fim: em(20), motoristaInfleet: 'drv-ficticio', motorista: item.motorista?.label ?? null }] },
       }
+    },
+    urlArquivoMulta(_multaId, coluna) {
+      return `data:text/plain;charset=utf-8,${encodeURIComponent(`Arquivo fictício (${coluna}): no mock não há arquivo para baixar.`)}`
     },
     async enviarArquivoMulta(multaId, coluna, file) {
       await delay()

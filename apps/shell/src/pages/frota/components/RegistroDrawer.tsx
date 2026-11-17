@@ -1,11 +1,11 @@
-import { ExternalLink } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Download, ExternalLink } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Drawer, EmptyState } from '@betinhos/ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CANAL, GRAU, GRAVIDADE, KIND_LABEL, KIND_TABLE, label, TIPO_COLISAO, TIPO_REPARO } from '../data/schema'
-import type { Classificacao, DataSource, FlowResult } from '../data/source'
+import type { Classificacao, ColunaArquivoMulta, DataSource, FlowResult } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
@@ -14,13 +14,19 @@ import { MultaPassoAPasso } from './MultaPassoAPasso'
 import { useNotify } from './Toasts'
 import { StatusBadge } from './Ui'
 
-type Campo = [string, string]
+type Campo = [string, ReactNode]
 type Detalhe = { titulo: string; status: number | null; veiculo: Ref | null; temMotorista: boolean; initial?: Record<string, string>; campos: Campo[] }
 
 const texto = (value: string | number | null | undefined) => (value === null || value === undefined || value === '' ? NAO_INFORMADO : String(value))
 const dia = (iso: string | null) => formatBR(diaSP(iso)) || NAO_INFORMADO
 
-function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
+/** Link que baixa o arquivo da multa; sem arquivo, o texto padrão (sem link). */
+function arquivoLink(nome: string | null | undefined, href: () => string): ReactNode {
+  if (!nome) return NAO_INFORMADO
+  return <a className="frota-link" href={href()} download={nome}><Download size={14} aria-hidden="true" /> {nome}</a>
+}
+
+function detalhe(kind: Kind, id: string, data: FrotaData, urlArquivo: (multaId: string, coluna: ColunaArquivoMulta) => string): Detalhe | null {
   if (kind === 'manutencao') {
     const item = data.manutencoes.find((row) => row.id === id)
     return !item ? null : { titulo: item.descricao, status: item.status, veiculo: item.veiculo, temMotorista: true, initial: { cr40f_agendarpara: item.agendarPara ?? '' }, campos: [
@@ -38,7 +44,8 @@ function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
       ['Valor', brl(item.valorGuia ?? infracao?.valor ?? null)], ['Pontos na CNH', texto(infracao?.pontos)],
       ['Prazo para indicar', formatBR(item.dataParaIndicar) || NAO_INFORMADO], ['Vencimento da guia', formatBR(item.vencimento ?? null) || NAO_INFORMADO],
       ['Valor com desconto', brl(item.valorComDesconto ?? null)], ['Canal da indicação', item.canal === CANAL.SENATRAN ? 'Senatran' : item.canal === CANAL.DSV ? 'DSV Digital' : item.canal === CANAL.PREFEITURA ? 'Prefeitura' : NAO_INFORMADO],
-      ['Notificação de autuação', texto(item.arquivos?.autuacao)], ['PDF da penalidade', texto(item.arquivos?.penalidade)], ['Comprovante', texto(item.arquivos?.comprovante)],
+      ['Notificação de autuação', arquivoLink(item.arquivos?.autuacao, () => urlArquivo(id, 'cr40f_autodainfracao'))], ['PDF da penalidade', arquivoLink(item.arquivos?.penalidade, () => urlArquivo(id, 'cr40f_pdfpenalidade'))],
+      ['Comprovante', arquivoLink(item.arquivos?.comprovante, () => urlArquivo(id, 'cr40f_comprovantepagamento'))],
     ] }
   }
   const item = data.colisoes.find((row) => row.id === id)
@@ -51,7 +58,7 @@ function detalhe(kind: Kind, id: string, data: FrotaData): Detalhe | null {
 export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onClassificado, onOpenVeiculo }: { source: DataSource; kind: Kind; id: string; data: FrotaData; onClose: () => void; onChanged: () => void; onClassificado?: (id: string, classificacao: Classificacao) => void; onOpenVeiculo: (id: string) => void }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const notify = useNotify()
-  const registro = detalhe(kind, id, data)
+  const registro = detalhe(kind, id, data, (multaId, coluna) => source.urlArquivoMulta(multaId, coluna))
   const manutencao = kind === 'manutencao' ? data.manutencoes.find((row) => row.id === id) : undefined
   const multa = kind === 'multa' ? data.multas.find((row) => row.id === id) : undefined
   useEffect(() => { setShareUrl(null) }, [kind, id])

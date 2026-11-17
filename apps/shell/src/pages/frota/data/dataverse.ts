@@ -5,7 +5,7 @@ import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PL
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
-import { EMPTY_DATA, FlowIncertoError, type ArquivoMulta, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
+import { EMPTY_DATA, FlowIncertoError, type ArquivoMulta, type ColunaArquivoMulta, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
 import type { DespesaCombustivel, Dossie, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
 import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
@@ -400,6 +400,10 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       const json = typeof payload.new_DossieJson === 'string' ? payload.new_DossieJson : ''
       if (!json) throw new Error('O servidor não devolveu o dossiê da multa')
       return JSON.parse(json) as Dossie
+    },
+
+    urlArquivoMulta(multaId: string, coluna: ColunaArquivoMulta) {
+      return `${apiUrl}/cr40f_multases(${guid(multaId)})/${coluna}/$value`
     },
 
     async enviarArquivoMulta(multaId: string, coluna: ArquivoMulta, file: File) {

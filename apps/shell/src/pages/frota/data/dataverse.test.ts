@@ -548,4 +548,10 @@ describe('passo a passo da multa (Custom APIs)', () => {
     expect(init?.method).toBe('PATCH')
     expect((init?.headers as Record<string, string>)['x-ms-file-name']).toBe('comprovante pagamento marco.pdf')
   })
+
+  it('urlArquivoMulta aponta para o /$value da coluna de arquivo e recusa id inválido', () => {
+    const source = createXrmSource(host().xrm)
+    expect(source.urlArquivoMulta(MULTA_ID, 'cr40f_autodainfracao')).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_multases(aaaaaaaa-1111-2222-3333-444444444444)/cr40f_autodainfracao/$value')
+    expect(() => source.urlArquivoMulta('nao-e-guid', 'cr40f_pdfpenalidade')).toThrow('Identificador inválido')
+  })
 })

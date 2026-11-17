@@ -6,7 +6,7 @@ import { MULTA } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import { ApiError } from '../data/xrm'
 import type { Dossie, FrotaData, Multa } from '../data/types'
-import { dadosSemVazios, MultaPassoAPasso, opcoesMotoristas } from './MultaPassoAPasso'
+import { dadosSemVazios, MultaPassoAPasso, opcoesMotoristas, penalidadeFaltando } from './MultaPassoAPasso'
 
 const HOJE = '2026-11-17'
 const multa: Multa = { id: 'u1', titulo: 'AIT 1A2B3C', status: MULTA.NOTIFICAR, dataHora: '2026-11-10T16:00:00Z', local: 'Av. de Teste, 100', dataParaIndicar: '2026-11-30', indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'TST1A11' }, motorista: null, infracaoId: null, criadoEm: '2026-11-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
@@ -159,13 +159,105 @@ describe('MultaPassoAPasso', () => {
     expect(screen.queryByText(/Failed to fetch/)).toBeNull()
   })
 
-  it('aguardando penalidade não tem passo e explica o porquê', () => {
+  it('aguardando penalidade mostra o formulário Registrar penalidade, sem o passo de pagamento', () => {
     renderPasso(fonte(), { ...multa, status: MULTA.INDICADA, responsavel: 100000001, motivoEmpresa: 100000000 })
+    expect(screen.getByRole('heading', { name: 'Registrar penalidade' })).toBeTruthy()
     expect(screen.getByText(/Aguardando a penalidade/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Registrar pagamento' })).toBeNull()
     expect(screen.getByRole('heading', { name: 'Feito até agora' })).toBeTruthy()
     expect(screen.getByText('Responsável')).toBeTruthy()
     expect(screen.getByText('Empresa (prazo perdido)')).toBeTruthy()
+  })
+})
+
+describe('Registrar penalidade', () => {
+  const aguardando = { ...multa, status: MULTA.INDICADA, responsavel: 100000001, motivoEmpresa: 100000000 }
+  const arquivoPdf = () => new File(['x'], 'penalidade.pdf', { type: 'application/pdf' })
+  const botao = () => screen.getByRole('button', { name: 'Registrar penalidade' }) as HTMLButtonElement
+
+  it('o vencimento é obrigatório: sem ele o botão fica desabilitado e diz o que falta', () => {
+    renderPasso(fonte(), aguardando)
+    expect(botao().disabled).toBe(true)
+    expect(screen.getByText('Informe o vencimento da guia.')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(/Vencimento da guia/), { target: { value: '2026-12-05' } })
+    expect(botao().disabled).toBe(false)
+    expect(screen.queryByText('Informe o vencimento da guia.')).toBeNull()
+    fireEvent.change(screen.getByLabelText(/Valor com desconto/), { target: { value: '0' } })
+    expect(botao().disabled).toBe(true)
+    expect(screen.getByText('O valor com desconto precisa ser maior que zero.')).toBeTruthy()
+  })
+
+  it('grava vencimento e valor direto na multa (campos livres), envia o PDF antes e recarrega', async () => {
+    const ordem: string[] = []
+    const source = fonte({
+      dateBehaviors: vi.fn(async () => ({ cr40f_vencimento: 'DateOnly' as const })),
+      enviarArquivoMulta: vi.fn(async () => { ordem.push('pdf') }),
+      update: vi.fn(async () => { ordem.push('update') }),
+    })
+    const { onChanged } = renderPasso(source, aguardando)
+    fireEvent.change(screen.getByLabelText(/Vencimento da guia/), { target: { value: '2026-12-05' } })
+    fireEvent.change(screen.getByLabelText(/Valor com desconto/), { target: { value: '78.10' } })
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [arquivoPdf()] } })
+    await act(async () => { fireEvent.click(botao()) })
+    expect(source.enviarArquivoMulta).toHaveBeenCalledWith('u1', 'cr40f_pdfpenalidade', expect.any(File))
+    expect(source.update).toHaveBeenCalledWith('multa', 'u1', { cr40f_vencimento: '2026-12-05', cr40f_valorcomdesconto: 78.1 })
+    expect(source.passoMulta).not.toHaveBeenCalled()
+    expect(ordem).toEqual(['pdf', 'update'])
+    expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('valor e PDF são opcionais; coluna UserLocal recebe a meia-noite de São Paulo', async () => {
+    const source = fonte({ dateBehaviors: vi.fn(async () => ({ cr40f_vencimento: 'UserLocal' as const })), update: vi.fn(async () => {}) })
+    renderPasso(source, aguardando)
+    fireEvent.change(screen.getByLabelText(/Vencimento da guia/), { target: { value: '2026-12-05' } })
+    await act(async () => { fireEvent.click(botao()) })
+    expect(source.update).toHaveBeenCalledWith('multa', 'u1', { cr40f_vencimento: '2026-12-05T03:00:00Z' })
+    expect(source.enviarArquivoMulta).not.toHaveBeenCalled()
+  })
+
+  it('recusa 400 do servidor aparece como veio; outro erro vira a mensagem genérica', async () => {
+    const update = vi.fn<DataSource['update']>().mockRejectedValueOnce(new ApiError('Vencimento fora do prazo da guia.', 400)).mockRejectedValueOnce(new Error('Failed to fetch'))
+    renderPasso(fonte({ update, dateBehaviors: vi.fn(async () => ({})) }), aguardando)
+    fireEvent.change(screen.getByLabelText(/Vencimento da guia/), { target: { value: '2026-12-05' } })
+    await act(async () => { fireEvent.click(botao()) })
+    expect(await screen.findByText('Vencimento fora do prazo da guia.')).toBeTruthy()
+    await act(async () => { fireEvent.click(botao()) })
+    expect(await screen.findByText('Não foi possível registrar a penalidade. Tente de novo.')).toBeTruthy()
+    expect(screen.queryByText(/Failed to fetch/)).toBeNull()
+  })
+
+  it('falha no envio do PDF mostra a mensagem do arquivo e não grava o vencimento', async () => {
+    const source = fonte({ enviarArquivoMulta: vi.fn(async () => { throw new Error('Failed to fetch') }), update: vi.fn(async () => {}) })
+    renderPasso(source, aguardando)
+    fireEvent.change(screen.getByLabelText(/Vencimento da guia/), { target: { value: '2026-12-05' } })
+    fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, { target: { files: [arquivoPdf()] } })
+    await act(async () => { fireEvent.click(botao()) })
+    expect(await screen.findByText('Não foi possível enviar o arquivo. Tente de novo.')).toBeTruthy()
+    expect(source.update).not.toHaveBeenCalled()
+  })
+
+  it('penalidadeFaltando: vencimento válido e valor vazio ou positivo', () => {
+    expect(penalidadeFaltando({ vencimento: '', valor: '' })).toBe('Informe o vencimento da guia.')
+    expect(penalidadeFaltando({ vencimento: '2026-12-05', valor: '' })).toBeNull()
+    expect(penalidadeFaltando({ vencimento: '2026-12-05', valor: '78.1' })).toBeNull()
+    expect(penalidadeFaltando({ vencimento: '2026-12-05', valor: '-1' })).toBe('O valor com desconto precisa ser maior que zero.')
+  })
+})
+
+describe('motivo do botão desabilitado', () => {
+  it('mostra abaixo do botão o que validarPasso devolve e some quando o passo está completo', () => {
+    renderPasso(fonte())
+    expect((screen.getByRole('button', { name: 'Confirmar responsável' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Escolha o responsável: motorista ou empresa.')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('Empresa (culpa da empresa)'))
+    expect((screen.getByRole('button', { name: 'Confirmar responsável' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByText('Escolha o responsável: motorista ou empresa.')).toBeNull()
+  })
+
+  it('o botão aponta para o texto com aria-describedby', () => {
+    renderPasso(fonte())
+    const texto = screen.getByText('Escolha o responsável: motorista ou empresa.')
+    expect(screen.getByRole('button', { name: 'Confirmar responsável' }).getAttribute('aria-describedby')).toBe(texto.id)
   })
 })
 

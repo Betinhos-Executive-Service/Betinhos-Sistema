@@ -14,6 +14,8 @@ export type Classificacao = { servicos: number[]; categorias: number[]; origem: 
 export type FlowId = 'aprovarManutencao'
 /** Colunas de arquivo livres da multa que a tela grava. */
 export type ArquivoMulta = 'cr40f_comprovantepagamento' | 'cr40f_pdfpenalidade'
+/** Colunas de arquivo da multa que a tela baixa (inclui o PDF da autuação, que só o SNE grava). */
+export type ColunaArquivoMulta = ArquivoMulta | 'cr40f_autodainfracao'
 export type FlowResult = { message: string | null; shareUrl: string | null }
 
 /** O Flow pode ter rodado no servidor mesmo sem resposta (tempo esgotado ou falha de rede). */
@@ -74,4 +76,6 @@ export interface DataSource {
   dossieMulta(multaId: string): Promise<Dossie>
   /** Grava um arquivo numa coluna livre da multa (comprovante de pagamento ou PDF da penalidade). */
   enviarArquivoMulta(multaId: string, coluna: ArquivoMulta, file: File): Promise<void>
+  /** Endereço que baixa o arquivo de uma coluna de arquivo da multa (Dataverse: GET .../coluna/$value; no mock, um link inofensivo). */
+  urlArquivoMulta(multaId: string, coluna: ColunaArquivoMulta): string
 }
