@@ -56,6 +56,7 @@ public class AgendarTests
         Assert.Equal(G.TextoManutencao, linha.GetAttributeValue<string>(G.ObsFaturamento));
         Assert.Equal(G.TextoTrajeto, linha.GetAttributeValue<string>(G.Trajeto));
         Assert.Equal("Levar até sexta", linha.GetAttributeValue<string>(G.ObsOperacao));
+        Assert.Equal(G.OrigemVeiculoManual, linha.GetAttributeValue<OptionSetValue>(G.OrigemVeiculo).Value); // Manual: o DriverRecordSharing não zera o veículo
         Assert.False(linha.Contains(G.ObsInterna));
         Assert.False(linha.Contains(G.Motorista));
 
@@ -97,6 +98,7 @@ public class AgendarTests
         Assert.Equal(G.StatusAProgramar, atual.GetAttributeValue<OptionSetValue>(G.Status).Value);
         Assert.False(atual.GetAttributeValue<bool>(G.FoiProgramado));
         Assert.Equal(new DateTime(2026, 11, 25, 3, 0, 0, DateTimeKind.Utc), atual.GetAttributeValue<DateTime>(G.Saida));
+        Assert.Equal(G.OrigemVeiculoManual, atual.GetAttributeValue<OptionSetValue>(G.OrigemVeiculo).Value);
         Assert.False(atual.Contains(G.ObsOperacao)); // sem comentário novo, não mexe
         var m = memoria.Linha(M.Tabela, _manutencaoId);
         Assert.Equal(M.Agendado, m.GetAttributeValue<OptionSetValue>(M.Status).Value);

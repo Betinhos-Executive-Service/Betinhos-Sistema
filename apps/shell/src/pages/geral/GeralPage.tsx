@@ -459,7 +459,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const recebimentos = recebimentosSource(host)
   // Contagem só quando aparece: nos cards (ao lado do ID) ou com a coluna Comprovantes visível na tabela.
   const comprovantesVisible = cardsLayout || visibleColumns.some((c) => c.key === COMPROVANTES_KEY)
-  const contagem = useContagemRecebimentos(recebimentos, useMemo(() => (comprovantesVisible ? rows.map((r) => String(r[ID_ATTRIBUTE])) : []), [rows, comprovantesVisible]))
+  const { contagem } = useContagemRecebimentos(recebimentos, useMemo(() => (comprovantesVisible ? rows.map((r) => String(r[ID_ATTRIBUTE])) : []), [rows, comprovantesVisible]))
   const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
   const besideId = useCallback((id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />, [contagem])
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])

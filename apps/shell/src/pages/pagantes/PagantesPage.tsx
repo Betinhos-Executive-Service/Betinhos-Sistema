@@ -76,16 +76,18 @@ function Pagantes({ host }: { host: Host }) {
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortPagantes(list, view.config.sort, choices) : list, view.config.sort, (p) => p.id), [list, choices, view.config.sort, extra])
-  const comprovantes = useColunaComprovantes(source.recebimentos, view.config, filters, list, opDoPagante, mobile)
-  const { comLeitura } = comprovantes
+  const [version, setVersion] = useState(0)
+  const comprovantes = useColunaComprovantes(source.recebimentos, view.config, filters, list, opDoPagante, mobile, version)
+  const { comLeitura, contada } = comprovantes
   const read = useMemo(() => comLeitura(extra.read(readPagante, (p) => p.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
     const words = searchWords(q)
-    return words.length ? filtered.filter((p) => index.matches(p, words)) : filtered
-  }, [filtered, index, q, choices])
+    if (!contada && !words.length) return filtered
+    return filtered.filter((p) => (!contada || contada(p)) && (!words.length || index.matches(p, words)))
+  }, [filtered, index, q, choices, contada])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
@@ -104,7 +106,6 @@ function Pagantes({ host }: { host: Host }) {
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
   const frameUrl = gerarOpId ? source.gerarPagantesUrl(gerarOpId) : null
-  const [version, setVersion] = useState(0)
   // Um pagante por vez com gravação ou recibo em andamento: evita duplo clique e envio duplicado.
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -192,8 +193,10 @@ function Pagantes({ host }: { host: Host }) {
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
     // O total só vale com a lista inteira: até lá, o rodapé avisa que ainda soma.
     const pending = !pg.listComplete && pg.loading
-    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
-    const empty = pending
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending || comprovantes.aguardando ? 'somando valores…' : formatMoney(total(visible))}</span>
+    const empty = comprovantes.aguardando
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title={comprovantes.aguardando} />
+      : pending
       ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
     const table = (rows: Pagante[], tableFooter?: ReactNode) => (
@@ -227,6 +230,7 @@ function Pagantes({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {pg.contatosError && pg.choices ? <Alert tone="warning" title="Contatos não carregados">{pg.contatosError} Busca por telefone e WhatsApp ficam indisponíveis até atualizar.</Alert> : null}
+      {comprovantes.aviso}
       {body}
       {pg.choices ? (
         <PaganteDrawer p={current} onClose={() => setSelected(null)} onOpen={setSelected} choices={pg.choices} contatos={pg.contatos} source={source} version={version}
