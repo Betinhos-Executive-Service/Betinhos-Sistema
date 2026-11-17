@@ -61,6 +61,49 @@ public class MultasDoDiaTests
     }
 
     [Fact]
+    public void Multa_sem_prazo_de_indicacao_entra_no_fim_da_secao_Indicar()
+    {
+        var multas = new[]
+        {
+            M("S2", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-10" }),
+            M("S1", new MultaEstado { Status = MultaCodigos.Identificar }),
+            M("A1", new MultaEstado { Status = MultaCodigos.Identificar, DataParaIndicar = "2026-11-20" }),
+        };
+
+        var r = MultasDoDia.Montar(multas, Hoje);
+
+        Assert.Equal(new[] { "A1", "S1", "S2" }, r.Indicar.Select(l => l.Auto));
+        Assert.Null(r.Indicar[1].Prazo);
+        Assert.Equal("Definir o responsável (sem prazo informado)", r.Indicar[1].Passo);
+        Assert.Equal("Indicar no órgão (sem prazo informado)", r.Indicar[2].Passo);
+        Assert.Equal(3, r.Total);
+    }
+
+    [Fact]
+    public void Indicar_sem_passo_pendente_mostra_Conferir_a_etapa()
+    {
+        var multas = new[]
+        {
+            M("C1", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-10", DataIndicacao = "2026-11-14", Canal = MultaCodigos.DsvDigital, DataParaIndicar = "2026-11-20" }),
+            M("C2", new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-10", DataIndicacao = "2026-11-14", Canal = MultaCodigos.DsvDigital }),
+        };
+
+        var r = MultasDoDia.Montar(multas, Hoje);
+
+        Assert.Equal("Conferir a etapa", r.Indicar[0].Passo);
+        Assert.Equal("Conferir a etapa (sem prazo informado)", r.Indicar[1].Passo);
+    }
+
+    [Fact]
+    public void AceitePendente_so_com_indicacao_registrada_pela_Senatran_sem_aceite()
+    {
+        Assert.True(MultaEtapas.AceitePendente(new MultaEstado { DataIndicacao = "2026-11-14", Canal = MultaCodigos.Senatran }));
+        Assert.False(MultaEtapas.AceitePendente(new MultaEstado { DataIndicacao = "2026-11-14", Canal = MultaCodigos.Senatran, AceiteEm = "2026-11-15" }));
+        Assert.False(MultaEtapas.AceitePendente(new MultaEstado { DataIndicacao = "2026-11-14", Canal = MultaCodigos.DsvDigital }));
+        Assert.False(MultaEtapas.AceitePendente(new MultaEstado { Canal = MultaCodigos.Senatran }));
+    }
+
+    [Fact]
     public void Plugin_le_as_abertas_inclusive_antigas_sem_tarefa()
     {
         var mundo = new FakeMundo();

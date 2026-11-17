@@ -148,6 +148,9 @@ public static class MultaEtapas
         return (etapa == Identificar || etapa == Indicar) && m.DataParaIndicar != null && string.CompareOrdinal(m.DataParaIndicar, hoje) < 0;
     }
 
+    /// <summary>Indicação da Senatran registrada e ainda sem aceite na CNH Digital (mesma regra do passo RegistrarAceite).</summary>
+    public static bool AceitePendente(MultaEstado m) => m.DataIndicacao != null && m.Canal == MultaCodigos.Senatran && m.AceiteEm == null;
+
     public static MultaSituacao Avaliar(MultaEstado m, string hoje)
     {
         var etapa = Etapa(m.Status);
@@ -164,7 +167,7 @@ public static class MultaEtapas
             case Indicar:
                 if (m.DataAviso == null) s.Pendentes.Add(Passos.AvisarMotorista);
                 if (m.DataIndicacao == null || m.Canal == null) s.Pendentes.Add(Passos.RegistrarIndicacao);
-                else if (m.Canal == MultaCodigos.Senatran && m.AceiteEm == null) s.Pendentes.Add(Passos.RegistrarAceite);
+                else if (AceitePendente(m)) s.Pendentes.Add(Passos.RegistrarAceite);
                 break;
             case Pagar:
                 if (m.Vencimento == null) s.AguardandoPenalidade = true;

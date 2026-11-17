@@ -28,7 +28,7 @@ public sealed class MultasDoDiaResultado
     [DataMember(Name = "aguardandoAcerto", Order = 7)] public int AguardandoAcerto { get; set; }
 }
 
-/// <summary>Seções do e-mail "Multas de hoje" (spec §6), com as regras de MultaEtapas. Cada multa entra numa seção só.
+/// <summary>Seções do e-mail "Multas de hoje" (spec §6), com as regras de MultaEtapas. Cada multa entra numa seção só. Etapas 1 e 2 sem prazo informado ficam no fim de "Indicar".
 /// "Pagar com 40%" inclui as guias já vencidas (dias &lt;= 5, inclusive negativos): nunca perder prazo.</summary>
 public static class MultasDoDia
 {
@@ -40,9 +40,9 @@ public static class MultasDoDia
             var e = m.Estado;
             var s = MultaEtapas.Avaliar(e, hoje);
             if (s.PrazoVencido) r.PrazoVencido.Add(Linha(m, s));
-            else if (s.Etapa == MultaEtapas.Indicar && e.Canal == MultaCodigos.Senatran && e.AceiteEm == null && e.DataIndicacao != null && Regras.Dias(e.DataIndicacao, hoje) >= 2)
+            else if (s.Etapa == MultaEtapas.Indicar && MultaEtapas.AceitePendente(e) && Regras.Dias(e.DataIndicacao!, hoje) >= 2)
                 r.Aceite.Add(Linha(m, s));
-            else if ((s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && e.DataParaIndicar != null && Regras.Dias(hoje, e.DataParaIndicar) <= 7)
+            else if ((s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && (e.DataParaIndicar == null || Regras.Dias(hoje, e.DataParaIndicar) <= 7))
                 r.Indicar.Add(Linha(m, s));
             else if (s.Etapa == MultaEtapas.Pagar && e.Vencimento != null && Regras.Dias(hoje, e.Vencimento) <= 5)
                 r.Pagar.Add(Linha(m, s));
@@ -65,6 +65,13 @@ public static class MultasDoDia
         Placa = m.Placa,
         Responsavel = MultaEtapas.ResponsavelEfetivo(m.Estado) == MultaCodigos.Empresa ? "Empresa" : m.Motorista ?? "Sem responsável",
         Prazo = s.ProximoPrazo,
-        Passo = s.ProximoPasso,
+        Passo = PassoDaLinha(s),
     };
+
+    /// <summary>Nunca deixa a linha sem passo (multa na etapa sem pendência) nem esconde a falta do prazo.</summary>
+    private static string PassoDaLinha(MultaSituacao s)
+    {
+        var passo = string.IsNullOrEmpty(s.ProximoPasso) ? "Conferir a etapa" : s.ProximoPasso;
+        return (s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && s.ProximoPrazo == null ? passo + " (sem prazo informado)" : passo;
+    }
 }
