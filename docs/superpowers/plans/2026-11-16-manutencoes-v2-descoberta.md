@@ -165,3 +165,10 @@ Papéis que têm Create/Write em `cr40f_despesaoperacional`, Create em `cr40f_an
 - `Acesso-Motoristas` tem `prvCreatecr40f_reservadeveculos`: **sim** (Basic, 1) → o ponto 1 para o Renan fica sem candidato: `ExecutePrivilegeName` nas APIs de gestor não separaria o motorista do escritório.
 - `LIMITE` do shell: **troca o padrão do plano** para `{ comentarioAprovador: 100, comentarioAoMotorista: 1000, estabelecimento: 100, servicoRealizado: 100, comentarioColaborador: 4000, descricao: 4000 }` (valores do plano que diferem do DEV: `comentarioAoMotorista` 100 → 1000, `comentarioColaborador` 500 → 4000 e `descricao` 2000 → 4000; `comentarioAprovador`, `estabelecimento` e `servicoRealizado` já eram 100 e batem). O comentário ao motorista também vai para `cr40f_obsdeoperao` (memo, 40000), então o limite efetivo é o de `cr40f_comentariosaomotorista`.
 - Rótulo da opção 100000018 (D8): ainda é `FrotaAgendadaVencida` → a migration `20261117-1010-agente-frota-atrasada.ps1` (`UpdateOptionValue`) é necessária.
+
+### Colunas da despesa que a conclusão grava (conferência da revisão final, só leitura no DEV)
+
+- `cr40f_despesaoperacional.cr40f_observacao`: memo, **4000** (a conclusão grava o comentário, até 4000: igual ao `LIMITE.comentarioColaborador`).
+- `cr40f_despesaoperacional.cr40f_estabelecimento`: texto, **200** (a conclusão grava o estabelecimento, até 100 no shell: o limite da manutenção, 100, é o menor).
+- Resultado: nenhum `LIMITE` do shell muda; os dois limites do shell já são o menor entre a manutenção e a despesa.
+
