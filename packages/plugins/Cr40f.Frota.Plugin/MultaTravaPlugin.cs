@@ -45,6 +45,7 @@ public sealed class MultaTravaPlugin : IPlugin
             var auto = alvo.GetAttributeValue<string>("cr40f_novacoluna")?.Trim();
             if (string.IsNullOrEmpty(auto)) recusas.Add("Informe o número do auto de infração.");
             else if (AutoExiste(system, auto!)) recusas.Add($"Já existe multa com o auto {auto}.");
+            if (!string.IsNullOrEmpty(auto)) alvo["cr40f_novacoluna"] = auto; // grava cortado, para a checagem de duplicata achar o valor depois
             var passos = alvo.Attributes.Where(a => a.Key != "cr40f_status" && CamposDePasso.Contains(a.Key) && a.Value != null).Select(a => a.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
             if (passos.Count > 0 && !VemDoPasso(context)) recusas.Add(Mensagem(passos));
             // Toda multa nova começa na etapa 1, nos dois modos (não é recusa: é o ponto de partida do passo a passo).

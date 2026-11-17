@@ -104,6 +104,17 @@ public class MultaTravaTests
     }
 
     [Fact]
+    public void Create_grava_o_numero_do_auto_sem_espacos()
+    {
+        var mundo = new FakeMundo();
+        var alvo = Alvo(Guid.NewGuid(), ("cr40f_novacoluna", " 1A2B3C "));
+
+        Contexto.Rodar(new MultaTravaPlugin(), Contexto.Gravacao("Create", alvo), mundo);
+
+        Assert.Equal("1A2B3C", alvo.GetAttributeValue<string>("cr40f_novacoluna"));
+    }
+
+    [Fact]
     public void Create_comeca_na_etapa_1_e_aceita_o_motorista()
     {
         var mundo = new FakeMundo().Variavel(MultaTravaPlugin.ModoVariavel, "travar");
