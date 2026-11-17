@@ -116,8 +116,9 @@ describe('chips ANT. (período anterior de mesma duração)', () => {
   it('Serviços e Financeiro mostram o anterior, a variação e se é favorável em texto', () => {
     renderServicos(BASE)
     // 01/09–15/10 (45 dias): o anterior é 18/07–31/08, sem serviços → base zero.
-    expect(within(kpi('Total de serviços')).getByTitle('Período anterior de mesma duração: 0, sem variação em %').textContent).toBe('Ant.Período anterior de mesma duração 0, sem variação em %')
-    expect(within(kpi('Cancelados')).getByText('Período anterior de mesma duração')).toBeTruthy()
+    expect(within(kpi('Total de serviços')).getByTitle('Período anterior de mesma duração: sem variação em %').textContent).toBe('—, sem variação em %')
+    expect(within(kpi('Total de serviços')).getByText('vs 0 no período anterior')).toBeTruthy()
+    expect(within(kpi('Cancelados')).getByText('vs 0 no período anterior')).toBeTruthy()
     cleanup()
     const anterior = { ...BASE, reservas: [...BASE.reservas, reserva({ saidaRaw: '2026-08-10T12:00:00Z', valor: 2000, cliente: 'Tenaris' })] }
     renderFinanceiro(anterior)

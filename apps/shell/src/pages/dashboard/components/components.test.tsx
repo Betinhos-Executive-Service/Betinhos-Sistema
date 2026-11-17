@@ -6,8 +6,8 @@ import { AnaliseCard } from './AnaliseCard'
 import { tomStatus } from './Celulas'
 import { DashboardToolbar } from './DashboardToolbar'
 import { Emergenciais } from './Emergenciais'
+import { StatCard } from '@betinhos/ui'
 import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
-import { KpiCard } from './KpiCard'
 import { KpiGrid } from './KpiGrid'
 import { AbaCarregando, ProgressoCarga } from './Carregando'
 import { SemDadoBloco } from './Estados'
@@ -124,18 +124,20 @@ describe('componentes do Dashboard', () => {
     semAvisoDeGrafico(() => render(<KpiGrid kpis={kpis} />))
     const card = screen.getByRole('article', { name: 'Faturamento' })
     expect(within(card).getByText('R$ 10,0k')).toBeTruthy()
-    expect(within(card).getByText('R$ 9,0k').parentElement?.textContent).toBe('Mês ant.Mesmo período do mês anterior R$ 9,0k +11,1%')
+    expect(within(card).getByText('vs R$ 9,0k no mês anterior')).toBeTruthy()
+    expect(within(card).getByTitle('Mesmo período do mês anterior').textContent).toBe('+11,1%, favorável')
     expect(within(card).getByText('Previsão')).toBeTruthy()
+    expect(card.lastElementChild?.classList.contains('bt-spark')).toBe(true)
     expect(card.lastElementChild?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('s/dado tem uma regra só: o valor do KPI e o do bloco viram "s/dado" em tom secundário, e o bloco traz o motivo', () => {
     render(<>
-      <KpiCard rotulo="Multas" valor={null} />
+      <StatCard label="Multas" value={null} />
       <SemDadoBloco titulo="Por infração" periodo={PERIODO} unidade="multas" motivo="A tabela de multas não respondeu nesta carga." />
     </>)
     const kpi = screen.getByRole('article', { name: 'Multas' })
-    expect(within(kpi).getByText('s/dado').className).toBe('dash-kpi__valor dash-kpi__valor--semdado')
+    expect(within(kpi).getByText('s/dado').className).toBe('bt-stat__value bt-stat__value--empty')
     expect(kpi.textContent).not.toContain('—')
     const bloco = screen.getByRole('region', { name: 'Por infração' })
     expect(within(bloco).getByText('s/dado').className).toBe('dash-card__valor dash-card__valor--semdado')
@@ -149,7 +151,7 @@ describe('componentes do Dashboard', () => {
     expect(barra.getAttribute('aria-valuenow')).toBe('46')
     expect(screen.getByText('46%')).toBeTruthy()
     expect(screen.getByRole('status', { name: 'Carregando dashboard' })).toBeTruthy()
-    expect(document.querySelector('.dash-kpi')).toBeNull()
+    expect(document.querySelector('.bt-stat')).toBeNull()
   })
 
   it('card de análise com gráfico: o gráfico fica sempre à vista e os valores abrem sob demanda', () => {

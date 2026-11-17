@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { StatCard, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
@@ -12,8 +12,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -60,13 +60,11 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   if (prazo?.ly != null) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
-      <KpiCard rotulo={KPIS[0]} valor={k ? int(k.total) : null}>{ma.ant ? <ChipAnt chip={ma.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
-        {ma.ant ? <ChipAnt chip={ma.ant.custoTotal} /> : undefined}
-      </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom={tomAtencao(k?.emAndamento)} valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, agendadas ou programadas' : undefined} />
-      <KpiCard rotulo={KPIS[3]} valor={k ? brl(k.custoMedio) : null} />
-      <KpiCard rotulo={KPIS[4]} valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
+      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [ma.ant?.total] })} />
+      <StatCard label={KPIS[1]} value={k ? brl(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
+      <StatCard label={KPIS[2]} {...tomAtencao(k?.emAndamento)} value={k ? int(k.emAndamento) : null} {...extrasKpi({ apoio: k ? 'solicitadas, agendadas ou programadas' : undefined })} />
+      <StatCard label={KPIS[3]} value={k ? brl(k.custoMedio) : null} />
+      <StatCard label={KPIS[4]} value={prazo ? diasTexto(prazo.medio) : null} {...extrasKpi({ apoio: apoioPrazo })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">

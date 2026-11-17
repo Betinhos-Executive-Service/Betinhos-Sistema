@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Button, PageToolbar, Select, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Button, PageToolbar, Select, StatCard, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { AlertTriangle, CircleCheck, X } from 'lucide-react'
 import { LinhaChart } from '../../charts/Charts'
@@ -14,8 +14,8 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
-import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tendencia, tomAtencao } from '../KpiLinha'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar, useTopCelular } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import type { DadosAba, PropsAba } from './abas'
@@ -38,17 +38,14 @@ const formatarKpi = (k: KpiDespesa, indisponivel: boolean) =>
   (indisponivel ? null : k.valor == null ? '—' : k.formato === 'brlS' ? brlS(k.valor) : k.formato === 'brl' ? brl(k.valor) : int(k.valor))
 const forte = (texto: string) => <strong className="dash-forte">{texto}</strong>
 
-/** KPI de despesa: o card único com o chip ANT. e, na hospedagem, a faixa da política (com texto) como extras. */
+/** KPI de despesa: comparativo ANT. e, na hospedagem, a faixa da política (com texto) como extras. */
 function KpiDespesaCartao({ k, indisponivel }: { k: KpiDespesa; indisponivel: boolean }) {
   const icone = k.faixa?.tom === 'ok' ? <CircleCheck size={12} /> : k.faixa?.tom === 'warn' || k.faixa?.tom === 'danger' ? <AlertTriangle size={12} /> : undefined
-  const extras = k.chip || k.faixa ? <>
-    {k.chip ? <ChipAnt chip={k.chip} /> : null}
-    {k.faixa ? <>
-      <StatusBadge tone={TOM_FAIXA[k.faixa.tom]} icon={icone}>{k.faixa.texto}</StatusBadge>
-      <span className="dash-apoio">{k.faixa.apoio}</span>
-    </> : null}
+  const faixa = k.faixa ? <>
+    <StatusBadge tone={TOM_FAIXA[k.faixa.tom]} icon={icone}>{k.faixa.texto}</StatusBadge>
+    <span className="dash-apoio">{k.faixa.apoio}</span>
   </> : undefined
-  return <KpiCard rotulo={k.rotulo} valor={formatarKpi(k, indisponivel)} tom={ATENCAO.has(k.id) ? tomAtencao(k.valor) : 'brand'} serie={k.serie}>{extras}</KpiCard>
+  return <StatCard label={k.rotulo} value={formatarKpi(k, indisponivel)} {...tomAtencao(ATENCAO.has(k.id) ? k.valor : null)} trend={tendencia(k.serie)} {...extrasKpi({ chips: [k.chip], extra: faixa })} />
 }
 
 type Proprios = { proprios: FiltrosDespesaProprios; onProprios: (f: FiltrosDespesaProprios) => void }

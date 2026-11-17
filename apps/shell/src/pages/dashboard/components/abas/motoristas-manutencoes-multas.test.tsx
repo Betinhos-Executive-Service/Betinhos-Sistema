@@ -151,7 +151,7 @@ describe('ManutencoesTab', () => {
   it('regra de vazio: tabela no ar sem prazo medido mostra "—", nunca s/dado', () => {
     semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dadosVazios({ manutencoes: [manutencao({ dia: '2026-10-05', tipoReparo: 'Preventiva programada' })] }))} />))
     const prazo = kpi('Prazo médio')
-    expect(prazo.querySelector('.dash-kpi__valor')?.textContent).toBe('—')
+    expect(prazo.querySelector('.bt-stat__value')?.textContent).toBe('—')
     expect(within(prazo).queryByText('s/dado')).toBeNull()
     // Comparativo sem medição não aparece (nem "Ano anterior —").
     expect(within(prazo).queryByText('Ano anterior')).toBeNull()

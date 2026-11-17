@@ -17,13 +17,13 @@ function Rotulo({ curto, longo }: { curto?: string; longo: string }) {
 }
 
 /**
- * Comparativos: o domínio usa os códigos do legado (LM, LY, ANT.); a tela mostra um rótulo curto em português e o nome
- * completo vai na dica (title) e no leitor de tela.
+ * Comparativos: o domínio usa os códigos do legado (LM, LY, ANT.); o chip mostra o rótulo curto, o card do KPI usa o `periodo` na
+ * frase de apoio, e o nome completo vai na dica (title) e no leitor de tela.
  */
-const COMPARATIVO: Record<string, { curto: string; longo: string }> = {
-  LM: { curto: 'Mês ant.', longo: 'Mesmo período do mês anterior' },
-  LY: { curto: 'Ano ant.', longo: 'Mesmo período do ano anterior' },
-  'ANT.': { curto: 'Ant.', longo: 'Período anterior de mesma duração' },
+export const COMPARATIVO: Record<string, { curto: string; periodo: string; longo: string }> = {
+  LM: { curto: 'Mês ant.', periodo: 'mês anterior', longo: 'Mesmo período do mês anterior' },
+  LY: { curto: 'Ano ant.', periodo: 'ano anterior', longo: 'Mesmo período do ano anterior' },
+  'ANT.': { curto: 'Ant.', periodo: 'período anterior', longo: 'Período anterior de mesma duração' },
 }
 
 const comparativo = (codigo: string): { curto?: string; longo: string } => COMPARATIVO[codigo] ?? { longo: codigo }
