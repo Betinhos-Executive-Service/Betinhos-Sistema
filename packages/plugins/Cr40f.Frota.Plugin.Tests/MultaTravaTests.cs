@@ -137,4 +137,13 @@ public class MultaTravaTests
 
         Assert.Contains("cr40f_responsavel", erro.Message);
     }
+
+    [Fact]
+    public void Registrador_filtra_pelos_mesmos_campos_de_passo()
+    {
+        var fonte = System.IO.File.ReadAllText(FixtureParidade.Caminho("..", "..", "..", "..", "tools", "Cr40f.Frota.Registrar", "Program.cs"));
+        var linha = fonte.Split('\n').Single(l => l.StartsWith("const string CamposDePasso = "));
+        var campos = linha.Split('"')[1].Split(',');
+        Assert.Equal(MultaTravaPlugin.CamposDePasso.OrderBy(c => c, StringComparer.Ordinal), campos.OrderBy(c => c, StringComparer.Ordinal));
+    }
 }
