@@ -59,9 +59,18 @@ Para cada notificação de autuação que aparecer no SNE:
    achados nas buscas dos itens 2 e 3 (o nome de navegação distingue maiúsculas e minúsculas):
    - placa: `"cr40f_Placa@odata.bind": "/cr40f_veiculoses(<GUID do veículo>)"`;
    - infração: `"cr40f_Codigodainfracao@odata.bind": "/cr40f_infracaodetransitos(<GUID da infração>)"`.
+   Para criar com `@odata.bind`, use a ferramenta `create_record` do conector MCP do Dataverse, com a tabela `cr40f_multas`
+   e os campos do item 4 (inclusive as duas chaves `@odata.bind`) no corpo do registro; não invente outros parâmetros.
    Exemplo com GUIDs fictícios:
    `"cr40f_Placa@odata.bind": "/cr40f_veiculoses(00000000-0000-4000-8000-000000000001)"`. Não grave
    `cr40f_placa` nem `cr40f_codigodainfracao` com o GUID direto: o lookup só grava pelo `@odata.bind`.
+   **Conferência obrigatória da primeira multa criada em cada execução.** Os nomes de navegação `cr40f_Placa` e
+   `cr40f_Codigodainfracao` ainda não foram confirmados em uso real. Logo depois de criar a primeira multa da execução,
+   abra o registro criado (ferramenta de leitura do conector, pelo id devolvido na criação) e confirme que a placa e, se
+   o item 3 achou a infração, a infração ficaram preenchidas. Se não ficaram, **pare a rotina**: não crie mais nenhuma
+   multa, não faça o passo 2 e avise o Júnior com o auto, o que foi enviado e o que voltou. Se ficaram, siga para as
+   próximas sem repetir a conferência.
+
 5. **Anexe o PDF** da notificação de autuação na coluna de arquivo `cr40f_autodainfracao` da multa criada
    (upload de arquivo do conector: iniciar, enviar e confirmar). Multa sem o PDF fica incompleta: se o envio falhar,
    anote o auto para anexar depois.
@@ -87,6 +96,7 @@ Um resumo curto, nesta ordem:
 - multas novas cadastradas (auto, placa, data para indicar);
 - penalidades gravadas (auto, vencimento, valor com desconto);
 - multas criadas "sem infração no cadastro" (auto e código da infração do SNE);
+- se a conferência da primeira multa falhou: a rotina parou ali, com o que voltou no registro;
 - puladas e por quê (já cadastrada, duplicada, placa não encontrada, dado obrigatório faltando no SNE, outra recusa com a
   mensagem) e PDFs que não subiram.
 

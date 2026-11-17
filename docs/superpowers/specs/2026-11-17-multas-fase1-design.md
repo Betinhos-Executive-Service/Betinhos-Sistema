@@ -231,9 +231,9 @@ A parte do Infleet reaproveita a coleta de evidências do termo: `EvidenciaInfle
 ## 8. Rotina do SNE (skill do Júnior)
 
 A versão nova do roteiro fica versionada em `docs/multas/rotina-sne.md`, e o Júnior copia o conteúdo para a skill dele no claude.ai. Mudanças:
-1. **Multa nova:** sempre grava número do auto, órgão autuador (código e nome), placa, data e hora, local, código da infração, valor e `cr40f_dataparaindicar`, e anexa o PDF da notificação de autuação. Nunca grava status, responsável, canal nem as datas dos passos.
+1. **Multa nova:** sempre grava número do auto, órgão autuador (código e nome), placa, data e hora, local, código da infração, valor e `cr40f_dataparaindicar`, e anexa o PDF da notificação de autuação. Nunca grava status, responsável, canal nem as datas dos passos. A infração pode faltar quando o código não está no cadastro: a multa é criada sem ela e vai no resumo para o Júnior.
 2. **Multas abertas sem vencimento:** procura a penalidade no portal e grava `cr40f_vencimento`, `cr40f_valorcomdesconto` e `cr40f_pdfpenalidade`.
-3. **Duplicata:** se a gravação for recusada por número repetido, a rotina segue para a próxima multa.
+3. **Duplicata:** com a trava em "observar" (modo de partida), o servidor não recusa número repetido, só registra; por isso a busca pelo número do auto antes de criar é obrigatória. Com a trava em "travar", se a gravação for recusada por número repetido, a rotina segue para a próxima multa.
 
 ## 9. Virada
 

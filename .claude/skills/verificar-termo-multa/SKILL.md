@@ -4,6 +4,11 @@ description: "Verifica o termo de multa do lado do gestor no Sistema Betinhos (p
 ---
 # Verificar termo de multa (gestor)
 
+> **Fase 1 das multas (17/11/2026): o termo está escondido.** O `TermoMultaPanel` não aparece no drawer da multa e a lista
+> não tem mais a coluna Termo nem as visões "Termos pendentes" e "Contestados" (a multa anda pelo passo a passo; skill
+> `verificar-multas`). O código e os testes do painel continuam e voltam na fase 3; até lá, esta skill só vale para os testes
+> do componente (`TermoMultaPanel.test.tsx`).
+
 ## Cobre
 - Painel `TermoMultaPanel.tsx`: G1 motorista/aditivo e "Registrar aditivo de Nome" (`#/funcionarios?ficha=<id>&voltar=<hash>`), G3 confirmação do envio, G4 prazo e "Lembrar motorista" (`new_LembrarTermoMulta`), G5 hash, "Baixar PDF" (`new_BaixarPdfTermoMulta`, base64 → Blob) e parcelas, G6 valor travado com termo pendente.
 - Lista de Multas: coluna Termo (`domain/linhas.ts`, `rotuloTermo`) e visões "Termos pendentes" e "Contestados" (`domain/listas.ts`).
