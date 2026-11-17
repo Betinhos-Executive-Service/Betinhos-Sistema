@@ -315,7 +315,7 @@
 .gr-manut__abrir svg { flex: 0 0 auto; color: var(--bt-color-warning); }
 /* Rótulo: na tabela, a placa em destaque e "Manutenção" embaixo, pequeno; em cards, uma linha; na densidade mínima, só a placa (o ícone já diz que é manutenção). */
 .gr-manut__rotulo { display: inline-flex; min-width: 0; }
-.gr-table .gr-manut__rotulo { flex-direction: column-reverse; align-items: flex-start; line-height: 1.2; }
+.gr-table .gr-manut__rotulo { flex-direction: column; align-items: flex-start; line-height: 1.2; }
 .gr-manut__sep { margin: 0 0.25em; }
 .gr-table .gr-manut__sep { display: none; }
 .gr-table .gr-manut__tipo { font-size: var(--bt-font-size-11); font-weight: 500; color: var(--bt-color-text-secondary); }

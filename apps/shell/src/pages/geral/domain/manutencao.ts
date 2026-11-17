@@ -219,8 +219,14 @@ export const editavelNaManutencao = (column: Column) => !column.alias && (column
  * `problema` (o problema, o grau e a janela) e `vazio`.
  */
 export type CelulaManutencao = { tipo: 'campo' | 'status' | 'veiculo' | 'problema' | 'vazio'; column: Column }
-/** `resumoNaPrimeira`: sem coluna para o problema, ele vai dentro da primeira coluna. `statusNoProblema`: sem Status de Op., o status vai junto do problema. */
-export type DesenhoManutencao = { celulas: CelulaManutencao[]; resumoNaPrimeira: boolean; statusNoProblema: boolean }
+/**
+ * - `primeiraEditavel`: a primeira coluna da visão é motorista ou saída; ela continua sendo o campo editável de sempre.
+ * - `botaoEm`: onde fica o botão que abre a gaveta: `-1` = primeira coluna; um índice de `celulas` = a primeira célula que
+ *   não edita (quando a primeira coluna edita); `null` = em nenhum lugar (visão só com campos editáveis).
+ * - `resumoNoBotao`: sem coluna para o problema, ele vai junto do botão.
+ * - `statusNoProblema`: sem Status de Op., o status vai junto do problema.
+ */
+export type DesenhoManutencao = { celulas: CelulaManutencao[]; resumoNoBotao: boolean; statusNoProblema: boolean; primeiraEditavel: boolean; botaoEm: number | null }
 
 const STATUS_DA_LINHA = 'cr40f_status'
 const VEICULO = 'cr40f_veiculo'
@@ -241,7 +247,11 @@ export function desenhoDaManutencao(columns: Column[]): DesenhoManutencao {
   const comuns = resto.filter((c) => !editavelNaManutencao(c) && c !== status && c !== veiculo && !c.alias && !VIRTUAIS.has(c.key))
   const problema = comuns.find((c) => propria(c, TRAJETO)) ?? comuns.reduce<Column | undefined>((maior, c) => (!maior || c.width > maior.width ? c : maior), undefined)
   const tipo = (c: Column): CelulaManutencao['tipo'] => (editavelNaManutencao(c) ? 'campo' : c === status ? 'status' : c === veiculo ? 'veiculo' : c === problema ? 'problema' : 'vazio')
-  return { celulas: resto.map((column) => ({ tipo: tipo(column), column })), resumoNaPrimeira: columns.length > 0 && !problema, statusNoProblema: !status }
+  const celulas = resto.map((column) => ({ tipo: tipo(column), column }))
+  const primeiraEditavel = columns.length > 0 && editavelNaManutencao(columns[0])
+  const naoEdita = celulas.findIndex((c) => c.tipo !== 'campo')
+  const botaoEm = !primeiraEditavel ? -1 : naoEdita >= 0 ? naoEdita : null
+  return { celulas, resumoNoBotao: columns.length > 0 && !problema, statusNoProblema: !status, primeiraEditavel, botaoEm }
 }
 
 /** Colunas da edição da manutenção no celular: motorista e saída da visão, ou criadas aqui quando a visão não as tem. */

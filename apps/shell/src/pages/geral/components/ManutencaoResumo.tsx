@@ -1,4 +1,5 @@
 import { StatusBadge } from '@betinhos/ui'
+import { Wrench } from 'lucide-react'
 import type { LinhaManutencao } from '../domain/manutencao'
 
 /**
@@ -38,9 +39,22 @@ export function ManutencaoResumo({ m, quebra = false, status = true }: { m: Linh
 export function ManutencaoRotulo({ m }: { m: LinhaManutencao }) {
   return (
     <span className="gr-manut__rotulo">
-      <span className="gr-manut__tipo">Manutenção</span>
-      <span className="gr-manut__sep"> · </span>
       <span className="gr-manut__placa">{m.veiculo}</span>
+      <span className="gr-manut__sep"> · </span>
+      <span className="gr-manut__tipo">Manutenção</span>
     </span>
+  )
+}
+
+/** Nome acessível do botão que abre a gaveta: começa pelo texto visível ("TST1A11 · Manutenção") e diz o que abre. */
+export const rotuloAbrirManutencao = (m: LinhaManutencao) => `${m.veiculo} · Manutenção, abrir: ${m.descricao}`
+
+/** Botão da linha que abre a gaveta da manutenção (o único alvo acessível dela) e, sem coluna para o problema, o resumo embaixo. */
+export function ManutencaoAbrir({ m, abrir, resumo, statusNoResumo }: { m: LinhaManutencao; abrir: () => void; resumo: boolean; statusNoResumo: boolean }) {
+  return (
+    <>
+      <button type="button" className="gr-open gr-manut__abrir" aria-label={rotuloAbrirManutencao(m)} title={m.descricao} onClick={abrir}><Wrench size={14} aria-hidden="true" /><ManutencaoRotulo m={m} /></button>
+      {resumo ? <ManutencaoResumo m={m} quebra status={statusNoResumo} /> : null}
+    </>
   )
 }

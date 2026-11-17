@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, COLUMN_FILTER_EVENT, Checkbox, ColumnFilter, ColumnMenu, Spinner, type TableDensity, type TableQuickFilters } from '@betinhos/ui'
-import { ArrowDown, ArrowUp, ChevronRight, Wrench } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronRight } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { useVirtualRows } from '../../../app/VirtualTable'
 import { cellKind, isBadgeValue } from '../domain/cells'
@@ -12,7 +12,7 @@ import { sameSort } from '../domain/sort'
 import { ID_ATTRIBUTE, type AttributeMap, type Column, type Sort } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { LoadSentinel } from './LoadMore'
-import { ManutencaoResumo, ManutencaoRotulo, ManutencaoSelos } from './ManutencaoResumo'
+import { ManutencaoAbrir, ManutencaoResumo, ManutencaoSelos } from './ManutencaoResumo'
 
 /** Um grupo do servidor: rótulo e contagem reais; `rows` só tem o que já carregou (abre sob demanda, 100 por vez). */
 export type GroupView = { id: string; label: string; count: number; open: boolean; rows: Row[]; more: boolean; loading: boolean; error: string | null }
@@ -369,17 +369,24 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
                   <div className="bt-table__cell gr-cell--select" role="gridcell">
                     <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={isSelected} onChange={() => onToggle(id)} />
                   </div>
-                  <div className={desenho.resumoNaPrimeira ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
-                    <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} title={m.descricao} onClick={abrir}><Wrench size={14} aria-hidden="true" /><ManutencaoRotulo m={m} /></button>
-                    {desenho.resumoNaPrimeira ? <ManutencaoResumo m={m} quebra status={desenho.statusNoProblema} /> : null}
-                  </div>
-                  {desenho.celulas.map(({ tipo, column }) => {
+                  {desenho.primeiraEditavel
+                    // A primeira coluna da visão é motorista ou saída: continua sendo o campo editável; o botão vai para `botaoEm`.
+                    ? <Fragment key={columns[0].key}>{renderCell(row, columns[0])}</Fragment>
+                    : (
+                      <div className={desenho.resumoNoBotao ? 'bt-table__cell gr-cell gr-cell--first gr-manut__primeira' : 'bt-table__cell gr-cell gr-cell--first'} role="gridcell">
+                        <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} />
+                      </div>
+                    )}
+                  {desenho.celulas.map(({ tipo, column }, indice) => {
                     if (tipo === 'campo') return <Fragment key={column.key}>{renderCell(row, column)}</Fragment>
+                    const comBotao = indice === desenho.botaoEm
                     return (
-                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}`}>
+                      <div key={column.key} role="gridcell" className={`bt-table__cell gr-cell gr-manut__trecho gr-manut__trecho--${tipo}${comBotao && desenho.resumoNoBotao ? ' gr-manut__primeira' : ''}`}>
+                        {comBotao ? <ManutencaoAbrir m={m} abrir={abrir} resumo={desenho.resumoNoBotao} statusNoResumo={desenho.statusNoProblema} /> : null}
                         {tipo === 'status' ? <ManutencaoSelos m={m} /> : null}
                         {tipo === 'veiculo' ? <span className="gr-cell__value" title={m.veiculo}>{m.veiculo}</span> : null}
-                        {tipo === 'problema' ? <button type="button" tabIndex={-1} className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} status={desenho.statusNoProblema} /></button> : null}
+                        {/* Mesmo destino do botão da placa: um alvo acessível só por linha (fora do Tab e dos leitores de tela). */}
+                        {tipo === 'problema' ? <button type="button" tabIndex={-1} aria-hidden="true" className="gr-manut__resumo-botao" onClick={abrir}><ManutencaoResumo m={m} status={desenho.statusNoProblema} /></button> : null}
                       </div>
                     )
                   })}

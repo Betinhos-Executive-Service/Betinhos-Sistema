@@ -14,10 +14,10 @@ afterEach(() => { act(() => fecharGavetaRegistro()) })
 const host = { mode: 'mock' } as const
 // A busca deixa na lista só as quatro linhas de manutenção do mock (OS-9001 a OS-9004).
 beforeEach(() => { window.location.hash = '#/geral?q=OS-900' })
-const abrirDe = (descricao: string) => screen.findByRole('button', { name: new RegExp(`^Abrir manutenção ${descricao}`), hidden: true })
+const abrirDe = (descricao: string) => screen.findByRole('button', { name: new RegExp(`abrir: ${descricao}`), hidden: true })
 const linhaDe = async (descricao: string) => (await abrirDe(descricao)).closest('[role="row"]') as HTMLElement
 const chave = () => screen.getByLabelText('Mostrar manutenções') as HTMLInputElement
-const nenhumaManutencao = () => screen.queryByRole('button', { name: /^Abrir manutenção/, hidden: true }) == null
+const nenhumaManutencao = () => screen.queryByRole('button', { name: /, abrir: /, hidden: true }) == null
 
 describe('Geral › linhas de manutenção', () => {
   it('aparecem com outra cara, com o selo de atrasada, e abrem a gaveta da manutenção pela Geral', async () => {

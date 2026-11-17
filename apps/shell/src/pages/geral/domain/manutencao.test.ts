@@ -194,14 +194,14 @@ describe('linha de manutenção', () => {
     const d = desenhoDaManutencao(cols)
     expect(d.celulas.map((c) => c.tipo)).toEqual(['vazio', 'status', 'vazio', 'campo', 'campo', 'veiculo', 'vazio', 'problema', 'vazio'])
     expect(d.celulas.map((c) => c.column)).toEqual(cols.slice(1))
-    expect(d).toMatchObject({ resumoNaPrimeira: false, statusNoProblema: false })
+    expect(d).toMatchObject({ resumoNoBotao: false, statusNoProblema: false })
   })
 
   it('sem Trajeto, o problema vai na coluna comum mais larga; sem Status de Op., o status vai junto com o problema', () => {
     const cols = [coluna('cr40f_id'), coluna('comprovantes', 90), coluna('cr40f_dataehorriodesada'), coluna('cr40f_cliente', 140), coluna('cr40f_motorista'), coluna('cr40f_statusdefaturamento', 140)]
     const d = desenhoDaManutencao(cols)
     expect(d.celulas.map((c) => c.tipo)).toEqual(['vazio', 'campo', 'problema', 'campo', 'vazio'])
-    expect(d).toMatchObject({ resumoNaPrimeira: false, statusNoProblema: true })
+    expect(d).toMatchObject({ resumoNoBotao: false, statusNoProblema: true })
   })
 
   it('colunas virtuais (Portal, Comprovantes) e de tabela ligada não recebem o problema', () => {
@@ -210,15 +210,24 @@ describe('linha de manutenção', () => {
     expect(comCliente.celulas.map((c) => c.tipo)).toEqual(['vazio', 'campo', 'problema', 'campo'])
     const semLivre = desenhoDaManutencao([coluna('cr40f_id'), portal, coluna('comprovantes', 72), coluna('a_1.new_valortotal', 300), coluna('cr40f_motorista')])
     expect(semLivre.celulas.map((c) => c.tipo)).toEqual(['vazio', 'vazio', 'vazio', 'campo'])
-    expect(semLivre.resumoNaPrimeira).toBe(true)
+    expect(semLivre.resumoNoBotao).toBe(true)
   })
 
   it('visão sem coluna para o problema: o resumo vai dentro da primeira coluna e nenhuma célula sobra', () => {
-    expect(desenhoDaManutencao([coluna('cr40f_id')])).toEqual({ celulas: [], resumoNaPrimeira: true, statusNoProblema: true })
+    expect(desenhoDaManutencao([coluna('cr40f_id')])).toEqual({ celulas: [], resumoNoBotao: true, statusNoProblema: true, primeiraEditavel: false, botaoEm: -1 })
     const d = desenhoDaManutencao([coluna('cr40f_id'), coluna('cr40f_status'), coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')])
     expect(d.celulas.map((c) => c.tipo)).toEqual(['status', 'campo', 'campo'])
-    expect(d).toMatchObject({ resumoNaPrimeira: true, statusNoProblema: false })
-    expect(desenhoDaManutencao([])).toEqual({ celulas: [], resumoNaPrimeira: false, statusNoProblema: true })
+    expect(d).toMatchObject({ resumoNoBotao: true, statusNoProblema: false })
+    expect(desenhoDaManutencao([])).toEqual({ celulas: [], resumoNoBotao: false, statusNoProblema: true, primeiraEditavel: false, botaoEm: -1 })
+  })
+
+  it('primeira coluna da visão é motorista ou saída: ela continua editável e o botão de abrir vai para a primeira coluna que não edita', () => {
+    const cols = ['cr40f_motorista', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_trajeto'].map((k) => coluna(k))
+    const d = desenhoDaManutencao(cols)
+    expect(d).toMatchObject({ primeiraEditavel: true, botaoEm: 0, resumoNoBotao: false })
+    expect(d.celulas.map((c) => c.tipo)).toEqual(['status', 'campo', 'problema'])
+    // Só campos editáveis: não há onde pôr o botão (a ação "Editar" da seleção continua abrindo a gaveta).
+    expect(desenhoDaManutencao([coluna('cr40f_dataehorriodesada'), coluna('cr40f_motorista')])).toMatchObject({ primeiraEditavel: true, botaoEm: null })
   })
 
   it('colunas da edição no celular: as da visão, ou criadas quando a visão não tem', () => {

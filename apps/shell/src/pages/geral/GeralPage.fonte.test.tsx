@@ -16,7 +16,7 @@ describe('Geral › fonte do mock', () => {
   it('no modo mock a página liga as linhas de manutenção do mock (aparecem no dev e nos prints)', async () => {
     window.location.hash = '#/geral?q=OS-900'
     render(<GeralPage host={{ mode: 'mock' }} />)
-    expect(await screen.findByRole('button', { name: /^Abrir manutenção Manutenção fictícia m2/, hidden: true })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /abrir: Manutenção fictícia m2/, hidden: true })).toBeTruthy()
     expect(chamadas[0]).toMatchObject({ manutencoes: true })
   })
 })

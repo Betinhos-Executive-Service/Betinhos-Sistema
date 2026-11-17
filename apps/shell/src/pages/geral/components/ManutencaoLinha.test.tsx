@@ -51,7 +51,7 @@ describe('linha de manutenção', () => {
     expect(cardManutencao.className).toContain('gr-card--manutencao')
     expect(within(cardManutencao).getByText('Sem motorista')).toBeTruthy()
     expect(within(cardManutencao).getByText('Semana de 23/11 a 29/11/2026')).toBeTruthy()
-    fireEvent.click(within(cardManutencao).getByRole('button', { name: 'Abrir manutenção Manutenção fictícia m2 (TST2B22)' }))
+    fireEvent.click(within(cardManutencao).getByRole('button', { name: 'TST2B22 · Manutenção, abrir: Manutenção fictícia m2' }))
     expect(abrir).toHaveBeenCalledWith(expect.objectContaining({ manutencaoId: 'm2' }))
     expect(onOpen).not.toHaveBeenCalled()
     fireEvent.click(within(cardManutencao).getByRole('button', { name: 'Programar' }))
@@ -60,21 +60,58 @@ describe('linha de manutenção', () => {
 })
 
 const INFO = { type: 'String', updatable: true, options: [] } as unknown as AttributeInfo
-function tabela(cols: Column[], rows: Row[], abrir = vi.fn()) {
+function tabela(cols: Column[], rows: Row[], abrir = vi.fn(), onSelectRow = vi.fn(), onToggle = vi.fn()) {
   const view = render(
     <GeralTable
       columns={cols} attributes={null} rows={rows} loading={false} sort={null} defaultSort={null} onSort={() => undefined} filteredKeys={[]} onClearFilter={() => undefined} onHide={() => undefined}
-      onResize={() => undefined} onMove={() => undefined} selected={new Set()} onToggle={() => undefined} onSelectRow={() => undefined} onToggleAll={() => undefined} onOpen={() => undefined}
+      onResize={() => undefined} onMove={() => undefined} selected={new Set()} onToggle={onToggle} onSelectRow={onSelectRow} onToggleAll={() => undefined} onOpen={() => undefined}
       renderCell={(row, column) => <Cell key={column.key} row={row} column={column} info={INFO} status={{ kind: 'idle' }} onSave={async () => true} onReset={() => undefined} search={async () => []} editable />}
       footer={null} empty={null}
       manutencao={{ ler: (row) => lerLinhaManutencao(row, HOJE), abrir }}
     />,
   )
-  return { ...view, abrir }
+  return { ...view, abrir, onSelectRow, onToggle }
 }
 const celulaDe = (linha: HTMLElement, key: string) => linha.querySelector<HTMLElement>('[data-col="' + key + '"]')!
 
 describe('tabela com linha de manutenção', () => {
+  it('um só alvo acessível por linha, com o nome começando pelo texto visível', () => {
+    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto'].map((k) => coluna(k))
+    const { container } = tabela(cols, [m3])
+    const linha = container.querySelector<HTMLElement>('.gr-row--manutencao')!
+    const abrir = within(linha).getAllByRole('button').filter((b) => /abrir:/.test(b.getAttribute('aria-label') ?? ''))
+    expect(abrir).toHaveLength(1)
+    const visivel = (abrir[0].textContent ?? '').trim()
+    expect(abrir[0].getAttribute('aria-label')?.startsWith(visivel)).toBe(true)
+    // O resumo no Trajeto abre a mesma gaveta, mas fica fora do Tab e da árvore acessível.
+    const resumo = linha.querySelector<HTMLElement>('.gr-manut__resumo-botao')!
+    expect(resumo.getAttribute('aria-hidden')).toBe('true')
+    expect(resumo.tabIndex).toBe(-1)
+  })
+
+  it('abrir a manutenção pela placa ou pelo problema não muda a seleção (D8)', () => {
+    const cols = ['cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto'].map((k) => coluna(k))
+    const { container, abrir, onSelectRow, onToggle } = tabela(cols, [m3])
+    const linha = container.querySelector<HTMLElement>('.gr-row--manutencao')!
+    fireEvent.click(within(linha).getByRole('button', { name: /abrir:/ }))
+    fireEvent.click(within(linha).getByText('Manutenção fictícia m3'))
+    expect(abrir).toHaveBeenCalledTimes(2)
+    expect(onSelectRow).not.toHaveBeenCalled()
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it('primeira coluna da visão é motorista: ela continua editável e o botão de abrir vai para o Status de Op.', () => {
+    const cols = ['cr40f_motorista', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_trajeto'].map((k) => coluna(k))
+    const { container } = tabela(cols, [m3])
+    const linha = container.querySelector<HTMLElement>('.gr-row--manutencao')!
+    const celulas = within(linha).getAllByRole('gridcell')
+    expect(celulas).toHaveLength(cols.length + 1)
+    expect(celulas[1].getAttribute('data-col')).toBe('cr40f_motorista')
+    expect(celulas[1].classList.contains('gr-cell--editable')).toBe(true)
+    expect(within(celulas[2]).getByRole('button', { name: /^TST1A11 · Manutenção, abrir:/ })).toBeTruthy()
+    expect(within(celulas[2]).getByText('Programado')).toBeTruthy()
+  })
+
   it('visão sem coluna para o resumo: o resumo aparece na primeira coluna, abaixo do botão, e não desalinha as colunas', () => {
     const cols = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_motorista'].map((k) => coluna(k))
     const { container, abrir } = tabela(cols, [m2])
@@ -82,10 +119,10 @@ describe('tabela com linha de manutenção', () => {
     const celulas = within(linha).getAllByRole('gridcell')
     expect(celulas).toHaveLength(4) // seleção, primeira, saída, motorista: nenhuma célula a mais
     const primeira = celulas[1]
-    expect(within(primeira).getByRole('button', { name: 'Abrir manutenção Manutenção fictícia m2 (TST2B22)' }).textContent).toContain('Manutenção · TST2B22')
+    expect(within(primeira).getByRole('button', { name: 'TST2B22 · Manutenção, abrir: Manutenção fictícia m2' }).textContent).toContain('TST2B22 · Manutenção')
     expect(within(primeira).getByText('Manutenção fictícia m2')).toBeTruthy()
     expect(within(primeira).getByText('Semana de 23/11 a 29/11/2026')).toBeTruthy()
-    fireEvent.click(within(primeira).getByRole('button', { name: /Abrir manutenção/ }))
+    fireEvent.click(within(primeira).getByRole('button', { name: /, abrir: / }))
     expect(abrir).toHaveBeenCalledWith(expect.objectContaining({ manutencaoId: 'm2' }))
   })
 
@@ -152,6 +189,6 @@ describe('tabela com linha de manutenção', () => {
     fireEvent.keyDown(saida, { key: 'ArrowRight' })
     expect(document.activeElement).toBe(celulaDe(linha, 'cr40f_motorista'))
     fireEvent.keyDown(saida, { key: 'ArrowLeft' })
-    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toMatch(/^Abrir manutenção/)
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toMatch(/· Manutenção, abrir: /)
   })
 })
