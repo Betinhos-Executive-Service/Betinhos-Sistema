@@ -1,6 +1,6 @@
 // apps/shell/src/pages/frota/components/CamposManutencao.test.tsx
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GRUPOS_MANUT, SERVICOS_MANUT } from '../domain/manutencaoCatalogo'
@@ -71,8 +71,17 @@ describe('useOpcoesBusca', () => {
     const { result } = renderHook(() => useOpcoesBusca(buscar, bruno))
     await waitFor(() => expect(result.current.lista.map((o) => o.id)).toEqual(['f2', 'f1'])) // a escolhida vem primeiro, sem repetir
     expect(result.current.opcoes).toEqual([{ value: 'f2', label: 'Bruno' }, { value: 'f1', label: 'Ana' }])
-    result.current.onSearch('')
-    await waitFor(() => expect(buscar).toHaveBeenCalledWith(''))
+    // Abrir o painel (texto vazio) não busca de novo nem mostra "Carregando…": a lista inicial já está aqui.
+    act(() => result.current.onSearch(''))
+    expect(buscar).toHaveBeenCalledTimes(1)
+    expect(result.current.carregando).toBe(false)
+    expect(result.current.lista.map((o) => o.id)).toEqual(['f2', 'f1'])
+    // Digitando, busca no servidor e mostra só o que veio; apagar o texto volta à lista inicial.
+    act(() => result.current.onSearch('br'))
+    await waitFor(() => expect(buscar).toHaveBeenCalledWith('br'))
+    await waitFor(() => expect(result.current.lista.map((o) => o.id)).toEqual(['f2']))
+    act(() => result.current.onSearch(''))
+    expect(result.current.lista.map((o) => o.id)).toEqual(['f2', 'f1'])
   })
 
   it('sem escolhida, a lista é a do servidor', async () => {

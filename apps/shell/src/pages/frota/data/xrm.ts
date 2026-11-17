@@ -15,8 +15,12 @@ export type XrmHost = {
   Utility?: { getGlobalContext: () => { getClientUrl: () => string } }
 }
 
-/** Mensagem legível de erros do Xrm.WebApi / fetch. */
+/** Mensagem do erro exatamente como veio (Xrm.WebApi, fetch ou Custom API), inclusive o ponto final. */
+export function rawErrorMessage(error: unknown) {
+  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error)
+}
+
+/** Mensagem legível de erros do Xrm.WebApi / fetch, sem o ponto final (para compor frases). */
 export function errorMessage(error: unknown) {
-  const message = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error)
-  return message.replace(/\.+$/, '')
+  return rawErrorMessage(error).replace(/\.+$/, '')
 }

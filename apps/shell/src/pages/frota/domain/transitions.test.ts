@@ -4,7 +4,7 @@ import { COLISAO, MANUT, MULTA } from '../data/schema'
 import type { DataSource, FlowResult } from '../data/source'
 import { EMPTY_DATA, FlowIncertoError } from '../data/source'
 import { manutencaoFalsa } from '../testUtils'
-import { acoesManutencao, applyTransition, bloqueio, buildPatch, executarAcaoManutencao, liberarFlows, rotuloAcao, StaleError, transitionsFor, validate, type RegistroStatus, type Transition } from './transitions'
+import { acoesManutencao, applyTransition, bloqueio, buildPatch, desfechoDaAcao, executarAcaoManutencao, liberarFlows, rotuloAcao, StaleError, transitionsFor, validate, type RegistroStatus, type Transition } from './transitions'
 
 const ctx = { now: new Date('2026-10-02T15:00:00Z'), dateBehaviors: { cr40f_prazo: 'DateOnly' } as const }
 const ids = (kind: Parameters<typeof transitionsFor>[0], status: number | null) => transitionsFor(kind, status).map((item) => item.id)
@@ -325,5 +325,13 @@ describe('ações da manutenção (Custom APIs)', () => {
     await primeira
     await expect(executarAcaoManutencao(source, alvo(MANUT.SOLICITADO), 'encaixar', async () => { throw new Error('falhou') })).rejects.toThrow('falhou')
     await expect(executarAcaoManutencao(source, alvo(MANUT.SOLICITADO), 'encaixar', async () => 'de novo')).resolves.toBe('de novo')
+  })
+})
+
+describe('desfechoDaAcao (um só lugar para o que as gavetas fazem com o resultado)', () => {
+  it('feito devolve o valor; StaleError vira desatualizada; outro erro vira falha com a mensagem do servidor', async () => {
+    expect(await desfechoDaAcao(async () => 'ok')).toEqual({ tipo: 'feito', valor: 'ok' })
+    expect(await desfechoDaAcao(async () => { throw new StaleError() })).toEqual({ tipo: 'desatualizada' })
+    expect(await desfechoDaAcao(async () => { throw new Error('A janela precisa ser um dia ou uma semana de segunda a domingo.') })).toEqual({ tipo: 'falha', mensagem: 'A janela precisa ser um dia ou uma semana de segunda a domingo.' })
   })
 })

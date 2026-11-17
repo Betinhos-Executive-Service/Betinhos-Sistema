@@ -2,6 +2,7 @@ import { toDataverseDate, type DateBehavior } from '../data/dates'
 import { COLISAO, MANUT, MULTA, MULTA_CAMPO, STATUS_FIELD } from '../data/schema'
 import { FlowIncertoError, type DataSource, type FlowId, type FlowResult } from '../data/source'
 import type { Kind } from '../data/types'
+import { rawErrorMessage } from '../data/xrm'
 
 export type FieldSpec = { key: string; label: string; type: 'text' | 'textarea' | 'date' | 'datetime' | 'money'; required: boolean; maxLength?: number }
 export type Requisito = 'veiculo' | 'motorista'
@@ -194,5 +195,17 @@ export async function executarAcaoManutencao<T>(source: Pick<DataSource, 'curren
     return await executar()
   } finally {
     acoesEmCurso.delete(chave)
+  }
+}
+
+/** O que a gaveta faz com o resultado de uma ação da manutenção: seguir, recarregar (StaleError) ou mostrar a falha. */
+export type DesfechoAcao<T> = { tipo: 'feito'; valor: T } | { tipo: 'desatualizada' } | { tipo: 'falha'; mensagem: string }
+
+/** Único ponto que separa "outra pessoa mudou a manutenção" de falha comum (a mensagem do servidor chega como veio, com o ponto final). As gavetas só decidem o que mostrar. */
+export async function desfechoDaAcao<T>(executar: () => Promise<T>): Promise<DesfechoAcao<T>> {
+  try {
+    return { tipo: 'feito', valor: await executar() }
+  } catch (reason) {
+    return reason instanceof StaleError ? { tipo: 'desatualizada' } : { tipo: 'falha', mensagem: rawErrorMessage(reason) }
   }
 }
