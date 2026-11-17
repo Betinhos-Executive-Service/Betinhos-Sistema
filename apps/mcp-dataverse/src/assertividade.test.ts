@@ -3,7 +3,8 @@ import { DataverseSession } from './dataverse'
 import { clean, limitJson } from './format'
 import { env, json, mockFetch, tokenReply, type Call } from './helpers.test-util'
 import { INSTRUCTIONS } from './instrucoes'
-import { AGGREGATE_HINT, dropCurrencyAux, nullColumns, outerWithoutNullCheck, promptSummary, suggest, wrongOperators } from './dicas'
+import { glossario } from './glossario'
+import { AGGREGATE_HINT, EMPTY_FILTER_HINT, FILTER_HELP, cleanExpandChildren, dateOnlyEq, dropCurrencyAux, fetchAttributeMissing, nullColumns, outerWithoutNullCheck, promptSummary, suggest, wrongOperators } from './dicas'
 import { columnSchema, validateXml } from './metadata'
 import { buildTools, nowInfo, promptInputs, type ToolDef } from './tools'
 
@@ -310,9 +311,9 @@ describe('describe_table', () => {
     mockFetch(route())
     const out = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva' })))
     const names = out.colunas.map((c: any) => c.nome)
-    expect(names.slice(0, 4)).toEqual(['cr40f_reservaid', 'cr40f_cliente', 'cr40f_data', 'createdon'])
-    expect(names.at(-1)).toBe('statecode')
-    expect(out.colunas.at(-1).sistema).toBe(true)
+    expect(names.slice(0, 3)).toEqual(['cr40f_reservaid', 'cr40f_cliente', 'cr40f_data'])
+    expect(names.indexOf('ownerid')).toBeGreaterThan(names.indexOf('cr40f_data'))
+    expect(out.colunas.slice(-2).every((c: any) => c.sistema)).toBe(true)
     expect(out.colunas.find((c: any) => c.nome === 'ownerid').automatico).toBe(true)
   })
 
@@ -395,7 +396,7 @@ describe('auxiliares', () => {
     expect(INSTRUCTIONS).toMatch(/DEV/)
     expect(INSTRUCTIONS).toMatch(/confirmar/)
     expect(INSTRUCTIONS).toMatch(/UTC-3/)
-    for (const c of ['cr40f_nomecompleto', 'cr40f_placa', 'cr40f_titulo', 'cr40f_statuscotacao', 'cr40f_Passageiro1', 'cr40f_Veiculo', 'FetchXML aggregate']) expect(INSTRUCTIONS).toContain(c)
+    for (const c of ['cr40f_nomecompleto', 'cr40f_placa', 'cr40f_titulo', 'glossario(termo)', 'cr40f_Passageiro1', 'FetchXML aggregate']) expect(INSTRUCTIONS).toContain(c)
     for (const t of ['cr40f_reservadeveculos', 'cr40f_bancodedados', 'cr40f_clientes1', 'cr40f_funcionarios', 'cr40f_veiculos', 'cr40f_pagantes', 'cr40f_despesaoperacional', 'cr40f_pedidodecotacao']) {
       expect(INSTRUCTIONS).toContain(t)
     }
@@ -403,9 +404,9 @@ describe('auxiliares', () => {
 
   it('instruções: choice não é 0/1, status 0 só em funcionários e categoria de despesa', () => {
     expect(INSTRUCTIONS).toMatch(/NÃO é 0\/1/)
-    expect(INSTRUCTIONS).toMatch(/cr40f_status eq 0, só nesta tabela/)
-    expect(INSTRUCTIONS).toMatch(/Pendente = 202410001/)
-    expect(INSTRUCTIONS).toContain('cr40f_categoriadespesaoperacional')
+    expect(glossario('funcionário')).toMatch(/0 Ativo.*só nesta tabela/)
+    expect(glossario('pagante')).toMatch(/202410001 Pendente/)
+    expect(glossario('despesa')).toContain('cr40f_categoriadespesaoperacional')
     expect(INSTRUCTIONS).toContain('<link-entity')
   })
 })
@@ -586,10 +587,10 @@ describe('rodada 4', () => {
 
   it('A2, A4, A7, A8 e A3 (linha): instruções com os fatos confirmados', () => {
     expect(INSTRUCTIONS).toMatch(/bancodedados/)
-    expect(INSTRUCTIONS).toMatch(/new_clientedaop/)
-    expect(INSTRUCTIONS).toMatch(/202410002/)
-    expect(INSTRUCTIONS).toMatch(/202410010/)
-    expect(INSTRUCTIONS).toMatch(/cr40f_valor_a_receber/)
+    expect(glossario('op')).toMatch(/new_clientedaop/)
+    expect(glossario('pagante')).toMatch(/202410002/)
+    expect(glossario('faturamento')).toMatch(/202410010/)
+    expect(glossario('faturamento')).toMatch(/cr40f_valor_a_receber/)
     expect(INSTRUCTIONS).toMatch(/Search está desativado no DEV/)
     expect(INSTRUCTIONS).toMatch(/Passageiro1 a 4/)
     expect(INSTRUCTIONS).toMatch(/whoami \(agora\)/)
@@ -700,5 +701,171 @@ describe('rodada 4', () => {
     const r = JSON.parse(textOf(await tools()('fetch').handler({ tabela: 'cr40f_reserva', id: GUID, colunas: 'cr40f_nome,_cr40f_cliente_value' })))
     expect(r.registro._cr40f_cliente_value).toBeNull()
     expect(r.registro.cr40f_nome).toBe('a')
+  })
+})
+
+describe('rodada 5', () => {
+  const fx = (g: string) => `<fetch aggregate="true"><entity name="cr40f_reserva"><attribute name="cr40f_status" groupby="true" alias="g"/>${g}<attribute name="cr40f_valor" aggregate="sum" alias="soma"/></entity></fetch>`
+
+  it('A1 a A8: glossario traz as regras de cada tabela e as instruções só apontam para ele', () => {
+    const t = (n: string) => glossario(n)
+    expect(t('faturamento')).toMatch(/new_valortotal/)
+    expect(t('faturamento')).toMatch(/cr40f_valor_a_receber/)
+    expect(t('faturamento')).toMatch(/202410012 Pagamento Em Atraso/)
+    expect(t('serviço')).toMatch(/202410008 Concluído/)
+    expect(t('cotação')).toMatch(/100004007 "Convertida em serviço"/)
+    expect(t('cotação')).toMatch(/cr40f_prazoresponder/)
+    expect(t('pagante')).toMatch(/_cr40f_financeiro_value/)
+    expect(t('pagante')).toMatch(/_cr40f_bancodedados_value/)
+    expect(t('funcionário')).toMatch(/cr40f_nomedaempresa/)
+    expect(t('despesa')).toMatch(/cr40f_datagasto/)
+    expect(t('despesa')).toMatch(/Abastecimento/)
+    expect(t('op')).toMatch(/202410003 Paga/)
+    expect(t('veiculo')).toMatch(/cr40f_statusdoveiculo/)
+    expect(t('veiculo')).toMatch(/multa/)
+    expect(t('zzz')).toMatch(/^Sem bloco para "zzz"/)
+    expect(INSTRUCTIONS).toMatch(/glossario\(termo\)/)
+    expect(INSTRUCTIONS.length).toBeLessThan(2400)
+  })
+
+  it('A1: a ferramenta glossario é de leitura e não usa a rede', async () => {
+    const calls = mockFetch(route())
+    const r = textOf(await tools()('glossario').handler({ termo: 'pagante' }))
+    expect(r).toMatch(/cr40f_pagantes/)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('B1: agregação FetchXML não pagina por count e devolve todos os grupos', async () => {
+    const grupos = Array.from({ length: 8 }, (_, i) => ({ g: 100 + i, soma: i }))
+    const calls = mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: grupos }) : undefined)))
+    const out = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: fx(''), tamanhoPagina: 3 })))
+    expect(out.value).toHaveLength(8)
+    expect(out.maisRegistros).toBe(false)
+    expect(decodeURIComponent(calls.find((c) => c.url.includes('/cr40f_reservas'))!.url)).not.toMatch(/count=/)
+  })
+
+  it('B2: dategrouping não deixa @txt "2.026"', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas') ? json({ value: [{ y: 2026, 'y@OData.Community.Display.V1.FormattedValue': '2.026', soma: 1 }] }) : undefined)))
+    const xml = fx('<attribute name="cr40f_data" groupby="true" dategrouping="year" alias="y"/>')
+    const out = JSON.parse(textOf(await tools()('read_query').handler({ fetchXml: xml })))
+    expect(out.value[0].y).toBe(2026)
+    expect(out.value[0]['y@txt']).toBeUndefined()
+  })
+
+  it('B3: texto vazio não culpa o acento; descrição diz que ignora acento e caixa', () => {
+    expect(EMPTY_FILTER_HINT).not.toMatch(/acento.*difer|difer.*acento/i)
+    expect(EMPTY_FILTER_HINT).toMatch(/ignora acento e caixa/)
+    expect(tools()('read_query').description).toMatch(/ignora acento e caixa/)
+  })
+
+  it('B4: DateOnly em FILTER_HELP, na descrição e dica no eq do cache', () => {
+    expect(FILTER_HELP).toMatch(/DateOnly.*ge dia and lt dia\+1/)
+    expect(tools()('read_query').description).toMatch(/DateOnly: intervalo ge dia and lt dia\+1/)
+    const cols = [{ nome: 'cr40f_data', formato: 'DateOnly/DateOnly' }, { nome: 'createdon', formato: 'DateAndTime/UserLocal' }]
+    expect(dateOnlyEq("cr40f_data eq 2026-11-17 and createdon eq 2026-11-17", cols)).toEqual(['cr40f_data'])
+    expect(dateOnlyEq('cr40f_data ge 2026-11-17', cols)).toEqual([])
+  })
+
+  it('B4: filtro eq em DateOnly do cache sem resultado traz a dica do intervalo', async () => {
+    const inner = route((c) => (c.url.includes('/cr40f_reservas?') ? json({ value: [] }) : undefined))
+    mockFetch((c) => {
+      const u = decodeURIComponent(c.url)
+      if (u.includes('/Attributes/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata')) return json({ value: [{ LogicalName: 'cr40f_data', Format: 'DateOnly', DateTimeBehavior: { Value: 'DateOnly' } }] })
+      return inner(c)
+    })
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const out = JSON.parse(textOf(await t('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_reservaid', filter: 'cr40f_data eq 2026-11-17' })))
+    expect(out._dica).toMatch(/cr40f_data é DateOnly.*ge dia and lt dia\+1/)
+  })
+
+  it('B5: expand de coleção sem nextLink, com _dica e sem a volta ao pai', async () => {
+    const pai = 'cr40f_clientes1id'
+    const rows = [{ [pai]: GUID, 'rel@odata.nextLink': 'https://x/next', rel: [{ id: 'a', _cr40f_cliente_value: GUID, '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue': 'X', _cr40f_outro_value: 'zzz' }] }]
+    expect(cleanExpandChildren(rows, ['rel'], pai)).toBe(true)
+    expect(rows[0]).not.toHaveProperty('rel@odata.nextLink')
+    expect(rows[0].rel[0]).toEqual({ id: 'a', _cr40f_outro_value: 'zzz' })
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ value: [{ cr40f_reservaid: GUID, rel: [{ id: 'a', _cr40f_cliente_value: GUID }], 'rel@odata.nextLink': 'https://x/next' }] }) : undefined)))
+    const out = JSON.parse(textOf(await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_reservaid', expand: 'rel($select=id;$top=1)' })))
+    expect(out._dica).toMatch(/há mais filhos: consulte a tabela filha com filter _col_value eq <id>/)
+    expect(JSON.stringify(out)).not.toMatch(/nextLink/)
+    expect(out.value[0].rel[0]._cr40f_cliente_value).toBeUndefined()
+  })
+
+  it('B5: erro de $count dentro de $expand explica a 1:N reversa; descrição traz o padrão', async () => {
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ error: { code: '0x1', message: 'The query parameter $skip, $count, $search, and $levels are not supported inside $expand.' } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_nome', expand: 'rel($count=true)' })
+    expect(textOf(r)).toMatch(/1:N reversa.*umParaMuitos.*contar:true/)
+    expect(tools()('read_query').description).toMatch(/1:N reversa: expand=<navegacao de umParaMuitos>\(\$select=col;\$top=n\)/)
+  })
+
+  it('B6: aspa dentro do texto no FILTER_HELP e no erro de literal sem fechar', async () => {
+    expect(FILTER_HELP).toMatch(/D''Avila/)
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ error: { code: '0x1', message: 'There is an unterminated literal at position 39 in ...' } }, 400) : undefined)))
+    const r = await tools()('read_query').handler({ tabela: 'cr40f_reserva', select: 'cr40f_nome', filter: "cr40f_nome eq 'D'Avila'" })
+    expect(textOf(r)).toMatch(/Aspa dentro do texto se dobra: 'D''Avila'/)
+  })
+
+  it('B7: atributo inexistente no FetchXML sugere coluna parecida (cache) como no OData', async () => {
+    expect(fetchAttributeMissing("'cr40f_reserva' entity doesn't contain attribute with Name = 'cr40f_valr' and NameMapping = 'Logical'.")).toEqual({ type: 'cr40f_reserva', property: 'cr40f_valr' })
+    mockFetch(route((c) => (c.url.includes('/cr40f_reservas?') ? json({ error: { code: '0x80041103', message: "'cr40f_reserva' entity doesn't contain attribute with Name = 'cr40f_valr' and NameMapping = 'Logical'." } }, 400) : undefined)))
+    const t = tools()
+    await t('describe_table').handler({ tabela: 'cr40f_reserva' })
+    const r = await t('read_query').handler({ fetchXml: '<fetch><entity name="cr40f_reserva"><attribute name="cr40f_valr"/></entity></fetch>' })
+    expect(textOf(r)).toMatch(/não tem a coluna "cr40f_valr".*Parecidas: cr40f_valor/)
+  })
+
+  it('B8: FetchXML pagina por número, sem pagingCookie; proximaPagina vai inteira', () => {
+    const s = tools()('read_query').schema as Record<string, { description?: string }>
+    expect(s.pagingCookie).toBeUndefined()
+    expect(s.pagina.description).toMatch(/sem cookie/)
+    expect(s.proximaPagina.description).toMatch(/cole inteira, sem repetir filtros/)
+  })
+
+  it('B9: describe_table põe colunas de sistema por último e recomenda filtroColuna', async () => {
+    mockFetch(route())
+    const out = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva' })))
+    const names: string[] = out.colunas.map((c: { nome: string }) => c.nome)
+    expect(names.indexOf('cr40f_data')).toBeLessThan(names.indexOf('createdon'))
+    expect(names.indexOf('cr40f_valor')).toBeLessThan(names.indexOf('ownerid'))
+    expect(out.colunas.find((c: { nome: string }) => c.nome === 'ownerid').sistema).toBe(true)
+    expect(tools()('describe_table').description).toMatch(/filtroColuna/)
+  })
+
+  it('B10: relação casou e nenhuma coluna: aviso curto "relações abaixo"', async () => {
+    mockFetch(route())
+    const out = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva', filtroColuna: 'rel_cliente' })))
+    expect(out.colunas).toEqual([])
+    expect(out._aviso).toMatch(/Nenhuma coluna casa com 'rel_cliente'; relações abaixo/)
+  })
+
+  it('B11: decimal com ponto nas descrições de create_record e update_record', () => {
+    expect(tools()('create_record').description).toMatch(/número com ponto \(12\.5\)/)
+    expect(tools()('update_record').description).toMatch(/número com ponto \(12\.5\)/)
+  })
+
+  it('B12: delete_record 404 diz "já excluído ou id errado"', async () => {
+    mockFetch(route((c) => (c.method === 'DELETE' ? json({ error: { code: '0x80040217', message: 'Does Not Exist' } }, 404) : undefined)))
+    const r = await tools()('delete_record').handler({ tabela: 'cr40f_reserva', id: GUID })
+    expect(r.isError).toBe(true)
+    expect(textOf(r)).toMatch(/Já excluído ou id errado: cr40f_reserva\(/)
+  })
+
+  it('B13: N:N traz a navegação do lado da tabela descrita; associate diz qual usar', async () => {
+    const inner = route()
+    mockFetch((c) => {
+      const u = decodeURIComponent(c.url)
+      if (u.includes("EntityDefinitions(LogicalName='cr40f_reserva')/ManyToManyRelationships")) {
+        return json({ value: [{ SchemaName: 'rel_nn', Entity1LogicalName: 'cr40f_outra', Entity2LogicalName: 'cr40f_reserva', Entity1NavigationPropertyName: 'nav_outra', Entity2NavigationPropertyName: 'nav_reserva', IntersectEntityName: 'x' }] })
+      }
+      return inner(c)
+    })
+    const out = JSON.parse(textOf(await tools()('describe_table').handler({ tabela: 'cr40f_reserva' })))
+    expect(out.relacoes.muitosParaMuitos[0].navegacao).toBe('nav_reserva')
+    expect((tools()('associate').schema.relacao as { description?: string }).description).toMatch(/lado de `tabela` \(origem\).*muitosParaMuitos\[\]\.navegacao/)
+  })
+
+  it('B14: contagem barata documentada', () => {
+    expect(tools()('read_query').description).toMatch(/contar:true com top:1/)
   })
 })

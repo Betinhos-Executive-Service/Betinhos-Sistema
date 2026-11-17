@@ -2,10 +2,11 @@
 
 export const FILTER_HELP =
   "Operadores OData: eq ne gt ge lt le, and/or/not, contains(col,'x'), startswith(col,'x'); texto entre aspas simples; datas ISO com Z (2026-11-01T03:00:00Z); " +
-  "relativas: Microsoft.Dynamics.CRM.LastXDays(PropertyName='createdon',PropertyValue=30); lookup: _col_value eq <guid>; choice: col eq <valor numérico>."
+  "relativas: Microsoft.Dynamics.CRM.LastXDays(PropertyName='createdon',PropertyValue=30); lookup: _col_value eq <guid>; choice: col eq <valor numérico>; " +
+  "aspa dentro do texto se dobra: 'D''Avila'; DateOnly: filtre por intervalo (ge dia and lt dia+1), eq pela data falha."
 
 export const EMPTY_FILTER_HINT =
-  'Nenhum registro com este filtro. Confira: datas são UTC (dia local de São Paulo = 03:00Z a 03:00Z do dia seguinte), choice filtra por valor numérico (describe_table), lookup por _col_value, texto exato diferencia acentos (use contains).'
+  'Nenhum registro com este filtro. Confira: datas são UTC (dia local de São Paulo = 03:00Z a 03:00Z do dia seguinte), choice filtra por valor numérico (describe_table), lookup por _col_value, texto ignora acento e caixa (contains casa ã com a); data só-dia (DateOnly): use intervalo ge dia and lt dia+1.'
 
 /** Minúsculas, sem acento e só letras/números. */
 export const norm = (s: string) =>
@@ -82,6 +83,52 @@ export const propertyMissing = (message: string): { property: string; type?: str
     message.match(/Invalid property '([^']+)' was found in entity '([^']+)'/i)
   if (!m) return undefined
   return { property: m[1], type: m[2] ? m[2].replace(/^Microsoft\.Dynamics\.CRM\./, '') : undefined }
+}
+
+/** FetchXML: atributo inexistente (0x80041103). `type` vem em minúsculas (nome lógico). */
+export const fetchAttributeMissing = (message: string): { property: string; type: string } | undefined => {
+  const m = message.match(/'([^']+)' entity doesn't contain attribute with Name = '([^']+)'/i)
+  return m ? { property: m[2], type: m[1].toLowerCase() } : undefined
+}
+
+/** `col eq 2026-11-17` em coluna DateOnly do cache: o valor cru varia (T00:00Z ou T03:00Z), então eq falha. */
+export function dateOnlyEq(filter: string | undefined, cols: { nome: string; formato?: string }[] | undefined): string[] {
+  if (!filter || !cols) return []
+  const out: string[] = []
+  for (const m of filter.matchAll(/\b([a-z_][a-z0-9_]*)\s+eq\s+'?\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z?)?'?/gi)) {
+    if (cols.some((c) => c.nome === m[1].toLowerCase() && c.formato?.startsWith('DateOnly'))) out.push(m[1])
+  }
+  return out
+}
+
+/** Dentro do expand de coleção: some a volta ao pai e o nextLink; devolve se há mais filhos que o expand trouxe. */
+export function cleanExpandChildren(rows: Record<string, unknown>[], names: string[], idKey: string): boolean {
+  let more = false
+  const F = '@OData.Community.Display.V1.FormattedValue'
+  const L = '@Microsoft.Dynamics.CRM.lookuplogicalname'
+  for (const row of rows) {
+    for (const k of names) {
+      const next = `${k}@odata.nextLink`
+      const kids = row[k]
+      if (next in row) {
+        if (Array.isArray(kids) && kids.length) more = true
+        delete row[next]
+      }
+      const parentId = row[idKey]
+      if (!Array.isArray(kids) || typeof parentId !== 'string') continue
+      for (const kid of kids as Record<string, unknown>[]) {
+        if (!kid || typeof kid !== 'object') continue
+        for (const key of Object.keys(kid)) {
+          if (/^_.+_value$/.test(key) && String(kid[key]).toLowerCase() === parentId.toLowerCase()) {
+            delete kid[key]
+            delete kid[key + F]
+            delete kid[key + L]
+          }
+        }
+      }
+    }
+  }
+  return more
 }
 
 export const searchDisabled = (code: string, message: string) => /0x80048d0b/i.test(code + message) || /Search feature is disabled/i.test(message)

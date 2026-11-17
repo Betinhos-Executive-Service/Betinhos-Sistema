@@ -23,4 +23,4 @@ describe('custo de contexto dos schemas', () => {
 })
 
 // Teto 17000; subiu para 17600 só pelo update_table (alterarColunas, B1 da 4ª rodada).
-const BUDGET = 17_600
+const BUDGET = 18_000

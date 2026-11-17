@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { DataverseError, METADATA_TIMEOUT_MS, buildQuery, idFromEntityHeader, isGuid, isLogicalName, isQualifiedName, odataLiteral, type ApiOptions, type ApiResult, type DataverseSession, type EntityInfo } from './dataverse'
 import { AMBIENTES, type Ambiente } from './env'
+import { glossario } from './glossario'
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, errorResult, limitJson, ok, text, type ToolResult } from './format'
 import {
   applyFetchPaging,
@@ -14,7 +15,7 @@ import {
   labelText,
   validateXml,
 } from './metadata'
-import { AGGREGATE_HINT, EMPTY_FILTER_HINT, FILTER_HELP, OPERATOR_HINT, OUTER_HINT, applyHint, dropCurrencyAux, expandNames, fold, outerWithoutNullCheck, promptSummary, filterSyntaxError, nullColumns, numericEqColumns, propertyMissing, searchDisabled, suggest, wrongOperators, type Candidate } from './dicas'
+import { AGGREGATE_HINT, EMPTY_FILTER_HINT, FILTER_HELP, OPERATOR_HINT, OUTER_HINT, applyHint, dropCurrencyAux, expandNames, fold, outerWithoutNullCheck, promptSummary, filterSyntaxError, fetchAttributeMissing, dateOnlyEq, cleanExpandChildren, nullColumns, numericEqColumns, propertyMissing, searchDisabled, suggest, wrongOperators, type Candidate } from './dicas'
 
 export interface ToolContext {
   session: DataverseSession
@@ -42,6 +43,7 @@ const WRITE_TOOLS = new Set(['create_record', 'update_record', 'upsert_record'])
 /** Colunas que o sistema preenche sozinho (fora de somenteObrigatorias). */
 const AUTO_COLUMNS = new Set(['ownerid', 'owninguser', 'owningbusinessunit', 'owningteam', 'transactioncurrencyid', 'exchangerate'])
 const SYSTEM_LOOKUPS = new Set(['createdby', 'createdonbehalfby', 'modifiedby', 'modifiedonbehalfby', 'owninguser', 'owningbusinessunit', 'owningteam', 'transactioncurrencyid'])
+const SYS_COLS = /^(owner(id|idname)|owning\w+|created(by|on|onbehalfby)|modified(by|on|onbehalfby)|versionnumber|importsequencenumber|overriddencreatedon|timezoneruleversionnumber|utcconversiontimezonecode|transactioncurrencyid|exchangerate)$|_base$/
 const AGGREGATE_RE = /\b(groupby|aggregate)\s*\(/i
 
 function makeTool<S extends z.ZodRawShape>(
@@ -177,6 +179,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       const ex = infos.filter(Boolean).map((e) => `read_query(tabela:"${e!.logicalName}", filter:"contains(${e!.primaryName},'${String(args.consulta ?? 'texto').replace(/'/g, "''")}')")`)
       return `Dataverse Search está desativado neste ambiente. Alternativa: read_query com contains(<colunaPrincipal>,'texto'): cliente = cr40f_clientes1 / cr40f_nomedocliente; passageiro = cr40f_bancodedados / cr40f_nomedopassageiro; serviço = cr40f_reservadeveculos / cr40f_id${ex.length ? `. Para sua busca: ${ex.join('; ')}` : ''}.`
     }
+    if (tool === 'delete_record' && error.status === 404) return `Já excluído ou id errado: ${args.tabela}(${args.id}) não existe.`
     if (tool === 'execute_action' && error.status === 404) {
       return "Se for função (WhoAmI, Retrieve*, Get*) use tipo:'function'; senão confira o nome exato (Custom API: prefixo e maiúsculas, ex.: cr40f_MinhaApi)."
     }
@@ -198,7 +201,10 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       const hint = await writeHint(amb, args.tabela, args.dados as Record<string, unknown>, error.message)
       if (hint) return hint
     }
-    const miss = propertyMissing(error.message)
+    const miss = propertyMissing(error.message) ?? (tool === 'read_query' && args.fetchXml ? fetchAttributeMissing(error.message) : undefined)
+    if (tool === 'read_query' && /\$count.*not supported inside \$expand|not supported inside \$expand/i.test(error.message)) {
+      return '$expand de 1:N reversa não aceita $count/$skip: use expand=<navegacao de umParaMuitos do describe_table>($select=col;$top=n), ou conte na tabela filha com contar:true e filter _col_value eq <id>.'
+    }
     if (args.apply && typeof args.tabela === 'string' && (miss || /doesn't contain attribute/i.test(error.message))) {
       const e = await session.entity(amb, args.tabela)
       return applyHint(e.logicalName, e.primaryId)
@@ -230,6 +236,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
       return `${e.logicalName} não tem a coluna "${miss.property}". ${near.length ? `Parecidas: ${near.map((c) => c.nome).join(', ')}. ` : ''}Coluna principal: ${e.primaryName}. Veja describe_table(tabela:"${e.logicalName}", filtroColuna:"trecho").`
     }
     if (args.filter && error.status === 400 && wrongOperators(args.filter)) return `${OPERATOR_HINT} ${FILTER_HELP}`
+    if ((args.filter || args.apply) && error.status === 400 && /unterminated literal/i.test(error.message)) return `Aspa dentro do texto se dobra: 'D''Avila'. ${FILTER_HELP}`
     if ((args.filter || args.apply) && error.status === 400 && filterSyntaxError(error.message)) return FILTER_HELP
     return undefined
   }
@@ -378,8 +385,18 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
 
   add(
     defineTool(
+      'glossario',
+      'Regras de negócio e valores de status por termo; sem rede.',
+      { termo: z.string().optional().describe('Ex.: pagante; vazio = tudo.') },
+      READ,
+      async (a) => ok({ glossario: glossario(a.termo) }),
+    ),
+  )
+
+  add(
+    defineTool(
       'whoami',
-      'Usuário, unidade, organização e hora atual (agora) do ambiente.',
+      'Usuário, unidade, organização e hora atual (agora).',
       { ambiente },
       READ,
       async (a) => {
@@ -500,7 +517,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           relacoes: {
             muitosParaUm: m2o.map((r) => ({ nome: r.SchemaName, alvo: r.ReferencedEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencingEntityNavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
             umParaMuitos: o2m.map((r) => ({ nome: r.SchemaName, tabela: r.ReferencingEntity, coluna: r.ReferencingAttribute, navegacao: r.ReferencedEntityNavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
-            muitosParaMuitos: m2m.map((r) => ({ nome: r.SchemaName, tabela1: r.Entity1LogicalName, tabela2: r.Entity2LogicalName, navegacao1: r.Entity1NavigationPropertyName, navegacao2: r.Entity2NavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
+            muitosParaMuitos: m2m.map((r) => ({ nome: r.SchemaName, tabela1: r.Entity1LogicalName, tabela2: r.Entity2LogicalName, navegacao1: r.Entity1NavigationPropertyName, navegacao2: r.Entity2NavigationPropertyName, navegacao: r.Entity1LogicalName === e.logicalName ? r.Entity1NavigationPropertyName : r.Entity2NavigationPropertyName, ...(r.IsCustomRelationship === false ? { sistema: true } : {}) })),
           },
         }
   }
@@ -511,12 +528,12 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'describe_table',
-      'Colunas (obrigatórias primeiro; tipo, rótulo, choices, lookups com alvoEntitySet e navegação para @odata.bind), chaves e relações. Cache de 1 h.',
+      'Colunas (obrigatórias primeiro, sistema por último; tipo, rótulo, choices, lookups com alvoEntitySet e navegação para @odata.bind, formato de data), chaves e relações. Tabela grande: filtroColuna. Cache 1 h.',
       {
         ambiente,
         tabela,
-        filtroColuna: z.string().optional().describe('Trecho do nome ou rótulo (colunas e relações).'),
-        somenteObrigatorias: z.boolean().default(false).describe('Só as exigidas ao criar (sem ownerid etc.).'),
+        filtroColuna: z.string().optional().describe('Trecho do nome/rótulo (colunas e relações).'),
+        somenteObrigatorias: z.boolean().default(false).describe('Só as exigidas ao criar.'),
         atualizar,
       },
       READ,
@@ -527,7 +544,8 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         const has = (...v: unknown[]) => !term || v.some((x) => typeof x === 'string' && x.toLowerCase().includes(term))
         const SYSTEM = new Set(['statecode', 'statuscode'])
         const REQUIRED = new Set(['ApplicationRequired', 'SystemRequired'])
-        const rank = (c: any) => (SYSTEM.has(c.nome) ? 2 : REQUIRED.has(c.obrigatoria) ? 0 : 1)
+        const isSys = (n: string) => SYSTEM.has(n) || SYS_COLS.test(n)
+        const rank = (c: any) => (isSys(c.nome) ? 2 : REQUIRED.has(c.obrigatoria) ? 0 : 1)
         let cols = (full.colunas as any[]).filter((c) => has(c.nome, c.rotulo))
         if (a.somenteObrigatorias) cols = cols.filter((c) => REQUIRED.has(c.obrigatoria) && c.criar !== false && c.nome !== full.chave && !SYSTEM.has(c.nome) && !AUTO_COLUMNS.has(c.nome))
         // entitySet dos alvos dos lookups (lista de tabelas: 1 chamada, cache de 1 h); sem ela, só omite alvoEntitySet.
@@ -544,7 +562,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           .sort((x, y) => rank(x.c) - rank(y.c) || x.i - y.i)
           .map(({ c }) => ({
             ...c,
-            ...(SYSTEM.has(c.nome) ? { sistema: true } : {}),
+            ...(isSys(c.nome) ? { sistema: true } : {}),
             ...(AUTO_COLUMNS.has(c.nome) ? { automatico: true } : {}),
             ...(c.alvos && c.alvos.every((t: string) => sets.has(t)) ? { alvoEntitySet: c.alvos.length === 1 ? sets.get(c.alvos[0]) : c.alvos.map((t: string) => sets.get(t)) } : {}),
           }))
@@ -558,7 +576,9 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
               muitosParaMuitos: r.muitosParaMuitos.filter((x: any) => !(term && x.sistema) && has(x.nome, x.tabela1, x.tabela2, x.navegacao1, x.navegacao2)),
             }
         let aviso: string | undefined
-        if (term && !colunas.length) {
+        const nRel = ((relacoes as any).muitosParaUm?.length ?? 0) + ((relacoes as any).umParaMuitos?.length ?? 0) + ((relacoes as any).muitosParaMuitos?.length ?? 0)
+        if (term && !colunas.length && nRel) aviso = `Nenhuma coluna casa com '${a.filtroColuna}'; relações abaixo.`
+        else if (term && !colunas.length) {
           const all = full.colunas as any[]
           const show = (c: any) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`
           const near = suggest(a.filtroColuna ?? '', all.map((c) => ({ nome: c.nome, rotulo: c.rotulo })), 10).map((c) => `${c.nome}${c.rotulo ? ` (${c.rotulo})` : ''}`)
@@ -576,7 +596,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'read_query',
-      'Consulta OData (tabela + select/filter/orderby/expand/top/apply) ou FetchXML (fetchXml). Sem SQL. Informe select. Lookup: _col_value; campo do lookup: contains(Nav/coluna,\'x\') ou expand Nav($select=col). Coluna principal varia. Sem orderby a ordem varia; próximo futuro: col ge <agora ISO>, orderby col asc, top 1. Datas em UTC (campo@txt em hora local); São Paulo = UTC-3, dia local = 03:00Z a 03:00Z; relativa: Microsoft.Dynamics.CRM.LastXDays(PropertyName=\'createdon\',PropertyValue=30). Soma: apply=filter(statecode eq 0)/groupby((cr40f_status),aggregate(cr40f_valor with sum as soma)); com groupby/aggregate o select é ignorado e orderby/top não vão no apply. Agrupar por lookup só via FetchXML aggregate: <attribute name=\"cr40f_cliente\" groupby=\"true\" alias=\"c\"/>, <order alias=\"total\" descending=\"true\"/>. Grupo vazio vem como null e @txt \"(vazio)\"; exclua com operator=\"not-null\". Saída: campo@txt = rótulo, campo@tab = tabela do lookup, nulos omitidos (_nulas = nulas em toda a página).',
+      'Consulta OData (tabela + select/filter/orderby/expand/top/apply) ou FetchXML (fetchXml). Sem SQL. Informe select. Texto ignora acento e caixa. Contagem barata: contar:true com top:1. DateOnly: intervalo ge dia and lt dia+1. Lookup: _col_value; campo do lookup: contains(Nav/coluna,\'x\') ou expand Nav($select=col). Sem orderby a ordem varia. Datas em UTC (@txt em hora local; fuso nas instruções); relativa: Microsoft.Dynamics.CRM.LastXDays(PropertyName=\'createdon\',PropertyValue=30). Soma: apply=filter(statecode eq 0)/groupby((cr40f_status),aggregate(cr40f_valor with sum as soma)); com groupby/aggregate o select é ignorado e orderby/top não vão no apply. Agrupar por lookup só via FetchXML aggregate (padrão nas instruções). 1:N reversa: expand=<navegacao de umParaMuitos>($select=col;$top=n). Grupo vazio: null/\"(vazio)\"; exclua com operator=\"not-null\". Saída: campo@txt = rótulo, @tab = tabela do lookup, nulos omitidos (_nulas = nulas na página toda).',
       {
         ambiente,
         tabela: tabela.optional().describe('Obrigatória no OData; no FetchXML vem de <entity name>.'),
@@ -588,10 +608,9 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         top: z.number().int().min(1).optional().describe('Máximo de linhas no total.'),
         contar: z.boolean().default(false).describe('Inclui o total ($count).'),
         tamanhoPagina: z.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE).describe('Linhas por página (máx. 200).'),
-        proximaPagina: z.string().optional().describe('proximaPagina da resposta anterior (OData).'),
+        proximaPagina: z.string().optional().describe('proximaPagina da resposta anterior (OData): cole inteira, sem repetir filtros.'),
         fetchXml: z.string().optional().describe('FetchXML completo (alternativa ao OData).'),
-        pagina: z.number().int().min(1).optional().describe('FetchXML: página (2 em diante).'),
-        pagingCookie: z.string().optional().describe('FetchXML: pagingCookie da página anterior.'),
+        pagina: z.number().int().min(1).optional().describe('FetchXML: página (2 em diante), sem cookie; agregação não pagina.'),
       },
       READ,
       async (a) => {
@@ -607,14 +626,18 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           if (!entityName) throw new Error('Informe "tabela" ou use <entity name="..."> no FetchXML.')
           const e = await session.entity(a.ambiente, entityName)
           const count = Number(a.fetchXml.match(/<fetch\b[^>]*?\scount\s*=\s*["'](\d+)["']/i)?.[1]) || size
-          const xml = applyFetchPaging(a.fetchXml, { page: a.pagina, count: /\scount\s*=/.test(a.fetchXml) ? undefined : size, pagingCookie: a.pagingCookie })
+          const aggregate = /<fetch\b[^>]*?\saggregate\s*=\s*["']true["']/i.test(a.fetchXml)
+          // Agregado já é pequeno (até 5000 grupos): paginar por count perderia grupos sem avisar.
+          const xml = applyFetchPaging(a.fetchXml, { page: a.pagina, count: aggregate || /\scount\s*=/.test(a.fetchXml) ? undefined : size })
           const r = await api(a.ambiente, 'GET', `${e.entitySet}${buildQuery({ fetchXml: xml })}`)
           const rows: unknown[] = Array.isArray(r.data.value) ? r.data.value : []
           const more = r.data['@Microsoft.Dynamics.CRM.morerecords']
           const hasTop = /<fetch\b[^>]*?\stop\s*=/i.test(a.fetchXml)
-          const aggregate = /<fetch\b[^>]*?\saggregate\s*=\s*["']true["']/i.test(a.fetchXml)
           const aliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bgroupby\s*=\s*["']true["'][^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
           if (aggregate) {
+            // Ano/mês agrupados vêm formatados como "2.026": o @txt só atrapalha.
+            const dateAliases = [...a.fetchXml.matchAll(/<attribute\b[^>]*\bdategrouping\s*=[^>]*>/gi)].map((m) => m[0].match(/\balias\s*=\s*["']([^"']+)["']/i)?.[1]).filter((x): x is string => !!x)
+            for (const row of rows as Record<string, unknown>[]) for (const d of dateAliases) delete row[`${d}@OData.Community.Display.V1.FormattedValue`]
             // Grupo sem valor (lookup/choice vazio) vem sem a chave: torna-o explícito (null + "(vazio)").
             for (const row of rows as Record<string, unknown>[]) {
               for (const g of aliases) {
@@ -633,7 +656,6 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
               value: rows,
               // Sem a anotação e com a página cheia, não afirme que acabou.
               maisRegistros: more ?? (!hasTop && !aggregate && rows.length >= count),
-              pagingCookie: r.data['@Microsoft.Dynamics.CRM.fetchxmlpagingcookie'],
               ...(dica ? { _dica: dica } : {}),
             },
             { keepNulls: aggregate },
@@ -657,11 +679,16 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
         if (!aggregating && Array.isArray(page.value)) page.value = dropCurrencyAux(page.value as Record<string, unknown>[], a.select)
         const rows = page.value as unknown[]
         const notes: Record<string, unknown> = {}
+        if (a.expand && Array.isArray(rows) && cleanExpandChildren(rows as Record<string, unknown>[], expandNames(a.expand), e.primaryId)) {
+          notes._dica = 'há mais filhos: consulte a tabela filha com filter _col_value eq <id>.'
+        }
         if (aggregating && a.select) notes._aviso = 'select ignorado: com apply só valem as colunas do groupby/aggregate.'
         const nulas = nullColumns(rows, [select, ...expandNames(a.expand)].filter(Boolean).join(','))
         if (nulas.length) notes._nulas = nulas
         if (!rows.length && !page.proximaPagina && (a.filter || a.apply)) {
           notes._dica = EMPTY_FILTER_HINT
+          const dateCols = dateOnlyEq(a.filter, cachedCols(a.ambiente, e))
+          if (dateCols.length) notes._dica = `${dateCols.join(', ')} é DateOnly: eq pela data falha (o valor cru varia); use intervalo ge dia and lt dia+1. ${EMPTY_FILTER_HINT}`
           // Filtro `col eq <número>` em choice com valor que não existe: diz os valores válidos (só no caminho do resultado vazio).
           const bad: string[] = []
           for (const { col, valor } of numericEqColumns(a.filter).slice(0, 3)) {
@@ -727,7 +754,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'create_record',
-      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = número ou rótulo exato. PROD exige confirmar.',
+      'Cria registro. Lookup: "<navegação>@odata.bind":"/<entitySet>(<guid>)"; navegação (em `navegacao` do describe_table) é sensível a maiúsculas. Choice = número ou rótulo exato. Decimal/moeda: número com ponto (12.5). PROD exige confirmar.',
       { ambiente, tabela, dados: z.record(z.string(), z.unknown()).describe('Colunas e valores.'), confirmar },
       WRITE_RW,
       async (a) => {
@@ -744,7 +771,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'update_record',
-      'Atualiza colunas (PATCH; não cria). Lookup: "<navegação>@odata.bind" (navegação exata, sensível a maiúsculas); limpar: disassociate com valorUnico. PROD exige confirmar.',
+      'Atualiza colunas (PATCH; não cria). Lookup: "<navegação>@odata.bind" (navegação exata, sensível a maiúsculas); limpar: disassociate com valorUnico. Decimal: número com ponto (12.5). PROD exige confirmar.',
       { ambiente, tabela, id: recordId, dados: z.record(z.string(), z.unknown()).describe('Só as colunas a alterar.'), confirmar },
       WRITE_RW,
       async (a) => {
@@ -807,7 +834,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'create_table',
-      'Cria tabela personalizada com coluna principal de texto. O schema do PROD vem das soluções: lá só em exceção, com confirmar. Prefixo cr40f_; rótulos em pt-BR. 30 a 70 s.',
+      'Cria tabela personalizada com coluna principal de texto. PROD: schema vem das soluções (só em exceção, com confirmar). Prefixo cr40f_; rótulos pt-BR. 30 a 70 s.',
       {
         ambiente,
         nomeSchema: z.string().refine(isLogicalName, 'Nome de esquema inválido (letras, números e _)').describe('Ex.: cr40f_Equipamento.'),
@@ -818,8 +845,8 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           .object({ nomeSchema: z.string(), rotulo: z.string(), tamanhoMaximo: z.number().int().optional() })
           .describe('Ex.: {"nomeSchema":"cr40f_name","rotulo":"Nome"}.'),
         propriedade: z.enum(['UserOwned', 'OrganizationOwned']).default('UserOwned'),
-        solucao: z.string().optional().describe('Nome único da solução que recebe a tabela.'),
-        idioma: z.number().int().default(1046).describe('LCID dos rótulos (pt-BR).'),
+        solucao: z.string().optional().describe('Solução que recebe a tabela.'),
+        idioma: z.number().int().default(1046).describe('LCID (pt-BR).'),
         confirmar,
       },
       WRITE_RW,
@@ -837,7 +864,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'update_table',
-      'Altera rótulos, adiciona colunas (texto, memo, inteiro, decimal, moeda, data, booleano, choice, lookup) e altera as existentes. 30 a 70 s. PROD: schema vem das soluções; exige confirmar.',
+      'Altera rótulos, adiciona colunas e altera as existentes. 30 a 70 s. PROD: schema vem das soluções; exige confirmar.',
       {
         ambiente,
         tabela,
@@ -856,7 +883,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
           )
           .optional()
           .describe('Colunas existentes: rótulo, descrição, opções.'),
-        solucao: z.string().optional().describe('Nome único da solução que recebe as colunas.'),
+        solucao: z.string().optional().describe('Solução que recebe as colunas.'),
         idioma: z.number().int().default(1046),
         confirmar,
       },
@@ -1040,7 +1067,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
   add(
     defineTool(
       'execute_action',
-      'Executa ação (POST), função (GET, só leitura) ou Custom API, solta ou vinculada (tabela + id). PROD exige confirmar nas ações. Parâmetros de função: texto entre aspas; GUID/número/booleano sem aspas.',
+      'Executa ação (POST), função (GET, só leitura) ou Custom API, solta ou vinculada (tabela + id). PROD exige confirmar nas ações. Função: texto entre aspas; GUID/número sem.',
       {
         ambiente,
         nome: z.string().refine(isQualifiedName, 'Nome inválido').describe('Ex.: WhoAmI ou cr40f_MinhaApi.'),
@@ -1073,7 +1100,7 @@ export function buildTools(ctx: ToolContext): ToolDef[] {
     ambiente,
     tabela,
     id: recordId,
-    relacao: z.string().refine(isLogicalName, 'Relação inválida').describe('Navigation property (describe_table, relacoes).'),
+    relacao: z.string().refine(isLogicalName, 'Relação inválida').describe('Navegação do lado de `tabela` (origem): N:N = muitosParaMuitos[].navegacao do describe_table da origem; 1:N = umParaMuitos[].navegacao.'),
     confirmar,
   }
   const target = { tabelaAlvo: tabela, idAlvo: recordId }

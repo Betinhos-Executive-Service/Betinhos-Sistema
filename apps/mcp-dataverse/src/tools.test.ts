@@ -20,11 +20,11 @@ describe('catálogo de ferramentas', () => {
     expect(names).toEqual(
       [
         'associate', 'create_record', 'create_table', 'delete_record', 'delete_table', 'describe_table', 'disassociate',
-        'execute_action', 'execute_prompt', 'fetch', 'list_prompts', 'list_tables', 'read_query', 'search',
+        'execute_action', 'execute_prompt', 'fetch', 'glossario', 'list_prompts', 'list_tables', 'read_query', 'search',
         'update_record', 'update_table', 'upsert_record', 'whoami',
       ].sort(),
     )
-    for (const t of list.filter((t) => ['whoami', 'list_tables', 'describe_table', 'read_query', 'search', 'fetch', 'list_prompts'].includes(t.name))) {
+    for (const t of list.filter((t) => ['whoami', 'glossario', 'list_tables', 'describe_table', 'read_query', 'search', 'fetch', 'list_prompts'].includes(t.name))) {
       expect(t.annotations.readOnlyHint).toBe(true)
     }
     for (const n of ['delete_record', 'delete_table']) expect(list.find((t) => t.name === n)!.annotations.destructiveHint).toBe(true)
@@ -52,19 +52,19 @@ describe('read_query', () => {
     expect(r.isError).toBe(true)
   })
 
-  it('FetchXML: lê a tabela do XML, pagina e devolve pagingCookie', async () => {
+  it('FetchXML: lê a tabela do XML, pagina por número de página (sem cookie)', async () => {
     const calls = mockFetch(
       baseRoute(() => json({ value: [{ x: 1 }], '@Microsoft.Dynamics.CRM.morerecords': true, '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie': '<cookie/>' })),
     )
     const xml = '<fetch><entity name="cr40f_reserva"><attribute name="cr40f_name"/></entity></fetch>'
-    const r = await tools()('read_query').handler({ fetchXml: xml, pagina: 2, pagingCookie: '<c/>' })
+    const r = await tools()('read_query').handler({ fetchXml: xml, pagina: 2 })
     const url = decodeURIComponent(dvCalls(calls)[0].url)
     expect(url).toContain('cr40f_reservas?fetchXml=')
     expect(url).toContain('page="2"')
     expect(url).toContain('count="50"')
     const out = JSON.parse(textOf(r))
     expect(out.maisRegistros).toBe(true)
-    expect(out.pagingCookie).toBe('<cookie/>')
+    expect(out.pagingCookie).toBeUndefined()
   })
 
   it('proximaPagina de outro host é recusada (sem vazar token)', async () => {
