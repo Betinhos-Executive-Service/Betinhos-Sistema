@@ -61,7 +61,9 @@ const FILTROS_DAS_VISOES = ['q', 'f', 'status', 'tipo', 'veiculo', 'pessoa', 'ca
 function useFrotaRota(tab: Tab) {
   const query = useHashQuery()
   const sub = lerOpcao<SubMultas>(query, 'sub', ['multas', 'infracoes'], 'multas')
-  const subManut = lerOpcao<SubManutencoes>(query, 'sub', ['encaixar', 'todas'], 'encaixar')
+  // Link antigo com filtro de lista (q, status, f...) e sem `sub` é da lista: abre em "Todas". `novo` não conta (é a gaveta nova).
+  const temFiltroDeLista = FILTROS_DAS_VISOES.some((chave) => chave !== 'novo' && query.has(chave))
+  const subManut = lerOpcao<SubManutencoes>(query, 'sub', ['encaixar', 'todas'], temFiltroDeLista ? 'todas' : 'encaixar')
   const veiculo = query.get('ficha') || null
   const [kind, id] = (query.get('registro') ?? '').split(':')
   const registro = KINDS.find((item) => item === kind) && id ? { kind: kind as Kind, id } : null
@@ -155,7 +157,7 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
       {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} docs={docs} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
       {registro?.kind === 'manutencao' ? <GavetaManutencao key={registro.id} source={source} id={registro.id} hoje={today} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
       {registro && registro.kind !== 'manutencao' ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onOpenVeiculo={onOpenVeiculo} /> : null}
-      {result && !fatal && route.novaManutencao ? <NovaManutencaoDrawer source={source} veiculos={data.veiculos} hoje={today} onClose={() => patchHashQuery({ novo: null })} onCriada={(id) => { patchHashQuery({ novo: null, registro: `manutencao:${id}` }); onReload() }} /> : null}
+      {result && !fatal && route.tab === 'manutencoes' && route.novaManutencao ? <NovaManutencaoDrawer source={source} veiculos={data.veiculos} hoje={today} onClose={() => patchHashQuery({ novo: null })} onCriada={(id) => { patchHashQuery({ novo: null, registro: `manutencao:${id}` }); onReload() }} /> : null}
     </>
   )
   if (LISTAS.includes(route.tab)) return <div className="page page--full frota-page">{conteudo}</div>

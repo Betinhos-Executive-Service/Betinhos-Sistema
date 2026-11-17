@@ -127,4 +127,29 @@ describe('Frota', () => {
     expect(await screen.findByRole('dialog', { name: 'Nova manutenção' })).toBeTruthy()
     expect(openForm).not.toHaveBeenCalled()
   })
+
+  it('?novo=manutencao só abre a Nova manutenção na aba Manutenções, não em Multas nem em Colisões', async () => {
+    for (const aba of ['multas', 'colisoes'] as const) {
+      history.replaceState(null, '', `#/frota-${aba}?novo=manutencao`)
+      renderFrota(createMockSource(), aba)
+      await screen.findByRole('button', { name: 'Novo registro' })
+      expect(screen.queryByRole('dialog', { name: 'Nova manutenção' })).toBeNull()
+      cleanup()
+    }
+  })
+
+  it('link antigo de Manutenções com filtro de lista e sem sub abre a sub-aba Todas; só com novo, a fila', async () => {
+    history.replaceState(null, '', '#/frota-manutencoes?q=freio')
+    renderFrota(createMockSource(), 'manutencoes')
+    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
+    cleanup()
+    history.replaceState(null, '', '#/frota-manutencoes?status=0')
+    renderFrota(createMockSource(), 'manutencoes')
+    expect((await screen.findByRole('tab', { name: 'Todas' })).getAttribute('aria-selected')).toBe('true')
+    cleanup()
+    history.replaceState(null, '', '#/frota-manutencoes?novo=manutencao')
+    renderFrota(createMockSource(), 'manutencoes')
+    expect((await screen.findByRole('tab', { name: /A encaixar/ })).getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByRole('dialog', { name: 'Nova manutenção' })).toBeTruthy()
+  })
 })
