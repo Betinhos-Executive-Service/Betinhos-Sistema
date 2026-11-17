@@ -42,13 +42,15 @@ Quando a spec, os planos anteriores e o código atual divergem, a spec decide. A
   - **Paginação por cookie e ordenação seguem:** a ordem continua na raiz.
   - **Busca:** continua nos campos da localização rápida. A descrição da manutenção não entra na busca.
 - **D4. Desligado tira só a categoria Manutenção.** O filtro é `ne` **ou** `null`, porque `ne` não devolve vazio (como no SQL), e as linhas sem categoria continuam. Ligado não filtra nada: serviços, manutenções, trocas e linhas sem categoria aparecem.
-- **D5. A linha de manutenção tem desenho próprio.**
-  - **Tabela:**
-    - a barra e o fundo usam os tokens de aviso do DS (`--bt-color-warning`, `--bt-color-warning-soft`), porque o DS que o shell usa não tem token laranja próprio;
-    - a primeira coluna é o botão "🔧 Manutenção · <placa>";
-    - motorista e saída ficam na própria coluna;
-    - o resto das colunas vira trechos contínuos (`grid-column: span N`, `aria-colspan`). O primeiro trecho traz o resumo: problema, grau, janela, status da manutenção e os selos "Atrasada" (danger) e "Fora da janela" (warning).
-  - **Cards:** mesmo resumo, com "Programar" no lugar de "Editar campos".
+- **D5. A linha de manutenção tem desenho próprio, com colunas com sentido** (decisão do Renan, 17/11/2026, ao rever a UI; substitui os trechos com `grid-column: span N`).
+  - **Tabela:** uma célula por coluna da visão, e cada dado na coluna de mesmo sentido (`desenhoDaManutencao`):
+    - fundo com a tinta suave do aviso do DS (`--bt-color-warning-soft` misturado à superfície) e barra de 3 px em `--bt-color-warning`;
+    - primeira coluna: botão com a chave (`Wrench`), a placa em destaque e "Manutenção" embaixo; na densidade mínima, só a placa. O nome acessível começa pelo texto visível ("TST1A11 · Manutenção, abrir: <problema>"). Se a primeira coluna da visão for motorista ou saída, ela continua editável e o botão vai para a primeira célula que não edita;
+    - Status de Op.: a etiqueta do status da manutenção e, embaixo, os alertas em texto com ponto, "● Atrasada" (perigo) e "● Fora da janela" (aviso);
+    - Veículo: a placa;
+    - problema e "grau · janela" no Trajeto ou, sem ele, na coluna livre mais larga da própria linha (nem virtual, como Portal e Comprovantes, nem de tabela ligada). Sem Status de Op., o status e os alertas vão junto do problema; sem coluna livre, o problema vai junto do botão. O clique no problema abre a mesma gaveta, mas ele fica fora do Tab e da árvore acessível (um alvo por linha);
+    - motorista e saída ficam na própria coluna, com o `Cell` de sempre; as outras colunas ficam vazias.
+  - **Cards:** placa e "Manutenção" numa linha, o problema, status e alertas, "grau · janela" e "Programar" no lugar de "Editar campos".
   - **Atrasada:** usa `atrasada()` de `frota/domain/janela.ts`, com o fim da janela ou, na falta dele, `cr40f_agendarpara`.
   - **Limite aceito:** na linha de manutenção as setas do teclado andam só entre as células que existem nela.
 - **D6. Só motorista e saída editam, com o `Cell` de sempre.** Ele traz as regras de tipo, validação, proteção da Tenaris, releitura e "Tentar de novo". As outras colunas de serviço não aparecem na linha. No celular, "Programar" abre a `GeralSheet` só com os dois campos. Quando a visão não tem a coluna, a coluna é criada ali (`colunasDaManutencao`).
