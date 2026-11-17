@@ -40,8 +40,8 @@ type Options = {
   /** Colunas virtuais que o painel oferece, mas que só aparecem quando o usuário liga (ex.: Portal). */
   hiddenByDefault?: string[]
   /** "Mostrar manutenções" mudado na tela: conta como "Alterada"; "Restaurar" volta ao da visão. */
-  manutencoesAlteradas?: boolean
-  resetManutencoes?: () => void
+  manutencoesAlteradas: boolean
+  resetManutencoes: () => void
 }
 
 const sortKey = (column: { attribute: string; alias: string | null }) => (column.alias ? `${column.alias}.${column.attribute}` : column.attribute)
@@ -158,7 +158,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     if (resetFilters) resetFilters()
     else setFilters(emptyFilters())
     setGroup(null)
-    resetManutencoes?.()
+    resetManutencoes()
   }, [views, active.id, selectView, setPrefs, setSort, setFilters, resetFilters, setGroup, resetManutencoes])
 
   const state: TableViewState = {
@@ -168,7 +168,7 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
     active,
     config,
     // O agrupamento é da tela (não é gravado na visão): fica fora de "Alterada", senão Salvar pareceria não ter efeito.
-    dirty: !sameConfig(withGroup(config, null), baseline) || Boolean(o.manutencoesAlteradas),
+    dirty: !sameConfig(withGroup(config, null), baseline) || o.manutencoesAlteradas,
     canPublish: false,
     setConfig,
     density,

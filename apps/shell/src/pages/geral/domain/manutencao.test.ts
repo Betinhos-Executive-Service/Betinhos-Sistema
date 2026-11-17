@@ -175,6 +175,15 @@ describe('linha de manutenção', () => {
     expect(avisoForaDaJanela('2026-11-18T13:00:00Z', { janela: null, janelaRotulo: 'Sem janela' })).toBeNull()
   })
 
+  it('o aviso de fora da janela segue o selo: só com a manutenção Agendada ou Programada', () => {
+    const fora = lerLinhaManutencao(linha({ cr40f_dataehorriodesada: '2026-11-18T13:00:00Z' }), HOJE)!
+    for (const [status, esperado] of [[202410001, true], [202410005, true], [202410002, false], [100000001, false], [100000002, false], [0, false], [null, false]] as const) {
+      expect(avisoForaDaJanela('2026-11-18T13:00:00Z', { ...fora, status }) != null, String(status)).toBe(esperado)
+    }
+    // Aviso e selo usam a mesma linha lida: o status da linha vem junto.
+    expect(avisoForaDaJanela('2026-11-18T13:00:00Z', lerLinhaManutencao(linha({ 'bt_manut.cr40f_status': 202410002 }), HOJE)!)).toBeNull()
+  })
+
   it('trechos: motorista e saída na própria coluna; o resto junta, o primeiro trecho com o resumo', () => {
     const cols = ['cr40f_id', 'cr40f_status', 'cr40f_cliente', 'cr40f_dataehorriodesada', 'cr40f_motorista', 'cr40f_trajeto', 'x__cr40f_Motorista.cr40f_motorista'].map((k) => coluna(k))
     expect(trechosDaManutencao(cols)).toEqual([
