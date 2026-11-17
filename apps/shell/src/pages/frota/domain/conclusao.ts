@@ -4,6 +4,7 @@ import { ANEXO_DESPESA, LIMITE, PAGAMENTO } from '../data/schema'
 import type { AlvoArquivo, ArquivoEnviado, ArquivosManutencao, ComandosManutencao, OrigemArquivo, PedidoConclusao, RespostaConclusao } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { errorMessage } from '../data/xrm'
+import { lerKm } from './km'
 
 /** Campos da conclusão: os mesmos do App (serviços do catálogo, km, data, valor, pagamento, estabelecimento, cidade, quem realizou, comentário, nota e fotos). */
 export type ValoresConclusao = { servicos: number[]; km: string; data: string; valor: string; pagamento: string; estabelecimento: string; cidadeId: string; realizadoPorId: string; servicoRealizado: string; comentario: string; notas: File[]; fotos: File[] }
@@ -15,8 +16,6 @@ export type LeituraConclusao = { erros: ErrosConclusao; aviso: string | null; pe
 
 export const MAX_FOTOS_FINAIS = 3
 const PAGAMENTOS: number[] = Object.values(PAGAMENTO)
-/** O servidor lê o km como `int` (Contratos.cs): acima disso a chamada falharia. */
-const KM_MAXIMO = 2_147_483_647
 const DATA_HORA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/
 
 const formatoSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
@@ -58,8 +57,8 @@ function primeiroErroDeFormato(arquivos: File[], tipo: TipoArquivo): string | un
 export function validarConclusao(v: ValoresConclusao, ctx: ContextoConclusao): LeituraConclusao {
   const erros: ErrosConclusao = {}
   if (v.servicos.length === 0) erros.servicos = 'Escolha pelo menos um serviço realizado'
-  const km = /^\d+$/.test(v.km.trim()) ? Number(v.km.trim()) : Number.NaN
-  if (!(km > 0 && km <= KM_MAXIMO)) erros.km = 'Informe o km do veículo (número inteiro)'
+  const km = lerKm(v.km)
+  if (km === null) erros.km = 'Informe o km do veículo (número inteiro)'
   const data = DATA_HORA.test(v.data) && !Number.isNaN(new Date(`${v.data}:00-03:00`).getTime()) ? `${v.data}:00-03:00` : null
   if (!data) erros.data = 'Informe a data e a hora'
   const valor = Number(v.valor.trim().replace(',', '.'))
@@ -80,8 +79,8 @@ export function validarConclusao(v: ValoresConclusao, ctx: ContextoConclusao): L
   if (v.fotos.length > MAX_FOTOS_FINAIS) erros.fotos = `No máximo ${MAX_FOTOS_FINAIS} fotos`
   else erros.fotos = primeiroErroDeFormato(v.fotos, 'foto')
   for (const campo of ['notas', 'fotos'] as const) if (!erros[campo]) delete erros[campo]
-  const aviso = km > 0 && ctx.kmPedido !== null && km < ctx.kmPedido ? `O km informado (${numeroBR(km)}) é menor que o km do pedido (${numeroBR(ctx.kmPedido)}). Confira antes de concluir.` : null
-  if (Object.keys(erros).length || !data) return { erros, aviso, pedido: null }
+  const aviso = km !== null && ctx.kmPedido !== null && km < ctx.kmPedido ? `O km informado (${numeroBR(km)}) é menor que o km do pedido (${numeroBR(ctx.kmPedido)}). Confira antes de concluir.` : null
+  if (Object.keys(erros).length || !data || km === null) return { erros, aviso, pedido: null }
   return {
     erros, aviso,
     pedido: { manutencaoId: ctx.manutencaoId, servicos: [...new Set(v.servicos)], km, data, valor: Math.round(valor * 100) / 100, pagamento, estabelecimento, cidadeId: v.cidadeId, realizadoPorId: v.realizadoPorId, servicoRealizado: servicoRealizado || null, comentario: comentario || null },

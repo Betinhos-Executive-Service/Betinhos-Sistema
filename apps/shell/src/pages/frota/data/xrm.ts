@@ -24,3 +24,6 @@ export function rawErrorMessage(error: unknown) {
 export function errorMessage(error: unknown) {
   return rawErrorMessage(error).replace(/\.+$/, '')
 }
+
+/** Garante um ponto final na frase (sem duplicar o que a mensagem já traz), para compor com outra frase em seguida. */
+export const comPontoFinal = (frase: string) => (/[.!?]$/.test(frase) ? frase : `${frase}.`)

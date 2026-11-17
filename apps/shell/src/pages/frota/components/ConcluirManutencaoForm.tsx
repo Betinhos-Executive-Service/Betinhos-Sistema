@@ -6,6 +6,7 @@ import { LIMITE, PAGAMENTO_MANUT } from '../data/schema'
 import { FOTO_MAX_BYTES } from '../data/sharepoint'
 import type { DataSource, OpcaoBusca } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
+import { comPontoFinal } from '../data/xrm'
 import { concluirPeloShell, MAX_FOTOS_FINAIS, validarConclusao, valoresConclusaoIniciais, type ErrosConclusao, type ValoresConclusao } from '../domain/conclusao'
 import { desfechoDaAcao, executarAcaoManutencao } from '../domain/transitions'
 import { GradeServicos } from './GradeServicos'
@@ -70,7 +71,7 @@ export function ConcluirManutencaoForm({ source, detalhe, onConcluida, onVoltar,
     <form className="frota-stack" noValidate onSubmit={(event) => { event.preventDefault(); void concluir() }}>
       <strong>Concluir</strong>
       <p className="frota-muted">Os mesmos campos do App. Ao concluir, a despesa da manutenção é criada e a linha da Geral é concluída.</p>
-      {falha ? <Alert tone="danger" title="Não foi possível concluir">{falha}{/[.!?]$/.test(falha) ? '' : '.'} O que você preencheu foi mantido.</Alert> : null}
+      {falha ? <Alert tone="danger" title="Não foi possível concluir">{comPontoFinal(falha)} O que você preencheu foi mantido.</Alert> : null}
       {aviso ? <Alert tone="warning">{aviso}</Alert> : null}
       <div className="frota-fields">
         <div className="frota-fields__wide frota-stack">
