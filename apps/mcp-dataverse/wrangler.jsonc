@@ -14,11 +14,11 @@
     "bindings": [{ "name": "MCP_OBJECT", "class_name": "DataverseMcp" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DataverseMcp"] }],
-  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "TROCAR_PELO_ID_DO_KV" }],
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "30a6569379c94ef0ae796a834a2c5701" }],
   "vars": {
     "ENTRA_TENANT_ID": "bed8b3ad-d487-4193-a748-09e16f0e0327",
     "ENTRA_CLIENT_ID": "95d58342-4382-4315-940f-9277dc687d4f",
-    "MCP_RESOURCE": "https://mcp-dataverse.betinhosexecutiveservice.workers.dev/mcp",
+    "MCP_RESOURCE": "https://mcp-dataverse.betinhosexecutiveservice.workers.dev",
     "ALLOWED_EMAIL_DOMAIN": "betinhos.com.br",
     "DV_URL_DEV": "https://org23b93544.crm2.dynamics.com",
     "DV_URL_TEST": "https://appbetinhostest.crm2.dynamics.com",

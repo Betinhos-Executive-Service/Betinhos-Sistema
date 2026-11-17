@@ -6,7 +6,7 @@ export const env = {
   ENTRA_CLIENT_ID: 'client-1',
   ENTRA_CLIENT_SECRET: 'segredo-de-teste',
   COOKIE_ENCRYPTION_KEY: 'x'.repeat(32),
-  MCP_RESOURCE: 'https://mcp.test/mcp',
+  MCP_RESOURCE: 'https://mcp.test',
   ALLOWED_EMAIL_DOMAIN: 'betinhos.com.br',
   DV_URL_DEV: 'https://dev.crm.test',
   DV_URL_TEST: 'https://test.crm.test',

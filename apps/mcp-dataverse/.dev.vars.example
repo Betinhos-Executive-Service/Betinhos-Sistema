@@ -1,4 +1,4 @@
 # Copie para .dev.vars (ignorado pelo git) e preencha.
 ENTRA_CLIENT_SECRET=
 COOKIE_ENCRYPTION_KEY=
-MCP_RESOURCE=http://localhost:8788/mcp
+MCP_RESOURCE=http://localhost:8788
