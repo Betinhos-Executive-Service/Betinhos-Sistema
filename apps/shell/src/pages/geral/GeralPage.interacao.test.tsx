@@ -45,8 +45,13 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const before = px(track(/Trajeto/))
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    // Mede a borda só ao apertar: medir a cada movimento forçaria um reflow por evento.
+    const headMeasures = () => (HTMLElement.prototype.getBoundingClientRect as unknown as { mock: { contexts: HTMLElement[] } }).mock.contexts.filter((el) => el.getAttribute('role') === 'columnheader').length
+    const measured = headMeasures()
+    fireEvent.pointerMove(handle, { clientX: 130, pointerId: 1, buttons: 1 })
     fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
     await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(headMeasures()).toBe(measured)
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)
@@ -247,13 +252,13 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
-    await screen.findByText('Status de Operação: Confirmado')
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     await saveAs('Confirmados')
     expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
     // Reaberta, a visão devolve o filtro dela ao painel (editável), sem `f=` na URL.
-    expect(await screen.findByText('Status de Operação: Confirmado')).toBeTruthy()
+    expect(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ }).textContent).toContain('1')
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))

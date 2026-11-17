@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FORMATTED, mapBaseline, mapColisao, mapDespesaCombustivel, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, ref } from './mappers'
+import { FORMATTED, mapBaseline, mapColisao, mapDespesaCombustivel, mapDetalheManutencao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, ref, SELECT, SELECT_DETALHE_MANUTENCAO } from './mappers'
 
 describe('mappers', () => {
   it('mapeia veículo com hodômetro', () => {
@@ -44,6 +44,32 @@ describe('mappers', () => {
       { cr40f_agendarpara: 'UserLocal' },
     )
     expect(manutencao).toMatchObject({ id: 'm1', status: 0, valor: null, agendarPara: '2026-10-05', veiculo: { id: 'v1', label: 'ABC1D23' } })
+  })
+
+  it('mapeia janela, data do encaixe e km da realização', () => {
+    const m = mapManutencao(
+      { cr40f_manutencoesid: 'M2', cr40f_status: 202410001, cr40f_janelainicio: '2026-11-23', cr40f_janelafim: '2026-11-29', cr40f_datadaaprovacao: '2026-11-17T13:00:00Z', cr40f_kmrealizado: 85200, createdon: '2026-11-10T12:00:00Z' },
+      { cr40f_janelainicio: 'DateOnly', cr40f_janelafim: 'DateOnly', cr40f_datadaaprovacao: 'UserLocal' },
+    )
+    expect(m).toMatchObject({ janelaInicio: '2026-11-23', janelaFim: '2026-11-29', dataAprovacao: '2026-11-17', kmRealizado: 85200 })
+    expect(mapManutencao({ cr40f_manutencoesid: 'M3' })).toMatchObject({ janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null })
+    expect(SELECT.manutencoes).toEqual(expect.arrayContaining(['cr40f_janelainicio', 'cr40f_janelafim', 'cr40f_datadaaprovacao', 'cr40f_kmrealizado']))
+  })
+
+  it('detalhe da manutenção junta fotos, nota, pagamento, comentários e quem realizou', () => {
+    const d = mapDetalheManutencao({
+      cr40f_manutencoesid: 'M4', cr40f_pagamento: 202410003,
+      _cr40f_realizado_por_nome_value: 'F1', [`_cr40f_realizado_por_nome_value${FORMATTED}`]: 'Ana',
+      cr40f_foto01: 'https://x.invalid/1', cr40f_linkdaevidencia: '', cr40f_foto03: 'https://x.invalid/3',
+      new_linkdanotafiscal: 'https://x.invalid/nf1\nhttps://x.invalid/nf2', new_linkdafotofinal1: 'https://x.invalid/f1',
+      cr40f_comentariosaomotorista: 'Levar cedo', new_comentariosdocolaborador: 'Feito',
+    })
+    expect(d).toMatchObject({
+      id: 'm4', pagamento: 202410003, realizadoPor: { id: 'f1', label: 'Ana' },
+      fotosPedido: ['https://x.invalid/1', 'https://x.invalid/3'], linkNotaFiscal: 'https://x.invalid/nf1\nhttps://x.invalid/nf2', fotosFinais: ['https://x.invalid/f1'],
+      comentarioAoMotorista: 'Levar cedo', comentarioColaborador: 'Feito',
+    })
+    expect(SELECT_DETALHE_MANUTENCAO).toEqual(expect.arrayContaining(['cr40f_janelafim', 'cr40f_kmrealizado', '_cr40f_realizado_por_nome_value', 'new_linkdanotafiscal', 'cr40f_foto01']))
   })
 
   it('mapeia multa com indicado booleano e datas de dia', () => {

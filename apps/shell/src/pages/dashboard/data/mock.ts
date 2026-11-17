@@ -208,8 +208,8 @@ function criarDespesasMock(reservas: Reserva[], funcionarios: Funcionario[], now
 }
 
 const TIPOS_REPARO = ['Preventiva sistemática', 'Corretiva não crítica', 'Corretiva crítica', 'Conservação, conforto e imagem', 'Avaria']
-/** Rótulos reais de `cr40f_status` da manutenção (metadata DEV); Solicitado, Aprovado e Programado contam como em andamento. */
-const STATUS_MANUTENCAO = ['Realizado', 'Realizado', 'Realizado', 'Aprovado', 'Programado', 'Solicitado', 'Cancelado']
+/** Rótulos reais de `cr40f_status` da manutenção (metadata DEV); Solicitado, Agendado e Programado contam como em andamento. */
+const STATUS_MANUTENCAO = ['Realizado', 'Realizado', 'Realizado', 'Agendado', 'Programado', 'Solicitado', 'Cancelado']
 const INFRACOES = [
   { codigo: '745-50', descricao: 'Transitar em velocidade superior à máxima permitida em até 20%' },
   { codigo: '746-30', descricao: 'Transitar em velocidade superior à máxima permitida em mais de 20% até 50%' },

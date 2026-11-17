@@ -8,7 +8,7 @@ import type { Colisao, FrotaData, Manutencao, Multa } from '../data/types'
 import { linhasDaTabela } from '../testUtils'
 import { Registros } from './Registros'
 
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manut('a', {}), manut('b', { status: MANUT.REALIZADO, veiculo: { id: 'v2', label: 'TST2B22' }, solicitante: { id: 'f2', label: 'Bruno' }, criadoEm: '2026-06-01T12:00:00Z' })] }
 const source = { openForm: vi.fn(async () => {}) } as unknown as DataSource
 const rows = linhasDaTabela
@@ -63,7 +63,7 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('filtro por um veículo que saiu dos dados após recarga continua visível e pode ser limpo', async () => {
+  it('filtro por um veículo que saiu dos dados após recarga continua valendo e pode ser limpo', async () => {
     window.location.hash = '#/frota?aba=ocorrencias&veiculo=v2'
     const antes: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m2', 'v2')] }
     const depois: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m3', 'v1')] }
@@ -71,8 +71,7 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(1))
     rerender(<Registros kinds={['multa']} data={depois} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(await screen.findByText(/Nenhum registro de multa com estes filtros/)).toBeTruthy()
-    expect(screen.getByText(/Veículo: V2/)).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
@@ -94,5 +93,14 @@ describe('Registros', () => {
     render(<Registros kinds={['multa']} data={comTermo} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
     expect(screen.getByText('Contestado')).toBeTruthy()
+  })
+
+  it('com onNovo, "Novo registro" abre a gaveta da tela e não o formulário nativo', () => {
+    const onNovo = vi.fn()
+    const nativo = { openForm: vi.fn(async () => {}) } as unknown as DataSource
+    render(<Registros kinds={['manutencao']} data={data} source={nativo} onOpen={() => {}} onReload={() => {}} onNovo={onNovo} />)
+    fireEvent.click(screen.getByRole('button', { name: /Novo/ }))
+    expect(onNovo).toHaveBeenCalledTimes(1)
+    expect(nativo.openForm).not.toHaveBeenCalled()
   })
 })

@@ -1,10 +1,11 @@
 import { Pencil, Sparkles } from 'lucide-react'
-import { Button, Checkbox, StatusBadge } from '@betinhos/ui'
+import { Button, StatusBadge } from '@betinhos/ui'
 import { useState } from 'react'
 import type { Classificacao, DataSource } from '../data/source'
 import type { Manutencao } from '../data/types'
 import { errorMessage } from '../data/xrm'
-import { CATEGORIAS_MANUT, categoriasDe, ORIGEM, patchManual, SERVICOS_MANUT } from '../domain/manutencaoCatalogo'
+import { categoriasDe, GRUPOS_MANUT, ORIGEM, patchManual } from '../domain/manutencaoCatalogo'
+import { GradeServicos } from './GradeServicos'
 import { useNotify } from './Toasts'
 
 function Origem({ item }: { item: Manutencao }) {
@@ -21,7 +22,6 @@ export function ClassificacaoManutencao({ source, item, onClassificado }: { sour
   const [editando, setEditando] = useState(false)
   const [selecionados, setSelecionados] = useState<number[]>(item.servicos)
   const [salvando, setSalvando] = useState(false)
-  const grupos = CATEGORIAS_MANUT.map((categoria) => ({ ...categoria, servicos: SERVICOS_MANUT.filter((servico) => servico.categoria === categoria.value) }))
 
   async function salvarCorrecao() {
     setSalvando(true)
@@ -38,23 +38,10 @@ export function ClassificacaoManutencao({ source, item, onClassificado }: { sour
     onClassificado({ servicos: selecionados, categorias: categoriasDe(selecionados), origem: ORIGEM.MANUAL, confianca: null })
   }
 
-  function alternar(value: number) {
-    setSelecionados((atual) => (atual.includes(value) ? atual.filter((v) => v !== value) : [...atual, value]))
-  }
-
   if (editando) {
     return (
       <div className="frota-classif">
-        <div className="frota-classif__grade">
-          {grupos.map((grupo) => (
-            <fieldset key={grupo.value} className="frota-classif__cat">
-              <legend>{grupo.label}</legend>
-              {grupo.servicos.map((servico) => (
-                <Checkbox key={servico.value} label={servico.label} checked={selecionados.includes(servico.value)} onChange={() => alternar(servico.value)} disabled={salvando} />
-              ))}
-            </fieldset>
-          ))}
-        </div>
+        <GradeServicos selecionados={selecionados} onChange={setSelecionados} disabled={salvando} />
         <div className="frota-cluster">
           <Button size="compact" loading={salvando} disabled={selecionados.length === 0} onClick={() => void salvarCorrecao()}>Salvar correção</Button>
           <Button size="compact" variant="secondary" disabled={salvando} onClick={() => { setSelecionados(item.servicos); setEditando(false) }}>Cancelar</Button>
@@ -63,7 +50,7 @@ export function ClassificacaoManutencao({ source, item, onClassificado }: { sour
     )
   }
 
-  const porCategoria = grupos
+  const porCategoria = GRUPOS_MANUT
     .map((grupo) => ({ ...grupo, servicos: grupo.servicos.filter((servico) => item.servicos.includes(servico.value)) }))
     .filter((grupo) => grupo.servicos.length > 0)
 

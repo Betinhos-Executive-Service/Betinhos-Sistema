@@ -12,10 +12,9 @@ const CURTO: Record<PendenciaTipo, string> = {
   reincidencia: 'Manutenção reincidente',
   custo: 'Custo fora da curva',
   hodometro: 'Hodômetro desatualizado',
-  aprovar: 'Aprovar manutenção',
+  encaixar: 'A encaixar',
   preventiva: 'Preventiva do plano',
-  programar: 'Programar manutenção',
-  agendada: 'Manutenção agendada',
+  atrasada: 'Manutenção atrasada',
   notificar: 'Notificar condutor',
   indicar: 'Indicar condutor',
   colisao: 'Colisão em aberto',
@@ -71,7 +70,7 @@ export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: 
   const filtro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl) ?? ''
 
   const aviso = erroPreventiva ? <Alert tone="warning">Preventivas indisponíveis: {erroPreventiva}</Alert> : null
-  if (!itens.length) return <>{aviso}<EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Aprovações, agendamentos, multas e colisões em aberto aparecem aqui.</EmptyState></>
+  if (!itens.length) return <>{aviso}<EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Encaixes, manutenções atrasadas, multas e colisões em aberto aparecem aqui.</EmptyState></>
 
   const contagem = (tipo: PendenciaTipo) => itens.filter((item) => item.tipo === tipo).length
   const atrasadas = itens.filter((item) => urgencia(item) === 'atrasado').length

@@ -219,7 +219,7 @@ Pacote `@betinhos/agentes-ia` (TypeScript, `@anthropic-ai/sdk` 0.133.0 só em de
 | Financeiro | `financeiro.ts` | SemRecibo, OPPendenteAntiga, RepasseAguardando, MargemNegativa, OSSemCobranca | CriarPendencia |
 | Logística | `logistica.ts` | ServicoSemMotorista, ServicoSemVeiculo, ConflitoHorario, MotoristaSemVeiculoAtual | AtribuirMotorista, AtribuirVeiculo |
 | Pessoas | `pessoas.ts` | CNHVencendo, ASOVencendo, DocumentoVencido, Aniversario, MultaSemMotorista, ComunicadoSugerido, TreinamentoPendente | CriarPendencia, CriarComunicadoRascunho |
-| Frota | `frota.ts` | FrotaPrioridade, FrotaReincidencia, FrotaPreventiva, FrotaAgendadaVencida, FrotaCustoAlto, FrotaHodometro | CriarPendencia |
+| Frota | `frota.ts` | FrotaPrioridade, FrotaReincidencia, FrotaPreventiva, FrotaAtrasada, FrotaCustoAlto, FrotaHodometro | CriarPendencia |
 
 Travas (`src/validar.ts`, replicadas no flow): `stop_reason` precisa ser `end_turn`; resposta JSON com `resumo` e `propostas`; no máximo 20 propostas; tipo e ação precisam pertencer ao agente; prioridade alta/media/baixa; `registroAlvo.id` precisa ser GUID; no agente Frota, pendências obrigatórias (prioridade, reincidência, custo) precisam ter proposta. O texto do contexto vai como "Contexto do departamento (JSON)". `scripts/avaliar.ts` roda casos locais (`.local/casos.json`, `ANTHROPIC_API_KEY` no ambiente local) e compara tipos esperados e obtidos. O que a proposta aprovada executa na ponta (criar pendência, atribuir) está no shell, fora do escopo deste documento (não confirmado aqui).
 

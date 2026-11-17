@@ -13,6 +13,7 @@ export const TABELAS_COM_GAVETA = [
   'cr40f_financeiro',
   'cr40f_pagantes',
   'cr40f_despesaoperacional',
+  'cr40f_manutencoes',
 ] as const
 
 export type TabelaComGaveta = (typeof TABELAS_COM_GAVETA)[number]

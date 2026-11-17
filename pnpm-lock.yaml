@@ -416,8 +416,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dataverse
       '@betinhos/ui':
-        specifier: npm:@betinhos-executive-service/ui@^1.35.4
-        version: '@betinhos-executive-service/ui@1.35.4(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
+        specifier: npm:@betinhos-executive-service/ui@^2.0.1
+        version: '@betinhos-executive-service/ui@2.0.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)'
       '@fontsource/manrope':
         specifier: ^5.2.6
         version: 5.3.0
@@ -774,8 +774,11 @@ packages:
   '@betinhos-executive-service/tokens@1.18.0':
     resolution: {integrity: sha512-siyEGtc0pxXflxzCUYnL73ig3pDw9ogoKc3SuZFt28PZPUN68y8nWcjPDInNvps3pzRCieMiyfvq0ukSd/4mvA==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.18.0/d6ea0fc9517468f162d831679bb9e6e6716f0046}
 
-  '@betinhos-executive-service/tokens@1.35.4':
-    resolution: {integrity: sha512-PCessyvtG/pOp5AgKYYNa6RI3ufcE8QEtmOYudoPm9ELddQfLVeQX3fjqnYpSIAjoM/gZWUcZUB5v+/5LTBoLw==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.35.4/d4f06285ccc1eb726c59c627f7abf3106e55a2f3}
+  '@betinhos-executive-service/tokens@1.28.0':
+    resolution: {integrity: sha512-M/9DUiz6ZXJNTmx7F69WmsYiCjQIEKr1s/ys1Fi+aeitORKpVUhybXonJn6DGoo6zRaBqRHzGqo4wzQpmngWKQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/1.28.0/9b2bcb3ab145225540d25d3cc1b7c98d8ad0831a}
+
+  '@betinhos-executive-service/tokens@2.0.1':
+    resolution: {integrity: sha512-3Gg4r8I2u59oPstpMc3N2TWXEr6HbLdcp3hqVtDYWXf1AkVwsk1k4nPC7guGCymHdXCT0eew9Pn19qXRdahx+Q==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/tokens/2.0.1/b10aee97b4ba72a72f875b8b70676493973807a0}
 
   '@betinhos-executive-service/ui@1.11.0':
     resolution: {integrity: sha512-Z6pT9w8yha9CqAPO4VnvW7YpNz2qyS2nMnkKXCV/3p0S1NMem8Icu4JGQghuYf8RlhzElx+HpNZ5ubV3HnxL8g==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.11.0/ef92e2a9bfd19f0e19a4aff89a7bdcfe641d7652}
@@ -797,8 +800,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@betinhos-executive-service/ui@1.35.4':
-    resolution: {integrity: sha512-+NnBRHesHXvDZuAhiSbvdmllCJcurTSngZYAf3HnsJnKbQTSnRvONaeL9F2x8YOmyR1DwXzL0tPoDNAvW8hoNw==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/1.35.4/4ed1d10703bb06ea5d4aad3278c732332f5927d0}
+  '@betinhos-executive-service/ui@2.0.1':
+    resolution: {integrity: sha512-Adce7jABbqaHMsRJDLi0S/cZsoXJZEAAKBznJgyjd4C0ZW5e3uvDbocnmwsOa7SO5DP/0bHQdKQKntcPg1s9YQ==, tarball: https://npm.pkg.github.com/download/@betinhos-executive-service/ui/2.0.1/5bd1303ff8e84b573e7b0b0fb52fbaa569969ef8}
     peerDependencies:
       '@types/react': '*'
       react: ^19.2.0
@@ -3302,8 +3305,8 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
-  hono@4.13.18:
-    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
+  hono@4.13.19:
+    resolution: {integrity: sha512-KmXvQAXwcAHV+muzbIwoJ23niEB5nMoDVr9WcRkU8mvjUECm/1+7v4Jgp7P7a+H6MLFrh+vXrGonGrGS+RQfkA==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -5169,7 +5172,9 @@ snapshots:
 
   '@betinhos-executive-service/tokens@1.18.0': {}
 
-  '@betinhos-executive-service/tokens@1.35.4': {}
+  '@betinhos-executive-service/tokens@1.28.0': {}
+
+  '@betinhos-executive-service/tokens@2.0.1': {}
 
   '@betinhos-executive-service/ui@1.11.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -5181,7 +5186,7 @@ snapshots:
 
   '@betinhos-executive-service/ui@1.18.0(@types/react@18.3.30)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.35.4
+      '@betinhos-executive-service/tokens': 1.28.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
@@ -5189,15 +5194,15 @@ snapshots:
 
   '@betinhos-executive-service/ui@1.18.0(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.35.4
+      '@betinhos-executive-service/tokens': 1.28.0
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
       '@types/react': 19.3.0
 
-  '@betinhos-executive-service/ui@1.35.4(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@betinhos-executive-service/ui@2.0.1(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@betinhos-executive-service/tokens': 1.35.4
+      '@betinhos-executive-service/tokens': 2.0.1
       '@tanstack/react-virtual': 3.14.23(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
@@ -5543,9 +5548,9 @@ snapshots:
 
   '@fontsource/manrope@5.3.0': {}
 
-  '@hono/node-server@2.1.8(hono@4.13.18)':
+  '@hono/node-server@2.1.8(hono@4.13.19)':
     dependencies:
-      hono: 4.13.18
+      hono: 4.13.19
 
   '@img/colour@1.1.0': {}
 
@@ -5740,15 +5745,15 @@ snapshots:
       eventsource-parser: 3.1.1
       jose: 6.2.17
       pkce-challenge: 5.0.1
-      zod: 4.6.7
+      zod: 4.3.6
 
   '@modelcontextprotocol/core@2.4.0':
     dependencies:
-      zod: 4.6.7
+      zod: 4.3.6
 
   '@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.6)(supports-color@10.2.2)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.8(hono@4.13.18)
+      '@hono/node-server': 2.1.8(hono@4.13.19)
       ajv: 8.20.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -5758,7 +5763,7 @@ snapshots:
       eventsource-parser: 3.1.1
       express: 5.3.0(supports-color@10.2.2)
       express-rate-limit: 8.7.4(express@5.3.0(supports-color@10.2.2))(supports-color@10.2.2)
-      hono: 4.13.18
+      hono: 4.13.19
       jose: 6.2.17
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -5773,7 +5778,7 @@ snapshots:
   '@modelcontextprotocol/server@2.4.0':
     dependencies:
       '@modelcontextprotocol/core': 2.4.0
-      zod: 4.6.7
+      zod: 4.3.6
 
   '@module-federation/error-codes@0.22.0': {}
 
@@ -7586,7 +7591,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  hono@4.13.18: {}
+  hono@4.13.19: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@2.4.0):
     dependencies:

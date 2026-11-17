@@ -6,7 +6,7 @@ import { buildPendencias } from './pendencias'
 
 const today = '2026-10-20'
 const A = { id: 'v1', label: 'ABC1D23' }
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `M ${id}`, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: A, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `M ${id}`, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: A, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const veic = (id: string, extra: Partial<Veiculo> = {}): Veiculo => ({ id, placa: id.toUpperCase(), marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: PROPRIO, motorista: null, hodometro: null, hodometroEm: null, ...extra })
 
 describe('reincidencias', () => {
@@ -38,12 +38,20 @@ describe('reincidencias', () => {
 })
 
 describe('prioridadeParada', () => {
-  it('Alta solicitada há 3 dias e Urgente aprovada sem data há 6 entram; Média e recentes não', () => {
+  it('Alta solicitada há 3 dias entra (conta do pedido); Média e recentes não', () => {
     expect(prioridadeParada(manut('a', { grau: 3, status: MANUT.SOLICITADO, criadoEm: '2026-10-17T12:00:00Z' }), today)).toBe(3)
-    expect(prioridadeParada(manut('b', { grau: 4, status: MANUT.APROVADO, criadoEm: '2026-10-14T12:00:00Z' }), today)).toBe(6)
     expect(prioridadeParada(manut('c', { grau: 2, status: MANUT.SOLICITADO, criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
     expect(prioridadeParada(manut('d', { grau: 4, status: MANUT.SOLICITADO, criadoEm: '2026-10-19T12:00:00Z' }), today)).toBeNull()
-    expect(prioridadeParada(manut('e', { grau: 4, status: MANUT.APROVADO, agendarPara: '2026-10-25', criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
+  })
+
+  it('Urgente encaixada há 6 dias sem programação entra: conta do encaixe, não do pedido', () => {
+    expect(prioridadeParada(manut('b', { grau: 4, status: MANUT.AGENDADO, criadoEm: '2026-09-01T12:00:00Z', dataAprovacao: '2026-10-14' }), today)).toBe(6)
+    expect(prioridadeParada(manut('e', { grau: 4, status: MANUT.AGENDADO, criadoEm: '2026-09-01T12:00:00Z', dataAprovacao: '2026-10-18' }), today)).toBeNull()
+  })
+
+  it('sem data do encaixe (registro antigo) e Programada não entram', () => {
+    expect(prioridadeParada(manut('f', { grau: 4, status: MANUT.AGENDADO, criadoEm: '2026-09-01T12:00:00Z' }), today)).toBeNull()
+    expect(prioridadeParada(manut('g', { grau: 4, status: MANUT.PROGRAMADO, criadoEm: '2026-09-01T12:00:00Z', dataAprovacao: '2026-09-02' }), today)).toBeNull()
   })
 })
 
@@ -72,7 +80,7 @@ describe('custoForaDaCurva', () => {
 })
 
 describe('buildPendencias com regras proativas', () => {
-  it('prioridade parada substitui aprovar e reincidência vem logo depois', () => {
+  it('prioridade parada substitui A encaixar e reincidência vem logo depois', () => {
     const result = buildPendencias({
       manutencoes: [
         manut('alta', { grau: 3, status: MANUT.SOLICITADO, criadoEm: '2026-10-10T12:00:00Z' }),
@@ -81,7 +89,8 @@ describe('buildPendencias com regras proativas', () => {
       ],
       multas: [], colisoes: [], veiculos: [], planoPreventivo: [], baselines: [],
     }, today, new Date('2026-10-20T12:00:00Z'))
-    expect(result.map((p) => [p.tipo, p.id])).toEqual([['prioridade', 'alta'], ['reincidencia', 'reinc:v1:9'], ['aprovar', 'baixa']])
+    expect(result.map((p) => [p.tipo, p.id])).toEqual([['prioridade', 'alta'], ['reincidencia', 'reinc:v1:9'], ['encaixar', 'baixa']])
+    expect(result[0].detalhe).toBe('Aguardando encaixe há 10 dias')
     expect(result[1].titulo).toMatch(/^3ª vez: /)
     expect(result[1].detalhe).toContain('causa raiz')
   })

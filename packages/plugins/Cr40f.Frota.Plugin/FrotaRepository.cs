@@ -23,7 +23,7 @@ public sealed class FrotaRepository
         dados.Veiculos.AddRange(Todos(veiculos).Select(Mapper.Veiculo));
 
         // Reincidência olha 12 meses; preventiva precisa da última execução, que pode ser mais antiga: sem corte por data.
-        var manut = Consulta("cr40f_manutencoes", "cr40f_descricao", "cr40f_status", "cr40f_graudamanutencao", "cr40f_agendarpara", "cr40f_datamanutencao", "createdon", "cr40f_kmatual", "cr40f_valor", "cr40f_estabelecimento", "cr40f_placa_carro", "new_servicosmanutencao");
+        var manut = Consulta("cr40f_manutencoes", "cr40f_descricao", "cr40f_status", "cr40f_graudamanutencao", "cr40f_agendarpara", "cr40f_janelafim", "cr40f_datadaaprovacao", "cr40f_datamanutencao", "createdon", "cr40f_kmatual", "cr40f_kmrealizado", "cr40f_valor", "cr40f_estabelecimento", "cr40f_placa_carro", "new_servicosmanutencao");
         manut.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
         dados.Manutencoes.AddRange(Todos(manut).Select(Mapper.Manutencao));
 
@@ -73,9 +73,12 @@ public static class Mapper
             Status = e.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value,
             Grau = e.GetAttributeValue<OptionSetValue>("cr40f_graudamanutencao")?.Value,
             AgendarPara = Dia(e, "cr40f_agendarpara"),
+            JanelaFim = Dia(e, "cr40f_janelafim"),
+            DataAprovacao = Dia(e, "cr40f_datadaaprovacao"),
             DataManutencao = Dia(e, "cr40f_datamanutencao"),
             CriadoEm = Dia(e, "createdon") ?? "1900-01-01",
             Km = Numero(e, "cr40f_kmatual"),
+            KmRealizado = Numero(e, "cr40f_kmrealizado"),
             Valor = e.GetAttributeValue<Money>("cr40f_valor")?.Value ?? Numero(e, "cr40f_valor"),
             Estabelecimento = e.GetAttributeValue<string>("cr40f_estabelecimento"),
             VeiculoId = veiculo?.Id.ToString(),

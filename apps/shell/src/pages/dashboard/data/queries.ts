@@ -70,9 +70,9 @@ export const veiculosPath = (set: string, comHodometro = true) =>
 export const itensPlanoPath = (set: string) =>
   `${set}?$select=cr40f_itemplanopreventivoid,cr40f_name,cr40f_servico,cr40f_intervalokm,cr40f_intervalomeses,cr40f_avisokm,cr40f_avisodias&$filter=statecode eq 0`
 export const baselinesPath = (set: string) => `${set}?$select=cr40f_baselinepreventivaid,_cr40f_veiculo_value,_cr40f_item_value,cr40f_km,cr40f_data`
-/** Manutenções Realizado, Solicitado, Aprovado e Programado, sem janela de datas: a preventiva precisa do histórico todo. */
+/** Manutenções Realizado, Solicitado, Agendado e Programado, sem janela de datas: a preventiva precisa do histórico todo. */
 export const manutencoesPreventivaPath = (set: string) =>
-  `${set}?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)`
+  `${set}?$select=cr40f_manutencoesid,cr40f_status,cr40f_datamanutencao,createdon,cr40f_kmatual,cr40f_kmrealizado,_cr40f_placa_carro_value,new_servicosmanutencao&$filter=statecode eq 0 and (cr40f_status eq 202410002 or cr40f_status eq 0 or cr40f_status eq 202410001 or cr40f_status eq 202410005)`
 
 /** Telemetria diária do Infleet: `new_data` é DateOnly, então o filtro usa a data pura, sem hora. */
 export const telemetriaPath = (set: string, desde: string, ate: string) =>
@@ -305,7 +305,7 @@ export const mapVeiculoPrev = (row: Row): VeiculoPrev => ({
 })
 export const mapManutencaoPrev = (row: Row): ManutencaoPrev => ({
   id: lower(row.cr40f_manutencoesid), status: num(row.cr40f_status), dataManutencao: textoOuNull(row.cr40f_datamanutencao), criadoEm: str(row.createdon),
-  km: num(row.cr40f_kmatual), veiculo: refDe(row, '_cr40f_placa_carro_value'), servicos: lerMulti(row.new_servicosmanutencao),
+  km: num(row.cr40f_kmatual), kmRealizado: num(row.cr40f_kmrealizado), veiculo: refDe(row, '_cr40f_placa_carro_value'), servicos: lerMulti(row.new_servicosmanutencao),
 })
 /** A consulta só traz itens ativos (`statecode eq 0`); sem aviso cadastrado, vale o padrão da Frota. */
 export const mapItemPlanoDash = (row: Row): ItemPlano => ({

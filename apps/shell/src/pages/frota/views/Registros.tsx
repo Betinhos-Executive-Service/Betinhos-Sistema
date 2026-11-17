@@ -35,7 +35,8 @@ function opcoes(refs: (Ref | null)[]) {
 
 const categoriasTexto = (valores: number[]) => valores.map((value) => CATEGORIAS_MANUT.find((option) => option.value === value)?.label).filter(Boolean).join(' · ')
 
-type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean }
+/** `onNovo`: a tela abre a gaveta própria de criação (Manutenções); sem ele, "Novo registro" abre o formulário nativo. */
+type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean; onNovo?: () => void }
 
 /** Abas de registros; cada tipo tem sua lista (visões, colunas e filtros próprios). */
 export function Registros(props: Props) {
@@ -43,7 +44,7 @@ export function Registros(props: Props) {
   return <Lista key={kind} kind={kind} {...props} />
 }
 
-function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false }: Props & { kind: Kind }) {
+function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false, onNovo }: Props & { kind: Kind }) {
   const size = useMedia('(max-width: 820px)') ? 'touch' : 'default'
   const auditoria = useAuditoria()
   const notify = useNotify()
@@ -84,6 +85,10 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   }
 
   async function novo() {
+    if (onNovo) {
+      onNovo()
+      return
+    }
     try {
       await source.openForm(kind)
     } catch (reason) {

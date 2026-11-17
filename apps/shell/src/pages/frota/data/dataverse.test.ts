@@ -276,7 +276,6 @@ describe('runFlow', () => {
   }
 
   it.each([
-    ['aprovarManutencao', { guids: GUID }],
     ['notificarCondutor', { guids: GUID }],
     ['gerarContrato', { GUID_MULTA: GUID }],
   ] as const)('chama o Flow %s com POST e o corpo certo', async (flow, expectedBody) => {
@@ -297,13 +296,11 @@ describe('runFlow', () => {
     stubFetch(200)
     const { xrm, retrieveMultipleRecords } = flowHost()
     const source = createXrmSource(xrm)
-    await source.runFlow('aprovarManutencao', GUID)
     await source.runFlow('notificarCondutor', GUID)
     await source.runFlow('gerarContrato', GUID)
     const options = retrieveMultipleRecords.mock.calls.map((call) => call[1])
-    expect(options[0]).toContain("schemaname eq 'new_FlowUrlManutencao'")
-    expect(options[1]).toContain("schemaname eq 'new_FlowUrlNotificarMotoristaMultas'")
-    expect(options[2]).toContain("schemaname eq 'new_FlowUrlGerarContratoMultas'")
+    expect(options[0]).toContain("schemaname eq 'new_FlowUrlNotificarMotoristaMultas'")
+    expect(options[1]).toContain("schemaname eq 'new_FlowUrlGerarContratoMultas'")
   })
 
   it('usa o valor padrão da definição quando não há valor sobrescrito', async () => {
@@ -349,10 +346,10 @@ describe('runFlow', () => {
     const fetchMock = stubFetch(200)
     const { xrm, retrieveMultipleRecords } = flowHost()
     const source = createXrmSource(xrm)
-    await source.prepareFlow('aprovarManutencao')
+    await source.prepareFlow('gerarContrato')
     expect(fetchMock).not.toHaveBeenCalled()
     expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
-    await source.runFlow('aprovarManutencao', GUID)
+    await source.runFlow('gerarContrato', GUID)
     expect(retrieveMultipleRecords).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -360,19 +357,19 @@ describe('runFlow', () => {
   it('prepareFlow não devolve a URL', async () => {
     stubFetch(200)
     const { xrm } = flowHost()
-    expect(await createXrmSource(xrm).prepareFlow('aprovarManutencao')).toBeUndefined()
+    expect(await createXrmSource(xrm).prepareFlow('gerarContrato')).toBeUndefined()
   })
 
   it('devolve nulos quando o corpo não é JSON', async () => {
     stubFetch(200, undefined)
     const { xrm } = flowHost()
-    expect(await createXrmSource(xrm).runFlow('aprovarManutencao', GUID)).toEqual({ message: null, shareUrl: null })
+    expect(await createXrmSource(xrm).runFlow('gerarContrato', GUID)).toEqual({ message: null, shareUrl: null })
   })
 
   it('recusa identificador que não é GUID sem chamar nada', async () => {
     const fetchMock = stubFetch(200)
     const { xrm, retrieveMultipleRecords } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('aprovarManutencao', "x'; drop"))
+    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', "x'; drop"))
     expect(message).toBe('Identificador inválido')
     expect(fetchMock).not.toHaveBeenCalled()
     expect(retrieveMultipleRecords).not.toHaveBeenCalled()
@@ -409,15 +406,15 @@ describe('runFlow', () => {
   it('status 500 vira erro sem a URL', async () => {
     stubFetch(500, {})
     const { xrm } = flowHost()
-    const message = await messageOf(createXrmSource(xrm).runFlow('aprovarManutencao', GUID))
-    expect(message).toBe('O Flow "Agendar manutenção" respondeu 500. Confira o registro antes de tentar de novo')
+    const message = await messageOf(createXrmSource(xrm).runFlow('gerarContrato', GUID))
+    expect(message).toBe('O Flow "Gerar contrato" respondeu 500. Confira o registro antes de tentar de novo')
     expect(message).not.toContain('SEGREDO')
   })
 
   it('status 500 não é resultado incerto', async () => {
     stubFetch(500, {})
     const { xrm } = flowHost()
-    const error = await createXrmSource(xrm).runFlow('aprovarManutencao', GUID).catch((reason: unknown) => reason)
+    const error = await createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
     expect(error).toBeInstanceOf(Error)
     expect(error).not.toBeInstanceOf(FlowIncertoError)
   })
@@ -442,17 +439,17 @@ describe('runFlow', () => {
       }))
       vi.stubGlobal('fetch', fetchMock)
       const { xrm } = flowHost()
-      const pending = createXrmSource(xrm).runFlow('aprovarManutencao', GUID).catch((reason: unknown) => reason)
+      const pending = createXrmSource(xrm).runFlow('gerarContrato', GUID).catch((reason: unknown) => reason)
       await vi.advanceTimersByTimeAsync(0)
       expect(fetchMock).toHaveBeenCalledTimes(1)
-      await vi.advanceTimersByTimeAsync(59_999)
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(signal?.aborted).toBe(false)
       await vi.advanceTimersByTimeAsync(1)
       const error = await pending
       expect(error).toBeInstanceOf(FlowIncertoError)
       const message = (error as Error).message
       expect(signal?.aborted).toBe(true)
-      expect(message).toBe('O Flow "Agendar manutenção" não respondeu em 60 s. Confira o registro antes de tentar de novo')
+      expect(message).toBe('O Flow "Gerar contrato" não respondeu em 40 s. Confira o registro antes de tentar de novo')
       expect(message).not.toContain('SEGREDO')
     } finally {
       vi.useRealTimers()

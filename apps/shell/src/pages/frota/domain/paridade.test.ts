@@ -15,8 +15,8 @@ type F = {
 // Mesmo arquivo dos testes do plugin C# (Custom API cr40f_FrotaPendencias).
 const caminho = fileURLToPath(new URL('../../../../../../packages/plugins/Cr40f.Frota.Plugin.Tests/Fixtures/paridade.json', import.meta.url))
 const f = JSON.parse(readFileSync(caminho, 'utf8')) as F
-// A Custom API só devolve as regras proativas; "agendada" só quando já venceu.
-const PROATIVOS: PendenciaTipo[] = ['prioridade', 'reincidencia', 'preventiva', 'agendada', 'custo', 'hodometro']
+// A Custom API só devolve as regras proativas; "A encaixar" e as de multa e colisão são só da tela.
+const PROATIVOS: PendenciaTipo[] = ['prioridade', 'reincidencia', 'preventiva', 'atrasada', 'custo', 'hodometro']
 
 describe('paridade com a Custom API cr40f_FrotaPendencias', () => {
   it('mesmas pendências proativas do fixture', () => {
@@ -27,7 +27,7 @@ describe('paridade com a Custom API cr40f_FrotaPendencias', () => {
       baselines: f.baselines.map((b): Baseline => ({ id: `${b.veiculoId}-${b.itemId}`, veiculo: { id: b.veiculoId, label: b.veiculoId }, item: { id: b.itemId, label: b.itemId }, km: b.km, data: b.data })),
       multas: [], colisoes: [],
     }, f.hoje, new Date(f.agora))
-    const proativas = pendencias.filter((p) => PROATIVOS.includes(p.tipo) && (p.tipo !== 'agendada' || (p.dias ?? 0) < 0))
+    const proativas = pendencias.filter((p) => PROATIVOS.includes(p.tipo))
     expect(proativas.map((p) => `${p.tipo}|${p.id}`).sort()).toEqual(f.esperado)
   })
 })

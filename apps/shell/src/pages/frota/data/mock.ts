@@ -1,10 +1,11 @@
 import { mockVolume } from '../../../app/mockVolume'
-import { CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
+import { categoriasDe, CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatalogo'
+import { janelaValida, segundaDe, somarDias } from '../domain/janela'
 import { addMonths, todaySP } from './dates'
-import { COLISAO, MANUT, MULTA, STATUS_FIELD, VEICULO } from './schema'
+import { ANEXO_DESPESA, COLISAO, MANUT, MULTA, PAGAMENTO, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
-import type { DataSource, FlowId } from './source'
-import type { Colisao, DespesaCombustivel, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
+import type { DataSource, FlowId, OpcaoBusca } from './source'
+import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, Ref, TelemetriaKm, TermoMulta } from './types'
 import { latenciaMock } from '../../../app/latenciaMock'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
@@ -21,7 +22,7 @@ const v1: Ref = { id: 'v1', label: 'TST1A11' }
 const v2: Ref = { id: 'v2', label: 'TST2B22' }
 
 function manut(id: string, veiculo: Ref, extra: Partial<Manutencao>): Manutencao {
-  return { id, codigo: id.toUpperCase(), descricao: `Manutenção fictícia ${id}`, status: MANUT.SOLICITADO, grau: 2, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 50000, veiculo, solicitante: ana, criadoEm: iso(-3), servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra }
+  return { id, codigo: id.toUpperCase(), descricao: `Manutenção fictícia ${id}`, status: MANUT.SOLICITADO, grau: 2, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 50000, veiculo, solicitante: ana, criadoEm: iso(-3), servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra }
 }
 function multa(id: string, extra: Partial<Multa>): Multa {
   return { id, codigo: `NT-${id}`, titulo: `AIT fictício ${id}`, status: MULTA.NOTIFICAR, dataHora: iso(-20), local: 'Av. de Teste, 100', dataParaIndicar: offset(5), indicado: false, dataAviso: null, dataIndicacao: null, veiculo: v1, motorista: bruno, infracaoId: 'i1', criadoEm: iso(-10), valorGuia: null, recursoPendente: false, termoVigente: null, ...extra }
@@ -57,14 +58,17 @@ function seed(): FrotaData {
     ],
     manutencoes: [
       manut('m1', v1, { grau: 4, descricao: 'Freio com ruído (fictício)', servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.IA, confiancaIa: 0.93 }),
-      manut('m2', v2, { status: MANUT.APROVADO, comentarioAprovador: 'Ok' }),
-      manut('m3', v1, { status: MANUT.PROGRAMADO, agendarPara: offset(-1) }),
+      manut('m2', v2, { status: MANUT.AGENDADO, comentarioAprovador: 'Ok', janelaInicio: segundaDe(offset(7)), janelaFim: somarDias(segundaDe(offset(7)), 6), dataAprovacao: offset(-1) }),
+      manut('m3', v1, { status: MANUT.PROGRAMADO, janelaInicio: offset(-3), janelaFim: offset(-3), dataAprovacao: offset(-6) }),
       manut('m4', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-40), valor: 480.9, estabelecimento: 'Oficina Teste', servicoRealizado: 'Troca de óleo', criadoEm: iso(-45), km: 160000, servicos: [100000000, 100000001], categorias: [100000000], origemClassificacao: ORIGEM.MANUAL }),
       // Reincidência fictícia: com m1, 3ª vez do mesmo serviço de freio no v1 em 120 dias.
       manut('m4b', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-70), valor: 650, estabelecimento: 'Oficina Teste', descricao: 'Freio rangendo (fictício)', criadoEm: iso(-72), servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.MANUAL }),
       manut('m4c', v1, { status: MANUT.REALIZADO, dataManutencao: iso(-25), valor: 720, estabelecimento: 'Freios Exemplo', descricao: 'Freio voltou a fazer ruído (fictício)', criadoEm: iso(-27), servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.MANUAL }),
       manut('m5', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-100), valor: 1250, tipo: 100000001, criadoEm: iso(-110) }),
       manut('m6', v2, { status: MANUT.REALIZADO, dataManutencao: iso(-70), tipo: 2, criadoEm: iso(-72) }),
+      // Fila "A encaixar" de exemplo: Urgente (m1), Alta parada há 5 dias (m7) e Baixa de ontem (m8).
+      manut('m7', v2, { grau: 3, descricao: 'Ar-condicionado sem gelar (fictício)', criadoEm: iso(-5) }),
+      manut('m8', v1, { grau: 1, descricao: 'Lâmpada da placa queimada (fictício)', criadoEm: iso(-1) }),
       ...volumeManutencoes(mockVolume(), v1, v2),
     ],
     multas: [
@@ -124,6 +128,26 @@ export function createMockSource(): DataSource {
   const comTermo = (multas: Multa[]) => multas.map((m) => { const t = termos.get(m.id)?.[0]; return { ...m, termo: t?.status ? { status: t.status, enviadoEm: t.enviadoEm } : null } })
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
   const delay = () => new Promise((resolve) => setTimeout(resolve, latenciaMock(250)))
+
+  // O que só a gaveta mostra (fotos, nota, pagamento, comentários), por manutenção.
+  const extras = new Map<string, Partial<DetalheManutencao>>([
+    ['m1', { fotosPedido: ['https://example.invalid/fotos/m1-1.jpg', 'https://example.invalid/fotos/m1-2.jpg'] }],
+    ['m4', { pagamento: 202410000, realizadoPor: bruno, linkNotaFiscal: 'https://example.invalid/fotos/m4-nf.jpg', fotosFinais: ['https://example.invalid/fotos/m4-final-1.jpg'], comentarioColaborador: 'Troca feita sem intercorrências (fictício).' }],
+  ])
+  const extra = (id: string) => {
+    let e = extras.get(id)
+    if (!e) { e = {}; extras.set(id, e) }
+    return e
+  }
+  const manutencaoDoMock = (id: string) => {
+    const m = data.manutencoes.find((item) => item.id === id)
+    if (!m) throw new Error('Registro não encontrado no mock.')
+    return m
+  }
+  const encerrada = (status: number | null) => status === MANUT.REALIZADO || status === MANUT.REPROVADO || status === MANUT.CANCELADO
+  const pessoas: Ref[] = [ana, bruno]
+  const CIDADES: OpcaoBusca[] = [{ id: 'c1', nome: 'São José dos Campos - SP' }, { id: 'c2', nome: 'São Paulo - SP' }, { id: 'c3', nome: 'Taubaté - SP' }]
+  const contem = (nome: string, texto: string) => nome.toLowerCase().includes(texto.trim().toLowerCase())
 
   return {
     mode: 'mock',
@@ -195,11 +219,9 @@ export function createMockSource(): DataSource {
     },
     async runFlow(flow: FlowId, id: string) {
       await delay()
-      const kind: Kind = flow === 'aprovarManutencao' ? 'manutencao' : 'multa'
-      const record = find(kind, id) as Record<string, unknown> | undefined
+      const record = find('multa', id) as Record<string, unknown> | undefined
       if (!record) throw new Error('Registro não encontrado no mock.')
-      if (flow === 'aprovarManutencao') record.status = MANUT.APROVADO
-      else if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
+      if (flow === 'notificarCondutor') { record.status = MULTA.NOTIFICADO; record.dataAviso = todaySP() }
       else record.status = MULTA.INDICADA
       return { message: 'Mock: Flow simulado.', shareUrl: flow === 'gerarContrato' ? 'https://example.invalid/contrato-ficticio.pdf' : null }
     },
@@ -250,6 +272,83 @@ export function createMockSource(): DataSource {
     async listarParcelasTermo(termoId) {
       await delay()
       return structuredClone(parcelas.get(termoId) ?? [])
+    },
+    async detalheManutencao(id) {
+      await delay()
+      const m = data.manutencoes.find((item) => item.id === id)
+      if (!m) return null
+      return structuredClone({ ...m, comentarioAoMotorista: null, comentarioColaborador: null, pagamento: null, realizadoPor: null, fotosPedido: [], linkNotaFiscal: null, fotosFinais: [], ...extras.get(id) })
+    },
+    async criarManutencao(input) {
+      await delay()
+      const veiculo = data.veiculos.find((v) => v.id === input.veiculoId)
+      if (!veiculo) throw new Error('Veículo não encontrado no mock.')
+      const id = `mn${data.manutencoes.length + 1}`
+      data.manutencoes.unshift(manut(id, { id: veiculo.id, label: veiculo.placa }, { descricao: input.descricao, grau: input.grau, tipo: input.tipo, km: input.km, solicitante: pessoas.find((p) => p.id === input.solicitanteId) ?? null, criadoEm: new Date().toISOString() }))
+      return id
+    },
+    async agendarManutencao({ manutencaoId, inicio, fim, comentario }) {
+      await delay()
+      const m = manutencaoDoMock(manutencaoId)
+      if (!janelaValida({ inicio, fim })) throw new Error('A janela precisa ser um dia ou uma semana de segunda a domingo.')
+      if (m.status !== MANUT.SOLICITADO && m.status !== MANUT.AGENDADO && m.status !== MANUT.PROGRAMADO) throw new Error('Só dá para encaixar uma manutenção em aberto.')
+      if (!m.veiculo) throw new Error('A manutenção não tem veículo. Informe o veículo antes de encaixar.')
+      Object.assign(m, { status: MANUT.AGENDADO, janelaInicio: inicio, janelaFim: fim, dataAprovacao: m.dataAprovacao ?? todaySP() })
+      if (comentario) extra(manutencaoId).comentarioAoMotorista = comentario
+    },
+    async reprovarManutencao(id, comentario) {
+      await delay()
+      const m = manutencaoDoMock(id)
+      if (!comentario.trim()) throw new Error('Escreva o motivo da reprovação.')
+      if (m.status !== MANUT.SOLICITADO) throw new Error('Só dá para reprovar uma manutenção que ainda não foi encaixada.')
+      Object.assign(m, { status: MANUT.REPROVADO, comentarioAprovador: comentario.trim() })
+    },
+    async cancelarManutencao(id, comentario) {
+      await delay()
+      const m = manutencaoDoMock(id)
+      if (encerrada(m.status)) throw new Error('Esta manutenção já foi encerrada.')
+      m.status = MANUT.CANCELADO
+      if (comentario?.trim()) m.comentarioAprovador = comentario.trim()
+    },
+    async concluirManutencao(p) {
+      await delay()
+      const m = manutencaoDoMock(p.manutencaoId)
+      if (m.status === MANUT.REPROVADO || m.status === MANUT.CANCELADO) throw new Error('Esta manutenção já foi encerrada.')
+      // Mesmas validações e mensagens do Ciclo.cs (servidor).
+      if (p.servicos.length === 0) throw new Error('Escolha pelo menos um serviço realizado.')
+      if (!(p.km > 0)) throw new Error('Informe o km do veículo.')
+      if (!(p.valor > 0)) throw new Error('Informe o valor pago.')
+      if (!Object.values(PAGAMENTO).some((forma) => forma === p.pagamento)) throw new Error('Escolha a forma de pagamento.')
+      if (!p.estabelecimento.trim()) throw new Error('Informe o estabelecimento.')
+      if (!p.cidadeId) throw new Error('Informe a cidade.')
+      if (!p.realizadoPorId) throw new Error('Informe quem realizou a manutenção.')
+      if (m.status !== MANUT.REALIZADO) {
+        const e = extra(p.manutencaoId)
+        if (!p.linkNotaFiscal && !e.linkNotaFiscal) throw new Error('Falta a foto da nota fiscal.')
+        const servicos = [...new Set(p.servicos)]
+        Object.assign(m, { status: MANUT.REALIZADO, servicos, categorias: categoriasDe(servicos), origemClassificacao: ORIGEM.MANUAL, confiancaIa: null, kmRealizado: p.km, valor: p.valor, estabelecimento: p.estabelecimento, dataManutencao: p.data, servicoRealizado: p.servicoRealizado ?? m.servicoRealizado })
+        Object.assign(e, {
+          pagamento: p.pagamento, realizadoPor: pessoas.find((f) => f.id === p.realizadoPorId) ?? { id: p.realizadoPorId, label: '' }, comentarioColaborador: p.comentario,
+          linkNotaFiscal: p.linkNotaFiscal ?? e.linkNotaFiscal ?? null, fotosFinais: [p.linkFotoFinal1, p.linkFotoFinal2, p.linkFotoFinal3].filter((l): l is string => Boolean(l)),
+        })
+      }
+      return { despesaId: `d-${p.manutencaoId}`, statusAnexo: ANEXO_DESPESA.PENDENTE, geralId: null }
+    },
+    async enviarArquivoManutencao(alvo, arquivo, origem, ordem) {
+      await delay()
+      const caminho = `Manutenções/MOCK/${alvo.codigo || alvo.id}`
+      return { link: `https://example.invalid/manutencoes/${encodeURIComponent(alvo.codigo || alvo.id)}/${origem.toLowerCase()}-${ordem}-${encodeURIComponent(arquivo.name)}`, nomeArquivo: arquivo.name, caminho }
+    },
+    async anexarNotaFiscalDespesa() {
+      await delay()
+    },
+    async buscarFuncionarios(texto) {
+      await delay()
+      return pessoas.filter((p) => contem(p.label, texto)).map((p) => ({ id: p.id, nome: p.label }))
+    },
+    async buscarCidades(texto) {
+      await delay()
+      return CIDADES.filter((c) => contem(c.nome, texto))
     },
   }
 }

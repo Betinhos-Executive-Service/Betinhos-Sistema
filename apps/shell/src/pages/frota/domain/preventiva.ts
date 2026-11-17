@@ -12,19 +12,21 @@ export type Preventiva = {
   ultima: UltimaExecucao | null
 }
 export type VeiculoPrev = Pick<Veiculo, 'id' | 'placa' | 'status' | 'categoria' | 'hodometro' | 'hodometroEm'>
-export type ManutencaoPrev = Pick<Manutencao, 'id' | 'status' | 'dataManutencao' | 'criadoEm' | 'km' | 'veiculo' | 'servicos'>
+export type ManutencaoPrev = Pick<Manutencao, 'id' | 'status' | 'dataManutencao' | 'criadoEm' | 'km' | 'kmRealizado' | 'veiculo' | 'servicos'>
+/** Km da manutenção: o informado por quem concluiu (cr40f_kmrealizado) vale mais que o do pedido (cr40f_kmatual). */
+export const kmDe = (m: Pick<ManutencaoPrev, 'km' | 'kmRealizado'>) => m.kmRealizado ?? m.km
 export type EntradaPreventiva = { veiculos: VeiculoPrev[]; manutencoes: ManutencaoPrev[]; itens: ItemPlano[]; baselines: Baseline[] }
 
 export const ESTADO_ORDEM: EstadoPreventiva[] = ['vencido', 'a_vencer', 'em_dia', 'sem_base']
 export const ESTADO_LABEL: Record<EstadoPreventiva, string> = { vencido: 'Vencido', a_vencer: 'A vencer', em_dia: 'Em dia', sem_base: 'Sem base' }
 export const ESTADO_TONE: Record<EstadoPreventiva, 'danger' | 'warning' | 'success' | 'neutral'> = { vencido: 'danger', a_vencer: 'warning', em_dia: 'success', sem_base: 'neutral' }
 
-const EM_ANDAMENTO: number[] = [MANUT.SOLICITADO, MANUT.APROVADO, MANUT.PROGRAMADO]
+const EM_ANDAMENTO: number[] = [MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO]
 
 /** Km atual do veículo: hodômetro Infleet; sem ele, o maior km das manutenções (estimado). */
 export function kmAtualDe(veiculo: VeiculoPrev, manutencoes: ManutencaoPrev[]): { km: number | null; estimado: boolean } {
   if (veiculo.hodometro !== null) return { km: veiculo.hodometro, estimado: false }
-  const kms = manutencoes.filter((m) => m.veiculo?.id === veiculo.id && m.km !== null).map((m) => m.km as number)
+  const kms = manutencoes.filter((m) => m.veiculo?.id === veiculo.id && kmDe(m) !== null).map((m) => kmDe(m) as number)
   return kms.length ? { km: Math.max(...kms), estimado: true } : { km: null, estimado: false }
 }
 
@@ -39,8 +41,9 @@ function ultimaExecucao(item: ItemPlano, doVeiculo: ManutencaoPrev[], baseline: 
     // A data sempre existe (manutenção sem dia não entra); o km pode faltar e vir da última execução informada,
     // só se ela não for anterior à manutenção (baseline mais antiga daria um km velho para uma execução nova).
     const baselineValida = baseline && (baseline.data === null || baseline.data >= melhor.dia) ? baseline : undefined
-    const km = melhor.m.km ?? baselineValida?.km ?? null
-    return { km, data: melhor.dia, origem: 'manutencao', manutencaoId: melhor.m.id, complementadaPorBaseline: melhor.m.km === null && km !== null }
+    const kmManutencao = kmDe(melhor.m)
+    const km = kmManutencao ?? baselineValida?.km ?? null
+    return { km, data: melhor.dia, origem: 'manutencao', manutencaoId: melhor.m.id, complementadaPorBaseline: kmManutencao === null && km !== null }
   }
   if (baseline && (baseline.km !== null || baseline.data !== null)) return { km: baseline.km, data: baseline.data, origem: 'baseline', manutencaoId: null, complementadaPorBaseline: false }
   return null

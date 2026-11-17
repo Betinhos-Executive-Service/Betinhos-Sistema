@@ -28,6 +28,30 @@ it('abre a gaveta da tabela do registro por cima da lista e fechar limpa o estad
   expect(window.location.hash).toBe('#/geral?q=ana')
 })
 
+it('manutenção abre a gaveta única da Frota por cima da lista, sem trocar a rota', async () => {
+  render(<GavetaRegistro host={host} />)
+  act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
+  const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+  expect(within(gaveta).getByRole('button', { name: 'Encaixar' })).toBeTruthy()
+  expect(window.location.hash).toBe('#/geral?q=ana')
+})
+
+it('a gaveta da manutenção tem o ToastProvider do hospedeiro: a ação grava e o aviso aparece', async () => {
+  render(<GavetaRegistro host={host} />)
+  act(() => abrirGavetaRegistro('cr40f_manutencoes', 'm1'))
+  const gaveta = await screen.findByRole('dialog', { name: 'Freio com ruído (fictício)' })
+  fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' }))
+  await act(async () => { fireEvent.click(within(gaveta).getByRole('button', { name: 'Cancelar manutenção' })) })
+  expect(await screen.findByText('Manutenção cancelada.')).toBeTruthy()
+  expect(await within(gaveta).findByText('Cancelado')).toBeTruthy()
+})
+
+it('manutenção que não existe mostra o aviso na própria gaveta', async () => {
+  render(<GavetaRegistro host={host} />)
+  act(() => abrirGavetaRegistro('cr40f_manutencoes', 'nao-existe'))
+  expect(await screen.findByRole('dialog', { name: 'Manutenção não encontrada' })).toBeTruthy()
+})
+
 it('registro que não existe mostra o erro na própria gaveta', async () => {
   render(<GavetaRegistro host={host} />)
   act(() => abrirGavetaRegistro('cr40f_pagantes', 'nao-existe'))
