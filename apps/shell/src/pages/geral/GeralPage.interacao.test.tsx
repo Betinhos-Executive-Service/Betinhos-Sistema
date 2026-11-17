@@ -45,8 +45,13 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const before = px(track(/Trajeto/))
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    // Mede a borda só ao apertar: medir a cada movimento forçaria um reflow por evento.
+    const headMeasures = () => (HTMLElement.prototype.getBoundingClientRect as unknown as { mock: { contexts: HTMLElement[] } }).mock.contexts.filter((el) => el.getAttribute('role') === 'columnheader').length
+    const measured = headMeasures()
+    fireEvent.pointerMove(handle, { clientX: 130, pointerId: 1, buttons: 1 })
     fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
     await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(headMeasures()).toBe(measured)
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)

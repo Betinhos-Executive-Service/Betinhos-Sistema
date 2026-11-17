@@ -80,7 +80,7 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
   // Sim/Não ocupa uma trilha fixa estreita: o conteúdo é um switch, não cresce com a tela.
   const BOOLEAN_WIDTH = 96
   // Durante o arraste a largura vive em `drag` e vai direto para o estilo da grade (um quadro por vez), sem renderizar a tabela; ao soltar é gravada nas preferências.
-  const drag = useRef<{ key: string; start: number; width: number; frame: number; done: () => void } | null>(null)
+  const drag = useRef<{ key: string; start: number; drawn: number; x: number; width: number; frame: number; done: () => void } | null>(null)
   const [dropAt, setDropAt] = useState<{ key: string; after: boolean } | null>(null)
   const [announce, setAnnounce] = useState('')
   const root = useRef<HTMLDivElement>(null)
@@ -123,16 +123,16 @@ export function GeralTable({ columns, attributes, rows, loading, sort, defaultSo
     window.addEventListener('keydown', esc, true)
     document.documentElement.classList.add('gr-resizing')
     const done = () => { window.removeEventListener('keydown', esc, true); document.documentElement.classList.remove('gr-resizing') }
-    drag.current = { key: column.key, start: column.width, width: column.width, frame: 0, done }
+    // Mede a borda desenhada uma vez, ao apertar: trilhas `fr` ficam mais largas que a largura declarada (partir dela
+    // fazia a borda fugir do cursor), e medir a cada movimento forçava um reflow por evento, logo depois do quadro anterior.
+    const drawn = handle.parentElement?.getBoundingClientRect().width || column.width
+    drag.current = { key: column.key, start: column.width, drawn, x: e.clientX, width: column.width, frame: 0, done }
   }
   const resizeMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current
-    const cell = e.currentTarget.parentElement
-    if (!d || !cell || e.buttons === 0) return
-    // Mede a borda desenhada: trilhas `fr` ficam mais largas que a largura declarada, e partir dela fazia a coluna encolher e a borda fugir do cursor.
-    const rect = cell.getBoundingClientRect()
-    d.width = clampW(rect.width + e.clientX - rect.right)
-    const grid = cell.closest<HTMLElement>('.gr-grid')
+    if (!d || e.buttons === 0) return
+    d.width = clampW(d.drawn + e.clientX - d.x)
+    const grid = e.currentTarget.closest<HTMLElement>('.gr-grid')
     if (!grid || d.frame) return
     d.frame = requestAnimationFrame(() => {
       d.frame = 0
