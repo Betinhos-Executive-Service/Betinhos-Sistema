@@ -9,7 +9,7 @@ export const LIMIARES = {
   reincidenciaLonga: { vezes: 5, dias: 365 },
   prioridadeGrauMinimo: 3,
   solicitadoParadoDias: 2,
-  aprovadoSemDataDias: 5,
+  agendadoParadoDias: 5,
   hodometroHoras: 48,
   custoJanelaDias: 90,
   custoFatorMediana: 1.5,
@@ -49,12 +49,21 @@ export function reincidencias(manutencoes: Manutencao[], today: string): Reincid
   return result.sort((a, b) => b.vezes - a.vezes || b.custo - a.custo)
 }
 
-/** Alta/Urgente parada: Solicitada há mais de N dias ou Aprovada sem data há mais de M dias (contados da criação). */
+/**
+ * Alta/Urgente parada: Solicitada há mais de N dias (contados do pedido) ou Agendada há mais de M dias sem programação
+ * (contados do encaixe, cr40f_datadaaprovacao). Agendada sem data do encaixe é registro antigo (antes da conversão do
+ * plano 5) e não entra. A Custom API (Regras.PrioridadeParada) faz igual.
+ */
 export function prioridadeParada(m: Manutencao, today: string): number | null {
   if ((m.grau ?? 0) < LIMIARES.prioridadeGrauMinimo) return null
-  const dias = daysBetween(diaSP(m.criadoEm) ?? m.criadoEm.slice(0, 10), today)
-  if (m.status === MANUT.SOLICITADO && dias > LIMIARES.solicitadoParadoDias) return dias
-  if (m.status === MANUT.AGENDADO && !m.agendarPara && dias > LIMIARES.aprovadoSemDataDias) return dias
+  if (m.status === MANUT.SOLICITADO) {
+    const dias = daysBetween(diaSP(m.criadoEm) ?? m.criadoEm.slice(0, 10), today)
+    return dias > LIMIARES.solicitadoParadoDias ? dias : null
+  }
+  if (m.status === MANUT.AGENDADO && m.dataAprovacao) {
+    const dias = daysBetween(diaSP(m.dataAprovacao) ?? m.dataAprovacao.slice(0, 10), today)
+    return dias > LIMIARES.agendadoParadoDias ? dias : null
+  }
   return null
 }
 

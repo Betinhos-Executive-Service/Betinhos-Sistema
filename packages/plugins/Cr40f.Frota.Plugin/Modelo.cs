@@ -16,7 +16,7 @@ public static class Limiares
 {
     public const int ReincidenciaCurtaVezes = 3, ReincidenciaCurtaDias = 120;
     public const int ReincidenciaLongaVezes = 5, ReincidenciaLongaDias = 365;
-    public const int PrioridadeGrauMinimo = 3, SolicitadoParadoDias = 2, AprovadoSemDataDias = 5;
+    public const int PrioridadeGrauMinimo = 3, SolicitadoParadoDias = 2, AgendadoParadoDias = 5;
     public const int HodometroHoras = 48, CustoJanelaDias = 90, CustoMinimoVeiculos = 3;
     public const decimal CustoFatorMediana = 1.5m;
 }
@@ -40,11 +40,17 @@ public sealed class ManutencaoRegistro
     [DataMember(Name = "descricao")] public string Descricao { get; set; } = "";
     [DataMember(Name = "status")] public int? Status { get; set; }
     [DataMember(Name = "grau")] public int? Grau { get; set; }
-    /// <summary>Dias yyyy-MM-dd já no fuso de São Paulo.</summary>
+    /// <summary>Dias yyyy-MM-dd já no fuso de São Paulo. Data antiga de agendamento: vale só para registro sem janela (antes da conversão).</summary>
     [DataMember(Name = "agendarPara")] public string? AgendarPara { get; set; }
+    /// <summary>Último dia da janela do encaixe (cr40f_janelafim).</summary>
+    [DataMember(Name = "janelaFim")] public string? JanelaFim { get; set; }
+    /// <summary>Dia do primeiro encaixe (cr40f_datadaaprovacao).</summary>
+    [DataMember(Name = "dataAprovacao")] public string? DataAprovacao { get; set; }
     [DataMember(Name = "dataManutencao")] public string? DataManutencao { get; set; }
     [DataMember(Name = "criadoEm")] public string CriadoEm { get; set; } = "";
     [DataMember(Name = "km")] public decimal? Km { get; set; }
+    /// <summary>Km informado por quem concluiu (cr40f_kmrealizado); na preventiva vale mais que o km do pedido.</summary>
+    [DataMember(Name = "kmRealizado")] public decimal? KmRealizado { get; set; }
     [DataMember(Name = "valor")] public decimal? Valor { get; set; }
     [DataMember(Name = "estabelecimento")] public string? Estabelecimento { get; set; }
     [DataMember(Name = "veiculoId")] public string? VeiculoId { get; set; }

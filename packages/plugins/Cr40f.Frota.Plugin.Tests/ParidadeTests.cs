@@ -48,8 +48,9 @@ public class ParidadeTests
         Assert.Contains("120 dias", reinc.Detalhe);
         Assert.Contains("causa raiz", reinc.Detalhe);
         Assert.Contains("12 meses", p.Single(x => x.Id == "reinc:v4:100000002").Detalhe);
-        Assert.Equal("Aguardando aprovação há 3 dias", p.Single(x => x.Id == "p1").Detalhe);
-        Assert.Equal("Aprovada sem data há 6 dias", p.Single(x => x.Id == "p2").Detalhe);
+        Assert.Equal("Aguardando encaixe há 3 dias", p.Single(x => x.Id == "p1").Detalhe);
+        Assert.Equal("Encaixada sem programação há 6 dias", p.Single(x => x.Id == "p2").Detalhe);
+        Assert.Equal("Janela até 18/10/2026 e ainda não realizada", p.Single(x => x.Id == "a1").Detalhe);
         Assert.StartsWith("Vencida: vencida há 1.000 km", p.Single(x => x.Id == "v1:i-oleo").Detalhe);
         Assert.Equal("Última leitura do Infleet há 49 h", p.Single(x => x.Id == "hod:v2").Detalhe);
     }

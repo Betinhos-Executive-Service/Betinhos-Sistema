@@ -7,14 +7,15 @@ namespace Cr40f.Frota.Plugin;
 
 /// <summary>
 /// Porte de apps/shell/src/pages/frota/domain/alertas.ts e da parte proativa de pendencias.ts/preventiva.ts.
-/// Tipos: prioridade, reincidencia, preventiva, agendada (só vencida), custo, hodometro. A paridade é conferida pelo
-/// fixture Fixtures/paridade.json, lido também por apps/shell/src/pages/frota/domain/paridade.test.ts.
+/// Tipos: prioridade, reincidencia, preventiva, atrasada (janela vencida), custo, hodometro. "A encaixar" é a fila da
+/// tela e não entra aqui. A paridade é conferida pelo fixture Fixtures/paridade.json, lido também por
+/// apps/shell/src/pages/frota/domain/paridade.test.ts.
 /// </summary>
 public static class Regras
 {
     private static readonly CultureInfo PtBr = new("pt-BR");
     private static readonly int[] Anuladas = { Codigos.Cancelado, Codigos.Reprovado };
-    public static readonly string[] Ordem = { "prioridade", "reincidencia", "preventiva", "agendada", "custo", "hodometro" };
+    public static readonly string[] Ordem = { "prioridade", "reincidencia", "preventiva", "atrasada", "custo", "hodometro" };
     private static readonly int[] EmAndamento = { Codigos.Solicitado, Codigos.Agendado, Codigos.Programado };
 
     public static Resultado Avaliar(DadosFrota dados, string hoje, DateTime agoraUtc)
@@ -24,9 +25,9 @@ public static class Regras
         {
             var parada = PrioridadeParada(m, hoje);
             if (parada is int dias)
-                lista.Add(new Pendencia { Tipo = "prioridade", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"{(m.Status == Codigos.Solicitado ? "Aguardando aprovação" : "Aprovada sem data")} há {dias} dias" });
-            else if ((m.Status == Codigos.Agendado || m.Status == Codigos.Programado) && m.AgendarPara != null && Dias(hoje, m.AgendarPara) < 0)
-                lista.Add(new Pendencia { Tipo = "agendada", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"Agendada para {Br(m.AgendarPara)} e ainda não realizada" });
+                lista.Add(new Pendencia { Tipo = "prioridade", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"{(m.Status == Codigos.Solicitado ? "Aguardando encaixe" : "Encaixada sem programação")} há {dias} dias" });
+            else if (Atrasada(m, hoje))
+                lista.Add(new Pendencia { Tipo = "atrasada", Id = m.Id, VeiculoId = m.VeiculoId, Placa = m.VeiculoLabel, ManutencaoId = m.Id, Titulo = m.Descricao, Detalhe = $"Janela até {Br(FimDaJanela(m)!)} e ainda não realizada" });
         }
         lista.AddRange(Reincidencias(dados.Manutencoes, hoje));
         lista.AddRange(Preventivas(dados, hoje));
@@ -37,14 +38,32 @@ public static class Regras
         return new Resultado { Hoje = hoje, Total = ordenada.Count, Pendencias = ordenada };
     }
 
+    /// <summary>Alta/Urgente parada: Solicitada há mais de 2 dias (do pedido) ou Agendada há mais de 5 sem programação (do encaixe). Sem data do encaixe (registro antigo) não entra.</summary>
     public static int? PrioridadeParada(ManutencaoRegistro m, string hoje)
     {
         if ((m.Grau ?? 0) < Limiares.PrioridadeGrauMinimo) return null;
-        var dias = Dias(m.CriadoEm, hoje);
-        if (m.Status == Codigos.Solicitado && dias > Limiares.SolicitadoParadoDias) return dias;
-        if (m.Status == Codigos.Agendado && m.AgendarPara == null && dias > Limiares.AprovadoSemDataDias) return dias;
+        if (m.Status == Codigos.Solicitado)
+        {
+            var dias = Dias(m.CriadoEm, hoje);
+            return dias > Limiares.SolicitadoParadoDias ? dias : (int?)null;
+        }
+        if (m.Status == Codigos.Agendado && m.DataAprovacao != null)
+        {
+            var dias = Dias(m.DataAprovacao, hoje);
+            return dias > Limiares.AgendadoParadoDias ? dias : (int?)null;
+        }
         return null;
     }
+
+    /// <summary>Fim da janela do encaixe; sem janela (registro anterior às manutenções v2), a data antiga de agendamento.</summary>
+    public static string? FimDaJanela(ManutencaoRegistro m) => m.JanelaFim ?? m.AgendarPara;
+
+    /// <summary>Atrasada não é estado: janela vencida (fim antes de hoje) com a manutenção Agendada ou Programada.</summary>
+    public static bool Atrasada(ManutencaoRegistro m, string hoje)
+        => (m.Status == Codigos.Agendado || m.Status == Codigos.Programado) && FimDaJanela(m) is string fim && Dias(hoje, fim) < 0;
+
+    /// <summary>Km da manutenção: o de quem concluiu vale mais que o do pedido.</summary>
+    public static decimal? KmDe(ManutencaoRegistro m) => m.KmRealizado ?? m.Km;
 
     private static string DiaDe(ManutencaoRegistro m) => m.DataManutencao ?? m.CriadoEm;
 
@@ -81,7 +100,7 @@ public static class Regras
         foreach (var v in dados.Veiculos.Where(v => v.Status == Codigos.VeiculoAtivo && v.Categoria == Codigos.Proprio))
         {
             var doVeiculo = dados.Manutencoes.Where(m => m.VeiculoId == v.Id).ToList();
-            var kms = doVeiculo.Where(m => m.Km != null).Select(m => m.Km!.Value).ToList();
+            var kms = doVeiculo.Select(KmDe).Where(k => k != null).Select(k => k!.Value).ToList();
             var kmAtual = v.Hodometro ?? (kms.Count > 0 ? kms.Max() : (decimal?)null);
             foreach (var item in itens)
             {
@@ -113,7 +132,7 @@ public static class Regras
         {
             var dia = DiaDe(melhor);
             var baselineValida = baseline != null && (baseline.Data == null || string.CompareOrdinal(baseline.Data, dia) >= 0) ? baseline : null;
-            return (melhor.Km ?? baselineValida?.Km, dia);
+            return (KmDe(melhor) ?? baselineValida?.Km, dia);
         }
         if (baseline != null && (baseline.Km != null || baseline.Data != null)) return (baseline.Km, baseline.Data);
         return (null, null);
