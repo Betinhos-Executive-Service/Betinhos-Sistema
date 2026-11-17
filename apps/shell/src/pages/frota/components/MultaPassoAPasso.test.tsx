@@ -163,7 +163,9 @@ describe('MultaPassoAPasso', () => {
     renderPasso(fonte(), { ...multa, status: MULTA.INDICADA, responsavel: 100000001, motivoEmpresa: 100000000 })
     expect(screen.getByText(/Aguardando a penalidade/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Registrar pagamento' })).toBeNull()
-    expect(screen.getByText('Responsável: Empresa (prazo perdido)')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Feito até agora' })).toBeTruthy()
+    expect(screen.getByText('Responsável')).toBeTruthy()
+    expect(screen.getByText('Empresa (prazo perdido)')).toBeTruthy()
   })
 })
 

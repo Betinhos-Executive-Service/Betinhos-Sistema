@@ -40,18 +40,18 @@ export function dadosSemVazios(d: DadosPasso): DadosPasso {
   return Object.fromEntries(Object.entries(d).filter(([, valor]) => valor !== '')) as DadosPasso
 }
 
-/** Passos feitos, só leitura. */
-function feitos(e: MultaEstado, responsavel: Ref | null): string[] {
-  const linhas: string[] = []
+/** O que já foi feito (rótulo e valor com data), só leitura. */
+function feitos(e: MultaEstado, responsavel: Ref | null): [string, string][] {
+  const linhas: [string, string][] = []
   const motivo = e.motivoEmpresa != null ? ` (${ROTULO_MOTIVO[e.motivoEmpresa]})` : ''
-  if (e.responsavel === RESPONSAVEL.EMPRESA) linhas.push(`Responsável: Empresa${motivo}`)
-  else if (responsavel) linhas.push(`Responsável: ${responsavel.label}`)
-  if (e.dataAviso) linhas.push(`Motorista avisado em ${formatBR(e.dataAviso)}`)
-  if (e.dataIndicacao) linhas.push(`Indicada em ${formatBR(e.dataIndicacao)}${e.canal != null ? ` pela ${ROTULO_CANAL[e.canal]}` : ''}`)
-  if (e.aceiteEm) linhas.push(`Aceite na CNH Digital em ${formatBR(e.aceiteEm)}`)
-  if (e.pagaEm) linhas.push(`Paga em ${formatBR(e.pagaEm)}${e.valorPago != null ? ` · ${brl(e.valorPago)}` : ''}`)
-  if (e.acertoEm) linhas.push(e.competencia ? `Lançada na folha de ${formatBR(e.competencia).slice(3)}` : `Empresa assumiu${motivo}`)
-  if (e.canceladaEm) linhas.push(`Cancelada em ${formatBR(e.canceladaEm)}${e.motivoCancelamento ? `: ${e.motivoCancelamento}` : ''}`)
+  if (e.responsavel === RESPONSAVEL.EMPRESA) linhas.push(['Responsável', `Empresa${motivo}`])
+  else if (responsavel) linhas.push(['Responsável', responsavel.label])
+  if (e.dataAviso) linhas.push(['Motorista avisado', formatBR(e.dataAviso)])
+  if (e.dataIndicacao) linhas.push(['Indicação no órgão', `${formatBR(e.dataIndicacao)}${e.canal != null ? ` · ${ROTULO_CANAL[e.canal]}` : ''}`])
+  if (e.aceiteEm) linhas.push(['Aceite na CNH Digital', formatBR(e.aceiteEm)])
+  if (e.pagaEm) linhas.push(['Pagamento', `${formatBR(e.pagaEm)}${e.valorPago != null ? ` · ${brl(e.valorPago)}` : ''}`])
+  if (e.acertoEm) linhas.push(['Acerto', `${formatBR(e.acertoEm)} · ${e.competencia ? `lançado na folha de ${formatBR(e.competencia).slice(3)}` : `Empresa assumiu${motivo}`}`])
+  if (e.canceladaEm) linhas.push(['Cancelamento', `${formatBR(e.canceladaEm)}${e.motivoCancelamento ? ` · ${e.motivoCancelamento}` : ''}`])
   return linhas
 }
 
@@ -285,8 +285,11 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       )}
 
       {lista.length > 0 && (
-        <section className="multa-feitos" aria-label="Passos feitos">
-          <ul>{lista.map((linha) => <li key={linha}>{linha}</li>)}</ul>
+        <section className="frota-group" aria-labelledby={`${multa.id}-feitos`}>
+          <h3 id={`${multa.id}-feitos`} className="frota-group__title">Feito até agora</h3>
+          <dl className="frota-detail">
+            {lista.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
+          </dl>
         </section>
       )}
     </div>

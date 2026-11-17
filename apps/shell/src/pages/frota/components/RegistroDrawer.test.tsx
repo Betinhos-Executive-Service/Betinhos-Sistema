@@ -23,7 +23,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
 
 const manutencao: Manutencao = { id: 'm1', codigo: 'M-1', descricao: 'Freio com ruído', status: MANUT.SOLICITADO, grau: null, tipo: null, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC-1234' }, solicitante: null, criadoEm: '2026-10-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null }
 const multa: Multa = { id: 'u1', titulo: 'Multa sem condutor', status: MULTA.NOTIFICAR, dataHora: null, local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC-1234' }, motorista: null, infracaoId: null, criadoEm: '2026-10-01T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null }
-const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa] }
+const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manutencao], multas: [multa, { ...multa, id: 'u2', titulo: 'Multa com condutor', status: MULTA.NOTIFICADO, motorista: { id: 'f1', label: 'Ana' }, dataAviso: '2026-10-02' }] }
 
 function renderDrawer(source: DataSource, kind: 'manutencao' | 'multa', id: string) {
   const onClose = vi.fn()
@@ -63,12 +63,36 @@ describe('RegistroDrawer', () => {
     expect(screen.queryByRole('button', { name: 'Gerar contrato de indicação' })).toBeNull()
   })
 
-  it('multa mostra o passo a passo e deixa os dados recolhidos', () => {
+  it('multa mostra o cartão e as etapas, sem selo, título "Passo a passo", rodapé nem lista com bolinha', () => {
     renderDrawer(fakeSource(), 'multa', 'u1')
     expect(screen.getByRole('list', { name: 'Etapas da multa' })).toBeTruthy()
-    const dados = screen.getByText('Dados e arquivos').closest('details') as HTMLDetailsElement
-    expect(dados.open).toBe(false)
+    expect(screen.queryByText('Passo a passo')).toBeNull()
+    expect(screen.queryByText('1. Identificar o responsável')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Abrir formulário/ })).toBeNull()
+    expect(screen.queryByText(/Edição completa no formulário/)).toBeNull()
+    expect(document.querySelector('details')).toBeNull()
     expect(screen.queryByText('Termo de acordo')).toBeNull()
+  })
+
+  it('multa tem as seções Feito até agora (só o que tem valor) e Dados da multa, sempre abertas', () => {
+    renderDrawer(fakeSource(), 'multa', 'u2')
+    expect(screen.getByText('Motorista avisado')).toBeTruthy()
+    expect(screen.getByText('02/10/2026')).toBeTruthy()
+    expect(screen.queryByText('Pagamento')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Feito até agora' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Dados da multa' })).toBeTruthy()
+    expect(screen.getByText('Data da infração')).toBeTruthy()
+    expect(screen.getByText('Local')).toBeTruthy()
+  })
+
+  it('multa sem nada feito não mostra a seção Feito até agora', () => {
+    renderDrawer(fakeSource(), 'multa', 'u1')
+    expect(screen.queryByRole('heading', { name: 'Feito até agora' })).toBeNull()
+  })
+
+  it('manutenção continua com o rodapé do formulário', () => {
+    renderDrawer(fakeSource(), 'manutencao', 'm1')
+    expect(screen.getByRole('button', { name: /Abrir formulário/ })).toBeTruthy()
   })
 
   it('mostra a classificação da IA e grava a correção manual dos serviços', async () => {

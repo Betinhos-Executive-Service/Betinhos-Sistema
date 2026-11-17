@@ -79,19 +79,16 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
       actions={registro ? <BotaoAuditoria entity={KIND_TABLE[kind]} ids={[id]} name={registro.titulo} /> : null}
       eyebrow={KIND_LABEL[kind]}
       title={registro?.titulo || 'Registro não encontrado'}
-      footer={<>
+      footer={multa ? undefined : <>
         <span className="frota-muted">Edição completa no formulário do Dataverse.</span>
         <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => void abrirFormulario()} disabled={!registro}>Abrir formulário</Button>
       </>}
     >
       {!registro ? <EmptyState compact align="start" title="Este registro não está mais na lista">Recarregue a tela.</EmptyState> : (
         <div className="frota-drawer">
-          <div className="frota-drawer__status"><StatusBadge kind={kind} value={registro.status} /></div>
+          {!multa && <div className="frota-drawer__status"><StatusBadge kind={kind} value={registro.status} /></div>}
           {multa ? (
-            <section className="frota-group" aria-labelledby={`${id}-passos`}>
-              <h3 id={`${id}-passos`} className="frota-group__title">Passo a passo</h3>
-              <MultaPassoAPasso key={`${id}-${multa.status}`} source={source} multa={multa} data={data} onChanged={onChanged} />
-            </section>
+            <MultaPassoAPasso key={`${id}-${multa.status}`} source={source} multa={multa} data={data} onChanged={onChanged} />
           ) : (
             <section className="frota-group" aria-labelledby={`${id}-acoes`}>
               <h3 id={`${id}-acoes`} className="frota-group__title">Ações de status</h3>
@@ -121,14 +118,9 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onC
                 {registro.campos.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
               </dl>
             )
-            return multa ? (
-              <details className="frota-group multa-dados">
-                <summary className="frota-group__title">Dados e arquivos</summary>
-                {corpo}
-              </details>
-            ) : (
+            return (
               <section className="frota-group" aria-labelledby={`${id}-dados`}>
-                <h3 id={`${id}-dados`} className="frota-group__title">Dados</h3>
+                <h3 id={`${id}-dados`} className="frota-group__title">{multa ? 'Dados da multa' : 'Dados'}</h3>
                 {corpo}
               </section>
             )
