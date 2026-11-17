@@ -1,11 +1,14 @@
 import type { MouseEvent, ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { Button, Checkbox, StatusBadge } from '@betinhos/ui'
+import { Wrench } from 'lucide-react'
 import { ChoiceBadge } from './ChoiceBadge'
 import { formatCell } from '../domain/format'
 import { rowKey } from '../domain/layout'
+import type { LinhaManutencao } from '../domain/manutencao'
 import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { ManutencaoResumo } from './ManutencaoResumo'
 
 type Props = {
   rows: Row[]
@@ -27,13 +30,15 @@ type Props = {
   footer?: ReactNode
   /** Desktop: cards em grade responsiva. */
   grid?: boolean
+  /** Linhas de manutenção (manutenções v2): card próprio, que abre a gaveta da manutenção; `ler` devolve `null` para serviço. */
+  manutencao?: { ler: (row: Row) => LinhaManutencao | null; abrir: (m: LinhaManutencao) => void }
 }
 
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
@@ -47,6 +52,25 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
       <ul className={grid ? 'gr-cards gr-cards--grid' : 'gr-cards'} aria-label="Serviços">
         {rows.map((row) => {
           const id = String(row[ID_ATTRIBUTE])
+          const m = manutencao?.ler(row) ?? null
+          if (m && manutencao) {
+            return (
+              <li key={id} className={selected.has(id) ? 'gr-card gr-card--manutencao is-selected' : 'gr-card gr-card--manutencao'} onClick={(event: MouseEvent<HTMLLIElement>) => { if (!(event.target as HTMLElement).closest('button, input, a, label')) onToggle(id) }} onContextMenu={onCardContextMenu ? (event) => onCardContextMenu(id, event) : undefined}>
+                <div className="gr-card__head">
+                  <span className="gr-card__check">
+                    <Checkbox label={<span className="gr-sr">Selecionar manutenção {m.veiculo}</span>} checked={selected.has(id)} onChange={() => onToggle(id)} />
+                  </span>
+                  <button type="button" className="gr-open gr-manut__abrir" aria-label={`Abrir manutenção ${m.descricao} (${m.veiculo})`} onClick={() => manutencao.abrir(m)}><Wrench size={14} aria-hidden="true" /><span>Manutenção · {m.veiculo}</span></button>
+                </div>
+                <p className="gr-card__line"><strong>{formatCell('datetime', row, DATA)}</strong></p>
+                <ManutencaoResumo m={m} quebra />
+                <p className="gr-card__line">
+                  {row._cr40f_motorista_value == null ? <StatusBadge tone="warning">Sem motorista</StatusBadge> : <>Motorista: <strong>{formatCell('readonly', row, '_cr40f_motorista_value')}</strong></>}
+                </p>
+                <Button variant="secondary" size="touch" fullWidth onClick={() => onEdit(id)}>Programar</Button>
+              </li>
+            )
+          }
           const name = formatCell('readonly', row, 'cr40f_id')
           const statusRaw = has.status ? row[STATUS] : null
           const data = has.data ? formatCell('datetime', row, rowKey(has.data, attributes?.get(has.data.key))) : null

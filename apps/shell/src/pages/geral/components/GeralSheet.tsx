@@ -28,6 +28,8 @@ type Props = {
   search: (column: Column, text: string) => Promise<LookupOption[]>
   /** Comprovantes que o motorista enviou ao receber (só leitura). */
   recebimentos: RecebimentosSource
+  /** Linha de manutenção: a sheet vira "Programar manutenção", sem os comprovantes de recebimento (são de serviço). */
+  manutencao?: { titulo: string }
 }
 
 type FieldProps = {
@@ -144,7 +146,7 @@ function SheetField({ row, column, info, status, onSave, onReset, search, onInva
 }
 
 /** Edição dos campos do serviço no celular: um campo por coluna editável da visão, gravado campo a campo. */
-export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search, recebimentos }: Props) {
+export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search, recebimentos, manutencao }: Props) {
   const name = formatCell('readonly', row, 'cr40f_id')
   const [confirming, setConfirming] = useState(false)
   const invalid = useRef(new Set<string>())
@@ -167,7 +169,7 @@ export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose
 
   return (
     <>
-      <Sheet open={open} onClose={requestClose} eyebrow="Editar campos" expandLabel="Ver todos os campos" title={`Serviço ${name}`}>
+      <Sheet open={open} onClose={requestClose} eyebrow={manutencao ? 'Programar manutenção' : 'Editar campos'} expandLabel="Ver todos os campos" title={manutencao ? manutencao.titulo : `Serviço ${name}`}>
         <div className="gr-sheet">
           {columns.map((column) => {
             if (!column.alias && column.attribute === 'cr40f_id') return null
@@ -196,10 +198,12 @@ export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose
               />
             )
           })}
-          <section className="gr-sheet__comprovantes" aria-labelledby="gr-sheet-comprovantes">
-            <h3 id="gr-sheet-comprovantes">Comprovantes de recebimento</h3>
-            <ComprovantesRecebimento source={recebimentos} reservaIds={[String(row[ID_ATTRIBUTE])]} />
-          </section>
+          {manutencao ? null : (
+            <section className="gr-sheet__comprovantes" aria-labelledby="gr-sheet-comprovantes">
+              <h3 id="gr-sheet-comprovantes">Comprovantes de recebimento</h3>
+              <ComprovantesRecebimento source={recebimentos} reservaIds={[String(row[ID_ATTRIBUTE])]} />
+            </section>
+          )}
         </div>
       </Sheet>
       <Dialog

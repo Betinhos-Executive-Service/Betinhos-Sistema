@@ -306,3 +306,20 @@
 .gr-sheet__comprovantes .cmp-comprovantes { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 .gr-sheet__comprovantes .cmp-comprovante__previa { height: 120px; }
 
+
+/* Linhas de manutenção (manutenções v2, plano 3): barra e fundo no laranja de aviso do DS, ícone Wrench e resumo da manutenção. */
+.gr-table .bt-table__row.gr-row--manutencao:not(.is-selected) .bt-table__cell { background-color: var(--bt-color-warning-soft); }
+.gr-table .bt-table__row.gr-row--manutencao .gr-cell--select { box-shadow: inset 4px 0 0 var(--bt-color-warning); }
+.gr-manut__abrir { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-weight: 600; }
+.gr-manut__abrir svg { flex: 0 0 auto; color: var(--bt-color-warning); }
+.gr-manut__primeira { flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--bt-space-1); }
+.gr-manut__trecho { min-width: 0; }
+.gr-manut__resumo-botao { display: flex; align-items: center; width: 100%; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.gr-manut__resumo { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; overflow: hidden; white-space: nowrap; }
+.gr-manut__resumo--quebra { flex-wrap: wrap; white-space: normal; }
+.gr-manut__descricao { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--bt-color-text-primary); }
+.gr-manut__meta { flex: 0 0 auto; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gr-card.gr-card--manutencao { box-shadow: inset 4px 0 0 var(--bt-color-warning); }
+.gr-card.gr-card--manutencao:not(.is-selected) { background-color: var(--bt-color-warning-soft); }
+.gr-manut-chave { display: inline-flex; flex: 0 0 auto; align-items: center; }
+.gr-manut-chave--celular { padding: 0 var(--bt-space-1) var(--bt-space-2); }

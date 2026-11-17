@@ -1,6 +1,6 @@
 import type { Row } from '@betinhos/dataverse'
 import { diaSP, formatBR, toDateOnly } from '../../frota/data/dates'
-import { GRAU, STATUS_OPTIONS, TONE, label, type Tone } from '../../frota/data/schema'
+import { GRAU, MANUT, STATUS_OPTIONS, TONE, label, type Tone } from '../../frota/data/schema'
 import { atrasada, rotuloJanela, type Janela } from '../../frota/domain/janela'
 import { parse } from './fetch'
 import { parseLayout } from './layout'
@@ -144,6 +144,8 @@ export function aplicarManutencoes(fetchxml: string, mostrar: boolean): string {
 
 const F = '@OData.Community.Display.V1.FormattedValue'
 const doLink = (coluna: (typeof COLUNAS_MANUTENCAO)[number]) => `${ALIAS_MANUTENCAO}.${coluna}`
+/** A programação ainda vale: Agendada ou Programada. Realizada, Cancelada, Reprovada e Solicitada não têm selo de janela. */
+const emProgramacao = (status: number | null | undefined) => status === MANUT.AGENDADO || status === MANUT.PROGRAMADO
 const valorTexto = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
 const valorNumero = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
 
@@ -160,7 +162,7 @@ export type LinhaManutencao = {
   janela: Janela | null
   janelaRotulo: string
   atrasada: boolean
-  /** Saída programada fora da janela do encaixe: avisa, não bloqueia (spec). */
+  /** Saída programada fora da janela do encaixe, só com a manutenção Agendada ou Programada: avisa, não bloqueia (spec). */
   foraDaJanela: boolean
 }
 
@@ -192,13 +194,14 @@ export function lerLinhaManutencao(row: Row, hoje: string): LinhaManutencao | nu
     janela,
     janelaRotulo: janela ? rotuloJanela(janela) : agendarPara ? `Agendada para ${formatBR(agendarPara)}` : 'Sem janela',
     atrasada: status != null && atrasada({ status, janelaFim: fim, agendarPara }, hoje),
-    foraDaJanela: saida != null && janela != null && (saida < janela.inicio || saida > janela.fim),
+    foraDaJanela: emProgramacao(status) && saida != null && janela != null && (saida < janela.inicio || saida > janela.fim),
   }
 }
 
-/** Texto do aviso depois de gravar uma saída fora da janela; `null` quando está dentro ou não há janela. */
-export function avisoForaDaJanela(saidaIso: string | null, m: Pick<LinhaManutencao, 'janela' | 'janelaRotulo'>): string | null {
+/** Texto do aviso depois de gravar uma saída fora da janela; `null` quando está dentro, não há janela ou a manutenção já não está Agendada nem Programada (como o selo). */
+export function avisoForaDaJanela(saidaIso: string | null, m: Pick<LinhaManutencao, 'janela' | 'janelaRotulo'> & { status?: number | null }): string | null {
   const dia = diaSP(saidaIso)
+  if (m.status !== undefined && !emProgramacao(m.status)) return null
   if (!dia || !m.janela || (dia >= m.janela.inicio && dia <= m.janela.fim)) return null
   return `A saída de ${formatBR(dia)} ficou fora da janela da manutenção (${m.janelaRotulo}). A data foi gravada; confira com o gestor de frota.`
 }
@@ -211,12 +214,18 @@ export type Trecho = { tipo: 'campo'; column: Column } | { tipo: 'resumo' | 'vaz
 
 /**
  * Motorista e saída na própria coluna; as colunas vizinhas restantes viram um trecho só, e o primeiro trecho leva o
- * resumo. Quando a visão não tem coluna para o resumo (só a primeira, ou a primeira mais os campos editáveis), o resumo
- * ganha um trecho de `span` 1 com a chave da primeira coluna, antes dos campos: quem desenha o põe na primeira coluna.
+ * resumo, sempre antes dos campos editáveis. Quando não há coluna comum antes do primeiro campo (só a primeira, ou a
+ * primeira seguida de campos), o resumo ganha um trecho de `span` 1 com a chave da primeira coluna, na frente: quem
+ * desenha o põe dentro da primeira coluna (não é uma célula a mais) e as colunas comuns que sobram viram `vazio`.
  */
 export function trechosDaManutencao(columns: Column[]): Trecho[] {
   const trechos: Trecho[] = []
-  let comResumo = false
+  // Um campo antes de qualquer coluna comum: o resumo não pode ficar depois dele, então vai para a primeira coluna.
+  const resto = columns.slice(1)
+  const primeiraComum = resto.findIndex((c) => !editavelNaManutencao(c))
+  const primeiroCampo = resto.findIndex(editavelNaManutencao)
+  const resumoNaPrimeira = primeiraComum === -1 || (primeiroCampo !== -1 && primeiroCampo < primeiraComum)
+  let comResumo = resumoNaPrimeira
   for (const column of columns.slice(1)) {
     if (editavelNaManutencao(column)) { trechos.push({ tipo: 'campo', column }); continue }
     const ultimo = trechos[trechos.length - 1]
@@ -224,7 +233,7 @@ export function trechosDaManutencao(columns: Column[]): Trecho[] {
     trechos.push({ tipo: comResumo ? 'vazio' : 'resumo', key: column.key, span: 1 })
     comResumo = true
   }
-  if (!comResumo && columns.length) trechos.unshift({ tipo: 'resumo', key: columns[0].key, span: 1 })
+  if (resumoNaPrimeira && columns.length) trechos.unshift({ tipo: 'resumo', key: columns[0].key, span: 1 })
   return trechos
 }
 
