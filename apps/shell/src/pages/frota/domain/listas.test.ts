@@ -53,6 +53,12 @@ describe('termo na lista de multas (v2)', () => {
     expect(registroColumns('multa').map((c) => c.key)).toContain('termo')
     expect(registroColumns('manutencao').map((c) => c.key)).not.toContain('termo')
     expect(registroBuiltins('multa').map((v) => v.name)).toEqual(['A notificar', 'Termos pendentes', 'Contestados'])
+    // Manutenções: "Em aberto" continua a padrão (ordem 1); "A encaixar" (ex-sub-aba) filtra Solicitado, a mais antiga primeiro.
+    const [abertas, encaixar] = registroBuiltins('manutencao')
+    expect([abertas.name, abertas.ordem, encaixar.id, encaixar.name, encaixar.ordem]).toEqual(['Em aberto', 1, 'encaixar', 'A encaixar', 2])
+    const config = JSON.parse(encaixar.config)
+    expect(config.filters.quick.status.values.map((v: { value: string }) => v.value)).toEqual([String(MANUT.SOLICITADO)])
+    expect(config.sort).toEqual({ key: 'data', dir: 'asc' })
     const filtros = JSON.parse(registroBuiltins('multa')[1].config).filters.quick.termo
     expect(filtros.values.map((v: { value: string }) => v.value)).toEqual(['pendente'])
   })

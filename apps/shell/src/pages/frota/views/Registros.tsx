@@ -1,5 +1,5 @@
 import { Plus, RefreshCw } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { Button, EmptyState, SearchBox, SegmentedControl, StatusBadge as Badge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
@@ -35,8 +35,11 @@ function opcoes(refs: (Ref | null)[]) {
 
 const categoriasTexto = (valores: number[]) => valores.map((value) => CATEGORIAS_MANUT.find((option) => option.value === value)?.label).filter(Boolean).join(' · ')
 
-/** `onNovo`: a tela abre a gaveta própria de criação (Manutenções); sem ele, "Novo registro" abre o formulário nativo. */
-type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean; onNovo?: () => void }
+/**
+ * `onNovo`: a tela abre a gaveta própria de criação (Manutenções); sem ele, "Novo registro" abre o formulário nativo.
+ * `visaoInicial`: visão pronta (ex.: `pronta:encaixar`) aplicada uma vez ao carregar; `onVisaoAplicada` avisa para limpar o link.
+ */
+type Props = { kinds: Kind[]; data: FrotaData; source: DataSource; host?: Host; onOpen: (kind: Kind, id: string) => void; onReload: () => void; loading?: boolean; onNovo?: () => void; visaoInicial?: string; onVisaoAplicada?: () => void }
 
 /** Abas de registros; cada tipo tem sua lista (visões, colunas e filtros próprios). */
 export function Registros(props: Props) {
@@ -44,7 +47,7 @@ export function Registros(props: Props) {
   return <Lista key={kind} kind={kind} {...props} />
 }
 
-function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false, onNovo }: Props & { kind: Kind }) {
+function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, loading = false, onNovo, visaoInicial, onVisaoAplicada }: Props & { kind: Kind }) {
   const size = useMedia('(max-width: 820px)') ? 'touch' : 'default'
   const auditoria = useAuditoria()
   const notify = useNotify()
@@ -69,6 +72,15 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     builtins: () => registroBuiltins(kind),
     legacy: { keys: LEGACY_KEYS, read: (q) => registroLegacy(q, kind, opcoesRefs) },
   })
+
+  // Link antigo (ex.: `?sub=encaixar`): abre a visão pedida uma vez, quando as visões carregam.
+  const visaoAplicada = useRef(false)
+  useEffect(() => {
+    if (!visaoInicial || visaoAplicada.current || view.status !== 'ready' || !view.views.some((v) => v.id === visaoInicial)) return
+    visaoAplicada.current = true
+    view.select(visaoInicial)
+    onVisaoAplicada?.()
+  }, [visaoInicial, view, onVisaoAplicada])
 
   const read = useMemo(() => extra.read(readRegistro, (linha: Linha) => linha.id), [extra])
   const visiveis = useMemo(
