@@ -195,6 +195,44 @@ describe('arquivos, anexo da despesa e buscas', () => {
     expect(webApi.updateRecord).toHaveBeenCalledWith('cr40f_despesaoperacional', DESPESA_LIMPA, { cr40f_statusanexo: 100000003 })
   })
 
+  it('anexo da nota: arquivo grande em qualquer posição é recusado antes de gravar, sem marcar a despesa como falhou', async () => {
+    const f = resposta(true, 200, { shareLink: 'https://1drv.ms/d1' })
+    vi.stubGlobal('fetch', f)
+    const { d, webApi } = criarDeps()
+    d.metadata = navegacao
+    const grande = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'grande.pdf', { type: 'application/pdf' })
+    await expect(criarArquivosXrm(d).anexarNotaFiscalDespesa(DESPESA, [arquivo('nf.pdf', 'application/pdf'), grande], PESSOA)).rejects.toThrow('grande.pdf passa de 10 MB')
+    expect(f).not.toHaveBeenCalled()
+    expect(webApi.createRecord).not.toHaveBeenCalled()
+    expect(webApi.updateRecord).not.toHaveBeenCalled()
+  })
+
+  it('formato não aceito é recusado na camada de dados, antes de subir: foto sem PDF, nota com PDF', async () => {
+    const f = resposta(true, 200, { shareLink: 'https://1drv.ms/x' })
+    vi.stubGlobal('fetch', f)
+    const { d, webApi } = criarDeps()
+    d.metadata = navegacao
+    const arquivos = criarArquivosXrm(d)
+    await expect(arquivos.enviarArquivoManutencao({ ...alvo, veiculo: null }, arquivo('foto.pdf', 'application/pdf'), 'POS_MANUTENCAO', 1)).rejects.toThrow('foto.pdf: formato não aceito (use JPG, PNG ou WEBP)')
+    await expect(arquivos.enviarArquivoManutencao({ ...alvo, veiculo: null }, arquivo('nf.heic', 'image/heic'), 'NOTA_FISCAL', 1)).rejects.toThrow('nf.heic: formato não aceito (use JPG, PNG, WEBP ou PDF)')
+    await expect(arquivos.anexarNotaFiscalDespesa(DESPESA, [arquivo('nf.exe', 'application/octet-stream')], PESSOA)).rejects.toThrow('nf.exe: formato não aceito (use JPG, PNG, WEBP ou PDF)')
+    expect(f).not.toHaveBeenCalled()
+    expect(webApi.createRecord).not.toHaveBeenCalled()
+    expect(webApi.updateRecord).not.toHaveBeenCalled()
+    f.mockClear()
+    await arquivos.enviarArquivoManutencao({ ...alvo, veiculo: null }, arquivo('nf.pdf', 'application/pdf'), 'NOTA_FISCAL', 1) // PDF vale como nota
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+
+  it('a data do envio do anexo vem do relógio injetado', async () => {
+    vi.stubGlobal('fetch', resposta(true, 200, { shareLink: 'https://1drv.ms/d1' }))
+    const { d, webApi } = criarDeps()
+    d.metadata = navegacao
+    webApi.retrieveRecord.mockResolvedValueOnce({ cr40f_nome: 'Manutenção' })
+    await criarArquivosXrm(d).anexarNotaFiscalDespesa(DESPESA, [arquivo('nf.jpg')], PESSOA)
+    expect(webApi.createRecord).toHaveBeenCalledWith('cr40f_anexodespesaoperacional', expect.objectContaining({ cr40f_dataenvio: '2026-11-17T13:00:00.000Z' }))
+  })
+
   it('busca funcionários ativos e cidades ativas pelo nome, com aspas escapadas', async () => {
     const { d, webApi } = criarDeps()
     webApi.retrieveMultipleRecords.mockResolvedValueOnce({ entities: [{ cr40f_funcionariosid: '{F1}', cr40f_nomecompleto: "Ana D'Ávila" }] })

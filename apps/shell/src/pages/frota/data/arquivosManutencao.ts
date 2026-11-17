@@ -64,7 +64,41 @@ export function exigirSucessoDoFlow(resultado: unknown) {
   if (!status) return
   const normal = status.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   if (normal === 'sucesso' || normal === 'success' || normal === 'ok') return
-  throw new Error(String(r.message ?? r.mensagem ?? r.error ?? r.erro ?? `O Flow de arquivos respondeu ${status}`))
+  const mensagem = [r.message, r.mensagem, r.error, r.erro].map(textoDeErro).find(Boolean)
+  throw new Error(mensagem ?? `O Flow de arquivos respondeu ${status}`)
+}
+
+/** Mensagem de um erro do flow: texto, ou o `message`/`mensagem` de um objeto (nunca "[object Object]"). */
+function textoDeErro(valor: unknown): string | undefined {
+  if (typeof valor === 'string') return valor.trim() || undefined
+  if (valor && typeof valor === 'object') {
+    const o = valor as Record<string, unknown>
+    return textoDeErro(o.message) ?? textoDeErro(o.mensagem)
+  }
+  return undefined
+}
+
+// ---------- Formatos aceitos (a mesma lista vale para o `accept` do Upload e para a camada de dados) ----------
+
+const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp'] as const
+const TIPOS_NOTA = [...TIPOS_FOTO, 'application/pdf'] as const
+const EXT_FOTO = ['.png', '.jpg', '.jpeg', '.webp'] as const
+const EXT_NOTA = [...EXT_FOTO, '.pdf'] as const
+
+/** Valor do `accept` do Upload: foto = PNG, JPEG e WEBP; nota = os mesmos e PDF. */
+export const ACCEPT_FOTO = [...TIPOS_FOTO, ...EXT_FOTO].join(',')
+export const ACCEPT_NOTA = [...TIPOS_NOTA, ...EXT_NOTA].join(',')
+
+export type TipoArquivo = 'foto' | 'nota'
+
+/** Recusa o arquivo de formato fora da lista: pelo tipo declarado e, sem tipo, pela extensão do nome. */
+export function exigirFormato(arquivo: Pick<File, 'name' | 'type'>, tipo: TipoArquivo) {
+  const tipos: readonly string[] = tipo === 'nota' ? TIPOS_NOTA : TIPOS_FOTO
+  const extensoes: readonly string[] = tipo === 'nota' ? EXT_NOTA : EXT_FOTO
+  const declarado = arquivo.type.trim().toLowerCase().replace('image/jpg', 'image/jpeg')
+  const extensao = /\.[a-z0-9]+$/i.exec(arquivo.name)?.[0].toLowerCase() ?? ''
+  const aceito = declarado ? tipos.includes(declarado) : extensoes.includes(extensao)
+  if (!aceito) throw new Error(`${arquivo.name}: formato não aceito (${tipo === 'nota' ? 'use JPG, PNG, WEBP ou PDF' : 'use JPG, PNG ou WEBP'})`)
 }
 
 /** Data e hora de São Paulo (UTC−3, sem horário de verão) como `YYYYMMDD-HHmmss`. */

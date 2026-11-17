@@ -1,5 +1,5 @@
 // apps/shell/src/pages/frota/data/manutencaoDataverse.ts
-import { carimboDeEnvio, exigirSucessoDoFlow, extensaoDe, linkDoFlow, nomeArquivoEnvio, pastaDespesa, pastaManutencao, tipoFoto, VAR_FLOW_ARQUIVOS } from './arquivosManutencao'
+import { carimboDeEnvio, exigirFormato, exigirSucessoDoFlow, extensaoDe, linkDoFlow, nomeArquivoEnvio, pastaDespesa, pastaManutencao, tipoFoto, VAR_FLOW_ARQUIVOS } from './arquivosManutencao'
 import { chamarCustomApi } from './customApi'
 import type { DateBehavior } from './dates'
 import { cleanId, guid, mapDetalheManutencao, SELECT_DETALHE_MANUTENCAO } from './mappers'
@@ -140,6 +140,7 @@ export function criarArquivosXrm(deps: DepsXrm): ArquivosManutencao {
   return {
     async enviarArquivoManutencao(alvo, arquivo, origem, ordem) {
       if (arquivo.size > FOTO_MAX_BYTES) throw new Error(`${arquivo.name} passa de 10 MB`)
+      exigirFormato(arquivo, origem === 'NOTA_FISCAL' ? 'nota' : 'foto')
       const id = guid(alvo.id)
       let modelo: string | null = null
       let placa: string | null = null
@@ -166,6 +167,11 @@ export function criarArquivosXrm(deps: DepsXrm): ArquivosManutencao {
     async anexarNotaFiscalDespesa(despesaId, arquivos, enviadoPorId) {
       const id = guid(despesaId)
       const pessoa = guid(enviadoPorId)
+      // Tudo é conferido antes de gravar qualquer coisa: arquivo inválido não deixa a despesa marcada como "falhou".
+      for (const arquivo of arquivos) {
+        if (arquivo.size > FOTO_MAX_BYTES) throw new Error(`${arquivo.name} passa de 10 MB`)
+        exigirFormato(arquivo, 'nota')
+      }
       const despesa = await api.retrieveRecord(TABELA_DESPESA, id, '?$select=cr40f_nome')
       const nome = typeof despesa.cr40f_nome === 'string' && despesa.cr40f_nome ? despesa.cr40f_nome : 'Manutenção'
       const caminho = pastaDespesa(deps.envLabel, nome)
@@ -180,7 +186,7 @@ export function criarArquivosXrm(deps: DepsXrm): ArquivosManutencao {
           })
           await api.createRecord(TABELA_ANEXO, {
             cr40f_nome: `Comprovante ${ordem} - ${nome}`, cr40f_nomearquivo: base, cr40f_urlsharepoint: link, cr40f_sharelink: link,
-            cr40f_dataenvio: new Date().toISOString(), cr40f_ordem: ordem, cr40f_status: ANEXO_STATUS_ENVIADO, cr40f_tipo: ANEXO_TIPO_COMPROVANTE,
+            cr40f_dataenvio: agora().toISOString(), cr40f_ordem: ordem, cr40f_status: ANEXO_STATUS_ENVIADO, cr40f_tipo: ANEXO_TIPO_COMPROVANTE,
             [`${nav.despesa}@odata.bind`]: `/${ENTITY_SET.despesas}(${id})`,
             [`${nav.enviadoPor}@odata.bind`]: `/${ENTITY_SET.funcionarios}(${pessoa})`,
           })

@@ -1,6 +1,6 @@
 // apps/shell/src/pages/frota/data/arquivosManutencao.test.ts
 import { describe, expect, it } from 'vitest'
-import { carimboDeEnvio, exigirSucessoDoFlow, extensaoDe, linkDoFlow, nomeArquivoEnvio, pastaDespesa, pastaManutencao, segmentoPasta, tipoFoto } from './arquivosManutencao'
+import { ACCEPT_FOTO, ACCEPT_NOTA, carimboDeEnvio, exigirFormato, exigirSucessoDoFlow, extensaoDe, linkDoFlow, nomeArquivoEnvio, pastaDespesa, pastaManutencao, segmentoPasta, tipoFoto } from './arquivosManutencao'
 
 describe('arquivos da manutenção', () => {
   it('mesmas pastas do App: Manutenções/[DEV/]<modelo - placa>/<código> e Despesas/[DEV/]<nome>', () => {
@@ -41,6 +41,31 @@ describe('arquivos da manutenção', () => {
     expect(() => exigirSucessoDoFlow({ status: 'Sucesso' })).not.toThrow()
     expect(() => exigirSucessoDoFlow({ shareLink: 'https://1drv.ms/a' })).not.toThrow()
     expect(() => exigirSucessoDoFlow({ status: 'Sucésso' })).not.toThrow() // acento é ignorado
+  })
+
+  it('erro do flow como objeto vira a mensagem dele, nunca [object Object]', () => {
+    expect(() => exigirSucessoDoFlow({ status: 'Erro', error: { message: 'Pasta sem permissão' } })).toThrow('Pasta sem permissão')
+    expect(() => exigirSucessoDoFlow({ status: 'Erro', erro: { mensagem: 'x', message: 'Sem espaço' } })).toThrow('Sem espaço')
+    expect(() => exigirSucessoDoFlow({ status: 'Erro', error: { code: 500 } })).toThrow('O Flow de arquivos respondeu Erro')
+  })
+
+  it('formatos aceitos: foto é PNG, JPEG ou WEBP; nota também aceita PDF; sem tipo, vale a extensão', () => {
+    const f = (name: string, type: string) => ({ name, type })
+    expect(() => exigirFormato(f('a.jpg', 'image/jpeg'), 'foto')).not.toThrow()
+    expect(() => exigirFormato(f('a.PNG', ''), 'foto')).not.toThrow()
+    expect(() => exigirFormato(f('a.webp', 'image/webp'), 'nota')).not.toThrow()
+    expect(() => exigirFormato(f('nf.pdf', 'application/pdf'), 'nota')).not.toThrow()
+    expect(() => exigirFormato(f('nf.pdf', ''), 'nota')).not.toThrow()
+    expect(() => exigirFormato(f('nf.pdf', 'application/pdf'), 'foto')).toThrow('nf.pdf: formato não aceito (use JPG, PNG ou WEBP)')
+    expect(() => exigirFormato(f('a.heic', 'image/heic'), 'nota')).toThrow('a.heic: formato não aceito (use JPG, PNG, WEBP ou PDF)')
+    expect(() => exigirFormato(f('a.exe', 'application/octet-stream'), 'nota')).toThrow('formato não aceito')
+    expect(() => exigirFormato(f('sem-extensao', ''), 'foto')).toThrow('formato não aceito')
+    expect(() => exigirFormato(f('a.jpg', 'application/pdf'), 'foto')).toThrow('formato não aceito') // o tipo declarado manda
+  })
+
+  it('as constantes de accept do Upload saem da mesma lista', () => {
+    expect(ACCEPT_FOTO).toBe('image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp')
+    expect(ACCEPT_NOTA).toBe('image/png,image/jpeg,image/webp,application/pdf,.png,.jpg,.jpeg,.webp,.pdf')
   })
 
   it('nome do arquivo no OneDrive leva data e hora de São Paulo, para o reenvio não colidir com o anterior', () => {
