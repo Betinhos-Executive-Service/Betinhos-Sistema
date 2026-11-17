@@ -47,6 +47,21 @@ describe('JanelaCampos', () => {
     expect(lidos().dia).toBe('2026-11-20')
   })
 
+  it('não oferece semanas que já terminaram, nem a que veio nos valores', () => {
+    render(<Controlado inicial={{ modo: 'semana', dia: '2026-11-18', semana: '2026-11-02', comentario: '' }} />)
+    fireEvent.click(screen.getByRole('combobox', { name: /Semana/ }))
+    const opcoes = screen.getAllByRole('option', { hidden: true }).map((o) => o.textContent ?? '')
+    expect(opcoes.length).toBeGreaterThan(0)
+    expect(opcoes.some((texto) => texto.includes('02/11'))).toBe(false)
+    expect(opcoes[0]).toContain('16/11') // a primeira é a semana de hoje
+  })
+
+  it('a semana gravada mais adiante, fora das próximas oito, continua na lista', () => {
+    render(<Controlado inicial={{ modo: 'semana', dia: '2026-11-18', semana: '2027-03-01', comentario: '' }} />)
+    fireEvent.click(screen.getByRole('combobox', { name: /Semana/ }))
+    expect(screen.getAllByRole('option', { hidden: true }).some((o) => (o.textContent ?? '').includes('01/03'))).toBe(true)
+  })
+
   it('guarda o comentário ao motorista', () => {
     render(<Controlado inicial={{ modo: 'dia', dia: '2026-11-18', semana: '2026-11-16', comentario: '' }} />)
     fireEvent.change(screen.getByLabelText(/Comentário ao motorista/), { target: { value: 'Levar cedo' } })

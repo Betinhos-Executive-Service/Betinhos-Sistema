@@ -11,8 +11,9 @@ type Props = { valores: ValoresJanela; erros: ErrosJanela; hoje: string; disable
 export function JanelaCampos({ valores, erros, hoje, disabled = false, onChange }: Props) {
   const set = (patch: Partial<ValoresJanela>) => onChange({ ...valores, ...patch })
   const semanas = semanasAPartirDe(hoje, SEMANAS_OFERECIDAS)
-  // A semana já gravada (reagendar) aparece mesmo fora das próximas oito.
-  const lista = valores.semana && !semanas.some((s) => s.inicio === valores.semana) ? [semanaDe(valores.semana), ...semanas] : semanas
+  // A semana já gravada (reagendar) aparece mesmo fora das próximas oito, desde que ainda não tenha terminado.
+  const gravada = valores.semana ? semanaDe(valores.semana) : null
+  const lista = gravada && gravada.fim >= hoje && !semanas.some((s) => s.inicio === gravada.inicio) ? [gravada, ...semanas] : semanas
   const opcoes = lista.map((s) => ({ value: s.inicio, label: rotuloJanela(s) }))
   return (
     <div className="frota-fields">

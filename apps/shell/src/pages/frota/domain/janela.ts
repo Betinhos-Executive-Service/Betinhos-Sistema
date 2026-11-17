@@ -59,9 +59,18 @@ export function atrasada(m: Pick<Manutencao, 'status' | 'janelaFim' | 'agendarPa
   return (m.status === MANUT.AGENDADO || m.status === MANUT.PROGRAMADO) && fim !== null && daysBetween(hoje, fim) < 0
 }
 
+/**
+ * Valores do formulário de encaixe. Com janela gravada e ainda em vigor (termina hoje ou depois), ela; janela já vencida
+ * (reagendar uma manutenção atrasada) não volta: abre com hoje, no mesmo modo (dia ou semana), porque a tela recusa
+ * janela que terminou antes de hoje.
+ */
 export function valoresJanelaIniciais(atual: Janela | null, hoje: string, comentario: string | null): ValoresJanela {
-  if (atual && janelaValida(atual)) return { modo: modoDe(atual), dia: atual.inicio, semana: segundaDe(atual.inicio), comentario: comentario ?? '' }
-  return { modo: 'semana', dia: hoje, semana: segundaDe(hoje), comentario: comentario ?? '' }
+  const texto = comentario ?? ''
+  if (atual && janelaValida(atual)) {
+    if (atual.fim >= hoje) return { modo: modoDe(atual), dia: atual.inicio, semana: segundaDe(atual.inicio), comentario: texto }
+    return { modo: modoDe(atual), dia: hoje, semana: segundaDe(hoje), comentario: texto }
+  }
+  return { modo: 'semana', dia: hoje, semana: segundaDe(hoje), comentario: texto }
 }
 
 export type LeituraJanela = { erros: ErrosJanela; janela: Janela | null; comentario: string | null }

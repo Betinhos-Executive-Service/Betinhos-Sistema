@@ -45,6 +45,14 @@ describe('janela do encaixe', () => {
     expect(valoresJanelaIniciais({ inicio: '2026-11-23', fim: '2026-11-29' }, '2026-11-18', null)).toEqual({ modo: 'semana', dia: '2026-11-23', semana: '2026-11-23', comentario: '' })
   })
 
+  it('reagendar com a janela já vencida abre com hoje (mesmo modo), nunca com a janela vencida; janela que termina hoje ou depois fica', () => {
+    const hoje = '2026-11-18'
+    expect(valoresJanelaIniciais({ inicio: '2026-11-09', fim: '2026-11-15' }, hoje, 'Levar cedo')).toEqual({ modo: 'semana', dia: hoje, semana: '2026-11-16', comentario: 'Levar cedo' })
+    expect(valoresJanelaIniciais(janelaDoDia('2026-11-10'), hoje, null)).toEqual({ modo: 'dia', dia: hoje, semana: '2026-11-16', comentario: '' })
+    expect(valoresJanelaIniciais({ inicio: '2026-11-16', fim: '2026-11-22' }, hoje, null)).toMatchObject({ modo: 'semana', semana: '2026-11-16' }) // semana corrente vale
+    expect(valoresJanelaIniciais(janelaDoDia(hoje), hoje, null)).toMatchObject({ modo: 'dia', dia: hoje }) // vence hoje: ainda vale
+  })
+
   it('lê dia ou semana; recusa janela que já passou e comentário longo', () => {
     const base = { modo: 'semana' as const, dia: '2026-11-18', semana: '2026-11-23', comentario: ' ok ' }
     expect(lerJanela(base, '2026-11-18', 100)).toEqual({ erros: {}, janela: { inicio: '2026-11-23', fim: '2026-11-29' }, comentario: 'ok' })
