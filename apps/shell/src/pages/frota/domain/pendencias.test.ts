@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { COLISAO, MANUT, MULTA, PROPRIO, VEICULO } from '../data/schema'
 import type { Baseline, Colisao, ItemPlano, Manutencao, Multa, Veiculo } from '../data/types'
-import { buildPendencias } from './pendencias'
+import { buildPendencias, PENDENCIA_LABEL } from './pendencias'
 
 const today = '2026-10-02'
 const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Manutenção ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: null, solicitante: null, criadoEm: '2026-09-01T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
@@ -47,6 +47,12 @@ describe('buildPendencias', () => {
       multa('longe', { status: MULTA.NOTIFICADO, dataParaIndicar: '2026-11-01' }),
     ] })
     expect(result.map((item) => [item.tipo, item.id])).toEqual([['notificar', 'n'], ['indicar', 'i']])
+  })
+
+  it('os rótulos das multas vêm das etapas do passo a passo, sem o nome antigo', () => {
+    expect(PENDENCIA_LABEL.notificar).toContain('1. Identificar o responsável')
+    expect(PENDENCIA_LABEL.indicar).toContain('2. Indicar no órgão')
+    expect(`${PENDENCIA_LABEL.notificar} ${PENDENCIA_LABEL.indicar}`).not.toMatch(/notificar o condutor|indicar condutor/i)
   })
 
   it('aponta colisões enviadas ou em análise', () => {

@@ -28,14 +28,15 @@ export function periodoAlemDe12Meses(periodo: Periodo, today: string): boolean {
 
 export const AVISO_12_MESES = 'Combustível e km consideram só os últimos 12 meses.'
 
-/** Todos os lançamentos de custo do período, já com dia (America/Sao_Paulo) e valor; ignora multa finalizada sem valor. */
+/** Todos os lançamentos de custo do período, já com dia (America/Sao_Paulo) e valor; ignora multa cancelada e multa finalizada sem valor. */
 function lancamentos(entrada: EntradaCusto, periodo: Periodo): Lancamento[] {
   const valorInfracao = (id: string | null) => entrada.infracoes.find((item) => item.id === id)?.valor ?? null
   const itens: Lancamento[] = []
   for (const m of realizadas(entrada.manutencoes, periodo)) itens.push({ fonte: 'manutencao', dia: diaSP(m.dataManutencao ?? m.criadoEm)!, veiculoId: m.veiculo?.id, valor: m.valor })
   for (const m of multasNoPeriodo(entrada.multas, periodo)) {
     const valor = valorInfracao(m.infracaoId)
-    if (m.status === MULTA.FINALIZADO && valor === null) continue
+    // Cancelada não é custo (a multa foi anulada); finalizada sem valor também fica de fora.
+    if (m.status === MULTA.CANCELADA || (m.status === MULTA.FINALIZADO && valor === null)) continue
     itens.push({ fonte: 'multas', dia: diaSP(m.dataHora ?? m.criadoEm)!, veiculoId: m.veiculo?.id, valor })
   }
   for (const d of entrada.despesasCombustivel) if (d.categoria === 'combustivel' && d.dia && d.dia >= periodo.de && d.dia <= periodo.ate) itens.push({ fonte: 'combustivel', dia: d.dia, veiculoId: d.veiculo?.id, valor: d.valor })
