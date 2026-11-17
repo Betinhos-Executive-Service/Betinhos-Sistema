@@ -122,9 +122,10 @@ export function validateIdentity(env: AppEnv, idToken: string | undefined): Iden
     throw new EntraError('id_token emitido para outro aplicativo.', 'wrong_audience', 403)
   }
   const email = String(claims.email ?? claims.preferred_username ?? claims.upn ?? '').toLowerCase()
-  const domain = env.ALLOWED_EMAIL_DOMAIN.toLowerCase().replace(/^@/, '')
-  if (!email.endsWith(`@${domain}`)) {
-    throw new EntraError(`Só contas @${domain} são aceitas.`, 'wrong_domain', 403)
+  // Lista separada por vírgula (ex.: betinhos.com.br,betinhos.onmicrosoft.com).
+  const domains = env.ALLOWED_EMAIL_DOMAIN.split(',').map((d) => d.trim().toLowerCase().replace(/^@/, '')).filter(Boolean)
+  if (!domains.some((d) => email.endsWith(`@${d}`))) {
+    throw new EntraError(`Só contas ${domains.map((d) => `@${d}`).join(' ou ')} são aceitas.`, 'wrong_domain', 403)
   }
   const oid = String(claims.oid ?? claims.sub ?? '')
   if (!oid) throw new EntraError('id_token sem identificador do usuário.', 'invalid_id_token')

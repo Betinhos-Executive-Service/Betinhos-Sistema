@@ -19,7 +19,7 @@
     "ENTRA_TENANT_ID": "bed8b3ad-d487-4193-a748-09e16f0e0327",
     "ENTRA_CLIENT_ID": "95d58342-4382-4315-940f-9277dc687d4f",
     "MCP_RESOURCE": "https://mcp-dataverse.betinhosexecutiveservice.workers.dev",
-    "ALLOWED_EMAIL_DOMAIN": "betinhos.com.br",
+    "ALLOWED_EMAIL_DOMAIN": "betinhos.com.br,betinhos.onmicrosoft.com",
     "DV_URL_DEV": "https://org23b93544.crm2.dynamics.com",
     "DV_URL_TEST": "https://appbetinhostest.crm2.dynamics.com",
     "DV_URL_PROD": "https://orgf261ae8e.crm2.dynamics.com"

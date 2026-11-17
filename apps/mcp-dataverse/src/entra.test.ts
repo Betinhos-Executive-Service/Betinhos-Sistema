@@ -24,6 +24,12 @@ describe('validateIdentity', () => {
     expect(() => validateIdentity(env, idToken({ email: 'a@gmail.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
     expect(() => validateIdentity(env, idToken({ email: 'a@evilbetinhos.com.br' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
   })
+
+  it('aceita qualquer domínio da lista separada por vírgula', () => {
+    const multi = { ...env, ALLOWED_EMAIL_DOMAIN: 'betinhos.com.br, betinhos.onmicrosoft.com' }
+    expect(validateIdentity(multi, idToken({ email: 'renan@betinhos.onmicrosoft.com' })).email).toBe('renan@betinhos.onmicrosoft.com')
+    expect(() => validateIdentity(multi, idToken({ email: 'a@onmicrosoft.com' }))).toThrowError(expect.objectContaining({ code: 'wrong_domain' }))
+  })
   it('recusa id_token ausente', () => {
     expect(() => validateIdentity(env, undefined)).toThrow(EntraError)
   })
