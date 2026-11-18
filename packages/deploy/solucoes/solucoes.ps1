@@ -390,11 +390,24 @@ function Restore-Estados($Dv, [string] $Alvo, $Foto, [switch] $DesligarNovos, $A
     $stepsAgora[$id] = [int] $s.statecode; $nomes[$id] = [string] $s.name
   }
   $naFoto = @{}
+  # Fluxo aposentado que a foto tinha ligado e o import desligou: so religa se o substituto nao ficar ligado (decidido depois
+  # de restaurar o substituto). Religar para desligar em seguida falha quando a versao gerenciada nao ativa mais: caso real no
+  # PROD em 18/11/2026, os 3 flows de multa com e-mail invalido (a correcao estava na camada Active que a remocao apagou).
+  $substitutoDe = @{}
+  foreach ($a in @($Aposentados)) { $substitutoDe[[string] $a.nome] = [string] $a.substituto }
+  $adiados = @()
   foreach ($p in $Foto.fluxos.PSObject.Properties) {
     $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
     if (-not $fluxosAgora.ContainsKey($id) -or $fluxosAgora[$id] -eq $antes) { continue }
+    if ($antes -eq 1 -and $substitutoDe.ContainsKey($nomes[$id])) { $adiados += [pscustomobject]@{ Id = $id; Nome = [string] $p.Value.nome; Antes = $antes }; continue }
     try { Set-EstadoDv $Dv $Alvo "workflows" $id $antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $id; nome = [string] $p.Value.nome; de = $fluxosAgora[$id]; para = $antes }; $fluxosAgora[$id] = $antes }
     catch { $falhas += "fluxo $($p.Value.nome) ($id): $(Get-ErroDv $_)" }
+  }
+  foreach ($d in $adiados) {
+    $substituto = $substitutoDe[$nomes[$d.Id]]
+    if (@($fluxosAgora.Keys | Where-Object { $nomes[$_] -eq $substituto -and $fluxosAgora[$_] -eq 1 }).Count) { continue }
+    try { Set-EstadoDv $Dv $Alvo "workflows" $d.Id $d.Antes; $mudancas += [ordered]@{ tipo = "fluxo"; id = $d.Id; nome = $d.Nome; de = $fluxosAgora[$d.Id]; para = $d.Antes }; $fluxosAgora[$d.Id] = $d.Antes }
+    catch { $falhas += "fluxo $($d.Nome) ($($d.Id)): $(Get-ErroDv $_)" }
   }
   foreach ($p in $Foto.steps.PSObject.Properties) {
     $id = $p.Name.ToLowerInvariant(); $antes = [int] $p.Value.estado; $naFoto[$id] = $true
