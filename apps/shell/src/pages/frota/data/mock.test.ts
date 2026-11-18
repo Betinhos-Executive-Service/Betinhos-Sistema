@@ -93,4 +93,10 @@ describe('mock das manutenções', () => {
     expect((await source.buscarFuncionarios('ana')).map((o) => o.id)).toEqual(['f1'])
     expect((await source.buscarCidades('')).length).toBeGreaterThan(1)
   })
+
+  it('busca de veículos acha por placa ou modelo e esconde os vendidos', async () => {
+    const source = createMockSource()
+    expect(await source.buscarVeiculos('virtus')).toEqual([{ id: 'v2', nome: 'TST2B22 · Virtus' }])
+    expect((await source.buscarVeiculos('tst')).map((o) => o.id)).not.toContain('v3')
+  })
 })

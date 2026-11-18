@@ -116,6 +116,7 @@ const COLLECTION: Record<Kind, 'manutencoes' | 'multas' | 'colisoes'> = { manute
 const FIELD_TO_PROP: Record<string, string> = {
   cr40f_agendarpara: 'agendarPara', cr40f_datamanutencao: 'dataManutencao', cr40f_valor: 'valor', cr40f_estabelecimento: 'estabelecimento', cr40f_servicorealizado: 'servicoRealizado', cr40f_comentariosdoaprovador: 'comentarioAprovador',
   cr40f_datadeavisoaocondutor: 'dataAviso', cr40f_datadeindicacao: 'dataIndicacao', cr40f_indicado: 'indicado', new_valorguia: 'valorGuia', new_recursopendente: 'recursoPendente', cr40f_vencimento: 'vencimento', cr40f_valorcomdesconto: 'valorComDesconto',
+  cr40f_kmatual: 'km', cr40f_graudamanutencao: 'grau', cr40f_tipodoreparo: 'tipo', cr40f_janelainicio: 'janelaInicio', cr40f_janelafim: 'janelaFim', cr40f_kmrealizado: 'kmRealizado',
   [CAMPO.origem]: 'origemClassificacao', [CAMPO.confianca]: 'confiancaIa', [CAMPO.descricao]: 'descricao',
 }
 
@@ -203,6 +204,10 @@ export function createMockSource(): DataSource {
         if (key === STATUS_FIELD[kind]) record.status = value
         else if (FIELD_TO_PROP[key]) record[FIELD_TO_PROP[key]] = value
         else if (MULTI_TO_PROP[key]) record[MULTI_TO_PROP[key]] = lerMulti(value)
+        else if (key === 'cr40f_Placa_Carro@odata.bind') {
+          const veiculo = data.veiculos.find((v) => String(value).includes(v.id))
+          if (veiculo) record.veiculo = { id: veiculo.id, label: veiculo.placa }
+        } else if (key === 'cr40f_Solicitado_por@odata.bind') record.solicitante = pessoas.find((p) => String(value).includes(p.id)) ?? record.solicitante
       }
     },
     async openForm(kind, id) {
@@ -376,6 +381,12 @@ export function createMockSource(): DataSource {
     async buscarFuncionarios(texto) {
       await delay()
       return pessoas.filter((p) => contem(p.label, texto)).map((p) => ({ id: p.id, nome: p.label }))
+    },
+    async buscarVeiculos(texto) {
+      await delay()
+      return data.veiculos
+        .filter((v) => v.status !== VEICULO.VENDIDO && (contem(v.placa, texto) || contem(v.modelo ?? '', texto)))
+        .map((v) => ({ id: v.id, nome: [v.placa, v.modelo].filter(Boolean).join(' · ') }))
     },
     async buscarCidades(texto) {
       await delay()

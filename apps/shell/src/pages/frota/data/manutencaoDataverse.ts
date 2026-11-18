@@ -4,7 +4,7 @@ import { chamarCustomApi } from './customApi'
 import type { DateBehavior } from './dates'
 import { programarPatch } from '../../geral/domain/commands'
 import { cleanId, guid, mapDetalheManutencao, ref, SELECT_DETALHE_MANUTENCAO } from './mappers'
-import { ANEXO_DESPESA, ENTITY_SET, MANUT, TABLE } from './schema'
+import { ANEXO_DESPESA, ENTITY_SET, MANUT, TABLE, VEICULO } from './schema'
 import { FOTO_MAX_BYTES, fileToBase64 } from './sharepoint'
 import type { ArquivosManutencao, ComandosManutencao } from './source'
 import type { DespesaDaManutencao, ProgramacaoManutencao } from './types'
@@ -249,6 +249,14 @@ export function criarArquivosXrm(deps: DepsXrm): ArquivosManutencao {
       const filtro = `statecode eq 0 and cr40f_status eq 0${texto.trim() ? ` and contains(cr40f_nomecompleto,'${termo(texto)}')` : ''}`
       const r = await api.retrieveMultipleRecords('cr40f_funcionarios', `?$select=cr40f_funcionariosid,cr40f_nomecompleto&$filter=${filtro}&$orderby=cr40f_nomecompleto asc&$top=50`)
       return r.entities.map((row) => ({ id: cleanId(row.cr40f_funcionariosid), nome: String(row.cr40f_nomecompleto ?? '') })).filter((o) => o.nome)
+    },
+
+    async buscarVeiculos(texto) {
+      const busca = texto.trim() ? ` and (contains(cr40f_placa,'${termo(texto)}') or contains(cr40f_modelo,'${termo(texto)}'))` : ''
+      const r = await api.retrieveMultipleRecords(TABLE.veiculos, `?$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo&$filter=statecode eq 0 and cr40f_statusdoveiculo ne ${VEICULO.VENDIDO}${busca}&$orderby=cr40f_placa asc&$top=50`)
+      return r.entities
+        .map((row) => ({ id: cleanId(row.cr40f_veiculosid), nome: [row.cr40f_placa, row.cr40f_modelo].filter((v): v is string => typeof v === 'string' && v !== '').join(' · ') }))
+        .filter((o) => o.nome)
     },
 
     async buscarCidades(texto) {
