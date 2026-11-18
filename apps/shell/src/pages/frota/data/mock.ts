@@ -112,6 +112,8 @@ function seed(): FrotaData {
   }
 }
 
+/** Id de um `@odata.bind` do mock (`/conjunto(id)`). */
+const idDoBind = (value: unknown) => /\(([^)]+)\)$/.exec(String(value))?.[1]
 const COLLECTION: Record<Kind, 'manutencoes' | 'multas' | 'colisoes'> = { manutencao: 'manutencoes', multa: 'multas', colisao: 'colisoes' }
 const FIELD_TO_PROP: Record<string, string> = {
   cr40f_agendarpara: 'agendarPara', cr40f_datamanutencao: 'dataManutencao', cr40f_valor: 'valor', cr40f_estabelecimento: 'estabelecimento', cr40f_servicorealizado: 'servicoRealizado', cr40f_comentariosdoaprovador: 'comentarioAprovador',
@@ -205,9 +207,10 @@ export function createMockSource(): DataSource {
         else if (FIELD_TO_PROP[key]) record[FIELD_TO_PROP[key]] = value
         else if (MULTI_TO_PROP[key]) record[MULTI_TO_PROP[key]] = lerMulti(value)
         else if (key === 'cr40f_Placa_Carro@odata.bind') {
-          const veiculo = data.veiculos.find((v) => String(value).includes(v.id))
+          const veiculo = data.veiculos.find((v) => v.id === idDoBind(value))
           if (veiculo) record.veiculo = { id: veiculo.id, label: veiculo.placa }
-        } else if (key === 'cr40f_Solicitado_por@odata.bind') record.solicitante = pessoas.find((p) => String(value).includes(p.id)) ?? record.solicitante
+        } else if (key === 'cr40f_Solicitado_por@odata.bind') record.solicitante = pessoas.find((p) => p.id === idDoBind(value)) ?? record.solicitante
+        else if (kind === 'manutencao' && key === 'cr40f_comentariosaomotorista') extra(id).comentarioAoMotorista = value as string | null
       }
     },
     async openForm(kind, id) {

@@ -41,15 +41,16 @@ export function EditarManutencaoForm({ source, m, onSalvo, onVoltar, onDesatuali
 
   async function salvar() {
     if (salvando || !sujo) return
-    const janelaMudou = valores.janelaInicio !== inicial.janelaInicio || valores.janelaFim !== inicial.janelaFim
-    let comportamentos = {}
-    if (janelaMudou) {
-      try { comportamentos = await source.dateBehaviors('manutencao') } catch { /* a coluna é só data: vale o padrão */ }
-    }
-    const leitura = lerEdicao(inicial, valores, conclusao, comportamentos)
+    const leitura = lerEdicao(inicial, valores, conclusao)
     setErros(leitura.erros)
     if (Object.keys(leitura.erros).length || !Object.keys(leitura.patch).length) return
-    await gravar(() => source.update('manutencao', m.id, leitura.patch), onSalvo)
+    const janelaMudou = 'cr40f_janelainicio' in leitura.patch || 'cr40f_janelafim' in leitura.patch
+    // Dentro do gravar: já em "salvando" (Salvar em loading, gaveta não fecha) enquanto lê o DateBehavior da janela.
+    await gravar(async () => {
+      // A coluna é só data: sem a leitura, vale o padrão.
+      const comportamentos = janelaMudou ? await source.dateBehaviors('manutencao').catch(() => ({})) : {}
+      await source.update('manutencao', m.id, janelaMudou ? lerEdicao(inicial, valores, conclusao, comportamentos).patch : leitura.patch)
+    }, onSalvo)
   }
 
   return (
@@ -79,7 +80,7 @@ export function EditarManutencaoForm({ source, m, onSalvo, onVoltar, onDesatuali
             <Select options={OPCOES_GRAU} searchable={false} clearable={false} placeholder="Selecione" value={valores.grau || null} onChange={(v) => set({ grau: v ?? '' })} />
           </Field>
           <Field className="frota-fields__wide" label="Comentário ao motorista" error={erros.comentario} disabled={salvando}>
-            <Textarea rows={2} maxLength={LIMITE.comentarioAprovador} value={valores.comentario} onChange={texto('comentario')} />
+            <Textarea rows={2} maxLength={LIMITE.comentarioAoMotorista} value={valores.comentario} onChange={texto('comentario')} />
           </Field>
         </div>
       </Bloco>

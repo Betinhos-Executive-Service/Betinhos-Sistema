@@ -32,13 +32,14 @@ function dataHoraLocal(iso: string | null) {
 
 export function valoresEdicaoIniciais(m: DetalheManutencao): ValoresEdicao {
   return {
-    veiculoId: m.veiculo?.id ?? '', solicitanteId: m.solicitante?.id ?? '', descricao: m.descricao, km: texto(m.km), tipo: texto(m.tipo), grau: texto(m.grau), comentario: m.comentarioAprovador ?? '',
+    veiculoId: m.veiculo?.id ?? '', solicitanteId: m.solicitante?.id ?? '', descricao: m.descricao, km: texto(m.km), tipo: texto(m.tipo), grau: texto(m.grau), comentario: m.comentarioAoMotorista ?? '',
     janelaInicio: m.janelaInicio ?? '', janelaFim: m.janelaFim ?? '',
     dataManutencao: dataHoraLocal(m.dataManutencao), kmRealizado: texto(m.kmRealizado), valor: m.valor === null ? '' : m.valor.toFixed(2), estabelecimento: m.estabelecimento ?? '', servicoRealizado: m.servicoRealizado ?? '',
   }
 }
 
-export const houveEdicao = (inicial: ValoresEdicao, atual: ValoresEdicao) => (Object.keys(inicial) as (keyof ValoresEdicao)[]).some((k) => inicial[k] !== atual[k])
+/** Compara sem os espaços das pontas, como `lerEdicao`: só espaço não conta como alteração (nem liga o Salvar, nem pede descarte). */
+export const houveEdicao = (inicial: ValoresEdicao, atual: ValoresEdicao) => (Object.keys(inicial) as (keyof ValoresEdicao)[]).some((k) => inicial[k].trim() !== atual[k].trim())
 
 function lerValor(bruto: string) {
   const numero = Number(bruto.trim().replace(',', '.'))
@@ -77,8 +78,8 @@ export function lerEdicao(inicial: ValoresEdicao, atual: ValoresEdicao, conclusa
   lerCampoKm('km', 'cr40f_kmatual', 'Informe o km (número inteiro)')
 
   const comentario = atual.comentario.trim()
-  if (comentario.length > LIMITE.comentarioAprovador) erros.comentario = `Máximo de ${LIMITE.comentarioAprovador} caracteres`
-  else if (mudou('comentario')) patch.cr40f_comentariosdoaprovador = comentario || null
+  if (comentario.length > LIMITE.comentarioAoMotorista) erros.comentario = `Máximo de ${LIMITE.comentarioAoMotorista} caracteres`
+  else if (mudou('comentario')) patch.cr40f_comentariosaomotorista = comentario || null
 
   if (mudou('janelaInicio') || mudou('janelaFim')) {
     const { janelaInicio: inicio, janelaFim: fim } = atual

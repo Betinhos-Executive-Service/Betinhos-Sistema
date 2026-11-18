@@ -40,7 +40,7 @@ describe('EditarManutencaoForm', () => {
     await waitFor(() => expect(onSalvo).toHaveBeenCalled())
     expect(update).toHaveBeenCalledTimes(1)
     expect(update).toHaveBeenCalledWith('manutencao', 'm1', {
-      cr40f_descricao: 'Freio com ruído forte', cr40f_kmatual: 123456, cr40f_comentariosdoaprovador: 'Levar cedo', cr40f_janelainicio: '2026-11-23', cr40f_janelafim: '2026-11-29',
+      cr40f_descricao: 'Freio com ruído forte', cr40f_kmatual: 123456, cr40f_comentariosaomotorista: 'Levar cedo', cr40f_janelainicio: '2026-11-23', cr40f_janelafim: '2026-11-29',
     })
   })
 
