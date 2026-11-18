@@ -204,6 +204,15 @@
 .frota-guia__passo { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .frota-guia__passo h3 { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); }
 .frota-guia__feitos { display: grid; gap: var(--bt-space-1); margin: 0; padding-left: var(--bt-space-4); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.frota-gaveta-corpo { display: grid; gap: var(--bt-space-4); min-width: 0; }
+.frota-cabecalho { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.frota-bloco { display: grid; gap: var(--bt-space-3); min-width: 0; padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); }
+.frota-bloco[data-destaque] { background: var(--bt-color-surface); border-color: var(--bt-color-border-strong); }
+.frota-bloco__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.frota-bloco__citacao { margin: 0; font-size: var(--bt-font-size-14); }
+.frota-linha-tempo { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-13); }
+.frota-linha-tempo li { position: relative; padding-left: var(--bt-space-4); }
+.frota-linha-tempo li::before { content: ''; position: absolute; left: 0; top: .5em; width: 8px; height: 8px; border-radius: 50%; background: var(--bt-color-border-strong); }
 .frota-etapas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
 .frota-etapas__item { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-2); border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
 .frota-etapas__item b { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: var(--bt-font-size-11); }
