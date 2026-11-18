@@ -5,8 +5,9 @@
 //
 //   node exportar-dataverse.mjs <pasta-saida>
 //
-// Tabelas: todas as personalizadas (cr40f_, new_ e demais), menos as virtuais, mais as padrão de BACKUP_TABELAS_EXTRA
-// (vírgula; padrão account,contact). Nunca exporta cr40f_segredo (segredos não saem do Dataverse) nem o que estiver em
+// Tabelas: as da Betinhos (prefixos cr40f_ e new_), menos as virtuais, mais as padrão de BACKUP_TABELAS_EXTRA
+// (vírgula; padrão account,contact). As personalizadas da plataforma (sem prefixo, msdyn_) ficam fora: várias o
+// Dataverse nem deixa ler. Nunca exporta cr40f_segredo (segredos não saem do Dataverse) nem o que estiver em
 // BACKUP_TABELAS_EXCLUIR. Falha numa tabela não para as outras: fica no manifesto e o processo sai com código 1.
 // Não imprime registros, só nomes de tabela e contagens.
 import { once } from 'node:events'
@@ -17,6 +18,7 @@ import { createGzip } from 'node:zlib'
 
 export const SEMPRE_EXCLUIR = ['cr40f_segredo']
 const EXTRA_PADRAO = ['account', 'contact']
+const PREFIXOS = ['cr40f_', 'new_']
 const API = 'api/data/v9.2'
 
 const rotulo = (label) => label?.UserLocalizedLabel?.Label || label?.LocalizedLabels?.[0]?.Label || undefined
@@ -29,7 +31,7 @@ export function escolherTabelas(definicoes, { extra = EXTRA_PADRAO, excluir = []
   return definicoes
     .filter((d) => d.EntitySetName && !fora.has(d.LogicalName))
     .filter((d) => d.TableType !== 'Virtual')
-    .filter((d) => d.IsCustomEntity === true || dentro.has(d.LogicalName))
+    .filter((d) => PREFIXOS.some((p) => d.LogicalName.startsWith(p)) || dentro.has(d.LogicalName))
     .map((d) => ({ logico: d.LogicalName, conjunto: d.EntitySetName, nome: rotulo(d.DisplayName) ?? d.LogicalName, chave: d.PrimaryIdAttribute }))
     .sort((a, b) => a.logico.localeCompare(b.logico))
 }
@@ -125,7 +127,7 @@ async function principal(pasta) {
     'OData-Version': '4.0',
     Prefer: 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
   }
-  const definicoes = await obter(`${base}/${API}/EntityDefinitions?$select=LogicalName,EntitySetName,IsCustomEntity,TableType,DisplayName,PrimaryIdAttribute`, cabecalhos)
+  const definicoes = await obter(`${base}/${API}/EntityDefinitions?$select=LogicalName,EntitySetName,TableType,DisplayName,PrimaryIdAttribute`, cabecalhos)
   const extra = process.env.BACKUP_TABELAS_EXTRA === undefined ? EXTRA_PADRAO : lista(process.env.BACKUP_TABELAS_EXTRA)
   const tabelas = escolherTabelas(definicoes.value ?? [], { extra, excluir: lista(process.env.BACKUP_TABELAS_EXCLUIR) })
 
