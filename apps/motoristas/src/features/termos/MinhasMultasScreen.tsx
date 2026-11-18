@@ -62,7 +62,7 @@ function MultaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa:
       {multa.infracao ? <span className="multa-card-local">{multa.infracao}</span> : null}
       <span className="termo-badge" data-tone={multa.grupo === "precisa" ? "atencao" : multa.grupo === "encerrada" ? "neutro" : "sucesso"}>{multa.situacao}</span>
       {parcelas.length ? (
-        <ul className="multa-parcelas" aria-label="Parcelas do desconto em folha">
+        <ul className="multa-parcelas" data-tour="multas-parcelas" aria-label="Parcelas do desconto em folha">
           {parcelas.map((p) => <li key={p.numero}>{descreverParcela(p, parcelas.length)}</li>)}
         </ul>
       ) : null}
@@ -84,7 +84,7 @@ function MultaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa:
 
 function Grupo({ titulo, itens, destaque, ...resto }: { titulo: string; itens: MinhaMulta[]; destaque?: boolean; somenteLeitura: boolean; onAbrirTermo: (m: MinhaMulta) => void; onDeclarar: (id: string) => Promise<void> }) {
   return (
-    <section className="multa-grupo" data-destaque={destaque || undefined} aria-label={titulo}>
+    <section className="multa-grupo" data-destaque={destaque || undefined} data-tour={destaque ? "multas-precisa" : undefined} aria-label={titulo}>
       <h2 className="multa-grupo-titulo">{titulo}<span className="termo-tab-count">{itens.length}</span></h2>
       <ul className="termo-list">{itens.map((m) => <MultaCard key={m.id} multa={m} {...resto} />)}</ul>
     </section>

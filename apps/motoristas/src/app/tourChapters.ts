@@ -613,15 +613,18 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     title: "Multas",
     steps: [
       step("voltar", "Voltar", ["Volta para a tela anterior."], { target: SERVICE_HOME }),
-      step("abas", "Pendentes e Concluídos", [
-        "Pendentes: termos esperando a sua assinatura. Concluídos: os que você já assinou, contestou ou que expiraram. O número mostra quantos há em cada aba."
-      ], { target: ".termo-tab", within: "parent" }),
-      step("termo", "O termo", [
-        "Cada linha mostra a placa, o código da infração, a descrição, a data e hora, o valor e o prazo para assinar (\"Assine até\")."
-      ], { target: ".termo-row", optional: true }),
-      step("prazo", "Prazo", [
-        "Assine dentro do prazo. Passado o prazo, o termo expira e você precisa falar com o gestor de frota."
-      ], { target: ".termo-row", optional: true }),
+      step("precisa", "Precisa de você", [
+        "Multas que precisam de você aparecem aqui"
+      ], { target: dt("multas-precisa"), optional: true }),
+      step("termo", "Termo da multa", [
+        "Assine o termo ou conteste pelo app"
+      ], { target: ".termo-primary", match: "^Abrir termo$", optional: true }),
+      step("aceite", "Aceite na CNH Digital", [
+        "Quando a empresa indicar você no órgão, aceite na CNH Digital e toque em Já aceitei"
+      ], { target: dt("multas-aceite"), optional: true }),
+      step("parcelas", "Parcelas", [
+        "Acompanhe o desconto de cada parcela"
+      ], { target: dt("multas-parcelas"), optional: true }),
       helpStep()
     ]
   },

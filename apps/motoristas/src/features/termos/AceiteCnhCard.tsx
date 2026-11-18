@@ -33,7 +33,7 @@ export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
   };
 
   return (
-    <div className="multa-aceite">
+    <div className="multa-aceite" data-tour="multas-aceite">
       <p className="termo-help">{textoAceite(multa.auto, multa.prazoAceite)}</p>
       {registrado ? <p className="termo-alert" data-tone="sucesso" role="status">Aceite registrado. O gestor vai conferir; atualize a lista para ver a situação.</p> : <button type="button" className="termo-primary" disabled={enviando || semConexao} aria-busy={enviando || undefined} onClick={() => void declarar()}>
         {semConexao ? SEM_CONEXAO_TEXTO : enviando ? "Registrando" : "Já aceitei"}
