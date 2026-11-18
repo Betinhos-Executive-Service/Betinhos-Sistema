@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { usuarioDoAccess } from '../src/acesso.mjs'
-import { agrupar, tamanho } from '../src/pagina.mjs'
+import { agrupar, haQuanto, paginaHtml, tamanho } from '../src/pagina.mjs'
 import worker from '../src/worker.mjs'
 
 const b64url = (dados) => Buffer.from(dados).toString('base64url')
@@ -55,36 +55,47 @@ test('agrupa por tipo, mais nova primeiro, e ignora arquivo fora do padrão', ()
   assert.equal(tamanho(5 * 1024 ** 2), '5,0 MB')
 })
 
+const gravados = []
 const bucket = {
   async list({ prefix }) {
+    if (prefix === 'registros/downloads/') return { truncated: false, objects: [{ key: `registros/downloads/${String(1e13 - Date.UTC(2026, 10, 18, 12, 0)).padStart(13, '0')}-ab`, customMetadata: { email: 'bia@betinhos.com.br', chave: 'diario/betinhos-prod-20261117-0323.zip' } }] }
     return { truncated: false, objects: prefix === 'diario/' ? [{ key: 'diario/betinhos-prod-20261118-0323.zip', size: 2048 }] : [] }
   },
   async get(chave) {
     return chave === 'diario/betinhos-prod-20261118-0323.zip' ? { body: 'ZIP', size: 3 } : null
   },
+  async put(chave, corpo, op) { gravados.push({ chave, ...op.customMetadata }) },
 }
+const ctx = { pendentes: [], waitUntil(p) { this.pendentes.push(p) } }
 
 test('página: 403 sem login, lista e baixa com login, recusa chave fora do padrão', async () => {
   const env = { ...ENV, BACKUPS: bucket }
   const op = { fetchFn: certs }
-  assert.equal((await worker.fetch(pedido(null), env, {}, op)).status, 403)
+  assert.equal((await worker.fetch(pedido(null), env, ctx, op)).status, 403)
   const token = await jwt({})
-  const pagina = await worker.fetch(pedido(token), env, {}, op)
+  const pagina = await worker.fetch(pedido(token), env, ctx, op)
   assert.equal(pagina.status, 200)
   const html = await pagina.text()
   assert.match(html, /18\/11\/2026 às 03:23/)
   assert.match(html, /ana@gmail\.com/)
-  const zip = await worker.fetch(pedido(token, '/baixar/diario/betinhos-prod-20261118-0323.zip'), env, {}, op)
+  const zip = await worker.fetch(pedido(token, '/baixar/diario/betinhos-prod-20261118-0323.zip'), env, ctx, op)
   assert.equal(zip.status, 200)
   assert.match(zip.headers.get('Content-Disposition'), /attachment; filename="betinhos-prod-20261118-0323.zip"/)
   assert.equal(await zip.text(), 'ZIP')
-  assert.equal((await worker.fetch(pedido(token, '/baixar/..%2Fsegredo'), env, {}, op)).status, 404)
+  await Promise.all(ctx.pendentes)
+  assert.equal(gravados.at(-1).email, 'ana@gmail.com')
+  assert.match(gravados.at(-1).chave, /^diario\/betinhos-prod-20261118-0323\.zip$/)
+  assert.match(html, /bia@betinhos\.com\.br<small>[^<]*cópia de 17\/11\/2026 às 03:23/)
+  const n = gravados.length
+  await worker.fetch(new Request('https://backups-betinhos.x.workers.dev/baixar/diario/betinhos-prod-20261118-0323.zip', { method: 'HEAD', headers: { 'Cf-Access-Jwt-Assertion': token } }), env, ctx, op)
+  assert.equal(gravados.length, n)
+  assert.equal((await worker.fetch(pedido(token, '/baixar/..%2Fsegredo'), env, ctx, op)).status, 404)
 })
 
 test('DEV_SEM_LOGIN só vale em localhost', async () => {
   const env = { DEV_SEM_LOGIN: '1', BACKUPS: bucket }
-  assert.equal((await worker.fetch(new Request('http://localhost:52431/'), env, {})).status, 200)
-  assert.equal((await worker.fetch(pedido(null), env, {})).status, 403)
+  assert.equal((await worker.fetch(new Request('http://localhost:52431/'), env, ctx)).status, 200)
+  assert.equal((await worker.fetch(pedido(null), env, ctx)).status, 403)
 })
 
 test('kid novo fora do cache: busca as chaves de novo (troca de chave do Access)', async () => {
@@ -93,4 +104,25 @@ test('kid novo fora do cache: busca as chaves de novo (troca de chave do Access)
   const jwk2 = { ...(await crypto.subtle.exportKey('jwk', nova.publicKey)), kid: 'k2' }
   const certs2 = async () => new Response(JSON.stringify({ keys: [jwk, jwk2] }))
   assert.equal(await usuarioDoAccess(pedido(await jwt({}, { kid: 'k2', chave: nova.privateKey })), ENV, { fetchFn: certs2 }), 'ana@gmail.com')
+})
+
+test('destaque: em dia, parado há mais de 2 dias e vazio; uso do espaço', () => {
+  const grupos = agrupar([{ key: 'diario/betinhos-prod-20261118-0323.zip', size: 512 * 1024 ** 2 }, { key: 'semanal/betinhos-prod-20261118-0323.zip', size: 512 * 1024 ** 2 }])
+  const feita = Date.UTC(2026, 10, 18, 6, 23)
+  const emDia = paginaHtml({ grupos, email: 'a', versao: 'v', agora: feita + 5 * 3600_000 })
+  assert.match(emDia, /Backup em dia/)
+  assert.match(emDia, /há 5 h · 512,0 MB/)
+  assert.match(emDia, /Espaço usado: 1,0 GB de 10 GB/)
+  assert.match(emDia, /Cópias anteriores<span class="n">0</)
+  assert.match(paginaHtml({ grupos, email: 'a', versao: 'v', downloads: [{ ms: feita, email: 'x', chave: 'mensal/betinhos-prod-20261101-0323.zip' }] }), /cópia de 01\/11\/2026 às 03:23/)
+  assert.doesNotMatch(emDia, /role="alert"/)
+  const parado = paginaHtml({ grupos, email: 'a', versao: 'v', agora: feita + 3 * 86400_000 })
+  assert.match(parado, /Backup parado/)
+  assert.match(parado, /role="alert"/)
+  const vazio = paginaHtml({ grupos: agrupar([]), email: 'a', versao: 'v' })
+  assert.match(vazio, /Nenhuma cópia ainda/)
+  assert.doesNotMatch(vazio, /class="botao"/)
+  assert.match(vazio, /Espaço usado: 0 MB/)
+  assert.equal(haQuanto(30_000), 'agora há pouco')
+  assert.equal(haQuanto(50 * 3600_000), 'há 2 dias')
 })
