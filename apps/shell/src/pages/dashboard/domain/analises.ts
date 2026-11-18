@@ -70,7 +70,8 @@ export function totalProduzido(ctx: Contexto, cmp: Comparacao): TotalProduzido {
 }
 
 export type LinhaMeta = { mes: string; rotulo: string; meta: number; real: number; pct: number; tom: 'success' | 'info' | 'warning' }
-export type MetaRealizado = Destaque & { linhas: LinhaMeta[] }
+/** `atingimento`: realizado ÷ meta do período todo (pct em %, tom pelos limites de `tomMeta`); nulo sem meta. */
+export type MetaRealizado = Destaque & { linhas: LinhaMeta[]; atingimento: { pct: number; tom: LinhaMeta['tom']; meta: string } | null }
 
 /** Limites do atingimento: a partir de 100% da meta o mês está em dia, abaixo de 80% pede atenção. */
 export const tomMeta = (pct: number): LinhaMeta['tom'] => (pct >= 100 ? 'success' : pct >= 80 ? 'info' : 'warning')
@@ -94,9 +95,10 @@ export function metaRealizado(ctx: Contexto, cmp: Comparacao): MetaRealizado {
   return {
     linhas,
     valor: brlS(totalReal),
-    sub: `${meses.length} meses · ${dec(pct, 1)}% da meta`,
+    sub: `${meses.length} meses`,
     chips: naoNulos([chipValor('LY', totalReal, cmp.lyValor, brlS)]),
-    apoio: totalMeta > 0 ? [{ rotulo: 'Meta', texto: `${brlS(totalMeta)} · ${pct.toFixed(0)}%${pct >= 100 ? ' atingida' : ''}`, atencao: pct < 100 }] : [],
+    apoio: [],
+    atingimento: totalMeta > 0 ? { pct, tom: tomMeta(pct), meta: brlS(totalMeta) } : null,
   }
 }
 

@@ -136,6 +136,12 @@ describe('componentes do Dashboard', () => {
     expect(screen.queryByText('s/dado')).toBeNull()
   })
 
+  it('card de análise mostra o selo no topo e a frase de apoio', () => {
+    render(<AnaliseCard titulo="Meta" periodo="p" unidade="R$" valor="R$ 10,00" delta={<span>82,0% da meta</span>} hint="Meta R$ 12,2k · vs R$ 9,0k no ano anterior" />)
+    expect(screen.getByText('82,0% da meta')).toBeTruthy()
+    expect(screen.getByText(/vs R\$ 9,0k no ano anterior/)).toBeTruthy()
+  })
+
   it('apoio em atenção tem ícone e texto "Atenção:" além da cor', () => {
     const { container, rerender } = render(<ApoioTexto apoio={{ rotulo: '% da receita', texto: '12,0% · Alto', atencao: true }} />)
     expect(container.querySelector('svg[aria-hidden="true"]')).not.toBeNull()

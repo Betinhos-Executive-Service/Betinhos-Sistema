@@ -1,27 +1,17 @@
 import { useId } from 'react'
-import { DeltaBadge, ProgressRing, StatCard, Surface } from '@betinhos/ui'
-import { dec } from '../domain/format'
+import { ProgressRing, StatCard, Surface } from '@betinhos/ui'
 import { tomRecebimento } from '../domain/kpis'
-import type { Chip, Kpi, KpiId } from '../domain/types'
+import type { Kpi, KpiId } from '../domain/types'
 import { extrasKpi } from './KpiExtras'
+import { fraseComparativo, separarComparativo, seloComparativo } from './KpiChip'
 import { tendencia, tomKpi } from './KpiLinha'
 
 const ROTULO = 'Indicadores executivos'
 /** Ordem de leitura e de foco: a mesma do bento (herói, anel, os quatro compactos). */
 const ORDEM: KpiId[] = ['faturamento', 'recebimento', 'servicos', 'ticket', 'aReceber', 'cpPendente']
-const FRASE: Record<string, string> = { LY: 'no ano anterior', LM: 'no mês anterior' }
-type ChipValor = Extract<Chip, { tipo: 'valor' }>
-
-/** O comparativo que vira selo no topo do card: o do ano anterior; sem ele, o do mês anterior. Os demais seguem como chip. */
-function separarComparativo(chips: Chip[]) {
-  const valores = chips.filter((c): c is ChipValor => c.tipo === 'valor')
-  const principal = valores.find((c) => c.rotulo === 'LY') ?? valores[0]
-  return { principal, outros: chips.filter((c) => c !== principal) }
-}
 
 function KpiCard({ kpi, onOpen }: { kpi: Kpi; onOpen?: () => void }) {
   const { principal, outros } = separarComparativo(kpi.chips)
-  const sobe = (principal?.variacao ?? 0) >= 0
   const atencao = kpi.id === 'cpPendente' && kpi.apoio.some((a) => a.atencao)
   const serie = tendencia(kpi.serie)
   // O herói mostra o primeiro e o último mês do gráfico (CSS lê os data-*).
@@ -29,8 +19,7 @@ function KpiCard({ kpi, onOpen }: { kpi: Kpi; onOpen?: () => void }) {
   return (
     <StatCard
       className={`dash-bento__${kpi.id}`} label={kpi.rotulo} value={kpi.valor} {...tomKpi(atencao ? 'warning' : 'info')} {...eixo}
-      delta={principal ? <DeltaBadge trend={sobe ? 'up' : 'down'}>{sobe ? '+' : '−'}{dec(Math.abs(principal.variacao), 1)}%</DeltaBadge> : undefined} deltaPlacement="top"
-      hint={principal ? `vs ${principal.anterior} ${FRASE[principal.rotulo] ?? 'no período anterior'}` : undefined}
+      delta={principal && seloComparativo(principal)} deltaPlacement="top" hint={principal && fraseComparativo(principal)}
       {...extrasKpi({ chips: outros, apoio: kpi.apoio })} trend={serie} onOpen={onOpen}
     />
   )

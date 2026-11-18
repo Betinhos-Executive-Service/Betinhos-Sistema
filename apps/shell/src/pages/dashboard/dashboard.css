@@ -267,3 +267,5 @@ button.dash-atencao__linha { cursor: pointer; }
 .dash-carga__trilho { width: min(360px, 100%); height: var(--bt-space-2); overflow: hidden; border-radius: var(--bt-radius-full); background-color: var(--bt-color-border); }
 .dash-carga__barra { height: 100%; border-radius: inherit; background-color: var(--bt-color-action); transition: width 200ms var(--bt-ease-out); }
 @media (prefers-reduced-motion: reduce) { .dash-carga__barra { transition: none; } }
+/* Sparkline do herói no tom action (azul), como no protótipo; o StatCard "info" usa o azul-marinho e um cinza na área. */
+.dash-bento__faturamento .bt-spark { --bt-stat-tone: var(--bt-color-action); --bt-stat-tone-soft: var(--bt-color-action-soft); }

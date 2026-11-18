@@ -14,6 +14,7 @@ const VALOR = '.bt-stat__value, .dash-kpi__valor'
 const ALERTA = '.bt-alert-card, .dash-alerta'
 // 167 px vale para o card sem extras (valor de 26 px, DS 3.1.1); com apoio em 2 linhas ou extras o card cresce
 // (decisão do Renan, 17/11/2026). O teto pega fileira estourada por quebra inesperada.
+// O herói do bento (Faturamento, 2 linhas) fica fora da medida: tem altura própria.
 const TETO_KPI = 190
 
 ;(async () => {
@@ -39,7 +40,7 @@ const TETO_KPI = 190
         return {
           rolagem: document.documentElement.scrollWidth - innerWidth,
           kpis: document.querySelectorAll(KPI).length, alertas: document.querySelectorAll(ALERTA).length,
-          cortados, altKpi: altura(KPI), altAlerta: altura(ALERTA),
+          cortados, altKpi: altura('.bt-stat:not(.dash-bento__faturamento), .dash-kpi'), altAlerta: altura(ALERTA),
         }
       }, { KPI, VALOR, ALERTA })
       linhas.push({ aba, w, ...m, console: console_.splice(0).length })
