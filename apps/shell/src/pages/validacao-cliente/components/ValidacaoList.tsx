@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Checkbox, StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { LoadingTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { fechamentoSugerido, podeMarcarFechamento, prazoVencido, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Linha } from '../domain/types'
@@ -67,7 +67,7 @@ export function ValidacaoTable({ list, hoje, selecionados, onToggle, onOpen, loa
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.vc-open')}>
-      <LoadingTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

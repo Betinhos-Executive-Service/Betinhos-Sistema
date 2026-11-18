@@ -1,6 +1,7 @@
 import { FIRST_PAGE, withFirstPage } from '../../../app/pagedLoad'
 import { emailMicrosoft, FUNCAO_MOTORISTA, semApp } from './semApp'
 import { toDateOnly } from './dates'
+import { chamarCustomApi } from '../../frota/data/customApi'
 import { buildPatch, dateBehaviorsPath, toDateBehaviors, type DateBehavior, type DateBehaviorsResponse, type PatchContext } from './patch'
 import { ENTITY_SET, FIELDS, TABLE, VEICULO_TABLE } from './schema'
 import { createSharePointDocs, nomeComData } from './sharepoint'
@@ -185,19 +186,18 @@ export function createXrmSource(xrm: XrmHost): DataSource {
       await api.updateRecord(TABLE, id, { [field]: null })
     },
 
-    /** Coluna de arquivo: PATCH com o binário e o nome em `x-ms-file-name` (até 128 MB numa só requisição; o limite do aditivo é 10 MB). */
-    async uploadAditivo(id: string, file: File) {
-      const response = await fetch(`${apiUrl}/${ENTITY_SET}(${guid(id, 'funcionário')})/new_aditivoassinatura`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/octet-stream', 'x-ms-file-name': encodeURIComponent(file.name), 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
-        body: file,
-      })
-      if (!response.ok) {
-        let detalhe = ''
-        try { detalhe = ((await response.json()) as { error?: { message?: string } }).error?.message ?? '' } catch { /* corpo vazio */ }
-        throw new Error(detalhe || `Envio recusado pelo Dataverse (${response.status}).`)
-      }
+    async gerarAditivo(id: string) {
+      const payload = await chamarCustomApi(apiUrl, 'new_GerarAditivoMotorista', { new_FuncionarioId: guid(id, 'funcionário') }, 'Não foi possível gerar o aditivo')
+      const pdfBase64 = typeof payload.new_PdfBase64 === 'string' ? payload.new_PdfBase64 : ''
+      if (!pdfBase64) throw new Error('O servidor não devolveu o PDF do aditivo')
+      const nomeArquivo = typeof payload.new_NomeArquivo === 'string' && payload.new_NomeArquivo ? payload.new_NomeArquivo : 'aditivo.pdf'
+      return { pdfBase64, nomeArquivo }
+    },
+
+    async registrarAditivo(id: string, pdfBase64: string, assinadoEm: string) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(assinadoEm)) throw new Error('Informe a data da assinatura.')
+      // Meio-dia UTC: o plugin converte para o dia de Brasília e meia-noite UTC cairia na véspera.
+      await chamarCustomApi(apiUrl, 'new_RegistrarAditivoMotorista', { new_FuncionarioId: guid(id, 'funcionário'), new_PdfBase64: pdfBase64, new_AssinadoEm: `${assinadoEm}T12:00:00Z` }, 'Não foi possível registrar o aditivo')
     },
 
     async saveLogins(id, html) {

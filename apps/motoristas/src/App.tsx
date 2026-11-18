@@ -227,7 +227,7 @@ function App() {
     voucherDrafts
   });
 
-  const { termosMulta, termosStatus, reloadTermosMulta } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
   const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
   const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
   const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
@@ -586,7 +586,10 @@ function App() {
     setScreen,
     setTourTermoId: tour.setTourTermoId,
     termosMulta,
-    termosStatus
+    termosStatus,
+    minhasMultas,
+    minhasMultasOfflineEm,
+    minhasMultasLidoEm
   });
   if (telaTermos) return show(telaTermos);
 
@@ -608,7 +611,7 @@ function App() {
       services={store.agenda}
       pendingComunicados={comunicados.filter(isComunicadoPending).length}
       pendingChecklists={checklists.filter(isChecklistPending).length}
-      pendingMultas={separarTermos(termosMulta).pendentes.length}
+      pendingMultas={Math.max(precisaDeVoce, separarTermos(termosMulta).pendentes.length)}
       pendingTreinamentos={treinamentos.filter(isTreinamentoPendente).length}
       pendingGastosCartao={cartao.gastosCartaoPendentes.length}
       multasBanner={resumoPendentes(termosMulta)}

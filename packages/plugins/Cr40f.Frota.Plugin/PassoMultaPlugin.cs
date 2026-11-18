@@ -13,6 +13,7 @@ public sealed class PassoMultaPlugin : IPlugin
 {
     public const string Mensagem = "cr40f_PassoMulta";
     public const string Parcelas = "new_parcelamultafolha";
+    public static readonly string[] ApisDoTermo = { "new_AssinarTermoMulta", "new_ContestarTermoMulta" };
     public const int Prevista = 100000000, Descontada = 100000001;
 
     public void Execute(IServiceProvider serviceProvider)
@@ -29,7 +30,7 @@ public sealed class PassoMultaPlugin : IPlugin
             var dados = context.InputParameters.Contains("DadosJson") ? Convert.ToString(context.InputParameters["DadosJson"]) : null;
             var hoje = FrotaPendenciasPlugin.ResolverHoje(null, DateTime.UtcNow);
             // Parcelas: a trava do termo só deixa o servidor gravar; criadas pelo SYSTEM com o dono = quem fez o acerto.
-            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje, factory.CreateOrganizationService(null), context.UserId);
+            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje, factory.CreateOrganizationService(null), context.UserId, MultaTravaPlugin.TemPai(context, ApisDoTermo), tracing);
             tracing.Trace("{0}: {1} gravado na multa {2}", Mensagem, passo, multaId);
         }
         catch (InvalidPluginExecutionException) { throw; }
@@ -41,7 +42,7 @@ public sealed class PassoMultaPlugin : IPlugin
         }
     }
 
-    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje, IOrganizationService? sistema = null, Guid? dono = null)
+    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje, IOrganizationService? sistema = null, Guid? dono = null, bool viaTermo = false, ITracingService? tracing = null)
     {
         sistema ??= service;
         DadosPasso? dados;
@@ -50,6 +51,11 @@ public sealed class PassoMultaPlugin : IPlugin
         dados ??= new DadosPasso(); // "null" no JSON vale dados vazios: a validação do passo recusa com a mensagem do que falta.
         var linha = service.Retrieve(MultaMapper.Tabela, multaId, new ColumnSet(MultaMapper.Colunas));
         var antes = MultaMapper.Estado(linha);
+        if ((passo == Passos.TermoAssinado || passo == Passos.TermoContestado) && !viaTermo)
+            throw new InvalidPluginExecutionException("Este passo é registrado pelo termo do motorista.");
+        var termoVigente = MultaMapper.CarregarTermo(sistema, linha, antes, tracing);
+        if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha" && antes.TermoParcelas != null && antes.TermoPrimeiroMes == null)
+            throw new InvalidPluginExecutionException("O termo assinado não tem o primeiro mês; confira o termo antes de lançar na folha.");
         if (passo == Passos.Cancelar || passo == Passos.ConcluirDesconto || passo == Passos.ReabrirDesconto) ContarParcelas(sistema, multaId, antes); // só estes passos leem a contagem
         var erro = MultaEtapas.Validar(antes, passo, dados, hoje);
         if (erro != null) throw new InvalidPluginExecutionException(erro);
@@ -57,9 +63,14 @@ public sealed class PassoMultaPlugin : IPlugin
         if (trocaMotorista && !Guid.TryParse(dados.MotoristaId, out _)) throw new InvalidPluginExecutionException("Motorista inválido.");
         var depois = MultaEtapas.Aplicar(antes, passo, dados, hoje);
         if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha")
-            CriarParcelas(sistema, multaId, linha.GetAttributeValue<string>("cr40f_novacoluna") ?? "sem número", antes, dados, dono);
+            CriarParcelas(sistema, multaId, linha.GetAttributeValue<string>("cr40f_novacoluna") ?? "sem número", antes, dados, dono, termoVigente);
         var mudancas = MultaEtapas.Mudancas(antes, depois);
         if (mudancas.Count > 0) service.Update(MultaMapper.Gravacao(multaId, mudancas));
+        if (passo == Passos.PrazoVencido && antes.TermoPendente == true && termoVigente is Guid t)
+        {
+            sistema.Update(new Entity(MultaMapper.Termo, t) { ["new_status"] = new OptionSetValue(MultaMapper.TermoCancelado) });
+            sistema.Update(new Entity(MultaMapper.Tabela, multaId) { ["new_termovigente"] = null });
+        }
         return Json.Serializar(MultaEtapas.Avaliar(depois, hoje));
     }
 
@@ -72,7 +83,7 @@ public sealed class PassoMultaPlugin : IPlugin
         e.ParcelasDescontadas = status.Count(v => v == Descontada);
     }
 
-    private static void CriarParcelas(IOrganizationService s, Guid multaId, string auto, MultaEstado m, DadosPasso d, Guid? dono)
+    private static void CriarParcelas(IOrganizationService s, Guid multaId, string auto, MultaEstado m, DadosPasso d, Guid? dono, Guid? termoId)
     {
         foreach (var p in MultaParcelas.Dividir(m.ValorPago!.Value, d.Parcelas ?? 1, d.Competencia!))
         {
@@ -86,6 +97,7 @@ public sealed class PassoMultaPlugin : IPlugin
                 ["new_valor"] = new Money(p.Valor),
                 ["new_status"] = new OptionSetValue(Prevista),
             };
+            if (m.TermoParcelas != null && termoId is Guid tid) e["new_termo"] = new EntityReference(MultaMapper.Termo, tid);
             if (dono is Guid u && u != Guid.Empty) e["ownerid"] = new EntityReference("systemuser", u);
             s.Create(e);
         }

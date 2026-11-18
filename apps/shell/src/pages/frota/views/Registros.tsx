@@ -5,7 +5,7 @@ import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
 import { useRowSelection } from '../../../app/Selecao'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { SearchHits } from '../../../app/SearchHits'
 import { searchWords, useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
@@ -121,7 +121,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   const hoje = todaySP()
   const largura = (key: string, padrao: number) => LARGURAS[kind][key] ?? padrao
   const table = (rows: Linha[], tableFooter?: ReactNode) => (
-    <VirtualTable<Linha>
+    <ListTable<Linha>
       rows={rows}
       rowKey={(linha) => linha.id}
       selection={sel.selection}

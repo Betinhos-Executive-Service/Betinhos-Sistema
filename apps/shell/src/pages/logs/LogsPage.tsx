@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { LoadingTable } from '../../app/VirtualTable'
+import { ListTable } from '../../app/ListTable'
 import { FileText, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -142,7 +142,7 @@ function LogsTable({ list, onOpen, loading, view, quickFilters, footer, empty }:
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.lg-open')}>
-      <LoadingTable className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando logs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando logs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

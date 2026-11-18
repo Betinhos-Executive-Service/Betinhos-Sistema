@@ -8,7 +8,7 @@ import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
  * O servidor é quem decide: a tela usa isto para mostrar o passo e travar o botão; a gravação passa pela cr40f_PassoMulta.
  */
 export type Etapa = 'identificar' | 'indicar' | 'pagar' | 'acertar' | 'encerrada' | 'recurso' | 'cancelada'
-export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto'] as const
+export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto', 'TermoAssinado', 'TermoContestado'] as const
 export type Passo = (typeof PASSOS)[number]
 
 export type MultaEstado = {
@@ -18,6 +18,9 @@ export type MultaEstado = {
   acertoEm?: string | null; encerradaEm?: string | null; canceladaEm?: string | null; motivoCancelamento?: string | null; recursoPendente?: boolean | null
   /** Contagem de parcelas da multa, carregada pelo passo. Ausente = 0. */
   parcelasPrevistas?: number | null; parcelasDescontadas?: number | null
+  contestadaEm?: string | null; aceiteDeclaradoEm?: string | null
+  /** Termo vigente, carregado pelo passo (não são colunas da multa). */
+  termoPendente?: boolean | null; termoParcelas?: number | null; termoPrimeiroMes?: string | null; termoValor?: number | null
 }
 
 export type DadosPasso = {
@@ -27,7 +30,7 @@ export type DadosPasso = {
   parcelas?: number
 }
 
-export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean; descontando: boolean }
+export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean; descontando: boolean; aguardandoTermo: boolean }
 
 export const ROTULO_PASSO: Record<Passo, string> = {
   DefinirResponsavel: 'Definir o responsável',
@@ -42,6 +45,8 @@ export const ROTULO_PASSO: Record<Passo, string> = {
   ResultadoRecurso: 'Registrar o resultado do recurso',
   ConcluirDesconto: 'Concluir desconto',
   ReabrirDesconto: 'Reabrir desconto',
+  TermoAssinado: 'Termo assinado',
+  TermoContestado: 'Termo contestado',
 }
 
 export const ROTULO_ETAPA: Record<Etapa, string> = {
@@ -98,16 +103,34 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
   } else if (etapa === 'acertar') { if (!emDesconto) pendentes.push('RegistrarAcerto') }
   else if (etapa === 'recurso') pendentes.push('ResultadoRecurso')
   const proximoPrazo = (etapa === 'identificar' || etapa === 'indicar' ? m.dataParaIndicar : etapa === 'pagar' ? m.vencimento : null) ?? null
-  const proximoPasso = pendentes.length ? ROTULO_PASSO[pendentes[0]] : aguardandoPenalidade ? 'Aguardando penalidade' : emDesconto ? 'Descontando em folha' : etapa === 'cancelada' ? 'Cancelada' : etapa === 'encerrada' ? 'Encerrada' : ''
-  return { etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido: vencido, aguardandoPenalidade, descontando: emDesconto }
+  const aguardandoTermo = etapa === 'indicar' && !vencido && m.termoPendente === true && m.dataAviso == null
+  const proximoPasso = aguardandoTermo ? 'Aguardando o motorista assinar o termo' : pendentes.length ? rotuloPendente(m, pendentes[0]) : aguardandoPenalidade ? 'Aguardando penalidade' : emDesconto ? 'Descontando em folha' : etapa === 'cancelada' ? 'Cancelada' : etapa === 'encerrada' ? 'Encerrada' : ''
+  return { etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido: vencido, aguardandoPenalidade, descontando: emDesconto, aguardandoTermo }
+}
+
+/** Data inicial do campo do aceite: a que o motorista declarou (o gestor pode trocar). */
+export const dataAceiteInicial = (m: MultaEstado): string | undefined => m.aceiteDeclaradoEm?.slice(0, 10)
+
+function rotuloPendente(m: MultaEstado, passo: Passo): string {
+  if (passo === 'DefinirResponsavel' && m.contestadaEm != null) return 'Decidir a contestação do motorista'
+  if (passo === 'RegistrarAceite' && m.aceiteDeclaradoEm != null) return `Conferir o aceite na CNH Digital (motorista declarou em ${m.aceiteDeclaradoEm.slice(8, 10)}/${m.aceiteDeclaradoEm.slice(5, 7)})`
+  return ROTULO_PASSO[passo]
 }
 
 const MAXIMO_PARCELAS = 12
+const PASSO_FORA = 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
 export const competenciaDe = (mes: string) => `${mes.slice(0, 7)}-01`
 export const mesBr = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 export function janelaCompetencia(hoje: string) {
   const mes = competenciaDe(hoje)
   return { de: addMonths(mes, -1), ate: addMonths(mes, MAXIMO_PARCELAS) }
+}
+/** Primeiro mês do Acertar -> folha com termo assinado: o do termo, ou o mês de hoje se ele saiu da janela do RH. */
+export function mesDoTermo(m: MultaEstado, hoje: string): string | null {
+  if (m.termoParcelas == null || m.termoPrimeiroMes == null) return null
+  const { de, ate } = janelaCompetencia(hoje)
+  const mes = competenciaDe(m.termoPrimeiroMes)
+  return mes < de || mes > ate ? competenciaDe(hoje) : mes
 }
 export type ParcelaPlano = { numero: number; total: number; competencia: string; valor: number }
 export function dividirParcelas(valor: number, n: number, primeira: string): ParcelaPlano[] {
@@ -143,6 +166,12 @@ function validarFolha(m: MultaEstado, d: DadosPasso, hoje: string): string | nul
   if (!d.competencia || !/^\d{4}-(0[1-9]|1[0-2])(-01)?$/.test(d.competencia)) return 'Informe o mês do desconto.'
   if (!((m.valorPago ?? 0) > 0)) return 'Registre o pagamento antes de lançar na folha.'
   if (!m.motoristaId?.trim()) return 'A multa não tem motorista; defina o responsável antes.'
+  if (m.termoParcelas != null) {
+    if (m.termoValor != null && (m.valorPago ?? 0) > m.termoValor) return 'O valor pago passou do valor do termo; envie um termo novo ou registre como empresa assume.'
+    if ((d.parcelas ?? 1) !== m.termoParcelas) return `O motorista assinou ${m.termoParcelas} parcela(s); o número de parcelas não muda.`
+    const mes = mesDoTermo(m, hoje)!
+    return competenciaDe(d.competencia) === mes ? null : `O primeiro mês segue o termo assinado (${mesBr(mes)}).`
+  }
   const { de, ate } = janelaCompetencia(hoje)
   const c = competenciaDe(d.competencia)
   if (c < de || c > ate) return `Escolha um mês entre ${mesBr(de)} e ${mesBr(ate)}.`
@@ -154,14 +183,19 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
   if (!(PASSOS as readonly string[]).includes(passo)) return `Passo desconhecido: ${passo}.`
   const s = avaliar(m, hoje)
   if (s.prazoVencido && passo !== 'PrazoVencido') return 'O prazo de indicação venceu. Responda se a multa foi indicada antes de seguir.'
+  if (passo === 'TermoAssinado') {
+    if (s.etapa !== 'indicar' || m.dataAviso != null) return PASSO_FORA
+    return dataRuim(d.data, hoje, 'Informe a data da assinatura.')
+  }
+  if (passo === 'TermoContestado') return s.etapa === 'indicar' && m.dataAviso == null ? null : PASSO_FORA
   if (passo === 'PrazoVencido') {
     if (!s.prazoVencido) return 'O prazo de indicação ainda não venceu.'
     if (typeof d.indicou !== 'boolean') return 'Responda se a multa foi indicada.'
     if (!d.indicou) return null
     const ruim = canalDe(d.canal) === null ? 'Escolha o canal da indicação.' : dataRuim(d.data, hoje, 'Informe a data da indicação.')
     if (ruim) return ruim
-    // Sem responsável efetivo (multa nova no prazo vencido da etapa 1) a indicação precisa dizer quem foi indicado.
-    return responsavelEfetivo(m) === null && !d.motoristaId?.trim() ? 'Escolha o motorista que foi indicado.' : null
+    // Sem responsável efetivo, ou com a contestação do motorista pendente, a indicação precisa dizer quem foi indicado.
+    return (responsavelEfetivo(m) === null || m.contestadaEm != null) && !d.motoristaId?.trim() ? 'Escolha o motorista que foi indicado.' : null
   }
   if (passo === 'Cancelar') {
     if (!aberta(s.etapa)) return 'Esta multa já está encerrada.'
@@ -185,6 +219,8 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
       : 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
   }
   if (!s.pendentes.includes(passo as Passo)) return 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
+  if (m.termoPendente === true && passo === 'RegistrarIndicacao') return 'Aguarde a assinatura do termo ou cancele o termo.'
+  if (m.termoPendente === true && passo === 'AvisarMotorista') return 'Cancele o termo antes de avisar pelo WhatsApp.'
   if (s.pendentes[0] !== passo) return ANTES[s.pendentes[0]] ?? 'Siga a ordem dos passos.'
   switch (passo as Passo) {
     case 'DefinirResponsavel':
@@ -214,6 +250,7 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
   const n: MultaEstado = { ...m }
   switch (passo) {
     case 'DefinirResponsavel':
+      n.contestadaEm = null
       if (d.responsavel === 'empresa') Object.assign(n, { responsavel: RESPONSAVEL.EMPRESA, motivoEmpresa: MOTIVO_EMPRESA.CULPA_EMPRESA, status: MULTA.INDICADA })
       else Object.assign(n, { responsavel: RESPONSAVEL.MOTORISTA, motoristaId: d.motoristaId, status: MULTA.NOTIFICADO })
       break
@@ -248,7 +285,14 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
         Object.assign(n, { canal: canalDe(d.canal), dataIndicacao: d.data, indicado: true })
         if (d.motoristaId?.trim()) Object.assign(n, { motoristaId: d.motoristaId, responsavel: RESPONSAVEL.MOTORISTA })
       } else Object.assign(n, { responsavel: RESPONSAVEL.EMPRESA, motivoEmpresa: MOTIVO_EMPRESA.PRAZO_PERDIDO })
+      n.contestadaEm = null
       n.status = MULTA.INDICADA
+      break
+    case 'TermoAssinado':
+      n.dataAviso = d.data
+      break
+    case 'TermoContestado':
+      Object.assign(n, { contestadaEm: hoje, status: MULTA.NOTIFICAR })
       break
     case 'Cancelar':
       Object.assign(n, { motivoCancelamento: d.motivoTexto!.trim(), canceladaEm: hoje, status: MULTA.CANCELADA })
@@ -265,7 +309,7 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
   return n
 }
 
-const CAMPOS = ['status', 'responsavel', 'motoristaId', 'motivoEmpresa', 'dataAviso', 'canal', 'dataIndicacao', 'indicado', 'aceiteEm', 'pagaEm', 'valorPago', 'competencia', 'acertoEm', 'encerradaEm', 'canceladaEm', 'motivoCancelamento', 'recursoPendente'] as const
+const CAMPOS = ['status', 'responsavel', 'motoristaId', 'motivoEmpresa', 'dataAviso', 'canal', 'dataIndicacao', 'indicado', 'aceiteEm', 'pagaEm', 'valorPago', 'competencia', 'acertoEm', 'encerradaEm', 'canceladaEm', 'motivoCancelamento', 'recursoPendente', 'contestadaEm'] as const
 
 /** Campos que mudaram, no formato `campo=valor` (o mesmo de MultaEtapas.Formatar). */
 export function mudancas(antes: MultaEstado, depois: MultaEstado): string[] {

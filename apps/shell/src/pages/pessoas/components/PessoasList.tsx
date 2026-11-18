@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { Copy } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { STATUS, label } from '../domain/choices'
@@ -49,7 +49,7 @@ export function PessoasTable({ list, choices, dups, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pessoas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pessoas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
