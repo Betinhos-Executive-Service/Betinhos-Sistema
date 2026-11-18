@@ -63,6 +63,7 @@ namespace Betinhos.DriverRecordSharing
         private const int SelfieMaxBytes = 1572864; // 1,5 MB
         public const string ServerWriteVariable = "termo_server_write";
         private const string Bloqueado = "Termo assinado não pode ser alterado nem excluído.";
+        private const string ParcelaBloqueada = "Parcela de multa só é lançada ou desfeita pela tela Descontos em folha e não pode ser alterada nem excluída por fora.";
         private const string SemAditivo = "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.";
         // APIs que gravam termo e parcela pelo servidor. cr40f_PassoMulta e cr40f_LancarDescontoFolha (Cr40f.Frota.Plugin)
         // criam e lançam as parcelas do Acertar -> folha (RH bloco 1).
@@ -154,7 +155,7 @@ namespace Betinhos.DriverRecordSharing
             {
                 if (context.MessageName == "Create") throw new InvalidPluginExecutionException("Parcela de multa só é criada pela assinatura do termo ou pelo acerto da multa.");
                 // Lançar e desfazer só pela cr40f_LancarDescontoFolha, que grava a data e encerra ou reabre a multa (spec RH §8).
-                throw new InvalidPluginExecutionException(Bloqueado);
+                throw new InvalidPluginExecutionException(ParcelaBloqueada);
             }
         }
 

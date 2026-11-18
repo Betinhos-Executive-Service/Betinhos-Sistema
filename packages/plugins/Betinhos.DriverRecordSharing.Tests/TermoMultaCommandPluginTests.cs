@@ -487,7 +487,17 @@ namespace Betinhos.DriverRecordSharing.Tests
             var s = Cenario();
             var parcela = s.Add(new Entity("new_parcelamultafolha") { ["new_status"] = new OptionSetValue(100000000) });
             var target = new Entity("new_parcelamultafolha", parcela.Id) { ["new_status"] = new OptionSetValue(novo) };
-            Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Update", target));
+            var error = Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Update", target));
+            Assert.Equal("Parcela de multa só é lançada ou desfeita pela tela Descontos em folha e não pode ser alterada nem excluída por fora.", error.Message);
+        }
+
+        [Fact]
+        public void DeleteDeParcelaPeloClienteEhBloqueado()
+        {
+            var s = Cenario();
+            var parcela = s.Add(new Entity("new_parcelamultafolha") { ["new_status"] = new OptionSetValue(100000000) });
+            var error = Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Delete", new EntityReference("new_parcelamultafolha", parcela.Id)));
+            Assert.Equal("Parcela de multa só é lançada ou desfeita pela tela Descontos em folha e não pode ser alterada nem excluída por fora.", error.Message);
         }
 
         [Theory]
