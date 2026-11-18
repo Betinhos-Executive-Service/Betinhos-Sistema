@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Corrige o lote do "Flow Novo Sistema Tenaris -> Dataverse" (par obrigatório: SyncTenaris v3.7 + MarcarStatusSync v5.5).
+// Corrige o lote do "Flow Novo Sistema Tenaris -> Dataverse" (par obrigatório: SyncTenaris v3.8 + MarcarStatusSync v5.5).
 // Depois do patch:
 //   - pessoas: o script manda pessoas[] já sem repetição e com telefone/e-mail/departamento coalescidos (versao 2).
 //     Saem Select_Responsável, Select_Pax_1..4, Compose_TodasPessoas, Filter_SemVazios, Loop_Dedup e, no
@@ -30,7 +30,7 @@ import { rodandoComoCli } from './solucoes/arquivo.mjs'
 const URLS = { DEV: 'https://org23b93544.crm2.dynamics.com', PROD: 'https://orgf261ae8e.crm2.dynamics.com' }
 const FLOW_ID = 'cbcd9564-1b1e-f111-88b1-7ced8da87540'
 const FLOW_NOME = 'Flow Novo Sistema Tenaris -> Dataverse'
-export const MSG_PAYLOAD_ANTIGO = 'SyncTenaris antigo: instale v3.7 e MarcarStatusSync v5.5'
+export const MSG_PAYLOAD_ANTIGO = 'SyncTenaris antigo: instale v3.8 e MarcarStatusSync v5.5'
 const TODOS = ['Succeeded', 'Failed', 'Skipped', 'TimedOut']
 const ok = (nome) => ({ [nome]: ['Succeeded'] })
 // Cópia de uma ação para outro lugar do flow: sem id de operação e sem dependência herdada.
