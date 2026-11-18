@@ -2,8 +2,8 @@ import { DeltaBadge, EmptyState, type TableColumn } from '@betinhos/ui'
 import { Tabela } from './Tabela'
 import { Inbox } from 'lucide-react'
 import { AnosChart, BarraChart, MetaChart } from '../charts/Charts'
-import type { LinhaMeta, MetaRealizado, StatusServicos, TicketMensal, TotalProduzido } from '../domain/analises'
-import { brl, brlS, dec, int } from '../domain/format'
+import { tomMeta, type LinhaMeta, type MetaRealizado, type StatusServicos, type TicketMensal, type TotalProduzido } from '../domain/analises'
+import { brl, brlS, dec, int, somar } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { AnaliseCard } from './AnaliseCard'
 import { fraseComparativo, separarComparativo, seloComparativo } from './KpiChip'
@@ -22,6 +22,14 @@ const resto = <R,>(header: string, cell: TableColumn<R>['cell']): TableColumn<R>
 const forte = (texto: string) => <strong className="dash-forte">{texto}</strong>
 const vazio = (titulo: string) => <EmptyState compact icon={<Inbox />} title={titulo} />
 
+/** Linha "Total" do meta × realizado: soma de meta e realizado, com o atingimento deles. */
+const totalMeta = (linhas: LinhaMeta[]): LinhaMeta => {
+  const meta = somar(linhas, (l) => l.meta)
+  const real = somar(linhas, (l) => l.real)
+  const pct = meta ? (real / meta) * 100 : 0
+  return { mes: 'total', rotulo: 'Total', meta, real, pct, tom: tomMeta(pct) }
+}
+
 /** Total produzido: faturamento mensal dos 3 anos (gráfico de linhas) e os valores sob demanda. */
 export function TotalProduzidoCard({ dados: tp, periodo }: { dados: TotalProduzido; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
@@ -32,9 +40,9 @@ export function TotalProduzidoCard({ dados: tp, periodo }: { dados: TotalProduzi
   const { principal, outros } = separarComparativo(tp.chips)
   return (
     <AnaliseCard
-      titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} delta={principal && seloComparativo(principal)} hint={principal && fraseComparativo(principal)} chips={outros} apoio={tp.apoio}
+      titulo="Total produzido" ampliarId="total-produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} delta={principal && seloComparativo(principal)} hint={principal && fraseComparativo(principal)} chips={outros} apoio={tp.apoio}
       grafico={<AnosChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} anos={anos} dados={tp.pontos.map((p) => Object.fromEntries([['rotulo', p.rotulo], ...anos.map((a, i) => [a, p.valores[i]] as const)]))} />}
-      tabela={<Tabela columns={colunas} rows={tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
+      tabela={<Tabela columns={colunas} rows={tp.pontos.length ? [...tp.pontos, { rotulo: 'Total', valores: anos.map((_, i) => somar(tp.pontos, (p) => p.valores[i] ?? 0)) }] : tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
       copiar={tabelaCopia(tp.pontos, [['Mês', (p) => p.rotulo], ...anos.map((a, i) => [a, (p: PontoTP) => brl(p.valores[i])] as const)])}
     />
   )
@@ -56,10 +64,10 @@ export function MetaRealizadoCard({ dados: mr, periodo }: { dados: MetaRealizado
   const apoio = [ating && `Meta ${ating.meta}`, principal && fraseComparativo(principal)].filter(Boolean).join(' · ')
   return (
     <AnaliseCard
-      titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub ? `${mr.sub} · Meses sem dado contam com realizado zero.` : 'Meses sem dado contam com realizado zero.'} hint={apoio}
+      titulo="Meta × realizado" ampliarId="meta-realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub ? `${mr.sub} · Meses sem dado contam com realizado zero.` : 'Meses sem dado contam com realizado zero.'} hint={apoio}
       delta={ating && <DeltaBadge tone={TOM_META[ating.tom]} title="Realizado ÷ meta do período">{dec(ating.pct, 1)}% da meta</DeltaBadge>}
       grafico={mr.linhas.length ? <MetaChart descricao={`Meta e realizado por mês, ${periodo}`} formatar={brlS} dados={mr.linhas.map((l) => ({ rotulo: l.rotulo, meta: l.meta, real: l.real, tom: l.tom }))} /> : undefined}
-      tabela={<Tabela columns={colunas} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />} tabelaSobDemanda tabelaNoLugar
+      tabela={<Tabela columns={colunas} rows={mr.linhas.length ? [...mr.linhas, totalMeta(mr.linhas)] : mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />} tabelaSobDemanda tabelaNoLugar
       copiar={tabelaCopia(mr.linhas, [['Mês', (l) => l.rotulo], ['Meta', (l) => brl(l.meta)], ['Realizado', (l) => brl(l.real)], ['Atingimento', (l) => pct(l.pct)]])}
     />
   )

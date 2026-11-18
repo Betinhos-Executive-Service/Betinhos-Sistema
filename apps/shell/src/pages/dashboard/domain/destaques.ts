@@ -49,8 +49,10 @@ const rankClientes = (rows: Reserva[], max: number) =>
     .sort((a, b) => b.qtd - a.qtd || a.cliente.localeCompare(b.cliente, 'pt-BR')).slice(0, max)
 
 /** Emergencial: `createdon` no mesmo dia (texto bruto UTC) da saída. */
+export const emergencial = (r: Reserva) => r.criadoRaw.slice(0, 10) === r.saidaRaw.slice(0, 10)
+
 export function emergenciais(rv: Reserva[]): Emergenciais {
-  const em = rv.filter((r) => r.criadoRaw.slice(0, 10) === r.saidaRaw.slice(0, 10))
+  const em = rv.filter(emergencial)
   const porMes = agrupar(em, (r) => r.saidaRaw.slice(0, 7))
   return {
     total: em.length,

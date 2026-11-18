@@ -1,17 +1,18 @@
 import { useMemo } from 'react'
-import { StatCard, type TableColumn } from '@betinhos/ui'
+import { type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularMultas, type LinhaMultaInfracao, type LinhaMultaMotorista, type MultasMes } from '../../domain/abas/multas'
-import { int } from '../../domain/format'
-import { useDetalhe } from '../DetalheDrawer'
+import { int, somar } from '../../domain/format'
+import { useDetalhe } from '../DetalheProvider'
 import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { extrasKpi } from '../KpiExtras'
+import { KpiAba } from '../KpiAba'
 import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
@@ -38,12 +39,12 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [mu.ant?.total] })} />
-      <StatCard
+      <KpiAba label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [mu.ant?.total] })} />
+      <KpiAba
         label={KPIS[1]} {...tomAtencao(k?.pendentes)} value={k ? int(k.pendentes) : null} onOpen={verPendentes}
         {...extrasKpi({ chips: [mu.ant?.pendentes], apoio: k ? [{ rotulo: 'Status', texto: 'Identificar o responsável', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : [] })}
       />
-      <StatCard label={KPIS[2]} value={k ? int(k.resolvidas) : null} {...extrasKpi({ apoio: k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : [] })} />
+      <KpiAba label={KPIS[2]} value={k ? int(k.resolvidas) : null} {...extrasKpi({ apoio: k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : [] })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -75,7 +76,7 @@ function PorMesCard({ pontos, total, periodo }: { pontos: MultasMes[]; total: nu
     <AnaliseCard
       titulo="Multas por mês" periodo={periodo} unidade="multas por mês" valor={multas(total)} sub="Pela data da multa"
       grafico={pontos.length ? <BarraChart descricao={`Multas por mês, ${periodo}`} nome="Multas" formatar={int} larguraEixo={36} dados={pontos.map((p) => ({ rotulo: p.rotulo, valor: p.qtd }))} /> : undefined}
-      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma multa no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={[...pontos, { mes: 'total', rotulo: 'Total', qtd: somar(pontos, (p) => p.qtd), pendentes: somar(pontos, (p) => p.pendentes) }]} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma multa no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Multas', (p) => p.qtd], ['Pendentes', (p) => p.pendentes]])}
       tabelaSobDemanda={pontos.length > 0}
     />

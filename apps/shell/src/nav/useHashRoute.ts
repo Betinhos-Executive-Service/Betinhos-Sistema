@@ -7,9 +7,11 @@ const EVENTO_QUERY = 'bt:hashquery'
 function subscribe(onChange: () => void) {
   window.addEventListener('hashchange', onChange)
   window.addEventListener(EVENTO_QUERY, onChange)
+  window.addEventListener('popstate', onChange)
   return () => {
     window.removeEventListener('hashchange', onChange)
     window.removeEventListener(EVENTO_QUERY, onChange)
+    window.removeEventListener('popstate', onChange)
   }
 }
 
@@ -72,9 +74,13 @@ function serializar(query: URLSearchParams) {
   return query.toString().replace(/%2C/gi, ',').replace(/%3A/gi, ':')
 }
 
-function gravar(id: string, query: URLSearchParams, avisar: boolean) {
+function hashDe(id: string, query: URLSearchParams) {
   const texto = serializar(query)
-  const proximo = `${hrefFor(id)}${texto ? `?${texto}` : ''}`
+  return `${hrefFor(id)}${texto ? `?${texto}` : ''}`
+}
+
+function gravar(id: string, query: URLSearchParams, avisar: boolean) {
+  const proximo = hashDe(id, query)
   if (proximo === location.hash) return
   history.replaceState(history.state, '', proximo)
   if (avisar) window.dispatchEvent(new Event(EVENTO_QUERY))
@@ -93,11 +99,7 @@ export function readHashQuery() {
 /** `null`/`undefined` remove o parâmetro; lista grava um valor por ocorrência (`cliente=A&cliente=B`); o resto da query fica como está. */
 export type QueryPatch = Record<string, string | readonly string[] | null | undefined>
 
-/**
- * Mescla `patch` na query do hash atual. `silent` grava sem avisar quem escuta: só para semear a URL
- * durante a primeira renderização da tela (um aviso ali atualizaria outros componentes no meio do render).
- */
-export function patchHashQuery(patch: QueryPatch, options: { silent?: boolean } = {}) {
+function mesclar(patch: QueryPatch) {
   const { id, query } = parseHash(location.hash)
   for (const [chave, valor] of Object.entries(patch)) {
     query.delete(chave)
@@ -105,5 +107,26 @@ export function patchHashQuery(patch: QueryPatch, options: { silent?: boolean } 
     if (typeof valor === 'string') query.set(chave, valor)
     else for (const item of valor) query.append(chave, item)
   }
+  return { id, query }
+}
+
+/**
+ * Mescla `patch` na query do hash atual. `silent` grava sem avisar quem escuta: só para semear a URL
+ * durante a primeira renderização da tela (um aviso ali atualizaria outros componentes no meio do render).
+ */
+export function patchHashQuery(patch: QueryPatch, options: { silent?: boolean } = {}) {
+  const { id, query } = mesclar(patch)
   gravar(id, query, !options.silent)
+}
+
+/**
+ * Como `patchHashQuery`, mas cria uma entrada no histórico: o botão Voltar desfaz a mudança (ex.: fecha o card ampliado).
+ * `estado` vai no `history.state` da nova entrada, para quem fecha saber se pode voltar em vez de editar a URL.
+ */
+export function pushHashQuery(patch: QueryPatch, estado?: unknown) {
+  const { id, query } = mesclar(patch)
+  const proximo = hashDe(id, query)
+  if (proximo === location.hash) return
+  history.pushState(estado ?? history.state, '', proximo)
+  window.dispatchEvent(new Event(EVENTO_QUERY))
 }

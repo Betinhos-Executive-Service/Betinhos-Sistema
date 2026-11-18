@@ -45,20 +45,20 @@ Pré-requisitos: Deploy da `develop` verde (migration, plugin da frota, DriverRe
 ## 4. Desconto em folha (RH bloco 1)
 Spec: `docs/superpowers/specs/2026-11-18-rh-descontos-folha-design.md`. Mesmas regras da seção 3 (só DEV, quem tem acesso, checkout principal). Pré-requisito: Deploy verde com a migration `20261118-1800-rh-descontos-parcelas.ps1` (colunas `new_multa` e `new_lancadoem`) e a Custom API `cr40f_LancarDescontoFolha` registrada.
 
-Testes sem Dataverse: `pnpm --filter shell test -- rh-descontos multa` (tela, prévia das parcelas, Excel) e os testes `MultaParcelas*`, `LancarDescontoFolha*` e `PassoMulta*` do `Cr40f.Frota.Plugin.Tests`. No mock (`pnpm dev`, porta 36472), `#/rh-descontos` mostra 4 colaboradores fictícios, setembro em atraso e o Excel `descontos-folha-AAAA-MM.xlsx`.
+Testes sem Dataverse: `pnpm --filter shell test -- rh-descontos multa` (tela, prévia das parcelas, Excel) e os testes `MultaParcelas*`, `LancarDescontoFolha*` e `PassoMulta*` do `Cr40f.Frota.Plugin.Tests`. No mock (`pnpm dev`, porta 36472), `#/rh-descontos` mostra "Descontos de <mês>" com setas de mês, o aviso de setembro em atraso ("N desconto(s) de meses anteriores ainda não foi/foram lançado(s), desde <mês>" com "Ver <mês>"), os cartões "1 Lançar no sistema da folha" ("Faltam X de N motoristas · R$") e "2 Enviar Excel à contabilidade" (botão "Baixar Excel", arquivo `descontos-folha-AAAA-MM.xlsx`; volta a pedir o download depois de lançar ou desfazer) e uma tabela com 4 colaboradores fictícios (Motorista, Motivo, Situação, Descontar, ação). A seta do nome expande a linha: Auto, Infração, Data, Parcelamento, as parcelas mês a mês (a do mês com borda azul) e "Abrir a multa na Frota". Checkbox só em parcela A lançar; com seleção aparece "Marcar as N como lançadas" no rodapé. Em 390px as linhas viram cartões, sem rolagem horizontal, e "Selecionar todas a lançar" fica visível acima delas.
 
 Leitura das parcelas de uma multa (critério de cada passo):
 `new_parcelamultafolhas?$select=new_name,new_numero,new_competencia,new_valor,new_status,new_lancadoem&$filter=_new_multa_value eq <id da multa>&$orderby=new_numero` e da multa `cr40f_multases(<id>)?$select=cr40f_status,cr40f_competenciadesconto,cr40f_acertoem,cr40f_encerradaem`.
 
 1. **Multa de teste**: auto `TST-RH-<data>`, motorista de teste, valor pago R$ 100,00; passo a passo até "4. Acertar".
 2. **Acertar → folha em 2 parcelas**, primeiro mês = mês atual. Esperado: 2 parcelas Previstas de R$ 50,00 (competências no dia 1 de dois meses seguidos); a multa segue em "4. Acertar" (202410006) com a situação "Descontando em folha", `cr40f_competenciadesconto` = 1º mês, `cr40f_acertoem` = hoje; a tarefa do Planner fica Concluída e o e-mail diário não cobra a multa.
-3. **Tela**: em `#/rh-descontos` a 1ª aparece no mês atual e a 2ª no próximo, R$ 50,00 cada, no holerite do motorista e na linha do tempo.
-4. **Lançar a 1ª** (passo 2, fita): parcela Descontada com `new_lancadoem` = hoje; a multa continua aberta.
+3. **Tela**: em `#/rh-descontos` a 1ª aparece no mês atual como "Multa <placa> · parcela 1 de 2", A lançar, R$ 50,00; expandida, mostra as 2 parcelas mês a mês. A 2ª aparece no próximo mês (seta ">").
+4. **Lançar a 1ª** ("Marcar lançado" na linha; rodapé "1 parcela · R$ 50,00 marcada como lançada." e situação "Lançada em dd/mm"): parcela Descontada com `new_lancadoem` = hoje; a multa continua aberta.
 5. **Lançar a 2ª**: multa Encerrada com `cr40f_encerradaem` = hoje.
-6. **Desfazer a 2ª**: parcela Prevista sem `new_lancadoem`; multa de volta em "4. Acertar" sem `cr40f_encerradaem`.
+6. **Desfazer a 2ª** ("Desfazer" na linha; rodapé "... voltou para a lançar."): parcela Prevista sem `new_lancadoem`; multa de volta em "4. Acertar" sem `cr40f_encerradaem`.
 7. **Lançar a 2ª de novo**: a multa encerra.
 8. **Fim**: a multa de teste fica Encerrada e as parcelas ficam como histórico fictício. Não apague: a trava do termo e o Restrict do lookup bloqueiam.
-9. **Recusas** (mensagem do servidor na tela, nada gravado): Acertar → folha sem valor pago ("Registre o pagamento antes de lançar na folha."), mês fora da janela ("Escolha um mês entre ..."), 13 parcelas, cancelar a multa com parcela Prevista, e `PATCH` direto em `new_parcelamultafolha.new_status` pela Web API (a trava recusa; em `observar`, conferir o trace).
+9. **Recusas** (mensagem do servidor na tela, nada gravado): Acertar → folha sem valor pago ("Registre o pagamento antes de lançar na folha."), mês fora da janela ("Escolha um mês entre ..."), 13 parcelas, cancelar a multa com parcela Prevista, e `PATCH` direto em `new_parcelamultafolha.new_status` pela Web API (a trava do termo recusa sempre, com "Parcela de multa só é lançada ou desfeita pela tela Descontos em folha e não pode ser alterada nem excluída por fora."). Mudar `cr40f_multas.cr40f_status` direto pela Web API passa enquanto `cr40f_MultasTravaModo` = `observar` (padrão no DEV); conferir o "Recusaria" no trace.
 
 Permissão: a tela só lê (`prvRead` em `new_parcelamultafolha` e `cr40f_multas`); grava pela Custom API, que exige `prvWritecr40f_multas`. Em 18/11/2026 o papel Acesso-Betinhos-MDA lê multas mas não lê parcelas.
 

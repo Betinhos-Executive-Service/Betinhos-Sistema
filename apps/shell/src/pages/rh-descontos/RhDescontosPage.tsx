@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, SegmentedControl, Surface, useShellHeader } from '@betinhos/ui'
-import { Check, ChevronLeft, ChevronRight, Download, HandCoins, TriangleAlert } from 'lucide-react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Checkbox, EmptyState, StatusBadge, Surface, useShellHeader } from '@betinhos/ui'
+import { Check, ChevronLeft, ChevronRight, Download, HandCoins, TriangleAlert, Undo2 } from 'lucide-react'
 import type { Host } from '../../host'
 import { baixarXlsx } from '../../lib/xlsx'
 import { BrandLoader } from '../../app/BrandLoader'
@@ -9,23 +9,37 @@ import { createFrotaSource } from '../frota/data/hostSource'
 import type { ParcelaFolha } from '../frota/data/types'
 import { ApiError, errorMessage, mensagemDaAcao } from '../frota/data/xrm'
 import { formatMoney } from '../geral/domain/format'
-import { FaixaMeses } from './components/FaixaMeses'
-import { FitaFechamento } from './components/FitaFechamento'
-import { Holerite } from './components/Holerite'
-import { LinhaDoTempo } from './components/LinhaDoTempo'
-import { PassosFolha, type Passo } from './components/PassosFolha'
-import { cadeias, mesDe, mesPorExtenso, nomeArquivo, planilhaDoMes, porColaborador, resumo, somaMes, totaisPorMes } from './domain/descontos'
+import { DetalheParcela } from './components/DetalheParcela'
+import { cadeias, chaveOrigem, estadoParcela, mesDe, mesPorExtenso, motivoTexto, nomeArquivo, SEM_COLABORADOR, planilhaDoMes, porColaborador, situacaoTexto, somaMes, somaValores } from './domain/descontos'
 import './rh-descontos.css'
 
-const MESES_FAIXA = 7
-type Vista = 'holerites' | 'tempo'
+/** Meses carregados antes e depois do escolhido, para a corrente de cada parcelamento no detalhe. */
+const JANELA = 3
 type Atrasadas = { quantidade: number; maisAntigo: string | null }
+const VAZIO: ParcelaFolha[] = []
+const RETORNO = {
+  lancar: ['marcada como lançada', 'marcadas como lançadas'],
+  desfazer: ['voltou para a lançar', 'voltaram para a lançar'],
+} as const
+const FALHA = { lancar: 'Não foi possível marcar como lançado. Tente de novo.', desfazer: 'Não foi possível desfazer. Tente de novo.' }
 
 const abrirMulta = (id: string) => { window.location.hash = `#/frota-multas?registro=multa:${id}` }
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+const alternado = (prev: Set<string>, id: string) => { const n = new Set(prev); if (!n.delete(id)) n.add(id); return n }
+const contarMotoristas = (l: ParcelaFolha[]) => new Set(l.map((p) => p.colaborador?.id ?? '')).size
+
+function Situacao({ p, mesAtual }: { p: ParcelaFolha; mesAtual: string }) {
+  switch (estadoParcela(p, mesAtual)) {
+    case 'lancada': return <StatusBadge tone="success" icon={<Check size={12} />}>{situacaoTexto(p)}</StatusBadge>
+    case 'cancelada': return <StatusBadge>Cancelada</StatusBadge>
+    case 'atrasada': return <StatusBadge tone="danger">Atrasada</StatusBadge>
+    case 'futura': return <StatusBadge tone="warning">A lançar</StatusBadge>
+  }
+}
 
 /**
- * Descontos em folha (RH): conferir as parcelas de multa por colaborador e por mês, marcar o que foi lançado
- * na folha e enviar o Excel à contabilidade. A faixa e a janela carregada vão do mês da folha -2 ao +4.
+ * Descontos em folha (RH): uma tabela com as parcelas de multa do mês. O RH lança cada valor no sistema da
+ * folha, marca a linha como lançada e baixa o Excel para a contabilidade.
  */
 export function RhDescontosPage({ host }: { host: Host }) {
   useShellHeader({ title: 'Descontos em folha' })
@@ -34,51 +48,46 @@ export function RhDescontosPage({ host }: { host: Host }) {
   }, [host])
   const [mesAtual] = useState(() => todaySP().slice(0, 7))
   const [mes, setMes] = useState(mesAtual)
-  const [inicio, setInicio] = useState(() => somaMes(mesAtual, -2))
-  const [passo, setPasso] = useState<Passo>('conferir')
-  const [vista, setVista] = useState<Vista>('holerites')
-  const [dados, setDados] = useState<{ parcelas: ParcelaFolha[]; atrasadas: Atrasadas } | null>(null)
+  const [dados, setDados] = useState<{ parcelas: ParcelaFolha[]; atrasadas: Atrasadas; inicio: string; fim: string } | null>(null)
   const [falha, setFalha] = useState<unknown>(null)
-  const [marcados, setMarcados] = useState<Set<string>>(new Set())
-  const [ativoId, setAtivoId] = useState('')
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [abertos, setAbertos] = useState<Set<string>>(new Set())
   const [erros, setErros] = useState<Map<string, string>>(new Map())
   const [ocupado, setOcupado] = useState(false)
   const [retorno, setRetorno] = useState('')
   const [excel, setExcel] = useState<Record<string, string>>({})
   const token = useRef(0)
 
-  const meses = useMemo(() => Array.from({ length: MESES_FAIXA }, (_, i) => somaMes(inicio, i)), [inicio])
-
   const carregar = useCallback(async () => {
     if (!source) return
     const mine = ++token.current
+    const inicio = somaMes(mes, -JANELA), fim = somaMes(mes, JANELA)
     try {
-      const [parcelas, atrasadas] = await Promise.all([source.listarDescontosPeriodo(inicio, somaMes(inicio, MESES_FAIXA - 1)), source.previstasAntes(mesAtual)])
-      if (mine === token.current) { setDados({ parcelas, atrasadas }); setFalha(null) }
+      const [parcelas, atrasadas] = await Promise.all([source.listarDescontosPeriodo(inicio, fim), source.previstasAntes(mesAtual)])
+      if (mine === token.current) { setDados({ parcelas, atrasadas, inicio, fim }); setFalha(null) }
     } catch (reason) {
       if (mine === token.current) setFalha(reason)
     }
-  }, [source, inicio, mesAtual])
+  }, [source, mes, mesAtual])
   useEffect(() => { void carregar() }, [carregar])
 
   const irParaMes = (m: string) => {
     setMes(m)
-    setMarcados(new Set())
+    setSelecionados(new Set())
+    setAbertos(new Set())
     setRetorno('')
-    setInicio((atual) => (m >= atual && m <= somaMes(atual, MESES_FAIXA - 1) ? atual : somaMes(m, -2)))
   }
-  const deslocar = (n: number) => irParaMes(somaMes(mes, n))
 
-  const todas = useMemo(() => dados?.parcelas ?? [], [dados])
-  const doMes = useMemo(() => todas.filter((p) => mesDe(p) === mes), [todas, mes])
-  const grupos = useMemo(() => porColaborador(doMes), [doMes])
-  const gruposTodos = useMemo(() => porColaborador(todas), [todas])
-  const totais = useMemo(() => totaisPorMes(todas, mesAtual), [todas, mesAtual])
+  // Dados de outra janela (ex.: salto para "Mês atual") não valem para o mês escolhido: mostra o carregando.
+  const vigente = dados && mes >= dados.inicio && mes <= dados.fim ? dados : null
+  const todas = vigente?.parcelas ?? VAZIO
   const correntes = useMemo(() => cadeias(todas), [todas])
-  const totaisMeses = useMemo(() => new Map([...totais].map(([m, t]) => [m, t.lancado + t.aLancar + t.atrasada])), [totais])
-  const r = resumo(doMes)
-  const tm = totais.get(mes) ?? { lancado: 0, aLancar: 0, atrasada: 0 }
-  const atrasadas = mes === mesAtual && dados && dados.atrasadas.quantidade > 0 ? dados.atrasadas : null
+  const linhas = useMemo(() => porColaborador(todas.filter((p) => mesDe(p) === mes)).flatMap((g) => g.parcelas), [todas, mes])
+  const aLancar = linhas.filter((p) => p.status === 'prevista')
+  const escolhidas = aLancar.filter((p) => selecionados.has(p.id))
+  const todasMarcadas = aLancar.length > 0 && escolhidas.length === aLancar.length
+  const atrasadas = mes === mesAtual && vigente?.atrasadas.quantidade ? vigente.atrasadas : null
+  const maisAntigo = atrasadas?.maisAntigo
 
   const executar = async (ids: string[], acao: 'lancar' | 'desfazer') => {
     if (!source || !ids.length) return
@@ -90,82 +99,123 @@ export function RhDescontosPage({ host }: { host: Host }) {
       const resultado = await source.lancarDescontoFolha(ids, acao)
       marcar(resultado.parcelas.filter((x) => !x.ok).map((x) => [x.id, x.erro ?? 'Não foi possível concluir.']))
       const feitos = new Set(resultado.parcelas.filter((x) => x.ok).map((x) => x.id))
-      const valor = todas.filter((p) => feitos.has(p.id)).reduce((t, p) => t + p.valor, 0)
-      if (feitos.size) setRetorno(`${feitos.size} ${feitos.size === 1 ? 'parcela' : 'parcelas'} · ${formatMoney(valor)} ${acao === 'lancar' ? (feitos.size === 1 ? 'lançada' : 'lançadas') : (feitos.size === 1 ? 'voltou a prevista' : 'voltaram a previstas')}.`)
+      const valor = somaValores(todas.filter((p) => feitos.has(p.id)))
+      if (feitos.size) setRetorno(`${plural(feitos.size, 'parcela', 'parcelas')} · ${formatMoney(valor)} ${RETORNO[acao][feitos.size === 1 ? 0 : 1]}.`)
+      // O Excel já baixado ficou desatualizado: a tarefa 2 volta a pedir o download.
+      if (feitos.size) setExcel((prev) => { const n = { ...prev }; delete n[mes]; return n })
     } catch (reason) {
-      const msg = mensagemDaAcao(reason, acao === 'lancar' ? 'Não foi possível lançar. Tente de novo.' : 'Não foi possível desfazer. Tente de novo.')
+      const msg = mensagemDaAcao(reason, FALHA[acao])
       marcar(ids.map((id) => [id, msg]))
     }
-    setMarcados(new Set())
+    setSelecionados((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n })
     await carregar()
     setOcupado(false)
   }
-  const idsDos = (colaboradores: string[], status: ParcelaFolha['status']) => grupos.filter((g) => colaboradores.includes(g.id)).flatMap((g) => g.parcelas.filter((p) => p.status === status).map((p) => p.id))
-  const alternarMarca = (id: string) => setMarcados((prev) => { const n = new Set(prev); if (!n.delete(id)) n.add(id); return n })
 
   const baixar = () => {
-    baixarXlsx(nomeArquivo(mes), planilhaDoMes(doMes, mes))
+    baixarXlsx(nomeArquivo(mes), planilhaDoMes(linhas, mes))
     setExcel((prev) => ({ ...prev, [mes]: horaSP(new Date().toISOString()) }))
   }
 
-  const concluidos: Passo[] = [...(doMes.length && r.previstas === 0 ? ['lancar' as const] : []), ...(excel[mes] ? ['enviar' as const] : [])]
   const semAcesso = falha instanceof ApiError && falha.status === 403
   const nomeMes = mesPorExtenso(mes)
 
   if (error) return <div className="page rh-descontos"><Alert tone="danger" title="Não foi possível abrir os descontos em folha">{error}. Abra o Sistema Betinhos pelo Dataverse.</Alert></div>
 
   let corpo
-  if (falha && !dados) corpo = <Alert tone="danger" title={semAcesso ? 'Sem acesso' : 'Não foi possível carregar os descontos'} action={semAcesso ? undefined : <Button variant="secondary" size="compact" onClick={() => void carregar()}>Tentar de novo</Button>}>{semAcesso ? 'Você não tem acesso aos descontos em folha.' : errorMessage(falha)}</Alert>
-  else if (!dados) corpo = <BrandLoader label="Carregando os descontos" variant="inline" size="md" />
-  else if (!doMes.length) corpo = <EmptyState icon={<HandCoins size={36} />} title={`Nenhum desconto para ${nomeMes}.`}>Escolha outro mês na faixa acima.</EmptyState>
+  if (falha && !vigente) corpo = <Alert tone="danger" title={semAcesso ? 'Sem acesso' : 'Não foi possível carregar os descontos'} action={semAcesso ? undefined : <Button variant="secondary" size="compact" onClick={() => void carregar()}>Tentar de novo</Button>}>{semAcesso ? 'Você não tem acesso aos descontos em folha.' : errorMessage(falha)}</Alert>
+  else if (!vigente) corpo = <BrandLoader label="Carregando os descontos" variant="inline" size="md" />
+  else if (!linhas.length) corpo = <EmptyState icon={<HandCoins size={36} />} title={`Nenhum desconto para ${nomeMes}.`}>Use as setas acima para ver outro mês.</EmptyState>
   else corpo = (
     <>
-      <PassosFolha passo={passo} concluidos={concluidos} onChange={setPasso} />
-      {passo === 'conferir' ? (
-        <>
-          <Surface className="rh-resumo">
-            <div>
-              <span className="rh-rotulo">Total do mês</span>
-              <p className="rh-resumo__total">{formatMoney(r.total)}</p>
-              <p className="rh-muted">{r.colaboradores} {r.colaboradores === 1 ? 'motorista' : 'motoristas'} · {doMes.length} {doMes.length === 1 ? 'parcela' : 'parcelas'}</p>
-            </div>
-            <div className="rh-resumo__progresso">
-              <div className="rh-barra" role="img" aria-label={`Lançado ${formatMoney(tm.lancado)} de ${formatMoney(r.total)}`}>
-                <span className="rh-barra__lancado" style={{ width: `${r.total ? (tm.lancado / r.total) * 100 : 0}%` }} />
-              </div>
-              <p className="rh-legenda"><span data-tipo="lancado">Lançado {formatMoney(tm.lancado)}</span><span data-tipo="alancar">A lançar {formatMoney(r.total - tm.lancado)}</span></p>
-            </div>
-            {atrasadas?.maisAntigo ? (
-              <div className="rh-aviso">
-                <TriangleAlert size={18} aria-hidden="true" />
-                <span>{atrasadas.quantidade} {atrasadas.quantidade === 1 ? 'parcela de meses anteriores ainda prevista' : 'parcelas de meses anteriores ainda previstas'}</span>
-                <Button variant="secondary" size="compact" onClick={() => irParaMes(atrasadas.maisAntigo!)}>{`Ver ${mesPorExtenso(atrasadas.maisAntigo)}`}</Button>
-              </div>
-            ) : null}
-          </Surface>
-          <SegmentedControl<Vista> aria-label="Modo de exibição" value={vista} onChange={setVista} options={[{ value: 'holerites', label: 'Holerites' }, { value: 'tempo', label: 'Linha do tempo' }]} />
-          {vista === 'holerites'
-            ? <div className="rh-holerites">{grupos.map((g) => <Holerite key={g.id} grupo={g} cadeias={correntes} erros={erros} onAbrirMulta={abrirMulta} />)}</div>
-            : <LinhaDoTempo grupos={gruposTodos} meses={meses} mes={mes} mesAtual={mesAtual} totais={totaisMeses} onMes={irParaMes} onAbrirMulta={abrirMulta} />}
-        </>
-      ) : null}
-      {passo === 'lancar' ? <p className="rh-retorno" role="status">{retorno}</p> : null}
-      {passo === 'lancar' ? (
-        <FitaFechamento grupos={grupos} correntes={correntes} mes={mes} mesAtual={mesAtual} marcados={marcados} ativoId={ativoId} erros={erros} ocupado={ocupado}
-          onMarcar={alternarMarca} onAtivo={setAtivoId} onLancar={(c) => void executar(idsDos(c, 'prevista'), 'lancar')} onDesfazer={(c) => void executar(idsDos([c], 'descontada'), 'desfazer')} onAbrirMulta={abrirMulta} />
-      ) : null}
-      {passo === 'enviar' ? (
-        <Surface className="rh-enviar">
-          <h3>Enviar à contabilidade</h3>
-          <p className="rh-resumo__total">{formatMoney(r.total)}</p>
-          <p className="rh-muted">{r.colaboradores} {r.colaboradores === 1 ? 'motorista' : 'motoristas'} · {doMes.length} {doMes.length === 1 ? 'parcela' : 'parcelas'} · {r.lancadas} {r.lancadas === 1 ? 'lançada' : 'lançadas'}</p>
-          {r.previstas ? <Alert tone="warning" title={`Ainda há ${r.previstas} ${r.previstas === 1 ? 'parcela' : 'parcelas'} a lançar`}>O Excel leva todas as parcelas do mês, inclusive as previstas.</Alert> : null}
-          <div className="rh-enviar__acoes">
-            <Button variant="primary" icon={<Download size={18} />} onClick={baixar}>Baixar Excel</Button>
-            {excel[mes] ? <span className="rh-ok"><Check size={16} aria-hidden="true" /> Excel baixado às {excel[mes]}</span> : null}
+      <div className="rh-tarefas">
+        <Surface className="rh-tarefa" data-feito={!aLancar.length || undefined}>
+          <span className="rh-tarefa__num" aria-hidden="true">{aLancar.length ? '1' : <Check size={16} />}</span>
+          <div className="rh-tarefa__texto">
+            <h3>Lançar no sistema da folha</h3>
+            {aLancar.length
+              ? <p>Faltam <strong>{contarMotoristas(aLancar)} de {plural(contarMotoristas(linhas), 'motorista', 'motoristas')}</strong> · <strong className="rh-mono">{formatMoney(somaValores(aLancar))}</strong></p>
+              : <p>Tudo lançado.</p>}
+            <small>Lance o valor no sistema da folha e marque a linha como lançada abaixo.</small>
           </div>
         </Surface>
-      ) : null}
+        <Surface className="rh-tarefa" data-feito={!!excel[mes] || undefined}>
+          <span className="rh-tarefa__num" aria-hidden="true">{excel[mes] ? <Check size={16} /> : '2'}</span>
+          <div className="rh-tarefa__texto">
+            <h3>Enviar Excel à contabilidade</h3>
+            <p>{excel[mes] ? `Excel baixado às ${excel[mes]}.` : `Planilha com ${plural(linhas.length, 'parcela', 'parcelas')} do mês.`}</p>
+            {aLancar.length ? <small>O Excel sai com a situação de cada parcela, inclusive as que faltam lançar.</small> : null}
+          </div>
+          <Button variant={aLancar.length ? 'secondary' : 'primary'} icon={<Download size={18} />} onClick={baixar}>Baixar Excel</Button>
+        </Surface>
+      </div>
+
+      <Surface className="rh-lista">
+        <table className="rh-tabela" aria-label={`Descontos de ${nomeMes}`}>
+          <thead>
+            <tr>
+              <th scope="col" className="rh-col-sel">
+                <Checkbox label={<span className="rh-sr">Selecionar todas a lançar</span>} checked={todasMarcadas} disabled={!aLancar.length || ocupado}
+                  onChange={() => setSelecionados(todasMarcadas ? new Set() : new Set(aLancar.map((p) => p.id)))} />
+              </th>
+              <th scope="col">Motorista</th>
+              <th scope="col">Motivo</th>
+              <th scope="col">Situação</th>
+              <th scope="col" className="rh-col-valor">Descontar</th>
+              <th scope="col"><span className="rh-sr">Ação</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((p) => {
+              const aberto = abertos.has(p.id)
+              const nome = p.colaborador?.nome ?? SEM_COLABORADOR.nome
+              const motivo = motivoTexto(p)
+              return (
+                <Fragment key={p.id}>
+                  <tr className="rh-linha" data-aberto={aberto || undefined}>
+                    <td className="rh-col-sel">
+                      {p.status === 'prevista'
+                        ? <Checkbox label={<span className="rh-sr">{`Selecionar ${nome}, ${motivo}`}</span>} checked={selecionados.has(p.id)} disabled={ocupado} onChange={() => setSelecionados((prev) => alternado(prev, p.id))} />
+                        : null}
+                    </td>
+                    <td className="rh-col-nome">
+                      <button type="button" className="rh-expandir" aria-expanded={aberto} aria-controls={aberto ? `rh-detalhe-${p.id}` : undefined} aria-label={`${nome}, ${motivo}`} onClick={() => setAbertos((prev) => alternado(prev, p.id))}>
+                        <ChevronRight size={16} aria-hidden="true" />
+                        <span>{nome}</span>
+                      </button>
+                    </td>
+                    <td className="rh-col-motivo">
+                      {motivo}
+                      {erros.get(p.id) ? <p className="rh-erro" role="alert">{erros.get(p.id)}</p> : null}
+                    </td>
+                    <td className="rh-col-situacao"><Situacao p={p} mesAtual={mesAtual} /></td>
+                    <td className="rh-col-valor rh-mono">{formatMoney(p.valor)}</td>
+                    <td className="rh-col-acao">
+                      {p.status === 'prevista' ? <Button variant="secondary" size="compact" disabled={ocupado} onClick={() => void executar([p.id], 'lancar')}>Marcar lançado</Button> : null}
+                      {p.status === 'descontada' ? <Button variant="ghost" size="compact" icon={<Undo2 size={14} />} disabled={ocupado} onClick={() => void executar([p.id], 'desfazer')}>Desfazer</Button> : null}
+                    </td>
+                  </tr>
+                  {aberto ? (
+                    <tr className="rh-detalhe" id={`rh-detalhe-${p.id}`}>
+                      <td colSpan={6}><DetalheParcela p={p} corrente={correntes.get(chaveOrigem(p)) ?? [p]} mes={mes} mesAtual={mesAtual} onAbrirMulta={abrirMulta} /></td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+        <footer className="rh-rodape">
+          <p className="rh-retorno" role="status">{retorno}</p>
+          {escolhidas.length ? <span className="rh-rodape__sel">{`${plural(escolhidas.length, 'selecionada', 'selecionadas')} · ${formatMoney(somaValores(escolhidas))}`}</span> : null}
+          <span className="rh-rodape__total">Total do mês <strong className="rh-mono">{formatMoney(somaValores(linhas))}</strong></span>
+          {escolhidas.length ? (
+            <Button variant="primary" disabled={ocupado} loading={ocupado} onClick={() => void executar(escolhidas.map((p) => p.id), 'lancar')}>
+              {escolhidas.length === 1 ? 'Marcar a selecionada como lançada' : `Marcar as ${escolhidas.length} como lançadas`}
+            </Button>
+          ) : null}
+        </footer>
+      </Surface>
     </>
   )
 
@@ -174,15 +224,22 @@ export function RhDescontosPage({ host }: { host: Host }) {
       <header className="rh-topo">
         <div>
           <span className="rh-rotulo">RH · Descontos em folha</span>
-          <h2>{`Folha de ${nomeMes}`}</h2>
+          <h2>{`Descontos de ${nomeMes}`}</h2>
         </div>
-        <div className="rh-topo__nav">
-          <Button variant="secondary" icon={<ChevronLeft size={18} />} aria-label="Mês anterior" onClick={() => deslocar(-1)} />
-          <Button variant="secondary" icon={<ChevronRight size={18} />} aria-label="Próximo mês" onClick={() => deslocar(1)} />
-          <Button variant="secondary" onClick={() => irParaMes(mesAtual)} disabled={mes === mesAtual}>Hoje</Button>
-        </div>
+        <nav className="rh-mes" aria-label="Mês da folha">
+          <Button variant="secondary" icon={<ChevronLeft size={18} />} aria-label="Mês anterior" disabled={ocupado} onClick={() => irParaMes(somaMes(mes, -1))} />
+          <span className="rh-mes__nome">{nomeMes}</span>
+          <Button variant="secondary" icon={<ChevronRight size={18} />} aria-label="Próximo mês" disabled={ocupado} onClick={() => irParaMes(somaMes(mes, 1))} />
+          {mes !== mesAtual ? <Button variant="ghost" disabled={ocupado} onClick={() => irParaMes(mesAtual)}>Mês atual</Button> : null}
+        </nav>
       </header>
-      <FaixaMeses meses={meses} mes={mes} totais={totais} onChange={irParaMes} />
+      {atrasadas && maisAntigo ? (
+        <div className="rh-aviso" role="note">
+          <TriangleAlert size={18} aria-hidden="true" />
+          <span>{`${plural(atrasadas.quantidade, 'desconto', 'descontos')} de meses anteriores ainda não ${atrasadas.quantidade === 1 ? 'foi lançado' : 'foram lançados'}, desde ${mesPorExtenso(maisAntigo)}.`}</span>
+          <Button variant="secondary" size="compact" onClick={() => irParaMes(maisAntigo)}>{`Ver ${mesPorExtenso(maisAntigo)}`}</Button>
+        </div>
+      ) : null}
       {corpo}
     </div>
   )

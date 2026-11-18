@@ -1,5 +1,5 @@
 import { useId, useMemo } from 'react'
-import { Button, StatCard, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Button, StatusBadge, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { calcularFinanceiro, type CicloFinanceiro, type Financeiro, type LinhaClienteFin, type LinhaForma, type LinhaStatusFat, type LinhaStatusPag } from '../../domain/abas/financeiro'
 import type { Delta } from '../../domain/analises'
@@ -11,6 +11,7 @@ import { tabelaCopia } from '../Copiar'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { extrasKpi } from '../KpiExtras'
+import { KpiAba } from '../KpiAba'
 import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
@@ -217,12 +218,12 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
       : `${int(k.pagamentosMedidos)} de ${int(k.pagamentosRecebidos)} pagamentos com data confiável · ${HISTORICO}`
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <StatCard label={ROTULOS_FINANCEIRO[0]} value={brlS(k.maiorServico)} {...extrasKpi({ chips: [fi.ant.maiorServico] })} />
-      <StatCard label={ROTULOS_FINANCEIRO[1]} value={int(k.clientesAtivos)} {...extrasKpi({ chips: [fi.ant.clientesAtivos] })} />
-      <StatCard label={ROTULOS_FINANCEIRO[2]} value={brlS(k.totalRecebido)} {...extrasKpi({ apoio: 'serviços com faturamento pago' })} />
-      <StatCard label={ROTULOS_FINANCEIRO[3]} value={k.cartao == null ? null : brlS(k.cartao)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}` })} />
-      <StatCard label={ROTULOS_FINANCEIRO[4]} value={k.atrasados == null ? null : int(k.atrasados)} {...tomAtencao(k.atrasados)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}` })} />
-      <StatCard label={ROTULOS_FINANCEIRO[5]} value={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} {...extrasKpi({ apoio: tempoApoio })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[0]} value={brlS(k.maiorServico)} {...extrasKpi({ chips: [fi.ant.maiorServico] })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[1]} value={int(k.clientesAtivos)} {...extrasKpi({ chips: [fi.ant.clientesAtivos] })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[2]} value={brlS(k.totalRecebido)} {...extrasKpi({ apoio: 'serviços com faturamento pago' })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[3]} value={k.cartao == null ? null : brlS(k.cartao)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}` })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[4]} value={k.atrasados == null ? null : int(k.atrasados)} {...tomAtencao(k.atrasados)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}` })} />
+      <KpiAba label={ROTULOS_FINANCEIRO[5]} value={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} {...extrasKpi({ apoio: tempoApoio })} />
     </KpiLinha>
     <div className="dash-grade">
       <CicloCard ciclo={fi.ciclo} indisponivel={indisponivel} periodo={periodo} />

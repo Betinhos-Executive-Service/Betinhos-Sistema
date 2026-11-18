@@ -4,13 +4,13 @@ import { ChevronRight, CircleCheck } from 'lucide-react'
 import type { AlertaItem } from '../domain/types'
 import { painelAtencao, type AlertaPainel } from '../domain/alertas'
 
-type Abrir = Partial<Record<string, () => void>>
+type Abrir = Partial<Record<string, (el: HTMLElement) => void>>
 type Gravidade = 'danger' | 'warn'
 
 const ROTULO: Record<Gravidade, string> = { danger: 'Crítico', warn: 'Atenção' }
 
 /** Linha do painel: ponto da cor da gravidade, rótulo e categoria, número, apoio e chevron; vira botão quando há drill-down. */
-function Linha({ item, gravidade, onOpen }: { item: AlertaPainel; gravidade: Gravidade; onOpen?: () => void }) {
+function Linha({ item, gravidade, onOpen }: { item: AlertaPainel; gravidade: Gravidade; onOpen?: (el: HTMLElement) => void }) {
   const conteudo = <>
     <span className={`dash-atencao__ponto dash-atencao__ponto--${gravidade}`} aria-hidden="true" />
     <span className="dash-atencao__nome">{item.rotulo}<span className="dash-atencao__categoria"> · {item.categoria}</span></span>
@@ -21,7 +21,7 @@ function Linha({ item, gravidade, onOpen }: { item: AlertaPainel; gravidade: Gra
   return (
     <li>
       {onOpen
-        ? <button type="button" className="dash-atencao__linha dash-atencao__linha--aberta" onClick={onOpen}>{conteudo}</button>
+        ? <button type="button" data-origem={item.id} className="dash-atencao__linha dash-atencao__linha--aberta" onClick={(e) => onOpen(e.currentTarget)}>{conteudo}</button>
         : <div className="dash-atencao__linha">{conteudo}</div>}
     </li>
   )

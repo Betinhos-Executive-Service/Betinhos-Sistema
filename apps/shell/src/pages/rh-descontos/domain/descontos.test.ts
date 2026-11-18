@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ParcelaFolha } from '../../frota/data/types'
-import { mascararCpf, nomeArquivo, planilhaDoMes, porColaborador, resumo, totaisPorMes } from './descontos'
+import { estadoParcela, motivoTexto, nomeArquivo, planilhaDoMes, porColaborador, somaValores } from './descontos'
 
 const ana = { id: 'c1', nome: 'Ana Teste', cpf: '000.000.000-00' }
 const bruno = { id: 'c2', nome: 'Bruno Teste', cpf: '111.111.111-11' }
@@ -15,8 +15,8 @@ const P = [
 ]
 
 describe('descontos', () => {
-  it('resumo soma e conta', () => {
-    expect(resumo(P)).toEqual({ total: 238.67, colaboradores: 2, previstas: 2, lancadas: 1 })
+  it('somaValores soma em centavos', () => {
+    expect(somaValores(P)).toBe(238.67)
   })
 
   it('planilhaDoMes tem colunas, subtotais e total geral', () => {
@@ -34,21 +34,19 @@ describe('descontos', () => {
 
   it('nomeArquivo', () => expect(nomeArquivo('2026-11')).toBe('descontos-folha-2026-11.xlsx'))
 
-  it('porColaborador agrupa com subtotal em centavos e situação', () => {
+  it('porColaborador agrupa com subtotal e situação', () => {
     const g = porColaborador(P)
-    expect(g.map((x) => [x.nome, x.subtotal, x.tudoLancado])).toEqual([['Ana Teste', 19523, false], ['Bruno Teste', 4344, false]])
+    expect(g.map((x) => [x.nome, x.subtotal])).toEqual([['Ana Teste', 195.23], ['Bruno Teste', 43.44]])
     expect(g[1].parcelas.map((x) => x.id)).toEqual(['a', 'c'])
   })
 
-  it('totaisPorMes separa lançado, a lançar e atrasada', () => {
-    const antiga = parcela({ id: 'd', valor: 60, competencia: '2026-09-01' })
-    const t = totaisPorMes([...P, antiga], '2026-11')
-    expect(t.get('2026-11')).toEqual({ lancado: 10.1, aLancar: 228.57, atrasada: 0 })
-    expect(t.get('2026-09')).toEqual({ lancado: 0, aLancar: 0, atrasada: 60 })
+  it('motivoTexto mostra placa e parcela', () => {
+    expect(motivoTexto(parcela({ id: 'x', valor: 1, numero: 2, total: 3 }))).toMatch(/^Multa .+ · parcela 2 de 3$/)
+    expect(motivoTexto(parcela({ id: 'y', valor: 1, origem: 'termo', multa: null }))).toBe('Termo · à vista')
   })
-
-  it('mascararCpf', () => {
-    expect(mascararCpf('111.111.111-11')).toBe('111.***.***-11')
-    expect(mascararCpf(null)).toBe('')
+  it('estadoParcela separa lançada, cancelada, atrasada e a lançar', () => {
+    expect(P.map((p) => estadoParcela(p, '2026-11'))).toEqual(['futura', 'futura', 'lancada'])
+    expect(estadoParcela(P[0], '2026-12')).toBe('atrasada')
+    expect(estadoParcela({ ...P[0], status: 'cancelada' }, '2026-12')).toBe('cancelada')
   })
 })

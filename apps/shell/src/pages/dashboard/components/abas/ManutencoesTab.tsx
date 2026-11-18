@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import { StatCard, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Manutencoes, type StatusMeta } from '../../domain/abas/manutencoes'
-import { brl, brlS, dec, int } from '../../domain/format'
+import { brl, brlS, dec, int, somar } from '../../domain/format'
 import { META_MANUTENCAO } from '../../domain/metas'
 import type { Apoio } from '../../domain/types'
 import { AnaliseCard } from '../AnaliseCard'
@@ -13,6 +13,7 @@ import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
 import { extrasKpi } from '../KpiExtras'
+import { KpiAba } from '../KpiAba'
 import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
@@ -60,11 +61,11 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   if (prazo?.ly != null) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
-      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [ma.ant?.total] })} />
-      <StatCard label={KPIS[1]} value={k ? brlS(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
-      <StatCard label={KPIS[2]} {...tomAtencao(k?.emAndamento)} value={k ? int(k.emAndamento) : null} {...extrasKpi({ apoio: k ? 'solicitadas, agendadas ou programadas' : undefined })} />
-      <StatCard label={KPIS[3]} value={k ? brl(k.custoMedio) : null} />
-      <StatCard label={KPIS[4]} value={prazo ? diasTexto(prazo.medio) : null} {...extrasKpi({ apoio: apoioPrazo })} />
+      <KpiAba label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [ma.ant?.total] })} />
+      <KpiAba label={KPIS[1]} value={k ? brlS(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
+      <KpiAba label={KPIS[2]} {...tomAtencao(k?.emAndamento)} value={k ? int(k.emAndamento) : null} {...extrasKpi({ apoio: k ? 'solicitadas, agendadas ou programadas' : undefined })} />
+      <KpiAba label={KPIS[3]} value={k ? brl(k.custoMedio) : null} />
+      <KpiAba label={KPIS[4]} value={prazo ? diasTexto(prazo.medio) : null} {...extrasKpi({ apoio: apoioPrazo })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -92,7 +93,7 @@ function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total:
     <AnaliseCard
       titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
       grafico={pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
-      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={[...pontos, { mes: 'total', rotulo: 'Total', valor: somar(pontos, (p) => p.valor) }]} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Custo', (p) => brl(p.valor)]])}
       tabelaSobDemanda={pontos.length > 0}
     />

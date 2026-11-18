@@ -108,7 +108,10 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'packages/deploy/push-flows-dev.ps1',
     'packages/deploy/flows-dev.mjs',
     'packages/deploy/flows-dev.test.mjs',
+    'packages/deploy/backup/exportar-dataverse.mjs',
+    '.github/workflows/backup-prod.yml',
     'apps/portal-cliente/src/x.ts',
+    'apps/backups/src/worker.mjs',
     '',
   ])
   assert.equal(r.caminho, 'nada')

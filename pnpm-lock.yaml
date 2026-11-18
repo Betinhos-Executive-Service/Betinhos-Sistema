@@ -172,6 +172,12 @@ importers:
 
   .: {}
 
+  apps/backups:
+    devDependencies:
+      wrangler:
+        specifier: ^4.151.3
+        version: 4.151.3(@types/node@24.19.2)
+
   apps/cadastro-passageiro:
     devDependencies:
       wrangler:

@@ -1,44 +1,14 @@
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react'
-import { Drawer, StatusBadge, type TableColumn } from '@betinhos/ui'
-import { Tabela } from './Tabela'
+import { StatusBadge, type TableColumn } from '@betinhos/ui'
 import { ExternalLink } from 'lucide-react'
+import { Tabela } from './Tabela'
 import { linkRegistro, type Detalhe, type Entidade, type LinhaCnhDetalhe, type LinhaMultaDetalhe, type LinhaServicoDetalhe } from '../domain/detalhes'
-import { brl, int } from '../domain/format'
-import { useQueryId } from '../../../nav/queryState'
+import { brl, plural } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
 import { forte, resto, dataBR } from './abas/MoMaMuComum'
 import { Vazio } from './Estados'
 import { MEDIA_MOBILE, juntar, useTopCelular } from './Linhas'
 
-/* Drill-down: um único Drawer (DS §10.12, wide) na página; KPIs, alertas e linhas o abrem com a lista já calculada no domínio. */
-
-type Contexto = { abrir: (id: string) => void; clientUrl: string | null }
-const DetalheContexto = createContext<Contexto | null>(null)
-
-/** Abre o drill-down pelo id (`cnh`, `cp-pendente`, `motorista:<key>`…); null fora do `DetalheProvider` (o gatilho não aparece). */
-export const useDetalhe = () => useContext(DetalheContexto)?.abrir ?? null
-
-/**
- * O drill-down aberto vive na URL (`detalhe=<id>`) e a lista é refeita a partir dos dados da página (`resolver`), então recarregar
- * ou compartilhar o link reabre a mesma lista. Ao fechar, a última lista segue desenhada até o fim da animação do Drawer.
- * `clientUrl` só no modo Dataverse (links "Abrir no Dataverse").
- */
-export function DetalheProvider({ clientUrl, resolver, children }: { clientUrl: string | null; resolver: (id: string) => Detalhe | null; children: ReactNode }) {
-  const [id, setId] = useQueryId('detalhe')
-  const atual = id ? resolver(id) : null
-  const ultimo = useRef<Detalhe | null>(null)
-  if (atual) ultimo.current = atual
-  const detalhe = atual ?? ultimo.current
-  const abrir = useCallback((proximo: string) => setId(proximo), [setId])
-  const fechar = useCallback(() => setId(null), [setId])
-  const valor = useMemo(() => ({ abrir, clientUrl }), [abrir, clientUrl])
-  return (
-    <DetalheContexto.Provider value={valor}>
-      {children}
-      {detalhe ? <DetalheDrawer detalhe={detalhe} aberto={atual != null} onFechar={fechar} clientUrl={clientUrl} /> : null}
-    </DetalheContexto.Provider>
-  )
-}
+/* Tabela de registros do card ampliado (serviços, CNH, multas): a lista que antes vivia no Drawer. */
 
 /** Link do registro: ícone com nome acessível; sem link (exemplo, histórico CSV), nada. */
 function Abrir({ href, nome }: { href: string | null; nome: string }) {
@@ -50,21 +20,8 @@ function Abrir({ href, nome }: { href: string | null; nome: string }) {
   )
 }
 
-const plural = (n: number, um: string, varios: string) => `${int(n)} ${n === 1 ? um : varios}`
 
-/** Drawer do drill-down: título, descrição da regra, resumo (quantidade e total) e a lista; fecha por X, Esc e fundo. */
-export function DetalheDrawer({ detalhe, aberto, onFechar, clientUrl }: { detalhe: Detalhe; aberto: boolean; onFechar: () => void; clientUrl: string | null }) {
-  return (
-    <Drawer open={aberto} onClose={onFechar} title={detalhe.titulo} eyebrow="Detalhe do indicador" size="wide">
-      <div className="dash-detalhe">
-        <p className="dash-detalhe__descricao">{detalhe.descricao}</p>
-        <Lista key={detalhe.titulo} detalhe={detalhe} clientUrl={clientUrl} />
-      </div>
-    </Drawer>
-  )
-}
-
-function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | null }) {
+export function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | null }) {
   const mobile = useMedia(MEDIA_MOBILE)
   // Celular: as 10 primeiras e "Ver todos (N)" (o resumo acima sempre conta a lista inteira).
   const top = useTopCelular<{ id: string }>(detalhe.linhas, mobile, 'detalhe')
