@@ -5,10 +5,10 @@ import { daysBetween, formatBR, toDataverseDate, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, RESPONSAVEL } from '../data/schema'
 import type { DataSource } from '../data/source'
-import type { FrotaData, Multa, Ref } from '../data/types'
+import type { FrotaData, Multa, ParcelaFolha, Ref } from '../data/types'
 import { mensagemDaAcao } from '../data/xrm'
 import { estadoDaMulta, responsavelDaMulta, urgenciaDoPrazo } from '../domain/multaEstado'
-import { aberta, avaliar, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
+import { aberta, avaliar, janelaCompetencia, mesBr, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
 import { mensagemWhatsApp } from '../domain/multaMensagem'
 import { useNotify } from './Toasts'
 
@@ -42,7 +42,7 @@ export function dadosSemVazios(d: DadosPasso): DadosPasso {
 }
 
 /** O que já foi feito (rótulo e valor com data), só leitura. */
-function feitos(e: MultaEstado, responsavel: Ref | null): [string, string][] {
+function feitos(e: MultaEstado, responsavel: Ref | null, parcelas: number): [string, string][] {
   const linhas: [string, string][] = []
   const motivo = e.motivoEmpresa != null ? ` (${ROTULO_MOTIVO[e.motivoEmpresa]})` : ''
   if (e.responsavel === RESPONSAVEL.EMPRESA) linhas.push(['Responsável', `Empresa${motivo}`])
@@ -51,7 +51,7 @@ function feitos(e: MultaEstado, responsavel: Ref | null): [string, string][] {
   if (e.dataIndicacao) linhas.push(['Indicação no órgão', `${formatBR(e.dataIndicacao)}${e.canal != null ? ` · ${ROTULO_CANAL[e.canal]}` : ''}`])
   if (e.aceiteEm) linhas.push(['Aceite na CNH Digital', formatBR(e.aceiteEm)])
   if (e.pagaEm) linhas.push(['Pagamento', `${formatBR(e.pagaEm)}${e.valorPago != null ? ` · ${brl(e.valorPago)}` : ''}`])
-  if (e.acertoEm) linhas.push(['Acerto', `${formatBR(e.acertoEm)} · ${e.competencia ? `lançado na folha de ${formatBR(e.competencia).slice(3)}` : `Empresa assumiu${motivo}`}`])
+  if (e.acertoEm) linhas.push(['Acerto', `${formatBR(e.acertoEm)} · ${e.competencia ? `na folha desde ${mesBr(e.competencia)}${parcelas ? `, ${parcelas} ${parcelas === 1 ? 'parcela' : 'parcelas'}` : ''}` : `Empresa assumiu${motivo}`}`])
   if (e.canceladaEm) linhas.push(['Cancelamento', `${formatBR(e.canceladaEm)}${e.motivoCancelamento ? ` · ${e.motivoCancelamento}` : ''}`])
   return linhas
 }
@@ -84,6 +84,16 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const [erroRastreador, setErroRastreador] = useState<string | null>(null)
   const [montando, setMontando] = useState(false)
   const textoRef = useRef<HTMLTextAreaElement>(null)
+  const [parcelasFolha, setParcelasFolha] = useState<ParcelaFolha[]>([])
+  const comDesconto = situacao.descontando || (situacao.etapa === 'encerrada' && !!estado.competencia && !!estado.acertoEm)
+
+  // Parcelas da folha da multa; a resposta que chega fora de ordem é descartada.
+  useEffect(() => {
+    if (!comDesconto) { setParcelasFolha([]); return }
+    let atual = true
+    source.listarParcelasMulta(multa.id).then((lista) => { if (atual) setParcelasFolha(lista) }, () => { if (atual) setParcelasFolha([]) })
+    return () => { atual = false }
+  }, [source, multa.id, comDesconto, multa.status, multa.acertoEm])
 
   // Passo novo começa limpo; o responsável já sugere o motorista que veio no cadastro da multa.
   useEffect(() => {
@@ -238,10 +248,22 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       case 'RegistrarAcerto':
         return <>
           <ChoiceGroup label="Acerto" inline>
-            <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha' })} />
+            <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha', parcelas: 1, competencia: hoje.slice(0, 7) })} />
             <Radio name={nome} label="Empresa assume" checked={dados.acerto === 'empresa'} onChange={() => setDados({ acerto: 'empresa' })} />
           </ChoiceGroup>
-          {dados.acerto === 'folha' && <Field label="Mês do desconto" required><Input type="month" disabled={salvando} value={dados.competencia ?? ''} onChange={(e: { target: { value: string } }) => set({ competencia: e.target.value })} /></Field>}
+          {dados.acerto === 'folha' && (
+            <>
+              <div className="frota-fields">
+                <Field label="Primeiro mês" required>
+                  <Input type="month" min={janelaCompetencia(hoje).de.slice(0, 7)} max={janelaCompetencia(hoje).ate.slice(0, 7)} disabled={salvando} value={dados.competencia ?? ''} onChange={(e: { target: { value: string } }) => set({ competencia: e.target.value })} />
+                </Field>
+                <Field label="Parcelas">
+                  <Input type="number" min={1} max={12} step={1} disabled={salvando} value={String(dados.parcelas ?? 1)} onChange={(e: { target: { value: string } }) => set({ parcelas: Math.max(1, Math.min(12, Math.trunc(Number(e.target.value)) || 1)) })} />
+                </Field>
+              </div>
+              {estado.valorPago ? <p className="frota-muted">{previaParcelas(estado.valorPago, dados.parcelas ?? 1)}</p> : <p className="frota-muted">Registre o pagamento antes de lançar na folha.</p>}
+            </>
+          )}
           {dados.acerto === 'empresa' && (
             <Field label="Motivo" required>
               <Select aria-label="Motivo de a empresa assumir" options={MOTIVOS} placeholder="Escolha o motivo" value={dados.motivo ?? null} onChange={(v) => set({ motivo: (v ?? undefined) as DadosPasso['motivo'] })} />
@@ -282,7 +304,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   }
 
   const prazoTexto = situacao.proximoPrazo ? `${formatBR(situacao.proximoPrazo)}${urgencia === 'vencido' ? ' · vencido' : dias === 0 ? ' · hoje' : ''}` : '—'
-  const lista = feitos(estado, responsavel)
+  const lista = feitos(estado, responsavel, parcelasFolha.length)
 
   return (
     <div className="multa-passos">
@@ -341,7 +363,22 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           {faltaPenalidade && <p id={`${multa.id}-falta`} className="frota-muted">{faltaPenalidade}</p>}
         </section>
       ) : (
-        <p className="frota-muted">{situacao.etapa === 'cancelada' ? 'Multa cancelada.' : 'Multa encerrada. Nada a fazer.'}</p>
+        <p className="frota-muted">{situacao.etapa === 'cancelada' ? 'Multa cancelada.' : situacao.descontando ? 'Descontando em folha: o RH lança cada parcela em Descontos em folha.' : 'Multa encerrada. Nada a fazer.'}</p>
+      )}
+
+      {comDesconto && parcelasFolha.length > 0 && (
+        <section className="frota-group multa-descontos" aria-label="Descontos em folha">
+          <h3 className="frota-group__title">{situacao.descontando ? `Descontando ${parcelasFolha.filter((p) => p.status === 'descontada').length}/${parcelasFolha.length}` : 'Descontos em folha'}</h3>
+          <ul className="multa-descontos__lista">
+            {parcelasFolha.map((p) => (
+              <li key={p.id}>
+                <span>{p.numero}/{p.total} · {mesBr(p.competencia)}</span>
+                <span>{brl(p.valor)}</span>
+                <span>{p.status === 'descontada' && p.lancadoEm ? `Lançada em ${p.lancadoEm.slice(8, 10)}/${p.lancadoEm.slice(5, 7)}` : p.status === 'cancelada' ? 'Cancelada' : 'Prevista'}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {lista.length > 0 && (

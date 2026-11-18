@@ -275,3 +275,34 @@ describe('opcoesMotoristas', () => {
     expect(lista).toEqual([{ value: 'f1', label: ana.label }, { value: 'f2', label: bruno.label }])
   })
 })
+
+describe('Acertar na folha com parcelas', () => {
+  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 100 }
+  const descontando: Multa = { ...acertar, competencia: '2026-10-01', acertoEm: '2026-11-10' }
+  const parcela = (n: number, status: 'prevista' | 'descontada') => ({ id: `p${n}`, numero: n, total: 3, competencia: `2026-${String(9 + n).padStart(2, '0')}-01`, valor: 33.33, status, lancadoEm: status === 'descontada' ? '2026-11-10' : null, origem: 'multa' as const, colaborador: null, multa: null })
+
+  it('Lancei na folha pede primeiro mês (mês atual) e parcelas, mostra a prévia e grava com parcelas', async () => {
+    const source = fonte()
+    renderPasso(source, acertar)
+    fireEvent.click(screen.getByLabelText('Lancei na folha'))
+    const mes = screen.getByLabelText(/Primeiro mês/) as HTMLInputElement
+    expect(mes.value).toBe('2026-11')
+    expect(mes.min).toBe('2026-10')
+    expect(mes.max).toBe('2027-11')
+    expect((screen.getByLabelText(/Parcelas/) as HTMLInputElement).value).toBe('1')
+    fireEvent.change(screen.getByLabelText(/Parcelas/), { target: { value: '3' } })
+    expect(screen.getByText('3× R$ 33,33 · última R$ 33,34')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar acerto' })) })
+    expect(source.passoMulta).toHaveBeenCalledWith('u1', 'RegistrarAcerto', { acerto: 'folha', competencia: '2026-11', parcelas: 3 })
+  })
+
+  it('multa descontando mostra o bloco Descontos em folha com as parcelas e o andamento', async () => {
+    const source = fonte({ listarParcelasMulta: vi.fn(async () => [parcela(1, 'descontada'), parcela(2, 'prevista'), parcela(3, 'prevista')]) })
+    renderPasso(source, descontando)
+    expect(await screen.findByRole('heading', { name: 'Descontando 1/3' })).toBeTruthy()
+    expect(screen.getByText('1/3 · 10/2026')).toBeTruthy()
+    expect(screen.getByText('Lançada em 10/11')).toBeTruthy()
+    expect(screen.getAllByText('Prevista')).toHaveLength(2)
+    expect(screen.queryByText('Multa encerrada. Nada a fazer.')).toBeNull()
+  })
+})
