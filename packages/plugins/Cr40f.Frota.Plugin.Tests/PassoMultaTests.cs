@@ -224,7 +224,7 @@ public class PassoMultaTests
         var mundo = new FakeMundo();
         var multa = MultaParaFolha(mundo, Guid.NewGuid());
         PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12\"}", Hoje);
-        var p = Assert.Single(mundo.Criados.Where(e => e.LogicalName == PassoMultaPlugin.Parcelas));
+        var p = Assert.Single(mundo.Criados, e => e.LogicalName == PassoMultaPlugin.Parcelas);
         Assert.Equal(100m, p.GetAttributeValue<Money>("new_valor").Value);
         Assert.Equal("Multa 1A2B3C · 1/1", p["new_name"]);
     }
