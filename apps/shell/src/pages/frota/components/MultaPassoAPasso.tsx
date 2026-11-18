@@ -22,6 +22,7 @@ const BOTAO: Record<Passo, string> = {
   DefinirResponsavel: 'Confirmar responsável', AvisarMotorista: 'Avisei', RegistrarIndicacao: 'Registrar indicação', RegistrarAceite: 'Registrar aceite',
   RegistrarPagamento: 'Registrar pagamento', RegistrarAcerto: 'Registrar acerto', PrazoVencido: 'Responder', Cancelar: 'Cancelar multa',
   Recorrer: 'Entrar com recurso', ResultadoRecurso: 'Registrar resultado',
+  ConcluirDesconto: 'Concluir desconto', ReabrirDesconto: 'Reabrir desconto',
 }
 const CANAIS = [{ value: 'senatran', label: 'Senatran' }, { value: 'dsv', label: 'DSV Digital' }, { value: 'prefeitura', label: 'Prefeitura' }]
 const MOTIVOS = [{ value: 'culpa-empresa', label: 'Culpa da empresa' }, { value: 'prazo-perdido', label: 'Prazo perdido' }]

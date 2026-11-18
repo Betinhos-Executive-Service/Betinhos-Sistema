@@ -1,3 +1,4 @@
+import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
 
 /**
@@ -6,7 +7,7 @@ import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
  * O servidor é quem decide: a tela usa isto para mostrar o passo e travar o botão; a gravação passa pela cr40f_PassoMulta.
  */
 export type Etapa = 'identificar' | 'indicar' | 'pagar' | 'acertar' | 'encerrada' | 'recurso' | 'cancelada'
-export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso'] as const
+export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto'] as const
 export type Passo = (typeof PASSOS)[number]
 
 export type MultaEstado = {
@@ -14,15 +15,18 @@ export type MultaEstado = {
   dataParaIndicar?: string | null; dataAviso?: string | null; canal?: number | null; dataIndicacao?: string | null; indicado?: boolean | null
   aceiteEm?: string | null; vencimento?: string | null; pagaEm?: string | null; valorPago?: number | null; competencia?: string | null
   acertoEm?: string | null; encerradaEm?: string | null; canceladaEm?: string | null; motivoCancelamento?: string | null; recursoPendente?: boolean | null
+  /** Contagem de parcelas da multa, carregada pelo passo. Ausente = 0. */
+  parcelasPrevistas?: number | null; parcelasDescontadas?: number | null
 }
 
 export type DadosPasso = {
   responsavel?: 'motorista' | 'empresa'; motoristaId?: string; motivo?: 'prazo-perdido' | 'culpa-empresa'
   canal?: 'senatran' | 'dsv' | 'prefeitura'; data?: string; valorPago?: number; competencia?: string
   acerto?: 'folha' | 'empresa'; indicou?: boolean; resultado?: 'deferido' | 'indeferido'; motivoTexto?: string
+  parcelas?: number
 }
 
-export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean }
+export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean; descontando: boolean }
 
 export const ROTULO_PASSO: Record<Passo, string> = {
   DefinirResponsavel: 'Definir o responsável',
@@ -35,6 +39,8 @@ export const ROTULO_PASSO: Record<Passo, string> = {
   Cancelar: 'Cancelar',
   Recorrer: 'Entrar com recurso',
   ResultadoRecurso: 'Registrar o resultado do recurso',
+  ConcluirDesconto: 'Concluir desconto',
+  ReabrirDesconto: 'Reabrir desconto',
 }
 
 export const ROTULO_ETAPA: Record<Etapa, string> = {
@@ -70,11 +76,15 @@ export function prazoVencido(m: MultaEstado, hoje: string) {
   return (etapa === 'identificar' || etapa === 'indicar') && m.dataIndicacao == null && m.dataParaIndicar != null && m.dataParaIndicar < hoje
 }
 
+/** Acertar -> folha já gravado: a multa espera as parcelas serem lançadas (spec RH §3). */
+export const descontando = (m: MultaEstado) => etapaDe(m.status) === 'acertar' && !!m.competencia && !!m.acertoEm
+
 export function avaliar(m: MultaEstado, hoje: string): Situacao {
   const etapa = etapaDe(m.status)
   const vencido = prazoVencido(m, hoje)
   const pendentes: Passo[] = []
   let aguardandoPenalidade = false
+  const emDesconto = descontando(m)
   if (vencido) pendentes.push('PrazoVencido')
   else if (etapa === 'identificar') pendentes.push('DefinirResponsavel')
   else if (etapa === 'indicar') {
@@ -84,11 +94,41 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
   } else if (etapa === 'pagar') {
     if (m.vencimento == null) aguardandoPenalidade = true
     else pendentes.push('RegistrarPagamento')
-  } else if (etapa === 'acertar') pendentes.push('RegistrarAcerto')
+  } else if (etapa === 'acertar') { if (!emDesconto) pendentes.push('RegistrarAcerto') }
   else if (etapa === 'recurso') pendentes.push('ResultadoRecurso')
   const proximoPrazo = (etapa === 'identificar' || etapa === 'indicar' ? m.dataParaIndicar : etapa === 'pagar' ? m.vencimento : null) ?? null
-  const proximoPasso = pendentes.length ? ROTULO_PASSO[pendentes[0]] : aguardandoPenalidade ? 'Aguardando penalidade' : etapa === 'cancelada' ? 'Cancelada' : etapa === 'encerrada' ? 'Encerrada' : ''
-  return { etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido: vencido, aguardandoPenalidade }
+  const proximoPasso = pendentes.length ? ROTULO_PASSO[pendentes[0]] : aguardandoPenalidade ? 'Aguardando penalidade' : emDesconto ? 'Descontando em folha' : etapa === 'cancelada' ? 'Cancelada' : etapa === 'encerrada' ? 'Encerrada' : ''
+  return { etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido: vencido, aguardandoPenalidade, descontando: emDesconto }
+}
+
+const MAXIMO_PARCELAS = 12
+const somaMeses = (iso: string, meses: number) => {
+  const [a, m] = iso.split('-').map(Number)
+  const t = a * 12 + (m - 1) + meses
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-01`
+}
+export const competenciaDe = (mes: string) => `${mes.slice(0, 7)}-01`
+export const mesBr = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`
+export function janelaCompetencia(hoje: string) {
+  const mes = competenciaDe(hoje)
+  return { de: somaMeses(mes, -1), ate: somaMeses(mes, MAXIMO_PARCELAS) }
+}
+export type ParcelaPlano = { numero: number; total: number; competencia: string; valor: number }
+export function dividirParcelas(valor: number, n: number, primeira: string): ParcelaPlano[] {
+  const centavos = Math.round(valor * 100)
+  const parcela = Math.floor(centavos / n)
+  const inicio = competenciaDe(primeira)
+  return Array.from({ length: n }, (_, i) => ({
+    numero: i + 1, total: n, competencia: somaMeses(inicio, i),
+    valor: (i === n - 1 ? centavos - parcela * (n - 1) : parcela) / 100,
+  }))
+}
+const brlTexto = (v: number) => brl(v).replace(/\u00a0/g, ' ')
+export function previaParcelas(valor: number, n: number) {
+  const plano = dividirParcelas(valor, n, '2000-01')
+  const primeira = plano[0].valor
+  const ultima = plano[n - 1].valor
+  return ultima === primeira ? `${n}× ${brlTexto(primeira)}` : `${n}× ${brlTexto(primeira)} · última ${brlTexto(ultima)}`
 }
 
 const CANAL_DE: Record<string, number> = { senatran: CANAL.SENATRAN, dsv: CANAL.DSV, prefeitura: CANAL.PREFEITURA }
@@ -101,6 +141,17 @@ function dataRuim(data: string | undefined, hoje: string, vazio: string): string
   const d = new Date(`${data}T00:00:00Z`)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== data) return 'Data inválida.'
   return data > hoje ? 'A data não pode ser no futuro.' : null
+}
+
+function validarFolha(m: MultaEstado, d: DadosPasso, hoje: string): string | null {
+  if (!d.competencia || !/^\d{4}-(0[1-9]|1[0-2])(-01)?$/.test(d.competencia)) return 'Informe o mês do desconto.'
+  if (!((m.valorPago ?? 0) > 0)) return 'Registre o pagamento antes de lançar na folha.'
+  if (!m.motoristaId?.trim()) return 'A multa não tem motorista; defina o responsável antes.'
+  const { de, ate } = janelaCompetencia(hoje)
+  const c = competenciaDe(d.competencia)
+  if (c < de || c > ate) return `Escolha um mês entre ${mesBr(de)} e ${mesBr(ate)}.`
+  const n = d.parcelas ?? 1
+  return n < 1 || n > MAXIMO_PARCELAS ? 'Escolha de 1 a 12 parcelas.' : null
 }
 
 export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje: string): string | null {
@@ -118,9 +169,18 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
   }
   if (passo === 'Cancelar') {
     if (!aberta(s.etapa)) return 'Esta multa já está encerrada.'
+    if ((m.parcelasPrevistas ?? 0) > 0) return 'Esta multa tem parcelas previstas na folha e não pode ser cancelada.'
     const motivo = d.motivoTexto?.trim() ?? ''
     if (motivo.length < 5) return 'Escreva o motivo do cancelamento.'
     return motivo.length > 2000 ? 'O motivo do cancelamento passa de 2.000 caracteres.' : null
+  }
+  if (passo === 'ConcluirDesconto') {
+    if (!descontando(m)) return 'Esta multa não está descontando em folha.'
+    return (m.parcelasPrevistas ?? 0) > 0 || !((m.parcelasDescontadas ?? 0) > 0) ? 'Ainda há parcelas previstas desta multa.' : null
+  }
+  if (passo === 'ReabrirDesconto') {
+    if (s.etapa !== 'encerrada' || !m.competencia || !m.acertoEm) return 'Só reabre multa encerrada pelo desconto em folha.'
+    return (m.parcelasPrevistas ?? 0) > 0 ? null : 'Não há parcela prevista para reabrir a multa.'
   }
   if (passo === 'Recorrer') return s.etapa === 'identificar' || s.etapa === 'indicar' || s.etapa === 'pagar' ? null : 'Só dá para entrar com recurso antes do pagamento.'
   if (!s.pendentes.length) {
@@ -144,7 +204,7 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
     case 'RegistrarPagamento':
       return dataRuim(d.data, hoje, 'Informe a data do pagamento.') ?? (typeof d.valorPago === 'number' && d.valorPago > 0 ? null : 'Informe o valor pago.')
     case 'RegistrarAcerto':
-      if (d.acerto === 'folha') return d.competencia && /^\d{4}-(0[1-9]|1[0-2])(-01)?$/.test(d.competencia) ? null : 'Informe o mês do desconto.'
+      if (d.acerto === 'folha') return validarFolha(m, d, hoje)
       if (d.acerto === 'empresa') return motivoDe(d.motivo) === null ? 'Escolha o motivo de a empresa assumir.' : null
       return 'Escolha: lancei na folha ou empresa assume.'
     case 'ResultadoRecurso':
@@ -178,9 +238,14 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
       else n.status = MULTA.PAGO
       break
     case 'RegistrarAcerto':
-      if (d.acerto === 'folha') n.competencia = d.competencia!.length === 7 ? `${d.competencia}-01` : d.competencia
-      else n.motivoEmpresa = motivoDe(d.motivo)
-      Object.assign(n, { acertoEm: hoje, encerradaEm: hoje, status: MULTA.FINALIZADO })
+      if (d.acerto === 'folha') Object.assign(n, { competencia: competenciaDe(d.competencia!), acertoEm: hoje }) // segue em Acertar até a última parcela
+      else Object.assign(n, { motivoEmpresa: motivoDe(d.motivo), acertoEm: hoje, encerradaEm: hoje, status: MULTA.FINALIZADO })
+      break
+    case 'ConcluirDesconto':
+      Object.assign(n, { encerradaEm: d.data?.trim() ? d.data : hoje, status: MULTA.FINALIZADO })
+      break
+    case 'ReabrirDesconto':
+      Object.assign(n, { encerradaEm: null, status: MULTA.PAGO })
       break
     case 'PrazoVencido':
       if (d.indicou === true) {
