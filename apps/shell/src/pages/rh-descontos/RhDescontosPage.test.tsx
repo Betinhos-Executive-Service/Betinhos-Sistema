@@ -37,7 +37,7 @@ describe('Descontos em folha', () => {
     const faixa = screen.getByRole('group', { name: 'Meses da folha' })
     const botoes = within(faixa).getAllByRole('button')
     expect(botoes).toHaveLength(7)
-    fireEvent.click(botoes[2])
+    fireEvent.click(botoes[3])
     expect(await screen.findByRole('heading', { name: `Folha de ${mesPorExtenso(somaMes(HOJE, 1))}` })).toBeTruthy()
   })
 
@@ -69,6 +69,7 @@ describe('Descontos em folha', () => {
   it('lança os marcados e desfaz', async () => {
     await abrir()
     passo(/Lançar/)
+    expect((screen.getByRole('button', { name: 'Marque quem já foi lançado' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Ana/ }))
     fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Diego/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Lançar os 2 marcados' }))

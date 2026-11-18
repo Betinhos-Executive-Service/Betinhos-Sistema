@@ -45,7 +45,7 @@ export function FitaFechamento({ grupos, todas, mes, mesAtual, marcados, ativoId
           <div><dt>Falta lançar</dt><dd className="rh-mono">{formatMoney((total - lancado) / 100)}</dd></div>
           <div className="rh-fita__total"><dt>Total</dt><dd className="rh-mono">{formatMoney(total / 100)}</dd></div>
         </dl>
-        <Button variant="primary" disabled={!n || ocupado} loading={ocupado} onClick={() => onLancar(marcadosValidos)}>{n === 1 ? 'Lançar o 1 marcado' : `Lançar os ${n} marcados`}</Button>
+        <Button variant="primary" disabled={!n || ocupado} loading={ocupado} onClick={() => onLancar(marcadosValidos)}>{n === 0 ? 'Marque quem já foi lançado' : n === 1 ? 'Lançar o 1 marcado' : `Lançar os ${n} marcados`}</Button>
       </section>
 
       <section className="rh-fita__detalhe" aria-label={`Detalhe de ${ativo.nome}`}>

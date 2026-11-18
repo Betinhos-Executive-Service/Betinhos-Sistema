@@ -25,7 +25,7 @@ const abrirMulta = (id: string) => { window.location.hash = `#/frota-multas?regi
 
 /**
  * Descontos em folha (RH): conferir as parcelas de multa por colaborador e por mês, marcar o que foi lançado
- * na folha e enviar o Excel à contabilidade. A janela carregada é a da faixa de 7 meses.
+ * na folha e enviar o Excel à contabilidade. A faixa e a janela carregada vão do mês da folha -2 ao +4.
  */
 export function RhDescontosPage({ host }: { host: Host }) {
   useShellHeader({ title: 'Descontos em folha' })
@@ -34,7 +34,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
   }, [host])
   const [mesAtual] = useState(() => todaySP().slice(0, 7))
   const [mes, setMes] = useState(mesAtual)
-  const [inicio, setInicio] = useState(() => somaMes(mesAtual, -1))
+  const [inicio, setInicio] = useState(() => somaMes(mesAtual, -2))
   const [passo, setPasso] = useState<Passo>('conferir')
   const [vista, setVista] = useState<Vista>('holerites')
   const [dados, setDados] = useState<{ parcelas: ParcelaFolha[]; atrasadas: Atrasadas } | null>(null)
@@ -63,7 +63,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
   const irParaMes = (m: string) => {
     setMes(m)
     setMarcados(new Set())
-    setInicio((atual) => (m >= atual && m <= somaMes(atual, MESES_FAIXA - 1) ? atual : somaMes(m, -1)))
+    setInicio((atual) => (m >= atual && m <= somaMes(atual, MESES_FAIXA - 1) ? atual : somaMes(m, -2)))
   }
   const deslocar = (n: number) => irParaMes(somaMes(mes, n))
 

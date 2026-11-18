@@ -22,7 +22,7 @@ export function Holerite({ grupo, cadeias, erros, onAbrirMulta }: { grupo: Grupo
   return (
     <article className="rh-holerite" aria-label={grupo.nome} data-lancado={grupo.tudoLancado || undefined}>
       <header className="rh-holerite__topo">
-        <Avatar name={grupo.nome} />
+        <Avatar name={grupo.nome.split(/\s+/).filter((p) => /^\p{L}/u.test(p)).join(' ')} />
         <div>
           <h3>{grupo.nome}</h3>
           <small>{mascararCpf(grupo.cpf)}</small>
