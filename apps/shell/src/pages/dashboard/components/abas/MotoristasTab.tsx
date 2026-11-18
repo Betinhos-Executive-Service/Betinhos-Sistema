@@ -1,5 +1,5 @@
 import { useId, useMemo } from 'react'
-import { Button, SegmentedControl, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Button, SegmentedControl, StatCard, StatusBadge, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { LinhaChart } from '../../charts/Charts'
@@ -15,7 +15,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { Expansivel, Linhas, MEDIA_MOBILE, VER_MESES, VER_RANKING, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { dataBR, forte, resto } from './MoMaMuComum'
@@ -51,17 +52,17 @@ function MotoristasAba({ ctx, dados, periodo, frota, onFrota }: DadosAba & Props
   const semInfleet = mo.kpis.score == null
   const semFuncionarios = mo.kpis.total == null
   const abrir = useDetalhe()
-  const verCnh = abrir && mo.kpis.cnhAtencao ? { onAbrir: () => abrir('cnh') } : undefined
+  const verCnh = abrir && mo.kpis.cnhAtencao ? () => abrir('cnh') : undefined
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} valor={mo.kpis.total == null ? null : int(mo.kpis.total)} />
-      <KpiCard
-        rotulo={KPIS[1]} tom={tomAtencao(mo.kpis.cnhAtencao)} valor={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
-        apoio={mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: `vencida ou em até ${JANELA_DIAS} dias`, atencao: true }] : []} acao={verCnh}
+      <StatCard label={KPIS[0]} value={mo.kpis.total == null ? null : int(mo.kpis.total)} />
+      <StatCard
+        label={KPIS[1]} {...tomAtencao(mo.kpis.cnhAtencao)} value={mo.kpis.cnhAtencao == null ? null : int(mo.kpis.cnhAtencao)}
+        {...extrasKpi({ apoio: mo.kpis.cnhAtencao ? [{ rotulo: 'Validade', texto: `vencida ou em até ${JANELA_DIAS} dias`, atencao: true }] : [] })} onOpen={verCnh}
       />
-      <KpiCard
-        rotulo={KPIS[2]} valor={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
-        apoio={mo.kpis.score ? [{ rotulo: 'Notas válidas', texto: int(mo.kpis.score.validas) }] : []}
+      <StatCard
+        label={KPIS[2]} value={mo.kpis.score == null ? null : nota(mo.kpis.score.media)}
+        {...extrasKpi({ apoio: mo.kpis.score ? [{ rotulo: 'Notas válidas', texto: int(mo.kpis.score.validas) }] : [] })}
       />
     </KpiLinha>
     <div className="dash-grade">

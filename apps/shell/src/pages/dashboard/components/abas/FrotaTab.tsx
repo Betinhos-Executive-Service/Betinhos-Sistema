@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { TableColumn } from '@betinhos/ui'
+import { StatCard, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { BarrasChart, LinhaChart, type SerieBarra } from '../../charts/Charts'
 import { CORTE_USO_FROTA, calcularFrota, type EventosMes, type Frota, type TelemetriaFrota, type UsoMes } from '../../domain/abas/frota'
@@ -11,7 +11,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Rolagem, col, larguraMinima, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tendencia, tomKpi } from '../KpiLinha'
 import { ChipAnt } from '../KpiChip'
 import type { ChipAnterior } from '../../domain/comparar'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar } from '../Linhas'
@@ -85,21 +86,21 @@ function KpisFrota({ frota }: { frota: Frota }) {
   const cadastro = `Frota cadastrada: ${int(k.cadastrados)} · ${int(k.vendidos)} ${k.vendidos === 1 ? 'vendido' : 'vendidos'}`
   return (
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_KPI[0]} valor={valor(k.total)} apoio={fora ? SEM_VEICULOS : cadastro} />
-      <KpiCard rotulo={ROTULOS_KPI[1]} valor={valor(k.disponiveis)} apoio={fora ? undefined : parte(k.disponiveis) ?? 'status Ativo'} />
-      <KpiCard rotulo={ROTULOS_KPI[2]} valor={valor(k.blindados)} apoio={parte(k.blindados)} />
-      <KpiCard
-        rotulo={ROTULOS_KPI[3]} valor={valor(k.emManutencao)}
-        apoio={fora ? undefined : k.emManutencao == null ? naoRespondeu('A tabela de manutenções') : 'com manutenção em andamento no período'}
+      <StatCard label={ROTULOS_KPI[0]} value={valor(k.total)} {...extrasKpi({ apoio: fora ? SEM_VEICULOS : cadastro })} />
+      <StatCard label={ROTULOS_KPI[1]} value={valor(k.disponiveis)} {...extrasKpi({ apoio: fora ? undefined : parte(k.disponiveis) ?? 'status Ativo' })} />
+      <StatCard label={ROTULOS_KPI[2]} value={valor(k.blindados)} {...extrasKpi({ apoio: parte(k.blindados) })} />
+      <StatCard
+        label={ROTULOS_KPI[3]} value={valor(k.emManutencao)}
+        {...extrasKpi({ apoio: fora ? undefined : k.emManutencao == null ? naoRespondeu('A tabela de manutenções') : 'com manutenção em andamento no período' })}
       />
-      <KpiCard
-        rotulo={ROTULOS_KPI[4]} valor={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} serie={serieUso}
-        apoio={fora ? undefined : k.usoMedioPropria == null ? 'sem próprios ativos com dias no período' : `média diária desde ${dataBR(CORTE_USO_FROTA)}`}
+      <StatCard
+        label={ROTULOS_KPI[4]} value={fora ? null : k.usoMedioPropria == null ? '—' : pct(k.usoMedioPropria)} trend={tendencia(serieUso)}
+        {...extrasKpi({ apoio: fora ? undefined : k.usoMedioPropria == null ? 'sem próprios ativos com dias no período' : `média diária desde ${dataBR(CORTE_USO_FROTA)}` })}
       />
-      <KpiCard
-        rotulo={ROTULOS_KPI[5]} valor={prev ? int(prev.vencidas) : null} tom={prev == null ? 'brand' : prev.vencidas ? 'warning' : 'success'}
-        apoio={prev ? `${int(prev.aVencer)} a vencer` : naoRespondeu('O plano preventivo')}
-        acao={{ texto: 'Abrir frota', onAbrir: () => { location.hash = '#/frota' } }}
+      <StatCard
+        label={ROTULOS_KPI[5]} value={prev ? int(prev.vencidas) : null} {...tomKpi(prev == null ? 'info' : prev.vencidas ? 'warning' : 'success')}
+        {...extrasKpi({ apoio: prev ? `${int(prev.aVencer)} a vencer` : naoRespondeu('O plano preventivo') })}
+        openLabel="Abrir frota" onOpen={() => { location.hash = '#/frota' }}
       />
     </KpiLinha>
   )

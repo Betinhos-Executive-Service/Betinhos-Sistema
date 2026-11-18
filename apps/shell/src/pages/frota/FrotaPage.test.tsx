@@ -76,6 +76,7 @@ describe('Frota', () => {
     renderFrota(source, 'colisoes')
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull() // lista: sem PageHeader (DS §11.2)
     expect(screen.queryByRole('tablist')).toBeNull()
+    await waitFor(() => expect(viewTrigger().textContent).toContain('Colisões')) // a padrão tem o nome da tela, nunca "Visão padrão"
   })
 
   it('a visão "Plano preventivo" mostra a tabela dos itens', async () => {
@@ -114,7 +115,7 @@ describe('Frota', () => {
     fireEvent.click(await screen.findByText('Freio com ruído (fictício)', {}, { timeout: 8000 }))
     expect(screen.queryByRole('tablist', { name: 'Manutenções' })).toBeNull()
     expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
-    expect(viewTrigger().textContent).toContain('Visão padrão') // a padrão continua a de hoje: todas as manutenções
+    expect(viewTrigger().textContent).toContain('Manutenções') // a padrão (todas as manutenções) tem o nome da tela
     expect(await screen.findByRole('dialog', { name: 'TST1A11 · Freio com ruído (fictício)' })).toBeTruthy()
     expect(location.hash).toContain('registro=')
   })
@@ -140,7 +141,7 @@ describe('Frota', () => {
     window.localStorage.clear() // a lista lembra a última visão aberta
     history.replaceState(null, '', '#/frota-manutencoes?sub=todas')
     renderFrota(createMockSource(), 'manutencoes')
-    await waitFor(() => expect(viewTrigger().textContent).toContain('Visão padrão'), { timeout: 8000 })
+    await waitFor(() => expect(viewTrigger().textContent).toContain('Manutenções'), { timeout: 8000 })
     expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
   })
 

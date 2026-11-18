@@ -76,7 +76,7 @@ test("agenda offline: salvar de novo com rede substitui a agenda (atualiza onlin
 test("agenda offline: removerDaAgendaOffline tira o serviço enviado e o cabeçalho que sobra", () => {
   const armazem = memoria();
   salvarAgendaOffline({ driver, agenda: [cabecalho("h1"), servico("a", em(0)), cabecalho("h2"), servico("b", em(1))] }, agora, armazem);
-  removerDaAgendaOffline("a", armazem, agora);
+  removerDaAgendaOffline("a", agora, armazem);
   assert.deepEqual(lerAgendaOffline(agora, armazem)?.agenda.map((item) => item.id), ["h2", "b"]);
 });
 

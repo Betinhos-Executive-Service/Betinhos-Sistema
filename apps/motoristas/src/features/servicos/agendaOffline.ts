@@ -93,7 +93,7 @@ export function lerAgendaOffline(agora = new Date(), armazem: ArmazemTexto | und
 }
 
 /** Serviço enviado ou concluído sai do cache; sobra o resto da agenda. */
-export function removerDaAgendaOffline(detailId: string, armazem: ArmazemTexto | undefined = obterArmazem(), agora = new Date()) {
+export function removerDaAgendaOffline(detailId: string, agora = new Date(), armazem: ArmazemTexto | undefined = obterArmazem()) {
   if (!armazem) return;
   try {
     const bruto = armazem.getItem(AGENDA_OFFLINE_KEY);

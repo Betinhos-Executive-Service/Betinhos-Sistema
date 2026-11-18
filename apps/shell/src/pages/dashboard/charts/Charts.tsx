@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { cor, type CorToken } from './tokens'
 
 /** Cores de série com classe de legenda correspondente no CSS. */
@@ -143,23 +143,6 @@ export function BarrasChart({ dados, series, formatar, descricao, empilhado = fa
           </ResponsiveContainer>
         </div>
       </figure>
-    </div>
-  )
-}
-
-/** Faixa abaixo do ponto mais baixo, para a área não encostar a linha na base do card. */
-const dominioSpark = ([min, max]: readonly [number, number]): [number, number] => [min - ((max - min) || Math.abs(max) || 1) * 0.35, max]
-
-/** Tendência dos últimos meses na base do card de KPI: linha na cor do indicador e área no tom suave. Decorativa; o valor está no card. */
-export function Sparkline({ dados, linha, area }: { dados: Ponto[]; linha: CorToken; area: CorToken }) {
-  return (
-    <div className="dash-spark" aria-hidden="true">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart accessibilityLayer={false} data={dados} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-          <YAxis hide domain={dominioSpark} />
-          <Area type="monotone" dataKey="valor" stroke={cor(linha)} strokeWidth={1.5} fill={cor(area)} fillOpacity={1} baseValue="dataMin" dot={false} activeDot={false} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
     </div>
   )
 }

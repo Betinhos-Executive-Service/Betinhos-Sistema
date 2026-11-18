@@ -4,7 +4,8 @@ import { EMPTY_DATA } from '../data/source'
 import type { FrotaData } from '../data/types'
 import { toCsv } from '../../../app/csv'
 import { linhas } from './linhas'
-import { matchesRegistroKeyword, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, readRegistro, registroBuiltins, registroColumns } from './listas'
+import { matchesRegistroKeyword, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, readRegistro, registroBuiltins, registroColumns, sortRegistros } from './listas'
+import type { Linha } from './linhas'
 import { buildTimeline } from './timeline'
 
 const v1 = { id: 'v1', label: 'ABC1D23' }
@@ -83,12 +84,19 @@ describe('lista de multas (fase 1)', () => {
   })
 
   it('Manutenções: Em aberto e A encaixar', () => {
-    // Manutenções: "Em aberto" continua a padrão (ordem 1); "A encaixar" (ex-sub-aba) filtra Solicitado, a mais antiga primeiro.
+    // Manutenções: "Em aberto" (ordem 1); "A encaixar" (ex-sub-aba) filtra Solicitado, a de maior grau e mais antiga primeiro.
     const [abertas, encaixar] = registroBuiltins('manutencao')
     expect([abertas.name, abertas.ordem, encaixar.id, encaixar.name, encaixar.ordem]).toEqual(['Em aberto', 1, 'encaixar', 'A encaixar', 2])
     const config = JSON.parse(encaixar.config)
     expect(config.filters.quick.status.values.map((v: { value: string }) => v.value)).toEqual([String(MANUT.SOLICITADO)])
-    expect(config.sort).toEqual({ key: 'data', dir: 'asc' })
+    expect(config.sort).toEqual({ key: 'grau', dir: 'desc' })
+    expect(config.columns.find((c: { key: string }) => c.key === 'grau').visible).toBe(false) // Grau é coluna oculta por padrão
+  })
+
+  it('ordenar por grau: maior grau primeiro; no mesmo grau, o pedido mais antigo; sem grau no fim', () => {
+    const linha = (id: string, grau: number | null, dia: string) => ({ kind: 'manutencao', id, titulo: id, veiculo: null, pessoa: null, status: MANUT.SOLICITADO, dia, extra: '', categorias: [], termo: '', termoStatus: null, grau }) as Linha
+    const lista = [linha('media', 2, '2026-11-01'), linha('sem', null, '2026-10-01'), linha('alta-nova', 3, '2026-11-10'), linha('alta-velha', 3, '2026-11-02')]
+    expect(sortRegistros(lista, 'manutencao', { key: 'grau', dir: 'desc' }).map((l) => l.id)).toEqual(['alta-velha', 'alta-nova', 'media', 'sem'])
   })
 })
 
