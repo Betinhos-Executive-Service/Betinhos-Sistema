@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { cor, useAparenciaDosGraficos, type CorToken } from './tokens'
 
 /** Cores de série com classe de legenda correspondente no CSS. */
@@ -144,6 +144,78 @@ export function BarrasChart({ dados, series, formatar, descricao, empilhado = fa
                 />
               ))}
             </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </figure>
+    </div>
+  )
+}
+
+type TomMeta = 'success' | 'info' | 'warning'
+const COR_META: Record<TomMeta, CorToken> = { success: 'success', info: 'action', warning: 'warning' }
+export type PontoMeta = { rotulo: string; meta: number; real: number; tom: TomMeta }
+
+/** Meta × realizado: barras do realizado coloridas pelo atingimento (verde ≥ 100%, azul no meio, amarelo < 80%) e a meta em linha tracejada. */
+export function MetaChart({ dados, formatar, descricao, larguraEixo = 64 }: { dados: PontoMeta[]; formatar: (v: number) => string; descricao: string; larguraEixo?: number }) {
+  useAparenciaDosGraficos()
+  return (
+    <div className="dash-grafico">
+      <ul className="dash-legenda">
+        {([['success', 'Meta batida (≥ 100%)'], ['info', 'Entre 80% e 100%'], ['warning', 'Abaixo de 80%']] as const).map(([tom, nome]) => (
+          <li key={tom}><svg className="dash-legenda__amostra" width={12} height={12} viewBox="0 0 12 12" aria-hidden="true"><rect width={12} height={12} rx={2} fill={cor(COR_META[tom])} /></svg>{nome}</li>
+        ))}
+        <li><span className="dash-legenda__traco dash-legenda__traco--secondary dash-legenda__traco--tracejada" aria-hidden="true" />Meta</li>
+      </ul>
+      <figure className="dash-chart" role="img" aria-label={descricao}>
+        <div className="dash-chart__area">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart accessibilityLayer={false} data={dados} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke={cor('border')} vertical={false} />
+              <XAxis {...eixoX()} />
+              <YAxis {...eixoY(formatar, larguraEixo)} />
+              <Tooltip {...dica(formatar)} cursor={{ fill: cor('surfaceSoft') }} />
+              <Bar dataKey="real" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={32} isAnimationActive={false}>
+                {dados.map((d) => <Cell key={d.rotulo} fill={cor(COR_META[d.tom])} />)}
+              </Bar>
+              <Line type="linear" dataKey="meta" name="Meta" stroke={cor('secondary')} strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: cor('surface') }} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </figure>
+    </div>
+  )
+}
+
+/** Anos em comparação (do mais antigo ao atual): o atual em área com gradiente, os anteriores em linha esmaecida (50% e 25%, o mais antigo tracejado). */
+export function AnosChart({ dados, anos, formatar, descricao, larguraEixo = 64 }: { dados: Ponto[]; anos: string[]; formatar: (v: number) => string; descricao: string; larguraEixo?: number }) {
+  useAparenciaDosGraficos()
+  const gradiente = `dash-area-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
+  const atual = anos[anos.length - 1]
+  const anteriores = anos.slice(0, -1)
+  const series: Serie[] = anos.map((a, i) => ({ chave: a, nome: a, cor: a === atual ? 'action' : 'secondary', tracejada: i === 0 && anos.length > 2 }))
+  return (
+    <div className="dash-grafico">
+      <Legenda series={series} />
+      <figure className="dash-chart" role="img" aria-label={descricao}>
+        <div className="dash-chart__area">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart accessibilityLayer={false} data={dados} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={gradiente} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={cor('action')} stopOpacity={0.32} />
+                  <stop offset="100%" stopColor={cor('action')} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={cor('border')} vertical={false} />
+              <XAxis {...eixoX()} />
+              <YAxis {...eixoY(formatar, larguraEixo)} />
+              <Tooltip {...dica(formatar)} cursor={{ stroke: cor('border') }} />
+              {anteriores.map((a, i) => (
+                <Line key={a} type="monotone" dataKey={a} name={a} stroke={cor('secondary')} strokeWidth={2} strokeOpacity={i === anteriores.length - 1 ? 0.5 : 0.25}
+                  strokeDasharray={i === 0 && anteriores.length > 1 ? '5 4' : undefined} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
+              ))}
+              <Area type="monotone" dataKey={atual} name={atual} stroke={cor('action')} strokeWidth={2} fill={`url(#${gradiente})`} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: cor('surface') }} isAnimationActive={false} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </figure>

@@ -302,3 +302,80 @@ describe('GavetaManutencao: recarga depois de gravar', () => {
     expect(screen.queryByRole('dialog', { name: /ANTIGO/ })).toBeNull()
   })
 })
+
+describe('GavetaManutencao: editar', () => {
+  const comStatus = (status: number) => {
+    const source = createMockSource()
+    const lido = source.detalheManutencao.bind(source)
+    vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => { const d = await lido(i); return d && { ...d, status } })
+    return source
+  }
+
+  it.each([['reprovada', MANUT.REPROVADO], ['cancelada', MANUT.CANCELADO], ['realizada', MANUT.REALIZADO], ['agendada', MANUT.AGENDADO]])('o lápis aparece em manutenção %s', async (_nome, status) => {
+    montar('m1', comStatus(status))
+    const g = await gaveta(M1)
+    expect(within(g).getByRole('button', { name: 'Editar' })).toBeTruthy()
+  })
+
+  it('o lápis troca o corpo pelo formulário, com o foco no primeiro campo, e Voltar devolve o foco ao lápis', async () => {
+    montar('m1')
+    const g = await gaveta(M1)
+    fireEvent.click(within(g).getByRole('button', { name: 'Editar' }))
+    expect(await within(g).findByRole('heading', { name: 'Pedido' })).toBeTruthy()
+    expect(within(g).queryByRole('region', { name: 'Próximo passo' })).toBeNull()
+    expect(within(g).queryByRole('button', { name: 'Mais ações' })).toBeNull()
+    await waitFor(() => expect(g.contains(document.activeElement) && document.activeElement !== g).toBe(true))
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(g).getByRole('button', { name: 'Editar' })))
+    expect(within(g).getByRole('region', { name: 'Próximo passo' })).toBeTruthy()
+  })
+
+  it('Voltar com alteração pendente pede para descartar', async () => {
+    montar('m1')
+    const g = await gaveta(M1)
+    fireEvent.click(within(g).getByRole('button', { name: 'Editar' }))
+    fireEvent.change(await within(g).findByLabelText(/Km no pedido/), { target: { value: '777' } })
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Continuar editando' }))
+    expect(within(g).getByLabelText(/Km no pedido/)).toBeTruthy()
+    fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
+    expect(await within(g).findByRole('region', { name: 'Próximo passo' })).toBeTruthy()
+  })
+
+  it('Voltar sem alteração volta direto', async () => {
+    montar('m1')
+    const g = await gaveta(M1)
+    fireEvent.click(within(g).getByRole('button', { name: 'Editar' }))
+    fireEvent.click(await within(g).findByRole('button', { name: 'Voltar' }))
+    expect(await within(g).findByRole('region', { name: 'Próximo passo' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'Descartar alterações?' })).toBeNull()
+  })
+
+  it('fechar a gaveta com alteração pendente pede para descartar; Descartar fecha', async () => {
+    const onClose = vi.fn()
+    render(<ToastProvider><GavetaManutencao source={createMockSource()} id="m1" hoje={hoje} onClose={onClose} onChanged={() => {}} /></ToastProvider>)
+    const g = await gaveta(M1)
+    fireEvent.click(within(g).getByRole('button', { name: 'Editar' }))
+    fireEvent.change(await within(g).findByLabelText(/Km no pedido/), { target: { value: '777' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar painel' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Descartar' }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('Salvar grava o patch, avisa, recarrega, avisa quem abriu e volta à visão normal', async () => {
+    const { source, onChanged } = montar('m1')
+    const update = vi.spyOn(source, 'update')
+    const g = await gaveta(M1)
+    fireEvent.click(within(g).getByRole('button', { name: 'Editar' }))
+    fireEvent.change(await within(g).findByLabelText(/Descrição do problema/), { target: { value: 'Freio chiando' } })
+    fireEvent.click(within(g).getByRole('button', { name: 'Salvar' }))
+    expect(await screen.findByText('Manutenção atualizada.')).toBeTruthy()
+    expect(update).toHaveBeenCalledWith('manutencao', 'm1', { cr40f_descricao: 'Freio chiando' })
+    expect(onChanged).toHaveBeenCalled()
+    expect(await screen.findByRole('dialog', { name: 'TST1A11 · Freio chiando' })).toBeTruthy()
+  })
+})

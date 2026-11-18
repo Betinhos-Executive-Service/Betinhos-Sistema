@@ -44,6 +44,7 @@ export function atalho(kind: Exclude<Atalho, 'personalizado'>, now: Date): Perio
     case 'ult7': return { inicio: fmtDia(y, m, d - 6), fim: hoje }
     case 'ult30': return { inicio: fmtDia(y, m, d - 29), fim: hoje }
     case 'esteMes': return { inicio: fmtDia(y, m, 1), fim: hoje }
+    case 'esteTrimestre': return { inicio: fmtDia(y, m - (m % 3), 1), fim: hoje }
     case 'mesAnt': return { inicio: fmtDia(y, m - 1, 1), fim: fmtDia(y, m, 0) }
     case 'esteAno': return { inicio: `${y}-01-01`, fim: hoje }
     case 'anoAnt': return { inicio: `${y - 1}-01-01`, fim: `${y - 1}-12-31` }

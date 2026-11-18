@@ -297,4 +297,14 @@ describe('arquivos, anexo da despesa e buscas', () => {
     expect(webApi.retrieveMultipleRecords.mock.calls[1][0]).toBe('cr40f_cidade')
     expect(webApi.retrieveMultipleRecords.mock.calls[1][1]).toContain('cr40f_ativa eq true')
   })
+
+  it('busca veículos ativos e não vendidos por placa ou modelo, com aspas escapadas', async () => {
+    const { d, webApi } = criarDeps()
+    webApi.retrieveMultipleRecords.mockResolvedValueOnce({ entities: [{ cr40f_veiculosid: '{V1}', cr40f_placa: 'TST1A11', cr40f_modelo: 'Corolla' }] })
+    expect(await criarArquivosXrm(d).buscarVeiculos("o'c")).toEqual([{ id: 'v1', nome: 'TST1A11 · Corolla' }])
+    const [tabela, consulta] = webApi.retrieveMultipleRecords.mock.calls[0]
+    expect(tabela).toBe('cr40f_veiculos')
+    expect(consulta).toContain(`contains(cr40f_placa,'${encodeURIComponent("o''c")}')`)
+    expect(consulta).toContain('statecode eq 0')
+  })
 })

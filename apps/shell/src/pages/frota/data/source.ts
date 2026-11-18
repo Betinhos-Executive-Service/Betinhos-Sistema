@@ -67,6 +67,8 @@ export interface ArquivosManutencao {
   buscarFuncionarios(texto: string): Promise<OpcaoBusca[]>
   /** Cidades ativas pelo nome (até 50), como "São José dos Campos - SP". */
   buscarCidades(texto: string): Promise<OpcaoBusca[]>
+  /** Veículos não vendidos pela placa ou pelo modelo (até 50), como "ABC1D23 · Hilux". */
+  buscarVeiculos(texto: string): Promise<OpcaoBusca[]>
 }
 
 export interface DataSource extends ComandosManutencao, ArquivosManutencao {

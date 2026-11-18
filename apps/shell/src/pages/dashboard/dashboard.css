@@ -17,12 +17,18 @@
 .dash-corpo { container: dash / inline-size; display: grid; gap: var(--bt-space-4); min-width: 0; }
 
 /* Eyebrow do DS (§4.3): caixa alta, 800, 11 px, slate. */
-.dash-faixa__titulo, .dash-card__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.dash-card__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); line-height: var(--bt-typography-label-micro-line-height); letter-spacing: .08em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
 
 /* ---------- Barra de filtros ---------- */
 .dash-filtros { align-items: flex-start; }
 .dash-filtros .bt-page-toolbar__start { gap: var(--bt-space-2) var(--bt-space-3); }
-.dash-periodo { min-width: 168px; }
+/* Filtros como chips: vazio = "+ Status" tracejado; com valor = chip preenchido ("Cliente: X", com o ✕ do DS para limpar). */
+.dash-chip .bt-select__trigger { border-radius: var(--bt-radius-pill, 999px); border-style: dashed; background: transparent; color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-bold); }
+.dash-chip .bt-select__trigger:has(.bt-select__value:not(.is-placeholder)) { border-style: solid; border-color: var(--bt-color-action); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); }
+.dash-chip--status .bt-select__value:not(.is-placeholder)::before { content: 'Status: '; }
+.dash-chip--cliente .bt-select__value:not(.is-placeholder)::before { content: 'Cliente: '; }
+.dash-chip--motorista .bt-select__value:not(.is-placeholder)::before { content: 'Motorista: '; }
+.dash-chip--tipo .bt-select__value:not(.is-placeholder)::before { content: 'Tipo: '; }
 .dash-datas, .dash-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); min-width: 0; }
 .dash-erro { align-self: center; color: var(--bt-color-danger); font-size: var(--bt-font-size-12); }
 
@@ -81,18 +87,60 @@
 .dash-apoio--atencao, .dash-apoio--atencao .dash-apoio__rotulo { color: var(--bt-color-warning); }
 .dash-apoio__icone { vertical-align: -2px; margin-right: var(--bt-space-1); }
 
-/* ---------- Faixas de alerta ---------- */
-/* Alertas de operação | Qualidade dos dados: duas colunas na largura cheia, uma no estreito (mesmo corte da grade de cards). */
-.dash-faixas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
-@container dash (min-width: 900px) { .dash-faixas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.dash-faixa { container: dash-faixa / inline-size; display: grid; align-content: start; gap: var(--bt-space-2); min-width: 0; }
-/* Fileiras da faixa com a mesma altura: as duas faixas lado a lado ficam alinhadas. */
-/* Cards da faixa pela largura da própria faixa: 1 coluna no estreito, 2 (2 × 2) a partir de ~400 px e 4 numa faixa larga. */
-.dash-faixa__lista { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; gap: var(--bt-space-2) var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
-@container dash-faixa (min-width: 400px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container dash-faixa (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-/* Alerta em tom ok: sem a borda firme nem a sombra dos que pedem ação (o hover do clicável continua do DS). */
-.bt-alert-card.dash-alerta--ok:not(.bt-alert-card--open:hover) { border-color: var(--bt-color-border); box-shadow: none; }
+/* ---------- Bento do Resumo ---------- */
+/* Faturamento é o herói (2 linhas), Recebimento o anel alto e os quatro compactos fecham 2 × 2. Sem subgrid: cada card tem a própria altura. */
+.dash-bento { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--bt-space-3);
+  grid-template-areas: "fat fat" "rec rec" "sv tk" "ar cp"; }
+.dash-bento > .bt-stat { grid-row: auto; grid-template-rows: auto auto auto 1fr; }
+.dash-bento > .dash-bento__faturamento { grid-area: fat; }
+.dash-bento > .dash-bento__recebimento { grid-area: rec; }
+.dash-bento > .dash-bento__servicos { grid-area: sv; }
+.dash-bento > .dash-bento__ticket { grid-area: tk; }
+.dash-bento > .dash-bento__aReceber { grid-area: ar; }
+.dash-bento > .dash-bento__cpPendente { grid-area: cp; }
+@container dash (min-width: 560px) { .dash-bento { grid-template-areas: "fat fat" "rec sv" "rec tk" "ar cp"; } }
+@container dash (min-width: 1000px) { .dash-bento { grid-template-columns: 2fr 1.1fr 1fr 1fr; grid-template-areas: "fat rec sv tk" "fat rec ar cp"; } }
+/* Herói: valor maior e gráfico de área do período, com o primeiro e o último mês nas pontas. */
+.dash-bento > .bt-stat { align-self: stretch; }
+.dash-bento__faturamento { position: relative; min-height: 190px; }
+.dash-bento__faturamento .bt-stat__value { font-size: clamp(26px, 9cqi, 40px); }
+.dash-bento__faturamento .bt-spark.bt-stat__spark { align-self: stretch; height: 100%; min-height: 96px; }
+.dash-bento__faturamento[data-inicio]::before, .dash-bento__faturamento[data-inicio]::after { position: absolute; bottom: var(--bt-space-1); font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.dash-bento__faturamento[data-inicio]::before { content: attr(data-inicio); left: var(--bt-space-3); }
+.dash-bento__faturamento[data-inicio]::after { content: attr(data-fim); right: var(--bt-space-3); }
+/* Recebimento: anel centralizado e "R$ X de R$ Y" embaixo. */
+.dash-anel { display: grid; place-items: center; flex: 1; }
+.dash-anel__valores { margin: 0; text-align: center; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.dash-anel__valores strong { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-14); }
+
+/* ---------- Painel "Precisa de atenção" ---------- */
+.dash-atencao__cabeca { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--bt-space-2); }
+.dash-atencao__ordem { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.dash-atencao__colunas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-4); }
+@container dash (min-width: 700px) { .dash-atencao__colunas:has(> :nth-child(2)) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dash-atencao__coluna { display: grid; align-content: start; gap: var(--bt-space-2); min-width: 0; }
+.dash-atencao__grupo { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); }
+.dash-atencao__grupo--danger { color: var(--bt-color-danger); }
+.dash-atencao__grupo--warn { color: var(--bt-color-warning-strong, var(--bt-color-warning)); }
+.dash-atencao__lista { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.dash-atencao__ponto { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.dash-atencao__ponto--danger { background: var(--bt-color-danger); }
+.dash-atencao__ponto--warn { background: var(--bt-color-warning); }
+.dash-atencao__linha { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); width: 100%; min-height: 44px; padding: var(--bt-space-2) var(--bt-space-3);
+  border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md, 8px); background: var(--bt-color-surface); color: inherit; font: inherit; text-align: left; }
+button.dash-atencao__linha { cursor: pointer; }
+.dash-atencao__linha--aberta:hover { border-color: var(--bt-color-border-strong); background: var(--bt-color-surface-soft, var(--bt-color-surface)); }
+.dash-atencao__linha--aberta:focus-visible { outline: 2px solid var(--bt-color-action); outline-offset: 2px; }
+.dash-atencao__nome { min-width: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+.dash-atencao__categoria { font-weight: var(--bt-font-weight-regular, 400); color: var(--bt-color-text-secondary); }
+.dash-atencao__numero { font-size: var(--bt-font-size-16, 16px); font-variant-numeric: tabular-nums; }
+.dash-atencao__apoio { grid-column: 2 / 4; grid-row: 2; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.dash-atencao__apoio:empty { display: none; }
+.dash-atencao__seta { grid-column: 4; grid-row: 1 / span 2; color: var(--bt-color-text-secondary); }
+.dash-atencao__rodape { display: flex; flex-wrap: wrap; gap: var(--bt-space-1) var(--bt-space-4); margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.dash-atencao__ok { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-success); }
+.dash-atencao__ok strong { color: inherit; }
+.dash-atencao__vazio { margin: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
 
 /* ---------- Grade de cards (destaques e análises) ---------- */
 .dash-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }
@@ -219,3 +267,5 @@
 .dash-carga__trilho { width: min(360px, 100%); height: var(--bt-space-2); overflow: hidden; border-radius: var(--bt-radius-full); background-color: var(--bt-color-border); }
 .dash-carga__barra { height: 100%; border-radius: inherit; background-color: var(--bt-color-action); transition: width 200ms var(--bt-ease-out); }
 @media (prefers-reduced-motion: reduce) { .dash-carga__barra { transition: none; } }
+/* Sparkline do herói no tom action (azul), como no protótipo; o StatCard "info" usa o azul-marinho e um cinza na área. */
+.dash-bento__faturamento .bt-spark { --bt-stat-tone: var(--bt-color-action); --bt-stat-tone-soft: var(--bt-color-action-soft); }

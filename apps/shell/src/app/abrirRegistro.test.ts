@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { openGridRecord } from './abrirRegistro'
+import { openGridRecord, podeAbrirRegistro } from './abrirRegistro'
 import { TABELAS_COM_GAVETA, fecharGavetaRegistro, gavetaRegistroAberta } from './registroAberto'
 
 afterEach(() => { fecharGavetaRegistro(); vi.unstubAllGlobals() })
@@ -23,4 +23,12 @@ it('tabela sem tela no shell não abre a gaveta', () => {
   vi.stubGlobal('Xrm', { Navigation: { navigateTo: vi.fn(async () => undefined) } })
   void openGridRecord('cr40f_solicitantes', id)
   expect(gavetaRegistroAberta()).toBeNull()
+})
+
+it('mapa central: tabela com gaveta (inclui multa) é abrível; sem gaveta e sem Xrm, não; com Xrm, sim', () => {
+  expect(TABELAS_COM_GAVETA).toContain('cr40f_multas')
+  expect(podeAbrirRegistro('cr40f_multas')).toBe(true)
+  expect(podeAbrirRegistro('cr40f_solicitantes')).toBe(false)
+  vi.stubGlobal('Xrm', { Navigation: { navigateTo: vi.fn(async () => undefined) } })
+  expect(podeAbrirRegistro('cr40f_reservadeveculos')).toBe(true)
 })

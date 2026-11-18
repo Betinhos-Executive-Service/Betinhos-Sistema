@@ -35,24 +35,24 @@ describe('Dashboard', () => {
     await within(painel).findByRole('region', { name: 'Total produzido' })
     const kpis = within(painel).getByRole('region', { name: 'Indicadores executivos' })
     expect(within(kpis).getByText('Faturamento')).toBeTruthy()
-    expect(within(kpis).getAllByRole('article').length).toBe(6)
-    expect(within(painel).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Alertas de operação', 'Qualidade dos dados', 'Total produzido', 'Meta × realizado'])
+    expect(within(kpis).getAllByRole('article').length).toBe(5)
+    expect(within(kpis).getByRole('region', { name: 'Recebimento' })).toBeTruthy()
+    expect(within(painel).getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Recebimento', expect.stringMatching(/^Precisa de atenção · \d+$/), 'Total produzido', 'Meta × realizado'])
     // Produção, clientes e motoristas foram para as abas próprias; seções numeradas, atalhos e iframe saíram.
     expect(painel.textContent).not.toMatch(/Produção própria|Faturamento por cliente|Serviços por motorista|Top 5 motoristas|Frota e pessoas/)
     expect(screen.queryByRole('navigation', { name: 'Seções do resumo' })).toBeNull()
     expect(document.querySelector('iframe')).toBeNull()
-    expect(screen.getByRole('combobox', { name: 'Período' }).textContent).toContain('Este ano')
+    expect(screen.getByRole('radio', { name: 'Ano' }).getAttribute('aria-checked')).toBe('true')
     // O dashboard antigo (legado) segue como modo TV.
     expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
   })
 
-  it('trocar o período para "Mês anterior" recalcula', async () => {
+  it('trocar o período para "Mês" recalcula', async () => {
     render(<DashboardPage host={{ mode: 'mock' }} />)
     await screen.findByRole('region', { name: 'Total produzido' })
-    fireEvent.click(screen.getByRole('combobox', { name: 'Período' }))
-    fireEvent.click(await screen.findByText('Mês anterior'))
-    expect(screen.getByRole('combobox', { name: 'Período' }).textContent).toContain('Mês anterior')
-    const p = atalho('mesAnt', new Date())
+    fireEvent.click(screen.getByRole('radio', { name: 'Mês' }))
+    expect(screen.getByRole('radio', { name: 'Mês' }).getAttribute('aria-checked')).toBe('true')
+    const p = atalho('esteMes', new Date())
     const br = (d: string) => d.split('-').reverse().join('/')
     expect((await screen.findAllByText(`${br(p.inicio)} a ${br(p.fim)}`, { exact: false })).length).toBeGreaterThan(0)
   })
@@ -71,7 +71,7 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('tabpanel', { name: 'Resumo' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Indicadores executivos' })).toBeNull()
     // Filtros globais e "Abrir modo TV" continuam fora do Resumo.
-    expect(screen.getByRole('combobox', { name: 'Período' })).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: 'Período' })).toBeTruthy()
     // O dashboard antigo (legado) segue como modo TV.
     expect(screen.getByRole('link', { name: /Abrir modo TV/ }).getAttribute('href')).toContain('new_dashboard')
 

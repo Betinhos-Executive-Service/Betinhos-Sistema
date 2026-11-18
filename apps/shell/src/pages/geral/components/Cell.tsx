@@ -1,9 +1,8 @@
 import { memo, useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Button, Input, Select, Spinner, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
+import { Button, Input, LookupCell, Select, Spinner, Switch, Textarea, Tooltip, type SelectOption } from '@betinhos/ui'
 import { AlertTriangle, Check, Lock } from 'lucide-react'
 import { cellKind, MOTORISTA_TITLE, readonlyHint, isBadgeValue, lookupTarget } from '../domain/cells'
-import { openGridRecord } from '../../../app/abrirRegistro'
 import { isProtegido } from '../domain/protecao'
 import { ChoiceBadge } from './ChoiceBadge'
 import { ProtecaoLock } from './ProtecaoLock'
@@ -316,7 +315,7 @@ export const Cell = memo(function Cell({ row, column, info, status, onSave, onRe
       />
     )
   } else if (isBadgeValue(column, raw) && text !== '') value = <ChoiceBadge column={column} info={info} raw={raw} text={text} />
-  else if (target && text !== '') value = <button type="button" className="gr-cell__value gr-lookup" title={text} aria-label={`Abrir ${label}: ${text}`} onClick={(event) => { if (event.detail <= 1) void openGridRecord(target.table, target.id) }} onDoubleClick={(event) => event.stopPropagation()}>{text}</button>
+  else if (target && text !== '') value = <span className="gr-cell__value" title={text}><LookupCell table={target.table} id={target.id}>{text}</LookupCell></span>
   else if (href && column.attribute === 'new_linkdovoucher') value = <a className="gr-cell__value" href={href} target="_blank" rel="noreferrer" title={text}>{text}</a>
   else value = <span className="gr-cell__value" title={hint ? `${text}\n${hint}` : text}>{text}</span>
 

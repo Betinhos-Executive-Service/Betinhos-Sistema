@@ -21,10 +21,10 @@ it('Resumo Operacional é rota React do shell', () => {
 })
 
 it('usa rótulo do sitemap, depois metadata, depois nome lógico', () => {
-  const labels = new Map([['cr40f_servicosporpassageiro', 'Serviços por passageiro']])
+  const labels = new Map([['cr40f_categoriadespesaoperacional', 'Categorias de despesa']])
   expect(itemLabel(findItem('clientes')!.item, labels)).toBe('Clientes')
-  expect(itemLabel(findItem('cr40f_servicosporpassageiro')!.item, labels)).toBe('Serviços por passageiro')
-  expect(itemLabel(findItem('cr40f_trocasdecarro')!.item, labels)).toBe('cr40f_trocasdecarro')
+  expect(itemLabel(findItem('cr40f_categoriadespesaoperacional')!.item, labels)).toBe('Categorias de despesa')
+  expect(itemLabel(findItem('cr40f_formapagamentodespesa')!.item, labels)).toBe('cr40f_formapagamentodespesa')
 })
 
 it('Documentos é rota React em Cadastros, logo após Funcionários', () => {
@@ -39,9 +39,9 @@ it('Equipamentos é rota React em Cadastros', () => {
   expect(findItem('equipamentos')?.item).toMatchObject({ kind: 'page', page: 'equipamentos', label: 'Equipamentos' })
 })
 
-it('Frota tem um item por visão, sem as tabelas legadas nem Infrações solta', () => {
+it('Frota tem um item por visão, sem as tabelas legadas', () => {
   const frota = MENU.find((group) => group.id === 'frota')!
-  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Colisões', 'Indicadores', 'Plano preventivo', 'Checklists de Veículos'])
+  expect(frota.items.map((item) => item.label)).toEqual(['Pendências', 'Veículos', 'Manutenções', 'Multas', 'Infrações', 'Colisões', 'Indicadores', 'Plano preventivo', 'Checklists de Veículos'])
   expect(ENTITY_NAMES).not.toContain('cr40f_manutencoes')
   expect(ENTITY_NAMES).not.toContain('cr40f_multas')
   expect(ENTITY_NAMES).not.toContain('cr40f_colisao_v2')
@@ -55,7 +55,10 @@ it('links antigos da Frota e de Infrações vão para a visão nova', () => {
   expect(ir('frota', 'aba=ocorrencias')).toBe('frota-multas?')
   expect(ir('frota', 'aba=ocorrencias&tipo=colisao')).toBe('frota-colisoes?')
   expect(ir('frota', 'aba=pendencias&ficha=v1')).toBe('frota?ficha=v1')
-  expect(ir('infracoes', 'ver=i1')).toBe('frota-multas?ver=i1&sub=infracoes')
+  expect(ir('infracoes', 'ver=i1')).toBe('frota-infracoes?ver=i1')
+  expect(ir('frota-multas', 'sub=infracoes&ver=i1')).toBe('frota-infracoes?ver=i1')
+  expect(ir('frota-multas', 'q=abc')).toBeNull()
+  expect(findItem('frota-infracoes')?.item).toMatchObject({ kind: 'page', page: 'infracoes' })
   expect(ir('frota', 'aba=checklists')).toBe('frota-checklists?')
   expect(ir('new_gestaochecklistsveiculos', '')).toBe('frota-checklists?')
   expect(ir('frota', 'ficha=v1')).toBeNull()
@@ -81,7 +84,7 @@ it('Funções Operacionais é rota React no Operacional e os links antigos vão 
   expect(findItem('funcoes-operacionais')?.item).toMatchObject({ kind: 'page', page: 'funcoes-operacionais', label: 'Funções Operacionais' })
   expect(findItem('new_telafuncoesoperacionais')).toBeNull()
   expect(findItem('custom-page-funcoes-operacionais')).toBeNull()
-  expect(findItem('cr40f_trocasdecarro')?.item).toMatchObject({ kind: 'entity' })
+  expect(findItem('cr40f_trocasdecarro')).toBeNull()
   const r = rotaAtualizada('new_telafuncoesoperacionais', new URLSearchParams('aba=carro'))
   expect(r && `${r.id}?${r.query}`).toBe('funcoes-operacionais?aba=carro')
   expect(rotaAtualizada('custom-page-funcoes-operacionais', new URLSearchParams())?.id).toBe('funcoes-operacionais')
@@ -117,4 +120,10 @@ it('Conciliação do cartão saiu do menu: Cartões corporativos é de Cadastros
 
 it('Infleet abre dentro do shell, na área de conteúdo', () => {
   expect(findItem('infleet')?.item).toMatchObject({ kind: 'site', url: 'https://app.infleet.com.br/monitoring' })
+})
+
+it('Back-End não lista mais as tabelas de apoio tiradas em 18/11/2026', () => {
+  for (const id of ['cr40f_servicosporpassageiro', 'cr40f_trocasdecarro', 'new_possedeveiculo', 'new_teladespesasoperacionais', 'new_fotomanutencao', 'cr40f_anexodespesaoperacional', 'cr40f_anexocolisao_v2', 'cr40f_anexorecebimento_v2']) {
+    expect(findItem(id)).toBeNull()
+  }
 })

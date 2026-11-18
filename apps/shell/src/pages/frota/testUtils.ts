@@ -35,5 +35,6 @@ export function manutencaoFalsa(): ComandosManutencao & ArquivosManutencao {
     anexarNotaFiscalDespesa: vi.fn(async () => {}),
     buscarFuncionarios: vi.fn(async () => []),
     buscarCidades: vi.fn(async () => []),
+    buscarVeiculos: vi.fn(async () => []),
   }
 }

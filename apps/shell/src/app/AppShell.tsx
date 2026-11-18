@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, ReceiptText, Route,
-  ScrollText, Shield, ShieldCheck, Shuffle, Sun, Moon, Monitor, Tag, TrendingUp, Users, Wallet, Wrench,
+  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
+  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Sun, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
@@ -64,6 +64,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'frota-veiculos': <CarFront />,
   'frota-manutencoes': <Wrench />,
   'frota-multas': <AlertTriangle />,
+  'frota-infracoes': <Scale />,
   'frota-colisoes': <Camera />,
   'frota-indicadores': <Gauge />,
   'frota-plano': <Clock />,
@@ -77,8 +78,6 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   new_dashboard: <LayoutDashboard />,
   operacional: <Clock />,
   'funcoes-operacionais': <Wrench />,
-  cr40f_trocasdecarro: <Shuffle />,
-  new_possedeveiculo: <KeyRound />,
   'frota-checklists': <ClipboardCheck />,
   qualidade: <Shield />,
   infleet: <MapPin />,
@@ -99,17 +98,11 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   equipamentos: <Laptop />,
   treinamentos: <GraduationCap />,
   new_marketing: <Megaphone />,
-  cr40f_servicosporpassageiro: <List />,
-  new_teladespesasoperacionais: <Coins />,
-  new_fotomanutencao: <Camera />,
   'logs-apps': <FileText />,
-  cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
   cartoes: <CreditCard />,
   cr40f_formapagamentodespesa: <Wallet />,
-  cr40f_anexocolisao_v2: <Paperclip />,
-  cr40f_anexorecebimento_v2: <Paperclip />,
   comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,
   composicao: <Calculator />,
