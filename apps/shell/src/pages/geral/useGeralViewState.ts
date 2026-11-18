@@ -79,7 +79,8 @@ function configOf(columns: Column[], prefs: ColumnPrefs | null, sort: Sort, filt
       const width = prefs?.widths?.[c.key]
       const key = configKey(c.key, extras)
       const label = key !== c.key ? labels.get(key) : undefined
-      return { key, visible: prefs ? !prefs.hidden.includes(c.key) : !hidden.has(c.key), ...(width ? { width } : {}), ...(label ? { label } : {}) }
+      const pinned = prefs?.pinned?.includes(c.key) ? { pinned: true as const } : {}
+      return { key, visible: prefs ? !prefs.hidden.includes(c.key) : !hidden.has(c.key), ...(width ? { width } : {}), ...(label ? { label } : {}), ...pinned }
     }),
     sort: toViewSort(sort, extras),
     filters: storedFilters(filters),
@@ -123,11 +124,12 @@ export function useGeralViewState(o: Options): { state: TableViewState; columnDe
       const layout = new Set(baseline.columns.map((c) => c.key))
       const extra = next.columns.filter((c) => c.key.startsWith('x:') && !layout.has(fromConfigKey(c.key))).map((c) => ({ key: c.key, label: c.label ?? c.key }))
       const keys = next.columns.map((c) => ({ ...c, key: fromConfigKey(c.key) }))
-      const untouched = !extra.length && keys.length === baseline.columns.length && keys.every((c, i) => c.key === baseline.columns[i]?.key && c.visible === baseline.columns[i]?.visible && !c.width)
+      const untouched = !extra.length && keys.length === baseline.columns.length && keys.every((c, i) => c.key === baseline.columns[i]?.key && c.visible === baseline.columns[i]?.visible && !c.width && !c.pinned)
       if (untouched) setPrefs(null)
       else {
         const widths = Object.fromEntries(keys.flatMap((c) => (c.width ? [[c.key, c.width]] : [])))
-        setPrefs({ order: keys.map((c) => c.key), hidden: keys.filter((c) => !c.visible).map((c) => c.key), ...(Object.keys(widths).length ? { widths } : {}), ...(extra.length ? { extra } : {}) })
+        const pinned = keys.filter((c) => c.pinned).map((c) => c.key)
+        setPrefs({ order: keys.map((c) => c.key), hidden: keys.filter((c) => !c.visible).map((c) => c.key), ...(Object.keys(widths).length ? { widths } : {}), ...(extra.length ? { extra } : {}), ...(pinned.length ? { pinned } : {}) })
       }
     }
     if (JSON.stringify(next.sort) !== JSON.stringify(current.sort)) setSort(fromViewSort(next.sort, columns))

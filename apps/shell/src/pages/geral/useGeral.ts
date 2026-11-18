@@ -688,6 +688,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return ids.length > 0 && ids.every((id) => s.has(id)) ? new Set() : new Set(ids)
   }), [])
   const clearSelection = useCallback(() => setSelected(new Set()), [])
+  /** Seleção inteira de uma vez (tabela do DS, que controla clique, Ctrl, Shift e o cabeçalho). */
+  const setSelection = useCallback((next: Set<string>) => setSelected(next), [])
 
   const setCell = useCallback((key: string, event: CellEvent) => setCells((m) => {
     const next = new Map(m)
@@ -757,5 +759,5 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells, mostrarManutencoes, manutencoesAlteradas }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = filtersOverride != null && hasActiveFilters(filtersOverride) && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, setSelection, save, resetCell }
 }

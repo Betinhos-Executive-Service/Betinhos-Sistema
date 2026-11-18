@@ -24,6 +24,11 @@ describe('urlState', () => {
     expect(readUrlState(new URLSearchParams(text))).toEqual(state)
   })
 
+  it('tabela=ds (tabela do Design System) vai e volta; outro valor é ignorado', () => {
+    expect(readUrlState(new URLSearchParams('view=v&tabela=ds'))).toEqual({ view: 'v', tabela: 'ds' })
+    expect(readUrlState(new URLSearchParams('tabela=outra'))).toEqual({})
+    expect(writeUrlState({ view: 'v', tabela: 'ds' })).toBe('view=v&tabela=ds')
+  })
   it('omite valores vazios', () => {
     expect(writeUrlState({})).toBe('')
     expect(writeUrlState({ view: '', q: '', sort: null, filters: emptyFilters() })).toBe('')

@@ -20,6 +20,13 @@ describe('colunas', () => {
     saveColumnPrefs(kv, 'v1', null)
     expect(kv.getItem(STORAGE_KEY)).toBe('{}')
   })
+  it('colunas fixas: guarda e lê só listas de texto', () => {
+    const kv = mem()
+    saveColumnPrefs(kv, 'v1', { hidden: [], order: ['a', 'b'], pinned: ['b'] })
+    expect(loadColumnPrefs(kv, 'v1')).toEqual({ hidden: [], order: ['a', 'b'], pinned: ['b'] })
+    kv.setItem(STORAGE_KEY, '{"v1": {"hidden": [], "order": ["a"], "pinned": [1]}}')
+    expect(loadColumnPrefs(kv, 'v1')).toEqual({ hidden: [], order: ['a'] })
+  })
   it('aplica ordem e ocultas; colunas novas da visão entram no fim', () => {
     const cols = [col('a'), col('b'), col('c'), col('d')]
     expect(applyColumnPrefs(cols, { hidden: ['b'], order: ['c', 'a'] }).map((c) => c.key)).toEqual(['c', 'a', 'd'])
