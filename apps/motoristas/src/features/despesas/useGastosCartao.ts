@@ -115,10 +115,14 @@ export function useGastosCartao({ comunicadosDriverIdRef, despesas, driverContex
     void reloadRelatorio();
   }, [screen, driverContextId, reloadRelatorio]);
   // Devolvida reenviada: a lista já mostra "Em conferência", sem depender de nova consulta (o sinal pode estar ruim).
-  const marcarDevolucaoEnviada = useCallback((id: string, explicacao: string) => {
+  const marcarDevolucaoEnviada = useCallback((id: string, explicacao: string, alteracoes: Partial<DespesaRelatorio> = {}) => {
     setRelatorioDespesas((atual) => atual && atual.map((item) => item.id === id
-      ? { ...item, status: STATUS_DESPESA.enviado, statusAnexo: ANEXO_COMPLETO, justificativa: explicacao || item.justificativa }
+      ? { ...item, ...alteracoes, status: STATUS_DESPESA.enviado, statusAnexo: ANEXO_COMPLETO, justificativa: explicacao || item.justificativa }
       : item));
+  }, []);
+  // "Lancei em dobro": cancelada, sai da lista (o relatório não mostra canceladas).
+  const marcarDevolucaoCancelada = useCallback((id: string) => {
+    setRelatorioDespesas((atual) => atual && atual.map((item) => item.id === id ? { ...item, status: STATUS_DESPESA.cancelado } : item));
   }, []);
   // Toque no push de devolução: abre o detalhe da despesa na lista do relatório (some ao sair da tela).
   const [abrirDespesaId, setAbrirDespesaId] = useState("");
@@ -201,6 +205,7 @@ export function useGastosCartao({ comunicadosDriverIdRef, despesas, driverContex
     gastosCartaoStatus,
     limparAbrirDespesa,
     marcarDevolucaoEnviada,
+    marcarDevolucaoCancelada,
     motoristaIdRelatorio: comunicadosDriverIdRef.current,
     relatorioDespesas,
     relatorioModelo,
