@@ -1,7 +1,9 @@
 # Backup externo do PROD (Cloudflare R2)
 
 Cópia dos registros do PROD fora da Microsoft, feita pelo job `r2` do workflow "Backup do PROD"
-(`.github/workflows/backup-prod.yml`), todo dia às 03:23 (Brasília) ou à mão (Actions → Backup do PROD → Run workflow).
+(`.github/workflows/backup-prod.yml`), todo dia às 03:23 (Brasília) ou à mão (Actions → Backup do PROD → Run workflow, sempre na branch `main`).
+O environment `prod` só aceita a `main`: o agendamento roda na `develop` (branch padrão) e só dispara o workflow na `main`;
+execução à mão em outra branch pula os jobs de backup.
 O job `power-platform` do mesmo workflow faz o `pac admin backup` (ponto de restauração dentro do Power Platform).
 
 ## O que vai
@@ -38,7 +40,7 @@ acima de 9 GB.
 4. `BACKUP_SENHA`: senha longa e aleatória, **guardada também fora do GitHub** (gerenciador de senhas). Sem ela nenhuma
    cópia abre, e o objetivo é restaurar mesmo sem GitHub. Trocar a senha não recifra as cópias antigas: guarde as duas
    até as antigas saírem da rotação (um ano).
-5. Rodar o workflow à mão uma vez e conferir no resumo o tamanho da cópia.
+5. Rodar o workflow à mão na `main` uma vez e conferir no resumo o tamanho da cópia.
 
 ## Restaurar
 
