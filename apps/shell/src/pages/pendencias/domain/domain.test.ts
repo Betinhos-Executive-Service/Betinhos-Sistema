@@ -7,7 +7,7 @@ import { PENDENCIA_FIELDS, builtinViews, fromLegacyFilters, legacyViewConfig, pe
 import { pendenciasQuery } from './query'
 import { TIPO_LABEL, type OpResumo, type PaganteResumo, type Pendencia, type Reserva } from './types'
 import { keywordIndex, searchWords } from '../../../app/search'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 
 const op = (id: string, status: number, valor: number | null = 1000): OpResumo => ({ id, codigo: `OP-${id}`, status, valor, cliente: 'AGC' })
 const res = (id: string, opId: string | null, fat: number, cp: number | null = CP.pendente, cpValor = 1000): Reserva => ({

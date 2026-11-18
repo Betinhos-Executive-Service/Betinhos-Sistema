@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { TIPOS } from './filters'
 import { TIPO_LABEL, type Pendencia, type TipoPendencia } from './types'
 

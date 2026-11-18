@@ -1,4 +1,5 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { digitsOnly } from '../../../app/format'
 import { sortRows } from '../../../app/listSort'
 import { searchWords } from '../../../app/search'
 import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
@@ -75,7 +76,7 @@ export function readPagante(p: Pagante, key: string): unknown {
  * e-mail, cliente). Sem as opções de escolha (modo mock do servidor) os rótulos ficam de fora.
  */
 export const paganteKeywordText = (p: Pagante, contato: Contato | undefined, choices?: ChoiceSet) => [
-  p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato?.telefone.replace(/\D/g, ''), contato?.email, contato?.cliente,
+  p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato && digitsOnly(contato.telefone), contato?.email, contato?.cliente,
   p.valor == null ? '' : formatMoney(p.valor), p.criadoEm ? formatDate(p.criadoEm) : '',
   choices && p.forma != null ? label(choices.forma, p.forma, '') : '',
   choices && p.status != null ? label(choices.status, p.status, '') : '',
@@ -93,8 +94,8 @@ export function sortPagantes(list: Pagante[], sort: ViewSort | null, choices: Ch
   return sortRows(list, (p) => {
     switch (sort.key) {
       case 'pessoa': return p.pessoa
-      case 'codigo': return Number(p.codigo.replace(/\D/g, '')) || p.codigo || null
-      case 'op': return Number(p.op.replace(/\D/g, '')) || p.op || null
+      case 'codigo': return Number(digitsOnly(p.codigo)) || p.codigo || null
+      case 'op': return Number(digitsOnly(p.op)) || p.op || null
       case 'valor': return p.valor
       case 'forma': return p.forma == null ? null : label(choices.forma, p.forma, '')
       case 'status': return p.status == null ? null : label(choices.status, p.status, '')

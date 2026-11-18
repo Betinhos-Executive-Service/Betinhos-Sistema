@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
 import { searchWords } from '../../../app/search'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { label } from '../../pagantes/domain/status'
 import { situacaoLabel } from '../conciliacao/domain/regras'
 import type { Transacao } from '../conciliacao/domain/types'

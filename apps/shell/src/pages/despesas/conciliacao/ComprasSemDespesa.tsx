@@ -7,7 +7,7 @@ import { searchWords, useDebouncedText } from '../../../app/search'
 import { SelectionBar, useRowSelection } from '../../../app/Selecao'
 import { useQueryFilters, useQueryTexto } from '../../../nav/queryState'
 import { filtrosCodec } from './domain/url'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import { dateKey } from '../../operacional/domain/time'
 import {
   abaDe, CANAIS, canalLabel, CSV_CABECALHO, csvLinhas, filtrar, FILTROS_VAZIOS, MOTIVO_REABERTA, ordenar, ORDENS, resumoRevisar, SITUACAO,

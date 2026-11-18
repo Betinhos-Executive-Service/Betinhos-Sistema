@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { fmtData, money } from '../components/ValidacaoList'
+import { formatDay, formatMoney } from '../../../app/format'
 import { SITUACOES, entraNoFechamento, fechamentoSugerido, mesDe, mesLabel, podeMarcarFechamento, situacaoLabel } from './regras'
 import type { Cliente, Linha, Situacao } from './types'
 
@@ -68,8 +68,8 @@ const FECHAMENTO_TEXTO = (l: Linha) =>
 
 /** Texto da busca por palavras (fora da visão): o que a lista mostra (datas e valor como aparecem) mais pedido, CR e observação. */
 export const linhaKeywordText = (l: Linha) => [
-  l.codigo, l.pedido, fmtData(l.data), situacaoLabel(l.situacao), l.trajeto, l.cliente.nome, l.valorLiberado == null ? '' : money.format(l.valorLiberado),
-  fmtData(l.prazoTacita), l.ultimaMensagem && `${l.ultimaMensagem.lado === 'cliente' ? 'Cliente' : 'Betinhos'} ${l.ultimaMensagem.texto}`,
+  l.codigo, l.pedido, formatDay(l.data), situacaoLabel(l.situacao), l.trajeto, l.cliente.nome, l.valorLiberado == null ? '' : formatMoney(l.valorLiberado),
+  formatDay(l.prazoTacita), l.ultimaMensagem && `${l.ultimaMensagem.lado === 'cliente' ? 'Cliente' : 'Betinhos'} ${l.ultimaMensagem.texto}`,
   FECHAMENTO_TEXTO(l), l.cr, l.observacao, l.aprovadoPor,
 ].filter(Boolean).join(' ')
 

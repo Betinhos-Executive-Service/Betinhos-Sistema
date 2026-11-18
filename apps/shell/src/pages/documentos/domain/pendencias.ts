@@ -1,9 +1,13 @@
 // domain/pendencias.ts
 import { keywordIndex, searchWords } from '../../../app/search'
 import { formatBR } from '../../funcionarios/data/dates'
-import { ESTADO_LABEL } from '../components/StatusDoc'
 import { statusDe } from './vencimento'
-import type { Categoria, DocEmitido, Dono, ItemChecklist, Kpi, Pendencia, TipoDoc } from './types'
+import type { Categoria, DocEmitido, EstadoItem, Dono, ItemChecklist, Kpi, Pendencia, TipoDoc } from './types'
+
+export const ESTADO_LABEL: Record<EstadoItem, string> = {
+  vencido: 'Vencido', vence7: 'Vence em até 7 dias', vence30: 'Vence em até 30 dias', vence60: 'Vence em até 60 dias',
+  ok: 'Em dia', semValidade: 'Sem validade', faltando: 'Faltando', opcional: 'Não enviado',
+}
 
 export const chaveDonoTipo = (donoId: string, tipoId: string) => `${donoId}|${tipoId}`
 export const isObrigatorio = (tipo: TipoDoc, dono: Dono) => dono.obrigKey != null && tipo.obrigatorioPara.includes(dono.obrigKey)

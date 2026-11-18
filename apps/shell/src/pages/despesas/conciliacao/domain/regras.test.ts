@@ -5,7 +5,7 @@ import {
   abaDe, acoes, CANAL, cartaoParaForm, cartaoVigente, csvLinhas, diasDesde, diferencaCandidata, ehCandidata, filtrar, FILTROS_VAZIOS, idadeTexto, janelaCandidatas,
   ordenar, resumoRevisar, SITUACAO, TIPO, validarCartao,
 } from './regras'
-import { formatMoney } from '../../../pagantes/domain/messages'
+import { formatMoney } from '../../../../app/format'
 import { filtrosCodec } from './url'
 import type { Cartao, Transacao } from './types'
 

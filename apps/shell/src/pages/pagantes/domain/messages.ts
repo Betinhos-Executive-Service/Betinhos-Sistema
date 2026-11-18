@@ -1,14 +1,9 @@
 import { phoneDigits } from '../../operacional/domain/phone'
+import { formatDate, formatDateTime, formatMoney } from '../../../app/format'
 import { STATUS, isPaid } from './status'
 import type { Contato, Pagante } from './types'
 
-const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-const dateOnly = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })
-
-export const formatMoney = (value: number | null) => (value == null ? '—' : money.format(value))
-export const formatDateTime = (value: Date | null) => (value ? dateTime.format(value).replace(',', '') : '—')
-export const formatDate = (value: Date | null) => (value ? dateOnly.format(value) : '—')
+export { formatDate, formatDateTime, formatMoney }
 
 export type SharedLink = { kind: 'pagamento' | 'recibo'; url: string }
 

@@ -1,4 +1,5 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { formatDay, formatMoney } from '../../../app/format'
 import { sortRows } from '../../../app/listSort'
 import { byNome } from './cadastros'
 import { STATUS, STATUS_OPTIONS, statusLabel } from './choices'
@@ -75,7 +76,6 @@ export function readEquipamento(e: Equipamento, key: string): unknown {
   }
 }
 
-const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 /**
  * Texto em que a busca procura (fora da visão): tudo o que a lista mostra (descrição, tipo, marca/modelo, responsável,
@@ -83,7 +83,7 @@ const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
  */
 export const equipamentoKeywordText = (e: Equipamento) => [
   e.descricao, e.tipoNome, e.marcaModelo, e.responsavelNome, statusLabel(e.status), e.numeroSerie,
-  e.dataCompra ? e.dataCompra.split('-').reverse().join('/') : '', e.valorCompra == null ? '' : brl.format(e.valorCompra), e.observacoes,
+  formatDay(e.dataCompra), e.valorCompra == null ? '' : formatMoney(e.valorCompra), e.observacoes,
 ].filter(Boolean).join(' ')
 
 export function sortEquipamentos(list: Equipamento[], sort: ViewSort | null) {

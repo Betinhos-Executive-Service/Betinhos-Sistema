@@ -1,7 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
 import { searchWords } from '../../../app/search'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { digitsOnly, formatDate, formatMoney } from '../../../app/format'
 import { label } from '../../pagantes/domain/status'
 import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
 import { EM_ABERTO, OP_STATUS } from './status'
@@ -63,7 +63,7 @@ export function readOp(op: Op, key: string): unknown {
 }
 
 /** Telefone escrito em cada linha do texto de passageiros ("Fulano - (12) 99999-0000"), só com dígitos. */
-const digitosPorLinha = (texto: string) => texto.split(/\r?\n|;/).map((l) => l.replace(/\D/g, '')).filter((d) => d.length >= 4).join(' ')
+const digitosPorLinha = (texto: string) => texto.split(/\r?\n|;/).map(digitsOnly).filter((d) => d.length >= 4).join(' ')
 
 /**
  * Texto em que a busca procura (não fica na visão): tudo que a lista mostra, na forma exibida (valor e datas
@@ -84,7 +84,7 @@ export function matchesKeyword(op: Op, query: string, choices?: OpChoices) {
 }
 
 /** O número da OP ordena como número (OP-9 antes de OP-10). */
-const codigoNum = (codigo: string) => Number(codigo.replace(/\D/g, '')) || null
+const codigoNum = (codigo: string) => Number(digitsOnly(codigo)) || null
 
 export function sortOps(list: Op[], sort: ViewSort | null, choices: OpChoices) {
   if (!sort) return list

@@ -2,7 +2,7 @@ import type { StatusTone } from '@betinhos/ui'
 import { STATUS as PAGANTE, isPaid } from '../../pagantes/domain/status'
 import type { Pagante, ServicoOp } from '../../pagantes/domain/types'
 import { totalOp } from '../../pagantes/data/queries'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import type { Op, OpChoices } from './types'
 
 /** `cr40f_status` da OP. Pendente usa outra faixa (100000001) porque veio de uma versão antiga do choice. */

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Alert, Button, Field, Textarea } from '@betinhos/ui'
 import { Check, MessageSquareQuote, Sparkles, Undo2, XCircle } from 'lucide-react'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import { motivoValido, type Decisao } from '../domain/decisao'
 import { diferencaValor } from '../domain/ia'
 import { MOTIVO } from '../domain/status'

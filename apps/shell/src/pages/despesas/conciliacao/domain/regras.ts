@@ -1,6 +1,7 @@
 import type { StatusTone } from '@betinhos/ui'
+import { formatDay } from '../../../../app/format'
 import { keywordIndex, searchWords } from '../../../../app/search'
-import { formatMoney } from '../../../pagantes/domain/messages'
+import { formatMoney } from '../../../../app/format'
 import { OPERACIONAL } from '../../domain/status'
 import { addDays, dateKey } from '../../../operacional/domain/time'
 import type { Cartao, DespesaCandidata, Transacao } from './types'
@@ -55,7 +56,7 @@ export const FILTROS_VAZIOS: Filtros = { busca: '', cartaoId: null, motoristaId:
  * TicketLog). A parcela e a data ISO também entram.
  */
 export const textoDe = (t: Transacao) => [
-  t.dataCompra.split('-').reverse().join('/'), t.dataCompra, t.estabelecimento, t.descricao, t.motivo, canalLabel(t.canal), t.cartaoNome, t.final, t.motoristaNome,
+  formatDay(t.dataCompra), t.dataCompra, t.estabelecimento, t.descricao, t.motivo, canalLabel(t.canal), t.cartaoNome, t.final, t.motoristaNome,
   formatMoney(t.valor), tipoLabel(t.tipo), situacaoLabel(t.situacao), t.despesaNome, t.placa, t.veiculoNome, t.combustivel, t.cidadePosto,
   t.totalParcelas && t.totalParcelas > 1 ? `${t.parcela ?? '?'}/${t.totalParcelas}` : '',
 ].filter(Boolean).join(' ')
@@ -134,7 +135,7 @@ export function diferencaCandidata(d: Pick<DespesaCandidata, 'valor' | 'data'>, 
 export const CSV_CABECALHO = ['Compra', 'Estabelecimento', 'Descrição no banco', 'Canal', 'Cartão', 'Final', 'Motorista', 'Valor', 'Parcela', 'Tipo', 'Situação', 'Motivo', 'Despesa', 'Placa', 'Litros']
 export function csvLinhas(list: Transacao[]): (string | number | null)[][] {
   return list.map((t) => [
-    t.dataCompra.split('-').reverse().join('/'), t.estabelecimento, t.descricao, canalLabel(t.canal), t.cartaoNome, t.final, t.motoristaNome, t.valor,
+    formatDay(t.dataCompra), t.estabelecimento, t.descricao, canalLabel(t.canal), t.cartaoNome, t.final, t.motoristaNome, t.valor,
     t.totalParcelas && t.totalParcelas > 1 ? `${t.parcela ?? '?'}/${t.totalParcelas}` : '', tipoLabel(t.tipo), situacaoLabel(t.situacao), t.motivo, t.despesaNome, t.placa, t.litros,
   ])
 }

@@ -1,4 +1,5 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { digitsOnly, formatMoney } from '../../../app/format'
 import { sortRows } from '../../../app/listSort'
 import { searchWords } from '../../../app/search'
 import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, label, labels } from './choices'
@@ -61,8 +62,6 @@ export function readInfracao(i: Infracao, key: string, multas: (id: string) => n
   }
 }
 
-const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-
 /**
  * Texto em que a busca procura (não fica na visão): tudo que a lista mostra (código, descrição, gravidade, pontos,
  * valor, competências, responsável, "Inativa") e o enquadramento (artigo).
@@ -70,7 +69,7 @@ const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 export const infracaoKeywordText = (i: Infracao) => [
   i.codigo, i.descricao, i.enquadramento,
   label(GRAVIDADE, i.gravidade, ''), i.pontos == null ? '' : `${i.pontos} ${i.pontos === 1 ? 'ponto' : 'pontos'}`,
-  i.valor == null ? '' : brl.format(i.valor), labels(COMPETENCIA, i.competencia), label(RESPONSABILIDADE, i.responsabilidade, ''),
+  i.valor == null ? '' : formatMoney(i.valor), labels(COMPETENCIA, i.competencia), label(RESPONSABILIDADE, i.responsabilidade, ''),
   i.ativo ? '' : 'Inativa',
 ].filter(Boolean).join(' ')
 
@@ -81,7 +80,7 @@ export function sortInfracoes(list: Infracao[], sort: ViewSort | null, multas: (
   if (!sort) return list
   return sortRows(list, (i) => {
     switch (sort.key) {
-      case 'infracao': return Number(i.codigo.replace(/\D/g, '')) || i.codigo || null
+      case 'infracao': return Number(digitsOnly(i.codigo)) || i.codigo || null
       case 'descricao': return i.descricao || null
       case 'gravidade': return i.gravidade
       case 'pontos': return i.pontos

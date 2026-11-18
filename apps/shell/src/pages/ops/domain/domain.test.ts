@@ -11,7 +11,7 @@ import { OP_STATUS, cancelBlock, proximoPasso, resumoRateio, type Resumo } from 
 import { buildTimeline } from './timeline'
 import { FALLBACK_OP_CHOICES } from './status'
 import { createMockOps } from '../data/mock'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 
 const now = new Date(2026, 9, 8, 10)
 const ops = createMockOps(now)
