@@ -11,6 +11,10 @@
 # crie o flow "Multa | Push do aceite" no Power Automate com a conta que usa as connections do flow "Termo de multa | Push ao motorista"
 # e rode este script com -Apply para gravar a definicao. As connection references vem do flow existente e, para as que ele nao declara,
 # do flow "Termo de multa | Push ao motorista" (-FlowDeReferencias). Depois disso o Deploy atualiza sozinho (flows-dev.mjs).
+# Fora do flows-dev.mjs de proposito: enquanto o flow nao existe no DEV o Deploy ficaria vermelho; o mapeamento entra num PR
+# seguinte, depois da criacao manual.
+# A conta da connection reference do Dataverse precisa do privilegio prvCreatenew_TermoMulta (PrivilegioGestor) para chamar
+# new_LembrarAceiteMulta; sem ele a API recusa com "Sem permissao para lembrar o aceite.".
 # Somente DEV, sem bypass: o PROD recebe pelas solucoes. Dry run por padrao. Requer az login com acesso ao DEV.
 
 $ErrorActionPreference = 'Stop'
