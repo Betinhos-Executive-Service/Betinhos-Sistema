@@ -1,0 +1,156 @@
+name: Backup do PROD
+
+# Backup periódico do PROD em dois lugares, todo dia de madrugada (horário de Brasília) ou à mão:
+# - power-platform: `pac admin backup`, ponto de restauração no próprio Power Platform (Admin Center ou `pac admin restore`),
+#   retenção da plataforma (7 dias, ou até 28 em ambiente gerenciado). Além do backup que o "Publicar soluções" faz antes
+#   de cada import. A conta de serviço já é app de administração (mesmo requisito de _importar-solucoes.yml).
+# - r2: cópia fora da Microsoft. Exporta os registros das tabelas (packages/deploy/backup/exportar-dataverse.mjs, nunca a
+#   cr40f_segredo), cifra com BACKUP_SENHA (AES-256, artefato-cifrado.sh) e envia ao Cloudflare R2; rotação por quantidade
+#   (7 diárias, 8 semanais, 12 mensais, retencao.mjs) para caber nos 10 GB gratuitos. Nada vai para artefato do GitHub
+#   (repositório público). Configuração e restauração: packages/deploy/backup/README.md.
+# Os dois jobs são independentes: um falhar não impede o outro.
+on:
+  schedule:
+    # 06:23 UTC = 03:23 em Brasília.
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+    inputs:
+      rotulo:
+        description: 'Rótulo do backup. Vazio = backup-diario-AAAAMMDD-HHMM.'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  power-platform:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: prod
+    # Só um backup por vez; não disputa o grupo publicar-prod (backup não escreve nas soluções).
+    concurrency:
+      group: backup-prod
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
+        run: |
+          pac auth create --name ci-backup --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
+          if ($LASTEXITCODE -ne 0) { throw "pac auth falhou." }
+      - name: Backup
+        env:
+          ROTULO: ${{ inputs.rotulo }}
+        run: |
+          $rotulo = $env:ROTULO
+          if (-not $rotulo) {
+            $agora = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time')
+            $rotulo = "backup-diario-$($agora.ToString('yyyyMMdd-HHmm'))"
+          }
+          pac admin backup --environment $env:DV_ENVIRONMENT_URL --label $rotulo
+          if ($LASTEXITCODE -ne 0) { throw "Backup do PROD falhou ($rotulo)." }
+          "## Backup do PROD: $rotulo" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+      - name: Backups disponíveis
+        # Informativo: a lista não derruba o job.
+        continue-on-error: true
+        run: |
+          $lista = pac admin list-backups --environment $env:DV_ENVIRONMENT_URL 2>&1 | Out-String
+          Write-Host $lista
+          "### Backups disponíveis`n``````text`n$lista`n``````" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+
+  r2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: prod
+    concurrency:
+      group: backup-prod-r2
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+      BACKUP_TABELAS_EXCLUIR: ${{ vars.BACKUP_TABELAS_EXCLUIR }}
+      # Endpoint S3 do R2 (https://<id-da-conta>.r2.cloudflarestorage.com) e bucket: variáveis do environment prod.
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # O aws cli novo manda checksums que o R2 nem sempre aceita; só quando a operação exige.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+    steps:
+      - name: Configuração presente
+        env:
+          BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          faltam=()
+          for n in R2_ENDPOINT R2_BUCKET AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY BACKUP_SENHA DV_ENVIRONMENT_URL DV_CLIENT_SECRET; do
+            [ -n "${!n}" ] || faltam+=("$n")
+          done
+          if [ ${#faltam[@]} -gt 0 ]; then
+            echo "::error::Faltam no environment prod: ${faltam[*]} (AWS_* = secrets R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY). Veja packages/deploy/backup/README.md."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Exportar tabelas do PROD
+        id: exportar
+        # Falha em alguma tabela não impede o envio do que saiu; o job fica vermelho no fim.
+        continue-on-error: true
+        run: node packages/deploy/backup/exportar-dataverse.mjs "$RUNNER_TEMP/backup"
+      - name: Cifrar
+        env:
+          PACOTES_SENHA: ${{ secrets.BACKUP_SENHA }}
+        run: |
+          [ -f "$RUNNER_TEMP/backup/manifesto.json" ] || { echo "::error::A exportação não gerou manifesto; nada a enviar."; exit 1; }
+          nome=$(node packages/deploy/backup/retencao.mjs nome)
+          bash packages/deploy/solucoes/artefato-cifrado.sh cifrar "$RUNNER_TEMP/backup" "$RUNNER_TEMP/$nome"
+          rm -rf "$RUNNER_TEMP/backup/tabelas"
+          echo "NOME=$nome" >> "$GITHUB_ENV"
+          tamanho=$(du -h "$RUNNER_TEMP/$nome" | cut -f1)
+          {
+            echo "## Backup externo (R2): $nome"
+            echo "Tamanho cifrado: $tamanho"
+            node -e 'const m=require(process.argv[1]);console.log(`${m.tabelas.length} tabelas, ${m.totalRegistros} registros, ${m.falhas.length} falhas`);for(const f of m.falhas)console.log(`- falhou: ${f.tabela}`)' "$RUNNER_TEMP/backup/manifesto.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Enviar ao R2
+        run: |
+          s3() { aws s3 --endpoint-url "$R2_ENDPOINT" "$@"; }
+          for classe in $(node packages/deploy/backup/retencao.mjs classes); do
+            s3 cp --only-show-errors "$RUNNER_TEMP/$NOME" "s3://$R2_BUCKET/$classe/$NOME"
+            echo "Enviado: $classe/$NOME"
+            echo "- $classe/$NOME" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Rotação das cópias
+        # Só depois do envio desta execução: nunca fica sem cópia por causa da limpeza.
+        run: |
+          aws s3api list-objects-v2 --endpoint-url "$R2_ENDPOINT" --bucket "$R2_BUCKET" --output json > "$RUNNER_TEMP/lista.json"
+          node packages/deploy/backup/retencao.mjs excluir < "$RUNNER_TEMP/lista.json" | while read -r chave; do
+            [ -n "$chave" ] || continue
+            aws s3 rm --only-show-errors --endpoint-url "$R2_ENDPOINT" "s3://$R2_BUCKET/$chave"
+            echo "Apagada: $chave"
+          done
+          aws s3api list-objects-v2 --endpoint-url "$R2_ENDPOINT" --bucket "$R2_BUCKET" --output json > "$RUNNER_TEMP/lista.json"
+          node -e '
+            const t = require("fs").readFileSync(process.argv[1], "utf8").trim();
+            const l = (t ? JSON.parse(t).Contents : null) ?? [];
+            const gb = l.reduce((s, o) => s + o.Size, 0) / 1024 ** 3;
+            console.log(`Bucket: ${l.length} arquivos, ${gb.toFixed(2)} GB`);
+            if (gb > 9) console.log(`::warning::Bucket com ${gb.toFixed(2)} GB, perto dos 10 GB gratuitos do R2. Reduza as quantidades em retencao.mjs ou exclua tabelas grandes (BACKUP_TABELAS_EXCLUIR).`);
+          ' "$RUNNER_TEMP/lista.json" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Resultado da exportação
+        if: steps.exportar.outcome == 'failure'
+        run: |
+          echo "::error::Alguma tabela falhou na exportação (lista no resumo). O que saiu foi enviado."
+          exit 1
