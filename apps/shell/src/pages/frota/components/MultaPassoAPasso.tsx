@@ -23,6 +23,7 @@ const BOTAO: Record<Passo, string> = {
   RegistrarPagamento: 'Registrar pagamento', RegistrarAcerto: 'Registrar acerto', PrazoVencido: 'Responder', Cancelar: 'Cancelar multa',
   Recorrer: 'Entrar com recurso', ResultadoRecurso: 'Registrar resultado',
   ConcluirDesconto: 'Concluir desconto', ReabrirDesconto: 'Reabrir desconto',
+  TermoAssinado: 'Termo assinado', TermoContestado: 'Termo contestado', // internos: a tela não oferece
 }
 const CANAIS = [{ value: 'senatran', label: 'Senatran' }, { value: 'dsv', label: 'DSV Digital' }, { value: 'prefeitura', label: 'Prefeitura' }]
 const MOTIVOS = [{ value: 'culpa-empresa', label: 'Culpa da empresa' }, { value: 'prazo-perdido', label: 'Prazo perdido' }]

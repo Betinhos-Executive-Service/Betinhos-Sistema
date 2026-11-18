@@ -5,7 +5,7 @@ import { aplicarPasso, avaliar, dividirParcelas, janelaCompetencia, mudancas, pr
 
 type F = {
   hoje: string
-  avaliacoes: { nome: string; multa: MultaEstado; etapa: string; pendentes: string[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean; descontando?: boolean }[]
+  avaliacoes: { nome: string; multa: MultaEstado; etapa: string; pendentes: string[]; proximoPasso: string; proximoPrazo: string | null; prazoVencido: boolean; aguardandoPenalidade: boolean; descontando?: boolean; aguardandoTermo?: boolean }[]
   divisoes: { valor: number; parcelas: number; primeira: string; esperado: { numero: number; competencia: string; valor: number }[] }[]
   validacoes: { nome: string; multa: MultaEstado; passo: string; dados?: DadosPasso; erro: string | null }[]
   aplicacoes: { nome: string; multa: MultaEstado; passo: string; dados?: DadosPasso; mudancas: string[] }[]
@@ -17,12 +17,12 @@ const f = JSON.parse(readFileSync(caminho, 'utf8')) as F
 
 describe('paridade de MultaEtapas com o plugin', () => {
   it('o fixture traz todos os casos', () => {
-    expect([f.avaliacoes.length, f.validacoes.length, f.aplicacoes.length]).toEqual([19, 56, 25])
+    expect([f.avaliacoes.length, f.validacoes.length, f.aplicacoes.length]).toEqual([23, 69, 29])
   })
 
   it.each(f.avaliacoes.map((c) => [c.nome, c] as const))('avalia: %s', (_nome, c) => {
     const s = avaliar(c.multa, f.hoje)
-    expect(s).toEqual({ etapa: c.etapa, pendentes: c.pendentes, proximoPasso: c.proximoPasso, proximoPrazo: c.proximoPrazo, prazoVencido: c.prazoVencido, aguardandoPenalidade: c.aguardandoPenalidade, descontando: c.descontando ?? false })
+    expect(s).toEqual({ etapa: c.etapa, pendentes: c.pendentes, proximoPasso: c.proximoPasso, proximoPrazo: c.proximoPrazo, prazoVencido: c.prazoVencido, aguardandoPenalidade: c.aguardandoPenalidade, descontando: c.descontando ?? false, aguardandoTermo: c.aguardandoTermo ?? false })
   })
 
   it.each(f.validacoes.map((c) => [c.nome, c] as const))('valida: %s', (_nome, c) => {

@@ -32,7 +32,10 @@ public static class Passos
     /// <summary>Internos: só a cr40f_LancarDescontoFolha chama (via Execute de cr40f_PassoMulta); direto do cliente recusam pelas mesmas regras.</summary>
     public const string ConcluirDesconto = "ConcluirDesconto";
     public const string ReabrirDesconto = "ReabrirDesconto";
-    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto };
+    /// <summary>Internos: só a API do termo chama (cr40f_PassoMulta confere o ParentContext). A tela nunca oferece.</summary>
+    public const string TermoAssinado = "TermoAssinado";
+    public const string TermoContestado = "TermoContestado";
+    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto, TermoAssinado, TermoContestado };
 }
 
 /// <summary>O que as regras leem e o passo muda. Datas em yyyy-MM-dd (dia de São Paulo). Espelho: MultaEstado de multaEtapas.ts.</summary>
@@ -58,6 +61,13 @@ public sealed class MultaEstado
     [DataMember(Name = "canceladaEm")] public string? CanceladaEm { get; set; }
     [DataMember(Name = "motivoCancelamento")] public string? MotivoCancelamento { get; set; }
     [DataMember(Name = "recursoPendente")] public bool? RecursoPendente { get; set; }
+    [DataMember(Name = "contestadaEm")] public string? ContestadaEm { get; set; }
+    [DataMember(Name = "aceiteDeclaradoEm")] public string? AceiteDeclaradoEm { get; set; }
+    // Termo vigente, carregado pelo passo (não são colunas da multa).
+    [DataMember(Name = "termoPendente")] public bool? TermoPendente { get; set; }
+    [DataMember(Name = "termoParcelas")] public int? TermoParcelas { get; set; }
+    [DataMember(Name = "termoPrimeiroMes")] public string? TermoPrimeiroMes { get; set; }
+    [DataMember(Name = "termoValor")] public decimal? TermoValor { get; set; }
     /// <summary>Contagem de new_parcelamultafolha da multa, carregada pelo passo. Ausente = 0.</summary>
     [DataMember(Name = "parcelasPrevistas")] public int? ParcelasPrevistas { get; set; }
     [DataMember(Name = "parcelasDescontadas")] public int? ParcelasDescontadas { get; set; }
@@ -95,6 +105,7 @@ public sealed class MultaSituacao
     [DataMember(Name = "prazoVencido", Order = 5)] public bool PrazoVencido { get; set; }
     [DataMember(Name = "aguardandoPenalidade", Order = 6)] public bool AguardandoPenalidade { get; set; }
     [DataMember(Name = "descontando", Order = 7)] public bool Descontando { get; set; }
+    [DataMember(Name = "aguardandoTermo", Order = 8)] public bool AguardandoTermo { get; set; }
 }
 
 /// <summary>
@@ -122,6 +133,8 @@ public static class MultaEtapas
         [Passos.ResultadoRecurso] = "Registrar o resultado do recurso",
         [Passos.ConcluirDesconto] = "Concluir desconto",
         [Passos.ReabrirDesconto] = "Reabrir desconto",
+        [Passos.TermoAssinado] = "Termo assinado",
+        [Passos.TermoContestado] = "Termo contestado",
     };
 
     public static readonly IReadOnlyDictionary<string, string> RotuloEtapa = new Dictionary<string, string>
@@ -193,11 +206,30 @@ public static class MultaEtapas
                 break;
             case Recurso: s.Pendentes.Add(Passos.ResultadoRecurso); break;
         }
-        s.ProximoPasso = s.Pendentes.Count > 0 ? RotuloPasso[s.Pendentes[0]]
+        s.AguardandoTermo = etapa == Indicar && !s.PrazoVencido && m.TermoPendente == true && m.DataAviso == null;
+        s.ProximoPasso = s.AguardandoTermo ? "Aguardando o motorista assinar o termo"
+            : s.Pendentes.Count > 0 ? RotuloPendente(m, s.Pendentes[0])
             : s.AguardandoPenalidade ? "Aguardando penalidade"
             : s.Descontando ? "Descontando em folha"
             : etapa == Cancelada ? "Cancelada" : etapa == Encerrada ? "Encerrada" : "";
         return s;
+    }
+
+    private static string RotuloPendente(MultaEstado m, string passo)
+    {
+        if (passo == Passos.DefinirResponsavel && m.ContestadaEm != null) return "Decidir a contestação do motorista";
+        if (passo == Passos.RegistrarAceite && m.AceiteDeclaradoEm != null)
+            return $"Conferir o aceite na CNH Digital (motorista declarou em {m.AceiteDeclaradoEm.Substring(8, 2)}/{m.AceiteDeclaradoEm.Substring(5, 2)})";
+        return RotuloPasso[passo];
+    }
+
+    /// <summary>Primeiro mês do Acertar -> folha com termo assinado: o do termo, ou o mês de hoje se ele saiu da janela do RH.</summary>
+    public static string? MesDoTermo(MultaEstado m, string hoje)
+    {
+        if (m.TermoParcelas == null || m.TermoPrimeiroMes == null) return null;
+        var (de, ate) = MultaParcelas.Janela(hoje);
+        var mes = MultaParcelas.Competencia(m.TermoPrimeiroMes);
+        return string.CompareOrdinal(mes, de) < 0 || string.CompareOrdinal(mes, ate) > 0 ? hoje.Substring(0, 7) + "-01" : mes;
     }
 
     public static string? Validar(MultaEstado m, string passo, DadosPasso d, string hoje)
@@ -207,14 +239,19 @@ public static class MultaEtapas
         if (s.PrazoVencido && passo != Passos.PrazoVencido) return "O prazo de indicação venceu. Responda se a multa foi indicada antes de seguir.";
         switch (passo)
         {
+            case Passos.TermoAssinado:
+                if (s.Etapa != Indicar || m.DataAviso != null) return "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
+                return DataRuim(d.Data, hoje, "Informe a data da assinatura.");
+            case Passos.TermoContestado:
+                return s.Etapa == Indicar && m.DataAviso == null ? null : "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
             case Passos.PrazoVencido:
                 if (!s.PrazoVencido) return "O prazo de indicação ainda não venceu.";
                 if (d.Indicou is not bool indicou) return "Responda se a multa foi indicada.";
                 if (!indicou) return null;
                 var ruim = CanalDe(d.Canal) == null ? "Escolha o canal da indicação." : DataRuim(d.Data, hoje, "Informe a data da indicação.");
                 if (ruim != null) return ruim;
-                // Sem responsável efetivo (multa nova no prazo vencido da etapa 1) a indicação precisa dizer quem foi indicado.
-                return ResponsavelEfetivo(m) == null && string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista que foi indicado." : null;
+                // Sem responsável efetivo, ou com a contestação do motorista pendente, a indicação precisa dizer quem foi indicado.
+                return (ResponsavelEfetivo(m) == null || m.ContestadaEm != null) && string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista que foi indicado." : null;
             case Passos.Cancelar:
                 if (!Aberta(s.Etapa)) return "Esta multa já está encerrada.";
                 if (m.ParcelasPrevistas > 0) return "Esta multa tem parcelas previstas na folha e não pode ser cancelada.";
@@ -235,6 +272,8 @@ public static class MultaEtapas
                 ? "A penalidade ainda não chegou: grave o vencimento antes de registrar o pagamento."
                 : "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
         if (!s.Pendentes.Contains(passo)) return "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
+        if (m.TermoPendente == true && passo == Passos.RegistrarIndicacao) return "Aguarde a assinatura do termo ou cancele o termo.";
+        if (m.TermoPendente == true && passo == Passos.AvisarMotorista) return "Cancele o termo antes de avisar pelo WhatsApp.";
         if (s.Pendentes[0] != passo) return Antes.TryGetValue(s.Pendentes[0], out var antes) ? antes : "Siga a ordem dos passos.";
         switch (passo)
         {
@@ -265,6 +304,13 @@ public static class MultaEtapas
         if (d.Competencia == null || !MesIso.IsMatch(d.Competencia)) return "Informe o mês do desconto.";
         if (!(m.ValorPago > 0)) return "Registre o pagamento antes de lançar na folha.";
         if (string.IsNullOrWhiteSpace(m.MotoristaId)) return "A multa não tem motorista; defina o responsável antes.";
+        if (m.TermoParcelas is int assinadas)
+        {
+            if (m.TermoValor is decimal teto && m.ValorPago > teto) return "O valor pago passou do valor do termo; envie um termo novo ou registre como empresa assume.";
+            if ((d.Parcelas ?? 1) != assinadas) return $"O motorista assinou {assinadas} parcela(s); o número de parcelas não muda.";
+            var mes = MesDoTermo(m, hoje)!;
+            return MultaParcelas.Competencia(d.Competencia) == mes ? null : $"O primeiro mês segue o termo assinado ({MultaParcelas.MesBr(mes)}).";
+        }
         var (de, ate) = MultaParcelas.Janela(hoje);
         var c = MultaParcelas.Competencia(d.Competencia);
         if (string.CompareOrdinal(c, de) < 0 || string.CompareOrdinal(c, ate) > 0) return $"Escolha um mês entre {MultaParcelas.MesBr(de)} e {MultaParcelas.MesBr(ate)}.";
@@ -278,6 +324,7 @@ public static class MultaEtapas
         switch (passo)
         {
             case Passos.DefinirResponsavel:
+                n.ContestadaEm = null;
                 if (d.Responsavel == "empresa") { n.Responsavel = MultaCodigos.Empresa; n.MotivoEmpresa = MultaCodigos.CulpaDaEmpresa; n.Status = MultaCodigos.Pagar; }
                 else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; }
                 break;
@@ -314,7 +361,14 @@ public static class MultaEtapas
                     if (!string.IsNullOrWhiteSpace(d.MotoristaId)) { n.MotoristaId = d.MotoristaId; n.Responsavel = MultaCodigos.Motorista; }
                 }
                 else { n.Responsavel = MultaCodigos.Empresa; n.MotivoEmpresa = MultaCodigos.PrazoPerdido; }
+                n.ContestadaEm = null;
                 n.Status = MultaCodigos.Pagar;
+                break;
+            case Passos.TermoAssinado:
+                n.DataAviso = d.Data;
+                break;
+            case Passos.TermoContestado:
+                n.ContestadaEm = hoje; n.Status = MultaCodigos.Identificar;
                 break;
             case Passos.Cancelar:
                 n.MotivoCancelamento = d.MotivoTexto!.Trim(); n.CanceladaEm = hoje; n.Status = MultaCodigos.Cancelada;
@@ -338,6 +392,7 @@ public static class MultaEtapas
         ("aceiteEm", m => m.AceiteEm), ("pagaEm", m => m.PagaEm), ("valorPago", m => m.ValorPago), ("competencia", m => m.Competencia),
         ("acertoEm", m => m.AcertoEm), ("encerradaEm", m => m.EncerradaEm), ("canceladaEm", m => m.CanceladaEm),
         ("motivoCancelamento", m => m.MotivoCancelamento), ("recursoPendente", m => m.RecursoPendente),
+        ("contestadaEm", m => m.ContestadaEm),
     };
 
     public static List<KeyValuePair<string, object?>> Mudancas(MultaEstado antes, MultaEstado depois) =>
