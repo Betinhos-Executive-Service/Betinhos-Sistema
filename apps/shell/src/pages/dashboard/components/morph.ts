@@ -38,6 +38,8 @@ export function criarClone(el: HTMLElement, r: DOMRect): HTMLElement {
   Object.assign(clone.style, {
     position: 'fixed', top: `${r.top}px`, left: `${r.left}px`, width: `${r.width}px`, height: `${r.height}px`, margin: '0', boxSizing: 'border-box',
     pointerEvents: 'none', visibility: 'visible', borderRadius: cs.borderRadius, boxShadow: cs.boxShadow, color: cs.color, fontFamily: cs.fontFamily,
+    // Fora do grid de origem (.dash-bento > .bt-stat) o clone perderia as trilhas e chegaria com outro layout.
+    gridTemplateRows: cs.gridTemplateRows, gridTemplateColumns: cs.gridTemplateColumns,
   })
   return clone
 }
