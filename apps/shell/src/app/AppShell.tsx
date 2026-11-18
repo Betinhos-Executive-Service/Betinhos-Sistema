@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
   FileText, FolderCheck, FolderCog, Gauge, GraduationCap, History, Home, Hourglass, IdCard, Landmark, Laptop, LayoutDashboard, Mail, Megaphone, MapPin, ReceiptText, Route,
-  ScrollText, Shield, ShieldCheck, Tag, TrendingUp, Users, Wallet, Wrench,
+  Scale, ScrollText, Shield, ShieldCheck, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
@@ -43,6 +43,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'frota-veiculos': <CarFront />,
   'frota-manutencoes': <Wrench />,
   'frota-multas': <AlertTriangle />,
+  'frota-infracoes': <Scale />,
   'frota-colisoes': <Camera />,
   'frota-indicadores': <Gauge />,
   'frota-plano': <Clock />,

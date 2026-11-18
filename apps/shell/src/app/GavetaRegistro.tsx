@@ -17,6 +17,7 @@ const ADAPTADORES: Record<TabelaComGaveta, ComponentType<GavetaProps>> = {
   cr40f_pagantes: lazy(() => import('./gavetas/GavetaPagante')),
   cr40f_despesaoperacional: lazy(() => import('./gavetas/GavetaDespesa')),
   cr40f_manutencoes: lazy(() => import('./gavetas/GavetaManutencao')),
+  cr40f_multas: lazy(() => import('./gavetas/GavetaMulta')),
 }
 
 /**
