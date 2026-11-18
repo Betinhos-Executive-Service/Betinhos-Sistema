@@ -63,7 +63,8 @@ export function mapMinhaMulta(bruto: unknown): MinhaMulta | null {
 /** O servidor já entrega na ordem certa (aceite mais urgente primeiro, encerradas por fim); aqui só se separa. */
 export function agruparMinhasMultas(itens: MinhaMulta[]) {
   return {
-    precisa: itens.filter((m) => m.grupo === "precisa"),
+    // Prazo mais curto primeiro; sem prazo vai para o fim (sort é estável, mantém a ordem da API no empate).
+    precisa: itens.filter((m) => m.grupo === "precisa").sort((x, y) => (x.prazoAceite ?? "9999").localeCompare(y.prazoAceite ?? "9999")),
     andamento: itens.filter((m) => m.grupo === "andamento"),
     encerrada: itens.filter((m) => m.grupo === "encerrada")
   };

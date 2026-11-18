@@ -16,6 +16,15 @@ test("agrupa na ordem do servidor", () => {
   assert.deepEqual(g.precisa.map((m) => m.id), ["a", "d"]);
 });
 
+test("Para fazer agora: prazo mais curto primeiro, sem prazo no fim", () => {
+  const g = agruparMinhasMultas([
+    multa({ id: "sem", grupo: "precisa", acao: "assinar" }),
+    multa({ id: "tarde", grupo: "precisa", acao: "aceite", prazoAceite: "2026-12-01" }),
+    multa({ id: "cedo", grupo: "precisa", acao: "aceite", prazoAceite: "2026-11-25" })
+  ]);
+  assert.deepEqual(g.precisa.map((m) => m.id), ["cedo", "tarde", "sem"]);
+});
+
 test("cache é do usuário que salvou", () => {
   const armazem = memoria();
   salvarMinhasMultas("u1", [multa({})], armazem);
