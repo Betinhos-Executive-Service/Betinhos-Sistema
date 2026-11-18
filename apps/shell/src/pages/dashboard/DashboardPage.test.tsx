@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DashboardPage } from './DashboardPage'
 import { ABAS_POR_SERVICO, avisoSegmento } from './components/abas/abas'
@@ -8,6 +8,9 @@ import type { Filtros } from './domain/types'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
+
+/** O jsdom não mede layout: com movimento reduzido o card só faz fade (a animação de origem é provada no navegador). */
+const movimentoReduzido = () => vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduce'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
 
 const ABAS = ['Resumo', 'Serviços', 'Financeiro', 'Despesas', 'Frota', 'Motoristas', 'Manutenções', 'Multas']
 
@@ -124,30 +127,80 @@ describe('Dashboard', () => {
     expect(screen.getByRole('radio', { name: 'Terceiros' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  it('drill-down: KPI, alerta e linha do ranking abrem o Drawer com a lista; fecha pelo X', async () => {
+  it('card ampliado: KPI, alerta e linha do ranking abrem o card com a lista; Esc, X e Voltar fecham', async () => {
+    movimentoReduzido()
     render(<DashboardPage host={{ mode: 'mock' }} />)
     await screen.findByRole('region', { name: 'Total produzido' })
-    fireEvent.click(screen.getByRole('button', { name: 'CP pendente: Ver detalhes' }))
-    const drawer = screen.getByRole('dialog', { name: 'CP pendente' })
+    const gatilho = screen.getByRole('button', { name: 'CP pendente: Ver detalhes' })
+    gatilho.focus()
+    fireEvent.click(gatilho)
+    const card = await screen.findByRole('dialog', { name: 'CP pendente' }, { timeout: 3000 })
+    expect(location.hash).toContain('detalhe=cp-pendente')
     const valorKpi = within(screen.getByRole('article', { name: 'CP pendente' })).getByText(/^R\$/).textContent
-    // Resumo do Drawer: quantidade e a mesma soma do card (moeda curta no card, cheia no Drawer).
-    expect(within(drawer).getByText(/serviços? · R\$/)).toBeTruthy()
+    expect(within(card).getByText(/serviços? · R\$/)).toBeTruthy()
     expect(valorKpi).toBeTruthy()
-    expect(within(drawer).getAllByRole('row').length).toBeGreaterThan(1)
+    expect(within(card).getAllByRole('row').length).toBeGreaterThan(1)
     // Modo exemplo: sem link para o Dataverse.
-    expect(within(drawer).queryByRole('link', { name: /Abrir no Dataverse/ })).toBeNull()
-    fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar painel' }))
-    expect(screen.queryByRole('dialog', { name: 'CP pendente' })).toBeNull()
-    const cnh = screen.queryByRole('button', { name: 'CNH: Ver detalhes' })
-    if (cnh) {
-      fireEvent.click(cnh)
-      expect(screen.getByRole('dialog', { name: 'CNH em atenção' })).toBeTruthy()
-    }
+    expect(within(card).queryByRole('link', { name: /Abrir no Dataverse/ })).toBeNull()
+    // Esc fecha, tira o detalhe da URL e devolve o foco ao item de origem.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'CP pendente' })).toBeNull(), { timeout: 3000 })
+    expect(location.hash).not.toContain('detalhe=')
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'CP pendente: Ver detalhes' })))
+    // O botão X também fecha.
+    fireEvent.click(screen.getByRole('button', { name: 'CP pendente: Ver detalhes' }))
+    const outro = await screen.findByRole('dialog', { name: 'CP pendente' }, { timeout: 3000 })
+    fireEvent.click(within(outro).getByRole('button', { name: 'Fechar' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'CP pendente' })).toBeNull(), { timeout: 3000 })
     const abas = screen.getByRole('tablist', { name: 'Abas do dashboard' })
     fireEvent.click(within(abas).getByRole('tab', { name: 'Motoristas' }))
     const [primeiro] = await screen.findAllByRole('button', { name: /: ver serviços$/ })
     fireEvent.click(primeiro)
-    expect(screen.getByRole('dialog', { name: /^Serviços de / })).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: /^Serviços de / }, { timeout: 3000 })).toBeTruthy()
+  })
+
+  it('card ampliado: número, anel e gráfico abrem com tabela; link direto abre sem origem e sem erro', async () => {
+    movimentoReduzido()
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('region', { name: 'Total produzido' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ampliar Total produzido' }))
+    const card = await screen.findByRole('dialog', { name: 'Total produzido' }, { timeout: 3000 })
+    expect(location.hash).toContain('detalhe=total-produzido')
+    expect(within(card).getAllByRole('row').length).toBeGreaterThan(1)
+    expect(within(card).getByRole('button', { name: 'Fechar' })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 3000 })
+    erro.mockRestore()
+  })
+
+  it('card ampliado: KPI de outras abas abre com top 5, "Ver na lista" e foco volta ao KPI; gráfico abre pelo teclado', async () => {
+    movimentoReduzido()
+    history.replaceState(null, '', '#/dashboard?tab=multas')
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    const kpi = await screen.findByRole('button', { name: /^Multas/ }, { timeout: 3000 })
+    fireEvent.click(kpi)
+    const card = await screen.findByRole('dialog', {}, { timeout: 3000 })
+    expect(within(card).getAllByRole('region', { name: /Top 5/ }).length).toBeGreaterThan(0)
+    expect(within(card).getByRole('link', { name: /Ver na lista/ }).getAttribute('href')).toContain('#/frota-multas?f=')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 3000 })
+  })
+
+  it('card ampliado: o gráfico (foco) abre com Enter e Espaço', async () => {
+    movimentoReduzido()
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    const grafico = await screen.findByRole('button', { name: 'Ampliar Total produzido' })
+    expect(grafico.getAttribute('tabindex')).toBe('0')
+    fireEvent.keyDown(grafico, { key: 'Enter' })
+    await screen.findByRole('dialog', { name: 'Total produzido' }, { timeout: 3000 })
+  })
+
+  it('card ampliado: link direto com detalhe= abre o card sem animação de origem', async () => {
+    history.replaceState(null, '', '#/dashboard?detalhe=faturamento')
+    render(<DashboardPage host={{ mode: 'mock' }} />)
+    const card = await screen.findByRole('dialog', { name: 'Faturamento' }, { timeout: 3000 })
+    expect(within(card).getAllByRole('row').length).toBeGreaterThan(1)
   })
 
   it('na primeira carga, cada aba mostra o mesmo spinner com a barra de progresso', () => {

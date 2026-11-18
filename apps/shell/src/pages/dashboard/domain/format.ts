@@ -13,4 +13,8 @@ export function brlS(v: number | null | undefined) {
   if (v >= 1e3) return `R$\u00a0${dec(v / 1e3, 1)}k`
   return brl(v)
 }
+/** Soma de um campo numérico das linhas (linha "Total" das tabelas mensais). */
+export const somar = <T,>(rows: T[], valor: (r: T) => number) => rows.reduce((t, r) => t + valor(r), 0)
 export const int = (v: number) => v.toLocaleString('pt-BR')
+/** "1 dia", "3 dias" (número formatado). */
+export const plural = (n: number, um: string, varios: string) => `${int(n)} ${n === 1 ? um : varios}`

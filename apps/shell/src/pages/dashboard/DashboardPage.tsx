@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { Alert, Button, EmptyState, StatusBadge, Tabs, ToastProvider, buttonClassName, tabId, useShellHeader } from '@betinhos/ui'
 import { ExternalLink, Info, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
@@ -10,7 +10,7 @@ import { createSource, type ConjuntoExtra } from './data/source'
 import { filtrarServicos, opcoesFiltro, type OpcoesFiltro } from './domain/base'
 import { int } from './domain/format'
 import type { Contexto } from './domain/kpis'
-import { detalheDoId } from './domain/detalhes'
+import { ampliadoDoId } from './domain/detalhes'
 import { cargaDesde, periodoAnterior } from './domain/periodo'
 import { dashboardQuery, despesasQuery, lerFrotaMotorista } from './domain/query'
 import type { Filtros } from './domain/types'
@@ -26,7 +26,8 @@ import { ManutencoesTab } from './components/abas/ManutencoesTab'
 import { MultasTab } from './components/abas/MultasTab'
 import { ProgressoCarga } from './components/Carregando'
 import { DashboardToolbar, PeriodoRapido } from './components/DashboardToolbar'
-import { DetalheProvider } from './components/DetalheDrawer'
+import { DetalheProvider, type GenericoAmpliado } from './components/DetalheProvider'
+import { extrasDaAba as topsELista } from './domain/extrasAba'
 import './dashboard.css'
 
 const PAINEL_ID = 'dash-painel'
@@ -94,7 +95,9 @@ export function DashboardPage({ host }: { host: Host }) {
   useShellHeader({ title: 'Dashboard', actions: headerActions })
 
   // Drill-down aberto pela URL: refeito com o recorte atual assim que os dados chegam.
-  const resolverDetalhe = (id: string) => (ctx && db.dados ? detalheDoId(id, ctx, db.dados) : null)
+  const resolverDetalhe = useCallback((id: string) => (ctx && db.dados ? ampliadoDoId(id, ctx, db.dados) : null), [ctx, db.dados])
+  // Top 5 e "Ver na lista" dos cards das abas (KPIs e análises), pelo recorte da aba aberta.
+  const extrasGenericos = useCallback((dado: GenericoAmpliado) => (ctx && db.dados ? { ...topsELista(aba, dado.titulo, ctx, db.dados, filtrosDespesa), periodo } : null), [aba, ctx, db.dados, periodo, filtrosDespesa])
   const segmentado = filtros.status.length + filtros.clientes.length + filtros.motoristas.length + filtros.tipos.length > 0
   const limpar = () => setFiltros({ ...filtros, status: [], clientes: [], motoristas: [], tipos: [] })
   const aviso = avisoSegmento(aba, filtros)
@@ -148,7 +151,7 @@ export function DashboardPage({ host }: { host: Host }) {
         {/* Drill-down: um Drawer para a página; links "Abrir no Dataverse" só no modo Dataverse. */}
         {/* Toast do DS ("Tabela copiada"): o shell não tem provider global, então a página monta o seu. */}
         <ToastProvider>
-          <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null} resolver={resolverDetalhe}>
+          <DetalheProvider clientUrl={host.mode === 'dataverse' ? host.clientUrl : null} resolver={resolverDetalhe} extras={extrasGenericos}>
             <ProgressoCarga.Provider value={db.progresso}>
               {db.dados || carregandoPrimeira ? conteudo[aba]() : null}
             </ProgressoCarga.Provider>

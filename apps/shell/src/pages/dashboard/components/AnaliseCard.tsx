@@ -1,9 +1,11 @@
 import { useId, type ReactNode } from 'react'
 import { Button, Surface } from '@betinhos/ui'
+import { Maximize2 } from 'lucide-react'
 import { useQueryConjunto } from '../../../nav/queryState'
 import type { Apoio, Chip } from '../domain/types'
 import { BotaoCopiar, type TabelaCopiavel } from './Copiar'
 import { Chips } from './KpiChip'
+import { idDoCard, useAmpliavel, useDetalhe } from './DetalheProvider'
 
 type Props = {
   titulo: string
@@ -30,14 +32,20 @@ type Props = {
   natural?: boolean
   /** Valores da tabela em texto: o rodapé ganha "Copiar tabela" (TSV para a planilha), mesmo com a tabela fechada. */
   copiar?: TabelaCopiavel
+  /** Id de domínio do card ampliado (ex.: `total-produzido`, com top 5 e lista); sem ele, o card ampliado reaproveita o gráfico e a tabela daqui. */
+  ampliarId?: string
 }
 
 /**
  * Card de análise no formato do legado com o DS (§10.16): título em eyebrow, valor grande, apoio e chips à direita;
  * gráfico e tabela juntos; período e unidade no rodapé; valores do gráfico disponíveis em tabela.
  */
-export function AnaliseCard({ titulo, periodo, unidade, valor, sub, delta, hint, chips: todos = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, tabelaNoLugar = false, largo = false, natural = false, copiar }: Props) {
+export function AnaliseCard({ titulo, periodo, unidade, valor, sub, delta, hint, chips: todos = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, tabelaNoLugar = false, largo = false, natural = false, copiar, ampliarId }: Props) {
   const id = useId()
+  const abrirId = useDetalhe()
+  const generico = useAmpliavel(titulo, { titulo, periodo, unidade, valor, sub, hint, chips: todos.filter((c) => c.tipo !== 'sem-dado'), apoio, grafico, tabela })
+  const idCard = ampliarId ?? idDoCard(titulo)
+  const ampliar = abrirId && (ampliarId || generico) ? (el?: HTMLElement | null) => abrirId(idCard, el) : null
   // A tabela sob demanda vive na URL (`tabela=<título do card>`): reabrir o link mostra as mesmas tabelas abertas.
   const { valores, alternar } = useQueryConjunto('tabela')
   const aberta = valores.has(titulo)
@@ -45,7 +53,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, delta, hint,
   const temLado = delta != null || chips.length > 0 || apoio.length > 0 || extra != null
   const mostrarTabela = tabela != null && (!tabelaSobDemanda || aberta)
   return (
-    <Surface className={['dash-card', largo && 'dash-grade__largo', natural && 'dash-grade__natural'].filter(Boolean).join(' ')} aria-labelledby={`${id}-t`}>
+    <Surface data-origem={ampliar ? idCard : undefined} className={['dash-card', largo && 'dash-grade__largo', natural && 'dash-grade__natural'].filter(Boolean).join(' ')} aria-labelledby={`${id}-t`}>
       <header className="dash-card__head">
         <div className="dash-card__resumo">
           <h2 className="dash-card__titulo" id={`${id}-t`}>{titulo}</h2>
@@ -56,13 +64,14 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, delta, hint,
         {temLado ? <div className="dash-card__lado">{extra}{delta}{chips.length || apoio.length ? <span className="dash-card__chips"><Chips chips={chips} apoio={apoio} /></span> : null}</div> : null}
       </header>
       <div className="dash-card__corpo">
-        {tabelaNoLugar && aberta ? null : grafico}
+        {tabelaNoLugar && aberta ? null : grafico && ampliar ? <div className="dash-card__ampliavel" role="button" tabIndex={0} aria-label={`Ampliar ${titulo}`} onClick={(e) => ampliar(e.currentTarget)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); ampliar(e.currentTarget) } }}>{grafico}</div> : grafico}
         {mostrarTabela ? <div id={`${id}-v`} className="dash-card__tabela">{tabela}</div> : null}
       </div>
       <footer className="dash-card__nota">
         <span>{periodo} · {unidade}</span>
-        {(tabelaSobDemanda && tabela != null) || (copiar && copiar.linhas.length) ? (
+        {(tabelaSobDemanda && tabela != null) || (copiar && copiar.linhas.length) || ampliar ? (
           <span className="dash-card__acoes">
+            {ampliar ? <Button variant="ghost" size="compact" icon={<Maximize2 size={14} />} onClick={(e) => ampliar(e.currentTarget.closest<HTMLElement>('[data-origem]') ?? e.currentTarget)}>Ampliar</Button> : null}
             {copiar && copiar.linhas.length ? <BotaoCopiar tabela={copiar} nome={`de ${titulo}`} /> : null}
             {tabelaSobDemanda && tabela != null ? (
               <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => alternar(titulo)}>{tabelaNoLugar ? (aberta ? 'Ver gráfico' : 'Ver tabela') : aberta ? 'Ocultar valores' : 'Ver valores'}</Button>

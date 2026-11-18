@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Button, PageToolbar, Select, StatCard, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Button, PageToolbar, Select, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { AlertTriangle, CircleCheck, X } from 'lucide-react'
 import { LinhaChart } from '../../charts/Charts'
@@ -7,7 +7,7 @@ import {
   calcularDespesas, periodoAnteriorDespesa,
   type Distribuicao, type KpiDespesa, type KpiDespesaId, type LinhaDistribuicao, type LinhaMes, type LinhaMotorista,
 } from '../../domain/abas/despesas'
-import { brl, brlS, int } from '../../domain/format'
+import { brl, brlS, int, somar } from '../../domain/format'
 import type { Tom } from '../../domain/types'
 import { useMedia } from '../../../operacional/useMedia'
 import { AnaliseCard } from '../AnaliseCard'
@@ -15,6 +15,7 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, Rolagem, pct } from '../Celulas'
 import { extrasKpi } from '../KpiExtras'
+import { KpiAba } from '../KpiAba'
 import { KpiLinha, tendencia, tomAtencao } from '../KpiLinha'
 import { COLUNA_LARGA, Linhas, MEDIA_MOBILE, juntar, useTopCelular } from '../Linhas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
@@ -45,7 +46,7 @@ function KpiDespesaCartao({ k, indisponivel }: { k: KpiDespesa; indisponivel: bo
     <StatusBadge tone={TOM_FAIXA[k.faixa.tom]} icon={icone}>{k.faixa.texto}</StatusBadge>
     <span className="dash-apoio">{k.faixa.apoio}</span>
   </> : undefined
-  return <StatCard label={k.rotulo} value={formatarKpi(k, indisponivel)} {...tomAtencao(ATENCAO.has(k.id) ? k.valor : null)} trend={tendencia(k.serie)} {...extrasKpi({ chips: [k.chip], extra: faixa })} />
+  return <KpiAba label={k.rotulo} value={formatarKpi(k, indisponivel)} {...tomAtencao(ATENCAO.has(k.id) ? k.valor : null)} trend={tendencia(k.serie)} {...extrasKpi({ chips: [k.chip], extra: faixa })} />
 }
 
 type Proprios = { proprios: FiltrosDespesaProprios; onProprios: (f: FiltrosDespesaProprios) => void }
@@ -103,6 +104,16 @@ export const DespesasCarregando = () => <AbaCarregando />
 
 type Bloco = { periodo: string; mobile: boolean }
 
+/** Linha "Total" de despesas por mês; o ticket é o valor total dividido pelos lançamentos. */
+const totalMes = (linhas: LinhaMes[]): LinhaMes => {
+  const lancamentos = somar(linhas, (l) => l.lancamentos)
+  const valor = somar(linhas, (l) => l.valor)
+  return {
+    mes: 'total', rotulo: 'Total', lancamentos, valor, alimentacao: somar(linhas, (l) => l.alimentacao), aguardando: somar(linhas, (l) => l.aguardando),
+    ticket: lancamentos ? valor / lancamentos : 0, semComprovante: somar(linhas, (l) => l.semComprovante),
+  }
+}
+
 function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { linhas: LinhaMes[]; total: number; lancamentos: number }) {
   const colunas: TableColumn<LinhaMes>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (l) => l.rotulo }, { key: 'resto', header: 'Valores', width: COLUNA_LARGA, cell: (l) => juntar(`${int(l.lancamentos)} lançamentos`, `Despesa ${brl(l.valor)}`, `Alimentação ${brl(l.alimentacao)}`) }]
@@ -122,7 +133,7 @@ function PorMesCard({ linhas, total, lancamentos, periodo, mobile }: Bloco & { l
           series={[{ chave: 'valor', nome: 'Despesa total', cor: 'action' }, { chave: 'alimentacao', nome: 'Alimentação', cor: 'brand', tracejada: true }]}
         />
       ) : <Vazio titulo="Nenhuma despesa no período" />}
-      tabela={linhas.length ? <Tabela columns={colunas} rows={linhas} rowKey={(l) => l.mes} /> : undefined}
+      tabela={linhas.length ? <Tabela columns={colunas} rows={[...linhas, totalMes(linhas)]} rowKey={(l) => l.mes} /> : undefined}
       tabelaSobDemanda
       copiar={tabelaCopia(linhas, [['Mês', (l) => l.rotulo], ['Lançamentos', (l) => l.lancamentos], ['Despesa', (l) => brl(l.valor)], ['Alimentação', (l) => brl(l.alimentacao)]])}
     />

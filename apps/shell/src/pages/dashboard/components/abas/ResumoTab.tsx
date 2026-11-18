@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { calcularResumo } from '../../domain/resumo'
-import { useDetalhe } from '../DetalheDrawer'
+import { useDetalhe } from '../DetalheProvider'
 import { MetaRealizadoCard, TotalProduzidoCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { KpiGrid } from '../KpiGrid'
@@ -20,10 +20,10 @@ function Resumo({ ctx, dados, periodo }: DadosAba) {
   const resumo = useMemo(() => calcularResumo(ctx, dados), [dados, ctx])
   // Drill-down: as listas saem do mesmo recorte dos números (sem consulta nova).
   const abrir = useDetalhe()
-  const kpis = abrir ? { cpPendente: () => abrir('cp-pendente'), aReceber: () => abrir('a-receber') } : {}
+  const kpis = abrir ? { faturamento: () => abrir('faturamento'), recebimento: () => abrir('recebimento'), servicos: () => abrir('servicos'), ticket: () => abrir('ticket'), cpPendente: () => abrir('cp-pendente'), aReceber: () => abrir('a-receber') } : {}
   const alertas = abrir ? {
-    cnh: () => abrir('cnh'), multas: () => abrir('multas'),
-    semVeiculo: () => abrir('sem-veiculo'), semMotorista: () => abrir('sem-motorista'), semCliente: () => abrir('sem-cliente'),
+    cnh: (el: HTMLElement) => abrir('cnh', el), multas: (el: HTMLElement) => abrir('multas', el),
+    semVeiculo: (el: HTMLElement) => abrir('sem-veiculo', el), semMotorista: (el: HTMLElement) => abrir('sem-motorista', el), semCliente: (el: HTMLElement) => abrir('sem-cliente', el),
   } : {}
   return <>
     <KpiGrid kpis={resumo.kpis} abrir={kpis} />
