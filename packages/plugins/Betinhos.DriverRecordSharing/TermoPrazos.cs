@@ -2,7 +2,7 @@ using System;
 
 namespace Betinhos.DriverRecordSharing
 {
-    /// <summary>Prazos do termo de multa e do lembrete do aceite (spec fase 3, secoes 5.2 e 5.4). Puro: sem servico.</summary>
+    /// <summary>Prazos do termo de multa e do lembrete do aceite (spec fase 3, seções 5.2 e 5.4). Puro: sem serviço.</summary>
     public static class TermoPrazos
     {
         public const int DiasParaAssinar = 7, MargemAntesDoPrazo = 3, MaxLembretesAceite = 3;
@@ -23,14 +23,18 @@ namespace Betinhos.DriverRecordSharing
 
         public static bool LembrarTermo(DateTime enviadoEmUtc, DateTime? ultimoLembreteUtc, DateTime? dataParaIndicar, DateTime agoraUtc)
         {
-            if (ultimoLembreteUtc == null) return agoraUtc >= enviadoEmUtc.AddDays(2);
             var vespera = ExpiraEm(enviadoEmUtc, dataParaIndicar).AddDays(-1);
+            if (ultimoLembreteUtc == null)
+            {
+                var primeiro = enviadoEmUtc.AddDays(2);
+                return agoraUtc >= (vespera < primeiro ? vespera : primeiro);
+            }
             return agoraUtc >= vespera && agoraUtc - ultimoLembreteUtc.Value >= TimeSpan.FromHours(20);
         }
 
         public static bool LembrarAceite(DateTime indicacao, DateTime? ultimoLembrete, DateTime hoje)
         {
-            var k = ultimoLembrete == null ? 0 : Math.Min(MaxLembretesAceite, (int)Math.Floor((ultimoLembrete.Value.Date - indicacao.Date).TotalDays / 2));
+            var k = ultimoLembrete == null || ultimoLembrete.Value.Date < indicacao.Date ? 0 : Math.Min(MaxLembretesAceite, (int)Math.Floor((ultimoLembrete.Value.Date - indicacao.Date).TotalDays / 2));
             return k < MaxLembretesAceite && (hoje.Date - indicacao.Date).TotalDays >= 2 * (k + 1);
         }
     }

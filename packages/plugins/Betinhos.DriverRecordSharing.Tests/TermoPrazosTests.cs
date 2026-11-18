@@ -44,5 +44,36 @@ namespace Betinhos.DriverRecordSharing.Tests
         [InlineData("2026-11-20", "2026-11-16", false)]
         public void Lembrete_do_aceite_no_maximo_tres(string hoje, string? ultimo, bool lembra)
             => Assert.Equal(lembra, TermoPrazos.LembrarAceite(Dia("2026-11-10"), ultimo == null ? (DateTime?)null : Dia(ultimo), Dia(hoje)));
+
+        [Fact]
+        public void Lembrete_do_termo_na_vespera_com_prazo_curto()
+        {
+            // enviado 18/11 12:00, prazo 23/11: expira 20/11 03:00 UTC; véspera 19/11 03:00, antes de enviado + 2 dias (20/11 12:00).
+            var enviado = Utc("2026-11-18T12:00:00");
+            Assert.False(TermoPrazos.LembrarTermo(enviado, null, Dia("2026-11-23"), Utc("2026-11-19T02:59:59")));
+            Assert.True(TermoPrazos.LembrarTermo(enviado, null, Dia("2026-11-23"), Utc("2026-11-19T03:00:00")));
+        }
+
+        [Fact]
+        public void Expirou_no_instante_exato_e_um_segundo_antes()
+        {
+            var enviado = Utc("2026-11-18T12:00:00");
+            var prazo = Dia("2026-11-25");
+            Assert.True(TermoPrazos.Expirou(enviado, prazo, Utc("2026-11-22T03:00:00")));
+            Assert.False(TermoPrazos.Expirou(enviado, prazo, Utc("2026-11-22T02:59:59")));
+        }
+
+        [Fact]
+        public void Expirou_usa_os_7_dias_quando_o_limite_de_Brasilia_passa_deles()
+        {
+            var enviado = Utc("2026-11-10T12:00:00");
+            var prazo = Dia("2026-12-30");
+            Assert.False(TermoPrazos.Expirou(enviado, prazo, Utc("2026-11-17T11:59:59")));
+            Assert.True(TermoPrazos.Expirou(enviado, prazo, Utc("2026-11-17T12:00:00")));
+        }
+
+        [Fact]
+        public void Lembrete_do_aceite_ignora_ultimo_lembrete_anterior_a_indicacao()
+            => Assert.True(TermoPrazos.LembrarAceite(Dia("2026-11-10"), Dia("2026-11-01"), Dia("2026-11-12")));
     }
 }
