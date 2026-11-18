@@ -17,8 +17,6 @@ namespace Betinhos.DriverRecordSharing.Tests
         private const int Cancelado = 100000004;
         private const int Guia = 100000000;
         private const int Folha = 100000001;
-        private const int MultaIndicada = 202410001;
-        private const int MultaRecurso = 202410002;
         private static readonly DateTime Relogio = new DateTime(2026, 10, 22, 15, 4, 5, DateTimeKind.Utc);
         private const string AssinaturaValida = "[[[0.1,0.2],[0.3,0.4],[0.5,0.5]]]";
 
@@ -71,7 +69,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             var s = Cenario();
             s.InfleetFalha = true;
 
-            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Guia, 1, 100m));
+            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 1, 100m));
 
             var evid = s.Rows("new_termomulta").Single().GetAttributeValue<string>("new_evidenciasjson");
             Assert.Contains("\"infleet\":{\"erro\":", evid.Replace(" ", ""));
@@ -82,10 +80,11 @@ namespace Betinhos.DriverRecordSharing.Tests
         [InlineData("semAditivoData", "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.")]
         [InlineData("semAditivoArquivo", "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.")]
         [InlineData("termoPendente", "Já existe um termo pendente para esta multa.")]
-        [InlineData("parcelas", "Escolha de 1 a 3 parcelas.")]
+        [InlineData("guia", "O termo agora é só para desconto em folha.")]
+        [InlineData("parcelas", "Escolha de 1 a 12 parcelas.")]
         [InlineData("competencia", "Competência inválida.")]
+        [InlineData("janela", "Escolha um mês entre 09/2026 e 10/2027.")]
         [InlineData("valor", "Informe um valor maior que zero.")]
-        [InlineData("recurso", "Há recurso pendente: o desconto só pode ser acordado depois do resultado.")]
         public void EnviarValidaComoValidarAcordo(string caso, string mensagem)
         {
             var s = Cenario();
@@ -96,10 +95,11 @@ namespace Betinhos.DriverRecordSharing.Tests
                 case "semAditivoData": s.Motorista.Attributes.Remove("new_aditivoassinaturaem"); break;
                 case "semAditivoArquivo": s.Motorista.Attributes.Remove("new_aditivoassinatura"); break;
                 case "termoPendente": s.Add(new Entity("new_termomulta") { ["new_multa"] = s.Multa.ToEntityReference(), ["new_status"] = new OptionSetValue(Pendente) }); break;
-                case "parcelas": p["new_Parcelas"] = 4; break;
+                case "guia": p["new_FormaPagamento"] = Guia; break;
+                case "parcelas": p["new_Parcelas"] = 13; break;
+                case "janela": p["new_PrimeiraCompetencia"] = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc); break;
                 case "competencia": p["new_PrimeiraCompetencia"] = new DateTime(2026, 11, 2, 0, 0, 0, DateTimeKind.Utc); break;
                 case "valor": p["new_ValorTotal"] = 0.01m; break;
-                case "recurso": s.Multa["new_recursopendente"] = true; break;
             }
 
             var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, p));
@@ -108,21 +108,56 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void GuiaComRecursoPendentePodeSerEnviada()
+        public void EnviarRecusaDepoisDoAviso()
         {
             var s = Cenario();
-            s.Multa["new_recursopendente"] = true;
+            s.Multa["cr40f_datadeavisoaocondutor"] = new DateTime(2026, 10, 20);
+            Assert.Equal("O termo só é enviado na etapa 2, antes do aviso ao motorista.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
+        }
 
-            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Guia, 1, 80m));
+        [Fact]
+        public void EnviarRecusaForaDaEtapa2()
+        {
+            var s = Cenario();
+            s.Multa["cr40f_status"] = new OptionSetValue(202410000);
+            Assert.Equal("O termo só é enviado na etapa 2, antes do aviso ao motorista.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
+        }
 
-            Assert.Single(s.Rows("new_termomulta"));
+        [Fact]
+        public void EnviarRecusaComPrazoCurto()
+        {
+            var s = Cenario();
+            s.Multa["cr40f_dataparaindicar"] = new DateTime(2026, 10, 24);
+            Assert.Equal("Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
+        }
+
+        [Fact]
+        public void EnviarRecusaTextoProvisorio()
+        {
+            var s = Cenario();
+            s.Rows("new_textotermomulta").First(r => r.GetAttributeValue<string>("new_versao") == "v1")["new_versao"] = "v0-placeholder";
+            Assert.Equal("O texto do termo ainda é provisório.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
+        }
+
+        [Fact]
+        public void EnviarTrocaOsMarcadoresNovos()
+        {
+            var s = Cenario();
+            s.Rows("new_textotermomulta").First(r => r.GetAttributeValue<string>("new_versao") == "v1")["new_texto"] = "{motorista}|{placa}|{datahora}|{local}|{auto}|{valor}|{parcelas}|{primeiromes}";
+            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 3, 195.23m));
+            Assert.Equal("João Motorista|ABC1D23|10/10/2026 10:00|Av. Paulista, 1000|Multa teste|R$ 195,23|3|11/2026",
+                s.Rows("new_termomulta").Single().GetAttributeValue<string>("new_textotermo"));
         }
 
         [Fact]
         public void EnviarSemPushDisponivelNaoQuebraERegistraAviso()
         {
             var s = Cenario();
-            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Guia, 1, 80m));
+            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 1, 80m));
             Assert.Contains(s.Traces, t => t.Contains("push"));
         }
 
@@ -192,7 +227,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void AssinarGravaRelogioDoServidorHashDoPdfMultaIndicadaETresParcelas()
+        public void AssinarGravaRelogioDoServidorHashDoPdfERegistraOPasso()
         {
             var s = Cenario();
             var termo = TermoPendente(s, Folha, 3, 100m);
@@ -211,42 +246,34 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(AssinaturaValida, termo.GetAttributeValue<string>("new_assinaturajson"));
             Assert.Equal(-23.55m, termo.GetAttributeValue<decimal>("new_latitude"));
             Assert.False(termo.Contains("new_assinatura"));
-            Assert.Equal(MultaIndicada, s.Multa.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
-            var parcelas = s.Rows("new_parcelamultafolha").OrderBy(r => r.GetAttributeValue<int>("new_numero")).ToList();
-            Assert.Equal(3, parcelas.Count);
-            Assert.Equal(100m, parcelas.Sum(r => r.GetAttributeValue<Money>("new_valor").Value));
-            Assert.Equal(33.34m, parcelas[0].GetAttributeValue<Money>("new_valor").Value);
-            Assert.All(parcelas, r => Assert.Equal(100000000, r.GetAttributeValue<OptionSetValue>("new_status").Value));
-            Assert.Equal(new DateTime(2027, 1, 1), parcelas[2].GetAttributeValue<DateTime>("new_competencia"));
+            var passo = Assert.Single(s.Executados, r => r.RequestName == "cr40f_PassoMulta");
+            Assert.Equal("TermoAssinado", passo["Passo"]);
+            Assert.Equal(s.Multa.Id, passo["MultaId"]);
+            Assert.Equal("{\"data\":\"2026-10-22\"}", passo["DadosJson"]);
+            Assert.Empty(s.Rows("new_parcelamultafolha"));
+            Assert.Equal(202410004, s.Multa.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
         }
 
         [Fact]
-        public void AssinarFolhaComRecursoPendenteEhRecusado()
+        public void AssinarUsaODiaDeBrasiliaNaMadrugadaUtc()
         {
             var s = Cenario();
             var termo = TermoPendente(s, Folha, 3, 100m);
-            s.Multa["new_recursopendente"] = true;
-
-            var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo)));
-
-            Assert.Equal("Há recurso pendente: o desconto só pode ser acordado depois do resultado.", error.Message);
-            Assert.Equal(Pendente, Status(termo));
-            Assert.Empty(s.Rows("new_parcelamultafolha"));
+            s.Relogio = new DateTime(2026, 10, 23, 1, 30, 0, DateTimeKind.Utc);
+            Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo));
+            Assert.Equal("{\"data\":\"2026-10-22\"}", Assert.Single(s.Executados)["DadosJson"]);
         }
 
         [Fact]
-        public void AssinarGuiaComRecursoPendenteNaoMudaStatusDaMulta()
+        public void AssinarComMultaEmOutraEtapaExplicaAoMotoristaENaoAssina()
         {
             var s = Cenario();
-            var termo = TermoPendente(s, Guia, 1, 100m);
-            s.Multa["new_recursopendente"] = true;
-            s.Multa["cr40f_status"] = new OptionSetValue(MultaRecurso);
-
-            Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo));
-
-            Assert.Equal(Assinado, Status(termo));
-            Assert.Equal(MultaRecurso, s.Multa.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
-            Assert.Empty(s.Rows("new_parcelamultafolha"));
+            var termo = TermoPendente(s, Folha, 3, 100m);
+            s.AoExecutar = r => throw new InvalidPluginExecutionException("Este passo não vale para a etapa atual da multa. Recarregue a tela.");
+            var erro = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo)));
+            Assert.Equal("Esta multa mudou de etapa e o termo não pode mais ser assinado. Procure o escritório.", erro.Message);
+            Assert.Equal(Pendente, Status(termo));
+            Assert.Null(s.UploadedPdf);
         }
 
         [Fact]
@@ -263,17 +290,6 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void AssinarGuiaNaoGeraParcelas()
-        {
-            var s = Cenario();
-            var termo = TermoPendente(s, Guia, 1, 100m);
-
-            Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo));
-
-            Assert.Empty(s.Rows("new_parcelamultafolha"));
-        }
-
-        [Fact]
         public void SelfieQueNaoEhJpegEhRecusada()
         {
             var s = Cenario();
@@ -287,7 +303,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         // ---------- Contestar / Cancelar / Expirar ----------
 
         [Fact]
-        public void ContestarMarcaContestadoERecursoSemParcelas()
+        public void ContestarMarcaContestadoERegistraOPassoSemRecurso()
         {
             var s = Cenario();
             var termo = TermoPendente(s, Folha, 3, 100m);
@@ -297,8 +313,9 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Contestado, Status(termo));
             Assert.Equal(Relogio, termo.GetAttributeValue<DateTime>("new_assinadoem"));
             Assert.Equal("Não era eu dirigindo naquele dia.", termo.GetAttributeValue<string>("new_motivocontestacao"));
-            Assert.Equal(MultaRecurso, s.Multa.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
-            Assert.True(s.Multa.GetAttributeValue<bool>("new_recursopendente"));
+            Assert.Equal("TermoContestado", Assert.Single(s.Executados, r => r.RequestName == "cr40f_PassoMulta")["Passo"]);
+            Assert.Equal(202410004, s.Multa.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+            Assert.False(s.Multa.GetAttributeValue<bool>("new_recursopendente"));
             Assert.Empty(s.Rows("new_parcelamultafolha"));
         }
 
@@ -310,35 +327,61 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_ContestarTermoMulta", s.MotoristaUser.Id, new Dictionary<string, object> { ["new_TermoId"] = termo.Id, ["new_Motivo"] = "curto" }));
         }
 
-        [Theory]
-        [InlineData("new_CancelarTermoMulta", Cancelado)]
-        [InlineData("new_ExpirarTermoMulta", Expirado)]
-        public void CancelarEExpirarSoDePendente(string api, int esperado)
+        [Fact]
+        public void CancelarSoDePendente()
+        {
+            var s = Cenario();
+            var termo = TermoPendente(s, Guia, 1, 100m);
+            var p = new Dictionary<string, object> { ["new_TermoId"] = termo.Id };
+
+            Run(s, "new_CancelarTermoMulta", s.Gestor, p);
+            Assert.Equal(Cancelado, Status(termo));
+            Assert.Null(s.Multa.GetAttributeValue<EntityReference>("new_termovigente"));
+
+            Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_CancelarTermoMulta", s.Gestor, p));
+        }
+
+        [Fact]
+        public void ExpirarVencidoMudaParaExpiradoELimpaOVigente()
         {
             var s = Cenario();
             var termo = TermoPendente(s, Guia, 1, 100m);
             termo["new_enviadoem"] = Relogio.AddDays(-7);
+            var p = new Dictionary<string, object> { ["new_TermoId"] = termo.Id };
 
-            Assert.Equal(termo.Id, s.Multa.GetAttributeValue<EntityReference>("new_termovigente").Id);
-            Run(s, api, s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id });
-            Assert.Equal(esperado, Status(termo));
+            var ctx = Run(s, "new_ExpirarTermoMulta", s.Gestor, p);
+
+            Assert.Equal(true, ctx.OutputParameters["new_Expirou"]);
+            Assert.Equal(Expirado, Status(termo));
             Assert.Null(s.Multa.GetAttributeValue<EntityReference>("new_termovigente"));
-
-            Assert.Throws<InvalidPluginExecutionException>(() => Run(s, api, s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id }));
+            // Termo que já não está pendente (corrida com a assinatura): devolve false, sem erro.
+            Assert.Equal(false, Run(s, "new_ExpirarTermoMulta", s.Gestor, p).OutputParameters["new_Expirou"]);
         }
 
-        [Fact]
-        public void ExpirarDentroDoPrazoDeAssinaturaEhRecusado()
+        [Theory]
+        [InlineData("2026-10-28T15:04:04", false)]
+        [InlineData("2026-10-29T15:04:05", true)]
+        public void ExpirarDecidePeloPrazoDeSeteDias(string agora, bool expirou)
         {
             var s = Cenario();
             var termo = TermoPendente(s, Guia, 1, 100m);
-            termo["new_enviadoem"] = Relogio.AddDays(-7).AddMinutes(1);
+            s.Relogio = DateTime.SpecifyKind(DateTime.Parse(agora, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Utc);
 
-            var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_ExpirarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id }));
+            var ctx = Run(s, "new_ExpirarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id });
 
-            Assert.Equal("Este termo ainda está no prazo de assinatura.", error.Message);
-            Assert.Equal(Pendente, Status(termo));
-            Assert.Equal(termo.Id, s.Multa.GetAttributeValue<EntityReference>("new_termovigente").Id);
+            Assert.Equal(expirou, ctx.OutputParameters["new_Expirou"]);
+            Assert.Equal(expirou ? Expirado : Pendente, Status(termo));
+        }
+
+        [Fact]
+        public void ExpirarAntesDaMargemDoPrazoDeIndicacao()
+        {
+            var s = Cenario();
+            var termo = TermoPendente(s, Guia, 1, 100m);
+            s.Multa["cr40f_dataparaindicar"] = new DateTime(2026, 10, 27);
+            s.Relogio = new DateTime(2026, 10, 24, 3, 0, 0, DateTimeKind.Utc); // 00:00 de Brasília do dia 24 = prazo - 3
+
+            Assert.Equal(true, Run(s, "new_ExpirarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id }).OutputParameters["new_Expirou"]);
         }
 
         [Fact]
@@ -601,6 +644,37 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void LembreteAutomaticoNaoLancaErroForaDaHora()
+        {
+            var s = Cenario();
+            var termo = TermoPendente(s, Guia, 1, 100m);
+            s.Relogio = Relogio.AddDays(1);
+            var ctx = Run(s, "new_LembrarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id, ["new_Automatico"] = true });
+            Assert.Equal(false, ctx.OutputParameters["new_Lembrou"]);
+            Assert.False(termo.Contains("new_ultimolembreteem"));
+        }
+
+        [Fact]
+        public void LembreteAutomaticoGravaQuandoChegaADataEDevolveTrue()
+        {
+            var s = Cenario();
+            var termo = TermoPendente(s, Guia, 1, 100m);
+            s.Relogio = Relogio.AddDays(2);
+            var ctx = Run(s, "new_LembrarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id, ["new_Automatico"] = true });
+            Assert.Equal(true, ctx.OutputParameters["new_Lembrou"]);
+            Assert.Equal(s.Relogio, termo.GetAttributeValue<DateTime>("new_ultimolembreteem"));
+        }
+
+        [Fact]
+        public void LembreteAutomaticoDeTermoNaoPendenteDevolveFalse()
+        {
+            var s = Cenario();
+            var termo = TermoAssinado(s);
+            var ctx = Run(s, "new_LembrarTermoMulta", s.Gestor, new Dictionary<string, object> { ["new_TermoId"] = termo.Id, ["new_Automatico"] = true });
+            Assert.Equal(false, ctx.OutputParameters["new_Lembrou"]);
+        }
+
+        [Fact]
         public void LembrarSoAceitaTermoPendente()
         {
             var s = Cenario();
@@ -683,15 +757,18 @@ namespace Betinhos.DriverRecordSharing.Tests
 
         private static Entity TermoPendente(Scenario s, int forma, int parcelas, decimal valor)
         {
-            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, forma, parcelas, valor));
-            return s.Rows("new_termomulta").Single();
+            // O Enviar só aceita folha; termo de guia (legado) é montado trocando a forma do termo criado.
+            Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, parcelas, valor));
+            var termo = s.Rows("new_termomulta").Single();
+            if (forma == Guia) termo["new_formapagamento"] = new OptionSetValue(Guia);
+            return termo;
         }
 
         private static RemoteExecutionContext Run(Scenario s, string message, Guid user, Dictionary<string, object> inputs)
         {
             var ctx = new RemoteExecutionContext { MessageName = message, InitiatingUserId = user, UserId = user, Depth = 1 };
             foreach (var input in inputs) ctx.InputParameters[input.Key] = input.Value;
-            new TermoMultaCommandPlugin(() => Relogio, () => s).Execute(new Provider(ctx, s));
+            new TermoMultaCommandPlugin(() => s.Relogio, () => s).Execute(new Provider(ctx, s));
             return ctx;
         }
 
@@ -704,7 +781,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             var ctx = new RemoteExecutionContext { MessageName = message, PrimaryEntityName = name, InitiatingUserId = Guid.NewGuid(), Stage = 20, Depth = parent == null ? 1 : 2, ParentContext = parent };
             if (spoof) ctx.SharedVariables["termo_server_write"] = true;
             ctx.InputParameters["Target"] = target;
-            new TermoMultaCommandPlugin(() => Relogio, () => s).Execute(new Provider(ctx, s));
+            new TermoMultaCommandPlugin(() => s.Relogio, () => s).Execute(new Provider(ctx, s));
         }
 
         private static byte[] TinyJpeg()
@@ -745,7 +822,8 @@ namespace Betinhos.DriverRecordSharing.Tests
                 ["cr40f_codigodainfracao"] = infracao.ToEntityReference(),
                 ["new_valorguia"] = new Money(293.47m),
                 ["new_recursopendente"] = false,
-                ["cr40f_status"] = new OptionSetValue(202410000),
+                ["cr40f_status"] = new OptionSetValue(202410004),
+                ["cr40f_dataparaindicar"] = new DateTime(2026, 11, 20),
             });
             s.Add(new Entity("new_textotermomulta") { ["new_versao"] = "v1", ["new_tipo"] = new OptionSetValue(100000000), ["new_vigente"] = true, ["new_texto"] = "Eu, {motorista}, CPF {cpf}, reconheço a infração {infracao} com o veículo {placa}, no valor de {valor}: {forma} ({parcelas} parcela(s))." });
             s.Add(new Entity("new_textotermomulta") { ["new_versao"] = "a1", ["new_tipo"] = new OptionSetValue(100000001), ["new_vigente"] = true, ["new_texto"] = "ADITIVO {motorista}" });
@@ -776,6 +854,9 @@ namespace Betinhos.DriverRecordSharing.Tests
             public Guid Gestor;
             public Entity Motorista, MotoristaUser, Multa;
             public bool InfleetFalha;
+            public DateTime Relogio = TermoMultaCommandPluginTests.Relogio;
+            public readonly List<OrganizationRequest> Executados = new List<OrganizationRequest>();
+            public Action<OrganizationRequest> AoExecutar;
             public byte[] UploadedPdf;
             public readonly HashSet<Guid> Privilegiados = new HashSet<Guid>();
             private readonly List<byte[]> blocks = new List<byte[]>();
@@ -845,6 +926,10 @@ namespace Betinhos.DriverRecordSharing.Tests
                 var response = new OrganizationResponse();
                 switch (request.RequestName)
                 {
+                    case "cr40f_PassoMulta":
+                        AoExecutar?.Invoke(request);
+                        Executados.Add(request);
+                        return response;
                     case "GrantAccess":
                         var target = (EntityReference)request.Parameters["Target"];
                         var principal = (Microsoft.Crm.Sdk.Messages.PrincipalAccess)request.Parameters["PrincipalAccess"];

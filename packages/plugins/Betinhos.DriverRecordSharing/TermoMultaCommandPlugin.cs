@@ -59,7 +59,11 @@ namespace Betinhos.DriverRecordSharing
         private const int Guia = 100000000, Folha = 100000001;
         private const int Prevista = 100000000, Descontada = 100000001, ParcelaCancelada = 100000002;
         private const int TextoTipoTermo = 100000000;
-        private const int MultaIndicada = 202410001, MultaRecurso = 202410002;
+        private const string PassoMulta = "cr40f_PassoMulta";
+        private const int MaxParcelas = 12;
+        private const string VersaoProvisoria = "v0-placeholder";
+        private const string MultaMudouDeEtapa = "Esta multa mudou de etapa e o termo não pode mais ser assinado. Procure o escritório.";
+        private const int StatusIndicar = 202410004;
         private const int SelfieMaxBytes = 1572864; // 1,5 MB
         public const string ServerWriteVariable = "termo_server_write";
         private const string Bloqueado = "Termo assinado não pode ser alterado nem excluído.";
@@ -73,7 +77,6 @@ namespace Betinhos.DriverRecordSharing
         private const string CadastroDuplicado = "Seu cadastro está duplicado. Procure o escritório.";
         private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
-        private const int PrazoAssinaturaDias = 7;
         private readonly Func<DateTime> clock;
         private readonly Func<IOrganizationService, ITracingService, ITermoInfleet> infleet;
 
@@ -195,9 +198,15 @@ namespace Betinhos.DriverRecordSharing
             context.SharedVariables[ServerWriteVariable] = true;
             var multaId = InputGuid(context, "new_MultaId");
             caller.Retrieve(Multa, multaId, new ColumnSet("cr40f_multasid"));
-            var multa = system.Retrieve(Multa, multaId, new ColumnSet("cr40f_novacoluna", "cr40f_dataehorario", "cr40f_localdainfracao", "cr40f_placa", "cr40f_motorista", "cr40f_codigodainfracao", "new_valorguia", "new_recursopendente"));
+            var multa = system.Retrieve(Multa, multaId, new ColumnSet("cr40f_novacoluna", "cr40f_dataehorario", "cr40f_localdainfracao", "cr40f_placa", "cr40f_motorista", "cr40f_codigodainfracao", "new_valorguia", "cr40f_status", "cr40f_datadeavisoaocondutor", "cr40f_dataparaindicar"));
+            var hoje = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date;
+            var prazo = multa.GetAttributeValue<DateTime?>("cr40f_dataparaindicar");
+            var etapa2 = multa.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value == StatusIndicar
+                && multa.GetAttributeValue<DateTime?>("cr40f_datadeavisoaocondutor") == null
+                && (prazo == null || prazo.Value.Date >= hoje);
+            if (!etapa2) throw new InvalidPluginExecutionException("O termo só é enviado na etapa 2, antes do aviso ao motorista.");
+            if (TermoPrazos.PrazoCurtoParaEnviar(prazo, hoje)) throw new InvalidPluginExecutionException("Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.");
             var forma = InputInt(context, "new_FormaPagamento");
-            if (forma != Guia && forma != Folha) throw new InvalidPluginExecutionException("Forma de pagamento inválida.");
             var parcelas = InputInt(context, "new_Parcelas");
             var valorTotal = context.InputParameters.Contains("new_ValorTotal") ? Convert.ToDecimal(context.InputParameters["new_ValorTotal"], CultureInfo.InvariantCulture) : 0m;
             var competencia = context.InputParameters.Contains("new_PrimeiraCompetencia") && context.InputParameters["new_PrimeiraCompetencia"] is DateTime c ? c : (DateTime?)null;
@@ -208,16 +217,16 @@ namespace Betinhos.DriverRecordSharing
             pendenteQuery.Criteria.AddCondition("new_multa", ConditionOperator.Equal, multaId);
             pendenteQuery.Criteria.AddCondition("new_status", ConditionOperator.Equal, Pendente);
 
-            var erro = ValidarAcordo(forma, parcelas, valorTotal, competencia,
+            var erro = ValidarAcordo(forma, parcelas, valorTotal, competencia, hoje,
                 temMotorista: motorista != null,
                 temAditivo: motorista != null && TemAditivo(motorista),
-                recursoPendente: multa.GetAttributeValue<bool>("new_recursopendente"),
                 termoPendente: () => system.RetrieveMultiple(pendenteQuery).Entities.Count > 0);
             if (erro != null) throw new InvalidPluginExecutionException(erro);
 
             var primeira = DateOnly(competencia.Value);
             var plano = forma == Folha ? CalcularParcelas(valorTotal, parcelas, primeira) : new List<Parcela>();
             var texto = TextoVigente(system);
+            if (texto.GetAttributeValue<string>("new_versao") == VersaoProvisoria) throw new InvalidPluginExecutionException("O texto do termo ainda é provisório.");
             var placa = Placa(system, multa);
             var infracao = multa.GetAttributeValue<EntityReference>("cr40f_codigodainfracao");
             var catalogo = infracao == null ? null : system.Retrieve(infracao.LogicalName, infracao.Id, new ColumnSet("cr40f_codigodainfracao", "cr40f_descricaodainfracao", "cr40f_valordamulta"));
@@ -233,7 +242,11 @@ namespace Betinhos.DriverRecordSharing
                 .Replace("{infracao}", infracaoTexto)
                 .Replace("{valor}", TermoMultaDocumento.Brl(valorTotal))
                 .Replace("{forma}", formaTexto)
-                .Replace("{parcelas}", parcelas.ToString(CultureInfo.InvariantCulture));
+                .Replace("{parcelas}", parcelas.ToString(CultureInfo.InvariantCulture))
+                .Replace("{datahora}", DataHoraBr(multa.GetAttributeValue<DateTime?>("cr40f_dataehorario")))
+                .Replace("{local}", multa.GetAttributeValue<string>("cr40f_localdainfracao") ?? "")
+                .Replace("{auto}", multa.GetAttributeValue<string>("cr40f_novacoluna") ?? "")
+                .Replace("{primeiromes}", primeira.ToString("MM/yyyy", PtBr));
 
             var dataInfracao = multa.GetAttributeValue<DateTime?>("cr40f_dataehorario");
             Dictionary<string, object> infleetDados;
@@ -294,16 +307,23 @@ namespace Betinhos.DriverRecordSharing
             context.OutputParameters["new_TermoId"] = termoId;
         }
 
+        private static string DataHoraBr(DateTime? utc) =>
+            utc == null ? "" : TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc), SaoPaulo()).ToString("dd/MM/yyyy HH:mm", PtBr);
+
         /// Espelha validarAcordo de apps/shell/src/pages/frota/domain/termoMulta.ts (mesma ordem e mensagens).
-        public static string ValidarAcordo(int forma, int parcelas, decimal valorTotal, DateTime? competencia, bool temMotorista, bool temAditivo, bool recursoPendente, Func<bool> termoPendente)
+        public static string ValidarAcordo(int forma, int parcelas, decimal valorTotal, DateTime? competencia, DateTime hoje, bool temMotorista, bool temAditivo, Func<bool> termoPendente)
         {
             if (!temMotorista) return "A multa não tem motorista indicado.";
             if (!temAditivo) return SemAditivo;
             if (termoPendente()) return "Já existe um termo pendente para esta multa.";
-            if (parcelas < 1 || parcelas > 3) return "Escolha de 1 a 3 parcelas.";
+            if (forma != Folha) return "O termo agora é só para desconto em folha.";
+            if (parcelas < 1 || parcelas > MaxParcelas) return "Escolha de 1 a 12 parcelas.";
             if (!competencia.HasValue || DateOnly(competencia.Value).Day != 1 || competencia.Value.TimeOfDay != TimeSpan.Zero) return "Competência inválida.";
+            var de = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-1);
+            var ate = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(12);
+            var mes = DateOnly(competencia.Value);
+            if (mes < de || mes > ate) return $"Escolha um mês entre {de.ToString("MM/yyyy", PtBr)} e {ate.ToString("MM/yyyy", PtBr)}.";
             if (!(EmCentavos(valorTotal) >= parcelas)) return "Informe um valor maior que zero.";
-            if (forma == Folha && recursoPendente) return "Há recurso pendente: o desconto só pode ser acordado depois do resultado.";
             return null;
         }
 
@@ -392,10 +412,6 @@ namespace Betinhos.DriverRecordSharing
             var parcelas = termo.GetAttributeValue<int>("new_parcelas");
             var valorTotal = termo.GetAttributeValue<Money>("new_valortotal")?.Value ?? 0m;
             var multaRef = termo.GetAttributeValue<EntityReference>("new_multa");
-            var multa = system.Retrieve(Multa, multaRef.Id, new ColumnSet("new_recursopendente"));
-            var recursoPendente = multa.GetAttributeValue<bool>("new_recursopendente");
-            if (forma == Folha && recursoPendente)
-                throw new InvalidPluginExecutionException("Há recurso pendente: o desconto só pode ser acordado depois do resultado.");
             var plano = forma == Folha ? CalcularParcelas(valorTotal, parcelas, DateOnly(termo.GetAttributeValue<DateTime>("new_primeiracompetencia"))) : new List<Parcela>();
 
             var pdf = TermoMultaDocumento.Build(new TermoPdfDados
@@ -420,6 +436,10 @@ namespace Betinhos.DriverRecordSharing
             });
             var hash = Sha256Hex.Of(pdf);
 
+            // O passo vem antes de qualquer gravação: se a multa já saiu da etapa 2, nada fica pelo caminho (nem PDF órfão).
+            var dia = TimeZoneInfo.ConvertTimeFromUtc(agora, SaoPaulo()).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            RegistrarPasso(system, multaRef.Id, "TermoAssinado", "{\"data\":\"" + dia + "\"}", MultaMudouDeEtapa);
+
             // Grava tudo enquanto o termo ainda está Pendente; o status muda por último.
             // new_assinatura (PNG) fica vazio: o sandbox não tem encoder de imagem e o PDF já leva a assinatura vetorial.
             var dados = new Entity(Termo, termo.Id);
@@ -435,24 +455,6 @@ namespace Betinhos.DriverRecordSharing
             UploadPdf(system, termo.ToEntityReference(), (termo.GetAttributeValue<string>("new_name") ?? "termo") + ".pdf", pdf);
             system.Update(new Entity(Termo, termo.Id) { ["new_status"] = new OptionSetValue(Assinado) });
 
-            // Guia com recurso pendente: assina, mas a multa continua em Recurso.
-            if (!recursoPendente) system.Update(new Entity(Multa, multaRef.Id) { ["cr40f_status"] = new OptionSetValue(MultaIndicada) });
-            if (forma == Folha)
-            {
-                foreach (var p in plano)
-                {
-                    system.Create(new Entity(ParcelaTable)
-                    {
-                        ["new_name"] = Limit((termo.GetAttributeValue<string>("new_name") ?? "TM") + " " + p.Numero + "/" + plano.Count, 100),
-                        ["new_termo"] = termo.ToEntityReference(),
-                        ["new_motorista"] = motoristaRef,
-                        ["new_numero"] = p.Numero,
-                        ["new_competencia"] = p.Competencia,
-                        ["new_valor"] = new Money(p.Valor),
-                        ["new_status"] = new OptionSetValue(Prevista),
-                    });
-                }
-            }
             context.OutputParameters["new_HashPdf"] = hash;
         }
 
@@ -470,7 +472,17 @@ namespace Betinhos.DriverRecordSharing
                 ["new_assinadoem"] = clock(),
             });
             var multa = termo.GetAttributeValue<EntityReference>("new_multa");
-            system.Update(new Entity(Multa, multa.Id) { ["cr40f_status"] = new OptionSetValue(MultaRecurso), ["new_recursopendente"] = true });
+            RegistrarPasso(system, multa.Id, "TermoContestado", "{}", MultaMudouDeEtapa);
+        }
+
+        // A multa só muda pelo cr40f_PassoMulta; a trava reconhece este plugin pelo ParentContext. Recusa vira mensagem para o motorista.
+        private static void RegistrarPasso(IOrganizationService system, Guid multaId, string passo, string dadosJson, string mensagemSeRecusar)
+        {
+            try
+            {
+                system.Execute(new OrganizationRequest(PassoMulta) { ["MultaId"] = multaId, ["Passo"] = passo, ["DadosJson"] = dadosJson });
+            }
+            catch (InvalidPluginExecutionException) { throw new InvalidPluginExecutionException(mensagemSeRecusar); }
         }
 
         private static void Encerrar(IPluginExecutionContext context, IOrganizationService caller, IOrganizationService system, int status, string erro, DateTime? agoraParaPrazo)
@@ -479,15 +491,26 @@ namespace Betinhos.DriverRecordSharing
             var id = InputGuid(context, "new_TermoId");
             caller.Retrieve(Termo, id, new ColumnSet("new_status"));
             var termo = system.Retrieve(Termo, id, new ColumnSet("new_status", "new_multa", "new_enviadoem"));
-            if (Choice(termo, "new_status") != Pendente) throw new InvalidPluginExecutionException(erro);
-            if (agoraParaPrazo.HasValue)
+            var expirando = agoraParaPrazo.HasValue;
+            if (Choice(termo, "new_status") != Pendente)
+            {
+                // O flow de expiração lista os pendentes e pode perder a corrida para a assinatura: devolve false, sem erro.
+                if (expirando) { context.OutputParameters["new_Expirou"] = false; return; }
+                throw new InvalidPluginExecutionException(erro);
+            }
+            var multaRef = termo.GetAttributeValue<EntityReference>("new_multa");
+            if (expirando)
             {
                 var enviadoEm = termo.GetAttributeValue<DateTime?>("new_enviadoem");
-                if (!enviadoEm.HasValue || enviadoEm.Value.AddDays(PrazoAssinaturaDias) > agoraParaPrazo.Value)
-                    throw new InvalidPluginExecutionException("Este termo ainda está no prazo de assinatura.");
+                var prazo = multaRef == null ? (DateTime?)null : system.Retrieve(Multa, multaRef.Id, new ColumnSet("cr40f_dataparaindicar")).GetAttributeValue<DateTime?>("cr40f_dataparaindicar");
+                if (!enviadoEm.HasValue || !TermoPrazos.Expirou(enviadoEm.Value, prazo, agoraParaPrazo.Value))
+                {
+                    context.OutputParameters["new_Expirou"] = false;
+                    return;
+                }
             }
             system.Update(new Entity(Termo, id) { ["new_status"] = new OptionSetValue(status) });
-            var multaRef = termo.GetAttributeValue<EntityReference>("new_multa");
+            if (expirando) context.OutputParameters["new_Expirou"] = true;
             if (multaRef == null) return;
             var multa = system.Retrieve(Multa, multaRef.Id, new ColumnSet("new_termovigente"));
             if (multa.GetAttributeValue<EntityReference>("new_termovigente")?.Id == id)
@@ -504,14 +527,31 @@ namespace Betinhos.DriverRecordSharing
             context.SharedVariables[ServerWriteVariable] = true;
             var id = InputGuid(context, "new_TermoId");
             caller.Retrieve(Termo, id, new ColumnSet("new_status"));
-            var termo = system.Retrieve(Termo, id, new ColumnSet("new_status", "new_ultimolembreteem"));
-            if (Choice(termo, "new_status") != Pendente) throw new InvalidPluginExecutionException("Só é possível lembrar termo pendente.");
+            var termo = system.Retrieve(Termo, id, new ColumnSet("new_status", "new_ultimolembreteem", "new_enviadoem", "new_multa"));
+            var automatico = context.InputParameters.Contains("new_Automatico") && context.InputParameters["new_Automatico"] is bool b && b;
+            if (Choice(termo, "new_status") != Pendente)
+            {
+                if (automatico) { context.OutputParameters["new_Lembrou"] = false; return; }
+                throw new InvalidPluginExecutionException("Só é possível lembrar termo pendente.");
+            }
             var agora = clock();
             var ultimo = termo.GetAttributeValue<DateTime?>("new_ultimolembreteem");
-            if (ultimo.HasValue && ultimo.Value.AddHours(24) > agora)
+            if (automatico)
+            {
+                var enviadoEm = termo.GetAttributeValue<DateTime?>("new_enviadoem");
+                var multaRef = termo.GetAttributeValue<EntityReference>("new_multa");
+                var prazo = multaRef == null ? (DateTime?)null : system.Retrieve(Multa, multaRef.Id, new ColumnSet("cr40f_dataparaindicar")).GetAttributeValue<DateTime?>("cr40f_dataparaindicar");
+                if (!enviadoEm.HasValue || !TermoPrazos.LembrarTermo(enviadoEm.Value, ultimo, prazo, agora))
+                {
+                    context.OutputParameters["new_Lembrou"] = false;
+                    return;
+                }
+            }
+            else if (ultimo.HasValue && ultimo.Value.AddHours(24) > agora)
                 throw new InvalidPluginExecutionException("Já foi enviado um lembrete nas últimas 24 horas.");
             // O flow "Termo de multa | Push ao motorista" dispara na alteração desta coluna.
             system.Update(new Entity(Termo, id) { ["new_ultimolembreteem"] = agora });
+            context.OutputParameters["new_Lembrou"] = true;
         }
 
         // O PDF tem segurança de campo: o motorista dono (ou quem pode criar termo) recebe o arquivo lido como sistema.
