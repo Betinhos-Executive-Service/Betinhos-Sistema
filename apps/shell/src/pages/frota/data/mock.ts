@@ -21,8 +21,11 @@ const iso = (days: number) => `${offset(days)}T15:00:00Z`
 
 const ana: Ref = { id: 'f1', label: 'Ana Souza (fictício)' }
 const bruno: Ref = { id: 'f2', label: 'Bruno Lima (fictício)' }
+const motTeste: Ref = { id: 'f3', label: 'Motorista Teste (fictício)' }
 const v1: Ref = { id: 'v1', label: 'TST1A11' }
 const v2: Ref = { id: 'v2', label: 'TST2B22' }
+const fase3Tst: Ref = { id: 'v5', label: 'TST1A23' }
+const fase3Abc: Ref = { id: 'f2f2f2f2-0000-4000-8000-000000000001', label: 'ABC1D23' }
 
 function manut(id: string, veiculo: Ref, extra: Partial<Manutencao>): Manutencao {
   return { id, codigo: id.toUpperCase(), descricao: `Manutenção fictícia ${id}`, status: MANUT.SOLICITADO, grau: 2, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 50000, veiculo, solicitante: ana, criadoEm: iso(-3), servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra }
@@ -57,6 +60,7 @@ function seed(): FrotaData {
       { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
       // ID no formato GUID e inativo (vendido): o lookup de veículo do mock da Geral abre a ficha dele por cima da lista.
       { id: 'f2f2f2f2-0000-4000-8000-000000000001', placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', cor: 'Cinza', anoModelo: 2019, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
+      { id: 'v5', placa: 'TST1A23', marca: 'Toyota', modelo: 'Etios', cor: 'Branco', anoModelo: 2022, status: VEICULO.ATIVO, categoria: 100000000, motorista: motTeste, hodometro: null, hodometroEm: null },
       { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000002, motorista: null, hodometro: null, hodometroEm: null },
     ],
     manutencoes: [
@@ -88,6 +92,14 @@ function seed(): FrotaData {
       multa('u11', { status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: bruno, indicado: true, canal: CANAL.DSV, dataAviso: offset(-50), dataIndicacao: offset(-48), pagaEm: offset(-35), valorPago: 100, competencia: `${addMonths(todaySP(), -1).slice(0, 7)}-01`, acertoEm: offset(-20), dataHora: iso(-70), titulo: 'TST0002' }),
       multa('u12', { status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: ana, indicado: true, canal: CANAL.DSV, dataAviso: offset(-30), dataIndicacao: offset(-28), pagaEm: offset(-5), valorPago: 100, dataHora: iso(-40), titulo: 'TST0005' }),
       multa('u10', { status: MULTA.RECURSO, responsavel: RESPONSAVEL.MOTORISTA, recursoPendente: true, veiculo: v2 }),
+      // Fase 3 (o motorista resolve no app): autos A000000101 a A000000106, cada um com o passo corrente de um caso.
+      // (a) etapa 2, aditivo e sem termo; (b) etapa 2, termo pendente de ontem; (c) etapa 1, contestada; (d) Senatran com aceite declarado; (e) e (f) Acertar com termo assinado.
+      multa('f3a', { titulo: 'A000000101', codigo: 'A000000101', status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, motorista: motTeste, veiculo: fase3Tst, dataParaIndicar: offset(8), valorGuia: 293.47 }),
+      multa('f3b', { titulo: 'A000000102', codigo: 'A000000102', status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, motorista: motTeste, veiculo: fase3Abc, dataParaIndicar: offset(8), valorGuia: 293.47, termoVigente: { id: 'tf3b-1', label: 'tf3b-1' } }),
+      multa('f3c', { titulo: 'A000000103', codigo: 'A000000103', status: MULTA.NOTIFICAR, motorista: motTeste, veiculo: fase3Tst, dataParaIndicar: offset(8), contestadaEm: offset(-1) }),
+      multa('f3d', { titulo: 'A000000104', codigo: 'A000000104', status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, motorista: motTeste, veiculo: fase3Abc, canal: CANAL.SENATRAN, dataAviso: offset(-3), dataIndicacao: offset(-2), indicado: true, dataParaIndicar: offset(8), aceiteDeclaradoEm: offset(-1) }),
+      multa('f3e', { titulo: 'A000000105', codigo: 'A000000105', status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: motTeste, veiculo: fase3Tst, indicado: true, canal: CANAL.DSV, dataAviso: offset(-40), dataIndicacao: offset(-38), pagaEm: offset(-3), valorPago: 293.47, dataHora: iso(-60) }),
+      multa('f3f', { titulo: 'A000000106', codigo: 'A000000106', status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: motTeste, veiculo: fase3Abc, indicado: true, canal: CANAL.DSV, dataAviso: offset(-70), dataIndicacao: offset(-68), pagaEm: offset(-3), valorPago: 293.47, dataHora: iso(-90) }),
     ],
     infracoes: [{ id: 'i1', codigo: '7455-0', descricao: 'Velocidade superior à máxima em até 20%', gravidade: 1, pontos: 4, valor: 130.16 }],
     colisoes: [colisao('c1', COLISAO.ENVIADO), colisao('c2', COLISAO.RESOLVIDO)],
@@ -141,7 +153,7 @@ export function createMockSource(): DataSource {
   const data = seed()
   const fotos = new Map<string, Blob>()
   // Aditivo exige data e PDF, como no Dataverse. Só a Ana (fictícia) tem os dois; o Bruno tem a data sem o PDF.
-  const aditivos = new Map<string, { data: string | null; arquivo: string | null }>([[ana.id, { data: '2026-10-15', arquivo: 'aditivo.pdf' }], [bruno.id, { data: '2026-10-15', arquivo: null }]])
+  const aditivos = new Map<string, { data: string | null; arquivo: string | null }>([[ana.id, { data: '2026-10-15', arquivo: 'aditivo.pdf' }], [motTeste.id, { data: '2026-10-15', arquivo: 'aditivo.pdf' }], [bruno.id, { data: '2026-10-15', arquivo: null }]])
   const temAditivo = (id: string) => { const a = aditivos.get(id); return !!a?.data && !!a.arquivo }
   const termo = (id: string, extra: Partial<TermoMulta>): TermoMulta => ({ id, status: 'pendente', forma: 'folha', parcelas: 3, valorTotal: 293.47, primeiraCompetencia: addMonths(`${todaySP().slice(0, 7)}-01`, 1), enviadoEm: iso(-4), assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: iso(-4), ...extra })
   // Termos fictícios: u2 pendente (Ana), u3 assinado com parcelas, u4 contestado.
@@ -149,6 +161,10 @@ export function createMockSource(): DataSource {
     ['u2', [termo('tu2-1', { forma: 'guia', parcelas: 1, valorTotal: 195.23, enviadoEm: iso(-4), ultimoLembreteEm: iso(-2) })]],
     ['u3', [termo('tu3-1', { status: 'assinado', enviadoEm: iso(-30), assinadoEm: iso(-28), hashPdf: '9f2c1a7be04d3f6a8c1e5b2d7f9a0c3e4b6d8f1a2c3e5b7d9f0a1c2e3b4d5f6a' })]],
     ['u4', [termo('tu4-1', { status: 'contestado', forma: 'guia', parcelas: 1, valorTotal: 130.16, enviadoEm: iso(-6), motivoContestacao: 'Eu estava de folga nesse dia (fictício).' })]],
+    ['f3b', [termo('tf3b-1', { forma: 'folha', enviadoEm: iso(-1) })]],
+    ['f3c', [termo('tf3c-1', { status: 'contestado', enviadoEm: iso(-3), motivoContestacao: 'Eu não estava com o carro nesse dia (fictício).' })]],
+    ['f3e', [termo('tf3e-1', { status: 'assinado', enviadoEm: iso(-6), assinadoEm: iso(-4), hashPdf: '5d41402abc4b2a76b9719d911017c592e3b0c44298fc1c149afbf4c8996fb924' })]],
+    ['f3f', [termo('tf3f-1', { status: 'assinado', enviadoEm: iso(-6), assinadoEm: iso(-4), primeiraCompetencia: addMonths(`${todaySP().slice(0, 7)}-01`, -3), hashPdf: '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae' })]],
   ])
   const parcelas = new Map([['tu3-1', [0, 1, 2].map((i) => ({ numero: i + 1, competencia: addMonths(`${todaySP().slice(0, 7)}-01`, i - 1), valor: i === 0 ? 97.83 : 97.82, status: i === 0 ? 'Descontada' : 'Prevista' }))]])
   // Parcelas de folha fictícias (RH): quatro colaboradores, meses relativos a hoje.
@@ -188,7 +204,7 @@ export function createMockSource(): DataSource {
     return m
   }
   const encerrada = (status: number | null) => status === MANUT.REALIZADO || status === MANUT.REPROVADO || status === MANUT.CANCELADO
-  const pessoas: Ref[] = [ana, bruno]
+  const pessoas: Ref[] = [ana, bruno, motTeste]
   // Linha da Geral de cada manutenção encaixada (o que o Agendar cria no Dataverse). As já encaixadas no seed ganham a delas.
   const linhas = new Map<string, ProgramacaoManutencao>(
     data.manutencoes
@@ -461,7 +477,7 @@ export function createMockSource(): DataSource {
       const erro = validarPasso(antes, passo, dados, hoje)
       if (erro) throw new ApiError(erro, 400)
       const depois = aplicarPasso(antes, passo, dados, hoje)
-      aplicarNaMulta(item, depois, [ana, bruno])
+      aplicarNaMulta(item, depois, [ana, bruno, motTeste])
       return avaliar(depois, hoje)
     },
     async dossieMulta(multaId) {
