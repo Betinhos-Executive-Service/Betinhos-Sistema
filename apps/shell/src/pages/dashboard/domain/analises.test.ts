@@ -61,7 +61,13 @@ describe('alertas', () => {
     expect(q.semVeiculo.valor).toBe('1')
     expect(q.semTipoVeiculo.valor).toBe('1')
     expect(q.semMotorista.valor).toBe('1')
-    expect(q.semCliente).toMatchObject({ valor: '3', status: '60,0% dos serviços', tom: 'warn' })
+    expect(q.semCliente).toMatchObject({ valor: '3', status: '60,0% dos serviços', tom: 'danger' })
+    // 10% ou mais dos serviços é perigo; abaixo disso (1 em 15), atenção.
+    expect(q.semVeiculo).toMatchObject({ status: '20,0% dos serviços', tom: 'danger' })
+    const muitos = [...rv, ...Array.from({ length: 10 }, () => reserva({ saidaRaw: '2026-07-01T12:00:00Z', motoristaId: 'm1', veiculoId: 'v1', cliente: 'Tenaris' }))]
+    expect(Object.fromEntries(alertasQualidade(muitos, nowMs).map((a) => [a.id, a.tom])).semVeiculo).toBe('warn')
+    // Exatamente 10% (1 em 10) já é perigo.
+    expect(Object.fromEntries(alertasQualidade(muitos.slice(0, 10), nowMs).map((a) => [a.id, a.tom])).semVeiculo).toBe('danger')
   })
 
 })

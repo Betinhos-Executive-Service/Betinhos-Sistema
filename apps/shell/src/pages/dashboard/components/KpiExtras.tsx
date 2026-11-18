@@ -15,7 +15,8 @@ type Entrada = {
 
 /** Extras do `StatCard` logo abaixo do valor, como chips compactos: `<StatCard {...extrasKpi({ chips, apoio })} />`. */
 export function extrasKpi({ chips = [], apoio = [], extra }: Entrada): Pick<StatCardProps, 'children'> {
-  const comparativos = chips.filter((c): c is Chip | ChipAnterior => c != null)
+  // Comparativo sem base ("ANO ANT. s/dado") só ocupa espaço: fica de fora.
+  const comparativos = chips.filter((c): c is Chip | ChipAnterior => c != null && c.tipo !== 'sem-dado')
   const frase = typeof apoio === 'string' ? apoio : ''
   const rotulados = typeof apoio === 'string' ? [] : apoio
   if (!comparativos.length && !rotulados.length && !frase && extra == null) return {}

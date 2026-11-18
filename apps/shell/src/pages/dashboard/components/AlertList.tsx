@@ -15,11 +15,12 @@ export function Faixa({ titulo, itens, children }: { titulo: string; itens: numb
   )
 }
 
-/** `abrir`: drill-down por id do alerta (só aparece com número diferente de zero e dado disponível). */
+/** `abrir`: drill-down por id do alerta (só aparece com número diferente de zero e dado disponível).
+ *  Alertas em tom `ok` (zerados ou score bom) vão para o fim e ficam discretos: o olho cai primeiro no que pede ação. */
 export function AlertList({ titulo, itens, abrir = {} }: { titulo: string; itens: AlertaItem[]; abrir?: Partial<Record<string, () => void>> }) {
   return (
     <Faixa titulo={titulo} itens={itens.length}>
-      {itens.map((a) => <AlertCard as="li" key={a.id} value={a.valor} label={a.rotulo} status={a.status} tone={TOM[a.tom]} onOpen={a.status !== 's/dado' && a.valor !== '0' ? abrir[a.id] : undefined} />)}
+      {[...itens].sort((a, b) => Number(a.tom === 'ok') - Number(b.tom === 'ok')).map((a) => <AlertCard as="li" key={a.id} className={a.tom === 'ok' ? 'dash-alerta--ok' : undefined} value={a.valor} label={a.rotulo} status={a.status} tone={TOM[a.tom]} onOpen={a.status !== 's/dado' && a.valor !== '0' ? abrir[a.id] : undefined} />)}
     </Faixa>
   )
 }

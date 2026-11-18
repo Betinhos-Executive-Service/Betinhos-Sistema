@@ -3,7 +3,7 @@ import { dec, int, stL } from './format'
 import { DIA_MS } from './periodo'
 import { JANELA_DIAS } from '../../documentos/domain/vencimento'
 import { alertaScore, type ResultadoScore } from './score'
-import type { AlertaItem, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Veiculo } from './types'
+import type { AlertaItem, Conjunto, Funcionario, Manutencao, Multa, Ocorrencia, Reserva, Tom, Veiculo } from './types'
 
 export type Secundarios = { manutencoes: Manutencao[]; multas: Multa[]; ocorrencias: Ocorrencia[]; funcionarios: Funcionario[]; veiculos: Veiculo[]; indisponiveis: Conjunto[] }
 
@@ -43,9 +43,14 @@ export const QUALIDADE = {
 } as const
 export type AlertaQualidade = keyof typeof QUALIDADE
 
+/** Fração dos serviços a partir da qual um alerta de qualidade fica vermelho. */
+const LIMITE_QUALIDADE_PERIGO = 0.1
+
 export function alertasQualidade(rv: Reserva[], nowMs: number): AlertaItem[] {
   const share = (n: number) => (rv.length ? `${dec((n / rv.length) * 100, 1)}% dos serviços` : 's/dado')
-  const item = (id: string, rotulo: string, n: number): AlertaItem => ({ id, valor: int(n), rotulo, status: share(n), tom: n ? 'warn' : 'ok' })
+  // Cor pela gravidade: 10% ou mais dos serviços é perigo, qualquer caso é atenção.
+  const tom = (n: number): Tom => (!n ? 'ok' : n >= rv.length * LIMITE_QUALIDADE_PERIGO ? 'danger' : 'warn')
+  const item = (id: string, rotulo: string, n: number): AlertaItem => ({ id, valor: int(n), rotulo, status: share(n), tom: tom(n) })
   const conta = (id: AlertaQualidade) => rv.filter((r) => QUALIDADE[id](r, nowMs)).length
   const semVeiculo = conta('semVeiculo')
   const semTipo = conta('semTipoVeiculo')
