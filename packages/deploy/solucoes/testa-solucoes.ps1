@@ -383,6 +383,33 @@ $fotoVigiaDesligada = [pscustomobject]@{ fluxos = [pscustomobject]@{ 'a1' = [psc
 $script:respostas = $vigiaDesligada; $script:chamadas = @()
 $r = Restore-Estados $dvProd 'Prod' $fotoVigiaDesligada -Aposentados $aposentados
 Confere ($r.Mudancas.Count -eq 0 -and @($script:chamadas | Where-Object { $_.Method -eq 'Patch' }).Count -eq 0) 'aposentado: sem substituto ligado fica como estava'
+# Aposentado que a foto tinha ligado e o import desligou: com o substituto ligado nao religa (caso de 18/11/2026: religar falhava
+# e reprovava o PROD); sem substituto ligado religa, como antes
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 0; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 1; category = 5 }) },
+  [pscustomobject]@{ value = @() }
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+Confere ($r.Mudancas.Count -eq 0 -and $r.Falhas.Count -eq 0 -and @($script:chamadas | Where-Object { $_.Method -eq 'Patch' }).Count -eq 0) 'aposentado desligado pelo import: substituto ligado, nao religa'
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 0; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 0; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoVigiaDesligada -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Mudancas.Count -eq 1 -and $r.Mudancas[0].nome -eq 'Antigo' -and $r.Mudancas[0].para -eq 1 -and $patches.Count -eq 1 -and $patches[0].Uri -like '*workflows(a1)') 'aposentado desligado pelo import: sem substituto ligado, religa'
+$script:respostas = @(
+  [pscustomobject]@{ value = @([pscustomobject]@{ workflowid = 'a1'; name = 'Antigo'; statecode = 0; category = 5 }, [pscustomobject]@{ workflowid = 'v1'; name = 'Vigia'; statecode = 0; category = 5 }) },
+  [pscustomobject]@{ value = @() },
+  [pscustomobject]@{}, [pscustomobject]@{}
+)
+$script:chamadas = @()
+$r = Restore-Estados $dvProd 'Prod' $fotoAposentado -Aposentados $aposentados
+$patches = @($script:chamadas | Where-Object { $_.Method -eq 'Patch' })
+Confere ($r.Falhas.Count -eq 0 -and $patches.Count -eq 1 -and $patches[0].Uri -like '*workflows(v1)' -and $r.Mudancas[0].nome -eq 'Vigia') 'aposentado desligado pelo import: o substituto religado na restauracao conta, e o antigo fica desligado'
 
 # -DesligarNovos le as 6 solucoes rastreadas (so BetinhosCore existe aqui, com n1 e n3); n4 e n5 estao fora delas e ficam como estao
 $script:respostas = @(
