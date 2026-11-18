@@ -29,6 +29,17 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const rows = () => document.querySelectorAll('.pg-open').length
 
 describe('Pendências', () => {
+  it('busca por várias palavras e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) } } })
+    render(<PendenciasPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-501')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar pendências' }), { target: { value: 'op-505 rateio' } })
+    await waitFor(() => expect(rows()).toBe(1))
+    await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toContain('op-505'))
+  })
+
   it('mostra as 5 pendências do mock e filtra pela visão Rateio', async () => {
     render(<PendenciasPage host={{ mode: 'mock' }} />)
     await screen.findByText('OP-501')

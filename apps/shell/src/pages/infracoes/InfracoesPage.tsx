@@ -2,6 +2,8 @@ import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, useDebouncedText } from '../../app/search'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import type { Infracao } from './domain/types'
@@ -9,7 +11,7 @@ import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { INFRACAO_COLUMNS, INFRACAO_DEFAULT_FILTERS, INFRACAO_FIELDS, INFRACAO_SORT, TELA, builtinViews, fromLegacyFilters, matchesKeyword, readInfracao, sortInfracoes } from './domain/lista'
+import { INFRACAO_COLUMNS, INFRACAO_DEFAULT_FILTERS, INFRACAO_FIELDS, INFRACAO_SORT, TELA, builtinViews, fromLegacyFilters, infracaoKeywordText, infracaoWords, readInfracao, sortInfracoes } from './domain/lista'
 import { infracoesQuery } from './domain/query'
 import { usoIndex } from './domain/uso'
 import { useInfracoes } from './useInfracoes'
@@ -47,16 +49,19 @@ function Infracoes({ host }: { host: Host }) {
     legacy: { keys: LEGACY_KEYS, read: (q) => fromLegacyFilters(infracoesQuery.ler(q)) },
   })
   const [query, setQuery] = useQueryTexto('q')
+  const q = useDebouncedText(query)
+  const words = useMemo(() => infracaoWords(q), [q])
+  const index = useMemo(() => keywordIndex<Infracao>(infracaoKeywordText), [])
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
   const multas = useCallback((id: string) => uso.get(id)?.length ?? 0, [uso])
   const read = useMemo(() => extra.read((row: Infracao, key: string) => readInfracao(row, key, multas), (i) => i.id), [multas, extra])
   const visible = useMemo(() => {
-    const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && matchesKeyword(i, query))
+    const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && index.matches(i, words))
     return extra.sort(sortInfracoes(list, view.config.sort, multas), view.config.sort, (i) => i.id)
-  }, [data.list, filters, allFields, query, multas, view.config.sort, read, extra])
+  }, [data.list, filters, allFields, index, words, multas, view.config.sort, read, extra])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  const lazyKey = useMemo(() => ({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
@@ -98,7 +103,7 @@ function Infracoes({ host }: { host: Host }) {
       {/* "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete. */}
       <div role="toolbar" aria-label="Comandos de infrações">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por código, descrição, artigo, gravidade, competência ou valor" aria-label="Buscar infrações" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
             <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
@@ -108,7 +113,7 @@ function Infracoes({ host }: { host: Host }) {
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
       {data.multasError && data.loaded ? <Alert tone="warning" title="Não foi possível carregar o uso nas multas">{data.multasError} A contagem de multas fica indisponível até atualizar.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {data.loaded ? <InfracaoDrawer target={target} onTarget={setTarget} list={data.list} uso={uso} usoState={usoState} source={source} onSaved={data.upsert} /> : null}
     </div>
   )

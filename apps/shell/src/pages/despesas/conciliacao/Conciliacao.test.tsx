@@ -154,6 +154,15 @@ describe('Compras sem despesa: resumo, filtros, lote e exportação', () => {
     expect(await linha('RESTAURANTE SABOR')).toBeTruthy()
   })
 
+  it('busca por várias palavras destaca os termos (SearchHits) e filtra em AND', async () => {
+    await renderPage()
+    await screen.findByText('POSTO SHELL AV BRASIL')
+    const box = screen.getByRole('searchbox', { name: 'Buscar compras' })
+    expect(document.querySelector('.search-hits')).toBeTruthy()
+    fireEvent.change(box, { target: { value: 'POSTO SHELL AV BRASIL zzzzqq' } })
+    await waitFor(() => expect(screen.queryByText('POSTO SHELL AV BRASIL')).toBeNull())
+  })
+
   it('ignora várias compras de uma vez com um motivo pronto', async () => {
     await renderPage()
     // Mais recentes primeiro: POSTO GRAAL (04/11) e POSTO SHELL (03/11) ficam lado a lado.

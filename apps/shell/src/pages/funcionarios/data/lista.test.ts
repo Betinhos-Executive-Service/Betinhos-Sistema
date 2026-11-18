@@ -35,6 +35,11 @@ describe('lista de funcionários (Design System)', () => {
   it('busca sem acento e por CPF sem pontuação; chips de alerta fora da visão', () => {
     expect(rows.filter((r) => matchesKeyword(r, 'avila')).map((r) => r.id)).toEqual(['1'])
     expect(rows.filter((r) => matchesKeyword(r, '52998224725')).map((r) => r.id)).toEqual(['1'])
+    const semMascara = withAlertas([row('9', { cr40f_nomecompleto: 'Caio', cr40f_numerodocpf: '52998224725', cr40f_telefonepessoal: '11987654321' })], '2026-10-01')[0]
+    expect(matchesKeyword(semMascara, '529.982.247-25')).toBe(true)
+    expect(matchesKeyword(semMascara, '(11) 98765-4321')).toBe(true)
+    expect(matchesKeyword(semMascara, 'caio 98765')).toBe(true)
+    expect(matchesKeyword(semMascara, 'caio 1234')).toBe(false)
     expect(rows.filter((r) => matchesAlerta(r, 'aniversario')).map((r) => r.id)).toEqual(['3'])
   })
 

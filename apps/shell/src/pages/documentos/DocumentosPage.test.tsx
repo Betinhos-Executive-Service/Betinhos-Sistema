@@ -39,6 +39,16 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 const linhaDe = async (nome: RegExp, doc: RegExp) => (await screen.findAllByRole('row')).find((r) => nome.test(r.textContent ?? '') && doc.test(r.textContent ?? ''))!
 
 describe('Central de documentos', () => {
+  it('busca por várias palavras (AND) e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) } } })
+    render(<DocumentosPage host={{ mode: 'mock' }} />)
+    fireEvent.change(await screen.findByRole('searchbox', { name: 'Buscar documentos' }), { target: { value: 'carlao CNH vencido' } })
+    await waitFor(() => expect(screen.getAllByRole('row').filter((r) => /Carlão/.test(r.textContent ?? '')).length).toBe(1))
+    await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toContain('cnh'))
+  })
+
   it('mostra KPIs de Pessoas, filtra por KPI e troca para Frota', async () => {
     render(<DocumentosPage host={{ mode: 'mock' }} />)
     const vencidos = await screen.findByRole('button', { name: /Vencidos/ })

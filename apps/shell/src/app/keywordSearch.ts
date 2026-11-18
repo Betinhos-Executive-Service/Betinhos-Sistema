@@ -97,20 +97,31 @@ export function matchesKeywords(tokens: string[], texts: string[]) {
 export function highlightRanges(text: string, tokens: string[]): [number, number][] {
   const needles = tokens.map(fold).filter(Boolean)
   if (!text || !needles.length) return []
-  let folded = ''
-  const starts: number[] = []
-  const ends: number[] = []
-  let offset = 0
-  for (const char of text) {
-    const piece = fold(char)
-    for (let index = 0; index < piece.length; index++) { starts.push(offset); ends.push(offset + char.length) }
-    folded += piece
-    offset += char.length
+  const whole = fold(text)
+  const found = needles.filter((needle) => whole.includes(needle))
+  if (!found.length) return []
+  // Dobrar o texto inteiro mantém o tamanho quando nenhum caractere muda de comprimento; só então dá para mapear 1 a 1.
+  let folded = whole
+  let starts: number[] | null = null
+  let ends: number[] | null = null
+  if (whole.length !== text.length || [...text].length !== text.length) {
+    folded = ''
+    starts = []
+    ends = []
+    let offset = 0
+    for (const char of text) {
+      const piece = fold(char)
+      for (let index = 0; index < piece.length; index++) { starts.push(offset); ends.push(offset + char.length) }
+      folded += piece
+      offset += char.length
+    }
   }
   const marked = new Array<boolean>(text.length).fill(false)
-  for (const needle of needles) {
+  for (const needle of found) {
     for (let at = folded.indexOf(needle); at !== -1; at = folded.indexOf(needle, at + 1)) {
-      for (let index = starts[at]; index < ends[at + needle.length - 1]; index++) marked[index] = true
+      const from = starts ? starts[at] : at
+      const to = ends ? ends[at + needle.length - 1] : at + needle.length
+      for (let index = from; index < to; index++) marked[index] = true
     }
   }
   const ranges: [number, number][] = []

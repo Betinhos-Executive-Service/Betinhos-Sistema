@@ -1,4 +1,6 @@
 import type { StatusTone } from '@betinhos/ui'
+import { keywordIndex, searchWords } from '../../../../app/search'
+import { formatMoney } from '../../../pagantes/domain/messages'
 import { OPERACIONAL } from '../../domain/status'
 import { addDays, dateKey } from '../../../operacional/domain/time'
 import type { Cartao, DespesaCandidata, Transacao } from './types'
@@ -43,16 +45,27 @@ export const MOTIVO_CASADA = 'Casada manualmente no Sistema Betinhos.'
 export const MOTIVO_REABERTA = 'Reaberta no Sistema Betinhos.'
 export const motivoReprocessar = (c: Cartao) => `Cartão ${c.nome} vinculado no Sistema Betinhos; a conciliação casa na hora com a despesa do motorista ou cria uma para ele validar.`
 
-/** Filtros da fila. `busca` confere estabelecimento, descrição, motorista, cartão, placa e motivo; `canal` vazio no registro = Itaú. */
+/** Filtros da fila. `busca` confere as palavras em qualquer campo de `textoDe`; `canal` vazio no registro = Itaú. */
 export type Filtros = { busca: string; cartaoId: string | null; motoristaId: string | null; canal: number | null; situacao: number | null; de: string; ate: string }
 export const FILTROS_VAZIOS: Filtros = { busca: '', cartaoId: null, motoristaId: null, canal: null, situacao: null, de: '', ate: '' }
 
-const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-const textoDe = (t: Transacao) => normalizar([t.estabelecimento, t.descricao, t.motoristaNome, t.cartaoNome, t.final, t.placa, t.motivo, t.despesaNome].join(' '))
+/**
+ * Texto em que a busca procura: tudo que a lista mostra (data como na tela, lançamento, estabelecimento, motivo, canal,
+ * cartão, final, motorista, valor, tipo, situação) mais despesa, placa, veículo, combustível e cidade do posto (CTF e
+ * TicketLog). A parcela e a data ISO também entram.
+ */
+export const textoDe = (t: Transacao) => [
+  t.dataCompra.split('-').reverse().join('/'), t.dataCompra, t.estabelecimento, t.descricao, t.motivo, canalLabel(t.canal), t.cartaoNome, t.final, t.motoristaNome,
+  formatMoney(t.valor), tipoLabel(t.tipo), situacaoLabel(t.situacao), t.despesaNome, t.placa, t.veiculoNome, t.combustivel, t.cidadePosto,
+  t.totalParcelas && t.totalParcelas > 1 ? `${t.parcela ?? '?'}/${t.totalParcelas}` : '',
+].filter(Boolean).join(' ')
 
-/** Filtros por texto, cartão, motorista, canal, situação e período (data da compra, `aaaa-mm-dd`, limites inclusivos). */
+// O texto de cada compra é calculado uma vez (a lista nova, depois de recarregar ou gravar, traz objetos novos).
+const indice = keywordIndex<Transacao>(textoDe)
+
+/** Filtros por texto (palavras em qualquer campo), cartão, motorista, canal, situação e período (data da compra, `aaaa-mm-dd`, limites inclusivos). */
 export function filtrar(list: Transacao[], f: Filtros) {
-  const palavras = normalizar(f.busca).split(/\s+/).filter(Boolean)
+  const palavras = searchWords(f.busca)
   return list.filter((t) =>
     (!f.cartaoId || t.cartaoId === f.cartaoId) &&
     (!f.motoristaId || t.motoristaId === f.motoristaId) &&
@@ -60,7 +73,7 @@ export function filtrar(list: Transacao[], f: Filtros) {
     (f.situacao == null || t.situacao === f.situacao) &&
     (!f.de || t.dataCompra >= f.de) &&
     (!f.ate || t.dataCompra <= f.ate) &&
-    (!palavras.length || palavras.every((p) => textoDe(t).includes(p))))
+    indice.matches(t, palavras))
 }
 
 /** Situações da fila "Para revisar", na ordem dos cartões de resumo. */

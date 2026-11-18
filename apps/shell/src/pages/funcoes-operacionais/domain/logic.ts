@@ -6,7 +6,6 @@ import {
   displayDriverName,
   formatDateTime,
   formatTime,
-  normalizeText,
   now,
   parseDate,
   startOfDay,
@@ -19,32 +18,36 @@ export function serviceById(state: AppState, serviceId: string): Service | null 
   return state.data.services.find((service) => service.id === serviceId) || null;
 }
 
-export function passengerLinksByService(state: AppState, serviceId: string) {
-  return state.data.passengerLinks
+export function passengerLinksOf(passengerLinks: AppState["data"]["passengerLinks"], serviceId: string) {
+  return passengerLinks
     .filter((item) => item.serviceId === serviceId)
     .sort((left, right) => left.order - right.order);
 }
 
-function buildSearchBlob(service: Service): string {
-  return normalizeText([
-    service.readableId,
-    service.paxView,
-    service.clienteLabel,
-    service.enderecoSaida,
-    service.destino,
-    service.motoristaLabel,
-    service.obsOperacao,
-    service.solicitanteLabel,
-    service.trajeto,
-    service.veiculoLabel,
-    service.tipoVeiculoLabel,
-    formatDateTime(service.dataSaida)
-  ].join(" "));
+export function passengerLinksByService(state: AppState, serviceId: string) {
+  return passengerLinksOf(state.data.passengerLinks, serviceId);
 }
 
-function matchesDriverSearch(service: Service, query: string): boolean {
-  const normalized = normalizeText(query);
-  return !normalized || buildSearchBlob(service).includes(normalized);
+/** Texto da busca por palavras: o que o card mostra (ID, trajeto, PAX, cliente, motorista, status, tipo, data e hora) e o que está carregado do serviço. */
+export function serviceKeywordText(service: Service, passengerLinks: Array<{ passengerLabel: string }>): string {
+  return [
+    service.readableId,
+    service.paxView,
+    ...passengerLinks.map((link) => stripContactPhone(link.passengerLabel)),
+    service.clienteLabel,
+    service.solicitanteLabel,
+    service.trajeto,
+    service.enderecoSaida,
+    service.destino,
+    service.motoristaId ? service.motoristaLabel : "Sem motorista",
+    service.statusLabel,
+    service.tipoServicoLabel,
+    service.veiculoLabel,
+    service.tipoVeiculoLabel,
+    service.obsOperacao,
+    formatDateTime(service.dataSaida),
+    formatTime(service.dataSaida)
+  ].join(" ");
 }
 
 function driverStartDate(state: AppState): Date {
@@ -53,20 +56,21 @@ function driverStartDate(state: AppState): Date {
   return selected ? startOfDay(selected) : fallback;
 }
 
-export function driverServices(state: AppState): Service[] {
+/** `matches` é a busca por palavras já com debounce (índice de `serviceKeywordText`). */
+export function driverServices(state: AppState, matches: (service: Service) => boolean): Service[] {
   const start = driverStartDate(state);
   return state.data.services
     .filter((service) => {
       const date = parseDate(service.dataSaida);
       return !!date && date >= start;
     })
-    .filter((service) => matchesDriverSearch(service, state.driver.query))
+    .filter(matches)
     .sort((left, right) => compareAsc(left.dataSaida, right.dataSaida));
 }
 
-export function cloneServices(state: AppState): Service[] {
+export function cloneServices(state: AppState, matches: (service: Service) => boolean): Service[] {
   return state.data.services
-    .filter((service) => matchesDriverSearch(service, state.clone.query))
+    .filter(matches)
     .sort((left, right) => compareAsc(left.dataSaida, right.dataSaida));
 }
 

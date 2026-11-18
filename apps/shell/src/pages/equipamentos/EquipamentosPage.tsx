@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, type MenuAction } from '@betinhos/ui'
 import { Laptop, Plus, RefreshCw, SearchX, Tags } from 'lucide-react'
 import type { Host } from '../../host'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import type { Equipamento } from './domain/types'
@@ -12,7 +14,7 @@ import { createCacheImagens } from './data/imagens'
 import { createSource } from './data/source'
 import { ImagensContext } from './components/ImagemFoto'
 import { STATUS } from './domain/choices'
-import { EQUIPAMENTO_COLUMNS, EQUIPAMENTO_DEFAULT_FILTERS, EQUIPAMENTO_SORT, TELA, builtinViews, equipamentoFields, matchesKeyword, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './domain/lista'
+import { EQUIPAMENTO_COLUMNS, EQUIPAMENTO_DEFAULT_FILTERS, EQUIPAMENTO_SORT, TELA, builtinViews, equipamentoFields, equipamentoKeywordText, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './domain/lista'
 import { useEquipamentos } from './useEquipamentos'
 import { EquipamentosCards, EquipamentosTable } from './components/EquipamentosList'
 import { EquipamentoDrawer } from './components/EquipamentoDrawer'
@@ -51,19 +53,22 @@ function Equipamentos({ host }: { host: Host }) {
     builtins: builtinViews,
   })
   const [query, setQuery] = useQueryTexto('q')
+  const q = useDebouncedText(query)
+  const words = useMemo(() => searchWords(q), [q])
+  const index = useMemo(() => keywordIndex<Equipamento>(equipamentoKeywordText), [])
   // Link direto `?ver=<guid>` (ou `?editar=`) e `?novo=1` abrem o drawer de cadastro/edição.
   const [target, setTarget] = useQueryAlvo()
 
   const inativos = useMemo(() => new Set(data.pessoas.filter((p) => !p.ativo).map((p) => p.id)), [data.pessoas])
   const read = useMemo(() => extra.read(readEquipamento, (e) => e.id), [extra])
   const visible = useMemo(() => {
-    const list = data.equipamentos.filter((e) => matchesFilters(e, filters, allFields, read) && matchesKeyword(e, query))
+    const list = data.equipamentos.filter((e) => matchesFilters(e, filters, allFields, read) && index.matches(e, words))
     return extra.sort(sortEquipamentos(list, view.config.sort), view.config.sort, (e) => e.id)
-  }, [data.equipamentos, filters, fields, query, view.config.sort, read])
+  }, [data.equipamentos, filters, fields, index, words, view.config.sort, read])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   // Chave por conteúdo: `fields` depende dos itens (filtro de Responsável), então salvar ou recarregar gera outro
   // objeto `filters` com o mesmo conteúdo, e uma chave por referência voltaria ao primeiro lote a cada gravação.
-  const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
@@ -115,7 +120,7 @@ function Equipamentos({ host }: { host: Host }) {
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por descrição, tipo, modelo, série, responsável, status ou observação" aria-label="Buscar equipamentos" />}
           more={moreActions}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
@@ -125,7 +130,7 @@ function Equipamentos({ host }: { host: Host }) {
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {data.loaded ? <EquipamentoDrawer target={target} onTarget={setTarget} list={data.equipamentos} tipos={data.tipos} pessoas={data.pessoas} source={source} onSaved={data.upsert} onCapa={data.setCapa} /> : null}
       {/* Renomear reflete nos itens (upsertTipo); inativar tira o tipo dos seletores, mas o item o mantém marcado "(inativo)". */}
       {data.loaded ? <TiposDrawer open={tiposOpen} onClose={() => setTiposOpen(false)} tipos={data.tipos} uso={usoTipos} source={source} onSaved={data.upsertTipo} /> : null}

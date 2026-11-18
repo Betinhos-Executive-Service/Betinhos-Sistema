@@ -1,4 +1,4 @@
-import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
+import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
 import { CLASSIFICACAO, STATUS, label } from './choices'
 import type { Filters, ViewFilters } from './filters'
 import type { ChoiceSet, Pessoa } from './types'
@@ -58,15 +58,16 @@ export function readPessoa(p: Pessoa, key: string, dupIds: Set<string>): unknown
   }
 }
 
-/** Texto em que a busca procura (não fica na visão): nome, cliente, celular, e-mail, departamento e cargo. */
-export const pessoaKeywordText = (p: Pessoa, cargo: string) => [p.nome, p.cliente, p.telefone, p.telefone.replace(/\D/g, ''), p.email, p.departamento, cargo].filter(Boolean).join(' ')
-
-/** Busca por palavra-chave: todas as palavras aparecem no texto da pessoa. */
-export function matchesKeyword(p: Pessoa, query: string, cargo: string) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const text = normalizeSearch(pessoaKeywordText(p, cargo))
-  return words.every((w) => text.includes(w))
+/**
+ * Texto em que a busca procura: tudo o que a lista mostra (pessoa, cargo, cliente, contato, classificação, último
+ * serviço em dd/mm/aaaa) mais status, idioma, departamento, CR, endereço e preferências; telefone também só com dígitos.
+ */
+export function pessoaKeywordText(p: Pessoa, choices: ChoiceSet) {
+  const ultimo = p.ultimoServico ? p.ultimoServico.split('-').reverse().join('/') : ''
+  return [
+    p.nome, p.cliente, p.telefone, p.telefone.replace(/\D/g, ''), p.email, p.departamento, p.cr, p.endereco, p.preferencias, ultimo,
+    label(choices.cargo, p.cargo), label(choices.classificacao, p.classificacao), label(choices.status, p.status), label(choices.idioma, p.idioma),
+  ].filter(Boolean).join(' ')
 }
 
 /** Ordena pela coluna da visão; vazios por último. */

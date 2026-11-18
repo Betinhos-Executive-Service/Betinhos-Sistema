@@ -26,7 +26,7 @@ description: "Verifica o módulo de Treinamentos do shell (#/treinamentos: lista
 - Funcionários: Carlos, Márcio, Rafael (motoristas ativos), Bruna (administrativo), Gustavo (desligado). Anexos enviados no mock só existem em memória.
 
 ## Roteiro em mock (navegador, desktop 1366×800 e 375 px)
-1. `#/treinamentos` → "Dados de exemplo", tabela com Treinamento, Situação, Público-alvo, Exige, Validade (com "Vencido" na Direção defensiva), Publicado em; visões prontas Rascunhos e Publicados; busca "direcao" acha a Direção defensiva.
+1. `#/treinamentos` → "Dados de exemplo", tabela com Treinamento, Situação, Público-alvo, Exige, Validade (com "Vencido" na Direção defensiva), Publicado em; visões prontas Rascunhos e Publicados; busca "direcao" acha a Direção defensiva; busca por várias palavras (E, sem acento, em título, descrição, público, situação, validade, datas e conteúdo) filtra e marca as palavras na tabela (`SearchHits`).
 2. Novo treinamento → preencher título, texto com `# Regras`, `- item` e `**negrito**` (a prévia à direita mostra título, lista e negrito), vídeo `youtube.com/x` → Publicar mostra "O vídeo precisa de um link https:// válido."; corrigir para `https://…`.
 3. Ligar "Exige quiz", adicionar 3 perguntas com 2 alternativas cada; Salvar sem marcar a correta → "Marque a alternativa correta da pergunta 1."; marcar as corretas; nota mínima 120 → "A nota mínima vai de 0 a 100."; voltar a 70.
 4. Público "Selecionar" sem ninguém → Publicar mostra "Selecione pelo menos um funcionário." e não abre o diálogo; "Por função" sem função → "Escolha pelo menos uma função."; "Motoristas" → "3 funcionários recebem" (Gustavo desligado e Bruna administrativo fora).

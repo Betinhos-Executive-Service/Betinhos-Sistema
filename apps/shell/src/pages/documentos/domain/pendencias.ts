@@ -1,5 +1,7 @@
 // domain/pendencias.ts
-import { normalizeSearch } from '@betinhos/ui'
+import { keywordIndex, searchWords } from '../../../app/search'
+import { formatBR } from '../../funcionarios/data/dates'
+import { ESTADO_LABEL } from '../components/StatusDoc'
 import { statusDe } from './vencimento'
 import type { Categoria, DocEmitido, Dono, ItemChecklist, Kpi, Pendencia, TipoDoc } from './types'
 
@@ -70,10 +72,18 @@ export function montarChecklist(dono: Dono, tipos: TipoDoc[], docs: DocEmitido[]
 
 export type FiltroCentral = { aba: Categoria; kpi: Kpi | null; tipo: string | null; q: string }
 
+/** Texto da busca por palavras: o que a linha mostra (cadastro, detalhe, documento, validade, situação) mais e-mail, código, número e observação. */
+export const pendenciaKeywordText = (p: Pendencia) => [
+  p.dono.nome, p.dono.detalhe, p.dono.email, p.tipo.nome, p.tipo.codigo, p.doc?.numero, p.doc?.observacao, formatBR(p.doc?.validade), ESTADO_LABEL[p.estado],
+].filter(Boolean).join(' ')
+
+const indice = keywordIndex<Pendencia>(pendenciaKeywordText)
+
+/** `filtro.q` deve chegar já com debounce: as palavras valem AND entre elas e OR entre os campos. */
 export function filtrarPendencias(lista: Pendencia[], filtro: FiltroCentral) {
-  const termo = normalizeSearch(filtro.q)
+  const palavras = searchWords(filtro.q)
   return lista.filter((p) => p.dono.categoria === filtro.aba
     && (!filtro.kpi || p.estado === filtro.kpi)
     && (!filtro.tipo || p.tipo.id === filtro.tipo)
-    && (!termo || normalizeSearch(`${p.dono.nome} ${p.dono.detalhe} ${p.tipo.nome}`).includes(termo)))
+    && indice.matches(p, palavras))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
-import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, matchesKeyword, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './lista'
+import { EQUIPAMENTO_DEFAULT_FILTERS, builtinViews, equipamentoFields, equipamentoKeywordText, pessoasResponsaveis, readEquipamento, sortEquipamentos } from './lista'
 import { STATUS, statusLabel, statusTone } from './choices'
 import { opcoesAtivas, validateTipo } from './cadastros'
 import { applyForm, diffForm, emptyEquipamento, emptyForm, hasChanges, isDirty, serieRepetida, toForm, validateForm, withResponsavel, withStatus } from './form'
@@ -10,6 +10,7 @@ import { createMockEquipamentos, createMockPessoas, createMockTipos } from '../d
 import { createSource } from '../data/source'
 import type { Host } from '../../../host'
 
+import { keywordIndex, searchWords } from '../../../app/search'
 const S = (v: number) => String(v)
 const tipos: TipoEquipamento[] = [{ id: 't1', nome: 'Notebook', ativo: true }, { id: 't2', nome: 'Pager', ativo: false }, { id: 't3', nome: 'Mouse', ativo: true }]
 const pessoas: Pessoa[] = [{ id: 'p1', nome: 'Bruna Lima', ativo: true }, { id: 'p2', nome: 'Fabio Nunes', ativo: false }]
@@ -212,10 +213,16 @@ describe('lista', () => {
     expect(apply(view('baixados'))).toEqual(['e3'])
     expect(apply(view('todos'))).toEqual(['e1', 'e2', 'e3'])
   })
-  it('busca por responsável, série e tipo sem acento', () => {
-    expect(list.filter((e) => matchesKeyword(e, 'bruna')).map((e) => e.id)).toEqual(['e1'])
-    expect(list.filter((e) => matchesKeyword(e, 'dl5440')).map((e) => e.id)).toEqual(['e1'])
-    expect(list.filter((e) => matchesKeyword(e, 'impressora')).map((e) => e.id)).toEqual(['e3'])
+  it('busca por responsável, série, tipo, status, compra e observação, sem acento, com AND entre palavras', () => {
+    const q = (query: string) => { const index = keywordIndex<Equipamento>(equipamentoKeywordText); const words = searchWords(query); return list.filter((e) => index.matches(e, words)).map((e) => e.id) }
+    expect(q('bruna')).toEqual(['e1'])
+    expect(q('dl5440')).toEqual(['e1'])
+    expect(q('impressora')).toEqual(['e3'])
+    expect(q('baixado')).toEqual(['e3'])
+    expect(q('bruna impressora')).toEqual([])
+    const e1 = list.find((e) => e.id === 'e1')!
+    expect(equipamentoKeywordText({ ...e1, dataCompra: '2026-03-15', observacoes: 'Caixa lacrada' })).toContain('15/03/2026')
+    expect(equipamentoKeywordText({ ...e1, observacoes: 'Caixa lacrada' })).toContain('Caixa lacrada')
   })
   it('ordena por descrição', () => {
     expect(sortEquipamentos(list, { key: 'equipamento', dir: 'asc' }).map((e) => e.id)).toEqual(['e3', 'e1', 'e2'])

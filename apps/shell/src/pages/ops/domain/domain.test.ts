@@ -11,6 +11,7 @@ import { OP_STATUS, cancelBlock, proximoPasso, resumoRateio, type Resumo } from 
 import { buildTimeline } from './timeline'
 import { FALLBACK_OP_CHOICES } from './status'
 import { createMockOps } from '../data/mock'
+import { formatMoney } from '../../pagantes/domain/messages'
 
 const now = new Date(2026, 9, 8, 10)
 const ops = createMockOps(now)
@@ -59,6 +60,13 @@ describe('filtros e visões', () => {
 
   it('busca sem acento por cliente e passageiro e filtra por status', () => {
     expect(ops.filter((o) => matchesKeyword(o, 'lumen helena')).map((o) => o.codigo)).toEqual(['OP-402', 'OP-408'])
+    // Todas as palavras precisam aparecer (cliente + passageiro), em qualquer campo.
+    expect(ops.filter((o) => matchesKeyword(o, 'lumen zzzz')).length).toBe(0)
+    // Campos além do nome: status, valor formatado e telefone só com dígitos.
+    expect(ops.filter((o) => matchesKeyword(o, 'cancelada', FALLBACK_OP_CHOICES)).map((o) => o.codigo)).toContain('OP-413')
+    const comValor = ops.find((o) => o.valor)!
+    expect(matchesKeyword(comValor, formatMoney(comValor.valor), FALLBACK_OP_CHOICES)).toBe(true)
+    expect(matchesKeyword({ ...comValor, passageiros: 'Ana (11) 98765-4321' }, '987654321')).toBe(true)
     expect(apply(fromLegacyFilters({ status: [OP_STATUS.cancelada] }, FALLBACK_OP_CHOICES))).toEqual(['OP-413'])
     expect(apply(viewFilters('canceladas'))).toEqual(['OP-413'])
     expect(apply(viewFilters('em-aberto')).length).toBeGreaterThan(0)

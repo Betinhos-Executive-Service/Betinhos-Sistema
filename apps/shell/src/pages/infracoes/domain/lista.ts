@@ -1,7 +1,8 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, label } from './choices'
-import { normalize, type Filters } from './filters'
+import { searchWords } from '../../../app/search'
+import { COMPETENCIA, GRAVIDADE, RESPONSABILIDADE, label, labels } from './choices'
+import type { Filters } from './filters'
 import type { Infracao } from './types'
 
 /**
@@ -60,17 +61,21 @@ export function readInfracao(i: Infracao, key: string, multas: (id: string) => n
   }
 }
 
-/** Sem acento, sem caixa e sem pontuação de código ("574-6" acha "5746"). */
-const compact = (text: string) => normalize(text).replace(/[\s.\-/]/g, '')
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
-/** Busca por palavra-chave (não fica na visão): código, descrição e artigo. */
-export function matchesKeyword(i: Infracao, query: string) {
-  const terms = normalize(query).split(/\s+/).filter(Boolean)
-  if (!terms.length) return true
-  const hay = normalize(`${i.codigo} ${i.descricao} ${i.enquadramento}`)
-  const code = compact(i.codigo)
-  return terms.every((t) => hay.includes(t) || code.includes(compact(t)))
-}
+/**
+ * Texto em que a busca procura (não fica na visão): tudo que a lista mostra (código, descrição, gravidade, pontos,
+ * valor, competências, responsável, "Inativa") e o enquadramento (artigo).
+ */
+export const infracaoKeywordText = (i: Infracao) => [
+  i.codigo, i.descricao, i.enquadramento,
+  label(GRAVIDADE, i.gravidade, ''), i.pontos == null ? '' : `${i.pontos} ${i.pontos === 1 ? 'ponto' : 'pontos'}`,
+  i.valor == null ? '' : brl.format(i.valor), labels(COMPETENCIA, i.competencia), label(RESPONSABILIDADE, i.responsabilidade, ''),
+  i.ativo ? '' : 'Inativa',
+].filter(Boolean).join(' ')
+
+/** Palavras da busca; "574-6" vira "5746", que é como o código está gravado. */
+export const infracaoWords = (query: string) => searchWords(query).map((w) => (/^\d+(-\d+)+$/.test(w) ? w.replace(/-/g, '') : w))
 
 export function sortInfracoes(list: Infracao[], sort: ViewSort | null, multas: (id: string) => number) {
   if (!sort) return list

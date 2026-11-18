@@ -1,4 +1,4 @@
-import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { CONFIG_VERSION, emptyFilters, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../app/listSort'
 import type { LogApp } from './data'
 
@@ -73,13 +73,14 @@ export function readLog(l: LogApp, key: string): unknown {
   }
 }
 
-/** Busca por palavra-chave: mensagem, erro, código, tela, usuário e app. */
-export function matchesKeyword(l: LogApp, query: string) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const hay = normalizeSearch([l.mensagem, l.erro, l.codigo, l.tela, l.usuario, l.email, l.app, l.versao].join(' '))
-  return words.every((w) => hay.includes(w))
-}
+const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+export const fmtData = (d: Date | null) => (d ? dateTime.format(d).replace(',', '') : '—')
+
+/** Texto da busca por palavras: tudo que a lista mostra (com a data como aparece) mais origem, ação, plataforma e URL do log. */
+export const logKeywordText = (l: LogApp) => [
+  l.erro, l.mensagem, fmtData(l.data), l.app, severidadeLabel(l.severidade), l.tela, l.usuario, l.email, l.versao, l.codigo,
+  l.plataforma, l.origem, l.acao, l.fase, l.componente, l.url, l.sessao,
+].join(' ')
 
 const PESO: Record<string, number> = { critical: 4, error: 3, warning: 2, info: 1 }
 

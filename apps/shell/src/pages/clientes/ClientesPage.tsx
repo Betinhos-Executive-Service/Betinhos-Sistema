@@ -3,6 +3,7 @@ import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewB
 import { Landmark, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { listCache } from '../../app/listCache'
+import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
@@ -53,10 +54,10 @@ function Clientes({ host }: { host: Host }) {
   const read = useMemo(() => extra.read(readCliente, byId), [extra])
   const filtered = useMemo(() => filterRows(sorted, valid, allFields, read), [sorted, valid, allFields, read])
   const index = useMemo(() => keywordIndex<Cliente>(clienteKeywordText), [])
+  const words = useMemo(() => searchWords(q), [q])
   const visible = useMemo(() => {
-    const words = searchWords(q)
     return words.length ? filtered.filter((c) => index.matches(c, words)) : filtered
-  }, [filtered, index, q])
+  }, [filtered, index, words])
   const groups = useRowGroups(visible, view.config.group, allFields, read)
   const lazyKey = useMemo(() => JSON.stringify({ valid, q, sort: view.config.sort }), [valid, q, view.config.sort])
 
@@ -93,7 +94,7 @@ function Clientes({ host }: { host: Host }) {
     <div className="page page--full cl-page">
       <div role="toolbar" aria-label="Comandos de clientes">
         <ViewBar pinnable onAudit={() => auditoria({ entity: ENTITY, onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={CLIENTE_COLUMNS} catalog={extra.catalog} filters={ready ? { fields: allFields } : undefined}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, registro ou endereço" aria-label="Buscar clientes" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, registro, endereço ou data de cadastro" aria-label="Buscar clientes" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={cs.loading && ready} onClick={refresh} />
             <Button size={size} icon={<Plus size={16} />} disabled={!ready} onClick={create}>Novo cliente</Button>
@@ -102,7 +103,7 @@ function Clientes({ host }: { host: Host }) {
         </ViewBar>
       </div>
       {cs.error && ready ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{cs.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {ready ? <ClienteDrawer target={target} onTarget={setTarget} list={list} source={source} onSaved={upsert} /> : null}
     </div>
   )

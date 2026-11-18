@@ -7,6 +7,7 @@ import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
 import { selectionActions, useRowSelection } from '../../app/Selecao'
+import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -88,13 +89,13 @@ function Ops({ host }: { host: Host }) {
   const { comLeitura, contada } = comprovantes
   const read = useMemo(() => comLeitura(extra.read(readOp, (op) => op.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
-  const index = useMemo(() => keywordIndex<Op>(opKeywordText), [])
+  const index = useMemo(() => keywordIndex<Op>((op) => opKeywordText(op, choices ?? undefined)), [choices])
+  const words = useMemo(() => searchWords(q), [q])
   const visible = useMemo(() => {
     if (!choices) return []
-    const words = searchWords(q)
     if (!contada && !words.length) return filtered
     return filtered.filter((op) => (!contada || contada(op)) && (!words.length || index.matches(op, words)))
-  }, [filtered, index, q, choices, contada])
+  }, [filtered, index, words, choices, contada])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
@@ -222,7 +223,7 @@ function Ops({ host }: { host: Host }) {
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro ou trajeto" aria-label="Buscar ordens de pagamento" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro, telefone, trajeto, status ou valor" aria-label="Buscar ordens de pagamento" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />
             <Button size={size} icon={<CalendarCheck size={16} />} onClick={abrirFechar}>Fechar mês</Button>
@@ -238,7 +239,7 @@ function Ops({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {comprovantes.aviso}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {ops.choices ? (
         <OpDrawer op={current} onClose={() => setSelectedId(null)} choices={ops.choices} source={source} version={version}
           busy={current != null && busyId === current.id} onCancel={setCancelRequest} onGerarPagantes={gerarPagantes} />

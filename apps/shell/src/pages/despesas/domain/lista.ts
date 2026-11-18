@@ -1,4 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig } from '@betinhos/ui'
+import { searchWords } from '../../../app/search'
+import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { situacaoLabel } from '../conciliacao/domain/regras'
 import type { Transacao } from '../conciliacao/domain/types'
@@ -80,15 +82,25 @@ export function readDespesa(d: Despesa, key: string): unknown {
   }
 }
 
-/** Texto em que a busca por palavra-chave procura (não fica na visão). */
-export const despesaKeywordText = (d: Despesa) => [d.nome, d.estabelecimento, d.motorista, d.categoria, d.forma, d.reserva, d.veiculo, d.protocolo, d.cidade].filter(Boolean).join(' ')
+/**
+ * Texto em que a busca procura (não fica na visão): tudo que a lista mostra na forma exibida (data e valor formatados,
+ * rótulos de status, alertas e conciliação), mais observações, motivo da devolução, justificativa e quem lançou.
+ * Sem as opções de escolha (modo mock do servidor) os rótulos de status ficam de fora.
+ */
+export const despesaKeywordText = (d: Despesa, choices?: DespesaChoices, compra?: Transacao) => [
+  d.nome, d.estabelecimento, d.motorista, d.categoria, d.forma, d.reserva, d.veiculo, d.manutencao, d.protocolo, d.cidade,
+  d.observacao, d.observacaoInterna, d.motivoDevolucao, d.justificativaMotorista, d.criadoPor,
+  d.data ? formatDate(d.data) : '', d.valor == null ? '' : formatMoney(d.valor),
+  choices && d.statusOperacional != null ? label(choices.operacional, d.statusOperacional, '') : '',
+  choices && d.statusFinanceiro != null ? label(choices.financeiro, d.statusFinanceiro, '') : '',
+  ...alertasDe(d).map((a) => ALERTAS.find((x) => x.value === a)?.label),
+  compra ? situacaoLabel(compra.situacao) : '',
+].filter(Boolean).join(' ')
 
 /** Busca por palavra-chave (não fica na visão). */
-export function matchesKeyword(d: Despesa, query: string) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const text = normalizeSearch(despesaKeywordText(d))
-  return words.every((w) => text.includes(w))
+export function matchesKeyword(d: Despesa, query: string, choices?: DespesaChoices, compra?: Transacao) {
+  const text = normalizeSearch(despesaKeywordText(d, choices, compra))
+  return searchWords(query).every((w) => text.includes(w))
 }
 
 /** Compra do cartão ligada a cada despesa (por id da despesa), vinda da conciliação. */

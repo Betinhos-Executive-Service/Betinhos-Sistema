@@ -1,5 +1,8 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
+import { keywordIndex } from '../../../app/search'
+import { formatBR } from '../data/dates'
+import { brl } from '../data/format'
 import { CATEGORIA, COLISAO, GRAU, MANUT, STATUS_OPTIONS, VEICULO, VEICULO_STATUS, label, type Option } from '../data/schema'
 import type { Kind, Veiculo } from '../data/types'
 import type { custoVeiculo } from './indicadores'
@@ -73,15 +76,12 @@ export function readVeiculo(l: LinhaVeiculo, key: string): unknown {
   }
 }
 
-// Texto da busca em minúsculas, calculado uma vez por linha (não a cada tecla).
-const textoVeiculo = new WeakMap<LinhaVeiculo, string[]>()
-export const matchesVeiculoKeyword = (l: LinhaVeiculo, query: string) => {
-  const termo = query.trim().toLowerCase()
-  if (!termo) return true
-  let valores = textoVeiculo.get(l)
-  if (!valores) textoVeiculo.set(l, valores = [l.veiculo.placa, l.veiculo.marca, l.veiculo.modelo, l.motorista].filter(Boolean).map((valor) => valor!.toLowerCase()))
-  return valores.some((valor) => valor.includes(termo))
-}
+const indiceVeiculo = keywordIndex<LinhaVeiculo>((l) => [
+  l.veiculo.placa, l.veiculo.marca, l.veiculo.modelo, l.veiculo.cor, l.veiculo.anoModelo, label(CATEGORIA, l.veiculo.categoria, ''), label(VEICULO_STATUS, l.veiculo.status, ''),
+  l.motorista, l.custo.qtd > l.custo.semValor ? brl(l.custo.total) : null,
+].filter((valor) => valor != null && valor !== '').join(' '))
+/** Palavras já normalizadas (`searchWords`): todas precisam aparecer em algum campo da linha. */
+export const matchesVeiculoKeyword = (l: LinhaVeiculo, words: string[]) => indiceVeiculo.matches(l, words)
 
 export function sortVeiculos(list: LinhaVeiculo[], sort: ViewSort | null) {
   if (!sort) return list
@@ -198,14 +198,12 @@ export function readRegistro(l: Linha, key: string): unknown {
   }
 }
 
-const textoRegistro = new WeakMap<Linha, string[]>()
-export const matchesRegistroKeyword = (l: Linha, query: string) => {
-  const termo = query.trim().toLowerCase()
-  if (!termo) return true
-  let valores = textoRegistro.get(l)
-  if (!valores) textoRegistro.set(l, valores = [l.titulo, l.codigo, l.veiculo?.label, l.pessoa?.label].filter(Boolean).map((valor) => valor!.toLowerCase()))
-  return valores.some((valor) => valor.includes(termo))
-}
+const indiceRegistro = keywordIndex<Linha>((l) => [
+  l.titulo, l.codigo, l.dia && formatBR(l.dia), l.veiculo?.label, l.pessoa?.label, l.extra, label(STATUS_OPTIONS[l.kind], l.status, ''),
+  l.grau == null ? null : label(GRAU, l.grau, ''), l.categorias.map((c) => label(CATEGORIAS_MANUT, c, '')).join(' '), l.proximoPasso, l.proximoPrazo && formatBR(l.proximoPrazo),
+].filter(Boolean).join(' '))
+/** Palavras já normalizadas (`searchWords`): todas precisam aparecer em algum campo da linha. */
+export const matchesRegistroKeyword = (l: Linha, words: string[]) => indiceRegistro.matches(l, words)
 
 /**
  * Valor de ordenação do Grau: o grau manda e, no mesmo grau, o pedido mais antigo vem antes na ordem decrescente

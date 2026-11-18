@@ -48,6 +48,15 @@ describe('Pagantes', () => {
     expect(within(ficha).getByRole('button', { name: 'Gerar recibo' })).toBeTruthy()
   })
 
+  it('busca por várias palavras destaca os termos (SearchHits) e filtra em AND', async () => {
+    const { container } = render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText('PAG-1201')
+    const box = screen.getByRole('searchbox', { name: 'Buscar pagantes' })
+    expect(container.querySelector('.search-hits')).toBeTruthy()
+    fireEvent.change(box, { target: { value: 'PAG-1201 zzzzqq' } })
+    await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
+  })
+
   it('importa as visões salvas no navegador para “Minhas” uma vez', async () => {
     window.localStorage.setItem(VIEWS_KEY, JSON.stringify({ views: [{ id: 'v1', nome: 'Falhas desde sempre', filters: { periodo: 'all', falhas: true } }] }))
     render(<PagantesPage host={{ mode: 'mock' }} />)

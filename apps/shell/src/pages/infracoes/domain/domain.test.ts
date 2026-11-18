@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import { keywordIndex } from '../../../app/search'
 import { mapInfracao, mapMultaUso, parseMulti } from '../data/queries'
 import { createMockInfracoes, createMockMultas } from '../data/mock'
 import { emptyFilters, matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EMPTY_FILTERS } from './filters'
-import { INFRACAO_DEFAULT_FILTERS, INFRACAO_FIELDS, builtinViews, fromLegacyFilters, matchesKeyword, readInfracao, sortInfracoes } from './lista'
+import { INFRACAO_DEFAULT_FILTERS, INFRACAO_FIELDS, builtinViews, fromLegacyFilters, infracaoKeywordText, infracaoWords, readInfracao, sortInfracoes } from './lista'
 import { buildPayload, emptyForm, isDirty, parseValor, toForm, validateForm, withGravidade } from './form'
 import { resumoUso, usoIndex } from './uso'
+import type { Infracao } from './types'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
 const list = createMockInfracoes()
+const matchesKeyword = (i: Infracao, query: string) => keywordIndex<Infracao>(infracaoKeywordText).matches(i, infracaoWords(query))
 const byCode = (c: string) => list.find((i) => i.codigo === c)!
 
 describe('mapeamento', () => {
@@ -42,6 +45,12 @@ describe('filtros', () => {
   it('busca sem acento e por código com hífen', () => {
     expect(list.filter((i) => matchesKeyword(i, 'semaforo')).map((i) => i.codigo)).toEqual(['5746'])
     expect(list.filter((i) => matchesKeyword(i, '745-5')).map((i) => i.codigo)).toEqual(['7455'])
+    // Palavras em AND e campos novos (valor formatado e rótulo da gravidade).
+    expect(list.filter((i) => matchesKeyword(i, 'semaforo zzzz'))).toEqual([])
+    const i0 = list[0]
+    expect(matchesKeyword(i0, `${i0.codigo} ${i0.descricao.split(' ')[0]}`)).toBe(true)
+    const comPontos = list.find((i) => i.pontos && i.pontos > 1)!
+    expect(matchesKeyword(comPontos, `${comPontos.codigo} ${comPontos.pontos} pontos`)).toBe(true)
   })
   it('links antigos: competência multi e gravidade; situação e só com multas', () => {
     expect(codigos(legacy({ competencia: 202410002, gravidade: [3] }))).toEqual(['5010', '6050'])

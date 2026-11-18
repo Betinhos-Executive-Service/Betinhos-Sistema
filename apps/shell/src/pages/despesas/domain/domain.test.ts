@@ -3,6 +3,7 @@ import { createMockDespesas } from '../data/mock'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EMPTY_FILTERS, VIEWS_KEY, loadViews, opcoes, parseStoredFilters } from './filters'
 import { builtinViews, despesaFields, fromLegacyFilters, legacyViewConfig, matchesKeyword, readDespesa, sortDespesas } from './lista'
+import { formatMoney } from '../../pagantes/domain/messages'
 import { resumo } from './resumo'
 import { ANEXO, FALLBACK_CHOICES, FINANCEIRO, OPERACIONAL, semComprovante, withFallback } from './status'
 import type { Despesa } from './types'
@@ -35,6 +36,10 @@ describe('filtros de despesas', () => {
     expect(q('imigrantes ribeiro').every((d) => d.estabelecimento === 'Ecovias Imigrantes' && d.motorista === 'Ana Ribeiro')).toBe(true)
     expect(q('desp-5003').map((d) => d.id)).toEqual(['mock-desp-3'])
     expect(q('sao paulo').length).toBeGreaterThan(0)
+    expect(q('imigrantes zzzz')).toEqual([])
+    // Campos que antes ficavam de fora: valor formatado, observação e protocolo.
+    expect(matchesKeyword({ ...list[0], observacao: 'Troca de pneu urgente', protocolo: 'PRT-77' }, 'pneu urgente prt-77')).toBe(true)
+    expect(matchesKeyword(list[0], formatMoney(list[0].valor))).toBe(true)
   })
 
   it('opções de categoria e motorista vêm do que carregou, em ordem alfabética', () => {

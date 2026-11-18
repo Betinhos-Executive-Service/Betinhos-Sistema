@@ -1,10 +1,11 @@
-import type { SearchCondition } from './search'
+import { keywordFilter } from '../../../app/keywordSearch'
+import { SEARCH_LINKS, type Search } from './search'
 import { ID_ATTRIBUTE, type Sort } from './types'
 import { CAMPOS_PROTEGIDOS } from './protecao'
 import { EMPTY_GROUP_ID, OTHERS_GROUP_ID } from '@betinhos/ui'
 import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR, periodRange, type GroupSpec, type GroupTarget } from './grouping'
 
-type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: SearchCondition[]; group?: GroupTarget }
+type BuildOptions = { page: number; pageSize: number; cookie: string | null; sort: Sort; search: Search | null; group?: GroupTarget }
 
 export function parse(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
@@ -38,12 +39,16 @@ function addCondition(doc: Document, filter: Element, attribute: string, operato
   filter.appendChild(condition)
 }
 
-/** Busca por palavra-chave: filtro OR com as condições de `buildSearch` (`like` em texto, `in` em choice e lookup). */
-function injectSearch(doc: Document, entity: Element, search: SearchCondition[]) {
-  if (!search.length) return
-  const filter = doc.createElement('filter')
-  filter.setAttribute('type', 'or')
-  for (const item of search) addCondition(doc, filter, item.attribute, item.operator, item.operator === 'like' ? item.value : item.values)
+/** Busca por palavras: filtro com as condições de `searchFields` e um link-entity `outer` para cada lookup usado (ver `search.ts`). */
+function injectSearch(doc: Document, entity: Element, search: Search | null) {
+  const filter = search && keywordFilter(doc, search.tokens, search.fields)
+  if (!filter) return
+  for (const link of SEARCH_LINKS) {
+    if (!search.fields.some((field) => field.entity === link.alias)) continue
+    const element = doc.createElement('link-entity')
+    for (const [name, value] of [['name', link.table], ['from', `${link.table}id`], ['to', link.lookup], ['alias', link.alias], ['link-type', 'outer']]) element.setAttribute(name, value)
+    entity.appendChild(element)
+  }
   entity.appendChild(filter)
 }
 
@@ -104,7 +109,7 @@ export function buildFetch(fetchxml: string, { page, pageSize, cookie, sort, sea
  * Base das consultas agregadas: a visão sem paginação, `distinct`, ordem nem colunas (filtros, links e busca ficam), com as
  * colunas de `groupby` pedidas e a contagem de linhas no apelido `total`.
  */
-function aggregateFetch(fetchxml: string, search: SearchCondition[], groupColumns: (doc: Document) => Element[] = () => []) {
+function aggregateFetch(fetchxml: string, search: Search | null, groupColumns: (doc: Document) => Element[] = () => []) {
   const { doc, root, entity } = parse(fetchxml)
   for (const name of ['count', 'page', 'paging-cookie', 'returntotalrecordcount', 'distinct']) root.removeAttribute(name)
   root.setAttribute('aggregate', 'true')
@@ -121,13 +126,13 @@ function aggregateFetch(fetchxml: string, search: SearchCondition[], groupColumn
 }
 
 /** FetchXML da visão convertido em contagem total (`aggregate`). */
-export const buildCountFetch = (fetchxml: string, { search }: { search: SearchCondition[] }) => aggregateFetch(fetchxml, search)
+export const buildCountFetch = (fetchxml: string, { search }: { search: Search | null }) => aggregateFetch(fetchxml, search)
 
 /**
  * FetchXML da visão convertido em contagem por grupo (`aggregate` + `groupby`). Data agrupa por ano (e mês) no fuso do
  * usuário (`dategrouping`); o valor nulo volta como um grupo sem o apelido.
  */
-export function buildGroupsFetch(fetchxml: string, { search, spec }: { search: SearchCondition[]; spec: Pick<GroupSpec, 'attribute' | 'kind' | 'by'> }) {
+export function buildGroupsFetch(fetchxml: string, { search, spec }: { search: Search | null; spec: Pick<GroupSpec, 'attribute' | 'kind' | 'by'> }) {
   return aggregateFetch(fetchxml, search, (doc) => {
     const column = (alias: string, dategrouping?: 'year' | 'month') => {
       const attribute = doc.createElement('attribute')
@@ -148,14 +153,6 @@ export function linkEntities(fetchxml: string) {
     const name = link.getAttribute('name')
     return alias && name ? [{ alias, name }] : []
   })
-}
-
-/** Atributos da visão de localização rápida: condições do filtro `isquickfindfields` com valor `{0}`. */
-export function quickFindAttributes(fetchxml: string) {
-  const { entity } = parse(fetchxml)
-  return Array.from(entity.querySelectorAll('filter[isquickfindfields="1"] > condition'))
-    .filter((c) => c.getAttribute('value') === '{0}')
-    .flatMap((c) => (c.getAttribute('attribute') ? [c.getAttribute('attribute') as string] : []))
 }
 
 export function defaultSort(fetchxml: string): Sort {

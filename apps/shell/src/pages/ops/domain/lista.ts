@@ -1,5 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
+import { searchWords } from '../../../app/search'
+import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
 import { EM_ABERTO, OP_STATUS } from './status'
@@ -60,15 +62,25 @@ export function readOp(op: Op, key: string): unknown {
   }
 }
 
-/** Busca por palavra-chave (não fica na visão): OP, cliente, passageiros e trajetos. */
-/** Texto em que a busca procura: número, cliente, passageiros e trajetos. */
-export const opKeywordText = (op: Op) => [op.codigo, op.cliente, op.passageiros, op.trajetos].filter(Boolean).join(' ')
+/** Telefone escrito em cada linha do texto de passageiros ("Fulano - (12) 99999-0000"), só com dígitos. */
+const digitosPorLinha = (texto: string) => texto.split(/\r?\n|;/).map((l) => l.replace(/\D/g, '')).filter((d) => d.length >= 4).join(' ')
 
-export function matchesKeyword(op: Op, query: string) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const text = normalizeSearch(opKeywordText(op))
-  return words.every((w) => text.includes(w))
+/**
+ * Texto em que a busca procura (não fica na visão): tudo que a lista mostra, na forma exibida (valor e datas
+ * formatados, rótulo do status), mais trajetos, idioma, quem criou e o telefone dos passageiros só com dígitos.
+ * Sem as opções de escolha (modo mock do servidor) o status e o idioma ficam de fora.
+ */
+export const opKeywordText = (op: Op, choices?: OpChoices) => [
+  op.codigo, op.cliente, op.passageiros, digitosPorLinha(op.passageiros), op.trajetos, op.criadoPor,
+  choices && op.status != null ? label(choices.status, op.status, '') : '',
+  choices && op.idioma != null ? label(choices.idioma, op.idioma, '') : '',
+  valorOp(op) == null ? '' : formatMoney(valorOp(op)),
+  op.primeiroServico ? formatDate(op.primeiroServico) : '', op.ultimoServico ? formatDate(op.ultimoServico) : '', op.criadoEm ? formatDate(op.criadoEm) : '',
+].filter(Boolean).join(' ')
+
+export function matchesKeyword(op: Op, query: string, choices?: OpChoices) {
+  const text = normalizeSearch(opKeywordText(op, choices))
+  return searchWords(query).every((w) => text.includes(w))
 }
 
 /** O número da OP ordena como número (OP-9 antes de OP-10). */

@@ -6,7 +6,8 @@ import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
 import { useRowSelection } from '../../../app/Selecao'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { useDebouncedText } from '../../../app/search'
+import { SearchHits } from '../../../app/SearchHits'
+import { searchWords, useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
 import { useQueryTexto } from '../../../nav/queryState'
@@ -44,6 +45,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
   const [busca, setBusca] = useQueryTexto('q')
   // A lista filtra 200 ms depois da última tecla.
   const termo = useDebouncedText(busca)
+  const palavras = useMemo(() => searchWords(termo), [termo])
 
   const linhas = useMemo<LinhaVeiculo[]>(() => {
     const periodo = ultimos12Meses(today)
@@ -64,8 +66,8 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
 
   const read = useMemo(() => extra.read(readVeiculo, byVeiculo), [extra])
   const visiveis = useMemo(
-    () => extra.sort(sortVeiculos(filterRows(linhas, filters, allFields, read).filter((linha) => matchesVeiculoKeyword(linha, termo)), view.config.sort), view.config.sort, byVeiculo),
-    [linhas, filters, termo, view.config.sort, read],
+    () => extra.sort(sortVeiculos(filterRows(linhas, filters, allFields, read).filter((linha) => matchesVeiculoKeyword(linha, palavras)), view.config.sort), view.config.sort, byVeiculo),
+    [linhas, filters, palavras, view.config.sort, read],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
   const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
@@ -105,17 +107,19 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
     <>
       <div role="toolbar" aria-label="Comandos de veículos" {...sel.bar}>
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
-          search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />}
+          search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, marca, modelo, cor, motorista, categoria ou status" value={busca} onChange={setBusca} />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>
-      {groups ? (
-        <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
-      ) : (
-        <>
-          {table(slice, footer)}
-          <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
-        </>
-      )}
+      <SearchHits tokens={palavras}>
+        {groups ? (
+          <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
+        ) : (
+          <>
+            {table(slice, footer)}
+            <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
+          </>
+        )}
+      </SearchHits>
     </>
   )
 }

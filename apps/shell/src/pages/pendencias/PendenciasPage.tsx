@@ -6,6 +6,8 @@ import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { hrefFor } from '../../nav/useHashRoute'
 import { useListView } from '../../app/useListView'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
@@ -13,7 +15,7 @@ import { formatMoney } from '../pagantes/domain/messages'
 import { createSource as createPagantesSource } from '../pagantes/data/source'
 import { createSource } from './data/source'
 import { VIEWS_KEY, loadViews } from './domain/filters'
-import { PENDENCIA_COLUMNS, PENDENCIA_FIELDS, PENDENCIA_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, readPendencia, sortPendencias } from './domain/lista'
+import { PENDENCIA_COLUMNS, PENDENCIA_FIELDS, PENDENCIA_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, pendenciaKeywordText, readPendencia, sortPendencias } from './domain/lista'
 import { pendenciasQuery } from './domain/query'
 import type { Pendencia } from './domain/types'
 import { usePendencias } from './usePendencias'
@@ -60,12 +62,15 @@ function Pendencias({ host }: Props) {
 
   // Busca, pendência aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView).
   const [query, setQuery] = useQueryTexto('q')
+  const q = useDebouncedText(query)
+  const words = useMemo(() => searchWords(q), [q])
+  const index = useMemo(() => keywordIndex<Pendencia>(pendenciaKeywordText), [])
   const visible = useMemo(
-    () => sortPendencias(pend.list.filter((p) => matchesFilters(p, filters, PENDENCIA_FIELDS, readPendencia) && matchesKeyword(p, query)), view.config.sort),
-    [pend.list, filters, query, view.config.sort],
+    () => sortPendencias(pend.list.filter((p) => matchesFilters(p, filters, PENDENCIA_FIELDS, readPendencia) && index.matches(p, words)), view.config.sort),
+    [pend.list, filters, index, words, view.config.sort],
   )
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  const lazyKey = useMemo(() => ({ filters, query: q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, PENDENCIA_FIELDS, readPendencia)
   const clearAll = () => { clearFilters(); setQuery('') }
@@ -127,13 +132,13 @@ function Pendencias({ host }: Props) {
     <div className="page page--full pd-page">
       <div role="toolbar" aria-label="Comandos de pendências">
         <ViewBar pinnable view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por tipo, OP, OS, cliente, detalhe, data ou valor" aria-label="Buscar pendências" />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pend.loading && pend.loaded} onClick={refresh} />}>
           {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {pend.error && pend.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pend.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       <PendenciaDrawer pendencia={current} onClose={() => setSelectedId(null)} {...acoes} />
       <CorrigirDialog pendencia={corrigir} source={source} onClose={() => setCorrigir(null)}
         onApplied={(n) => { setCorrigir(null); toast({ tone: 'success', message: n === 1 ? '1 alteração aplicada.' : `${n} alterações aplicadas.` }); refresh() }} />

@@ -6,17 +6,17 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { openFromRow, openRowActions } from '../pagantes/components/PagantesList'
 import { MAX_LOGS, createSource, type LogApp, type Source } from './data'
 import { LogDrawer } from './LogDrawer'
-import { LOG_COLUMNS, LOG_SORT, builtinViews, PERIODOS, PERIODO_PADRAO, TELA, logFields, matchesKeyword, periodoStart, periodoValido, quemFoi, readLog, severidadeLabel, severidadeTone, sortLogs } from './lista'
+import { LOG_COLUMNS, LOG_SORT, builtinViews, PERIODOS, PERIODO_PADRAO, TELA, fmtData, logFields, logKeywordText, periodoStart, periodoValido, quemFoi, readLog, severidadeLabel, severidadeTone, sortLogs } from './lista'
 import './logs.css'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
-const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-const fmtData = (d: Date | null) => (d ? dateTime.format(d).replace(',', '') : '—')
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 type State = { list: LogApp[]; loaded: boolean; loading: boolean; error: string | null }
@@ -58,11 +58,14 @@ function Logs({ host }: { host: Host }) {
   })
   const [query, setQuery] = useQueryTexto('q')
 
+  const q = useDebouncedText(query)
+  const words = useMemo(() => searchWords(q), [q])
+  const index = useMemo(() => keywordIndex<LogApp>(logKeywordText), [])
   const visible = useMemo(() => {
-    const list = data.list.filter((l) => matchesFilters(l, filters, fields, readLog) && matchesKeyword(l, query))
+    const list = data.list.filter((l) => matchesFilters(l, filters, fields, readLog) && index.matches(l, words))
     return sortLogs(list, view.config.sort)
-  }, [data.list, filters, fields, query, view.config.sort])
-  const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort, periodo }), [filters, query, view.config.sort, periodo])
+  }, [data.list, filters, fields, index, words, view.config.sort])
+  const lazyKey = useMemo(() => ({ filters, query: q, sort: view.config.sort, periodo }), [filters, q, view.config.sort, periodo])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, fields, readLog)
   const clearAll = () => { clearFilters(); setQuery('') }
@@ -103,14 +106,14 @@ function Logs({ host }: { host: Host }) {
     <div className="page page--full lg-page">
       <div role="toolbar" aria-label="Comandos dos logs">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por mensagem, código, tela ou usuário" aria-label="Buscar logs" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por erro, mensagem, código, app, tela, usuário ou versão" aria-label="Buscar logs" />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}>
           {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <Select className="lg-periodo" aria-label="Período" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? PERIODO_PADRAO)} />
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {data.loaded ? <LogDrawer log={selected} list={data.list} periodo={PERIODOS.find((p) => p.value === periodo)?.label ?? ''} onClose={() => setSelectedId(null)} /> : null}
     </div>
   )

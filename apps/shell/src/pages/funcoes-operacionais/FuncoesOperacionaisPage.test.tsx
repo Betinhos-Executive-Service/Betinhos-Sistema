@@ -30,6 +30,20 @@ async function pick(selectId: string, label: string) {
 }
 
 describe('Funções Operacionais', () => {
+  it('busca por várias palavras (E) na aba Motorista e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) }, delete: () => undefined } })
+    render(<FuncoesOperacionaisPage host={{ mode: 'mock' }} />)
+    await screen.findByText('5 serviços')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviço' }), { target: { value: 'diego confirmado' } })
+    await waitFor(() => expect(screen.queryByText('5 serviços')).toBeNull())
+    await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toContain('diego'))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviço' }), { target: { value: 'diego palavra-inexistente' } })
+    expect(await screen.findByText('0 serviços')).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+
   it('abre na aba Motorista com os serviços do mock e troca de aba pela query do shell', async () => {
     render(<FuncoesOperacionaisPage host={{ mode: 'mock' }} />)
     await waitFor(() => expect(document.querySelectorAll('.service-card').length).toBeGreaterThan(0))

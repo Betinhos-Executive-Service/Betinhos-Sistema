@@ -3,9 +3,11 @@ import { CP, FAT, OP, PAG } from './codes'
 import { detectarPendencias } from './detect'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EMPTY_FILTERS, VIEWS_KEY, loadViews } from './filters'
-import { PENDENCIA_FIELDS, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, readPendencia, sortPendencias } from './lista'
+import { PENDENCIA_FIELDS, builtinViews, fromLegacyFilters, legacyViewConfig, pendenciaKeywordText, readPendencia, sortPendencias } from './lista'
 import { pendenciasQuery } from './query'
-import type { OpResumo, PaganteResumo, Reserva } from './types'
+import { TIPO_LABEL, type OpResumo, type PaganteResumo, type Pendencia, type Reserva } from './types'
+import { keywordIndex, searchWords } from '../../../app/search'
+import { formatMoney } from '../../pagantes/domain/messages'
 
 const op = (id: string, status: number, valor: number | null = 1000): OpResumo => ({ id, codigo: `OP-${id}`, status, valor, cliente: 'AGC' })
 const res = (id: string, opId: string | null, fat: number, cp: number | null = CP.pendente, cpValor = 1000): Reserva => ({
@@ -101,6 +103,8 @@ describe('correções da revisão', () => {
   })
 })
 
+const matchesKeyword = (p: Pendencia, q: string) => keywordIndex(pendenciaKeywordText).matches(p, searchWords(q))
+
 describe('filterPendencias', () => {
   const base = detectarPendencias(
     [op('1', OP.paga), op('2', OP.cancelada)],
@@ -115,6 +119,13 @@ describe('filterPendencias', () => {
   it('busca por OP, OS e cliente sem acento nem caixa', () => {
     expect(base.filter((p) => matchesKeyword(p, 'op-1')).map((p) => p.opId)).toEqual(['1'])
     expect(base.filter((p) => matchesKeyword(p, 'agc'))).toHaveLength(2)
+  })
+  it('busca por várias palavras (AND) e acha tipo, detalhe e valor', () => {
+    const p = base[0]
+    expect(matchesKeyword(p, TIPO_LABEL[p.tipo].toUpperCase())).toBe(true)
+    expect(matchesKeyword(p, `${p.cliente} ${p.detalhe}`)).toBe(true)
+    expect(matchesKeyword(p, `${p.cliente} palavra-que-nao-existe`)).toBe(false)
+    expect(matchesKeyword(p, formatMoney(p.valor))).toBe(true)
   })
   it('visão "Corrigíveis" mostra só tipos 1 e 3; "Rateio" só o tipo 5', () => {
     expect(apply(view('corrigiveis')).every((p) => p.corrigivel)).toBe(true)
