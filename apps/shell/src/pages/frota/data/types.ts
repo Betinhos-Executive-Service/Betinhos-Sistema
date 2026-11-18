@@ -39,6 +39,8 @@ export type ParcelaFolhaStatus = 'prevista' | 'descontada' | 'cancelada'
 export type ParcelaFolha = {
   id: string; numero: number; total: number; competencia: string; valor: number; status: ParcelaFolhaStatus; lancadoEm: string | null
   origem: 'multa' | 'termo'
+  /** Termo de origem quando não há multa; separa dois termos do mesmo colaborador. */
+  termoId?: string | null
   colaborador: { id: string; nome: string; cpf: string | null } | null
   multa: { id: string; auto: string; placa: string | null; dataInfracao: string | null; infracao: string | null } | null
 }

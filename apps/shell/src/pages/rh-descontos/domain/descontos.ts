@@ -34,7 +34,7 @@ export function mascararCpf(cpf: string | null) {
 }
 
 /** Parcelas do mesmo parcelamento (multa, ou termo do colaborador) ficam na mesma corrente. */
-export const chaveOrigem = (p: ParcelaFolha) => p.multa?.id ?? `termo:${p.colaborador?.id ?? ''}:${p.total}`
+export const chaveOrigem = (p: ParcelaFolha) => p.multa?.id ?? `termo:${p.termoId ?? `${p.colaborador?.id ?? ''}:${p.total}`}`
 
 export function cadeias(todas: ParcelaFolha[]) {
   const mapa = new Map<string, ParcelaFolha[]>()

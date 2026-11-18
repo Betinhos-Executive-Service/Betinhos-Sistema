@@ -50,7 +50,7 @@ public sealed class PassoMultaPlugin : IPlugin
         dados ??= new DadosPasso(); // "null" no JSON vale dados vazios: a validação do passo recusa com a mensagem do que falta.
         var linha = service.Retrieve(MultaMapper.Tabela, multaId, new ColumnSet(MultaMapper.Colunas));
         var antes = MultaMapper.Estado(linha);
-        ContarParcelas(sistema, multaId, antes);
+        if (passo == Passos.Cancelar || passo == Passos.ConcluirDesconto || passo == Passos.ReabrirDesconto) ContarParcelas(sistema, multaId, antes); // só estes passos leem a contagem
         var erro = MultaEtapas.Validar(antes, passo, dados, hoje);
         if (erro != null) throw new InvalidPluginExecutionException(erro);
         var trocaMotorista = (passo == Passos.DefinirResponsavel && dados.Responsavel == "motorista") || !string.IsNullOrWhiteSpace(dados.MotoristaId);

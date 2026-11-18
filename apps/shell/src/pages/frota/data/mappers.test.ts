@@ -103,7 +103,7 @@ describe('mappers', () => {
       new_parcelamultafolhaid: '{PF1}', new_numero: 2, new_competencia: '2026-12-01', new_valor: 33.33, new_status: 100000001, new_lancadoem: '2026-11-18T12:00:00Z',
       _new_multa_value: '{M1}', _new_motorista_value: '{F1}',
       new_Multa: { cr40f_novacoluna: 'TST0002', cr40f_dataehorario: '2026-09-01T15:00:00Z', [`_cr40f_placa_value${FORMATTED}`]: 'TST4B56', [`_cr40f_codigodainfracao_value${FORMATTED}`]: 'Infração fictícia' },
-      new_motorista: { cr40f_nomecompleto: 'Bruno Teste (fictício)', cr40f_numerodocpf: '111.111.111-11' },
+      new_Motorista: { cr40f_nomecompleto: 'Bruno Teste (fictício)', cr40f_numerodocpf: '111.111.111-11' },
     }, 3)
     expect(p).toMatchObject({ id: 'pf1', numero: 2, total: 3, competencia: '2026-12-01', valor: 33.33, status: 'descontada', lancadoEm: '2026-11-18', origem: 'multa' })
     expect(p.multa).toEqual({ id: 'm1', auto: 'TST0002', placa: 'TST4B56', dataInfracao: '2026-09-01', infracao: 'Infração fictícia' })

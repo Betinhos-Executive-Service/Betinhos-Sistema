@@ -279,7 +279,7 @@ export function mapParcelaTermo(row: Row): ParcelaTermo {
 }
 
 export const NAV_MULTA = 'new_Multa'
-export const NAV_MOTORISTA = 'new_motorista'
+export const NAV_MOTORISTA = 'new_Motorista'
 export const SELECT_PARCELA_FOLHA = ['new_parcelamultafolhaid', 'new_numero', 'new_competencia', 'new_valor', 'new_status', 'new_lancadoem', '_new_multa_value', '_new_termo_value', '_new_motorista_value'] as const
 export const EXPAND_PARCELA_FOLHA = `${NAV_MULTA}($select=cr40f_novacoluna,cr40f_dataehorario,_cr40f_placa_value,_cr40f_codigodainfracao_value),${NAV_MOTORISTA}($select=cr40f_nomecompleto,cr40f_numerodocpf)`
 const STATUS_PARCELA: Record<number, ParcelaFolhaStatus> = { 100000000: 'prevista', 100000001: 'descontada', 100000002: 'cancelada' }
@@ -296,6 +296,7 @@ export function mapParcelaFolha(row: Row, total: number): ParcelaFolha {
     status: STATUS_PARCELA[num(row.new_status) ?? 100000000] ?? 'prevista',
     lancadoEm: str(row.new_lancadoem)?.slice(0, 10) ?? null,
     origem: row._new_multa_value ? 'multa' : 'termo',
+    termoId: row._new_termo_value ? cleanId(row._new_termo_value) : null,
     colaborador: motorista ? { id: cleanId(str(row._new_motorista_value) ?? ''), nome: str(motorista.cr40f_nomecompleto) ?? 'Sem nome', cpf: str(motorista.cr40f_numerodocpf) } : null,
     multa: multa && row._new_multa_value ? {
       id: cleanId(str(row._new_multa_value) ?? ''),

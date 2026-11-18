@@ -64,6 +64,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
   const irParaMes = (m: string) => {
     setMes(m)
     setMarcados(new Set())
+    setRetorno('')
     setInicio((atual) => (m >= atual && m <= somaMes(atual, MESES_FAIXA - 1) ? atual : somaMes(m, -2)))
   }
   const deslocar = (n: number) => irParaMes(somaMes(mes, n))
