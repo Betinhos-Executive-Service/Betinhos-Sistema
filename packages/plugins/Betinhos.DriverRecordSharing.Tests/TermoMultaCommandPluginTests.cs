@@ -274,6 +274,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal("Esta multa mudou de etapa e o termo não pode mais ser assinado. Procure o escritório.", erro.Message);
             Assert.Equal(Pendente, Status(termo));
             Assert.Null(s.UploadedPdf);
+            Assert.Contains(s.Traces, t => t.Contains("Este passo não vale para a etapa atual da multa"));
         }
 
         [Fact]

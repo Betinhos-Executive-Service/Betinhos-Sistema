@@ -438,7 +438,7 @@ namespace Betinhos.DriverRecordSharing
 
             // O passo vem antes de qualquer gravação: se a multa já saiu da etapa 2, nada fica pelo caminho (nem PDF órfão).
             var dia = TimeZoneInfo.ConvertTimeFromUtc(agora, SaoPaulo()).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            RegistrarPasso(system, multaRef.Id, "TermoAssinado", "{\"data\":\"" + dia + "\"}", MultaMudouDeEtapa);
+            RegistrarPasso(system, tracing, multaRef.Id, "TermoAssinado", "{\"data\":\"" + dia + "\"}", MultaMudouDeEtapa);
 
             // Grava tudo enquanto o termo ainda está Pendente; o status muda por último.
             // new_assinatura (PNG) fica vazio: o sandbox não tem encoder de imagem e o PDF já leva a assinatura vetorial.
@@ -472,17 +472,21 @@ namespace Betinhos.DriverRecordSharing
                 ["new_assinadoem"] = clock(),
             });
             var multa = termo.GetAttributeValue<EntityReference>("new_multa");
-            RegistrarPasso(system, multa.Id, "TermoContestado", "{}", MultaMudouDeEtapa);
+            RegistrarPasso(system, tracing, multa.Id, "TermoContestado", "{}", MultaMudouDeEtapa);
         }
 
         // A multa só muda pelo cr40f_PassoMulta; a trava reconhece este plugin pelo ParentContext. Recusa vira mensagem para o motorista.
-        private static void RegistrarPasso(IOrganizationService system, Guid multaId, string passo, string dadosJson, string mensagemSeRecusar)
+        private static void RegistrarPasso(IOrganizationService system, ITracingService tracing, Guid multaId, string passo, string dadosJson, string mensagemSeRecusar)
         {
             try
             {
                 system.Execute(new OrganizationRequest(PassoMulta) { ["MultaId"] = multaId, ["Passo"] = passo, ["DadosJson"] = dadosJson });
             }
-            catch (InvalidPluginExecutionException) { throw new InvalidPluginExecutionException(mensagemSeRecusar); }
+            catch (InvalidPluginExecutionException error)
+            {
+                tracing?.Trace("TermoMulta: passo {0} recusado: {1}", passo, error.Message);
+                throw new InvalidPluginExecutionException(mensagemSeRecusar);
+            }
         }
 
         private static void Encerrar(IPluginExecutionContext context, IOrganizationService caller, IOrganizationService system, int status, string erro, DateTime? agoraParaPrazo)
