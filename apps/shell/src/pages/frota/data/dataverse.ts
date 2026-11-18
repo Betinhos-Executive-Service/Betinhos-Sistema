@@ -46,18 +46,18 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
   const customApi = (nome: string, body: Record<string, unknown>, falha: string) => chamarCustomApi(apiUrl, nome, body, falha)
 
-  /** Quantas parcelas cada multa (ou termo) tem no total, para o "x/y". Uma consulta por lote de 50 origens. */
+  /** Quantas parcelas cada multa (ou termo) tem no total, para o "x/y". Uma consulta por lote de 50 origens, em paralelo. */
   async function totaisPorOrigem(rows: Row[]) {
     const totais = new Map<string, number>()
     const multas = [...new Set(rows.map((r) => r._new_multa_value).filter(Boolean).map(String))]
     const termos = [...new Set(rows.filter((r) => !r._new_multa_value).map((r) => r._new_termo_value).filter(Boolean).map(String))]
-    for (const [campo, ids] of [['_new_multa_value', multas], ['_new_termo_value', termos]] as const)
-      for (let i = 0; i < ids.length; i += 50) {
-        const lote = ids.slice(i, i + 50).map((id) => `${campo} eq ${guid(id)}`).join(' or ')
-        for (const r of (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${campo}&$filter=${lote}`)).entities) {
-          const k = cleanId(r[campo]); totais.set(k, (totais.get(k) ?? 0) + 1)
-        }
-      }
+    const consultas = ([['_new_multa_value', multas], ['_new_termo_value', termos]] as const).flatMap(([campo, ids]) =>
+      Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => {
+        const lote = ids.slice(i * 50, i * 50 + 50).map((id) => `${campo} eq ${guid(id)}`).join(' or ')
+        return api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${campo}&$filter=${lote}`).then((res) => ({ campo, linhas: res.entities }))
+      }))
+    for (const { campo, linhas } of await Promise.all(consultas))
+      for (const r of linhas) { const k = cleanId(r[campo]); totais.set(k, (totais.get(k) ?? 0) + 1) }
     return totais
   }
 
