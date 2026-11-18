@@ -20,8 +20,9 @@ const M3 = 'TST1A11 · Manutenção fictícia m3'
 function montar(id: string, source: DataSource = createMockSource()) {
   const onChanged = vi.fn()
   const onClassificado = vi.fn()
-  render(<ToastProvider><GavetaManutencao source={source} id={id} hoje={hoje} onClose={() => {}} onChanged={onChanged} onClassificado={onClassificado} /></ToastProvider>)
-  return { source, onChanged, onClassificado }
+  const arvore = (i: string) => <ToastProvider><GavetaManutencao source={source} id={i} hoje={hoje} onClose={() => {}} onChanged={onChanged} onClassificado={onClassificado} /></ToastProvider>
+  const { rerender } = render(arvore(id))
+  return { source, onChanged, onClassificado, trocarId: (i: string) => rerender(arvore(i)) }
 }
 const gaveta = (nome: string) => screen.findByRole('dialog', { name: nome })
 /** Abre o "⋯" do guia e escolhe a exceção (o menu usa popover, oculto no jsdom). */
@@ -31,32 +32,36 @@ async function mais(g: HTMLElement, nome: string) {
 }
 
 describe('GavetaManutencao', () => {
-  it('abre no passo da etapa (Solicitado → "Quando vai ser?"), com o pedido e as fotos abaixo', async () => {
+  it('abre com o pedido primeiro, o passo da etapa depois e sem rodapé', async () => {
     montar('m1')
     const g = await gaveta(M1)
-    expect(within(g).getByRole('heading', { name: 'Quando vai ser?' })).toBeTruthy()
-    expect(within(g).getByText(/^Descrição do motorista: Freio com ruído \(fictício\)/)).toBeTruthy()
-    expect(within(g).getAllByRole('link', { name: /Fotos do pedido, arquivo/ })).toHaveLength(2)
-    expect(within(g).getByText('As alterações uma a uma ficam na auditoria, no botão do alto da gaveta.')).toBeTruthy()
+    const pedido = within(g).getByRole('region', { name: 'Pedido' })
+    expect(within(pedido).getByText('“Freio com ruído (fictício)”')).toBeTruthy()
+    expect(within(pedido).getAllByRole('link', { name: /Fotos do pedido, arquivo/ })).toHaveLength(2)
+    const passo = within(g).getByRole('region', { name: 'Próximo passo' })
+    expect(within(passo).getByRole('heading', { name: 'Quando vai ser?' })).toBeTruthy()
+    expect(pedido.compareDocumentPosition(passo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(g).queryByRole('button', { name: /Abrir formulário/ })).toBeNull()
+    expect(within(g).queryByText(/Edição completa no formulário/)).toBeNull()
+    expect(within(g).queryByText(/As alterações uma a uma/)).toBeNull()
   })
 
-  it('a linha do pedido traz o tipo de reparo e o comentário ao motorista só quando existem', async () => {
+  it('o card do pedido traz o tipo de reparo e o comentário ao motorista só quando existem', async () => {
     const source = createMockSource()
     const original = source.detalheManutencao.bind(source)
     vi.spyOn(source, 'detalheManutencao').mockImplementation(async (i) => { const d = await original(i); return d && { ...d, comentarioAoMotorista: 'Levar cedo' } })
     montar('m1', source)
-    const g = await gaveta(M1)
-    expect(within(g).getByText(/Tipo de reparo: Preventiva sistemática/)).toBeTruthy()
-    expect(within(g).getByText(/Comentário ao motorista: Levar cedo/)).toBeTruthy()
+    const pedido = within(await gaveta(M1)).getByRole('region', { name: 'Pedido' })
+    expect(within(pedido).getByText('Preventiva sistemática')).toBeTruthy()
+    expect(within(pedido).getByText('Levar cedo')).toBeTruthy()
     cleanup()
     const semNada = createMockSource()
     const lido = semNada.detalheManutencao.bind(semNada)
     vi.spyOn(semNada, 'detalheManutencao').mockImplementation(async (i) => { const d = await lido(i); return d && { ...d, tipo: null } })
     montar('m1', semNada)
-    const g2 = await gaveta(M1)
-    // Só a linha do pedido: o passo Agendar tem um campo "Comentário ao motorista".
-    const pedido = within(g2).getByText(/^Descrição do motorista:/).textContent
-    expect(pedido).not.toMatch(/Tipo de reparo|Comentário ao motorista/)
+    const pedido2 = within(await gaveta(M1)).getByRole('region', { name: 'Pedido' })
+    expect(within(pedido2).queryByText('Tipo de reparo')).toBeNull()
+    expect(within(pedido2).queryByText('Comentário ao motorista')).toBeNull()
   })
 
   it('Agendar pelo guia grava, recarrega e avisa quem abriu', async () => {
@@ -78,6 +83,14 @@ describe('GavetaManutencao', () => {
     expect(within(g).queryByRole('heading', { name: 'Aguardando o motorista concluir no App' })).toBeNull()
     fireEvent.click(within(g).getByRole('button', { name: 'Voltar' }))
     expect(within(g).getByRole('heading', { name: 'Aguardando o motorista concluir no App' })).toBeTruthy()
+  })
+
+  it('com uma exceção aberta, o card do formulário leva o nome da exceção', async () => {
+    montar('m1')
+    const g = await gaveta(M1)
+    await mais(g, 'Reprovar')
+    expect(within(g).getByRole('region', { name: 'Reprovar' })).toBeTruthy()
+    expect(within(g).queryByRole('region', { name: 'Próximo passo' })).toBeNull()
   })
 
   it('Reprovar pelo ⋯ exige motivo', async () => {
@@ -125,14 +138,11 @@ describe('GavetaManutencao', () => {
     expect(await gaveta('Manutenção não encontrada')).toBeTruthy()
   })
 
-  it('Abrir formulário abre o formulário nativo e recarrega', async () => {
-    const source = createMockSource()
-    const abrir = vi.spyOn(source, 'openForm')
-    const { onChanged } = montar('m1', source)
-    const g = await gaveta(M1)
-    await act(async () => { fireEvent.click(within(g).getByRole('button', { name: /Abrir formulário/ })) })
-    expect(abrir).toHaveBeenCalledWith('manutencao', 'm1')
-    expect(onChanged).toHaveBeenCalled()
+  it('cabeçalho com status e histórico em linha do tempo', async () => {
+    montar('m3')
+    const g = await gaveta(M3)
+    expect(within(g).getByText('Programado')).toBeTruthy()
+    expect(within(within(g).getByRole('region', { name: 'Histórico' })).getAllByRole('listitem').length).toBeGreaterThan(0)
   })
 
   it('tem o botão da auditoria no alto da gaveta', async () => {
@@ -280,16 +290,15 @@ describe('GavetaManutencao: recarga depois de gravar', () => {
       const titulo = await new Promise<string>((resolve) => { pendentes.push(resolve) })
       return d ? { ...d, descricao: titulo } : d
     })
-    montar('m1', source)
-    const g = await gaveta(M1)
-    const abrir = () => within(g).getByRole('button', { name: /Abrir formulário/ })
-    await act(async () => { fireEvent.click(abrir()) })
-    await act(async () => { fireEvent.click(abrir()) })
+    const { trocarId } = montar('m1', source)
+    await gaveta(M1)
+    act(() => { trocarId('m2') })
+    act(() => { trocarId('m1') })
     await waitFor(() => expect(pendentes).toHaveLength(2))
-    await act(async () => { pendentes[1]('NOVO') }) // a segunda recarga responde primeiro
+    await act(async () => { pendentes[1]('NOVO') }) // a leitura mais nova (m1) responde primeiro
     expect(await screen.findByRole('dialog', { name: 'TST1A11 · NOVO' })).toBeTruthy()
-    await act(async () => { pendentes[0]('ANTIGO') }) // a primeira chega tarde
+    await act(async () => { pendentes[0]('ANTIGO') }) // a de m2 chega tarde
     expect(screen.getByRole('dialog', { name: 'TST1A11 · NOVO' })).toBeTruthy()
-    expect(screen.queryByRole('dialog', { name: 'TST1A11 · ANTIGO' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: /ANTIGO/ })).toBeNull()
   })
 })

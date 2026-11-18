@@ -1,6 +1,6 @@
-import { ExternalLink, MoreHorizontal } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, ChoiceGroup, Field, Input, Menu, Radio, Select, type MenuAction } from '@betinhos/ui'
+import { Alert, Button, ChoiceGroup, Field, Input, Radio, Select } from '@betinhos/ui'
 import { abrirGavetaRegistro } from '../../../app/registroAberto'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
@@ -8,7 +8,7 @@ import { GRAU, PAGAMENTO_MANUT, label } from '../data/schema'
 import type { DataSource, OpcaoBusca } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
-import { avaliar, chavePasso, ETAPAS, lerAgendar, lerProgramar, rotuloExtra, textoDespesa, textoSaida, valoresAgendarIniciais, type Extra, type Situacao, type ValoresAgendar } from '../domain/manutencaoEtapas'
+import { avaliar, chavePasso, ETAPAS, lerAgendar, lerProgramar, textoDespesa, textoSaida, valoresAgendarIniciais, type Extra, type Situacao, type ValoresAgendar } from '../domain/manutencaoEtapas'
 import { rotuloJanela } from '../domain/janela'
 import { desfechoDaAcao, executarAcaoManutencao } from '../domain/transitions'
 import { JanelaCampos } from './JanelaCampos'
@@ -49,40 +49,14 @@ export function Arquivos({ titulo, links }: { titulo: string; links: string[] })
   )
 }
 
-/** Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): barra de três etapas e um passo por vez. */
+/** Guia da gaveta da manutenção: barra de três etapas e um passo por vez. */
 export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizada, onExtra, autoFoco = true }: Props) {
   const situacao = useMemo(() => avaliar(m, hoje), [m, hoje])
-  const parada = situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada'
-  const mais: MenuAction[] = situacao.extras.map((extra) => ({ id: extra, label: rotuloExtra(extra, situacao.etapa), onSelect: () => onExtra(extra) }))
-  const realizar = situacao.etapa === 'realizar' && m.programacao?.motorista && m.programacao.saida
-  const subtitulo = realizar
-    ? `${label(GRAU, m.grau)} · ${m.programacao!.motorista!.label} leva em ${textoSaida(m.programacao!.saida!)}`
-    : `${label(GRAU, m.grau)} · pedido por ${texto(m.solicitante?.label)}`
-
   return (
     <div className="frota-guia">
-      <header className="frota-guia__topo">
-        {/* Placa e descrição ficam no título da gaveta; o guia mostra só o subtítulo. */}
-        <div className="frota-guia__id">
-          <span className="frota-muted">{subtitulo}</span>
-        </div>
-        {situacao.prazo && (
-          <div className="frota-guia__prazo" data-perigo={situacao.prazo.perigo ? '' : undefined}>
-            <small>{situacao.prazo.rotulo}</small>
-            <b>{situacao.prazo.texto}</b>
-          </div>
-        )}
-        {mais.length > 0 && <Menu trigger={(props) => <Button variant="ghost" size="compact" icon={<MoreHorizontal size={16} />} aria-label="Mais ações" {...props} />} actions={mais} />}
-      </header>
-
       <Barra situacao={situacao} />
-
       {/* A chave remonta o passo quando os dados de partida mudam (ex.: reagendou e continua em Programar). */}
       <Passo key={chavePasso(m)} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
-
-      {!parada && situacao.feitos.length > 0 && (
-        <ul className="frota-guia__feitos">{situacao.feitos.map((f) => <li key={f}>{f}</li>)}</ul>
-      )}
     </div>
   )
 }
@@ -229,7 +203,6 @@ function PassoProgramar({ source, m, onFeito, onDesatualizada, onExtra, autoFoco
           {leitura.foraDaJanela && janela && <Alert tone="warning">A saída fica fora da janela ({janela}). Grava assim mesmo.</Alert>}
           {erro && <Alert tone="danger" title="Não foi possível gravar">{erro}</Alert>}
           <div className="frota-cluster"><Button variant="primary" loading={salvando} onClick={programar}>Programar</Button></div>
-          <p className="frota-muted">Também dá para programar pela linha na Geral.</p>
         </>
       )}
     </section>
