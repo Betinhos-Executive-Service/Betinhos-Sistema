@@ -25,8 +25,8 @@ export function InfracoesPage({ host }: { host: Host }) {
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['gravidade', 'competencia', 'responsabilidade', 'situacao', 'multas'] as const
 
-/** `embutido`: aba Infrações dentro de Multas na Frota, que já tem página, cabeçalho e toasts próprios. */
-export function Infracoes({ host, embutido = false }: { host: Host; embutido?: boolean }) {
+function Infracoes({ host }: { host: Host }) {
+  useShellHeader({ title: 'Infrações de trânsito' })
   const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
@@ -94,9 +94,8 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   }
 
   return (
-    <div className={embutido ? 'if-page' : 'page page--full if-page'}>
+    <div className="page page--full if-page">
       {/* "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete. */}
-      {embutido ? null : <CabecalhoShell />}
       <div role="toolbar" aria-label="Comandos de infrações">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
           search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />}
@@ -104,7 +103,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
             <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
           </>}>
-          {source.mock && !embutido && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
@@ -113,10 +112,4 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
       {data.loaded ? <InfracaoDrawer target={target} onTarget={setTarget} list={data.list} uso={uso} usoState={usoState} source={source} onSaved={data.upsert} /> : null}
     </div>
   )
-}
-
-/** Só a página solta registra o cabeçalho do celular; embutida, quem registra é a Frota. */
-function CabecalhoShell() {
-  useShellHeader({ title: 'Infrações de trânsito' })
-  return null
 }
