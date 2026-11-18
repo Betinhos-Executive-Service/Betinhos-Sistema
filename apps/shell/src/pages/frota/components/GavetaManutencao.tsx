@@ -277,8 +277,12 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       title={<span className="frota-gaveta__titulo">{placa} · {m.descricao || 'Manutenção'}</span>}
       actions={<>
         <span ref={acoes}>
-          {extra || editando ? null : <Button variant="ghost" size="compact" icon={<Pencil size={16} />} aria-label="Editar" onClick={() => setEditando(true)} />}
-          {extra || editando ? null : <MaisAcoes situacao={situacao} onExtra={setExtra} />}
+          {extra || editando ? null : (
+            <>
+              <Button variant="ghost" size="compact" icon={<Pencil size={16} />} aria-label="Editar" onClick={() => setEditando(true)} />
+              <MaisAcoes situacao={situacao} onExtra={setExtra} />
+            </>
+          )}
         </span>
         <BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />
       </>}

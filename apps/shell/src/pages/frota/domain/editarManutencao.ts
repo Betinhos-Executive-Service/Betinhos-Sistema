@@ -34,7 +34,7 @@ export function valoresEdicaoIniciais(m: DetalheManutencao): ValoresEdicao {
   return {
     veiculoId: m.veiculo?.id ?? '', solicitanteId: m.solicitante?.id ?? '', descricao: m.descricao, km: texto(m.km), tipo: texto(m.tipo), grau: texto(m.grau), comentario: m.comentarioAprovador ?? '',
     janelaInicio: m.janelaInicio ?? '', janelaFim: m.janelaFim ?? '',
-    dataManutencao: dataHoraLocal(m.dataManutencao), kmRealizado: texto(m.kmRealizado), valor: texto(m.valor), estabelecimento: m.estabelecimento ?? '', servicoRealizado: m.servicoRealizado ?? '',
+    dataManutencao: dataHoraLocal(m.dataManutencao), kmRealizado: texto(m.kmRealizado), valor: m.valor === null ? '' : m.valor.toFixed(2).replace('.', ','), estabelecimento: m.estabelecimento ?? '', servicoRealizado: m.servicoRealizado ?? '',
   }
 }
 
@@ -68,13 +68,13 @@ export function lerEdicao(inicial: ValoresEdicao, atual: ValoresEdicao, conclusa
   else if (mudou('grau')) patch.cr40f_graudamanutencao = Number(atual.grau)
   if (mudou('tipo')) patch.cr40f_tipodoreparo = atual.tipo ? Number(atual.tipo) : null
 
-  const inteiro = (campo: 'km' | 'kmRealizado', coluna: string, mensagem: string) => {
+  const lerCampoKm = (campo: 'km' | 'kmRealizado', coluna: string, mensagem: string) => {
     if (!mudou(campo)) return
     const km = lerKm(atual[campo])
     if (km === null && atual[campo].trim()) erros[campo] = mensagem
     else patch[coluna] = km
   }
-  inteiro('km', 'cr40f_kmatual', 'Informe o km (número inteiro)')
+  lerCampoKm('km', 'cr40f_kmatual', 'Informe o km (número inteiro)')
 
   const comentario = atual.comentario.trim()
   if (comentario.length > LIMITE.comentarioAprovador) erros.comentario = `Máximo de ${LIMITE.comentarioAprovador} caracteres`
@@ -95,10 +95,10 @@ export function lerEdicao(inicial: ValoresEdicao, atual: ValoresEdicao, conclusa
   }
 
   if (conclusao) {
-    inteiro('kmRealizado', 'cr40f_kmrealizado', 'Informe o km realizado (número inteiro)')
+    lerCampoKm('kmRealizado', 'cr40f_kmrealizado', 'Informe o km realizado (número inteiro)')
     if (mudou('dataManutencao')) {
-      const iso = DATA_HORA.test(atual.dataManutencao) ? new Date(`${atual.dataManutencao}:00-03:00`) : null
-      if (iso && !Number.isNaN(iso.getTime())) patch.cr40f_datamanutencao = iso.toISOString()
+      const data = DATA_HORA.test(atual.dataManutencao) ? new Date(`${atual.dataManutencao}:00-03:00`) : null
+      if (data && !Number.isNaN(data.getTime())) patch.cr40f_datamanutencao = data.toISOString()
       else if (atual.dataManutencao.trim()) erros.dataManutencao = 'Data e hora inválidas'
       else patch.cr40f_datamanutencao = null
     }
