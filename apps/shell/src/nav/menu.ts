@@ -90,19 +90,11 @@ export const MENU: MenuGroup[] = [
     id: 'back-end',
     label: 'Back-End',
     items: [
-      table('cr40f_servicosporpassageiro'),
-      table('cr40f_trocasdecarro'),
-      table('new_possedeveiculo'),
       // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
       wr('Dashboard antigo (TV)', 'new_dashboard'),
-      wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
-      table('new_fotomanutencao'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
-      table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
-      table('cr40f_anexocolisao_v2'),
-      table('cr40f_anexorecebimento_v2'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
       wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
       table('cr40f_pedidodecotacao'),
