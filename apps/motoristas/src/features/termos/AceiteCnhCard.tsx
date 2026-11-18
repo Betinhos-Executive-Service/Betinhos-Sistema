@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { reportAppError } from "../../shared/appErrorLogger";
-import { SEM_CONEXAO_TEXTO, textoAceite, type MinhaMulta } from "./minhasMultas";
+import { diaMes, SEM_CONEXAO_TEXTO, type MinhaMulta } from "./minhasMultas";
 
 type Props = {
   multa: MinhaMulta;
@@ -33,10 +33,14 @@ export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
   };
 
   return (
-    <div className="multa-aceite" data-tour="multas-aceite">
-      <p className="termo-help">{textoAceite(multa.auto, multa.prazoAceite)}</p>
-      {registrado ? <p className="termo-alert" data-tone="sucesso" role="status">Aceite registrado. O gestor vai conferir; atualize a lista para ver a situação.</p> : <button type="button" className="termo-primary" disabled={enviando || semConexao} aria-busy={enviando || undefined} onClick={() => void declarar()}>
-        {semConexao ? SEM_CONEXAO_TEXTO : enviando ? "Registrando" : "Já aceitei"}
+    <div className="multa-aceite">
+      <ol className="multa-passos">
+        <li>Abra o app CNH Digital</li>
+        <li>Toque em Infrações e escolha a multa {multa.auto}</li>
+        <li>Aceite a indicação{multa.prazoAceite ? ` até ${diaMes(multa.prazoAceite)}` : ""} e volte aqui</li>
+      </ol>
+      {registrado ? <p className="termo-alert" data-tone="sucesso" role="status">Aceite registrado. O gestor vai conferir; atualize a lista para ver a situação.</p> : <button type="button" className="termo-primary multa-botao" disabled={enviando || semConexao} aria-busy={enviando || undefined} onClick={() => void declarar()}>
+        {semConexao ? SEM_CONEXAO_TEXTO : enviando ? "Registrando" : "Já aceitei na CNH Digital"}
       </button>}
       {erro ? <p className="termo-alert" data-tone="erro" role="alert">{erro}</p> : null}
     </div>

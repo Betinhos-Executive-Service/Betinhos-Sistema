@@ -204,7 +204,7 @@ test("capítulo multas explica a Home da fase 3: precisa de você, termo, aceite
   const textos = capitulo.steps.flatMap((s) => s.text);
   for (const t of [
     "Multas que precisam de você aparecem aqui",
-    "Assine o termo ou conteste pelo app",
+    "Toque na multa para abrir e assinar o termo, ou contestar pelo app",
     "Quando a empresa indicar você no órgão, aceite na CNH Digital e toque em Já aceitei",
     "Acompanhe o desconto de cada parcela"
   ]) assert.ok(textos.includes(t), t);
