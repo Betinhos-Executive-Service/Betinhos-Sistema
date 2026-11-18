@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FORMATTED, mapBaseline, mapColisao, mapDespesaCombustivel, mapDetalheManutencao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapTelemetriaKm, mapVeiculo, ref, SELECT, SELECT_DETALHE_MANUTENCAO } from './mappers'
+import { FORMATTED, mapBaseline, mapColisao, mapDespesaCombustivel, mapDetalheManutencao, mapItemPlano, mapManutencao, mapMulta, mapParcelaFolha, mapPosse, mapTelemetriaKm, mapVeiculo, ref, SELECT, SELECT_DETALHE_MANUTENCAO } from './mappers'
 
 describe('mappers', () => {
   it('multa: lê responsável, canal, datas dos passos, valores e nomes dos arquivos', () => {
@@ -96,5 +96,21 @@ describe('mappers', () => {
   it('mapeia posse com local de base', () => {
     const posse = mapPosse({ new_possedeveiculoid: 'P1', new_iniciodaposse: '2026-10-01T12:00:00Z', _new_veiculo_value: 'V1', _new_localdebase_value: 'B1', [`_new_localdebase_value${FORMATTED}`]: 'Base Centro' })
     expect(posse).toMatchObject({ id: 'p1', fim: null, motorista: null, localBase: { id: 'b1', label: 'Base Centro' } })
+  })
+
+  it('parcela de folha: lê multa e colaborador expandidos e o lançamento', () => {
+    const p = mapParcelaFolha({
+      new_parcelamultafolhaid: '{PF1}', new_numero: 2, new_competencia: '2026-12-01', new_valor: 33.33, new_status: 100000001, new_lancadoem: '2026-11-18T12:00:00Z',
+      _new_multa_value: '{M1}', _new_motorista_value: '{F1}',
+      new_Multa: { cr40f_novacoluna: 'TST0002', cr40f_dataehorario: '2026-09-01T15:00:00Z', [`_cr40f_placa_value${FORMATTED}`]: 'TST4B56', [`_cr40f_codigodainfracao_value${FORMATTED}`]: 'Infração fictícia' },
+      new_motorista: { cr40f_nomecompleto: 'Bruno Teste (fictício)', cr40f_numerodocpf: '111.111.111-11' },
+    }, 3)
+    expect(p).toMatchObject({ id: 'pf1', numero: 2, total: 3, competencia: '2026-12-01', valor: 33.33, status: 'descontada', lancadoEm: '2026-11-18', origem: 'multa' })
+    expect(p.multa).toEqual({ id: 'm1', auto: 'TST0002', placa: 'TST4B56', dataInfracao: '2026-09-01', infracao: 'Infração fictícia' })
+    expect(p.colaborador).toEqual({ id: 'f1', nome: 'Bruno Teste (fictício)', cpf: '111.111.111-11' })
+  })
+  it('parcela de termo: sem multa vira origem termo e status padrão prevista', () => {
+    const p = mapParcelaFolha({ new_parcelamultafolhaid: 'PF2', new_numero: 1, new_competencia: '2026-11-01', new_valor: 10, _new_termo_value: 'T1' }, 1)
+    expect(p).toMatchObject({ origem: 'termo', status: 'prevista', multa: null, colaborador: null, lancadoEm: null })
   })
 })

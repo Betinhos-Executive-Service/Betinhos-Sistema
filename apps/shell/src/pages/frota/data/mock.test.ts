@@ -1,7 +1,7 @@
 // apps/shell/src/pages/frota/data/mock.test.ts
 import { describe, expect, it } from 'vitest'
 import { segundaDe, somarDias } from '../domain/janela'
-import { todaySP } from './dates'
+import { addMonths, todaySP } from './dates'
 import { createMockSource } from './mock'
 import { ANEXO_DESPESA, MANUT } from './schema'
 import type { PedidoConclusao } from './source'
@@ -98,5 +98,41 @@ describe('mock das manutenções', () => {
     const source = createMockSource()
     expect(await source.buscarVeiculos('virtus')).toEqual([{ id: 'v2', nome: 'TST2B22 · Virtus' }])
     expect((await source.buscarVeiculos('tst')).map((o) => o.id)).not.toContain('v3')
+  })
+})
+
+describe('mock dos descontos em folha', () => {
+  const mes = (n: number) => addMonths(`${todaySP().slice(0, 7)}-01`, n).slice(0, 7)
+
+  it('o mês atual traz os colaboradores fictícios e a linha do tempo tem parcelas de outros meses', async () => {
+    const source = createMockSource()
+    const atual = await source.listarDescontosPeriodo(mes(0), mes(0))
+    expect(new Set(atual.map((p) => p.colaborador?.nome))).toEqual(new Set(['Ana Teste (fictício)', 'Bruno Teste (fictício)', 'Carla Teste (fictício)', 'Diego Teste (fictício)']))
+    expect(atual.find((p) => p.multa?.auto === 'TST0002')).toMatchObject({ numero: 2, total: 3, valor: 33.33, status: 'prevista' })
+    const periodo = await source.listarDescontosPeriodo(mes(-2), mes(2))
+    expect(periodo.some((p) => p.competencia.slice(0, 7) === mes(-1) && p.status === 'descontada')).toBe(true)
+    expect(periodo.some((p) => p.competencia.slice(0, 7) === mes(1))).toBe(true)
+    expect(await source.previstasAntes(mes(0))).toEqual({ quantidade: 1, maisAntigo: mes(-2) })
+  })
+
+  it('lançar marca descontada com a data de hoje; lançar de novo recusa a parcela', async () => {
+    const source = createMockSource()
+    const [alvo] = (await source.listarDescontosPeriodo(mes(0), mes(0))).filter((p) => p.status === 'prevista')
+    const r = await source.lancarDescontoFolha([alvo.id], 'lancar')
+    expect(r.parcelas).toEqual([{ id: alvo.id, ok: true, erro: null }])
+    const depois = (await source.listarDescontosPeriodo(mes(0), mes(0))).find((p) => p.id === alvo.id)
+    expect(depois).toMatchObject({ status: 'descontada', lancadoEm: todaySP() })
+    const de_novo = await source.lancarDescontoFolha([alvo.id], 'lancar')
+    expect(de_novo.parcelas[0]).toEqual({ id: alvo.id, ok: false, erro: 'Esta parcela já foi lançada.' })
+  })
+
+  it('lançar a última parcela encerra a multa e desfazer a reabre', async () => {
+    const source = createMockSource()
+    const parcelas = await source.listarParcelasMulta('u11')
+    expect(parcelas.map((p) => p.status)).toEqual(['descontada', 'prevista', 'prevista'])
+    const r = await source.lancarDescontoFolha([parcelas[1].id, parcelas[2].id], 'lancar')
+    expect(r.encerradas).toEqual(['u11'])
+    const desfeito = await source.lancarDescontoFolha([parcelas[2].id], 'desfazer')
+    expect(desfeito.reabertas).toEqual(['u11'])
   })
 })

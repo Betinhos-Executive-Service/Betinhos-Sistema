@@ -3,12 +3,12 @@ import { categoriasDe, CAMPO, lerMulti, ORIGEM } from '../domain/manutencaoCatal
 import { janelaValida, segundaDe, somarDias } from '../domain/janela'
 import { addMonths, todaySP } from './dates'
 import { estadoDaMulta } from '../domain/multaEstado'
-import { aplicarPasso, avaliar, validarPasso, type MultaEstado } from '../domain/multaEtapas'
+import { aplicarPasso, avaliar, dividirParcelas, validarPasso, type MultaEstado } from '../domain/multaEtapas'
 import { ANEXO_DESPESA, CANAL, COLISAO, MANUT, MOTIVO_EMPRESA, MULTA, PAGAMENTO, RESPONSAVEL, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import type { DataSource, OpcaoBusca } from './source'
 import { ApiError } from './xrm'
-import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, ProgramacaoManutencao, Ref, TelemetriaKm, TermoMulta } from './types'
+import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, ParcelaFolha, ProgramacaoManutencao, Ref, ResultadoLancamento, TelemetriaKm, TermoMulta } from './types'
 import { latenciaMock } from '../../../app/latenciaMock'
 
 // Dados fictícios só para `pnpm dev` em localhost. Nunca usados dentro do Dataverse.
@@ -85,6 +85,8 @@ function seed(): FrotaData {
       multa('u7', { status: MULTA.INDICADA, responsavel: RESPONSAVEL.MOTORISTA, motorista: ana, canal: CANAL.DSV, dataAviso: offset(-20), dataIndicacao: offset(-18), indicado: true, vencimento: offset(4), valorComDesconto: 78.1, dataHora: iso(-45) }),
       multa('u8', { status: MULTA.NOTIFICADO, responsavel: RESPONSAVEL.MOTORISTA, canal: CANAL.SENATRAN, dataAviso: offset(-5), dataIndicacao: offset(-3), indicado: true, dataParaIndicar: offset(6) }),
       multa('u9', { status: MULTA.CANCELADA, canceladaEm: offset(-7), motivoCancelamento: 'Multa duplicada no portal (fictício).' }),
+      multa('u11', { status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: bruno, indicado: true, canal: CANAL.DSV, dataAviso: offset(-50), dataIndicacao: offset(-48), pagaEm: offset(-35), valorPago: 100, competencia: `${addMonths(todaySP(), -1).slice(0, 7)}-01`, acertoEm: offset(-20), dataHora: iso(-70), titulo: 'TST0002' }),
+      multa('u12', { status: MULTA.PAGO, responsavel: RESPONSAVEL.MOTORISTA, motorista: ana, indicado: true, canal: CANAL.DSV, dataAviso: offset(-30), dataIndicacao: offset(-28), pagaEm: offset(-5), valorPago: 100, dataHora: iso(-40), titulo: 'TST0005' }),
       multa('u10', { status: MULTA.RECURSO, responsavel: RESPONSAVEL.MOTORISTA, recursoPendente: true, veiculo: v2 }),
     ],
     infracoes: [{ id: 'i1', codigo: '7455-0', descricao: 'Velocidade superior à máxima em até 20%', gravidade: 1, pontos: 4, valor: 130.16 }],
@@ -149,6 +151,23 @@ export function createMockSource(): DataSource {
     ['u4', [termo('tu4-1', { status: 'contestado', forma: 'guia', parcelas: 1, valorTotal: 130.16, enviadoEm: iso(-6), motivoContestacao: 'Eu estava de folga nesse dia (fictício).' })]],
   ])
   const parcelas = new Map([['tu3-1', [0, 1, 2].map((i) => ({ numero: i + 1, competencia: addMonths(`${todaySP().slice(0, 7)}-01`, i - 1), valor: i === 0 ? 97.83 : 97.82, status: i === 0 ? 'Descontada' : 'Prevista' }))]])
+  // Parcelas de folha fictícias (RH): quatro colaboradores, meses relativos a hoje.
+  const mes = (n: number) => `${addMonths(`${todaySP().slice(0, 7)}-01`, n)}`
+  const colab = (id: string, nome: string, cpf: string) => ({ id, nome, cpf })
+  const colabAna = colab('fc1', 'Ana Teste (fictício)', '000.000.000-00')
+  const colabBruno = colab('fc2', 'Bruno Teste (fictício)', '111.111.111-11')
+  const colabCarla = colab('fc3', 'Carla Teste (fictício)', '222.222.222-22')
+  const colabDiego = colab('fc4', 'Diego Teste (fictício)', '333.333.333-33')
+  const parcelasFolha: ParcelaFolha[] = []
+  const plano = (multaId: string, auto: string, placa: string, colaborador: ParcelaFolha['colaborador'], valor: number, n: number, primeira: string, lancadas: number[], infracao: string) => {
+    for (const p of dividirParcelas(valor, n, primeira))
+      parcelasFolha.push({ id: `pf-${multaId}-${p.numero}`, numero: p.numero, total: n, competencia: p.competencia, valor: p.valor, status: lancadas.includes(p.numero) ? 'descontada' : 'prevista', lancadoEm: lancadas.includes(p.numero) ? offset(-10) : null, origem: 'multa', colaborador, multa: { id: multaId, auto, placa, dataInfracao: offset(-60), infracao } })
+  }
+  plano('u12', 'TST0001', 'TST1A23', colabAna, 195.23, 1, mes(0), [], 'Transitar em velocidade superior (fictício)')
+  plano('u11', 'TST0002', 'TST4B56', colabBruno, 100, 3, mes(-1), [1], 'Estacionar em local proibido (fictício)')
+  plano('mx3', 'TST0003', 'TST7C89', colabCarla, 88.38, 1, mes(0), [1], 'Avançar sinal (fictício)')
+  plano('mx4', 'TST0004', 'TST2D34', colabDiego, 150.01, 2, mes(0), [], 'Parar sobre a faixa (fictício)')
+  plano('mx5', 'TST0006', 'TST5E67', colabBruno, 60, 1, mes(-2), [], 'Não usar cinto (fictício)')
   const comTermo = (multas: Multa[]) => multas.map((m) => { const t = termos.get(m.id)?.[0]; return { ...m, termo: t?.status ? { status: t.status, enviadoEm: t.enviadoEm } : null } })
   const find = (kind: Kind, id: string) => (data[COLLECTION[kind]] as { id: string; status: number | null }[]).find((item) => item.id === id)
   const delay = () => new Promise((resolve) => setTimeout(resolve, latenciaMock(250)))
@@ -394,6 +413,44 @@ export function createMockSource(): DataSource {
     async buscarCidades(texto) {
       await delay()
       return CIDADES.filter((c) => contem(c.nome, texto))
+    },
+    async listarDescontosPeriodo(inicio, fim) {
+      await delay()
+      return structuredClone(parcelasFolha.filter((p) => p.status !== 'cancelada' && p.competencia.slice(0, 7) >= inicio && p.competencia.slice(0, 7) <= fim))
+    },
+    async previstasAntes(mesRef) {
+      await delay()
+      const antigas = parcelasFolha.filter((p) => p.status === 'prevista' && p.competencia.slice(0, 7) < mesRef).map((p) => p.competencia.slice(0, 7)).sort()
+      return { quantidade: antigas.length, maisAntigo: antigas[0] ?? null }
+    },
+    async listarParcelasMulta(multaId) {
+      await delay()
+      return structuredClone(parcelasFolha.filter((p) => p.multa?.id === multaId).sort((a, b) => a.numero - b.numero))
+    },
+    async lancarDescontoFolha(ids, acao): Promise<ResultadoLancamento> {
+      await delay()
+      if (ids.length < 1 || ids.length > 200) throw new ApiError('Escolha de 1 a 200 parcelas.', 400)
+      const resultado: ResultadoLancamento = { parcelas: [], encerradas: [], reabertas: [] }
+      const afetadas = new Set<string>()
+      for (const id of ids) {
+        const p = parcelasFolha.find((x) => x.id === id)
+        const erro = !p ? 'Parcela não encontrada.' : p.status === 'cancelada' ? 'Esta parcela foi cancelada.'
+          : acao === 'lancar' && p.status === 'descontada' ? 'Esta parcela já foi lançada.'
+            : acao === 'desfazer' && p.status === 'prevista' ? 'Esta parcela ainda não foi lançada.' : null
+        if (!p || erro) { resultado.parcelas.push({ id, ok: false, erro }); continue }
+        p.status = acao === 'lancar' ? 'descontada' : 'prevista'
+        p.lancadoEm = acao === 'lancar' ? todaySP() : null
+        if (p.multa) afetadas.add(p.multa.id)
+        resultado.parcelas.push({ id, ok: true, erro: null })
+      }
+      for (const multaId of afetadas) {
+        const m = data.multas.find((row) => row.id === multaId)
+        const todas = parcelasFolha.filter((p) => p.multa?.id === multaId)
+        if (!m) continue
+        if (acao === 'lancar' && m.status !== MULTA.FINALIZADO && todas.every((p) => p.status === 'descontada')) { m.status = MULTA.FINALIZADO; m.encerradaEm = todaySP(); resultado.encerradas.push(multaId) }
+        if (acao === 'desfazer' && m.status === MULTA.FINALIZADO) { m.status = MULTA.PAGO; m.encerradaEm = null; resultado.reabertas.push(multaId) }
+      }
+      return resultado
     },
     async passoMulta(multaId, passo, dados) {
       await delay()
