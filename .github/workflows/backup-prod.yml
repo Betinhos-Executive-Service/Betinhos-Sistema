@@ -1,0 +1,62 @@
+name: Backup do PROD
+
+# Backup periódico do ambiente PROD (pac admin backup), além do que o "Publicar soluções" já faz antes de cada import.
+# Roda todo dia de madrugada (horário de Brasília) e pode ser disparado à mão com um rótulo próprio.
+# O backup fica no próprio Power Platform (restauração pelo Admin Center ou `pac admin restore`); a retenção é a da
+# plataforma (7 dias, ou até 28 em ambiente gerenciado). Nada sai do Dataverse: o repositório é público e não guarda dados.
+# A conta de serviço já é app de administração (mesmo requisito do backup em _importar-solucoes.yml).
+on:
+  schedule:
+    # 06:23 UTC = 03:23 em Brasília.
+    - cron: '23 6 * * *'
+  workflow_dispatch:
+    inputs:
+      rotulo:
+        description: 'Rótulo do backup. Vazio = backup-diario-AAAAMMDD-HHMM.'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: prod
+    # Só um backup por vez; não disputa o grupo publicar-prod (backup não escreve nas soluções).
+    concurrency:
+      group: backup-prod
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/instalar-pac
+      - name: Conectar o pac
+        run: |
+          pac auth create --name ci-backup --applicationId $env:DV_CLIENT_ID --clientSecret $env:DV_CLIENT_SECRET --tenant $env:DV_TENANT_ID --environment $env:DV_ENVIRONMENT_URL
+          if ($LASTEXITCODE -ne 0) { throw "pac auth falhou." }
+      - name: Backup
+        env:
+          ROTULO: ${{ inputs.rotulo }}
+        run: |
+          $rotulo = $env:ROTULO
+          if (-not $rotulo) {
+            $agora = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'E. South America Standard Time')
+            $rotulo = "backup-diario-$($agora.ToString('yyyyMMdd-HHmm'))"
+          }
+          pac admin backup --environment $env:DV_ENVIRONMENT_URL --label $rotulo
+          if ($LASTEXITCODE -ne 0) { throw "Backup do PROD falhou ($rotulo)." }
+          "## Backup do PROD: $rotulo" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+      - name: Backups disponíveis
+        # Informativo: a lista não derruba o job.
+        continue-on-error: true
+        run: |
+          $lista = pac admin list-backups --environment $env:DV_ENVIRONMENT_URL 2>&1 | Out-String
+          Write-Host $lista
+          "### Backups disponíveis`n``````text`n$lista`n``````" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
