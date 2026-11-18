@@ -10,7 +10,7 @@ import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal, errorMessage } from '../data/xrm'
 import { lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
-import { avaliar, chavePasso, type Extra } from '../domain/manutencaoEtapas'
+import { avaliar, chavePasso, rotuloExtra, type Extra } from '../domain/manutencaoEtapas'
 import { desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
@@ -255,7 +255,7 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       <div className="frota-gaveta-corpo" ref={corpo}>
         <CabecalhoManutencao m={m} situacao={situacao} />
         <PedidoManutencao m={m} onOpenVeiculo={onOpenVeiculo} />
-        <Bloco titulo={tituloPasso} destaque>
+        <Bloco titulo={extra ? rotuloExtra(extra, situacao.etapa) : tituloPasso} destaque>
           {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
         </Bloco>
         <HistoricoManutencao situacao={situacao} />

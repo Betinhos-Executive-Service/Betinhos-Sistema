@@ -85,6 +85,14 @@ describe('GavetaManutencao', () => {
     expect(within(g).getByRole('heading', { name: 'Aguardando o motorista concluir no App' })).toBeTruthy()
   })
 
+  it('com uma exceção aberta, o card do formulário leva o nome da exceção', async () => {
+    montar('m1')
+    const g = await gaveta(M1)
+    await mais(g, 'Reprovar')
+    expect(within(g).getByRole('region', { name: 'Reprovar' })).toBeTruthy()
+    expect(within(g).queryByRole('region', { name: 'Próximo passo' })).toBeNull()
+  })
+
   it('Reprovar pelo ⋯ exige motivo', async () => {
     const source = createMockSource()
     const reprovar = vi.spyOn(source, 'reprovarManutencao')
