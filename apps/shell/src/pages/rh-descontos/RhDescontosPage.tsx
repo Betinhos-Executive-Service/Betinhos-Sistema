@@ -43,6 +43,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
   const [ativoId, setAtivoId] = useState('')
   const [erros, setErros] = useState<Map<string, string>>(new Map())
   const [ocupado, setOcupado] = useState(false)
+  const [retorno, setRetorno] = useState('')
   const [excel, setExcel] = useState<Record<string, string>>({})
   const token = useRef(0)
 
@@ -81,11 +82,15 @@ export function RhDescontosPage({ host }: { host: Host }) {
   const executar = async (ids: string[], acao: 'lancar' | 'desfazer') => {
     if (!source || !ids.length) return
     setOcupado(true)
+    setRetorno('')
     setErros((prev) => { const n = new Map(prev); ids.forEach((id) => n.delete(id)); return n })
     const marcar = (lista: [string, string][]) => setErros((prev) => new Map([...prev, ...lista]))
     try {
       const resultado = await source.lancarDescontoFolha(ids, acao)
       marcar(resultado.parcelas.filter((x) => !x.ok).map((x) => [x.id, x.erro ?? 'Não foi possível concluir.']))
+      const feitos = new Set(resultado.parcelas.filter((x) => x.ok).map((x) => x.id))
+      const valor = todas.filter((p) => feitos.has(p.id)).reduce((t, p) => t + p.valor, 0)
+      if (feitos.size) setRetorno(`${feitos.size} ${feitos.size === 1 ? 'parcela' : 'parcelas'} · ${formatMoney(valor)} ${acao === 'lancar' ? (feitos.size === 1 ? 'lançada' : 'lançadas') : (feitos.size === 1 ? 'voltou a prevista' : 'voltaram a previstas')}.`)
     } catch (reason) {
       const msg = mensagemDaAcao(reason, acao === 'lancar' ? 'Não foi possível lançar. Tente de novo.' : 'Não foi possível desfazer. Tente de novo.')
       marcar(ids.map((id) => [id, msg]))
@@ -143,6 +148,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
             : <LinhaDoTempo grupos={gruposTodos} meses={meses} mes={mes} mesAtual={mesAtual} totais={totaisMeses} onMes={irParaMes} onAbrirMulta={abrirMulta} />}
         </>
       ) : null}
+      {passo === 'lancar' ? <p className="rh-retorno" role="status">{retorno}</p> : null}
       {passo === 'lancar' ? (
         <FitaFechamento grupos={grupos} todas={todas} mes={mes} mesAtual={mesAtual} marcados={marcados} ativoId={ativoId} erros={erros} ocupado={ocupado}
           onMarcar={alternarMarca} onAtivo={setAtivoId} onLancar={(c) => void executar(idsDos(c, 'prevista'), 'lancar')} onDesfazer={(c) => void executar(idsDos([c], 'descontada'), 'desfazer')} onAbrirMulta={abrirMulta} />

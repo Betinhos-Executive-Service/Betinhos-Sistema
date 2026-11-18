@@ -21,6 +21,7 @@ export function FitaFechamento({ grupos, todas, mes, mesAtual, marcados, ativoId
   const marcadosValidos = grupos.filter((g) => marcados.has(g.id) && !g.tudoLancado).map((g) => g.id)
   const erroDe = (g: GrupoColaborador) => g.parcelas.map((p) => erros.get(p.id)).find(Boolean)
   const previstasAtivo = ativo.parcelas.filter((p) => p.status === 'prevista')
+  const lancadasAtivo = ativo.parcelas.filter((p) => p.status === 'descontada')
   const valorPrevistas = previstasAtivo.reduce((s, p) => s + Math.round(p.valor * 100), 0) / 100
   const n = marcadosValidos.length
 
@@ -77,7 +78,7 @@ export function FitaFechamento({ grupos, todas, mes, mesAtual, marcados, ativoId
         ))}
         <div className="rh-fita__acoes">
           {previstasAtivo.length ? <Button variant="primary" disabled={ocupado} onClick={() => onLancar([ativo.id])}>{`Lancei ${formatMoney(valorPrevistas)} na folha`}</Button> : null}
-          {ativo.parcelas.some((p) => p.status === 'descontada') ? <Button variant="secondary" icon={<Undo2 size={16} />} disabled={ocupado} onClick={() => onDesfazer(ativo.id)}>Desfazer</Button> : null}
+          {lancadasAtivo.length ? <Button variant="secondary" icon={<Undo2 size={16} />} disabled={ocupado} onClick={() => onDesfazer(ativo.id)}>{`Desfazer ${lancadasAtivo.length === 1 ? '1 lançamento' : `${lancadasAtivo.length} lançamentos`} (${formatMoney(lancadasAtivo.reduce((t, p) => t + p.valor, 0))})`}</Button> : null}
         </div>
       </section>
     </div>
