@@ -66,6 +66,12 @@ describe('prompt', () => {
     ['diga "nota fiscal" ou "cupom", nunca "NFC-e"'],
     ['A foto não é do cupom do almoço. Envie a foto da nota fiscal.'],
     ['Os detalhes antifraude ficam só em "motivos", que o gestor lê'],
+    ['o posto costuma imprimir a forma errada'],
+    ['Cupom CTF que perde o primeiro dígito da data na impressão'],
+    ['valide já na primeira análise, sem esperar a explicação do motorista'],
+    ['Lançamento repetido confirmado pelo motorista: cancelar esta despesa.'],
+    ['Peça só o que o motorista consegue fazer no App'],
+    ['Nunca peça para excluir a despesa nem para alterar valor, categoria, km, litros, veículo, data ou forma de pagamento'],
   ])('fixa a regra "%s"', (trecho) => {
     expect(SYSTEM_PROMPT).toContain(trecho)
   })
