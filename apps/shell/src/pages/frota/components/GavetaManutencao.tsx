@@ -1,6 +1,7 @@
 // apps/shell/src/pages/frota/components/GavetaManutencao.tsx
+import { Pencil } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, EmptyState, Field, Textarea } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, EmptyState, Field, Textarea } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CarregandoRegistro } from '../../../app/BrandLoader'
 import { todaySP } from '../data/dates'
@@ -14,6 +15,7 @@ import { avaliar, chavePasso, rotuloExtra, type Extra } from '../domain/manutenc
 import { desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
+import { EditarManutencaoForm } from './EditarManutencaoForm'
 import { JanelaCampos } from './JanelaCampos'
 import { Bloco, CabecalhoManutencao, HistoricoManutencao, MaisAcoes, PedidoManutencao } from './ManutencaoResumo'
 import { ManutencaoPassoAPasso } from './ManutencaoPassoAPasso'
@@ -122,6 +124,11 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   const notify = useNotify()
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' })
   const [extra, setExtra] = useState<Extra | null>(null)
+  const [editando, setEditando] = useState(false)
+  /** Saída (Voltar ou fechar a gaveta) que espera a resposta de "Descartar alterações?". */
+  const [descartando, setDescartando] = useState<'voltar' | 'fechar' | null>(null)
+  const edicao = useRef({ sujo: false, salvando: false })
+  const aoMudarEdicao = useCallback((estado: { sujo: boolean; salvando: boolean }) => { edicao.current = estado }, [])
   const vivo = useRef(true)
   useEffect(() => {
     vivo.current = true
@@ -164,12 +171,32 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
     else if (extraAnterior.current) acoes.current?.querySelector<HTMLElement>('[aria-label="Mais ações"]')?.focus()
     extraAnterior.current = extra
   }, [extra])
+  // Edição: ao abrir, no primeiro campo; ao voltar, no lápis.
+  const editandoAntes = useRef(false)
+  useEffect(() => {
+    if (editando) corpo.current?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [role="combobox"]:not([disabled])')?.focus()
+    else if (editandoAntes.current) acoes.current?.querySelector<HTMLElement>('[aria-label="Editar"]')?.focus()
+    editandoAntes.current = editando
+  }, [editando])
 
   function gravado(mensagem: string) {
     notify('success', mensagem)
     setExtra(null)
+    setEditando(false)
     void carregar()
     onChanged()
+  }
+
+  function sairDaEdicao() {
+    setDescartando(null)
+    edicao.current = { sujo: false, salvando: false }
+    setEditando(false)
+  }
+  const voltarDaEdicao = () => { if (edicao.current.sujo) setDescartando('voltar'); else sairDaEdicao() }
+  const fechar = () => {
+    if (!editando) { onClose(); return }
+    if (edicao.current.salvando) return
+    if (edicao.current.sujo) setDescartando('fechar'); else onClose()
   }
 
   /**
@@ -241,25 +268,43 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   const situacao = avaliar(m, hoje)
   const tituloPasso = situacao.etapa === 'realizada' ? 'Resultado' : situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada' ? 'Encerrada' : 'Próximo passo'
   return (
+    <>
     <Drawer
       open
       size="wide"
-      onClose={onClose}
+      onClose={fechar}
       eyebrow={m.codigo ? `Manutenção ${m.codigo}` : 'Manutenção'}
       title={<span className="frota-gaveta__titulo">{placa} · {m.descricao || 'Manutenção'}</span>}
       actions={<>
-        <span ref={acoes}>{extra ? null : <MaisAcoes situacao={situacao} onExtra={setExtra} />}</span>
+        <span ref={acoes}>
+          {extra || editando ? null : <Button variant="ghost" size="compact" icon={<Pencil size={16} />} aria-label="Editar" onClick={() => setEditando(true)} />}
+          {extra || editando ? null : <MaisAcoes situacao={situacao} onExtra={setExtra} />}
+        </span>
         <BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />
       </>}
     >
       <div className="frota-gaveta-corpo" ref={corpo}>
-        <CabecalhoManutencao m={m} situacao={situacao} />
-        <PedidoManutencao m={m} onOpenVeiculo={onOpenVeiculo} />
-        <Bloco titulo={extra ? rotuloExtra(extra, situacao.etapa) : tituloPasso} destaque>
-          {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
-        </Bloco>
-        <HistoricoManutencao situacao={situacao} />
+        {editando ? (
+          <EditarManutencaoForm source={source} m={m} onSalvo={() => gravado('Manutenção atualizada.')} onVoltar={voltarDaEdicao} onDesatualizada={desatualizada} onEstado={aoMudarEdicao} />
+        ) : (
+          <>
+            <CabecalhoManutencao m={m} situacao={situacao} />
+            <PedidoManutencao m={m} onOpenVeiculo={onOpenVeiculo} />
+            <Bloco titulo={extra ? rotuloExtra(extra, situacao.etapa) : tituloPasso} destaque>
+              {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
+            </Bloco>
+            <HistoricoManutencao situacao={situacao} />
+          </>
+        )}
       </div>
     </Drawer>
+    <Dialog open={descartando !== null} onClose={() => setDescartando(null)} title="Descartar alterações?"
+      actions={<>
+        <Button variant="secondary" onClick={() => setDescartando(null)}>Continuar editando</Button>
+        <Button variant="danger" onClick={() => { if (descartando === 'fechar') onClose(); else sairDaEdicao() }}>Descartar</Button>
+      </>}>
+      O que você alterou ainda não foi gravado.
+    </Dialog>
+    </>
   )
 }
