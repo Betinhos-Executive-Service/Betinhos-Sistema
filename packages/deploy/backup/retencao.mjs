@@ -3,14 +3,14 @@
 // A limpeza é por quantidade, não por idade: só apaga quando há cópias mais novas além do limite. Se o backup parar de
 // rodar, nada antigo some.
 //
-//   node retencao.mjs nome                 # nome do arquivo desta execução (betinhos-prod-AAAAMMDD-HHMM.tar.enc)
+//   node retencao.mjs nome                 # nome do arquivo desta execução (betinhos-prod-AAAAMMDD-HHMM.zip)
 //   node retencao.mjs classes              # pastas desta execução, uma por linha
 //   node retencao.mjs excluir < lista.json # recebe a saída de `aws s3api list-objects-v2`; imprime as chaves a apagar
 import { pathToFileURL } from 'node:url'
 
 export const LIMITES = { diario: 7, semanal: 8, mensal: 12 }
 const FUSO = 'America/Sao_Paulo'
-const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(\d{8}-\d{4})\.tar\.enc$/
+const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(\d{8}-\d{4})\.zip$/
 
 export function partesBrasilia(data) {
   const p = Object.fromEntries(
@@ -23,7 +23,7 @@ export function partesBrasilia(data) {
 
 export function nomeArquivo(data) {
   const p = partesBrasilia(data)
-  return `betinhos-prod-${p.year}${p.month}${p.day}-${p.hour}${p.minute}.tar.enc`
+  return `betinhos-prod-${p.year}${p.month}${p.day}-${p.hour}${p.minute}.zip`
 }
 
 export function classes(data) {

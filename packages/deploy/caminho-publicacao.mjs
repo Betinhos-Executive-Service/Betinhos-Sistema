@@ -28,7 +28,7 @@ export const PLUGIN_PASTA = String.raw`Cr40f\.([A-Za-z]+)\.Plugin|Betinhos\.(Dri
 export const nomePlugin = (m) => (m[1] ?? m[2]).toLowerCase()
 const PLUGIN = new RegExp(`^packages/plugins/(?:${PLUGIN_PASTA})/`)
 
-// Não mudam nada no PROD. Os apps portal-cliente e cadastro-passageiro são Workers da Cloudflare (wrangler), fora do Dataverse.
+// Não mudam nada no PROD. Os apps portal-cliente, cadastro-passageiro e backups são Workers da Cloudflare (wrangler), fora do Dataverse.
 export const NEUTRO = [
   /^docs\//,
   /^legacy\//,
@@ -37,6 +37,7 @@ export const NEUTRO = [
   /^scripts\//,
   /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
+  /^apps\/backups\//,
   // App Motoristas: teste, documentação, skills e scripts de QA não mudam o PROD. O resto do app (build e service worker) vai pelas
   // soluções: o HTML e o service worker estão na BetinhosMotoristas.
   /^apps\/motoristas\/(tests|docs|\.claude|scripts\/qa)\//,

@@ -1,0 +1,10 @@
+BACKUP DO SISTEMA BETINHOS (PROD)
+
+planilhas\        Uma planilha por tabela (Serviços, Clientes, Passageiros...). Dois cliques abrem no Excel.
+                  Nomes de cliente, motorista e status aparecem por extenso; datas no horário de Brasília.
+dados-tecnicos\   Cópia completa para restaurar o sistema (uso da TI). Não precisa abrir.
+
+Os dados são de clientes e passageiros (LGPD): não envie por WhatsApp ou e-mail, não salve em pendrive
+e apague a cópia do computador quando terminar.
+
+Arquivos e fotos do SharePoint (comprovantes, fotos de passageiro, anexos) não estão neste backup.

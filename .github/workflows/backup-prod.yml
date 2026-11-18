@@ -5,7 +5,8 @@ name: Backup do PROD
 #   retenção da plataforma (7 dias, ou até 28 em ambiente gerenciado). Além do backup que o "Publicar soluções" faz antes
 #   de cada import. A conta de serviço já é app de administração (mesmo requisito de _importar-solucoes.yml).
 # - r2: cópia fora da Microsoft. Exporta os registros das tabelas (packages/deploy/backup/exportar-dataverse.mjs, nunca a
-#   cr40f_segredo), cifra com BACKUP_SENHA (AES-256, artefato-cifrado.sh) e envia ao Cloudflare R2; rotação por quantidade
+#   cr40f_segredo), monta um zip AES-256 com a BACKUP_SENHA (planilhas do time em CSV + dados completos, planilhas.mjs) e envia ao
+#   Cloudflare R2; o time baixa pela página apps/backups (Cloudflare Access); rotação por quantidade
 #   (7 diárias, 8 semanais, 12 mensais, retencao.mjs) para caber nos 10 GB gratuitos. Nada vai para artefato do GitHub
 #   (repositório público). Configuração e restauração: packages/deploy/backup/README.md.
 # Os dois jobs são independentes: um falhar não impede o outro.
@@ -125,20 +126,29 @@ jobs:
         # Falha em alguma tabela não impede o envio do que saiu; o job fica vermelho no fim.
         continue-on-error: true
         run: node packages/deploy/backup/exportar-dataverse.mjs "$RUNNER_TEMP/backup"
-      - name: Cifrar
+      - name: Montar o pacote (zip com senha)
         env:
-          PACOTES_SENHA: ${{ secrets.BACKUP_SENHA }}
+          BACKUP_SENHA: ${{ secrets.BACKUP_SENHA }}
         run: |
-          [ -f "$RUNNER_TEMP/backup/manifesto.json" ] || { echo "::error::A exportação não gerou manifesto; nada a enviar."; exit 1; }
+          b="$RUNNER_TEMP/backup"
+          [ -f "$b/manifesto.json" ] || { echo "::error::A exportação não gerou manifesto; nada a enviar."; exit 1; }
           nome=$(node packages/deploy/backup/retencao.mjs nome)
-          bash packages/deploy/solucoes/artefato-cifrado.sh cifrar "$RUNNER_TEMP/backup" "$RUNNER_TEMP/$nome"
-          rm -rf "$RUNNER_TEMP/backup/tabelas"
+          # Planilhas do time (um CSV por tabela) e dados completos para restaurar, num zip AES-256 com a BACKUP_SENHA
+          # (abre no 7-Zip). O zip é a única coisa que sai do runner.
+          mkdir -p "$b/pacote/dados-tecnicos"
+          # As planilhas são conveniência: se o script cair, o pacote sai só com os dados completos.
+          node packages/deploy/backup/planilhas.mjs "$b" "$b/pacote/planilhas" || echo "::warning::As planilhas falharam; o pacote vai só com os dados completos."
+          mv "$b/tabelas" "$b/manifesto.json" "$b/pacote/dados-tecnicos/"
+          cp packages/deploy/backup/LEIA-ME.txt "$b/pacote/"
+          command -v 7z >/dev/null || sudo apt-get install -y -qq p7zip-full >/dev/null
+          (cd "$b/pacote" && 7z a -bso0 -bsp0 -tzip -mem=AES256 -mx=7 "-p$BACKUP_SENHA" "$RUNNER_TEMP/$nome" .)
+          rm -rf "$b/pacote/planilhas" "$b/pacote/dados-tecnicos/tabelas"
           echo "NOME=$nome" >> "$GITHUB_ENV"
           tamanho=$(du -h "$RUNNER_TEMP/$nome" | cut -f1)
           {
             echo "## Backup externo (R2): $nome"
-            echo "Tamanho cifrado: $tamanho"
-            node -e 'const m=require(process.argv[1]);console.log(`${m.tabelas.length} tabelas, ${m.totalRegistros} registros, ${m.falhas.length} falhas`);for(const f of m.falhas)console.log(`- falhou: ${f.tabela}`)' "$RUNNER_TEMP/backup/manifesto.json"
+            echo "Tamanho do zip: $tamanho"
+            node -e 'const m=require(process.argv[1]);console.log(`${m.tabelas.length} tabelas, ${m.totalRegistros} registros, ${m.falhas.length} falhas`);for(const f of m.falhas)console.log(`- falhou: ${f.tabela}`)' "$b/pacote/dados-tecnicos/manifesto.json"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Enviar ao R2
         run: |

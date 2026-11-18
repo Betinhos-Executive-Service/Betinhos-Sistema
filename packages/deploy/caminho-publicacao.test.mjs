@@ -111,6 +111,7 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'packages/deploy/backup/exportar-dataverse.mjs',
     '.github/workflows/backup-prod.yml',
     'apps/portal-cliente/src/x.ts',
+    'apps/backups/src/worker.mjs',
     '',
   ])
   assert.equal(r.caminho, 'nada')

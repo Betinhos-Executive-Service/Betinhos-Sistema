@@ -1,0 +1,16 @@
+{
+  "name": "@betinhos/backups",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Página dos backups do PROD para o time (Cloudflare Worker + R2, login pelo Cloudflare Access)",
+  "scripts": {
+    "dev": "wrangler dev --port 52431 --var DEV_SEM_LOGIN:1",
+    "push": "node scripts/bump-version.mjs && wrangler deploy",
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "node --check src/worker.mjs && node --check src/acesso.mjs && node --check src/pagina.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  }
+}
