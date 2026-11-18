@@ -120,9 +120,13 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
   /** Depois que o servidor registra o aditivo: relê a ficha (selo e data) sem perder o rascunho da aba Dados e avisa quem pediu o aditivo. */
   async function recarregarAposAditivo() {
     if (!original) return
-    const fresh = await source.get(original.id)
-    setOriginal(fresh)
-    notify('success', 'Aditivo registrado.')
+    try {
+      const fresh = await source.get(original.id)
+      setOriginal(fresh)
+      notify('success', 'Aditivo registrado.')
+    } catch {
+      notify('success', 'Aditivo registrado. Recarregue a ficha para ver a data.')
+    }
     onAditivoSalvo?.()
   }
 

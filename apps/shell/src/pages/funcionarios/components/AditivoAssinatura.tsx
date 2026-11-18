@@ -31,6 +31,7 @@ export function AditivoAssinatura({ id, atual, assinadoEm, source, onRegistrado,
   const [data, setData] = useState(hoje ?? todaySP())
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
   const limite = hoje ?? todaySP()
   const futura = data > limite
   const ocupado = Boolean(disabled) || gerando || enviando
@@ -46,7 +47,7 @@ export function AditivoAssinatura({ id, atual, assinadoEm, source, onRegistrado,
 
   async function gerar() {
     if (!id) return
-    setGerando(true); setErro(null)
+    setGerando(true); setErro(null); setAviso(null)
     try {
       const { pdfBase64, nomeArquivo } = await source.gerarAditivo(id)
       const url = URL.createObjectURL(base64ToBlob(pdfBase64, 'application/pdf'))
@@ -64,23 +65,28 @@ export function AditivoAssinatura({ id, atual, assinadoEm, source, onRegistrado,
     setEnviando(true); setErro(null)
     try {
       await source.registrarAditivo(id, await fileToBase64(arquivo), data)
-      fechar()
-      await onRegistrado()
     } catch (reason) {
       // A recusa do servidor aparece sem alteração.
       setErro(reason instanceof Error ? reason.message : 'Não foi possível registrar o aditivo.')
-    } finally { setEnviando(false) }
+      setEnviando(false)
+      return
+    }
+    // O registro deu certo: falha só na releitura não pode parecer falha do registro.
+    fechar()
+    try { await onRegistrado() } catch { setAviso('Aditivo registrado. Recarregue a ficha para ver a data.') }
+    setEnviando(false)
   }
 
   return (
     <div className="aditivo field--wide">
       <p className="hint">Sem o aditivo, o motorista não assina termos pelo app.</p>
       {!id && <p className="hint">Salve o colaborador para gerar o aditivo.</p>}
-      {atual && assinadoEm && (
+      {aviso && <p className="hint" role="status">{aviso}</p>}
+      {atual && (
         <div className="cluster">
-          <span className="aditivo-pendente">Assinado em {formatBR(assinadoEm)}</span>
+          <span className="aditivo-pendente">{assinadoEm ? `Assinado em ${formatBR(assinadoEm)}` : 'Aditivo anexado'}</span>
           <a className="aditivo-link" href={atual.url} target="_blank" rel="noopener noreferrer" title={atual.nome}><Download size={16} aria-hidden /> Baixar</a>
-          <a className="aditivo-link" href={VALIDADOR} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden /> Conferir no validar.iti.gov.br</a>
+          {assinadoEm && <a className="aditivo-link" href={VALIDADOR} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden /> Conferir no validar.iti.gov.br</a>}
         </div>
       )}
       <div className="cluster">

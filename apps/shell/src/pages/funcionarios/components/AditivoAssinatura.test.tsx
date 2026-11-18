@@ -111,4 +111,21 @@ describe('AditivoAssinatura', () => {
     expect((screen.getByRole('button', { name: 'Gerar aditivo' }) as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByRole('button', { name: 'Anexar assinado' }) as HTMLButtonElement).disabled).toBe(true)
   })
+
+  it('registro aceito e releitura falhando não mostra erro de registro', async () => {
+    const onRegistrado = vi.fn(async () => { throw new Error('rede') })
+    const { registrarAditivo } = montar({ onRegistrado })
+    anexar()
+    escolher(pdf())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar aditivo' })) })
+    await waitFor(() => expect(registrarAditivo).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('Aditivo registrado. Recarregue a ficha para ver a data.')).toBeTruthy()
+    expect(screen.queryByText(/Não foi possível registrar/)).toBeNull()
+  })
+
+  it('aditivo legado sem data mostra "Aditivo anexado" e Baixar', () => {
+    montar({ atual: { nome: 'aditivo.pdf', url: 'https://x/y/$value' }, assinadoEm: null })
+    expect(screen.getByText('Aditivo anexado')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Baixar/ })).toBeTruthy()
+  })
 })
