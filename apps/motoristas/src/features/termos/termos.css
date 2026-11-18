@@ -130,3 +130,23 @@
   .termo-tabpanel { animation:termo-fade 160ms ease-out backwards; }
 }
 .termo-flow-scroll:focus-visible { outline:0; box-shadow:inset 0 0 0 2px rgba(33,89,210,.25); }
+
+/* Tela Multas: três grupos. O destaque de "Precisa de você" vem do título e do fundo do cartão, sem borda lateral colorida. */
+.multa-grupos { display:grid; gap:20px; }
+.multa-grupo { display:grid; gap:8px; }
+.multa-grupo-titulo { display:flex; align-items:center; gap:8px; margin:0; color:#001a3d; font-size:1rem; font-weight:800; }
+.multa-grupo[data-destaque] .multa-grupo-titulo { color:#856000; }
+.multa-grupo-toggle { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0; border:0; background:none; color:inherit; font:inherit; cursor:pointer; }
+.multa-grupo-toggle::after { content:"▾"; color:#64748b; transition:transform 160ms cubic-bezier(.23,1,.32,1); }
+.multa-grupo-toggle[aria-expanded="true"]::after { transform:rotate(180deg); }
+.multa-grupo-toggle:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); border-radius:6px; }
+.multa-card { display:grid; gap:8px; padding:12px 14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; }
+.multa-grupo[data-destaque] .multa-card { background:#fff7df; border-color:#f3dfa0; }
+.multa-card-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.multa-card-head strong { font-size:1rem; font-weight:800; letter-spacing:.02em; }
+.multa-card-head small { color:#64748b; font-size:.75rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.multa-card-local { color:#475569; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
+.multa-card .termo-badge { justify-self:start; }
+.multa-parcelas { display:grid; gap:2px; margin:0; padding:0; list-style:none; color:#475569; font-size:.82rem; font-variant-numeric:tabular-nums; }
+.multa-aceite { display:grid; gap:8px; }
+@media (prefers-reduced-motion:reduce) { .multa-grupo-toggle::after { transition:none; } }

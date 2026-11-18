@@ -13,7 +13,12 @@ export function customApiErrorMessage(error: unknown, fallback: string) {
   return message || fallback;
 }
 
-export async function executeCustomApi(operationName: string, parameters: CustomApiParameters): Promise<Record<string, unknown>> {
+export type CustomApiOptions = {
+  /** Custom API do tipo Function (GET), como new_MinhasMultas; o padrão é Action (POST). */
+  funcao?: boolean;
+};
+
+export async function executeCustomApi(operationName: string, parameters: CustomApiParameters, options: CustomApiOptions = {}): Promise<Record<string, unknown>> {
   // Host do Dataverse (URL direta ou model-driven): Action não vinculada por fetch com o cookie da sessão.
   let online: NonNullable<NonNullable<XrmApi["WebApi"]>["online"]> | undefined =
     canFetchOnDataverseHost() ? createFetchWebApi(window.location.origin, {}).online : undefined;
@@ -35,7 +40,7 @@ export async function executeCustomApi(operationName: string, parameters: Custom
   try {
     response = await execute({
       ...parameters,
-      getMetadata: () => ({ boundParameter: null, operationType: 0, operationName, parameterTypes })
+      getMetadata: () => ({ boundParameter: null, operationType: options.funcao ? 1 : 0, operationName, parameterTypes })
     });
   } catch (error) {
     // Xrm e o WebApi por fetch rejeitam com { message } já vindo do servidor.

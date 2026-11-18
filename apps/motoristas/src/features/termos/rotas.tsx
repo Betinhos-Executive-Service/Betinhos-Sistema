@@ -1,6 +1,7 @@
+import type { MinhaMulta, CargaStatus } from "./minhasMultas";
+import { declararAceite } from "./minhasMultas";
+import { MinhasMultasScreen } from "./MinhasMultasScreen";
 import type { TermoMulta } from "./termosMulta";
-import type { TermosLoadStatus } from "./TermosMultaScreen";
-import { TermosMultaScreen } from "./TermosMultaScreen";
 import type { Screen } from "../../types";
 import type { ReactNode } from "react";
 
@@ -9,20 +10,24 @@ type Props = {
   setScreen: React.Dispatch<React.SetStateAction<Screen>>;
   setTourTermoId: (id: string) => void;
   termosMulta: TermoMulta[];
-  termosStatus: TermosLoadStatus;
+  termosStatus: CargaStatus;
+  minhasMultas: MinhaMulta[];
+  minhasMultasOfflineEm: string | null;
 };
 
-// Tela de termos de multa.
+// Tela Multas: o que precisa do motorista, o que está em andamento e as encerradas.
 export function rotasTermos(screen: Screen, {
   reloadTermosMulta,
   setScreen,
   setTourTermoId,
   termosMulta,
-  termosStatus
+  termosStatus,
+  minhasMultas,
+  minhasMultasOfflineEm
 }: Props): ReactNode | null {
   if (screen === "multas") {
     return (
-      <TermosMultaScreen items={termosMulta} loadStatus={termosStatus} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onSelectedChange={setTourTermoId} />
+      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} />
     );
   }
   return null;
