@@ -12,6 +12,12 @@ export const GENERAL_DRAWER = { target: 2, position: 2, width: { value: 75, unit
 const guid = (id: string) => id.replace(/[{}]/g, '')
 
 /**
+ * Mapa central do lookup clicável (DS §10.9.7): vale link quando a tabela tem gaveta no shell ou quando há o que abrir no
+ * Dataverse (Formulário Geral, formulário nativo); fora do Dataverse e sem gaveta, a célula fica só com o texto.
+ */
+export const podeAbrirRegistro = (table: string) => temGaveta(table) || Boolean(getXrmHost())
+
+/**
  * Abre um registro relacionado (lookup, ID) a partir de uma lista (Composição, Geral). Tabela com tela no shell: abre a
  * gaveta dessa tela por cima da lista, sem trocar de rota (`GavetaRegistro`). Senão, dentro do model-driven, painel
  * lateral com `navigateTo` (o Geral no Formulário Geral, o resto no formulário nativo); sem `navigateTo`, `openForm`;

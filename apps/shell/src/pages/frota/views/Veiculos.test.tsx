@@ -63,10 +63,10 @@ describe('Veiculos', () => {
     expect(screen.queryByText(/0,00/)).toBeNull()
   })
 
-  it('abre a ficha ao clicar na linha', () => {
+  it('abre a ficha ao dar duplo clique na linha', () => {
     const onOpenVeiculo = vi.fn()
     render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={onOpenVeiculo} onReload={() => {}} />)
-    fireEvent.click(screen.getByText('TST1A11'))
+    fireEvent.doubleClick(screen.getByText('TST1A11'))
     expect(onOpenVeiculo).toHaveBeenCalledWith('v1')
   })
 })

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { AppShell } from './app/AppShell'
 import { AuditoriaProvider } from './app/auditoria/AuditoriaProvider'
 import { GavetaRegistro } from './app/GavetaRegistro'
+import { RegistrosAbriveis } from './app/RegistrosAbriveis'
 import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
 import { usePrefetchOnIntent } from './app/routes'
@@ -55,10 +56,12 @@ export function App() {
 
   return (
     <AuditoriaProvider host={host}>
-      <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
-        <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
-      </AppShell>
-      <GavetaRegistro host={host} />
+      <RegistrosAbriveis>
+        <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
+          <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
+        </AppShell>
+        <GavetaRegistro host={host} />
+      </RegistrosAbriveis>
     </AuditoriaProvider>
   )
 }

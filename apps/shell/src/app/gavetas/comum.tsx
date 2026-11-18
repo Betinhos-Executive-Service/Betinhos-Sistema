@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, Drawer } from '@betinhos/ui'
 import type { Host } from '../../host'
+import { createFrotaSource } from '../../pages/frota/data/hostSource'
+import type { DataSource } from '../../pages/frota/data/source'
 import { CarregandoRegistro } from '../BrandLoader'
 
 /** O que todo adaptador recebe do hospedeiro: o registro (tabela já escolhida) e o fechar. */
@@ -41,6 +43,19 @@ export function ComCarga<T>({ carga, rotulo, onClose, children }: { carga: Retur
   return (
     <Drawer open eyebrow={rotulo} title="Não foi possível abrir" onClose={onClose}>
       <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`} action={<Button variant="secondary" onClick={tentarDeNovo}>Tentar de novo</Button>}>{estado.erro}</Alert>
+    </Drawer>
+  )
+}
+
+/** Fonte da Frota no `host` (a mesma da tela Frota); se não der para criá-la, a gaveta mostra o erro. */
+export function ComFonteFrota({ host, rotulo, onClose, children }: { host: Host; rotulo: string; onClose: () => void; children: (source: DataSource) => ReactNode }) {
+  const fonte = useMemo(() => {
+    try { return { source: createFrotaSource(host), erro: null } } catch (reason) { return { source: null, erro: mensagem(reason) } }
+  }, [host])
+  if (fonte.source) return <>{children(fonte.source)}</>
+  return (
+    <Drawer open eyebrow={rotulo} title="Não foi possível abrir" onClose={onClose}>
+      <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`}>{fonte.erro}</Alert>
     </Drawer>
   )
 }

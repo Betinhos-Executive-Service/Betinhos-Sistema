@@ -1,11 +1,9 @@
 /* Tela Frota no shell: só composição local; cores, tipos, raios e sombras vêm dos tokens do Design System. */
-.frota { min-width: 0; }
-.frota .bt-tabs__panel { padding-top: var(--bt-space-4); }
 .frota-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .frota-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .frota-nowrap { white-space: nowrap; }
 .frota-cluster { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; }
-.frota-stack, .frota-lista, .frota-indicadores, .frota-pend { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.frota-stack, .frota-indicadores, .frota-pend { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .frota-filter { min-width: 160px; }
 .frota-data { width: 150px; }
 .frota-link { padding: 0; border: 0; background: none; font: inherit; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-action); text-align: left; cursor: pointer; }
@@ -115,7 +113,6 @@
 /* Só nas abas com cabeçalho próprio; as listas ficam com o topo das outras listas, para a linha de comando cair na mesma altura. */
 .frota-page:not(.page--full) { padding-top: var(--bt-space-3); }
 .frota-page .page__header { margin-bottom: var(--bt-space-1); }
-.frota-page .frota .bt-tabs__panel { padding-top: var(--bt-space-3); }
 .frota-page .bt-page-header__row { min-height: 0; }
 .frota-page .bt-page-header__title { font-size: clamp(22px, 2.4vw, 28px); }
 .frota-page .bt-metric { min-height: 0; padding: var(--bt-space-2-5) var(--bt-space-3); gap: var(--bt-space-2-5); box-shadow: none; }

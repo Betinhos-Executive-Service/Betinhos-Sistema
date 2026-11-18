@@ -1,9 +1,10 @@
 import { useMemo, type ReactNode } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { Button, EmptyState, SearchBox, StatusBadge, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, LookupCell, SearchBox, StatusBadge, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
+import { useRowSelection } from '../../../app/Selecao'
 import { VirtualTable } from '../../../app/VirtualTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
@@ -48,12 +49,17 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
     const periodo = ultimos12Meses(today)
     const pendencias = buildPendencias(data, today)
     const abertas = possesAbertas(data.posses)
-    return data.veiculos.map((veiculo) => ({
-      veiculo,
-      motorista: rotuloMotoristaAtual(motoristaAtual(veiculo, abertas)),
-      pendencias: pendencias.filter((item) => item.veiculo?.id === veiculo.id).length,
-      custo: custoVeiculo(data.manutencoes, veiculo.id, periodo),
-    }))
+    return data.veiculos.map((veiculo) => {
+      const atual = motoristaAtual(veiculo, abertas)
+      return {
+        id: veiculo.id,
+        veiculo,
+        motorista: rotuloMotoristaAtual(atual),
+        motoristaId: atual.tipo === 'motorista' ? atual.motorista.id : undefined,
+        pendencias: pendencias.filter((item) => item.veiculo?.id === veiculo.id).length,
+        custo: custoVeiculo(data.manutencoes, veiculo.id, periodo),
+      }
+    })
   }, [data, today])
 
   const read = useMemo(() => extra.read(readVeiculo, byVeiculo), [extra])
@@ -65,12 +71,14 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
   const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visiveis, lazyKey)
   const groups = useRowGroups(visiveis, view.config.group, allFields, read)
+  const sel = useRowSelection(visiveis)
 
   const footer = <span className="frota-muted">{visiveis.length} de {linhas.length}</span>
   const table = (rows: LinhaVeiculo[], tableFooter?: ReactNode) => (
     <VirtualTable<LinhaVeiculo>
       rows={rows}
-      rowKey={(linha) => linha.veiculo.id}
+      rowKey={(linha) => linha.id}
+      selection={sel.selection}
       onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
       view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }}
       quickFilters={quickFilters}
@@ -81,7 +89,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
         { key: 'placa', header: 'Placa', label: 'Placa', sortable: true, defaultWidth: 200, width: 'minmax(150px, 1.2fr)', cell: ({ veiculo }) => <TableTitle title={veiculo.placa || 'Sem placa'} meta={[veiculo.marca, veiculo.modelo].filter(Boolean).join(' ') || undefined} /> },
         { key: 'categoria', header: 'Categoria', label: 'Categoria', sortable: true, defaultWidth: 130, hideBelow: 'compact', cell: ({ veiculo }) => label(CATEGORIA, veiculo.categoria) },
         { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 130, width: 'minmax(96px, .7fr)', cell: ({ veiculo }) => <StatusBadge tone={veiculo.status === VEICULO.ATIVO ? 'success' : veiculo.status === null ? 'warning' : 'neutral'}>{label(VEICULO_STATUS, veiculo.status, 'Sem status')}</StatusBadge> },
-        { key: 'motorista', header: 'Motorista atual', label: 'Motorista atual', sortable: true, defaultWidth: 200, hideBelow: 'mobile', cell: ({ motorista }) => motorista || '—' },
+        { key: 'motorista', header: 'Motorista atual', label: 'Motorista atual', sortable: true, defaultWidth: 200, hideBelow: 'mobile', cell: ({ motorista, motoristaId }) => <LookupCell table="cr40f_funcionarios" id={motoristaId}>{motorista}</LookupCell> },
         { key: 'pendencias', header: 'Pendências', label: 'Pendências', sortable: true, defaultWidth: 120, width: 'minmax(90px, .6fr)', cell: ({ pendencias }) => (pendencias > 0 ? <StatusBadge tone="danger">{pendencias}</StatusBadge> : '—') },
         { key: 'custo', header: 'Manutenção (12 meses)', label: 'Manutenção (12 meses)', sortable: true, defaultWidth: 190, hideBelow: 'compact', cell: ({ custo }) => (
           <span className="frota-nowrap">
@@ -94,9 +102,9 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
   )
 
   return (
-    <div className="frota-lista">
-      <div role="toolbar" aria-label="Comandos de veículos">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+    <>
+      <div role="toolbar" aria-label="Comandos de veículos" {...sel.bar}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
           search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={busca} onChange={setBusca} />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>
@@ -108,6 +116,6 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
           <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
         </>
       )}
-    </div>
+    </>
   )
 }

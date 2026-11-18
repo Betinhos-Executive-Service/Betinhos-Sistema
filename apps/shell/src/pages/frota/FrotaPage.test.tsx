@@ -42,7 +42,7 @@ describe('Frota', () => {
     await act(async () => {
       resolver({ data: { ...EMPTY_DATA, veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: null, motorista: null, hodometro: null, hodometroEm: null }] }, errors: {} })
     })
-    fireEvent.click(await screen.findByText('TST1A11'))
+    fireEvent.doubleClick(await screen.findByText('TST1A11'))
     expect(await screen.findByRole('dialog', { name: 'TST1A11' })).toBeTruthy()
   })
 
@@ -59,19 +59,17 @@ describe('Frota', () => {
     renderFrota(source, 'veiculos')
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull() // lista: sem PageHeader (DS §11.2)
     expect(screen.queryByRole('tablist')).toBeNull()
-    fireEvent.click(await screen.findByText('TST1A11'))
+    fireEvent.doubleClick(await screen.findByText('TST1A11'))
     expect(await screen.findByRole('dialog', { name: 'TST1A11' })).toBeTruthy()
     expect(location.hash).toBe('#/frota-veiculos?q=TST&ficha=v1')
   })
 
-  it('Multas tem a aba Infrações; Colisões fica separada', async () => {
+  it('Multas e Colisões são itens separados, sem barra de abas', async () => {
     const source = fakeSource('mock', 'MOCK')
     history.replaceState(null, '', '#/frota-multas?q=abc')
     renderFrota(source, 'multas')
-    expect(screen.getByRole('tab', { name: 'Multas' }).getAttribute('aria-selected')).toBe('true')
-    fireEvent.click(screen.getByRole('tab', { name: 'Infrações' }))
-    expect(location.hash).toBe('#/frota-multas?sub=infracoes')
-    expect(await screen.findByRole('button', { name: 'Nova infração' }, { timeout: 15_000 })).toBeTruthy()
+    expect(screen.queryByRole('tablist')).toBeNull()
+    await waitFor(() => expect(viewTrigger()).toBeTruthy())
     cleanup()
     renderFrota(source, 'colisoes')
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull() // lista: sem PageHeader (DS §11.2)
@@ -112,7 +110,7 @@ describe('Frota', () => {
   it('Manutenções é só a tabela, sem sub-abas: barra de visões e a linha abre a gaveta única', async () => {
     history.replaceState(null, '', '#/frota-manutencoes')
     renderFrota(createMockSource(), 'manutencoes')
-    fireEvent.click(await screen.findByText('Freio com ruído (fictício)', {}, { timeout: 8000 }))
+    fireEvent.doubleClick(await screen.findByText('Freio com ruído (fictício)', {}, { timeout: 8000 }))
     expect(screen.queryByRole('tablist', { name: 'Manutenções' })).toBeNull()
     expect(screen.queryByRole('tab', { name: /A encaixar|Todas/ })).toBeNull()
     expect(viewTrigger().textContent).toContain('Manutenções') // a padrão (todas as manutenções) tem o nome da tela
