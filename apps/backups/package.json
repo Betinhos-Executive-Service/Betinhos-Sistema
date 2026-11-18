@@ -1,6 +1,6 @@
 {
   "name": "@betinhos/backups",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "description": "Página dos backups do PROD para o time (Cloudflare Worker + R2, login pelo Cloudflare Access)",
