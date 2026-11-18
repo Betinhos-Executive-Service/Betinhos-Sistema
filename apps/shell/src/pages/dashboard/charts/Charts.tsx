@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { cor, type CorToken } from './tokens'
+import { cor, useAparenciaDosGraficos, type CorToken } from './tokens'
 
 /** Cores de série com classe de legenda correspondente no CSS. */
 export type CorSerie = Extract<CorToken, 'action' | 'brand' | 'secondary'>
@@ -11,7 +11,7 @@ type Base = { dados: Ponto[]; formatar: (v: number) => string; descricao: string
 const texto = () => ({ fill: cor('secondary'), fontSize: 11 })
 const eixoX = () => ({ dataKey: 'rotulo', tick: texto(), stroke: cor('border'), tickLine: false, tickMargin: 8, minTickGap: 8 })
 const eixoY = (formatar: (v: number) => string, largura: number) => ({ tick: texto(), axisLine: false, tickLine: false, width: largura, tickFormatter: (v: unknown) => formatar(Number(v)) })
-/** Dica no padrão de popover do DS: superfície branca, borda, raio 10 e sombra de popover. */
+/** Dica no padrão de popover do DS: superfície, borda, raio 10 e sombra de popover. */
 const dica = (formatar: (v: number) => string) => ({
   formatter: (v: unknown) => (v == null ? '—' : formatar(Number(v))),
   contentStyle: { backgroundColor: 'var(--bt-color-surface)', border: '1px solid var(--bt-color-border)', borderRadius: 'var(--bt-radius-md)', boxShadow: 'var(--bt-shadow-popover)', fontSize: 12, padding: '8px 10px' },
@@ -32,6 +32,7 @@ export function Legenda({ series }: { series: Serie[] }) {
 
 /** Linhas com grade horizontal, tooltip e legenda; sem animação (recarga a cada 60 s). Ocupa a altura que o card der, com mínimo de 240 px. */
 export function LinhaChart({ dados, series, formatar, descricao, larguraEixo = 64 }: Base & { series: Serie[] }) {
+  useAparenciaDosGraficos()
   const poucos = dados.length <= 2
   return (
     <div className="dash-grafico">
@@ -60,6 +61,7 @@ export function LinhaChart({ dados, series, formatar, descricao, larguraEixo = 6
 }
 
 export function BarraChart({ dados, formatar, descricao, nome, larguraEixo = 64 }: Base & { nome: string }) {
+  useAparenciaDosGraficos()
   return (
     <div className="dash-grafico">
       <figure className="dash-chart" role="img" aria-label={descricao}>
@@ -99,6 +101,7 @@ const preenchimento = (prefixo: string, s: SerieBarra) => (s.padrao && s.padrao 
 
 /** Legenda das barras: amostra quadrada com o mesmo padrão da série e o nome. */
 export function LegendaBarras({ series }: { series: SerieBarra[] }) {
+  useAparenciaDosGraficos()
   const prefixo = `dash-leg-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
   return (
     <ul className="dash-legenda">
@@ -119,6 +122,7 @@ type BarrasProps = { dados: Ponto[]; series: SerieBarra[]; formatar: (v: number)
 
 /** Barras agrupadas ou empilhadas com legenda; cada série tem cor e padrão próprios. Sem animação (recarga a cada 60 s). */
 export function BarrasChart({ dados, series, formatar, descricao, empilhado = false, larguraEixo = 48, dominioMax }: BarrasProps) {
+  useAparenciaDosGraficos()
   const prefixo = `dash-pad-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
   return (
     <div className="dash-grafico">
