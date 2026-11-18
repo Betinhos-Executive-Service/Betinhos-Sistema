@@ -116,7 +116,7 @@
                         },
                         "parameters": {
                           "body/payload/tag": "new_termomulta-@{triggerOutputs()?['body/new_termomultaid']}",
-                          "body/payload/body": "@{if(empty(triggerOutputs()?['body/new_ultimolembreteem']), 'Multa para assinar', if(empty(triggerOutputs()?['body/new_enviadoem']), 'Lembrete: multa para assinar', concat('Lembrete: multa para assinar até ', formatDateTime(convertFromUtc(addDays(triggerOutputs()?['body/new_enviadoem'], 7), 'E. South America Standard Time'), 'dd/MM'))))}\nToque para ver o termo e assinar.",
+                          "body/payload/body": "Você tem uma multa para resolver no app\nToque para abrir.",
                           "body/payload/title": "App Motoristas",
                           "body/subscriptions": "@body('Select_subs_Send_push')",
                           "body/payload/url": "/WebResources/new_app-motoristas-v2?termoMultaId=@{triggerOutputs()?['body/new_termomultaid']}"
@@ -256,7 +256,7 @@
                 },
                 "parameters": {
                   "payload/dynamicParams/entityLogicalName": "new_termomulta",
-                  "payload/message": "@{if(empty(triggerOutputs()?['body/new_ultimolembreteem']), 'Multa para assinar', if(empty(triggerOutputs()?['body/new_enviadoem']), 'Lembrete: multa para assinar', concat('Lembrete: multa para assinar até ', formatDateTime(convertFromUtc(addDays(triggerOutputs()?['body/new_enviadoem'], 7), 'E. South America Standard Time'), 'dd/MM'))))}\nToque para ver o termo e assinar.",
+                  "payload/message": "Você tem uma multa para resolver no app\nToque para abrir.",
                   "payload/playerType": "PowerApps",
                   "payload/app": "{\"type\":\"AppModule\",\"displayName\":\"App Motoristas v2\",\"appIdentifier\":\"new_AppMotoristasv2\"}",
                   "payload/dynamicParams/recordId": "@triggerOutputs()?['body/new_termomultaid']",

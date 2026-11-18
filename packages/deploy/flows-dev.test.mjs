@@ -69,6 +69,9 @@ test('mudança no script ou no JSON publica só aquele flow', () => {
 
 test('flows do App Motoristas: o JSON publica o próprio flow e as funções comuns publicam todos que as usam', () => {
   assert.deepEqual(nomes(['packages/deploy/flows/termo-multa-push.json']), ['termo-multa'])
+  assert.deepEqual(nomes(['packages/deploy/flows/multa-aceite-push.json']), ['multa-aceite-push'])
+  assert.deepEqual(nomes(['packages/deploy/provision-flow-multa-aceite-push.ps1']), ['multa-aceite-push'])
+  assert.equal(descrever(['multa-aceite-push'])[0].apply, true)
   assert.deepEqual(nomes(['packages/deploy/flows/comunicados-push.json']), ['comunicados-push'])
   assert.deepEqual(nomes(['packages/deploy/flows/treinamentos-push.json']), ['treinamentos-push'])
   assert.deepEqual(nomes(['packages/deploy/flows/checklist-push.json', 'packages/deploy/flows/checklists-rotina-diaria.json']), ['checklists'])
@@ -77,14 +80,14 @@ test('flows do App Motoristas: o JSON publica o próprio flow e as funções com
     assert.deepEqual(nomes([`packages/deploy/provision-flow-${n}.ps1`]), [n])
   }
   assert.deepEqual(nomes(['packages/deploy/flows/sincronizar-flow.ps1']).sort(), [
-    'carro-atual', 'checklist-planner', 'checklists', 'cobranca-qr-webhook', 'combustivel-insights', 'comunicados-push', 'termo-multa', 'treinamentos-push',
+    'carro-atual', 'checklist-planner', 'checklists', 'cobranca-qr-webhook', 'combustivel-insights', 'comunicados-push', 'multa-aceite-push', 'termo-multa', 'treinamentos-push',
   ])
   for (const n of ['carro-atual', 'checklist-planner', 'checklists', 'cobranca-qr-webhook', 'combustivel-insights', 'comunicados-push', 'treinamentos-push']) assert.equal(descrever([n])[0].apply, true, n)
   assert.ok(descrever(['termo-multa'])[0].flows.includes('Termo de multa | Push ao motorista'))
 })
 
 test('JSON exportado do DEV não leva assinatura dos gatilhos, connection references nem URL assinada (vêm do flow existente)', () => {
-  for (const f of ['termo-multa-push', 'comunicados-push', 'treinamentos-push', 'checklists-rotina-diaria', 'checklist-push', 'carro-atual', 'checklist-planner', 'cobranca-qr-webhook', 'combustivel-insights']) {
+  for (const f of ['termo-multa-push', 'multa-aceite-push', 'comunicados-push', 'treinamentos-push', 'checklists-rotina-diaria', 'checklist-push', 'carro-atual', 'checklist-planner', 'cobranca-qr-webhook', 'combustivel-insights']) {
     const texto = readFileSync(join(aqui, 'flows', `${f}.json`), 'utf8')
     const definicao = JSON.parse(texto)
     assert.ok(definicao.triggers && definicao.actions, f)

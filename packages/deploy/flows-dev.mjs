@@ -95,6 +95,10 @@ export const ENTRADAS = [
     arquivos: [script('lembrete-pagamento'), flowsDir('lembrete-pagamento\\.ps1')],
   },
   {
+    nome: 'multa-aceite-push', script: 'provision-flow-multa-aceite-push.ps1', flows: ['Multa | Push do aceite'], apply: true,
+    arquivos: [script('multa-aceite-push'), flowsDir('multa-aceite-push\\.json', SINCRONIZAR)],
+  },
+  {
     nome: 'multas-do-dia', script: 'provision-flow-multas-do-dia.ps1', flows: ['Multas | Multas de hoje'], args: [['Remetente', 'FLOW_FROTA_REMETENTE']],
     arquivos: [script('multas-do-dia'), flowsDir('multas-do-dia\\.json')],
   },

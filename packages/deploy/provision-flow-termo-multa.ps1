@@ -8,11 +8,10 @@
 #   "Termo de multa | Cópia ao motorista" (LIGADO): quando new_termomulta fica Assinado com PDF e sem cópia enviada,
 #     baixa new_pdf, envia por e-mail ao motorista (cr40f_emailmicrosoft, senão cr40f_emailbetinhos) com o hash no corpo
 #     e grava new_copiaenviadaem/new_copiacanal. Se o e-mail falhar, o termo não muda.
-#   "Termo de multa | Expirar pendentes" (DESLIGADO): diário 07:00 (America/Sao_Paulo), termos Pendente com
-#     new_enviadoem há mais de 7 dias → Custom API new_ExpirarTermoMulta (new_TermoId). A Custom API vem da Task B2
-#     (repo dos plugins); o flow fica em rascunho até ela existir no DEV. Ligue depois pelo Power Automate.
-#   "Termo de multa | Lembrete diário" (ligado só se a Custom API new_LembrarTermoMulta existir): 07:00, termos Pendente
-#     com new_enviadoem até o fim do dia D-3 (calendário de São Paulo) e new_ultimolembreteem vazio → new_LembrarTermoMulta (new_TermoId).
+#   "Termo de multa | Expirar pendentes" (ligado quando a Custom API existe): diário 07:00 (America/Sao_Paulo), todos os termos Pendente →
+#     Custom API new_ExpirarTermoMulta (new_TermoId); ela decide (7 dias do envio ou D-3 do prazo de indicação) e devolve new_Expirou.
+#   "Termo de multa | Lembrete diário" (ligado quando new_LembrarTermoMulta existe): 07:00, todos os termos Pendente → new_LembrarTermoMulta
+#     (new_TermoId, new_Automatico = true); ela decide quem recebe e grava new_ultimolembreteem, que dispara o push (new_Lembrou).
 #   "Termo de multa | Aviso ao gestor" (LIGADO): quando new_status vira Assinado ou Contestado, e-mail a quem enviou o termo (new_enviadopor)
 #     com placa, motorista, desfecho, data e link da multa no Sistema Betinhos. Brief v2: docs/superpowers/specs/2026-10-23-termo-multa-ux-v2-brief.md.
 # Spec: docs/superpowers/specs/2026-10-22-termo-multa-assinatura-design.md. Sem -Apply roda em DRY RUN.
@@ -210,7 +209,7 @@ $expirar = @'
       "type": "OpenApiConnection", "runAfter": {},
       "inputs": {
         "host": { "apiId": "__DV__", "connectionName": "shared_commondataserviceforapps", "operationId": "ListRecords" },
-        "parameters": { "entityName": "__SET_TERMO__", "$select": "new_termomultaid", "$filter": "new_status eq 100000000 and new_enviadoem lt @{convertToUtc(addDays(startOfDay(convertFromUtc(utcNow(), 'E. South America Standard Time')), -7), 'E. South America Standard Time')}" },
+        "parameters": { "entityName": "__SET_TERMO__", "$select": "new_termomultaid", "$filter": "new_status eq 100000000" },
         "authentication": "@parameters('$authentication')"
       },
       "runtimeConfiguration": { "paginationPolicy": { "minimumItemCount": 5000 } }
@@ -233,8 +232,10 @@ $expirar = @'
 }
 '@
 
-$lembrar = $expirar.Replace('Pendentes_vencidos', 'Pendentes_sem_lembrete').Replace('Expirar_cada', 'Lembrar_cada').Replace('"Expirar"', '"Lembrar"').Replace('new_ExpirarTermoMulta', 'new_LembrarTermoMulta').Replace("new_enviadoem lt @{convertToUtc(addDays(startOfDay(convertFromUtc(utcNow(), 'E. South America Standard Time')), -7), 'E. South America Standard Time')}", "new_enviadoem lt @{convertToUtc(addDays(startOfDay(convertFromUtc(utcNow(), 'E. South America Standard Time')), -2), 'E. South America Standard Time')} and new_ultimolembreteem eq null")
-if ($lembrar -notmatch 'new_ultimolembreteem eq null') { throw 'Filtro do lembrete não montado.' }
+# Lembrete diario: todos os pendentes; a Custom API decide quem recebe (new_Automatico = true) e so ela grava
+# new_ultimolembreteem. O push sai do flow "Push ao motorista", que dispara nessa gravacao: new_Lembrou = false nao grava, nao envia.
+$lembrar = $expirar.Replace('Pendentes_vencidos', 'Pendentes_para_lembrar').Replace('Expirar_cada', 'Lembrar_cada').Replace('"Expirar"', '"Lembrar"').Replace('new_ExpirarTermoMulta', 'new_LembrarTermoMulta').Replace('"item/new_TermoId":', '"item/new_Automatico": true, "item/new_TermoId":')
+if ($lembrar -notmatch 'new_Automatico') { throw 'Parametro new_Automatico do lembrete nao montado.' }
 
 $aviso = @'
 {
@@ -270,7 +271,7 @@ $aviso = @'
       "type": "OpenApiConnection", "runAfter": { "Termo": ["Succeeded"] },
       "inputs": {
         "host": { "apiId": "__DV__", "connectionName": "shared_commondataserviceforapps", "operationId": "GetItem" },
-        "parameters": { "entityName": "__SET_MULTAS__", "recordId": "@outputs('Termo')?['body/_new_multa_value']", "$select": "_cr40f_placa_value" },
+        "parameters": { "entityName": "__SET_MULTAS__", "recordId": "@outputs('Termo')?['body/_new_multa_value']", "$select": "_cr40f_placa_value,cr40f_novacoluna" },
         "authentication": "@parameters('$authentication')"
       }
     },
@@ -301,7 +302,7 @@ $aviso = @'
             "parameters": {
               "emailMessage/To": "@{outputs('Criador')?['body/internalemailaddress']}",
               "emailMessage/Subject": "Termo de multa @{toLower(outputs('Desfecho'))}: @{coalesce(outputs('Multa')?['body/_cr40f_placa_value@OData.Community.Display.V1.FormattedValue'], 'sem placa')} · @{coalesce(outputs('Termo')?['body/_new_motorista_value@OData.Community.Display.V1.FormattedValue'], 'motorista')}",
-              "emailMessage/Body": "<p>Olá,</p><p>O termo de multa que você enviou foi <b>@{toLower(outputs('Desfecho'))}</b> pelo motorista.</p><ul><li><b>Placa:</b> @{coalesce(outputs('Multa')?['body/_cr40f_placa_value@OData.Community.Display.V1.FormattedValue'], '—')}</li><li><b>Motorista:</b> @{coalesce(outputs('Termo')?['body/_new_motorista_value@OData.Community.Display.V1.FormattedValue'], '—')}</li><li><b>Desfecho:</b> @{outputs('Desfecho')}</li><li><b>Data:</b> @{outputs('Quando')}</li>@{if(equals(outputs('Desfecho'), 'Contestado'), concat('<li><b>Motivo:</b> ', coalesce(outputs('Termo')?['body/new_motivocontestacao'], '—'), '</li>'), '')}</ul><p><a href=\"__URL__/WebResources/cr40f_SistemaBetinhos.html#/frota-multas?registro=multa:@{outputs('Termo')?['body/_new_multa_value']}\">Abrir a multa no Sistema Betinhos</a></p>@{if(equals(outputs('Desfecho'), 'Contestado'), '<p>Converse pessoalmente com o motorista sobre a contestação.</p>', '')}",
+              "emailMessage/Body": "<p>Olá,</p><p>@{if(equals(outputs('Desfecho'), 'Assinado'), concat('O motorista assinou o termo da multa ', coalesce(outputs('Multa')?['body/cr40f_novacoluna'], 'sem número'), '. O aviso já está registrado; siga para a indicação.'), concat('O motorista contestou a multa ', coalesce(outputs('Multa')?['body/cr40f_novacoluna'], 'sem número'), '. Abra a multa e decida o responsável.'))}</p><ul><li><b>Placa:</b> @{coalesce(outputs('Multa')?['body/_cr40f_placa_value@OData.Community.Display.V1.FormattedValue'], '—')}</li><li><b>Motorista:</b> @{coalesce(outputs('Termo')?['body/_new_motorista_value@OData.Community.Display.V1.FormattedValue'], '—')}</li><li><b>Desfecho:</b> @{outputs('Desfecho')}</li><li><b>Data:</b> @{outputs('Quando')}</li>@{if(equals(outputs('Desfecho'), 'Contestado'), concat('<li><b>Motivo:</b> ', coalesce(outputs('Termo')?['body/new_motivocontestacao'], '—'), '</li>'), '')}</ul><p><a href=\"__URL__/WebResources/cr40f_SistemaBetinhos.html#/frota-multas?registro=multa:@{outputs('Termo')?['body/_new_multa_value']}\">Abrir a multa no Sistema Betinhos</a></p>",
               "emailMessage/Importance": "Normal"
             },
             "authentication": "@parameters('$authentication')"
@@ -382,9 +383,9 @@ function Ensure-Flow([string] $nome, [string] $descricao, [string] $clientData, 
 Ensure-Flow 'Termo de multa | Cópia ao motorista' 'Quando o termo de multa fica Assinado, envia a cópia em PDF ao motorista por e-mail e registra new_copiaenviadaem/new_copiacanal. Falha no e-mail não altera o termo.' (ClientData $copia @('shared_commondataserviceforapps', 'shared_office365')) $true
 # Decisão do controlador (22/10/2026): expiração só pela Custom API new_ExpirarTermoMulta (respeita a trava do plugin),
 # nunca por update direto do status. Nasce DESLIGADO; com a Custom API no DEV o script o liga; sem ela, mantém o estado atual.
-Ensure-Flow 'Termo de multa | Expirar pendentes' 'Todo dia às 07:00 expira, pela Custom API new_ExpirarTermoMulta, os termos Pendentes enviados antes do início do dia D-7 em São Paulo. Criado desligado; o script liga quando a Custom API existir (Task B2).' (ClientData $expirar @('shared_commondataserviceforapps')) $temCustomApi
+Ensure-Flow 'Termo de multa | Expirar pendentes' 'Todo dia às 07:00 expira, pela Custom API new_ExpirarTermoMulta, todos os termos Pendentes; a Custom API expira só os que passaram de 7 dias do envio ou de D-3 do prazo de indicação (new_Expirou). Criado desligado; o script liga quando a Custom API existir (Task B2).' (ClientData $expirar @('shared_commondataserviceforapps')) $temCustomApi
 if (-not $temCustomApi) { Write-Output "ATENÇÃO: '$customApi' ainda não existe no DEV. Depois da Task B2, rode este script de novo para ligar 'Termo de multa | Expirar pendentes'." }
-Ensure-Flow 'Termo de multa | Lembrete diário' 'Todo dia às 07:00 lembra, pela Custom API new_LembrarTermoMulta, os termos Pendentes enviados há 3 dias ou mais e ainda sem lembrete. Criado desligado; o script liga quando a Custom API existir.' (ClientData $lembrar @('shared_commondataserviceforapps')) $temLembrar
+Ensure-Flow 'Termo de multa | Lembrete diário' 'Todo dia às 07:00 lembra, pela Custom API new_LembrarTermoMulta, todos os termos Pendentes (new_Automatico = true); a Custom API decide quem recebe e grava new_ultimolembreteem, que dispara o push (new_Lembrou). Criado desligado; o script liga quando a Custom API existir.' (ClientData $lembrar @('shared_commondataserviceforapps')) $temLembrar
 if (-not $temLembrar) { Write-Output "ATENÇÃO: 'new_LembrarTermoMulta' ainda não existe no DEV. Depois de criá-la, rode este script de novo para ligar 'Termo de multa | Lembrete diário'." }
 Ensure-Flow 'Termo de multa | Aviso ao gestor' 'Quando o termo de multa fica Assinado ou Contestado, envia e-mail a quem enviou o termo (new_enviadopor) com placa, motorista, desfecho, data e link da multa no Sistema Betinhos.' (ClientData $aviso @('shared_commondataserviceforapps', 'shared_office365')) $true
 
