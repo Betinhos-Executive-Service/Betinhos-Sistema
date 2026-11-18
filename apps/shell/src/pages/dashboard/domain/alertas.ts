@@ -63,3 +63,19 @@ export function alertasQualidade(rv: Reserva[], nowMs: number): AlertaItem[] {
     item('semCliente', 'Sem cliente', semCliente),
   ]
 }
+
+export type AlertaPainel = AlertaItem & { categoria: 'operação' | 'qualidade' }
+export type PainelAtencao = { criticos: AlertaPainel[]; atencao: AlertaPainel[]; emDia: AlertaPainel[]; semDado: AlertaPainel[] }
+
+const numero = (a: AlertaItem) => Number(a.valor.replace(/\./g, '')) || 0
+
+/** Junta os alertas de operação e de qualidade num painel só: crítico (danger) e atenção (warn), cada coluna do maior número para o menor; ok e s/dado ficam à parte. */
+export function painelAtencao(operacao: AlertaItem[], qualidade: AlertaItem[]): PainelAtencao {
+  const todos: AlertaPainel[] = [
+    ...operacao.map((a) => ({ ...a, categoria: 'operação' as const })),
+    ...qualidade.map((a) => ({ ...a, categoria: 'qualidade' as const })),
+  ]
+  const por = (tom: Tom) => todos.filter((a) => a.tom === tom)
+  const maior = (a: AlertaItem, b: AlertaItem) => numero(b) - numero(a)
+  return { criticos: por('danger').sort(maior), atencao: por('warn').sort(maior), emDia: por('ok'), semDado: por('neutral') }
+}

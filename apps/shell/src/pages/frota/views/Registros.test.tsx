@@ -33,10 +33,10 @@ describe('Registros', () => {
     expect(window.location.hash).not.toMatch(/[?&](status|de)=/)
   })
 
-  it('abre o detalhe ao clicar na linha e o formulário nativo em Novo', () => {
+  it('abre o detalhe ao dar duplo clique na linha e o formulário nativo em Novo', () => {
     const onOpen = vi.fn()
     render(<Registros kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={() => {}} />)
-    fireEvent.click(screen.getByText('Serviço a'))
+    fireEvent.doubleClick(screen.getByText('Serviço a'))
     expect(onOpen).toHaveBeenCalledWith('manutencao', 'a')
     fireEvent.click(screen.getByRole('button', { name: /Novo/ }))
     expect(source.openForm).toHaveBeenCalledWith('manutencao')

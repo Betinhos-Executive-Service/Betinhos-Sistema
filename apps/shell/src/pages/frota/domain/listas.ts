@@ -29,7 +29,7 @@ const builtin = (columns: ViewColumnDef[], sort: ViewSort) => (id: string, name:
 // ---------- Veículos ----------
 
 export const TELA_VEICULOS = 'frota.veiculos'
-export type LinhaVeiculo = { veiculo: Veiculo; motorista: string | null; pendencias: number; custo: ReturnType<typeof custoVeiculo> }
+export type LinhaVeiculo = { id: string; veiculo: Veiculo; motorista: string | null; motoristaId?: string; pendencias: number; custo: ReturnType<typeof custoVeiculo> }
 
 /** Colunas na ordem padrão; a primeira (Foto) é fixa. */
 export const VEICULO_COLUMNS: ViewColumnDef[] = [

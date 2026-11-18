@@ -66,6 +66,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'frota-veiculos', label: 'Veículos', page: 'frota', aba: 'veiculos' },
       { kind: 'page', id: 'frota-manutencoes', label: 'Manutenções', page: 'frota', aba: 'manutencoes' },
       { kind: 'page', id: 'frota-multas', label: 'Multas', page: 'frota', aba: 'multas' },
+      { kind: 'page', id: 'frota-infracoes', label: 'Infrações', page: 'infracoes' },
       { kind: 'page', id: 'frota-colisoes', label: 'Colisões', page: 'frota', aba: 'colisoes' },
       { kind: 'page', id: 'frota-indicadores', label: 'Indicadores', page: 'frota', aba: 'indicadores' },
       { kind: 'page', id: 'frota-plano', label: 'Plano preventivo', page: 'frota', aba: 'plano' },
@@ -95,19 +96,11 @@ export const MENU: MenuGroup[] = [
     id: 'back-end',
     label: 'Back-End',
     items: [
-      table('cr40f_servicosporpassageiro'),
-      table('cr40f_trocasdecarro'),
-      table('new_possedeveiculo'),
       // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
       wr('Dashboard antigo (TV)', 'new_dashboard'),
-      wr('Despesas Operacionais', 'new_teladespesasoperacionais'),
-      table('new_fotomanutencao'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
-      table('cr40f_anexodespesaoperacional'),
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
-      table('cr40f_anexocolisao_v2'),
-      table('cr40f_anexorecebimento_v2'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
       wr('Comunicados (antigo)', 'cr40f_GerenciarComunicados.html'),
       table('cr40f_pedidodecotacao'),
@@ -122,7 +115,7 @@ export const ALL_ITEMS = MENU.flatMap((group) => group.items)
 export const ENTITY_NAMES = ALL_ITEMS.flatMap((item) => (item.kind === 'entity' ? [item.entity] : []))
 export const DEFAULT_ITEM = MENU[0].items[0]
 
-/** Itens do menu que viraram visão da Frota: `#/frota?aba=x` → `#/frota-x`; `#/infracoes` → aba Infrações de Multas. */
+/** Itens do menu que viraram visão da Frota: `#/frota?aba=x` → `#/frota-x`; `#/infracoes` e `#/frota-multas?sub=infracoes` → item Infrações. */
 export function rotaAtualizada(id: string, query: URLSearchParams): { id: string; query: URLSearchParams } | null {
   // O WebResource da Página Inicial virou a tela React; links antigos seguem abrindo.
   if (id === 'cr40f_homebetinhos') return { id: 'inicio', query }
@@ -138,7 +131,12 @@ export function rotaAtualizada(id: string, query: URLSearchParams): { id: string
   if (id === 'new_gestaochecklistsveiculos') return { id: 'frota-checklists', query }
   // A Conciliação do cartão virou a fila "Compras sem despesa" de Despesas; links antigos seguem abrindo.
   if (id === 'conciliacao-cartao') return { id: 'despesas-operacionais', query: new URLSearchParams([...query, ['fila', 'sem-despesa']]) }
-  if (id === 'infracoes') return { id: 'frota-multas', query: new URLSearchParams([...query, ['sub', 'infracoes']]) }
+  // Infrações já foi rota solta (`#/infracoes`) e aba de Multas (`?sub=infracoes`); os links antigos abrem o item próprio.
+  if (id === 'infracoes' || (id === 'frota-multas' && query.get('sub') === 'infracoes')) {
+    const rest = new URLSearchParams(query)
+    rest.delete('sub')
+    return { id: 'frota-infracoes', query: rest }
+  }
   const aba = id === 'frota' ? query.get('aba') : null
   if (!aba) return null
   const rest = new URLSearchParams(query)

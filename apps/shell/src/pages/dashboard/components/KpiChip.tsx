@@ -1,11 +1,12 @@
 import { AlertTriangle, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { DeltaBadge } from '@betinhos/ui'
 import type { ChipAnterior } from '../domain/comparar'
 import { dec } from '../domain/format'
 import type { Apoio, Chip } from '../domain/types'
 
 /** Rótulos curtos dos chips, como no legado; o leitor de tela recebe o rótulo inteiro. */
 const CURTO: Record<string, string> = {
-  'Projeção': 'Proj', 'Futuros': 'Futuro', '% do faturamento': '% fat', '% da receita': '% rec', 'Concluídos': 'Conc', 'Meta': 'Meta',
+  'Projeção': 'Proj', 'Futuros': 'Futuro', '% do faturamento': '% fat', '% da receita': '% rec', 'Concluídos': 'Conc',
 }
 /** Apoios que viram chip rotulado; os demais (previsão, recebido) ficam como linha de texto. */
 const virouChip = (rotulo: string) => rotulo in CURTO || /^\dº$/.test(rotulo)
@@ -98,3 +99,17 @@ export function ChipAnt({ chip }: { chip: ChipAnterior }) {
     </span>
   )
 }
+
+const FRASE: Record<string, string> = { LY: 'no ano anterior', LM: 'no mês anterior' }
+type ChipValor = Extract<Chip, { tipo: 'valor' }>
+
+/** O comparativo que vira selo no topo do card: o do ano anterior; sem ele, o do mês anterior. Os demais seguem como chip. */
+export function separarComparativo(chips: Chip[]) {
+  const valores = chips.filter((c): c is ChipValor => c.tipo === 'valor')
+  const principal = valores.find((c) => c.rotulo === 'LY') ?? valores[0]
+  return { principal, outros: chips.filter((c) => c !== principal) }
+}
+
+/** Selo de variação do comparativo (seta, sinal e %) e a frase "vs R$ X no ano anterior" da linha de apoio. */
+export const seloComparativo = (c: ChipValor) => <DeltaBadge trend={c.variacao >= 0 ? 'up' : 'down'}>{c.variacao >= 0 ? '+' : '−'}{dec(Math.abs(c.variacao), 1)}%</DeltaBadge>
+export const fraseComparativo = (c: ChipValor) => `vs ${c.anterior} ${FRASE[c.rotulo] ?? 'no período anterior'}`

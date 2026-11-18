@@ -1,9 +1,10 @@
 import { Plus, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { Button, EmptyState, SearchBox, SegmentedControl, TableTitle, ViewBar } from '@betinhos/ui'
+import { Button, EmptyState, LookupCell, SearchBox, SegmentedControl, TableTitle, ViewBar } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
+import { useRowSelection } from '../../../app/Selecao'
 import { VirtualTable } from '../../../app/VirtualTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
@@ -21,7 +22,7 @@ import { errorMessage } from '../data/xrm'
 import { linhas, type Linha } from '../domain/linhas'
 import { EXTRA, LARGURAS, MULTA_FILTROS_PADRAO, PESSOA, VISAO_PADRAO, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
-import { urgenciaDoPrazo } from '../domain/multaEstado'
+import { EMPRESA, urgenciaDoPrazo } from '../domain/multaEstado'
 import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const PLURAL: Record<Kind, string> = { manutencao: 'Manutenções', multa: 'Multas', colisao: 'Colisões' }
@@ -93,6 +94,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visiveis, lazyKey)
   const groups = useRowGroups(visiveis, view.config.group, allFields, read)
+  const sel = useRowSelection(visiveis)
 
   function trocar(next: Kind) {
     patchHashQuery({ tipo: next === kinds[0] ? null : next, f: null })
@@ -120,6 +122,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     <VirtualTable<Linha>
       rows={rows}
       rowKey={(linha) => linha.id}
+      selection={sel.selection}
       onRowClick={(linha) => onOpen(linha.kind, linha.id)}
       view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }}
       quickFilters={quickFilters}
@@ -128,8 +131,8 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
       columns={[
         { key: 'descricao', header: titulo('descricao'), label: titulo('descricao'), sortable: true, defaultWidth: largura('descricao', 300), width: 'minmax(180px, 2fr)', cell: (linha) => <TableTitle title={linha.titulo} meta={linha.categorias.length > 0 ? categoriasTexto(linha.categorias) : undefined} /> },
         { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: largura('data', 120), width: 'minmax(92px, .6fr)', cell: (linha) => <span className="frota-nowrap">{formatBR(linha.dia)}</span> },
-        { key: 'veiculo', header: titulo('veiculo'), label: titulo('veiculo'), sortable: true, defaultWidth: largura('veiculo', 120), width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <span className="frota-nowrap">{linha.veiculo?.label || '—'}</span> },
-        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: largura('pessoa', 190), hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
+        { key: 'veiculo', header: titulo('veiculo'), label: titulo('veiculo'), sortable: true, defaultWidth: largura('veiculo', 120), width: 'minmax(90px, .7fr)', hideBelow: 'mobile', cell: (linha) => <LookupCell table="cr40f_veiculos" id={linha.veiculo?.id}>{linha.veiculo?.label}</LookupCell> },
+        { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: largura('pessoa', 190), hideBelow: 'mobile', cell: (linha) => <LookupCell table="cr40f_funcionarios" id={linha.pessoa?.id === EMPRESA.id ? null : linha.pessoa?.id}>{linha.pessoa?.label}</LookupCell> },
         ...(kind === 'multa' ? [] : [{ key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact' as const, cell: (linha: Linha) => <span className="frota-nowrap">{linha.extra}</span> }]),
         { key: 'status', header: titulo('status'), label: titulo('status'), sortable: true, defaultWidth: largura('status', 160), width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
         ...(kind === 'manutencao' ? [{ key: 'grau', header: 'Grau', label: 'Grau', sortable: true, defaultWidth: 110, hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.grau == null ? <span className="frota-muted">—</span> : label(GRAU, linha.grau)) }] : []),
@@ -144,9 +147,9 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   )
 
   return (
-    <div className="frota-lista">
-      <div role="toolbar" aria-label="Comandos de registros">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }}
+    <>
+      <div role="toolbar" aria-label="Comandos de registros" {...sel.bar}>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
           search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa ou pessoa' : 'Buscar descrição, placa ou pessoa'} value={busca} onChange={setBusca} />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />
@@ -163,6 +166,6 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
           <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
         </>
       )}
-    </div>
+    </>
   )
 }

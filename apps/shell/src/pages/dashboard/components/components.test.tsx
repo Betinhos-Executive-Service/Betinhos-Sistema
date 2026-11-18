@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AlertList } from './AlertList'
+import { PainelAtencao } from './PainelAtencao'
 import { AnaliseCard } from './AnaliseCard'
 import { tomStatus } from './Celulas'
-import { DashboardToolbar } from './DashboardToolbar'
+import { DashboardToolbar, PeriodoRapido } from './DashboardToolbar'
 import { Emergenciais } from './Emergenciais'
 import { StatCard } from '@betinhos/ui'
 import { ApoioChip, ApoioTexto, KpiChip } from './KpiChip'
@@ -33,7 +33,7 @@ function semAvisoDeGrafico<T>(fn: () => T): T {
 }
 const PERIODO = '01/10/2026 a 15/10/2026'
 /** Blocos da aba Resumo, na ordem da página. */
-const TITULOS = ['Alertas de operação', 'Qualidade dos dados', 'Total produzido', 'Meta × realizado']
+const TITULOS = ['Recebimento', expect.stringMatching(/^Precisa de atenção · \d+$/), 'Total produzido', 'Meta × realizado']
 const FILTROS: Filtros = { atalho: 'esteMes', inicio: '2026-10-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
 const AGORA = new Date('2026-10-15T15:00:00Z')
 const rvDe = (dados: Dados) => filtrarServicos(dados.reservas, FILTROS)
@@ -89,29 +89,46 @@ describe('componentes do Dashboard', () => {
     expect(screen.getByText('R$ 37,4k')).toBeTruthy()
   })
 
-  it('alerta tem status em texto e ícone, não só cor', () => {
-    render(<AlertList titulo="Operação" itens={[
-      { id: 'cnh', valor: '2', rotulo: 'CNH', status: 'Atenção', tom: 'danger' },
-      { id: 'multas', valor: '3', rotulo: 'Multas', status: '24% pendentes', tom: 'danger' },
-    ]} />)
-    const faixa = screen.getByRole('region', { name: 'Operação' })
-    expect(within(faixa).getAllByRole('listitem').length).toBe(2)
-    expect(within(faixa).getByText('CNH')).toBeTruthy()
-    expect(within(faixa).getByText('Atenção')).toBeTruthy()
-    // Quando o selo não diz o estado, o leitor de tela recebe "Atenção:" antes do texto.
-    expect(within(faixa).getByText('24% pendentes', { exact: false }).textContent).toBe('Atenção: 24% pendentes')
-    expect(faixa.querySelectorAll('svg').length).toBe(2)
+  it('painel de atenção agrupa por gravidade, com categoria e ordem pelo maior número', () => {
+    const abrir = vi.fn()
+    render(<PainelAtencao
+      operacao={[
+        { id: 'cnh', valor: '2', rotulo: 'CNH', status: 'Atenção', tom: 'danger' },
+        { id: 'multas', valor: '13', rotulo: 'Multas', status: '52% pendentes', tom: 'danger' },
+        { id: 'score', valor: '69', rotulo: 'Score motoristas', status: '52 notas válidas', tom: 'warn' },
+      ]}
+      qualidade={[{ id: 'semCliente', valor: '101', rotulo: 'Sem cliente', status: '3,8% dos serviços', tom: 'warn' }]}
+      abrir={{ multas: abrir }}
+    />)
+    const painel = screen.getByRole('region', { name: 'Precisa de atenção · 4' })
+    const [criticos, atencao] = within(painel).getAllByRole('list')
+    expect(within(criticos).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringContaining('Multas · operação'), expect.stringContaining('CNH · operação'),
+    ])
+    expect(within(atencao).getAllByRole('listitem')[0].textContent).toContain('Sem cliente · qualidade')
+    expect(within(painel).getByRole('heading', { name: 'Crítico' })).toBeTruthy()
+    expect(within(painel).getByRole('heading', { name: 'Atenção' })).toBeTruthy()
+    // Só o alerta com drill-down vira botão.
+    expect(within(painel).getAllByRole('button').map((b) => b.textContent)).toEqual([expect.stringContaining('Multas')])
+    fireEvent.click(within(painel).getByRole('button'))
+    expect(abrir).toHaveBeenCalledTimes(1)
   })
 
-  it('alerta zerado vai para o fim da faixa, discreto', () => {
-    render(<AlertList titulo="Operação" itens={[
-      { id: 'cnh', valor: '0', rotulo: 'CNH', status: 'OK', tom: 'ok' },
-      { id: 'multas', valor: '3', rotulo: 'Multas', status: '24% pendentes', tom: 'danger' },
-    ]} />)
-    const itens = within(screen.getByRole('region', { name: 'Operação' })).getAllByRole('listitem')
-    expect(itens.map((li) => li.textContent?.includes('CNH'))).toEqual([false, true])
-    expect(itens[1].classList.contains('dash-alerta--ok')).toBe(true)
-    expect(itens[0].classList.contains('dash-alerta--ok')).toBe(false)
+  it('painel de atenção: ok vai para "Em dia" no fim, s/dado para "Sem dado" e coluna vazia some', () => {
+    render(<PainelAtencao
+      operacao={[
+        { id: 'cnh', valor: '0', rotulo: 'CNH', status: 'OK', tom: 'ok' },
+        { id: 'multas', valor: '3', rotulo: 'Multas', status: '24% pendentes', tom: 'danger' },
+        { id: 'ocorrencias', valor: '—', rotulo: 'Ocorrências', status: 's/dado', tom: 'neutral' },
+      ]}
+      qualidade={[]}
+    />)
+    const painel = screen.getByRole('region', { name: 'Precisa de atenção · 1' })
+    expect(within(painel).getByText('Em dia:').parentElement?.textContent).toContain('CNH')
+    expect(within(painel).getByText('Sem dado:').parentElement?.textContent).toContain('Ocorrências')
+    expect(within(painel).queryByRole('heading', { name: 'Atenção' })).toBeNull()
+    expect(within(painel).getAllByRole('listitem').length).toBe(1)
+    expect(within(painel).queryByRole('button')).toBeNull()
   })
 
   it('card de análise não mostra comparativo sem base', () => {
@@ -119,11 +136,10 @@ describe('componentes do Dashboard', () => {
     expect(screen.queryByText('s/dado')).toBeNull()
   })
 
-  it('alerta indisponível aparece como s/dado em tom neutro, sem ícone de atenção', () => {
-    render(<AlertList titulo="Operação" itens={[{ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'neutral' }]} />)
-    expect(screen.getAllByText('s/dado').length).toBe(1)
-    expect(screen.queryByText(/Atenção/)).toBeNull()
-    expect(screen.getByRole('region', { name: 'Operação' }).querySelector('svg')).toBeNull()
+  it('card de análise mostra o selo no topo e a frase de apoio', () => {
+    render(<AnaliseCard titulo="Meta" periodo="p" unidade="R$" valor="R$ 10,00" delta={<span>82,0% da meta</span>} hint="Meta R$ 12,2k · vs R$ 9,0k no ano anterior" />)
+    expect(screen.getByText('82,0% da meta')).toBeTruthy()
+    expect(screen.getByText(/vs R\$ 9,0k no ano anterior/)).toBeTruthy()
   })
 
   it('apoio em atenção tem ícone e texto "Atenção:" além da cor', () => {
@@ -140,7 +156,9 @@ describe('componentes do Dashboard', () => {
     semAvisoDeGrafico(() => render(<KpiGrid kpis={kpis} />))
     const card = screen.getByRole('article', { name: 'Faturamento' })
     expect(within(card).getByText('R$ 10,0k')).toBeTruthy()
-    expect(within(card).getByText('R$ 9,0k').parentElement?.textContent).toBe('Mês ant.Mesmo período do mês anterior R$ 9,0k +11,1%')
+    // Sem comparativo do ano anterior, o do mês anterior vira o selo do topo e a frase "vs".
+    expect(within(card).getByText('+11,1%')).toBeTruthy()
+    expect(within(card).getByText('vs R$ 9,0k no mês anterior')).toBeTruthy()
     expect(within(card).getByText('Previsão')).toBeTruthy()
     expect(card.lastElementChild?.classList.contains('bt-spark')).toBe(true)
     expect(card.lastElementChild?.getAttribute('aria-hidden')).toBe('true')
@@ -200,15 +218,17 @@ describe('componentes do Dashboard', () => {
     expect(tomStatus('Mensal')).toBe('neutral')
   })
 
-  it('barra de filtros: período num seletor, o escolhido exibido, e a troca recalcula o período', async () => {
+  it('período em botões rápidos: Mês, Trimestre e Ano recalculam as datas; Personalizado mantém', () => {
     const filtros: Filtros = { atalho: 'esteAno', inicio: '2026-01-01', fim: '2026-10-15', status: [], clientes: [], motoristas: [], tipos: [] }
     const onChange = vi.fn()
-    render(<DashboardToolbar filtros={filtros} opcoes={{ status: [], clientes: [], motoristas: [], tipos: [] }} now={new Date('2026-10-15T12:00:00Z')} onChange={onChange} />)
-    const periodo = screen.getByRole('combobox', { name: 'Período' })
-    expect(periodo.textContent).toContain('Este ano')
-    fireEvent.click(periodo)
-    fireEvent.click(await screen.findByText('Mês anterior'))
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ atalho: 'mesAnt', inicio: '2026-09-01', fim: '2026-09-30' }))
+    render(<PeriodoRapido filtros={filtros} now={new Date('2026-11-18T12:00:00Z')} onChange={onChange} />)
+    expect(screen.getByRole('radio', { name: 'Ano' }).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: 'Trimestre' }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ atalho: 'esteTrimestre', inicio: '2026-10-01', fim: '2026-11-18' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Mês' }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ atalho: 'esteMes', inicio: '2026-11-01', fim: '2026-11-18' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Personalizado' }))
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ atalho: 'personalizado', inicio: '2026-01-01' }))
   })
 
   it('barra de filtros: período inválido mostra erro e não propaga', () => {
@@ -237,9 +257,14 @@ describe('componentes do Dashboard', () => {
     semAvisoDeGrafico(() => {
       for (const dados of [VAZIO, UM_SERVICO]) {
         const { container } = renderResumo(dados)
-        expect(within(screen.getByRole('region', { name: 'Indicadores executivos' })).getAllByRole('article')).toHaveLength(6)
+        const kpis = within(screen.getByRole('region', { name: 'Indicadores executivos' }))
+        // Cinco StatCards e o card do anel (Recebimento).
+        expect(kpis.getAllByRole('article')).toHaveLength(5)
+        expect(kpis.getByRole('region', { name: 'Recebimento' })).toBeTruthy()
         expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(TITULOS)
-        for (const titulo of TITULOS.slice(0, 2)) expect(within(screen.getByRole('region', { name: titulo })).getAllByRole('listitem')).toHaveLength(4)
+        // O número do título é a quantidade de itens críticos e de atenção listados; os demais vão para "Em dia" / "Sem dado".
+        const painel = screen.getByRole('region', { name: /^Precisa de atenção/ })
+        expect(within(painel).queryAllByRole('listitem')).toHaveLength(Number(/\d+$/.exec(painel.querySelector('h2')?.textContent ?? '')?.[0]))
         // Produção, clientes, motoristas e frota saíram do Resumo.
         expect(container.textContent).not.toMatch(/Produção própria|Faturamento por cliente|Serviços por motorista|Frota e pessoas|Top 5/)
         cleanup()
@@ -252,6 +277,11 @@ describe('componentes do Dashboard', () => {
     const status = screen.getByRole('region', { name: 'Status dos serviços' })
     expect(within(status).getByRole('progressbar', { name: /^Participação de .+: 100,0%$/ })).toBeTruthy()
     const meta = screen.getByRole('region', { name: 'Meta × realizado' })
+    expect(within(meta).getByRole('img', { name: /^Meta e realizado por mês/ })).toBeTruthy()
+    expect(within(meta).getByText('Meses sem dado contam com realizado zero.', { exact: false })).toBeTruthy()
+    fireEvent.click(within(meta).getByRole('button', { name: 'Ver tabela' }))
+    expect(within(meta).queryByRole('img', { name: /^Meta e realizado por mês/ })).toBeNull()
+    expect(within(meta).getByRole('button', { name: 'Ver gráfico' })).toBeTruthy()
     expect(within(meta).getByRole('progressbar', { name: /^Atingimento de out\/26: \d+,\d%$/ })).toBeTruthy()
     const emerg = screen.getByRole('region', { name: 'Serviços emergenciais' })
     expect(within(emerg).getByRole('list', { name: 'Clientes com mais pedidos emergenciais' }).textContent).toContain('Tenaris')
@@ -262,7 +292,7 @@ describe('componentes do Dashboard', () => {
     telaCelular(true)
     const { container } = semAvisoDeGrafico(() => {
       const r = renderBlocos(UM_SERVICO)
-      for (const b of screen.getAllByRole('button', { name: 'Ver valores' })) fireEvent.click(b)
+      for (const b of screen.getAllByRole('button', { name: /^Ver (valores|tabela)$/ })) fireEvent.click(b)
       return r
     })
     const texto = container.textContent ?? ''

@@ -1,19 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Paperclip, ReceiptText, Route,
-  ScrollText, Shield, ShieldCheck, Shuffle, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
+  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
+  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
 import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
 import { useInstallPrompt } from './useInstallPrompt'
+import { TEMAS, useTema, type Tema } from './tema'
 
 // Versão do build na última linha do rodapé da sidebar (DS §10.1), no lugar do BuildBadge flutuante.
 const BUILD = formatBuild(__APP_VERSION__, __BUILD_DATE__)
 
 // Logo B da Betinhos: o mesmo WebResource usado como favicon e ícone do app instalável.
 const BRAND_LOGO = '/WebResources/cr40f_SistemaBetinhosIcon192.png'
+
+const TEMA_INFO: Record<Tema, { rotulo: string; icone: ReactNode }> = {
+  claro: { rotulo: 'Claro', icone: <Sun /> },
+  escuro: { rotulo: 'Escuro', icone: <Moon /> },
+  sistema: { rotulo: 'Sistema', icone: <Monitor /> },
+}
+
+/** Alterna Claro → Escuro → Sistema no rodapé da navegação; a escolha fica no navegador. */
+function TemaToggle() {
+  const [tema, setTema] = useTema()
+  const atual = TEMA_INFO[tema]
+  const proximo = TEMAS[(TEMAS.indexOf(tema) + 1) % TEMAS.length]
+  const dica = `Tema: ${atual.rotulo}. Trocar para ${TEMA_INFO[proximo].rotulo}`
+  return (
+    <button type="button" className="bt-shell__item" onClick={() => setTema(proximo)} title={dica} aria-label={dica}>
+      <span className="bt-shell__item-icon" aria-hidden="true">{atual.icone}</span>
+      <span className="bt-shell__item-label">Tema: {atual.rotulo}</span>
+    </button>
+  )
+}
 
 type Props = {
   activeId: string
@@ -44,6 +65,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'frota-veiculos': <CarFront />,
   'frota-manutencoes': <Wrench />,
   'frota-multas': <AlertTriangle />,
+  'frota-infracoes': <Scale />,
   'frota-colisoes': <Camera />,
   'frota-indicadores': <Gauge />,
   'frota-plano': <Clock />,
@@ -57,8 +79,6 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   new_dashboard: <LayoutDashboard />,
   operacional: <Clock />,
   'funcoes-operacionais': <Wrench />,
-  cr40f_trocasdecarro: <Shuffle />,
-  new_possedeveiculo: <KeyRound />,
   'frota-checklists': <ClipboardCheck />,
   qualidade: <Shield />,
   infleet: <MapPin />,
@@ -80,17 +100,11 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   treinamentos: <GraduationCap />,
   'rh-descontos': <HandCoins />,
   new_marketing: <Megaphone />,
-  cr40f_servicosporpassageiro: <List />,
-  new_teladespesasoperacionais: <Coins />,
-  new_fotomanutencao: <Camera />,
   'logs-apps': <FileText />,
-  cr40f_anexodespesaoperacional: <Paperclip />,
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
   cartoes: <CreditCard />,
   cr40f_formapagamentodespesa: <Wallet />,
-  cr40f_anexocolisao_v2: <Paperclip />,
-  cr40f_anexorecebimento_v2: <Paperclip />,
   comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,
   composicao: <Calculator />,
@@ -159,12 +173,17 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, de
       search={search}
       onSearchChange={setSearch}
       status={{ tone: connection.ok ? 'success' : 'warning', text: connection.text }}
-      footer={install ? (
-        <button type="button" className="bt-shell__item" onClick={install}>
-          <span className="bt-shell__item-icon" aria-hidden="true"><Download /></span>
-          <span className="bt-shell__item-label">Instalar aplicativo</span>
-        </button>
-      ) : null}
+      footer={(
+        <>
+          <TemaToggle />
+          {install ? (
+            <button type="button" className="bt-shell__item" onClick={install}>
+              <span className="bt-shell__item-icon" aria-hidden="true"><Download /></span>
+              <span className="bt-shell__item-label">Instalar aplicativo</span>
+            </button>
+          ) : null}
+        </>
+      )}
       version={BUILD}
     >
       {children}

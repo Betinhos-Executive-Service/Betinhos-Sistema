@@ -6,11 +6,13 @@ import './app/tabelas.css'
 import { App } from './App'
 import { esconderSplashInicial } from './app/BrandLoader'
 import { applyRouteFromSearch } from './nav/useHashRoute'
+import { aplicarTema, lerTema } from './app/tema'
 import { instalarLogDeErros } from './app/errorLog'
 import { instalarMedicaoDesempenho } from './app/perfLog'
 import { instalarCorrecaoViewportIos } from './app/viewportIos'
 
 instalarLogDeErros()
+aplicarTema(lerTema())
 
 // Item do sitemap do model-driven abre o WebResource com `?data=<rota>`; vira hash antes de montar.
 applyRouteFromSearch()
