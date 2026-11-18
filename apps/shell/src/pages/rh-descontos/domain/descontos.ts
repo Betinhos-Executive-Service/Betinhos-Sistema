@@ -2,9 +2,7 @@ import type { Celula, Planilha } from '../../../lib/xlsx'
 import { addMonths, formatBR, toDateOnly } from '../../frota/data/dates'
 import type { ParcelaFolha } from '../../frota/data/types'
 import { mesBr } from '../../frota/domain/multaEtapas'
-import { formatMoney } from '../../geral/domain/format'
 
-export type LinhaDesconto = ParcelaFolha & { grupo: string; origemTexto: string; parcelaTexto: string; situacaoTexto: string }
 export type GrupoColaborador = {
   id: string; nome: string; cpf: string | null; parcelas: ParcelaFolha[]
   /** Centavos inteiros, para não acumular erro de ponto flutuante. */
@@ -17,8 +15,9 @@ const SEM_COLABORADOR = { id: '', nome: 'Sem colaborador', cpf: null }
 
 export const mesDe = (p: ParcelaFolha) => p.competencia.slice(0, 7)
 export const somaMes = (mes: string, n: number) => addMonths(`${mes}-01`, n).slice(0, 7)
-export const mesPorExtenso = (mes: string) => new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-export const mesAbreviado = (mes: string) => new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+const nomeDoMes = (mes: string, opcoes: Intl.DateTimeFormatOptions) => new Date(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)) - 1).toLocaleDateString('pt-BR', opcoes)
+export const mesPorExtenso = (mes: string) => nomeDoMes(mes, { month: 'long', year: 'numeric' })
+export const mesAbreviado = (mes: string) => nomeDoMes(mes, { month: 'short' }).replace('.', '')
 
 export const origemTexto = (p: ParcelaFolha) => (p.multa ? `Multa ${p.multa.auto}${p.multa.placa ? ` · ${p.multa.placa}` : ''}` : 'Termo')
 export const parcelaTexto = (p: ParcelaFolha) => `${p.numero}/${p.total}`
@@ -39,7 +38,12 @@ export const chaveOrigem = (p: ParcelaFolha) => p.multa?.id ?? `termo:${p.colabo
 
 export function cadeias(todas: ParcelaFolha[]) {
   const mapa = new Map<string, ParcelaFolha[]>()
-  for (const p of todas) mapa.set(chaveOrigem(p), [...(mapa.get(chaveOrigem(p)) ?? []), p])
+  for (const p of todas) {
+    const k = chaveOrigem(p)
+    const lista = mapa.get(k)
+    if (lista) lista.push(p)
+    else mapa.set(k, [p])
+  }
   for (const lista of mapa.values()) lista.sort((a, b) => a.numero - b.numero)
   return mapa
 }
@@ -50,7 +54,12 @@ const ordemParcela = (a: ParcelaFolha, b: ParcelaFolha) =>
 /** Um grupo por colaborador (ordem alfabética), com as parcelas ordenadas por origem e número. */
 export function porColaborador(p: ParcelaFolha[]): GrupoColaborador[] {
   const mapa = new Map<string, ParcelaFolha[]>()
-  for (const x of p) mapa.set(x.colaborador?.id ?? '', [...(mapa.get(x.colaborador?.id ?? '') ?? []), x])
+  for (const x of p) {
+    const k = x.colaborador?.id ?? ''
+    const lista = mapa.get(k)
+    if (lista) lista.push(x)
+    else mapa.set(k, [x])
+  }
   return [...mapa.values()]
     .map((lista) => {
       const c = lista[0].colaborador ?? SEM_COLABORADOR
@@ -65,12 +74,6 @@ export function porColaborador(p: ParcelaFolha[]): GrupoColaborador[] {
       }
     })
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-}
-
-export function linhasDoMes(p: ParcelaFolha[]): LinhaDesconto[] {
-  return porColaborador(p).flatMap((g) => g.parcelas.map((x) => ({
-    ...x, grupo: `${g.nome} · ${formatMoney(reais(g.subtotal))}`, origemTexto: origemTexto(x), parcelaTexto: parcelaTexto(x), situacaoTexto: situacaoTexto(x),
-  })))
 }
 
 export function resumo(p: ParcelaFolha[]) {
@@ -109,7 +112,11 @@ export function planilhaDoMes(p: ParcelaFolha[], mes: string): Planilha {
   linhas.push([{ valor: 'Total geral', negrito: true }, null, null, null, null, null, null, null, dinheiro(resumo(p).total), null])
   return {
     aba: `Folha ${mes.slice(5, 7)}-${mes.slice(0, 4)}`,
-    colunas: [['Colaborador', 28], ['CPF', 16], ['Competência', 13], ['Nº do auto', 14], ['Placa', 10], ['Data da infração', 16], ['Infração', 40], ['Parcela', 9], ['Valor', 14], ['Situação', 18]].map(([titulo, largura]) => ({ titulo: titulo as string, largura: largura as number })),
+    colunas: [
+      { titulo: 'Colaborador', largura: 28 }, { titulo: 'CPF', largura: 16 }, { titulo: 'Competência', largura: 13 }, { titulo: 'Nº do auto', largura: 14 },
+      { titulo: 'Placa', largura: 10 }, { titulo: 'Data da infração', largura: 16 }, { titulo: 'Infração', largura: 40 }, { titulo: 'Parcela', largura: 9 },
+      { titulo: 'Valor', largura: 14 }, { titulo: 'Situação', largura: 18 },
+    ],
     linhas,
   }
 }

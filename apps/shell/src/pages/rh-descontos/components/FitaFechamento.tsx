@@ -3,21 +3,20 @@ import { Check, Undo2 } from 'lucide-react'
 import { formatBR } from '../../frota/data/dates'
 import type { ParcelaFolha } from '../../frota/data/types'
 import { formatMoney } from '../../geral/domain/format'
-import { cadeias, chaveOrigem, mascararCpf, mesAbreviado, mesDe, origemTexto, parcelaTexto, type GrupoColaborador } from '../domain/descontos'
+import { chaveOrigem, mascararCpf, mesAbreviado, mesDe, origemTexto, parcelaTexto, type GrupoColaborador } from '../domain/descontos'
 
 type Props = {
-  grupos: GrupoColaborador[]; todas: ParcelaFolha[]; mes: string; mesAtual: string
+  grupos: GrupoColaborador[]; correntes: Map<string, ParcelaFolha[]>; mes: string; mesAtual: string
   marcados: Set<string>; ativoId: string; erros: Map<string, string>; ocupado: boolean
   onMarcar: (id: string) => void; onAtivo: (id: string) => void
   onLancar: (colaboradores: string[]) => void; onDesfazer: (colaborador: string) => void; onAbrirMulta: (multaId: string) => void
 }
 
 /** Passo Lançar: a "fita de somar" à esquerda (marcar quem já foi lançado na folha) e o detalhe do colaborador à direita. */
-export function FitaFechamento({ grupos, todas, mes, mesAtual, marcados, ativoId, erros, ocupado, onMarcar, onAtivo, onLancar, onDesfazer, onAbrirMulta }: Props) {
+export function FitaFechamento({ grupos, correntes, mes, mesAtual, marcados, ativoId, erros, ocupado, onMarcar, onAtivo, onLancar, onDesfazer, onAbrirMulta }: Props) {
   const total = grupos.reduce((s, g) => s + g.subtotal, 0)
   const lancado = grupos.reduce((s, g) => s + g.lancado, 0)
   const ativo = grupos.find((g) => g.id === ativoId) ?? grupos[0]
-  const correntes = cadeias(todas)
   const marcadosValidos = grupos.filter((g) => marcados.has(g.id) && !g.tudoLancado).map((g) => g.id)
   const erroDe = (g: GrupoColaborador) => g.parcelas.map((p) => erros.get(p.id)).find(Boolean)
   const previstasAtivo = ativo.parcelas.filter((p) => p.status === 'prevista')

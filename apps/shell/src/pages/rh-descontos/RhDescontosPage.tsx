@@ -150,7 +150,7 @@ export function RhDescontosPage({ host }: { host: Host }) {
       ) : null}
       {passo === 'lancar' ? <p className="rh-retorno" role="status">{retorno}</p> : null}
       {passo === 'lancar' ? (
-        <FitaFechamento grupos={grupos} todas={todas} mes={mes} mesAtual={mesAtual} marcados={marcados} ativoId={ativoId} erros={erros} ocupado={ocupado}
+        <FitaFechamento grupos={grupos} correntes={correntes} mes={mes} mesAtual={mesAtual} marcados={marcados} ativoId={ativoId} erros={erros} ocupado={ocupado}
           onMarcar={alternarMarca} onAtivo={setAtivoId} onLancar={(c) => void executar(idsDos(c, 'prevista'), 'lancar')} onDesfazer={(c) => void executar(idsDos([c], 'descontada'), 'desfazer')} onAbrirMulta={abrirMulta} />
       ) : null}
       {passo === 'enviar' ? (

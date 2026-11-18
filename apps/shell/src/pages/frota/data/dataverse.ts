@@ -14,10 +14,6 @@ import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 type Row = Record<string, unknown>
 type Behaviors = Record<string, DateBehavior>
 
-const proximoMes = (iso: string) => {
-  const [a, m] = iso.split('-').map(Number)
-  return m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, '0')}-01`
-}
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/
 
 export function getDataverseEnvironmentLabel(clientUrl: string) {
@@ -341,7 +337,7 @@ export function createXrmSource(xrm: XrmHost): DataSource {
 
     async listarDescontosPeriodo(inicio: string, fim: string) {
       if (!MES.test(inicio) || !MES.test(fim)) throw new Error('Mês inválido')
-      const filtro = `new_competencia ge ${inicio}-01 and new_competencia lt ${proximoMes(`${fim}-01`)} and new_status ne 100000002`
+      const filtro = `new_competencia ge ${inicio}-01 and new_competencia lt ${addMonths(`${fim}-01`, 1)} and new_status ne 100000002`
       const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')}&$expand=${EXPAND_PARCELA_FOLHA}&$filter=${filtro}&$orderby=new_competencia asc`)).entities
       const totais = await totaisPorOrigem(rows)
       return rows.map((r) => mapParcelaFolha(r, totais.get(cleanId(r._new_multa_value ?? r._new_termo_value)) ?? 1))

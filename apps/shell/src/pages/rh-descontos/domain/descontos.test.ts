@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ParcelaFolha } from '../../frota/data/types'
-import { linhasDoMes, mascararCpf, nomeArquivo, planilhaDoMes, porColaborador, resumo, totaisPorMes } from './descontos'
+import { mascararCpf, nomeArquivo, planilhaDoMes, porColaborador, resumo, totaisPorMes } from './descontos'
 
 const ana = { id: 'c1', nome: 'Ana Teste', cpf: '000.000.000-00' }
 const bruno = { id: 'c2', nome: 'Bruno Teste', cpf: '111.111.111-11' }
@@ -15,18 +15,6 @@ const P = [
 ]
 
 describe('descontos', () => {
-  it('linhasDoMes ordena por colaborador e origem, com grupo, textos e subtotal', () => {
-    const l = linhasDoMes(P)
-    expect(l.map((x) => x.id)).toEqual(['b', 'a', 'c'])
-    expect(l[0].grupo).toBe('Ana Teste · R$ 195,23')
-    expect(l[1].grupo).toBe('Bruno Teste · R$ 43,44')
-    expect(l[1].origemTexto).toBe('Multa TST0002 · TST4B56')
-    expect(l[1].parcelaTexto).toBe('2/3')
-    expect(l[1].situacaoTexto).toBe('Prevista')
-    expect(l[2].origemTexto).toBe('Termo')
-    expect(l[2].situacaoTexto).toBe('Lançada em 18/11')
-  })
-
   it('resumo soma e conta', () => {
     expect(resumo(P)).toEqual({ total: 238.67, colaboradores: 2, previstas: 2, lancadas: 1 })
   })

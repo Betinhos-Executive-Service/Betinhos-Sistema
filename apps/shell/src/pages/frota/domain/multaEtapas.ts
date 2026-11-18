@@ -1,3 +1,4 @@
+import { addMonths } from '../data/dates'
 import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
 
@@ -102,16 +103,11 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
 }
 
 const MAXIMO_PARCELAS = 12
-const somaMeses = (iso: string, meses: number) => {
-  const [a, m] = iso.split('-').map(Number)
-  const t = a * 12 + (m - 1) + meses
-  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-01`
-}
 export const competenciaDe = (mes: string) => `${mes.slice(0, 7)}-01`
 export const mesBr = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 export function janelaCompetencia(hoje: string) {
   const mes = competenciaDe(hoje)
-  return { de: somaMeses(mes, -1), ate: somaMeses(mes, MAXIMO_PARCELAS) }
+  return { de: addMonths(mes, -1), ate: addMonths(mes, MAXIMO_PARCELAS) }
 }
 export type ParcelaPlano = { numero: number; total: number; competencia: string; valor: number }
 export function dividirParcelas(valor: number, n: number, primeira: string): ParcelaPlano[] {
@@ -119,7 +115,7 @@ export function dividirParcelas(valor: number, n: number, primeira: string): Par
   const parcela = Math.floor(centavos / n)
   const inicio = competenciaDe(primeira)
   return Array.from({ length: n }, (_, i) => ({
-    numero: i + 1, total: n, competencia: somaMeses(inicio, i),
+    numero: i + 1, total: n, competencia: addMonths(inicio, i),
     valor: (i === n - 1 ? centavos - parcela * (n - 1) : parcela) / 100,
   }))
 }

@@ -2,6 +2,7 @@
 // Planilha .xlsx mínima gerada no navegador (uma aba, texto inline, número, moeda, negrito). Sem dependência além do fflate.
 // O pagamento-fornecedores tem gerador próprio (lib/excel.js) acoplado aos serviços; este é o genérico do shell.
 import { strToU8, zipSync } from 'fflate'
+import { baixarBlob } from './pdf/baixar'
 
 export type Celula = string | number | null | { valor: number; formato: 'moeda' } | { valor: string; negrito: true }
 export type Planilha = { aba: string; colunas: { titulo: string; largura?: number }[]; linhas: Celula[][] }
@@ -35,9 +36,5 @@ export function gerarXlsx(p: Planilha): Uint8Array {
   })
 }
 
-export function baixarXlsx(nome: string, p: Planilha) {
-  const url = URL.createObjectURL(new Blob([gerarXlsx(p) as Uint8Array<ArrayBuffer>], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-  const a = Object.assign(document.createElement('a'), { href: url, download: nome })
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
+export const baixarXlsx = (nome: string, p: Planilha) =>
+  baixarBlob(new Blob([gerarXlsx(p) as Uint8Array<ArrayBuffer>], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nome)
