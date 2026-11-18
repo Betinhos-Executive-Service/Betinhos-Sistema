@@ -6,7 +6,9 @@
   "workers_dev": true,
   // Sem URL de pré-visualização: o Cloudflare Access protege só o endereço workers.dev.
   "preview_urls": false,
-  // Só leitura no código: o Worker lista e baixa; quem grava e apaga é o job r2 do backup-prod.yml.
+  // O Worker lista e baixa as cópias e só grava em registros/downloads/; quem grava e apaga cópias é o job r2 do backup-prod.yml.
+  // Fontes e logo do Design System (servidos pela borda, atrás do mesmo Access).
+  "assets": { "directory": "./public" },
   "r2_buckets": [{ "binding": "BACKUPS", "bucket_name": "betinhos-backup-prod" }],
   // Registro de quem baixou o quê (LGPD), em Workers Logs.
   "observability": { "enabled": true, "traces": { "enabled": true } }
