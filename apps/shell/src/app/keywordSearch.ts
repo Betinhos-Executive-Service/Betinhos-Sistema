@@ -5,9 +5,9 @@
  *
  * O Dataverse compara sem acento nem caixa (collation CI_AI); `fold` faz o mesmo no cliente para casar o destaque.
  */
-export const MAX_KEYWORDS = 6
+const MAX_KEYWORDS = 6
 
-export const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('pt-BR')
+const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('pt-BR')
 
 /** Palavras da busca: separadas por espaço, sem as de 1 caractere nem repetidas (ignora acento e caixa), no máximo 6. */
 export function keywordTokens(search: string): string[] {
@@ -88,7 +88,7 @@ export function matchesKeywords(tokens: string[], texts: string[]) {
   return tokens.every((token) => haystack.some((text) => text.includes(fold(token))))
 }
 
-export type HighlightPart = { text: string; hit: boolean }
+type HighlightPart = { text: string; hit: boolean }
 
 /** Divide o texto nos trechos que casam com alguma palavra (sem acento nem caixa), preservando o texto original. */
 export function highlightParts(text: string, tokens: string[]): HighlightPart[] {

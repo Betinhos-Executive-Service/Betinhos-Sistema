@@ -35,13 +35,13 @@ const CHOICE_TYPES = new Set(['Picklist', 'State', 'Status'])
 const TEXT_TYPES = new Set(['String', 'Memo'])
 const INTEGER_TYPES = new Set(['Integer', 'BigInt'])
 
-const sameVia = (field: CatalogField, via: string[]) => (field.relationships ?? []).map((item) => item.to).join('/') === via.join('/')
+const viaOf = (field: CatalogField) => (field.relationships ?? []).map((item) => item.to).join('/')
 
 /** Campos da busca presentes no catálogo (mais as colunas de dinheiro da visão), sem repetir o mesmo campo. */
 export function compositionSearchCatalogFields(catalog: CatalogField[], definition: ViewDefinition) {
   const found = new Map<string, CatalogField>()
-  const add = (field: CatalogField | undefined) => { if (field?.available) found.set(`${field.table}.${field.attribute}.${(field.relationships ?? []).map((item) => item.to).join('/')}`, field) }
-  for (const { table, attribute, via } of SEARCH_FIELDS) add(catalog.find((field) => field.table === table && field.attribute === attribute && sameVia(field, via) && field.path.length === via.length && (via.length > 0 || table === COMPOSITION_TABLE)))
+  const add = (field: CatalogField | undefined) => { if (field?.available) found.set(`${field.table}.${field.attribute}.${viaOf(field)}`, field) }
+  for (const { table, attribute, via } of SEARCH_FIELDS) add(catalog.find((field) => field.table === table && field.attribute === attribute && viaOf(field) === via.join('/') && field.path.length === via.length && (via.length > 0 || table === COMPOSITION_TABLE)))
   for (const { id } of definition.columns) { const field = catalog.find((item) => item.id === id); if (field?.type === 'Money' && !field.path.length) add(field) }
   return [...found.values()]
 }
@@ -50,7 +50,8 @@ export function compositionSearchCatalogFields(catalog: CatalogField[], definiti
 export function compositionKeywordFilter(document: Document, tokens: string[], fields: CatalogField[], aliasOf: (field: CatalogField) => string | null) {
   const specs: KeywordField[] = []
   for (const field of fields) {
-    const base = { attribute: field.attribute, ...(aliasOf(field) ? { entity: aliasOf(field)! } : {}) }
+    const entity = aliasOf(field)
+    const base = { attribute: field.attribute, ...(entity ? { entity } : {}) }
     if (TEXT_TYPES.has(field.type)) specs.push({ ...base, kind: 'text' })
     else if (field.type === 'Money') specs.push({ ...base, kind: 'money' })
     else if (INTEGER_TYPES.has(field.type)) specs.push({ ...base, kind: 'integer' })
