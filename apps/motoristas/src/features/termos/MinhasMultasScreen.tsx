@@ -90,17 +90,24 @@ function Meta({ multa }: { multa: MinhaMulta }) {
   );
 }
 
-/** Cartão que começa fechado: o cabeçalho é o botão que abre e fecha os detalhes. */
-function Cartao({ className, grupo, chip, titulo, resumo, tour, children }: { className?: string; grupo: string; chip?: ReactNode; titulo: string; resumo: string; tour?: string; children: ReactNode }) {
-  const [aberto, setAberto] = useState(false);
+/** Cartões abertos na sessão do app (por id da multa): sobrevivem à ida ao termo e à volta. Sem armazenamento persistente. */
+const cartoesAbertos = new Set<string>();
+
+/** Cartão que começa fechado: o cabeçalho é o botão que abre e fecha os detalhes. `resumoSoFechado` esconde o resumo quando o corpo já repete a informação. */
+function Cartao({ id, className, grupo, chip, titulo, resumo, resumoSoFechado, tour, children }: { id: string; className?: string; grupo: string; chip?: ReactNode; titulo: string; resumo: string; resumoSoFechado?: boolean; tour?: string; children: ReactNode }) {
+  const [aberto, setAbertoEstado] = useState(() => cartoesAbertos.has(id));
+  const alternar = () => setAbertoEstado((v) => {
+    if (v) cartoesAbertos.delete(id); else cartoesAbertos.add(id);
+    return !v;
+  });
   const corpoId = useId();
   return (
     <li className={`multa-card${className ? ` ${className}` : ""}`} data-grupo={grupo} data-aberto={aberto || undefined}>
-      <button type="button" className="multa-cabeca" aria-expanded={aberto} aria-controls={corpoId} data-tour={tour} onClick={() => setAberto((v) => !v)}>
+      <button type="button" className="multa-cabeca" aria-expanded={aberto} aria-controls={corpoId} data-tour={tour} onClick={alternar}>
         <span className="multa-cabeca-texto">
           {chip}
           <span className="multa-titulo">{titulo}</span>
-          <span className="multa-resumo">{resumo}</span>
+          {resumoSoFechado && aberto ? null : <span className="multa-resumo">{resumo}</span>}
         </span>
         <span className="multa-seta" aria-hidden="true" />
       </button>
@@ -119,7 +126,7 @@ function TarefaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa
   const tour = multa.acao === "aceite" ? "multas-aceite" : multa.acao === "assinar" ? "multas-termo" : undefined;
   const chipEl = <span className="multa-chip" data-tom={chip ? (chip.startsWith("Prazo vencido") ? "vencido" : "prazo") : "neutro"}>{chip || "Sem prazo marcado"}</span>;
   return (
-    <Cartao className="multa-tarefa" grupo={multa.grupo} chip={chipEl} titulo={titulo} resumo={resumo} tour={tour}>
+    <Cartao id={multa.id} className="multa-tarefa" grupo={multa.grupo} chip={chipEl} titulo={titulo} resumo={resumo} tour={tour}>
       <Meta multa={multa} />
       <Trilha etapa={etapaDaMulta(multa)} />
       {multa.acao === "assinar" ? (
@@ -142,7 +149,7 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
   const proxima = parcelas.find((p) => p.status !== "descontada")?.numero;
   const resumo = `Falta descontar ${formatBrl(falta)} · ${descontadas} de ${total} descontadas`;
   return (
-    <Cartao className="multa-dinheiro" grupo={multa.grupo} titulo={`Multa ${multa.placa || multa.auto} · ${diaMes(multa.dataHora)}`} resumo={resumo} tour={destaqueTour ? "multas-parcelas" : undefined}>
+    <Cartao id={multa.id} className="multa-dinheiro" resumoSoFechado grupo={multa.grupo} titulo={`Multa ${multa.placa || multa.auto} · ${diaMes(multa.dataHora)}`} resumo={resumo} tour={destaqueTour ? "multas-parcelas" : undefined}>
       <Trilha etapa={etapaDaMulta(multa)} />
       <p className="multa-rotulo">Falta descontar</p>
       <p className="multa-valor">{formatBrl(falta)}</p>
@@ -165,7 +172,7 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
 function SimplesCard({ multa, somenteLeitura }: { multa: MinhaMulta; somenteLeitura: boolean }) {
   const resumo = [multa.placa || multa.auto, diaMes(multa.dataHora)].filter(Boolean).join(" · ");
   return (
-    <Cartao grupo={multa.grupo} titulo={multa.situacao} resumo={resumo}>
+    <Cartao id={multa.id} grupo={multa.grupo} titulo={multa.situacao} resumo={resumo}>
       <Meta multa={multa} />
       <Trilha etapa={etapaDaMulta(multa)} />
       <VerTermoAssinado multa={multa} somenteLeitura={somenteLeitura} />
@@ -269,6 +276,7 @@ export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, lidoE
                     <h2 className="multa-grupo-titulo">
                       <button type="button" className="multa-grupo-toggle" aria-expanded={encerradasAbertas} onClick={() => setEncerradasAbertas((v) => !v)}>
                         Encerradas · {grupos.encerrada.length}
+                        <span className="multa-seta" aria-hidden="true" />
                       </button>
                     </h2>
                     {encerradasAbertas ? <ul className="termo-list">{grupos.encerrada.map((m) => <SimplesCard key={m.id} multa={m} somenteLeitura={somenteLeitura} />)}</ul> : null}

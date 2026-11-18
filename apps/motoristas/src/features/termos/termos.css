@@ -136,8 +136,7 @@
 .multa-grupo { display:grid; gap:10px; }
 .multa-grupo-titulo { display:flex; align-items:center; gap:8px; margin:0; color:#5b6472; font-size:.75rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
 .multa-grupo-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; padding:0; border:0; background:none; color:#001a3d; font:inherit; font-size:.9375rem; font-weight:700; letter-spacing:0; text-transform:none; cursor:pointer; }
-.multa-grupo-toggle::after { content:"›"; color:#5b6472; font-size:1.125rem; transition:transform 140ms cubic-bezier(.23,1,.32,1); }
-.multa-grupo-toggle[aria-expanded="true"]::after { transform:rotate(90deg); }
+.multa-grupo-toggle[aria-expanded="true"] .multa-seta { transform:rotate(225deg); }
 .multa-grupo-toggle:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); border-radius:6px; }
 .multa-card { display:grid; padding:0; border:1px solid #ebebe6; border-radius:16px; background:#fff; color:#001a3d; }
 .multa-chip { justify-self:start; display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:.75rem; font-weight:700; background:#f0f0ec; color:#5b6472; }
@@ -192,4 +191,4 @@
 .multa-botao-sec { display:inline-flex; align-items:center; justify-content:center; padding:0 16px; border:1px solid #d9d9d4; background:transparent; color:#001a3d; font:inherit; font-size:.9375rem; font-weight:700; cursor:pointer; }
 .multa-botao-sec:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
 .multa-botao-sec:disabled { opacity:.55; cursor:not-allowed; }
-@media (prefers-reduced-motion:reduce) { .multa-grupo-toggle::after,.multa-botao,.multa-seta,.multa-corpo,.multa-card[data-aberto] .multa-corpo { transition:none; } .multa-botao:not(:disabled):active { transform:none; } }
+@media (prefers-reduced-motion:reduce) { .multa-botao,.multa-seta,.multa-corpo,.multa-card[data-aberto] .multa-corpo { transition:none; } .multa-botao:not(:disabled):active { transform:none; } }
