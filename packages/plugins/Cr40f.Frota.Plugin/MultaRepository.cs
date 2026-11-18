@@ -79,11 +79,17 @@ public static class MultaMapper
     public const int TermoPendente = 100000000, TermoAssinado = 100000001, TermoCancelado = 100000004, FormaFolha = 100000001;
 
     /// <summary>Lê o termo vigente da multa para as regras do termo. Devolve o id do termo vigente, ou null.</summary>
-    public static Guid? CarregarTermo(IOrganizationService sistema, Entity linha, MultaEstado e)
+    public static Guid? CarregarTermo(IOrganizationService sistema, Entity linha, MultaEstado e, ITracingService? tracing = null)
     {
         var vigente = linha.GetAttributeValue<EntityReference>("new_termovigente");
         if (vigente == null) return null;
-        var t = sistema.Retrieve(Termo, vigente.Id, new ColumnSet("new_status", "new_formapagamento", "new_parcelas", "new_primeiracompetencia", "new_valortotal"));
+        var t = sistema.Retrieve(Termo, vigente.Id, new ColumnSet("new_multa", "new_status", "new_formapagamento", "new_parcelas", "new_primeiracompetencia", "new_valortotal"));
+        // O termo vigente tem de ser desta multa; se apontar para outra, a multa fica sem termo vigente.
+        if (t.GetAttributeValue<EntityReference>("new_multa")?.Id != linha.Id)
+        {
+            tracing?.Trace("Termo vigente {0} não pertence à multa {1}; tratando como sem termo vigente.", vigente.Id, linha.Id);
+            return null;
+        }
         var status = t.GetAttributeValue<OptionSetValue>("new_status")?.Value;
         e.TermoPendente = status == TermoPendente;
         if (status == TermoAssinado && t.GetAttributeValue<OptionSetValue>("new_formapagamento")?.Value == FormaFolha)

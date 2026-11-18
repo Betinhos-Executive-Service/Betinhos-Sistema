@@ -259,8 +259,35 @@ public class PassoMultaTests
             ["new_primeiracompetencia"] = DateTime.Parse(primeiroMes, System.Globalization.CultureInfo.InvariantCulture), ["new_valortotal"] = new Money(valor),
         });
 
-    private static Entity MultaComTermo(FakeMundo mundo, int status, Entity termo, Action<Entity>? extra = null) =>
-        Multa(mundo, status, m => { m["new_termovigente"] = new EntityReference(MultaMapper.Termo, termo.Id); extra?.Invoke(m); });
+    private static Entity MultaComTermo(FakeMundo mundo, int status, Entity termo, Action<Entity>? extra = null)
+    {
+        var multa = Multa(mundo, status, m => { m["new_termovigente"] = new EntityReference(MultaMapper.Termo, termo.Id); extra?.Invoke(m); });
+        termo["new_multa"] = new EntityReference(MultaMapper.Tabela, multa.Id);
+        return multa;
+    }
+
+    [Fact]
+    public void Termo_vigente_de_outra_multa_e_tratado_como_sem_termo_e_vai_ao_trace()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000000, 1, "2026-12-01", 100m);
+        var multa = MultaComTermo(mundo, MultaCodigos.Indicar, termo);
+        termo["new_multa"] = new EntityReference(MultaMapper.Tabela, Guid.NewGuid()); // o termo é de outra multa
+        var estado = MultaMapper.Estado(multa);
+        var tracing = new TraceFake();
+
+        var id = MultaMapper.CarregarTermo(mundo, multa, estado, tracing);
+
+        Assert.Null(id);
+        Assert.NotEqual(true, estado.TermoPendente);
+        Assert.Contains(tracing.Linhas, l => l.Contains(termo.Id.ToString()) && l.Contains(multa.Id.ToString()));
+    }
+
+    private sealed class TraceFake : ITracingService
+    {
+        public List<string> Linhas { get; } = new();
+        public void Trace(string format, params object[] args) => Linhas.Add(args.Length == 0 ? format : string.Format(format, args));
+    }
 
     [Fact]
     public void TermoAssinado_fora_da_api_do_termo_e_recusado()

@@ -30,7 +30,7 @@ public sealed class PassoMultaPlugin : IPlugin
             var dados = context.InputParameters.Contains("DadosJson") ? Convert.ToString(context.InputParameters["DadosJson"]) : null;
             var hoje = FrotaPendenciasPlugin.ResolverHoje(null, DateTime.UtcNow);
             // Parcelas: a trava do termo só deixa o servidor gravar; criadas pelo SYSTEM com o dono = quem fez o acerto.
-            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje, factory.CreateOrganizationService(null), context.UserId, MultaTravaPlugin.TemPai(context, ApisDoTermo));
+            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje, factory.CreateOrganizationService(null), context.UserId, MultaTravaPlugin.TemPai(context, ApisDoTermo), tracing);
             tracing.Trace("{0}: {1} gravado na multa {2}", Mensagem, passo, multaId);
         }
         catch (InvalidPluginExecutionException) { throw; }
@@ -42,7 +42,7 @@ public sealed class PassoMultaPlugin : IPlugin
         }
     }
 
-    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje, IOrganizationService? sistema = null, Guid? dono = null, bool viaTermo = false)
+    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje, IOrganizationService? sistema = null, Guid? dono = null, bool viaTermo = false, ITracingService? tracing = null)
     {
         sistema ??= service;
         DadosPasso? dados;
@@ -53,7 +53,7 @@ public sealed class PassoMultaPlugin : IPlugin
         var antes = MultaMapper.Estado(linha);
         if ((passo == Passos.TermoAssinado || passo == Passos.TermoContestado) && !viaTermo)
             throw new InvalidPluginExecutionException("Este passo é registrado pelo termo do motorista.");
-        var termoVigente = MultaMapper.CarregarTermo(sistema, linha, antes);
+        var termoVigente = MultaMapper.CarregarTermo(sistema, linha, antes, tracing);
         if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha" && antes.TermoParcelas != null && antes.TermoPrimeiroMes == null)
             throw new InvalidPluginExecutionException("O termo assinado não tem o primeiro mês; confira o termo antes de lançar na folha.");
         if (passo == Passos.Cancelar || passo == Passos.ConcluirDesconto || passo == Passos.ReabrirDesconto) ContarParcelas(sistema, multaId, antes); // só estes passos leem a contagem

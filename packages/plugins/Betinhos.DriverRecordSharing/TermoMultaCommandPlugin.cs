@@ -901,7 +901,7 @@ namespace Betinhos.DriverRecordSharing
             if (erro != null) throw new InvalidPluginExecutionException(erro);
             var nome = "aditivo-" + SemAcento(aditivo.Funcionario.GetAttributeValue<string>("cr40f_nomecompleto")) + "-" + SemAcento(aditivo.Versao) + ".pdf";
             UploadPdf(system, aditivo.Funcionario.ToEntityReference(), nome, assinado, ColunaAditivo);
-            system.Update(new Entity(Funcionario, aditivo.Funcionario.Id) { ["new_aditivoassinaturaem"] = assinadoEm.Value });
+            system.Update(new Entity(Funcionario, aditivo.Funcionario.Id) { ["new_aditivoassinaturaem"] = DateTime.SpecifyKind(dia.AddHours(12), DateTimeKind.Utc) }); // dia de São Paulo às 12:00 UTC: meia-noite e meio-dia UTC caem no mesmo dia
         }
 
         // ---------------- Utilitários ----------------

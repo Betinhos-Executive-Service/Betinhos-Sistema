@@ -939,7 +939,27 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             Assert.Equal("new_aditivoassinatura", s.ColunaDoUpload);
             Assert.Equal(pdf, s.UploadedPdf);
-            Assert.Equal(new DateTime(2026, 10, 21), s.Motorista.GetAttributeValue<DateTime>("new_aditivoassinaturaem"));
+            Assert.Equal(new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc), s.Motorista.GetAttributeValue<DateTime>("new_aditivoassinaturaem"));
+        }
+
+        [Fact]
+        public void RegistrarAditivoGravaOMesmoDiaParaMeiaNoiteEMeioDiaUtc()
+        {
+            DateTime Grava(DateTime assinadoEm)
+            {
+                var s = Cenario();
+                s.Privilegiados.Add(s.Gestor);
+                var inputs = DoFuncionario(s);
+                inputs["new_PdfBase64"] = Convert.ToBase64String(AditivoAssinado(s));
+                inputs["new_AssinadoEm"] = assinadoEm;
+                Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs);
+                return s.Motorista.GetAttributeValue<DateTime>("new_aditivoassinaturaem");
+            }
+
+            var meiaNoite = Grava(new DateTime(2026, 10, 21, 0, 0, 0, DateTimeKind.Utc)); // 20/10 21:00 em São Paulo
+            var meioDia = Grava(new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc)); // 21/10 09:00 em São Paulo
+            Assert.Equal(new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc), meiaNoite);
+            Assert.Equal(new DateTime(2026, 10, 21, 12, 0, 0, DateTimeKind.Utc), meioDia);
         }
 
         [Fact]
