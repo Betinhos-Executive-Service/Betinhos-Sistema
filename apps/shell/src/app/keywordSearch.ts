@@ -93,12 +93,10 @@ export function matchesKeywords(tokens: string[], texts: string[]) {
   return tokens.every((token) => haystack.some((text) => text.includes(fold(token))))
 }
 
-type HighlightPart = { text: string; hit: boolean }
-
-/** Divide o texto nos trechos que casam com alguma palavra (sem acento nem caixa), preservando o texto original. */
-export function highlightParts(text: string, tokens: string[]): HighlightPart[] {
+/** Trechos `[início, fim)` do texto que casam com alguma palavra (sem acento nem caixa), já unidos e em ordem. */
+export function highlightRanges(text: string, tokens: string[]): [number, number][] {
   const needles = tokens.map(fold).filter(Boolean)
-  if (!text || !needles.length) return [{ text, hit: false }]
+  if (!text || !needles.length) return []
   let folded = ''
   const starts: number[] = []
   const ends: number[] = []
@@ -115,11 +113,27 @@ export function highlightParts(text: string, tokens: string[]): HighlightPart[] 
       for (let index = starts[at]; index < ends[at + needle.length - 1]; index++) marked[index] = true
     }
   }
-  const parts: HighlightPart[] = []
+  const ranges: [number, number][] = []
   for (let index = 0; index < text.length; index++) {
-    const last = parts[parts.length - 1]
-    if (last && last.hit === marked[index]) last.text += text[index]
-    else parts.push({ text: text[index], hit: marked[index] })
+    if (!marked[index]) continue
+    const last = ranges[ranges.length - 1]
+    if (last && last[1] === index) last[1] = index + 1
+    else ranges.push([index, index + 1])
   }
+  return ranges
+}
+
+type HighlightPart = { text: string; hit: boolean }
+
+/** Divide o texto nos trechos que casam com alguma palavra (sem acento nem caixa), preservando o texto original. */
+export function highlightParts(text: string, tokens: string[]): HighlightPart[] {
+  const parts: HighlightPart[] = []
+  let at = 0
+  for (const [start, end] of highlightRanges(text, tokens)) {
+    if (start > at) parts.push({ text: text.slice(at, start), hit: false })
+    parts.push({ text: text.slice(start, end), hit: true })
+    at = end
+  }
+  if (at < text.length || !parts.length) parts.push({ text: text.slice(at), hit: false })
   return parts
 }
