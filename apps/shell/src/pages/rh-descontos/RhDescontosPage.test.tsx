@@ -73,14 +73,14 @@ describe('Descontos em folha', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Ana/ }))
     fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Diego/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Lançar os 2 marcados' }))
-    expect((await screen.findByRole('status')).textContent).toMatch(/^2 parcelas · R\$ .+ lançadas\.$/)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^2 parcelas · R\$ .+ lançadas\.$/))
     passo(/Conferir/)
     expect(await within(holerite(/Ana/)).findByText(/^Lançado/)).toBeTruthy()
     passo(/Lançar/)
     fireEvent.click(screen.getByRole('button', { name: /Ana Teste/ }))
     fireEvent.click(await screen.findByRole('button', { name: /^Desfazer 1 lançamento \(R\$/ }))
     await waitFor(() => expect((screen.getByRole('checkbox', { name: /Marcar Ana/ }) as HTMLInputElement).disabled).toBe(false))
-    expect(screen.getByRole('status').textContent).toMatch(/voltou a prevista/)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/voltou a prevista/))
   })
 
   it('mostra a recusa do servidor como veio', async () => {
