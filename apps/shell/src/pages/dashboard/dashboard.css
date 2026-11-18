@@ -98,6 +98,8 @@
 .dash-grade__natural { align-self: start; }
 
 .dash-card { container-type: inline-size; display: flex; flex-direction: column; gap: var(--bt-space-3); min-width: 0; }
+/* Mesmo contorno e sombra do StatCard e do AlertCard (DS 3.4.0); .bt-surface na frente para vencer a regra do Surface. */
+.bt-surface.dash-card { border-color: var(--bt-color-border-strong); box-shadow: var(--bt-shadow-card); }
 .dash-card__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-2) var(--bt-space-4); }
 .dash-card__resumo { display: grid; flex: 1 1 180px; gap: var(--bt-space-1); min-width: 0; }
 .dash-card__valor { font-size: var(--bt-font-size-26); font-weight: var(--bt-font-weight-extrabold); line-height: 1.1; color: var(--bt-color-brand); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
