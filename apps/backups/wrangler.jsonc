@@ -1,0 +1,15 @@
+{
+  "name": "backups-betinhos",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-26",
+  "account_id": "a26e65df1496d9808e12a495bc47cd80",
+  "workers_dev": true,
+  // Sem URL de pré-visualização: o Cloudflare Access protege só o endereço workers.dev.
+  "preview_urls": false,
+  // Só leitura no código: o Worker lista e baixa; quem grava e apaga é o job r2 do backup-prod.yml.
+  "r2_buckets": [{ "binding": "BACKUPS", "bucket_name": "betinhos-backup-prod" }],
+  // Registro de quem baixou o quê (LGPD), em Workers Logs.
+  "observability": { "enabled": true, "traces": { "enabled": true } }
+  // Secrets (wrangler secret put): ACCESS_EQUIPE (nome da equipe do Zero Trust, <equipe>.cloudflareaccess.com) e
+  // ACCESS_AUD (Application Audience do app do Access). Sem os dois, a página recusa todo mundo.
+}

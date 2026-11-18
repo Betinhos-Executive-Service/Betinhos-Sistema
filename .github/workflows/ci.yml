@@ -87,8 +87,8 @@ jobs:
       # Todo pacote com script typecheck (shell, escala-fds, portal-cliente e worker, agentes-ia, despesas-ia).
       - name: Typecheck
         run: pnpm -r --if-present typecheck
-      - name: Sintaxe do cadastro-passageiro
-        run: pnpm --filter @betinhos/cadastro-passageiro check
+      - name: Sintaxe dos Workers sem typecheck (cadastro-passageiro e backups)
+        run: pnpm --filter @betinhos/cadastro-passageiro --filter @betinhos/backups check
       # Inclui @betinhos/formulario-geral (build do webresource + 19 testes do app).
       - name: Testes (exceto shell)
         run: pnpm -r --filter '!@betinhos/shell' test

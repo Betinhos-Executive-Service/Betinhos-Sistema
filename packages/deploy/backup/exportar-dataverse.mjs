@@ -1,4 +1,6 @@
 // Exporta os registros do Dataverse para uma pasta (um .ndjson.gz por tabela + manifesto.json), para o backup externo.
+// Cada registro vem com os valores formatados (nome do lookup, rótulo da choice) e o manifesto leva os nomes de exibição
+// da tabela e das colunas, para planilhas.mjs montar as planilhas do time.
 // Login da conta de serviço por client credentials (DV_TENANT_ID, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_ENVIRONMENT_URL).
 //
 //   node exportar-dataverse.mjs <pasta-saida>
@@ -17,9 +19,10 @@ export const SEMPRE_EXCLUIR = ['cr40f_segredo']
 const EXTRA_PADRAO = ['account', 'contact']
 const API = 'api/data/v9.2'
 
+const rotulo = (label) => label?.UserLocalizedLabel?.Label || label?.LocalizedLabels?.[0]?.Label || undefined
 const lista = (texto) => (texto ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
 
-// Recebe EntityDefinitions e devolve [{ logico, conjunto }] na ordem de nome.
+// Recebe EntityDefinitions e devolve [{ logico, conjunto, nome, chave }] na ordem de nome.
 export function escolherTabelas(definicoes, { extra = EXTRA_PADRAO, excluir = [] } = {}) {
   const fora = new Set([...SEMPRE_EXCLUIR, ...excluir])
   const dentro = new Set(extra)
@@ -27,7 +30,7 @@ export function escolherTabelas(definicoes, { extra = EXTRA_PADRAO, excluir = []
     .filter((d) => d.EntitySetName && !fora.has(d.LogicalName))
     .filter((d) => d.TableType !== 'Virtual')
     .filter((d) => d.IsCustomEntity === true || dentro.has(d.LogicalName))
-    .map((d) => ({ logico: d.LogicalName, conjunto: d.EntitySetName }))
+    .map((d) => ({ logico: d.LogicalName, conjunto: d.EntitySetName, nome: rotulo(d.DisplayName) ?? d.LogicalName, chave: d.PrimaryIdAttribute }))
     .sort((a, b) => a.logico.localeCompare(b.logico))
 }
 
@@ -89,6 +92,23 @@ export async function exportarTabela(base, conjunto, cabecalhos, arquivo, opcoes
   return total
 }
 
+// Metadata das colunas para a planilha: { colunas: { logico: 'Nome de exibição' }, semFuso: ['coluna'], numericas: ['coluna'] }
+// (data e hora "independente de fuso" vem com Z mas não deve virar horário de Brasília; dinheiro e número saem crus, mesmo
+// com valor formatado). Falha aqui não derruba a exportação.
+const NUMERICOS = new Set(['Money', 'Integer', 'BigInt', 'Decimal', 'Double'])
+async function metadataColunas(base, logico, cabecalhos) {
+  const atributos = `${base}/${API}/EntityDefinitions(LogicalName='${logico}')/Attributes`
+  const [nomes, datas] = await Promise.all([
+    obter(`${atributos}?$select=LogicalName,DisplayName,AttributeType`, cabecalhos).catch(() => ({})),
+    obter(`${atributos}/Microsoft.Dynamics.CRM.DateTimeAttributeMetadata?$select=LogicalName,DateTimeBehavior`, cabecalhos).catch(() => ({})),
+  ])
+  return {
+    colunas: Object.fromEntries((nomes.value ?? []).map((a) => [a.LogicalName, rotulo(a.DisplayName)]).filter(([, v]) => v)),
+    semFuso: (datas.value ?? []).filter((a) => a.DateTimeBehavior?.Value === 'TimeZoneIndependent').map((a) => a.LogicalName),
+    numericas: (nomes.value ?? []).filter((a) => NUMERICOS.has(a.AttributeType)).map((a) => a.LogicalName),
+  }
+}
+
 async function principal(pasta) {
   const base = (process.env.DV_ENVIRONMENT_URL ?? '').replace(/\/+$/, '')
   const faltam = ['DV_ENVIRONMENT_URL', 'DV_TENANT_ID', 'DV_CLIENT_ID', 'DV_CLIENT_SECRET'].filter((n) => !process.env[n])
@@ -103,19 +123,20 @@ async function principal(pasta) {
     Accept: 'application/json',
     'OData-MaxVersion': '4.0',
     'OData-Version': '4.0',
-    Prefer: 'odata.maxpagesize=5000',
+    Prefer: 'odata.maxpagesize=5000,odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
   }
-  const definicoes = await obter(`${base}/${API}/EntityDefinitions?$select=LogicalName,EntitySetName,IsCustomEntity,TableType`, cabecalhos)
+  const definicoes = await obter(`${base}/${API}/EntityDefinitions?$select=LogicalName,EntitySetName,IsCustomEntity,TableType,DisplayName,PrimaryIdAttribute`, cabecalhos)
   const extra = process.env.BACKUP_TABELAS_EXTRA === undefined ? EXTRA_PADRAO : lista(process.env.BACKUP_TABELAS_EXTRA)
   const tabelas = escolherTabelas(definicoes.value ?? [], { extra, excluir: lista(process.env.BACKUP_TABELAS_EXCLUIR) })
 
   mkdirSync(join(pasta, 'tabelas'), { recursive: true })
   const manifesto = { ambiente: base, inicio: new Date().toISOString(), tabelas: [], falhas: [] }
-  for (const { logico, conjunto } of tabelas) {
+  for (const { logico, conjunto, nome, chave } of tabelas) {
     const inicio = Date.now()
     try {
       const registros = await exportarTabela(base, conjunto, cabecalhos, join(pasta, 'tabelas', `${logico}.ndjson.gz`))
-      manifesto.tabelas.push({ tabela: logico, conjunto, registros })
+      const { colunas, semFuso, numericas } = registros ? await metadataColunas(base, logico, cabecalhos) : {}
+      manifesto.tabelas.push({ tabela: logico, conjunto, nome, chave, registros, colunas, semFuso, numericas })
       console.log(`${logico}: ${registros} registros (${((Date.now() - inicio) / 1000).toFixed(1)} s)`)
     } catch (erro) {
       manifesto.falhas.push({ tabela: logico, erro: String(erro.message ?? erro).slice(0, 300) })
