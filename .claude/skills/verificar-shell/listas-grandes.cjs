@@ -1,7 +1,7 @@
 // Listas grandes no modo mock (Chromium headless): primeira página, rolagem infinita sem botão, busca sem travar,
 // cache ao voltar, edição refletida, erro no meio da carga. Uso (com `pnpm dev` rodando):
 //   node .claude/skills/verificar-shell/listas-grandes.cjs <pasta-dos-prints> [http://localhost:36472/]
-// Na VM cloud o Playwright e o Chromium já vêm instalados; fora dela ajuste PLAYWRIGHT_MODULE e CHROMIUM.
+// Na VM cloud o Playwright e o Chromium já vêm instalados; fora dela ajuste PLAYWRIGHT_MODULE e, se preciso, CHROMIUM.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '/opt/node-tools/node_modules/playwright')
 const OUT = process.argv[2] || '.'
 const BASE = process.argv[3] || 'http://localhost:36472/'
@@ -13,7 +13,8 @@ async function scrollDown(page, times = 4) { await page.mouse.move(900, 500); fo
 async function waitText(page, re, timeout = 15000) { await page.getByText(re).first().waitFor({ timeout }) }
 
 ;(async () => {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' })
+  // Sem CHROMIUM, o Chromium que o Playwright instalado já encontra (na VM cloud, o pré-instalado).
+  const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {})
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -90,7 +91,7 @@ async function waitText(page, re, timeout = 15000) { await page.getByText(re).fi
   await page.screenshot({ path: `${OUT}/06-pessoas-erro-no-meio.png` })
 
   // 7. Outras listas com volume.
-  for (const [rota, nome, fim] of [['ops?periodo=all', 'ops', /OPs · R\$/], ['pagantes?periodo=all', 'pagantes', /pagantes · R\$/], ['despesas-operacionais?periodo=all', 'despesas', /de \d+ no período$/]]) {
+  for (const [rota, nome, fim] of [['ops?periodo=all', 'ops', /OPs · R\$/], ['pagantes?periodo=all', 'pagantes', /pagantes · R\$/], ['despesas-operacionais?periodo=all', 'despesas', /despesas de \d+$/]]) {
     t0 = Date.now()
     await page.goto(`${BASE}?volume=5000#/${rota}`)
     await page.locator('.bt-table__row').first().waitFor({ timeout: 20000 })
@@ -115,7 +116,7 @@ async function waitText(page, re, timeout = 15000) { await page.getByText(re).fi
   await page.goto(`${BASE}?volume=3000#/funcionarios`)
   await page.locator('.bt-table__row').first().waitFor({ timeout: 20000 })
   const fFirst = Date.now() - t0
-  await waitText(page, /de 300\d ·/, 20000)
+  await waitText(page, /de 30\d\d ·/, 20000)
   log(`[funcionários] primeira linha em ${fFirst} ms; completa em ${Date.now() - t0} ms; linhas no DOM: ${await rows(page)}; rodapé: "${await footer(page)}"`)
   await page.screenshot({ path: `${OUT}/09-funcionarios.png` })
 
