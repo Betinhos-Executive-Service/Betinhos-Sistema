@@ -21,6 +21,8 @@ export type Multa = { id: string; /** cr40f_id_multa (ex.: NT-1073), o código c
   responsavel?: number | null; motivoEmpresa?: number | null; canal?: number | null; aceiteEm?: string | null; vencimento?: string | null
   valorComDesconto?: number | null; valorPago?: number | null; pagaEm?: string | null; competencia?: string | null; acertoEm?: string | null
   encerradaEm?: string | null; canceladaEm?: string | null; motivoCancelamento?: string | null; arquivos?: ArquivosMulta
+  /** Fase 3: dia em que o motorista contestou o termo e dia em que declarou o aceite na CNH Digital. */
+  contestadaEm?: string | null; aceiteDeclaradoEm?: string | null
 }
 /** Retorno da Custom API new_DossieMulta (plugin DossieMultaPlugin). */
 export type DossieServico = { id: string; codigo: string | null; cliente: string | null; saida: string; retorno: string | null; motorista: string | null; status: string | null; noHorario: boolean }

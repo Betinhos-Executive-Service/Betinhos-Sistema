@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest'
 import { calcularParcelas, expiraEm, rotuloTermo, validarAcordo, type Acordo } from './termoMulta'
 
 const folha: Acordo = { forma: 'folha', parcelas: 3, valorTotal: 195.23, primeiraCompetencia: '2026-11-01' }
-const ctxOk = { temAditivo: true, recursoPendente: false, temMotorista: true, termoPendente: false }
-const ctxTudoRuim = { temAditivo: false, recursoPendente: true, temMotorista: false, termoPendente: true }
+const ctxOk = { temAditivo: true, recursoPendente: false, temMotorista: true, termoPendente: false, hoje: '2026-11-18', dataParaIndicar: '2026-12-10', avisado: false }
+const ctxTudoRuim = { ...ctxOk, temAditivo: false, recursoPendente: true, temMotorista: false, termoPendente: true }
 
 const MSG = {
   motorista: 'A multa não tem motorista indicado.',
   aditivo: 'O motorista ainda não tem o aditivo de assinatura eletrônica registrado.',
   termo: 'Já existe um termo pendente para esta multa.',
-  parcelas: 'Escolha de 1 a 3 parcelas.',
+  parcelas: 'Escolha de 1 a 12 parcelas.',
+  soFolha: 'O termo agora é só para desconto em folha.',
+  janela: 'Escolha um mês entre 10/2026 e 11/2027.',
+  etapa2: 'O termo só é enviado na etapa 2, antes do aviso ao motorista.',
+  prazoCurto: 'Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.',
   competencia: 'Competência inválida.',
   valor: 'Informe um valor maior que zero.',
   recurso: 'Há recurso pendente: o desconto só pode ser acordado depois do resultado.',
@@ -42,47 +46,57 @@ describe('calcularParcelas', () => {
   })
   it('acordo de folha inválido lança erro, sem dividir por zero', () => {
     expect(() => calcularParcelas({ ...folha, parcelas: 0 as 1 })).toThrow()
-    expect(() => calcularParcelas({ ...folha, parcelas: 4 as 3 })).toThrow()
+    expect(() => calcularParcelas({ ...folha, parcelas: 13 })).toThrow()
     expect(() => calcularParcelas({ ...folha, primeiraCompetencia: '2026-11-15' })).toThrow()
   })
 })
 
-describe('validarAcordo', () => {
+const folhaF: Acordo = { ...folha, primeiraCompetencia: '2026-12-01' }
+describe('validarAcordo (fase 3)', () => {
   it('acordo válido retorna null', () => {
-    expect(validarAcordo(folha, ctxOk)).toBeNull()
-    expect(validarAcordo({ ...folha, forma: 'guia' }, { ...ctxOk, recursoPendente: true })).toBeNull()
+    expect(validarAcordo(folhaF, ctxOk)).toBeNull()
+    expect(validarAcordo({ ...folhaF, parcelas: 12, primeiraCompetencia: '2027-11-01' }, ctxOk)).toBeNull()
   })
   it('mensagens exatas de cada regra', () => {
-    expect(validarAcordo(folha, { ...ctxOk, temMotorista: false })).toBe(MSG.motorista)
-    expect(validarAcordo(folha, { ...ctxOk, temAditivo: false })).toBe(MSG.aditivo)
-    expect(validarAcordo(folha, { ...ctxOk, termoPendente: true })).toBe(MSG.termo)
-    expect(validarAcordo({ ...folha, valorTotal: 0 }, ctxOk)).toBe(MSG.valor)
-    expect(validarAcordo({ ...folha, valorTotal: -5 }, ctxOk)).toBe(MSG.valor)
-    expect(validarAcordo(folha, { ...ctxOk, recursoPendente: true })).toBe(MSG.recurso)
+    expect(validarAcordo(folhaF, { ...ctxOk, temMotorista: false })).toBe(MSG.motorista)
+    expect(validarAcordo(folhaF, { ...ctxOk, temAditivo: false })).toBe(MSG.aditivo)
+    expect(validarAcordo(folhaF, { ...ctxOk, termoPendente: true })).toBe(MSG.termo)
+    expect(validarAcordo({ ...folhaF, forma: 'guia' }, ctxOk)).toBe(MSG.soFolha)
+    expect(validarAcordo({ ...folhaF, valorTotal: 0 }, ctxOk)).toBe(MSG.valor)
+    expect(validarAcordo(folhaF, { ...ctxOk, recursoPendente: true })).toBe(MSG.recurso)
+    expect(validarAcordo(folhaF, { ...ctxOk, avisado: true })).toBe(MSG.etapa2)
+    expect(validarAcordo(folhaF, { ...ctxOk, dataParaIndicar: '2026-11-20' })).toBe(MSG.prazoCurto)
+    expect(validarAcordo(folhaF, { ...ctxOk, dataParaIndicar: '2026-11-21' })).toBeNull()
   })
-  it('parcelas fora de 1 a 3 ou não inteiras', () => {
-    expect(validarAcordo({ ...folha, parcelas: 0 as 1 }, ctxOk)).toBe(MSG.parcelas)
-    expect(validarAcordo({ ...folha, parcelas: 4 as 3 }, ctxOk)).toBe(MSG.parcelas)
-    expect(validarAcordo({ ...folha, parcelas: 1.5 as 1 }, ctxOk)).toBe(MSG.parcelas)
+  it('parcelas fora de 1 a 12 ou não inteiras', () => {
+    expect(validarAcordo({ ...folhaF, parcelas: 0 }, ctxOk)).toBe(MSG.parcelas)
+    expect(validarAcordo({ ...folhaF, parcelas: 13 }, ctxOk)).toBe(MSG.parcelas)
+    expect(validarAcordo({ ...folhaF, parcelas: 1.5 }, ctxOk)).toBe(MSG.parcelas)
   })
-  it('competência fora do formato YYYY-MM-01', () => {
-    expect(validarAcordo({ ...folha, primeiraCompetencia: '2026-11-15' }, ctxOk)).toBe(MSG.competencia)
-    expect(validarAcordo({ ...folha, primeiraCompetencia: '2026-13-01' }, ctxOk)).toBe(MSG.competencia)
-    expect(validarAcordo({ ...folha, primeiraCompetencia: 'novembro' }, ctxOk)).toBe(MSG.competencia)
+  it('competência fora do formato e fora da janela do RH', () => {
+    expect(validarAcordo({ ...folhaF, primeiraCompetencia: '2026-12-15' }, ctxOk)).toBe(MSG.competencia)
+    expect(validarAcordo({ ...folhaF, primeiraCompetencia: 'novembro' }, ctxOk)).toBe(MSG.competencia)
+    expect(validarAcordo({ ...folhaF, primeiraCompetencia: '2026-08-01' }, ctxOk)).toBe(MSG.janela)
+    expect(validarAcordo({ ...folhaF, primeiraCompetencia: '2027-12-01' }, ctxOk)).toBe(MSG.janela)
+    expect(validarAcordo({ ...folhaF, primeiraCompetencia: '2026-10-01' }, ctxOk)).toBeNull()
   })
   it('valor mínimo de R$ 0,01 por parcela e 1,005 arredondado', () => {
-    expect(validarAcordo({ ...folha, valorTotal: 0.02 }, ctxOk)).toBe(MSG.valor)
-    expect(validarAcordo({ ...folha, valorTotal: 0.03 }, ctxOk)).toBeNull()
-    expect(validarAcordo({ ...folha, parcelas: 1, valorTotal: 1.005 }, ctxOk)).toBeNull()
+    expect(validarAcordo({ ...folhaF, valorTotal: 0.02 }, ctxOk)).toBe(MSG.valor)
+    expect(validarAcordo({ ...folhaF, valorTotal: 0.03 }, ctxOk)).toBeNull()
+    expect(validarAcordo({ ...folhaF, parcelas: 1, valorTotal: 1.005 }, ctxOk)).toBeNull()
   })
-  it('ordem das validações, em pares', () => {
-    const ruim = { ...folha, parcelas: 0 as 1, primeiraCompetencia: 'x', valorTotal: 0 }
+  it('ordem do plugin: etapa 2, prazo curto, motorista, aditivo, pendente, folhaF, parcelas, competência, janela, valor', () => {
+    const ruim = { ...folhaF, forma: 'guia' as const, parcelas: 0, primeiraCompetencia: 'x', valorTotal: 0 }
+    expect(validarAcordo(ruim, { ...ctxTudoRuim, avisado: true, dataParaIndicar: '2026-11-19' })).toBe(MSG.etapa2)
+    expect(validarAcordo(ruim, { ...ctxTudoRuim, dataParaIndicar: '2026-11-19' })).toBe(MSG.prazoCurto)
     expect(validarAcordo(ruim, ctxTudoRuim)).toBe(MSG.motorista)
     expect(validarAcordo(ruim, { ...ctxTudoRuim, temMotorista: true })).toBe(MSG.aditivo)
     expect(validarAcordo(ruim, { ...ctxTudoRuim, temMotorista: true, temAditivo: true })).toBe(MSG.termo)
-    expect(validarAcordo(ruim, { ...ctxOk, recursoPendente: true })).toBe(MSG.parcelas)
-    expect(validarAcordo({ ...ruim, parcelas: 3 }, { ...ctxOk, recursoPendente: true })).toBe(MSG.competencia)
-    expect(validarAcordo({ ...ruim, parcelas: 3, primeiraCompetencia: '2026-11-01' }, { ...ctxOk, recursoPendente: true })).toBe(MSG.valor)
+    expect(validarAcordo(ruim, ctxOk)).toBe(MSG.soFolha)
+    expect(validarAcordo({ ...ruim, forma: 'folha' }, ctxOk)).toBe(MSG.parcelas)
+    expect(validarAcordo({ ...ruim, forma: 'folha', parcelas: 3 }, ctxOk)).toBe(MSG.competencia)
+    expect(validarAcordo({ ...ruim, forma: 'folha', parcelas: 3, primeiraCompetencia: '2026-08-01' }, ctxOk)).toBe(MSG.janela)
+    expect(validarAcordo({ ...ruim, forma: 'folha', parcelas: 3, primeiraCompetencia: '2026-12-01' }, { ...ctxOk, recursoPendente: true })).toBe(MSG.valor)
   })
 })
 
@@ -91,6 +105,10 @@ describe('prazo e rótulo do termo (v2)', () => {
     expect(expiraEm('2026-10-20T13:00:00Z')).toBe('2026-10-27')
     expect(expiraEm('2026-10-21T01:30:00Z')).toBe('2026-10-27')
     expect(expiraEm(null)).toBeNull()
+  })
+  it('expira no que vier primeiro: 7 dias ou 3 dias antes do prazo de indicação', () => {
+    expect(expiraEm('2026-10-20T13:00:00Z', '2026-11-30')).toBe('2026-10-27')
+    expect(expiraEm('2026-10-20T13:00:00Z', '2026-10-25')).toBe('2026-10-22')
   })
   it('rótulo da coluna Termo', () => {
     expect(rotuloTermo({ status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' })).toBe('Pendente · expira 27/10')

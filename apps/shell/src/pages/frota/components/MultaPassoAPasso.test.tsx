@@ -5,7 +5,7 @@ import { ToastProvider } from '@betinhos/ui'
 import { MULTA } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import { ApiError } from '../data/xrm'
-import type { Dossie, FrotaData, Multa } from '../data/types'
+import type { Dossie, FrotaData, Multa, TermoMulta } from '../data/types'
 import { dadosSemVazios, MultaPassoAPasso, opcoesMotoristas, penalidadeFaltando } from './MultaPassoAPasso'
 
 const HOJE = '2026-11-17'
@@ -304,5 +304,53 @@ describe('Acertar na folha com parcelas', () => {
     expect(screen.getByText('Lançada em 10/11')).toBeTruthy()
     expect(screen.getAllByText('Prevista')).toHaveLength(2)
     expect(screen.queryByText('Multa encerrada. Nada a fazer.')).toBeNull()
+  })
+})
+
+const termoBase: TermoMulta = { id: 't1', status: 'pendente', forma: 'folha', parcelas: 3, valorTotal: 300, primeiraCompetencia: '2026-12-01', enviadoEm: '2026-11-17T13:00:00Z', assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: '2026-11-17T13:00:00Z' }
+
+describe('Termo dentro do passo a passo', () => {
+  const avisar: Multa = { ...multa, status: MULTA.NOTIFICADO, motorista: ana, dataParaIndicar: '2026-12-10' }
+
+  it('etapa 2 com aditivo e sem termo: oferece o termo pelo app e o WhatsApp', async () => {
+    renderPasso(fonte({ temAditivo: vi.fn(async () => true) }), avisar)
+    expect(await screen.findByRole('button', { name: 'Enviar termo pelo app' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Avisei' })).toBeNull()
+  })
+
+  it('termo pendente: mostra o andamento e deixa o Avisei desabilitado com o motivo', async () => {
+    const m: Multa = { ...avisar, termo: { status: 'pendente', enviadoEm: termoBase.enviadoEm }, termoVigente: { id: 't1', label: 'Termo' } }
+    renderPasso(fonte({ temAditivo: vi.fn(async () => true), listarTermos: vi.fn(async () => [termoBase]) }), m)
+    expect(await screen.findByText('Aguardando o motorista assinar o termo')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Lembrar' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Cancelar termo' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Avisei' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Cancele o termo antes de avisar pelo WhatsApp.')).toBeTruthy()
+  })
+
+  it('etapa 1 com termo contestado mostra a contestação do motorista', async () => {
+    const m: Multa = { ...multa, motorista: ana, contestadaEm: '2026-11-16', termo: { status: 'contestado', enviadoEm: termoBase.enviadoEm } }
+    renderPasso(fonte({ listarTermos: vi.fn(async () => [{ ...termoBase, status: 'contestado' as const, motivoContestacao: 'Não era eu dirigindo' }]) }), m)
+    expect(await screen.findByText('Contestação do motorista')).toBeTruthy()
+    expect(screen.getByText(/Não era eu dirigindo/)).toBeTruthy()
+  })
+
+  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 90, termo: { status: 'assinado', enviadoEm: '2026-10-05T13:00:00Z' } }
+
+  it('acerto com termo assinado: parcelas fixas e mês do termo', async () => {
+    const termo = { ...termoBase, status: 'assinado' as const, parcelas: 3, primeiraCompetencia: '2026-11-01' }
+    renderPasso(fonte({ listarTermos: vi.fn(async () => [termo]) }), acertar)
+    fireEvent.click(await screen.findByLabelText('Lancei na folha'))
+    expect(await screen.findByText('3 parcelas, como assinado')).toBeTruthy()
+    expect((screen.getByLabelText(/Primeiro mês/) as HTMLInputElement).value).toBe('2026-11')
+  })
+
+  it('acerto com primeiro mês do termo já passado avisa e usa o primeiro mês possível', async () => {
+    const termo = { ...termoBase, status: 'assinado' as const, parcelas: 3, primeiraCompetencia: '2026-08-01' }
+    renderPasso(fonte({ listarTermos: vi.fn(async () => [termo]) }), acertar)
+    fireEvent.click(await screen.findByLabelText('Lancei na folha'))
+    expect(await screen.findByText('O primeiro mês do termo (08/2026) já passou; as parcelas começam em 11/2026.')).toBeTruthy()
   })
 })
