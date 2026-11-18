@@ -36,8 +36,10 @@ export interface DataSource {
   uploadImage(id: string, field: ImageField, file: File): Promise<void>
   /** Limpa a coluna de imagem (volta às iniciais). */
   removeImage(id: string, field: ImageField): Promise<void>
-  /** Envia o PDF do aditivo de assinatura eletrônica para a coluna de arquivo `new_aditivoassinatura`. */
-  uploadAditivo(id: string, file: File): Promise<void>
+  /** Gera o PDF do aditivo com o texto vigente (`new_GerarAditivoMotorista`) para assinar no gov.br. */
+  gerarAditivo(id: string): Promise<{ pdfBase64: string; nomeArquivo: string }>
+  /** Confere e anexa o PDF assinado no gov.br (`new_RegistrarAditivoMotorista`); `assinadoEm` é `yyyy-MM-dd`. A recusa do servidor sobe como Error com a mensagem original. */
+  registrarAditivo(id: string, pdfBase64: string, assinadoEm: string): Promise<void>
   /** Grava "Logins e senhas" (HTML rich text ou null). */
   saveLogins(id: string, html: string | null): Promise<void>
   multas(id: string): Promise<Multa[]>
@@ -69,12 +71,12 @@ export function validateImage(file: File) {
   return null
 }
 
-export const ADITIVO_MAX_BYTES = 10 * 1024 * 1024
+export const ADITIVO_MAX_BYTES = 5 * 1024 * 1024
 
 export function validateAditivo(file: File) {
   const pdf = file.type === 'application/pdf' || ((file.type === '' || file.type === 'application/octet-stream') && /\.pdf$/i.test(file.name))
   if (!pdf) return 'Envie o aditivo em PDF.'
-  if (file.size > ADITIVO_MAX_BYTES) return 'O aditivo deve ter até 10 MB.'
+  if (file.size > ADITIVO_MAX_BYTES) return 'O PDF passa de 5 MB.'
   if (file.size === 0) return 'O arquivo está vazio.'
   return null
 }

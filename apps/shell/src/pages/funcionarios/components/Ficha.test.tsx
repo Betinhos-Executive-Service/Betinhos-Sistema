@@ -21,7 +21,7 @@ function fakeSource(save: DataSource['save'], extra: Partial<DataSource> = {}): 
   return {
     mode: 'mock', envLabel: 'TEST',
     list: async () => [record], get: async () => structuredClone(record), save,
-    uploadImage: async () => {}, removeImage: async () => {}, uploadAditivo: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
+    uploadImage: async () => {}, removeImage: async () => {}, gerarAditivo: async () => ({ pdfBase64: '', nomeArquivo: 'a.pdf' }), registrarAditivo: async () => {}, saveLogins: async () => {}, multas: async () => [], posses: async () => [], equipamentos: async () => [], anotacoes: async () => [], addAnotacao: async () => {}, updateAnotacao: async () => {}, deleteAnotacao: async () => {}, limitesAnexo: async () => ({ maxBytes: 5e6, bloqueadas: [] }), anexo: async () => ({ nome: 'a', blob: new Blob() }),
     documentos: { pasta: () => '', listar: async () => [], enviar: async () => { throw new Error('n/a') }, abrir: async () => ({ nome: '', blob: new Blob() }), excluir: async () => {} },
     usuarioDoApp: async () => null, searchVeiculos: async () => [], openForm: () => {},
     ...extra,
@@ -165,115 +165,37 @@ describe('Ficha', () => {
   })
 
   describe('Assinatura eletrônica (aditivo)', () => {
-    const pdf = () => new File(['%PDF-1.4'], 'aditivo.pdf', { type: 'application/pdf' })
+    const comAditivo: Funcionario = { ...record, values: { ...record.values, new_aditivoassinaturaem: '2026-10-15' }, aditivo: { nome: 'aditivo.pdf', url: 'https://x/y/$value' } }
 
-    it('mostra a seção com explicação e o selo no cabeçalho quando há data', async () => {
-      const comAditivo: Funcionario = { ...record, values: { ...record.values, new_aditivoassinaturaem: '2026-10-15' }, aditivo: { nome: 'aditivo.pdf', url: 'https://x/y/$value' } }
+    it('mostra a seção com explicação, o selo no cabeçalho e o link de download quando há aditivo', async () => {
       await renderFicha(fakeSource(vi.fn(async () => 'f1'), { get: async () => structuredClone(comAditivo) }))
       expect(screen.getByText('Assinatura eletrônica')).toBeTruthy()
       expect(screen.getByText(/sem o aditivo, o motorista não assina termos pelo app/i)).toBeTruthy()
       expect(screen.getByText('Aditivo assinado em 15/10/2026')).toBeTruthy()
-      const link = screen.getByRole('link', { name: /aditivo\.pdf/ })
-      expect(link.getAttribute('href')).toBe('https://x/y/$value')
+      expect(screen.getByText('Assinado em 15/10/2026')).toBeTruthy()
+      expect(screen.getByRole('link', { name: /Baixar/ }).getAttribute('href')).toBe('https://x/y/$value')
     })
 
-    it('sem data não mostra o selo', async () => {
+    it('sem data não mostra o selo e a data não vira campo editável da ficha', async () => {
       await renderFicha(fakeSource(vi.fn(async () => 'f1')))
       const cabecalho = document.querySelector('.drawer-head') as HTMLElement
       expect(within(cabecalho).queryByText(/Aditivo assinado em/)).toBeNull()
+      expect(screen.queryByLabelText('Aditivo assinado em')).toBeNull()
     })
 
-    it('salvar com data e PDF grava a data e envia o arquivo', async () => {
-      const save = vi.fn(async () => 'f1')
-      const uploadAditivo = vi.fn(async () => {})
-      await renderFicha(fakeSource(save, { uploadAditivo }))
-      fireEvent.change(screen.getByLabelText('Aditivo assinado em'), { target: { value: '2026-10-20' } })
-      const arquivo = pdf()
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [arquivo] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      await waitFor(() => expect(uploadAditivo).toHaveBeenCalledTimes(1))
-      const [, draft] = save.mock.calls[0] as unknown as [Funcionario, { values: Record<string, unknown> }]
-      expect(draft.values.new_aditivoassinaturaem).toBe('2026-10-20')
-      expect(uploadAditivo).toHaveBeenCalledWith('f1', arquivo)
-    })
-
-    it('só o arquivo (sem alterar campos) também habilita salvar e envia', async () => {
-      const save = vi.fn(async () => 'f1')
-      const uploadAditivo = vi.fn(async () => {})
-      await renderFicha(fakeSource(save, { uploadAditivo }))
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      await waitFor(() => expect(uploadAditivo).toHaveBeenCalledTimes(1))
-    })
-
-    it('aditivo salvo avisa onAditivoSalvo (volta para a multa); salvar sem aditivo ou com falha no upload não avisa', async () => {
+    it('registrar o aditivo recarrega a ficha, mostra o selo e avisa onAditivoSalvo (volta para a multa)', async () => {
+      let atual: Funcionario = structuredClone(record)
+      const registrarAditivo = vi.fn(async () => { atual = structuredClone(comAditivo) })
       const onAditivoSalvo = vi.fn()
-      const ok = fakeSource(vi.fn(async () => 'f1'))
-      render(<ToastProvider><Ficha source={ok} id="f1" onClose={() => {}} onSaved={() => {}} onAditivoSalvo={onAditivoSalvo} /></ToastProvider>)
+      const source = fakeSource(vi.fn(async () => 'f1'), { get: async () => structuredClone(atual), registrarAditivo })
+      render(<ToastProvider><Ficha source={source} id="f1" onClose={() => {}} onSaved={() => {}} onAditivoSalvo={onAditivoSalvo} /></ToastProvider>)
       await screen.findByDisplayValue('Ana Souza')
-      fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Aninha' } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      expect(onAditivoSalvo).not.toHaveBeenCalled()
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
+      fireEvent.click(screen.getByRole('button', { name: 'Anexar assinado' }))
+      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [new File(['%PDF-1.4'], 'aditivo.pdf', { type: 'application/pdf' })] } })
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar aditivo' })) })
       await waitFor(() => expect(onAditivoSalvo).toHaveBeenCalledTimes(1))
-      cleanup()
-      const falha = vi.fn()
-      render(<ToastProvider><Ficha source={fakeSource(vi.fn(async () => 'f1'), { uploadAditivo: async () => { throw new Error('rede') } })} id="f1" onClose={() => {}} onSaved={() => {}} onAditivoSalvo={falha} /></ToastProvider>)
-      await screen.findByDisplayValue('Ana Souza')
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      expect(falha).not.toHaveBeenCalled()
-    })
-
-    it('recusa arquivo que não é PDF e acima de 10 MB', async () => {
-      const uploadAditivo = vi.fn(async () => {})
-      await renderFicha(fakeSource(vi.fn(async () => 'f1'), { uploadAditivo }))
-      const input = screen.getByLabelText('Arquivo do aditivo (PDF)')
-      fireEvent.change(input, { target: { files: [new File(['x'], 'foto.png', { type: 'image/png' })] } })
-      expect(await screen.findByText('Envie o aditivo em PDF.')).toBeTruthy()
-      const grande = new File(['x'], 'grande.pdf', { type: 'application/pdf' })
-      Object.defineProperty(grande, 'size', { value: 11 * 1024 * 1024 })
-      fireEvent.change(input, { target: { files: [grande] } })
-      expect(await screen.findByText('O aditivo deve ter até 10 MB.')).toBeTruthy()
-      expect(uploadAditivo).not.toHaveBeenCalled()
-    })
-
-    it('falha no envio do arquivo avisa e não perde o resto', async () => {
-      const save = vi.fn(async () => 'f1')
-      const uploadAditivo = vi.fn(async () => { throw new Error('Sem permissão.') })
-      await renderFicha(fakeSource(save, { uploadAditivo }))
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      expect(await screen.findByText(/Aditivo não enviado: Sem permissão\./)).toBeTruthy()
-      expect(save).toHaveBeenCalledTimes(1)
-      expect(screen.getByText(/aditivo\.pdf · será enviado ao salvar/)).toBeTruthy()
-    })
-
-    it('aceita application/octet-stream quando a extensão é .pdf', async () => {
-      const uploadAditivo = vi.fn(async () => {})
-      await renderFicha(fakeSource(vi.fn(async () => 'f1'), { uploadAditivo }))
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [new File(['%PDF'], 'scan.PDF', { type: 'application/octet-stream' })] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Salvar/ })) })
-      await waitFor(() => expect(uploadAditivo).toHaveBeenCalledTimes(1))
-    })
-
-    it('criar novo com PDF e upload falhando mantém o PDF pendente depois da troca de id', async () => {
-      const novo: Funcionario = { ...record, id: 'novo1' }
-      const save = vi.fn(async () => 'novo1')
-      const uploadAditivo = vi.fn(async () => { throw new Error('Sem permissão.') })
-      const source = fakeSource(save, { uploadAditivo, get: async () => structuredClone(novo) })
-      function Pai() {
-        const [id, setId] = useState<string | null>(null)
-        return <ToastProvider><Ficha source={source} id={id} onClose={() => {}} onSaved={(savedId) => setId(savedId)} /></ToastProvider>
-      }
-      render(<Pai />)
-      fireEvent.change(screen.getByLabelText(/Nome completo/), { target: { value: 'Ana Souza' } })
-      fireEvent.change(screen.getByLabelText(/Apelido/), { target: { value: 'Ana' } })
-      fireEvent.change(screen.getByLabelText('Arquivo do aditivo (PDF)'), { target: { files: [pdf()] } })
-      await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Criar colaborador/ })) })
-      expect(await screen.findByText(/Aditivo não enviado: Sem permissão\./)).toBeTruthy()
-      expect(await screen.findByText(/aditivo\.pdf · será enviado ao salvar/)).toBeTruthy()
+      expect(registrarAditivo).toHaveBeenCalledWith('f1', expect.any(String), expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+      expect(await screen.findByText('Aditivo assinado em 15/10/2026')).toBeTruthy()
     })
   })
 

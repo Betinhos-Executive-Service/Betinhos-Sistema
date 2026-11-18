@@ -68,15 +68,12 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
-  const [aditivoArquivo, setAditivoArquivo] = useState<File | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   // A seção aberta vive na URL (`secao=documentos`); "Dados" é o padrão. Colaborador novo só tem a seção Dados.
   const [secao, setTab] = useQueryTexto('secao', 'dados')
   const tabs = comunicados ? TABS : TABS.filter((item) => item.key !== 'comunicados')
   const tab: Tab = !id ? 'dados' : tabs.find((item) => item.key === secao)?.key ?? 'dados'
   const idAnterior = useRef(id)
-  // Id do colaborador recém-criado cujo PDF não subiu: a troca de id vinda do próprio save não zera o arquivo pendente.
-  const manterAditivoDe = useRef<string | null>(null)
   const [discarding, setDiscarding] = useState(false)
   const panel = useRef<HTMLElement>(null)
   const mobile = useIsMobile()
@@ -85,8 +82,6 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
     // Trocar de colaborador volta para Dados; na abertura da ficha vale a seção da URL.
     if (idAnterior.current !== id) { idAnterior.current = id; setTab('dados') }
     setErrors({})
-    if (id && manterAditivoDe.current === id) manterAditivoDe.current = null
-    else setAditivoArquivo(null)
     if (!id) {
       setOriginal(null)
       setDraft(emptyDraft())
@@ -122,10 +117,19 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
     }
   }
 
+  /** Depois que o servidor registra o aditivo: relê a ficha (selo e data) sem perder o rascunho da aba Dados e avisa quem pediu o aditivo. */
+  async function recarregarAposAditivo() {
+    if (!original) return
+    const fresh = await source.get(original.id)
+    setOriginal(fresh)
+    notify('success', 'Aditivo registrado.')
+    onAditivoSalvo?.()
+  }
+
   const dirty = useMemo(() => changedKeys(original, draft), [original, draft])
   const baseline = useMemo(() => JSON.stringify(original ? draftFrom(original) : emptyDraft()), [original])
-  const touched = JSON.stringify(draft) !== baseline || aditivoArquivo !== null
-  const pendentes = dirty.length + (aditivoArquivo ? 1 : 0)
+  const touched = JSON.stringify(draft) !== baseline
+  const pendentes = dirty.length
   const isNew = !id
   const nome = String(draft.values.cr40f_nomecompleto ?? '') || (isNew ? 'Novo colaborador' : '')
   const alertas = original ? computeAlertas({
@@ -158,24 +162,11 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
     setSaving(true)
     try {
       const savedId = await source.save(original, draft)
-      let aditivoOk = true
-      const enviouAditivo = aditivoArquivo !== null
-      if (aditivoArquivo) {
-        try {
-          await source.uploadAditivo(savedId, aditivoArquivo)
-          setAditivoArquivo(null)
-        } catch (reason) {
-          aditivoOk = false
-          if (isNew) manterAditivoDe.current = savedId
-          notify('error', `Aditivo não enviado: ${errorMessage(reason)}. Os demais dados foram salvos; o PDF continua na tela.`)
-        }
-      }
       const fresh = await source.get(savedId)
       setOriginal(fresh)
       setDraft(draftFrom(fresh))
-      if (aditivoOk) notify('success', isNew ? 'Colaborador criado.' : 'Alterações salvas.')
+      notify('success', isNew ? 'Colaborador criado.' : 'Alterações salvas.')
       onSaved(savedId, isNew)
-      if (enviouAditivo && aditivoOk) onAditivoSalvo?.()
     } catch (reason) {
       notify('error', `Não salvou: ${errorMessage(reason)}. Suas alterações continuam na tela.`)
     } finally {
@@ -264,7 +255,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                 <fieldset key={group} className="group">
                   <legend>{GROUP_LABELS[group]}</legend>
                   <div className="fields">
-                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly) && !(acesso && field.key === 'cr40f_emailmicrosoft')).map((field) => (
+                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly) && !(acesso && field.key === 'cr40f_emailmicrosoft') && field.key !== 'new_aditivoassinaturaem').map((field) => (
                       <FieldInput
                         key={field.key}
                         field={field}
@@ -275,7 +266,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                       />
                     ))}
                     {group === 'assinatura' && (
-                      <AditivoAssinatura atual={original?.aditivo ?? null} pendente={aditivoArquivo} disabled={saving} onPick={setAditivoArquivo} />
+                      <AditivoAssinatura id={original?.id ?? null} atual={original?.aditivo ?? null} assinadoEm={typeof original?.values.new_aditivoassinaturaem === 'string' ? original.values.new_aditivoassinaturaem : null} source={source} disabled={saving} onRegistrado={recarregarAposAditivo} />
                     )}
                     {group === 'vinculo' && (
                       <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
@@ -341,7 +332,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
             <span className="drawer-foot-status">{isNew ? 'Preencha os obrigatórios (*)' : pendentes ? `${pendentes} alteração(ões) não salva(s)` : 'Sem alterações'}</span>
             <div className="cluster">
               {!isNew && (
-                <Button variant="secondary" icon={<Undo2 size={16} />} disabled={!pendentes || saving} onClick={() => { if (original) { setDraft(draftFrom(original)); setErrors({}); setAditivoArquivo(null) } }}>
+                <Button variant="secondary" icon={<Undo2 size={16} />} disabled={!pendentes || saving} onClick={() => { if (original) { setDraft(draftFrom(original)); setErrors({}) } }}>
                   Desfazer
                 </Button>
               )}
