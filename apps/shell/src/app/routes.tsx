@@ -44,6 +44,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   treinamentos: () => import('../pages/treinamentos/TreinamentosPage').then((m) => m.TreinamentosPage),
   composicao: () => import('../pages/composicao/ComposicaoPage').then((m) => m.ComposicaoPage),
   cartoes: () => import('../pages/cartoes/CartoesPage').then((m) => m.CartoesPage),
+  'rh-descontos': () => import('../pages/rh-descontos/RhDescontosPage').then((m) => m.RhDescontosPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()

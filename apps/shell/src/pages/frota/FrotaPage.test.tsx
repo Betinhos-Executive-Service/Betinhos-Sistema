@@ -24,7 +24,7 @@ function fakeSource(mode: DataSource['mode'], envLabel: string): DataSource {
     enviarFotoVeiculo: async () => {},
     salvarItemPlano: async () => {},
     inativarItemPlano: async () => {},
-    salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank',
+    salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], listarDescontosPeriodo: async () => [], previstasAntes: async () => ({ quantidade: 0, maisAntigo: null }), listarParcelasMulta: async () => [], lancarDescontoFolha: async () => ({ parcelas: [], encerradas: [], reabertas: [] }), passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank',
   }
 }
 

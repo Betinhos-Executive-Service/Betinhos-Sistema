@@ -333,6 +333,20 @@ describe('passo a passo da multa (Custom APIs)', () => {
     await expect(createXrmSource(host().xrm).dossieMulta(MULTA_ID)).rejects.toMatchObject({ name: 'ApiError', status: 500 })
   })
 
+  it('lancarDescontoFolha chama cr40f_LancarDescontoFolha com os ids limpos e devolve o ResultadoJson', async () => {
+    const resultado = { parcelas: [{ id: 'x', ok: true, erro: null }], encerradas: [], reabertas: [] }
+    const fetchMock = resposta(true, 200, { ResultadoJson: JSON.stringify(resultado) })
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await createXrmSource(host().xrm).lancarDescontoFolha([MULTA_ID], 'lancar')).toEqual(resultado)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_LancarDescontoFolha')
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ ParcelaIdsJson: '["aaaaaaaa-1111-2222-3333-444444444444"]', Acao: 'lancar' })
+  })
+
+  it('lancarDescontoFolha repassa a recusa do servidor como ApiError', async () => {
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Escolha de 1 a 200 parcelas.' } }))
+    await expect(createXrmSource(host().xrm).lancarDescontoFolha([], 'lancar')).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Escolha de 1 a 200 parcelas.' })
+  })
+
   it('dossieMulta lê o new_DossieJson', async () => {
     const dossie = { multa: { id: 'x', auto: 'AIT 1', placa: 'TST1A11', dataHora: null, local: null, orgao: null, dataParaIndicar: null, infracao: null }, servicos: [], infleet: { erro: 'Sem token' } }
     const fetchMock = resposta(true, 200, { new_DossieJson: JSON.stringify(dossie) })

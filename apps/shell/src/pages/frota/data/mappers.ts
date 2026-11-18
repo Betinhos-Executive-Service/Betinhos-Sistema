@@ -1,7 +1,7 @@
 import { lerMulti } from '../domain/manutencaoCatalogo'
 import { diaSP, toDateOnly, type DateBehavior } from './dates'
 import { AVISO_PADRAO, FORMA_PAGAMENTO, TERMO_STATUS_DE } from './schema'
-import type { Baseline, Colisao, DespesaCombustivel, DetalheManutencao, Infracao, ItemPlano, Manutencao, Multa, ParcelaTermo, Posse, Ref, ResumoTermo, TelemetriaKm, TermoMulta, Veiculo } from './types'
+import type { Baseline, Colisao, DespesaCombustivel, DetalheManutencao, Infracao, ItemPlano, Manutencao, Multa, ParcelaFolha, ParcelaFolhaStatus, ParcelaTermo, Posse, Ref, ResumoTermo, TelemetriaKm, TermoMulta, Veiculo } from './types'
 
 export const FORMATTED = '@OData.Community.Display.V1.FormattedValue'
 
@@ -275,5 +275,35 @@ export function mapParcelaTermo(row: Row): ParcelaTermo {
     competencia: str(row.new_competencia)?.slice(0, 10) ?? '',
     valor: num(row.new_valor),
     status: str(row['new_status@OData.Community.Display.V1.FormattedValue']),
+  }
+}
+
+export const NAV_MULTA = 'new_Multa'
+export const NAV_MOTORISTA = 'new_Motorista'
+export const SELECT_PARCELA_FOLHA = ['new_parcelamultafolhaid', 'new_numero', 'new_competencia', 'new_valor', 'new_status', 'new_lancadoem', '_new_multa_value', '_new_termo_value', '_new_motorista_value'] as const
+export const EXPAND_PARCELA_FOLHA = `${NAV_MULTA}($select=cr40f_novacoluna,cr40f_dataehorario,_cr40f_placa_value,_cr40f_codigodainfracao_value),${NAV_MOTORISTA}($select=cr40f_nomecompleto,cr40f_numerodocpf)`
+const STATUS_PARCELA: Record<number, ParcelaFolhaStatus> = { 100000000: 'prevista', 100000001: 'descontada', 100000002: 'cancelada' }
+
+export function mapParcelaFolha(row: Row, total: number): ParcelaFolha {
+  const multa = row[NAV_MULTA] as Row | null | undefined
+  const motorista = row[NAV_MOTORISTA] as Row | null | undefined
+  return {
+    id: cleanId(str(row.new_parcelamultafolhaid) ?? ''),
+    numero: num(row.new_numero) ?? 0,
+    total,
+    competencia: str(row.new_competencia)?.slice(0, 10) ?? '',
+    valor: num(row.new_valor) ?? 0,
+    status: STATUS_PARCELA[num(row.new_status) ?? 100000000] ?? 'prevista',
+    lancadoEm: str(row.new_lancadoem)?.slice(0, 10) ?? null,
+    origem: row._new_multa_value ? 'multa' : 'termo',
+    termoId: row._new_termo_value ? cleanId(row._new_termo_value) : null,
+    colaborador: motorista ? { id: cleanId(str(row._new_motorista_value) ?? ''), nome: str(motorista.cr40f_nomecompleto) ?? 'Sem nome', cpf: str(motorista.cr40f_numerodocpf) } : null,
+    multa: multa && row._new_multa_value ? {
+      id: cleanId(str(row._new_multa_value) ?? ''),
+      auto: str(multa.cr40f_novacoluna) ?? 'sem número',
+      placa: str(multa[`_cr40f_placa_value${FORMATTED}`]),
+      dataInfracao: str(multa.cr40f_dataehorario)?.slice(0, 10) ?? null,
+      infracao: str(multa[`_cr40f_codigodainfracao_value${FORMATTED}`]),
+    } : null,
   }
 }

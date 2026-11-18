@@ -1,7 +1,7 @@
 import type { DateBehavior } from './dates'
 import type { Acordo } from '../domain/termoMulta'
 import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
-import type { DetalheManutencao, Dossie, FrotaData, Kind, ParcelaTermo, TableKey, TermoMulta, Veiculo } from './types'
+import type { DetalheManutencao, Dossie, FrotaData, Kind, ParcelaFolha, ParcelaTermo, ResultadoLancamento, TableKey, TermoMulta, Veiculo } from './types'
 
 export type LoadResult = { data: FrotaData; errors: Partial<Record<TableKey, string>> }
 
@@ -109,6 +109,14 @@ export interface DataSource extends ComandosManutencao, ArquivosManutencao {
   baixarPdfTermo(termoId: string): Promise<{ nome: string; blob: Blob }>
   /** Parcelas de desconto em folha do termo, na ordem. */
   listarParcelasTermo(termoId: string): Promise<ParcelaTermo[]>
+  /** Parcelas com competência de `inicio` a `fim` (`yyyy-MM`, inclusivos), de multa e de termo. Alimenta a linha do tempo e o mês. */
+  listarDescontosPeriodo(inicio: string, fim: string): Promise<ParcelaFolha[]>
+  /** Parcelas Previstas com competência antes do mês; `maisAntigo` em yyyy-MM. */
+  previstasAntes(mes: string): Promise<{ quantidade: number; maisAntigo: string | null }>
+  /** Parcelas de desconto em folha de uma multa, na ordem. */
+  listarParcelasMulta(multaId: string): Promise<ParcelaFolha[]>
+  /** Custom API cr40f_LancarDescontoFolha: lança ou desfaz parcelas em lote; a recusa vem com a mensagem do servidor. */
+  lancarDescontoFolha(ids: string[], acao: 'lancar' | 'desfazer'): Promise<ResultadoLancamento>
   /** Custom API cr40f_PassoMulta: valida e grava o passo no servidor; a recusa vem com a mensagem do servidor. */
   passoMulta(multaId: string, passo: Passo, dados: DadosPasso): Promise<Situacao>
   /** Custom API new_DossieMulta: serviço da agenda, viagens do InFleet e dados da notificação, para a mensagem do WhatsApp. */

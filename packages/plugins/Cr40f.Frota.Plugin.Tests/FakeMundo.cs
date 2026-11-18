@@ -73,7 +73,7 @@ public sealed class FakeMundo : IOrganizationService
 
     private static bool Casa(Entity r, ConditionExpression c)
     {
-        var v = Norm(r.Contains(c.AttributeName) ? r[c.AttributeName] : null);
+        var v = Norm(r.Contains(c.AttributeName) ? r[c.AttributeName] : c.AttributeName == r.LogicalName + "id" ? r.Id : null); // chave primária não vem em Attributes
         if (c.AttributeName == "statecode" && v == null) v = 0;
         switch (c.Operator)
         {

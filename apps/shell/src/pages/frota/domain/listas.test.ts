@@ -42,6 +42,7 @@ describe('lista de multas (fase 1)', () => {
       { ...base, id: 'c', status: 202410006 },
       { ...base, id: 'd', status: 202410005 },
       { ...base, id: 'e', status: 202410001, vencimento: '2026-11-20', responsavel: 100000001 },
+      { ...base, id: 'f', status: 202410006, competencia: '2026-12-01', acertoEm: '2026-11-17' },
     ],
   }
 
@@ -56,6 +57,7 @@ describe('lista de multas (fase 1)', () => {
     expect(porId.b.situacoes).toEqual(['aguardando-penalidade'])
     expect(porId.c.situacoes).toEqual(['comigo', 'aguardando-acerto'])
     expect(porId.d.situacoes).toEqual(['encerradas'])
+    expect(porId.f.situacoes).toEqual(['descontando'])
     expect(porId.e.pessoa).toEqual({ id: 'empresa', label: 'Empresa' })
     expect(porId.e.proximoPrazo).toBe('2026-11-20')
     expect(readRegistro(porId.a, 'situacao')).toEqual(['comigo', 'prazo-vencido'])
@@ -77,10 +79,11 @@ describe('lista de multas (fase 1)', () => {
     expect(comigo).toEqual(['desconhecido', 'recurso', 'sem-status'])
   })
 
-  it('visões: Comigo é a padrão; depois Prazo vencido, Aguardando penalidade, Aguardando acerto, Encerradas e canceladas, Todas', () => {
+  it('visões: Comigo é a padrão; depois Prazo vencido, Aguardando penalidade, Aguardando acerto, Descontando, Encerradas e canceladas, Todas', () => {
     expect(MULTA_VISAO_PADRAO).toBe('Comigo')
     expect(MULTA_FILTROS_PADRAO.advanced.items).toMatchObject([{ field: 'situacao', op: 'in', values: [{ value: 'comigo' }] }])
-    expect(registroBuiltins('multa').map((v) => v.name)).toEqual(['Prazo vencido', 'Aguardando penalidade', 'Aguardando acerto', 'Encerradas e canceladas', 'Todas'])
+    expect(registroBuiltins('multa').map((v) => v.name)).toEqual(['Prazo vencido', 'Aguardando penalidade', 'Aguardando acerto', 'Descontando', 'Encerradas e canceladas', 'Todas'])
+    expect(registroBuiltins('multa').map((v) => v.id)).toEqual(['prazo-vencido', 'aguardando-penalidade', 'aguardando-acerto', 'descontando', 'encerradas', 'todas'])
   })
 
   it('Manutenções: Em aberto e A encaixar', () => {

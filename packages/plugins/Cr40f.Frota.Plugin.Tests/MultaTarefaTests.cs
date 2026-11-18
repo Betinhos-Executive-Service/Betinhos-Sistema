@@ -104,6 +104,31 @@ public class MultaTarefaTests
     }
 
     [Fact]
+    public void Multa_descontando_em_folha_cria_a_tarefa_concluida_e_fecha_a_aberta()
+    {
+        var (mundo, multa) = Cenario(MultaCodigos.Acertar);
+        Tarefa(mundo).Sincronizar(multa.Id, true, null);
+        Assert.Equal(MultaTarefa.Afazer, UnicaTarefa(mundo).GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+
+        mundo.Update(new Entity(MultaMapper.Tabela, multa.Id)
+        {
+            ["cr40f_competenciadesconto"] = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc),
+            ["cr40f_acertoem"] = new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc),
+        });
+        Tarefa(mundo).Sincronizar(multa.Id, false, MultaCodigos.Acertar);
+        Assert.Equal(MultaTarefa.Concluida, UnicaTarefa(mundo).GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+
+        var (mundo2, multa2) = Cenario(MultaCodigos.Acertar);
+        mundo2.Update(new Entity(MultaMapper.Tabela, multa2.Id)
+        {
+            ["cr40f_competenciadesconto"] = new DateTime(2026, 12, 1, 12, 0, 0, DateTimeKind.Utc),
+            ["cr40f_acertoem"] = new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc),
+        });
+        Tarefa(mundo2).Sincronizar(multa2.Id, true, null);
+        Assert.Equal(MultaTarefa.Concluida, UnicaTarefa(mundo2).GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+    }
+
+    [Fact]
     public void Fecha_quando_a_multa_encerra_e_reabre_se_concluida_com_a_multa_aberta()
     {
         var (mundo, multa) = Cenario(MultaCodigos.Acertar);

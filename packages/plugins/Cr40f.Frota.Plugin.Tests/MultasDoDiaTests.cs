@@ -43,6 +43,19 @@ public class MultasDoDiaTests
     }
 
     [Fact]
+    public void Multa_descontando_em_folha_nao_conta_como_aguardando_acerto()
+    {
+        var multas = new[]
+        {
+            M("D1", new MultaEstado { Status = MultaCodigos.Acertar, Competencia = "2026-12-01", AcertoEm = "2026-11-17" }),
+            M("D2", new MultaEstado { Status = MultaCodigos.Acertar }),
+        };
+        var r = MultasDoDia.Montar(multas, Hoje);
+        Assert.Equal(1, r.AguardandoAcerto);
+        Assert.Equal(1, r.Total);
+    }
+
+    [Fact]
     public void Indicada_pela_Senatran_com_aceite_pendente_depois_do_prazo_fica_em_Aceite_e_avisa_o_prazo()
     {
         var multas = new[]

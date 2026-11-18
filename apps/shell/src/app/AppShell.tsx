@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
-  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Sun, Tag, TrendingUp, Users, Wallet, Wrench,
+  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
+  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
@@ -54,6 +54,7 @@ export const GROUP_ICONS: Record<string, ReactNode> = {
   financeiro: <Wallet />,
   frota: <Car />,
   cadastros: <Database />,
+  rh: <UserCog />,
   'back-end': <FolderCog />,
 }
 
@@ -97,6 +98,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   curriculos: <ScrollText />,
   equipamentos: <Laptop />,
   treinamentos: <GraduationCap />,
+  'rh-descontos': <HandCoins />,
   new_marketing: <Megaphone />,
   'logs-apps': <FileText />,
   cr40f_categoriadespesaoperacional: <Tag />,

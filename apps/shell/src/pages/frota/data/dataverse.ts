@@ -2,17 +2,19 @@ import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
 import { chamarCustomApi } from './customApi'
 import { criarArquivosXrm, criarComandosXrm, type DepsXrm } from './manutencaoDataverse'
-import { cleanId, GUID, guid, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { cleanId, GUID, guid, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaFolha, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, EXPAND_PARCELA_FOLHA, SELECT, SELECT_PARCELA, SELECT_PARCELA_FOLHA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
 import { EMPTY_DATA, type ArquivoMulta, type ColunaArquivoMulta, type DataSource, type ItemPlanoInput, type LoadResult } from './source'
-import type { DespesaCombustivel, Dossie, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
+import type { DespesaCombustivel, Dossie, FrotaData, Kind, ResultadoLancamento, TableKey, TelemetriaKm } from './types'
 import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
 type Row = Record<string, unknown>
 type Behaviors = Record<string, DateBehavior>
+
+const MES = /^\d{4}-(0[1-9]|1[0-2])$/
 
 export function getDataverseEnvironmentLabel(clientUrl: string) {
   const hostname = new URL(clientUrl).hostname.toLowerCase()
@@ -43,6 +45,21 @@ export function createXrmSource(xrm: XrmHost): DataSource {
   const behaviorCache = new Map<string, Promise<Behaviors>>()
   /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
   const customApi = (nome: string, body: Record<string, unknown>, falha: string) => chamarCustomApi(apiUrl, nome, body, falha)
+
+  /** Quantas parcelas cada multa (ou termo) tem no total, para o "x/y". Uma consulta por lote de 50 origens, em paralelo. */
+  async function totaisPorOrigem(rows: Row[]) {
+    const totais = new Map<string, number>()
+    const multas = [...new Set(rows.map((r) => r._new_multa_value).filter(Boolean).map(String))]
+    const termos = [...new Set(rows.filter((r) => !r._new_multa_value).map((r) => r._new_termo_value).filter(Boolean).map(String))]
+    const consultas = ([['_new_multa_value', multas], ['_new_termo_value', termos]] as const).flatMap(([campo, ids]) =>
+      Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => {
+        const lote = ids.slice(i * 50, i * 50 + 50).map((id) => `${campo} eq ${guid(id)}`).join(' or ')
+        return api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${campo}&$filter=${lote}`).then((res) => ({ campo, linhas: res.entities }))
+      }))
+    for (const { campo, linhas } of await Promise.all(consultas))
+      for (const r of linhas) { const k = cleanId(r[campo]); totais.set(k, (totais.get(k) ?? 0) + 1) }
+    return totais
+  }
 
   async function getJson<T>(path: string): Promise<T> {
     const response = await fetch(`${apiUrl}/${path}`, { credentials: 'same-origin', headers: { Accept: 'application/json', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' } })
@@ -316,6 +333,32 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     async listarParcelasTermo(termoId: string) {
       const result = await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA.join(',')}&$filter=_new_termo_value eq ${guid(termoId)}&$orderby=new_numero asc`)
       return result.entities.map(mapParcelaTermo)
+    },
+
+    async listarDescontosPeriodo(inicio: string, fim: string) {
+      if (!MES.test(inicio) || !MES.test(fim)) throw new Error('Mês inválido')
+      const filtro = `new_competencia ge ${inicio}-01 and new_competencia lt ${addMonths(`${fim}-01`, 1)} and new_status ne 100000002`
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')}&$expand=${EXPAND_PARCELA_FOLHA}&$filter=${filtro}&$orderby=new_competencia asc`)).entities
+      const totais = await totaisPorOrigem(rows)
+      return rows.map((r) => mapParcelaFolha(r, totais.get(cleanId(r._new_multa_value ?? r._new_termo_value)) ?? 1))
+    },
+
+    async previstasAntes(mes: string) {
+      if (!MES.test(mes)) throw new Error('Mês inválido')
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=new_competencia&$filter=new_status eq 100000000 and new_competencia lt ${mes}-01&$orderby=new_competencia asc`)).entities
+      return { quantidade: rows.length, maisAntigo: rows.length ? String(rows[0].new_competencia).slice(0, 7) : null }
+    },
+
+    async listarParcelasMulta(multaId: string) {
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')}&$expand=${EXPAND_PARCELA_FOLHA}&$filter=_new_multa_value eq ${guid(multaId)}&$orderby=new_numero asc`)).entities
+      return rows.map((r) => mapParcelaFolha(r, rows.length))
+    },
+
+    async lancarDescontoFolha(ids: string[], acao: 'lancar' | 'desfazer'): Promise<ResultadoLancamento> {
+      const payload = await customApi('cr40f_LancarDescontoFolha', { ParcelaIdsJson: JSON.stringify(ids.map(guid)), Acao: acao }, 'Não foi possível lançar as parcelas')
+      const json = typeof payload.ResultadoJson === 'string' ? payload.ResultadoJson : ''
+      if (!json) throw new Error('O servidor não devolveu o resultado do lançamento. Recarregue a tela')
+      return JSON.parse(json) as ResultadoLancamento
     },
 
     async passoMulta(multaId: string, passo: Passo, dados: DadosPasso): Promise<Situacao> {

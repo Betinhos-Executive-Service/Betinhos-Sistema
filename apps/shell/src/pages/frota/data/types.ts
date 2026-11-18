@@ -34,6 +34,17 @@ export type TermoStatus = 'pendente' | 'assinado' | 'contestado' | 'expirado' | 
 /** Último termo da multa, para a coluna Termo da lista. */
 export type ResumoTermo = { status: TermoStatus; enviadoEm: string | null }
 export type ParcelaTermo = { numero: number; competencia: string; valor: number | null; status: string | null }
+export type ParcelaFolhaStatus = 'prevista' | 'descontada' | 'cancelada'
+/** Linha de new_parcelamultafolha para o RH e para o drawer da multa. `total` = parcelas da mesma multa (ou termo). */
+export type ParcelaFolha = {
+  id: string; numero: number; total: number; competencia: string; valor: number; status: ParcelaFolhaStatus; lancadoEm: string | null
+  origem: 'multa' | 'termo'
+  /** Termo de origem quando não há multa; separa dois termos do mesmo colaborador. */
+  termoId?: string | null
+  colaborador: { id: string; nome: string; cpf: string | null } | null
+  multa: { id: string; auto: string; placa: string | null; dataInfracao: string | null; infracao: string | null } | null
+}
+export type ResultadoLancamento = { parcelas: { id: string; ok: boolean; erro: string | null }[]; encerradas: string[]; reabertas: string[] }
 export type TermoMulta = { id: string; status: TermoStatus | null; forma: 'guia' | 'folha' | null; parcelas: number | null; valorTotal: number | null; primeiraCompetencia: string | null; enviadoEm: string | null; assinadoEm: string | null; hashPdf: string | null; motivoContestacao: string | null; ultimoLembreteEm: string | null; criadoEm: string }
 export type Infracao = { id: string; codigo: string; descricao: string | null; gravidade: number | null; pontos: number | null; valor: number | null }
 export type Colisao = { id: string; titulo: string; status: number | null; tipo: number | null; dataHora: string | null; local: string | null; descricao: string | null; houveTerceiro: boolean; veiculo: Ref | null; motorista: Ref | null; criadoEm: string }
