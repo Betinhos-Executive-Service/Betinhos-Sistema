@@ -20,6 +20,8 @@ type Props = {
   tabela?: ReactNode
   /** Com gráfico, a tabela é a alternativa em valores e abre sob demanda. */
   tabelaSobDemanda?: boolean
+  /** A tabela aberta troca o gráfico (em vez de ficar sob ele) e o botão vira "Ver tabela" / "Ver gráfico". */
+  tabelaNoLugar?: boolean
   largo?: boolean
   /** Fica na altura do próprio conteúdo em vez de esticar até o card vizinho. */
   natural?: boolean
@@ -31,7 +33,7 @@ type Props = {
  * Card de análise no formato do legado com o DS (§10.16): título em eyebrow, valor grande, apoio e chips à direita;
  * gráfico e tabela juntos; período e unidade no rodapé; valores do gráfico disponíveis em tabela.
  */
-export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips: todos = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false, copiar }: Props) {
+export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips: todos = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, tabelaNoLugar = false, largo = false, natural = false, copiar }: Props) {
   const id = useId()
   // A tabela sob demanda vive na URL (`tabela=<título do card>`): reabrir o link mostra as mesmas tabelas abertas.
   const { valores, alternar } = useQueryConjunto('tabela')
@@ -50,7 +52,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips: todos
         {temLado ? <div className="dash-card__lado">{extra}{chips.length || apoio.length ? <span className="dash-card__chips"><Chips chips={chips} apoio={apoio} /></span> : null}</div> : null}
       </header>
       <div className="dash-card__corpo">
-        {grafico}
+        {tabelaNoLugar && aberta ? null : grafico}
         {mostrarTabela ? <div id={`${id}-v`} className="dash-card__tabela">{tabela}</div> : null}
       </div>
       <footer className="dash-card__nota">
@@ -59,7 +61,7 @@ export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips: todos
           <span className="dash-card__acoes">
             {copiar && copiar.linhas.length ? <BotaoCopiar tabela={copiar} nome={`de ${titulo}`} /> : null}
             {tabelaSobDemanda && tabela != null ? (
-              <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => alternar(titulo)}>{aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
+              <Button variant="ghost" size="compact" aria-expanded={aberta} aria-controls={aberta ? `${id}-v` : undefined} onClick={() => alternar(titulo)}>{tabelaNoLugar ? (aberta ? 'Ver gráfico' : 'Ver tabela') : aberta ? 'Ocultar valores' : 'Ver valores'}</Button>
             ) : null}
           </span>
         ) : null}

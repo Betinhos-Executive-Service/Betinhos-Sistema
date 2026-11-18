@@ -199,6 +199,15 @@ describe('análises', () => {
     expect(m.sub).toMatch(/^1 meses · /)
   })
 
+  it('meta × realizado: mês do período sem dado entra com realizado zero e a meta no total', () => {
+    const fx = f({ atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15' })
+    const m = metaRealizado({ todas, rv: filtrarServicos(todas, fx), f: fx, now: NOW }, cmp)
+    expect(m.linhas.map((l) => l.mes)).toEqual(['2026-09', '2026-10'])
+    expect(m.linhas[0]).toMatchObject({ real: 0, pct: 0, tom: 'warning' })
+    expect(m.linhas[0].meta).toBeGreaterThan(0)
+    expect(m.sub).toMatch(/^2 meses · /)
+  })
+
   it('status dos serviços', () => {
     const st = statusServicos(ctx)
     expect(st.sub).toBe('2 concluídos · 1 cancelados')

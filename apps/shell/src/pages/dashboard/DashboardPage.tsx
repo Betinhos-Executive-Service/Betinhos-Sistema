@@ -25,7 +25,7 @@ import { MotoristasTab, type FrotaMotorista } from './components/abas/Motoristas
 import { ManutencoesTab } from './components/abas/ManutencoesTab'
 import { MultasTab } from './components/abas/MultasTab'
 import { ProgressoCarga } from './components/Carregando'
-import { DashboardToolbar } from './components/DashboardToolbar'
+import { DashboardToolbar, PeriodoRapido } from './components/DashboardToolbar'
 import { DetalheProvider } from './components/DetalheDrawer'
 import './dashboard.css'
 
@@ -40,6 +40,8 @@ const horaBR = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', min
 export function DashboardPage({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
+  // Largura que não comporta o período ao lado das ações: ele desce para a barra de filtros.
+  const estreito = useMedia('(max-width: 1180px)')
   // A aba vive na URL (#/dashboard?tab=servicos): recarregar ou compartilhar o link mantém a aba.
   const query = useHashQuery()
   const aba = abaDaUrl(query.get('tab'))
@@ -122,11 +124,12 @@ export function DashboardPage({ host }: { host: Host }) {
       </span>}
       description="Indicadores executivos, alertas e análises da operação no período escolhido."
       actions={<>
+        {estreito ? null : <PeriodoRapido filtros={filtros} now={now} onChange={setFiltros} />}
         <a className={buttonClassName({ variant: 'secondary' })} href={hrefFor('new_dashboard')}><ExternalLink size={16} aria-hidden="true" /> Abrir modo TV</a>
         {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} loading={db.carregando && Boolean(db.dados)} onClick={() => void db.atualizar()}>Atualizar</Button>}
       </>}
       tabs={<div className="dash-abas"><Tabs tabs={[...ABAS]} value={aba} onChange={trocarAba} panelId={PAINEL_ID} aria-label="Abas do dashboard" /></div>}
-      toolbar={<DashboardToolbar filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
+      toolbar={<DashboardToolbar periodoAqui={estreito} filtros={filtros} opcoes={opcoes} now={now} onChange={setFiltros} />}
     >
       <div
         className="dash-corpo" role="tabpanel" id={PAINEL_ID} aria-labelledby={tabId(PAINEL_ID, aba)}

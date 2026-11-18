@@ -1,7 +1,7 @@
 import { EmptyState, type TableColumn } from '@betinhos/ui'
 import { Tabela } from './Tabela'
 import { Inbox } from 'lucide-react'
-import { BarraChart, LinhaChart } from '../charts/Charts'
+import { AnosChart, BarraChart, MetaChart } from '../charts/Charts'
 import type { LinhaMeta, MetaRealizado, StatusServicos, TicketMensal, TotalProduzido } from '../domain/analises'
 import { brl, brlS, int } from '../domain/format'
 import { useMedia } from '../../operacional/useMedia'
@@ -28,7 +28,7 @@ export function TotalProduzidoCard({ dados: tp, periodo }: { dados: TotalProduzi
   return (
     <AnaliseCard
       titulo="Total produzido" periodo={periodo} unidade="R$ por mês" valor={tp.valor} sub={`Comparativo 3 anos · ${tp.sub}`} chips={tp.chips} apoio={tp.apoio}
-      grafico={<LinhaChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} dados={tp.pontos.map((p) => ({ rotulo: p.rotulo, [anos[0]]: p.valores[0], [anos[1]]: p.valores[1], [anos[2]]: p.valores[2] }))} series={[{ chave: anos[0], nome: anos[0], cor: 'secondary', tracejada: true }, { chave: anos[1], nome: anos[1], cor: 'brand' }, { chave: anos[2], nome: anos[2], cor: 'action' }]} />}
+      grafico={<AnosChart descricao={`Faturamento mensal de ${anos.join(', ')}, ${periodo}`} formatar={brlS} anos={anos} dados={tp.pontos.map((p) => Object.fromEntries([['rotulo', p.rotulo], ...anos.map((a, i) => [a, p.valores[i]] as const)]))} />}
       tabela={<Tabela columns={colunas} rows={tp.pontos} rowKey={(p) => p.rotulo} />} tabelaSobDemanda
       copiar={tabelaCopia(tp.pontos, [['Mês', (p) => p.rotulo], ...anos.map((a, i) => [a, (p: PontoTP) => brl(p.valores[i])] as const)])}
     />
@@ -48,8 +48,9 @@ export function MetaRealizadoCard({ dados: mr, periodo }: { dados: MetaRealizado
     ]
   return (
     <AnaliseCard
-      titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub} chips={mr.chips} apoio={mr.apoio}
-      tabela={<Tabela columns={colunas} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />}
+      titulo="Meta × realizado" periodo={periodo} unidade="R$ por mês" valor={mr.valor} sub={mr.sub ? `${mr.sub} · Meses sem dado contam com realizado zero.` : 'Meses sem dado contam com realizado zero.'} chips={mr.chips} apoio={mr.apoio}
+      grafico={mr.linhas.length ? <MetaChart descricao={`Meta e realizado por mês, ${periodo}`} formatar={brlS} dados={mr.linhas.map((l) => ({ rotulo: l.rotulo, meta: l.meta, real: l.real, tom: l.tom }))} /> : undefined}
+      tabela={<Tabela columns={colunas} rows={mr.linhas} rowKey={(l) => l.mes} empty={vazio('Nenhuma meta no período')} />} tabelaSobDemanda tabelaNoLugar
       copiar={tabelaCopia(mr.linhas, [['Mês', (l) => l.rotulo], ['Meta', (l) => brl(l.meta)], ['Realizado', (l) => brl(l.real)], ['Atingimento', (l) => pct(l.pct)]])}
     />
   )

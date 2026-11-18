@@ -4,7 +4,7 @@ import { agrupar, mesesComDados, soma, temSegmento } from './base'
 import { brl, brlS, dec, int } from './format'
 import { cancelado, chipOuSemDado, chipValor, produzido, semDado, ticketDoPeriodo, ticketStats, valorDoPeriodo, type Comparacao, type Contexto } from './kpis'
 import { metaMensal, metaProporcional, totalFixoNoPeriodo } from './meta'
-import { diasNoMes, fmtDia, hojeBR, mesRotulo, mesesDoAno, parseDia, periodoNoAno } from './periodo'
+import { diasNoMes, fmtDia, hojeBR, mesRotulo, mesesDoAno, mesesEntre, parseDia, periodoNoAno } from './periodo'
 import type { Apoio, Chip, Reserva } from './types'
 
 export type Destaque = { valor: string; sub: string; chips: Chip[]; apoio: Apoio[] }
@@ -72,18 +72,21 @@ export function totalProduzido(ctx: Contexto, cmp: Comparacao): TotalProduzido {
 export type LinhaMeta = { mes: string; rotulo: string; meta: number; real: number; pct: number; tom: 'success' | 'info' | 'warning' }
 export type MetaRealizado = Destaque & { linhas: LinhaMeta[] }
 
+/** Limites do atingimento: a partir de 100% da meta o mês está em dia, abaixo de 80% pede atenção. */
+export const tomMeta = (pct: number): LinhaMeta['tom'] => (pct >= 100 ? 'success' : pct >= 80 ? 'info' : 'warning')
+
+/** Todos os meses do período entram, inclusive os sem serviço: a meta deles conta no total com realizado zero (senão inflaria o % da meta). */
 export function metaRealizado(ctx: Contexto, cmp: Comparacao): MetaRealizado {
-  const { rv, now } = ctx
-  const comDados = mesesComDados(rv)
-  const meses = mesesOuAno(rv, now)
+  const { rv, f } = ctx
+  const meses = mesesEntre(f.inicio, f.fim)
   const byM = agrupar(rv, (r) => r.mes)
-  const ano = anoAtual(now)
-  const linhas = meses.map((mes, i): LinhaMeta => {
+  const linhas = meses.map((mes): LinhaMeta => {
     const [y, m] = mes.split('-').map(Number)
-    const real = comDados.length ? soma(byM.get(mes) ?? []) : (ANOS_MAPA.includes(ano) ? FAT_FIXO[ano]?.[i] ?? 0 : 0)
+    const doMes = byM.get(mes)
+    const real = doMes ? soma(doMes) : (ANOS_MAPA.includes(y) && !temSegmento(f) ? FAT_FIXO[y]?.[m - 1] ?? 0 : 0)
     const meta = metaMensal(y, m - 1)
     const pct = meta > 0 ? (real / meta) * 100 : 0
-    return { mes, rotulo: mesRotulo(mes), meta, real, pct, tom: pct >= 100 ? 'success' : pct >= 75 ? 'info' : 'warning' }
+    return { mes, rotulo: mesRotulo(mes), meta, real, pct, tom: tomMeta(pct) }
   })
   const totalMeta = linhas.reduce((t, l) => t + l.meta, 0)
   const totalReal = linhas.reduce((t, l) => t + l.real, 0)

@@ -32,6 +32,8 @@ describe('período', () => {
     expect(atalho('ult7', NOW)).toEqual({ inicio: '2026-10-09', fim: '2026-10-15' })
     expect(atalho('ult30', NOW)).toEqual({ inicio: '2026-09-16', fim: '2026-10-15' })
     expect(atalho('esteMes', NOW)).toEqual({ inicio: '2026-10-01', fim: '2026-10-15' })
+    expect(atalho('esteTrimestre', NOW)).toEqual({ inicio: '2026-10-01', fim: '2026-10-15' })
+    expect(atalho('esteTrimestre', new Date('2026-08-20T12:00:00Z'))).toEqual({ inicio: '2026-07-01', fim: '2026-08-20' })
     expect(atalho('mesAnt', NOW)).toEqual({ inicio: '2026-09-01', fim: '2026-09-30' })
     expect(atalho('esteAno', NOW)).toEqual({ inicio: '2026-01-01', fim: '2026-10-15' })
     expect(atalho('anoAnt', NOW)).toEqual({ inicio: '2025-01-01', fim: '2025-12-31' })
