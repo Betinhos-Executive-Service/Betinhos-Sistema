@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import { getInitialComunicadoId } from "../../app/bootstrap";
 import type { PortaDados } from "../../data/porta";
 import { hasDataverseRuntime } from "../../data/dataverse/cliente";
@@ -14,11 +13,10 @@ type Options = {
   driverIdRef: MutableRefObject<string>;
   previewMode: boolean;
   setScreen: (screen: Screen) => void;
-  setDataLoadingState: (loading: LoadingOverlayState | null) => void;
 };
 
 // Comunicados do motorista, seleção, origem da navegação e deep link do push.
-export function useComunicados({ dados, driverIdRef, previewMode, setScreen, setDataLoadingState }: Options) {
+export function useComunicados({ dados, driverIdRef, previewMode, setScreen }: Options) {
   const [comunicados, setComunicados] = useState<ComunicadoDestinatario[]>([]);
   const [comunicadosStatus, setComunicadosStatus] = useState<ComunicadosLoadStatus>(() => isMockComunicados() || hasDataverseRuntime() ? "loading" : "ready");
   const [selectedComunicadoId, setSelectedComunicadoId] = useState("");
@@ -52,7 +50,6 @@ export function useComunicados({ dados, driverIdRef, previewMode, setScreen, set
         setComunicados((current) => current.some((row) => row.id === item.id) ? current : [item, ...current]);
         setSelectedComunicadoId(item.id);
         setScreen("comunicados");
-        setDataLoadingState(null);
       })
       .catch((error) => {
         reportAppError(error, { severity: "warning", source: "app", action: "loadDriverComunicado", phase: "deep-link" });

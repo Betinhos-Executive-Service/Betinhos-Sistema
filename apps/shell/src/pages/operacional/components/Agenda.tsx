@@ -1,10 +1,11 @@
 import { ChevronDown } from 'lucide-react'
 import { useQueryBandeira } from '../../../nav/queryState'
-import { EmptyState, Skeleton, StatusBadge } from '@betinhos/ui'
+import { EmptyState, StatusBadge } from '@betinhos/ui'
 import type { HourGroup } from '../domain/bands'
 import type { Reserva } from '../domain/types'
 import { serviceState, statusTone } from '../domain/serviceState'
 import { formatHour } from '../domain/time'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 function ServiceRow({ reserva, now, selected, changed, onSelect }: { reserva: Reserva; now: Date; selected: boolean; changed: boolean; onSelect: (id: string) => void }) {
   const state = serviceState(reserva, now)
@@ -24,14 +25,9 @@ function ServiceRow({ reserva, now, selected, changed, onSelect }: { reserva: Re
   )
 }
 
+/** Primeira carga da agenda: loader da marca no lugar das linhas. */
 export function AgendaSkeleton() {
-  return (
-    <ul className="op-agenda__list" aria-busy="true" aria-label="Carregando serviços">
-      {Array.from({ length: 6 }, (_, i) => (
-        <li key={i} className="op-row op-row--skeleton"><Skeleton width={42} /><span className="op-row__main"><Skeleton width="70%" /><Skeleton width="45%" /></span><Skeleton width={72} height={22} /></li>
-      ))}
-    </ul>
-  )
+  return <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" />
 }
 
 type Props = {

@@ -1,20 +1,22 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader } from '@betinhos/ui'
 import { GraduationCap, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
+import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, type Linha, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
 import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
-import { NavTopo } from './components/NavTopo'
+import { NavTopo } from '../../app/NavTopo'
 import { TreinamentoEditor } from './components/TreinamentoEditor'
 import { TreinamentoPainel } from './components/TreinamentoPainel'
+import { BrandLoader } from '../../app/BrandLoader'
 import './treinamentos.css'
 
 export function TreinamentosPage({ host }: { host: Host }) {
@@ -49,17 +51,19 @@ function Treinamentos({ host }: { host: Host }) {
     builtins: builtinViews,
   })
 
+  const read = useMemo(() => extra.read(readTreinamento, (t) => t.id), [extra])
   const visible = useMemo(() => {
-    const read = extra.read(readTreinamento, (t) => t.id)
     const list = data.items.filter((t) => matchesFilters(t, filters, allFields, read) && matchesKeyword(t, query))
     return extra.sort(sortTreinamentos(list, view.config.sort, data.progresso), view.config.sort, (t) => t.id)
-  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra])
+  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra, read])
   const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar treinamentos" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Treinamentos', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Treinamentos' })
+  const size = mobile ? 'touch' : 'default'
 
   const goHome = useCallback(() => setTarget(null), [setTarget])
   const startNew = useCallback(() => { setModelo(null); setCreateKey((n) => n + 1); setTarget({ mode: 'create' }) }, [setTarget])
@@ -77,9 +81,9 @@ function Treinamentos({ host }: { host: Host }) {
   if (target?.mode === 'create') {
     body = editor(modelo ?? emptyDraft(), `novo-${createKey}`)
   } else if (target && !data.loaded) {
-    body = data.error ? erroCarga : <div className="surface tr-loading" role="status" aria-label="Carregando treinamento" />
+    body = data.error ? erroCarga : <div className="surface"><BrandLoader variant="inline" label="Carregando treinamento" text="Carregando treinamento…" /></div>
   } else if (target && !selected) {
-    body = <><NavTopo onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
+    body = <><NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={goHome} atual="Não encontrado" /><Alert tone="warning" title="Treinamento não encontrado">Ele pode ter sido excluído. Atualize a lista para conferir.</Alert></>
   } else if (selected) {
     body = isPublicado(selected) && target?.mode !== 'edit'
       ? <TreinamentoPainel key={selected.id} item={selected} funcionarios={data.funcionarios} source={source} onBack={goHome} onEditar={() => editar(selected.id)} onReaplicar={() => reaplicar(selected)} />
@@ -97,11 +101,15 @@ function Treinamentos({ host }: { host: Host }) {
     const publicados = data.items.filter(isPublicado).length
     const footer = <span className="tr-num">{visible.length} de {data.items.length} · {publicados} {plural(publicados, 'publicado', 'publicados')}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum treinamento com estes filtros" action={<Button variant="secondary" onClick={() => { clearFilters(); setQuery('') }}>Limpar filtros</Button>}>Tire um filtro ou mude a busca para ver mais resultados.</EmptyState>
-    body = (
+    const table = (rows: Linha[], tableFooter?: ReactNode) => (
+      <TreinamentosTable list={rows} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Linha[]) => <TreinamentosCards list={rows} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <TreinamentosCards list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <TreinamentosTable list={slice} funcionarios={data.funcionarios} progresso={data.progresso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -110,11 +118,13 @@ function Treinamentos({ host }: { host: Host }) {
   return (
     <div className="page tr-page">
       <div role="toolbar" aria-label="Comandos de treinamentos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="tr-search" value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={startNew}>Novo treinamento</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={startNew}>Novo treinamento</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}

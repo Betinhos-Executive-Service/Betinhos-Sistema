@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import { Alert, Avatar, Button, Dialog, Drawer, Skeleton, StatusBadge, useToast } from '@betinhos/ui'
+import { Alert, Avatar, Button, Dialog, Drawer, StatusBadge, useToast } from '@betinhos/ui'
 import { Pencil } from 'lucide-react'
 import type { Source } from '../data/source'
 import { STATUS, label } from '../domain/choices'
@@ -10,6 +10,7 @@ import type { ChoiceSet, Historico, Pessoa } from '../domain/types'
 import { ContatoActions } from './ContatoActions'
 import { PessoaForm } from './PessoaForm'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
@@ -93,7 +94,7 @@ function Ficha({ p, choices, dups, source, onOpen }: { p: Pessoa; choices: Choic
       </Section>
 
       <Section title="Serviços" aside={r ? <span className="ps-muted ps-num">{limitado ? `Mais de ${r.total}` : r.total} no total · {r.ultimos90} nos últimos 90 dias</span> : null}>
-        {hist == null ? <div className="ps-ficha__loading" role="status" aria-label="Carregando histórico"><Skeleton height={18} /><Skeleton height={18} /><Skeleton height={18} /></div>
+        {hist == null ? <BrandLoader variant="inline" size="sm" label="Carregando histórico" text="Carregando histórico…" />
           : 'error' in hist ? <Alert tone="danger" title="Não foi possível carregar o histórico">{hist.error}</Alert>
           : (
             <>
@@ -175,7 +176,7 @@ export function PessoaDrawer({ target, onTarget, list, dups, choices, source, on
     const found = validateForm(form, new Date(), target?.mode === 'edit' ? base : null)
     setErrors(found)
     const first = Object.keys(found)[0]
-    if (first) { document.querySelector<HTMLElement>(`.ps-form [name="${first}"]`)?.focus(); return }
+    if (first) { document.querySelector<HTMLElement>(`.ps-form [name="${first}"], .ps-form [data-field="${first}"] [role="combobox"]`)?.focus(); return }
     setSaving(true)
     try {
       const bind = await source.clienteBind()

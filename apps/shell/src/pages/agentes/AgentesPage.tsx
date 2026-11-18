@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, Field, Input, Skeleton, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, Field, Input, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { Inbox, RefreshCw, Sparkles } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -11,6 +11,7 @@ import { useAgente } from './useAgente'
 import { PropostaCard } from './components/PropostaCard'
 import { AprovarDialog, DescartarDialog } from './components/DecisaoDialogs'
 import { Historico } from './components/Historico'
+import { BrandLoader } from '../../app/BrandLoader'
 import './agentes.css'
 
 export function AgentesPage({ host, agente = 'financeiro' }: { host: Host; agente?: Agente }) {
@@ -67,7 +68,7 @@ function Agentes({ host, agente }: { host: Host; agente: Agente }) {
         <Button type="submit" variant="primary" icon={<Sparkles size={18} />} loading={estado.polling}>Analisar agora</Button>
       </form>}>
       {estado.error && <Alert tone="danger" title="Falha ao carregar" action={<Button variant="secondary" size="compact" onClick={() => void estado.reload()}>Tentar de novo</Button>}>{estado.error}</Alert>}
-      {estado.polling && <div className="surface agentes__analisando" role="status"><Skeleton shape="rect" height={72} /><p>Analisando… leva cerca de 15 s.</p></div>}
+      {estado.polling && <div className="surface agentes__analisando"><BrandLoader variant="inline" size="md" label="Analisando" text="Analisando… leva cerca de 15 s." /></div>}
       {!estado.polling && atual?.status === 'erro' && <Alert tone="danger" title="A última análise falhou" action={<Button variant="secondary" size="compact" onClick={() => void estado.analisar(atual.pergunta)}>Tentar de novo</Button>}>{atual.erro}</Alert>}
       {!estado.polling && atual?.status === 'concluida' && (
         <>

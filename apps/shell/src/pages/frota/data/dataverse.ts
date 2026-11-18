@@ -1,15 +1,20 @@
 import { CAMPO, lerMulti } from '../domain/manutencaoCatalogo'
 import { addMonths, todaySP, type DateBehavior } from './dates'
-import { cleanId, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, SELECT, SELECT_PARCELA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
+import { chamarCustomApi } from './customApi'
+import { criarArquivosXrm, criarComandosXrm, type DepsXrm } from './manutencaoDataverse'
+import { cleanId, GUID, guid, mapBaseline, mapColisao, mapDespesaCombustivel, mapInfracao, mapItemPlano, mapManutencao, mapMulta, mapPosse, mapParcelaFolha, mapParcelaTermo, mapTelemetriaKm, mapTermoMulta, mapVeiculo, resumirTermos, EXPAND_PARCELA_FOLHA, SELECT, SELECT_PARCELA, SELECT_PARCELA_FOLHA, SELECT_RESUMO_TERMO, SELECT_TERMO, SELECT_VEICULOS_SEM_HODOMETRO } from './mappers'
 import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PLANO, KIND_TABLE, STATUS_FIELD, TABLE, TERMO_TABLE } from './schema'
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
-import { EMPTY_DATA, FlowIncertoError, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
-import type { DespesaCombustivel, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
-import { errorMessage, type XrmHost, type XrmWebApi } from './xrm'
+import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
+import { EMPTY_DATA, type ArquivoMulta, type ColunaArquivoMulta, type DataSource, type ItemPlanoInput, type LoadResult } from './source'
+import type { DespesaCombustivel, Dossie, FrotaData, Kind, ResultadoLancamento, TableKey, TelemetriaKm } from './types'
+import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
 type Row = Record<string, unknown>
 type Behaviors = Record<string, DateBehavior>
+
+const MES = /^\d{4}-(0[1-9]|1[0-2])$/
 
 export function getDataverseEnvironmentLabel(clientUrl: string) {
   const hostname = new URL(clientUrl).hostname.toLowerCase()
@@ -33,47 +38,27 @@ const ORDER: Record<TableKey, string> = {
 
 const PAGE_SIZE = 5000
 
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const FLOWS: Record<FlowId, { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }> = {
-  aprovarManutencao: { envVar: 'new_FlowUrlManutencao', body: (id) => ({ guids: id }), timeoutMs: 60_000, nome: 'Agendar manutenção' },
-  notificarCondutor: { envVar: 'new_FlowUrlNotificarMotoristaMultas', body: (id) => ({ guids: id }), timeoutMs: 30_000, nome: 'Notificar condutor' },
-  gerarContrato: { envVar: 'new_FlowUrlGerarContratoMultas', body: (id) => ({ GUID_MULTA: id }), timeoutMs: 40_000, nome: 'Gerar contrato' },
-}
-
 export function createXrmSource(xrm: XrmHost): DataSource {
   const api = xrm.WebApi as XrmWebApi
   const clientUrl = xrm.Utility?.getGlobalContext().getClientUrl().replace(/\/+$/, '') ?? location.origin
   const apiUrl = `${clientUrl}/api/data/v9.2`
   const behaviorCache = new Map<string, Promise<Behaviors>>()
-  // A URL do Flow tem assinatura: fica só aqui, em memória, e nunca sai em mensagem, log ou retorno.
-  const flowUrls = new Map<FlowId, string>()
-
-  /** Guid sem chaves e minúsculo; rejeita o que não for Guid. */
-  function guid(value: string) {
-    const id = cleanId(value)
-    if (!GUID.test(id)) throw new Error('Identificador inválido')
-    return id
-  }
-
   /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
-  async function customApi(nome: string, body: Record<string, unknown>, falha: string): Promise<Record<string, unknown>> {
-    const response = await fetch(`${apiUrl}/${nome}`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json; charset=utf-8', 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
-      body: JSON.stringify(body),
-    })
-    let payload: Record<string, unknown> = {}
-    try {
-      const parsed: unknown = await response.json()
-      if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
-    } catch { /* 204 ou corpo vazio */ }
-    if (!response.ok) {
-      const erro = payload.error as { message?: unknown } | undefined
-      throw new Error(typeof erro?.message === 'string' && erro.message ? erro.message : `${falha} (${response.status})`)
-    }
-    return payload
+  const customApi = (nome: string, body: Record<string, unknown>, falha: string) => chamarCustomApi(apiUrl, nome, body, falha)
+
+  /** Quantas parcelas cada multa (ou termo) tem no total, para o "x/y". Uma consulta por lote de 50 origens, em paralelo. */
+  async function totaisPorOrigem(rows: Row[]) {
+    const totais = new Map<string, number>()
+    const multas = [...new Set(rows.map((r) => r._new_multa_value).filter(Boolean).map(String))]
+    const termos = [...new Set(rows.filter((r) => !r._new_multa_value).map((r) => r._new_termo_value).filter(Boolean).map(String))]
+    const consultas = ([['_new_multa_value', multas], ['_new_termo_value', termos]] as const).flatMap(([campo, ids]) =>
+      Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => {
+        const lote = ids.slice(i * 50, i * 50 + 50).map((id) => `${campo} eq ${guid(id)}`).join(' or ')
+        return api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${campo}&$filter=${lote}`).then((res) => ({ campo, linhas: res.entities }))
+      }))
+    for (const { campo, linhas } of await Promise.all(consultas))
+      for (const r of linhas) { const k = cleanId(r[campo]); totais.set(k, (totais.get(k) ?? 0) + 1) }
+    return totais
   }
 
   async function getJson<T>(path: string): Promise<T> {
@@ -114,16 +99,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     if (override) return override
     const definitions = await api.retrieveMultipleRecords('environmentvariabledefinition', `?$select=defaultvalue&$filter=schemaname eq '${schemaName}'`)
     return definitions.entities.length > 0 ? ((definitions.entities[0].defaultvalue as string | null) ?? null) : null
-  }
-
-  async function flowUrl(flow: FlowId) {
-    const cached = flowUrls.get(flow)
-    if (cached) return cached
-    const { envVar, nome } = FLOWS[flow]
-    const url = await readEnvVar(envVar)
-    if (!url) throw new Error(`URL do Flow "${nome}" não configurada (variável ${envVar})`)
-    flowUrls.set(flow, url)
-    return url
   }
 
   const envLabel = getDataverseEnvironmentLabel(clientUrl)
@@ -194,9 +169,13 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     telemetriaKm: async () => (await retrieveAll('telemetriaKm', `new_data ge ${addMonths(todaySP(), -12)}`)).map(mapTelemetriaKm).filter((item): item is TelemetriaKm => item !== null),
   }
 
+  const deps: DepsXrm = { api, apiUrl, envLabel, lerVariavel: readEnvVar, metadata: getJson, comportamentos: () => loadBehaviors(TABLE.manutencoes) }
+
   return {
     mode: 'xrm',
     envLabel,
+    ...criarComandosXrm(deps),
+    ...criarArquivosXrm(deps),
 
     async load(): Promise<LoadResult> {
       const keys = Object.keys(loaders) as TableKey[]
@@ -209,6 +188,19 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         else errors[key] = errorMessage(result.reason)
       })
       return { data, errors }
+    },
+
+    async veiculo(id: string) {
+      if (!GUID.test(cleanId(id))) return null
+      const filtro = `cr40f_veiculosid eq ${cleanId(id)}`
+      try {
+        const [row] = await retrieveAll('veiculos', filtro)
+        return row ? mapVeiculo(row) : null
+      } catch (reason) {
+        if (!/hodometro/i.test(errorMessage(reason))) throw reason
+        const [row] = await retrieveAll('veiculos', filtro, SELECT_VEICULOS_SEM_HODOMETRO)
+        return row ? { ...mapVeiculo(row), hodometro: null, hodometroEm: null } : null
+      }
     },
 
     async currentStatus(kind: Kind, id: string) {
@@ -236,40 +228,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         if (id) params.set('id', cleanId(id))
         window.open(`${clientUrl}/main.aspx?${params}`, '_blank', 'noopener')
       }
-    },
-
-    async prepareFlow(flow: FlowId) {
-      await flowUrl(flow)
-    },
-
-    async runFlow(flow: FlowId, id: string): Promise<FlowResult> {
-      if (!GUID.test(id)) throw new Error('Identificador inválido')
-      const { body, timeoutMs, nome } = FLOWS[flow]
-      const url = await flowUrl(flow)
-
-      const controller = new AbortController()
-      let timedOut = false
-      const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
-      let response: Response
-      try {
-        response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(id)), signal: controller.signal })
-      } catch {
-        // O erro original pode citar a URL; só a mensagem própria sai daqui.
-        clearTimeout(timer)
-        if (timedOut) throw new FlowIncertoError(`O Flow "${nome}" não respondeu em ${timeoutMs / 1000} s. Confira o registro antes de tentar de novo`)
-        throw new FlowIncertoError(`Não foi possível chamar o Flow "${nome}" (rede ou bloqueio do navegador)`)
-      }
-
-      let payload: Record<string, unknown> = {}
-      try {
-        const parsed: unknown = await response.json()
-        if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
-      } catch { /* Corpo vazio ou não JSON. */ } finally { clearTimeout(timer) }
-
-      const status = response.status
-      if (flow === 'notificarCondutor' && (status === 207 || status === 400) && Number(payload.noDriver) > 0) throw new Error('A multa não tem motorista. Nada foi enviado')
-      if (status < 200 || status > 299 || status === 207) throw new Error(`O Flow "${nome}" respondeu ${status}. Confira o registro antes de tentar de novo`)
-      return { message: typeof payload.message === 'string' ? payload.message : null, shareUrl: typeof payload.shareUrl === 'string' ? payload.shareUrl : null }
     },
 
     async fotoVeiculo(id: string) {
@@ -375,6 +333,62 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     async listarParcelasTermo(termoId: string) {
       const result = await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA.join(',')}&$filter=_new_termo_value eq ${guid(termoId)}&$orderby=new_numero asc`)
       return result.entities.map(mapParcelaTermo)
+    },
+
+    async listarDescontosPeriodo(inicio: string, fim: string) {
+      if (!MES.test(inicio) || !MES.test(fim)) throw new Error('Mês inválido')
+      const filtro = `new_competencia ge ${inicio}-01 and new_competencia lt ${addMonths(`${fim}-01`, 1)} and new_status ne 100000002`
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')}&$expand=${EXPAND_PARCELA_FOLHA}&$filter=${filtro}&$orderby=new_competencia asc`)).entities
+      const totais = await totaisPorOrigem(rows)
+      return rows.map((r) => mapParcelaFolha(r, totais.get(cleanId(r._new_multa_value ?? r._new_termo_value)) ?? 1))
+    },
+
+    async previstasAntes(mes: string) {
+      if (!MES.test(mes)) throw new Error('Mês inválido')
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=new_competencia&$filter=new_status eq 100000000 and new_competencia lt ${mes}-01&$orderby=new_competencia asc`)).entities
+      return { quantidade: rows.length, maisAntigo: rows.length ? String(rows[0].new_competencia).slice(0, 7) : null }
+    },
+
+    async listarParcelasMulta(multaId: string) {
+      const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')}&$expand=${EXPAND_PARCELA_FOLHA}&$filter=_new_multa_value eq ${guid(multaId)}&$orderby=new_numero asc`)).entities
+      return rows.map((r) => mapParcelaFolha(r, rows.length))
+    },
+
+    async lancarDescontoFolha(ids: string[], acao: 'lancar' | 'desfazer'): Promise<ResultadoLancamento> {
+      const payload = await customApi('cr40f_LancarDescontoFolha', { ParcelaIdsJson: JSON.stringify(ids.map(guid)), Acao: acao }, 'Não foi possível lançar as parcelas')
+      const json = typeof payload.ResultadoJson === 'string' ? payload.ResultadoJson : ''
+      if (!json) throw new Error('O servidor não devolveu o resultado do lançamento. Recarregue a tela')
+      return JSON.parse(json) as ResultadoLancamento
+    },
+
+    async passoMulta(multaId: string, passo: Passo, dados: DadosPasso): Promise<Situacao> {
+      const payload = await customApi('cr40f_PassoMulta', { MultaId: guid(multaId), Passo: passo, DadosJson: JSON.stringify(dados) }, 'Não foi possível gravar o passo')
+      const json = typeof payload.MultaJson === 'string' ? payload.MultaJson : ''
+      if (!json) throw new Error('O servidor não devolveu a situação da multa. Recarregue a tela')
+      return JSON.parse(json) as Situacao
+    },
+
+    async dossieMulta(multaId: string): Promise<Dossie> {
+      const payload = await customApi('new_DossieMulta', { new_MultaId: guid(multaId) }, 'Não foi possível montar o dossiê da multa')
+      const json = typeof payload.new_DossieJson === 'string' ? payload.new_DossieJson : ''
+      if (!json) throw new Error('O servidor não devolveu o dossiê da multa')
+      return JSON.parse(json) as Dossie
+    },
+
+    urlArquivoMulta(multaId: string, coluna: ColunaArquivoMulta) {
+      return `${apiUrl}/cr40f_multases(${guid(multaId)})/${coluna}/$value`
+    },
+
+    async enviarArquivoMulta(multaId: string, coluna: ArquivoMulta, file: File) {
+      // x-ms-file-name só aceita ASCII: tira acentos e o que sobrar fora da faixa imprimível.
+      const nome = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]/g, '') || 'arquivo.pdf'
+      const response = await fetch(`${apiUrl}/cr40f_multases(${guid(multaId)})/${coluna}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/octet-stream', 'x-ms-file-name': nome, 'OData-Version': '4.0', 'OData-MaxVersion': '4.0' },
+        body: file,
+      })
+      if (!response.ok) throw new ApiError(`Não foi possível enviar o arquivo (${response.status})`, response.status)
     },
   }
 }

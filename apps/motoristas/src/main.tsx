@@ -6,6 +6,7 @@ import { AppErrorBoundary } from "./app/AppErrorBoundary";
 import { adaptadorDataverse } from "./data/dataverse/adaptador";
 import { installGlobalAppErrorLogger } from "./shared/appErrorLogger";
 import { installPwa } from "./lib/pwa";
+import { esconderSplashInicial } from "./shared/ui/BrandLoader";
 
 installGlobalAppErrorLogger();
 installPwa();
@@ -21,7 +22,10 @@ try {
     </React.StrictMode>,
     document.getElementById("root") as HTMLElement
   );
+  // O splash do index.html cobre o download e a leitura do JS; some quando o app pinta o primeiro quadro.
+  requestAnimationFrame(esconderSplashInicial);
 } catch (error) {
+  esconderSplashInicial();
   (window as Window & { __APP_REPORT_ERROR?: (error: unknown, context?: Record<string, unknown>) => void }).__APP_REPORT_ERROR?.(error, {
     severity: "critical",
     source: "main.render",

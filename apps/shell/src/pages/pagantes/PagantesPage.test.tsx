@@ -2,6 +2,11 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PagantesPage } from './PagantesPage'
+import { emptyFilters } from '@betinhos/ui'
+import { encodeTableFilters } from '../../app/filtersUrl'
+import { COMPROVANTES_KEY } from '../recebimentos/colunaOp'
+import { mockContagemPorOp } from '../recebimentos/mock'
+import { createMockPagantes } from './data/mock'
 import { VIEWS_KEY } from './domain/filters'
 
 // O mock simula latência; com a suíte inteira em paralelo a máquina fica lenta e 1 s de espera não basta.
@@ -14,7 +19,14 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('button')!)
+const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('.bt-table__row')!.querySelector<HTMLElement>('.pg-open')!)
+
+
+const blobText = (blob: Blob) => new Promise<string>((resolve) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result))
+  reader.readAsText(blob)
+})
 
 describe('Pagantes', () => {
   it('lista no mock, abre a ficha com rateio e marca como pago com recibo', async () => {
@@ -65,13 +77,47 @@ describe('Pagantes', () => {
     expect(within(confirm).queryByRole('checkbox', { name: /Gerar e enviar o recibo/ })).toBeNull()
   })
 
-  it('clique em qualquer ponto da linha abre a ficha; ações rápidas não', async () => {
+  it('clique na linha seleciona, duplo clique abre a ficha; ações rápidas não', async () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     const row = (await screen.findByText('PAG-1203')).closest('.bt-table__row') as HTMLElement
     fireEvent.click(within(row).getByRole('button', { name: /Copiar link|Sem link/ }))
-    expect(screen.queryByRole('dialog', { name: 'Helena Prado' })).toBeNull()
+    expect(screen.queryByText('1 selecionado')).toBeNull()
     fireEvent.click(within(row).getByText(/860,50/))
+    expect(row.getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('dialog', { name: 'Helena Prado' })).toBeNull()
+    fireEvent.doubleClick(within(row).getByText(/860,50/))
     expect(await screen.findByRole('dialog', { name: 'Helena Prado' })).toBeTruthy()
+  })
+
+  it('seleção em lote: faixa com contagem, exporta e gera recibos dos selecionados', async () => {
+    const blobs: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { blobs.push(blob); return 'blob:x' }, revokeObjectURL: () => undefined }))
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('PAG-1201')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    fireEvent.click((await screen.findByText('PAG-1203')).closest('.bt-table__row')!.querySelector('.pg-num')!, { ctrlKey: true })
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    expect(within(faixa).getByText('2 selecionados')).toBeTruthy()
+    // Como na Geral, a busca continua na linha de comando durante a seleção.
+    expect(screen.getByRole('searchbox', { name: 'Buscar pagantes' })).toBeTruthy()
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
+    await screen.findByText('2 pagantes exportados.')
+    const csv = await blobText(blobs[0])
+    expect(csv).toMatch(/PAG-1201/)
+    expect(csv).toMatch(/PAG-1203/)
+
+    // No mock o gerador só funciona dentro do Dataverse: o erro aparece e a seleção foi limpa.
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Gerar recibos' }))
+    await screen.findByText('O gerador de recibo só funciona dentro do Dataverse.')
+    expect(screen.queryByRole('group', { name: 'Comandos da seleção' })).toBeNull()
+  })
+
+  it('recibo gerado e não enviado oferece gerar de novo, não reenviar', async () => {
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await openRow('PAG-1211')
+    const ficha = await screen.findByRole('dialog')
+    expect(within(ficha).getByRole('button', { name: 'Gerar recibo novamente' })).toBeTruthy()
+    expect(within(ficha).queryByRole('button', { name: 'Reenviar recibo' })).toBeNull()
   })
 
   it('gerar recibo fecha a ficha antes de abrir o gerador e mostra o erro', async () => {
@@ -102,5 +148,39 @@ describe('Pagantes', () => {
     render(<PagantesPage host={{ mode: 'mock' }} />)
     expect(await screen.findByRole('dialog')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('PAG-1201')).toBeNull())
+  })
+
+  it('coluna Comprovantes: o pagante mostra a contagem da OP dele e o drawer abre agrupado por serviço', async () => {
+    history.replaceState(null, '', '#/pagantes')
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    const lista = createMockPagantes(new Date()).filter((p) => p.opId)
+    const contagem = mockContagemPorOp(lista.map((p) => p.opId))
+    const p = lista.find((x) => contagem.has(x.opId))!
+    const n = contagem.get(p.opId)!
+    const linha = (await screen.findByText(p.codigo)).closest('.bt-table__row') as HTMLElement
+    fireEvent.click(await within(linha).findByRole('button', { name: new RegExp(`^${n} comprovantes? de recebimento$`) }))
+    const drawer = await screen.findByRole('dialog', { name: p.op })
+    expect(within(drawer).getByText('Recebimento')).toBeTruthy()
+    await within(drawer).findByText(new RegExp(`^${n} comprovantes?`))
+  })
+
+  it('filtro Com/Sem comprovante usa a contagem da OP do pagante', async () => {
+    const lista = createMockPagantes(new Date())
+    const com = mockContagemPorOp(lista.map((p) => p.opId).filter(Boolean))
+    const tem = (p: { opId: string }) => Boolean(p.opId) && com.has(p.opId)
+    const filtro = (op: 'yes' | 'no') => encodeTableFilters({ ...emptyFilters(), quick: { [COMPROVANTES_KEY]: { type: 'condition', id: 'rapido-comprovantes', field: COMPROVANTES_KEY, op } } })
+    const com1 = lista.find(tem)!
+    const sem1 = lista.find((p) => !tem(p))!
+
+    history.replaceState(null, '', `#/pagantes?f=${filtro('yes')}`)
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText(com1.codigo)
+    await waitFor(() => expect(screen.queryByText(sem1.codigo)).toBeNull())
+    cleanup()
+
+    history.replaceState(null, '', `#/pagantes?f=${filtro('no')}`)
+    render(<PagantesPage host={{ mode: 'mock' }} />)
+    await screen.findByText(sem1.codigo)
+    await waitFor(() => expect(screen.queryByText(com1.codigo)).toBeNull())
   })
 })

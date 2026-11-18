@@ -6,6 +6,7 @@ import type * as finalizar from "../features/finalizar/remoto";
 import type * as voucher from "../features/voucher/remoto";
 import type * as recibo from "../features/recibo/remoto";
 import type * as ideias from "../features/ideias/remoto";
+import type * as prova from "../features/fotos/provaRemota";
 
 // Contrato de dados do app: as operações que as telas podem pedir, com nome de negócio.
 // Hoje só o adaptador Dataverse implementa (motoristas e terceiros fixos no web resource).
@@ -34,4 +35,7 @@ export type PortaDados = {
   acaoComunicado: typeof comunicados.executeComunicadoAction;
   carregarIdeias: typeof ideias.loadMyIdeasRemote;
   criarIdeia: typeof ideias.createIdeaRemote;
+  emitirProvaMidia: typeof prova.emitirProvaMidiaRemote;
+  registrarProvaMidia: typeof prova.registrarProvaMidiaRemote;
+  conferirProvaMidia: typeof prova.conferirProvaMidiaRemote;
 };

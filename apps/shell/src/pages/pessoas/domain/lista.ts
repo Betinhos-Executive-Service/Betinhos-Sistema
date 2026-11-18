@@ -13,6 +13,7 @@ export const TELA = 'pessoas'
 /** Colunas na ordem padrão; a primeira (Pessoa) é fixa. */
 export const PESSOA_COLUMNS: ViewColumnDef[] = [
   { key: 'nome', label: 'Pessoa' },
+  { key: 'cargo', label: 'Cargo' },
   { key: 'cliente', label: 'Cliente' },
   { key: 'contato', label: 'Contato' },
   { key: 'tags', label: 'Classificação' },
@@ -26,13 +27,13 @@ const options = (list: { value: number; label: string }[]): FilterOption[] => li
 export function pessoaFields(choices: ChoiceSet, clientes: FilterOption[]): FilterField[] {
   return [
     { key: 'nome', label: 'Pessoa', kind: 'text' },
+    { key: 'cargo', label: 'Cargo', kind: 'choice', options: options(choices.cargo) },
     { key: 'cliente', label: 'Cliente', kind: 'choice', options: clientes },
     { key: 'contato', label: 'Contato', kind: 'text' },
     { key: 'tags', label: 'Classificação', kind: 'choice', options: options(choices.classificacao) },
     { key: 'ultimo', label: 'Último serviço', kind: 'date' },
     { key: 'status', label: 'Status', kind: 'choice', options: options(choices.status), advancedOnly: true },
     { key: 'idioma', label: 'Idioma', kind: 'choice', options: options(choices.idioma), advancedOnly: true },
-    { key: 'cargo', label: 'Cargo', kind: 'choice', options: options(choices.cargo), advancedOnly: true },
     { key: 'departamento', label: 'Departamento', kind: 'text', advancedOnly: true },
     { key: 'duplicado', label: 'Possível duplicado', kind: 'bool', options: [{ value: '1', label: 'Sim' }, { value: '0', label: 'Não' }], advancedOnly: true },
   ]
@@ -73,6 +74,7 @@ export function sortPessoas(list: Pessoa[], key: string, dir: 'asc' | 'desc', ch
   const value = (p: Pessoa) => {
     if (key === 'nome') return p.nome
     if (key === 'cliente') return p.cliente
+    if (key === 'cargo') return label(choices.cargo, p.cargo)
     if (key === 'ultimo') return p.ultimoServico
     if (key === 'tags') return label(choices.classificacao, p.classificacao)
     return ''

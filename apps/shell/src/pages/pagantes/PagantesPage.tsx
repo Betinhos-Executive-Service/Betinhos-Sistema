@@ -1,20 +1,26 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, useShellHeader, useToast } from '@betinhos/ui'
-import { RefreshCw, SearchX, WalletCards } from 'lucide-react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
+import { Download, FileText, RefreshCw, SearchX, WalletCards } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
+import { downloadCsv } from '../../app/csv'
+import { selectionActions, useRowSelection } from '../../app/Selecao'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
+import { ComprovantesOpDrawer, type OpAberta } from '../recebimentos/ComprovantesOpDrawer'
+import { useColunaComprovantes } from '../recebimentos/useColunaComprovantes'
 import { createSource } from './data/source'
-import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, total, type Periodo } from './domain/filters'
+import { VIEWS_KEY, loadViews, total } from './domain/filters'
 import { PAGANTE_COLUMNS, PAGANTE_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, paganteFields, paganteKeywordText, readPagante, sortPagantes } from './domain/lista'
 import { formatMoney } from './domain/messages'
 import { pagantesQuery } from './domain/query'
-import { applyPatch, statusPatch } from './domain/status'
+import { applyPatch, canGerarRecibo, statusPatch } from './domain/status'
+import { pagantesCsv } from './domain/exportar'
 import type { Pagante } from './domain/types'
 import { usePagantes } from './usePagantes'
 import { PagantesCards, PagantesTable } from './components/PagantesList'
@@ -27,10 +33,11 @@ export function PagantesPage({ host }: { host: Host }) {
   return <ToastProvider><Pagantes host={host} /></ToastProvider>
 }
 
-/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` e `periodo` continuam. */
+/** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['status', 'forma', 'recibo', 'falhas'] as const
-const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
+const opDoPagante = (p: Pagante): OpAberta | null => (p.opId ? { id: p.opId, nome: p.op || 'OP sem código' } : null)
 
 function Pagantes({ host }: { host: Host }) {
   const auditoria = useAuditoria()
@@ -38,11 +45,7 @@ function Pagantes({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
-  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
-  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
-  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const pg = usePagantes(source, since, listCache(host))
+  const pg = usePagantes(source, null, listCache(host))
   const choices = pg.choices
   const fields = useMemo(() => (choices ? paganteFields(choices) : []), [choices])
 
@@ -65,26 +68,34 @@ function Pagantes({ host }: { host: Host }) {
   })
 
   // Busca, ficha aberta e Gerar Pagantes continuam na URL; os filtros vão em `f=` (useListView). A lista filtra 200 ms
-  // depois da última tecla; enquanto o período não chegou inteiro, a busca por código também vai ao servidor.
+  // depois da última tecla; enquanto a lista não chegou inteira, a busca por código também vai ao servidor.
   const [query, setQuery] = useQueryTexto('q')
   const q = useDebouncedText(query)
-  const searchPagantes = useCallback((text: string) => source.search(since, text), [source, since])
+  const searchPagantes = useCallback((text: string) => source.search(null, text), [source])
   const found = useServerSearch({ query: q, enabled: Boolean(choices) && !pg.listComplete, search: searchPagantes })
   const list = useMergedById(pg.list, found)
   // Ordena e filtra uma vez por lista/visão; a cada busca só confere o texto já normalizado de cada linha.
   const sorted = useMemo(() => extra.sort(choices ? sortPagantes(list, view.config.sort, choices) : list, view.config.sort, (p) => p.id), [list, choices, view.config.sort, extra])
-  const filtered = useMemo(() => filterRows(sorted, filters, allFields, extra.read(readPagante, (p) => p.id)), [sorted, filters, allFields, extra])
+  const [version, setVersion] = useState(0)
+  const comprovantes = useColunaComprovantes(source.recebimentos, view.config, filters, list, opDoPagante, mobile, version)
+  const { comLeitura, contada } = comprovantes
+  const read = useMemo(() => comLeitura(extra.read(readPagante, (p) => p.id)), [extra, comLeitura])
+  const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
   const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
   const visible = useMemo(() => {
     if (!choices) return []
     const words = searchWords(q)
-    return words.length ? filtered.filter((p) => index.matches(p, words)) : filtered
-  }, [filtered, index, q, choices])
+    if (!contada && !words.length) return filtered
+    return filtered.filter((p) => (!contada || contada(p)) && (!words.length || index.matches(p, words)))
+  }, [filtered, index, q, choices, contada])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
+  const sel = useRowSelection(visible)
+  const selecting = !mobile && sel.rows.length > 0
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
   // A ficha pode vir do rateio (pagante fora da lista carregada): guarda a cópia dela para continuar aberta.
@@ -95,7 +106,6 @@ function Pagantes({ host }: { host: Host }) {
   // O Gerar Pagantes aberto (por cima da tela) também vive na URL: `gerar=<id da OP>`.
   const [gerarOpId, setGerarOpId] = useQueryId('gerar')
   const frameUrl = gerarOpId ? source.gerarPagantesUrl(gerarOpId) : null
-  const [version, setVersion] = useState(0)
   // Um pagante por vez com gravação ou recibo em andamento: evita duplo clique e envio duplicado.
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -103,8 +113,9 @@ function Pagantes({ host }: { host: Host }) {
   // O gerador de recibo chama o refresh minutos depois: usa sempre o mais recente (período atual).
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pagantes" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pagantes', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pagantes' })
+  const size = mobile ? 'touch' : 'default'
 
   async function confirmStatus(enviarRecibo: boolean) {
     const request = statusRequest
@@ -128,13 +139,17 @@ function Pagantes({ host }: { host: Host }) {
     }
   }
 
-  async function gerarRecibo(p: Pagante) {
-    if (busyId) return
-    setBusyId(p.id)
+  async function gerarRecibo(rows: Pagante[]) {
+    const aptos = rows.filter(canGerarRecibo)
+    if (busyId || !aptos.length) return
+    const fora = rows.length - aptos.length
+    if (fora) toast({ tone: 'info', message: fora === 1 ? '1 pagante cancelado ficou de fora: cancelado não gera recibo.' : `${fora} pagantes cancelados ficaram de fora: cancelado não gera recibo.` })
+    setBusyId(aptos[0].id)
     // A ficha é modal (top layer): o modal do gerador, no documento, ficaria atrás dela e inerte.
     setSelected(null)
+    sel.clear()
     try {
-      await source.gerarRecibo([p.id], () => refreshRef.current())
+      await source.gerarRecibo(aptos.map((p) => p.id), () => refreshRef.current())
     } catch (reason) {
       toast({ tone: 'danger', message: reasonText(reason) })
     } finally {
@@ -149,6 +164,21 @@ function Pagantes({ host }: { host: Host }) {
     setGerarOpId(p.opId)
   }
 
+  function exportar(rows: Pagante[]) {
+    if (!pg.choices) return
+    downloadCsv(`pagantes-${todaySaoPaulo()}.csv`, pagantesCsv(rows, pg.choices))
+    toast({ tone: 'success', message: rows.length === 1 ? '1 pagante exportado.' : `${rows.length} pagantes exportados.` })
+  }
+
+  // Ações em lote: as mesmas na faixa da seleção e no clique direito.
+  const bulkActions = (rows: Pagante[]): MenuAction[] => {
+    const aptos = rows.some(canGerarRecibo)
+    return [
+      { id: 'recibos', label: rows.length === 1 ? 'Gerar recibo' : 'Gerar recibos', icon: <FileText size={16} />, disabled: !aptos || Boolean(busyId), title: !aptos ? 'Pagante cancelado não gera recibo.' : busyId ? 'Aguarde o recibo em andamento.' : undefined, onSelect: () => void gerarRecibo(rows) },
+      { id: 'exportar', label: 'Exportar seleção', icon: <Download size={16} />, onSelect: () => exportar(rows) },
+    ]
+  }
+
   const closeFrame = useCallback((reload: boolean) => { setGerarOpId(null); if (reload) refresh() }, [refresh, setGerarOpId])
 
   let body
@@ -157,20 +187,27 @@ function Pagantes({ host }: { host: Host }) {
   } else if (!pg.choices) {
     body = <PagantesTable list={[]} choices={{ status: [], forma: [], recibo: [] }} contatos={pg.contatos} onOpen={() => undefined} loading />
   } else if (pg.listComplete && !pg.loading && !pg.list.length) {
-    body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante neste período">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento. Amplie o período para ver os mais antigos.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<WalletCards size={36} />} title="Nenhum pagante ainda">Os pagantes são criados no Gerar Pagantes, a partir de uma Ordem de Pagamento.</EmptyState>
   } else {
+    const loaded = pg.choices
     const open = (id: string) => setSelected(visible.find((p) => p.id === id) ?? null)
-    // O total só vale com o período inteiro: até lá, o rodapé avisa que ainda soma.
+    // O total só vale com a lista inteira: até lá, o rodapé avisa que ainda soma.
     const pending = !pg.listComplete && pg.loading
-    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending ? 'somando valores…' : formatMoney(total(visible))}</span>
-    const empty = pending
-      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante do período…" />
+    const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pagante' : 'pagantes'} · {pending || comprovantes.aguardando ? 'somando valores…' : formatMoney(total(visible))}</span>
+    const empty = comprovantes.aguardando
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title={comprovantes.aguardando} />
+      : pending
+      ? <EmptyState align="start" icon={<SearchX size={36} />} title="Procurando no restante da lista…" />
       : <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum pagante com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Pagante[], tableFooter?: ReactNode) => (
+      <PagantesTable list={rows} choices={loaded} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} selection={sel.selection} bulkActions={(picked) => bulkActions(sel.targets(picked))} comprovantes={comprovantes.coluna} />
+    )
+    const cards = (rows: Pagante[]) => <PagantesCards list={rows} choices={loaded} contatos={pg.contatos} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <PagantesCards list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <PagantesTable list={slice} choices={pg.choices} contatos={pg.contatos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} pending={pending} />
       </>
     )
@@ -179,11 +216,12 @@ function Pagantes({ host }: { host: Host }) {
   return (
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />
-          <Select className="pg-filters__select" aria-label="Período de criação" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
+          // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
+          selection={{ count: selecting ? sel.rows.length : 0, onClear: sel.clear, actions: selectionActions(bulkActions(sel.rows)) }}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {pg.error && pg.choices ? (
@@ -192,11 +230,13 @@ function Pagantes({ host }: { host: Host }) {
         </Alert>
       ) : null}
       {pg.contatosError && pg.choices ? <Alert tone="warning" title="Contatos não carregados">{pg.contatosError} Busca por telefone e WhatsApp ficam indisponíveis até atualizar.</Alert> : null}
+      {comprovantes.aviso}
       {body}
       {pg.choices ? (
         <PaganteDrawer p={current} onClose={() => setSelected(null)} onOpen={setSelected} choices={pg.choices} contatos={pg.contatos} source={source} version={version}
-          onStatus={(p, kind) => setStatusRequest({ p, kind })} onRecibo={(p) => void gerarRecibo(p)} onAbrirOp={abrirOp} busyId={busyId} />
+          onStatus={(p, kind) => setStatusRequest({ p, kind })} onRecibo={(p) => void gerarRecibo([p])} onAbrirOp={abrirOp} busyId={busyId} />
       ) : null}
+      <ComprovantesOpDrawer op={comprovantes.aberta} source={source.recebimentos} servicos={source.servicos} mobile={mobile} onClose={comprovantes.fechar} />
       <StatusDialog request={statusRequest} contato={statusRequest ? pg.contatos.get(statusRequest.p.pessoaId) : undefined} onClose={() => setStatusRequest(null)} onConfirm={(enviar) => void confirmStatus(enviar)} />
       <GerarPagantesFrame url={frameUrl} onClose={closeFrame} />
     </div>

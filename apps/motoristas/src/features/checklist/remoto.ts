@@ -1,6 +1,7 @@
 // Checklist no Dataverse: foto do item.
 import { cleanODataGuid } from "../../data/dataverse/cliente.ts";
-import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 
 // Checklist de vistoria: sobe a foto pelo mesmo Flow do OneDrive e devolve o link. A linha de foto
 // no Dataverse é criada pelo plugin na conclusão (new_ConcluirChecklistVeiculo), não pelo app.
@@ -24,7 +25,7 @@ export async function uploadChecklistPhotoRemote({
   const caminho = `Checklists/${devPrefix}${sanitizePathSegment(placa, "Sem placa")}/${day} ${cleanODataGuid(checklistId).slice(0, 8)}`;
   const fileNameBase = `${sanitizePathSegment(itemLabel, "foto")}-${order}`;
   const nomeArquivo = `${sanitizePathSegment(fileNameBase, "arquivo")}.${getFileExtensionFromMimeType(getDataUrlMimeType(dataUrl))}`;
-  const link = await uploadMaintenancePhoto(caminho, dataUrl, fileNameBase, {
+  const link = await uploadMediaWithProof(caminho, dataUrl, fileNameBase, {
     origem: "checklist-veiculo",
     checklistId: cleanODataGuid(checklistId),
     item: itemLabel,

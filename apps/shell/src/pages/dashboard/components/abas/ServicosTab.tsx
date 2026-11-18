@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import { StatCard, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { BarraChart } from '../../charts/Charts'
 import { calcularServicos, type LinhaParticipacao, type Servicos } from '../../domain/abas/servicos'
 import { brl, brlS, int } from '../../domain/format'
@@ -10,8 +11,8 @@ import { StatusServicosCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Nome, Participacao, pct } from '../Celulas'
 import { Emergenciais } from '../Emergenciais'
-import { KpiCard, KpiLinha } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tendencia, tomAtencao } from '../KpiLinha'
 import { COLUNA_LARGA, MEDIA_MOBILE, juntar } from '../Linhas'
 import { ProducaoPropriaTerceira } from '../ProducaoPropriaTerceira'
 import { SemDadoBloco, Vazio } from '../Estados'
@@ -27,7 +28,7 @@ function PorMesCard({ dados, periodo }: { dados: Servicos; periodo: string }) {
   type Mes = Servicos['porMes'][number]
   const colunas: TableColumn<Mes>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (m) => m.rotulo }, { key: 'q', header: 'Serviços', width: COLUNA_LARGA, cell: (m) => `${int(m.qtd)} serviços` }]
-    : [{ key: 'm', header: 'Mês', cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> }, { key: 'q', header: 'Serviços', align: 'end', cell: (m) => int(m.qtd) }]
+    : [{ key: 'm', header: 'Mês', cell: (m) => <strong className="dash-forte">{m.rotulo}</strong> }, { key: 'q', header: 'Serviços', cell: (m) => int(m.qtd) }]
   return (
     <AnaliseCard
       titulo="Serviços por mês" periodo={periodo} unidade="serviços por mês" valor={int(dados.kpis.total)}
@@ -35,7 +36,7 @@ function PorMesCard({ dados, periodo }: { dados: Servicos; periodo: string }) {
       grafico={dados.porMes.length
         ? <BarraChart descricao={`Serviços por mês, ${periodo}`} nome="Serviços" formatar={int} larguraEixo={36} dados={dados.porMes.map((m) => ({ rotulo: m.rotulo, valor: m.qtd }))} />
         : <Vazio titulo="Nenhum serviço no período" />}
-      tabela={dados.porMes.length ? <Table columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
+      tabela={dados.porMes.length ? <Tabela columns={colunas} rows={dados.porMes} rowKey={(m) => m.mes} /> : undefined} tabelaSobDemanda
       copiar={tabelaCopia(dados.porMes, [['Mês', (m) => m.rotulo], ['Serviços', (m) => m.qtd]])}
     />
   )
@@ -52,15 +53,15 @@ function ParticipacaoCard({ titulo, coluna, linhas, periodo }: { titulo: string;
     ]
     : [
       { key: 't', header: coluna, width: 'minmax(0, 1.3fr)', cell: (l) => <Nome texto={l.tipo} /> },
-      { key: 'q', header: 'Serviços', align: 'end', width: 'minmax(64px, .7fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
-      { key: 'f', header: 'Faturamento', align: 'end', cell: (l) => brl(l.fat) },
+      { key: 'q', header: 'Serviços', width: 'minmax(64px, .7fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
+      { key: 'f', header: 'Faturamento', cell: (l) => brl(l.fat) },
       { key: 'p', header: <span className="dash-col-part">% do faturamento</span>, width: 'minmax(0, 1.3fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pctFat} rotulo={`Faturamento de ${l.tipo}`} /></span> },
     ]
   return (
     <AnaliseCard
       titulo={titulo} periodo={periodo} unidade="serviços e R$" valor={!topo ? '—' : topo.tipo === '—' ? 'Sem tipo informado' : topo.tipo}
       sub={topo ? `${pct(topo.pctFat)} do faturamento · ${int(topo.qtd)} serviços` : 'nenhum serviço no período'}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhum serviço no período" />} />}
       copiar={tabelaCopia(linhas, [[coluna, (l) => l.tipo], ['Serviços', (l) => l.qtd], ['% dos serviços', (l) => pct(l.pctQtd)], ['Faturamento', (l) => brl(l.fat)], ['% do faturamento', (l) => pct(l.pctFat)]])}
     />
   )
@@ -80,10 +81,10 @@ function ServicosAba({ ctx, dados, periodo }: DadosAba) {
   const { kpis } = sv
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={4}>
-      <KpiCard rotulo={ROTULOS_SERVICOS[0]} valor={int(kpis.total)} tom="brand" serie={sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd }))}><ChipAnt chip={sv.ant.total} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[1]} valor={int(kpis.concluidos.valor)} tom="success" apoio={`${pct(kpis.concluidos.pct)} do total`}><ChipAnt chip={sv.ant.concluidos} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[2]} valor={int(kpis.cancelados.valor)} tom="warning" apoio={`${pct(kpis.cancelados.pct)} do total`}><ChipAnt chip={sv.ant.cancelados} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_SERVICOS[3]} valor={int(kpis.emergenciais.valor)} tom="action" apoio={`${pct(kpis.emergenciais.pct)} do total`}><ChipAnt chip={sv.ant.emergenciais} /></KpiCard>
+      <StatCard label={ROTULOS_SERVICOS[0]} value={int(kpis.total)} trend={tendencia(sv.porMes.map((m) => ({ mes: m.mes, rotulo: m.rotulo, valor: m.qtd })))} {...extrasKpi({ chips: [sv.ant.total] })} />
+      <StatCard label={ROTULOS_SERVICOS[1]} value={int(kpis.concluidos.valor)} {...extrasKpi({ chips: [sv.ant.concluidos], apoio: `${pct(kpis.concluidos.pct)} do total` })} />
+      <StatCard label={ROTULOS_SERVICOS[2]} value={int(kpis.cancelados.valor)} {...tomAtencao(kpis.cancelados.valor)} {...extrasKpi({ chips: [sv.ant.cancelados], apoio: `${pct(kpis.cancelados.pct)} do total` })} />
+      <StatCard label={ROTULOS_SERVICOS[3]} value={int(kpis.emergenciais.valor)} {...extrasKpi({ chips: [sv.ant.emergenciais], apoio: `${pct(kpis.emergenciais.pct)} do total` })} />
     </KpiLinha>
     <div className="dash-grade">
       <PorMesCard dados={sv} periodo={periodo} />

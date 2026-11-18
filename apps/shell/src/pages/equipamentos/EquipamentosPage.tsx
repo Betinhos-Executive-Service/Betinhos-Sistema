@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader } from '@betinhos/ui'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, type MenuAction } from '@betinhos/ui'
 import { Laptop, Plus, RefreshCw, SearchX, Tags } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
+import type { Equipamento } from './domain/types'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -53,16 +55,17 @@ function Equipamentos({ host }: { host: Host }) {
   const [target, setTarget] = useQueryAlvo()
 
   const inativos = useMemo(() => new Set(data.pessoas.filter((p) => !p.ativo).map((p) => p.id)), [data.pessoas])
+  const read = useMemo(() => extra.read(readEquipamento, (e) => e.id), [extra])
   const visible = useMemo(() => {
-    const read = extra.read(readEquipamento, (e) => e.id)
     const list = data.equipamentos.filter((e) => matchesFilters(e, filters, allFields, read) && matchesKeyword(e, query))
     return extra.sort(sortEquipamentos(list, view.config.sort), view.config.sort, (e) => e.id)
-  }, [data.equipamentos, filters, fields, query, view.config.sort])
+  }, [data.equipamentos, filters, fields, query, view.config.sort, read])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   // Chave por conteúdo: `fields` depende dos itens (filtro de Responsável), então salvar ou recarregar gera outro
   // objeto `filters` com o mesmo conteúdo, e uma chave por referência voltaria ao primeiro lote a cada gravação.
   const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const [tiposOpen, setTiposOpen] = useState(false)
   const usoTipos = useMemo(() => {
@@ -73,8 +76,13 @@ function Equipamentos({ host }: { host: Host }) {
   const semResponsavel = useMemo(() => data.equipamentos.filter((e) => !e.responsavelId && e.status !== STATUS.baixado).length, [data.equipamentos])
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar equipamentos" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Equipamentos', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Equipamentos' })
+  const size = mobile ? 'touch' : 'default'
+  // "⋮" (Mais ações): o que é raro e não depende da seleção.
+  const moreActions: MenuAction[] = [
+    { id: 'tipos', label: 'Tipos de equipamento', icon: <Tags size={16} />, disabled: !data.loaded, onSelect: () => setTiposOpen(true) },
+  ]
 
   const novo = () => setTarget({ mode: 'create' })
   let body
@@ -88,11 +96,15 @@ function Equipamentos({ host }: { host: Host }) {
     const open = (id: string) => setTarget({ mode: 'view', id })
     const footer = <span className="eq-num">{visible.length} de {data.equipamentos.length} · {semResponsavel} sem responsável</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum equipamento com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Equipamento[], tableFooter?: ReactNode) => (
+      <EquipamentosTable list={rows} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Equipamento[]) => <EquipamentosCards list={rows} inativos={inativos} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <EquipamentosCards list={slice} inativos={inativos} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <EquipamentosTable list={slice} inativos={inativos} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -102,14 +114,14 @@ function Equipamentos({ host }: { host: Host }) {
     <ImagensContext.Provider value={imagens}>
     <div className="page eq-page">
       <div role="toolbar" aria-label="Comandos de equipamentos">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="eq-search" value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <span className="eq-acoes">
-            <Button variant="secondary" icon={<Tags size={16} />} disabled={!data.loaded} onClick={() => setTiposOpen(true)}>Tipos</Button>
-            <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={novo}>Novo equipamento</Button>
-          </span>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_equipamento', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={EQUIPAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por descrição, modelo, série ou responsável" aria-label="Buscar equipamentos" />}
+          more={moreActions}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={novo}>Novo equipamento</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}

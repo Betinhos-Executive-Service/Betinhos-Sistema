@@ -54,6 +54,11 @@ export function isDataverseHostRuntime() {
   return /\.dynamics\.com$/i.test(window.location.hostname);
 }
 
+// Página servida pelo host do Dataverse (com origem): o WebApi por fetch usa o cookie da sessão.
+export function canFetchOnDataverseHost() {
+  return typeof window !== "undefined" && Boolean(window.location?.origin) && isDataverseHostRuntime();
+}
+
 // Aberto pela URL direta: janela de topo (ou parent sem Xrm) no host do Dataverse.
 export function isStandaloneWebResourceRuntime() {
   if (!isDataverseHostRuntime()) return false;
@@ -77,7 +82,7 @@ function getFetchRuntime(): XrmLike {
       Utility: { getGlobalContext: () => ({ userSettings: { userId: whoAmIUserId }, getClientUrl: () => clientUrl }) },
       WebApi: createFetchWebApi(clientUrl, entitySetByName)
     };
-    dataverseLog("Xrm.WebApi ausente: usando WebApi por fetch na URL direta do web resource.", { clientUrl });
+    dataverseLog("Host do Dataverse: usando WebApi por fetch com o cookie da sessão.", { clientUrl });
   }
   return fetchRuntime;
 }
@@ -134,6 +139,9 @@ export function dataverseError(message: string, data?: unknown) {
 }
 
 export function getWindowXrm(): XrmLike | null {
+  // No host do Dataverse (URL direta ou dentro do model-driven) os dados vão por fetch com o cookie da sessão:
+  // o Xrm.WebApi do model-driven travava o carregamento no PROD (12/11/2026), e a URL direta já usava fetch.
+  if (canFetchOnDataverseHost()) return getFetchRuntime();
   const current = window as Window & { Xrm?: XrmLike };
   try {
     const parentWindow = window.parent as Window & { Xrm?: XrmLike };
@@ -355,6 +363,30 @@ export async function createOne(entitySetName: string, data: Record<string, unkn
     });
     throw error;
   }
+}
+
+/** Duplicata de chave primária: o registro já foi criado (412, 0x80040237 ou "matching key values already exists"). */
+export function isRecordAlreadyExistsError(error: unknown) {
+  const record = (error ?? {}) as { status?: unknown; errorCode?: unknown; code?: unknown; message?: unknown };
+  const code = String(record.errorCode ?? record.code ?? "").toLowerCase();
+  if (Number(record.status) === 412 || Number(record.errorCode) === 412) return true;
+  if (code === "0x80040237" || code === "-2147220937") return true;
+  return /matching key values already exists|cannot insert duplicate key|0x80040237|precondition failed/i.test(String(record.message ?? ""));
+}
+
+/**
+ * Cria com o GUID decidido pelo chamador (a chave primária vai no corpo). Reenvio do mesmo GUID não duplica:
+ * se o registro já existe, conta como sucesso.
+ */
+export async function createOneIdempotent(entitySetName: string, id: string, data: Record<string, unknown>) {
+  const entityName = getWebApiEntityName(entitySetName);
+  const guid = cleanGuid(id);
+  try {
+    await createOne(entitySetName, { ...data, [`${entityName}id`]: guid });
+  } catch (error) {
+    if (!isRecordAlreadyExistsError(error)) throw error;
+  }
+  return { id: guid };
 }
 
 export async function deleteOne(entitySetName: string, id: string) {

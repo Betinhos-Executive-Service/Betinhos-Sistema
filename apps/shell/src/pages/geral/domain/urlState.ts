@@ -1,9 +1,9 @@
-import type { TableFilters } from '@betinhos/ui'
+import type { TableFilters, ViewGroup } from '@betinhos/ui'
 import { decodeTableFilters, encodeTableFilters, hasActiveFilters } from './tableFilters'
 import type { Sort } from './types'
 
-/** Estado da tela que viaja na URL (`#/geral?view=…&q=…&sort=…&f=…`). */
-export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: TableFilters }
+/** Estado da tela que viaja na URL (`#/geral?view=…&q=…&sort=…&f=…&g=…&m=…`). `manutencoes`: só quando difere da visão. */
+export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: TableFilters; group?: ViewGroup; manutencoes?: boolean }
 
 /** `attr:asc|desc`, com `alias.attr` quando a coluna vem de uma tabela ligada. */
 function parseSort(text: string | null): Sort | undefined {
@@ -22,6 +22,17 @@ function parseSort(text: string | null): Sort | undefined {
 
 const sortText = (sort: NonNullable<Sort>) => `${sort.alias ? `${sort.alias}.` : ''}${sort.attribute}:${sort.descending ? 'desc' : 'asc'}`
 
+/** `campo` ou `campo:month|year` (data); o campo é o `key` da coluna. */
+function parseGroup(text: string | null): ViewGroup | undefined {
+  if (!text) return undefined
+  const cut = text.lastIndexOf(':')
+  const by = cut > 0 ? text.slice(cut + 1) : ''
+  if (by === 'month' || by === 'year') return { key: text.slice(0, cut), by }
+  return { key: text }
+}
+
+const groupText = (group: ViewGroup) => (group.by ? `${group.key}:${group.by}` : group.key)
+
 /** Lê o estado da query; valores ausentes, vazios ou inválidos ficam de fora (`f` inválido não gera filtros). */
 export function readUrlState(params: URLSearchParams): UrlState {
   const state: UrlState = {}
@@ -31,6 +42,10 @@ export function readUrlState(params: URLSearchParams): UrlState {
   if (q) state.q = q
   const sort = parseSort(params.get('sort'))
   if (sort) state.sort = sort
+  const group = parseGroup(params.get('g'))
+  if (group) state.group = group
+  const m = params.get('m')
+  if (m === '1' || m === '0') state.manutencoes = m === '1'
   const f = params.get('f')
   if (f) {
     // Lê o formato novo e o antigo (links compartilhados antes dos filtros do Design System).
@@ -48,5 +63,7 @@ export function writeUrlState(state: UrlState): string {
   if (state.sort) params.set('sort', sortText(state.sort))
   const f = state.filters ? encodeTableFilters(state.filters) : ''
   if (f) params.set('f', f)
+  if (state.group) params.set('g', groupText(state.group))
+  if (state.manutencoes != null) params.set('m', state.manutencoes ? '1' : '0')
   return params.toString()
 }

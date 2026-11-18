@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TextInputControl } from "../../shared/ui/FormFields";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
 import { AppShell } from "../../shared/ui/layout/AppShell";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { describeCameraError } from "../../shared/camera/cameraErrors";
@@ -11,10 +12,13 @@ import {
   captureVideoFrameDataUrl,
   captureVideoFrameDataUrlAsync,
   formatVideoDuration,
+  getVideoDurationSecondsFromUrl,
   readBlobAsDataUrl,
   readPhotoFileAsDataUrl
 } from "../../shared/camera/photoOrientation";
 import type { CapturedVideoDraft, MaintenancePhotoKind } from "../../types";
+import { VIDEO_BITRATE, VIDEO_MAX_SEGUNDOS, aceitaGaleria, acceptDaGaleria, confirmarAvisoLocalizacao, permiteVideo, precisaAvisoLocalizacao, validarVideo } from "./provaCaptura";
+import { CarimboPrevia, useProvaDaCaptura, type ProvaDaCaptura } from "./useProvaDaCaptura";
 
 type MediaCaptureScreenProps = {
   kind: MaintenancePhotoKind;
@@ -23,12 +27,12 @@ type MediaCaptureScreenProps = {
   onCapture: (photoDataUrl: string) => void;
   onCaptureVideo?: (video: CapturedVideoDraft) => void;
   onSwitchCamera: () => void;
+  prova?: ProvaDaCaptura;
 };
 
 type VideoCaptureProfile = {
   label: "hdPlus" | "hd";
   frameRate: number;
-  bitRate: number;
 };
 
 type BrowserImageCapture = {
@@ -95,18 +99,10 @@ function getPreferredVideoProfile(track: MediaStreamTrack): VideoCaptureProfile 
   const highTierDevice = deviceMemory >= 8 && hardwareConcurrency >= 8;
 
   if (supportsHdPlus && highTierDevice) {
-    return {
-      label: "hdPlus",
-      frameRate: 30,
-      bitRate: 12_000_000
-    };
+    return { label: "hdPlus", frameRate: 30 };
   }
 
-  return {
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  };
+  return { label: "hd", frameRate: 30 };
 }
 
 /** Perfil reaplicado no track: mantém o 4:3 em alta resolução (foto com o quadro inteiro) e o foco contínuo quando houver. */
@@ -141,11 +137,7 @@ async function preferTrackProfile(track: MediaStreamTrack, mode: "environment" |
     return preferredProfile;
   }
 
-  const fallbackProfile: VideoCaptureProfile = {
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  };
+  const fallbackProfile: VideoCaptureProfile = { label: "hd", frameRate: 30 };
 
   if (await applyProfile(fallbackProfile, supportsContinuousFocus)) {
     return fallbackProfile;
@@ -204,7 +196,14 @@ async function captureTrackPhotoDataUrl(stream: MediaStream) {
   return readBlobAsDataUrl(photoBlob);
 }
 
-export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo, onSwitchCamera }: MediaCaptureScreenProps) {
+export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVideo: onCaptureVideoProp, onSwitchCamera, prova }: MediaCaptureScreenProps) {
+  // Despesa só com foto: sem o tratamento de vídeo, a tela não oferece gravar.
+  const onCaptureVideo = prova && !permiteVideo(prova.origem.tela) ? undefined : onCaptureVideoProp;
+  const { sessao, finalizarFoto, registrarVideo, prepararDaGaleria } = useProvaDaCaptura(prova);
+  // Galeria só nas telas liberadas (GALERIA_POR_TELA); o checklist e as telas sem prova não mostram o botão.
+  const galeria = prova && aceitaGaleria(prova.origem.tela) ? acceptDaGaleria(prova.origem.tela) : "";
+  const galeriaInputRef = useRef<HTMLInputElement | null>(null);
+  const [erroArquivo, setErroArquivo] = useState("");
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -216,11 +215,6 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const cameraRequestSequenceRef = useRef(0);
   const supportMessageTimerRef = useRef<number | null>(null);
   const captureRequestedAtRef = useRef(Date.now());
-  const activeVideoProfileRef = useRef<VideoCaptureProfile>({
-    label: "hd",
-    frameRate: 30,
-    bitRate: 8_000_000
-  });
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -234,6 +228,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const torchOnRef = useRef(false);
+  const [avisoLocalizacao, setAvisoLocalizacao] = useState(() => Boolean(prova) && precisaAvisoLocalizacao());
 
   const useLiveCamera = shouldUseLiveCameraCapture();
   const useAppleMobile = isAppleMobileDevice();
@@ -320,7 +315,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       streamRef.current = stream;
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        activeVideoProfileRef.current = await preferTrackProfile(videoTrack, mode);
+        await preferTrackProfile(videoTrack, mode);
         setTorchSupported(supportsTorch(videoTrack));
         updateTrackContentHint(false);
         try {
@@ -445,7 +440,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       }
       if (!photoDataUrl && video) photoDataUrl = await captureVideoFrameDataUrlAsync(video);
       if (!photoDataUrl) throw new Error("Não foi possível capturar a foto.");
-      onCapture(photoDataUrl);
+      onCapture(await finalizarFoto(photoDataUrl, "camera-ao-vivo"));
     } catch (error) {
       reportAppError(error, {
         severity: "error",
@@ -493,10 +488,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         mimeType
           ? {
               mimeType,
-              videoBitsPerSecond: activeVideoProfileRef.current.bitRate
+              videoBitsPerSecond: VIDEO_BITRATE
             }
           : {
-              videoBitsPerSecond: activeVideoProfileRef.current.bitRate
+              videoBitsPerSecond: VIDEO_BITRATE
             }
       );
       recorderRef.current = recorder;
@@ -516,11 +511,16 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
         try {
           if (!chunks.length) throw new Error("Nenhum dado de vídeo capturado.");
           const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+          const durationSeconds = (Date.now() - recordingStartedAtRef.current) / 1000;
+          // 4 Mbps x 120 s cabe em 70 MB; codificador que ignora a taxa ainda é barrado aqui.
+          const refusal = validarVideo({ duracaoSegundos: durationSeconds, tamanhoBytes: blob.size });
+          if (refusal) throw new Error(refusal);
+          void registrarVideo(blob, "camera-ao-vivo", durationSeconds);
           previewUrl = URL.createObjectURL(blob);
           onCaptureVideo({
             rawBlob: blob,
             previewUrl,
-            durationLabel: formatVideoDuration((Date.now() - recordingStartedAtRef.current) / 1000)
+            durationLabel: formatVideoDuration(durationSeconds)
           });
           previewUrl = "";
         } catch (error) {
@@ -587,6 +587,14 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
       const previewUrl = URL.createObjectURL(file);
       try {
+        const durationSeconds = await getVideoDurationSecondsFromUrl(previewUrl);
+        const refusal = validarVideo({ duracaoSegundos: durationSeconds, tamanhoBytes: file.size });
+        if (refusal) {
+          URL.revokeObjectURL(previewUrl);
+          setCameraError(refusal);
+          return;
+        }
+        void registrarVideo(file, "camera-nativa", durationSeconds);
         onCaptureVideo({ rawBlob: file, previewUrl });
         event.target.value = "";
         setProcessing(false);
@@ -610,7 +618,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
 
     try {
       const dataUrl = await readPhotoFileAsDataUrl(file, 0);
-      onCapture(dataUrl);
+      onCapture(await finalizarFoto(dataUrl, "camera-nativa", file));
     } catch (error) {
       reportAppError(error, {
         severity: "error",
@@ -623,6 +631,41 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
       setCameraError(error instanceof Error ? error.message : "Não foi possível preparar a foto.");
     } finally {
       event.target.value = "";
+      setProcessing(false);
+    }
+  };
+
+  const handleGaleria = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || processing) return;
+    setErroArquivo("");
+    setCameraError("");
+    setProcessing(true);
+    try {
+      const resultado = await prepararDaGaleria(file);
+      if (!resultado) return;
+      if (!resultado.ok) {
+        setErroArquivo(resultado.erro);
+        return;
+      }
+      if (resultado.tipo === "video") {
+        if (!onCaptureVideo) return setErroArquivo("Vídeo indisponível nesta tela.");
+        onCaptureVideo({ rawBlob: resultado.video, previewUrl: URL.createObjectURL(resultado.video), durationLabel: formatVideoDuration(resultado.dados.duracaoSegundos ?? 0) });
+        return;
+      }
+      onCapture(resultado.dataUrl);
+    } catch (error) {
+      reportAppError(error, {
+        severity: "error",
+        source: "media-capture",
+        action: "prepare-gallery-file",
+        component: "MediaCaptureScreen",
+        screen: "TelaCameraMidia",
+        payload: { fileType: file.type, fileSize: file.size }
+      });
+      setErroArquivo("Não foi possível preparar este arquivo. Escolha outro ou tire uma foto.");
+    } finally {
       setProcessing(false);
     }
   };
@@ -642,7 +685,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
     }
 
     const timer = window.setInterval(() => {
-      setRecordingSeconds((Date.now() - recordingStartedAtRef.current) / 1000);
+      const seconds = (Date.now() - recordingStartedAtRef.current) / 1000;
+      setRecordingSeconds(seconds);
+      // Para sozinho no limite e entrega o que gravou (onstop monta o vídeo normalmente).
+      if (seconds >= VIDEO_MAX_SEGUNDOS) stopLiveRecording();
     }, 1000);
     return () => window.clearInterval(timer);
   }, [recording]);
@@ -699,12 +745,14 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </button>
               ) : null}
 
+              {prova && useLivePreview && ready ? <CarimboPrevia sessao={sessao} carimbo={prova.carimbo} /> : null}
+
               {useLiveCamera && capturingPhoto ? <div className="camera-shutter-flash" aria-hidden="true" /> : null}
 
               {useLiveCamera && recording ? (
                 <div className="camera-recording-pill" aria-live="polite">
                   <span />
-                  <strong>{formatVideoDuration(recordingSeconds)}</strong>
+                  <strong>{formatVideoDuration(recordingSeconds)} / {formatVideoDuration(VIDEO_MAX_SEGUNDOS)}</strong>
                 </div>
               ) : null}
 
@@ -719,7 +767,7 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </div>
               ) : null}
 
-              {useLivePreview && !cameraError && !ready && !starting ? (
+              {useLivePreview && !cameraError && !erroArquivo && !ready && !starting ? (
                 <div className="camera-start-panel native-camera-panel">
                   <strong>Câmera ao vivo</strong>
                   <span>A captura acontece direto na tela para manter qualidade e bloquear galeria.</span>
@@ -727,11 +775,34 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </div>
               ) : null}
 
-              {processing ? <div className="camera-loading camera-processing">{capturingPhoto ? "Capturando foto..." : "Preparando mídia..."}</div> : null}
+              {processing ? (
+                <div className="camera-loading camera-processing">
+                  <BrandLoader variant="inline" size="md" label={capturingPhoto ? "Capturando foto" : "Preparando mídia"} />
+                  <span aria-hidden="true">{capturingPhoto ? "Capturando foto..." : "Preparando mídia..."}</span>
+                </div>
+              ) : null}
               {starting ? (
                 <div className="camera-loading camera-permission-loading" aria-live="polite">
-                  <span>Abrindo câmera...</span>
+                  <BrandLoader variant="inline" size="md" label="Abrindo câmera" />
+                  <span aria-hidden="true">Abrindo câmera...</span>
                   {showSupportMessage ? <span>A câmera não respondeu. Fale com o suporte de TI da Betinhos.</span> : null}
+                </div>
+              ) : null}
+
+              {avisoLocalizacao ? (
+                <div className="camera-start-panel camera-location-notice" role="dialog" aria-modal="false" aria-labelledby="aviso-localizacao-titulo">
+                  <strong id="aviso-localizacao-titulo">Localização</strong>
+                  <span>A localização fica registrada junto da foto como prova.</span>
+                  <button type="button" onClick={() => { confirmarAvisoLocalizacao(); setAvisoLocalizacao(false); }}>Entendi</button>
+                </div>
+              ) : null}
+
+              {erroArquivo ? (
+                <div className="camera-error camera-file-error" role="alert">
+                  <strong>Arquivo não aceito</strong>
+                  <span>{erroArquivo}</span>
+                  <button type="button" className="camera-error-retry" onClick={() => galeriaInputRef.current?.click()}>Escolher outro</button>
+                  <button type="button" className="native-camera-link" onClick={() => setErroArquivo("")}>Voltar à câmera</button>
                 </div>
               ) : null}
 
@@ -770,6 +841,10 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
               </>
             ) : null}
 
+            {galeria ? (
+              <TextInputControl ref={galeriaInputRef} className="native-camera-input" type="file" accept={galeria} onChange={handleGaleria} data-testid="galeria-input" />
+            ) : null}
+
             <div className="photo-actions photo-actions-ios camera-actions-pro">
               <div className="camera-side-action camera-side-action-left">
                 {onCaptureVideo ? (
@@ -803,6 +878,12 @@ export function MediaCaptureScreen({ kind, title, onBack, onCapture, onCaptureVi
                 </button>
               </div>
             </div>
+
+            {galeria ? (
+              <button type="button" className="camera-gallery-action" onClick={() => galeriaInputRef.current?.click()} disabled={processing || recording}>
+                Escolher da galeria ou arquivo
+              </button>
+            ) : null}
           </div>
         </article>
       </section>

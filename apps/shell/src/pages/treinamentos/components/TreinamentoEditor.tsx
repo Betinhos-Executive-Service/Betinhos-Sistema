@@ -11,7 +11,7 @@ import {
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
 import { EditorTexto } from './EditorTexto'
-import { NavTopo } from './NavTopo'
+import { NavTopo } from '../../../app/NavTopo'
 import { QuizEditor } from './QuizEditor'
 
 type Props = {
@@ -170,7 +170,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<NavTopo onBack={voltar} disabled={lock} atual={publicado ? 'Editar publicado' : draft.id ? 'Editar rascunho' : 'Novo'} />}
+        breadcrumb={<NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={voltar} disabled={lock} atual={publicado ? 'Editar publicado' : draft.id ? 'Editar rascunho' : 'Novo'} />}
         title={publicado ? 'Editar treinamento publicado' : draft.id ? 'Editar treinamento' : 'Novo treinamento'}
         meta={<StatusBadge tone={publicado ? 'success' : 'neutral'}>{publicado ? 'Publicado' : 'Rascunho'}</StatusBadge>}
         description={publicado ? 'Corrija texto, vídeo, anexos ou validade. Quiz, assinatura e público ficam como foram publicados, e quem já concluiu continua concluído.' : 'Monte o conteúdo, escolha quem recebe e defina se exige assinatura e quiz. Publicado, quiz, assinatura e público não mudam mais.'}

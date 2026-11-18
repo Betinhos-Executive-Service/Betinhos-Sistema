@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, Drawer, Field, Sheet, Skeleton, StatusBadge, Textarea, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, Field, Sheet, StatusBadge, Textarea, useToast } from '@betinhos/ui'
 import { Save, Send, ShieldCheck, Undo2 } from 'lucide-react'
 import type { Source } from '../data/source'
 import { aplicarLiberacao, mesLabel, motivoLabel, podeEditarObservacao, podeLiberar, podeResponder, podeRetirar } from '../domain/regras'
 import type { Linha, Mensagem } from '../domain/types'
 import { Fechamento, Situacao, fmtData, money } from './ValidacaoList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   linha: Linha | null
@@ -183,7 +184,7 @@ export function ValidacaoDrawer({ linha, missing, onClose, source, mobile, onRes
           <section className="vc-secao" aria-labelledby="vc-conversa">
             <h3 id="vc-conversa" className="vc-secao__titulo">Conversa</h3>
             {erroConversa ? <Alert tone="danger" title="Não foi possível carregar a conversa">{erroConversa}</Alert>
-              : mensagens == null ? <Skeleton height={56} />
+              : mensagens == null ? <BrandLoader variant="inline" size="sm" label="Carregando conversa" />
               : mensagens.length ? (
                 <ol className="vc-conversa" aria-live="polite">
                   {mensagens.map((m) => (

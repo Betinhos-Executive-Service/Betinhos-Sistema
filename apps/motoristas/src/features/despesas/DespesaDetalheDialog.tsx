@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SystemIcon } from "../../shared/ui/icons/SystemIcon";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { useDetalheDialog } from "./useDetalheDialog";
 import { carregarArquivoComprovante, carregarDetalheDespesa, type AnexoDespesa, type ArquivoComprovante, type DespesaDetalhe } from "./despesaDetalhe";
 import { formatDataHora } from "../termos/termosMulta";
 import { DevolucaoPainel, GUARDA_VAZIA, MotivoDevolucao, type GuardaDevolucao } from "./DevolucaoPainel";
-import { SELO_DEVOLUCAO, estadoDevolucao } from "./devolucao";
+import { SELO_DEVOLUCAO, cancelarEmDobro, dependenciasRemotas, estadoDevolucao, guardarRascunho } from "./devolucao";
+import { reportAppError } from "../../shared/appErrorLogger";
 import { ANEXO_SEM_COMPROVANTE, STATUS_DESPESA, ehPendente, formatBRL, type DespesaRelatorio } from "./gastosRelatorio";
 
 export const STATUS_BADGE: Record<number, { rotulo: string; tom: string }> = {
@@ -41,7 +43,7 @@ function Comprovante({ anexo, indice }: { anexo: AnexoDespesa; indice: number })
     };
   }, [anexo, tentativa]);
 
-  if (estado.tipo === "carregando") return <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" />;
+  if (estado.tipo === "carregando") return <div className="gr-comprovante"><BrandLoader variant="inline" size="md" label="Carregando comprovante" /></div>;
   if (estado.tipo === "erro") {
     return (
       <div className="gr-comprovante gr-comprovante--erro">
@@ -72,21 +74,27 @@ type DialogProps = {
   /** Id do motorista, usado ao anexar o comprovante novo de uma despesa devolvida. */
   motoristaId?: string;
   /** Devolvida reenviada: a lista troca o selo na hora, sem esperar a releitura. */
-  onDevolucaoEnviada?: (id: string, explicacao: string) => void;
+  onDevolucaoEnviada?: (id: string, explicacao: string, alteracoes?: Partial<DespesaRelatorio>) => void;
+  /** "Lancei em dobro": cancelada; a lista tira a despesa na hora. */
+  onDevolucaoCancelada?: (id: string) => void;
 };
 
 /**
  * Detalhe de uma despesa, em painel de quase tela cheia. Fecha no X, no Esc e tocando fora.
- * Só a despesa devolvida (Precisa corrigir) tem ações: trocar o comprovante e/ou explicar. O valor nunca é editável.
+ * Só a despesa devolvida (Precisa corrigir) tem ações: trocar o comprovante, corrigir dados e/ou explicar, ou cancelar o lançamento em dobro. O valor nunca é editável.
  */
-export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDevolucaoEnviada }: DialogProps) {
+export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDevolucaoEnviada, onDevolucaoCancelada }: DialogProps) {
   const guardaRef = useRef<GuardaDevolucao>(GUARDA_VAZIA);
-  const [confirmando, setConfirmando] = useState(false);
+  const [confirmando, setConfirmando] = useState<"descartar" | "dobro" | null>(null);
   const [enviada, setEnviada] = useState(false);
-  // Durante o envio não fecha; com algo digitado ou escolhido pergunta antes de descartar.
+  const [cancelando, setCancelando] = useState(false);
+  const [falhouCancelar, setFalhouCancelar] = useState(false);
+  const cancelandoRef = useRef(false);
+  // Durante o envio ou o cancelamento não fecha; com algo digitado ou escolhido pergunta antes de descartar.
   const tentarFechar = useCallback(() => {
-    if (guardaRef.current.enviando) return;
-    if (guardaRef.current.sujo) { setConfirmando(true); return; }
+    if (guardaRef.current.enviando || cancelandoRef.current) return;
+    // Com uma confirmação aberta (ex.: "Cancelar este gasto?"), Esc/toque fora não a troca por outra.
+    if (guardaRef.current.sujo) { setConfirmando((atual) => atual ?? "descartar"); return; }
     onClose();
   }, [onClose]);
   const fecharRef = useDetalheDialog(tentarFechar);
@@ -126,6 +134,27 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
   ];
   const visiveis = campos.filter(([, valor]) => valor);
 
+  const cancelarDespesa = async () => {
+    if (cancelandoRef.current) return;
+    cancelandoRef.current = true;
+    setCancelando(true);
+    setFalhouCancelar(false);
+    try {
+      await cancelarEmDobro(dependenciasRemotas({ despesaId: despesa.id, nome: detalhe?.nome ?? "", motoristaId, ordem: proximaOrdem }));
+      guardaRef.current.descartar();
+      // Cancelada não volta a ser corrigida: o rascunho da explicação não fica no aparelho.
+      guardarRascunho(despesa.id, "");
+      onDevolucaoCancelada?.(despesa.id);
+      onClose();
+    } catch (erro) {
+      setFalhouCancelar(true);
+      reportAppError(erro, { severity: "warning", source: "app", action: "cancelarDespesaEmDobro", notifyUser: false });
+    } finally {
+      cancelandoRef.current = false;
+      setCancelando(false);
+    }
+  };
+
   return createPortal(
     <div className="gr-detalhe-overlay" role="dialog" aria-modal="true" aria-labelledby="gr-detalhe-titulo" onClick={tentarFechar}>
       <div className="gr-detalhe" onClick={(event) => event.stopPropagation()}>
@@ -156,13 +185,15 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
               motoristaId={motoristaId}
               guardaRef={guardaRef}
               anexosProntos={carga.tipo === "pronto"}
-              onEnviada={(explicacao) => { setEnviada(true); onDevolucaoEnviada?.(despesa.id, explicacao); }}
+              veiculoRotulo={detalhe?.veiculo ?? ""}
+              onEnviada={(explicacao, alteracoes) => { setEnviada(true); onDevolucaoEnviada?.(despesa.id, explicacao, alteracoes); }}
+              onLancouEmDobro={() => { setFalhouCancelar(false); setConfirmando("dobro"); }}
             />
           ) : null}
 
           <section aria-labelledby="gr-detalhe-comprovantes">
             <h3 className="gr-subtitulo" id="gr-detalhe-comprovantes">{estado === "acao" ? "Comprovante atual" : "Comprovante"}</h3>
-            {carga.tipo === "carregando" ? <div className="gr-comprovante gr-comprovante--carregando" role="status" aria-label="Carregando comprovante" /> : null}
+            {carga.tipo === "carregando" ? <div className="gr-comprovante"><BrandLoader variant="inline" size="md" label="Carregando comprovante" /></div> : null}
             {carga.tipo === "pronto" && anexos.length ? (
               <div className="gr-comprovantes">{anexos.map((anexo, i) => <Comprovante key={anexo.id} anexo={anexo} indice={i} />)}</div>
             ) : null}
@@ -176,7 +207,7 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
                 <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
               ))}
             </dl>
-            {carga.tipo === "carregando" ? <p className="gr-legenda" role="status">Carregando os outros dados…</p> : null}
+            {carga.tipo === "carregando" ? <BrandLoader variant="inline" size="sm" label="Carregando os outros dados" text="Carregando os outros dados" /> : null}
             {carga.tipo === "erro" ? (
               <div className="gr-vazio">
                 <p className="gr-legenda">{carga.mensagem}</p>
@@ -185,13 +216,24 @@ export function DespesaDetalheDialog({ despesa, onClose, motoristaId = "", onDev
             ) : null}
           </section>
         </div>
-        {confirmando ? (
+        {confirmando === "descartar" ? (
           <div className="dv-confirmar" role="alertdialog" aria-labelledby="dv-confirmar-titulo">
             <strong id="dv-confirmar-titulo">Descartar alterações?</strong>
-            <p>A foto escolhida e o texto novo ficam de fora.</p>
+            <p>A foto escolhida, os dados corrigidos e o texto novo ficam de fora.</p>
             <div className="dv-confirmar-acoes">
-              <button type="button" className="dv-acao" onClick={() => setConfirmando(false)}>Continuar editando</button>
+              <button type="button" className="dv-acao" onClick={() => setConfirmando(null)}>Continuar editando</button>
               <button type="button" className="dv-acao" onClick={() => { guardaRef.current.descartar(); onClose(); }}>Descartar</button>
+            </div>
+          </div>
+        ) : null}
+        {confirmando === "dobro" ? (
+          <div className="dv-confirmar" role="alertdialog" aria-labelledby="dv-dobro-titulo">
+            <strong id="dv-dobro-titulo">Cancelar este gasto?</strong>
+            <p>Use só se você lançou o mesmo gasto duas vezes. Ele sai da sua lista e não vai para o financeiro.</p>
+            {falhouCancelar ? <p className="dv-aviso" role="alert">Não deu para cancelar agora. Tente de novo quando o sinal melhorar.</p> : null}
+            <div className="dv-confirmar-acoes">
+              <button type="button" className="dv-acao" disabled={cancelando} onClick={() => setConfirmando(null)}>Voltar</button>
+              <button type="button" className="dv-acao" disabled={cancelando} aria-busy={cancelando} onClick={() => { void cancelarDespesa(); }}>{cancelando ? "Cancelando…" : falhouCancelar ? "Tentar de novo" : "Cancelar gasto"}</button>
             </div>
           </div>
         ) : null}

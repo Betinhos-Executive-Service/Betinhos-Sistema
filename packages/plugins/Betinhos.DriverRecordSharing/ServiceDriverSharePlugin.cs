@@ -167,9 +167,7 @@ namespace Betinhos.DriverRecordSharing
             catch (Exception ex)
             {
                 tracing.Trace("ServiceDriverSharePlugin error: {0}", ex);
-                throw new InvalidPluginExecutionException(
-                    PluginErrorMessage.ForUser(ex, context.CorrelationId),
-                    ex);
+                throw PluginErrorMessage.ToPluginException(ex, context.CorrelationId);
             }
         }
 

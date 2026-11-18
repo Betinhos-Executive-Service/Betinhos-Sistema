@@ -434,7 +434,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var s = Cenario();
             var error = Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Create", new Entity("new_parcelamultafolha") { ["new_valor"] = new Money(1m) }));
-            Assert.Equal("Parcela de multa só é criada pela assinatura do termo.", error.Message);
+            Assert.Equal("Parcela de multa só é criada pela assinatura do termo ou pelo acerto da multa.", error.Message);
         }
 
         [Fact]
@@ -479,16 +479,33 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Theory]
-        [InlineData(100000001, true)]
-        [InlineData(100000002, true)]
-        [InlineData(100000000, false)]
-        public void ParcelaSoMudaDePrevistaParaDescontadaOuCancelada(int novo, bool permitido)
+        [InlineData(100000001)]
+        [InlineData(100000002)]
+        [InlineData(100000000)]
+        public void ParcelaNaoMudaDeStatusPeloCliente(int novo)
         {
             var s = Cenario();
             var parcela = s.Add(new Entity("new_parcelamultafolha") { ["new_status"] = new OptionSetValue(100000000) });
             var target = new Entity("new_parcelamultafolha", parcela.Id) { ["new_status"] = new OptionSetValue(novo) };
-            if (permitido) AllowedGuard(s, "Update", target);
-            else Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Update", target));
+            Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Update", target));
+        }
+
+        [Theory]
+        [InlineData("cr40f_LancarDescontoFolha")]
+        [InlineData("cr40f_PassoMulta")]
+        public void ParcelaMudaPelasApisDoDesconto(string api)
+        {
+            var s = Cenario();
+            var parcela = s.Add(new Entity("new_parcelamultafolha") { ["new_status"] = new OptionSetValue(100000000) });
+            var target = new Entity("new_parcelamultafolha", parcela.Id) { ["new_status"] = new OptionSetValue(100000001), ["new_lancadoem"] = new DateTime(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc) };
+            AllowedGuard(s, "Update", target, new RemoteExecutionContext { MessageName = api });
+        }
+
+        [Fact]
+        public void CreateDeParcelaPeloPassoDaMultaEhPermitido()
+        {
+            var s = Cenario();
+            AllowedGuard(s, "Create", new Entity("new_parcelamultafolha") { ["new_valor"] = new Money(1m) }, new RemoteExecutionContext { MessageName = "cr40f_PassoMulta" });
         }
 
         [Fact]

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
+import { Alert, Avatar, Button, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, todaySaoPaulo, useToast } from '@betinhos/ui'
 import { BellRing, CalendarClock, Check, CheckCircle2, Eye, FileDown, Pencil, PenLine, RefreshCw, Repeat, SearchX, Users, XCircle } from 'lucide-react'
 import { parseSignature } from '../../comunicados/domain/comunicados'
 import { Assinatura } from '../../comunicados/components/Assinatura'
@@ -7,7 +7,8 @@ import type { Source } from '../data/source'
 import { erroTexto, fmtDia, formatDate, isConcluida, isVencido, matchParticipacao, plural, podeLembrar, publicoLabel, PUSH, pushLabel, statusParticipacao, type FiltroParticipacao, type Funcionario, type Participacao, type Treinamento } from '../domain/treinamentos'
 import { AnexosSecao } from './AnexosSecao'
 import { Conteudo } from './Conteudo'
-import { NavTopo } from './NavTopo'
+import { NavTopo } from '../../../app/NavTopo'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = { item: Treinamento; funcionarios: Funcionario[]; source: Source; onBack: () => void; onEditar: () => void; onReaplicar: () => void }
 
@@ -115,7 +116,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
     <>
       <PageHeader
         className="page__header"
-        breadcrumb={<NavTopo onBack={onBack} atual="Participação" />}
+        breadcrumb={<NavTopo modulo="Treinamentos" href="#/treinamentos" onBack={onBack} atual="Participação" />}
         title={item.titulo}
         meta={<>
           <StatusBadge tone="success">Publicado</StatusBadge>
@@ -151,7 +152,7 @@ export function TreinamentoPainel({ item, funcionarios, source, onBack, onEditar
             <SearchBox className="tr-search" value={busca} onChange={setBusca} placeholder="Buscar funcionário" aria-label="Buscar funcionário na participação" />
           </div>
           <ul className="tr-results__body" aria-busy={!loaded}>
-            {!loaded && loading ? [0, 1, 2].map((i) => <li key={i} className="tr-list__skeleton"><Skeleton shape="rect" height={44} /></li>) : null}
+            {!loaded && loading ? <li className="tr-list__skeleton"><BrandLoader variant="inline" size="md" label="Carregando participação" text="Carregando participação…" /></li> : null}
             {visiveis.map((p) => {
               const status = statusParticipacao(p)
               const ativo = selected?.id === p.id

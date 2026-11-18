@@ -38,6 +38,7 @@ import {
   sortContacts,
   validateContact,
 } from '../domain/contactDomain';
+import { BrandLoader } from '../../../app/BrandLoader';
 
 const CHANNEL_ICON = { whatsapp: MessageCircle, email: Mail, phone: Phone };
 const STATUS_ICON = { new: MessageCircle, in_progress: Send, waiting: Clock3, done: CheckCircle2 };
@@ -560,7 +561,7 @@ export default function ContactsView({
         <section className="panel contacts-panel">
           <div className="panel-heading"><div><span className="eyebrow">Inbox operacional</span><h2>Pendentes</h2></div><span className="panel-count">{pendingContacts.length + waitingContacts.length}</span></div>
           {contactLoadError && <div className="contact-load-error" role="alert">{contactLoadError}</div>}
-          {contactLoading ? <div className="contact-empty"><Clock3 size={25} aria-hidden="true" /><strong>Carregando contatos…</strong></div> : <>
+          {contactLoading ? <BrandLoader variant="inline" size="md" label="Carregando contatos" text="Carregando contatos…" /> : <>
             {pendingContacts.length ? renderCards(pendingContacts) : <div className="contact-section-empty">Nenhum pedido novo ou em atendimento.</div>}
             <details className="contact-waiting-section" open={waitingOpen} onToggle={(event) => setWaitingOpen(event.currentTarget.open)}>
               <summary><span><Clock3 size={15} aria-hidden="true" /> Aguardando</span><span className="contact-section-count">{waitingContacts.length}<ChevronDown size={15} aria-hidden="true" /></span></summary>

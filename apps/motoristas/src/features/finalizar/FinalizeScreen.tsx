@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { ConfirmDialog } from "../../shared/ui/ConfirmDialog";
@@ -25,6 +26,7 @@ import { matchesExpenseCitySearch, type ExpenseReferenceData } from "../despesas
 import { buildWhatsAppUrl, openExternalUrl } from "../../lib/localWorkflow";
 import { validateMaintenanceFinalizeFields, type MaintenanceFinalizeErrors } from "./maintenanceFinalize";
 import type { DetailData, MaintenancePhotoKind } from "../../types";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type FinalizeScreenProps = {
   detail: DetailData;
@@ -336,7 +338,7 @@ function MaintenancePhotoGrid({
                 <span className="media-video-badge">Vídeo</span>
               </>
             ) : (
-              <img src={photo.dataUrl} alt={`${label} ${index + 1}`} />
+              <ImagemOuPdf src={photo.dataUrl} alt={`${label} ${index + 1}`} />
             )}
           </button>
         ))}
@@ -512,7 +514,7 @@ function MaintenanceFinalize({
             }}
           />
 
-          {expenseReferenceLoading ? <div className="form-error-summary">Carregando cidades.</div> : null}
+          {expenseReferenceLoading ? <BrandLoader variant="inline" size="sm" label="Carregando cidades" text="Carregando cidades" /> : null}
           {!expenseReferenceLoading && expenseReferenceError ? <div className="form-error-summary">{expenseReferenceError}</div> : null}
           <SelectField
             ref={cityRef}

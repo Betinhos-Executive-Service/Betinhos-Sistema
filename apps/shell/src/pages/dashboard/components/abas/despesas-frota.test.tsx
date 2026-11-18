@@ -54,11 +54,11 @@ describe('DespesasTab', () => {
     }
     expect(kpi('Despesa realizada')).toContain('R$ 200,00')
     // Anterior R$ 50 → +300%: subir é desfavorável, dito em texto.
-    expect(kpi('Despesa realizada')).toMatch(/ANT\..*R\$ 50,00.*\+300,0%.*desfavorável/)
+    expect(kpi('Despesa realizada')).toMatch(/Ant\.Período anterior.*R\$ 50,00.*\+300,0%.*desfavorável/)
     expect(kpi('Sem comprovante')).toMatch(/^Sem comprovante1/)
     expect(kpi('Média hospedagem')).toContain('R$ 140,00')
     expect(kpi('Média hospedagem')).toContain('Dentro da meta')
-    expect(kpi('Média hospedagem')).not.toContain('ANT.')
+    expect(kpi('Média hospedagem')).not.toContain('Período anterior')
     expect(screen.getByRole('heading', { name: 'Por motorista' })).toBeTruthy()
     expect(screen.getByText('Ana Souza')).toBeTruthy()
   })
@@ -84,7 +84,7 @@ describe('DespesasTab', () => {
   it('despesas indisponíveis: KPIs com o valor s/dado (sem "—") e os cinco blocos com s/dado e o motivo', () => {
     render(<DespesasComEstado dados={dadosDespesas({ indisponiveis: ['despesas'] })} />)
     for (const r of ['Despesa realizada', 'Média hospedagem']) {
-      expect(within(screen.getByRole('article', { name: r })).getByText('s/dado').className).toContain('dash-kpi__valor--semdado')
+      expect(within(screen.getByRole('article', { name: r })).getByText('s/dado').className).toContain('bt-stat__value--empty')
       expect(kpi(r)).not.toContain('—')
     }
     expect(screen.getAllByText(/tabela de despesas não respondeu/)).toHaveLength(5)

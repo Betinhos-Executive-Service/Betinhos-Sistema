@@ -8,7 +8,7 @@ import { brl, NAO_INFORMADO } from '../data/format'
 import { GRAVIDADE, label, STATUS_OPTIONS, TIPO_REPARO } from '../data/schema'
 import type { LoadResult } from '../data/source'
 import type { FrotaData } from '../data/types'
-import { downloadCsv, toCsv } from '../domain/csv'
+import { downloadCsv, toCsv } from '../../../app/csv'
 import { AVISO_12_MESES, custoPorMesEmpilhado, custoPorVeiculo, FONTE_LABEL, indisponiveisDe, periodoAlemDe12Meses, type CustoVeiculo, type EntradaCusto, type Fonte } from '../domain/custoTotal'
 import { centavos, contarPor, custoPor, multasNoPeriodo, multasPorMotorista, realizadas, tempoMedioDias, ultimos12Meses, type Custo, type Periodo } from '../domain/indicadores'
 
@@ -127,8 +127,8 @@ export function Indicadores({ data, errors, today }: { data: FrotaData; errors: 
             empty={<EmptyState compact align="start" title="Sem veículos" />}
             columns={[
               { key: 'veiculo', header: 'Veículo', width: 'minmax(110px, 1.2fr)', cell: (item) => item.placa || 'Sem placa' },
-              { key: 'total', header: <Ordenar rotulo="Total" ativo={ordem === 'total'} onClick={() => setOrdem('total')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{brl(item.total)}</span> },
-              { key: 'custoPorKm', header: <Ordenar rotulo="R$/km" ativo={ordem === 'custoPorKm'} onClick={() => setOrdem('custoPorKm')} />, align: 'end', cell: (item) => <span className="frota-nowrap">{item.custoPorKm === null ? '—' : brl(item.custoPorKm)}</span> },
+              { key: 'total', header: <Ordenar rotulo="Total" ativo={ordem === 'total'} onClick={() => setOrdem('total')} />, cell: (item) => <span className="frota-nowrap">{brl(item.total)}</span> },
+              { key: 'custoPorKm', header: <Ordenar rotulo="R$/km" ativo={ordem === 'custoPorKm'} onClick={() => setOrdem('custoPorKm')} />, cell: (item) => <span className="frota-nowrap">{item.custoPorKm === null ? '—' : brl(item.custoPorKm)}</span> },
               { key: 'maiorFonte', header: 'Maior fonte', cell: (item) => (item.maiorFonte ? FONTE_LABEL[item.maiorFonte] : '—') },
             ]}
           />
@@ -143,9 +143,9 @@ export function Indicadores({ data, errors, today }: { data: FrotaData; errors: 
           empty={<EmptyState compact align="start" title="Sem multas no período" />}
           columns={[
             { key: 'motorista', header: 'Motorista', width: 'minmax(160px, 2fr)', cell: (item) => item.motorista },
-            { key: 'qtd', header: 'Multas', align: 'end', cell: (item) => item.qtd },
-            { key: 'valor', header: 'Valor (catálogo)', align: 'end', cell: (item) => <span className="frota-nowrap">{todasSemValor(item) ? NAO_INFORMADO : brl(item.valor)}{item.semValor > 0 && <span className="frota-muted"> · {item.semValor} sem valor</span>}</span> },
-            { key: 'pontos', header: 'Pontos na CNH', align: 'end', hideBelow: 'mobile', cell: (item) => item.pontos },
+            { key: 'qtd', header: 'Multas', cell: (item) => item.qtd },
+            { key: 'valor', header: 'Valor (catálogo)', cell: (item) => <span className="frota-nowrap">{todasSemValor(item) ? NAO_INFORMADO : brl(item.valor)}{item.semValor > 0 && <span className="frota-muted"> · {item.semValor} sem valor</span>}</span> },
+            { key: 'pontos', header: 'Pontos na CNH', hideBelow: 'mobile', cell: (item) => item.pontos },
           ]}
         />
       </Surface>

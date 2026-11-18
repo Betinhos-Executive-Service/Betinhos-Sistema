@@ -4,8 +4,8 @@ import type { Infracao, Manutencao, Multa } from '../data/types'
 import { contarPor, custoPor, custoPorMes, custoVeiculo, multasPorMotorista, tempoMedioDias, ultimos12Meses } from './indicadores'
 
 const periodo = { de: '2026-08-01', ate: '2026-10-02' }
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-08-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
-const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, titulo: id, status: 202410000, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: null, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-08-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, codigo: null, titulo: id, status: 202410000, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: null, motorista: { id: 'f1', label: 'Ana' }, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null, ...extra })
 const infracoes: Infracao[] = [{ id: 'i1', codigo: '7455', descricao: null, gravidade: 1, pontos: 4, valor: 130.16 }]
 
 const manutencoes = [
@@ -13,7 +13,7 @@ const manutencoes = [
   manut('b', { dataManutencao: '2026-10-01T12:00:00Z', valor: 250, veiculo: { id: 'v2', label: 'EFG4H56' }, tipo: 2 }),
   manut('semValor', { dataManutencao: '2026-10-01T12:00:00Z' }),
   manut('fora', { dataManutencao: '2026-07-01T12:00:00Z', valor: 999 }),
-  manut('aberta', { status: MANUT.APROVADO, valor: 500 }),
+  manut('aberta', { status: MANUT.AGENDADO, valor: 500 }),
 ]
 
 describe('indicadores', () => {

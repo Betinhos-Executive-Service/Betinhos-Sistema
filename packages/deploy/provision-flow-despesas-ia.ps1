@@ -39,7 +39,7 @@ $dataverseFlow = 'Flow Comprovantes Despesas Assincrono | App Motoristas'
 $sharePointFlow = 'Flow - Consultar Arquivos Sharepoint'
 $siteUrl = 'https://betinhos.sharepoint.com/sites/BetinhosGestoInterna'
 $libraryId = '0e524da8-15af-47ff-9b34-7116ac32763f'
-$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and (cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or cr40f_iastatusanalise eq 100000003 or (cr40f_iastatusanalise eq 100000002 and (cr40f_statusoperacional eq 100000000 or cr40f_statusoperacional eq 100000001)))'
+$triggerFilter = 'cr40f_statusanexo eq 100000002 and (cr40f_origem eq 100000000 or cr40f_origem eq 100000001 or (cr40f_origem eq 100000002 and cr40f_conciliadacartao eq true)) and (cr40f_iastatusanalise eq null or cr40f_iastatusanalise eq 100000000 or cr40f_iastatusanalise eq 100000003 or (cr40f_iastatusanalise eq 100000002 and (cr40f_statusoperacional eq 100000000 or cr40f_statusoperacional eq 100000001)))'
 $constantesPath = Join-Path $PSScriptRoot '../despesas-ia/dist/constantes.json'
 $backupDir = Join-Path $PSScriptRoot 'flows/backup'
 if (([Uri]$environmentUrl).Host -ne 'org23b93544.crm2.dynamics.com') { throw 'Somente DEV.' }
@@ -633,6 +633,7 @@ $gravarText = @'
       "item/cr40f_iavalorlido": "@outputs('Resposta')?['valor_lido']",
       "item/cr40f_iadatalida": "@outputs('Resposta')?['data_lida']",
       "item/cr40f_iacnpjlido": "@if(equals(outputs('Resposta')?['cnpj_lido'], null), null, substring(outputs('Resposta')?['cnpj_lido'], 0, min(length(outputs('Resposta')?['cnpj_lido']), 20)))",
+      "item/new_cnpjposto": "@if(equals(length(replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', '')), 14), replace(replace(replace(replace(coalesce(outputs('Resposta')?['cnpj_lido'], ''), '.', ''), '/', ''), '-', ''), ' ', ''), triggerOutputs()?['body/new_cnpjposto'])",
       "item/cr40f_iaestabelecimentolido": "@if(equals(outputs('Resposta')?['estabelecimento_lido'], null), null, substring(outputs('Resposta')?['estabelecimento_lido'], 0, min(length(outputs('Resposta')?['estabelecimento_lido']), 200)))",
       "item/cr40f_iaconfianca": "@float(formatNumber(outputs('Resposta')?['confianca'], '0.00', 'en-US'))",
       "item/cr40f_iajson": "@{outputs('Texto_resposta')}",

@@ -1,7 +1,8 @@
 import { toDataverseDate, type DateBehavior } from '../data/dates'
-import { COLISAO, MANUT, MULTA, MULTA_CAMPO, STATUS_FIELD } from '../data/schema'
-import { FlowIncertoError, type DataSource, type FlowId, type FlowResult } from '../data/source'
+import { COLISAO, MANUT, STATUS_FIELD } from '../data/schema'
+import type { DataSource } from '../data/source'
 import type { Kind } from '../data/types'
+import { rawErrorMessage } from '../data/xrm'
 
 export type FieldSpec = { key: string; label: string; type: 'text' | 'textarea' | 'date' | 'datetime' | 'money'; required: boolean; maxLength?: number }
 export type Requisito = 'veiculo' | 'motorista'
@@ -12,8 +13,6 @@ export type Transition = {
   label: string
   fields: FieldSpec[]
   danger?: boolean
-  /** Quando presente, o status é gravado pelo Flow, não pela tela. */
-  flow?: FlowId
   /** Dado que o registro precisa ter antes da ação (mesma exigência do botão nativo). */
   requires?: Requisito
   /** Campos fixos gravados junto com o status. */
@@ -22,45 +21,12 @@ export type Transition = {
 
 export type RegistroStatus = { id: string; status: number | null; temVeiculo: boolean; temMotorista: boolean }
 
-const agendarPara: FieldSpec = { key: 'cr40f_agendarpara', label: 'Agendar para', type: 'date', required: true }
-const comentario = (required: boolean): FieldSpec => ({ key: 'cr40f_comentariosdoaprovador', label: 'Comentário do aprovador', type: 'text', required, maxLength: 100 })
-
-const concluir: Transition = {
-  id: 'concluir', to: MANUT.REALIZADO, label: 'Concluir',
-  fields: [
-    { key: 'cr40f_datamanutencao', label: 'Data e hora da manutenção', type: 'datetime', required: true },
-    { key: 'cr40f_valor', label: 'Valor (R$)', type: 'money', required: true },
-    { key: 'cr40f_estabelecimento', label: 'Estabelecimento', type: 'text', required: true, maxLength: 100 },
-    { key: 'cr40f_servicorealizado', label: 'Serviço realizado', type: 'textarea', required: true, maxLength: 100 },
-  ],
-}
-const cancelarManutencao: Transition = { id: 'cancelar', to: MANUT.CANCELADO, label: 'Cancelar manutenção', fields: [], danger: true }
 const cancelarColisao: Transition = { id: 'cancelar', to: COLISAO.CANCELADO, label: 'Cancelar colisão', fields: [], danger: true }
-const desfechosMulta: Transition[] = [
-  { id: 'recurso', to: MULTA.RECURSO, label: 'Entrar com recurso', fields: [], set: { [MULTA_CAMPO.recursoPendente]: true } },
-  { id: 'descontado', to: MULTA.DESCONTADO, label: 'Marcar como descontado', fields: [] },
-  { id: 'pago', to: MULTA.PAGO, label: 'Marcar como pago', fields: [] },
-]
-const finalizar: Transition = { id: 'finalizar', to: MULTA.FINALIZADO, label: 'Finalizar', fields: [] }
-
 const RULES: Record<Kind, Record<number, Transition[]>> = {
-  manutencao: {
-    [MANUT.SOLICITADO]: [
-      { id: 'aprovar', to: MANUT.APROVADO, label: 'Aprovar e agendar', fields: [agendarPara, comentario(false)], flow: 'aprovarManutencao', requires: 'veiculo' },
-      // Não grava cr40f_datadaaprovacao: a regra de negócio "Aprovado" troca o status para Aprovado quando essa data é gravada.
-      { id: 'reprovar', to: MANUT.REPROVADO, label: 'Reprovar', fields: [comentario(true)], danger: true },
-      cancelarManutencao,
-    ],
-    [MANUT.APROVADO]: [{ id: 'programar', to: MANUT.PROGRAMADO, label: 'Programar', fields: [agendarPara] }, concluir, cancelarManutencao],
-    [MANUT.PROGRAMADO]: [concluir, cancelarManutencao],
-  },
-  multa: {
-    [MULTA.NOTIFICAR]: [{ id: 'notificado', to: MULTA.NOTIFICADO, label: 'Notificar condutor', fields: [], flow: 'notificarCondutor', requires: 'motorista' }],
-    [MULTA.NOTIFICADO]: [{ id: 'indicar', to: MULTA.INDICADA, label: 'Gerar contrato de indicação', fields: [], flow: 'gerarContrato', requires: 'motorista' }, ...desfechosMulta],
-    [MULTA.INDICADA]: desfechosMulta,
-    [MULTA.DESCONTADO]: [finalizar],
-    [MULTA.PAGO]: [finalizar],
-  },
+  // Manutenção não passa pelo StatusPanel: as ações dela são Custom APIs (acoesManutencao / executarAcaoManutencao, abaixo).
+  manutencao: {},
+  // Multa anda pelo passo a passo (MultaPassoAPasso → cr40f_PassoMulta); não tem transição de status aqui.
+  multa: {},
   colisao: {
     [COLISAO.ENVIADO]: [{ id: 'analisar', to: COLISAO.ANALISE, label: 'Colocar em análise', fields: [] }, cancelarColisao],
     [COLISAO.ANALISE]: [{ id: 'resolver', to: COLISAO.RESOLVIDO, label: 'Marcar como resolvido', fields: [] }, cancelarColisao],
@@ -93,9 +59,9 @@ export function validate(transition: Transition, values: Record<string, string>)
   return errors
 }
 
-/** Campos que a tela grava. Em transição com Flow o status fica de fora: quem grava é o Flow. */
+/** Campos que a tela grava: o status novo, os campos fixos e os preenchidos. */
 export function buildPatch(kind: Kind, transition: Transition, values: Record<string, string>, ctx: { now: Date; dateBehaviors: Record<string, DateBehavior> }) {
-  const patch: Record<string, unknown> = transition.flow ? {} : { [STATUS_FIELD[kind]]: transition.to, ...transition.set }
+  const patch: Record<string, unknown> = { [STATUS_FIELD[kind]]: transition.to, ...transition.set }
   for (const field of transition.fields) {
     const raw = (values[field.key] ?? '').trim()
     if (!raw) continue
@@ -115,16 +81,6 @@ export function buildPatch(kind: Kind, transition: Transition, values: Record<st
   return patch
 }
 
-/** Registros (`${kind}:${id}`) com uma chamada de Flow executando agora. */
-const flowsEmCurso = new Set<string>()
-/** Registros cuja última chamada de Flow terminou sem resposta (tempo esgotado ou rede): resultado desconhecido. */
-const flowsIncertos = new Set<string>()
-
-/** Uma recarga mostra o status real, então um resultado incerto pode ser tentado de novo; uma chamada ainda em execução continua bloqueada até terminar. */
-export function liberarFlows(): void {
-  flowsIncertos.clear()
-}
-
 export class StaleError extends Error {
   constructor() {
     super('Este registro foi alterado por outra pessoa. A tela foi recarregada')
@@ -133,44 +89,71 @@ export class StaleError extends Error {
 }
 
 /**
- * Relê o status no servidor e só age se ele ainda for o que a tela mostrava.
- * Transição direta: grava o status. Transição com Flow: grava os campos da etapa e chama o Flow.
+ * Relê o status no servidor e, só se ainda for o que a tela mostrava, grava o status e os campos da etapa.
  */
-export async function applyTransition(source: DataSource, kind: Kind, record: RegistroStatus, transition: Transition, values: Record<string, string>, now = new Date()): Promise<FlowResult | null> {
+export async function applyTransition(source: DataSource, kind: Kind, record: RegistroStatus, transition: Transition, values: Record<string, string>, now = new Date()): Promise<void> {
   if (!transitionsFor(kind, record.status).includes(transition)) throw new Error('Esta ação não está disponível para o status atual do registro')
   const motivo = bloqueio(transition, record)
   if (motivo) throw new Error(motivo)
   const erros = validate(transition, values)
   if (Object.keys(erros).length > 0) throw new Error('Preencha os campos obrigatórios antes de confirmar')
-  const flow = transition.flow
-  const chave = `${kind}:${record.id}`
-  if (!flow) {
-    const current = await source.currentStatus(kind, record.id)
-    if (current !== record.status) throw new StaleError()
-    const dateBehaviors = transition.fields.some((field) => field.type === 'date') ? await source.dateBehaviors(kind) : {}
-    await source.update(kind, record.id, buildPatch(kind, transition, values, { now, dateBehaviors }))
-    return null
-  }
-  // Verifica e reserva a chave de forma síncrona, antes de qualquer await: duas chamadas simultâneas não passam juntas.
-  if (flowsEmCurso.has(chave) || flowsIncertos.has(chave)) throw new Error('Já há uma ação em andamento para este registro. Aguarde e recarregue a tela')
-  flowsEmCurso.add(chave)
+  const current = await source.currentStatus(kind, record.id)
+  if (current !== record.status) throw new StaleError()
+  const dateBehaviors = transition.fields.some((field) => field.type === 'date') ? await source.dateBehaviors(kind) : {}
+  await source.update(kind, record.id, buildPatch(kind, transition, values, { now, dateBehaviors }))
+}
+
+// ---------- Manutenção (Custom APIs cr40f_Manutencao*, plano 1 das manutenções v2) ----------
+
+export type AcaoManutencao = 'encaixar' | 'reprovar' | 'cancelar' | 'concluir' | 'programar'
+
+/** Ciclo novo (spec 2026-11-16-manutencoes-v2): encaixar é aprovar; reprovar só antes do encaixe; concluir também lança depois do fato. */
+const ACOES_MANUTENCAO: Partial<Record<number, AcaoManutencao[]>> = {
+  [MANUT.SOLICITADO]: ['encaixar', 'reprovar', 'cancelar', 'concluir'],
+  [MANUT.AGENDADO]: ['encaixar', 'programar', 'cancelar', 'concluir'],
+  [MANUT.PROGRAMADO]: ['encaixar', 'cancelar', 'concluir'],
+}
+
+export function acoesManutencao(status: number | null): AcaoManutencao[] {
+  return status === null ? [] : ACOES_MANUTENCAO[status] ?? []
+}
+
+const ROTULO_ACAO: Record<Exclude<AcaoManutencao, 'encaixar'>, string> = { reprovar: 'Reprovar', cancelar: 'Cancelar manutenção', concluir: 'Concluir', programar: 'Programar' }
+
+export function rotuloAcao(acao: AcaoManutencao, status: number | null): string {
+  if (acao === 'encaixar') return status === MANUT.SOLICITADO ? 'Encaixar' : 'Reagendar'
+  return ROTULO_ACAO[acao]
+}
+
+/** Manutenções com uma ação em execução agora (uma por vez). */
+const acoesEmCurso = new Set<string>()
+
+/**
+ * Relê o status no servidor e só executa se ele ainda for o que a tela mostrava (senão, StaleError). A reserva da vez é
+ * síncrona, antes de qualquer await: dois cliques seguidos não disparam duas chamadas.
+ */
+export async function executarAcaoManutencao<T>(source: Pick<DataSource, 'currentStatus'>, record: { id: string; status: number | null }, acao: AcaoManutencao, executar: () => Promise<T>): Promise<T> {
+  if (!acoesManutencao(record.status).includes(acao)) throw new Error('Esta ação não está disponível para o status atual da manutenção')
+  const chave = `manutencao:${record.id}`
+  if (acoesEmCurso.has(chave)) throw new Error('Já há uma ação em andamento para esta manutenção. Aguarde')
+  acoesEmCurso.add(chave)
   try {
-    const current = await source.currentStatus(kind, record.id)
-    if (current !== record.status) throw new StaleError()
-    // Resolve a URL do Flow antes de gravar qualquer campo: se ela não estiver disponível, nada é alterado.
-    await source.prepareFlow(flow)
-    const dateBehaviors = transition.fields.some((field) => field.type === 'date') ? await source.dateBehaviors(kind) : {}
-    const patch = buildPatch(kind, transition, values, { now, dateBehaviors })
-    if (Object.keys(patch).length > 0) await source.update(kind, record.id, patch)
-    try {
-      return await source.runFlow(flow, record.id)
-    } catch (reason) {
-      // Resultado incerto (tempo esgotado, rede): o Flow pode ainda estar rodando, então o bloqueio fica até recarregar.
-      // Entra em "incertos" antes de sair de "em curso" (finally): a chave nunca fica fora dos dois conjuntos.
-      if (reason instanceof FlowIncertoError) flowsIncertos.add(chave)
-      throw reason
-    }
+    const atual = await source.currentStatus('manutencao', record.id)
+    if (atual !== record.status) throw new StaleError()
+    return await executar()
   } finally {
-    flowsEmCurso.delete(chave)
+    acoesEmCurso.delete(chave)
+  }
+}
+
+/** O que a gaveta faz com o resultado de uma ação da manutenção: seguir, recarregar (StaleError) ou mostrar a falha. */
+export type DesfechoAcao<T> = { tipo: 'feito'; valor: T } | { tipo: 'desatualizada' } | { tipo: 'falha'; mensagem: string }
+
+/** Único ponto que separa "outra pessoa mudou a manutenção" de falha comum (a mensagem do servidor chega como veio, com o ponto final). As gavetas só decidem o que mostrar. */
+export async function desfechoDaAcao<T>(executar: () => Promise<T>): Promise<DesfechoAcao<T>> {
+  try {
+    return { tipo: 'feito', valor: await executar() }
+  } catch (reason) {
+    return reason instanceof StaleError ? { tipo: 'desatualizada' } : { tipo: 'falha', mensagem: rawErrorMessage(reason) }
   }
 }

@@ -1,7 +1,11 @@
 import type { ChoiceOption, Row } from '@betinhos/dataverse'
 import { formatDateTime, formatMoney, TZ } from '../domain/format'
 import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
+import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR } from '../domain/grouping'
+import { ALIAS_MANUTENCAO, CATEGORIA_MANUTENCAO } from '../domain/manutencao'
 import { searchConditions } from '../domain/search'
+import { segundaDe, somarDias } from '../../frota/domain/janela'
+import { mockRecebimentos } from '../../recebimentos/mock'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
 
 const F = '@OData.Community.Display.V1.FormattedValue'
@@ -19,9 +23,11 @@ const lookupId = (group: number, n: number) => `bbbbbbbb-000${group}-4000-8000-$
 const options = (group: number, names: string[]): LookupOption[] => names.map((nome, i) => ({ id: lookupId(group, i + 1), nome }))
 
 export const MOCK_LOOKUPS: Record<string, LookupOption[]> = {
-  cr40f_motorista: options(1, ['Carlos Lima', 'Ana Souza', 'Bruno Dias', 'Teste']),
-  cr40f_veiculo: options(2, ['ABC1D23 · Corolla', 'DEF4G56 · Camry', 'GHI7J89 · Q5 Blindado', 'JKL0M12 · Spin']),
-  cr40f_cliente: options(3, ['Tenaris', 'Grupo Atlântico', 'Particular']),
+  // Carlos Lima, ABC1D23 e os clientes existem nos mocks de Funcionários, Frota e Clientes (mesmo ID): o lookup abre a
+  // gaveta de um registro de verdade. Os outros IDs não existem lá e a gaveta avisa "não encontrado".
+  cr40f_motorista: [{ id: 'f1f1f1f1-0000-4000-8000-000000000001', nome: 'Carlos Lima' }, ...options(1, ['Ana Souza', 'Bruno Dias', 'Teste'])],
+  cr40f_veiculo: [{ id: 'f2f2f2f2-0000-4000-8000-000000000001', nome: 'ABC1D23 · Corolla' }, ...options(2, ['DEF4G56 · Camry', 'GHI7J89 · Q5 Blindado', 'JKL0M12 · Spin'])],
+  cr40f_cliente: [{ id: '44444444-4444-4444-8444-444444444444', nome: 'Tenaris' }, { id: '11111111-1111-4111-8111-111111111111', nome: 'Grupo Atlântico' }, { id: '33333333-3333-4333-8333-333333333333', nome: 'Particular' }],
   cr40f_solicitante: options(4, ['Marina Alves', 'Paulo Reis', 'Renata Faria', 'Diego Torres']),
 }
 
@@ -53,6 +59,9 @@ export const MOCK_ATTRIBUTES: AttributeMap = new Map([
   // Atualizável na metadata, como no DEV: a trava vem de READONLY (o plugin DriverRecordSharing monta o texto).
   info('cr40f_passageirosetelefonedecontato', 'Memo', 'Passageiros e telefone de contato'),
   info('createdon', 'DateTime', 'Criado em', { updatable: false }),
+  // Como no DEV: o estado vem na metadata, mas não é campo de filtro (aparece só leitura quando a visão o filtra).
+  info('statecode', 'State', 'Status', { updatable: false }),
+  info('cr40f_cr', 'String', 'CR'),
 ])
 
 const AGENDA_COLS = [
@@ -62,6 +71,7 @@ const AGENDA_COLS = [
 ]
 const HOJE_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_cliente', 'cr40f_trajeto', 'cr40f_cotao']
 const SEM_MOTORISTA_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_status', 'cr40f_cliente', 'cr40f_solicitante', 'cr40f_trajeto', 'cr40f_tipodeveiculo', 'cr40f_cotao']
+const FATURAMENTO_COLS = ['cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_motorista', 'cr40f_statusdefaturamento', 'cr40f_cotao']
 
 const ACTIVE = '<condition attribute="statecode" operator="eq" value="0" />'
 const fetch = (cols: string[], conditions: string, order = '<order attribute="cr40f_dataehorriodesada" descending="false" />') =>
@@ -74,6 +84,11 @@ export function createMockViews(): View[] {
     { id: 'mock-agenda', nome: '🗓️Agenda', grupo: 'sistema', padrao: true, fetchxml: fetch(AGENDA_COLS, ''), layoutxml: layout(AGENDA_COLS) },
     { id: 'mock-hoje', nome: 'Hoje', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, '<condition attribute="cr40f_dataehorriodesada" operator="today" />'), layoutxml: layout(HOJE_COLS) },
     { id: 'mock-sem-motorista', nome: 'Sem motorista', grupo: 'sistema', padrao: false, fetchxml: fetch(SEM_MOTORISTA_COLS, '<condition attribute="cr40f_motorista" operator="null" />'), layoutxml: layout(SEM_MOTORISTA_COLS) },
+    // No formato de uma savedquery nativa do Dynamics ("Sem CR da Tenaris" do DEV): filtros só no FetchXML.
+    { id: 'mock-sem-cr-tenaris', nome: 'ℹ️ Sem CR da Tenaris', grupo: 'sistema', padrao: false, fetchxml: fetch(HOJE_COLS, `<condition attribute="cr40f_dataehorriodesada" operator="this-month" /><condition attribute="cr40f_cr" operator="null" /><condition attribute="cr40f_cliente" operator="eq" value="${MOCK_LOOKUPS.cr40f_cliente[0].id}" uiname="Tenaris" uitype="cr40f_clientes1" />`), layoutxml: layout(HOJE_COLS) },
+    // Visão de faturamento: filtra o status de faturamento, então "Mostrar manutenções" vem desligado (plano 3, D2),
+    // mesmo com a coluna Motorista. Pendente e Não Faturável: com o liga/desliga ligado, as manutenções aparecem nela.
+    { id: 'mock-faturamento', nome: '💲 Faturamento', grupo: 'sistema', padrao: false, fetchxml: fetch(FATURAMENTO_COLS, '<condition attribute="cr40f_statusdefaturamento" operator="in"><value>202410005</value><value>202410011</value></condition>'), layoutxml: layout(FATURAMENTO_COLS) },
   ]
 }
 
@@ -152,6 +167,84 @@ export function createMockRows(now: Date): Row[] {
   return rows
 }
 
+/** Linhas de manutenção do mock (OS-9001 a OS-9004). */
+export const MOCK_MANUTENCOES = 4
+
+/**
+ * Linhas da Geral de categoria Manutenção (manutenções v2, plano 3), com as colunas do link `bt_manut` já preenchidas,
+ * como a consulta ligada devolve. OS-9001 e OS-9002 apontam para m2 e m3 do mock da Frota, para a gaveta abrir o registro
+ * certo. OS-9003 é Agendada com a janela vencida (atrasada, sem motorista) e OS-9004 é uma linha com `cr40f_om` sem os
+ * dados do link (`bt_manut.*` vazio), para ver os rótulos de reserva; as duas apontam para manutenções da Frota que lá
+ * estão Solicitadas, então a gaveta delas mostra outro status.
+ */
+export function createMockManutencoes(now: Date): Row[] {
+  const hoje = spDay(now)
+  const proxima = segundaDe(somarDias(hoje, 7))
+  const passada = somarDias(hoje, -3)
+  const semanaPassada = segundaDe(somarDias(hoje, -7))
+  const m = (campo: string) => `${ALIAS_MANUTENCAO}.${campo}`
+  const linha = (n: number, saida: string, extra: Row): Row => ({
+    [ID_ATTRIBUTE]: `aaaaaaaa-0000-4000-8000-9${String(n).padStart(11, '0')}`,
+    cr40f_id: `OS-${9000 + n}`,
+    statecode: 0,
+    statuscode: 1,
+    new_categoriadoitem: CATEGORIA_MANUTENCAO,
+    [`new_categoriadoitem${F}`]: 'Manutenção',
+    cr40f_dataehorriodesada: saida,
+    [`cr40f_dataehorriodesada${F}`]: formatDateTime(saida),
+    createdon: saida,
+    [`createdon${F}`]: formatDateTime(saida),
+    cr40f_trajeto: 'Serviço de manutenção do veículo',
+    cr40f_endereodesada: 'Manutenção de Veículo',
+    cr40f_destino: 'Manutenção de Veículo',
+    cr40f_passageirosetelefonedecontato: 'Manutenção de Veículo',
+    cr40f_statusdefaturamento: 202410011,
+    [`cr40f_statusdefaturamento${F}`]: 'Não Faturável',
+    cr40f_tipodeveiculo: 202410000,
+    [`cr40f_tipodeveiculo${F}`]: 'Básico',
+    ...extra,
+  })
+  const doLink = (grau: number, rotuloGrau: string, status: number, rotuloStatus: string, id: string, descricao: string, inicio: string, fim: string): Row => ({
+    [m('cr40f_id')]: id, [m('cr40f_descricao')]: descricao,
+    [m('cr40f_graudamanutencao')]: grau, [`${m('cr40f_graudamanutencao')}${F}`]: rotuloGrau,
+    [m('cr40f_status')]: status, [`${m('cr40f_status')}${F}`]: rotuloStatus,
+    [m('cr40f_janelainicio')]: inicio, [m('cr40f_janelafim')]: fim,
+  })
+  const carlos = MOCK_LOOKUPS.cr40f_motorista[0]
+  return [
+    // m2 da Frota: encaixada na semana que vem e ainda a programar (sem motorista; saída no início da janela).
+    linha(1, `${proxima}T03:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm2', [`_cr40f_om_value${F}`]: 'M2',
+      _cr40f_veiculo_value: 'v2', [`_cr40f_veiculo_value${F}`]: 'TST2B22',
+      _cr40f_motorista_value: null,
+      ...doLink(2, 'Média', 202410001, 'Agendado', 'M2', 'Manutenção fictícia m2', proxima, somarDias(proxima, 6)),
+    }),
+    // m3 da Frota: programada com motorista num dia que já passou e sem conclusão, ou seja, atrasada.
+    linha(2, `${passada}T12:00:00.000Z`, {
+      cr40f_status: 202410005, [`cr40f_status${F}`]: 'Programado', new_foiprogramado: true,
+      _cr40f_om_value: 'm3', [`_cr40f_om_value${F}`]: 'M3',
+      _cr40f_veiculo_value: 'v1', [`_cr40f_veiculo_value${F}`]: 'TST1A11',
+      _cr40f_motorista_value: carlos.id, [`_cr40f_motorista_value${F}`]: carlos.nome,
+      ...doLink(2, 'Média', 202410005, 'Programado', 'M3', 'Manutenção fictícia m3', passada, passada),
+    }),
+    // Agendada com a semana da janela já vencida e ainda sem motorista: atrasada, a programar.
+    linha(3, `${semanaPassada}T03:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm7', [`_cr40f_om_value${F}`]: 'M7',
+      _cr40f_veiculo_value: 'v2', [`_cr40f_veiculo_value${F}`]: 'TST2B22',
+      _cr40f_motorista_value: null,
+      ...doLink(3, 'Alta', 202410001, 'Agendado', 'M7', 'Ar-condicionado sem gelar (fictício)', semanaPassada, somarDias(semanaPassada, 6)),
+    }),
+    // Ligada à manutenção (`cr40f_om`), mas sem nenhuma coluna do link: a linha mostra os rótulos de reserva.
+    linha(4, `${proxima}T15:00:00.000Z`, {
+      cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado', new_foiprogramado: false,
+      _cr40f_om_value: 'm8', [`_cr40f_om_value${F}`]: 'M8',
+      _cr40f_motorista_value: null,
+    }),
+  ]
+}
+
 /**
  * Histórico do popover de campo protegido: OS-1007 simula perfil sem acesso à auditoria, OS-1013 auditoria sem a troca;
  * as demais trazem a troca do valor da Tenaris para o atual, por Keila em 23/10 16:27 (São Paulo).
@@ -216,14 +309,17 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   const listed = () => Array.from(el.children).some((c) => c.tagName === 'value' && String(c.textContent).toLowerCase() === String(raw).toLowerCase())
   // Valor `AAAA-MM-DD` compara pelo dia (como o Dataverse faz com data); senão, como número.
   const isDayValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  // Valor ISO com horário compara o instante.
+  const isInstant = /^\d{4}-\d{2}-\d{2}T/.test(value)
+  const instantOf = (text: string) => (typeof raw === 'string' && !Number.isNaN(Date.parse(raw)) ? Date.parse(raw) - Date.parse(text) : NaN)
   switch (el.getAttribute('operator')) {
     case 'eq': return equals()
     // Como no SQL, `ne` e `not-in` não devolvem vazios.
     case 'ne': return !isEmpty(raw) && !equals()
-    case 'ge': return numberOf(raw) >= Number(value)
-    case 'le': return numberOf(raw) <= Number(value)
-    case 'gt': return isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
-    case 'lt': return isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
+    case 'ge': return isInstant ? instantOf(value) >= 0 : isDayValue ? day != null && day >= value : numberOf(raw) >= Number(value)
+    case 'le': return isInstant ? instantOf(value) <= 0 : isDayValue ? day != null && day <= value : numberOf(raw) <= Number(value)
+    case 'gt': return isInstant ? instantOf(value) > 0 : isDayValue ? day != null && day > value : numberOf(raw) > Number(value)
+    case 'lt': return isInstant ? instantOf(value) < 0 : isDayValue ? day != null && day < value : numberOf(raw) < Number(value)
     case 'in': return !isEmpty(raw) && listed()
     case 'not-in': return !isEmpty(raw) && !listed()
     case 'on': return day === value
@@ -248,9 +344,17 @@ function condition(el: Element, row: Row, now: Date): boolean | null {
   }
 }
 
+/** Filtro da coluna Comprovantes (`link-entity` any/not any em cr40f_anexorecebimento_v2), com a contagem do mock. */
+function comprovantes(el: Element, row: Row): boolean | null {
+  if (el.getAttribute('name') !== 'cr40f_anexorecebimento_v2') return null
+  const tem = mockRecebimentos(String(row[ID_ATTRIBUTE])).length > 0
+  const type = el.getAttribute('link-type')
+  return type === 'any' ? tem : type === 'not any' ? !tem : null
+}
+
 function filter(el: Element, row: Row, now: Date): boolean | null {
   const results = Array.from(el.children).flatMap((child) => {
-    const result = child.tagName === 'condition' ? condition(child, row, now) : child.tagName === 'filter' ? filter(child, row, now) : null
+    const result = child.tagName === 'condition' ? condition(child, row, now) : child.tagName === 'filter' ? filter(child, row, now) : child.tagName === 'link-entity' ? comprovantes(child, row) : null
     return result == null ? [] : [result]
   })
   if (!results.length) return null
@@ -264,18 +368,48 @@ const sortValue = (row: Row, attribute: string): string | number => {
   return typeof value === 'number' || typeof value === 'string' ? value : ''
 }
 
-/** Simula só o que o mock precisa do FetchXML: condições da raiz, busca, `<order>` da raiz e paginação. */
-export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, quickFind, now }: MockFetchOptions): Page {
+function mockEntity(fetchxml: string) {
   const doc = new DOMParser().parseFromString(fetchxml, 'text/xml')
   const entity = Array.from(doc.documentElement.children).find((c) => c.tagName === 'entity')
   if (!entity || doc.getElementsByTagName('parsererror').length) throw new Error('FetchXML da visão inválido.')
-  const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
-  // Mesmas condições que o FetchXML real leva.
-  const search = searchConditions(query, quickFind)
+  return entity
+}
 
-  const filtered = rows.filter((row) =>
+/** Linhas da visão: condições da raiz e busca (as mesmas que o FetchXML real leva). */
+function filterRows(rows: Row[], entity: Element, { query, quickFind, now }: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>) {
+  const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
+  const search = searchConditions(query, quickFind)
+  return rows.filter((row) =>
     roots.every((root) => filter(root, row, now) !== false)
     && (!search.length || search.some(({ attribute, value }) => likeMatches(row, attribute, value))))
+}
+
+/** Simula o FetchXML agregado de `buildGroupsFetch`: uma linha por grupo, com o apelido do valor (ou ano e mês) e `total`. */
+export function applyMockGroups(rows: Row[], fetchxml: string, options: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>): Row[] {
+  const entity = mockEntity(fetchxml)
+  const attribute = Array.from(entity.children).find((c) => c.tagName === 'attribute' && c.getAttribute('groupby') === 'true')?.getAttribute('name') ?? ''
+  const key = keyOf(attribute)
+  const date = Array.from(entity.children).some((c) => c.getAttribute('dategrouping'))
+  const monthly = Array.from(entity.children).some((c) => c.getAttribute('dategrouping') === 'month')
+  const groups = new Map<string, Row>()
+  for (const row of filterRows(rows, entity, options)) {
+    const raw = row[key]
+    const day = date ? dayOf(raw) : null
+    const keyed: Row = date
+      ? day ? { [GROUP_YEAR]: Number(day.slice(0, 4)), ...(monthly ? { [GROUP_MONTH]: Number(day.slice(5, 7)) } : {}) } : {}
+      : isEmpty(raw) ? {} : { [GROUP_VALUE]: raw, [`${GROUP_VALUE}${F}`]: row[`${key}${F}`] }
+    const id = JSON.stringify(keyed)
+    const found = groups.get(id)
+    if (found) found[GROUP_TOTAL] = Number(found[GROUP_TOTAL]) + 1
+    else groups.set(id, { ...keyed, [GROUP_TOTAL]: 1 })
+  }
+  return [...groups.values()]
+}
+
+/** Simula só o que o mock precisa do FetchXML: condições da raiz, busca, `<order>` da raiz e paginação. */
+export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, quickFind, now }: MockFetchOptions): Page {
+  const entity = mockEntity(fetchxml)
+  const filtered = filterRows(rows, entity, { query, quickFind, now })
 
   const order = Array.from(entity.children).find((c) => c.tagName === 'order')
   const orderAttribute = order?.getAttribute('attribute')

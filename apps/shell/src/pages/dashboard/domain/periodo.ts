@@ -44,6 +44,7 @@ export function atalho(kind: Exclude<Atalho, 'personalizado'>, now: Date): Perio
     case 'ult7': return { inicio: fmtDia(y, m, d - 6), fim: hoje }
     case 'ult30': return { inicio: fmtDia(y, m, d - 29), fim: hoje }
     case 'esteMes': return { inicio: fmtDia(y, m, 1), fim: hoje }
+    case 'esteTrimestre': return { inicio: fmtDia(y, m - (m % 3), 1), fim: hoje }
     case 'mesAnt': return { inicio: fmtDia(y, m - 1, 1), fim: fmtDia(y, m, 0) }
     case 'esteAno': return { inicio: `${y}-01-01`, fim: hoje }
     case 'anoAnt': return { inicio: `${y - 1}-01-01`, fim: `${y - 1}-12-31` }
@@ -104,6 +105,14 @@ export function cargaDesde(inicio: string, now: Date) {
 export function mesRotulo(mes: string) {
   const [y, m] = mes.split('-')
   return `${MESES_CURTOS[Number(m) - 1] ?? m}/${y.slice(2)}`
+}
+
+/** Todos os meses (AAAA-MM) de `inicio` a `fim` (AAAA-MM ou AAAA-MM-DD), inclusive os sem registro, para o eixo não pular meses. */
+export function mesesEntre(inicio: string, fim: string) {
+  const indice = (s: string) => { const { y, m } = parseDia(s); return y * 12 + m }
+  const meses: string[] = []
+  for (let i = indice(inicio), f = indice(fim); i <= f; i++) meses.push(`${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`)
+  return meses
 }
 
 /** Os 12 meses (AAAA-MM) de um ano. */

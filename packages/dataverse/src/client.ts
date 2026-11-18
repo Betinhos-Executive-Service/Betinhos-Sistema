@@ -1,6 +1,6 @@
 export type Row = Record<string, unknown>
 
-type RequestOptions = RequestInit & { maxPageSize?: number }
+type RequestOptions = RequestInit & { maxPageSize?: number; allAnnotations?: boolean }
 
 export type DataverseClient = {
   apiUrl: string
@@ -70,8 +70,8 @@ export function createClient(clientUrl: string, fetchImpl: typeof fetch = (...ar
   const apiUrl = `${clientUrl.replace(/\/+$/, '')}/api/data/v9.2`
 
   async function send(path: string, init: RequestOptions = {}) {
-    const { maxPageSize, ...rest } = init
-    const prefer = [`odata.include-annotations="${ANNOTATIONS}"`]
+    const { maxPageSize, allAnnotations, ...rest } = init
+    const prefer = [`odata.include-annotations="${allAnnotations ? '*' : ANNOTATIONS}"`]
     if (maxPageSize) prefer.push(`odata.maxpagesize=${maxPageSize}`)
     const response = await fetchImpl(/^https?:\/\//i.test(path) ? path : `${apiUrl}/${path}`, {
       credentials: 'same-origin',

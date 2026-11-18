@@ -1,31 +1,51 @@
 import { AlertTriangle, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { DeltaBadge } from '@betinhos/ui'
 import type { ChipAnterior } from '../domain/comparar'
 import { dec } from '../domain/format'
 import type { Apoio, Chip } from '../domain/types'
 
 /** Rótulos curtos dos chips, como no legado; o leitor de tela recebe o rótulo inteiro. */
 const CURTO: Record<string, string> = {
-  'Projeção': 'Proj', 'Futuros': 'Futuro', '% do faturamento': '% fat', '% da receita': '% rec', 'Concluídos': 'Conc', 'Meta': 'Meta',
+  'Projeção': 'Proj', 'Futuros': 'Futuro', '% do faturamento': '% fat', '% da receita': '% rec', 'Concluídos': 'Conc',
 }
 /** Apoios que viram chip rotulado; os demais (previsão, recebido) ficam como linha de texto. */
 const virouChip = (rotulo: string) => rotulo in CURTO || /^\dº$/.test(rotulo)
 
-function Rotulo({ texto }: { texto: string }) {
-  const curto = CURTO[texto]
-  if (!curto) return <span className="dash-chip__rotulo">{texto}</span>
-  return <><span className="dash-chip__rotulo" aria-hidden="true">{curto}</span><span className="dash-sr">{texto}</span></>
+/** Rótulo curto na tela e longo no leitor de tela; sem curto, mostra o próprio texto. */
+function Rotulo({ curto, longo }: { curto?: string; longo: string }) {
+  if (!curto) return <span className="dash-chip__rotulo">{longo}</span>
+  return <><span className="dash-chip__rotulo" aria-hidden="true">{curto}</span><span className="dash-sr">{longo}</span></>
 }
 
-/** Comparativo LM/LY: `[LY] R$ 994,1k ↗ +87,9%` — seta, sinal e texto, nunca só cor. */
+/**
+ * Comparativos: o domínio usa os códigos do legado (LM, LY, ANT.); a tela mostra um rótulo curto em português e o nome
+ * completo vai na dica (title) e no leitor de tela.
+ */
+const COMPARATIVO: Record<string, { curto: string; longo: string }> = {
+  LM: { curto: 'Mês ant.', longo: 'Mesmo período do mês anterior' },
+  LY: { curto: 'Ano ant.', longo: 'Mesmo período do ano anterior' },
+  'ANT.': { curto: 'Ant.', longo: 'Período anterior de mesma duração' },
+}
+
+const comparativo = (codigo: string): { curto?: string; longo: string } => COMPARATIVO[codigo] ?? { longo: codigo }
+
+/** Variação do comparativo: seta, sinal e % (a cor vem do chip). */
+function Delta({ variacao }: { variacao: number }) {
+  const sobe = variacao >= 0
+  return <span className="dash-chip__delta">{sobe ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownRight size={12} aria-hidden="true" />}{sobe ? '+' : '−'}{dec(Math.abs(variacao), 1)}%</span>
+}
+
+/** Comparativo mês/ano anterior: `[ANO ANT.] R$ 994,1k ↗ +87,9%` — seta, sinal e texto, nunca só cor. */
 export function KpiChip({ chip }: { chip: Chip }) {
+  const c = comparativo(chip.rotulo)
   if (chip.tipo === 'sem-dado') {
-    return <span className="dash-chip dash-chip--neutro"><Rotulo texto={chip.rotulo} /> <span className="dash-chip__texto">s/dado</span></span>
+    return <span className="dash-chip dash-chip--neutro" title={c.longo}><Rotulo curto={c.curto} longo={c.longo} /> <span className="dash-chip__texto">s/dado</span></span>
   }
   const sobe = chip.variacao >= 0
   return (
-    <span className={sobe ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'}>
-      <Rotulo texto={chip.rotulo} /> <span className="dash-chip__texto">{chip.anterior}</span>{' '}
-      <span className="dash-chip__delta">{sobe ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownRight size={12} aria-hidden="true" />}{sobe ? '+' : '−'}{dec(Math.abs(chip.variacao), 1)}%</span>
+    <span className={sobe ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'} title={c.longo}>
+      <Rotulo curto={c.curto} longo={c.longo} /> <span className="dash-chip__texto">{chip.anterior}</span>{' '}
+      <Delta variacao={chip.variacao} />
     </span>
   )
 }
@@ -34,7 +54,7 @@ export function KpiChip({ chip }: { chip: Chip }) {
 export function ApoioChip({ apoio }: { apoio: Apoio }) {
   return (
     <span className={apoio.atencao ? 'dash-chip dash-chip--atencao' : 'dash-chip'} title={CURTO[apoio.rotulo] ? apoio.rotulo : undefined}>
-      <Rotulo texto={apoio.rotulo} />{' '}
+      <Rotulo curto={CURTO[apoio.rotulo]} longo={apoio.rotulo} />{' '}
       {apoio.atencao ? <><AlertTriangle className="dash-chip__icone" size={12} aria-hidden="true" /><span className="dash-sr">Atenção:</span></> : null}
       <span className="dash-chip__texto">{apoio.texto}</span>
     </span>
@@ -51,10 +71,12 @@ export function ApoioTexto({ apoio }: { apoio: Apoio }) {
   )
 }
 
-/** Comparativos primeiro, depois os apoios: rotulados viram chip, o resto vira linha de texto. */
-export function Chips({ chips = [], apoio = [] }: { chips?: Chip[]; apoio?: Apoio[] }) {
+const ehAnt = (c: Chip | ChipAnterior): c is ChipAnterior => c.rotulo === 'ANT.'
+
+/** Comparativos primeiro (LM/LY ou ANT.), depois os apoios: rotulados viram chip, o resto vira linha de texto. */
+export function Chips({ chips = [], apoio = [] }: { chips?: (Chip | ChipAnterior)[]; apoio?: Apoio[] }) {
   return <>
-    {chips.map((c) => <KpiChip key={c.rotulo} chip={c} />)}
+    {chips.map((c) => (ehAnt(c) ? <ChipAnt key={c.rotulo} chip={c} /> : <KpiChip key={c.rotulo} chip={c} />))}
     {apoio.map((a) => (virouChip(a.rotulo) ? <ApoioChip key={a.rotulo} apoio={a} /> : <ApoioTexto key={a.rotulo} apoio={a} />))}
   </>
 }
@@ -64,15 +86,30 @@ export function Chips({ chips = [], apoio = [] }: { chips?: Chip[]; apoio?: Apoi
  * "favorável/desfavorável" em texto, além da cor.
  */
 export function ChipAnt({ chip }: { chip: ChipAnterior }) {
-  const rotulo = <><span className="dash-chip__rotulo" aria-hidden="true">{chip.rotulo}</span><span className="dash-sr">Período anterior</span></>
-  if (chip.tipo === 'sem-dado') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">s/dado</span></span>
-  if (chip.tipo === 'base-zero') return <span className="dash-chip dash-chip--neutro">{rotulo} <span className="dash-chip__texto">{chip.anterior} · base zero</span></span>
-  const sobe = chip.variacao >= 0
+  const c = comparativo(chip.rotulo)
+  const rotulo = <Rotulo curto={c.curto} longo={c.longo} />
+  if (chip.tipo === 'sem-dado') return <span className="dash-chip dash-chip--neutro" title={c.longo}>{rotulo} <span className="dash-chip__texto">s/dado</span></span>
+  // Anterior zero: mostra o valor, sem variação em % (não existe a partir de zero).
+  if (chip.tipo === 'base-zero') return <span className="dash-chip dash-chip--neutro" title={`${c.longo}: ${chip.anterior}, sem variação em %`}>{rotulo} <span className="dash-chip__texto">{chip.anterior}</span><span className="dash-sr">, sem variação em %</span></span>
   return (
-    <span className={chip.favoravel ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'}>
+    <span className={chip.favoravel ? 'dash-chip dash-chip--sobe' : 'dash-chip dash-chip--desce'} title={c.longo}>
       {rotulo} <span className="dash-chip__texto">{chip.anterior}</span>{' '}
-      <span className="dash-chip__delta">{sobe ? <ArrowUpRight size={12} aria-hidden="true" /> : <ArrowDownRight size={12} aria-hidden="true" />}{sobe ? '+' : '−'}{dec(Math.abs(chip.variacao), 1)}%</span>
+      <Delta variacao={chip.variacao} />
       <span className="dash-sr">{chip.favoravel ? ', favorável' : ', desfavorável'}</span>
     </span>
   )
 }
+
+const FRASE: Record<string, string> = { LY: 'no ano anterior', LM: 'no mês anterior' }
+type ChipValor = Extract<Chip, { tipo: 'valor' }>
+
+/** O comparativo que vira selo no topo do card: o do ano anterior; sem ele, o do mês anterior. Os demais seguem como chip. */
+export function separarComparativo(chips: Chip[]) {
+  const valores = chips.filter((c): c is ChipValor => c.tipo === 'valor')
+  const principal = valores.find((c) => c.rotulo === 'LY') ?? valores[0]
+  return { principal, outros: chips.filter((c) => c !== principal) }
+}
+
+/** Selo de variação do comparativo (seta, sinal e %) e a frase "vs R$ X no ano anterior" da linha de apoio. */
+export const seloComparativo = (c: ChipValor) => <DeltaBadge trend={c.variacao >= 0 ? 'up' : 'down'}>{c.variacao >= 0 ? '+' : '−'}{dec(Math.abs(c.variacao), 1)}%</DeltaBadge>
+export const fraseComparativo = (c: ChipValor) => `vs ${c.anterior} ${FRASE[c.rotulo] ?? 'no período anterior'}`

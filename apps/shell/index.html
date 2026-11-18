@@ -14,6 +14,14 @@
     <link rel="apple-touch-icon" href="/WebResources/cr40f_SistemaBetinhosAppleIcon.png" />
     <link rel="icon" type="image/png" href="/WebResources/cr40f_SistemaBetinhosIcon192.png" />
     <script>
+      // Tema (claro, escuro ou sistema) antes do primeiro quadro, sem piscar; mesma regra de src/app/tema.ts.
+      (function () {
+        var t = 'auto'
+        try { t = { claro: 'light', escuro: 'dark' }[localStorage.getItem('bt-tema')] || 'auto' } catch (e) {}
+        document.documentElement.dataset.theme = t
+      })()
+    </script>
+    <script>
       // No DEV o app instalado leva "DEV" no nome (mesmo id e escopo; só o nome muda).
       if (location.hostname === 'org23b93544.crm2.dynamics.com') {
         fetch('/WebResources/cr40f_SistemaBetinhos.webmanifest', { credentials: 'same-origin' })
@@ -33,9 +41,33 @@
           .catch(function () {})
       }
     </script>
+    <style>
+      /* Splash da marca (mesmo visual do BrandLoader): aparece antes do JS e some no primeiro quadro do app. */
+      #boot-splash { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-content: center; background: #e4e6eb; }
+      #boot-splash .boot-splash__mark { position: relative; width: 92px; height: 92px; }
+      #boot-splash img { position: absolute; inset: 12px; width: 68px; height: 68px; border-radius: 50%; box-shadow: 0 8px 24px rgba(0, 26, 61, 0.22); }
+      #boot-splash .boot-splash__ring { position: absolute; inset: 0; border-radius: 50%;
+        background: conic-gradient(from 0deg, rgba(0, 26, 61, 0) 0 30%, rgba(0, 26, 61, 0.55) 70%, #001a3d 100%), rgba(0, 26, 61, 0.1);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+        animation: boot-splash-spin 0.9s linear infinite; }
+      @keyframes boot-splash-spin { to { transform: rotate(360deg); } }
+      html[data-theme='dark'] #boot-splash { background: #0b1220; }
+      html[data-theme='dark'] #boot-splash img { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+      html[data-theme='dark'] #boot-splash .boot-splash__ring { background: conic-gradient(from 0deg, rgba(230, 235, 243, 0) 0 30%, rgba(230, 235, 243, 0.55) 70%, #e6ebf3 100%), rgba(230, 235, 243, 0.1); }
+      @media (prefers-color-scheme: dark) {
+        html[data-theme='auto'] #boot-splash { background: #0b1220; }
+        html[data-theme='auto'] #boot-splash img { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+        html[data-theme='auto'] #boot-splash .boot-splash__ring { background: conic-gradient(from 0deg, rgba(230, 235, 243, 0) 0 30%, rgba(230, 235, 243, 0.55) 70%, #e6ebf3 100%), rgba(230, 235, 243, 0.1); }
+      }
+      @media (prefers-reduced-motion: reduce) { #boot-splash .boot-splash__ring { animation-duration: 2.4s; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot-splash" role="status" aria-label="Carregando">
+      <div class="boot-splash__mark" aria-hidden="true"><span class="boot-splash__ring"></span><img src="/src/assets/logo-betinhos-b-192.webp" alt="" /></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

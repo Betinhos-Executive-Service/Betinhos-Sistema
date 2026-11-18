@@ -4,6 +4,7 @@ import { ImageOff, ImagePlus, LoaderCircle, Star, Trash2, X } from 'lucide-react
 import type { Source } from '../data/source'
 import { ImagensContext, useImagemFoto } from './ImagemFoto'
 import { ajustesAoExcluir, ajustesCapa, aplicarAjustes, arquivosColados, caminhoDaCapa, editavel, nasceCapa, nomeArquivoFoto, nomeFoto, ordenarFotos, validarFoto, type AjusteCapa, type Foto } from '../domain/fotos'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   /** Item salvo; null = cadastro novo (fotos só depois do primeiro salvamento). */
@@ -228,7 +229,7 @@ export function FotosSecao({ equipamentoId, source, onCapa, onEnviando }: Props)
   if (!equipamentoId) corpo = <p className="eq-fotos__vazio">Salve o item para adicionar fotos.</p>
   else if (erroCarga) {
     corpo = <Alert tone="danger" title="Não foi possível carregar as fotos" action={<Button variant="secondary" size="compact" onClick={() => void carregar(equipamentoId)}>Tentar de novo</Button>}>{erroCarga}</Alert>
-  } else if (fotos == null) corpo = <p className="eq-fotos__vazio" role="status">Carregando fotos…</p>
+  } else if (fotos == null) corpo = <BrandLoader variant="inline" size="sm" label="Carregando fotos" text="Carregando fotos…" />
   else if (!fotos.length) corpo = <p className="eq-fotos__vazio">Nenhuma foto ainda. A primeira vira a capa do item na lista.</p>
   else {
     corpo = (
@@ -324,7 +325,7 @@ function FotoViewer({ foto, onClose }: { foto: Foto | null; onClose: () => void 
           <div className="eq-viewer__corpo">
             {src && !quebrada ? <img src={src} alt={foto.nome} onError={() => setQuebrada(true)} />
               : falhou ? <ImageOff size={32} aria-hidden="true" />
-              : <p className="eq-muted" role="status">Carregando foto…</p>}
+              : <BrandLoader variant="inline" size="md" label="Carregando foto" text="Carregando foto…" />}
           </div>
           {falhou ? <p className="eq-muted">A foto não carregou do SharePoint.</p> : null}
         </div>

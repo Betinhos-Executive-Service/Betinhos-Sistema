@@ -1,0 +1,10 @@
+/* Leitura das tabelas no padrão da grade antiga do model-driven (pedido dos usuários, 13/11/2026): texto escuro e um
+   ponto maior, cabeçalho escuro em caixa normal. Vale para o `Table` do DS (listas e Geral); a grade da Composição e a
+   lista de Funcionários têm as mesmas regras nos próprios CSS. Fundo do cabeçalho, alturas e linhas ficam como estão.
+   (Regra a levar para o @betinhos/ui; aqui até o pacote publicar.) */
+.bt-table .bt-table__row { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); }
+.bt-table .bt-table__head { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); letter-spacing: 0; text-transform: none; }
+.bt-table .bt-table__title > span { font-size: var(--bt-font-size-12); }
+.bt-table .bt-table__footer { color: var(--bt-color-text-primary); font-size: var(--bt-font-size-13); }
+/* Etiquetas dentro da tabela: retângulo de canto curto e texto um ponto maior, como as cores de opção do model-driven. */
+.bt-table .bt-badge { border-radius: var(--bt-radius-xs); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }

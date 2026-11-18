@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoFrota, obrigatoriosFrota } from './index.ts'
+import { ACOES_POR_AGENTE, RESPOSTA_SCHEMA, SYSTEM_FROTA, TIPOS_POR_AGENTE, TODOS_OS_TIPOS, analisarMensagem, montarContextoFrota, obrigatoriosFrota } from './index.ts'
 
 const msg = (corpo: unknown, stop = 'end_turn') => ({ stop_reason: stop, model: 'claude-opus-5-5', content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(corpo) }] })
 const proposta = { tipo: 'OSSemCobranca', titulo: 'OS 1234 sem cobrança', justificativa: 'Concluída há 12 dias.', prioridade: 'alta', registroAlvo: { entidade: 'cr40f_reservadeveculos', id: '11111111-1111-1111-1111-111111111111' }, acao: { tipo: 'CriarPendencia', campos: { titulo: 'Emitir recibo da OS 1234' } } }
@@ -161,7 +161,7 @@ describe('Agente Frota', () => {
   const v = '11111111-1111-1111-1111-111111111111'
   const m = '22222222-2222-2222-2222-222222222222'
   const ctx = montarContextoFrota(JSON.stringify({ hoje: '2026-10-21', total: 3, pendencias: [
-    { tipo: 'prioridade', id: m, veiculoId: v, placa: 'ABC1A11', titulo: 'Freio', detalhe: 'Aguardando aprovação há 3 dias', manutencaoId: m },
+    { tipo: 'prioridade', id: m, veiculoId: v, placa: 'ABC1A11', titulo: 'Freio', detalhe: 'Aguardando encaixe há 3 dias', manutencaoId: m },
     { tipo: 'reincidencia', id: `reinc:${v}:100000007`, veiculoId: v, placa: 'ABC1A11', titulo: '3ª vez: Pastilhas de freio', detalhe: '3 vezes em 120 dias', manutencaoId: null },
     { tipo: 'hodometro', id: `hod:${v}`, veiculoId: v, placa: 'ABC1A11', titulo: 'Hodômetro parado', detalhe: 'há 3 dias', manutencaoId: null },
   ] }))
@@ -177,9 +177,15 @@ describe('Agente Frota', () => {
     expect(analisarMensagem(msg(completa), 'frota', obrigatoriosFrota(ctx)).ok).toBe(true)
   })
   it('ordem do choice cr40f_tipo: frota depois de pessoas e TreinamentoPendente no fim (valores já gravados não mudam)', () => {
-    expect(TODOS_OS_TIPOS.slice(-7)).toEqual(['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAgendadaVencida', 'FrotaCustoAlto', 'FrotaHodometro', 'TreinamentoPendente'])
+    expect(TODOS_OS_TIPOS.slice(-7)).toEqual(['FrotaPrioridade', 'FrotaReincidencia', 'FrotaPreventiva', 'FrotaAtrasada', 'FrotaCustoAlto', 'FrotaHodometro', 'TreinamentoPendente'])
+    expect(TODOS_OS_TIPOS.indexOf('FrotaAtrasada')).toBe(18)
     expect(TODOS_OS_TIPOS.indexOf('FrotaPrioridade')).toBe(15)
     expect(TODOS_OS_TIPOS.indexOf('TreinamentoPendente')).toBe(21)
     expect(new Set(TODOS_OS_TIPOS).size).toBe(TODOS_OS_TIPOS.length)
+  })
+  it('prompt da frota fala de "atrasada" e da proposta FrotaAtrasada, sem "agendada"', () => {
+    expect(SYSTEM_FROTA).toContain('atrasada (janela do encaixe vencida sem realizar)')
+    expect(SYSTEM_FROTA).toContain('- FrotaAtrasada: uma para cada pendência "atrasada".')
+    expect(SYSTEM_FROTA).not.toMatch(/agendada/i)
   })
 })

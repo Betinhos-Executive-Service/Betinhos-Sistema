@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Button, Checkbox } from '@betinhos/ui'
 import { FileText } from 'lucide-react'
 import { baixarComprovantes, textoErroPdf } from '../../comunicados/data/baixarComprovantes'
@@ -16,7 +16,10 @@ export function ComunicadosTab({ source, id, nome }: { source: ComunicadosSource
   const pares = useMemo(() => (data ? paresDoMotorista(nome, data[0], data[1], new Set()) : []), [data, nome])
   const [desmarcados, setDesmarcados] = useState<ReadonlySet<string>>(new Set())
   const [gerando, setGerando] = useState(false)
-  useEffect(() => setDesmarcados(new Set()), [data])
+  // Carga nova volta a marcar todos. O ajuste é no render, não num efeito: o efeito roda depois da lista aparecer
+  // e desfazia uma marcação feita nesse intervalo (teste "aba Comunicados" da Ficha falhava de vez em quando no CI).
+  const [dadosVistos, setDadosVistos] = useState(data)
+  if (dadosVistos !== data) { setDadosVistos(data); setDesmarcados(new Set()) }
 
   const escolhidos = pares.filter((par) => !desmarcados.has(par.destinatario.id))
   const alternar = (destId: string) => setDesmarcados((atual) => { const novo = new Set(atual); if (!novo.delete(destId)) novo.add(destId); return novo })

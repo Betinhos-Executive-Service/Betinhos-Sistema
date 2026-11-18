@@ -45,21 +45,91 @@ describe('Geral: redimensionar e reordenar colunas', () => {
     const before = px(track(/Trajeto/))
     const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    // Mede a borda só ao apertar: medir a cada movimento forçaria um reflow por evento.
+    const headMeasures = () => (HTMLElement.prototype.getBoundingClientRect as unknown as { mock: { contexts: HTMLElement[] } }).mock.contexts.filter((el) => el.getAttribute('role') === 'columnheader').length
+    const measured = headMeasures()
+    fireEvent.pointerMove(handle, { clientX: 130, pointerId: 1, buttons: 1 })
     fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
     await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(headMeasures()).toBe(measured)
     fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
     expect(px(track(/Trajeto/))).toBe(before + 60)
     expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain(`${before + 60}`)
   })
 
+  it('a largura fica ao soltar mesmo se a tabela renderizar no meio do arraste', async () => {
+    const host = { mode: 'mock' as const }
+    const { rerender } = render(<GeralPage host={host} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = px(track(/Trajeto/))
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 160, pointerId: 1, buttons: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(before + 60))
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(true)
+    // Render no meio do arraste (no DEV vem do virtualizador, da carga etc.): o React passa a conhecer a largura do arraste.
+    rerender(<GeralPage host={host} />)
+    fireEvent.pointerUp(handle, { clientX: 160, pointerId: 1 })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(px(track(/Trajeto/))).toBe(before + 60)
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(false)
+  })
+
+  it('Esc no meio do arraste volta à largura de antes e não grava', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const before = track(/Trajeto/)
+    const handle = screen.getByRole('separator', { name: 'Redimensionar coluna Trajeto', hidden: true })
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(handle, { clientX: 180, pointerId: 1, buttons: 1 })
+    await waitFor(() => expect(px(track(/Trajeto/))).toBe(px(before) + 80))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(track(/Trajeto/)).toBe(before)
+    fireEvent.pointerMove(handle, { clientX: 220, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(handle, { clientX: 220, pointerId: 1 })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(track(/Trajeto/)).toBe(before)
+    expect(window.localStorage.getItem('betinhos.geral.colunas.v1') ?? '').not.toContain(`${px(before) + 80}`)
+    expect(document.documentElement.classList.contains('gr-resizing')).toBe(false)
+  })
+
   it('Alt+seta no cabeçalho move a coluna e avisa a nova posição', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
-    const names = () => screen.getAllByRole('columnheader', { hidden: true }).slice(1).map((h) => h.getAttribute('title'))
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
     const [first, second, third] = names()
     fireEvent.keyDown(screen.getByRole('button', { name: new RegExp(`^${second}$`), hidden: true }), { key: 'ArrowRight', altKey: true })
     await waitFor(() => expect(names().slice(0, 3)).toEqual([first, third, second]))
     expect(screen.getByText(`Coluna ${second} movida para a posição 3`)).toBeTruthy()
+  })
+
+  it('Comprovantes é coluna normal: vem depois da primeira, mostra a contagem, filtra, move e não ordena', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
+    const [first] = names()
+    expect(names()[1]).toBe('Comprovantes')
+    expect(await screen.findAllByRole('button', { name: /comprovantes? de recebimento/, hidden: true })).not.toHaveLength(0)
+    const header = screen.getAllByRole('columnheader', { hidden: true }).find((h) => h.getAttribute('title') === 'Comprovantes')!
+    fireEvent.click(within(header).getByRole('button', { name: /^Comprovantes/, hidden: true }))
+    expect(await screen.findByRole('menuitem', { name: 'Filtrar por…', hidden: true })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /Classificar|Ordenar|Crescente|A → Z/, hidden: true })).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    // Levada para o início, a primeira coluna (botão que abre o serviço) continua primeira.
+    fireEvent.keyDown(within(header).getByRole('button', { name: /^Comprovantes/, hidden: true }), { key: 'ArrowLeft', altKey: true })
+    await waitFor(() => expect(window.localStorage.getItem('betinhos.geral.colunas.v1')).toContain('comprovantes'))
+    expect(names().slice(0, 2)).toEqual([first, 'Comprovantes'])
+  })
+
+  it('a primeira coluna anda para a direita mesmo com Comprovantes logo depois dela', async () => {
+    render(<GeralPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })
+    const names = () => screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable).map((h) => h.getAttribute('title'))
+    const [first, , second] = names()
+    const header = screen.getAllByRole('columnheader', { hidden: true }).find((h) => h.getAttribute('title') === first)!
+    fireEvent.keyDown(within(header).getByRole('button', { name: new RegExp(`^${first}`), hidden: true }), { key: 'ArrowRight', altKey: true })
+    await waitFor(() => expect(names()[0]).toBe(second))
+    expect(names().slice(0, 3)).toEqual([second, 'Comprovantes', first])
   })
 
   const LS = 'betinhos.geral.colunas.v1'
@@ -109,7 +179,7 @@ describe('Geral: redimensionar e reordenar colunas', () => {
 
   it('coluna Sim/Não não tem alça e as demais têm', async () => {
     await open()
-    const headers = screen.getAllByRole('columnheader', { hidden: true }).slice(1)
+    const headers = screen.getAllByRole('columnheader', { hidden: true }).filter((h) => h.draggable)
     const without = headers.filter((h) => h.querySelector('.gr-resize') === null)
     expect(without.map((h) => h.getAttribute('title'))).toEqual(BOOLEAN_LABELS)
   })
@@ -158,23 +228,23 @@ describe('Geral: visões pessoais e link compartilhável', () => {
 
   async function saveAs(name: string) {
     openMenu()
-    await choose('Salvar como…')
-    const dialog = await screen.findByRole('dialog', { name: 'Salvar como visão' })
+    await choose('Nova visão…')
+    const dialog = await screen.findByRole('dialog', { name: 'Nova visão' })
     fireEvent.change(within(dialog).getByLabelText(/Nome da visão/), { target: { value: name } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar visão' }))
     await waitFor(() => expect(viewName()).toContain(name))
   }
 
-  it('visão do sistema só oferece salvar como; as visões aparecem agrupadas', async () => {
+  it('visão do sistema só oferece nova visão; as visões aparecem agrupadas', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…'])
+    expect(await actions()).toEqual(['Nova visão…'])
     expect(screen.getByRole('menuitemradio', { name: /Agenda/, hidden: true }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'Sem motorista', hidden: true })).toBeTruthy()
   }, 60_000)
 
-  it('salvar como cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
+  it('nova visão cria a visão pessoal com o filtro dentro; renomear e excluir', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     // Filtro avulso: Status = Confirmado.
@@ -182,18 +252,19 @@ describe('Geral: visões pessoais e link compartilhável', () => {
     fireEvent.click(within(panel).getByRole('combobox', { name: 'Valores de Status de Operação', hidden: true }))
     fireEvent.click(await screen.findByRole('option', { name: 'Confirmado', hidden: true }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Aplicar', hidden: true }))
-    await screen.findByText('Status de Operação: Confirmado')
+    await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     await saveAs('Confirmados')
     expect(await screen.findByText('Visão salva. Ela fica só para você.')).toBeTruthy()
-    await waitFor(() => expect(screen.queryByText('Status de Operação: Confirmado')).toBeNull())
     await waitFor(() => expect(window.location.hash).toContain('view=mock-minha-1'))
+    // Reaberta, a visão devolve o filtro dela ao painel (editável), sem `f=` na URL.
+    expect(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Filtros/ }).textContent).toContain('1')
     expect(window.location.hash).not.toContain('f=')
     // O filtro foi para dentro da visão: a lista continua filtrada.
     await waitFor(() => expect(screen.queryAllByText(PAGE1)).toHaveLength(0))
 
     openMenu()
-    expect(await actions()).toEqual(['Salvar como…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
+    expect(await actions()).toEqual(['Nova visão…', 'Renomear…', 'Restaurar padrão', 'Excluir visão…'])
     await choose('Renomear…')
     const rename = await screen.findByRole('dialog', { name: 'Renomear visão' })
     fireEvent.change(within(rename).getByLabelText(/Nome da visão/), { target: { value: 'Só confirmados' } })

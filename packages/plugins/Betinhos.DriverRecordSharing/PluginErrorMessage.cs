@@ -9,6 +9,46 @@ namespace Betinhos.DriverRecordSharing
     {
         private const int MaxUserMessageLength = 420;
 
+        // 0x80048105 "More than one concurrent Share requests detected": dois Updates em paralelo
+        // compartilhando o mesmo registro. A transação já foi abortada, então não dá para repetir aqui.
+        private const int ConcurrentShareErrorCode = unchecked((int)0x80048105);
+
+        // Erro de plugin pronto para lançar. Compartilhamento concorrente volta como 503, que o
+        // conector do Dataverse no Power Automate repete sozinho; o resto segue como 400.
+        public static InvalidPluginExecutionException ToPluginException(Exception exception, Guid correlationId)
+        {
+            if (IsConcurrentShare(exception))
+            {
+                return new InvalidPluginExecutionException(
+                    string.Format(
+                        "[SHARE_CONCURRENT] Outra gravação está liberando o mesmo cadastro agora; tente de novo. Ref: {0:N}",
+                        correlationId),
+                    PluginHttpStatusCode.ServiceUnavailable);
+            }
+
+            return new InvalidPluginExecutionException(ForUser(exception, correlationId), exception);
+        }
+
+        // Procura o código nas exceções e faults internos; a mensagem cobre o 503 de uma execução
+        // aninhada do próprio plugin, que chega aqui com o código genérico de plugin.
+        internal static bool IsConcurrentShare(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                var fault = (current as System.ServiceModel.FaultException<OrganizationServiceFault>)?.Detail;
+                for (; fault != null; fault = fault.InnerFault)
+                {
+                    if (fault.ErrorCode == ConcurrentShareErrorCode) return true;
+                }
+            }
+
+            var messages = new List<string>();
+            Collect(exception, messages, 0);
+            return messages.Exists(m =>
+                m.IndexOf("[SHARE_CONCURRENT]", StringComparison.Ordinal) >= 0 ||
+                m.IndexOf("concurrent Share requests", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
         public static string ForUser(Exception exception, Guid correlationId)
         {
             var messages = new List<string>();

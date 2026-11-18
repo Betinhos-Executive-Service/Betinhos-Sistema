@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { FormField, MoneyInputField, SelectField, TextAreaField, TextInputField } from "../../shared/ui/FormFields";
@@ -40,6 +41,7 @@ const UPLOAD_ACTION_LABEL = { continue: "Enviar agora", retry: "Tentar de novo",
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 import { QUICK_READ_MAX_TENTATIVAS, isQuickReadFieldHighlighted, type QuickReadFilledFields, type QuickReadState } from "./receiptQuickRead";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type ExpenseScreenProps = {
   uploads?: ExpenseUploadListItem[];
@@ -64,6 +66,7 @@ type ExpenseScreenProps = {
   quickReadFilled?: QuickReadFilledFields;
   /** Completar gasto do cartão: data, valor, forma de pagamento e estabelecimento ficam travados (vêm do banco). */
   cartaoGasto?: boolean;
+  /** Atalho para o mapa de postos da rede CTF; sem ele o botão não aparece. */
 };
 
 /** A folha de conferência do cartão leva o foco para este campo. */
@@ -228,7 +231,7 @@ export function ExpenseScreen({
               </section>
             ) : null}
             <fieldset disabled={isSubmitting} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} className="finalize-form maintenance maintenance-request-form expense-form">
-              {referenceLoading ? <div className="form-error-summary">Carregando regras de despesa.</div> : null}
+              {referenceLoading ? <BrandLoader variant="inline" size="sm" label="Carregando regras de despesa" text="Carregando regras de despesa" /> : null}
               {!referenceLoading && referenceError ? <div className="form-error-summary">{referenceError}</div> : null}
               {!referenceLoading && !referenceError && (!categoriesReady || !paymentReady || !citiesReady) ? (
                 <div className="form-error-summary">Categorias, formas de pagamento ou cidades não encontradas no Dataverse.</div>
@@ -430,7 +433,7 @@ export function ExpenseScreen({
                             <span className="media-video-badge">{photo.durationLabel || "Vídeo"}</span>
                           </>
                         ) : (
-                          <img src={photo.dataUrl} alt={`Comprovante ${index + 1}`} />
+                          <ImagemOuPdf src={photo.dataUrl} alt={`Comprovante ${index + 1}`} />
                         )}
                       </button>
                     ))}

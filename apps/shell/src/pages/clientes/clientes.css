@@ -1,13 +1,14 @@
 /* Clientes: lista, ficha e formulário. Só tokens do Design System. */
 .cl-num { font-variant-numeric: tabular-nums; }
 .cl-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cl-search { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
 
 .cl-open { display: grid; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
 .cl-open strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
 .cl-open:focus-visible, .cl-card__open:focus-visible, .cl-link:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 
 /* Linha e cartão inteiros abrem a ficha (clique delegado ao botão do nome). */
+.cl-table .bt-table__cell { white-space: nowrap; }
+.cl-table .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; text-overflow: ellipsis; }
 .cl-table .bt-table__row:not(.bt-table__row--loading), .cl-card { cursor: pointer; }
 @media (hover: hover) and (pointer: fine) {
   .cl-table .bt-table__row:not(.bt-table__row--loading):hover, .cl-card:hover { background-color: var(--bt-color-surface-soft); }
@@ -35,5 +36,4 @@
 
 @media (max-width: 560px) {
   .cl-ficha__grid { grid-template-columns: minmax(0, 1fr); }
-  .cl-search { flex: 1 1 100%; max-width: none; }
 }

@@ -7,7 +7,8 @@ import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { bind, getBooleanValue, getClientUrl } from "../../data/dataverse/registros.ts";
 import { FLOW_URLS, describeFlowUrl, getCurrentClientUrlKey, resolveFlowUrl, runHttpFlow } from "../../data/dataverse/flow.ts";
 import { type LookupNavigationRequest, assertEntityHasAttributes, resolveLookupNavigationName } from "../../data/dataverse/metadados.ts";
-import { assertValidBase64Payload, dataUrlToBase64, getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { assertValidBase64Payload, dataUrlToBase64, getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 
 let expenseReferenceDataCache: ExpenseReferenceData | null = null;
 let expenseReferenceDataPromise: Promise<ExpenseReferenceData> | null = null;
@@ -292,12 +293,12 @@ export async function uploadExpenseInvoiceRemote({
   const path = `Despesas/${devPrefix}${sanitizePathSegment(expenseName, "Sem nome")}`;
   const lookupNavigationNames = await loadExpenseAttachmentLookupNavigationNamesRemote();
   onProgress?.(`Enviando comprovante ${order}.`);
-  const link = await uploadMaintenancePhoto(path, dataUrl, baseName, {
+  const link = await uploadMediaWithProof(path, dataUrl, baseName, {
     despesaGuid: expenseId,
     despesaNome: expenseName,
     tipo: "COMPROVANTE",
     indice: order
-  });
+  }, { tabela: "cr40f_despesaoperacional", registroId: expenseId });
 
   onProgress?.(`Vinculando comprovante ${order} à despesa.`);
   const record: Record<string, unknown> = {

@@ -9,6 +9,7 @@ import { resetDadosLocais } from "./app/resetDadosLocais";
 import { useEstadoInicial } from "./app/useEstadoInicial";
 import { useCarregarRascunhoMidia } from "./app/useCarregarRascunhoMidia";
 import { useAvisosGlobais } from "./app/useAvisosGlobais";
+import { useReenvioProvas } from "./features/fotos/useReenvioProvas";
 import { useNavegacao } from "./app/useNavegacao";
 import { useDadosFormularios } from "./app/useDadosFormularios";
 import { useAutoRefreshAgenda } from "./features/servicos/useAutoRefreshAgenda";
@@ -29,11 +30,14 @@ import { rotasRecebimento } from "./features/recebimento/rotas";
 import { rotasManutencao } from "./features/manutencao/rotas";
 import { rotasColisao } from "./features/colisao/rotas";
 import { rotasDespesas } from "./features/despesas/rotas";
+import { rotasPostos } from "./features/postos/rotas";
 import { expenseFlowView } from "./features/despesas/receiptQuickRead";
 import { useServiceDeepLink } from "./features/servicos/useServiceDeepLink";
 import { useAgendaLoad } from "./features/servicos/useAgendaLoad";
 import { useFilaServicos } from "./features/servicos/useFilaServicos";
 import { useFinalizeFlow } from "./features/finalizar/useFinalizeFlow";
+import { useEnvioPendente } from "./features/envio-pendente/useEnvioPendente";
+import { EnvioPendenteIndicador } from "./features/envio-pendente/EnvioPendenteIndicador";
 import { useMaintenanceFinalizePhoto } from "./features/finalizar/useMaintenanceFinalizePhoto";
 import { useReceiveFlow } from "./features/recebimento/useReceiveFlow";
 import { useQrChargeSummary } from "./features/recebimento/useQrChargeSummary";
@@ -77,12 +81,14 @@ function App() {
   );
   const { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store } = useEstadoInicial(hashRoutingActive);
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  // Tela de onde os postos foram abertos (início ou registrar gasto): o Voltar devolve para lá.
+  const [postosOrigem, setPostosOrigem] = useState<Screen>("inicio");
   const previousScreenRef = useRef<Screen>(initialScreen);
   const lastMediaScreenRef = useRef<Screen>(initialScreen);
   const [selectedDetail, setSelectedDetail] = useState<DetailData | null>(() => initialDetailRef.current);
   const fotoManutencao = useMaintenanceFinalizePhoto({ setScreen });
   const avisos = useAvisos({ screen, selectedDetail });
-  const { logAppError, setCriticalError, setDataLoadingState, setToast } = avisos;
+  const { logAppError, setCriticalError, setToast } = avisos;
   const [completingDetailKey, setCompletingDetailKey] = useState("");
   const fila = useFilaServicos({ selectedDetail, setScreen, setToast, store });
   const { blockIfNotFirstPending } = fila;
@@ -194,6 +200,18 @@ function App() {
     store
   });
   const { finalizeSelected, getServiceObservationDraft, openFinalizeFlow, openLocalCancelFlow, openVoucherFlow, saveSelectedServiceObservation, saveVoucherDraft, voucherDrafts } = finalizar;
+  const envioPendente = useEnvioPendente({
+    ativo: remoteMode || isLocalhostRuntime,
+    askVehicleChoice: finalizar.askVehicleChoice,
+    dados,
+    remoteMode,
+    setReceiveProofs: recebimento.setReceiveProofs,
+    setReceiveUploadedCounts: recebimento.setReceiveUploadedCounts,
+    setStore,
+    setToast,
+    setVoucherDrafts: finalizar.setVoucherDrafts,
+    aoConcluirChecklist: () => checklistsLista.reloadChecklists()
+  });
   const lastGlobalErrorRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
   usePersistenciaRascunhos({
@@ -213,9 +231,9 @@ function App() {
   const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
   const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
   const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
-  const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast, setDataLoadingState });
+  const checklistsLista = useChecklists({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setToast });
   const { checklists, setChecklistOrigin, setSelectedChecklistId } = checklistsLista;
-  const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen, setDataLoadingState });
+  const comunicadosLista = useComunicados({ dados, driverIdRef: comunicadosDriverIdRef, previewMode: isButtonPreviewMode || isReceiptPreviewMode, setScreen });
   const { comunicados, setComunicadoOrigin } = comunicadosLista;
 
   useServiceDeepLink({
@@ -225,7 +243,6 @@ function App() {
     isReceiptPreviewMode,
     pendingServiceDeepLinkRef,
     serviceDeepLinkHandledRef,
-    setDataLoadingState,
     setScreen,
     setSelectedDetail,
     setToast
@@ -233,8 +250,7 @@ function App() {
 
   useComunicadoDeepLink({ comunicadosLista, setScreen, setToast });
 
-  const { refreshLocal } = useAgendaLoad({
-    completeDataLoadingState: avisos.completeDataLoadingState,
+  const { agendaCarregando, agendaOfflineEm, refreshLocal } = useAgendaLoad({
     comunicadosDriverIdRef,
     dados,
     initialHashRouteRef,
@@ -247,7 +263,6 @@ function App() {
     screen,
     selectedChecklistId: checklistsLista.selectedChecklistId,
     serviceDeepLinkHandledRef,
-    setDataLoadingState,
     setDriverContext,
     setRemoteMode,
     setScreen,
@@ -256,12 +271,13 @@ function App() {
     setToast,
     store
   });
+  useReenvioProvas();
   useAvisosGlobais({
     completingClearTimerRef,
     finalizeTimerRef: finalizar.finalizeTimerRef,
     lastGlobalErrorRef,
     setCriticalError,
-    setCriticalErrorState: avisos.setCriticalErrorState,
+    setSessionExpired: avisos.setSessionExpired,
     setToastState: avisos.setToastState,
     toast: avisos.toast,
     voucherDraftTimerRef: finalizar.voucherDraftTimerRef
@@ -285,7 +301,8 @@ function App() {
   const tour = useTour({
     blocked: Boolean(finalizar.vehicleChoiceRequest || remoteOperation || despesas.expenseSend),
     criticalError: avisos.criticalError,
-    dataLoading: avisos.dataLoading,
+    // Agenda carregando conta como carga: o tour espera a lista aparecer.
+    dataLoading: Boolean(avisos.dataLoading) || agendaCarregando,
     driverContextId: driverContext?.id,
     expenseReading: screen === "gastos" && expenseFlowView(despesas.expenseQuickRead) === "leitura",
     screen,
@@ -304,7 +321,6 @@ function App() {
     remoteMode,
     screen,
     selectedDetail,
-    setDataLoadingState,
     setDriverContext,
     setExpenseReferenceData: despesas.setExpenseReferenceData,
     setExpenseReferenceError: despesas.setExpenseReferenceError,
@@ -326,8 +342,10 @@ function App() {
       closeTour={tour.closeTour}
       closeVehicleChoice={finalizar.closeVehicleChoice}
       criticalError={avisos.criticalError}
+      sessionExpired={avisos.sessionExpired}
       dataLoading={avisos.dataLoading}
       duvidaConferencia={despesas.duvidaConferencia}
+      envioPendente={<EnvioPendenteIndicador {...envioPendente} agendaOfflineEm={agendaOfflineEm} despesasPendentes={despesas.expenseUploadStatuses.filter(e => e.status.state === "interrupted").length} />}
       expenseSend={despesas.expenseSend}
       previousScreen={previousScreenRef.current}
       remoteMode={remoteMode}
@@ -407,6 +425,12 @@ function App() {
       setScreen("gastosCartao");
       return;
     }
+    if (screenName === "postosProximos") {
+      setComunicadoOrigin("");
+      setPostosOrigem("inicio");
+      setScreen("postosProximos");
+      return;
+    }
     if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
       setComunicadoOrigin("");
       setScreen(screenName);
@@ -445,8 +469,12 @@ function App() {
   const telaColisao = rotasColisao(screen, { ...colisao, ...veiculos, driverContext, remoteOperation, setScreen, setToast });
   if (telaColisao) return show(telaColisao);
 
-  const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, remoteMode, remoteOperation, setScreen, setToast });
+  const abrirPostosDoGasto = (origem: Screen) => { setPostosOrigem(origem); setScreen("postosProximos"); };
+  const telaDespesas = rotasDespesas(screen, { ...despesas, ...cartao, ...veiculos, abrirPostosProximos: abrirPostosDoGasto, remoteMode, remoteOperation, setScreen, setToast });
   if (telaDespesas) return show(telaDespesas);
+
+  const telaPostos = rotasPostos(screen, { origem: postosOrigem, setScreen, motoristaId: driverContext?.id ?? "" });
+  if (telaPostos) return show(telaPostos);
 
   const telaIdeias = rotasIdeias(screen, { ideasGateway, remoteMode, setScreen });
   if (telaIdeias) return show(telaIdeias);
@@ -517,6 +545,7 @@ function App() {
   if (telaDetalhe) return show(telaDetalhe);
 
   const telaHistorico = rotasHistorico(screen, {
+    agendaCarregando,
     refreshLocal,
     selectedDetail,
     setScreen,
@@ -526,6 +555,7 @@ function App() {
   if (telaHistorico) return show(telaHistorico);
 
   const telaServicos = rotasServicos(screen, {
+    agendaCarregando,
     checklists,
     completingDetailKey,
     comunicados,

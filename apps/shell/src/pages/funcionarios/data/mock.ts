@@ -37,7 +37,7 @@ function person(id: string, nome: string, apelido: string, extra: Partial<Funcio
     values: {
       cr40f_nomecompleto: nome, new_apelido: apelido, cr40f_status: 0, cr40f_funcao: 202410000, cr40f_nomedaempresa: 202410000, cr40f_tipodevinculo: 0,
       cr40f_telefonecorporativo: '+55 12 99000-0000', cr40f_datadeadmissao: '2022-03-01', cr40f_validadedacnh: offset(400), cr40f_datadoaso: addMonths(offset(200), -12),
-      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, new_notificacoesfrota: false, cr40f_gerarrecibopersonalizado: false,
+      new_notificacoesmotoristas: true, new_notificacoesoperacionais: false, new_notificacoesfinanceiras: false, new_notificacoesfrota: false, cr40f_recebeemailmultas: false, cr40f_gerarrecibopersonalizado: false,
       ...extra,
     },
     veiculo,
@@ -57,6 +57,8 @@ const ROWS0: Funcionario[] = [
   person('m7', 'Helena Simulada Costa', 'Helena', { cr40f_funcao: 202410001, cr40f_nomedaempresa: 202410001, cr40f_tipodevinculo: 1 }),
   person('m8', 'Igor Fake Moreira', 'Igor', { cr40f_datadoaso: addMonths(offset(20), -12) }, veiculos[2]),
   // Acesso ao app encerrado (systemuser desabilitado), mas segue ativo no cadastro: exercita "Reativar acesso".
+  // ID no formato GUID: o lookup de motorista do mock da Geral abre a ficha dele por cima da lista.
+  person('f1f1f1f1-0000-4000-8000-000000000001', 'Carlos Lima', 'Lima', { cr40f_validadedacnh: offset(300) }),
   person('m9', 'Joana Encerrada Teste', 'Joana', { cr40f_emailmicrosoft: 'joana.teste@betinhos.onmicrosoft.com', cr40f_telefonecorporativo: '+5512991234567' }),
 ]
 /** systemuser por e-mail no mock: Carlos ativo, Joana desabilitada (acesso encerrado). */
@@ -156,7 +158,7 @@ export function createMockSource(): DataSource {
       rows = rows.map((row) => (row.id === id ? { ...row, loginsesenhas: html } : row))
       await delay(null)
     },
-    multas: (id) => delay(id === 'm1' ? [{ id: 'x1', titulo: 'Excesso de velocidade', status: 'Indicada', dataHora: new Date().toISOString(), placa: 'ABC1D23', local: 'Rod. Dutra km 150' }] : []),
+    multas: (id) => delay(id === 'm1' ? [{ id: 'x1', titulo: 'Excesso de velocidade', status: 202410001, dataHora: new Date().toISOString(), placa: 'ABC1D23', local: 'Rod. Dutra km 150' }] : []),
     posses: (id) => delay(id === 'm1' ? [{ id: 'p1', veiculo: 'ABC1D23', inicio: '2026-01-10T09:00:00Z', fim: null }, { id: 'p2', veiculo: 'EFG4H56', inicio: '2025-05-01T09:00:00Z', fim: '2026-01-10T08:00:00Z' }] : []),
     // Mesmos itens de #/equipamentos (m1 tem a maquininha; m6, desligado, o celular de plantão); baixado fica de fora.
     equipamentos: (id) => delay(createMockEquipamentos()

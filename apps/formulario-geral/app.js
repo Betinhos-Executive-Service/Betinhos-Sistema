@@ -41,6 +41,7 @@
         obsOperacao: "cr40f_obsdeoperao",
         obsInterna: "cr40f_observaointerna",
         obsFinal: "new_observacaofinal",
+        obsFaturamento: "new_observacaodefaturamento",
         perfilPassageiro: "cr40f_perfildopassageiro",
         email: "cr40f_email",
         paxView: "cr40f_passageirosetelefonedecontato",
@@ -527,8 +528,8 @@
     scheduleDrafts: [],
     enderecoRascunho: [],
     enderecoPersonalizadoAtivo: false,
-    obs: { motorista: "", interna: "", final: "", passageiro: "" },
-    obsRet: { motorista: "", interna: "", final: "", passageiro: "" },
+    obs: emptyObs(),
+    obsRet: emptyObs(),
     options: {
       statusOperacao: FALLBACK.statusOperacao,
       statusFaturamento: FALLBACK.statusFaturamento,
@@ -1323,6 +1324,9 @@
     });
     el.retPrevDateTime?.addEventListener("change", () => {
       syncLegacyTimePartsFromDateTime(el.retPrevDateTime, el.retPrevHora, el.retPrevMinuto);
+    });
+    document.querySelectorAll("[data-obs], [data-ret-obs]").forEach((button) => {
+      button.prepend(obsIcon(button.dataset.obs || button.dataset.retObs));
     });
     document.querySelectorAll("[data-obs]").forEach((button) => {
       button?.addEventListener("click", () => switchObs(button.dataset.obs, false));
@@ -3382,6 +3386,7 @@
       f.obsOperacao,
       f.obsInterna,
       f.obsFinal,
+      f.obsFaturamento,
       f.perfilPassageiro,
       f.email,
       f.paxView,
@@ -3492,6 +3497,7 @@
     state.obs.motorista = r[f.obsOperacao] || "";
     state.obs.interna = r[f.obsInterna] || "";
     state.obs.final = r[f.obsFinal] || "";
+    state.obs.faturamento = r[f.obsFaturamento] || "";
     state.obs.passageiro = r[f.perfilPassageiro] || "";
     el.observacao.value = state.obs.motorista;
 
@@ -7956,6 +7962,7 @@
 
       el.observacao.value = state.obs[state.obsAtual] || fields.observacao || "";
       el.retornoObservacao.value = state.obsRet[state.retObsAtual] || fields.retornoObservacao || "";
+      syncObsTabs();
 
       renderScheduleDrafts();
       renderPassengers();
@@ -8017,8 +8024,8 @@
     setSelectValue(el.frequenteTipo, fields.frequenteTipo || "");
     setFieldValue(el.contabilizarFds, fields.contabilizarFds);
 
-    state.obs = { motorista: "", interna: "", final: "", passageiro: "", ...(snapshot.obs || {}) };
-    state.obsRet = { motorista: "", interna: "", final: "", passageiro: "", ...(snapshot.obsRet || {}) };
+    state.obs = { ...emptyObs(), ...(snapshot.obs || {}) };
+    state.obsRet = { ...emptyObs(), ...(snapshot.obsRet || {}) };
     state.obsAtual = snapshot.obsAtual || "motorista";
     state.retObsAtual = snapshot.retObsAtual || "motorista";
     state.activationDraftEditState = snapshot.activationDraftEditState
@@ -8037,6 +8044,7 @@
 
     el.observacao.value = state.obs[state.obsAtual] || fields.observacao || "";
     el.retornoObservacao.value = state.obsRet[state.retObsAtual] || fields.retornoObservacao || "";
+    syncObsTabs();
 
     renderScheduleDrafts();
     renderPassengers();
@@ -8171,27 +8179,49 @@
     el.saveButtonText.textContent = text;
   }
 
+  const OBS_ICON_PATHS = {
+    motorista: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 14v7M10 12H3M14 12h7"/>',
+    interna: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    final: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+    faturamento: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/>',
+    passageiro: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'
+  };
+
+  function emptyObs() {
+    return { motorista: "", interna: "", final: "", faturamento: "", passageiro: "" };
+  }
+
+  function obsIcon(key) {
+    const icon = document.createElement("span");
+    icon.className = "seg-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = `<svg viewBox="0 0 24 24" focusable="false">${OBS_ICON_PATHS[key]}</svg>`;
+    return icon;
+  }
+
+  function syncObsTabs() {
+    document.querySelectorAll("[data-obs], [data-ret-obs]").forEach((button) => {
+      const isActive = button.dataset.obs
+        ? button.dataset.obs === state.obsAtual
+        : button.dataset.retObs === state.retObsAtual;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", String(isActive));
+    });
+  }
+
   function switchObs(next, isReturn) {
     captureGlobalHistoryBeforeMutation(isReturn ? "Trocar observação do retorno" : "Trocar observação");
     if (isReturn) {
       state.obsRet[state.retObsAtual] = el.retornoObservacao.value;
       state.retObsAtual = next;
       el.retornoObservacao.value = state.obsRet[next] || "";
-      document.querySelectorAll("[data-ret-obs]").forEach((button) => {
-        const isActive = button.dataset.retObs === next;
-        button.classList.toggle("is-active", isActive);
-        button.setAttribute("aria-selected", String(isActive));
-      });
+      syncObsTabs();
       return;
     }
     state.obs[state.obsAtual] = el.observacao.value;
     state.obsAtual = next;
     el.observacao.value = next === "passageiro" ? composePreferencias() : state.obs[next] || "";
-    document.querySelectorAll("[data-obs]").forEach((button) => {
-      const isActive = button.dataset.obs === next;
-      button.classList.toggle("is-active", isActive);
-      button.setAttribute("aria-selected", String(isActive));
-    });
+    syncObsTabs();
     requestAnimationFrame(() => {
       el.observacao?.focus();
       el.observacao?.setSelectionRange?.(el.observacao.value.length, el.observacao.value.length);
@@ -11176,10 +11206,11 @@
       state.enderecoPersonalizadoAtivo = false;
       state.selectedPassengers = [emptyPassenger(1)];
       state.enderecoRascunho = [{ ordem: 1, endereco: "" }];
-      state.obs = { motorista: "", interna: "", final: "", passageiro: "" };
-      state.obsRet = { motorista: "", interna: "", final: "", passageiro: "" };
+      state.obs = emptyObs();
+      state.obsRet = emptyObs();
       state.obsAtual = "motorista";
       state.retObsAtual = "motorista";
+      syncObsTabs();
       state.globalHistory = { undo: [], redo: [], pending: null };
       passengerMatchCandidates = [];
       if (el.xlsxImportInput) el.xlsxImportInput.value = "";
@@ -12092,6 +12123,7 @@
     [
       ["motorista", "Mot"],
       ["interna", "Interna"],
+      ["faturamento", "Faturamento"],
       ["final", "Final"],
       ["passageiro", "Pref Pax"]
     ].forEach(([key, label]) => {
@@ -12102,7 +12134,7 @@
       button.dataset.importObsType = key;
       button.setAttribute("role", "tab");
       button.setAttribute("aria-selected", String(current === key));
-      button.textContent = label;
+      button.append(obsIcon(key), label);
       segmented.appendChild(button);
     });
     const textarea = document.createElement("textarea");
@@ -12115,7 +12147,7 @@
   }
 
   function ensureImportedObservationState(trecho) {
-    const current = ["motorista", "interna", "final", "passageiro"].includes(trecho?.observacaoAtual)
+    const current = Object.prototype.hasOwnProperty.call(emptyObs(), trecho?.observacaoAtual ?? "")
       ? trecho.observacaoAtual
       : "motorista";
     const existing = trecho?.observacoesFormulario || {};
@@ -12123,6 +12155,7 @@
       motorista: existing.motorista ?? trecho?.observacaoOperacional ?? importedMotoristaObservationFromXlsx(trecho),
       interna: existing.interna ?? trecho?.observacaoInterna ?? importedDefaultInternalObservation(trecho),
       final: existing.final ?? trecho?.observacaoFinal ?? "",
+      faturamento: existing.faturamento ?? "",
       passageiro: existing.passageiro ?? trecho?.observacaoPassageiro ?? composeImportedTrechoPreferencias(trecho),
       current
     };
@@ -13727,6 +13760,7 @@
         ? `Serviço criado por Split na PG: ${trecho.programacao}.`
         : importedDefaultInternalObservation(trecho)),
       [f.obsFinal]: importObs.final || "",
+      [f.obsFaturamento]: importObs.faturamento || "",
       [f.perfilPassageiro]: importObs.passageiro || "",
       [f.email]: "",
       [f.trajeto]: context.trajeto,
@@ -14477,6 +14511,7 @@
       [f.obsOperacao]: isReturn ? state.obsRet.motorista : (scheduleOverride?.obsMotorista ?? state.obs.motorista),
       [f.obsInterna]: isReturn ? state.obsRet.interna : state.obs.interna,
       [f.obsFinal]: isReturn ? state.obsRet.final : state.obs.final,
+      [f.obsFaturamento]: isReturn ? state.obsRet.faturamento : state.obs.faturamento,
       [f.perfilPassageiro]: context.preferencias,
       [f.email]: context.emailPassageiro || "",
       [f.trajeto]: isReturn ? invertTrajeto(context.trajeto) : trajeto,
@@ -14763,10 +14798,11 @@
     state.scheduleDrafts = [];
     state.enderecoRascunho = [];
     state.activationDraftEditState = { return: false, repeat: false };
-    state.obs = { motorista: "", interna: "", final: "", passageiro: "" };
-    state.obsRet = { motorista: "", interna: "", final: "", passageiro: "" };
+    state.obs = emptyObs();
+    state.obsRet = emptyObs();
     state.obsAtual = "motorista";
     state.retObsAtual = "motorista";
+    syncObsTabs();
     [
       el.trajeto,
       el.observacao,

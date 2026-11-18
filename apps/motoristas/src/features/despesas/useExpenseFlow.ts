@@ -6,9 +6,9 @@ import { DATAVERSE } from "../../data/dataverse/entidades";
 import { reportAppError } from "../../shared/appErrorLogger";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
-import type { CapturedVideoDraft, Screen } from "../../types";
+import type { Screen } from "../../types";
 import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "../fotos/envioMidia";
-import { hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
+import { ehPdf, hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
 import { useMediaDraftState } from "../fotos/useMediaDraftState";
 import { quickReadValueCents } from "../recebimento/receiveProofCheck";
 import { resumeExpenseSubmission, type ExpenseSubmissionProgress } from "./expenseSubmission";
@@ -31,6 +31,7 @@ import {
 } from "./receiptQuickRead";
 import { getQuickReadMockMode, readReceiptQuickMock } from "./receiptQuickReadMock";
 import { EMPTY_EXPENSE_DRAFT } from "./rascunho";
+import { encerrarSessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { useExpenseUploads } from "./useExpenseUploads";
 import { TIMEOUT_CONFERENCIA_MS, calcularSinais, camposConferencia, carregarServicosConferencia, lerRespostaConferencia, montarCorpoConferencia, respostaConferenciaMock, type ConferenciaEnvio, type GastoConferido } from "./conferenciaEnvio";
 import { STATUS_OPERACIONAL, acharGastoCartaoDuplicado, aplicarLeituraNoGastoCartao, buildGastoCartaoCompletarPayload, concluirGastoCartaoMock, conferirLeituraComCartao, isMockGastosCartao, type ConferenciaCartao, type GastoCartao } from "./gastosCartao";
@@ -203,10 +204,18 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
         setExpensePhotos([]);
         setExpensePreviewPhotoId("");
         setExpenseDraft({ ...EMPTY_EXPENSE_DRAFT, dataGasto: new Date().toISOString().slice(0, 10) });
+        encerrarSessaoDoRascunho("despesa");
         resetExpenseQuickRead();
       };
       if (!accepted) {
         clearForm();
+        if (navigator.onLine === false) {
+          // O diário já guarda o gasto e o worker o envia sozinho quando a conexão volta.
+          setExpenseSend(null);
+          setToast("Salvo no aparelho. Será enviado quando a conexão voltar.", "info");
+          setScreen(destino);
+          return;
+        }
         setExpenseSend({ phase: "error", current: 0, total });
         return;
       }
@@ -396,6 +405,7 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
       await wait(720);
       setRemoteOperation(null);
       revokePhotoPreviewUrls(expensePhotos);
+      encerrarSessaoDoRascunho("despesa");
       setExpenseDraft({
         categoriaId: "",
         veiculoId: "",
@@ -605,17 +615,6 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     setScreen("fotoGasto");
   };
 
-  const openExpenseVideoPreview = (video: CapturedVideoDraft) => {
-    setExpensePhotoDraft("");
-    setExpensePhotoPreviewUrl(video.previewUrl);
-    setExpensePhotoPosterUrl(video.posterUrl ?? "");
-    setExpensePhotoDurationLabel(video.durationLabel ?? "");
-    setExpensePhotoRawBlob(video.rawBlob);
-    setExpensePhotoIsVideo(true);
-    setExpensePreviewPhotoId("");
-    setScreen("previewFotoGasto");
-  };
-
   const openExpensePreview = (photoId: string) => {
     const photo = expensePhotos.find((item) => item.id === photoId);
     if (!photo) return;
@@ -634,7 +633,8 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     expenseRetakeTargetIdRef.current = "";
     const isNewPhoto = !expensePreviewPhotoId;
     const retaking = isNewPhoto && Boolean(retakeTargetId) && expensePhotos.some((photo) => photo.id === retakeTargetId);
-    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
+    // PDF da galeria não passa pela leitura rápida (ela lê imagem); o motorista preenche à mão.
+    const shouldQuickRead = isNewPhoto && !expensePhotoIsVideo && Boolean(expensePhotoDraft) && !ehPdf(expensePhotoDraft) && (expensePhotos.length === 0 || retaking);
     const quickReadDataUrl = expensePhotoDraft;
     if (!hasMediaDraftContent({ dataUrl: expensePhotoDraft, rawBlob: expensePhotoRawBlob, mediaType: expensePhotoIsVideo ? "video" : "foto" })) {
       return setScreen("gastos");
@@ -739,7 +739,6 @@ export function useExpenseFlow({ remoteMode, driverContext, remoteOperation, set
     isExpenseIdle,
     openExpenseCamera,
     openExpensePreview,
-    openExpenseVideoPreview,
     refazerLeituraCartao,
     resetExpenseQuickRead,
     retakeQuickReadPhoto,

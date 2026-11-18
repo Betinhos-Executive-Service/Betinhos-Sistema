@@ -36,6 +36,12 @@ Usa Chrome headless com user agent Android (ativa a câmera ao vivo) e câmera s
 11. `#historico` → busca "zzz inexistente" mostra `Nenhum serviço encontrado para "zzz inexistente".`
 12. Topo de Serviços (mock): "Comunicados pendentes" (2) e "Checklist do veículo" (1) como avisos compactos `button.notice-compact`, 56 px cada, superfície #fcfcfb sem sombra (não parecem card de serviço); o primeiro card de serviço começa perto de y=322 (antes y=647). Medir: `[...document.querySelectorAll('.notice-compact')].map(e=>e.getBoundingClientRect().height)`. Os avisos não têm `.agenda-card`/`.agenda-hit`: `document.querySelector(".agenda-card .agenda-hit")` em Serviços já cai no primeiro serviço. Detalhes do aviso em `verificar-app-comunicados` e `verificar-checklists-app`.
 
+## Início compacto em telas baixas (12/11/2026)
+
+- Mock, viewports 320×568, 360×640, 375×667, 390×844 e 844×390 (deitado). No Início: saudação "Olá, Nome" numa linha; card Serviços com duas linhas ("Serviços" + "Próximo em Xmin"; sem próximo, "N hoje" ou "Corridas de hoje"); pendências como etiquetas (`button.concept-pending-row`) que abrem a tela certa; grade 3 colunas (5 deitado).
+- Medir no console: `(s=>[s.scrollHeight,s.clientHeight])(document.querySelector('.concept-shell'))`. Esperado: iguais (sem rolagem) de 360×640 para cima; 320×568 rola ~55 px; nenhum tile abaixo de 66 px (`document.querySelector('.concept-tile').getBoundingClientRect().height`).
+- `scripts/qa/verify-ux-flows.cjs` abre Serviços por `[data-tour="servicos"]` (o texto do card muda). Sem Google Chrome, rode com `CHROME_PATH=<chromium do Playwright>`; o FAIL de CORS do Worker `carimbo-ip` vindo de `127.0.0.1` é do ambiente local.
+
 ## Confirmação depois de finalizar (modo Dataverse, 28/10/2026)
 - Depois de gravar a finalização, `finalizeSelected` recarrega a agenda (`loadRemoteStore`, 8 s por tentativa) e tenta de novo uma vez. A finalização já está salva: tempo esgotado **nunca** devolve o serviço à galeria. Depois de 2 falhas o motorista vê "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir." e o log `confirm-agenda-after-finalize` sai com `attempts: 2, restoredToAgenda: false`.
 - Antes disso o app devolvia o serviço e mandava finalizar de novo (64 casos, 18 motoristas, 07–28/10/2026), embora a OS estivesse Concluído.
@@ -110,3 +116,29 @@ Tela "Enviar comprovante" (`src/features/recebimento/ReceiveScreen.tsx`, lógica
 
 ## Resumo da Observação final (ícones por tópico)
 - Prévia `/?dev=preview` em 390×844: clique `Finalizar Serviço` (lista), digite no textarea, `Gerar resumo`. No modo mock cada frase vira um tópico; confira que todo `li` em `.observation-review-topics` tem `svg path` (a classe `is-<tipo>` vem de `topicKind`, que nunca devolve nulo; sem palavra-chave = `is-outros`). Teste unitário: `tests/observacaoOrganizada.test.ts`.
+
+## Prova de captura de mídia (fase 1: `src/features/fotos/provaCaptura.ts`, `useProvaDaCaptura.tsx`, `MediaCaptureScreen`)
+- Testes: `node --test --experimental-strip-types tests/provaCaptura.test.ts` (com rede, sem rede, falha no registrar e reenvio, descarte > 7 dias, localização negada e lenta, carimbo e redução a 2048 px, vídeo, limites 120 s / 70 MB, despesa sem vídeo, arquivo sem prova) e `tests/dataPort.test.ts` (porta com `emitirProvaMidia` e `registrarProvaMidia`).
+- Mock (localhost): código `K7M2QX` e hora fixos (`provaRemota.ts`). Chromium com `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream`, UA Android, 390 px, permissões `camera` e `geolocation`:
+  0. Primeira abertura (localStorage limpo): `.camera-location-notice` com "A localização fica registrada junto da foto como prova..." antes do pedido do navegador; "Entendi" grava `betinhos.prova.aviso-localizacao = "1"` e o aviso não volta.
+  1. `#/foto-gasto` → sem botão "Gravar vídeo"; `[data-testid="carimbo-previa"]` mostra `dd/mm/aaaa HH:mm:ss · Despesa` e `Código K7M2QX` no rodapé da câmera.
+  2. Esperar `video.videoWidth > 0`, "Tirar foto" → prévia com a faixa escura acrescentada **abaixo** da foto (canvas = altura da imagem + faixa; nenhum pixel coberto); a imagem tem maior lado ≤ 2048. A fila no IndexedDB (`app-motoristas-media-drafts`, chave `prova-captura`) ganha a entrada com `codigo`, `sha256`, `tamanhoBytes` e `localizacao.estado = "registrada"`.
+  3. UA iPhone em `#/foto-colisao` (câmera nativa): `setInputFiles` no input de vídeo com arquivo de 71 MB e `mtime` atual (> 50 MB tem de ir por caminho de arquivo) → "Vídeo muito grande (71 MB). O limite é 70 MB: grave um vídeo mais curto.".
+  4. Antes/depois: `git stash push -u -- apps/motoristas/src`, o dev server recompila, repetir o passo 1 (antes: 1 botão de vídeo), `git stash pop`.
+- Envio: `uploadMediaWithProof` (despesas, recebimento, manutenção, finalizar, colisão e checklist) registra a prova depois do link; falha deixa a prova pendente, reenviada ao abrir o app e no evento `online`. No mock não há link real: o registro só é verificável no DEV.
+- Não verificável em mock nem na nuvem: câmera e localização reais, Custom API `new_ProvaMidia` (depende do PR do backend no DEV). No DEV, depois do envio de uma despesa: linha em `cr40f_provamidias` com o link do comprovante, o mesmo `cr40f_codigo` impresso e sem selo.
+- Corrigido na fase 2: `.camera-error` estava preso ao seletor do loader no CSS e aparecia sem o véu, sobreposto ao painel da câmera.
+
+
+## Galeria, PDF e foto repetida (fase 2: `provaCaptura.prepararDaGaleria`, `metadadosArquivo.ts`, `GALERIA_POR_TELA`)
+- Testes: `node --test --experimental-strip-types tests/provaGaleria.test.ts` (EXIF lido e ausente, `mvhd` válido e com época errada, vídeo sem duração legível recusado, PDF > 10 MB e > 20 páginas, tela sem galeria, repetida recusada antes do envio, reenvio no mesmo registro e no mesmo rascunho, devolução com o comprovante da despesa, id real no registrar com `sessaoId`, original da câmera nativa, `idCliente` no reenvio, conferir sem rede segue, dois dHash na câmera). O selo da janela é só do servidor: o app não calcula mais.. Fixtures pequenas em `tests/fixtures/` (JPEG com e sem EXIF, MP4 mínimo, PDFs de 2 e 21 páginas).
+- Botão "Escolher da galeria ou arquivo" (`.camera-gallery-action`, input `[data-testid="galeria-input"]`): despesa e devolução (imagem e PDF), manutenção, finalizar e colisão (imagem, PDF e vídeo), recebimento (imagem e vídeo). Checklist **sem** botão.
+- Registro novo (despesa, solicitação de manutenção, colisão): a câmera abre com `sessaoDoRascunho(<tela>)`, id `novo-*` estável enquanto o rascunho existe (o fluxo chama `encerrarSessaoDoRascunho` ao concluir); o envio passa `{ tabela, registroId }` real ao `uploadMediaWithProof` e o registrar vai com o id real e `sessaoId`.
+- Mock (`criarPortaProvaMock`): lembra nesta aba o SHA conferido e registrado, com o id real e o da sessão; a mesma foto em outro registro volta "repetida", no mesmo registro ou rascunho passa. Roteiro Playwright (UA Android, 390 px, localStorage `betinhos.prova.aviso-localizacao = "1"`):
+  1. `/?r=1#/foto-colisao` → botão presente, `accept = image/*,application/pdf,video/*`. WebM sem metadados (`1a45dfa3` + zeros) → em até 4,5 s `.camera-file-error` "Não consegui ler a duração do vídeo. Grave de novo pela câmera do app.".
+  2. `#/foto-gasto` → `setInputFiles` com `tests/fixtures/foto-com-exif.jpg` → prévia; "Tirar outra" → mesma foto → aceita (mesmo rascunho). Em outro registro a mesma foto mostra "Esta foto já foi usada em outro registro em DD/MM/AAAA. Tire uma foto nova.".
+  2a. `#gastos-relatorio` → linha com `.gr-linha-motivo` → `.dv-painel input[type=file]` duas vezes com a mesma foto → "Novo comprovante pronto para enviar", sem recusa.
+  3. "Voltar à câmera" → PDF de 11 MB (`buffer`, `application/pdf`) → "PDF muito grande (11 MB). O limite é 10 MB.".
+  4. `#/checklists` → "Pular" no tour → `button[aria-label^="Veículo ABC1D23 · entregue"]` → `button[aria-label^="Tirar foto"]` → nenhum `.camera-gallery-action`.
+- Chrome do sistema em headless não expõe a câmera falsa ("Nenhuma câmera foi encontrada"); para a câmera ao vivo use o Chromium do Playwright (`ms-playwright/chromium-*`).
+- Não verificável em mock: seletor real do iPhone/Android (o que cada um preserva de EXIF), `conferir`/`registrar` no Dataverse e o selo recalculado no servidor.

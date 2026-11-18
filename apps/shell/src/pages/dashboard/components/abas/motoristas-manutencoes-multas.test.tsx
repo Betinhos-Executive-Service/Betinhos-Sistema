@@ -139,9 +139,10 @@ describe('ManutencoesTab', () => {
   it('mostra os cinco KPIs com % da receita e prazo médio', () => {
     semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dados())} />))
     expect(within(kpi('Manutenções')).getByText('2')).toBeTruthy()
-    expect(within(kpi('Custo total')).getByText(/1\.500,00/)).toBeTruthy()
+    expect(within(kpi('Custo total')).getByText(/1,5k/)).toBeTruthy()
     expect(within(kpi('Custo total')).getByText('15,0%')).toBeTruthy()
     expect(within(kpi('Em andamento')).getByText('1')).toBeTruthy()
+    expect(within(kpi('Em andamento')).getByText('solicitadas, agendadas ou programadas')).toBeTruthy()
     expect(within(kpi('Custo médio')).getByText(/750,00/)).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('10,0 dias')).toBeTruthy()
     expect(within(kpi('Prazo médio')).getByText('50,0%')).toBeTruthy()
@@ -150,9 +151,11 @@ describe('ManutencoesTab', () => {
   it('regra de vazio: tabela no ar sem prazo medido mostra "—", nunca s/dado', () => {
     semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dadosVazios({ manutencoes: [manutencao({ dia: '2026-10-05', tipoReparo: 'Preventiva programada' })] }))} />))
     const prazo = kpi('Prazo médio')
-    expect(prazo.querySelector('.dash-kpi__valor')?.textContent).toBe('—')
+    expect(prazo.querySelector('.bt-stat__value')?.textContent).toBe('—')
     expect(within(prazo).queryByText('s/dado')).toBeNull()
-    expect(within(prazo).getByText('Ano anterior').parentElement?.textContent).toContain('—')
+    // Comparativo sem medição não aparece (nem "Ano anterior —").
+    expect(within(prazo).queryByText('Ano anterior')).toBeNull()
+    expect(within(prazo).queryByText('Mês anterior')).toBeNull()
     const categorias = card('Categorias com metas')
     expect(within(linhaDe(categorias, 'Preventiva programada')).getByText('Sem medição')).toBeTruthy()
     expect(within(categorias).queryByText('s/dado')).toBeNull()
@@ -180,7 +183,7 @@ describe('MultasTab', () => {
   const dados = () => dadosVazios({
     multas: [
       multa({ dia: '2026-10-02', status: MULTA_NOTIFICAR, statusLabel: 'Notificar o Condutor', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
-      multa({ dia: '2026-10-04', statusLabel: 'Pago', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
+      multa({ dia: '2026-10-04', status: 202410005, statusLabel: 'Encerrada', motorista: 'Ana', infracaoCodigo: '7455', infracaoDescricao: 'Excesso de velocidade' }),
       multa({ dia: '2026-10-09', statusLabel: 'Indicada', motorista: 'Beto' }),
     ],
   })

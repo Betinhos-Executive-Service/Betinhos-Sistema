@@ -6,6 +6,7 @@ import type { Source } from '../data/source'
 import type { KV } from '../domain/columns'
 import { contar, type Motorista } from '../domain/commands'
 import { TZ } from '../domain/format'
+import { BrandLoader } from '../../../app/BrandLoader'
 import './contagem.css'
 
 export const EXCLUIDOS_KEY = 'betinhos.geral.contagem.excluidos.v1'
@@ -124,7 +125,7 @@ export function ContagemDrawer({ open, onClose, source, initialDay, kv, mobile }
           <Button variant="secondary" size="compact" onClick={() => { void reload() }}>Tentar de novo</Button>
         </Alert>
       ) : null}
-      {!result && !error ? <p className="gr-ct__loading">Carregando serviços…</p> : null}
+      {!result && !error ? <BrandLoader variant="inline" size="md" label="Carregando serviços" text="Carregando serviços…" /> : null}
       {result && result.linhas.length === 0 ? <EmptyState title="Nenhum motorista ativo" /> : null}
       {result && result.linhas.length > 0 ? (
         <ul className="gr-ct__list">

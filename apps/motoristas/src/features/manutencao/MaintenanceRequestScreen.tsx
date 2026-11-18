@@ -1,3 +1,4 @@
+import { ImagemOuPdf } from "../fotos/ImagemOuPdf";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionBar, ActionButton, type ActionButtonState } from "../../shared/ui/ActionButton";
 import { FormField, SelectField, TextAreaField, TextInputField } from "../../shared/ui/FormFields";
@@ -232,7 +233,7 @@ export function MaintenanceRequestScreen({
                           <span className="media-video-badge">{photo.durationLabel || "Vídeo"}</span>
                         </>
                       ) : (
-                        <img src={photo.dataUrl} alt={`Foto ${index + 1}`} />
+                        <ImagemOuPdf src={photo.dataUrl} alt={`Foto ${index + 1}`} />
                       )}
                     </button>
                   ))}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { encerrarSessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { createMaintenanceRequestRemote } from "./remoto";
 import { getDriverContext } from "../../data/dataverse/cliente";
 import type { ToastTone } from "../../shared/ui/LocalToast";
@@ -83,6 +84,7 @@ export function useMaintenanceRequestFlow({ logAppError, maintenanceCurrentVehic
       revokePhotoPreviewUrls(maintenanceRequestPhotos);
       setMaintenanceRequestDraft({ descricao: "", kmAtual: "", veiculoId: maintenanceCurrentVehicleId, gravidade: "" });
       setMaintenanceRequestPhotos([]);
+      encerrarSessaoDoRascunho("manutencao");
       clearMaintenanceRequestPhotoDraftState();
       setScreen("inicio");
       setToast("Solicitação enviada para aprovação.");

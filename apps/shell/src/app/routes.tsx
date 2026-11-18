@@ -5,6 +5,7 @@ import type { Host } from '../host'
 import { findItem, type MenuItem } from '../nav/menu'
 import { logAppError } from '@betinhos/ui/error-logger'
 import { isChunkLoadError, reportarErro } from './erros'
+import { BrandLoader } from './BrandLoader'
 
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
 type Agente = NonNullable<Extract<MenuItem, { kind: 'page' }>['agente']>
@@ -41,7 +42,9 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   inicio: () => import('../pages/inicio/InicioPage').then((m) => m.InicioPage),
   qualidade: () => import('../pages/qualidade/QualidadePage').then((m) => m.QualidadePage),
   treinamentos: () => import('../pages/treinamentos/TreinamentosPage').then((m) => m.TreinamentosPage),
-  'conciliacao-cartao': () => import('../pages/conciliacao-cartao/ConciliacaoCartaoPage').then((m) => m.ConciliacaoCartaoPage),
+  composicao: () => import('../pages/composicao/ComposicaoPage').then((m) => m.ComposicaoPage),
+  cartoes: () => import('../pages/cartoes/CartoesPage').then((m) => m.CartoesPage),
+  'rh-descontos': () => import('../pages/rh-descontos/RhDescontosPage').then((m) => m.RhDescontosPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()
@@ -168,16 +171,12 @@ function RouteFrame({ title, children }: { title: ReactNode; children: ReactNode
   )
 }
 
-/** Fallback do Suspense: cabeçalho neutro (título em Skeleton) e o corpo em Skeleton. */
+/** Fallback do Suspense: cabeçalho neutro (título em Skeleton) e o loader da marca no corpo. */
 export function PageFallback({ title }: { title: string }) {
   return (
     <RouteFrame title={<Skeleton width={220} height={32} />}>
-      <div className="surface" role="status" aria-label={`Carregando ${title}`}>
-        <Stack gap="3">
-          <Skeleton width="40%" height={20} />
-          <Skeleton shape="rect" height={96} />
-          <Skeleton shape="rect" height={96} />
-        </Stack>
+      <div className="surface">
+        <BrandLoader variant="inline" label={`Carregando ${title}`} text={`Carregando ${title}…`} />
       </div>
     </RouteFrame>
   )

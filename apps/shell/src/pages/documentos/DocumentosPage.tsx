@@ -1,6 +1,6 @@
 // DocumentosPage.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, EmptyState, MetricCard, PageToolbar, SearchBox, Select, Skeleton, StatusBadge, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Alert, Button, EmptyState, MetricCard, PageToolbar, SearchBox, Select, StatusBadge, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import { AlertTriangle, CalendarClock, CalendarDays, CheckCircle2, Clock, FileX, RefreshCw, Settings } from 'lucide-react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
@@ -18,6 +18,7 @@ import { PendenciasLista } from './components/PendenciasLista'
 import { RenovarDrawer, type AlvoRenovar } from './components/RenovarDrawer'
 import { ConfigDrawer } from './components/ConfigDrawer'
 import { FichaPessoaCentral, FichaVeiculoCentral } from './components/FichaCentral'
+import { BrandLoader } from '../../app/BrandLoader'
 import './documentos.css'
 
 const KPI_LABEL: Record<Kpi, string> = { vencido: 'Vencidos', vence7: 'Até 7 dias', vence30: '8 a 30 dias', vence60: '31 a 60 dias', faltando: 'Faltando' }
@@ -96,7 +97,7 @@ function Documentos({ host }: { host: Host }) {
   let body
   if (fatal) body = <Alert tone="danger" title="Documentos indisponíveis">{fatal}</Alert>
   else if (error && !data) body = <Alert tone="danger" title="Não foi possível carregar os documentos" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{error}</Alert>
-  else if (!data) body = <Skeleton shape="rect" height={240} />
+  else if (!data) body = <BrandLoader variant="inline" label="Carregando documentos" text="Carregando documentos…" />
   else if (!visiveis.length) body = <EmptyState className="surface" align="start" icon={<CheckCircle2 size={36} />} title={daAba.length ? 'Nenhum documento para estes filtros' : 'Tudo em dia'} action={daAba.length ? <Button variant="secondary" onClick={() => setFiltro({ ...filtro, kpi: null, tipo: null, q: '' })}>Limpar filtros</Button> : undefined} />
   else body = <PendenciasLista lista={visiveis} mobile={mobile} onRenovar={(p) => setAlvo({ tipo: p.tipo, dono: p.dono, anterior: p.doc })} onAbrirFicha={abrirFicha} />
 

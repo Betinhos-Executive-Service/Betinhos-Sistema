@@ -13,7 +13,7 @@ function dados(hodometro: number): FrotaData {
     ...EMPTY_DATA,
     veiculos: [{ id: 'v1', placa: 'TST1A11', marca: null, modelo: null, cor: null, anoModelo: null, status: VEICULO.ATIVO, categoria: PROPRIO, motorista: null, hodometro, hodometroEm: today }],
     planoPreventivo: [{ id: 'i1', nome: 'Troca de óleo', servico: 1, intervaloKm: 10000, intervaloMeses: null, avisoKm: 1000, avisoDias: 30, ativo: true }],
-    manutencoes: [{ id: 'm1', codigo: 'M1', descricao: 'Óleo', status: MANUT.REALIZADO, grau: null, tipo: null, agendarPara: null, dataManutencao: '2026-07-14', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 160000, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-07-14T12:00:00Z', servicos: [1], categorias: [], origemClassificacao: null, confiancaIa: null }],
+    manutencoes: [{ id: 'm1', codigo: 'M1', descricao: 'Óleo', status: MANUT.REALIZADO, grau: null, tipo: null, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: '2026-07-14', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: 160000, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-07-14T12:00:00Z', servicos: [1], categorias: [], origemClassificacao: null, confiancaIa: null }],
   }
 }
 

@@ -19,22 +19,22 @@ describe('infracaoDe (multaTipo do legado)', () => {
 })
 
 describe('calcularMultas', () => {
-  it('KPIs pela data da multa no período (segmentos não se aplicam): total, pendentes (Notificar) e resolvidas pelos status reais (spec §6)', () => {
+  it('KPIs pela data da multa no período: total, pendentes (etapa 1) e resolvidas pelo valor do status (Encerrada, Descontado e Cancelada)', () => {
     const muls = [
-      multa({ status: 202410000, statusLabel: 'Notificar o Condutor' }),
-      multa({ status: 202410000, statusLabel: 'Notificar o Condutor' }),
-      multa({ status: 202410006, statusLabel: 'Pago' }),
-      multa({ status: 202410003, statusLabel: 'Descontado' }),
-      multa({ status: 202410005, statusLabel: 'Finalizado' }),
-      multa({ status: 202410001, statusLabel: 'Indicada' }),
-      multa({ status: 202410002, statusLabel: 'Recurso' }),
+      multa({ status: 202410000, statusLabel: '1. Identificar o responsável' }),
+      multa({ status: 202410000, statusLabel: '1. Identificar o responsável' }),
+      multa({ status: 202410006, statusLabel: '4. Acertar' }),
+      multa({ status: 202410003, statusLabel: 'Descontado (antigo)' }),
+      multa({ status: 202410005, statusLabel: 'Encerrada' }),
+      multa({ status: 202410007, statusLabel: 'Cancelada' }),
+      multa({ status: 202410001, statusLabel: '3. Pagar' }),
+      multa({ status: 202410002, statusLabel: 'Em recurso' }),
       multa({ statusLabel: 'Resolvida' }),
-      multa({ statusLabel: 'Concluída' }),
       multa({ dia: '2026-08-31', status: 202410000 }),
       multa({ dia: '', status: 202410000 }),
     ]
-    // Pago, Descontado, Finalizado, Resolvida e Concluída; Indicada e Recurso seguem em aberto.
-    expect(calcularMultas(ctx, dadosCom(muls)).kpis).toEqual({ total: 9, pendentes: 2, resolvidas: 5 })
+    // O rótulo não decide mais: "Resolvida" sem valor conta como aberta; Acertar (antigo Pago) ainda pede o acerto.
+    expect(calcularMultas(ctx, dadosCom(muls)).kpis).toEqual({ total: 9, pendentes: 2, resolvidas: 3 })
   })
 
   it('conjunto fora do ar: KPIs null (s/dado) e listas vazias', () => {
@@ -76,6 +76,13 @@ describe('calcularMultas', () => {
     expect(calcularMultas(ctx, dadosCom(muls)).porMes).toEqual([
       { mes: '2026-09', rotulo: 'set/26', qtd: 1, pendentes: 0 },
       { mes: '2026-10', rotulo: 'out/26', qtd: 2, pendentes: 1 },
+    ])
+  })
+
+  it('por mês: mês do período sem multa entra com zero (eixo não pula meses)', () => {
+    expect(calcularMultas(ctx, dadosCom([multa({ dia: '2026-10-09' })])).porMes).toEqual([
+      { mes: '2026-09', rotulo: 'set/26', qtd: 0, pendentes: 0 },
+      { mes: '2026-10', rotulo: 'out/26', qtd: 1, pendentes: 0 },
     ])
   })
 })

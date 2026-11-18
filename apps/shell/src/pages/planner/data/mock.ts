@@ -29,9 +29,11 @@ import {
   normalizeContact,
   validateContact,
 } from '../domain/contactDomain'
+import { isMultaTask, MULTA_TASK_DONE_BLOCKED } from '../domain/multaTaskFlow'
 import { isQuoteTask, isQuoteTerminalStatus, QUOTE_CLIENT_DECISION_RETURN, QUOTE_TASK_DONE_BLOCKED, quoteStatusForTaskStatus, taskStatusForQuoteStatus, waitingContextForStatusChange } from '../domain/quoteTaskFlow'
 import { financeMemberIds, followUpNotices, isLossReason, readyNotice, urgentNotices, waitingReturnNotices, type QuoteNotice } from '../domain/quoteNotifications'
 import { applyQuoteWaiting, QUOTE_WAITING_CLEARED, QUOTE_WAITING_STATUS } from '../domain/quoteWaiting'
+import { quoteConflictError } from '../domain/quoteConflict'
 import { applyDerivedStatus, buildQuoteEmailHtml, buildQuotePlainText, lastProposalSentAt, normalizeQuoteRoute, QUOTE_COMPLETED_STATUSES, quoteRoutePoints, validateQuoteCommercial } from '../domain/quoteDomain'
 import type { NormalizedContact } from '../domain/contactDomain'
 import { createQuoteProposalVersion, normalizeQuoteOptions, prepareQuoteProposal, prepareQuoteResponse, resolveQuoteAcceptance } from '../domain/quoteScenarios'
@@ -291,6 +293,8 @@ interface SeedContext {
   sourceId?: string
   sourceLabel?: string
   sourceCode?: string
+  multaId?: string
+  multaCode?: string
   checklist?: MockChecklistItem[]
   personalTagIds?: string[]
   restrictedVisibility?: boolean
@@ -340,6 +344,7 @@ export function seedState(): MockState {
     task('task-17', 'Conferir placa e documentação', 'quote-0999', 'COT-0999', 'Transporte de equipe · Guarujá', 'done', 'high', 'Rafael Lima', 'Operação', dateFromToday(-2), 'Documentos conferidos antes do embarque.', 'task-16'),
     task('task-18', 'Acompanhar retorno sobre embarque', 'quote-0997', 'COT-0997', 'Operação de embarque · Viracopos', 'todo', 'medium', 'Rafael Lima', 'Operação', dateFromToday(5), 'Confirmar terminal, acesso e contato do coordenador local.'),
     task('task-19', 'Enviar comprovante de serviço', 'quote-0996', 'COT-0996', 'Apoio logístico · Hotel Fasano', 'done', 'low', 'Camila Torres', 'Financeiro', dateFromToday(-4), 'Comprovante enviado e anexado ao histórico.'),
+    task('task-multa-1', 'Multa AIT fictício u1 · TST1A11 · Definir o responsável', null, 'MULTA:u1', 'AIT fictício u1', 'todo', 'urgent', 'Rafael Lima', 'Operação', dateFromToday(5), 'Multa AIT fictício u1 · TST1A11.\nAbrir no Sistema Betinhos: #/frota-multas?registro=multa:u1', null, { sourceType: 'multa', sourceId: 'u1', sourceLabel: 'Multa', sourceCode: 'MULTA:u1', multaId: 'u1', multaCode: 'AIT fictício u1', checklist: [{ id: 'multa-definir-responsavel', title: 'Definir o responsável', done: false }] }),
   ]
   const recurringTasks: Array<[string, string, string | null, string, string, string | string[], string, number]> = [
     ['20', 'Conferir janela de chegada no terminal', 'quote-0995', 'todo', 'medium', 'Rafael Lima', 'Operação', 7],
@@ -654,6 +659,8 @@ export function updateTask(state: MockState, id: string, patch: TaskPatch): Mock
   const quote = existing?.quoteId ? (state.quotes || []).find((quoteItem) => quoteItem.id === existing.quoteId) : null
   const quoteTask = isQuoteTask(existing || {}) && !existing?.parentTaskId && Boolean(quote)
   if (quoteTask && patch.status === 'done' && !isQuoteTerminalStatus(quote?.status)) throw new Error(QUOTE_TASK_DONE_BLOCKED)
+  // No mock a multa está sempre aberta: a tarefa dela nunca conclui à mão.
+  if (existing && isMultaTask(existing) && patch.status === 'done' && existing.status !== 'done') throw new Error(MULTA_TASK_DONE_BLOCKED)
   const currentQuoteStatus = existing?.quoteStatus || quote?.status || 'Nova'
   const nextQuoteStatus = quoteTask && (patch.quoteStatus !== undefined || patch.status !== undefined)
     ? (patch.quoteStatus !== undefined ? patch.quoteStatus : quoteStatusForTaskStatus(patch.status, currentQuoteStatus))
@@ -1459,7 +1466,7 @@ export function syncQuoteFollowUps(state: MockState, today: string = localDateKe
 export function updateQuote(state: MockState, id: string, patchInput: QuotePatch = {}): MockState {
   const existing = (state.quotes || []).find((quote) => quote.id === id)
   if (!existing) throw new Error('Cotação não encontrada.')
-  if (patchInput.modifiedAt && patchInput.modifiedAt !== existing.modifiedAt) throw new Error('A cotação foi alterada por outra pessoa. Recarregue antes de salvar.')
+  if (patchInput.modifiedAt && patchInput.modifiedAt !== existing.modifiedAt) throw quoteConflictError('A cotação foi alterada por outra pessoa. Recarregue antes de salvar.')
   // V2.1: entrar em Aguardando exige o que falta/de quem/retorno; sair limpa os campos.
   const patch: QuotePatch = applyQuoteWaiting(existing.status, applyDerivedStatus(existing, patchInput))
   const nextStatus = patch.status ?? existing.status
@@ -1574,7 +1581,7 @@ export function markQuoteSent(state: MockState, id: string, proposal: QuoteSendP
   const quote = (state.quotes || []).find((item) => item.id === id)
   if (!quote || !QUOTE_COMPLETED_STATUSES.includes(quote.status || '')) throw new Error('Finalize a cotação antes de registrar o envio.')
   if (proposal.requestId && (quote.proposalVersions || []).some((version) => version.requestId === proposal.requestId)) return state
-  if (proposal.expectedModifiedAt && proposal.expectedModifiedAt !== quote.modifiedAt) throw new Error('A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.')
+  if (proposal.expectedModifiedAt && proposal.expectedModifiedAt !== quote.modifiedAt) throw quoteConflictError('A cotação foi alterada por outra pessoa. Recarregue antes de registrar o envio.')
   const options = proposal.options || normalizeQuoteOptions(quote)
   const prepared = prepareQuoteResponse({ ...quote, ...proposal.draft, options })
   if (!prepared.valid) throw new Error(prepared.error)

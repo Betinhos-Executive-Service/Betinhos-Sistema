@@ -47,5 +47,7 @@ export function Avatar({ name, src, size = 36 }: { name: string; src: string | n
 /** Selo do ambiente quando não é produção: DEV em atenção, MOCK em informação. */
 export function EnvBadge({ env }: { env: string }) {
   if (env === 'PROD') return null
-  return <DsStatusBadge tone={env === 'MOCK' ? 'info' : 'warning'} dot>{env}</DsStatusBadge>
+  // Mesmo selo das outras listas no mock; DEV/TEST seguem com o nome do ambiente.
+  if (env === 'MOCK') return <DsStatusBadge tone="info">Dados de exemplo</DsStatusBadge>
+  return <DsStatusBadge tone="warning" dot>{env}</DsStatusBadge>
 }

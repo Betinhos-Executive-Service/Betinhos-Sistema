@@ -1,6 +1,6 @@
 import { useId } from 'react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { cor, type CorToken } from './tokens'
+import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { cor, useAparenciaDosGraficos, type CorToken } from './tokens'
 
 /** Cores de série com classe de legenda correspondente no CSS. */
 export type CorSerie = Extract<CorToken, 'action' | 'brand' | 'secondary'>
@@ -11,7 +11,7 @@ type Base = { dados: Ponto[]; formatar: (v: number) => string; descricao: string
 const texto = () => ({ fill: cor('secondary'), fontSize: 11 })
 const eixoX = () => ({ dataKey: 'rotulo', tick: texto(), stroke: cor('border'), tickLine: false, tickMargin: 8, minTickGap: 8 })
 const eixoY = (formatar: (v: number) => string, largura: number) => ({ tick: texto(), axisLine: false, tickLine: false, width: largura, tickFormatter: (v: unknown) => formatar(Number(v)) })
-/** Dica no padrão de popover do DS: superfície branca, borda, raio 10 e sombra de popover. */
+/** Dica no padrão de popover do DS: superfície, borda, raio 10 e sombra de popover. */
 const dica = (formatar: (v: number) => string) => ({
   formatter: (v: unknown) => (v == null ? '—' : formatar(Number(v))),
   contentStyle: { backgroundColor: 'var(--bt-color-surface)', border: '1px solid var(--bt-color-border)', borderRadius: 'var(--bt-radius-md)', boxShadow: 'var(--bt-shadow-popover)', fontSize: 12, padding: '8px 10px' },
@@ -32,6 +32,7 @@ export function Legenda({ series }: { series: Serie[] }) {
 
 /** Linhas com grade horizontal, tooltip e legenda; sem animação (recarga a cada 60 s). Ocupa a altura que o card der, com mínimo de 240 px. */
 export function LinhaChart({ dados, series, formatar, descricao, larguraEixo = 64 }: Base & { series: Serie[] }) {
+  useAparenciaDosGraficos()
   const poucos = dados.length <= 2
   return (
     <div className="dash-grafico">
@@ -60,6 +61,7 @@ export function LinhaChart({ dados, series, formatar, descricao, larguraEixo = 6
 }
 
 export function BarraChart({ dados, formatar, descricao, nome, larguraEixo = 64 }: Base & { nome: string }) {
+  useAparenciaDosGraficos()
   return (
     <div className="dash-grafico">
       <figure className="dash-chart" role="img" aria-label={descricao}>
@@ -99,6 +101,7 @@ const preenchimento = (prefixo: string, s: SerieBarra) => (s.padrao && s.padrao 
 
 /** Legenda das barras: amostra quadrada com o mesmo padrão da série e o nome. */
 export function LegendaBarras({ series }: { series: SerieBarra[] }) {
+  useAparenciaDosGraficos()
   const prefixo = `dash-leg-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
   return (
     <ul className="dash-legenda">
@@ -119,6 +122,7 @@ type BarrasProps = { dados: Ponto[]; series: SerieBarra[]; formatar: (v: number)
 
 /** Barras agrupadas ou empilhadas com legenda; cada série tem cor e padrão próprios. Sem animação (recarga a cada 60 s). */
 export function BarrasChart({ dados, series, formatar, descricao, empilhado = false, larguraEixo = 48, dominioMax }: BarrasProps) {
+  useAparenciaDosGraficos()
   const prefixo = `dash-pad-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
   return (
     <div className="dash-grafico">
@@ -147,19 +151,74 @@ export function BarrasChart({ dados, series, formatar, descricao, empilhado = fa
   )
 }
 
-/** Faixa abaixo do ponto mais baixo, para a área não encostar a linha na base do card. */
-const dominioSpark = ([min, max]: readonly [number, number]): [number, number] => [min - ((max - min) || Math.abs(max) || 1) * 0.35, max]
+type TomMeta = 'success' | 'info' | 'warning'
+const COR_META: Record<TomMeta, CorToken> = { success: 'success', info: 'action', warning: 'warning' }
+export type PontoMeta = { rotulo: string; meta: number; real: number; tom: TomMeta }
 
-/** Tendência dos últimos meses na base do card de KPI: linha na cor do indicador e área no tom suave. Decorativa; o valor está no card. */
-export function Sparkline({ dados, linha, area }: { dados: Ponto[]; linha: CorToken; area: CorToken }) {
+/** Meta × realizado: barras do realizado coloridas pelo atingimento (verde ≥ 100%, azul no meio, amarelo < 80%) e a meta em linha tracejada. */
+export function MetaChart({ dados, formatar, descricao, larguraEixo = 64 }: { dados: PontoMeta[]; formatar: (v: number) => string; descricao: string; larguraEixo?: number }) {
+  useAparenciaDosGraficos()
   return (
-    <div className="dash-spark" aria-hidden="true">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart accessibilityLayer={false} data={dados} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-          <YAxis hide domain={dominioSpark} />
-          <Area type="monotone" dataKey="valor" stroke={cor(linha)} strokeWidth={1.5} fill={cor(area)} fillOpacity={1} baseValue="dataMin" dot={false} activeDot={false} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className="dash-grafico">
+      <ul className="dash-legenda">
+        {([['success', 'Meta batida (≥ 100%)'], ['info', 'Entre 80% e 100%'], ['warning', 'Abaixo de 80%']] as const).map(([tom, nome]) => (
+          <li key={tom}><svg className="dash-legenda__amostra" width={12} height={12} viewBox="0 0 12 12" aria-hidden="true"><rect width={12} height={12} rx={2} fill={cor(COR_META[tom])} /></svg>{nome}</li>
+        ))}
+        <li><span className="dash-legenda__traco dash-legenda__traco--secondary dash-legenda__traco--tracejada" aria-hidden="true" />Meta</li>
+      </ul>
+      <figure className="dash-chart" role="img" aria-label={descricao}>
+        <div className="dash-chart__area">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart accessibilityLayer={false} data={dados} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke={cor('border')} vertical={false} />
+              <XAxis {...eixoX()} />
+              <YAxis {...eixoY(formatar, larguraEixo)} />
+              <Tooltip {...dica(formatar)} cursor={{ fill: cor('surfaceSoft') }} />
+              <Bar dataKey="real" name="Realizado" radius={[4, 4, 0, 0]} maxBarSize={32} isAnimationActive={false}>
+                {dados.map((d) => <Cell key={d.rotulo} fill={cor(COR_META[d.tom])} />)}
+              </Bar>
+              <Line type="linear" dataKey="meta" name="Meta" stroke={cor('secondary')} strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: cor('surface') }} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </figure>
+    </div>
+  )
+}
+
+/** Anos em comparação (do mais antigo ao atual): o atual em área com gradiente, os anteriores em linha esmaecida (50% e 25%, o mais antigo tracejado). */
+export function AnosChart({ dados, anos, formatar, descricao, larguraEixo = 64 }: { dados: Ponto[]; anos: string[]; formatar: (v: number) => string; descricao: string; larguraEixo?: number }) {
+  useAparenciaDosGraficos()
+  const gradiente = `dash-area-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
+  const atual = anos[anos.length - 1]
+  const anteriores = anos.slice(0, -1)
+  const series: Serie[] = anos.map((a, i) => ({ chave: a, nome: a, cor: a === atual ? 'action' : 'secondary', tracejada: i === 0 && anos.length > 2 }))
+  return (
+    <div className="dash-grafico">
+      <Legenda series={series} />
+      <figure className="dash-chart" role="img" aria-label={descricao}>
+        <div className="dash-chart__area">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart accessibilityLayer={false} data={dados} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={gradiente} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={cor('action')} stopOpacity={0.32} />
+                  <stop offset="100%" stopColor={cor('action')} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={cor('border')} vertical={false} />
+              <XAxis {...eixoX()} />
+              <YAxis {...eixoY(formatar, larguraEixo)} />
+              <Tooltip {...dica(formatar)} cursor={{ stroke: cor('border') }} />
+              {anteriores.map((a, i) => (
+                <Line key={a} type="monotone" dataKey={a} name={a} stroke={cor('secondary')} strokeWidth={2} strokeOpacity={i === anteriores.length - 1 ? 0.5 : 0.25}
+                  strokeDasharray={i === 0 && anteriores.length > 1 ? '5 4' : undefined} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
+              ))}
+              <Area type="monotone" dataKey={atual} name={atual} stroke={cor('action')} strokeWidth={2} fill={`url(#${gradiente})`} dot={false} activeDot={{ r: 4, strokeWidth: 2, stroke: cor('surface') }} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </figure>
     </div>
   )
 }

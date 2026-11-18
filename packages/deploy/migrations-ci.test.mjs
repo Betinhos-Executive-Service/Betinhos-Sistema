@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checarMudancas, checarRemocoes } from './migrations-ci.mjs'
+import { checarMudancas, checarRemocoes, checarSubstituidas } from './migrations-ci.mjs'
 
 const P = 'packages/deploy/migrations/'
 const D = 'packages/deploy/'
@@ -38,4 +38,22 @@ test('remocoes: cabeçalho e remocoes.json andam juntos', () => {
 })
 test('o remocoes.json do repositório é coerente com as migrations', () => {
   assert.deepEqual(checarRemocoes(fileURLToPath(new URL('./migrations', import.meta.url))), [])
+})
+
+function dirSubst(arquivos, lista) {
+  const dir = mkdtempSync(join(tmpdir(), 'migr-'))
+  writeFileSync(join(dir, 'substituidas.json'), JSON.stringify(lista))
+  for (const nome of arquivos) writeFileSync(join(dir, nome), '')
+  return dir
+}
+test('substituidas: migration e substituta existem, substituta vem depois e tem motivo', () => {
+  const ok = { migration: '20261116-1800-a.ps1', por: '20261116-1900-a.ps1', motivo: 'falhou no DEV' }
+  const ambas = ['20261116-1800-a.ps1', '20261116-1900-a.ps1']
+  assert.deepEqual(checarSubstituidas(dirSubst(ambas, [ok])), [])
+  assert.equal(checarSubstituidas(dirSubst(['20261116-1800-a.ps1'], [ok])).length, 1)
+  assert.equal(checarSubstituidas(dirSubst(ambas, [{ ...ok, motivo: '' }])).length, 1)
+  assert.equal(checarSubstituidas(dirSubst(ambas, [{ ...ok, migration: ok.por, por: ok.migration }])).length, 1)
+})
+test('o substituidas.json do repositório é coerente com as migrations', () => {
+  assert.deepEqual(checarSubstituidas(fileURLToPath(new URL('./migrations', import.meta.url))), [])
 })

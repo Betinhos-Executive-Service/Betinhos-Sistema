@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ToastProvider } from '@betinhos/ui'
+import { CONFIG_VERSION, emptyFilters, ToastProvider } from '@betinhos/ui'
 import { MANUT } from '../data/schema'
 import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { Colisao, FrotaData, Manutencao, Multa } from '../data/types'
 import { linhasDaTabela } from '../testUtils'
+import { viewStoreFor } from '../../../app/viewStore'
 import { Registros } from './Registros'
 
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: `Serviço ${id}`, status: MANUT.SOLICITADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: null, valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: { id: 'f1', label: 'Ana' }, criadoEm: '2026-09-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
 const data: FrotaData = { ...EMPTY_DATA, manutencoes: [manut('a', {}), manut('b', { status: MANUT.REALIZADO, veiculo: { id: 'v2', label: 'TST2B22' }, solicitante: { id: 'f2', label: 'Bruno' }, criadoEm: '2026-06-01T12:00:00Z' })] }
 const source = { openForm: vi.fn(async () => {}) } as unknown as DataSource
 const rows = linhasDaTabela
@@ -32,10 +33,10 @@ describe('Registros', () => {
     expect(window.location.hash).not.toMatch(/[?&](status|de)=/)
   })
 
-  it('abre o detalhe ao clicar na linha e o formulário nativo em Novo', () => {
+  it('abre o detalhe ao dar duplo clique na linha e o formulário nativo em Novo', () => {
     const onOpen = vi.fn()
     render(<Registros kinds={['manutencao']} data={data} source={source} onOpen={onOpen} onReload={() => {}} />)
-    fireEvent.click(screen.getByText('Serviço a'))
+    fireEvent.doubleClick(screen.getByText('Serviço a'))
     expect(onOpen).toHaveBeenCalledWith('manutencao', 'a')
     fireEvent.click(screen.getByRole('button', { name: /Novo/ }))
     expect(source.openForm).toHaveBeenCalledWith('manutencao')
@@ -51,7 +52,7 @@ describe('Registros', () => {
     expect(onReload).not.toHaveBeenCalled()
   })
 
-  const multa = (id: string, veiculo: string): Multa => ({ id, titulo: `Multa ${id}`, status: null, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, infracaoId: null, criadoEm: '2026-09-10T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null })
+  const multa = (id: string, veiculo: string): Multa => ({ id, codigo: null, titulo: `Multa ${id}`, status: null, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, infracaoId: null, criadoEm: '2026-09-10T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null })
   const colisao = (id: string, veiculo: string): Colisao => ({ id, titulo: `Colisão ${id}`, status: null, tipo: null, dataHora: '2026-09-11T12:00:00Z', local: null, descricao: null, houveTerceiro: false, veiculo: { id: veiculo, label: veiculo.toUpperCase() }, motorista: { id: 'm1', label: 'Maria' }, criadoEm: '2026-09-11T12:00:00Z' })
 
   it('ao trocar entre multas e colisões, o filtro de veículo não passa para o outro tipo', async () => {
@@ -63,7 +64,7 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('filtro por um veículo que saiu dos dados após recarga continua visível e pode ser limpo', async () => {
+  it('filtro por um veículo que saiu dos dados após recarga continua valendo e pode ser limpo', async () => {
     window.location.hash = '#/frota?aba=ocorrencias&veiculo=v2'
     const antes: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m2', 'v2')] }
     const depois: FrotaData = { ...EMPTY_DATA, multas: [multa('m1', 'v1'), multa('m3', 'v1')] }
@@ -71,28 +72,46 @@ describe('Registros', () => {
     await waitFor(() => expect(rows()).toHaveLength(1))
     rerender(<Registros kinds={['multa']} data={depois} source={source} onOpen={() => {}} onReload={() => {}} />)
     expect(await screen.findByText(/Nenhum registro de multa com estes filtros/)).toBeTruthy()
-    expect(screen.getByText(/Veículo: V2/)).toBeTruthy()
-    fireEvent.click(screen.getAllByRole('button', { name: 'Limpar filtros' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     await waitFor(() => expect(rows()).toHaveLength(2))
   })
 
-  it('sem o resumo dos termos (falha na leitura), a lista avisa discretamente', async () => {
+  it('multas abrem na visão Comigo, sem a coluna Termo', async () => {
     window.location.hash = '#/frota-multas'
-    const semResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: undefined }, { ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={semResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText(/Coluna Termo indisponível/)).toBeTruthy()
-    cleanup()
-    const comResumo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m2', 'v1'), termo: null }] }
-    render(<Registros kinds={['multa']} data={comResumo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    await waitFor(() => expect(rows()).toHaveLength(1))
-    expect(screen.queryByText(/Coluna Termo indisponível/)).toBeNull()
+    const lista: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), status: 202410000 }, { ...multa('m2', 'v1'), status: 202410005 }] }
+    render(<Registros kinds={['multa']} data={lista} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Multa m1')).toBeTruthy()
+    expect(screen.queryByText('Multa m2')).toBeNull()
+    expect(screen.getAllByText('Próximo passo').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Coluna Termo/)).toBeNull()
   })
 
-  it('multas mostram a coluna Termo com o rótulo do último termo', async () => {
+  it('visões salvas antigas (coluna e filtro termo, ids de visão antigos) carregam sem erro e sem zerar as linhas', async () => {
     window.location.hash = '#/frota-multas'
-    const comTermo: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), termo: { status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' } }, { ...multa('m2', 'v1'), termo: { status: 'contestado', enviadoEm: null } }] }
-    render(<Registros kinds={['multa']} data={comTermo} source={source} onOpen={() => {}} onReload={() => {}} />)
-    expect(await screen.findByText('Pendente · expira 27/10')).toBeTruthy()
-    expect(screen.getByText('Contestado')).toBeTruthy()
+    const filtros = emptyFilters()
+    filtros.quick = { termo: { type: 'condition', id: 'rapido-termo', field: 'termo', op: 'in', values: [{ value: 'pendente', label: 'Pendente' }] } }
+    const config = JSON.stringify({
+      v: CONFIG_VERSION, sort: { key: 'termo', dir: 'asc' }, filters: filtros,
+      columns: ['descricao', 'data', 'veiculo', 'pessoa', 'termo', 'extra', 'status'].map((key) => ({ key, visible: true })),
+    })
+    const store = viewStoreFor({ mode: 'mock' })
+    for (const nome of ['A notificar', 'Termos pendentes', 'Contestados']) await store.create('frota.multa', nome, config)
+    const lista: FrotaData = { ...EMPTY_DATA, multas: [{ ...multa('m1', 'v1'), status: 202410000 }, { ...multa('m2', 'v1'), status: 202410005 }] }
+    render(<Registros kinds={['multa']} data={lista} source={source} onOpen={() => {}} onReload={() => {}} />)
+    expect(await screen.findByText('Multa m1')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Comigo/ }))
+    fireEvent.click(await screen.findByText('Termos pendentes'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Termos pendentes/ })).toBeTruthy())
+    await waitFor(() => expect(rows()).toHaveLength(2))
+    expect(screen.queryByText(/Coluna Termo/)).toBeNull()
+  })
+
+  it('com onNovo, "Novo registro" abre a gaveta da tela e não o formulário nativo', () => {
+    const onNovo = vi.fn()
+    const nativo = { openForm: vi.fn(async () => {}) } as unknown as DataSource
+    render(<Registros kinds={['manutencao']} data={data} source={nativo} onOpen={() => {}} onReload={() => {}} onNovo={onNovo} />)
+    fireEvent.click(screen.getByRole('button', { name: /Novo/ }))
+    expect(onNovo).toHaveBeenCalledTimes(1)
+    expect(nativo.openForm).not.toHaveBeenCalled()
   })
 })

@@ -54,7 +54,6 @@ const ROUTES = {
   checklists: { hash: "checklists" },
   "checklist-formulario": { hash: "checklists", before: async (page) => { await page.locator(".agenda-hit").first().click(); await page.waitForTimeout(900); } },
   "gastos-relatorio": { hash: "gastos-relatorio" },
-  "ranking-postos": { hash: "ranking-postos" },
   multas: { hash: "multas" },
   "multa-detalhe": { hash: "multas", before: async (page) => { await page.locator(".termo-row").first().click(); await page.waitForTimeout(1200); } },
   treinamentos: { hash: "treinamentos" },

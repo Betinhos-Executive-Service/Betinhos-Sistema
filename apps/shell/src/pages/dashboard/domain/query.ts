@@ -4,7 +4,7 @@ import type { FrotaMotorista } from '../components/abas/MotoristasTab'
 import { atalho } from './periodo'
 import type { Atalho, Filtros } from './types'
 
-const ATALHOS: readonly Atalho[] = ['hoje', 'ult7', 'ult30', 'esteMes', 'mesAnt', 'esteAno', 'anoAnt', 'personalizado']
+const ATALHOS: readonly Atalho[] = ['hoje', 'ult7', 'ult30', 'esteMes', 'esteTrimestre', 'mesAnt', 'esteAno', 'anoAnt', 'personalizado']
 const FROTAS: readonly FrotaMotorista[] = ['todos', 'proprios', 'terceiros']
 
 /**

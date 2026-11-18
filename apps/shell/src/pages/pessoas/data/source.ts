@@ -9,7 +9,7 @@ import type { ChoiceKey, ChoiceSet, Cliente, Historico, Pessoa } from '../domain
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { normalizeSearch } from '@betinhos/ui'
 import { MOCK_CLIENTES, createMockPessoas, mockHistorico, nextMockId } from './mock'
-import { ENTITIES, loadPagantesDaPessoa, loadPessoas, loadServicosDaPessoa, searchClientes, searchPessoas, type EntitySets } from './queries'
+import { ENTITIES, guid, loadPagantesDaPessoa, loadPessoas, mapPessoa, pessoasPath, loadServicosDaPessoa, searchClientes, searchPessoas, type EntitySets } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
 
 /** Tudo que a tela precisa do mundo externo; Dataverse em produção, memória no pnpm dev. */
@@ -17,6 +17,8 @@ export type Source = {
   mock: boolean
   /** Cadastro inteiro; `onFirstPage` recebe a primeira página antes (lista grande). */
   load: (onFirstPage?: (list: Pessoa[]) => void) => Promise<Pessoa[]>
+  /** Uma pessoa pelo ID (gaveta aberta por cima de outra lista); `null` se não existe ou está inativa. */
+  get: (id: string) => Promise<Pessoa | null>
   /** Até 50 pessoas que batem com a busca (usada enquanto a lista não carregou inteira). */
   search: (query: string) => Promise<Pessoa[]>
   choices: () => Promise<ChoiceSet>
@@ -36,6 +38,7 @@ function createMockSource(): Source {
   return {
     mock: true,
     load: (onFirstPage) => mockProgressive(rows.map((p) => ({ ...p })), onFirstPage),
+    async get(id) { await wait(200); const p = rows.find((x) => x.id === id); return p ? { ...p } : null },
     search: (q) => { const t = normalizeSearch(q); return mockSearch(rows, (p) => normalizeSearch(`${p.nome} ${p.email}`).includes(t)) },
     choices: async () => withFallback({}),
     async searchClientes(q) { await wait(150); const t = q.trim().toLowerCase(); return MOCK_CLIENTES.filter((c) => c.nome.toLowerCase().startsWith(t)) },
@@ -72,6 +75,10 @@ export function createSource(host: Host): Source {
   return {
     mock: false,
     load: async (onFirstPage) => loadPessoas(host.client, (await entitySets()).pessoa, onFirstPage),
+    get: async (id) => {
+      const [row] = await host.client.getAll(pessoasPath((await entitySets()).pessoa, `cr40f_bancodedadosid eq ${guid(id)}`))
+      return row ? mapPessoa(row) : null
+    },
     search: async (q) => searchPessoas(host.client, (await entitySets()).pessoa, q),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {

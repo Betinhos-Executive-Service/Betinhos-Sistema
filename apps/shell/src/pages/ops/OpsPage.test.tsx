@@ -2,6 +2,11 @@
 import { cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpsPage } from './OpsPage'
+import { emptyFilters } from '@betinhos/ui'
+import { encodeTableFilters } from '../../app/filtersUrl'
+import { COMPROVANTES_KEY } from '../recebimentos/colunaOp'
+import { mockContagemPorOp } from '../recebimentos/mock'
+import { createMockOps } from './data/mock'
 import { OP_STATUS } from './domain/status'
 
 configure({ asyncUtilTimeout: 8000 })
@@ -15,8 +20,47 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const openRow = async (code: string) => fireEvent.click((await screen.findByText(code)).closest('button')!)
 
+
+const blobText = (blob: Blob) => new Promise<string>((resolve) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result))
+  reader.readAsText(blob)
+})
+
 describe('Ordens de Pagamento', () => {
-  it('Fechar mês no cabeçalho: escolhe cliente e mês, confirma e avisa', async () => {
+  it('seleção em lote: copia os números e exporta as OPs selecionadas', async () => {
+    const writeText = vi.fn(async (_text: string) => undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    const blobs: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { blobs.push(blob); return 'blob:x' }, revokeObjectURL: () => undefined }))
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('OP-401')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    fireEvent.click((await screen.findByText('OP-402')).closest('.bt-table__row')!.querySelector('.pg-num')!, { shiftKey: true })
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    expect(within(faixa).getByText(/selecionados/)).toBeTruthy()
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Copiar números' }))
+    await screen.findByText(/números de OP copiados\./)
+    expect(writeText.mock.calls[0][0]).toMatch(/OP-401/)
+    expect(writeText.mock.calls[0][0]).toMatch(/OP-402/)
+
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Exportar seleção' }))
+    await screen.findByText(/OPs exportadas\./)
+    expect(await blobText(blobs[0])).toMatch(/OP-401/)
+  })
+
+  it('seleção de uma OP só oferece Gerar pagantes; com duas, some', async () => {
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    fireEvent.click((await screen.findByText('OP-401')).closest('.bt-table__row')!.querySelector('.pg-num')!)
+    const faixa = screen.getByRole('group', { name: 'Comandos da seleção' })
+    fireEvent.click(within(faixa).getByRole('button', { name: 'Gerar pagantes' }))
+    await screen.findByText('O Gerar Pagantes só abre dentro do Dataverse.')
+
+    fireEvent.click((await screen.findByText('OP-402')).closest('.bt-table__row')!.querySelector('.pg-num')!, { shiftKey: true })
+    expect(within(faixa).queryByRole('button', { name: 'Gerar pagantes' })).toBeNull()
+  })
+
+  it('Fechar mês na linha de comando: escolhe cliente e mês, confirma e avisa', async () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Fechar mês' }))
     const dialog = await screen.findByRole('dialog', { name: 'Fechar mês?' })
@@ -34,7 +78,7 @@ describe('Ordens de Pagamento', () => {
     render(<OpsPage host={{ mode: 'mock' }} />)
     await openRow('OP-401')
     const ficha = await screen.findByRole('dialog', { name: 'OP-401' })
-    expect(await within(ficha).findByText(/2 parcelas ativas/)).toBeTruthy()
+    expect(await within(ficha).findByText(/2 parcelas · recebido/)).toBeTruthy()
     expect(within(ficha).getByText('Mariana Albuquerque')).toBeTruthy()
     expect(within(ficha).getByText(/Há pagamento confirmado/)).toBeTruthy()
     expect(within(ficha).getByRole('button', { name: 'Cancelar OP' })).toHaveProperty('disabled', true)
@@ -77,5 +121,84 @@ describe('Ordens de Pagamento', () => {
     await waitFor(() => expect(screen.queryByText('OP-401')).toBeNull())
     await waitFor(() => expect(window.location.hash).toMatch(/[?&]f=/))
     expect(window.location.hash).not.toMatch(/[?&]status=/)
+  })
+
+  it('Agrupar pelo menu do título da coluna Status (ui ≥ 1.34.0, view.groupable)', async () => {
+    window.location.hash = '#/ops'
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-401')
+    fireEvent.click(screen.getByRole('button', { name: 'Status' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Agrupar por esta coluna', hidden: true }))
+    expect(await screen.findByRole('button', { name: /Pagamento Pendente/, expanded: false })).toBeTruthy()
+    expect(screen.queryByText('OP-401')).toBeNull()
+  })
+
+  it('Agrupar por status no painel Colunas: grupos começam fechados, abrem a tabela e o rodapé soma a lista', async () => {
+    window.location.hash = '#/ops'
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-401')
+    fireEvent.click(screen.getByRole('button', { name: 'Colunas' }))
+    const painel = await screen.findByRole('dialog')
+    fireEvent.click(within(painel).getByRole('combobox', { name: 'Agrupar por' }))
+    fireEvent.click((await screen.findAllByText('Status')).find((el) => el.closest('[role="option"]'))!)
+    fireEvent.click(within(painel).getByRole('button', { name: 'Aplicar' }))
+
+    const grupo = await screen.findByRole('button', { name: /Pagamento Pendente/, expanded: false })
+    expect(screen.queryByText('OP-401')).toBeNull()
+    expect(screen.getByText(/OPs · /)).toBeTruthy()
+    fireEvent.click(grupo)
+    expect(grupo.getAttribute('aria-expanded')).toBe('true')
+    expect(grupo.closest('.bt-groups__group')!.querySelector('.bt-table__row')).toBeTruthy()
+
+    // O checkbox do cabeçalho de um grupo marca só aquele grupo (selection.scope).
+    const outro = document.querySelector<HTMLButtonElement>('.bt-groups__toggle[aria-expanded="false"]')!
+    fireEvent.click(outro)
+    const cabecalho = (toggle: HTMLElement) => within(toggle.closest<HTMLElement>('.bt-groups__group')!).getByRole('checkbox', { name: 'Selecionar linhas do grupo' }) as HTMLInputElement
+    const pendente = cabecalho(grupo)
+    const segundo = cabecalho(outro)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(true)
+    expect(segundo.checked).toBe(false)
+    expect(segundo.indeterminate).toBe(false)
+    // Desmarcar um grupo preserva a seleção feita no outro.
+    fireEvent.click(segundo)
+    fireEvent.click(pendente)
+    expect(pendente.checked).toBe(false)
+    expect(segundo.checked).toBe(true)
+  })
+
+  it('coluna Comprovantes: indicador com a soma dos serviços e drawer agrupado por serviço', async () => {
+    history.replaceState(null, '', '#/ops')
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    const esperado = mockContagemPorOp(createMockOps(new Date()).map((op) => op.id))
+    const [id, n] = [...esperado][0]
+    const op = createMockOps(new Date()).find((x) => x.id === id)!
+    expect(screen.queryByRole('columnheader', { name: /Comprovantes/ }) ?? await screen.findByRole('columnheader', { name: /Comprovantes/ })).toBeTruthy()
+    const linha = (await screen.findByText(op.codigo)).closest('.bt-table__row') as HTMLElement
+    const indicador = await within(linha).findByRole('button', { name: new RegExp(`^${n} comprovantes? de recebimento$`) })
+    fireEvent.click(indicador)
+    const drawer = await screen.findByRole('dialog', { name: op.codigo })
+    expect(within(drawer).getByText('Recebimento')).toBeTruthy()
+    await within(drawer).findByText(new RegExp(`^${n} comprovantes?`))
+  })
+
+  it('filtro Sim/Não da coluna Comprovantes compara a contagem em memória', async () => {
+    const todas = createMockOps(new Date())
+    const com = mockContagemPorOp(todas.map((op) => op.id))
+    const filtro = (op: 'yes' | 'no') => encodeTableFilters({ ...emptyFilters(), quick: { [COMPROVANTES_KEY]: { type: 'condition', id: 'rapido-comprovantes', field: COMPROVANTES_KEY, op } } })
+    const codigos = (tem: boolean) => todas.filter((x) => com.has(x.id) === tem).map((x) => x.codigo)
+    expect(codigos(true).length).toBeGreaterThan(0)
+    expect(codigos(false).length).toBeGreaterThan(0)
+
+    history.replaceState(null, '', `#/ops?f=${filtro('yes')}`)
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText(codigos(true)[0])
+    await waitFor(() => expect(screen.queryByText(codigos(false)[0])).toBeNull())
+    cleanup()
+
+    history.replaceState(null, '', `#/ops?f=${filtro('no')}`)
+    render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText(codigos(false)[0])
+    await waitFor(() => expect(screen.queryByText(codigos(true)[0])).toBeNull())
   })
 })

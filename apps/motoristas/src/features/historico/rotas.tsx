@@ -6,6 +6,7 @@ import type { DetailData, Screen } from "../../types";
 import type { ReactNode } from "react";
 
 type Props = {
+  agendaCarregando: boolean;
   refreshLocal: (detailToRefresh?: DetailData, options?: RefreshOptions) => Promise<void>;
   selectedDetail: DetailData | null;
   setScreen: React.Dispatch<React.SetStateAction<Screen>>;
@@ -15,6 +16,7 @@ type Props = {
 
 // Telas do histórico: lista e detalhe.
 export function rotasHistorico(screen: Screen, {
+  agendaCarregando,
   refreshLocal,
   selectedDetail,
   setScreen,
@@ -29,6 +31,7 @@ export function rotasHistorico(screen: Screen, {
     return (
       <HistoryScreen
         items={store.history}
+        loading={agendaCarregando}
         onHome={() => setScreen("inicio")}
         onRefresh={refreshLocal}
         onOpenDetails={(detail) => {

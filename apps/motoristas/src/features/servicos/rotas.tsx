@@ -12,6 +12,7 @@ import type { DetailData, Screen } from "../../types";
 import type { ReactNode } from "react";
 
 type Props = {
+  agendaCarregando: boolean;
   checklists: ChecklistVeiculo[];
   completingDetailKey: string;
   comunicados: ComunicadoDestinatario[];
@@ -31,6 +32,7 @@ type Props = {
 
 // Tela de serviços (agenda).
 export function rotasServicos(screen: Screen, {
+  agendaCarregando,
   checklists,
   completingDetailKey,
   comunicados,
@@ -51,6 +53,7 @@ export function rotasServicos(screen: Screen, {
     return (
       <ServicesScreen
         items={store.agenda}
+        loading={agendaCarregando}
         pendingComunicados={comunicados.filter(isComunicadoPending)}
         onOpenComunicado={(id) => { setSelectedComunicadoId(id); setComunicadoOrigin("servicos"); setScreen("comunicados"); }}
         pendingChecklists={checklists.filter(isChecklistPending)}

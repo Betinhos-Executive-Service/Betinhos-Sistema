@@ -3,6 +3,8 @@ import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewB
 import { FileWarning, Plus, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
+import type { Infracao } from './domain/types'
 import { useListView } from '../../app/useListView'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -23,8 +25,8 @@ export function InfracoesPage({ host }: { host: Host }) {
 /** Parâmetros da barra antiga na URL; links com eles abrem com os filtros equivalentes. `q` continua. */
 const LEGACY_KEYS = ['gravidade', 'competencia', 'responsabilidade', 'situacao', 'multas'] as const
 
-/** `embutido`: aba Infrações dentro de Multas na Frota, que já tem página, cabeçalho e toasts próprios. */
-export function Infracoes({ host, embutido = false }: { host: Host; embutido?: boolean }) {
+function Infracoes({ host }: { host: Host }) {
+  useShellHeader({ title: 'Infrações de trânsito' })
   const auditoria = useAuditoria()
   const source = useMemo(() => createSource(host), [host])
   const mobile = useMedia('(max-width: 820px)')
@@ -47,15 +49,16 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const [query, setQuery] = useQueryTexto('q')
 
   const uso = useMemo(() => usoIndex(data.multas), [data.multas])
+  const multas = useCallback((id: string) => uso.get(id)?.length ?? 0, [uso])
+  const read = useMemo(() => extra.read((row: Infracao, key: string) => readInfracao(row, key, multas), (i) => i.id), [multas, extra])
   const visible = useMemo(() => {
-    const multas = (id: string) => uso.get(id)?.length ?? 0
-    const read = extra.read((row: (typeof data.list)[number], key: string) => readInfracao(row, key, multas), (i) => i.id)
     const list = data.list.filter((i) => matchesFilters(i, filters, allFields, read) && matchesKeyword(i, query))
     return extra.sort(sortInfracoes(list, view.config.sort, multas), view.config.sort, (i) => i.id)
-  }, [data.list, filters, query, uso, view.config.sort])
+  }, [data.list, filters, allFields, query, multas, view.config.sort, read, extra])
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, allFields, read)
   const clearAll = () => { clearFilters(); setQuery('') }
   const ativas = useMemo(() => data.list.filter((i) => i.ativo).length, [data.list])
   const usoState = data.multasError ?? (data.loading && !data.loaded ? 'loading' : 'ok')
@@ -63,7 +66,7 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
   const [target, setTarget] = useQueryAlvo()
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar infrações" onClick={refresh} />, [refresh])
+  const size = mobile ? 'touch' : 'default'
 
   let body
   if (data.error && !data.loaded) {
@@ -76,25 +79,31 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
     const open = (id: string) => setTarget({ mode: 'view', id })
     const footer = <span className="if-num">{visible.length} de {data.list.length} · {ativas} ativas</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma infração com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Infracao[], tableFooter?: ReactNode) => (
+      <InfracoesTable list={rows} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: Infracao[]) => <InfracoesCards list={rows} uso={uso} onOpen={open} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <InfracoesCards list={slice} uso={uso} onOpen={open} /> : <div className="surface">{empty}</div>)
-          : <InfracoesTable list={slice} uso={uso} onOpen={open} view={{ config: view.config, onChange: view.setConfig, extraCell: extra.cell }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
   }
 
   return (
-    <div className={embutido ? 'if-page' : 'page page--full if-page'}>
-      {embutido ? null : <CabecalhoShell actions={headerActions} />}
+    <div className="page page--full if-page">
+      {/* "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete. */}
       <div role="toolbar" aria-label="Comandos de infrações">
-        <ViewBar onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}>
-          {source.mock && !embutido ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="if-filters__search" value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
-          <Button icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_infracaodetransito', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={INFRACAO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por código, descrição ou artigo" aria-label="Buscar infrações" />}
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
+            <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={() => setTarget({ mode: 'create' })}>Nova infração</Button>
+          </>}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
@@ -103,10 +112,4 @@ export function Infracoes({ host, embutido = false }: { host: Host; embutido?: b
       {data.loaded ? <InfracaoDrawer target={target} onTarget={setTarget} list={data.list} uso={uso} usoState={usoState} source={source} onSaved={data.upsert} /> : null}
     </div>
   )
-}
-
-/** Só a página solta registra o cabeçalho do celular; embutida, quem registra é a Frota. */
-function CabecalhoShell({ actions }: { actions: ReactNode }) {
-  useShellHeader({ title: 'Infrações de trânsito', actions })
-  return null
 }

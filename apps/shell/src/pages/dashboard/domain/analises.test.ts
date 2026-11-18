@@ -61,7 +61,13 @@ describe('alertas', () => {
     expect(q.semVeiculo.valor).toBe('1')
     expect(q.semTipoVeiculo.valor).toBe('1')
     expect(q.semMotorista.valor).toBe('1')
-    expect(q.semCliente).toMatchObject({ valor: '3', status: '60,0% dos serviços', tom: 'warn' })
+    expect(q.semCliente).toMatchObject({ valor: '3', status: '60,0% dos serviços', tom: 'danger' })
+    // 10% ou mais dos serviços é perigo; abaixo disso (1 em 15), atenção.
+    expect(q.semVeiculo).toMatchObject({ status: '20,0% dos serviços', tom: 'danger' })
+    const muitos = [...rv, ...Array.from({ length: 10 }, () => reserva({ saidaRaw: '2026-07-01T12:00:00Z', motoristaId: 'm1', veiculoId: 'v1', cliente: 'Tenaris' }))]
+    expect(Object.fromEntries(alertasQualidade(muitos, nowMs).map((a) => [a.id, a.tom])).semVeiculo).toBe('warn')
+    // Exatamente 10% (1 em 10) já é perigo.
+    expect(Object.fromEntries(alertasQualidade(muitos.slice(0, 10), nowMs).map((a) => [a.id, a.tom])).semVeiculo).toBe('danger')
   })
 
 })
@@ -84,6 +90,15 @@ describe('destaques', () => {
     expect(p.classificados).toBe(3)
     expect(p.meses).toEqual([{ mes: '2026-10', rotulo: 'out/26', propria: 2, terceirizada: 1 }])
     expect(p.topPropria).toEqual([{ key: 'm1', nome: 'Ana', qtd: 2, fat: 200 }])
+  })
+
+  it('produção própria × terceirizada: eixo contínuo, mês sem classificado vale zero', () => {
+    const rv = [
+      reserva({ veiculoId: 'v1', saidaRaw: '2026-07-10T15:00:00Z' }),
+      reserva({ veiculoId: 'v1', saidaRaw: '2026-09-10T15:00:00Z' }),
+    ]
+    const p = producaoPropriaTerceira(rv, [veiculo({ id: 'v1', statusLabel: 'Disponível', categoria: 'Propria' })])
+    expect(p.meses.map((m) => [m.mes, m.propria])).toEqual([['2026-07', 1], ['2026-08', 0], ['2026-09', 1]])
   })
 
   it('produção própria × terceirizada: veículo de aluguel não entra nos classificados', () => {
@@ -181,7 +196,17 @@ describe('análises', () => {
     const m = metaRealizado(ctx, cmp)
     expect(m.linhas).toHaveLength(1)
     expect(m.linhas[0]).toMatchObject({ mes: '2026-10', real: 1000 })
-    expect(m.sub).toMatch(/^1 meses · /)
+    expect(m.sub).toBe('1 meses')
+  })
+
+  it('meta × realizado: mês do período sem dado entra com realizado zero e a meta no total', () => {
+    const fx = f({ atalho: 'personalizado', inicio: '2026-09-01', fim: '2026-10-15' })
+    const m = metaRealizado({ todas, rv: filtrarServicos(todas, fx), f: fx, now: NOW }, cmp)
+    expect(m.linhas.map((l) => l.mes)).toEqual(['2026-09', '2026-10'])
+    expect(m.linhas[0]).toMatchObject({ real: 0, pct: 0, tom: 'warning' })
+    expect(m.linhas[0].meta).toBeGreaterThan(0)
+    expect(m.sub).toBe('2 meses')
+    expect(m.atingimento?.pct).toBeCloseTo((m.linhas[0].real + m.linhas[1].real) / (m.linhas[0].meta + m.linhas[1].meta) * 100, 6)
   })
 
   it('status dos serviços', () => {

@@ -15,7 +15,6 @@
 /* Arquivos do vigente sempre à vista: um chip por arquivo (abrir) com a lixeira ao lado. */
 .doc-arquivos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5); min-width: 0; }
 .doc-arquivos__lista { display: flex; flex-wrap: wrap; gap: var(--bt-space-1-5); min-width: 0; margin: 0; padding: 0; list-style: none; }
-.doc-arquivos__skeleton { max-width: 240px; border-radius: var(--bt-radius-sm); }
 .doc-arq { display: inline-flex; align-items: center; max-width: 100%; min-width: 0; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface); }
 .doc-arq__abrir { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; min-height: var(--bt-control-height-compact); padding: 0 var(--bt-space-1) 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); cursor: pointer; transition: background-color var(--bt-duration-fast) ease; }
 .doc-arq__abrir svg { flex: none; }

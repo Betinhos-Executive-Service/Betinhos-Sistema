@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { BrandLoaderMark } from "./BrandLoader";
 
 export type LoadingOverlayState = {
   phase: "loading" | "success";
@@ -34,13 +35,12 @@ export function LoadingOverlay({ loading }: LoadingOverlayProps) {
             exit={{ opacity: 0, y: 8, scale: 0.99 }}
             transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
           >
-            <span className="loading-overlay-mark" aria-hidden="true">
-              <span className="loading-overlay-spinner" />
+            <BrandLoaderMark>
               <span className="loading-overlay-check">
                 <span className="loading-overlay-check-stem" />
                 <span className="loading-overlay-check-kick" />
               </span>
-            </span>
+            </BrandLoaderMark>
             <div className="loading-overlay-copy">
               <div className="loading-overlay-title">{loading.title}</div>
               {loading.message ? <p>{loading.message}</p> : null}

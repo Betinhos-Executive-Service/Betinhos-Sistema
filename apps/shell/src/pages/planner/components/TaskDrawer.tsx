@@ -1,6 +1,7 @@
 // Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
 import { PRIORITIES, canRegisterWaitingReturn, deriveExecutionActor, formatDate, hasTaskResponsible, normalizeAssigneeNames, normalizePersonalTagIds, normalizeText, normalizeWaitingContext, resolveTaskAssignment, statusById, validateWaitingContext } from '../domain/domain'
 import { deadlineRole, validateDeadlineChange } from '../domain/notifications'
+import { multaHref } from '../domain/multaTaskFlow'
 import { isQuoteTask, quoteStatusForTaskStatus } from '../domain/quoteTaskFlow'
 import { taskHistoryDetails, visibleTaskHistory } from '../domain/taskHistory'
 import { formatCommentTimestamp, formatRelativeTimestamp } from '../pageHelpers'
@@ -14,7 +15,7 @@ import { PersonalTagPicker } from './PersonalTags'
 import PriorityPicker from './PriorityPicker'
 import { WaitingContextFields } from './WaitingContextFields'
 import { createDraftAttachment, filesFromClipboard, releaseDraftAttachment, toAttachmentFiles, useDocumentPaste } from './attachmentFiles'
-import { ArrowUpRight, BellRing, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, FileText, Flag, LoaderCircle, MessageCircle, Play, Plus, Send, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, BellRing, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Eye, EyeOff, FileText, Flag, LoaderCircle, MessageCircle, Play, Plus, Send, Trash2, X } from 'lucide-react'
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 
@@ -545,6 +546,20 @@ export function TaskDrawerContent({
                 <strong>
                   {taskItem.quoteCode} · {taskItem.quoteTitle}
                 </strong>
+              </span>
+              <ArrowUpRight size={15} />
+            </button>
+          )}
+          {taskItem.multaId && (
+            <button
+              className="linked-record"
+              aria-label={`Abrir multa ${taskItem.multaCode || ""}`.trim()}
+              onClick={() => { window.location.hash = multaHref(taskItem.multaId); }}
+            >
+              <AlertTriangle size={16} />
+              <span>
+                <small>Abrir multa</small>
+                <strong>{taskItem.multaCode || taskItem.sourceCode}</strong>
               </span>
               <ArrowUpRight size={15} />
             </button>

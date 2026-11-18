@@ -138,6 +138,9 @@ export interface Task {
   quoteCode?: string
   quoteTitle?: string
   quoteStatus?: string
+  /** Multa que gerou a tarefa (cr40f_multa, plugin da frota). */
+  multaId?: string | null
+  multaCode?: string
   sourceType?: string
   sourceId?: string | null
   sourceCode?: string

@@ -3,6 +3,7 @@ import { LocalToast, type ToastState } from "../../shared/ui/LocalToast";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { describeVehicle, type FleetVehicle } from "../../lib/serviceVehicleInfleet";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 type MyVehicleScreenProps = {
   onBack: () => void;
@@ -67,10 +68,7 @@ export function MyVehicleScreen({ onBack, currentVehicleId, loadVehicles, saveVe
                   <button type="button" onClick={() => void refresh()}>Tentar de novo</button>
                 </div>
               ) : loading ? (
-                <div className="ideas-skeleton" role="status" aria-label="Carregando carros">
-                  <span />
-                  <span />
-                </div>
+                <BrandLoader variant="inline" label="Carregando carros" text="Carregando carros" />
               ) : vehicles.length ? (
                 <ul className="vehicle-choice-list">
                   {vehicles.map((vehicle, index) => {

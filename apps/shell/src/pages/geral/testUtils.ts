@@ -18,6 +18,7 @@ export const hooks = {
   attributes: null as null | Source['attributes'],
   mixedState: false,
   programada: false,
+  paginas: 0,
   gerarLink: null as null | Source['gerarLink'],
 }
 
@@ -28,13 +29,13 @@ export const hooks = {
  */
 export const TEST_PAGE_SIZE = 20
 
-/** Fábrica do vi.mock de './data/source': a fonte do mock sem latência e com páginas menores, com os ganchos acima. */
-export function mockSource(actual: SourceModule, { pageSize = TEST_PAGE_SIZE }: { pageSize?: number } = {}): SourceModule {
+/** Fábrica do vi.mock de './data/source': a fonte do mock sem latência e com páginas menores, com os ganchos acima. `manutencoes` liga as linhas OS-9001 a OS-9004. */
+export function mockSource(actual: SourceModule, { pageSize = TEST_PAGE_SIZE, manutencoes = false }: { pageSize?: number; manutencoes?: boolean } = {}): SourceModule {
   return {
     ...actual,
     createSource: (host: Parameters<SourceModule['createSource']>[0]): Source => {
       // Sem a latência simulada do pnpm dev: os testes não esperam timers artificiais.
-      const source = actual.createSource(host, { latency: 0, pageSize })
+      const source = actual.createSource(host, { latency: 0, pageSize, manutencoes })
       return {
         ...source,
         setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
@@ -43,6 +44,7 @@ export function mockSource(actual: SourceModule, { pageSize = TEST_PAGE_SIZE }: 
         update: (id, patch) => (hooks.update ? hooks.update(id, patch) : source.update(id, patch)),
         gerarLink: (id) => (hooks.gerarLink ? hooks.gerarLink(id) : source.gerarLink(id)),
         page: async (request) => {
+          hooks.paginas += 1
           const page = await source.page(request)
           if (hooks.programada) return { ...page, rows: page.rows.map((row, index) => (index === 0 ? { ...row, cr40f_status: 202410005, _cr40f_motorista_value: 'm1' } : index === 1 ? { ...row, cr40f_status: 202410001 } : row)) }
           return hooks.mixedState ? { ...page, rows: page.rows.map((row, index) => (index === 1 ? { ...row, statecode: 1 } : row)) } : page
@@ -60,7 +62,8 @@ export function usarAmbienteGeral() {
 
   beforeEach(() => {
     window.localStorage.clear()
-    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    // Desktop largo (≥1280 px): a linha de comando do DS mostra até 3 ações da seleção; abaixo disso, só 1.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('min-width: 1280px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
   })
   afterEach(() => {
     cleanup()
@@ -73,6 +76,7 @@ export function usarAmbienteGeral() {
     hooks.update = null
     hooks.attributes = null
     hooks.mixedState = false
+    hooks.paginas = 0
   })
 }
 
@@ -129,9 +133,12 @@ export async function pickView(name: string) {
   fireEvent.click(await screen.findByRole('menuitemradio', { name, hidden: true }))
 }
 
-/** Desktop: Gerar Voucher, Copiar Serviços, Gerar OP e Disparar vivem no menu "Ações" da barra. */
+/** Roda uma ação da seleção: o botão da linha de comando, se ela estiver lá (`inline`), ou o item do ⋮ "Mais ações", que
+ * abre com o grupo "N selecionados" em cima (DS 1.26, §10.9.6). */
 export async function acao(name: string) {
   const toolbar = screen.getByRole('toolbar', { name: 'Comandos de serviços' })
-  fireEvent.click(within(toolbar).getByRole('button', { name: /^Ações/ }))
+  const inline = within(toolbar).queryByRole('button', { name })
+  if (inline) { fireEvent.click(inline); return }
+  fireEvent.click(within(toolbar).getByRole('button', { name: /^Mais ações/ }))
   fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true }))
 }

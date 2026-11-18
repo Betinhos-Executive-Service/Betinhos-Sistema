@@ -15,8 +15,27 @@ export type XrmHost = {
   Utility?: { getGlobalContext: () => { getClientUrl: () => string } }
 }
 
-/** Mensagem legível de erros do Xrm.WebApi / fetch. */
-export function errorMessage(error: unknown) {
-  const message = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error)
-  return message.replace(/\.+$/, '')
+/** Mensagem do erro exatamente como veio (Xrm.WebApi, fetch ou Custom API), inclusive o ponto final. */
+export function rawErrorMessage(error: unknown) {
+  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error)
 }
+
+/** Erro de Custom API com o status HTTP: 400 é a recusa de regra do plugin (texto escrito para o usuário); o resto é falha técnica. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+/** Só a recusa de regra (HTTP 400) aparece como veio; qualquer outro erro vira a mensagem genérica da ação. */
+export function mensagemDaAcao(error: unknown, generica: string) {
+  return error instanceof ApiError && error.status === 400 ? error.message : generica
+}
+/** Mensagem legível de erros do Xrm.WebApi / fetch, sem o ponto final (para compor frases). */
+export function errorMessage(error: unknown) {
+  return rawErrorMessage(error).replace(/\.+$/, '')
+}
+
+/** Garante um ponto final na frase (sem duplicar o que a mensagem já traz), para compor com outra frase em seguida. */
+export const comPontoFinal = (frase: string) => (/[.!?]$/.test(frase) ? frase : `${frase}.`)

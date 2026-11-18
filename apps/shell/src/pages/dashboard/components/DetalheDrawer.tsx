@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from 'react'
-import { Drawer, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import { Drawer, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Tabela } from './Tabela'
 import { ExternalLink } from 'lucide-react'
 import { linkRegistro, type Detalhe, type Entidade, type LinhaCnhDetalhe, type LinhaMultaDetalhe, type LinhaServicoDetalhe } from '../domain/detalhes'
 import { brl, int } from '../domain/format'
@@ -70,7 +71,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
   const rows = <R,>() => top.linhas as unknown as R[]
   const link = (entidade: Entidade, id: string) => linkRegistro(clientUrl, entidade, id)
   const linkCol = <R extends { id: string },>(entidade: Entidade, nome: (r: R) => string): TableColumn<R> =>
-    ({ key: 'abrir', header: <span className="dash-sr">Abrir no Dataverse</span>, width: '44px', align: 'end', cell: (r) => <Abrir href={link(entidade, r.id)} nome={nome(r)} /> })
+    ({ key: 'abrir', header: <span className="dash-sr">Abrir no Dataverse</span>, width: '44px', cell: (r) => <Abrir href={link(entidade, r.id)} nome={nome(r)} /> })
   const comLink = clientUrl != null
 
   if (detalhe.tipo === 'servicos') {
@@ -87,12 +88,12 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
         ...(detalhe.comOp ? [{ key: 'op', header: 'OP', width: 'minmax(84px, .8fr)', cell: (l: LinhaServicoDetalhe) => l.op || '—' }] : []),
         { key: 'cl', header: 'Cliente', width: 'minmax(0, 1.2fr)', cell: (l) => l.cliente },
         { key: 'm', header: 'Motorista', width: 'minmax(0, 1fr)', cell: (l) => l.motorista },
-        { key: 'v', header: 'Valor', align: 'end', width: 'minmax(88px, .8fr)', cell: (l) => forte(brl(l.valor)) },
+        { key: 'v', header: 'Valor', width: 'minmax(88px, .8fr)', cell: (l) => forte(brl(l.valor)) },
       ]
     if (comLink) colunas.push(linkCol<LinhaServicoDetalhe>('reserva', (l) => `serviço ${codigo(l)} de ${dataBR(l.dia)}`))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'serviço', 'serviços')} · {brl(total)}</p>
-      <Table columns={colunas} rows={rows<LinhaServicoDetalhe>()} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
+      <Tabela columns={colunas} rows={rows<LinhaServicoDetalhe>()} rowKey={(l) => l.id} empty={<Vazio titulo="Nenhum serviço nesta lista" />} />
       {top.botao}
     </>
   }
@@ -111,7 +112,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
     if (comLink) colunas.push(linkCol<LinhaCnhDetalhe>('funcionario', (l) => l.motorista))
     return <>
       <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'motorista', 'motoristas')}</p>
-      <Table columns={colunas} rows={rows<LinhaCnhDetalhe>()} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
+      <Tabela columns={colunas} rows={rows<LinhaCnhDetalhe>()} rowKey={(l) => `${l.id}-${l.validade}`} empty={<Vazio titulo="Nenhuma CNH em atenção" />} />
       {top.botao}
     </>
   }
@@ -126,7 +127,7 @@ function Lista({ detalhe, clientUrl }: { detalhe: Detalhe; clientUrl: string | n
   if (comLink) colunas.push(linkCol<LinhaMultaDetalhe>('multa', (l) => `multa de ${dataBR(l.dia)}`))
   return <>
     <p className="dash-detalhe__resumo">{plural(detalhe.linhas.length, 'multa', 'multas')}</p>
-    <Table columns={colunas} rows={rows<LinhaMultaDetalhe>()} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
+    <Tabela columns={colunas} rows={rows<LinhaMultaDetalhe>()} rowKey={(l) => l.id || `${l.dia}-${l.motorista}-${l.infracao}`} empty={<Vazio titulo="Nenhuma multa pendente no período" />} />
     {top.botao}
   </>
 }

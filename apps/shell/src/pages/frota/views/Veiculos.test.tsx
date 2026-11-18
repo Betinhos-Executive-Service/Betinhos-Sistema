@@ -17,7 +17,7 @@ const data: FrotaData = {
     { ...base, id: 'v4', placa: 'TST4D44', marca: null, modelo: null, status: null, motorista: null },
   ],
   manutencoes: [
-    { id: 'm2', codigo: 'M2', descricao: 'Alinhamento', status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-09-25T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-09-21T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
+    { id: 'm2', codigo: 'M2', descricao: 'Alinhamento', status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: '2026-09-25T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'TST1A11' }, solicitante: null, criadoEm: '2026-09-21T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null },
   ],
 }
 
@@ -33,7 +33,7 @@ describe('Veiculos', () => {
         { id: 'p2', inicio: '2026-09-15T12:00:00Z', fim: null, veiculo: { id: 'v2', label: 'TST2B22' }, motorista: null, localBase: { id: 'b1', label: 'Base Centro' } },
       ],
     }
-    render(<Veiculos data={comPosses} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
+    render(<Veiculos data={comPosses} today="2026-10-02" source={source} onOpenVeiculo={() => {}} onReload={() => {}} />)
     expect(screen.getByText('Bruno')).toBeTruthy()
     expect(screen.getByText('Na base · Base Centro')).toBeTruthy()
     expect(screen.queryByText('Cadastro antigo')).toBeNull()
@@ -44,29 +44,29 @@ describe('Veiculos', () => {
   })
 
   it('abre filtrada em Ativo', () => {
-    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
+    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} onReload={() => {}} />)
     expect(screen.getByText('TST1A11')).toBeTruthy()
     expect(screen.queryByText('TST4D44')).toBeNull()
   })
 
   it('link antigo com status=sem mostra o veículo sem status, com o selo', async () => {
     window.location.hash = '#/frota?aba=veiculos&status=sem'
-    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
+    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} onReload={() => {}} />)
     expect(await screen.findByText('TST4D44')).toBeTruthy()
     expect(screen.queryByText('TST1A11')).toBeNull()
     expect(document.querySelector('.bt-table__row .bt-badge')?.textContent).toBe('Sem status')
   })
 
   it('mostra "sem valor" e nunca R$ 0,00 para manutenção realizada sem valor', () => {
-    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} />)
+    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={() => {}} onReload={() => {}} />)
     expect(screen.getByText(/1 sem valor/)).toBeTruthy()
     expect(screen.queryByText(/0,00/)).toBeNull()
   })
 
-  it('abre a ficha ao clicar na linha', () => {
+  it('abre a ficha ao dar duplo clique na linha', () => {
     const onOpenVeiculo = vi.fn()
-    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={onOpenVeiculo} />)
-    fireEvent.click(screen.getByText('TST1A11'))
+    render(<Veiculos data={data} today="2026-10-02" source={source} onOpenVeiculo={onOpenVeiculo} onReload={() => {}} />)
+    fireEvent.doubleClick(screen.getByText('TST1A11'))
     expect(onOpenVeiculo).toHaveBeenCalledWith('v1')
   })
 })

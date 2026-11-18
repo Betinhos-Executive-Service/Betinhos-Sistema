@@ -7,6 +7,7 @@ import type { ChoiceSet, Curriculo } from '../domain/types'
 import { choiceLabel } from '../domain/funnel'
 import { formatDate, formatMoney } from '../domain/text'
 import { telHref, whatsappHref } from '../../operacional/domain/phone'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   if (children == null || children === '') return null
@@ -113,7 +114,7 @@ function Arquivos({ id, link, source }: { id: string; link: string; source: Sour
           ))}
         </div>
       ) : null}
-      {lista.state === 'loading' ? <p className="cv-view__muted">Carregando arquivos…</p> : null}
+      {lista.state === 'loading' ? <BrandLoader variant="inline" size="sm" label="Carregando arquivos" text="Carregando arquivos…" /> : null}
       {lista.state === 'error' ? <p className="cv-view__muted" role="alert">Não foi possível listar os arquivos: {lista.message}</p> : null}
       {lista.state === 'ready' && !link && !docs.length ? <p className="cv-view__muted">Sem arquivo anexado.</p> : null}
       {erroAbrir ? <p className="cv-view__muted" role="alert">{erroAbrir}</p> : null}

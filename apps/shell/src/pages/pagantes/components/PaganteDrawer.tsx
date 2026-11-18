@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, Skeleton, StatusBadge } from '@betinhos/ui'
+import { Alert, Button, Drawer, StatusBadge } from '@betinhos/ui'
 import { CheckCircle2, ExternalLink, FileText, Lock, Split, XCircle } from 'lucide-react'
 import type { Source } from '../data/source'
 import { totalOp } from '../data/queries'
@@ -10,6 +10,9 @@ import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import { QuickActions } from './QuickActions'
 import { FalhaBadge, PagamentoBadge, ReciboBadge } from './StatusBadges'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
+import { ListaRecebimentos, resumoRecebimentos, useRecebimentos } from '../../recebimentos/ComprovantesRecebimento'
+import type { RecebimentosSource } from '../../recebimentos/source'
 
 type Props = {
   p: Pagante | null
@@ -118,7 +121,7 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
           <div className="pg-ficha__actions">
             <QuickActions p={p} contato={contato} size="default" labels contatoLoading={contatoLoading} />
             {canGerarRecibo(p) ? (
-              <Button variant="secondary" icon={<FileText size={16} />} loading={busy} onClick={() => onRecibo(p)}>{reciboEnviado(p) || p.linkRecibo ? 'Reenviar recibo' : 'Gerar recibo'}</Button>
+              <Button variant="secondary" icon={<FileText size={16} />} loading={busy} onClick={() => onRecibo(p)}>{reciboEnviado(p) ? 'Reenviar recibo' : p.linkRecibo ? 'Gerar recibo novamente' : 'Gerar recibo'}</Button>
             ) : null}
             {p.opId ? <Button variant="secondary" icon={<Split size={16} />} disabled={busy} onClick={() => onAbrirOp(p)}>Abrir OP no Gerar Pagantes</Button> : null}
           </div>
@@ -143,13 +146,13 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
                 <Item label="E-mail">{contato.email ? <a href={`mailto:${encodeURIComponent(contato.email)}`}>{contato.email}</a> : ''}</Item>
               </dl>
             ) : contatoLoading ? (
-              <div className="pg-ficha__loading" role="status" aria-label="Carregando contato"><Skeleton height={18} /><Skeleton height={18} /></div>
+              <BrandLoader variant="inline" size="sm" label="Carregando contato" text="Carregando contato…" />
             ) : (
               <p className="pg-muted">{!p.pessoaId ? 'Pagante sem pessoa vinculada.' : contatoError ? `Não foi possível carregar o contato. ${contatoError}` : 'Pessoa não encontrada ou inativa.'}</p>
             )}
           </Section>
 
-          {p.opId ? <RelatedBlocks p={p} related={related} choices={choices} onOpen={onOpen} /> : null}
+          {p.opId ? <RelatedBlocks p={p} related={related} choices={choices} onOpen={onOpen} recebimentos={source.recebimentos} /> : null}
 
           <Section title="Linha do tempo">
             <ol className="pg-timeline">
@@ -169,9 +172,9 @@ export function PaganteDrawer({ p, onClose, onOpen, choices, contatos, source, o
   )
 }
 
-function RelatedBlocks({ p, related, choices, onOpen }: { p: Pagante; related: Related; choices: ChoiceSet; onOpen: (p: Pagante) => void }) {
+function RelatedBlocks({ p, related, choices, onOpen, recebimentos }: { p: Pagante; related: Related; choices: ChoiceSet; onOpen: (p: Pagante) => void; recebimentos: RecebimentosSource }) {
   if (related == null) {
-    return <Section title="Rateio da OP"><div className="pg-ficha__loading" role="status" aria-label="Carregando rateio"><Skeleton height={18} /><Skeleton height={18} /><Skeleton height={18} /></div></Section>
+    return <Section title="Rateio da OP"><BrandLoader variant="inline" size="sm" label="Carregando rateio" text="Carregando rateio…" /></Section>
   }
   if ('error' in related) return <Alert tone="danger" title="Não foi possível carregar o rateio da OP">{related.error}</Alert>
   // A própria parcela vem da lista (mais nova que a consulta, se o status acabou de mudar).
@@ -215,6 +218,18 @@ function RelatedBlocks({ p, related, choices, onOpen }: { p: Pagante; related: R
           </ul>
         ) : <p className="pg-muted">Nenhum serviço ligado a esta OP.</p>}
       </Section>
+      <Recebimentos source={recebimentos} servicos={related.servicos} />
     </>
+  )
+}
+
+/** Comprovantes de recebimento da OP inteira (o anexo não tem pagante), agrupados por serviço. */
+function Recebimentos({ source, servicos }: { source: RecebimentosSource; servicos: ServicoOp[] }) {
+  const recebimentos = useRecebimentos(source, servicos.map((s) => s.id))
+  return (
+    <Section title="Comprovantes de recebimento" aside={<span className="pg-muted">{resumoRecebimentos(recebimentos.estado)}</span>}>
+      <p className="pg-muted">Comprovantes de todos os serviços da OP, não só deste pagante.</p>
+      <ListaRecebimentos {...recebimentos} source={source} servicos={servicos} />
+    </Section>
   )
 }

@@ -5,6 +5,7 @@ import {
   describeVehicle,
   needsDriverChoice,
   needsFleetChoice,
+  NOT_APPLICABLE_VEHICLE_CHOICE,
   parseInfleetVehicleResolution,
   selectableCandidates,
   thirdPartyResolution,
@@ -139,4 +140,12 @@ test("terceiro com carro atual grava sem perguntar", () => {
 test("terceiro sem carro atual escolhe na frota dele", () => {
   const resolution = thirdPartyResolution(null);
   assert.equal(needsFleetChoice(resolution), true);
+});
+
+test("Não se aplica: carro de terceiro ou sem carro não grava veículo e registra a escolha", () => {
+  const resolution = parseInfleetVehicleResolution(JSON.stringify({ decisao: "indisponivel", motivo: "infleet-indisponivel", candidatos: [] }));
+  const patch = buildInfleetServiceVehiclePatch(resolution, NOT_APPLICABLE_VEHICLE_CHOICE, bind);
+
+  assert.deepEqual(Object.keys(patch), ["new_evidenciaveiculoinfleet"]);
+  assert.equal(JSON.parse(String(patch.new_evidenciaveiculoinfleet)).escolhaMotorista.origem, "nao-se-aplica");
 });

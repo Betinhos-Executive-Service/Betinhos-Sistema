@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { VirtualTable } from '../../../app/VirtualTable'
-import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
+import { openFromRow, openOnRow, openRowActions, selectionRowActions, type SelectionProps } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import { opTone } from '../domain/status'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
 
 type Props = { list: Op[]; choices: OpChoices; onOpen: (id: string) => void; loading?: boolean }
-type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }
+type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode } & Partial<SelectionProps<Op>> & { comprovantes?: TableColumn<Op> }
 
 /** "Fulano - telefone" por linha (texto do flow): na lista basta o nome. */
 export function passageirosCurto(texto: string) {
@@ -30,25 +30,26 @@ export function OpBadge({ op, choices }: { op: Op; choices: OpChoices }) {
 
 function OpenName({ op, onOpen }: { op: Op; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="pg-open" onClick={() => onOpen(op.id)}>
+    <button type="button" className="pg-open" title={op.codigo || undefined} onClick={() => onOpen(op.id)}>
       <strong>{op.codigo || 'OP sem código'}</strong>
-      <span>{op.cliente || 'Sem cliente'}</span>
     </button>
   )
 }
 
-export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
+export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, footer, empty, selection, bulkActions, comprovantes }: TableProps) {
   const columns: TableColumn<Op>[] = [
     { key: 'op', header: 'OP', label: 'OP', sortable: true, defaultWidth: 220, width: 'minmax(160px, 1.3fr)', cell: (op) => <OpenName op={op} onOpen={onOpen} /> },
+    ...(comprovantes ? [comprovantes] : []),
+    { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span title={op.cliente || undefined}>{op.cliente || 'Sem cliente'}</span> },
     { key: 'servicos', header: 'Serviços', label: 'Serviços', sortable: true, defaultWidth: 200, width: 'minmax(130px, 1fr)', cell: (op) => <span className="pg-num">{periodo(op)}</span> },
     { key: 'passageiros', header: 'Passageiros', label: 'Passageiros', sortable: true, defaultWidth: 240, width: 'minmax(160px, 1.4fr)', hideBelow: 'compact', cell: (op) => passageirosCurto(op.passageiros) || '—' },
-    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', align: 'end', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },
+    { key: 'valor', header: 'Valor', label: 'Valor', sortable: true, defaultWidth: 130, width: 'minmax(104px, .8fr)', cell: (op) => <span className="pg-num" title={op.valor == null && op.valorServicos != null ? 'Soma dos serviços' : undefined}>{formatMoney(valorOp(op))}</span> },
     { key: 'status', header: 'Status', label: 'Status', sortable: true, defaultWidth: 180, width: 'minmax(150px, 1fr)', cell: (op) => <OpBadge op={op} choices={choices} /> },
     { key: 'criada', header: 'Criada em', label: 'Criada em', sortable: true, defaultWidth: 130, width: 'minmax(88px, .7fr)', hideBelow: 'compact', cell: (op) => formatDate(op.criadoEm) },
   ]
   return (
-    <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+    <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
+      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -63,22 +63,29 @@ type ExpansivelProps = {
   rotulos: readonly [string, string]
   aberta: boolean
   onAlternar: () => void
+  /** Ação extra da linha (ex.: "Ver serviços"), na mesma fileira do botão de abrir. */
+  acao?: ReactNode
 }
 
 /**
  * Célula das listas do celular: só o resumo da linha e um botão (alvo de 44 px) que abre o detalhe
  * logo abaixo, na mesma célula, sem rolagem horizontal. O detalhe só existe no DOM quando aberto.
  */
-export function Expansivel({ resumo, itens, rotulos: [abrir, fechar], aberta, onAlternar }: ExpansivelProps) {
+export function Expansivel({ resumo, itens, rotulos: [abrir, fechar], aberta, onAlternar, acao }: ExpansivelProps) {
   const id = useId()
   const mostrar = aberta && itens.length > 0
   return (
     <span className="dash-expansivel">
       <span id={`${id}-resumo`} className="dash-expansivel__resumo">{resumo}</span>
-      {itens.length ? (
-        <Button className="dash-expansivel__botao" variant="ghost" size="touch" aria-expanded={mostrar} aria-controls={mostrar ? `${id}-detalhe` : undefined} aria-describedby={`${id}-resumo`} onClick={onAlternar}>
-          {mostrar ? fechar : abrir}
-        </Button>
+      {itens.length || acao ? (
+        <span className="dash-expansivel__acoes">
+          {itens.length ? (
+            <Button className="dash-expansivel__botao" variant="ghost" size="touch" aria-expanded={mostrar} aria-controls={mostrar ? `${id}-detalhe` : undefined} aria-describedby={`${id}-resumo`} onClick={onAlternar}>
+              {mostrar ? fechar : abrir}
+            </Button>
+          ) : null}
+          {acao}
+        </span>
       ) : null}
       {mostrar ? <span id={`${id}-detalhe`} className="dash-expansivel__detalhe"><Linhas itens={itens} /></span> : null}
     </span>

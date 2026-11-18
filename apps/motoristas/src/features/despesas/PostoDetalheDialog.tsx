@@ -55,7 +55,7 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
       setEnviada(true);
       return true;
     } catch (error) {
-      reportAppError(error, { severity: "warning", source: "app", action: "enviarAvaliacaoPosto", screen: "RankingPostos", notifyUser: false });
+      reportAppError(error, { severity: "warning", source: "app", action: "enviarAvaliacaoPosto", screen: "PostosProximos", notifyUser: false });
       setErro(customApiErrorMessage(error, "Não foi possível enviar a avaliação. Tente de novo."));
       return false;
     } finally {
@@ -81,7 +81,7 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
           <button ref={fecharRef} type="button" className="gr-detalhe-fechar" aria-label="Fechar" disabled={salvando} onClick={pedirFechar}><SystemIcon name="dismiss" /></button>
         </header>
         <div className="gr-detalhe-corpo">
-          <section className="rp-bloco" aria-labelledby="rp-custa">
+          {posto.precoLitro > 0 ? <section className="rp-bloco" aria-labelledby="rp-custa">
             <h3 id="rp-custa">Quanto custa</h3>
             <div className="rp-bloco-linha">
               <strong className="rp-bloco-valor">{formatBRL(posto.precoLitro)}<small>/L</small></strong>
@@ -98,7 +98,7 @@ export function PostoDetalheDialog({ posto, dias, onAvaliado, onClose }: { posto
                 </ul>
               </details>
             ) : null}
-          </section>
+          </section> : null}
           <section className="rp-bloco" aria-labelledby="rp-onde">
             <h3 id="rp-onde">Onde fica · {rotuloDistancia(posto)} de você</h3>
             {posto.endereco ? <p className="rp-bloco-endereco">{enderecoLegivel(posto.endereco)}</p> : null}

@@ -61,6 +61,7 @@ describe('Pessoas', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar pessoa' }))
     expect(await screen.findByText('Nome muito curto.')).toBeTruthy()
+    expect(screen.getByText('Escolha o cliente.')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     const confirm = await screen.findByRole('dialog', { name: 'Descartar alterações?' })
@@ -68,6 +69,8 @@ describe('Pessoas', () => {
     expect(screen.getByRole('dialog', { name: 'Nova pessoa' })).toBeTruthy()
 
     fireEvent.change(nome, { target: { value: 'Ana Beatriz Lima' } })
+    fireEvent.click(screen.getByRole('combobox', { name: /Cliente/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Grupo Atlântico', hidden: true }))
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar pessoa' }))
     expect(await screen.findByText('Ana Beatriz Lima cadastrado.')).toBeTruthy()
     expect(await screen.findByRole('dialog', { name: 'Ana Beatriz Lima' })).toBeTruthy()

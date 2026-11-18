@@ -181,7 +181,18 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var s = NewScene();
             s.Service.Rows("new_checklistmodelo").ForEach(modelo => modelo["new_ativo"] = false);
+            s.Service.Template(padrao: false, name: "Blindados", filtro: Blindado, prioridade: 10);
             Assert.Throws<InvalidPluginExecutionException>(() => Run(s, s.Vehicle, s.OldVehicle));
+        }
+
+        [Fact]
+        public void SemNenhumModeloAtivoIgnoraSemConsultarAInfleet()
+        {
+            var s = NewScene();
+            s.Service.Rows("new_checklistmodelo").ForEach(modelo => modelo["new_ativo"] = false);
+            Assert.Equal("ignorado:sem-modelo-ativo", Run(s, s.Vehicle, s.OldVehicle));
+            Assert.Empty(s.Service.Rows("new_checklistveiculo"));
+            Assert.Null(s.History.AskedVehicle);
         }
 
         [Fact]

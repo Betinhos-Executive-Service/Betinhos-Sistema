@@ -1,4 +1,5 @@
 import { createFetchWebApi } from "./fetchWebApi.ts";
+import { canFetchOnDataverseHost } from "./cliente.ts";
 
 // Execução de Custom API (Action não vinculada) pelo Xrm.WebApi.online.execute, compartilhada por comunicados e termos de multa.
 type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown>) => Promise<Response> } } };
@@ -13,12 +14,15 @@ export function customApiErrorMessage(error: unknown, fallback: string) {
 }
 
 export async function executeCustomApi(operationName: string, parameters: CustomApiParameters): Promise<Record<string, unknown>> {
-  let xrm: XrmApi | undefined;
-  try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
-  xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
-  let online = xrm?.WebApi?.online;
-  // URL direta do web resource (host do Dataverse, sem Xrm): Action não vinculada por fetch com o cookie da sessão.
-  if (!online && /\.dynamics\.com$/i.test(window.location.hostname)) online = createFetchWebApi(window.location.origin, {}).online;
+  // Host do Dataverse (URL direta ou model-driven): Action não vinculada por fetch com o cookie da sessão.
+  let online: NonNullable<NonNullable<XrmApi["WebApi"]>["online"]> | undefined =
+    canFetchOnDataverseHost() ? createFetchWebApi(window.location.origin, {}).online : undefined;
+  if (!online) {
+    let xrm: XrmApi | undefined;
+    try { xrm = (window.parent as Window & { Xrm?: XrmApi }).Xrm; } catch { /* Parent may be cross-origin. */ }
+    xrm ??= (window as Window & { Xrm?: XrmApi }).Xrm;
+    online = xrm?.WebApi?.online;
+  }
   // O Xrm depende do `this`; extrair o método solto quebra com "reading '_execute'".
   const execute = online?.execute?.bind(online);
   if (!execute) throw new Error("Abra o app pelo Power Apps ou pelo link do Dataverse para registrar esta ação.");

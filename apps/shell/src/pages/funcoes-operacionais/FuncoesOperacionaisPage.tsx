@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Button, Spinner, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
+import { Button, Tabs, ToastProvider, useShellHeader, useToast } from '@betinhos/ui'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { patchHashQuery, useHashQuery } from '../../nav/useHashRoute'
@@ -12,6 +12,7 @@ import { CarroTab } from './components/CarroTab'
 import { CloneDrawer, DiscardDialog, LifecycleDrawer, LocationDrawer, ServiceDetailDrawer } from './components/Drawers'
 import { Icon } from './components/Icon'
 import { MotoristaTab, PedidoTab } from './components/ServiceLists'
+import { BrandLoader } from '../../app/BrandLoader'
 import './funcoes-operacionais.css'
 
 /** Funções Operacionais: trocar motorista, duplicar pedido e trocas de carro (antigo WebResource new_telafuncoesoperacionais). */
@@ -92,8 +93,10 @@ function FuncoesOperacionais({ host }: { host: Host }) {
         actions={refreshButton}
         tabs={<Tabs tabs={TABS} value={view} onChange={fo.switchView} aria-label="Funções operacionais" />}
       >
-        <div className={`fo-content content--${view} content--motion-${state.transitionKind || 'local'}`}>
+        <div className={`fo-content brand-loader-host content--${view} content--motion-${state.transitionKind || 'local'}`}>
           {view === 'driver' ? <MotoristaTab fo={fo} /> : view === 'clone' ? <PedidoTab fo={fo} /> : <CarroTab fo={fo} />}
+          {/* Recarga: véu só sobre o conteúdo da aba; menu, abas e cabeçalho continuam livres. */}
+          {state.loading && state.firstLoadDone ? <BrandLoader label={state.loadingMessage || 'Carregando...'} text={state.loadingMessage || 'Carregando...'} /> : null}
         </div>
       </PageLayout>
 
@@ -102,12 +105,6 @@ function FuncoesOperacionais({ host }: { host: Host }) {
       <ServiceDetailDrawer fo={fo} view={view} />
       <CloneDrawer fo={fo} />
       <DiscardDialog fo={fo} />
-
-      {state.loading && state.firstLoadDone && (
-        <div className="loading-overlay">
-          <div className="loading-card"><Spinner label={state.loadingMessage || 'Carregando...'} size={24} /><p aria-hidden="true">{state.loadingMessage || 'Carregando...'}</p></div>
-        </div>
-      )}
     </div>
   )
 }

@@ -4,8 +4,8 @@ import type { DespesaCombustivel, Manutencao, Multa } from '../data/types'
 import { custoPorMesEmpilhado, custoPorVeiculo, custoTotalVeiculo, type EntradaCusto } from './custoTotal'
 
 const periodo = { de: '2026-08-01', ate: '2026-10-02' }
-const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, dataManutencao: '2026-08-20T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-08-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
-const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, titulo: id, status: MULTA.NOTIFICAR, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC1D23' }, motorista: null, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null, ...extra })
+const manut = (id: string, extra: Partial<Manutencao>): Manutencao => ({ id, codigo: id, descricao: id, status: MANUT.REALIZADO, grau: 1, tipo: 1, agendarPara: null, janelaInicio: null, janelaFim: null, dataAprovacao: null, kmRealizado: null, dataManutencao: '2026-08-20T12:00:00Z', valor: null, estabelecimento: null, servicoRealizado: null, comentarioAprovador: null, km: null, veiculo: { id: 'v1', label: 'ABC1D23' }, solicitante: null, criadoEm: '2026-08-10T12:00:00Z', servicos: [], categorias: [], origemClassificacao: null, confiancaIa: null, ...extra })
+const multa = (id: string, extra: Partial<Multa>): Multa => ({ id, codigo: null, titulo: id, status: MULTA.NOTIFICAR, dataHora: '2026-09-10T12:00:00Z', local: null, dataParaIndicar: null, indicado: false, dataAviso: null, dataIndicacao: null, veiculo: { id: 'v1', label: 'ABC1D23' }, motorista: null, infracaoId: null, criadoEm: '2026-09-11T12:00:00Z', valorGuia: null, recursoPendente: false, termoVigente: null, ...extra })
 const desp = (id: string, extra: Partial<DespesaCombustivel>): DespesaCombustivel => ({ id, dia: '2026-09-05', valor: null, veiculo: { id: 'v1', label: 'ABC1D23' }, manutencao: null, categoria: 'combustivel', ...extra })
 
 const entrada: EntradaCusto = {
@@ -31,6 +31,11 @@ const entrada: EntradaCusto = {
 }
 
 describe('custoTotalVeiculo', () => {
+  it('multa cancelada não entra no custo (nem na quantidade), mesmo com valor de infração', () => {
+    const comCancelada = { ...entrada, multas: [...entrada.multas, multa('cancelada', { infracaoId: 'i1', status: MULTA.CANCELADA })] }
+    expect(custoTotalVeiculo(comCancelada, 'v1', periodo).porFonte.multas).toEqual({ valor: 130.16, qtd: 2, semValor: 1, indisponivel: false })
+  })
+
   it('soma as quatro fontes com semValor por fonte, ignorando multa finalizada sem valor e combustível fora do período', () => {
     const r = custoTotalVeiculo(entrada, 'v1', periodo)
     expect(r.porFonte.manutencao).toEqual({ valor: 150.55, qtd: 3, semValor: 1, indisponivel: false })

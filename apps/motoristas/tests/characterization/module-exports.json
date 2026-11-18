@@ -1,4 +1,7 @@
 {
+  "src/lib/guidDeterministico.ts": [
+    "guidDeterministico"
+  ],
   "src/lib/localWorkflow.ts": [
     "LocalStore",
     "VoucherValidationField",
@@ -37,6 +40,7 @@
     "InfleetVehicleCandidate",
     "InfleetVehicleDecision",
     "InfleetVehicleResolution",
+    "NOT_APPLICABLE_VEHICLE_CHOICE",
     "SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN",
     "SERVICE_VEHICLE_ORIGIN_INFLEET",
     "buildInfleetServiceVehiclePatch",
@@ -224,6 +228,11 @@
   "src/shared/currencyInput.ts": [
     "formatCurrencyInputOnBlur",
     "sanitizeCurrencyInput"
+  ],
+  "src/shared/erroDeRede.ts": [
+    "SEM_CONEXAO_MESSAGE",
+    "ehErroDeRede",
+    "estaOnline"
   ],
   "src/shared/errorLogGrouping.ts": [
     "ErrorCause",

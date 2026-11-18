@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Dialog, EmptyState, Field, Select, Skeleton } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, Field, Select } from '@betinhos/ui'
 import { CalendarCheck } from 'lucide-react'
 import { formatMoney } from '../../pagantes/domain/messages'
 import type { FechamentoMes, Source } from '../data/source'
 import type { Pendencia } from '../domain/types'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
@@ -73,7 +74,7 @@ export function FecharMesDialog({ pendencia, escolha, source, onClose, onDone }:
           <Button loading={fechando} disabled={!p || fechando} onClick={() => void fechar()}>Fechar mês</Button>
         </>}>
       {escolha?.erro ? <Alert tone="danger" title="Não foi possível carregar os meses">{escolha.erro}</Alert>
-        : escolha && opcoes == null ? <span className="pend-corrigir__loading" role="status" aria-label="Carregando meses"><Skeleton height={18} /><Skeleton height={18} /></span>
+        : escolha && opcoes == null ? <BrandLoader variant="inline" size="md" label="Carregando meses" text="Carregando meses…" />
         : semOpcoes ? <EmptyState align="start" icon={<CalendarCheck size={32} />} title="Nenhum mês para fechar">Não há serviços mensais concluídos sem OP em meses encerrados.</EmptyState>
         : (
           <>

@@ -4,6 +4,11 @@ description: "Verifica o backend do termo de multa com assinatura eletrônica: p
 ---
 # Verificar termo de multa (backend)
 
+> **Fase 1 das multas (17/11/2026): o termo está escondido no Sistema Betinhos** (volta na fase 3). As Custom APIs do termo
+> continuam publicadas, mas ninguém envia termo novo. Atenção: `new_AssinarTermoMulta` e `new_ContestarTermoMulta` gravam
+> `cr40f_status` da multa; com a trava das multas em `travar` (variável `cr40f_MultasTravaModo`), essa gravação é recusada.
+> Antes de religar o termo na fase 3, a trava precisa aceitar essas mensagens no `ParentContext`.
+
 ## Cobre
 - `packages/plugins/Betinhos.DriverRecordSharing/TermoMultaCommandPlugin.cs`, `TermoMultaDocumento.cs`, `MiniPdf.cs`.
 - `packages/plugins/Betinhos.DriverRecordSharing.Tests/TermoMultaCommandPluginTests.cs`, `MiniPdfTests.cs`.

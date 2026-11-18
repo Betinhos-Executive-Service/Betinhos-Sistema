@@ -1,18 +1,24 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, Drawer, Skeleton } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, StatusBadge } from '@betinhos/ui'
 import { ExternalLink, MapPin } from 'lucide-react'
 import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
 import { label } from '../../pagantes/domain/status'
 import type { Source } from '../data/source'
 import { LINKED } from '../data/queries'
+import { Canal, cartaoTexto, Situacao } from '../conciliacao/components/TransacoesLista'
+import { ehPluggy } from '../conciliacao/domain/regras'
+import type { Transacao } from '../conciliacao/domain/types'
+import { fmtData } from '../../equipamentos/components/EquipamentosList'
 import type { Anexo, Despesa, DespesaChoices } from '../domain/types'
 import { decidivel, type Decisao } from '../domain/decisao'
 import { AnaliseIA } from './AnaliseIA'
 import { DecisaoBloco, type EstadoDecisao } from './DecisaoBloco'
 import { Item } from './Ficha'
-import { ComprovantesGaleria } from './Comprovantes'
+import { ComprovantesGaleria } from '../../../lib/comprovantes/Galeria'
+import { arquivoTone } from '../domain/status'
 import { Alertas, FinanceiroBadge, OperacionalBadge, titulo } from './DespesasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   despesa: Despesa | null
@@ -20,12 +26,16 @@ type Props = {
   choices: DespesaChoices
   source: Source
   version: number
+  /** Compra do cartão ligada a esta despesa (conciliação); `onAbrirCompra` abre a compra para casar, ignorar ou reabrir. */
+  compra?: Transacao | null
+  onAbrirCompra?: (id: string) => void
   /** Grava a decisão e avisa o resultado; true = gravou (a ficha pode já ter avançado para outra despesa). */
   onDecidir: (d: Despesa, tipo: Decisao, motivo: string) => Promise<boolean>
 }
 type Anexos = Anexo[] | { error: string } | null
 const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const numero = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 })
+const precoLitro = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 4 })
 
 function Section({ title, children, aside }: { title: string; children: ReactNode; aside?: ReactNode }) {
   return (
@@ -56,7 +66,7 @@ function useAnexos(source: Source, id: string | null, version: number) {
   return data
 }
 
-export function DespesaDrawer({ despesa: d, onClose, choices, source, version, onDecidir }: Props) {
+export function DespesaDrawer({ despesa: d, onClose, choices, source, version, compra, onAbrirCompra, onDecidir }: Props) {
   const anexos = useAnexos(source, d?.id ?? null, version)
   const [estadoBloco, setDecisao] = useState<EstadoDecisao>('livre')
   const [descartando, setDescartando] = useState(false)
@@ -106,6 +116,33 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version, o
             </dl>
           </Section>
 
+          {compra ? (
+            <Section title="Compra no cartão" aside={onAbrirCompra ? <Button variant="secondary" size="compact" onClick={() => onAbrirCompra(compra.id)}>Abrir compra</Button> : undefined}>
+              <dl className="pg-ficha__grid">
+                <Item label="Canal"><Canal t={compra} /></Item>
+                <Item label="Situação"><Situacao t={compra} /></Item>
+                <Item label="Estabelecimento">{compra.estabelecimento || compra.descricao}</Item>
+                <Item label="Data da compra">{fmtData(compra.dataCompra)}</Item>
+                <Item label="Valor"><span className="pg-num">{formatMoney(compra.valor)}</span></Item>
+                <Item label="Cartão">{ehPluggy(compra) ? cartaoTexto(compra) : ''}</Item>
+                {ehPluggy(compra) ? null : (
+                  <>
+                    <Item label="Placa">{compra.placa}</Item>
+                    <Item label="Veículo">{compra.veiculoNome}</Item>
+                    <Item label="Combustível">{compra.combustivel}</Item>
+                    <Item label="Litros">{compra.litros != null ? <span className="pg-num">{numero.format(compra.litros)}</span> : ''}</Item>
+                    <Item label="Preço por litro">{compra.precoLitro != null ? <span className="pg-num">{precoLitro.format(compra.precoLitro)}</span> : ''}</Item>
+                    <Item label="Hodômetro">{compra.hodometro != null ? <span className="pg-num">{numero.format(compra.hodometro)}</span> : ''}</Item>
+                    <Item label="KM rodado">{compra.kmRodado != null ? <span className="pg-num">{numero.format(compra.kmRodado)}</span> : ''}</Item>
+                    <Item label="Desconto">{compra.desconto != null ? <span className="pg-num">{formatMoney(compra.desconto)}</span> : ''}</Item>
+                    <Item label="Cidade do posto">{compra.cidadePosto}</Item>
+                  </>
+                )}
+                {compra.motivo ? <Item label="Motivo"><span className="dp-texto">{compra.motivo}</span></Item> : null}
+              </dl>
+            </Section>
+          ) : null}
+
           <Section title="Vínculos">
             <dl className="pg-ficha__grid">
               <Item label="Motorista"><Vinculo nome={d.motorista} url={url(LINKED.motorista, d.motoristaId)} /></Item>
@@ -153,12 +190,14 @@ export function DespesaDrawer({ despesa: d, onClose, choices, source, version, o
 
 function Comprovantes({ anexos, choices, statusAnexo, source }: { anexos: Anexos; choices: DespesaChoices; statusAnexo: string; source: Source }) {
   if (anexos == null) {
-    return <Section title="Comprovantes"><div className="pg-ficha__loading" role="status" aria-label="Carregando comprovantes"><Skeleton height={18} /><Skeleton height={18} /></div></Section>
+    return <Section title="Comprovantes"><BrandLoader variant="inline" size="sm" label="Carregando comprovantes" text="Carregando comprovantes…" /></Section>
   }
   if ('error' in anexos) return <Alert tone="danger" title="Não foi possível carregar os comprovantes">{anexos.error}</Alert>
+  const meta = (a: Anexo) => [label(choices.anexoTipo, a.tipo, ''), a.enviadoEm ? formatDateTime(a.enviadoEm) : ''].filter(Boolean).join(' · ')
+  const selo = (a: Anexo) => <StatusBadge tone={arquivoTone(a.status)}>{label(choices.anexoStatus, a.status, 'Sem status')}</StatusBadge>
   return (
     <Section title="Comprovantes" aside={<span className="pg-muted">{statusAnexo}</span>}>
-      {anexos.length ? <ComprovantesGaleria anexos={anexos} choices={choices} ler={source.arquivo} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
+      {anexos.length ? <ComprovantesGaleria anexos={anexos} ler={source.arquivo} meta={meta} selo={selo} provas={source.provas} /> : <p className="pg-muted">Nenhum comprovante enviado.</p>}
     </Section>
   )
 }

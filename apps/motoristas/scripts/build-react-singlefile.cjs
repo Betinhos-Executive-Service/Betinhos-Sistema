@@ -27,6 +27,7 @@ async function run() {
     define: { "process.env.NODE_ENV": '"production"' },
     loader: {
       ".png": "dataurl",
+      ".webp": "dataurl",
       ".jpg": "dataurl",
       ".jpeg": "dataurl",
       ".svg": "dataurl",
@@ -44,6 +45,7 @@ async function run() {
     minify: true,
     loader: {
       ".png": "dataurl",
+      ".webp": "dataurl",
       ".jpg": "dataurl",
       ".jpeg": "dataurl",
       ".svg": "dataurl",
@@ -90,16 +92,26 @@ async function run() {
 
   const initScript = `<script>window.__APP_FLOW_ENV=${flowEnv};window.__APP_BUILD_INFO=${buildInfo};</script>`;
 
+  // Splash da marca: o mesmo do index.html do dev (estilo e marcação), com a logo embutida. Pinta antes do JS inline.
+  const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const splashStyle = indexHtml.match(/<style>[\s\S]*?#boot-splash[\s\S]*?<\/style>/)?.[0];
+  const splashMarkup = indexHtml.match(/<div id="boot-splash"[\s\S]*?<\/div>\s*<\/div>/)?.[0];
+  if (!splashStyle || !splashMarkup) throw new Error("index.html sem o splash #boot-splash");
+  const splashLogo = `data:image/webp;base64,${fs.readFileSync(path.join(root, "src", "assets", "images", "logo-betinhos-b-192.webp")).toString("base64")}`;
+  const splash = splashMarkup.replace(/src="[^"]*"/, `src="${splashLogo}"`);
+
   const html = `<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>App Betinhos Motoristas</title>
+    ${splashStyle}
     <style>${css}</style>
   </head>
   <body>
     <div id="root"></div>
+    ${splash}
     ${initScript}
     <script>${js}</script>
   </body>

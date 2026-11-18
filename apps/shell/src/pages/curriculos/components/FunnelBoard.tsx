@@ -1,9 +1,10 @@
-import { Button, Skeleton, StatusBadge } from '@betinhos/ui'
+import { Button, StatusBadge } from '@betinhos/ui'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ChoiceSet, Curriculo } from '../domain/types'
 import type { Stage } from '../domain/funnel'
 import type { BoardDrag } from '../useBoardDrag'
 import { CurriculoCard } from './CurriculoCard'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   stages: Stage[]
@@ -57,15 +58,7 @@ export function FunnelBoard({ stages, groups, choices, now, onOpen, onMove, drag
   )
 }
 
+/** Primeira carga do quadro: loader da marca no lugar das colunas. */
 export function BoardSkeleton() {
-  return (
-    <div className="cv-board cv-board--skeleton" aria-busy="true" aria-label="Carregando currículos">
-      {Array.from({ length: 4 }, (_, column) => (
-        <div key={column} className="cv-col">
-          <Skeleton width="60%" height={24} />
-          {Array.from({ length: 3 }, (_, row) => <Skeleton key={row} shape="rect" height={96} />)}
-        </div>
-      ))}
-    </div>
-  )
+  return <BrandLoader variant="inline" label="Carregando currículos" text="Carregando currículos…" />
 }

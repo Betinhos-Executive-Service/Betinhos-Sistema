@@ -70,4 +70,21 @@ describe('injectTableFilters', () => {
     expect(last.outerHTML).toBe('<filter type="and"><condition attribute="cr40f_trajeto" operator="like" value="GRU%"/></filter>')
     expect(injectTableFilters(VIEW, emptyFilters(), fields)).toBe(VIEW)
   })
+
+  it('Comprovantes Sim/Não vira link-entity any/not any em cr40f_anexorecebimento_v2, também dentro do avançado', () => {
+    expect(fields.find((f) => f.key === 'comprovantes')).toMatchObject({ kind: 'bool' })
+    const filters: TableFilters = {
+      quick: { comprovantes: { type: 'condition', id: 'q', field: 'comprovantes', op: 'yes' } },
+      advanced: { type: 'group', id: 'g', logic: 'or', items: [
+        { type: 'condition', id: 'a', field: 'comprovantes', op: 'no' },
+        { type: 'condition', id: 'b', field: 'cr40f_trajeto', op: 'eq', value: 'GRU' },
+      ] },
+    }
+    const doc = new DOMParser().parseFromString(injectTableFilters(VIEW, filters, fields), 'text/xml')
+    const link = '<link-entity name="cr40f_anexorecebimento_v2" from="cr40f_reserva" to="cr40f_reservadeveculosid" link-type='
+    expect(doc.querySelector('entity')!.lastElementChild!.outerHTML).toBe(
+      `<filter type="and">${link}"any"/><filter type="or">${link}"not any"/><condition attribute="cr40f_trajeto" operator="eq" value="GRU"/></filter></filter>`,
+    )
+    expect(doc.querySelector('condition[attribute="comprovantes"]')).toBeNull()
+  })
 })

@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Table, type TableColumn } from '@betinhos/ui'
+import { StatCard, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularMultas, type LinhaMultaInfracao, type LinhaMultaMotorista, type MultasMes } from '../../domain/abas/multas'
@@ -10,8 +11,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -33,15 +34,16 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const mu = useMemo(() => calcularMultas(ctx, dados), [ctx, dados])
   const k = mu.kpis
   const abrir = useDetalhe()
-  const verPendentes = abrir && k?.pendentes ? { texto: 'Ver multas', onAbrir: () => abrir('multas') } : undefined
+  const verPendentes = abrir && k?.pendentes ? () => abrir('multas') : undefined
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom="warning" valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Notificar o condutor', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
-        {mu.ant ? <ChipAnt chip={mu.ant.pendentes} /> : undefined}
-      </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom="success" valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Pago, Descontado ou Finalizado' }, ...parte(k.resolvidas)] : []} />
+      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [mu.ant?.total] })} />
+      <StatCard
+        label={KPIS[1]} {...tomAtencao(k?.pendentes)} value={k ? int(k.pendentes) : null} onOpen={verPendentes}
+        {...extrasKpi({ chips: [mu.ant?.pendentes], apoio: k ? [{ rotulo: 'Status', texto: 'Identificar o responsável', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : [] })}
+      />
+      <StatCard label={KPIS[2]} value={k ? int(k.resolvidas) : null} {...extrasKpi({ apoio: k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : [] })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -66,14 +68,14 @@ function PorMesCard({ pontos, total, periodo }: { pontos: MultasMes[]; total: nu
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Multas', (p) => juntar(multas(p.qtd), `${int(p.pendentes)} pendentes`))]
     : [
       { key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) },
-      { key: 'q', header: 'Multas', align: 'end', cell: (p) => int(p.qtd) },
-      { key: 'p', header: 'Pendentes', align: 'end', cell: (p) => int(p.pendentes) },
+      { key: 'q', header: 'Multas', cell: (p) => int(p.qtd) },
+      { key: 'p', header: 'Pendentes', cell: (p) => int(p.pendentes) },
     ]
   return (
     <AnaliseCard
       titulo="Multas por mês" periodo={periodo} unidade="multas por mês" valor={multas(total)} sub="Pela data da multa"
       grafico={pontos.length ? <BarraChart descricao={`Multas por mês, ${periodo}`} nome="Multas" formatar={int} larguraEixo={36} dados={pontos.map((p) => ({ rotulo: p.rotulo, valor: p.qtd }))} /> : undefined}
-      tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma multa no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma multa no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Multas', (p) => p.qtd], ['Pendentes', (p) => p.pendentes]])}
       tabelaSobDemanda={pontos.length > 0}
     />
@@ -86,15 +88,15 @@ function PorMotoristaCard({ linhas, periodo }: { linhas: LinhaMultaMotorista[]; 
     ? [{ key: 'n', header: 'Motorista', cell: (l) => l.motorista }, resto('Multas', (l) => juntar(multas(l.qtd), `Participação ${pct(l.pct)}`))]
     : [
       { key: 'n', header: 'Motorista', width: 'minmax(0, 1.3fr)', cell: (l) => forte(l.motorista) },
-      { key: 'q', header: 'Multas', align: 'end', width: 'minmax(56px, .5fr)', cell: (l) => int(l.qtd) },
-      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.4fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.motorista}`} tom="warning" /></span> },
+      { key: 'q', header: 'Multas', width: 'minmax(56px, .5fr)', cell: (l) => int(l.qtd) },
+      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.4fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.motorista}`} /></span> },
     ]
   const [maior] = linhas
   return (
     <AnaliseCard
       titulo="Por motorista" periodo={periodo} unidade="multas"
       valor={maior ? maior.motorista : undefined} sub={maior ? `Mais multas · ${multas(maior.qtd)} · ${pct(maior.pct)} do total` : undefined}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.motorista} empty={<Vazio titulo="Nenhuma multa no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.motorista} empty={<Vazio titulo="Nenhuma multa no período" />} />}
       copiar={tabelaCopia(linhas, [['Motorista', (l) => l.motorista], ['Multas', (l) => l.qtd], ['Participação', (l) => pct(l.pct)]])}
     />
   )
@@ -106,15 +108,15 @@ function PorInfracaoCard({ linhas, periodo }: { linhas: LinhaMultaInfracao[]; pe
     ? [{ key: 'i', header: 'Infração', cell: (l) => l.infracao }, resto('Multas', (l) => juntar(multas(l.qtd), `Participação ${pct(l.pct)}`))]
     : [
       { key: 'i', header: 'Infração (código e descrição)', width: 'minmax(0, 2.4fr)', cell: (l) => <span className="dash-mu-infracao">{l.infracao}</span> },
-      { key: 'q', header: 'Multas', align: 'end', width: 'minmax(64px, .4fr)', cell: (l) => int(l.qtd) },
-      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.infracao}`} tom="warning" /></span> },
+      { key: 'q', header: 'Multas', width: 'minmax(64px, .4fr)', cell: (l) => int(l.qtd) },
+      { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.infracao}`} /></span> },
     ]
   const [maior] = linhas
   return (
     <AnaliseCard
       largo titulo="Por infração" periodo={periodo} unidade="multas"
       valor={maior ? multas(maior.qtd) : undefined} sub={maior ? `Infração mais frequente: ${maior.infracao}` : undefined}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.infracao} empty={<Vazio titulo="Nenhuma multa no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.infracao} empty={<Vazio titulo="Nenhuma multa no período" />} />}
       copiar={tabelaCopia(linhas, [['Infração', (l) => l.infracao], ['Multas', (l) => l.qtd], ['Participação', (l) => pct(l.pct)]])}
     />
   )

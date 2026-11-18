@@ -8,8 +8,11 @@ import { AgendaCard } from "../../shared/ui/AgendaCard";
 import { ComunicadoAgendaCard } from "../comunicados/ComunicadoAgendaCard";
 import { ChecklistAgendaCard } from "../checklist/ChecklistAgendaCard";
 import { PullToRefresh } from "../../shared/ui/PullToRefresh";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import type { ComunicadoDestinatario } from "../comunicados/comunicados";
 import type { ChecklistVeiculo } from "../checklist/checklists";
+import { chaveDoEnvio } from "../envio-pendente/fila";
+import { useFilaEnvio } from "../envio-pendente/useFilaEnvio";
 
 type ServicesScreenProps = {
   items: AgendaItem[];
@@ -22,11 +25,14 @@ type ServicesScreenProps = {
   onOpenComunicado?: (id: string) => void;
   pendingChecklists?: ChecklistVeiculo[];
   onOpenChecklist?: (id: string) => void;
+  /** Agenda carregando: o loader fica só na lista; avisos, cabeçalho e navegação seguem usáveis. */
+  loading?: boolean;
 };
 
-export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey = "", queueHighlightDetailKey = "", onOpenDetails, pendingComunicados = [], onOpenComunicado, pendingChecklists = [], onOpenChecklist }: ServicesScreenProps) {
+export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey = "", queueHighlightDetailKey = "", onOpenDetails, pendingComunicados = [], onOpenComunicado, pendingChecklists = [], onOpenChecklist, loading = false }: ServicesScreenProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const enviosPendentes = useFilaEnvio();
   const visibleItems = useMemo(() => filterAgendaGalleryItems(items, now), [items, now]);
 
   useEffect(() => {
@@ -62,7 +68,9 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
           </section>
         ) : null}
         <PullToRefresh scrollRef={listRef} onRefresh={onRefresh}>
-        {visibleItems.length === 0 ? (
+        {visibleItems.length === 0 && loading ? (
+          <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços" />
+        ) : visibleItems.length === 0 ? (
           <div className="empty-services">Nenhum serviço atribuído a você no momento</div>
         ) : (
             <div ref={listRef} className="agenda-list">
@@ -94,6 +102,7 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
                       index={index}
                       isCompleting={isCompleting}
                       isQueueHighlight={isQueueHighlight}
+                      envioPendente={Boolean(item.detail && enviosPendentes.some((envio) => envio.id === chaveDoEnvio(item.detail!)))}
                       onOpen={(selected) => selected.detail && onOpenDetails(selected.detail)}
                     />
                   </motion.div>
@@ -102,6 +111,7 @@ export function ServicesScreen({ items, onHome, onRefresh, completingDetailKey =
             </AnimatePresence>
           </div>
         )}
+        {loading && visibleItems.length > 0 ? <BrandLoader label="Atualizando serviços" size="md" /> : null}
         </PullToRefresh>
       </section>
     </AppShell>

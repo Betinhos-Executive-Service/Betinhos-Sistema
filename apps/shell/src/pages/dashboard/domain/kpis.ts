@@ -12,6 +12,8 @@ export function ticketStats(rows: Reserva[]) {
   const value = soma(eleg)
   return { value, count: eleg.length, ticket: eleg.length ? value / eleg.length : 0 }
 }
+/** Ticket de uma linha de tabela: null (mostra "—") quando nenhum serviço é elegível, em vez de R$ 0,00 para quem faturou. */
+export const ticketOuNulo = (rows: Reserva[]) => { const t = ticketStats(rows); return t.count ? t.ticket : null }
 
 export function recebimentoStats(rows: Reserva[]) {
   const recebido = soma(rows.filter((r) => r.fatStatus === FAT_PAGO && r.valor > 0))
@@ -92,11 +94,14 @@ export function comparacao({ todas, f, now }: Contexto): Comparacao {
   }
 }
 
-/** Últimos 8 meses com serviço; sem nenhum, mai–dez do ano corrente (L13626–13636). */
-function mesesTendencia(rv: Reserva[], now: Date) {
+/** Meses com serviço; sem nenhum, os do ano corrente. Os KPIs usam os últimos 8 (L13626–13636). */
+function mesesDaSerie(rv: Reserva[], now: Date) {
   const meses = mesesComDados(rv)
-  return (meses.length ? meses : mesesDoAno(parseDia(hojeBR(now)).y)).slice(-8)
+  return meses.length ? meses : mesesDoAno(parseDia(hojeBR(now)).y)
 }
+
+/** Tom do anel de recebimento: abaixo de 50% atenção, a partir de 80% em dia, no meio neutro. */
+export const tomRecebimento = (razao: number): 'warn' | 'action' | 'ok' => (razao < 0.5 ? 'warn' : razao >= 0.8 ? 'ok' : 'action')
 
 export function kpisExecutivos(ctx: Contexto, cmp: Comparacao): Kpi[] {
   const { todas, rv, f, now } = ctx
@@ -112,9 +117,10 @@ export function kpisExecutivos(ctx: Contexto, cmp: Comparacao): Kpi[] {
   const lyTk = ticketDoPeriodo(todas, cmp.ly.inicio, cmp.ly.fim, f).ticket
 
   const byM = agrupar(rv, (r) => r.mes)
-  const meses = mesesTendencia(rv, now)
-  const serie = (fn: (rows: Reserva[]) => number): PontoSerie[] =>
-    meses.map((mes) => ({ mes, rotulo: MESES_CURTOS[Number(mes.slice(5, 7)) - 1], valor: fn(byM.get(mes) ?? []) }))
+  const todosMeses = mesesDaSerie(rv, now)
+  const meses = todosMeses.slice(-8)
+  const serie = (fn: (rows: Reserva[]) => number, doMeses = meses): PontoSerie[] =>
+    doMeses.map((mes) => ({ mes, rotulo: MESES_CURTOS[Number(mes.slice(5, 7)) - 1], valor: fn(byM.get(mes) ?? []) }))
   const compact = (chips: (Chip | null)[]) => chips.filter((c): c is Chip => c !== null)
 
   return [
@@ -122,7 +128,8 @@ export function kpisExecutivos(ctx: Contexto, cmp: Comparacao): Kpi[] {
       id: 'faturamento', rotulo: 'Faturamento', valor: brlS(cmp.produzido),
       chips: compact([lm ? chipValor('LM', cmp.produzido, cmp.lmValor, brlS) : null, chipValor('LY', cmp.produzido, cmp.lyValor, brlS)]),
       apoio: [{ rotulo: prev.rotulo, texto: prev.texto }],
-      serie: serie(soma),
+      // O card do faturamento é o gráfico do período inteiro, não só dos últimos meses.
+      serie: serie(soma, todosMeses),
     },
     {
       id: 'servicos', rotulo: 'Serviços', valor: int(rv.length),
@@ -150,7 +157,7 @@ export function kpisExecutivos(ctx: Contexto, cmp: Comparacao): Kpi[] {
       serie: serie((rows) => cpPendentes(rows).length),
     },
     {
-      id: 'recebimento', rotulo: 'Recebimento', valor: `${receb.percentual.toFixed(0)}%`, chips: [],
+      id: 'recebimento', rotulo: 'Recebimento', valor: `${receb.percentual.toFixed(0)}%`, chips: [], anel: { razao: receb.percentual / 100, recebido: brlS(receb.recebido), base: brlS(receb.base) },
       apoio: [{ rotulo: 'Recebido', texto: `${brlS(receb.recebido)} de ${brlS(receb.base)}` }],
       serie: serie((rows) => recebimentoStats(rows).percentual),
     },

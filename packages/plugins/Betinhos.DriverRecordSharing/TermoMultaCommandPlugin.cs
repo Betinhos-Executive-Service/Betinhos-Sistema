@@ -64,7 +64,9 @@ namespace Betinhos.DriverRecordSharing
         public const string ServerWriteVariable = "termo_server_write";
         private const string Bloqueado = "Termo assinado não pode ser alterado nem excluído.";
         private const string SemAditivo = "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.";
-        private static readonly string[] Apis = { "new_EnviarTermoMulta", "new_AssinarTermoMulta", "new_ContestarTermoMulta", "new_CancelarTermoMulta", "new_ExpirarTermoMulta", "new_LembrarTermoMulta" };
+        // APIs que gravam termo e parcela pelo servidor. cr40f_PassoMulta e cr40f_LancarDescontoFolha (Cr40f.Frota.Plugin)
+        // criam e lançam as parcelas do Acertar -> folha (RH bloco 1).
+        private static readonly string[] Apis = { "new_EnviarTermoMulta", "new_AssinarTermoMulta", "new_ContestarTermoMulta", "new_CancelarTermoMulta", "new_ExpirarTermoMulta", "new_LembrarTermoMulta", "cr40f_PassoMulta", "cr40f_LancarDescontoFolha" };
         private const string NaoESeu = "Este termo não é seu.";
         private const string PrivilegioGestor = "prvCreatenew_TermoMulta";
         private const string CadastroDuplicado = "Seu cadastro está duplicado. Procure o escritório.";
@@ -150,13 +152,8 @@ namespace Betinhos.DriverRecordSharing
             }
             if (reference.LogicalName == ParcelaTable)
             {
-                if (context.MessageName == "Create") throw new InvalidPluginExecutionException("Parcela de multa só é criada pela assinatura do termo.");
-                if (entity != null && Changed(entity, "new_parcelamultafolhaid").SequenceEqual(new[] { "new_status" }))
-                {
-                    var current = system.Retrieve(ParcelaTable, reference.Id, new ColumnSet("new_status"));
-                    var next = Choice(entity, "new_status");
-                    if (Choice(current, "new_status") == Prevista && (next == Descontada || next == ParcelaCancelada)) return;
-                }
+                if (context.MessageName == "Create") throw new InvalidPluginExecutionException("Parcela de multa só é criada pela assinatura do termo ou pelo acerto da multa.");
+                // Lançar e desfazer só pela cr40f_LancarDescontoFolha, que grava a data e encerra ou reabre a multa (spec RH §8).
                 throw new InvalidPluginExecutionException(Bloqueado);
             }
         }

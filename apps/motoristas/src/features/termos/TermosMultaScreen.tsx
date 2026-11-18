@@ -4,6 +4,7 @@ import { AppShell } from "../../shared/ui/layout/AppShell";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
 import { formatBrl, formatDataHora, isMockTermos, parseEvidencias, prazoAssinatura, proximaAba, separarTermos, TERMO_STATUS, type AbaTermos, type TermoMulta } from "./termosMulta";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 export type TermosLoadStatus = "loading" | "ready" | "error";
 
@@ -80,7 +81,7 @@ export function TermosMultaScreen({ items, loadStatus, onBack, onReload, onSelec
           <div id="termo-tabpanel" role="tabpanel" aria-labelledby={`termo-tab-${aba}`} className="termo-tabpanel" key={aba}>
             {error ? <p className="termo-alert" data-tone="erro" role="alert">{error}</p> : null}
             {loadStatus === "loading" && !items.length ? (
-              <div className="termo-skeleton" role="status" aria-busy="true" aria-label="Carregando multas"><span /><span /></div>
+              <BrandLoader variant="inline" label="Carregando multas" text="Carregando multas" />
             ) : loadStatus === "error" && !items.length ? (
               <div className="termo-alert" data-tone="erro" role="alert">
                 <p>Não foi possível carregar as multas.</p>

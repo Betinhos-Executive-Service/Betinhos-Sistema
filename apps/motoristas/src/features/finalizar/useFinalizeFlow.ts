@@ -6,6 +6,7 @@ import { findFirstPendingServiceDetail, getVoucherDraftKey, isSameDetail } from 
 import { cancelServiceRemote, finalizeExchangeRemote, finalizeMaintenanceRemote, resolveServiceVehicleRemote } from "./remoto";
 import { loadActiveFleetRemote } from "../meu-carro/remoto";
 import { getDriverContext, type DriverContext } from "../../data/dataverse/cliente";
+import { pedirArmazenamentoPersistente } from "../envio-pendente/armazenamentoPersistente";
 import { APP_OPERATION_ERROR_MESSAGE, reportAppError } from "../../shared/appErrorLogger";
 import {
   cancelDetailLocally,
@@ -25,6 +26,9 @@ import {
 import { isThirdPartyDriver } from "../meu-carro/myVehicle";
 import { createMockFleetLoader, MOCK_FLEET, pickMockInfleetScenario, resolveMockServiceVehicle } from "../../lib/serviceVehicleInfleetMock";
 import type { DetailData, Screen } from "../../types";
+import { chaveDoEnvio, filaDeEnvio, temEnvioPendente, tituloDoEnvio, type FilaItem } from "../envio-pendente/fila";
+import { classificarErro } from "../envio-pendente/classificarErro";
+import { MENSAGEM_SESSAO } from "../envio-pendente/processador";
 import { exchangeUserError } from "../servicos/trocaErros";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
@@ -88,9 +92,45 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
   }, []);
   const cancelVehicleChoice = useCallback(() => closeVehicleChoice(null), [closeVehicleChoice]);
 
+  // Sem conexão (ou rede caindo no envio): o serviço fica numa fila no aparelho e a agenda segue. Nada é apagado até o envio confirmar.
+  const guardarNoAparelho = async (detail: DetailData, fields: Record<string, string>, isVoucher: boolean, finalizadoEm: string, extra: Partial<FilaItem> = {}) => {
+    void pedirArmazenamentoPersistente();
+    try {
+      await filaDeEnvio.adicionar({
+        id: chaveDoEnvio(detail),
+        detailId: detail.id,
+        detailType: detail.type,
+        dataverseId: detail.dataverse?.id ?? "",
+        titulo: tituloDoEnvio(detail),
+        tipo: isVoucher ? "voucher" : detail.type === "MANUTENCAO" ? "manutencao" : detail.type === "TROCA" ? "troca" : "servico",
+        detail,
+        fields,
+        signatureDataUrl: store.signatures[detail.id],
+        photos: store.photos[detail.id],
+        finalizadoEm,
+        criadoEm: new Date().toISOString(),
+        tentativas: 0,
+        estado: "pendente",
+        ...extra
+      });
+    } catch (error) {
+      logAppError(error, "guardarNoAparelho", detail.type);
+      setRemoteOperation(null);
+      setCriticalError(APP_OPERATION_ERROR_MESSAGE);
+      return;
+    }
+    setRemoteOperation(null);
+    // O envio guardado leva os campos e as fotos; o formulário da manutenção começa limpo.
+    if (detail.type === "MANUTENCAO") setMaintenanceFinalizeDraft({ ...EMPTY_MAINTENANCE_FINALIZE_DRAFT });
+    setToast("Salvo no aparelho. Será enviado quando a conexão voltar.", "info");
+    setSelectedDetail(null);
+    setScreen("servicos");
+  };
+
   const finalizeSelected = async (fields: Record<string, string>) => {
     if (!selectedDetail || remoteOperation) return;
     const detailToFinalize = selectedDetail;
+    const finalizadoEm = new Date().toISOString();
     const receiveProofCount = receiveProofs[detailToFinalize.id]?.length ?? 0;
     const finalFields =
       receiveProofCount > 0
@@ -103,6 +143,11 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
 
     if (finalizeTimerRef.current) window.clearTimeout(finalizeTimerRef.current);
     if (completingClearTimerRef.current) window.clearTimeout(completingClearTimerRef.current);
+
+    if (navigator.onLine === false) {
+      await guardarNoAparelho(detailToFinalize, finalFields, isVoucher, finalizadoEm);
+      return;
+    }
 
     if (remoteMode) {
       const operationTitle =
@@ -129,11 +174,15 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
           phase: "success"
         });
       };
+      let vehicleResolution: InfleetVehicleResolution | undefined;
+      let vehicleChoice: DriverVehicleChoice | null = null;
+      let skipVehicle = false;
+      let linkAnterior: string | undefined;
       try {
         setProgress("Conferindo fila no Dataverse.");
         const remoteBeforeFinalize = await dados.carregarAgenda();
         const remoteFirstPendingDetail = detailToFinalize.type === "SERVICO"
-          ? findFirstPendingServiceDetail(remoteBeforeFinalize.agenda)
+          ? findFirstPendingServiceDetail(remoteBeforeFinalize.agenda, temEnvioPendente)
           : undefined;
         setStore((current) => ({ ...current, agenda: remoteBeforeFinalize.agenda, history: remoteBeforeFinalize.history }));
 
@@ -146,9 +195,6 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
         }
 
         // Infleet decide o carro do serviço; abaixo de 85% o motorista escolhe. Falha da Infleet não bloqueia.
-        let vehicleResolution: InfleetVehicleResolution | undefined;
-        let vehicleChoice: DriverVehicleChoice | null = null;
-        let skipVehicle = false;
         if (detailToFinalize.type === "SERVICO" && detailToFinalize.dataverse?.id) {
           setProgress("Conferindo o carro na Infleet.");
           const driver = driverContext ?? await getDriverContext();
@@ -169,17 +215,28 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
         const signatureDataUrl = store.signatures[detailToFinalize.id];
         const photos = store.photos[detailToFinalize.id];
         if (detailToFinalize.type === "SERVICO" && isVoucher) {
-          await dados.salvarVoucher({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
+          await dados.salvarVoucher({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle, onLinkAnterior: (link) => { linkAnterior = link; } });
         } else if (detailToFinalize.type === "SERVICO") {
           await dados.finalizarServico({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, vehicleResolution, vehicleChoice, skipVehicle });
         } else if (detailToFinalize.type === "MANUTENCAO") {
-          await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeMaintenanceRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, finalizadoEm });
         } else if (detailToFinalize.type === "TROCA") {
-          await finalizeExchangeRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress });
+          await finalizeExchangeRemote({ detail: detailToFinalize, fields: finalFields, signatureDataUrl, photos, onProgress: setProgress, finalizadoEm });
         }
         setSuccess("Enviado com sucesso.");
         await wait(720);
       } catch (error) {
+        const classe = classificarErro(error);
+        if (classe !== "negocio") {
+          reportAppError(error, {
+            severity: "warning", source: "app", action: "finalizeSelected", phase: "guardado-no-aparelho", screen: "finalizar",
+            detailId: detailToFinalize.id, detailType: detailToFinalize.type, notifyUser: false
+          });
+          await guardarNoAparelho(detailToFinalize, finalFields, isVoucher, finalizadoEm, classe === "sessao"
+            ? { estado: "precisa-acao", motivo: "sessao", ultimoErro: MENSAGEM_SESSAO }
+            : { vehicleResolution, vehicleChoice, skipVehicle, linkAnterior, ultimoErro: error instanceof Error ? error.message : undefined, proximaTentativaEm: Date.now() + 15_000 });
+          return;
+        }
         logAppError(error, "finalizeSelected", detailToFinalize.type);
         setRemoteOperation(null);
         if (isVoucher) {
@@ -205,6 +262,7 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
       });
     } else if (detailToFinalize.type === "SERVICO") {
       // Mock local: simula a Infleet para testar a UI sem Dataverse. Cenário por ?mockInfleet=.
+      // Sem conexão a fila acima já guardou o envio; online segue direto.
       const scenario = pickMockInfleetScenario(detailToFinalize.id);
       setRemoteOperation({ title: "Finalizando serviço", message: "Conferindo o carro na Infleet.", detailId: detailToFinalize.id, phase: "loading" });
       const resolution = await resolveMockServiceVehicle(scenario);
@@ -220,11 +278,13 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
             }
           : loadMockFleet);
         if (!choice) return;
-        if (resolution.motivo === "motorista-terceiro") choice = { ...choice, origem: "terceiro" };
+        if (resolution.motivo === "motorista-terceiro" && choice.origem !== "nao-se-aplica") choice = { ...choice, origem: "terceiro" };
       }
       const patch = buildInfleetServiceVehiclePatch(resolution, choice, (vehicleId) => vehicleId);
       const outcome = resolution.decisao === "automatico"
         ? `automático: ${resolution.escolhido?.placa} (${resolution.escolhido?.percentual}%)`
+        : choice?.origem === "nao-se-aplica"
+        ? "não se aplica (sem carro gravado)"
         : `escolhido pelo motorista (${choice?.origem === "frota" ? "frota" : choice?.origem === "terceiro" ? "carros do terceiro" : "carros da janela"}): ${choice?.placa}`;
       console.info("[mock Infleet]", scenario, patch);
       setToast(`Teste Infleet (${scenario}) · ${outcome}`, "success");
@@ -300,14 +360,15 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
           });
         })
         .catch((error) => {
+          // A finalização já foi gravada e o item saiu da agenda local; a atualização automática traz o resto
+          // quando a conexão voltar. No PROD (05–12/11/2026), 34 de 34 serviços com este aviso estavam Concluído.
           reportAppError(error, {
+            severity: "warning",
             source: "app", action: "finalizeSelected", phase: "confirm-agenda-after-finalize", screen: "servicos",
             detailId: detailToFinalize.id, detailType: detailToFinalize.type,
             payload: { dataverseId: detailToFinalize.dataverse?.id, timeoutMs: 8000, attempts: 2, restoredToAgenda: false }, notifyUser: false
           });
-          setCriticalError(
-            "O serviço foi finalizado, mas a agenda não atualizou. Não finalize de novo: feche e abra o app para conferir."
-          );
+          setToast("Serviço finalizado. A agenda atualiza quando a conexão melhorar.", "warning");
         });
     }, 1650);
   };
@@ -473,6 +534,7 @@ export function useFinalizeFlow({ blockIfNotFirstPending, completingClearTimerRe
   };
 
   return {
+    askVehicleChoice,
     cancelSelected,
     cancelVehicleChoice,
     closeVehicleChoice,

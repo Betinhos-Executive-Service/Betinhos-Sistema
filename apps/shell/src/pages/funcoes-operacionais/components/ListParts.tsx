@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, type CSSProperties } from 'react'
-import { Skeleton, Spinner } from '@betinhos/ui'
+import { useLayoutEffect, useRef } from 'react'
+import { Spinner } from '@betinhos/ui'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 /** Paginação incremental: avisa quando o fim da lista chega perto (700 px), com fallback de scroll/resize. */
 export function LoadMoreSentinel({ label, text, onVisible }: { label: string; text: string; onVisible: () => void }) {
@@ -35,17 +36,9 @@ export function LoadMoreSentinel({ label, text, onVisible }: { label: string; te
   )
 }
 
+/** Primeira carga das listas: loader da marca no lugar dos cards (nome mantido pelos chamadores). */
 export function SkeletonList() {
-  return (
-    <div className="skeleton-list" role="status" aria-busy="true" aria-label="Carregando serviços">
-      {[0, 1, 2, 3].map((index) => (
-        <div key={index} className="skeleton-card" style={{ '--item-index': index } as CSSProperties} aria-hidden="true">
-          <Skeleton shape="rect" width={56} height={40} />
-          <span className="skeleton-stack"><Skeleton width="30%" /><Skeleton /><Skeleton width="60%" /></span>
-        </div>
-      ))}
-    </div>
-  )
+  return <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" />
 }
 
 export const ListHead = () => (

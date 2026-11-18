@@ -1,13 +1,14 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { PortaDados } from "../../data/porta";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { getInitialDetail, getInitialParams } from "../../app/bootstrap";
 import { getHashRouteFallbackScreen, screenNeedsHashDetail, type HashRoute } from "../../app/navigation";
 import { hasDataverseRuntime, type DriverContext } from "../../data/dataverse/cliente";
 import { reportAppError } from "../../shared/appErrorLogger";
+import { classificarErro } from "../envio-pendente/classificarErro";
+import { lerAgendaOffline, salvarAgendaOffline } from "./agendaOffline";
 import { findDetailByParams, type LocalStore } from "../../lib/localWorkflow";
 import type { ToastTone } from "../../shared/ui/LocalToast";
-import type { LoadingOverlayState } from "../../shared/ui/LoadingOverlay";
 import type { DetailData, Screen } from "../../types";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "../../app/rotaInicial";
 
@@ -16,7 +17,6 @@ export type RefreshOptions = {
 };
 
 type Options = {
-  completeDataLoadingState: (title: string, message?: string) => Promise<void>;
   comunicadosDriverIdRef: MutableRefObject<string>;
   dados: PortaDados;
   initialHashRouteRef: MutableRefObject<HashRoute | null>;
@@ -29,7 +29,6 @@ type Options = {
   screen: Screen;
   selectedChecklistId: string;
   serviceDeepLinkHandledRef: MutableRefObject<boolean>;
-  setDataLoadingState: (loading: LoadingOverlayState | null) => void;
   setDriverContext: Dispatch<SetStateAction<DriverContext | null>>;
   setRemoteMode: Dispatch<SetStateAction<boolean>>;
   setScreen: (screen: Screen) => void;
@@ -40,21 +39,26 @@ type Options = {
 };
 
 // Carga da agenda: carga inicial (Dataverse ou mock), atualização manual/automática (refreshLocal) e reset dos dados locais.
-export function useAgendaLoad({ completeDataLoadingState, comunicadosDriverIdRef, dados, initialHashRouteRef, isButtonPreviewMode, isReceiptPreviewMode, logAppError, reloadChecklists, reloadComunicados, remoteMode, screen, selectedChecklistId, serviceDeepLinkHandledRef, setDataLoadingState, setDriverContext, setRemoteMode, setScreen, setSelectedDetail, setStore, setToast, store }: Options) {
+// `agendaCarregando` liga o loader só nas listas da agenda (Serviços, Histórico); o resto do app segue usável.
+export function useAgendaLoad({ comunicadosDriverIdRef, dados, initialHashRouteRef, isButtonPreviewMode, isReceiptPreviewMode, logAppError, reloadChecklists, reloadComunicados, remoteMode, screen, selectedChecklistId, serviceDeepLinkHandledRef, setDriverContext, setRemoteMode, setScreen, setSelectedDetail, setStore, setToast, store }: Options) {
+  const [agendaCarregando, setAgendaCarregando] = useState(
+    () => !isButtonPreviewMode && !isReceiptPreviewMode && hasDataverseRuntime()
+  );
+  // Horário (ISO) da agenda guardada que está na tela por falta de rede; null com a agenda atualizada.
+  const [agendaOfflineEm, setAgendaOfflineEm] = useState<string | null>(null);
+
   useEffect(() => {
     if (isButtonPreviewMode || isReceiptPreviewMode) return;
     if (!hasDataverseRuntime()) return;
     let alive = true;
     setRemoteMode(true);
-    setDataLoadingState({
-      phase: "loading",
-      title: "Carregando dados",
-      message: "Sincronizando agenda no Dataverse."
-    });
+    setAgendaCarregando(true);
     dados.carregarAgenda()
       .then((remote) => {
         if (!alive) return;
-        setDataLoadingState(null);
+        setAgendaCarregando(false);
+        setAgendaOfflineEm(null);
+        salvarAgendaOffline(remote);
         const remoteStore = { ...store, agenda: remote.agenda, history: remote.history };
         const hashRoute = initialHashRouteRef.current;
         const remoteInitialDetail = hashRoute ? findDetailFromHashRoute(remoteStore, hashRoute) : getInitialDetail(remoteStore);
@@ -211,7 +215,17 @@ export function useAgendaLoad({ completeDataLoadingState, comunicadosDriverIdRef
       })
       .catch((error) => {
         if (!alive) return;
-        setDataLoadingState(null);
+        setAgendaCarregando(false);
+        // Sem rede: abre com a última agenda guardada no aparelho, sem derrubar o app para o modo local.
+        const guardada = classificarErro(error) === "rede" ? lerAgendaOffline() : null;
+        if (guardada) {
+          setDriverContext(guardada.driver);
+          comunicadosDriverIdRef.current = guardada.driver?.id ?? "";
+          setStore((current) => ({ ...current, agenda: guardada.agenda, history: [] }));
+          setAgendaOfflineEm(guardada.salvoEm);
+          setToast("");
+          return;
+        }
         reportAppError(error, {
           severity: "critical",
           source: "app",
@@ -232,15 +246,11 @@ export function useAgendaLoad({ completeDataLoadingState, comunicadosDriverIdRef
     const silent = options?.silent === true;
 
     if (remoteMode) {
-      if (!silent) {
-        setDataLoadingState({
-          phase: "loading",
-          title: "Carregando dados",
-          message: "Atualizando dados do Dataverse."
-        });
-      }
+      if (!silent) setAgendaCarregando(true);
       try {
         const remote = await dados.carregarAgenda();
+        setAgendaOfflineEm(null);
+        salvarAgendaOffline(remote);
         setDriverContext(remote.driver);
         comunicadosDriverIdRef.current = remote.driver?.id ?? "";
         setStore((current) => ({ ...current, agenda: remote.agenda, history: remote.history }));
@@ -264,9 +274,15 @@ export function useAgendaLoad({ completeDataLoadingState, comunicadosDriverIdRef
             await dados.carregarDetalhe(detailToRefresh.dataverse?.id ?? detailToRefresh.id, detailToRefresh.type);
           if (refreshedDetail) setSelectedDetail(refreshedDetail);
         }
-        if (!silent) await completeDataLoadingState("Dados atualizados", "Dataverse sincronizado.");
+        if (!silent) setAgendaCarregando(false);
       } catch (error) {
-        if (!silent) setDataLoadingState(null);
+        if (!silent) setAgendaCarregando(false);
+        // Queda de rede com agenda guardada: segue com a que está na tela e só mostra o aviso.
+        const guardada = classificarErro(error) === "rede" ? lerAgendaOffline() : null;
+        if (guardada) {
+          setAgendaOfflineEm((atual) => atual ?? guardada.salvoEm);
+          return;
+        }
         logAppError(error, "loadRemoteStore", "refresh");
         if (!silent || error instanceof Error) {
           setToast(error instanceof Error ? error.message : "Falha ao atualizar Dataverse.");
@@ -277,7 +293,17 @@ export function useAgendaLoad({ completeDataLoadingState, comunicadosDriverIdRef
     setStore((current) => ({ ...current }));
   };
 
+  // Com a agenda guardada na tela, a volta da rede atualiza sozinha.
+  useEffect(() => {
+    if (!agendaOfflineEm) return;
+    const aoVoltarRede = () => { void refreshLocal(undefined, { silent: true }); };
+    window.addEventListener("online", aoVoltarRede);
+    return () => window.removeEventListener("online", aoVoltarRede);
+  }, [agendaOfflineEm, remoteMode]);
+
   return {
+    agendaCarregando,
+    agendaOfflineEm,
     refreshLocal
   };
 }

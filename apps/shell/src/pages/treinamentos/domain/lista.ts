@@ -11,6 +11,7 @@ export const TREINAMENTO_SORT: ViewSort = { key: 'criado', dir: 'desc' }
 
 export const TREINAMENTO_COLUMNS: ViewColumnDef[] = [
   { key: 'titulo', label: 'Treinamento' },
+  { key: 'descricao', label: 'Descrição' },
   { key: 'estado', label: 'Situação' },
   { key: 'progresso', label: 'Conclusão' },
   { key: 'publico', label: 'Público-alvo' },
@@ -26,6 +27,7 @@ const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', lab
 
 export const TREINAMENTO_FIELDS: FilterField[] = [
   { key: 'titulo', label: 'Treinamento', kind: 'text' },
+  { key: 'descricao', label: 'Descrição', kind: 'text' },
   { key: 'estado', label: 'Situação', kind: 'choice', options: ESTADO_FILTER },
   { key: 'publico', label: 'Público-alvo', kind: 'choice', options: PUBLICO_FILTER },
   { key: 'validade', label: 'Validade', kind: 'date' },
@@ -40,6 +42,7 @@ export type Linha = Treinamento & { criadoEm: string }
 export function readTreinamento(t: Linha, key: string): unknown {
   switch (key) {
     case 'titulo': return t.titulo
+    case 'descricao': return t.descricao
     case 'estado': return String(t.estado)
     case 'publico': return String(t.publicoTipo)
     case 'validade': return t.validade || null
@@ -62,6 +65,7 @@ export function sortTreinamentos(list: Linha[], sort: ViewSort | null, progresso
   return sortRows(list, (t) => {
     switch (sort.key) {
       case 'titulo': return t.titulo || null
+      case 'descricao': return t.descricao || null
       case 'estado': return t.estado
       case 'progresso': return progressoDe(progresso[t.id])?.pct ?? null
       case 'publico': return t.publicoTipo

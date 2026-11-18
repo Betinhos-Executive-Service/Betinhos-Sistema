@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { message, type Liberacao, type PortalSource } from '../data/portal'
 import { formatMoney } from '../domain/format'
 import { classificar, rotuloMotivo, type Candidato } from '../domain/portal'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 const MAX_OBSERVACAO = 2000
 
@@ -71,7 +72,7 @@ export function LiberarPortalDrawer({ ids, source, mobile, onClose, onDone }: Li
   const body = (
     <div className="gr-lp" aria-busy={(!result && !erro) || undefined}>
       {erro ? <Alert tone="danger">{erro}</Alert> : null}
-      {!result && !erro ? <p role="status">Conferindo os serviços…</p> : null}
+      {!result && !erro ? <BrandLoader variant="inline" size="md" label="Conferindo os serviços" text="Conferindo os serviços…" /> : null}
       {result ? <>
         <section aria-labelledby="gr-lp-prontos">
           <h3 id="gr-lp-prontos" className="gr-lp__title">Prontos para liberar ({prontos})</h3>

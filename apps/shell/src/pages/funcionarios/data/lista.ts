@@ -19,6 +19,7 @@ export const FUNCIONARIO_SORT: ViewSort = { key: 'nome', dir: 'asc' }
 /** Colunas na ordem padrão; a primeira (Colaborador) é fixa. */
 export const FUNCIONARIO_COLUMNS: ViewColumnDef[] = [
   { key: 'nome', label: 'Colaborador' },
+  { key: 'apelido', label: 'Apelido' },
   { key: 'funcao', label: 'Função' },
   { key: 'status', label: 'Status' },
   { key: 'contato', label: 'Contato' },
@@ -34,6 +35,7 @@ const EMPRESA_CURTA: Option[] = EMPRESA.map((option) => ({ ...option, label: opt
 /** Campos filtráveis: os das colunas entram no filtro rápido; os demais só no avançado. */
 export const FUNCIONARIO_FIELDS: FilterField[] = [
   { key: 'nome', label: 'Colaborador', kind: 'text' },
+  { key: 'apelido', label: 'Apelido', kind: 'text' },
   { key: 'funcao', label: 'Função', kind: 'choice', options: options(FUNCAO) },
   { key: 'status', label: 'Status', kind: 'choice', options: options(STATUS) },
   { key: 'contato', label: 'Contato', kind: 'text' },
@@ -54,6 +56,7 @@ export function readFuncionario(row: FuncionarioView, key: string): unknown {
   const v = row.values
   switch (key) {
     case 'nome': return [v.cr40f_nomecompleto, v.new_apelido].filter(Boolean).join(' ')
+    case 'apelido': return v.new_apelido ? String(v.new_apelido) : null
     case 'funcao': return asText(v.cr40f_funcao)
     case 'status': return asText(v.cr40f_status)
     case 'contato': return [v.cr40f_telefonecorporativo, v.cr40f_telefonepessoal].filter(Boolean).join(' ')
@@ -84,6 +87,7 @@ export function sortFuncionarios(list: FuncionarioView[], sort: ViewSort | null)
     const v = row.values
     switch (sort.key) {
       case 'nome': return normalizeSearch(String(v.cr40f_nomecompleto ?? '')) || null
+      case 'apelido': return normalizeSearch(String(v.new_apelido ?? '')) || null
       case 'funcao': return optionLabel(FUNCAO, v.cr40f_funcao) || null
       case 'status': return optionLabel(STATUS, v.cr40f_status) || null
       case 'contato': return contato(row) || null

@@ -11,7 +11,7 @@
 :where(.planner-page, .planner-portal) .quote-flow__steps li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 16px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: 12px; font-weight: 700; }
 :where(.planner-page, .planner-portal) .quote-flow__steps li b { flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: 11px; font-weight: 800; }
 :where(.planner-page, .planner-portal) .quote-flow__steps li.done { color: var(--bt-color-success); }
-:where(.planner-page, .planner-portal) .quote-flow__steps li.done b { border-color: var(--bt-color-success); background: var(--bt-color-success); color: #fff; }
+:where(.planner-page, .planner-portal) .quote-flow__steps li.done b { border-color: var(--bt-color-success); background: var(--bt-color-success); color: var(--bt-color-on-solid); }
 :where(.planner-page, .planner-portal) .quote-flow__steps li.active { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
 :where(.planner-page, .planner-portal) .quote-flow__steps li.active b { border-color: var(--bt-color-action); color: var(--bt-color-action); }
 :where(.planner-page, .planner-portal) .quote-flow__content { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }

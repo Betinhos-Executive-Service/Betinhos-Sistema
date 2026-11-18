@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Alert, Button, ContextMenu, EmptyState, Menu, SearchBox, Stack, StatusBadge, ToastProvider, ViewBar, readFilters, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction } from '@betinhos/ui'
-import { Archive, ArchiveRestore, Bug, CalendarDays, ChevronDown, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, MoreVertical, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus, X } from 'lucide-react'
+import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, Switch, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction, type TableFilters } from '@betinhos/ui'
+import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
 import { useTableLabel } from '../../app/useListView'
+import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAberto'
+import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
+import type { EditValue } from './domain/edit'
+import { avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, SAIDA, type LinhaManutencao } from './domain/manutencao'
 import { ProtecaoContext } from './components/ProtecaoLock'
 import type { Protecao } from './domain/protecao'
 import { Cell } from './components/Cell'
 import { GeralCards } from './components/GeralCards'
 import { GeralSheet } from './components/GeralSheet'
-import { GeralTable } from './components/GeralTable'
+import { recebimentosSource } from '../recebimentos/source'
+import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
+import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
+import { GeralTable, type Grouping } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
 import { EscalaFdsDrawer } from './components/EscalaFdsDrawer'
@@ -22,6 +29,9 @@ import { debounceSearch } from './components/useLookupSearch'
 import { LiberarPortalDrawer } from './components/LiberarPortalDrawer'
 import { createPortalSource, type Liberacao } from './data/portal'
 import { PORTAL_COLUMN, PORTAL_KEY, rotuloStatus, tomStatus, type StatusValidacao } from './domain/portal'
+import { COMPROVANTES_COLUMN, COMPROVANTES_KEY } from './domain/comprovantes'
+import { groupFields } from './domain/grouping'
+import { injectTableFilters } from './domain/tableFilters'
 import { LINK_FALHA, gerarLinkBlock } from './domain/link'
 import { LINK_CADASTRO_FALHA, linkCadastroBlock } from './domain/linkCadastro'
 import { LinkCadastroDrawer, type LinkCadastroRequest } from './components/LinkCadastroDrawer'
@@ -33,6 +43,7 @@ import { splitOp } from './domain/commands'
 import { applyColumnPrefs, loadColumnPrefs, saveColumnPrefs, type ColumnPrefs } from './domain/columns'
 import { buildLayout, buildViewFetch } from './domain/views'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
+import { formatCell, fromDateTimeLocal } from './domain/format'
 import { ENTITY, ID_ATTRIBUTE, type CellStatus, type Column, type Sort } from './domain/types'
 import { readUrlState, writeUrlState, type UrlState } from './domain/urlState'
 import { cellKey, useGeral, type SaveFailure } from './useGeral'
@@ -46,10 +57,14 @@ export function GeralPage({ host }: { host: Host }) {
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
-const noSelectionTitle = 'Selecione um ou mais serviços.'
+const VIRTUAL_COLUMNS = [COMPROVANTES_COLUMN, PORTAL_COLUMN]
+const VIRTUAL_KEYS: ReadonlySet<string> = new Set(VIRTUAL_COLUMNS.map((c) => c.key))
+/** Substantivo do primário do painel Filtros ("Mostrar 16 serviços"), como o rodapé da lista. */
+const SERVICOS = { one: 'serviço', other: 'serviços' }
 
 function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
-  const source = useMemo(() => createSource(host), [host])
+  // `manutencoes` só vale no mock (pnpm dev): as linhas OS-9001 a OS-9004 do plano 3. No Dataverse vêm da própria consulta.
+  const source = useMemo(() => createSource(host, { manutencoes: true }), [host])
   // Histórico do campo protegido sob demanda, uma consulta por OS enquanto a tela está aberta; falha não fica no cache.
   const protecao = useMemo(() => {
     const cache = new Map<string, Promise<Protecao>>()
@@ -93,11 +108,28 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [saved, setSaved] = useState<Record<string, ColumnPrefs | null>>({})
   const viewId = view?.id ?? null
   const prefs = useMemo(() => (viewId == null ? null : viewId in saved ? saved[viewId] : loadColumnPrefs(source.kv, viewId)), [viewId, saved, source.kv])
-  // Coluna virtual "Portal": oferecida no painel, oculta até o usuário ligar (preferência salva sem ela também a deixa oculta).
-  const allColumns = useMemo(() => [...geral.columns, PORTAL_COLUMN], [geral.columns])
-  const viewPrefs = useMemo(() => (prefs && !prefs.order.includes(PORTAL_KEY) ? { ...prefs, order: [...prefs.order, PORTAL_KEY], hidden: [...prefs.hidden, PORTAL_KEY] } : prefs), [prefs])
-  const visibleColumns = useMemo(() => applyColumnPrefs(allColumns, viewPrefs ?? { hidden: [PORTAL_KEY], order: [] }), [allColumns, viewPrefs])
-  const dataColumns = useMemo(() => visibleColumns.filter((c) => c.key !== PORTAL_KEY), [visibleColumns])
+  // Colunas virtuais: "Comprovantes" vem ligada logo depois da primeira coluna; "Portal" fica no painel, oculta até o
+  // usuário ligar. Preferência salva antes delas recebe cada uma no lugar padrão.
+  const allColumns = useMemo(() => {
+    const [first, ...rest] = geral.columns
+    return first ? [first, COMPROVANTES_COLUMN, ...rest, PORTAL_COLUMN] : []
+  }, [geral.columns])
+  const viewPrefs = useMemo(() => {
+    if (!prefs) return prefs
+    let { order, hidden } = prefs
+    if (order.length && !order.includes(COMPROVANTES_KEY)) order = [order[0], COMPROVANTES_KEY, ...order.slice(1)]
+    if (!order.includes(PORTAL_KEY)) { order = [...order, PORTAL_KEY]; hidden = [...hidden, PORTAL_KEY] }
+    return order === prefs.order ? prefs : { ...prefs, order, hidden }
+  }, [prefs])
+  // A primeira coluna é o botão que abre o serviço: coluna virtual levada para lá fica logo depois dela.
+  const visibleColumns = useMemo(() => {
+    const cols = applyColumnPrefs(allColumns, viewPrefs ?? { hidden: [PORTAL_KEY], order: [] })
+    const real = cols.findIndex((c) => !VIRTUAL_KEYS.has(c.key))
+    // Só virtuais visíveis (todas as reais ocultas): a primeira real volta, senão a coluna virtual viraria o botão.
+    if (real < 0) return allColumns.length ? [allColumns[0], ...cols] : cols
+    return real > 0 ? [cols[real], ...cols.slice(0, real), ...cols.slice(real + 1)] : cols
+  }, [allColumns, viewPrefs])
+  const dataColumns = useMemo(() => visibleColumns.filter((c) => !VIRTUAL_KEYS.has(c.key)), [visibleColumns])
   const setPrefs = useCallback((next: ColumnPrefs | null) => {
     if (viewId == null) return
     saveColumnPrefs(source.kv, viewId, next)
@@ -137,6 +169,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [contagemOpen, setContagemOpen] = useState(false)
   // Filtros do Design System (§10.9.2): rápidos por coluna e avançado E/OU; valem os que casam com os campos da metadata.
   const { filters, setFilters, setQuickFilter, filterFields } = geral
+  const { group, setGroup, groupSpec, buckets, groupLoads, toggleGroup, retryGroup, loadMoreGroup } = geral
+  // Cartões (celular ou modo Cartões) não agrupam: ao entrar neles o agrupamento sai, para a lista não ficar vazia com os grupos fechados.
+  useEffect(() => { if (cardsLayout && group) setGroup(null) }, [cardsLayout, group, setGroup])
   const valid = useMemo(() => readFilters(filters, filterFields), [filters, filterFields])
   const filteredKeys = useMemo(() => {
     const keys = new Set(Object.keys(valid.quick))
@@ -167,7 +202,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const keys = visibleColumns.map((c) => c.key)
     if (!keys.includes(key)) return
     const next = keys.filter((k) => k !== key)
-    next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, key)
+    let at = Math.max(0, Math.min(toIndex, next.length))
+    // A primeira coluna saindo do lugar: as virtuais que vinham logo depois dela ficam com a nova primeira, então ela
+    // vai para depois da próxima real (sem isso, Alt+→ e soltar logo depois da virtual não a moviam).
+    const lead = key === keys[0] ? next.findIndex((k) => !VIRTUAL_KEYS.has(k)) : 0
+    if (lead > 0 && at <= lead) at = Math.min(lead + 1, next.length)
+    next.splice(at, 0, key)
     const all = applyColumnPrefs(geral.columns, { ...base, hidden: [] }).map((c) => c.key)
     setPrefs({ ...base, order: [...next, ...all.filter((k) => !next.includes(k))] })
   }, [prefs, geral.columns, visibleColumns, setPrefs])
@@ -176,18 +216,20 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const viewPayload = useCallback(async () => {
     if (!view) throw new Error('Nenhuma visão aberta.')
     if (geral.filtersIgnored) throw new Error('Os filtros não puderam ser aplicados porque os campos não carregaram. Atualize e tente de novo.')
-    const fetchxml = buildViewFetch(view.fetchxml, geral.filters, geral.sort, geral.filterFields)
+    // "Mostrar manutenções" vai explícito na visão (marca no FetchXML; plano 3, D1). A base já vem sem a marca antiga.
+    const fetchxml = gravarManutencoesNaVisao(buildViewFetch(geral.viewFilters.base, geral.filters, geral.sort, geral.filterFields), geral.mostrarManutencoes)
     const layoutxml = buildLayout(dataColumns, prefs?.widths, await source.objectTypeCode())
     return { fetchxml, layoutxml }
-  }, [view, geral.filtersIgnored, geral.filters, geral.sort, geral.filterFields, dataColumns, prefs, source])
+  }, [view, geral.filtersIgnored, geral.viewFilters.base, geral.filters, geral.sort, geral.filterFields, geral.mostrarManutencoes, dataColumns, prefs, source])
   const createView = useCallback(async (name: string) => (await source.createView({ name, ...(await viewPayload()) })).id, [source, viewPayload])
   const updateView = useCallback(async () => {
     if (!view) return
     await source.updateView(view.id, await viewPayload())
-    // A visão agora carrega as colunas e larguras: as preferências locais já não têm o que acrescentar.
-    setPrefs(null)
+    // A visão agora carrega as colunas e larguras: das preferências locais só fica a coluna virtual oculta (não entra no layoutxml).
+    const hiddenVirtual = (prefs?.hidden ?? []).filter((k) => VIRTUAL_KEYS.has(k))
+    setPrefs(hiddenVirtual.length ? { hidden: hiddenVirtual, order: [] } : null)
     await reloadViews()
-  }, [view, source, viewPayload, setPrefs, reloadViews])
+  }, [view, source, viewPayload, prefs, setPrefs, reloadViews])
   const renameView = useCallback(async (name: string) => {
     if (!view) return
     await source.renameView(view.id, name)
@@ -200,15 +242,17 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     await reloadViews()
   }, [view, source, reloadViews])
   const { setSort: setGeralSort } = geral
-  // A coluna Portal não existe no FetchXML: não ordena.
+  // Colunas virtuais não existem no FetchXML: não ordenam.
   const setSort = useCallback((next: Sort) => {
-    if (next?.attribute === PORTAL_KEY) { toast({ tone: 'info', message: 'A coluna Portal não pode ser ordenada.' }); return }
+    const virtual = next && VIRTUAL_COLUMNS.find((c) => c.key === next.attribute)
+    if (virtual) { toast({ tone: 'info', message: `A coluna ${virtual.label} não pode ser ordenada.` }); return }
     setGeralSort(next)
   }, [setGeralSort, toast])
   const { state: viewState, columnDefs } = useGeralViewState({
     views: geral.views, view, viewsError: geral.viewsError, columns: allColumns, attributes, prefs: viewPrefs, setPrefs, hiddenByDefault: [PORTAL_KEY],
-    sort: geral.sort, setSort, filters, setFilters, selectView, reloadViews,
+    sort: geral.sort, setSort, filters, viewFilters: geral.viewFilters.filters, setFilters, resetFilters: geral.resetFilters, group, setGroup, selectView, reloadViews,
     createView, updateView, renameView, deleteView, kv: source.kv,
+    manutencoesAlteradas: geral.manutencoesAlteradas, resetManutencoes: geral.resetManutencoes,
   })
   const shareLink = useCallback(async () => {
     try {
@@ -247,6 +291,24 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     const states = new Set(selectedIds.map((id) => { const state = rowOf(id)?.statecode; return typeof state === 'number' ? state : -1 }))
     return states.size === 1 && !states.has(-1) ? (states.values().next().value as number) : null
   }, [selectedIds, rowOf])
+
+  // Linhas de manutenção (manutenções v2, plano 3): desenho próprio; abrem a gaveta da manutenção pelo hospedeiro.
+  // "Hoje" em São Paulo a cada render (barato): com a tela aberta na virada do dia, "Atrasada" passa a valer sem recarregar.
+  const hoje = todaySP()
+  const lerManutencao = useCallback((row: Row) => lerLinhaManutencao(row, hoje), [hoje])
+  const abrirManutencao = useCallback((m: LinhaManutencao) => abrirGavetaRegistro('cr40f_manutencoes', m.manutencaoId), [])
+  const manutencao = useMemo(() => ({ ler: lerManutencao, abrir: abrirManutencao }), [lerManutencao, abrirManutencao])
+  /** Abre a linha: a manutenção na gaveta dela; o serviço no Formulário Geral. */
+  const abrirLinha = useCallback((id: string) => {
+    const row = rowOf(id)
+    const m = row ? lerManutencao(row) : null
+    if (m) abrirManutencao(m)
+    else void openForm('edit', id)
+  }, [rowOf, lerManutencao, abrirManutencao, openForm])
+  // Ação na gaveta (encaixar, reprovar, cancelar, concluir): relê as páginas carregadas.
+  useRegistroAlterado('cr40f_manutencoes', () => reload())
+  /** Motivo das ações que só fazem sentido para serviço quando há manutenção na seleção (plano 3, D10). */
+  const soServicos = useMemo(() => (selectedIds.some((id) => { const row = rowOf(id); return row != null && ehLinhaDeManutencao(row) }) ? 'Ação só para serviços. Desmarque as manutenções.' : null), [selectedIds, rowOf])
 
   // Cada pedido tem um número; fechar o diálogo invalida o pedido em andamento, que não pode reabri-lo ao chegar.
   const copyRequest = useRef(0)
@@ -419,6 +481,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
       () => novos.forEach((id) => portalAsked.current.delete(id)),
     )
   }, [portal, portalVisible, rows, portalSeq])
+  const recebimentos = recebimentosSource(host)
+  // Contagem só quando aparece: nos cards (ao lado do ID) ou com a coluna Comprovantes visível na tabela.
+  const comprovantesVisible = cardsLayout || visibleColumns.some((c) => c.key === COMPROVANTES_KEY)
+  const { contagem } = useContagemRecebimentos(recebimentos, useMemo(() => (comprovantesVisible ? rows.map((r) => String(r[ID_ATTRIBUTE])) : []), [rows, comprovantesVisible]))
+  const [comprovantesDe, setComprovantesDe] = useState<ServicoAberto | null>(null)
+  const besideId = useCallback((id: string, nome: string) => <IndicadorRecebimentos quantidade={contagem.get(id.toLowerCase())} onClick={() => setComprovantesDe({ id, nome })} />, [contagem])
   const askLiberar = useCallback(() => { if (selectedIds.length) setLiberarIds(selectedIds) }, [selectedIds])
   const doneLiberar = useCallback((result: Liberacao, bloqueados: number) => {
     setLiberarIds(null)
@@ -433,111 +501,55 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [toast, labelOf, clearSelection])
 
   const mixedTitle = 'Selecione só serviços ativos ou só inativos.'
-  const mixedId = useId()
-  // Barra de seleção do celular: só aparece com linhas marcadas.
-  const selectionCommands = (
-    <>
-      {selectedIds.length === 1 ? <Button variant="action" size="touch" icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
-      <Button variant="action" size="touch" icon={<Ticket size={16} />} onClick={openVoucher}>Gerar Voucher</Button>
-      <Button variant="action" size="touch" icon={<Copy size={16} />} onClick={() => { void copySelected() }}>Copiar Serviços</Button>
-      <Button variant="action" size="touch" icon={<FilePlus2 size={16} />} onClick={askOp}>Gerar OP</Button>
-      <Button variant="action" size="touch" icon={<Send size={16} />} onClick={() => setDispRequest({ ids: selectedIds })}>Disparar</Button>
-      <Button variant="action" size="touch" icon={<Share2 size={16} />} onClick={askLiberar}>Liberar para o portal</Button>
-      {selectedState === 1
-        ? <Button variant="action" size="touch" icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-        : selectedState === 0
-          ? <Button variant="danger" size="touch" icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-          // aria-disabled (não disabled): continua focável e o leitor de tela lê o motivo; o clique não faz nada.
-          : <>
-            <Button variant="danger" size="touch" className="gr-btn--blocked" icon={<Archive size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Desativar</Button>
-            <Button variant="action" size="touch" className="gr-btn--blocked" icon={<ArchiveRestore size={16} />} aria-disabled="true" aria-describedby={mixedId} title={mixedTitle} onClick={(event) => event.preventDefault()}>Ativar</Button>
-            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-          </>}
-      <Button variant="ghost" size="touch" icon={<X size={16} />} onClick={clearSelection}>Limpar seleção</Button>
-    </>
-  )
-  const oneTitle = 'Selecione exatamente um serviço.'
-  // aria-disabled (não disabled): o botão continua focável, o leitor de tela lê o motivo e o clique não faz nada.
-  const blocked = (reason: string, describedBy: string) => ({
-    className: 'gr-btn--blocked',
-    'aria-disabled': 'true' as const,
-    'aria-describedby': describedBy,
-    title: reason,
-    onClick: (event: MouseEvent<HTMLButtonElement>) => event.preventDefault(),
-  })
-  // Rótulo de item de menu com o motivo embaixo quando o item está inerte.
-  const hint = (label: string, reason: string | null) => (reason ? <span className="gr-menu__hint" title={reason}>{label}<small>{reason}</small></span> : label)
+  const one = selectedIds.length === 1
   // Todos os comandos da linha têm o mesmo tamanho da barra do DS (40 px no desktop, 44 px no celular): nada de misturar compacto com padrão.
   const size = mobile ? 'touch' : 'default'
-  const createButton = <Button size={size} icon={<Plus size={16} />} onClick={() => { void openForm('create') }}>Criar serviço</Button>
-  // Desktop com linhas marcadas: a linha de comando vira a barra da seleção (como no model-driven). Sem seleção, os comandos
-  // que dependem dela não aparecem; a única ação primária da página é "Criar serviço", a última à direita (DS §10.9.1).
-  const selecting = !mobile && selectedIds.length > 0
-  // Ações em lote do botão "Ações"; o clique direito na linha usa as mesmas, com Editar, Ativar/Desativar e Registrar Erro.
-  const bulkActions: MenuAction[] = [
-    { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, onSelect: openVoucher },
-    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, onSelect: () => { void copySelected() } },
-    { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, onSelect: askOp },
-    { id: 'link', label: hint('Gerar link', linkBlock), icon: <Link2 size={16} />, disabled: linkBlock != null, onSelect: () => { void gerarLink() } },
-    { id: 'cadastro', label: hint('Link de cadastro', cadastroBlock), icon: <UserPlus size={16} />, disabled: cadastroBlock != null, onSelect: () => { void gerarLinkCadastro() } },
-    { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, onSelect: () => setDispRequest({ ids: selectedIds }) },
-    { id: 'portal', label: 'Liberar para o portal', icon: <Share2 size={16} />, onSelect: askLiberar },
-  ]
-  const one = selectedIds.length === 1
-  const contextActions: MenuAction[] = [
-    { id: 'editar', label: hint('Editar', one ? null : oneTitle), icon: <Pencil size={16} />, disabled: !one, onSelect: () => { void openForm('edit', selectedIds[0]) } },
-    ...bulkActions,
+  // Ações da seleção (DS §10.9.6): uma lista só para a linha de comando, o menu ⋮, a barra do celular e o clique direito.
+  // `inline` vai para a linha. No desktop a lista é a mesma com 0, 1 ou N marcados: a barra reserva o espaço medindo-a, então
+  // os controles fixos não andam ao marcar (com N, "Editar" fica inerte com o motivo). No celular a barra do rodapé tem 2
+  // lugares: "Editar" só entra com um serviço marcado.
+  const selectionActions: SelectionAction[] = [
+    { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: mobile ? one : true, onSelect: () => abrirLinha(selectedIds[0]) },
+    { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
     selectedState === 1
-      ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, group: '', onSelect: () => askState(true) }
-      : { id: 'desativar', label: hint('Desativar', selectedState === 0 ? null : mixedTitle), icon: <Archive size={16} />, tone: 'danger' as const, group: '', disabled: selectedState !== 0, onSelect: () => askState(false) },
-    { id: 'erro', label: hint('Registrar Erro', one ? null : oneTitle), icon: <Bug size={16} />, group: '', disabled: !one, onSelect: () => { void registrarErro() } },
+      ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, inline: true, onSelect: () => askState(true) }
+      : { id: 'desativar', label: 'Desativar', icon: <Archive size={16} />, tone: 'danger', inline: true, blocked: selectedState === 0 ? null : mixedTitle, onSelect: () => askState(false) },
+    { id: 'voucher', label: 'Gerar Voucher', icon: <Ticket size={16} />, group: 'Enviar', blocked: soServicos, onSelect: openVoucher },
+    { id: 'disparar', label: 'Disparar', icon: <Send size={16} />, group: 'Enviar', onSelect: () => setDispRequest({ ids: selectedIds }) },
+    { id: 'portal', label: 'Liberar para o portal', icon: <Share2 size={16} />, group: 'Enviar', blocked: soServicos, onSelect: askLiberar },
+    { id: 'link', label: 'Gerar link', icon: <Link2 size={16} />, group: 'Enviar', blocked: soServicos ?? linkBlock, onSelect: () => { void gerarLink() } },
+    { id: 'cadastro', label: 'Link de cadastro', icon: <UserPlus size={16} />, group: 'Enviar', blocked: soServicos ?? cadastroBlock, onSelect: () => { void gerarLinkCadastro() } },
+    { id: 'op', label: 'Gerar OP', icon: <FilePlus2 size={16} />, group: 'Operação', blocked: soServicos, onSelect: askOp },
+    { id: 'erro', label: 'Registrar Erro', icon: <Bug size={16} />, group: 'Operação', single: true, onSelect: () => { void registrarErro() } },
   ]
-  const selectedLabel = selectedIds.length === 1 ? '1 selecionado' : `${selectedIds.length} selecionados`
-  const selectionBar = (
-    <div className="gr-selection" role="group" aria-label="Comandos da seleção">
-      <Button variant="ghost" size={size} icon={<X size={16} />} aria-label="Limpar seleção" title="Limpar seleção" onClick={clearSelection} />
-      <span role="status" className="gr-filters__selected"><StatusBadge tone="info">{selectedLabel}</StatusBadge></span>
-      {selectedIds.length === 1 ? <Button variant="action" size={size} icon={<Pencil size={16} />} onClick={() => { void openForm('edit', selectedIds[0]) }}>Editar</Button> : null}
-      {selectedState === 1
-        ? <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} onClick={() => askState(true)}>Ativar</Button>
-        : selectedState === 0
-          ? <Button variant="danger" size={size} icon={<Archive size={16} />} onClick={() => askState(false)}>Desativar</Button>
-          : <>
-            <Button variant="danger" size={size} icon={<Archive size={16} />} {...blocked(mixedTitle, mixedId)}>Desativar</Button>
-            <Button variant="action" size={size} icon={<ArchiveRestore size={16} />} {...blocked(mixedTitle, mixedId)}>Ativar</Button>
-            <span id={mixedId} className="gr-sr">{mixedTitle}</span>
-          </>}
-      <Menu
-        align="start"
-        trigger={(props) => <Button {...props} variant="action" size={size} icon={<ChevronDown size={16} />} aria-label={`Ações (${selectedIds.length})`}>Ações</Button>}
-        actions={bulkActions}
-      />
-    </div>
-  )
-  // "⋮" (Mais ações): o que é raro sai da linha. Modo de exibição, link da tela e os atalhos para outras telas.
-  const shortcuts = (
-    <Menu
-      trigger={(props) => <Button {...props} variant="secondary" size={size} icon={<MoreVertical size={16} />} aria-label="Mais ações" />}
-      actions={[
-        ...(mobile ? [] : [
-          { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
-          { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
-        ]),
-        { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
-        { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('funcoes-operacionais') } },
-        { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
-        { id: 'auditoria', label: 'Auditoria', icon: <ShieldCheck size={16} />, group: 'Atalhos', onSelect: openAuditoria },
-        { id: 'erro', label: hint('Registrar Erro', selectedIds.length === 1 ? null : oneTitle), icon: <Bug size={16} />, group: 'Atalhos', disabled: selectedIds.length !== 1, onSelect: () => { void registrarErro() } },
-        { id: 'portal', label: hint('Liberar para o portal', selectedIds.length ? null : noSelectionTitle), icon: <Share2 size={16} />, group: 'Atalhos', disabled: !selectedIds.length, onSelect: askLiberar },
-        { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
-      ]}
-    />
-  )
-
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar serviços" onClick={reload} />, [reload])
-  useShellHeader({ title: 'Geral', actions: headerActions })
+  const selection = { count: selectedIds.length, onClear: clearSelection, actions: selectionActions }
+  const contextActions = selectionMenuActions(selection)
+  // "⋮" (Mais ações): só o que é raro e não depende da seleção. Modo de exibição, link da tela e os atalhos para outras telas.
+  const moreActions: MenuAction[] = [
+    ...(mobile ? [] : [
+      { id: 'tabela', label: 'Ver como tabela', icon: <Table2 size={16} />, group: 'Mostrar como', selected: mode === 'tabela', onSelect: () => changeMode('tabela') },
+      { id: 'cards', label: 'Ver como cards', icon: <LayoutGrid size={16} />, group: 'Mostrar como', selected: mode === 'cards', onSelect: () => changeMode('cards') },
+    ]),
+    { id: 'compartilhar', label: 'Compartilhar link', icon: <Link2 size={16} />, group: '', onSelect: () => { void shareLink() } },
+    { id: 'funcoes', label: 'Funções Operacionais', icon: <ClipboardList size={16} />, group: 'Atalhos', onSelect: () => { location.hash = hrefFor('funcoes-operacionais') } },
+    { id: 'escala', label: 'Escala FDS', icon: <CalendarDays size={16} />, group: 'Atalhos', onSelect: () => setEscalaOpen(true) },
+    { id: 'contagem', label: 'Contagem de Serviços', icon: <ListChecks size={16} />, group: 'Atalhos', onSelect: () => setContagemOpen(true) },
+  ]
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Geral' })
 
   const { save, resetCell, cells, selectOnly, selectRange, toggle } = geral
+  /** Grava como a célula sempre gravou; na linha de manutenção, saída fora da janela avisa e não bloqueia (spec). */
+  const salvar = useCallback(async (id: string, column: Column, value: EditValue) => {
+    const antes = rowOf(id)
+    const ok = await save(id, column, value)
+    const m = antes ? lerManutencao(antes) : null
+    if (ok && m && !column.alias && column.attribute === SAIDA) {
+      const aviso = avisoForaDaJanela(typeof value === 'string' && value ? fromDateTimeLocal(value) : null, m)
+      if (aviso) toast({ tone: 'warning', message: aviso })
+    }
+    return ok
+  }, [rowOf, save, lerManutencao, toast])
   const selectForEdit = useCallback((id: string) => selectOnly(id, true), [selectOnly])
   // Clique direito (DS §10.9.3): linha fora da seleção vira a seleção; Ctrl/⌘, campos e célula em edição ficam com o menu do navegador.
   const [contextAt, setContextAt] = useState<{ x: number; y: number } | null>(null)
@@ -566,6 +578,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
     const id = String(row[ID_ATTRIBUTE])
+    if (column.key === COMPROVANTES_KEY) return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{besideId(id, formatCell('readonly', row, 'cr40f_id'))}</div>
     if (column.key === PORTAL_KEY) {
       const st = portalStatus.get(id)
       return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{st ? <StatusBadge tone={tomStatus(st)}>{rotuloStatus(st)}</StatusBadge> : <span className="gr-cell__value">—</span>}</div>
@@ -576,20 +589,52 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         column={column}
         info={attributes?.get(column.key)}
         status={cells.get(cellKey(id, column.attribute)) ?? IDLE}
-        onSave={save}
+        onSave={salvar}
         onReset={resetCell}
         onBeginEdit={selectForEdit}
         search={searchLookup}
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, save, resetCell, searchLookup, selectForEdit, portalStatus])
+  }, [attributes, cells, salvar, resetCell, searchLookup, selectForEdit, portalStatus, besideId])
 
   const editRow = editId == null ? undefined : rowOf(editId)
+  const editManutencao = editRow ? lerManutencao(editRow) : null
 
+  const rowById = useMemo(() => new Map(rows.map((r) => [String(r[ID_ATTRIBUTE]), r])), [rows])
+  const grouping = useMemo<Grouping | undefined>(() => {
+    if (cardsLayout) return undefined
+    const fields = groupFields(filterFields)
+    return {
+      groups: groupSpec && buckets
+        ? buckets.map((bucket) => {
+          const load = groupLoads.get(bucket.id)
+          return {
+            id: bucket.id, label: bucket.label, count: bucket.count, open: load != null,
+            rows: (load?.ids ?? []).flatMap((id) => { const row = rowById.get(id); return row ? [row] : [] }),
+            more: load?.more ?? false, loading: load?.loading ?? false, error: load?.error ?? null,
+          }
+        })
+        : null,
+      onToggle: toggleGroup,
+      onLoadMore: loadMoreGroup,
+      onRetry: retryGroup,
+      menu: (column) => {
+        const field = column.alias ? undefined : fields.find((f) => f.key === column.attribute)
+        if (!field) return undefined
+        const date = field.kind === 'date'
+        return {
+          date,
+          active: group?.key !== field.key ? null : date ? group.by ?? 'month' : 'value',
+          onChange: (next) => setGroup(!next ? null : date ? { key: field.key, by: next === 'year' ? 'year' : 'month' } : { key: field.key }),
+        }
+      },
+    }
+  }, [cardsLayout, filterFields, groupSpec, buckets, groupLoads, rowById, group, toggleGroup, loadMoreGroup, retryGroup, setGroup])
+  const grouped = grouping?.groups != null
   const loadMoreProps = { more, loading, loadingMore, error: loadError, loaded: rows.length, total, onLoadMore: loadMore, onRetry: retryLoadMore, touch: mobile }
   const sentinel = more && !loading && !loadingMore && !loadError
-  const status = loading && rows.length === 0 ? null : statusText(rows.length, total, more)
+  const status = loading && rows.length === 0 && !grouped ? null : grouped ? `${total ?? 0} ${total === 1 ? 'serviço' : 'serviços'} em ${buckets?.length ?? 0} ${buckets?.length === 1 ? 'grupo' : 'grupos'}` : statusText(rows.length, total, more)
 
   const empty = (
     <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum serviço nesta visão" action={query ? <Button variant="secondary" onClick={() => setQuery('')}>Limpar busca</Button> : undefined}>
@@ -602,6 +647,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     if (first) selectView(first.id)
   }
 
+  // Liga/desliga por visão (spec): na linha de comando no desktop; no celular, acima dos cards.
+  const chaveManutencoes = <Switch label="Mostrar manutenções" checked={geral.mostrarManutencoes} disabled={!view} onChange={(event) => geral.setMostrarManutencoes(event.target.checked)} />
+
   let body: ReactNode
   if (geral.viewsError) {
     body = <Alert tone="danger" title="Não foi possível carregar as visões" action={<Button variant="secondary" onClick={onRetry}>Tentar de novo</Button>}>{geral.viewsError}</Alert>
@@ -609,10 +657,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     body = (
       <>
         {geral.attributesError ? <Alert tone="warning">Edição indisponível no momento: {geral.attributesError}</Alert> : null}
+        {geral.groupNotice ? <Alert tone="warning">{geral.groupNotice}</Alert> : null}
         {geral.pageError ? <Alert tone="danger" title="Não foi possível carregar os serviços" action={<Button variant="secondary" onClick={backToAgenda}>Voltar para a Agenda</Button>}>{geral.pageError}</Alert> : null}
         {cardsLayout
           ? (
             <div className={mobile ? (geral.selected.size > 0 ? 'gr-mobile has-selection' : 'gr-mobile') : 'gr-cardsview'}>
+              {mobile ? <div className="gr-manut-chave gr-manut-chave--celular">{chaveManutencoes}</div> : null}
               <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
               <GeralCards
                 grid={!mobile}
@@ -623,6 +673,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 selected={geral.selected}
                 onToggle={geral.toggle}
                 onOpen={(id) => { void openForm('edit', id) }}
+                besideId={besideId}
+                manutencao={manutencao}
                 onEdit={setEditId}
                 onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
@@ -633,12 +685,14 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           )
           : (
             <GeralTable
+              density={viewState.density}
               columns={visibleColumns}
               customWidths={prefs?.widths}
               onResize={resizeColumn}
               onMove={moveColumn}
               attributes={attributes}
               rows={rows}
+              grouping={grouping}
               loading={loading}
               sort={geral.sort}
               defaultSort={geral.defaultOrder}
@@ -654,9 +708,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onToggleAll={geral.toggleAll}
               onOpen={(id) => { void openForm('edit', id) }}
               renderCell={renderCell}
+              manutencao={manutencao}
+              unsortable={VIRTUAL_KEYS}
               scrollRef={scrollRef}
               tail={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
-              footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
+              footer={grouped ? <div className="gr-loadmore" role="status"><span>{status}{rows.length > 0 ? ` · ${rows.length} carregados` : ''}</span></div> : <LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
               empty={geral.pageError ? null : empty}
             />
           )}
@@ -664,52 +720,56 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     )
   }
 
-  const notApplied = geral.filtersIgnored ? [...Object.keys(filters.quick), ...filters.advanced.items.map((i) => i.id)] : undefined
+  // Contagem do primário do painel ("Mostrar N resultados"): a mesma consulta de total, com o rascunho no lugar dos filtros.
+  const { viewFilters: { base: filtersBase }, query: geralQuery, quickFind, comManutencoes } = geral
+  const countPreview = useCallback(async (draft: TableFilters) => {
+    if (!attributes || !view) return null
+    return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery, quickFind })
+  }, [attributes, view, source, filtersBase, filterFields, geralQuery, quickFind, comManutencoes])
 
   return (
     <ProtecaoContext.Provider value={protecao}>
       <div className="page page--full gr-page">
         {/* A linha de comando da lista (DS §10.9.1): visão, colunas, filtros, busca e comandos. */}
-        <div role="toolbar" aria-label="Comandos de serviços" className={selecting ? 'gr-commandline is-selecting' : 'gr-commandline'}>
+        <div role="toolbar" aria-label="Comandos de serviços" className="gr-commandline">
         <ViewBar
           onAudit={openAuditoria}
           view={viewState}
           columns={columnDefs}
           catalog={catalog}
-          filters={{ fields: filterFields, search: searchFilter, notApplied }}
+          filters={{ fields: filterFields, search: searchFilter, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
+          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
+          more={moreActions}
+          // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
+          primary={<>
+            <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
+            <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>
+          </>}
+          selection={selection}
         >
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          {selecting ? selectionBar : (
-            <>
-              <SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />
-              <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-            </>
-          )}
-          {shortcuts}
-          {selecting ? null : createButton}
+          {/* Depois da busca; continua visível com seleção (DS 1.26). Não encolhe: no celular empurraria "Criar serviço" para fora. */}
+          {!mobile ? <span className="gr-manut-chave">{chaveManutencoes}</span> : null}
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
         {body}
-        {mobile && geral.selected.size > 0 ? (
-          <div className="gr-selbar" role="group" aria-label="Ações sobre os selecionados">
-            <span role="status" className="gr-selbar__count">{geral.selected.size === 1 ? '1 selecionado' : `${geral.selected.size} selecionados`}</span>
-            {selectionCommands}
-          </div>
-        ) : null}
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}
-            columns={dataColumns}
+            columns={editManutencao ? colunasDaManutencao(dataColumns) : dataColumns}
+            manutencao={editManutencao ? { titulo: `Manutenção · ${editManutencao.veiculo}` } : undefined}
             attributes={attributes}
             cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}
             open
             onClose={() => setEditId(null)}
-            onSave={(column, value) => save(String(editRow[ID_ATTRIBUTE]), column, value)}
+            onSave={(column, value) => salvar(String(editRow[ID_ATTRIBUTE]), column, value)}
             onReset={(column) => resetCell(String(editRow[ID_ATTRIBUTE]), column.attribute)}
             search={(column, text) => source.search(column.attribute, text)}
+            recebimentos={recebimentos}
           />
         ) : null}
+        <ComprovantesServicoDrawer servico={comprovantesDe} source={recebimentos} mobile={mobile} onClose={() => setComprovantesDe(null)} />
         <CopyDialog open={copy.open} loading={copy.loading} text={copy.text} onClose={closeCopy} onCopied={() => { closeCopy(); toast({ tone: 'success', message: 'Serviços copiados.' }) }} />
         <LinkDialog request={linkRequest} onClose={() => setLinkRequest(null)}
           onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })}

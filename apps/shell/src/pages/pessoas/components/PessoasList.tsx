@@ -14,19 +14,22 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 
 const formatDay = (iso: string) => (iso ? iso.split('-').reverse().join('/') : '—')
 
-function OpenName({ p, choices, onOpen }: { p: Pessoa; choices: ChoiceSet; onOpen: (id: string) => void }) {
-  const cargo = label(choices.cargo, p.cargo)
+function OpenName({ p, onOpen }: { p: Pessoa; onOpen: (id: string) => void }) {
   return (
-    <button type="button" className="ps-open" onClick={() => onOpen(p.id)}>
+    <button type="button" className="ps-open" title={p.nome || undefined} onClick={() => onOpen(p.id)}>
       <strong>{p.nome || 'Sem nome'}</strong>
-      <span>{[cargo, p.departamento].filter(Boolean).join(' · ') || label(choices.classificacao, p.classificacao, '—')}</span>
     </button>
   )
 }
 
+/** Cargo · departamento, com a classificação quando não há nenhum dos dois. */
+function cargoTexto(p: Pessoa, choices: ChoiceSet) {
+  return [label(choices.cargo, p.cargo), p.departamento].filter(Boolean).join(' · ') || label(choices.classificacao, p.classificacao, '—')
+}
+
 function Badges({ p, choices, dup }: { p: Pessoa; choices: ChoiceSet; dup: boolean }) {
   return (
-    <span className="ps-badges">
+    <span className="ps-badges" title={[p.status === STATUS.inativo && label(choices.status, p.status), p.classificacao != null && label(choices.classificacao, p.classificacao), dup && 'Possível duplicado'].filter(Boolean).join(' · ')}>
       {p.status === STATUS.inativo ? <StatusBadge tone="neutral">{label(choices.status, p.status)}</StatusBadge> : null}
       {p.classificacao != null ? <StatusBadge tone="info">{label(choices.classificacao, p.classificacao)}</StatusBadge> : null}
       {dup ? <StatusBadge tone="warning" icon={<Copy size={12} />}>Possível duplicado</StatusBadge> : null}
@@ -36,17 +39,17 @@ function Badges({ p, choices, dup }: { p: Pessoa; choices: ChoiceSet; dup: boole
 
 export function PessoasTable({ list, choices, dups, onOpen, loading, view, quickFilters, footer, empty }: TableProps) {
   const columns: TableColumn<Pessoa>[] = [
-    { key: 'nome', header: 'Pessoa', label: 'Pessoa', sortable: true, defaultWidth: 280, width: 'minmax(180px, 1.5fr)', cell: (p) => <OpenName p={p} choices={choices} onOpen={onOpen} /> },
+    { key: 'nome', header: 'Pessoa', label: 'Pessoa', sortable: true, defaultWidth: 280, width: 'minmax(180px, 1.5fr)', cell: (p) => <OpenName p={p} onOpen={onOpen} /> },
+    { key: 'cargo', header: 'Cargo', label: 'Cargo', sortable: true, defaultWidth: 200, width: 'minmax(120px, 1fr)', cell: (p) => { const texto = cargoTexto(p, choices); return <span title={texto}>{texto}</span> } },
     { key: 'cliente', header: 'Cliente', label: 'Cliente', sortable: true, defaultWidth: 200, width: 'minmax(120px, 1fr)', cell: (p) => p.cliente || '—' },
-    { key: 'contato', header: 'Contato', label: 'Contato', defaultWidth: 220, width: 'minmax(150px, 1.1fr)', hideBelow: 'compact', cell: (p) => <span className="ps-contato"><span>{p.telefone || '—'}</span><span>{p.email}</span></span> },
+    { key: 'contato', header: 'Contato', label: 'Contato', defaultWidth: 220, width: 'minmax(150px, 1.1fr)', hideBelow: 'compact', cell: (p) => <span className="ps-contato" title={[p.telefone, p.email].filter(Boolean).join(' · ')}>{[p.telefone, p.email].filter(Boolean).join(' · ') || '—'}</span> },
     { key: 'tags', header: 'Classificação', label: 'Classificação', sortable: true, defaultWidth: 240, width: 'minmax(150px, 1fr)', cell: (p) => <Badges p={p} choices={choices} dup={dups.has(p.id)} /> },
     { key: 'ultimo', header: 'Último serviço', label: 'Último serviço', sortable: true, defaultWidth: 140, width: 'minmax(96px, .7fr)', hideBelow: 'compact', cell: (p) => formatDay(p.ultimoServico) },
-    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', align: 'end', cell: (p) => <ContatoActions p={p} compact /> },
+    { key: 'acoes', header: <span className="ps-sr">Ações rápidas</span>, label: 'Ações rápidas', defaultWidth: 96, width: '84px', cell: (p) => <ContatoActions p={p} compact /> },
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty}
-        severity={(p) => (dups.has(p.id) ? { tone: 'warning', label: 'Possível duplicado' } : null)} />
+      <VirtualTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pessoas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, Table, ToastProvider, ViewBar, matchesFilters, useShellHeader, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { LoadingTable } from '../../app/VirtualTable'
 import { FileText, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
@@ -62,14 +64,16 @@ function Logs({ host }: { host: Host }) {
   }, [data.list, filters, fields, query, view.config.sort])
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort, periodo }), [filters, query, view.config.sort, periodo])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, fields, readLog)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('ver')
   const selected = selectedId ? data.list.find((l) => l.id === selectedId) ?? null : null
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar logs" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Logs dos apps', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Logs dos apps' })
+  const size = mobile ? 'touch' : 'default'
 
   let body
   if (data.error && !data.loaded) {
@@ -81,11 +85,15 @@ function Logs({ host }: { host: Host }) {
   } else {
     const footer = <span className="lg-num">{visible.length} de {data.list.length}{data.list.length >= MAX_LOGS ? ` (limite de ${MAX_LOGS}; reduza o período)` : ''}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum log com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: LogApp[], tableFooter?: ReactNode) => (
+      <LogsTable list={rows} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true }} quickFilters={quickFilters} footer={tableFooter} empty={empty} />
+    )
+    const cards = (rows: LogApp[]) => <LogsCards list={rows} onOpen={setSelectedId} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <LogsCards list={slice} onOpen={setSelectedId} /> : <div className="surface">{empty}</div>)
-          : <LogsTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -94,11 +102,11 @@ function Logs({ host }: { host: Host }) {
   return (
     <div className="page page--full lg-page">
       <div role="toolbar" aria-label="Comandos dos logs">
-        <ViewBar onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="lg-search" value={query} onChange={setQuery} placeholder="Buscar por mensagem, código, tela ou usuário" aria-label="Buscar logs" />
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'new_appmotoristaslog', onOpenRecord: setSelectedId })} view={view} columns={LOG_COLUMNS} filters={{ fields }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por mensagem, código, tela ou usuário" aria-label="Buscar logs" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
           <Select className="lg-periodo" aria-label="Período" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? PERIODO_PADRAO)} />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />}
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
@@ -116,12 +124,12 @@ type ListProps = { list: LogApp[]; onOpen: (id: string) => void; loading?: boole
 
 function LogsTable({ list, onOpen, loading, view, quickFilters, footer, empty }: ListProps & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode }) {
   const columns: TableColumn<LogApp>[] = [
-    { key: 'mensagem', header: 'Mensagem', label: 'Mensagem', sortable: true, defaultWidth: 380, width: 'minmax(240px, 3fr)', cell: (l) => (
-      <button type="button" className="lg-open" onClick={() => onOpen(l.id)}>
+    { key: 'erro', header: 'Erro', label: 'Erro', sortable: true, defaultWidth: 200, width: 'minmax(140px, 1.2fr)', cell: (l) => (
+      <button type="button" className="lg-open" title={l.erro || undefined} onClick={() => onOpen(l.id)}>
         <strong>{l.erro || 'Erro'}</strong>
-        <span>{l.mensagem || 'Sem mensagem'}</span>
       </button>
     ) },
+    { key: 'mensagem', header: 'Mensagem', label: 'Mensagem', sortable: true, defaultWidth: 380, width: 'minmax(240px, 3fr)', cell: (l) => <span title={l.mensagem || undefined}>{l.mensagem || 'Sem mensagem'}</span> },
     { key: 'data', header: 'Data', label: 'Data', sortable: true, defaultWidth: 170, width: 'minmax(140px, 1fr)', cell: (l) => <span className="lg-num">{fmtData(l.data)}</span> },
     { key: 'app', header: 'App', label: 'App', sortable: true, defaultWidth: 150, width: 'minmax(110px, 1fr)', cell: (l) => l.app || '—' },
     { key: 'severidade', header: 'Severidade', label: 'Severidade', sortable: true, defaultWidth: 120, width: 'minmax(96px, .7fr)', cell: (l) => <Severidade l={l} /> },
@@ -131,7 +139,7 @@ function LogsTable({ list, onOpen, loading, view, quickFilters, footer, empty }:
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.lg-open')}>
-      <Table className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <LoadingTable className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando logs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

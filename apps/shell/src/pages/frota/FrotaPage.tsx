@@ -1,12 +1,13 @@
 import { RefreshCw } from 'lucide-react'
 import { Suspense, lazy, useCallback, useMemo, useState } from 'react'
-import { Alert, Button, StatusBadge, Tabs, ToastProvider, useShellHeader } from '@betinhos/ui'
+import { Alert, Button, StatusBadge, ToastProvider, useShellHeader } from '@betinhos/ui'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import type { FrotaAba } from '../../nav/menu'
-import { lerOpcao } from '../../nav/queryState'
 import { patchHashQuery, useHashQuery } from '../../nav/useHashRoute'
 import { FichaVeiculo } from './components/FichaVeiculo'
+import { GavetaManutencao } from './components/GavetaManutencao'
+import { NovaManutencaoDrawer } from './components/NovaManutencaoDrawer'
 import { RegistroDrawer } from './components/RegistroDrawer'
 import { Carregando, ViewGate } from './components/Ui'
 import { todaySP } from './data/dates'
@@ -23,11 +24,8 @@ import { Veiculos } from './views/Veiculos'
 import { useFrotaCarga } from './useFrotaCarga'
 import './frota.css'
 
-const MOCK_HOST: Host = { mode: 'mock' }
-/** Só quem abre a aba Infrações baixa o código dela. */
-/** Os Checklists de Veículos só baixam o código ao abrir a aba. */
+/** Os Checklists de Veículos só baixam o código ao abrir o item do menu. */
 const ChecklistsAba = lazy(() => import('./checklists/ChecklistsAba').then((m) => ({ default: m.ChecklistsAba })))
-const Infracoes = lazy(() => import('../infracoes/InfracoesPage').then((m) => ({ default: m.Infracoes })))
 
 export type Tab = FrotaAba
 
@@ -43,25 +41,25 @@ const TABS: { id: Tab; label: string; tables: TableKey[] }[] = [
   // Tela própria (`checklists/`), com dados e mock próprios: não usa as tabelas da Frota.
   { id: 'checklists', label: 'Checklists de Veículos', tables: [] },
 ]
-type SubMultas = 'multas' | 'infracoes'
 /** Páginas de lista não usam `PageHeader` (DS §11.2): o seletor de visão faz o papel de título. */
 const LISTAS: readonly Tab[] = ['veiculos', 'manutencoes', 'multas', 'colisoes']
 
 const KINDS: readonly Kind[] = ['manutencao', 'multa', 'colisao']
-/** Parâmetros dos filtros e gavetas das listas; trocar Multas ↔ Infrações apaga todos, para o filtro de uma não vazar para a outra. */
-const FILTROS_DAS_VISOES = ['q', 'f', 'status', 'tipo', 'veiculo', 'pessoa', 'categoria', 'de', 'ate', 'filtro', 'fde', 'fate', 'ver', 'editar', 'novo'] as const
 
-/** A visão vem do item do menu (`#/frota-veiculos`); ficha, registro e sub-aba vivem na query: `?ficha=<id>&registro=multa:<id>&sub=infracoes`. */
+/** A visão vem do item do menu (`#/frota-veiculos`); ficha e registro vivem na query: `?ficha=<id>&registro=multa:<id>`. */
 function useFrotaRota(tab: Tab) {
   const query = useHashQuery()
-  const sub = lerOpcao<SubMultas>(query, 'sub', ['multas', 'infracoes'], 'multas')
+  // Manutenções não tem sub-abas: link antigo `?sub=encaixar` abre a visão "A encaixar"; `?sub=todas` é ignorado.
+  const visaoManut = tab === 'manutencoes' && query.get('sub') === 'encaixar' ? 'pronta:encaixar' : undefined
   const veiculo = query.get('ficha') || null
   const [kind, id] = (query.get('registro') ?? '').split(':')
   const registro = KINDS.find((item) => item === kind) && id ? { kind: kind as Kind, id } : null
   const secao = query.get('secao') === 'preventivas' ? ('preventivas' as const) : null
-  return { tab, sub, veiculo, registro, secao }
+  const novaManutencao = query.get('novo') === 'manutencao'
+  return { tab, visaoManut, veiculo, registro, secao, novaManutencao }
 }
-const abrirSub = (sub: SubMultas) => patchHashQuery({ sub: sub === 'multas' ? null : sub, ficha: null, registro: null, secao: null, ...Object.fromEntries(FILTROS_DAS_VISOES.map((chave) => [chave, null])) })
+const abrirNovaManutencao = () => patchHashQuery({ novo: 'manutencao' })
+const limparSubManut = () => patchHashQuery({ sub: null })
 
 export function FrotaPage({ host, aba = 'pendencias' }: { host: Host; aba?: Tab }) {
   if (aba === 'checklists') return <Suspense fallback={<Carregando />}><ChecklistsAba host={host} titulo={TABS.find((item) => item.id === aba)!.label} /></Suspense>
@@ -107,7 +105,8 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
   const refreshButton = useMemo(() => (
     <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Recarregar a frota" loading={loading} onClick={() => void reload()} />
   ), [loading, reload])
-  useShellHeader({ title: tab.label, actions: refreshButton })
+  // Nas listas (linha de comando como a da Geral) o "Atualizar" fica na própria linha; o cabeçalho do celular não repete.
+  useShellHeader({ title: tab.label, actions: LISTAS.includes(route.tab) ? undefined : refreshButton })
 
   let body
   if (loading && !result) body = <Carregando />
@@ -115,10 +114,12 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
   else body = (
     <ViewGate errors={errors} tables={tab.tables} onRetry={onReload}>
       {route.tab === 'pendencias' && <Pendencias data={data} errors={errors} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} />}
-      {route.tab === 'manutencoes' && <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'multas' && route.sub === 'multas' && <Registros key="multas" kinds={['multa']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
-      {route.tab === 'colisoes' && <Registros key="colisoes" kinds={['colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} />}
+      {route.tab === 'veiculos' && <Veiculos data={data} today={today} source={source} host={host} onOpenVeiculo={onOpenVeiculo} onReload={onReload} loading={loading} />}
+      {route.tab === 'manutencoes' && (
+        <Registros key="manutencoes" kinds={['manutencao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} onNovo={abrirNovaManutencao} visaoInicial={route.visaoManut} onVisaoAplicada={limparSubManut} />
+      )}
+      {route.tab === 'multas' && <Registros key="multas" kinds={['multa']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
+      {route.tab === 'colisoes' && <Registros key="colisoes" kinds={['colisao']} data={data} source={source} host={host} onOpen={onOpen} onReload={onReload} loading={loading} />}
       {route.tab === 'indicadores' && <Indicadores data={data} errors={errors} today={today} />}
       {route.tab === 'plano' && <PlanoPreventivo data={data} source={source} onReload={onReload} />}
     </ViewGate>
@@ -126,16 +127,11 @@ export function Frota({ source, docs, host, aba = 'pendencias' }: { source: Data
 
   const conteudo = (
     <>
-      <div className="frota">
-        {route.tab === 'multas' ? (
-          <Tabs aria-label="Multas e infrações" tabs={[{ value: 'multas', label: 'Multas' }, { value: 'infracoes', label: 'Infrações' }]} value={route.sub} onChange={abrirSub}>
-            {route.sub === 'infracoes' ? <Suspense fallback={<Carregando />}><Infracoes host={host ?? MOCK_HOST} embutido /></Suspense> : body}
-          </Tabs>
-        ) : body}
-      </div>
-
+      {body}
       {result && !fatal && route.veiculo && !registro ? <FichaVeiculo errors={errors} source={source} docs={docs} id={route.veiculo} secao={route.secao} data={data} today={today} onClose={() => patchHashQuery({ ficha: null, secao: null, fde: null, fate: null })} onOpen={onOpen} onReload={onReload} /> : null}
-      {registro ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
+      {registro?.kind === 'manutencao' ? <GavetaManutencao key={registro.id} source={source} id={registro.id} hoje={today} onClose={() => setRegistro(null)} onChanged={onReload} onClassificado={aplicarClassificacao} onOpenVeiculo={onOpenVeiculo} /> : null}
+      {registro && registro.kind !== 'manutencao' ? <RegistroDrawer key={`${registro.kind}-${registro.id}`} source={source} kind={registro.kind} id={registro.id} data={data} onClose={() => setRegistro(null)} onChanged={onReload} onOpenVeiculo={onOpenVeiculo} /> : null}
+      {result && !fatal && route.tab === 'manutencoes' && route.novaManutencao ? <NovaManutencaoDrawer source={source} veiculos={data.veiculos} hoje={today} onClose={() => patchHashQuery({ novo: null })} onCriada={(id) => { patchHashQuery({ novo: null, registro: `manutencao:${id}` }); onReload() }} /> : null}
     </>
   )
   if (LISTAS.includes(route.tab)) return <div className="page page--full frota-page">{conteudo}</div>

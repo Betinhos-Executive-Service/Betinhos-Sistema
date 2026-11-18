@@ -28,8 +28,11 @@ export type InfleetVehicleResolution = {
 export type FleetVehicle = { id: string; placa: string; modelo: string; cor: string };
 
 // "candidato": um dos carros que a Infleet viu na janela; "frota": qualquer carro ativo, quando a Infleet não identifica;
-// "terceiro": carro do próprio motorista terceiro, sem Infleet.
-export type DriverVehicleChoice = { veiculoId: string; placa: string; origem: "candidato" | "frota" | "terceiro" };
+// "terceiro": carro do próprio motorista terceiro, sem Infleet; "nao-se-aplica": carro de terceiro ou serviço sem carro
+// (não grava veículo, só a evidência).
+export type DriverVehicleChoice = { veiculoId: string; placa: string; origem: "candidato" | "frota" | "terceiro" | "nao-se-aplica" };
+
+export const NOT_APPLICABLE_VEHICLE_CHOICE: DriverVehicleChoice = { veiculoId: "", placa: "", origem: "nao-se-aplica" };
 
 export const SERVICE_VEHICLE_ORIGIN_INFLEET = 100000002;
 export const SERVICE_VEHICLE_ORIGIN_DRIVER_CHOSEN = 100000003;

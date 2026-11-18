@@ -110,6 +110,12 @@ namespace Betinhos.DriverRecordSharing
         private static void Process(IPluginExecutionContext context, IOrganizationService system, DateTime now)
         {
             var templates = LoadActiveTemplates(system);
+            // Ambiente sem nenhum modelo ativo ainda não usa checklist; modelo ativo sem padrão continua sendo erro.
+            if (templates.Count == 0)
+            {
+                context.OutputParameters["new_Resumo"] = "ignorado:sem-modelo-ativo";
+                return;
+            }
             DefaultTemplate(templates); // exige exatamente um padrão ativo
             var maxPeriod = templates.Max(PeriodDays);
 

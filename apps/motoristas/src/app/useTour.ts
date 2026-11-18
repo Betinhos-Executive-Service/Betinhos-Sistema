@@ -3,7 +3,6 @@ import { clearAllChaptersSeen, closesWhenReadingEnds, hasSeenChapter, markChapte
 import { tourChaptersForScreen } from "./tourChapters";
 import { findTourTarget, hasTourProbe } from "./tourDom";
 import { hasDataverseRuntime, LOCAL_DRIVER_ID } from "../data/dataverse/cliente";
-import type { LoadingOverlayState } from "../shared/ui/LoadingOverlay";
 import type { ToastTone } from "../shared/ui/LocalToast";
 import type { Screen } from "../types";
 
@@ -11,7 +10,8 @@ type Options = {
   // Escolha do carro, operação remota ou envio de gasto na tela: o tour não abre por cima.
   blocked: boolean;
   criticalError: string;
-  dataLoading: LoadingOverlayState | null;
+  // Carga em andamento (overlay de envio ou agenda carregando): o tour espera.
+  dataLoading: boolean;
   driverContextId: string | undefined;
   // Tela de leitura do comprovante do gasto aberta: o capítulo dela fecha sozinho quando a leitura termina.
   expenseReading: boolean;

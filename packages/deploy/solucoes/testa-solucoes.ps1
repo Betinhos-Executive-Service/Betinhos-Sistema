@@ -416,6 +416,7 @@ $script:SegundosEntreTentativas = 0
 $script:pacChamadas = 0
 Confere (((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' 'c.json') -join ' ') -like '*--settings-file c.json*') 'import passa o arquivo de configuracao'
 Confere (-not ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4') -contains '--settings-file')) 'import sem configuracao nao passa --settings-file'
+Confere (-not ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' '' $true) -contains '--stage-and-upgrade') -and ((Get-ArgumentosDeImport 'x.zip' '1.0.0.4' '' $true) -contains '--activate-plugins')) 'import: ensaio sem upgrade tira so o stage-and-upgrade'
 Confere ((Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' '' }) -like '*CONEXAO_WEBPUSH*') 'PROD com Automacao sem conexao recusa'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore') 'Prod' '' })) 'PROD so com Core passa sem conexao'
 Confere ($null -eq (Falha-Com { Assert-ConexaoWebPush @('BetinhosCore', 'BetinhosAutomacao') 'Prod' 'abc' })) 'PROD com conexao passa'

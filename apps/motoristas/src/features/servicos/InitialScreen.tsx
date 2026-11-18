@@ -53,6 +53,13 @@ const baseModules = [
     disabled: false,
   },
   {
+    id: "postosProximos",
+    label: "Postos próximos",
+    detail: "Mapa da rede CTF",
+    icon: "postosProximos",
+    disabled: false,
+  },
+  {
     id: "maintenancePhoto",
     label: "Manutenção",
     detail: "Solicitar reparo",
@@ -89,6 +96,7 @@ const screenAliases: Record<string, string[]> = {
   checklists: ["checklists"],
   multas: ["multas"],
   treinamentos: ["treinamentos"],
+  postosProximos: ["postosProximos"],
   services: ["servicos", "services", "Services", "serviços"],
   history: ["historico", "history", "History", "histórico"],
   maintenancePhoto: ["maintenancePhoto", "maintenance", "MaintenancePhoto", "manutencao", "manutenção"],
@@ -104,6 +112,7 @@ const moduleHandlers: Record<string, string[]> = {
   checklists: [],
   multas: [],
   treinamentos: [],
+  postosProximos: [],
   services: [
     "onServices",
     "onService",
@@ -297,18 +306,15 @@ function formatTimeUntil(date: Date, now: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}min`;
 }
 
-function getNextServiceItem(props: InitialScreenProps, now: number) {
+function getNextServiceDate(props: InitialScreenProps, now: number) {
   const directDate = getServiceDate(props.nextServiceAt ?? props.proximoServicoEm);
-  if (directDate) return { date: directDate, item: null };
+  if (directDate) return directDate;
 
   const serviceDates = filterAgendaGalleryItems(props.services ?? [], now)
     .filter((service) => service.tipo !== "HEADER" && !service.canceled && service.detail)
-    .map((item) => {
-      const date = resolveAgendaDate(item, now);
-      return { item, date };
-    })
-    .filter((service): service is { item: AgendaItem; date: Date } => Boolean(service.date))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+    .map((item) => resolveAgendaDate(item, now))
+    .filter((date): date is Date => Boolean(date))
+    .sort((a, b) => a.getTime() - b.getTime());
 
   return serviceDates[0] ?? null;
 }
@@ -354,6 +360,11 @@ function ModuleIcon({ name }: { name: string }) {
   if (name === "treinamentos") {
     // Lucide graduation-cap: conteúdo de formação.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
+  if (name === "postosProximos") {
+    // Lucide fuel: posto de combustível.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
   if (name === "checklist") {
@@ -405,8 +416,7 @@ export function InitialScreen(props: InitialScreenProps) {
   const shellRef = useRef<HTMLElement | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const driverName = getFirstName(props.driverName ?? props.motoristaNome);
-  const nextService = useMemo(() => getNextServiceItem(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
-  const nextServiceDate = nextService?.date ?? null;
+  const nextServiceDate = useMemo(() => getNextServiceDate(props, now), [now, props.nextServiceAt, props.proximoServicoEm, props.services]);
   const agendaCount = useMemo(() => getTodayAgendaCount(props.services, now), [now, props.services]);
   const modules = useMemo(
     () => baseModules.concat(
@@ -429,13 +439,13 @@ export function InitialScreen(props: InitialScreenProps) {
   const gridModules = modules.filter((module) => module.id !== "services");
   const multasPrazo = props.multasBanner?.split(" · ")[1];
   const pendingTypes = [
-    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)} pendente${plural(n)}` },
-    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)} para assinar${multasPrazo ? ` · ${multasPrazo}` : ""}` },
-    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)} para ler` },
-    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)} para fazer` },
-    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `Gastos do cartão · ${n} para completar` },
+    { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)}` },
+    { id: "multas", count: props.pendingMultas ?? 0, text: (n: number) => `${n} multa${plural(n)}${multasPrazo ? ` · ${multasPrazo.replace(/^prazo /, "")}` : ""}` },
+    { id: "comunicados", count: props.pendingComunicados ?? 0, text: (n: number) => `${n} comunicado${plural(n)}` },
+    { id: "treinamentos", count: props.pendingTreinamentos ?? 0, text: (n: number) => `${n} treinamento${plural(n)}` },
+    { id: "gastosCartao", count: props.pendingGastosCartao ?? 0, text: (n: number) => `${n} gasto${plural(n)} a completar` },
   ];
-  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id, type.count]));
+  const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id === "gastosCartao" ? "expenses" : type.id, type.count]));
   const pendencias = pendingTypes
     .filter((type) => type.count > 0)
     .map((type) => ({ id: type.id, text: type.text(type.count) }));
@@ -478,20 +488,9 @@ export function InitialScreen(props: InitialScreenProps) {
     <PullToRefresh className="pull-refresh--home" scrollRef={shellRef} onRefresh={props.onRefresh ?? (() => window.location.reload())}>
     <main ref={shellRef} className="concept-shell">
       <header className="concept-topbar">
-        <div>
-          <span className="concept-kicker">Olá,</span>
-          <h1>{driverName}</h1>
-        </div>
+        <h1><span className="concept-kicker">Olá,</span> {driverName}</h1>
         <img className="concept-avatar" src={betinhosLogo} alt="Betinhos" />
       </header>
-
-      {nextServiceDate && (
-        <button className="concept-next-service" type="button" onClick={() => navigateTo("services")}>
-          <span className="concept-next-eyebrow">Próximo serviço em</span>
-          <strong>{formatTimeUntil(nextServiceDate, now)}</strong>
-          <small>{nextService?.item?.description ?? "Abrir agenda"}</small>
-        </button>
-      )}
 
       {servicesModule && (
         <button
@@ -507,9 +506,10 @@ export function InitialScreen(props: InitialScreenProps) {
           </span>
           <span className="concept-module-text">
             <strong>{servicesModule.label}</strong>
-            <small>
-              {servicesModule.detail}
-              {agendaCount > 0 ? <span className="concept-inline-count"> • {agendaCount}</span> : null}
+            <small className={nextServiceDate ? "concept-next" : undefined}>
+              {nextServiceDate
+                ? <>Próximo em <b>{formatTimeUntil(nextServiceDate, now)}</b></>
+                : agendaCount > 0 ? `${agendaCount} hoje` : servicesModule.detail}
             </small>
           </span>
         </button>
@@ -521,7 +521,6 @@ export function InitialScreen(props: InitialScreenProps) {
             <button className="concept-pending-row" key={item.id} type="button" onClick={() => navigateTo(item.id)}>
               <span className="concept-pending-dot" aria-hidden="true" />
               <span className="concept-pending-text">{item.text}</span>
-              <span className="concept-pending-chevron" aria-hidden="true">›</span>
             </button>
           ))}
         </section>

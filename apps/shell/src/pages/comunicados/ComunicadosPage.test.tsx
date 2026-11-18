@@ -24,6 +24,18 @@ describe('Comunicados', () => {
     expect(await screen.findByText('Push reenfileirado.')).toBeTruthy()
   })
 
+  it('Voltar fica no início do cabeçalho, antes do título, no relatório e no editor', async () => {
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    fireEvent.click(await screen.findByRole('button', { name: /Novo procedimento de embarque/ }))
+    const titulo = await screen.findByRole('heading', { name: 'Novo procedimento de embarque no GRU' })
+    const antes = (voltar: HTMLElement, alvo: HTMLElement) => Boolean(voltar.compareDocumentPosition(alvo) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(antes(screen.getByRole('button', { name: 'Voltar' }), titulo)).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Novo comunicado' }))
+    const editor = await screen.findByRole('heading', { name: 'Novo comunicado' })
+    expect(antes(screen.getByRole('button', { name: 'Voltar' }), editor)).toBe(true)
+  })
+
   it('cria um comunicado para motoristas selecionados e dispara depois de confirmar', async () => {
     render(<ComunicadosPage host={{ mode: 'mock' }} />)
     await screen.findByRole('button', { name: /^Revisão dos veículos/ })

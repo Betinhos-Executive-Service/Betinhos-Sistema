@@ -1,0 +1,12 @@
+[
+  {
+    "migration": "20261116-1800-prova-midia-galeria.ps1",
+    "por": "20261116-1900-prova-midia-galeria-forms.ps1",
+    "motivo": "Falhou no DEV (Deploy 43899596027) ao exigir isdefault no form principal de cr40f_manutencoes; a 1900 tem o mesmo conteudo com o form achado por tipo e estado."
+  },
+  {
+    "migration": "20261117-1200-multas-fase1.ps1",
+    "por": "20261117-2100-multas-fase1-choice-local.ps1",
+    "motivo": "Falhou no DEV (Deploy 44169786825) ao chamar UpdateOptionValue pelo nome do choice local cr40f_multas_cr40f_status; a 2100 tem o mesmo conteudo e decide global/local por OptionSet.IsGlobal."
+  }
+]

@@ -38,7 +38,7 @@ test('janela D-10 nunca antes do início da conciliação', () => {
 
 test('lê o Banco MCP só com operações de leitura e esconde entradas e saídas', () => {
   const banco = [...todas.values()].filter((a) => a.inputs?.host?.apiId === '__BANCO__')
-  assert.deepEqual(banco.map((a) => a.inputs.host.operationId).sort(), ['ListarContas', 'ListarConexoes', 'ListarTransacoes'].sort())
+  assert.deepEqual([...new Set(banco.map((a) => a.inputs.host.operationId))].sort(), ['ListarContas', 'ListarConexoes', 'ListarTransacoes'].sort())
   for (const a of banco) assert.deepEqual(a.runtimeConfiguration.secureData.properties, ['inputs', 'outputs'])
   assert.equal(acao('Contas').inputs.parameters['body/type'], 'CREDIT')
   const pagina = acao('Transacoes_pagina').inputs.parameters
@@ -211,7 +211,7 @@ test('varre transação parada em Aguardando quando o gatilho da despesa não pe
 })
 
 test('toda leitura do Banco MCP tenta de novo em espera crescente, por causa do 429 do Pluggy', () => {
-  for (const nome of ['Conexoes', 'Contas', 'Transacoes_pagina']) {
+  for (const nome of ['Conexoes', 'Contas', 'Contas_segunda', 'Transacoes_pagina']) {
     assert.deepEqual(acao(nome).inputs.retryPolicy, {
       type: 'exponential',
       count: 4,
@@ -271,4 +271,16 @@ test('compra do cartão 3 dias corridos sem comprovante válido vai ao gestor (D
   const erro = JSON.stringify(acao('Houve_erro').expression)
   assert.match(erro, /'Atrasadas'/)
   assert.match(erro, /'Cada_atrasada'/)
+})
+
+test('conexão que falhou em Contas espera 30 min e é lida de novo no mesmo run (429 do Pluggy às 08:07)', () => {
+  assert.deepEqual(acao('Esperar_banco').runAfter, { Contas: ['Failed', 'TimedOut'] })
+  assert.deepEqual(acao('Esperar_banco').inputs.interval, { count: 30, unit: 'Minute' })
+  const { runAfter, ...segunda } = acao('Contas_segunda')
+  const { runAfter: _, ...primeira } = acao('Contas')
+  assert.deepEqual(segunda, primeira)
+  assert.deepEqual(runAfter, { Esperar_banco: ['Succeeded'] })
+  // Contas ok: a segunda fica Skipped e a conta é lida; as duas falham: Cada_conta é pulada e Cada_conexao fica Failed.
+  assert.deepEqual(acao('Cada_conta').runAfter, { Contas_segunda: ['Succeeded', 'Skipped'] })
+  assert.match(acao('Cada_conta').foreach, /if\(equals\(actions\('Contas'\)\?\['status'\], 'Succeeded'\), outputs\('Contas'\).*outputs\('Contas_segunda'\)/)
 })

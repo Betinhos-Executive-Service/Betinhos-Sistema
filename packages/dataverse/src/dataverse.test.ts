@@ -73,6 +73,18 @@ describe('xrm shim', () => {
     expect(xrm.Utility!.getGlobalContext().getClientUrl()).toBe('https://org.example')
   })
 
+  it('pede todas as anotações, como o Xrm real (recibo lê o lookuplogicalname do cliente)', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'cr40f_bancodedados', EntitySetName: 'cr40f_bancodedadoses' })
+      return json({ value: [] })
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    await xrm.WebApi!.retrieveRecord('cr40f_bancodedados', '{ABC}', '?$select=_cr40f_cliente_value')
+    await xrm.WebApi!.retrieveMultipleRecords('cr40f_bancodedados', '?$select=a', 50)
+    const prefers = fetchMock.mock.calls.slice(1).map((c) => ((c as unknown[])[1] as { headers: Record<string, string> }).headers.Prefer)
+    expect(prefers).toEqual(['odata.include-annotations="*"', 'odata.include-annotations="*",odata.maxpagesize=50'])
+  })
+
   it('repassa o cookie de paginação do FetchXML (telas com views só carregavam a 1ª página)', async () => {
     const cookie = '<cookie pagenumber="2" pagingcookie="%253ccookie" />'
     const fetchMock = vi.fn(async (url: string) => {
@@ -97,6 +109,23 @@ describe('xrm shim', () => {
     const failed = await xrm.WebApi!.online!.execute(request('new_SolicitarChecklistVeiculo'))
     expect(failed.status).toBe(400)
     expect((await failed.json()).error.message).toContain('Veículo sem motorista.')
+  })
+
+  it('executa ação vinculada no registro, sem o parâmetro vinculado no corpo', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('EntityDefinitions')) return json({ LogicalName: 'cr40f_composicaodeprecos', EntitySetName: 'cr40f_composicaodeprecoses' })
+      return json({ NewRowVersion: '2' })
+    })
+    const xrm = createXrmShim(createClient('https://org.example', fetchMock as unknown as typeof fetch), 'https://org.example')
+    const response = await xrm.WebApi!.online!.execute({
+      entity: { entityType: 'cr40f_composicaodeprecos', id: '{ABC}' },
+      TargetField: 'cr40f_valor',
+      getMetadata: () => ({ boundParameter: 'entity', operationType: 0, operationName: 'new_AplicarEntradaCelulaComposicao', parameterTypes: { entity: {}, TargetField: {} } }),
+    })
+    expect(await response.json()).toEqual({ NewRowVersion: '2' })
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit]
+    expect(url).toBe('https://org.example/api/data/v9.2/cr40f_composicaodeprecoses(abc)/Microsoft.Dynamics.CRM.new_AplicarEntradaCelulaComposicao')
+    expect(JSON.parse(String(init.body))).toEqual({ TargetField: 'cr40f_valor' })
   })
 
   it('executeMultiple manda os Updates num changeset de $batch e rejeita se o changeset falhar', async () => {

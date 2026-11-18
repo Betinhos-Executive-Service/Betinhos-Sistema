@@ -15,6 +15,7 @@ export const INFRACAO_SORT: ViewSort = { key: 'infracao', dir: 'asc' }
 /** Colunas na ordem padrão; a primeira (Infração) é fixa. */
 export const INFRACAO_COLUMNS: ViewColumnDef[] = [
   { key: 'infracao', label: 'Infração' },
+  { key: 'descricao', label: 'Descrição' },
   { key: 'gravidade', label: 'Gravidade' },
   { key: 'pontos', label: 'Pontos' },
   { key: 'valor', label: 'Valor' },
@@ -29,6 +30,7 @@ const SIM_NAO: FilterOption[] = [{ value: '1', label: 'Sim' }, { value: '0', lab
 /** Campos filtráveis: os das colunas entram no filtro rápido; os demais só no avançado. */
 export const INFRACAO_FIELDS: FilterField[] = [
   { key: 'infracao', label: 'Infração', kind: 'text' },
+  { key: 'descricao', label: 'Descrição', kind: 'text' },
   { key: 'gravidade', label: 'Gravidade', kind: 'choice', options: options(GRAVIDADE) },
   { key: 'pontos', label: 'Pontos', kind: 'number' },
   { key: 'valor', label: 'Valor', kind: 'number', money: true },
@@ -45,6 +47,7 @@ const asText = (v: number | null) => (v == null ? null : String(v))
 export function readInfracao(i: Infracao, key: string, multas: (id: string) => number): unknown {
   switch (key) {
     case 'infracao': return [i.codigo, i.descricao, i.enquadramento].filter(Boolean).join(' ')
+    case 'descricao': return i.descricao
     case 'gravidade': return asText(i.gravidade)
     case 'pontos': return i.pontos
     case 'valor': return i.valor
@@ -74,6 +77,7 @@ export function sortInfracoes(list: Infracao[], sort: ViewSort | null, multas: (
   return sortRows(list, (i) => {
     switch (sort.key) {
       case 'infracao': return Number(i.codigo.replace(/\D/g, '')) || i.codigo || null
+      case 'descricao': return i.descricao || null
       case 'gravidade': return i.gravidade
       case 'pontos': return i.pontos
       case 'valor': return i.valor

@@ -514,9 +514,13 @@ function Test-FalhaTransitoriaDoServidor([string] $Erro) {
 
 # Primeira instalacao vai sem --stage-and-upgrade: o Dataverse recusa a solucao de retencao sem base ("Cannot create a
 # holding solution for missing base"). Com versao instalada, upgrade com stage, que e o que apaga o que saiu da solucao.
-function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "") {
+# $SemUpgrade: com versao instalada, importa como update (sem --stage-and-upgrade). Quem decide e importar-solucoes.ps1: o
+# ensaio so no TEST, ou a escolha pelo inventario (inventario.ps1). O update troca os
+# componentes que vieram no pacote e deixa no ambiente os que sairam da solucao; o upgrade apaga esses, mas monta e desmonta
+# uma solucao de espera (holding), o que custa ~10 min no BetinhosCore.
+function Get-ArgumentosDeImport([string] $Caminho, [string] $VersaoInstalada, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
   $args = @("solution", "import", "--path", $Caminho)
-  if ($VersaoInstalada) { $args += "--stage-and-upgrade" }
+  if ($VersaoInstalada -and -not $SemUpgrade) { $args += "--stage-and-upgrade" }
   if ($Configuracao) { $args += @("--settings-file", $Configuracao) }
   return $args + @("--publish-changes", "--activate-plugins", "--async", "--max-async-wait-time", "180")
 }
@@ -571,7 +575,7 @@ function New-ConfiguracaoDeImport([string] $Pasta, [string] $Solucao, [string] $
 
 # Importa o ZIP gerenciado com upgrade e prova pela versao instalada. Pac com erro nao e falha se a versao chegou.
 # $Alvo: Test ou Prod (explicito). $Permitidas: as 4 por padrao; a retirada passa tambem AppBetinhos (upgrade antes de desinstalar).
-function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "") {
+function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test", [int] $MinutosDeEspera = 60, [string[]] $Permitidas = $script:Solucoes, [string] $Configuracao = "", [bool] $SemUpgrade = $false) {
   Assert-HostAlvo $Dv $Alvo
   $m = Get-ManifestoDoPacote $Caminho
   if (-not $m.Managed) { throw "$Caminho nao e gerenciada." }
@@ -581,7 +585,7 @@ function Import-SolucaoGerenciada($Dv, [string] $Caminho, [string] $Alvo = "Test
   do {
     $tentativas++
     $erroPac = $null
-    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) $Configuracao) | Out-Null }
+    try { Invoke-Pac $Dv.Url (Get-ArgumentosDeImport $Caminho (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) $Configuracao $SemUpgrade) | Out-Null }
     catch {
       $erroPac = "$($_.Exception.Message)"
       if ($tentativas -lt 2 -and (Test-FalhaTransitoriaDoServidor $erroPac) -and (Get-VersaoInstalada (Update-DvToken $Dv) $m.UniqueName) -ne $m.Version) {

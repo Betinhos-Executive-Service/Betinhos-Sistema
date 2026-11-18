@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { StatusBadge, Table, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { StatCard, StatusBadge, type StatusTone, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
 import { calcularManutencoes, type LinhaCategoria, type LinhaTipoReparo, type Manutencoes, type StatusMeta } from '../../domain/abas/manutencoes'
@@ -11,8 +12,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Duplo, Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -55,17 +56,15 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   const k = ma.kpis
   const prazo = ma.prazo
   const apoioPrazo: Apoio[] = prazo?.ate10 != null ? [{ rotulo: `Até ${META_MANUTENCAO.preventivaDias} dias`, texto: pct(prazo.ate10) }] : []
-  if (prazo && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
-  if (prazo) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
+  if (prazo?.lm != null && ma.mostrarLM) apoioPrazo.push({ rotulo: 'Mês anterior', texto: diasTexto(prazo.lm) })
+  if (prazo?.ly != null) apoioPrazo.push({ rotulo: 'Ano anterior', texto: diasTexto(prazo.ly) })
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
-      <KpiCard rotulo={KPIS[0]} tom="brand" valor={k ? int(k.total) : null}>{ma.ant ? <ChipAnt chip={ma.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom="action" valor={k ? brl(k.custoTotal) : null} apoio={k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : []}>
-        {ma.ant ? <ChipAnt chip={ma.ant.custoTotal} /> : undefined}
-      </KpiCard>
-      <KpiCard rotulo={KPIS[2]} tom="warning" valor={k ? int(k.emAndamento) : null} apoio={k ? 'solicitadas, aprovadas ou programadas' : undefined} />
-      <KpiCard rotulo={KPIS[3]} tom="action" valor={k ? brl(k.custoMedio) : null} />
-      <KpiCard rotulo={KPIS[4]} tom="success" valor={prazo ? diasTexto(prazo.medio) : null} apoio={apoioPrazo} />
+      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [ma.ant?.total] })} />
+      <StatCard label={KPIS[1]} value={k ? brlS(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
+      <StatCard label={KPIS[2]} {...tomAtencao(k?.emAndamento)} value={k ? int(k.emAndamento) : null} {...extrasKpi({ apoio: k ? 'solicitadas, agendadas ou programadas' : undefined })} />
+      <StatCard label={KPIS[3]} value={k ? brl(k.custoMedio) : null} />
+      <StatCard label={KPIS[4]} value={prazo ? diasTexto(prazo.medio) : null} {...extrasKpi({ apoio: apoioPrazo })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
@@ -77,7 +76,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
       <div className="dash-grade">
         <CustoMesCard pontos={ma.custoPorMes} total={k.custoTotal} periodo={periodo} />
         <TipoReparoCard linhas={ma.porTipoReparo} periodo={periodo} />
-        <CategoriasCard linhas={ma.categorias} mostrarLM={ma.mostrarLM} periodo={periodo} />
+        <CategoriasCard linhas={ma.categorias} lmNoPeriodo={ma.mostrarLM} periodo={periodo} />
       </div>
     )}
   </>
@@ -88,12 +87,12 @@ function CustoMesCard({ pontos, total, periodo }: { pontos: PontoCusto[]; total:
   const mobile = useMedia(MEDIA_MOBILE)
   const colunas: TableColumn<PontoCusto>[] = mobile
     ? [{ key: 'm', header: 'Mês', cell: (p) => p.rotulo }, resto('Custo', (p) => `Custo ${brl(p.valor)}`)]
-    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Custo', align: 'end', cell: (p) => brl(p.valor) }]
+    : [{ key: 'm', header: 'Mês', cell: (p) => forte(p.rotulo) }, { key: 'v', header: 'Custo', cell: (p) => brl(p.valor) }]
   return (
     <AnaliseCard
       titulo="Custo por mês" periodo={periodo} unidade="R$ por mês" valor={brl(total)} sub="Custo das manutenções pela data da manutenção"
       grafico={pontos.length ? <BarraChart descricao={`Custo de manutenção por mês, ${periodo}`} nome="Custo" formatar={brlS} dados={pontos} /> : undefined}
-      tabela={pontos.length ? <Table columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
+      tabela={pontos.length ? <Tabela columns={colunas} rows={pontos} rowKey={(p) => p.mes} /> : <Vazio titulo="Nenhuma manutenção no período" />}
       copiar={tabelaCopia(pontos, [['Mês', (p) => p.rotulo], ['Custo', (p) => brl(p.valor)]])}
       tabelaSobDemanda={pontos.length > 0}
     />
@@ -107,8 +106,8 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
     ? [{ key: 't', header: 'Tipo de reparo', cell: (l) => l.tipo }, resto('Custo', (l) => juntar(`${int(l.qtd)} registros`, `Custo ${brl(l.valor)}`, `Participação ${pct(l.pct)}`))]
     : [
       { key: 't', header: 'Tipo de reparo', width: 'minmax(0, 1.4fr)', cell: (l) => forte(l.tipo) },
-      { key: 'q', header: 'Qtd', align: 'end', width: 'minmax(56px, .5fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
-      { key: 'v', header: 'Custo', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Qtd', width: 'minmax(56px, .5fr)', cell: (l) => <Duplo valor={int(l.qtd)} apoio={pct(l.pctQtd)} /> },
+      { key: 'v', header: 'Custo', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.tipo} no custo`} /></span> },
     ]
   const [maior] = linhas
@@ -116,16 +115,19 @@ function TipoReparoCard({ linhas, periodo }: { linhas: LinhaTipoReparo[]; period
     <AnaliseCard
       titulo="Por tipo de reparo" periodo={periodo} unidade="registros e R$"
       valor={maior ? maior.tipo : undefined} sub={maior ? `Mais frequente · ${int(maior.qtd)} registros · ${pct(maior.pct)} do custo` : undefined}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.tipo} empty={<Vazio titulo="Nenhuma manutenção no período" />} />}
       copiar={tabelaCopia(linhas, [['Tipo de reparo', (l) => l.tipo], ['Registros', (l) => l.qtd], ['% dos registros', (l) => pct(l.pctQtd)], ['Custo', (l) => brl(l.valor)], ['Participação no custo', (l) => pct(l.pct)]])}
     />
   )
 }
 
 /** Categorias (por palavra-chave do tipo de reparo) com a meta de cada uma e o selo Dentro/Fora da meta em texto. */
-function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria[]; mostrarLM: boolean; periodo: string }) {
+function CategoriasCard({ linhas, lmNoPeriodo, periodo }: { linhas: LinhaCategoria[]; lmNoPeriodo: boolean; periodo: string }) {
   const mobile = useMedia(MEDIA_MOBILE)
-  const comparativo = (l: LinhaCategoria) => [mostrarLM ? `Mês anterior ${anterior(l.lm)}` : '', `Ano anterior ${anterior(l.ly)}`].filter(Boolean)
+  // Comparativo todo "—" (nenhum registro no mês ou no ano anterior) não vira coluna nem texto.
+  const mostrarLM = lmNoPeriodo && linhas.some((l) => l.lm)
+  const mostrarLY = linhas.some((l) => l.ly)
+  const comparativo = (l: LinhaCategoria) => [mostrarLM ? `Mês anterior ${anterior(l.lm)}` : '', mostrarLY ? `Ano anterior ${anterior(l.ly)}` : ''].filter(Boolean)
   const colunas: TableColumn<LinhaCategoria>[] = mobile
     ? [
       { key: 'c', header: 'Categoria', cell: (l) => l.categoria },
@@ -138,9 +140,9 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
     ]
     : [
       { key: 'c', header: 'Categoria', width: 'minmax(160px, 1.3fr)', cell: (l) => forte(l.categoria) },
-      { key: 'q', header: 'Registros', align: 'end', width: 'minmax(72px, .6fr)', cell: (l) => int(l.qtd) },
-      ...(mostrarLM ? [{ key: 'lm', header: 'Mês anterior', align: 'end' as const, width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.lm) }] : []),
-      { key: 'ly', header: 'Ano anterior', align: 'end', width: 'minmax(92px, .7fr)', cell: (l) => anterior(l.ly) },
+      { key: 'q', header: 'Registros', width: 'minmax(72px, .6fr)', cell: (l) => int(l.qtd) },
+      ...(mostrarLM ? [{ key: 'lm', header: 'Mês anterior', width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.lm) }] : []),
+      ...(mostrarLY ? [{ key: 'ly', header: 'Ano anterior', width: 'minmax(92px, .7fr)', cell: (l: LinhaCategoria) => anterior(l.ly) }] : []),
       { key: 'm', header: <span className="dash-col-part">Meta</span>, width: 'minmax(180px, 1.6fr)', cell: (l) => <span className="dash-col-part">{l.meta ?? '—'}</span> },
       { key: 's', header: 'Status', width: 'minmax(132px, .9fr)', cell: (l) => <Selo status={l.status} /> },
     ]
@@ -150,10 +152,10 @@ function CategoriasCard({ linhas, mostrarLM, periodo }: { linhas: LinhaCategoria
       largo titulo="Categorias com metas" periodo={periodo} unidade="registros por categoria"
       valor={fora ? `${int(fora)} fora da meta` : 'Nenhuma fora da meta'}
       sub={`Corretiva crítica: ${META_MANUTENCAO.corretivaCritica ? `até ${META_MANUTENCAO.corretivaCritica}` : 'zero'} · Corretiva não crítica: até ${META_MANUTENCAO.naoCriticaPorMes} por mês · Preventiva programada: da aprovação à data em até ${META_MANUTENCAO.preventivaDias} dias`}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.categoria} />}
       copiar={tabelaCopia(linhas, [
         ['Categoria', (l) => l.categoria], ['Registros', (l) => l.qtd], ...(mostrarLM ? [['Mês anterior', (l: LinhaCategoria) => anterior(l.lm)] as const] : []),
-        ['Ano anterior', (l) => anterior(l.ly)], ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],
+        ...(mostrarLY ? [['Ano anterior', (l: LinhaCategoria) => anterior(l.ly)] as const] : []), ['Meta', (l) => l.meta ?? '—'], ['Status', (l) => SELO[l.status].texto],
       ])}
     />
   )

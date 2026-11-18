@@ -1,0 +1,10 @@
+[
+  { "name": "precedence", "expression": "=1+2*3", "expected": "7.00" },
+  { "name": "parentheses", "expression": "=(1+2)*3", "expected": "9.00" },
+  { "name": "percent", "expression": "=[Locação]*10%", "values": { "new_valorlocacao": "250.00" }, "expected": "25.00" },
+  { "name": "decimal-comma", "expression": "=10,25+1,75", "expected": "12.00" },
+  { "name": "unary", "expression": "=-[Ajuste]+10", "values": { "new_ajuste": "2.50" }, "expected": "7.50" },
+  { "name": "divide-zero", "expression": "=1/0", "error": "DIVIDE_BY_ZERO" },
+  { "name": "unknown-field", "expression": "=[Não existe]+1", "error": "UNKNOWN_FIELD" }
+]
+

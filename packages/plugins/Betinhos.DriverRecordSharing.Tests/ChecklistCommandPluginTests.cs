@@ -77,6 +77,30 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void RotinaSemNenhumModeloAtivoIgnoraSemCriarChecklist()
+        {
+            var service = new FakeService();
+            service.Vehicle("AAA0001");
+            var context = Context();
+
+            Invoke("Process", context, service, DateTime.UtcNow);
+
+            Assert.Empty(service.Rows("new_checklistveiculo"));
+            Assert.Equal("ignorado:sem-modelo-ativo", context.OutputParameters["new_Resumo"]);
+        }
+
+        [Fact]
+        public void RotinaComModeloAtivoSemPadraoFalha()
+        {
+            var service = new FakeService();
+            service.Template(padrao: false, name: "Blindados");
+            service.Vehicle("AAA0001");
+
+            AssertPluginError(() => Invoke("Process", Context(), service, DateTime.UtcNow));
+            Assert.Empty(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
         public void SolicitacaoManualAtribuiQuemEstaComOVeiculo()
         {
             var service = new FakeService();

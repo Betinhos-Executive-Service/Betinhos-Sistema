@@ -1,8 +1,10 @@
 import type { MaintenanceRequestVehicleOption } from "../manutencao/remoto";
+import { sessaoDoRascunho } from "../fotos/sessaoDoRascunho";
 import { expenseFlowView } from "./receiptQuickRead";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { DESCRICAO_ID, ExpenseScreen } from "./ExpenseScreen";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
+import { placaDosVeiculos } from "../fotos/provaCaptura";
 import { ReceiptReadingScreen } from "./ReceiptReadingScreen";
 import { ReceiptIllegibleScreen } from "./ReceiptIllegibleScreen";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
@@ -15,10 +17,10 @@ import { GastoCartaoDuplicadoDialog } from "./GastoCartaoDuplicadoDialog";
 import { LeituraCartaoSheet } from "./LeituraCartaoSheet";
 import { GastosCartaoScreen } from "./GastosCartaoScreen";
 import { GastosRelatorioScreen } from "./GastosRelatorioScreen";
-import { RankingPostosScreen } from "./RankingPostosScreen";
 import { reportAppError } from "../../shared/appErrorLogger";
 
 type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCartao> & {
+  abrirPostosProximos: (origem: Screen) => void;
   maintenanceCurrentVehicleId: string;
   maintenanceVehicles: MaintenanceRequestVehicleOption[];
   maintenanceVehiclesLoading: boolean;
@@ -31,6 +33,7 @@ type Props = ReturnType<typeof useExpenseFlow> & ReturnType<typeof useGastosCart
 // Telas de gastos: relatório, gastos do cartão a completar, postos perto, e "Registrar gasto" (câmera e prévia do comprovante, leitura rápida, ilegível e formulário).
 export function rotasDespesas(screen: Screen, {
   abrirDespesaId,
+  abrirPostosProximos,
   abrirGastoCartao,
   anexarDespesa,
   duplicidadeCartao,
@@ -40,6 +43,7 @@ export function rotasDespesas(screen: Screen, {
   gastosCartaoStatus,
   limparAbrirDespesa,
   marcarDevolucaoEnviada,
+  marcarDevolucaoCancelada,
   motoristaIdRelatorio,
   isExpenseIdle,
   relatorioModelo,
@@ -80,7 +84,6 @@ export function rotasDespesas(screen: Screen, {
   maintenanceVehiclesLoading,
   openExpenseCamera,
   openExpensePreview,
-  openExpenseVideoPreview,
   remoteMode,
   remoteOperation,
   refazerLeituraCartao,
@@ -114,8 +117,12 @@ export function rotasDespesas(screen: Screen, {
           setExpensePreviewPhotoId("");
           setScreen("previewFotoGasto");
         }}
-        onCaptureVideo={openExpenseVideoPreview}
         onSwitchCamera={() => setToast("Câmera alternada localmente.")}
+        prova={{
+          origem: { tela: "despesa", tabela: "cr40f_despesaoperacional", registroId: sessaoDoRascunho("despesa") },
+          carimbo: { placa: placaDosVeiculos(maintenanceVehicles, maintenanceCurrentVehicleId), registro: "Despesa" },
+          referencia: () => expenseDraft.dataGasto
+        }}
       />
     );
   }
@@ -238,19 +245,17 @@ export function rotasDespesas(screen: Screen, {
         onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
         motoristaId={motoristaIdRelatorio}
         onDevolucaoEnviada={marcarDevolucaoEnviada}
+        onDevolucaoCancelada={marcarDevolucaoCancelada}
         abrirDespesaId={abrirDespesaId}
         onDespesaAberta={limparAbrirDespesa}
         onPeriodo={setRelatorioPeriodo}
         onBack={() => setScreen("inicio")}
         onReload={() => { void reloadRelatorio(); }}
         onAttach={anexarDespesa}
-        onPrecoPostos={() => setScreen("rankingPostos")}
+        onPrecoPostos={() => abrirPostosProximos("gastosRelatorio")}
       />
     );
   }
 
-  if (screen === "rankingPostos") {
-    return <RankingPostosScreen onBack={() => setScreen("gastosRelatorio")} />;
-  }
   return null;
 }

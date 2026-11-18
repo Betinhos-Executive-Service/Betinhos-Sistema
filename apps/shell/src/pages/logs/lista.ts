@@ -26,8 +26,9 @@ export const SEVERIDADES: FilterOption[] = [
 export const severidadeLabel = (s: string) => SEVERIDADES.find((o) => o.value === s)?.label ?? (s || 'Sem severidade')
 export const severidadeTone = (s: string) => (s === 'critical' || s === 'error' ? 'danger' : s === 'warning' ? 'warning' : s === 'info' ? 'info' : 'neutral')
 
-/** Colunas na ordem padrão; a primeira (Mensagem) é fixa. */
+/** Colunas na ordem padrão; a primeira (Erro) é fixa. */
 export const LOG_COLUMNS: ViewColumnDef[] = [
+  { key: 'erro', label: 'Erro' },
   { key: 'mensagem', label: 'Mensagem' },
   { key: 'data', label: 'Data' },
   { key: 'app', label: 'App' },
@@ -41,6 +42,7 @@ export const LOG_COLUMNS: ViewColumnDef[] = [
 export function logFields(list: LogApp[]): FilterField[] {
   const apps = [...new Set(list.map((l) => l.app).filter(Boolean))].sort().map((a) => ({ value: a, label: a }))
   return [
+    { key: 'erro', label: 'Erro', kind: 'text' },
     { key: 'mensagem', label: 'Mensagem', kind: 'text' },
     { key: 'data', label: 'Data', kind: 'date' },
     { key: 'app', label: 'App', kind: 'choice', options: apps },
@@ -57,7 +59,8 @@ export const quemFoi = (l: LogApp) => l.usuario || l.email
 
 export function readLog(l: LogApp, key: string): unknown {
   switch (key) {
-    case 'mensagem': return [l.erro, l.mensagem].filter(Boolean).join(' ')
+    case 'erro': return l.erro
+    case 'mensagem': return l.mensagem
     case 'data': return l.data
     case 'app': return l.app
     case 'severidade': return l.severidade
@@ -87,7 +90,7 @@ export function sortLogs(list: LogApp[], sort: ViewSort | null) {
       case 'data': return l.data?.getTime()
       case 'severidade': return PESO[l.severidade] ?? 0
       case 'usuario': return quemFoi(l)
-      case 'mensagem': case 'app': case 'tela': case 'versao': return l[sort.key] || null
+      case 'erro': case 'mensagem': case 'app': case 'tela': case 'versao': return l[sort.key] || null
       default: return null
     }
   }, sort.dir)

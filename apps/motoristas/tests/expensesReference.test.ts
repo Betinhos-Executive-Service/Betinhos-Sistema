@@ -51,9 +51,11 @@ test("parseIntegerInput remove tudo que não é dígito", () => {
   assert.equal(parseIntegerInput(null as unknown as string), 0);
 });
 
-test("parseDecimalInput trata ponto como milhar e vírgula como decimal", () => {
+test("parseDecimalInput: vírgula decimal, ponto milhar, ponto sozinho decimal", () => {
   assert.equal(parseDecimalInput("45,5"), 45.5);
   assert.equal(parseDecimalInput("1.045,75 L"), 1045.75);
+  assert.equal(parseDecimalInput("23.02"), 23.02);
+  assert.equal(parseDecimalInput("1.045.500"), 1045500);
   assert.equal(parseDecimalInput(""), 0);
   assert.equal(parseDecimalInput("abc"), 0);
 });

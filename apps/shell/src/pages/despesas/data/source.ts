@@ -7,21 +7,28 @@ import type { KV } from '../../pagantes/domain/filters'
 import { aplicarDecisao, patchDecisao, type Decisao } from '../domain/decisao'
 import { withFallback } from '../domain/status'
 import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
-import { createArquivos } from './arquivo'
-import { createMockAnexos, createMockArquivo, createMockDespesas } from './mock'
+import { createArquivos } from '../../../lib/comprovantes/leitura'
+import { createMockAnexos, createMockDespesas } from './mock'
+import { createMockArquivo } from '../../../lib/comprovantes/mock'
+import { createCarregarProvas, type CarregarProvas } from '../../../lib/comprovantes/provaMidia'
 import { ENTITY_ANEXO, ENTITY_DESPESA, anexosPath, despesasPath, despesasSearchFilter, mapAnexo, mapDespesa } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
+import { guid } from '../../pagantes/data/queries'
 
 /** Tudo que a tela precisa do mundo externo. A única gravação é a decisão do gestor sobre a despesa. */
 export type Source = {
   mock: boolean
   /** Despesas do período; `onFirstPage` recebe a primeira página antes (lista grande). */
   load: (since: Date | null, onFirstPage?: (list: Despesa[]) => void) => Promise<Despesa[]>
+  /** Uma despesa pelo ID (gaveta aberta por cima de outra lista); `null` se não existe ou está inativa. */
+  get: (id: string) => Promise<Despesa | null>
   /** Até 50 despesas do período que batem com a busca (usada enquanto a lista não carregou inteira). */
   search: (since: Date | null, query: string) => Promise<Despesa[]>
   anexos: (despesaId: string) => Promise<Anexo[]>
   /** Conteúdo do comprovante para a prévia (imagem ou PDF). */
   arquivo: (anexo: Anexo) => Promise<Arquivo>
+  /** Prova de captura do App Motoristas pelo link do comprovante (selos ao lado do anexo). */
+  provas?: CarregarProvas
   choices: () => Promise<DespesaChoices>
   /** Decisão do gestor num único PATCH; falha (permissão, rede) propaga e nada muda. */
   decidir: (id: string, tipo: Decisao, motivo: string) => Promise<void>
@@ -41,8 +48,10 @@ function createMockSource(): Source {
       const t = normalizeSearch(q)
       return mockSearch(rows, (d) => (!since || (d.data != null && d.data >= since)) && normalizeSearch(`${d.protocolo} ${d.nome} ${d.estabelecimento}`).includes(t))
     },
+    async get(id) { await wait(200); const d = rows.find((x) => x.id === id); return d ? { ...d } : null },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },
     async arquivo(anexo) { await wait(300); return createMockArquivo(anexo) },
+    provas: createCarregarProvas({ mode: 'mock' }),
     choices: async () => withFallback({}),
     async decidir(id, tipo, motivo) {
       await wait(400)
@@ -76,8 +85,13 @@ export function createSource(host: Host): Source {
       const filter = despesasSearchFilter(q)
       return filter ? (await searchRows(host.client, despesasPath(await entitySet(ENTITY_DESPESA), since, filter))).map(mapDespesa) : []
     },
+    get: async (id) => {
+      const [row] = await host.client.getAll(despesasPath(await entitySet(ENTITY_DESPESA), null, `cr40f_despesaoperacionalid eq ${guid(id)}`))
+      return row ? mapDespesa(row) : null
+    },
     anexos: async (id) => (await host.client.getAll(anexosPath(await entitySet(ENTITY_ANEXO), id))).map(mapAnexo),
     arquivo: createArquivos(host.client),
+    provas: createCarregarProvas(host),
     // Rótulo é acessório: metadata fora do ar cai nos rótulos conhecidos.
     async choices() {
       const [operacional, financeiro, anexo, origem, anexoTipo, anexoStatus] = await Promise.all([

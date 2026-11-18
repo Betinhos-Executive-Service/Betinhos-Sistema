@@ -12,7 +12,10 @@ param(
   [string] $Cache = "",
   # Sem -Confiar (modo observar, o padrao): exporta tudo como antes e so registra o que a impressao digital teria decidido,
   # provando a decisao contra o pacote fresco. Com -Confiar: pula ou reaproveita de verdade.
-  [switch] $Confiar
+  [switch] $Confiar,
+  # Grava em $Pasta/inventarios o inventario de cada solucao do manifesto (inventario.ps1): o import compara com o destino e
+  # escolhe update ou upgrade. So o publicar.yml pede; o pacote do Deploy nao precisa.
+  [switch] $Inventario
 )
 
 # Etapa 1 dos workflows publicar.yml e retirar-caixa.yml, e fim do deploy.yml (pacote para o publicar), no DEV: conferencia
@@ -27,7 +30,7 @@ param(
 if ($PSVersionTable.PSEdition -eq "Core") {
   $ps = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
   # Switch por splat: com -File, "-Caixa:True" (como o Core serializa) e recusado pelo Windows PowerShell.
-  $extra = @(); if ($Caixa) { $extra += "-Caixa" }; if ($Confiar) { $extra += "-Confiar" }
+  $extra = @(); if ($Caixa) { $extra += "-Caixa" }; if ($Confiar) { $extra += "-Confiar" }; if ($Inventario) { $extra += "-Inventario" }
   if ($Publicadas) { $extra += @("-Publicadas", $Publicadas) }
   if ($Cache) { $extra += @("-Cache", $Cache) }
   & $ps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -EnvironmentUrl $EnvironmentUrl -Solucoes $Pedido -Pasta $Pasta @extra
@@ -40,6 +43,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "solucoes.ps1")
 . (Join-Path $PSScriptRoot "impressao.ps1")
 . (Join-Path $PSScriptRoot "segredos.ps1")
+. (Join-Path $PSScriptRoot "inventario.ps1")
 
 $dv = Connect-Dataverse $EnvironmentUrl @($script:HostDev)
 $escolhidas = if ($Caixa) { @("AppBetinhos") } else { @(Get-SolucoesEscolhidas $Pedido) }
@@ -136,6 +140,17 @@ if ($pendentes.Count) {
     if ($entrada.observacao -eq "erro") {
       Write-Host "::warning title=Impressao digital::$($p.Nome) - a impressao disse '$($p.Decisao.acao)', mas o pacote novo tem outro conteudo. Nao ligue SOLUCOES_IMPRESSAO=confiar; veja a skill verificar-solucoes."
     }
+  }
+}
+# Inventario do DEV de cada pacote (exportado ou do cache): o mesmo conteudo do ZIP, porque o grupo dataverse-dev segura o DEV.
+# Falha nunca barra o export: vira inventario incerto, e o import fica no upgrade.
+if ($Inventario -and -not $Caixa) {
+  $dv = Update-DvToken $dv
+  New-Item -ItemType Directory -Force -Path (Join-Path $Pasta "inventarios") | Out-Null
+  foreach ($entrada in @($manifesto | Where-Object { $_.origem -ne "pulada" })) {
+    $inv = try { Get-InventarioDaSolucao $dv $entrada.solucao } catch { @{ itens = @(); incerto = $true; motivos = @("inventario falhou: $(Get-ErroDv $_)") } }
+    Write-JsonFile (Join-Path $Pasta "inventarios\$($entrada.solucao).json") $inv
+    Write-Step "$($entrada.solucao) inventario: $(@($inv.itens).Count) item(ns)$(if ($inv.incerto) { "; INCERTO: $(@($inv.motivos | Select-Object -First 3) -join '; ')" })"
   }
 }
 # Trava de segredos (segredos.ps1) antes de qualquer artefato ou cache: inclui os ZIPs vindos do cache do Deploy.

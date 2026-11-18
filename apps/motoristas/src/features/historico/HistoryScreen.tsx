@@ -4,6 +4,7 @@ import type { AgendaItem, DetailData } from "../../types";
 import { AgendaCard } from "../../shared/ui/AgendaCard";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { PullToRefresh } from "../../shared/ui/PullToRefresh";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { SearchBar } from "../servicos/SearchBar";
 
@@ -12,9 +13,11 @@ type HistoryScreenProps = {
   onHome: () => void;
   onRefresh: () => void | Promise<void>;
   onOpenDetails: (detail: DetailData) => void;
+  /** Agenda carregando: o loader fica só na lista. */
+  loading?: boolean;
 };
 
-export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails }: HistoryScreenProps) {
+export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails, loading = false }: HistoryScreenProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const { query, setQuery, filteredAgenda } = useAgendaSearch(items);
 
@@ -25,7 +28,9 @@ export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails }: Histo
         <SearchBar query={query} onQueryChange={setQuery} />
         <PullToRefresh scrollRef={listRef} onRefresh={() => { setQuery(""); return onRefresh(); }}>
         <div ref={listRef} className="agenda-list">
-          {filteredAgenda.length > 0 ? (
+          {filteredAgenda.length === 0 && loading ? (
+            <BrandLoader variant="inline" label="Carregando histórico" text="Carregando histórico" />
+          ) : filteredAgenda.length > 0 ? (
             filteredAgenda.map((item: AgendaItem, index) => (
               <div key={item.id} className="agenda-layout-item">
                 <AgendaCard
@@ -41,6 +46,7 @@ export function HistoryScreen({ items, onHome, onRefresh, onOpenDetails }: Histo
             </div>
           )}
         </div>
+        {loading && filteredAgenda.length > 0 ? <BrandLoader label="Atualizando histórico" size="md" /> : null}
         </PullToRefresh>
       </section>
     </AppShell>

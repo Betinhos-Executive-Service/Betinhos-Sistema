@@ -1,6 +1,7 @@
 import type { ExpensePhoto } from "../features/despesas/expenses.types";
 import { useEffect } from "react";
 import { STORAGE_KEY } from "./bootstrap";
+import { pedirArmazenamentoPersistente } from "../features/envio-pendente/armazenamentoPersistente";
 import { reportAppError } from "../shared/appErrorLogger";
 import { saveMediaDraft, touchMediaDraft } from "../features/fotos/mediaDraftStore";
 import type { LocalStore } from "../lib/localWorkflow";
@@ -67,6 +68,7 @@ export function usePersistenciaRascunhos({ isButtonPreviewMode, isReceiptPreview
         photos: store.photos,
         receiveProofs: serializeReceiveProofs(receiveProofs)
       } satisfies PersistedFinalizeDraftAssets;
+    if (Object.keys(payload.signatures).length || Object.keys(payload.photos).length || Object.keys(payload.receiveProofs).length) void pedirArmazenamentoPersistente();
     void saveMediaDraft(payload).then(() => localStorage.removeItem(FINALIZE_DRAFT_ASSETS_STORAGE_KEY)).catch((error) => {
       reportAppError(error, {
         severity: "warning",

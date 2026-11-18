@@ -1,13 +1,9 @@
 /* Tela Frota no shell: só composição local; cores, tipos, raios e sombras vêm dos tokens do Design System. */
-.frota { min-width: 0; }
-.frota .bt-tabs__panel { padding-top: var(--bt-space-4); }
 .frota-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .frota-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .frota-nowrap { white-space: nowrap; }
 .frota-cluster { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; }
-.frota-stack, .frota-lista, .frota-indicadores, .frota-pend { display: grid; gap: var(--bt-space-3); min-width: 0; }
-.frota-skeleton { display: grid; gap: var(--bt-space-2-5); }
-.frota-busca { width: min(320px, 100%); }
+.frota-stack, .frota-indicadores, .frota-pend { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .frota-filter { min-width: 160px; }
 .frota-data { width: 150px; }
 .frota-link { padding: 0; border: 0; background: none; font: inherit; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-action); text-align: left; cursor: pointer; }
@@ -114,9 +110,9 @@
 .frota-classif__cat legend { padding: 0 var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
 
 /* Página compacta: cabeçalho enxuto e cards de dados menores. */
-.frota-page { padding-top: var(--bt-space-3); }
+/* Só nas abas com cabeçalho próprio; as listas ficam com o topo das outras listas, para a linha de comando cair na mesma altura. */
+.frota-page:not(.page--full) { padding-top: var(--bt-space-3); }
 .frota-page .page__header { margin-bottom: var(--bt-space-1); }
-.frota-page .frota .bt-tabs__panel { padding-top: var(--bt-space-3); }
 .frota-page .bt-page-header__row { min-height: 0; }
 .frota-page .bt-page-header__title { font-size: clamp(22px, 2.4vw, 28px); }
 .frota-page .bt-metric { min-height: 0; padding: var(--bt-space-2-5) var(--bt-space-3); gap: var(--bt-space-2-5); box-shadow: none; }
@@ -158,3 +154,67 @@
 .frota-foto-drop .bt-menu { display: block; }
 .frota-foto-previa { display: block; width: 100%; max-height: 260px; margin-top: var(--bt-space-2); border-radius: var(--bt-radius-md); object-fit: contain; background-color: var(--bt-color-surface-neutral); }
 @media (prefers-reduced-motion: reduce) { .frota-foto-botao { transition: none; } }
+
+/* Passo a passo da multa (modelo visual: barra de etapas do QuoteManagementDrawer). */
+.multa-passos { display: grid; gap: var(--bt-space-3); }
+.multa-topo { display: flex; align-items: center; gap: var(--bt-space-3); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.multa-topo__id { flex: 1; display: grid; min-width: 0; }
+.multa-topo__id strong { font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.multa-topo__id span, .multa-topo__prazo small { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.multa-topo__prazo { display: grid; text-align: right; }
+.multa-topo[data-urgencia="atencao"] .multa-topo__prazo b { color: var(--bt-color-warning); }
+.multa-topo[data-urgencia="vencido"] .multa-topo__prazo b { color: var(--bt-color-danger); }
+.multa-etapas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--bt-color-border); }
+.multa-etapas li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-2); border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.multa-etapas li b { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: var(--bt-font-size-11); }
+.multa-etapas li small { flex-basis: 100%; font-weight: var(--bt-font-weight-semibold); }
+.multa-etapas li.done { color: var(--bt-color-success); }
+.multa-etapas li.done b { border-color: var(--bt-color-success); background-color: var(--bt-color-success); color: var(--bt-color-white); }
+.multa-etapas li.active { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
+.multa-etapas li.active b { border-color: var(--bt-color-action); }
+.multa-passo { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.multa-passo h3 { margin: 0; font-size: var(--bt-font-size-14); color: var(--bt-color-brand); }
+.multa-passo[data-vencido] { border-color: var(--bt-color-danger); }
+.multa-passo[data-vencido] h3 { color: var(--bt-color-danger); }
+.multa-mensagem { width: 100%; padding: var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-sm); font: inherit; font-size: var(--bt-font-size-13); resize: vertical; }
+.frota-prazo[data-urgencia="atencao"] { color: var(--bt-color-warning); font-weight: var(--bt-font-weight-bold); }
+.frota-prazo[data-urgencia="vencido"] { color: var(--bt-color-danger); font-weight: var(--bt-font-weight-bold); }
+@media (max-width: 560px) { .multa-etapas li { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } .multa-topo { flex-wrap: wrap; } }
+/* O :indeterminate do navegador pega todo rádio de grupo sem escolha e o choice.css do DS pinta como checkbox indeterminado ("–" azul). */
+.multa-passos .bt-choice--radio .bt-choice__input:indeterminate:not(:checked) + .bt-choice__control { border-color: var(--bt-color-text-secondary); background-color: var(--bt-color-surface); }
+.multa-passos .bt-choice--radio .bt-choice__input:indeterminate:not(:checked) + .bt-choice__control::after { content: none; }
+/* Manutenções v2: erro de um grupo de campos, rótulo de grupo e links das fotos na gaveta */
+.frota-erro { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-danger); }
+.frota-campo__rotulo { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.frota-fotos { margin: 0; font-size: var(--bt-font-size-13); }
+.frota-fotos .frota-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
+
+/* Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): barra de três etapas, um passo por vez. */
+.frota-guia { display: grid; gap: var(--bt-space-4); min-width: 0; }
+.frota-guia__passo { display: grid; gap: var(--bt-space-3); min-width: 0; }
+.frota-guia__passo h3 { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); }
+.frota-gaveta-corpo { display: grid; gap: var(--bt-space-4); min-width: 0; }
+.frota-cabecalho { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.frota-bloco { display: grid; gap: var(--bt-space-3); min-width: 0; padding: var(--bt-space-4); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); }
+.frota-bloco[data-destaque] { background: var(--bt-color-surface); border-color: var(--bt-color-border-strong); }
+.frota-bloco__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.frota-bloco__citacao { margin: 0; font-size: var(--bt-font-size-14); }
+.frota-bloco .frota-detail { padding: 0; border: 0; background: none; }
+.frota-linha-tempo { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-13); }
+.frota-linha-tempo li { position: relative; padding-left: var(--bt-space-4); }
+.frota-linha-tempo li::before { content: ''; position: absolute; left: 0; top: .5em; width: 8px; height: 8px; border-radius: 50%; background: var(--bt-color-border-strong); }
+.frota-etapas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); }
+.frota-etapas__item { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-2); border-bottom: 2px solid transparent; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.frota-etapas__item b { display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--bt-color-border); border-radius: 999px; font-size: var(--bt-font-size-11); }
+.frota-etapas__item[data-feita] { color: var(--bt-color-success); }
+.frota-etapas__item[data-feita] b { border-color: var(--bt-color-success); background-color: var(--bt-color-success); color: var(--bt-color-white); }
+.frota-etapas__item[aria-current="step"] { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
+.frota-etapas__item[aria-current="step"] b { border-color: var(--bt-color-action); }
+.frota-etapas__item[data-parada] { color: var(--bt-color-text-secondary); border-bottom-color: var(--bt-color-border); }
+@media (max-width: 560px) { .frota-etapas__item { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } }
+/* Gaveta da manutenção: o título "placa · descrição" quebra linha em vez de cortar (no celular a descrição sumia). */
+.bt-drawer__title:has(> .frota-gaveta__titulo) { white-space: normal; }
+.bt-drawer__head:has(.frota-gaveta__titulo) { padding-block: var(--bt-space-2); }
+
+.multa-descontos__lista { display: grid; gap: var(--bt-space-1-5); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-13); }
+.multa-descontos__lista li { display: grid; grid-template-columns: minmax(0, 1fr) max-content max-content; gap: var(--bt-space-3); padding: var(--bt-space-2) var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }

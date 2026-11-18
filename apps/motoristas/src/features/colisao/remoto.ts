@@ -2,7 +2,8 @@
 import type { CollisionLookupNavigationNames, CollisionPhotoKind } from "./collisions";
 import { createOne } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
-import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix, uploadMaintenancePhoto } from "../../data/dataverse/arquivos.ts";
+import { getDataUrlMimeType, getFileExtensionFromMimeType, sanitizePathSegment, shouldUseDevFolderPrefix } from "../../data/dataverse/arquivos.ts";
+import { uploadMediaWithProof } from "../fotos/enviarComProva.ts";
 import { bind } from "../../data/dataverse/registros.ts";
 import { type LookupNavigationRequest, assertEntityHasAttributes, resolveLookupNavigationName } from "../../data/dataverse/metadados.ts";
 
@@ -51,13 +52,13 @@ export async function uploadCollisionPhotoRemote({
   const lookupNavigationNames = await loadCollisionAttachmentLookupNavigationNamesRemote();
 
   onProgress?.(`Enviando ${isVideo ? "video" : "foto"} ${order}.`);
-  const link = await uploadMaintenancePhoto(path, dataUrl, baseName, {
+  const link = await uploadMediaWithProof(path, dataUrl, baseName, {
     colisaoGuid: collisionId,
     colisaoNome: collisionName,
     tipo: kind,
     tipoMidia: isVideo ? "video" : "foto",
     indice: order
-  });
+  }, { tabela: "cr40f_colisao_v2", registroId: collisionId });
 
   onProgress?.(`Vinculando ${isVideo ? "video" : "foto"} ${order} à colisão.`);
   const recordName = `${label} ${order} - ${collisionName}`.slice(0, 100);

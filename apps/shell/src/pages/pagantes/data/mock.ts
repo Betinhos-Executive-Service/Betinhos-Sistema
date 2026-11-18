@@ -47,6 +47,8 @@ export function createMockPagantes(now: Date, extra = mockVolume()): Pagante[] {
     make(10, 3, 9, 760, 202410002, STATUS.naoFinalizado, { email: { status: ETAPA.erro, erro: 'Pessoa sem e-mail cadastrado.', enviadoEm: null } }),
     make(25, 0, 10, 4200, 202410000, STATUS.pago, { recibo: RECIBO.enviado, linkRecibo: 'https://onedrive.exemplo/recibo-25.pdf' }),
     make(40, 1, 11, 1500, 202410002, STATUS.pendente),
+    // Recibo gerado sem e-mail (Gerar Pagantes com o envio desmarcado): ainda não foi enviado.
+    make(11, 2, 11, 1491.06, 202410000, STATUS.pendente, { recibo: RECIBO.gerado, linkRecibo: 'https://onedrive.exemplo/recibo-11.pdf' }),
     // Casos reais de DEV: pagante antigo sem pessoa e sem OP; pendente com recibo emitido e sem link Cielo.
     make(12, 0, 0, 640, 202410001, STATUS.pendente, { pessoaId: '', pessoa: '', opId: '', op: '', linkPagamento: '', recibo: RECIBO.enviado, linkRecibo: 'https://onedrive.exemplo/recibo-12.pdf', link: { status: ETAPA.naoAplicavel, erro: '' }, email: { status: ETAPA.naoAplicavel, erro: '', enviadoEm: null } }),
     ...volume,

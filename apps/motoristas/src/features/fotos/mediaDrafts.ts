@@ -33,3 +33,8 @@ export async function prepareVideoBlobForUpload(blob: Blob) {
     revokePreviewUrl(previewUrl);
   }
 }
+
+/** Anexo em PDF escolhido na galeria (fase 2 da prova de captura). */
+export function ehPdf(dataUrl?: string | null) {
+  return Boolean(dataUrl?.startsWith("data:application/pdf"));
+}

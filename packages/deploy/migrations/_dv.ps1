@@ -28,6 +28,12 @@ function Invoke-Dv([string] $Method, [string] $Path, $Body = $null) {
   $headers = @{ Authorization = "Bearer $script:DvToken"; Accept = "application/json"; "OData-MaxVersion" = "4.0"; "OData-Version" = "4.0"; "MSCRM.SolutionUniqueName" = $script:SolucaoDev }
   $params = @{ Method = $Method; Uri = "$script:DvApi/$Path"; Headers = $headers }
   if ($null -ne $Body) {
+    # OData so le @odata.type se ele vier antes das propriedades; hashtable nao garante ordem.
+    if ($Body -is [hashtable] -and $Body.ContainsKey("@odata.type")) {
+      $ordenado = [ordered]@{ "@odata.type" = $Body["@odata.type"] }
+      foreach ($k in $Body.Keys) { if ($k -ne "@odata.type") { $ordenado[$k] = $Body[$k] } }
+      $Body = $ordenado
+    }
     $params.ContentType = "application/json; charset=utf-8"
     $params.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 50 -Compress))
   }

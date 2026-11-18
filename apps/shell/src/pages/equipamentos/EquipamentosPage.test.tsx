@@ -16,6 +16,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 const openButton = (nome: string) => screen.findByRole('button', { name: new RegExp(`^${nome}`) })
+// "Tipos" mora no ⋮ (Mais ações) da linha de comando, como os comandos raros da Geral.
+async function abrirTipos() {
+  fireEvent.click(screen.getByRole('button', { name: /^Mais ações/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Tipos de equipamento', hidden: true }))
+}
 const rowOf = async (nome: string) => (await openButton(nome)).closest('.bt-table__row') as HTMLElement
 
 /** Fonte de exemplo com operações trocadas (carga vazia, falha, salvamento lento). */
@@ -295,7 +300,7 @@ describe('Equipamentos', () => {
   it('gerencia tipos: adiciona, bloqueia repetido, renomeia e inativa', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
 
@@ -339,7 +344,7 @@ describe('Equipamentos', () => {
   it('lista de tipos: ativos primeiro, inativos marcados e quantos itens usam cada um', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     const linhas = [...drawer.querySelectorAll('.eq-tipos__item')] as HTMLElement[]
     const nomes = linhas.map((li) => li.querySelector('.eq-tipos__name')?.textContent)
@@ -360,7 +365,7 @@ describe('Equipamentos', () => {
   it('com renomeação por salvar, as outras linhas não abrem outra renomeação', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Monitor' }))
     const outro = within(drawer).getByRole('button', { name: 'Renomear tipo Mouse' }) as HTMLButtonElement
@@ -376,7 +381,7 @@ describe('Equipamentos', () => {
   it('tipo renomeado aparece nos itens; inativado some do seletor e fica marcado no item', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     fireEvent.click(within(drawer).getByRole('button', { name: 'Renomear tipo Mouse' }))
     fireEvent.change(drawer.querySelector('input[name="renomearTipo"]') as HTMLInputElement, { target: { value: 'Mouse óptico' } })
@@ -409,7 +414,7 @@ describe('Equipamentos', () => {
     })
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
     fireEvent.change(novo, { target: { value: 'Webcam' } })
@@ -431,7 +436,7 @@ describe('Equipamentos', () => {
   it('fechar os tipos com nome não salvo pede confirmação', async () => {
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     await openButton('Notebook reserva')
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const drawer = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     const novo = drawer.querySelector('input[name="novoTipo"]') as HTMLInputElement
     fireEvent.change(novo, { target: { value: 'Webcam' } })
@@ -443,7 +448,7 @@ describe('Equipamentos', () => {
     fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar painel' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Descartar alterações?' })).getByRole('button', { name: 'Descartar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Tipos de equipamento' })).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: 'Tipos' }))
+    await abrirTipos()
     const again = await screen.findByRole('dialog', { name: 'Tipos de equipamento' })
     expect((again.querySelector('input[name="novoTipo"]') as HTMLInputElement).value).toBe('')
   })

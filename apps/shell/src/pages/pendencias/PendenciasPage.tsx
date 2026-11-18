@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
-import { Alert, Button, EmptyState, SearchBox, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { Alert, Button, EmptyState, SearchBox, StatusBadge, ToastProvider, ViewBar, matchesFilters, useShellHeader, useToast } from '@betinhos/ui'
 import { CircleCheck, RefreshCw, SearchX } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
+import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { hrefFor } from '../../nav/useHashRoute'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
@@ -11,7 +12,7 @@ import { GerarPagantesFrame } from '../pagantes/components/Dialogs'
 import { formatMoney } from '../pagantes/domain/messages'
 import { createSource as createPagantesSource } from '../pagantes/data/source'
 import { createSource } from './data/source'
-import { EMPTY_FILTERS, PERIODOS, VIEWS_KEY, loadViews, periodoStart, type Periodo } from './domain/filters'
+import { VIEWS_KEY, loadViews } from './domain/filters'
 import { PENDENCIA_COLUMNS, PENDENCIA_FIELDS, PENDENCIA_SORT, TELA, builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, readPendencia, sortPendencias } from './domain/lista'
 import { pendenciasQuery } from './domain/query'
 import type { Pendencia } from './domain/types'
@@ -31,7 +32,6 @@ export function PendenciasPage({ host }: Props) {
 
 const soma = (list: Pendencia[]) => list.reduce((acc, p) => acc + (p.valor ?? 0), 0)
 const noop = () => undefined
-const isPeriodo = (v: string): v is Periodo => PERIODOS.some((p) => p.value === v)
 
 function Pendencias({ host }: Props) {
   const source = useMemo(() => createSource(host), [host])
@@ -39,11 +39,7 @@ function Pendencias({ host }: Props) {
   const toast = useToast()
   const mobile = useMedia('(max-width: 820px)')
 
-  // O período decide o que carrega do Dataverse; fica na URL e fora da visão.
-  const [periodoUrl, setPeriodo] = useQueryTexto('periodo', EMPTY_FILTERS.periodo)
-  const periodo = isPeriodo(periodoUrl) ? periodoUrl : EMPTY_FILTERS.periodo
-  const since = useMemo(() => periodoStart(periodo, new Date()), [periodo])
-  const pend = usePendencias(source, since)
+  const pend = usePendencias(source, null)
 
   const { view, filters, quickFilters, clearFilters } = useListView({
     host,
@@ -71,6 +67,7 @@ function Pendencias({ host }: Props) {
   // Lazy loading de renderização: trocar filtro, busca ou ordenação volta ao primeiro lote; recarregar a lista não.
   const lazyKey = useMemo(() => ({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
+  const groups = useRowGroups(visible, view.config.group, PENDENCIA_FIELDS, readPendencia)
   const clearAll = () => { clearFilters(); setQuery('') }
 
   const [selectedId, setSelectedId] = useQueryId('abrir')
@@ -82,8 +79,9 @@ function Pendencias({ host }: Props) {
   const frameUrl = gerarOpId ? pagantes.gerarPagantesUrl(gerarOpId) : null
 
   const refresh = useCallback(() => { void pend.reload() }, [pend.reload])
-  const headerActions = useMemo(() => <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar pendências" onClick={refresh} />, [refresh])
-  useShellHeader({ title: 'Pendências', actions: headerActions })
+  // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
+  useShellHeader({ title: 'Pendências' })
+  const size = mobile ? 'touch' : 'default'
 
   const acoes = {
     onCorrigir: (p: Pendencia) => { setSelectedId(null); setCorrigir(p) },
@@ -107,15 +105,19 @@ function Pendencias({ host }: Props) {
   } else if (!pend.loaded || (pend.loading && !visible.length)) {
     body = <PendenciasTable list={[]} onOpen={noop} loading {...acoes} />
   } else if (!pend.loading && !pend.list.length) {
-    body = <EmptyState className="surface" align="start" icon={<CircleCheck size={36} />} title="Nenhuma pendência neste período">OPs, pagantes e serviços estão alinhados. Amplie o período para conferir os mais antigos.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<CircleCheck size={36} />} title="Nenhuma pendência">OPs, pagantes e serviços estão alinhados.</EmptyState>
   } else {
     const footer = <span className="pg-num">{visible.length} {visible.length === 1 ? 'pendência' : 'pendências'} · {formatMoney(soma(visible))}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhuma pendência com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
-    body = (
+    const table = (rows: Pendencia[], tableFooter?: ReactNode) => (
+      <PendenciasTable list={rows} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true }} quickFilters={quickFilters} footer={tableFooter} empty={empty} {...acoes} />
+    )
+    const cards = (rows: Pendencia[]) => <PendenciasCards list={rows} onOpen={setSelectedId} {...acoes} />
+    body = groups ? (
+      <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} mobile={mobile} table={table} cards={cards} footer={footer} />
+    ) : (
       <>
-        {mobile
-          ? (visible.length ? <PendenciasCards list={slice} onOpen={setSelectedId} {...acoes} /> : <div className="surface">{empty}</div>)
-          : <PendenciasTable list={slice} onOpen={setSelectedId} view={{ config: view.config, onChange: view.setConfig }} quickFilters={quickFilters} footer={footer} empty={empty} {...acoes} />}
+        {mobile ? (visible.length ? cards(slice) : <div className="surface">{empty}</div>) : table(slice, footer)}
         {more ? <LazyFooter loaded={slice.length} more onLoadMore={loadMore} /> : null}
       </>
     )
@@ -124,11 +126,10 @@ function Pendencias({ host }: Props) {
   return (
     <div className="page page--full pd-page">
       <div role="toolbar" aria-label="Comandos de pendências">
-        <ViewBar view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}>
-          {source.mock ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
-          <SearchBox className="pg-filters__search" value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />
-          <Select className="pg-filters__select" aria-label="Período do serviço" searchable={false} clearable={false} options={PERIODOS} value={periodo} onChange={(v) => setPeriodo(v ?? EMPTY_FILTERS.periodo)} />
-          {mobile ? null : <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pend.loading && pend.loaded} onClick={refresh} />}
+        <ViewBar pinnable view={view} columns={PENDENCIA_COLUMNS} filters={{ fields: PENDENCIA_FIELDS }}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, serviço ou cliente" aria-label="Buscar pendências" />}
+          primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pend.loading && pend.loaded} onClick={refresh} />}>
+          {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
       </div>
       {pend.error && pend.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{pend.error} A lista mostra os dados da carga anterior.</Alert> : null}

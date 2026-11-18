@@ -1,0 +1,61 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Alert, Button, Drawer } from '@betinhos/ui'
+import type { Host } from '../../host'
+import { createFrotaSource } from '../../pages/frota/data/hostSource'
+import type { DataSource } from '../../pages/frota/data/source'
+import { CarregandoRegistro } from '../BrandLoader'
+
+/** O que todo adaptador recebe do hospedeiro: o registro (tabela já escolhida) e o fechar. */
+export type GavetaProps = { host: Host; id: string; onClose: () => void }
+
+export const mensagem = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
+/** Registro que não veio (excluído, inativo ou sem permissão) vira erro, mostrado na própria gaveta. */
+export function existente<T>(registro: T | null, rotulo: string): T {
+  if (registro == null) throw new Error(`${rotulo} não encontrado ou inativo.`)
+  return registro
+}
+
+type Estado<T> = { ok: true; dados: T } | { ok: false; erro: string } | null
+
+/** Carga do registro (e do que a gaveta precisa); `carregar` precisa ser estável (useCallback). */
+export function useCarga<T>(carregar: () => Promise<T>) {
+  const [tentativa, setTentativa] = useState(0)
+  const [estado, setEstado] = useState<Estado<T>>(null)
+  useEffect(() => {
+    let cancelado = false
+    setEstado(null)
+    carregar().then(
+      (dados) => { if (!cancelado) setEstado({ ok: true, dados }) },
+      (reason: unknown) => { if (!cancelado) setEstado({ ok: false, erro: mensagem(reason) }) },
+    )
+    return () => { cancelado = true }
+  }, [carregar, tentativa])
+  const tentarDeNovo = useCallback(() => setTentativa((n) => n + 1), [])
+  return { estado, tentarDeNovo }
+}
+
+/** Enquanto carrega, só o loader no meio da tela (sem gaveta provisória); falhou, a gaveta mostra o erro; carregado, a da tela. */
+export function ComCarga<T>({ carga, rotulo, onClose, children }: { carga: ReturnType<typeof useCarga<T>>; rotulo: string; onClose: () => void; children: (dados: T) => ReactNode }) {
+  const { estado, tentarDeNovo } = carga
+  if (estado?.ok) return <>{children(estado.dados)}</>
+  if (!estado) return <CarregandoRegistro label={`Carregando ${rotulo.toLowerCase()}`} onCancel={onClose} />
+  return (
+    <Drawer open eyebrow={rotulo} title="Não foi possível abrir" onClose={onClose}>
+      <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`} action={<Button variant="secondary" onClick={tentarDeNovo}>Tentar de novo</Button>}>{estado.erro}</Alert>
+    </Drawer>
+  )
+}
+
+/** Fonte da Frota no `host` (a mesma da tela Frota); se não der para criá-la, a gaveta mostra o erro. */
+export function ComFonteFrota({ host, rotulo, onClose, children }: { host: Host; rotulo: string; onClose: () => void; children: (source: DataSource) => ReactNode }) {
+  const fonte = useMemo(() => {
+    try { return { source: createFrotaSource(host), erro: null } } catch (reason) { return { source: null, erro: mensagem(reason) } }
+  }, [host])
+  if (fonte.source) return <>{children(fonte.source)}</>
+  return (
+    <Drawer open eyebrow={rotulo} title="Não foi possível abrir" onClose={onClose}>
+      <Alert tone="danger" title={`Não foi possível abrir ${rotulo.toLowerCase()}`}>{fonte.erro}</Alert>
+    </Drawer>
+  )
+}

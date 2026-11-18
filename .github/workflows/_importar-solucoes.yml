@@ -26,6 +26,11 @@ on:
         type: boolean
         required: false
         default: false
+      sem_upgrade:
+        description: 'Ensaio, só no TEST: soluções (vírgula, ou todas) importadas como update, sem --stage-and-upgrade.'
+        type: string
+        required: false
+        default: ''
 
 jobs:
   importar:
@@ -46,6 +51,10 @@ jobs:
       TRAVADO: ${{ inputs.alvo == 'test' && '--travado' || '' }}
       DESLIGAR_NOVOS: ${{ inputs.alvo == 'test' }}
       IMPORTAR_TUDO: ${{ inputs.importar_tudo }}
+      SEM_UPGRADE: ${{ inputs.sem_upgrade }}
+      # SOLUCOES_IMPORT_MODO (variável do repositório): vazia = observar (sempre upgrade; registra a escolha e se o upgrade
+      # apagou algo); escolher = update quando o inventário prova que nada saiu da solução (inventario.ps1).
+      ESCOLHER_MODO: ${{ vars.SOLUCOES_IMPORT_MODO == 'escolher' }}
       TAG_PUBLICADAS: solucoes-${{ inputs.alvo }}
       # Id da conexão do Web Push neste ambiente. Obrigatória no PROD quando a BetinhosAutomacao vai junto (importar-solucoes.ps1).
       CONEXAO_WEBPUSH: ${{ vars.CONEXAO_WEBPUSH }}
@@ -57,6 +66,7 @@ jobs:
         shell: bash
         run: |
           case "${{ inputs.alvo }}" in test|prod) ;; *) echo "::error::alvo inválido: ${{ inputs.alvo }}"; exit 1 ;; esac
+          if [ -n "$SEM_UPGRADE" ] && [ "${{ inputs.alvo }}" != "test" ]; then echo "::error::sem_upgrade é só ensaio no TEST."; exit 1; fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -110,6 +120,8 @@ jobs:
       - name: Importar
         run: |
           $extra = @(); if ($env:IMPORTAR_TUDO -eq 'true') { $extra += '-ImportarTudo' }
+          if ($env:SEM_UPGRADE) { $extra += @('-SemUpgrade', $env:SEM_UPGRADE) }
+          if ($env:ESCOLHER_MODO -eq 'true') { $extra += '-Escolher' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS -Publicadas publicadas-antes.json @extra
           if ($LASTEXITCODE -ne 0) { throw "importar-solucoes.ps1 falhou ($LASTEXITCODE)." }
       - name: Remover camadas Active (hotfixes já na main)
@@ -153,7 +165,8 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Publicar soluções: ${{ inputs.alvo }}"
+            echo "## Publicar soluções: ${{ inputs.alvo }} (modo de import: ${{ vars.SOLUCOES_IMPORT_MODO == 'escolher' && 'escolher' || 'observar' }})"
+            echo 'escolha: o que o inventário decidiu (update ou upgrade); observacaoEscolha (modo observar): acerto, conservador (upgrade sem nada a apagar) ou erro (escolheu update e o upgrade apagou algo; não ligue o escolher).'
             echo '```json'
             cat pacotes/importados.json 2>/dev/null || echo "import não concluído"
             echo '```'

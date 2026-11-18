@@ -1,5 +1,6 @@
 import { useId, useMemo } from 'react'
-import { Button, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
+import { Button, StatCard, StatusBadge, type TableColumn } from '@betinhos/ui'
+import { Tabela } from '../Tabela'
 import { calcularFinanceiro, type CicloFinanceiro, type Financeiro, type LinhaClienteFin, type LinhaForma, type LinhaStatusFat, type LinhaStatusPag } from '../../domain/abas/financeiro'
 import type { Delta } from '../../domain/analises'
 import { brl, brlS, dec, int, normL } from '../../domain/format'
@@ -9,8 +10,8 @@ import { AnaliseCard } from '../AnaliseCard'
 import { tabelaCopia } from '../Copiar'
 import { TicketMensalCard } from '../Analises'
 import { AbaCarregando } from '../Carregando'
-import { KpiCard, KpiLinha } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { SemDadoBloco, Vazio } from '../Estados'
 import { Duplo, Nome, Participacao, Rolagem, Status, ValorDelta, col, larguraMinima, pct, tomStatus } from '../Celulas'
 import { COLUNA_LARGA, Expansivel, MEDIA_MOBILE, VER_MESES, juntar, useLinhasAbertas, useTopCelular } from '../Linhas'
@@ -69,15 +70,15 @@ function StatusFaturamentoCard({ linhas, periodo }: { linhas: LinhaStatusFat[]; 
     ]
     : [
       { key: 's', header: 'Status', width: 'minmax(0, 1.2fr)', cell: (l) => <Status texto={l.status} /> },
-      { key: 'q', header: 'Serviços', align: 'end', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
-      { key: 'v', header: 'Faturamento', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Serviços', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
+      { key: 'v', header: 'Faturamento', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.status}`} /></span> },
     ]
   return (
     <AnaliseCard
       titulo="Status de faturamento" periodo={periodo} unidade="serviços e R$" valor={topo?.status ?? '—'}
       sub={topo ? `${pct(topo.pct)} dos serviços com saída a partir de 01/04/2026` : 'serviços com saída a partir de 01/04/2026'}
-      tabela={<Table columns={colunas} rows={linhas} rowKey={(l) => l.status} empty={<Vazio titulo="Nenhum serviço com saída a partir de 01/04/2026" />} />}
+      tabela={<Tabela columns={colunas} rows={linhas} rowKey={(l) => l.status} empty={<Vazio titulo="Nenhum serviço com saída a partir de 01/04/2026" />} />}
       copiar={tabelaCopia(linhas, [['Status', (l) => l.status], ['Serviços', (l) => l.qtd], ['Faturamento', (l) => brl(l.valor)], ['Participação', (l) => pct(l.pct)]])}
     />
   )
@@ -99,11 +100,11 @@ function TabelaDistribuicao({ coluna, linhas, badge, mobile }: { coluna: string;
     ]
     : [
       { key: 'n', header: coluna, width: 'minmax(0, 1.2fr)', cell: nome },
-      { key: 'q', header: 'Registros', align: 'end', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
-      { key: 'v', header: 'Valor', align: 'end', cell: (l) => brl(l.valor) },
+      { key: 'q', header: 'Registros', width: 'minmax(56px, .6fr)', cell: (l) => int(l.qtd) },
+      { key: 'v', header: 'Valor', cell: (l) => brl(l.valor) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: 'minmax(0, 1.2fr)', cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.rotulo}`} /></span> },
     ]
-  return <Table columns={colunas} rows={linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhum pagamento registrado" />} />
+  return <Tabela columns={colunas} rows={linhas} rowKey={(l) => l.rotulo} empty={<Vazio titulo="Nenhum pagamento registrado" />} />
 }
 
 /**
@@ -159,12 +160,12 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
     ]
     : [
       { key: 'c', header: 'Cliente', width: TRILHAS[0].width, cell: (l) => <Nome texto={l.cliente} /> },
-      { key: 's', header: 'Serviços', align: 'end', width: TRILHAS[1].width, cell: (l) => <Duplo valor={int(l.servicos)} apoio={pct(l.pctServicos)} /> },
-      { key: 'f', header: 'Faturamento', align: 'end', width: TRILHAS[2].width, cell: (l) => forte(brl(l.faturamento)) },
-      { key: 't', header: 'Ticket médio', align: 'end', width: TRILHAS[3].width, cell: (l) => brl(l.ticket) },
+      { key: 's', header: 'Serviços', width: TRILHAS[1].width, cell: (l) => <Duplo valor={int(l.servicos)} apoio={pct(l.pctServicos)} /> },
+      { key: 'f', header: 'Faturamento', width: TRILHAS[2].width, cell: (l) => forte(brl(l.faturamento)) },
+      { key: 't', header: 'Ticket médio', width: TRILHAS[3].width, cell: (l) => brl(l.ticket) },
       { key: 'p', header: <span className="dash-col-part">Participação</span>, width: TRILHAS[4].width, cell: (l) => <span className="dash-col-part"><Participacao valor={l.pct} rotulo={`Participação de ${l.cliente} no faturamento`} /></span> },
       {
-        key: 'b', header: 'Meses', align: 'end', width: TRILHAS[5].width,
+        key: 'b', header: 'Meses', width: TRILHAS[5].width,
         cell: (l) => {
           const aberta = abertas.aberta(l.cliente)
           return (
@@ -184,7 +185,7 @@ function ClientesCard({ fi, periodo }: { fi: Financeiro; periodo: string }) {
       },
     ]
   const top = useTopCelular(fi.clientes, mobile, 'clientes')
-  const tabela = <Table className="dash-fi-clientes" columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
+  const tabela = <Tabela className={mobile ? undefined : 'dash-tabela-detalhe'} columns={colunas} rows={top.linhas} rowKey={(l) => l.cliente} empty={<Vazio titulo="Nenhum cliente no período" />} style={mobile ? undefined : { minWidth: larguraMinima(TRILHAS, VAO) }} />
   return (
     <AnaliseCard
       titulo="Clientes" periodo={periodo} unidade="R$ e serviços por cliente" valor={int(fi.kpis.clientesAtivos)}
@@ -216,12 +217,12 @@ function FinanceiroAba({ ctx, dados, periodo }: DadosAba) {
       : `${int(k.pagamentosMedidos)} de ${int(k.pagamentosRecebidos)} pagamentos com data confiável · ${HISTORICO}`
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={6}>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[0]} valor={brlS(k.maiorServico)} tom="action"><ChipAnt chip={fi.ant.maiorServico} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[1]} valor={int(k.clientesAtivos)} tom="brand"><ChipAnt chip={fi.ant.clientesAtivos} /></KpiCard>
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[2]} valor={brlS(k.totalRecebido)} tom="success" apoio="serviços com faturamento pago" />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[3]} valor={k.cartao == null ? null : brlS(k.cartao)} tom="action" apoio={indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[4]} valor={k.atrasados == null ? null : int(k.atrasados)} tom="warning" apoio={indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}`} />
-      <KpiCard rotulo={ROTULOS_FINANCEIRO[5]} valor={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} tom="brand" apoio={tempoApoio} />
+      <StatCard label={ROTULOS_FINANCEIRO[0]} value={brlS(k.maiorServico)} {...extrasKpi({ chips: [fi.ant.maiorServico] })} />
+      <StatCard label={ROTULOS_FINANCEIRO[1]} value={int(k.clientesAtivos)} {...extrasKpi({ chips: [fi.ant.clientesAtivos] })} />
+      <StatCard label={ROTULOS_FINANCEIRO[2]} value={brlS(k.totalRecebido)} {...extrasKpi({ apoio: 'serviços com faturamento pago' })} />
+      <StatCard label={ROTULOS_FINANCEIRO[3]} value={k.cartao == null ? null : brlS(k.cartao)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `recebido em cartão, crédito, link ou máquina · ${HISTORICO}` })} />
+      <StatCard label={ROTULOS_FINANCEIRO[4]} value={k.atrasados == null ? null : int(k.atrasados)} {...tomAtencao(k.atrasados)} {...extrasKpi({ apoio: indisponivel ? SEM_PAGANTES : `pagamentos pendentes · ${HISTORICO}` })} />
+      <StatCard label={ROTULOS_FINANCEIRO[5]} value={k.tempoMedioPagamento == null ? null : dias(k.tempoMedioPagamento)} {...extrasKpi({ apoio: tempoApoio })} />
     </KpiLinha>
     <div className="dash-grade">
       <CicloCard ciclo={fi.ciclo} indisponivel={indisponivel} periodo={periodo} />

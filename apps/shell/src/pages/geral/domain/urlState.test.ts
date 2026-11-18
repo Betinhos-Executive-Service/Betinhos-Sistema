@@ -37,6 +37,14 @@ describe('urlState', () => {
     expect(readUrlState(new URLSearchParams('view=a&f=lixo'))).toEqual({ view: 'a' })
   })
 
+  it('"Mostrar manutenções" mudado na tela vai como m=1 ou m=0', () => {
+    expect(new URLSearchParams(writeUrlState({ view: 'a', manutencoes: false })).get('m')).toBe('0')
+    expect(readUrlState(new URLSearchParams(writeUrlState({ view: 'a', manutencoes: true })))).toEqual({ view: 'a', manutencoes: true })
+    expect(readUrlState(new URLSearchParams('m=0'))).toEqual({ manutencoes: false })
+    expect(readUrlState(new URLSearchParams('m=talvez'))).toEqual({})
+    expect(new URLSearchParams(writeUrlState({ view: 'a' })).has('m')).toBe(false)
+  })
+
   it('link do formato antigo (um filtro por atributo) abre como filtro rápido', () => {
     const f = encodeFilters({ cr40f_trajeto: { kind: 'text', op: 'begins', value: 'GRU' } })
     expect(readUrlState(new URLSearchParams(`f=${f}`)).filters?.quick.cr40f_trajeto).toMatchObject({ op: 'begins', value: 'GRU' })

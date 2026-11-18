@@ -62,7 +62,7 @@ describe('Geral: correções finais', () => {
     expect(await screen.findByText(`1 de 2 serviços desativados; falharam: ${failedName}. Sem permissão`)).toBeTruthy()
   })
 
-  it('Desativar e Ativar com seleção mista ficam focáveis, explicam o motivo e não fazem nada', async () => {
+  it('Desativar com seleção mista fica focável, explica o motivo e não faz nada', async () => {
     hooks.mixedState = true
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
@@ -70,8 +70,10 @@ describe('Geral: correções finais', () => {
     fireEvent.click(within(rows[1]).getByRole('checkbox'))
     fireEvent.click(within(rows[2]).getByRole('checkbox'))
     const reason = 'Selecione só serviços ativos ou só inativos.'
-    for (const name of ['Desativar', 'Ativar']) {
-      const button = screen.getByRole('button', { name })
+    // Seleção mista: a linha mostra só Desativar, inerte com o motivo (Ativar só aparece com todos inativos).
+    expect(screen.queryByRole('button', { name: 'Ativar' })).toBeNull()
+    {
+      const button = screen.getByRole('button', { name: 'Desativar' })
       expect(button.getAttribute('aria-disabled')).toBe('true')
       expect((button as HTMLButtonElement).disabled).toBe(false)
       expect(button.getAttribute('title')).toBe(reason)
@@ -99,7 +101,7 @@ describe('Geral: correções finais', () => {
     beforeEach(() => { hooks.programada = true; writeText.mockReset().mockResolvedValue(undefined); vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } }) })
     afterEach(() => { hooks.programada = false; hooks.gerarLink = null; vi.unstubAllGlobals() })
     const item = async () => {
-      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Ações/ }))
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Comandos de serviços' })).getByRole('button', { name: /^Mais ações/ }))
       return screen.findByRole('menuitem', { name: /^Gerar link/, hidden: true })
     }
 
@@ -226,12 +228,13 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   }
   const toolbar = () => screen.getByRole('toolbar', { name: 'Comandos de serviços' })
 
-  it('sem seleção o menu Ações não existe; com seleção, Gerar OP e Disparar aparecem habilitados', async () => {
+  it('sem seleção o ⋮ não tem ações da seleção; com seleção, Gerar OP e Disparar aparecem habilitados no grupo do ⋮', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
     expect(within(toolbar()).queryByRole('button', { name: /^Ações/ })).toBeNull()
+    expect(within(toolbar()).getByRole('button', { name: 'Mais ações' })).toBeTruthy()
     await pick('OS-1004')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Ações (1)' }))
+    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Mais ações \(\d+ da seleção\)$/ }))
     for (const name of ['Gerar OP', 'Disparar']) {
       const item = await screen.findByRole('menuitem', { name, hidden: true })
       expect((item as HTMLButtonElement).disabled).toBe(false)
@@ -272,14 +275,13 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('Auditoria abre o painel da seleção; Registrar Erro em mock mostra o aviso', async () => {
     render(<AuditoriaProvider host={{ mode: 'mock' }}><GeralPage host={{ mode: 'mock' }} /></AuditoriaProvider>)
     await pick('OS-1005')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Auditoria', hidden: true }))
+    // Auditoria é botão fixo da linha (DS §10.9.4), depois de Filtros.
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Auditoria' }))
     const painel = await screen.findByRole('dialog', { name: 'Auditoria', hidden: true })
     expect(within(painel).getByText(/1 registro/)).toBeTruthy()
     expect(await within(painel).findAllByText('Status', {}, { timeout: 2000 })).not.toHaveLength(0)
     fireEvent.click(within(painel).getByRole('button', { name: 'Fechar painel', hidden: true }))
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Registrar Erro', hidden: true }))
+    await acao('Registrar Erro')
     expect(await screen.findByText('A Gestão de Qualidade abre dentro do Dataverse.')).toBeTruthy()
   })
 
@@ -296,9 +298,10 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
   it('Registrar Erro fica inerte com 2 selecionados', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await pick('OS-1005', 'OS-1006')
-    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mais ações' }))
+    // Registrar Erro é `single`: o DS o deixa inerte no ⋮ "Mais ações" com o motivo padrão.
+    fireEvent.click(within(toolbar()).getByRole('button', { name: /^Mais ações/ }))
     const item = (await screen.findByRole('menuitem', { name: /Registrar Erro/, hidden: true })) as HTMLButtonElement
     expect(item.disabled).toBe(true)
-    expect(within(item).getByText('Selecione exatamente um serviço.')).toBeTruthy()
+    expect(within(item).getByText('Selecione exatamente um registro.')).toBeTruthy()
   })
 })

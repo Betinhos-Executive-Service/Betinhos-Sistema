@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Table, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
+import { LoadingTable } from '../../../app/VirtualTable'
 import { openFromRow } from '../../pagantes/components/PagantesList'
 import type { Cliente } from '../domain/types'
 
@@ -22,7 +23,7 @@ export function ClientesTable({ list, onOpen, loading, view, quickFilters, foote
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.cl-open')}>
-      <Table className="cl-table" columns={columns} rows={list} rowKey={(c) => c.id} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <LoadingTable className="cl-table" columns={columns} rows={list} rowKey={(c) => c.id} loading={loading} loadingLabel="Carregando clientes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

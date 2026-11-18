@@ -7,7 +7,7 @@
 // (new_statusgeracaorecibo, new_errogeracaorecibo, cr40f_linkdorecibo) e envia o e-mail.
 // O modal acompanha o registro; Abrir/Baixar usam o PDF local assim que ele fica pronto.
 
-var GR_VERSAO = "v0.0.4 · 13/10/2026 14:46";         // gravada por publicar-dev.js a cada publicação
+var GR_VERSAO = "v0.0.5 · 11/11/2026 11:15";         // gravada por publicar-dev.js a cada publicação
 var TAG_GR = "[BT-GERAR-RECIBO]";
 var GR_MAX_PARALELO = 4;          // entregas simultâneas ao Flow
 var GR_TIMEOUT_MS = 30000;        // POST de início; o Flow responde 202 em ~2 s
@@ -858,7 +858,7 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         lista.appendChild(card);
 
         item.els = {
-            card: card, track: track, toggleLabel: toggleLabel, pill: pill,
+            card: card, track: track, toggleLabel: toggleLabel, pill: pill, emailInput: emailInput,
             rodapeCard: rodapeCard, msg: msg, acoes: acoes, desc: desc, btnRestaurar: btnRestaurar
         };
     });
@@ -938,19 +938,52 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         try { window.open(item.url + sep + "download=1", "_blank", "noopener"); } catch (e) {}
     }
 
-    // Abre a aba do recibo durante o clique; ela mostra "Gerando…" até receber o blob.
+    // Página da aba de espera: carregando (spinner) ou erro, sempre com texto do que fazer.
+    function pintarAba(w, titulo, texto, detalhe, carregando) {
+        var d = w.document;
+        d.head.textContent = "";
+        d.title = titulo; // depois de limpar o head, que levaria o <title> junto
+        var st = d.createElement("style");
+        st.textContent = "body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;" +
+            "background:#f0f0f0;color:#475569;font:500 14px/1.5 'Manrope','Segoe UI',sans-serif}" +
+            ".c{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:420px;padding:16px;text-align:center}" +
+            ".t{font-weight:700;font-size:16px;color:" + (carregando ? "#1e293b" : "#b91c1c") + "}" +
+            ".s{width:32px;height:32px;border:3px solid #cbd5e1;border-top-color:#2563eb;border-radius:50%;animation:g 800ms linear infinite}" +
+            "@keyframes g{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.s{animation-duration:2.4s}}";
+        d.head.appendChild(st);
+        d.body.textContent = "";
+        var c = d.createElement("div");
+        c.className = "c";
+        c.setAttribute("role", carregando ? "status" : "alert");
+        if (carregando) { var s = d.createElement("div"); s.className = "s"; s.setAttribute("aria-hidden", "true"); c.appendChild(s); }
+        var t = d.createElement("div"); t.className = "t"; t.textContent = texto; c.appendChild(t);
+        var m = d.createElement("div"); m.textContent = detalhe; c.appendChild(m);
+        d.body.appendChild(c);
+    }
+
+    // Abre a aba do recibo durante o clique; ela mostra o carregamento até receber o blob.
     // O navegador pode bloquear a 2ª aba em diante (pop-up): nesse caso fica o botão "Abrir recibo".
     function abrirAbaEspera(item) {
         var w = null;
         try { w = window.open("", "_blank"); } catch (e) {}
         item.aba = w;
         if (!w) return;
+        var id = item.p.seqId || "";
         try {
             w.opener = null;
-            w.document.title = "Gerando recibo " + (item.p.seqId || "") + "…";
-            w.document.body.style.cssText = "margin:0;display:flex;align-items:center;justify-content:center;" +
-                "height:100vh;background:#f0f0f0;color:#475569;font:600 14px 'Manrope','Segoe UI',sans-serif;";
-            w.document.body.textContent = "Gerando recibo " + (item.p.seqId || "") + "…";
+            pintarAba(w, "Gerando recibo " + id + "…", "Gerando recibo " + id + "…",
+                "O PDF abre aqui em alguns segundos. Não feche esta aba.", true);
+        } catch (e) {}
+    }
+
+    // Falha antes do PDF: a aba diz o que houve em vez de ficar carregando para sempre.
+    function erroNaAba(item, mensagem) {
+        var w = item.aba;
+        item.aba = null;
+        if (!w || w.closed) return;
+        try {
+            pintarAba(w, "Erro no recibo " + (item.p.seqId || ""), "Não foi possível gerar o recibo " + (item.p.seqId || ""),
+                mensagem + " Feche esta aba e tente de novo na tela do sistema.", false);
         } catch (e) {}
     }
 
@@ -961,10 +994,6 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         try { w.location.href = item.pdfUrl; } catch (e) { console.warn(TAG_GR, "Não abriu o PDF na aba:", e); }
     }
 
-    function fecharAba(item) {
-        try { if (item.aba && !item.aba.closed) item.aba.close(); } catch (e) {}
-        item.aba = null;
-    }
 
     // Abrir/Baixar disponíveis assim que o PDF existe, mesmo antes (ou sem) a entrega pelo Flow.
     function mostrarAcoesPdf(item) {
@@ -1212,8 +1241,9 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
             entregar(item, paraBase64_GR(bytes));
         }, function (e) {
             console.error(TAG_GR, "Falha ao montar PDF:", p.id, e);
-            fecharAba(item);
-            concluir(item, "erro", "Não foi possível montar o PDF: " + (e && e.message ? e.message : e));
+            var msgPdf = "Não foi possível montar o PDF: " + (e && e.message ? e.message : e) + ".";
+            erroNaAba(item, msgPdf);
+            concluir(item, "erro", msgPdf);
         });
     }
 
@@ -1332,7 +1362,15 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
 
         // Abas abertas já no clique (abrir depois, quando o PDF fica pronto, o navegador bloqueia)
         itens.forEach(function (i) { abrirAbaEspera(i); setStatus(i, "fila", ""); fila.push(i); });
-        iniciarExecucao();
+        try {
+            iniciarExecucao();
+        } catch (e) {
+            // Erro de script não pode deixar as abas carregando para sempre.
+            console.error(TAG_GR, "Falha ao iniciar a geração:", e);
+            var msgIni = "Erro inesperado ao iniciar: " + (e && e.message ? e.message : e) + ".";
+            itens.forEach(function (i) { erroNaAba(i, msgIni); });
+            Xrm.Navigation.openAlertDialog({ text: "Não foi possível gerar o recibo. " + msgIni });
+        }
     };
 
     btnCancelar.onclick = function (ev) { ev.preventDefault(); pedirFechar(); };

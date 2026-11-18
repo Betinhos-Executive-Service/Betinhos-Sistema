@@ -43,6 +43,8 @@ namespace Betinhos.DriverRecordSharing
             var vehicle = system.Retrieve(PluginConfig.VehicleTable, newVehicle.Id, new ColumnSet(ChecklistFactory.VehicleColumns(PluginConfig.VehiclePlate, PluginConfig.VehicleInfleetId)));
             // Próprio e ativo (padrão se nenhum filtro casa) ou alcançado pelo filtro de algum modelo (Terceiro/Aluguel).
             var templates = ChecklistFactory.LoadActiveTemplates(system);
+            // Ambiente sem nenhum modelo ativo ainda não usa checklist; modelo ativo sem padrão continua sendo erro.
+            if (templates.Count == 0) return "ignorado:sem-modelo-ativo";
             var template = ChecklistFactory.ResolveTemplate(templates, vehicle);
             if (template == null && !ChecklistFactory.IsOwnActiveVehicle(vehicle)) return "ignorado:frota-nao-propria";
             var receiver = system.Retrieve(PluginConfig.EmployeeTable, target.Id, new ColumnSet(PluginConfig.EmployeeInfleetDriverId));

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Alert, Button, Select, Skeleton, StatusBadge as Badge } from '@betinhos/ui'
+import { Alert, Button, Select, StatusBadge as Badge } from '@betinhos/ui'
+import { BrandLoader } from '../../../app/BrandLoader'
 import { label, STATUS_OPTIONS, TONE } from '../data/schema'
 import type { LoadResult } from '../data/source'
 import type { Kind, TableKey } from '../data/types'
@@ -9,14 +10,9 @@ export function StatusBadge({ kind, value }: { kind: Kind; value: number | null 
   return <Badge tone={tone}>{label(STATUS_OPTIONS[kind], value, 'Sem status')}</Badge>
 }
 
-/** Linhas no formato da lista enquanto as tabelas chegam. */
-export function Carregando() {
-  return (
-    <div className="frota-skeleton" role="status" aria-busy="true">
-      {[0, 1, 2, 3, 4].map((index) => <Skeleton key={index} shape="rect" height={44} />)}
-      <span className="frota-sr-only">Carregando a frota…</span>
-    </div>
-  )
+/** Loader da marca no lugar da lista enquanto as tabelas chegam (`md` dentro de drawer). */
+export function Carregando({ label = 'Carregando a frota', size = 'lg' }: { label?: string; size?: 'lg' | 'md' }) {
+  return <BrandLoader variant="inline" size={size} label={label} text={`${label}…`} />
 }
 
 const TABLE_LABEL: Record<TableKey, string> = { veiculos: 'Veículos', manutencoes: 'Manutenções', multas: 'Multas', infracoes: 'Infrações', colisoes: 'Colisões', posses: 'Posses', planoPreventivo: 'Plano preventivo', baselines: 'Baselines de preventiva', despesasCombustivel: 'Despesas de combustível', telemetriaKm: 'Telemetria Infleet' }

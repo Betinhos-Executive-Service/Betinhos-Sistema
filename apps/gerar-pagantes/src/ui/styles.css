@@ -33,8 +33,10 @@ body { background: transparent; }
 
 /* Lista de pagantes */
 .payers-panel__toolbar { padding: var(--bt-space-3) var(--bt-space-4); }
-.payers-panel__toolbar .bt-page-toolbar__start { flex: 1; }
+.payers-panel__toolbar .bt-page-toolbar__start { flex: 1 1 220px; }
 .payers-panel__toolbar .bt-page-toolbar__start > * { flex: 1; min-width: 220px; }
+/* clip corta como o hidden do Surface, mas não vira área rolável: o foco não desloca o painel para o lado no celular. */
+.payers-panel { overflow: clip; }
 .payers-panel__list { display: grid; }
 .payers-panel__columns { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, .9fr) minmax(130px, .7fr) minmax(212px, 1fr); gap: var(--bt-space-3); min-height: 32px; align-items: center; padding: 0 var(--bt-space-4); border-top: 1px solid var(--bt-color-border); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .08em; text-transform: uppercase; }
 .payers-panel .bt-empty { margin: var(--bt-space-2) var(--bt-space-4) var(--bt-space-4); }
@@ -70,6 +72,8 @@ body { background: transparent; }
 .payer-editor__missing { display: flex; flex-basis: 100%; align-items: flex-start; gap: var(--bt-space-2); }
 .payer-editor__missing .bt-field { flex: 1; }
 .payer-editor__missing .bt-button { margin-top: 22px; }
+.payer-editor__email-actions { display: flex; gap: var(--bt-space-2); margin-top: 22px; }
+.payer-editor__email-actions .bt-button { margin-top: 0; white-space: nowrap; }
 .payer-editor__status { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--bt-space-1) var(--bt-space-3); padding-left: 40px; }
 .payer-editor__actions { --bt-gap: 0; margin-left: auto; }
 .payer-editor__link { padding: 0; border: 0; background: none; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
@@ -86,6 +90,9 @@ body { background: transparent; }
 .save-summary__list strong { color: var(--bt-color-text-primary); }
 .save-summary__list span:not(.bt-badge) { grid-column: 2; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
 .save-summary__effects p { margin: 0 0 var(--bt-space-1); }
+.save-summary__emails { display: grid; gap: var(--bt-space-3); margin: var(--bt-space-3) 0; padding-top: var(--bt-space-3); border-top: 1px solid var(--bt-color-border); }
+.save-summary__emails h3 { margin: 0; font-size: var(--bt-font-size-14); color: var(--bt-color-text-primary); }
+.save-summary__email { display: grid; gap: var(--bt-space-2); }
 
 /* Resultado depois de salvar */
 .result-view__list { display: grid; gap: var(--bt-space-2); margin: 0; padding: var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface-neutral); list-style: none; }
@@ -118,6 +125,7 @@ body { background: transparent; }
   .payer-editor__head, .payer-editor__toggles { grid-column: 1 / -1; }
   .payer-editor__missing { flex-direction: column; align-items: stretch; }
   .payer-editor__missing .bt-button { margin-top: 0; }
+  .payer-editor__email-actions { flex-direction: column; margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .payer-editor { animation: none; }

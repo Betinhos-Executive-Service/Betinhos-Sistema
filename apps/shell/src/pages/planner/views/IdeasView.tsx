@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, Check, Columns3, Lightbulb, List, Plus, RefreshCw, Search, X } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import SearchableSelect from '../components/SearchableSelect';
+import { BrandLoader } from '../../../app/BrandLoader';
 
 const IDEA_STATUSES = [
   { value: 100000000, label: "Nova" },
@@ -363,7 +364,7 @@ export default function IdeasView({ store }: any) {
         </div>
         {notice && <p className="ideas-feedback ideas-feedback-success" role="status">{notice}</p>}
         {loadError && <div className="ideas-feedback ideas-feedback-error" role="alert"><span>{loadError}</span><button type="button" onClick={refresh}>Tentar novamente</button></div>}
-        {loading && !ideas.length ? <div className="ideas-loading" role="status" aria-label="Carregando ideias"><span /><span /><span /></div> : !loadError && (view === "board" ? renderBoard() : renderList())}
+        {loading && !ideas.length ? <BrandLoader variant="inline" label="Carregando ideias" text="Carregando ideias…" /> : !loadError && (view === "board" ? renderBoard() : renderList())}
       </section>
       {drawer && <IdeaDrawer idea={drawer.idea} onClose={() => setDrawer(null)} onSave={handleSave} onArchive={handleArchive} />}
     </div>

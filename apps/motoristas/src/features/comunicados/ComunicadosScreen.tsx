@@ -18,6 +18,7 @@ import {
   validateSignature
 } from "./comunicados";
 import { montarEvidencia } from "./evidencia";
+import { BrandLoader } from "../../shared/ui/BrandLoader";
 
 const LGPD_AVISO = "Ao confirmar, registramos data, hora, aparelho, endereço de internet e localização (se você permitir) como comprovante desta ciência.";
 
@@ -207,9 +208,7 @@ export function ComunicadosScreen({ items, loadStatus = "ready", selectedId, onS
         ) : (
           <div className="comunicado-list services-panel">
             {loadStatus === "loading" && !items.length ? (
-              <div className="comunicado-skeleton" role="status" aria-busy="true" aria-label="Carregando comunicados">
-                <span /><span /><span />
-              </div>
+              <BrandLoader variant="inline" label="Carregando comunicados" text="Carregando comunicados" />
             ) : loadStatus === "error" && !items.length ? (
               <div className="comunicado-load-error" role="alert">
                 <p>Não foi possível carregar os comunicados. Verifique a conexão e tente novamente.</p>

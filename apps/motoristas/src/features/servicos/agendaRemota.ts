@@ -3,6 +3,7 @@ import type { AgendaItem, DetailAction, DetailData, DetailField, DetailPassenger
 import { createRemoteReadBatch, mapWithLimit } from "../../data/dataverse/remoteReadBatch.ts";
 import { cleanGuid, cleanODataGuid, dataverseLog, dataverseWarn, getBusinessId, getDriverContext, retrieveMultiple, retrieveMultipleAll, retrieveOne, updateOne, type DataverseRecord, type DriverContext } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
+import { buildPassengerMessage } from "./passengerMessage.ts";
 import { MAINTENANCE_SELECT, OPERATION_STATUS, getBooleanValue, getFormatted, getLookupName, getRecordId, normalizeText, toDate } from "../../data/dataverse/registros.ts";
 import { EXCHANGE_SELECT, EXCHANGE_STATUS, buildExchangeDisplay, buildExchangeWindowInfo, getExchangeIdFromGeral, hydrateExchangeAnchors, hydrateExchangeDetails, hydrateExchangeDriverContactPhones, shouldShowOpenExchangeForDriver } from "./trocas.ts";
 
@@ -76,29 +77,6 @@ function normalizeWhatsAppPhone(value: string) {
   return digits.length >= 10 ? digits : "";
 }
 
-function firstName(value: string) {
-  return value.trim().split(/\s+/)[0] ?? "";
-}
-
-function buildPassengerMessage(passengerName: string, driverName: string, serviceDate: Date | null) {
-  const passenger = firstName(passengerName);
-  const driver = firstName(driverName);
-  const when = serviceDate
-    ? serviceDate.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
-    : "";
-  return [
-    `Ola ${passenger || ","}`,
-    "",
-    driver
-      ? `Sou o ${driver} da Betinhos e serei o responsavel pelo seu transporte${when ? ` em ${when}` : ""}.`
-      : `Fui designado pela Betinhos como responsavel pelo seu atendimento${when ? ` em ${when}` : ""}.`,
-    "Caso precise de suporte adicional, nossa central esta a disposicao:",
-    "Telefone: +55 (12) 99723-6961",
-    "Email: junior@betinhos.com.br",
-    "",
-    "Ate breve."
-  ].join("\n");
-}
 
 function formatDetailDateTime(date: Date | null) {
   if (!date) return "";
@@ -161,13 +139,13 @@ async function buildPassengersHtml(geralId: string, serviceDate: Date | null, dr
       const name = String(passenger.cr40f_nomedopassageiro ?? getLookupName(row, "cr40f_bancodedados") ?? "");
       const phoneRaw = String(passenger.cr40f_telefone ?? "");
       const phone = normalizeWhatsAppPhone(phoneRaw);
-      const message = buildPassengerMessage(name, driverName, serviceDate);
+      const languageCode = getPassengerLanguageCode(passenger);
+      const message = buildPassengerMessage({ passengerName: name, driverName, serviceDate, languageCode });
       const phoneText = escapeHtml(phoneRaw || "Sem telefone");
       const whatsappUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : "";
       const phoneHtml = phone
         ? `<a href="${whatsappUrl}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
         : `<span style="color:#8a8a8a">${phoneText}</span>`;
-      const languageCode = getPassengerLanguageCode(passenger);
       const flagHtml = buildLanguageFlagHtml(languageCode);
       const language = PASSENGER_LANGUAGE_LABELS[languageCode] ?? getFormatted(passenger, "cr40f_idioma");
       return { id: passengerId, name, phone: phoneRaw, whatsappUrl, language, html: `<span>${flagHtml}${escapeHtml(name)}${name ? " - " : ""}${phoneHtml}</span>` };
@@ -197,14 +175,19 @@ async function buildSolicitanteHtml(record: DataverseRecord, serviceDate: Date |
     const solicitante = await readOne(
       DATAVERSE.bancoDeDados,
       solicitanteId,
-      "$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_telefone"
+      "$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_telefone,cr40f_idioma"
     );
     const phoneRaw = String(solicitante.cr40f_telefone ?? "");
     if (!phoneRaw) return solicitanteName;
 
     const phone = normalizeWhatsAppPhone(phoneRaw);
     const phoneText = escapeHtml(phoneRaw || "Sem telefone");
-    const message = buildPassengerMessage(solicitanteName, driverName, serviceDate);
+    const message = buildPassengerMessage({
+      passengerName: solicitanteName,
+      driverName,
+      serviceDate,
+      languageCode: getPassengerLanguageCode(solicitante)
+    });
     const phoneHtml = phone
       ? `<a href="https://wa.me/${phone}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer">${phoneText}</a>`
       : `<span style="color:#8a8a8a">${phoneText}</span>`;

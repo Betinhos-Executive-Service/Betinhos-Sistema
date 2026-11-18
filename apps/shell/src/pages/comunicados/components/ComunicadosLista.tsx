@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Alert, Button, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, Skeleton, StatusBadge, Surface, useToast } from '@betinhos/ui'
+import { Alert, Button, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, useToast } from '@betinhos/ui'
 import { ChevronRight, Clock, FileEdit, FileText, Megaphone, Plus, RefreshCw, SearchX, Send, Trash2 } from 'lucide-react'
 import type { Source } from '../data/source'
 import { COMUNICADO_ESCOPO, COMUNICADO_TIPO, formatDate, isDisparado, matchLista, plural, type Comunicado, type ListaFiltro } from '../domain/comunicados'
 import type { useComunicados } from '../useComunicados'
 import { PdfMotoristaDialog } from './PdfMotoristaDialog'
+import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
   data: ReturnType<typeof useComunicados>
@@ -87,7 +88,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
         </div>
         <div className="cm-list__head" aria-hidden="true"><span>Comunicado</span><span>Confirmação</span><span>Destinatários</span><span>Situação</span><span /></div>
         <ul className="cm-list__body" aria-busy={!loaded}>
-          {!loaded ? [0, 1, 2].map((i) => <li key={i} className="cm-list__skeleton"><Skeleton shape="rect" height={44} /></li>) : null}
+          {!loaded ? <li className="cm-list__skeleton"><BrandLoader variant="inline" size="md" label="Carregando comunicados" text="Carregando comunicados…" /></li> : null}
           {visiveis.map((item) => {
             const enviado = isDisparado(item)
             const ciencia = item.tipo === COMUNICADO_TIPO.ciencia

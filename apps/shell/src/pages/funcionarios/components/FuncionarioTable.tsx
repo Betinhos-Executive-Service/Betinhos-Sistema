@@ -26,16 +26,19 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
     {
       key: 'nome', header: 'Colaborador', label: 'Colaborador', sortable: true, defaultWidth: 280, width: 'minmax(220px, 2fr)', cell: (row) => {
         const nome = String(row.values.cr40f_nomecompleto ?? '')
-        const aniversario = row.alertas.find((alerta) => alerta.kind === 'aniversario')
         return (
           <div className="person">
             <Avatar name={nome} src={row.fotoThumb} />
-            <div>
-              <strong>{nome || 'Sem nome'}</strong>
-              <span className="muted">{String(row.values.new_apelido ?? '')}{aniversario && <> · <AlertBadge alerta={aniversario} /></>}</span>
-            </div>
+            <strong title={nome || undefined}>{nome || 'Sem nome'}</strong>
           </div>
         )
+      },
+    },
+    {
+      key: 'apelido', header: 'Apelido', label: 'Apelido', sortable: true, defaultWidth: 160, cell: (row) => {
+        const apelido = String(row.values.new_apelido ?? '')
+        const aniversario = row.alertas.find((alerta) => alerta.kind === 'aniversario')
+        return <span className="nowrap">{apelido || (aniversario ? null : muted)}{aniversario && <>{apelido && ' · '}<AlertBadge alerta={aniversario} /></>}</span>
       },
     },
     { key: 'funcao', header: 'Função', label: 'Função', sortable: true, defaultWidth: 150, cell: (row) => <span className="nowrap">{optionLabel(FUNCAO, row.values.cr40f_funcao)}{row.semApp && <> <SemAppBadge /></>}</span> },
@@ -57,5 +60,5 @@ export function FuncionarioTable({ rows, onOpen, loading, view, quickFilters, fo
     },
     { key: 'admissao', header: 'Admissão', label: 'Admissão', sortable: true, defaultWidth: 120, cell: (row) => <span className="nowrap">{formatBR(row.values.cr40f_datadeadmissao as string) || muted}</span> },
   ]
-  return <VirtualTable className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+  return <VirtualTable className="func-table" columns={columns} rows={rows} rowKey={(row) => row.id} onRowClick={(row) => onOpen(row.id)} loading={loading} loadingLabel="Carregando colaboradores" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
 }
