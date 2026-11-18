@@ -58,7 +58,7 @@ Leitura das parcelas de uma multa (critério de cada passo):
 6. **Desfazer a 2ª**: parcela Prevista sem `new_lancadoem`; multa de volta em "4. Acertar" sem `cr40f_encerradaem`.
 7. **Lançar a 2ª de novo**: a multa encerra.
 8. **Fim**: a multa de teste fica Encerrada e as parcelas ficam como histórico fictício. Não apague: a trava do termo e o Restrict do lookup bloqueiam.
-9. **Recusas** (mensagem do servidor na tela, nada gravado): Acertar → folha sem valor pago ("Registre o pagamento antes de lançar na folha."), mês fora da janela ("Escolha um mês entre ..."), 13 parcelas, cancelar a multa com parcela Prevista, e `PATCH` direto em `new_parcelamultafolha.new_status` pela Web API (a trava recusa; em `observar`, conferir o trace).
+9. **Recusas** (mensagem do servidor na tela, nada gravado): Acertar → folha sem valor pago ("Registre o pagamento antes de lançar na folha."), mês fora da janela ("Escolha um mês entre ..."), 13 parcelas, cancelar a multa com parcela Prevista, e `PATCH` direto em `new_parcelamultafolha.new_status` pela Web API (a trava do termo recusa sempre, com "Parcela de multa só é lançada ou desfeita pela tela Descontos em folha e não pode ser alterada nem excluída por fora."). Mudar `cr40f_multas.cr40f_status` direto pela Web API passa enquanto `cr40f_MultasTravaModo` = `observar` (padrão no DEV); conferir o "Recusaria" no trace.
 
 Permissão: a tela só lê (`prvRead` em `new_parcelamultafolha` e `cr40f_multas`); grava pela Custom API, que exige `prvWritecr40f_multas`. Em 18/11/2026 o papel Acesso-Betinhos-MDA lê multas mas não lê parcelas.
 
