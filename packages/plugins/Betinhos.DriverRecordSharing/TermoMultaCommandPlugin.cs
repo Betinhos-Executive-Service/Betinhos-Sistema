@@ -814,11 +814,12 @@ namespace Betinhos.DriverRecordSharing
             system.Update(new Entity(Multa, multa.Id) { ["cr40f_aceitedeclaradoem"] = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date });
         }
 
-        // Só o flow chama: o acesso à multa do chamador (como no Lembrar do termo) barra quem não é do escritório.
+        // Só o flow chama: exige o privilégio de gestor (como o brief pede) além do acesso à multa do chamador.
         private void LembrarAceite(IPluginExecutionContext context, IOrganizationService caller, IOrganizationService system)
         {
             var id = InputGuid(context, "new_MultaId");
             caller.Retrieve(Multa, id, new ColumnSet("cr40f_multasid"));
+            if (!TemPrivilegio(system, context.InitiatingUserId, PrivilegioGestor)) throw new InvalidPluginExecutionException("Sem permissão para lembrar o aceite.");
             var multa = system.Retrieve(Multa, id, ColunasAceite);
             var indicacao = multa.GetAttributeValue<DateTime?>("cr40f_datadeindicacao");
             var hoje = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date;

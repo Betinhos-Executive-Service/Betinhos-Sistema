@@ -648,6 +648,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var s = Cenario();
             AceitePendente(s, new DateTime(2026, 10, 20));
+            s.Privilegiados.Add(s.Gestor);
 
             var ctx = Run(s, "new_LembrarAceiteMulta", s.Gestor, DaMulta(s));
 
@@ -657,11 +658,40 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void LembrarAceiteRecusaQuemNaoEGestor()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+            Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_LembrarAceiteMulta", s.MotoristaUser.Id, DaMulta(s)));
+            Assert.False(s.Multa.Contains("cr40f_ultimolembreteaceiteem"));
+        }
+
+        [Fact]
+        public void MinhasMultasUsaTermoVigenteIgnoraParcelaCanceladaEEmpresa()
+        {
+            var s = Cenario();
+            var termo = s.Add(new Entity("new_termomulta") { ["new_multa"] = s.Multa.ToEntityReference(), ["new_status"] = new OptionSetValue(Pendente), ["new_enviadoem"] = Relogio });
+            s.Multa["new_termovigente"] = termo.ToEntityReference();
+            foreach (var (n, st) in new[] { (1, 100000000), (2, 100000002) })
+                s.Add(new Entity("new_parcelamultafolha") { ["new_multa"] = s.Multa.ToEntityReference(), ["new_numero"] = n, ["new_competencia"] = new DateTime(2026, 12, 1), ["new_valor"] = new Money(10m), ["new_status"] = new OptionSetValue(st) });
+            s.Add(new Entity("cr40f_multas") { ["cr40f_motorista"] = s.Motorista.ToEntityReference(), ["cr40f_status"] = new OptionSetValue(202410004), ["cr40f_responsavel"] = new OptionSetValue(100000001) });
+
+            var json = (string)Run(s, "new_MinhasMultas", s.MotoristaUser.Id, new Dictionary<string, object>()).OutputParameters["new_MultasJson"];
+
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "\"grupo\""));
+            Assert.Contains("\"acao\":\"assinar\"", json);
+            Assert.Contains("\"termoStatus\":\"pendente\"", json);
+            Assert.Contains("\"termoId\":\"" + termo.Id + "\"", json);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "\"numero\""));
+        }
+
+        [Fact]
         public void LembrarAceiteJaDeclaradoDevolveFalse()
         {
             var s = Cenario();
             AceitePendente(s, new DateTime(2026, 10, 20));
             s.Multa["cr40f_aceitedeclaradoem"] = new DateTime(2026, 10, 21);
+            s.Privilegiados.Add(s.Gestor);
 
             var ctx = Run(s, "new_LembrarAceiteMulta", s.Gestor, DaMulta(s));
 

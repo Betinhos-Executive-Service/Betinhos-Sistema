@@ -73,5 +73,30 @@ namespace Betinhos.DriverRecordSharing.Tests
                 Linha(202410004, l => { l.TermoVigenteId = Guid.NewGuid(); l.TermoVigenteStatus = 100000000; }) }, Hoje);
             Assert.Equal(new[] { "precisa", "andamento", "encerrada" }, r.Select(m => m.Grupo));
         }
+        [Fact]
+        public void Descontado_antigo_vale_como_encerrada()
+            => Assert.Equal(("encerrada", "Encerrada"), Pair(Assert.Single(MinhasMultas.Montar(new[] { Linha(202410003, l => l.EncerradaEm = new DateTime(2026, 11, 1)) }, Hoje))));
+
+        [Fact]
+        public void Encerrada_e_cancelada_sem_data_continuam_na_lista()
+        {
+            var r = MinhasMultas.Montar(new[] { Linha(202410005), Linha(202410007) }, Hoje);
+            Assert.Equal(2, r.Count);
+            Assert.All(r, m => Assert.Equal("encerrada", m.Grupo));
+        }
+
+        [Fact]
+        public void Indicar_com_aceite_confirmado()
+            => Assert.Equal("Indicação confirmada", Assert.Single(MinhasMultas.Montar(new[] { Linha(202410004, l => { l.Canal = 100000000; l.DataIndicacao = new DateTime(2026, 11, 12); l.AceiteEm = new DateTime(2026, 11, 15); l.AceiteDeclaradoEm = new DateTime(2026, 11, 14); }) }, Hoje)).Situacao);
+
+        [Fact]
+        public void Indicar_com_outro_canal_e_indicacao_registrada()
+            => Assert.Equal("Indicação enviada ao órgão", Assert.Single(MinhasMultas.Montar(new[] { Linha(202410004, l => { l.Canal = 100000001; l.DataIndicacao = new DateTime(2026, 11, 12); }) }, Hoje)).Situacao);
+
+        [Fact]
+        public void Indicar_sem_indicacao_aguarda_o_orgao()
+            => Assert.Equal("Aguardando a indicação no órgão", Assert.Single(MinhasMultas.Montar(new[] { Linha(202410004) }, Hoje)).Situacao);
+
+        private static (string, string) Pair(MinhaMulta m) => (m.Grupo, m.Situacao);
     }
 }

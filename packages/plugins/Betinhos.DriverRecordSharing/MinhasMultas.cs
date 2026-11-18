@@ -61,7 +61,7 @@ namespace Betinhos.DriverRecordSharing
 
     public static class MinhasMultas
     {
-        private const int Identificar = 202410000, Indicar = 202410004, Recurso = 202410002, Acertar = 202410006, Encerrada = 202410005, Cancelada = 202410007;
+        private const int Identificar = 202410000, Indicar = 202410004, Recurso = 202410002, Acertar = 202410006, Encerrada = 202410005, DescontadoAntigo = 202410003, Cancelada = 202410007;
         private const int Empresa = 100000001, Senatran = 100000000, TermoPendente = 100000000;
 
         public static List<MinhaMulta> Montar(IEnumerable<LinhaMinhaMulta> linhas, DateTime hoje)
@@ -70,9 +70,9 @@ namespace Betinhos.DriverRecordSharing
             var saida = new List<MinhaMulta>();
             foreach (var l in linhas)
             {
-                var fechada = l.Status == Encerrada || l.Status == Cancelada;
+                var fechada = l.Status == Encerrada || l.Status == Cancelada || l.Status == DescontadoAntigo;
                 var fimEm = l.EncerradaEm ?? l.CanceladaEm;
-                if (fechada && (fimEm == null || fimEm.Value.Date <= corte)) continue;
+                if (fechada && fimEm != null && fimEm.Value.Date <= corte) continue;
                 if (l.Responsavel == Empresa && !(fechada && (l.DataAviso != null || l.UltimoTermoId != null))) continue;
                 if (l.Status == Identificar && l.ContestadaEm == null) continue;
                 saida.Add(Converter(l));
@@ -88,7 +88,7 @@ namespace Betinhos.DriverRecordSharing
 
         private static MinhaMulta Converter(LinhaMinhaMulta l)
         {
-            var fechada = l.Status == Encerrada || l.Status == Cancelada;
+            var fechada = l.Status == Encerrada || l.Status == Cancelada || l.Status == DescontadoAntigo;
             var fimEm = l.EncerradaEm ?? l.CanceladaEm;
             var termoPendente = l.TermoVigenteId != null && l.TermoVigenteStatus == TermoPendente;
             var aceitePendente = l.Status == Indicar && l.Canal == Senatran && l.DataIndicacao != null && l.AceiteEm == null && l.AceiteDeclaradoEm == null;
@@ -101,7 +101,7 @@ namespace Betinhos.DriverRecordSharing
             else if (termoPendente) { grupo = "precisa"; acao = "assinar"; situacao = "Assine o termo da multa"; }
             else if (aceitePendente) { grupo = "precisa"; acao = "aceite"; situacao = "Aceite a indicação na CNH Digital"; prazo = Dia(l.DataParaIndicar); }
             else if (l.Status == Cancelada) situacao = "Cancelada";
-            else if (l.Status == Encerrada)
+            else if (l.Status == Encerrada || l.Status == DescontadoAntigo)
             {
                 // Com parcelas previstas o desconto ainda corre: continua em andamento.
                 if (previstas > 0) { grupo = "andamento"; situacao = "Descontando " + descontadas.ToString(CultureInfo.InvariantCulture) + " de " + vigentes.ToString(CultureInfo.InvariantCulture); }
@@ -109,7 +109,10 @@ namespace Betinhos.DriverRecordSharing
             }
             else if (l.Status == Identificar) situacao = "Contestação em análise";
             else if (l.Status == Recurso || l.RecursoPendente) situacao = "Em recurso";
-            else if (l.Status == Indicar) situacao = l.DataIndicacao == null || l.AceiteDeclaradoEm == null ? "Aguardando a indicação no órgão" : "Aceite em conferência";
+            else if (l.Status == Indicar) situacao = l.AceiteEm != null ? "Indicação confirmada"
+                : l.AceiteDeclaradoEm != null ? "Aceite em conferência"
+                : l.DataIndicacao != null && l.Canal != Senatran ? "Indicação enviada ao órgão"
+                : "Aguardando a indicação no órgão";
             else if (l.Status == Acertar) situacao = "Aguardando o lançamento na folha";
             else situacao = "Aguardando o pagamento";
 
