@@ -124,7 +124,7 @@ export type Dados = {
    */
   pendentes?: ('pagantes' | 'despesas')[]
 }
-export type Atalho = 'hoje' | 'ult7' | 'ult30' | 'esteMes' | 'mesAnt' | 'esteAno' | 'anoAnt' | 'personalizado'
+export type Atalho = 'hoje' | 'ult7' | 'ult30' | 'esteMes' | 'esteTrimestre' | 'mesAnt' | 'esteAno' | 'anoAnt' | 'personalizado'
 export type Filtros = {
   atalho: Atalho
   inicio: string
@@ -139,6 +139,10 @@ export type Chip = { rotulo: string; tipo: 'valor'; anterior: string; variacao: 
 export type Apoio = { rotulo: string; texto: string; atencao?: boolean }
 export type PontoSerie = { mes: string; rotulo: string; valor: number }
 export type KpiId = 'faturamento' | 'servicos' | 'ticket' | 'aReceber' | 'cpPendente' | 'recebimento'
-export type Kpi = { id: KpiId; rotulo: string; valor: string; chips: Chip[]; apoio: Apoio[]; serie: PontoSerie[] }
+export type Kpi = {
+  id: KpiId; rotulo: string; valor: string; chips: Chip[]; apoio: Apoio[]; serie: PontoSerie[]
+  /** Recebimento: fração recebida (0 a 1) e os valores já formatados, para o anel de progresso. */
+  anel?: { razao: number; recebido: string; base: string }
+}
 export type Tom = 'ok' | 'warn' | 'danger' | 'neutral'
 export type AlertaItem = { id: string; valor: string; rotulo: string; status: string; tom: Tom }
