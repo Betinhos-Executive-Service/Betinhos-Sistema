@@ -227,7 +227,7 @@ function App() {
     voucherDrafts
   });
 
-  const { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, precisaDeVoce } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
+  const { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce } = useTermosMulta(comunicadosDriverIdRef, driverContext?.id);
   const treinamentosLista = useTreinamentos({ comunicadosDriverIdRef, driverContextId: driverContext?.id, setScreen });
   const { setSelectedTreinamentoId, treinamentos } = treinamentosLista;
   const cartao = useGastosCartao({ comunicadosDriverIdRef, despesas, driverContextId: driverContext?.id, gastoCartaoAtualRef, remoteMode, screen, setScreen });
@@ -588,7 +588,8 @@ function App() {
     termosMulta,
     termosStatus,
     minhasMultas,
-    minhasMultasOfflineEm
+    minhasMultasOfflineEm,
+    minhasMultasLidoEm
   });
   if (telaTermos) return show(telaTermos);
 

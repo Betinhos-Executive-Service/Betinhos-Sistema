@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
-import { agruparMinhasMultas, listarMinhasMultas, type CargaStatus, type MinhaMulta } from "./minhasMultas";
+import { agruparMinhasMultas, erroDeRede, listarMinhasMultas, type CargaStatus, type MinhaMulta } from "./minhasMultas";
 import { lerMinhasMultas, salvarMinhasMultas, usuarioAtual } from "./minhasMultasOffline";
 import { isMockTermos, listarTermosMotorista, type TermoMulta } from "./termosMulta";
 
@@ -14,15 +14,20 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
   /** Hora (ISO) da última leitura guardada quando a tela mostra o cache por falta de rede; null com dados novos. */
   const [minhasMultasOfflineEm, setMinhasMultasOfflineEm] = useState<string | null>(null);
 
+  /** Hora da última leitura bem-sucedida: a faixa de sem conexão a usa quando a rede cai depois de carregar. */
+  const [minhasMultasLidoEm, setMinhasMultasLidoEm] = useState<string | null>(null);
+
   const carregarMinhasMultas = useCallback(async () => {
     try {
       const itens = await listarMinhasMultas();
       salvarMinhasMultas(usuarioAtual(), itens);
       setMinhasMultas(itens);
       setMinhasMultasOfflineEm(null);
+      setMinhasMultasLidoEm(new Date().toISOString());
       setTermosStatus("ready");
     } catch (error) {
-      const guardado = lerMinhasMultas(usuarioAtual());
+      // O cache só cobre falta de rede; erro do servidor mostra a mensagem de erro.
+      const guardado = erroDeRede(error) ? lerMinhasMultas(usuarioAtual()) : null;
       if (guardado) {
         setMinhasMultas(guardado.itens);
         setMinhasMultasOfflineEm(guardado.salvoEm);
@@ -48,5 +53,5 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
   }, [driverId]);
 
   const precisaDeVoce = agruparMinhasMultas(minhasMultas).precisa.length;
-  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, precisaDeVoce };
+  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce };
 }

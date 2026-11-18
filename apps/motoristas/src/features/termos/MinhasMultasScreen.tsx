@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { AceiteCnhCard } from "./AceiteCnhCard";
-import { agruparMinhasMultas, descreverParcela, horaDoCache, SEM_CONEXAO_TEXTO, type CargaStatus, type MinhaMulta } from "./minhasMultas";
+import { agruparMinhasMultas, descreverParcela, horaDoCache, parcelasVigentes, SEM_CONEXAO_TEXTO, type CargaStatus, type MinhaMulta } from "./minhasMultas";
 import { TermoMultaDetalheScreen } from "./TermoMultaDetalheScreen";
 import { abrirPdf, baixarPdf, formatDataHora, isMockTermos, navegadorPdfEnv, obterTermo, type TermoMulta } from "./termosMulta";
 
@@ -15,6 +15,8 @@ type Props = {
   loadStatus: CargaStatus;
   /** Hora da leitura guardada quando a lista veio do aparelho (sem conexão); null com dados novos. */
   offlineEm: string | null;
+  /** Hora da última leitura bem-sucedida (para a faixa quando a rede cai depois de carregar). */
+  lidoEm: string | null;
   onBack: () => void;
   onReload: () => Promise<void>;
   onDeclarar: (multaId: string) => Promise<void>;
@@ -22,10 +24,12 @@ type Props = {
   onSelectedChange?: (id: string) => void;
 };
 
-function useOnline() {
+function useOnline(aoVoltar: () => void) {
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine !== false);
+  const aoVoltarRef = useRef(aoVoltar);
+  aoVoltarRef.current = aoVoltar;
   useEffect(() => {
-    const ligar = () => setOnline(true);
+    const ligar = () => { setOnline(true); aoVoltarRef.current(); };
     const desligar = () => setOnline(false);
     window.addEventListener("online", ligar);
     window.addEventListener("offline", desligar);
@@ -47,7 +51,7 @@ function MultaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa:
       setPdf({ busy: false, erro: customApiErrorMessage(error, "Não foi possível abrir o PDF.") });
     }
   };
-  const parcelas = multa.parcelas;
+  const parcelas = parcelasVigentes(multa.parcelas);
   return (
     <li className="multa-card" data-grupo={multa.grupo}>
       <div className="multa-card-head">
@@ -87,14 +91,12 @@ function Grupo({ titulo, itens, destaque, ...resto }: { titulo: string; itens: M
   );
 }
 
-export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, onBack, onReload, onDeclarar, onSelectedChange }: Props) {
+export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, lidoEm, onBack, onReload, onDeclarar, onSelectedChange }: Props) {
   // Guarda o termo aberto: depois de assinar a multa muda de grupo, mas a tela de sucesso continua.
   const [selected, setSelected] = useState<TermoMulta | null>(null);
   useEffect(() => { onSelectedChange?.(selected?.id ?? ""); }, [selected?.id, onSelectedChange]);
   const [encerradasAbertas, setEncerradasAbertas] = useState(false);
   const [error, setError] = useState("");
-  const online = useOnline();
-  const somenteLeitura = !online || offlineEm !== null;
   const grupos = agruparMinhasMultas(items);
 
   const refresh = async () => {
@@ -105,7 +107,12 @@ export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, onBac
       setError("Não foi possível atualizar as multas. Tente novamente.");
     }
   };
-  useEffect(() => { void refresh(); }, []);
+  // Voltou a rede: relê as multas para sair do modo offline.
+  const online = useOnline(() => void refresh());
+  const somenteLeitura = !online || offlineEm !== null;
+  const faixaEm = offlineEm ?? (online ? null : lidoEm);
+  // O hook já carrega ao montar; aqui só se tenta de novo quando a primeira carga falhou.
+  useEffect(() => { if (loadStatus === "error") void refresh(); }, []);
 
   const abrirTermo = async (multa: MinhaMulta) => {
     if (!multa.termoId) return;
@@ -120,7 +127,8 @@ export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, onBac
 
   const declarar = async (multaId: string) => {
     await onDeclarar(multaId);
-    await refresh();
+    // Registro feito: a releitura é outra coisa e trata a própria falha (mensagem da tela).
+    void refresh();
   };
 
   const close = () => { setSelected(null); void refresh(); };
@@ -135,7 +143,7 @@ export function MinhasMultasScreen({ items, termos, loadStatus, offlineEm, onBac
         <>
           <ServicesMenu title="Multas" eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"} homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} onRefresh={refresh} />
           <section className="termo-screen" aria-label="Multas">
-            {offlineEm ? <p className="termo-alert" data-tone="atencao" role="status">Sem conexão. Mostrando as multas de {horaDoCache(offlineEm)}.</p> : null}
+            {faixaEm ? <p className="termo-alert" data-tone="atencao" role="status">Sem conexão. Mostrando as multas de {horaDoCache(faixaEm)}.</p> : null}
             {error ? <p className="termo-alert" data-tone="erro" role="alert">{error}</p> : null}
             {loadStatus === "loading" && !items.length ? (
               <BrandLoader variant="inline" label="Carregando multas" text="Carregando multas" />

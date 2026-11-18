@@ -13,6 +13,7 @@ type Props = {
   termosStatus: CargaStatus;
   minhasMultas: MinhaMulta[];
   minhasMultasOfflineEm: string | null;
+  minhasMultasLidoEm: string | null;
 };
 
 // Tela Multas: o que precisa do motorista, o que está em andamento e as encerradas.
@@ -23,11 +24,12 @@ export function rotasTermos(screen: Screen, {
   termosMulta,
   termosStatus,
   minhasMultas,
-  minhasMultasOfflineEm
+  minhasMultasOfflineEm,
+  minhasMultasLidoEm
 }: Props): ReactNode | null {
   if (screen === "multas") {
     return (
-      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} />
+      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} lidoEm={minhasMultasLidoEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} />
     );
   }
   return null;

@@ -75,6 +75,16 @@ export function diaMes(dia: string | null) {
   return m ? `${m[3]}/${m[2]}` : "";
 }
 
+/** O servidor já não manda parcela cancelada; se vier, ela não conta nem aparece. */
+export const parcelasVigentes = (parcelas: MinhaParcela[]) => parcelas.filter((p) => p.status !== "cancelada");
+
+/** Erro de rede (fetch rejeitado ou aparelho offline); resposta 4xx/5xx do servidor não é. */
+export function erroDeRede(error: unknown) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  const e = error as { cause?: unknown } | null;
+  return error instanceof TypeError || e?.cause instanceof TypeError;
+}
+
 /** "Parcela 2 de 3 · R$ 65,08 · folha de 12/2026 · prevista". */
 export function descreverParcela(parcela: MinhaParcela, total: number) {
   const m = /^(\d{4})-(\d{2})/.exec(parcela.competencia ?? "");

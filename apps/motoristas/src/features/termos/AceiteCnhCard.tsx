@@ -14,6 +14,7 @@ type Props = {
 export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [registrado, setRegistrado] = useState(false);
 
   const declarar = async () => {
     if (semConexao || (typeof navigator !== "undefined" && navigator.onLine === false)) { setErro(SEM_CONEXAO_TEXTO); return; }
@@ -21,9 +22,12 @@ export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
     setErro("");
     try {
       await onDeclarar(multa.id);
+      // Declaração gravada: se a releitura da lista falhar, o cartão não volta a "Registrando" nem acusa falha.
+      setRegistrado(true);
     } catch (cause) {
       reportAppError(cause, { source: "termosMulta", action: "declararAceite", screen: "Multas", detailId: multa.id, detailType: "MULTA", notifyUser: false });
       setErro(customApiErrorMessage(cause, "Não foi possível registrar. Tente de novo."));
+    } finally {
       setEnviando(false);
     }
   };
@@ -31,9 +35,9 @@ export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
   return (
     <div className="multa-aceite">
       <p className="termo-help">{textoAceite(multa.auto, multa.prazoAceite)}</p>
-      <button type="button" className="termo-primary" disabled={enviando || semConexao} aria-busy={enviando || undefined} onClick={() => void declarar()}>
+      {registrado ? <p className="termo-alert" data-tone="sucesso" role="status">Aceite registrado. O gestor vai conferir; atualize a lista para ver a situação.</p> : <button type="button" className="termo-primary" disabled={enviando || semConexao} aria-busy={enviando || undefined} onClick={() => void declarar()}>
         {semConexao ? SEM_CONEXAO_TEXTO : enviando ? "Registrando" : "Já aceitei"}
-      </button>
+      </button>}
       {erro ? <p className="termo-alert" data-tone="erro" role="alert">{erro}</p> : null}
     </div>
   );
