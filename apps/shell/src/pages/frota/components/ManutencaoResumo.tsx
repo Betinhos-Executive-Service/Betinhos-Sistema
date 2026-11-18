@@ -25,7 +25,8 @@ export function Bloco({ titulo, destaque = false, children }: { titulo: string; 
 export function CabecalhoManutencao({ m, situacao }: { m: DetalheManutencao; situacao: Situacao }) {
   const p = m.programacao
   const leva = situacao.etapa === 'realizar' && p?.motorista && p.saida ? `${p.motorista.label} leva em ${textoSaida(p.saida)}` : null
-  const pedido = `pedido por ${m.solicitante?.label || 'não informado'}${m.criadoEm ? ` em ${formatBR(diaSP(m.criadoEm)).slice(0, 5)}` : ''}`
+  const dia = formatBR(diaSP(m.criadoEm)).slice(0, 5)
+  const pedido = `pedido por ${m.solicitante?.label || 'não informado'}${dia ? ` em ${dia}` : ''}`
   return (
     <div className="frota-cabecalho">
       {m.grau !== null ? <StatusBadge tone={tomDoGrau(m.grau)}>{label(GRAU, m.grau)}</StatusBadge> : null}
