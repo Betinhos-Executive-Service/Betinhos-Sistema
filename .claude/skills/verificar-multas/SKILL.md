@@ -1,6 +1,6 @@
 ---
 name: verificar-multas
-description: "Verifica a fase 1 das multas: regras MultaEtapas (plugin e espelho do shell, paridade), Custom APIs cr40f_PassoMulta, cr40f_MultasDoDia e new_DossieMulta, trava (observar/travar), tarefa da multa no Planner, drawer passo a passo, lista e visões, Abrir multa no Planner, aba Multas da ficha e o e-mail Multas de hoje. Use após mudar packages/plugins/Cr40f.Frota.Plugin/Multa*.cs, PassoMultaPlugin.cs, MultasDoDia*.cs, DossieMultaPlugin.cs, frota/domain/multa*.ts, MultaPassoAPasso.tsx, frota/domain/{linhas,listas}.ts, planner/domain/multaTaskFlow.ts, flows/multas-do-dia.json ou as migrations 20261117-1200-multas-fase1.ps1 / 20261117-2100-multas-fase1-choice-local.ps1."
+description: "Verifica a fase 1 das multas: regras MultaEtapas (plugin e espelho do shell, paridade), Custom APIs cr40f_PassoMulta, cr40f_MultasDoDia e new_DossieMulta, trava (observar/travar), tarefa da multa no Planner, drawer passo a passo, lista e visões, Abrir multa no Planner, aba Multas da ficha e o e-mail Multas de hoje. Use após mudar packages/plugins/Cr40f.Frota.Plugin/Multa*.cs, PassoMultaPlugin.cs, MultasDoDia*.cs, DossieMultaPlugin.cs, frota/domain/multa*.ts, MultaPassoAPasso.tsx, frota/domain/{linhas,listas}.ts, planner/domain/multaTaskFlow.ts, flows/multas-do-dia.json as migrations 20261117-1200-multas-fase1.ps1 / 20261117-2100-multas-fase1-choice-local.ps1, ou o desconto em folha (MultaParcelas.cs, LancarDescontoFolhaPlugin.cs, Custom API cr40f_LancarDescontoFolha, apps/shell/src/pages/rh-descontos/**, lib/xlsx.ts, migration 20261118-1800-rh-descontos-parcelas.ps1)."
 ---
 # Verificar multas (fase 1)
 
@@ -42,8 +42,28 @@ Pré-requisitos: Deploy da `develop` verde (migration, plugin da frota, DriverRe
 7. **Dossiê**: na multa de teste, "Copiar mensagem" traz o serviço da agenda da placa no horário e as viagens do InFleet (ou, com o InFleet fora do ar, exatamente "Rastreador: indisponível no momento." sem quebrar).
 8. **E-mail**: com `cr40f_recebeemailmultas` marcado só para quem testa, rode o flow "Multas | Multas de hoje" à mão: um e-mail com as seções na ordem; sem itens, a execução termina sem enviar.
 
+## 4. Desconto em folha (RH bloco 1)
+Spec: `docs/superpowers/specs/2026-11-18-rh-descontos-folha-design.md`. Mesmas regras da seção 3 (só DEV, quem tem acesso, checkout principal). Pré-requisito: Deploy verde com a migration `20261118-1800-rh-descontos-parcelas.ps1` (colunas `new_multa` e `new_lancadoem`) e a Custom API `cr40f_LancarDescontoFolha` registrada.
+
+Testes sem Dataverse: `pnpm --filter shell test -- rh-descontos multa` (tela, prévia das parcelas, Excel) e os testes `MultaParcelas*`, `LancarDescontoFolha*` e `PassoMulta*` do `Cr40f.Frota.Plugin.Tests`. No mock (`pnpm dev`, porta 36472), `#/rh-descontos` mostra 4 colaboradores fictícios, setembro em atraso e o Excel `descontos-folha-AAAA-MM.xlsx`.
+
+Leitura das parcelas de uma multa (critério de cada passo):
+`new_parcelamultafolhas?$select=new_name,new_numero,new_competencia,new_valor,new_status,new_lancadoem&$filter=_new_multa_value eq <id da multa>&$orderby=new_numero` e da multa `cr40f_multases(<id>)?$select=cr40f_status,cr40f_competenciadesconto,cr40f_acertoem,cr40f_encerradaem`.
+
+1. **Multa de teste**: auto `TST-RH-<data>`, motorista de teste, valor pago R$ 100,00; passo a passo até "4. Acertar".
+2. **Acertar → folha em 2 parcelas**, primeiro mês = mês atual. Esperado: 2 parcelas Previstas de R$ 50,00 (competências no dia 1 de dois meses seguidos); a multa segue em "4. Acertar" (202410006) com a situação "Descontando em folha", `cr40f_competenciadesconto` = 1º mês, `cr40f_acertoem` = hoje; a tarefa do Planner fica Concluída e o e-mail diário não cobra a multa.
+3. **Tela**: em `#/rh-descontos` a 1ª aparece no mês atual e a 2ª no próximo, R$ 50,00 cada, no holerite do motorista e na linha do tempo.
+4. **Lançar a 1ª** (passo 2, fita): parcela Descontada com `new_lancadoem` = hoje; a multa continua aberta.
+5. **Lançar a 2ª**: multa Encerrada com `cr40f_encerradaem` = hoje.
+6. **Desfazer a 2ª**: parcela Prevista sem `new_lancadoem`; multa de volta em "4. Acertar" sem `cr40f_encerradaem`.
+7. **Lançar a 2ª de novo**: a multa encerra.
+8. **Fim**: a multa de teste fica Encerrada e as parcelas ficam como histórico fictício. Não apague: a trava do termo e o Restrict do lookup bloqueiam.
+9. **Recusas** (mensagem do servidor na tela, nada gravado): Acertar → folha sem valor pago ("Registre o pagamento antes de lançar na folha."), mês fora da janela ("Escolha um mês entre ..."), 13 parcelas, cancelar a multa com parcela Prevista, e `PATCH` direto em `new_parcelamultafolha.new_status` pela Web API (a trava recusa; em `observar`, conferir o trace).
+
+Permissão: a tela só lê (`prvRead` em `new_parcelamultafolha` e `cr40f_multas`); grava pela Custom API, que exige `prvWritecr40f_multas`. Em 18/11/2026 o papel Acesso-Betinhos-MDA lê multas mas não lê parcelas.
+
 ## Evidência obrigatória
-Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace do item 3.5, a tarefa do item 3.3 e o e-mail do item 3.8.
+Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace do item 3.5, a tarefa do item 3.3 e o e-mail do item 3.8; no desconto em folha, a leitura das parcelas e da multa após os itens 4.2, 4.5 e 4.6 e o print da tela no item 4.3.
 
 ## Limites
 - Só prova o DEV. O PROD recebe tudo pelo "Publicar soluções" (ensaio no TEST e aprovação do Renan).
