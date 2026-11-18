@@ -12,6 +12,8 @@ export type Linha = {
   codigo?: string | null
   /** Só multa: próximo passo, próximo prazo e filas das visões. */
   proximoPasso?: string; proximoPrazo?: string | null; situacoes?: string[]
+  /** Só manutenção: grau do pedido (ordena a visão A encaixar). */
+  grau?: number | null
 }
 
 /** Filas das visões da lista de multas (spec §7). Uma multa pode estar em mais de uma: Comigo e Prazo vencido, por exemplo. */
@@ -29,7 +31,7 @@ export function linhas(kind: Kind, data: FrotaData, hoje = todaySP()): Linha[] {
   const infracoes = new Map(data.infracoes.map((item) => [item.id, item]))
   const result: Linha[] =
     kind === 'manutencao'
-      ? data.manutencoes.map((item) => ({ kind, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, status: item.status, dia: diaSP(item.dataManutencao ?? item.criadoEm), extra: item.valor !== null ? brl(item.valor) : label(GRAU, item.grau), categorias: item.categorias, termo: '', termoStatus: null }))
+      ? data.manutencoes.map((item) => ({ kind, id: item.id, titulo: item.descricao, veiculo: item.veiculo, pessoa: item.solicitante, status: item.status, dia: diaSP(item.dataManutencao ?? item.criadoEm), extra: item.valor !== null ? brl(item.valor) : label(GRAU, item.grau), categorias: item.categorias, termo: '', termoStatus: null, grau: item.grau }))
       : kind === 'multa'
         ? data.multas.map((item) => {
           const s = situacaoDaMulta(item, hoje)

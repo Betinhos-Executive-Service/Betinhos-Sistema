@@ -30,3 +30,4 @@
 - verificar-formulario | apps/formulario-geral/**, packages/deploy/push-formulario-dev.ps1 | Formulário Geral (WebResource new_formulario_geral.html): 19 testes de contrato, validação dos obrigatórios, seletor e cartão do passageiro, abas de observação (inclui Faturamento), aviso de sucesso com número da OS; sem URL de gatilho nem planilha real no código
 - verificar-app-* e demais skills do App Motoristas | apps/motoristas/** | Índice próprio em `apps/motoristas/.claude/skills/verificar-index.md` (o Claude Code acha essas skills ao mexer em arquivos do app)
 - verificar-composicao | apps/shell/src/pages/composicao/** | Composição de Preço nativa (#/composicao): fórmulas, seleção, Excel, Gerar OP, visões em mock e roteiro no DEV (carga, cache do catálogo, casos de borda)
+- verificar-dashboard-cards | apps/shell/src/pages/dashboard/** | Cards do Dashboard (StatCard, AlertCard, DeltaBadge) nas 8 abas e 3 larguras: rolagem, cortes, alturas, console e drill-down
