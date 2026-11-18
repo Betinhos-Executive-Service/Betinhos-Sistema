@@ -33,7 +33,7 @@ export function AceiteCnhCard({ multa, semConexao, onDeclarar }: Props) {
   };
 
   return (
-    <div className="multa-aceite" data-tour="multas-aceite">
+    <div className="multa-aceite">
       <ol className="multa-passos">
         <li>Abra o app CNH Digital</li>
         <li>Toque em Infrações e escolha a multa {multa.auto}</li>

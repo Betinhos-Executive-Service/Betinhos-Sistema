@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
@@ -90,14 +90,36 @@ function Meta({ multa }: { multa: MinhaMulta }) {
   );
 }
 
+/** Cartão que começa fechado: o cabeçalho é o botão que abre e fecha os detalhes. */
+function Cartao({ className, grupo, chip, titulo, resumo, tour, children }: { className?: string; grupo: string; chip?: ReactNode; titulo: string; resumo: string; tour?: string; children: ReactNode }) {
+  const [aberto, setAberto] = useState(false);
+  const corpoId = useId();
+  return (
+    <li className={`multa-card${className ? ` ${className}` : ""}`} data-grupo={grupo} data-aberto={aberto || undefined}>
+      <button type="button" className="multa-cabeca" aria-expanded={aberto} aria-controls={corpoId} data-tour={tour} onClick={() => setAberto((v) => !v)}>
+        <span className="multa-cabeca-texto">
+          {chip}
+          <span className="multa-titulo">{titulo}</span>
+          <span className="multa-resumo">{resumo}</span>
+        </span>
+        <span className="multa-seta" aria-hidden="true" />
+      </button>
+      <div id={corpoId} className="multa-corpo" role="region" aria-label={titulo}>
+        <div className="multa-corpo-int"><div className="multa-detalhes">{children}</div></div>
+      </div>
+    </li>
+  );
+}
+
 /** Cartão de tarefa: o que o motorista precisa fazer agora. */
 function TarefaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa: MinhaMulta } & Acoes) {
   const chip = multa.acao === "aceite" ? textoChipPrazo(multa.prazoAceite, hojeEmBrasilia()) : "";
   const titulo = multa.acao === "assinar" ? "Assinar o termo da multa" : multa.acao === "aceite" ? "Aceitar a indicação na CNH Digital" : multa.situacao;
+  const resumo = [multa.placa || multa.auto, diaMes(multa.dataHora)].filter(Boolean).join(" · ");
+  const tour = multa.acao === "aceite" ? "multas-aceite" : multa.acao === "assinar" ? "multas-termo" : undefined;
+  const chipEl = <span className="multa-chip" data-tom={chip ? (chip.startsWith("Prazo vencido") ? "vencido" : "prazo") : "neutro"}>{chip || "Sem prazo marcado"}</span>;
   return (
-    <li className="multa-card multa-tarefa" data-grupo={multa.grupo}>
-      <span className="multa-chip" data-tom={chip ? (chip.startsWith("Prazo vencido") ? "vencido" : "prazo") : "neutro"}>{chip || "Sem prazo marcado"}</span>
-      <h3 className="multa-titulo">{titulo}</h3>
+    <Cartao className="multa-tarefa" grupo={multa.grupo} chip={chipEl} titulo={titulo} resumo={resumo} tour={tour}>
       <Meta multa={multa} />
       <Trilha etapa={etapaDaMulta(multa)} />
       {multa.acao === "assinar" ? (
@@ -109,7 +131,7 @@ function TarefaCard({ multa, somenteLeitura, onAbrirTermo, onDeclarar }: { multa
         </>
       ) : null}
       {multa.acao === "aceite" ? <AceiteCnhCard multa={multa} semConexao={somenteLeitura} onDeclarar={onDeclarar} /> : null}
-    </li>
+    </Cartao>
   );
 }
 
@@ -118,14 +140,15 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
   const parcelas = parcelasVigentes(multa.parcelas);
   const { total, descontadas, falta } = resumoDesconto(multa.parcelas);
   const proxima = parcelas.find((p) => p.status !== "descontada")?.numero;
+  const resumo = `Falta descontar ${formatBrl(falta)} · ${descontadas} de ${total} descontadas`;
   return (
-    <li className="multa-card multa-dinheiro" data-grupo={multa.grupo}>
+    <Cartao className="multa-dinheiro" grupo={multa.grupo} titulo={multa.situacao} resumo={resumo} tour={destaqueTour ? "multas-parcelas" : undefined}>
       <Trilha etapa={etapaDaMulta(multa)} />
       <p className="multa-rotulo">Falta descontar</p>
       <p className="multa-valor">{formatBrl(falta)}</p>
       <div className="multa-barra" aria-hidden="true">{parcelas.map((p) => <i key={p.numero} data-on={p.status === "descontada" || undefined} />)}</div>
       <p className="multa-legenda">{legendaParcelas(descontadas, total)} · {multa.placa || multa.auto}, {diaMes(multa.dataHora)}</p>
-      <ul className="multa-meses" data-tour={destaqueTour ? "multas-parcelas" : undefined} aria-label="Parcelas do desconto em folha">
+      <ul className="multa-meses" aria-label="Parcelas do desconto em folha">
         {parcelas.map((p) => (
           <li key={p.numero} data-estado={p.status === "descontada" ? "descontada" : p.numero === proxima ? "proxima" : "futura"}>
             <span>{mesFolha(p.competencia) || `Parcela ${p.numero}`}</span>
@@ -134,19 +157,20 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
         ))}
       </ul>
       <VerTermoAssinado multa={multa} somenteLeitura={somenteLeitura} />
-    </li>
+    </Cartao>
   );
 }
 
 /** Multa sem tarefa nem parcelas (em andamento ou encerrada): trilha e uma linha com a situação. */
 function SimplesCard({ multa, somenteLeitura }: { multa: MinhaMulta; somenteLeitura: boolean }) {
+  const resumo = [multa.placa || multa.auto, diaMes(multa.dataHora), multa.grupo === "encerrada" ? "Encerrada" : ""].filter(Boolean).join(" · ");
   return (
-    <li className="multa-card" data-grupo={multa.grupo}>
+    <Cartao grupo={multa.grupo} titulo={multa.situacao} resumo={resumo}>
       <Meta multa={multa} />
       <Trilha etapa={etapaDaMulta(multa)} />
       <p className="multa-situacao">{multa.situacao}</p>
       <VerTermoAssinado multa={multa} somenteLeitura={somenteLeitura} />
-    </li>
+    </Cartao>
   );
 }
 

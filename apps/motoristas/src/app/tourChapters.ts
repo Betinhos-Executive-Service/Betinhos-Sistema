@@ -617,8 +617,8 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Multas que precisam de você aparecem aqui"
       ], { target: dt("multas-precisa"), optional: true }),
       step("termo", "Termo da multa", [
-        "Assine o termo ou conteste pelo app"
-      ], { target: ".termo-primary", match: "^Ler e assinar o termo$", optional: true }),
+        "Toque na multa para abrir e assinar o termo, ou contestar pelo app"
+      ], { target: dt("multas-termo"), optional: true }),
       step("aceite", "Aceite na CNH Digital", [
         "Quando a empresa indicar você no órgão, aceite na CNH Digital e toque em Já aceitei"
       ], { target: dt("multas-aceite"), optional: true }),
