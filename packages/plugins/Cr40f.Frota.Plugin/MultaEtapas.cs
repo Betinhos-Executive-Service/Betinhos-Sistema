@@ -29,7 +29,10 @@ public static class Passos
     public const string Cancelar = "Cancelar";
     public const string Recorrer = "Recorrer";
     public const string ResultadoRecurso = "ResultadoRecurso";
-    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso };
+    /// <summary>Internos: só a cr40f_LancarDescontoFolha chama (via Execute de cr40f_PassoMulta); direto do cliente recusam pelas mesmas regras.</summary>
+    public const string ConcluirDesconto = "ConcluirDesconto";
+    public const string ReabrirDesconto = "ReabrirDesconto";
+    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto };
 }
 
 /// <summary>O que as regras leem e o passo muda. Datas em yyyy-MM-dd (dia de São Paulo). Espelho: MultaEstado de multaEtapas.ts.</summary>
@@ -55,12 +58,15 @@ public sealed class MultaEstado
     [DataMember(Name = "canceladaEm")] public string? CanceladaEm { get; set; }
     [DataMember(Name = "motivoCancelamento")] public string? MotivoCancelamento { get; set; }
     [DataMember(Name = "recursoPendente")] public bool? RecursoPendente { get; set; }
+    /// <summary>Contagem de new_parcelamultafolha da multa, carregada pelo passo. Ausente = 0.</summary>
+    [DataMember(Name = "parcelasPrevistas")] public int? ParcelasPrevistas { get; set; }
+    [DataMember(Name = "parcelasDescontadas")] public int? ParcelasDescontadas { get; set; }
 
     public MultaEstado Copia() => (MultaEstado)MemberwiseClone();
 }
 
 /// <summary>DadosJson da cr40f_PassoMulta. Textos fixos: responsavel motorista|empresa, motivo prazo-perdido|culpa-empresa,
-/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM.</summary>
+/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM, parcelas 1 a 12.</summary>
 [DataContract]
 public sealed class DadosPasso
 {
@@ -75,6 +81,7 @@ public sealed class DadosPasso
     [DataMember(Name = "indicou")] public bool? Indicou { get; set; }
     [DataMember(Name = "resultado")] public string? Resultado { get; set; }
     [DataMember(Name = "motivoTexto")] public string? MotivoTexto { get; set; }
+    [DataMember(Name = "parcelas")] public int? Parcelas { get; set; }
 }
 
 /// <summary>Saída MultaJson da cr40f_PassoMulta; também usada pela tarefa e pelo e-mail.</summary>
@@ -87,6 +94,7 @@ public sealed class MultaSituacao
     [DataMember(Name = "proximoPrazo", Order = 4)] public string? ProximoPrazo { get; set; }
     [DataMember(Name = "prazoVencido", Order = 5)] public bool PrazoVencido { get; set; }
     [DataMember(Name = "aguardandoPenalidade", Order = 6)] public bool AguardandoPenalidade { get; set; }
+    [DataMember(Name = "descontando", Order = 7)] public bool Descontando { get; set; }
 }
 
 /// <summary>
@@ -112,6 +120,8 @@ public static class MultaEtapas
         [Passos.Cancelar] = "Cancelar",
         [Passos.Recorrer] = "Entrar com recurso",
         [Passos.ResultadoRecurso] = "Registrar o resultado do recurso",
+        [Passos.ConcluirDesconto] = "Concluir desconto",
+        [Passos.ReabrirDesconto] = "Reabrir desconto",
     };
 
     public static readonly IReadOnlyDictionary<string, string> RotuloEtapa = new Dictionary<string, string>
@@ -152,6 +162,9 @@ public static class MultaEtapas
     /// <summary>Indicação da Senatran registrada e ainda sem aceite na CNH Digital (mesma regra do passo RegistrarAceite).</summary>
     public static bool AceitePendente(MultaEstado m) => m.DataIndicacao != null && m.Canal == MultaCodigos.Senatran && m.AceiteEm == null;
 
+    /// <summary>Acertar -> folha já gravado: a multa espera as parcelas serem lançadas (spec RH §3).</summary>
+    public static bool Descontando(MultaEstado m) => Etapa(m.Status) == Acertar && m.Competencia != null && m.AcertoEm != null;
+
     public static MultaSituacao Avaliar(MultaEstado m, string hoje)
     {
         var etapa = Etapa(m.Status);
@@ -174,11 +187,15 @@ public static class MultaEtapas
                 if (m.Vencimento == null) s.AguardandoPenalidade = true;
                 else s.Pendentes.Add(Passos.RegistrarPagamento);
                 break;
-            case Acertar: s.Pendentes.Add(Passos.RegistrarAcerto); break;
+            case Acertar:
+                if (Descontando(m)) s.Descontando = true;
+                else s.Pendentes.Add(Passos.RegistrarAcerto);
+                break;
             case Recurso: s.Pendentes.Add(Passos.ResultadoRecurso); break;
         }
         s.ProximoPasso = s.Pendentes.Count > 0 ? RotuloPasso[s.Pendentes[0]]
             : s.AguardandoPenalidade ? "Aguardando penalidade"
+            : s.Descontando ? "Descontando em folha"
             : etapa == Cancelada ? "Cancelada" : etapa == Encerrada ? "Encerrada" : "";
         return s;
     }
@@ -200,9 +217,16 @@ public static class MultaEtapas
                 return ResponsavelEfetivo(m) == null && string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista que foi indicado." : null;
             case Passos.Cancelar:
                 if (!Aberta(s.Etapa)) return "Esta multa já está encerrada.";
+                if (m.ParcelasPrevistas > 0) return "Esta multa tem parcelas previstas na folha e não pode ser cancelada.";
                 var motivo = d.MotivoTexto?.Trim() ?? "";
                 if (motivo.Length < 5) return "Escreva o motivo do cancelamento.";
                 return motivo.Length > 2000 ? "O motivo do cancelamento passa de 2.000 caracteres." : null;
+            case Passos.ConcluirDesconto:
+                if (!Descontando(m)) return "Esta multa não está descontando em folha.";
+                return m.ParcelasPrevistas > 0 || !(m.ParcelasDescontadas > 0) ? "Ainda há parcelas previstas desta multa." : null;
+            case Passos.ReabrirDesconto:
+                if (s.Etapa != Encerrada || m.Competencia == null || m.AcertoEm == null) return "Só reabre multa encerrada pelo desconto em folha.";
+                return m.ParcelasPrevistas > 0 ? null : "Não há parcela prevista para reabrir a multa.";
             case Passos.Recorrer:
                 return s.Etapa == Identificar || s.Etapa == Indicar || s.Etapa == Pagar ? null : "Só dá para entrar com recurso antes do pagamento.";
         }
@@ -227,13 +251,25 @@ public static class MultaEtapas
             case Passos.RegistrarPagamento:
                 return DataRuim(d.Data, hoje, "Informe a data do pagamento.") ?? (d.ValorPago is decimal v && v > 0 ? null : "Informe o valor pago.");
             case Passos.RegistrarAcerto:
-                if (d.Acerto == "folha") return d.Competencia != null && MesIso.IsMatch(d.Competencia) ? null : "Informe o mês do desconto.";
+                if (d.Acerto == "folha") return ValidarFolha(m, d, hoje);
                 if (d.Acerto == "empresa") return MotivoDe(d.Motivo) == null ? "Escolha o motivo de a empresa assumir." : null;
                 return "Escolha: lancei na folha ou empresa assume.";
             case Passos.ResultadoRecurso:
                 return d.Resultado == "deferido" || d.Resultado == "indeferido" ? null : "Escolha o resultado do recurso: deferido ou indeferido.";
         }
         return null;
+    }
+
+    private static string? ValidarFolha(MultaEstado m, DadosPasso d, string hoje)
+    {
+        if (d.Competencia == null || !MesIso.IsMatch(d.Competencia)) return "Informe o mês do desconto.";
+        if (!(m.ValorPago > 0)) return "Registre o pagamento antes de lançar na folha.";
+        if (string.IsNullOrWhiteSpace(m.MotoristaId)) return "A multa não tem motorista; defina o responsável antes.";
+        var (de, ate) = MultaParcelas.Janela(hoje);
+        var c = MultaParcelas.Competencia(d.Competencia);
+        if (string.CompareOrdinal(c, de) < 0 || string.CompareOrdinal(c, ate) > 0) return $"Escolha um mês entre {MultaParcelas.MesBr(de)} e {MultaParcelas.MesBr(ate)}.";
+        var n = d.Parcelas ?? 1;
+        return n < 1 || n > MultaParcelas.Maximo ? "Escolha de 1 a 12 parcelas." : null;
     }
 
     public static MultaEstado Aplicar(MultaEstado m, string passo, DadosPasso d, string hoje)
@@ -262,9 +298,14 @@ public static class MultaEtapas
                 else n.Status = MultaCodigos.Acertar;
                 break;
             case Passos.RegistrarAcerto:
-                if (d.Acerto == "folha") n.Competencia = d.Competencia!.Length == 7 ? d.Competencia + "-01" : d.Competencia;
-                else n.MotivoEmpresa = MotivoDe(d.Motivo);
-                n.AcertoEm = hoje; n.EncerradaEm = hoje; n.Status = MultaCodigos.Encerrada;
+                if (d.Acerto == "folha") { n.Competencia = MultaParcelas.Competencia(d.Competencia!); n.AcertoEm = hoje; } // segue em Acertar até a última parcela
+                else { n.MotivoEmpresa = MotivoDe(d.Motivo); n.AcertoEm = hoje; n.EncerradaEm = hoje; n.Status = MultaCodigos.Encerrada; }
+                break;
+            case Passos.ConcluirDesconto:
+                n.EncerradaEm = string.IsNullOrWhiteSpace(d.Data) ? hoje : d.Data; n.Status = MultaCodigos.Encerrada;
+                break;
+            case Passos.ReabrirDesconto:
+                n.EncerradaEm = null; n.Status = MultaCodigos.Acertar;
                 break;
             case Passos.PrazoVencido:
                 if (d.Indicou == true)

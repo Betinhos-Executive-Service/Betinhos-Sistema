@@ -12,6 +12,7 @@ namespace Cr40f.Frota.Plugin.Tests;
 public sealed class FixtureMultas
 {
     [DataMember(Name = "hoje")] public string Hoje { get; set; } = "";
+    [DataMember(Name = "divisoes")] public List<CasoDivisao> Divisoes { get; set; } = new();
     [DataMember(Name = "avaliacoes")] public List<CasoAvaliacao> Avaliacoes { get; set; } = new();
     [DataMember(Name = "validacoes")] public List<CasoValidacao> Validacoes { get; set; } = new();
     [DataMember(Name = "aplicacoes")] public List<CasoAplicacao> Aplicacoes { get; set; } = new();
@@ -30,6 +31,24 @@ public sealed class CasoAvaliacao
     [DataMember(Name = "proximoPrazo")] public string? ProximoPrazo { get; set; }
     [DataMember(Name = "prazoVencido")] public bool PrazoVencido { get; set; }
     [DataMember(Name = "aguardandoPenalidade")] public bool AguardandoPenalidade { get; set; }
+    [DataMember(Name = "descontando")] public bool Descontando { get; set; }
+}
+
+[DataContract]
+public sealed class CasoDivisao
+{
+    [DataMember(Name = "valor")] public decimal Valor { get; set; }
+    [DataMember(Name = "parcelas")] public int Parcelas { get; set; }
+    [DataMember(Name = "primeira")] public string Primeira { get; set; } = "";
+    [DataMember(Name = "esperado")] public List<ParcelaEsperada> Esperado { get; set; } = new();
+}
+
+[DataContract]
+public sealed class ParcelaEsperada
+{
+    [DataMember(Name = "numero")] public int Numero { get; set; }
+    [DataMember(Name = "competencia")] public string Competencia { get; set; } = "";
+    [DataMember(Name = "valor")] public decimal Valor { get; set; }
 }
 
 [DataContract]
@@ -54,8 +73,8 @@ public sealed class CasoAplicacao
 
 public class ParidadeMultaTests
 {
-    private static string Linha(string nome, string etapa, IEnumerable<string> pendentes, string passo, string? prazo, bool vencido, bool penalidade)
-        => $"{nome} | {etapa} | {string.Join(",", pendentes)} | {passo} | {prazo ?? "null"} | {vencido} | {penalidade}";
+    private static string Linha(string nome, string etapa, IEnumerable<string> pendentes, string passo, string? prazo, bool vencido, bool penalidade, bool descontando)
+        => $"{nome} | {etapa} | {string.Join(",", pendentes)} | {passo} | {prazo ?? "null"} | {vencido} | {penalidade} | {descontando}";
 
     [Fact]
     public void Avalia_igual_ao_shell()
@@ -65,8 +84,8 @@ public class ParidadeMultaTests
         foreach (var c in f.Avaliacoes)
         {
             var s = MultaEtapas.Avaliar(c.Multa, f.Hoje);
-            Assert.Equal(Linha(c.Nome, c.Etapa, c.Pendentes, c.ProximoPasso, c.ProximoPrazo, c.PrazoVencido, c.AguardandoPenalidade),
-                Linha(c.Nome, s.Etapa, s.Pendentes, s.ProximoPasso, s.ProximoPrazo, s.PrazoVencido, s.AguardandoPenalidade));
+            Assert.Equal(Linha(c.Nome, c.Etapa, c.Pendentes, c.ProximoPasso, c.ProximoPrazo, c.PrazoVencido, c.AguardandoPenalidade, c.Descontando),
+                Linha(c.Nome, s.Etapa, s.Pendentes, s.ProximoPasso, s.ProximoPrazo, s.PrazoVencido, s.AguardandoPenalidade, s.Descontando));
         }
     }
 
@@ -91,6 +110,18 @@ public class ParidadeMultaTests
             var depois = MultaEtapas.Aplicar(c.Multa, c.Passo, dados, f.Hoje);
             var mudancas = MultaEtapas.Mudancas(c.Multa, depois).Select(m => $"{m.Key}={MultaEtapas.Formatar(m.Value)}").OrderBy(x => x, StringComparer.Ordinal);
             Assert.Equal($"{c.Nome}: {string.Join(" ", c.Mudancas)}", $"{c.Nome}: {string.Join(" ", mudancas)}");
+        }
+    }
+
+    [Fact]
+    public void Divisoes_do_fixture()
+    {
+        var casos = FixtureMultas.Carregar().Divisoes;
+        Assert.NotEmpty(casos);
+        foreach (var c in casos)
+        {
+            var plano = MultaParcelas.Dividir(c.Valor, c.Parcelas, c.Primeira);
+            Assert.Equal(c.Esperado.Select(e => (e.Numero, e.Competencia, e.Valor)), plano.Select(p => (p.Numero, p.Competencia, p.Valor)));
         }
     }
 
