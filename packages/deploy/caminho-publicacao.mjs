@@ -47,6 +47,8 @@ export const NEUTRO = [
   // Formulário Geral: o que vai ao WebResource muda o PROD (soluções); teste, fixture, documentação e a pasta docs/ não.
   /^apps\/formulario-geral\/(docs\/.+|.+\.(test|fixtures)\.[^/]+|.+\.md)$/,
   /^packages\/deploy\/solucoes\//,
+  // Backup externo (job r2 do backup-prod.yml): só lê o PROD.
+  /^packages\/deploy\/backup\//,
   /^packages\/deploy\/(push-dev|push-webresources-dev|push-formulario-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
