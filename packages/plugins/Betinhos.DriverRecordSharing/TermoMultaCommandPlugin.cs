@@ -64,6 +64,7 @@ namespace Betinhos.DriverRecordSharing
         private const string VersaoProvisoria = "v0-placeholder";
         private const string MultaMudouDeEtapa = "Esta multa mudou de etapa e o termo não pode mais ser assinado. Procure o escritório.";
         private const int StatusIndicar = 202410004;
+        private const int CanalSenatran = 100000000;
         private const int SelfieMaxBytes = 1572864; // 1,5 MB
         public const string ServerWriteVariable = "termo_server_write";
         private const string Bloqueado = "Termo assinado não pode ser alterado nem excluído.";
@@ -114,6 +115,9 @@ namespace Betinhos.DriverRecordSharing
                     case "new_LembrarTermoMulta": Lembrar(context, caller, system); break;
                     case "new_BaixarPdfTermoMulta": BaixarPdf(context, system, tracing); break;
                     case "new_ConsultarAditivoMotorista": ConsultarAditivo(context, system, tracing); break;
+                    case "new_MinhasMultas": MinhasMultasDoMotorista(context, system, tracing); break;
+                    case "new_DeclararAceiteMulta": DeclararAceite(context, system, tracing); break;
+                    case "new_LembrarAceiteMulta": LembrarAceite(context, caller, system); break;
                     case "Create":
                     case "Update":
                     case "Delete":
@@ -701,6 +705,128 @@ namespace Betinhos.DriverRecordSharing
         // ID de bloco do Azure Blob: base64 de tamanho fixo e sem '+', '/' ou '=', que quebram o parâmetro blockid na URL.
         public static string BlockId(int index) =>
             Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes(index.ToString("D6", CultureInfo.InvariantCulture)));
+
+        // ---------------- App Motoristas: minhas multas, declarar e lembrar o aceite ----------------
+
+        private void MinhasMultasDoMotorista(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
+        {
+            var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
+            RecusarSeDuplicado(system, driver, tracing);
+            if (driver?.EmployeeReference == null) { context.OutputParameters["new_MultasJson"] = "[]"; return; }
+
+            var query = new QueryExpression(Multa)
+            {
+                ColumnSet = new ColumnSet("cr40f_novacoluna", "cr40f_placa", "cr40f_dataehorario", "cr40f_localdainfracao", "cr40f_codigodainfracao", "cr40f_status", "cr40f_responsavel",
+                    "cr40f_contestadaem", "cr40f_canalindicacao", "cr40f_datadeindicacao", "cr40f_aceiteem", "cr40f_aceitedeclaradoem", "cr40f_dataparaindicar", "cr40f_datadeavisoaocondutor",
+                    "cr40f_encerradaem", "cr40f_canceladaem", "new_recursopendente", "new_termovigente"),
+            };
+            query.Criteria.AddCondition("cr40f_motorista", ConditionOperator.Equal, driver.EmployeeReference.Id);
+            var multas = system.RetrieveMultiple(query).Entities;
+            if (multas.Count == 0) { context.OutputParameters["new_MultasJson"] = "[]"; return; }
+            var ids = multas.Select(m => (object)m.Id).ToArray();
+
+            // Último termo de cada multa (mais recente pelo envio) e parcelas não canceladas.
+            var termosQuery = new QueryExpression(Termo) { ColumnSet = new ColumnSet("new_multa", "new_status", "new_enviadoem") };
+            termosQuery.Criteria.AddCondition("new_multa", ConditionOperator.In, ids);
+            var termos = system.RetrieveMultiple(termosQuery).Entities
+                .GroupBy(t => t.GetAttributeValue<EntityReference>("new_multa")?.Id ?? Guid.Empty)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.GetAttributeValue<DateTime?>("new_enviadoem") ?? DateTime.MinValue).ToList());
+            var parcelasQuery = new QueryExpression(ParcelaTable) { ColumnSet = new ColumnSet("new_multa", "new_numero", "new_competencia", "new_valor", "new_status") };
+            parcelasQuery.Criteria.AddCondition("new_multa", ConditionOperator.In, ids);
+            var parcelas = system.RetrieveMultiple(parcelasQuery).Entities
+                .Where(p => Choice(p, "new_status") != ParcelaCancelada)
+                .GroupBy(p => p.GetAttributeValue<EntityReference>("new_multa")?.Id ?? Guid.Empty)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var placas = new Dictionary<Guid, string>();
+            var infracoes = new Dictionary<Guid, string>();
+            var linhas = new List<LinhaMinhaMulta>();
+            foreach (var m in multas)
+            {
+                var linha = new LinhaMinhaMulta
+                {
+                    Id = m.Id,
+                    Auto = m.GetAttributeValue<string>("cr40f_novacoluna"),
+                    Placa = Cache(placas, m.GetAttributeValue<EntityReference>("cr40f_placa"), r => system.Retrieve(r.LogicalName, r.Id, new ColumnSet("cr40f_placa")).GetAttributeValue<string>("cr40f_placa")),
+                    DataHora = m.GetAttributeValue<DateTime?>("cr40f_dataehorario"),
+                    Local = m.GetAttributeValue<string>("cr40f_localdainfracao"),
+                    Infracao = Cache(infracoes, m.GetAttributeValue<EntityReference>("cr40f_codigodainfracao"), r =>
+                    {
+                        var c = system.Retrieve(r.LogicalName, r.Id, new ColumnSet("cr40f_codigodainfracao", "cr40f_descricaodainfracao"));
+                        return (c.GetAttributeValue<string>("cr40f_codigodainfracao") + " - " + c.GetAttributeValue<string>("cr40f_descricaodainfracao")).Trim(' ', '-');
+                    }),
+                    Status = Choice(m, "cr40f_status"),
+                    Responsavel = ChoiceOuNulo(m, "cr40f_responsavel"),
+                    Canal = ChoiceOuNulo(m, "cr40f_canalindicacao"),
+                    ContestadaEm = m.GetAttributeValue<DateTime?>("cr40f_contestadaem"),
+                    DataIndicacao = m.GetAttributeValue<DateTime?>("cr40f_datadeindicacao"),
+                    AceiteEm = m.GetAttributeValue<DateTime?>("cr40f_aceiteem"),
+                    AceiteDeclaradoEm = m.GetAttributeValue<DateTime?>("cr40f_aceitedeclaradoem"),
+                    DataParaIndicar = m.GetAttributeValue<DateTime?>("cr40f_dataparaindicar"),
+                    DataAviso = m.GetAttributeValue<DateTime?>("cr40f_datadeavisoaocondutor"),
+                    EncerradaEm = m.GetAttributeValue<DateTime?>("cr40f_encerradaem"),
+                    CanceladaEm = m.GetAttributeValue<DateTime?>("cr40f_canceladaem"),
+                    RecursoPendente = m.GetAttributeValue<bool?>("new_recursopendente") ?? false,
+                };
+                var lista = termos.TryGetValue(m.Id, out var t) ? t : new List<Entity>();
+                var vigenteId = m.GetAttributeValue<EntityReference>("new_termovigente")?.Id;
+                var vigente = vigenteId == null ? null : lista.FirstOrDefault(x => x.Id == vigenteId.Value);
+                if (vigente != null) { linha.TermoVigenteId = vigente.Id; linha.TermoVigenteStatus = Choice(vigente, "new_status"); }
+                if (lista.Count > 0) { linha.UltimoTermoId = lista[0].Id; linha.UltimoTermoStatus = Choice(lista[0], "new_status"); }
+                if (parcelas.TryGetValue(m.Id, out var ps))
+                    foreach (var p in ps)
+                        linha.Parcelas.Add(new MinhaParcela
+                        {
+                            Numero = p.GetAttributeValue<int?>("new_numero") ?? 0,
+                            Competencia = p.GetAttributeValue<DateTime?>("new_competencia")?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                            Valor = p.GetAttributeValue<Money>("new_valor")?.Value ?? 0m,
+                            Status = Choice(p, "new_status") == Descontada ? "descontada" : "prevista",
+                        });
+                linhas.Add(linha);
+            }
+            var hoje = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date;
+            context.OutputParameters["new_MultasJson"] = Json(MinhasMultas.Montar(linhas, hoje).Select(m => m.ParaJson()).ToList());
+        }
+
+        private static string Cache(Dictionary<Guid, string> cache, EntityReference reference, Func<EntityReference, string> ler)
+        {
+            if (reference == null) return null;
+            if (!cache.TryGetValue(reference.Id, out var valor)) cache[reference.Id] = valor = ler(reference);
+            return valor;
+        }
+
+        private static int? ChoiceOuNulo(Entity entity, string name) => entity.GetAttributeValue<OptionSetValue>(name)?.Value;
+
+        private static bool AceitePendente(Entity multa) =>
+            Choice(multa, "cr40f_status") == StatusIndicar && Choice(multa, "cr40f_canalindicacao") == CanalSenatran
+            && multa.GetAttributeValue<DateTime?>("cr40f_datadeindicacao") != null && multa.GetAttributeValue<DateTime?>("cr40f_aceiteem") == null;
+
+        private static readonly ColumnSet ColunasAceite = new ColumnSet("cr40f_motorista", "cr40f_status", "cr40f_canalindicacao", "cr40f_datadeindicacao", "cr40f_aceiteem", "cr40f_aceitedeclaradoem", "cr40f_ultimolembreteaceiteem");
+
+        private void DeclararAceite(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
+        {
+            var multa = system.Retrieve(Multa, InputGuid(context, "new_MultaId"), ColunasAceite);
+            var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
+            RecusarSeDuplicado(system, driver, tracing);
+            if (!EhDono(driver, multa.GetAttributeValue<EntityReference>("cr40f_motorista"))) throw new InvalidPluginExecutionException("Esta multa não é sua.");
+            if (multa.GetAttributeValue<DateTime?>("cr40f_aceitedeclaradoem") != null) return;
+            if (!AceitePendente(multa)) throw new InvalidPluginExecutionException("Esta multa não espera o aceite na CNH Digital.");
+            system.Update(new Entity(Multa, multa.Id) { ["cr40f_aceitedeclaradoem"] = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date });
+        }
+
+        // Só o flow chama: o acesso à multa do chamador (como no Lembrar do termo) barra quem não é do escritório.
+        private void LembrarAceite(IPluginExecutionContext context, IOrganizationService caller, IOrganizationService system)
+        {
+            var id = InputGuid(context, "new_MultaId");
+            caller.Retrieve(Multa, id, new ColumnSet("cr40f_multasid"));
+            var multa = system.Retrieve(Multa, id, ColunasAceite);
+            var indicacao = multa.GetAttributeValue<DateTime?>("cr40f_datadeindicacao");
+            var hoje = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date;
+            var lembrar = indicacao != null && AceitePendente(multa) && multa.GetAttributeValue<DateTime?>("cr40f_aceitedeclaradoem") == null
+                && TermoPrazos.LembrarAceite(indicacao.Value, multa.GetAttributeValue<DateTime?>("cr40f_ultimolembreteaceiteem"), hoje);
+            if (lembrar) system.Update(new Entity(Multa, id) { ["cr40f_ultimolembreteaceiteem"] = hoje });
+            context.OutputParameters["new_Lembrou"] = lembrar;
+        }
 
         // ---------------- Utilitários ----------------
 

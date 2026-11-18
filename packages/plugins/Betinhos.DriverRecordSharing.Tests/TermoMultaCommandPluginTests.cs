@@ -571,6 +571,104 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Throws<InvalidPluginExecutionException>(() => Guard(s, "Delete", new EntityReference("new_parcelamultafolha", parcela.Id)));
         }
 
+        // ---------- App Motoristas: minhas multas, declarar e lembrar o aceite ----------
+
+        private static void AceitePendente(Scenario s, DateTime indicacao)
+        {
+            s.Multa["cr40f_canalindicacao"] = new OptionSetValue(100000000);
+            s.Multa["cr40f_datadeindicacao"] = indicacao;
+        }
+
+        private static Dictionary<string, object> DaMulta(Scenario s) => new Dictionary<string, object> { ["new_MultaId"] = s.Multa.Id };
+
+        [Fact]
+        public void MinhasMultasDevolveSoAsDoMotoristaSemOValorDaGuia()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+            var outro = s.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Outro (fictício)", ["statecode"] = new OptionSetValue(0) });
+            s.Add(new Entity("cr40f_multas") { ["cr40f_motorista"] = outro.ToEntityReference(), ["cr40f_status"] = new OptionSetValue(202410004) });
+
+            var ctx = Run(s, "new_MinhasMultas", s.MotoristaUser.Id, new Dictionary<string, object>());
+            var json = (string)ctx.OutputParameters["new_MultasJson"];
+
+            Assert.Contains("\"grupo\":\"precisa\"", json);
+            Assert.Contains("\"acao\":\"aceite\"", json);
+            Assert.Contains("\"prazoAceite\":\"2026-11-20\"", json);
+            Assert.Contains("\"placa\":\"ABC1D23\"", json);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(json, "\"grupo\""));
+            Assert.DoesNotContain("293", json);
+        }
+
+        [Fact]
+        public void MinhasMultasSemFuncionarioDevolveListaVazia()
+        {
+            var s = Cenario();
+            var ctx = Run(s, "new_MinhasMultas", s.Gestor, new Dictionary<string, object>());
+            Assert.Equal("[]", ctx.OutputParameters["new_MultasJson"]);
+        }
+
+        [Fact]
+        public void DeclararAceiteDeOutroMotoristaRecusa()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+            s.Multa["cr40f_motorista"] = s.Add(new Entity("cr40f_funcionarios") { ["cr40f_nomecompleto"] = "Outro (fictício)", ["statecode"] = new OptionSetValue(0) }).ToEntityReference();
+
+            var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_DeclararAceiteMulta", s.MotoristaUser.Id, DaMulta(s)));
+
+            Assert.Equal("Esta multa não é sua.", error.Message);
+            Assert.False(s.Multa.Contains("cr40f_aceitedeclaradoem"));
+        }
+
+        [Fact]
+        public void DeclararAceiteGravaHojeDeBrasiliaEDuasVezesNaoRegrava()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+
+            Run(s, "new_DeclararAceiteMulta", s.MotoristaUser.Id, DaMulta(s));
+            Assert.Equal(new DateTime(2026, 10, 22), s.Multa.GetAttributeValue<DateTime>("cr40f_aceitedeclaradoem"));
+
+            s.Relogio = Relogio.AddDays(2);
+            Run(s, "new_DeclararAceiteMulta", s.MotoristaUser.Id, DaMulta(s));
+            Assert.Equal(new DateTime(2026, 10, 22), s.Multa.GetAttributeValue<DateTime>("cr40f_aceitedeclaradoem"));
+        }
+
+        [Fact]
+        public void DeclararAceiteSemAceitePendenteRecusa()
+        {
+            var s = Cenario();
+            var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_DeclararAceiteMulta", s.MotoristaUser.Id, DaMulta(s)));
+            Assert.Equal("Esta multa não espera o aceite na CNH Digital.", error.Message);
+        }
+
+        [Fact]
+        public void LembrarAceiteNoDia2GravaEDevolveTrue()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+
+            var ctx = Run(s, "new_LembrarAceiteMulta", s.Gestor, DaMulta(s));
+
+            Assert.True((bool)ctx.OutputParameters["new_Lembrou"]);
+            Assert.Equal(new DateTime(2026, 10, 22), s.Multa.GetAttributeValue<DateTime>("cr40f_ultimolembreteaceiteem"));
+            Assert.False((bool)Run(s, "new_LembrarAceiteMulta", s.Gestor, DaMulta(s)).OutputParameters["new_Lembrou"]);
+        }
+
+        [Fact]
+        public void LembrarAceiteJaDeclaradoDevolveFalse()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+            s.Multa["cr40f_aceitedeclaradoem"] = new DateTime(2026, 10, 21);
+
+            var ctx = Run(s, "new_LembrarAceiteMulta", s.Gestor, DaMulta(s));
+
+            Assert.False((bool)ctx.OutputParameters["new_Lembrou"]);
+            Assert.False(s.Multa.Contains("cr40f_ultimolembreteaceiteem"));
+        }
+
         // ---------- Baixar PDF / Lembrar / Aditivo ----------
 
         private static Entity TermoAssinado(Scenario s)
