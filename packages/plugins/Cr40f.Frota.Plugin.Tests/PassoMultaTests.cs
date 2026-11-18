@@ -251,4 +251,89 @@ public class PassoMultaTests
             PassoMultaPlugin.Executar(mundo, multa.Id, Passos.Cancelar, "{\"motivoTexto\":\"Teste de cancelamento\"}", Hoje));
         Assert.Equal("Esta multa tem parcelas previstas na folha e não pode ser cancelada.", erro.Message);
     }
+
+    private static Entity Termo(FakeMundo mundo, int status, int parcelas, string primeiroMes, decimal valor, int forma = 100000001) =>
+        mundo.Add(new Entity(MultaMapper.Termo, Guid.NewGuid())
+        {
+            ["new_status"] = new OptionSetValue(status), ["new_formapagamento"] = new OptionSetValue(forma), ["new_parcelas"] = parcelas,
+            ["new_primeiracompetencia"] = DateTime.Parse(primeiroMes, System.Globalization.CultureInfo.InvariantCulture), ["new_valortotal"] = new Money(valor),
+        });
+
+    private static Entity MultaComTermo(FakeMundo mundo, int status, Entity termo, Action<Entity>? extra = null) =>
+        Multa(mundo, status, m => { m["new_termovigente"] = new EntityReference(MultaMapper.Termo, termo.Id); extra?.Invoke(m); });
+
+    [Fact]
+    public void TermoAssinado_fora_da_api_do_termo_e_recusado()
+    {
+        var mundo = new FakeMundo();
+        var multa = Multa(mundo, MultaCodigos.Indicar);
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.TermoAssinado, "{\"data\":\"2026-11-17\"}", Hoje));
+        Assert.Equal("Este passo é registrado pelo termo do motorista.", erro.Message);
+    }
+
+    [Fact]
+    public void TermoAssinado_pela_api_grava_o_aviso()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000000, 2, "2026-12-01", 200m);
+        var multa = MultaComTermo(mundo, MultaCodigos.Indicar, termo);
+        PassoMultaPlugin.Executar(mundo, multa.Id, Passos.TermoAssinado, "{\"data\":\"2026-11-17\"}", Hoje, viaTermo: true);
+        Assert.Equal(new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc), mundo.Atualizados.Single()["cr40f_datadeavisoaocondutor"]);
+    }
+
+    [Fact]
+    public void Indicacao_com_termo_pendente_e_recusada()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000000, 1, "2026-12-01", 100m);
+        var multa = MultaComTermo(mundo, MultaCodigos.Indicar, termo);
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"canal\":\"senatran\",\"data\":\"2026-11-15\"}", Hoje));
+        Assert.Equal("Aguarde a assinatura do termo ou cancele o termo.", erro.Message);
+    }
+
+    [Fact]
+    public void PrazoVencido_cancela_o_termo_pendente()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000000, 1, "2026-12-01", 100m);
+        var multa = MultaComTermo(mundo, MultaCodigos.Indicar, termo, m => m["cr40f_dataparaindicar"] = new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc));
+        PassoMultaPlugin.Executar(mundo, multa.Id, Passos.PrazoVencido, "{\"indicou\":false}", Hoje);
+        Assert.Equal(MultaMapper.TermoCancelado, termo.GetAttributeValue<OptionSetValue>("new_status").Value);
+        Assert.Null(multa["new_termovigente"]);
+    }
+
+    [Fact]
+    public void Acerto_folha_com_termo_cria_parcelas_com_o_termo()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000001, 2, "2026-12-01", 200m);
+        var multa = MultaComTermo(mundo, MultaCodigos.Acertar, termo, m =>
+        {
+            m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid());
+            m["cr40f_valorpago"] = new Money(120m); m["cr40f_pagaem"] = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
+        });
+        PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12-01\",\"parcelas\":2}", Hoje);
+        var parcelas = mundo.Linhas(PassoMultaPlugin.Parcelas);
+        Assert.Equal(2, parcelas.Count);
+        Assert.All(parcelas, p => Assert.Equal(termo.Id, p.GetAttributeValue<EntityReference>("new_termo").Id));
+    }
+
+    [Fact]
+    public void Acerto_folha_com_termo_sem_primeiro_mes_e_recusado_sem_estourar()
+    {
+        var mundo = new FakeMundo();
+        var termo = Termo(mundo, 100000001, 2, "2026-12-01", 200m);
+        termo.Attributes.Remove("new_primeiracompetencia");
+        var multa = MultaComTermo(mundo, MultaCodigos.Acertar, termo, m =>
+        {
+            m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid());
+            m["cr40f_valorpago"] = new Money(120m); m["cr40f_pagaem"] = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
+        });
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12-01\",\"parcelas\":2}", Hoje));
+        Assert.Contains("primeiro mês", erro.Message);
+        Assert.Empty(mundo.Linhas(PassoMultaPlugin.Parcelas));
+    }
 }

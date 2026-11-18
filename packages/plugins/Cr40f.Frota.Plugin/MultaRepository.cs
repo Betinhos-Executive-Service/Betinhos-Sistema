@@ -18,7 +18,7 @@ public static class MultaMapper
         "cr40f_novacoluna", "cr40f_placa", "cr40f_status", "cr40f_responsavel", "cr40f_motorista", "cr40f_motivoempresa", "cr40f_dataparaindicar",
         "cr40f_datadeavisoaocondutor", "cr40f_canalindicacao", "cr40f_datadeindicacao", "cr40f_indicado", "cr40f_aceiteem", "cr40f_vencimento",
         "cr40f_pagaem", "cr40f_valorpago", "cr40f_competenciadesconto", "cr40f_acertoem", "cr40f_encerradaem", "cr40f_canceladaem",
-        "cr40f_motivocancelamento", "new_recursopendente",
+        "cr40f_motivocancelamento", "new_recursopendente", "cr40f_contestadaem", "cr40f_aceitedeclaradoem", "new_termovigente",
     };
 
     /// <summary>Campo de MultaEstado (MultaEtapas.Mudancas) → coluna de cr40f_multas.</summary>
@@ -28,7 +28,7 @@ public static class MultaMapper
         ["dataAviso"] = "cr40f_datadeavisoaocondutor", ["canal"] = "cr40f_canalindicacao", ["dataIndicacao"] = "cr40f_datadeindicacao",
         ["indicado"] = "cr40f_indicado", ["aceiteEm"] = "cr40f_aceiteem", ["pagaEm"] = "cr40f_pagaem", ["valorPago"] = "cr40f_valorpago",
         ["competencia"] = "cr40f_competenciadesconto", ["acertoEm"] = "cr40f_acertoem", ["encerradaEm"] = "cr40f_encerradaem",
-        ["canceladaEm"] = "cr40f_canceladaem", ["motivoCancelamento"] = "cr40f_motivocancelamento", ["recursoPendente"] = "new_recursopendente",
+        ["canceladaEm"] = "cr40f_canceladaem", ["motivoCancelamento"] = "cr40f_motivocancelamento", ["recursoPendente"] = "new_recursopendente", ["contestadaEm"] = "cr40f_contestadaem",
     };
 
     public static MultaEstado Estado(Entity e) => new()
@@ -52,6 +52,8 @@ public static class MultaMapper
         CanceladaEm = Mapper.Dia(e, "cr40f_canceladaem"),
         MotivoCancelamento = e.GetAttributeValue<string>("cr40f_motivocancelamento"),
         RecursoPendente = e.Contains("new_recursopendente") ? e.GetAttributeValue<bool>("new_recursopendente") : null,
+        ContestadaEm = Mapper.Dia(e, "cr40f_contestadaem"),
+        AceiteDeclaradoEm = Mapper.Dia(e, "cr40f_aceitedeclaradoem"),
     };
 
     public static Entity Gravacao(Guid id, IEnumerable<KeyValuePair<string, object?>> mudancas)
@@ -72,6 +74,26 @@ public static class MultaMapper
 
     public static DateTime DataGravada(string dia) =>
         DateTime.SpecifyKind(DateTime.ParseExact(dia, "yyyy-MM-dd", CultureInfo.InvariantCulture).AddHours(12), DateTimeKind.Utc);
+
+    public const string Termo = "new_termomulta";
+    public const int TermoPendente = 100000000, TermoAssinado = 100000001, TermoCancelado = 100000004, FormaFolha = 100000001;
+
+    /// <summary>Lê o termo vigente da multa para as regras do termo. Devolve o id do termo vigente, ou null.</summary>
+    public static Guid? CarregarTermo(IOrganizationService sistema, Entity linha, MultaEstado e)
+    {
+        var vigente = linha.GetAttributeValue<EntityReference>("new_termovigente");
+        if (vigente == null) return null;
+        var t = sistema.Retrieve(Termo, vigente.Id, new ColumnSet("new_status", "new_formapagamento", "new_parcelas", "new_primeiracompetencia", "new_valortotal"));
+        var status = t.GetAttributeValue<OptionSetValue>("new_status")?.Value;
+        e.TermoPendente = status == TermoPendente;
+        if (status == TermoAssinado && t.GetAttributeValue<OptionSetValue>("new_formapagamento")?.Value == FormaFolha)
+        {
+            e.TermoParcelas = t.GetAttributeValue<int?>("new_parcelas");
+            e.TermoPrimeiroMes = t.GetAttributeValue<DateTime?>("new_primeiracompetencia")?.ToString("yyyy-MM-01", CultureInfo.InvariantCulture);
+            e.TermoValor = t.GetAttributeValue<Money>("new_valortotal")?.Value;
+        }
+        return vigente.Id;
+    }
 
     private static int? Opcao(Entity e, string coluna) => e.GetAttributeValue<OptionSetValue>(coluna)?.Value;
 }

@@ -146,4 +146,28 @@ public class MultaTravaTests
         var campos = linha.Split('"')[1].Split(',');
         Assert.Equal(MultaTravaPlugin.CamposDePasso.OrderBy(c => c, StringComparer.Ordinal), campos.OrderBy(c => c, StringComparer.Ordinal));
     }
+
+    [Theory]
+    [InlineData("cr40f_aceitedeclaradoem", "new_DeclararAceiteMulta", 0)]
+    [InlineData("cr40f_ultimolembreteaceiteem", "new_LembrarAceiteMulta", 0)]
+    [InlineData("cr40f_aceitedeclaradoem", "new_LembrarAceiteMulta", 1)]
+    [InlineData("cr40f_contestadaem", "new_DeclararAceiteMulta", 1)]
+    [InlineData("cr40f_contestadaem", null, 1)]
+    public void Campos_novos_so_pela_api_certa(string campo, string? pai, int recusas)
+    {
+        var alvo = Alvo(Guid.NewGuid(), (campo, new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc)));
+        var ctx = Contexto.Gravacao("Update", alvo, new Entity(MultaMapper.Tabela, alvo.Id), pai == null ? null : new RemoteExecutionContext { MessageName = pai });
+        Assert.Equal(recusas, MultaTravaPlugin.Avaliar(ctx, alvo, new FakeMundo()).Count);
+    }
+
+    [Fact]
+    public void Assinatura_do_termo_passa_pela_trava_via_passo()
+    {
+        var alvo = Alvo(Guid.NewGuid(), ("cr40f_datadeavisoaocondutor", new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc)));
+        // new_AssinarTermoMulta > cr40f_PassoMulta > Update: a trava reconhece o passo no meio da cadeia.
+        var avo = new RemoteExecutionContext { MessageName = "new_AssinarTermoMulta" };
+        var pai = new RemoteExecutionContext { MessageName = PassoMultaPlugin.Mensagem, ParentContext = avo };
+        var ctx = Contexto.Gravacao("Update", alvo, new Entity(MultaMapper.Tabela, alvo.Id), pai);
+        Assert.Empty(MultaTravaPlugin.Avaliar(ctx, alvo, new FakeMundo()));
+    }
 }
