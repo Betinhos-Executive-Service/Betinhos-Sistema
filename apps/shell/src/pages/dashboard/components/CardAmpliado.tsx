@@ -14,7 +14,7 @@ import { useMedia } from '../../operacional/useMedia'
 import { Chips } from './KpiChip'
 import { Lista } from './ListaDetalhe'
 import { MEDIA_MOBILE, juntar } from './Linhas'
-import { ABRIR_MS, CORPO_ENTRA, FADE_MS, FECHAR_MS, FUNDO_MS, REDUZIDO_MS, animar, criarClone, reduzidoAgora, transformPara } from './morph'
+import { ABRIR_MS, FADE_MS, FECHAR_MS, FUNDO_MS, REDUZIDO_MS, animar, criarClone, deslocar, encolher, recorte, reduzidoAgora } from './morph'
 import type { Conteudo, GenericoAmpliado, Origem } from './DetalheProvider'
 
 /* Card ampliado (chunk carregado sob demanda): gráfico maior, tabela dos números, comparativo, top 5 e "Ver na lista". */
@@ -80,15 +80,16 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       v.clone = clone
       v.el = el
       el.style.visibility = 'hidden'
-      p.style.transformOrigin = 'top left'
-      ;[...(corpo?.children ?? [])].forEach((c, i) => (c as HTMLElement).style.setProperty('--i', String(i)))
-      p.dataset.entrando = ''
+      const raioCard = getComputedStyle(el).borderRadius
+      const raioPainel = getComputedStyle(p).borderRadius
+      if (corpo) corpo.style.transformOrigin = 'top left'
       p.dataset.movendo = ''
       guardar(
-        animar(p, [{ transform: transformPara(de, para) }, { transform: 'none' }], ABRIR_MS),
-        animar(clone, [{ transform: 'none' }, { transform: transformPara(para, de) }], ABRIR_MS),
-        animar(clone, [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 0, offset: 1 }], ABRIR_MS, 'linear'),
-        corpo && animar(corpo, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: CORPO_ENTRA }, { opacity: 1, offset: 1 }], ABRIR_MS, 'linear'),
+        animar(p, [{ clipPath: recorte(de, para, raioCard) }, { clipPath: `inset(0px 0px 0px 0px round ${raioPainel})` }], ABRIR_MS),
+        animar(clone, [{ transform: 'none' }, { transform: deslocar(de, para) }], ABRIR_MS),
+        animar(clone, [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 0, offset: 1 }], ABRIR_MS, 'linear'),
+        corpo && animar(corpo, [{ transform: encolher(de, para) }, { transform: 'none' }], ABRIR_MS),
+        corpo && animar(corpo, [{ opacity: 0, offset: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 1, offset: 1 }], ABRIR_MS, 'linear'),
         fadeFundo(0, 1, FUNDO_MS),
       )
       aoTerminar(() => { if (v.seq === seq) { v.clone?.remove(); v.clone = null; delete p.dataset.movendo } })
@@ -117,12 +118,12 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       r.append(clone)
       v.clone?.remove()
       v.clone = clone
-      p.style.transformOrigin = 'top left'
       guardar(
-        animar(p, [{ transform: 'none' }, { transform: transformPara(para, de) }], FECHAR_MS),
-        animar(clone, [{ transform: transformPara(de, para) }, { transform: 'none' }], FECHAR_MS),
-        animar(clone, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.1 }, { opacity: 1, offset: 0.6 }, { opacity: 1, offset: 1 }], FECHAR_MS, 'linear'),
-        corpo && animar(corpo, [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 0, offset: 1 }], FECHAR_MS, 'linear'),
+        animar(p, [{ clipPath: `inset(0px 0px 0px 0px round ${getComputedStyle(p).borderRadius})` }, { clipPath: recorte(para, de, getComputedStyle(el).borderRadius) }], FECHAR_MS),
+        animar(clone, [{ transform: deslocar(para, de) }, { transform: 'none' }], FECHAR_MS),
+        animar(clone, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1, offset: 0.8 }, { opacity: 1, offset: 1 }], FECHAR_MS, 'linear'),
+        corpo && animar(corpo, [{ transform: 'none' }, { transform: encolher(para, de) }], FECHAR_MS),
+        corpo && animar(corpo, [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0, offset: 0.7 }, { opacity: 0, offset: 1 }], FECHAR_MS, 'linear'),
         fadeFundo(1, 0, FECHAR_MS),
       )
     }
