@@ -116,15 +116,18 @@ Sem mudança de API, só testes e, se precisar, correção:
 
 ## Adoção no shell (depois do PR do DS)
 
-1. Atualizar `@betinhos/ui`.
-2. Nas 8 telas do `VirtualTable`, trocar por `<Table virtual stickyScrollbar loadingContent={<BrandLoader …/>} view={{ …, fit: true }} />`. Fazer em lotes: OPs e Pagantes primeiro, depois Despesas, Transações e Pessoas, e por fim Funcionários e Frota.
-3. Nas 7 telas do `LoadingTable`, trocar por `<Table loadingContent=…>`. Ligar `fit` e `stickyScrollbar` nelas também, porque hoje não encolhem e passam a ficar iguais às outras.
-4. Apagar `VirtualTable`, `LoadingTable`, `comLoaderDaMarca`, `fitTemplate`, `BarraHorizontal` e `virtual.css`. O `useVirtualRows` fica até a Geral e a Composição pararem de usá-lo.
-5. Conferir cada lote no navegador (mock e DEV):
-   - 1280 px, 1100 px e 800 px de largura;
-   - lista com mais de 100 linhas;
-   - colunas fixas, redimensionar e a barra do pé;
-   - Despesas com colunas a mais, que é o caso da barra.
+1. Atualizar `@betinhos/ui` para a 3.7.0.
+2. As 15 telas (8 do `VirtualTable`, 7 do `LoadingTable`) passam a usar `app/ListTable.tsx`. É um adaptador de poucas linhas que só liga os padrões das listas no `Table` do DS: `virtual`, `stickyScrollbar`, `loadingContent` com o `BrandLoader` e `view.fit`. Todo o comportamento fica no DS. As 7 telas do `LoadingTable` passam a encolher as colunas e a ter a barra no pé, como as outras.
+3. Apagados `VirtualTable`, `LoadingTable`, `comLoaderDaMarca`, `fitTemplate`, `BarraHorizontal` e `virtual.css`. O `useVirtualRows` foi para `app/useVirtualRows.ts` e fica até a Geral e a Composição pararem de usá-lo.
+4. Conferido no mock (pacote do DS aplicado localmente):
+   - 1440 px e 1000 px nas 17 telas que abrem com tabela. As 8 telas do antigo `VirtualTable` dão as mesmas larguras de antes. As 7 do antigo `LoadingTable` passam a encolher (ex.: Pendências a 1000 px passa de 886 px de sobra para 366).
+   - `?volume=5000`: cerca de 38 linhas no DOM entre espaçadores.
+   - Coluna fixa com rolagem horizontal pela barra do pé.
+
+Três defeitos do DS apareceram nessa adoção e foram corrigidos no mesmo PR do DS (#68):
+- **`virtual` com `view` e sem `stickyHeader`** desenhava a lista inteira: o `overflow-x: auto` da área faz o `overflow-y` calculado virar `auto`.
+- **A tabela com `overflow: clip`** perdia o mínimo zero como item de grid. A Treinamentos esticava.
+- **O preenchimento da barra** entrava na largura de conteúdo da tabela e criava um laço de largura.
 
 ## Fora do escopo
 
