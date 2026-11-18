@@ -24,17 +24,22 @@ test('lê a Custom API cr40f_MultasDoDia e só envia com itens', () => {
 
 test('seções na ordem da spec, cada linha com auto, placa, responsável, prazo, passo e link da multa', () => {
   const corpo = tem.actions.Corpo.inputs
-  const ordem = ['1. Prazo vencido: responda', '2. Indicar em até 7 dias', '3. Aceite pendente na CNH Digital', '4. Pagar com 40% em até 5 dias', '5. Aguardando acerto']
+  const ordem = ['1. Prazo vencido: responda', '2. Contestadas pelo motorista', '3. Indicar em até 7 dias', '4. Aceite pendente na CNH Digital', '5. Pagar com 40% em até 5 dias', '6. Aguardando acerto']
   const posicoes = ordem.map((t) => corpo.indexOf(t))
   assert.ok(posicoes.every((p) => p >= 0), 'todas as seções no corpo')
   assert.deepEqual([...posicoes].sort((a, b) => a - b), posicoes)
-  for (const lista of ['Linhas_prazo', 'Linhas_indicar', 'Linhas_aceite', 'Linhas_pagar']) {
+  for (const lista of ['Linhas_prazo', 'Linhas_contestadas', 'Linhas_indicar', 'Linhas_aceite', 'Linhas_pagar']) {
     const sel = tem.actions[lista].inputs.select
     for (const campo of ["item()?['auto']", "item()?['placa']", "item()?['responsavel']", "item()?['prazo']", "item()?['passo']", '#/frota-multas?registro=multa:']) assert.ok(sel.includes(campo), `${lista}: ${campo}`)
     assert.match(sel, /if\(empty\(item\(\)\?\['prazo'\]\), '—', formatDateTime\(item\(\)\?\['prazo'\], 'dd\/MM\/yyyy'\)\)/, `${lista}: prazo sem guarda de vazio`)
     for (const campo of ['auto', 'placa', 'responsavel', 'passo']) assert.match(sel, new RegExp(`coalesce\\(item\\(\\)\\?\\['${campo}'\\]`), `${lista}: ${campo} sem coalesce`)
   }
   assert.match(corpo, /#\/frota-multas\?status=202410006/)
+})
+
+test('aceite marca " · motorista declarou" quando o motorista declarou pelo app', () => {
+  assert.ok(tem.actions.Linhas_aceite.inputs.select.includes("equals(item()?['declarado'], true), ' · motorista declarou'"))
+  assert.equal(tem.actions.Linhas_contestadas.inputs.from, "@outputs('Dados')?['contestadas']")
 })
 
 test('um e-mail para cada funcionário ativo com cr40f_recebeemailmultas, pela noreply', () => {

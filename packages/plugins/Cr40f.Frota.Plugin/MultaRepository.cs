@@ -113,8 +113,15 @@ public sealed class MultaResumo
         Auto = e.GetAttributeValue<string>("cr40f_novacoluna") ?? "sem número",
         Placa = e.GetAttributeValue<EntityReference>("cr40f_placa")?.Name,
         Motorista = e.GetAttributeValue<EntityReference>("cr40f_motorista")?.Name,
-        Estado = MultaMapper.Estado(e),
+        Estado = ComTermo(MultaMapper.Estado(e), e),
     };
+
+    private static MultaEstado ComTermo(MultaEstado estado, Entity e)
+    {
+        var status = (e.GetAttributeValue<AliasedValue>("tv.new_status")?.Value as OptionSetValue)?.Value;
+        if (status != null) estado.TermoPendente = status == MultaMapper.TermoPendente;
+        return estado;
+    }
 }
 
 public sealed class MultaRepository
@@ -128,6 +135,10 @@ public sealed class MultaRepository
         var q = new QueryExpression(MultaMapper.Tabela) { ColumnSet = new ColumnSet(MultaMapper.Colunas), PageInfo = new PagingInfo { Count = 5000, PageNumber = 1 } };
         q.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
         q.Criteria.AddCondition("cr40f_status", ConditionOperator.In, MultaCodigos.Identificar, MultaCodigos.Indicar, MultaCodigos.Pagar, MultaCodigos.Acertar);
+        // Termo vigente (se houver) para saber se está pendente: "Aguardando o motorista assinar o termo".
+        var tv = q.AddLink(MultaMapper.Termo, "new_termovigente", "new_termomultaid", JoinOperator.LeftOuter);
+        tv.EntityAlias = "tv";
+        tv.Columns = new ColumnSet("new_status");
         return Paginas.Todas(_service, q).Select(MultaResumo.De).ToList();
     }
 }

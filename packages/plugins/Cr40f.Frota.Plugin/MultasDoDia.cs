@@ -14,6 +14,7 @@ public sealed class LinhaMultaDia
     [DataMember(Name = "responsavel", Order = 4)] public string Responsavel { get; set; } = "";
     [DataMember(Name = "prazo", Order = 5)] public string? Prazo { get; set; }
     [DataMember(Name = "passo", Order = 6)] public string Passo { get; set; } = "";
+    [DataMember(Name = "declarado")] public bool Declarado { get; set; }
 }
 
 [DataContract]
@@ -26,6 +27,7 @@ public sealed class MultasDoDiaResultado
     [DataMember(Name = "aceite", Order = 5)] public List<LinhaMultaDia> Aceite { get; set; } = new();
     [DataMember(Name = "pagar", Order = 6)] public List<LinhaMultaDia> Pagar { get; set; } = new();
     [DataMember(Name = "aguardandoAcerto", Order = 7)] public int AguardandoAcerto { get; set; }
+    [DataMember(Name = "contestadas", Order = 9)] public List<LinhaMultaDia> Contestadas { get; set; } = new();
 }
 
 /// <summary>Seções do e-mail "Multas de hoje" (spec §6), com as regras de MultaEtapas. Cada multa entra numa seção só. Etapas 1 e 2 sem prazo informado ficam no fim de "Indicar".
@@ -41,6 +43,7 @@ public static class MultasDoDia
             var s = MultaEtapas.Avaliar(e, hoje);
             var prazoPassado = e.DataParaIndicar != null && string.CompareOrdinal(e.DataParaIndicar, hoje) < 0;
             if (s.PrazoVencido) r.PrazoVencido.Add(Linha(m, s, prazoPassado));
+            else if (s.Etapa == MultaEtapas.Identificar && e.ContestadaEm != null) r.Contestadas.Add(Linha(m, s, prazoPassado));
             else if (s.Etapa == MultaEtapas.Indicar && MultaEtapas.AceitePendente(e) && (prazoPassado || Regras.Dias(e.DataIndicacao!, hoje) >= 2))
                 r.Aceite.Add(Linha(m, s, prazoPassado));
             else if ((s.Etapa == MultaEtapas.Identificar || s.Etapa == MultaEtapas.Indicar) && (e.DataParaIndicar == null || Regras.Dias(hoje, e.DataParaIndicar) <= 7))
@@ -49,14 +52,18 @@ public static class MultasDoDia
                 r.Pagar.Add(Linha(m, s, prazoPassado));
             else if (s.Etapa == MultaEtapas.Acertar && !s.Descontando) r.AguardandoAcerto++; // descontando em folha: nada para a Frota fazer
         }
-        foreach (var lista in new[] { r.PrazoVencido, r.Indicar, r.Aceite, r.Pagar })
-            lista.Sort((a, b) =>
-            {
-                var c = string.CompareOrdinal(a.Prazo ?? "9999", b.Prazo ?? "9999");
-                return c != 0 ? c : string.CompareOrdinal(a.Auto, b.Auto);
-            });
-        r.Total = r.PrazoVencido.Count + r.Indicar.Count + r.Aceite.Count + r.Pagar.Count + r.AguardandoAcerto;
+        foreach (var lista in new[] { r.PrazoVencido, r.Contestadas, r.Indicar, r.Pagar })
+            lista.Sort(Ordem);
+        // Aceite que o motorista declarou pelo app sobe para o topo: só falta conferir na CNH Digital.
+        r.Aceite.Sort((a, b) => a.Declarado != b.Declarado ? (a.Declarado ? -1 : 1) : Ordem(a, b));
+        r.Total = r.PrazoVencido.Count + r.Contestadas.Count + r.Indicar.Count + r.Aceite.Count + r.Pagar.Count + r.AguardandoAcerto;
         return r;
+    }
+
+    private static int Ordem(LinhaMultaDia a, LinhaMultaDia b)
+    {
+        var c = string.CompareOrdinal(a.Prazo ?? "9999", b.Prazo ?? "9999");
+        return c != 0 ? c : string.CompareOrdinal(a.Auto, b.Auto);
     }
 
     private static LinhaMultaDia Linha(MultaResumo m, MultaSituacao s, bool prazoPassado) => new()
@@ -67,6 +74,7 @@ public static class MultasDoDia
         Responsavel = MultaEtapas.ResponsavelEfetivo(m.Estado) == MultaCodigos.Empresa ? "Empresa" : m.Motorista ?? "Sem responsável",
         Prazo = s.ProximoPrazo,
         Passo = PassoDaLinha(s, prazoPassado),
+        Declarado = m.Estado.AceiteDeclaradoEm != null,
     };
 
     /// <summary>Nunca deixa a linha sem passo (multa na etapa sem pendência) nem esconde a falta do prazo.</summary>
