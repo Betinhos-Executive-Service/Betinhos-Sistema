@@ -84,7 +84,7 @@ describe('DespesasTab', () => {
   it('despesas indisponíveis: KPIs com o valor s/dado (sem "—") e os cinco blocos com s/dado e o motivo', () => {
     render(<DespesasComEstado dados={dadosDespesas({ indisponiveis: ['despesas'] })} />)
     for (const r of ['Despesa realizada', 'Média hospedagem']) {
-      expect(within(screen.getByRole('article', { name: r })).getByText('s/dado').className).toContain('dash-kpi__valor--semdado')
+      expect(within(screen.getByRole('article', { name: r })).getByText('s/dado').className).toContain('bt-stat__value--empty')
       expect(kpi(r)).not.toContain('—')
     }
     expect(screen.getAllByText(/tabela de despesas não respondeu/)).toHaveLength(5)

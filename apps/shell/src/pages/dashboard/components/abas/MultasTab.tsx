@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { TableColumn } from '@betinhos/ui'
+import { StatCard, type TableColumn } from '@betinhos/ui'
 import { Tabela } from '../Tabela'
 import { useMedia } from '../../../operacional/useMedia'
 import { BarraChart } from '../../charts/Charts'
@@ -11,8 +11,8 @@ import { tabelaCopia } from '../Copiar'
 import { AbaCarregando } from '../Carregando'
 import { Participacao, pct } from '../Celulas'
 import { SemDadoBloco, Vazio, naoRespondeu } from '../Estados'
-import { KpiCard, KpiLinha, tomAtencao } from '../KpiCard'
-import { ChipAnt } from '../KpiChip'
+import { extrasKpi } from '../KpiExtras'
+import { KpiLinha, tomAtencao } from '../KpiLinha'
 import { MEDIA_MOBILE, juntar } from '../Linhas'
 import type { DadosAba, PropsAba } from './abas'
 import { forte, resto } from './MoMaMuComum'
@@ -34,15 +34,16 @@ function MultasAba({ ctx, dados, periodo }: DadosAba) {
   const mu = useMemo(() => calcularMultas(ctx, dados), [ctx, dados])
   const k = mu.kpis
   const abrir = useDetalhe()
-  const verPendentes = abrir && k?.pendentes ? { onAbrir: () => abrir('multas') } : undefined
+  const verPendentes = abrir && k?.pendentes ? () => abrir('multas') : undefined
   const parte = (n: number) => (k && k.total ? [{ rotulo: 'Do total', texto: pct((n / k.total) * 100) }] : [])
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={3}>
-      <KpiCard rotulo={KPIS[0]} valor={k ? int(k.total) : null}>{mu.ant ? <ChipAnt chip={mu.ant.total} /> : undefined}</KpiCard>
-      <KpiCard rotulo={KPIS[1]} tom={tomAtencao(k?.pendentes)} valor={k ? int(k.pendentes) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Identificar o responsável', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : []} acao={verPendentes}>
-        {mu.ant ? <ChipAnt chip={mu.ant.pendentes} /> : undefined}
-      </KpiCard>
-      <KpiCard rotulo={KPIS[2]} valor={k ? int(k.resolvidas) : null} apoio={k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : []} />
+      <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [mu.ant?.total] })} />
+      <StatCard
+        label={KPIS[1]} {...tomAtencao(k?.pendentes)} value={k ? int(k.pendentes) : null} onOpen={verPendentes}
+        {...extrasKpi({ chips: [mu.ant?.pendentes], apoio: k ? [{ rotulo: 'Status', texto: 'Identificar o responsável', atencao: k.pendentes > 0 }, ...parte(k.pendentes)] : [] })}
+      />
+      <StatCard label={KPIS[2]} value={k ? int(k.resolvidas) : null} {...extrasKpi({ apoio: k ? [{ rotulo: 'Status', texto: 'Encerrada, Descontado ou Cancelada' }, ...parte(k.resolvidas)] : [] })} />
     </KpiLinha>
     {k == null ? (
       <div className="dash-grade">
