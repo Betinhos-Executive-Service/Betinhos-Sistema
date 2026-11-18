@@ -34,6 +34,8 @@ const SEARCH_FIELDS: { table: string; attribute: string; via: string[] }[] = [
 const CHOICE_TYPES = new Set(['Picklist', 'State', 'Status'])
 const TEXT_TYPES = new Set(['String', 'Memo'])
 const INTEGER_TYPES = new Set(['Integer', 'BigInt'])
+/** Colunas calculadas: o `eq` nelas custa ~1,5 s em 9 mil composições (medido no DEV em 18/11/2026), contra 0,3 s sem elas. */
+const CALCULATED = new Set(['new_valortotal', 'new_subtotal'])
 
 const viaOf = (field: CatalogField) => (field.relationships ?? []).map((item) => item.to).join('/')
 
@@ -53,7 +55,7 @@ export function compositionKeywordFilter(document: Document, tokens: string[], f
     const entity = aliasOf(field)
     const base = { attribute: field.attribute, ...(entity ? { entity } : {}) }
     if (TEXT_TYPES.has(field.type)) specs.push({ ...base, kind: 'text' })
-    else if (field.type === 'Money') specs.push({ ...base, kind: 'money' })
+    else if (field.type === 'Money') specs.push({ ...base, kind: 'money', formattedOnly: !entity && CALCULATED.has(field.attribute) })
     else if (INTEGER_TYPES.has(field.type)) specs.push({ ...base, kind: 'integer' })
     else if (CHOICE_TYPES.has(field.type)) {
       const options = loadedChoiceOptions(field)

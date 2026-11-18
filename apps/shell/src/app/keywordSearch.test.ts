@@ -66,6 +66,13 @@ describe('keywordFilter', () => {
     expect(filterOf(['embraer'], fields)!.querySelector('condition[attribute="new_valortotal"]')).toBeNull()
   })
 
+  it('formattedOnly: dinheiro só com vírgula ou ponto', () => {
+    const calculated = [{ kind: 'money' as const, attribute: 'new_valortotal', formattedOnly: true }]
+    expect(filterOf(['11477'], calculated)).toBeNull()
+    expect(filterOf(['150,00'], calculated)!.querySelector('condition')?.getAttribute('value')).toBe('150.00')
+    expect(filterOf(['2.300'], calculated)!.querySelector('condition')?.getAttribute('value')).toBe('2300')
+  })
+
   it('sem campos possíveis devolve null', () => {
     expect(filterOf(['embraer'], [])).toBeNull()
   })

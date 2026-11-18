@@ -36,14 +36,19 @@ export function moneyToken(token: string): string | null {
 export const integerToken = (token: string) => /^\d{1,9}$/.test(token) ? token : null
 
 export type KeywordField = { attribute: string; entity?: string } & (
-  | { kind: 'text' | 'money' | 'integer' }
+  | { kind: 'text' | 'integer' }
+  /** `formattedOnly`: só palavra com `,` ou `.` ("150,00"); para coluna calculada, que o Dataverse recalcula linha a linha. */
+  | { kind: 'money'; formattedOnly?: boolean }
   | { kind: 'choice'; options: { value: string | number; label: string }[] }
 )
 
 function conditions(token: string, field: KeywordField): { operator: string; value?: string; values?: string[] } | null {
   switch (field.kind) {
     case 'text': return { operator: 'like', value: `%${escapeLike(token)}%` }
-    case 'money': { const value = moneyToken(token); return value === null ? null : { operator: 'eq', value } }
+    case 'money': {
+      const value = field.formattedOnly && !/[.,]/.test(token) ? null : moneyToken(token)
+      return value === null ? null : { operator: 'eq', value }
+    }
     case 'integer': { const value = integerToken(token); return value === null ? null : { operator: 'eq', value } }
     case 'choice': {
       const values = field.options.filter((option) => fold(option.label).includes(fold(token))).map((option) => String(option.value))
