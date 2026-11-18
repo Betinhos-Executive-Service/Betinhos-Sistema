@@ -96,7 +96,8 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       return
     }
 
-    const sair = () => { if (v.seq === seq) { encerrar(); onSaiu() } }
+    // Esconde antes de cancelar: sem o fill das animações, o painel inteiro piscaria por um quadro até desmontar.
+    const sair = () => { if (v.seq === seq) { r.style.visibility = 'hidden'; encerrar(); onSaiu() } }
     // Fechar no meio da abertura: volta de onde está (reverse), sem reiniciar.
     if (v.anims.some((a) => a.playState === 'running')) {
       v.anims.forEach((a) => a.reverse())
@@ -121,9 +122,9 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       guardar(
         animar(p, [{ clipPath: `inset(0px 0px 0px 0px round ${getComputedStyle(p).borderRadius})` }, { clipPath: recorte(para, de, getComputedStyle(el).borderRadius) }], FECHAR_MS),
         animar(clone, [{ transform: deslocar(para, de) }, { transform: 'none' }], FECHAR_MS),
-        animar(clone, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.4 }, { opacity: 1, offset: 0.8 }, { opacity: 1, offset: 1 }], FECHAR_MS, 'linear'),
+        animar(clone, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.25 }, { opacity: 1, offset: 0.55 }, { opacity: 1, offset: 1 }], FECHAR_MS, 'linear'),
         corpo && animar(corpo, [{ transform: 'none' }, { transform: encolher(para, de) }], FECHAR_MS),
-        corpo && animar(corpo, [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0, offset: 0.7 }, { opacity: 0, offset: 1 }], FECHAR_MS, 'linear'),
+        corpo && animar(corpo, [{ opacity: 1, offset: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 0, offset: 0.4 }, { opacity: 0, offset: 1 }], FECHAR_MS, 'linear'),
         fadeFundo(1, 0, FECHAR_MS),
       )
     }
