@@ -9,7 +9,7 @@ it('linha de comando do DS: seleção mostra Gerar OP e Excluir, ✕ limpa e Aud
   const toolbar = await screen.findByRole('toolbar', { name: 'Comandos da composição de preços' })
   await screen.findByRole('checkbox', { name: 'Selecionar Aurora Logística' })
   expect(within(toolbar).getByRole('button', { name: /^Visão: Todas as composições/ })).toBeTruthy()
-  expect(within(toolbar).getByRole('searchbox', { name: 'Buscar cliente ou trajeto' })).toBeTruthy()
+  expect(within(toolbar).getByRole('searchbox', { name: 'Buscar OS, cliente, passageiro, placa…' })).toBeTruthy()
   expect(within(toolbar).getByRole('button', { name: 'Atualizar' })).toBeTruthy()
   expect(within(toolbar).getByText('18 registros')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Gerar OP' })).toBeNull()

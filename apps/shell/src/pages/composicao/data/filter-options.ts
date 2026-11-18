@@ -29,6 +29,9 @@ async function entityInfo(table: string): Promise<EntityInfo> {
 }
 
 const choiceCache = new Map<string, Promise<FilterOption[]>>()
+/** Opções já lidas, para quem precisa delas sem esperar (a busca por palavras compara a palavra com os rótulos). */
+const loadedChoices = new Map<string, FilterOption[]>()
+export const loadedChoiceOptions = (field: Pick<CatalogField, 'table' | 'attribute'>) => loadedChoices.get(`${field.table}:${field.attribute}`)
 
 async function choiceOptions(field: CatalogField): Promise<FilterOption[]> {
   const kind = field.type === 'Status' ? 'Status' : field.type === 'State' ? 'State' : 'Picklist'
@@ -42,7 +45,7 @@ async function choiceOptions(field: CatalogField): Promise<FilterOption[]> {
 export async function searchFilterOptions(field: CatalogField, search: string): Promise<FilterOption[]> {
   if (field.type !== 'Lookup') {
     const key = `${field.table}:${field.attribute}`
-    if (!choiceCache.has(key)) choiceCache.set(key, choiceOptions(field).catch((error) => { choiceCache.delete(key); throw error }))
+    if (!choiceCache.has(key)) choiceCache.set(key, choiceOptions(field).then((loaded) => { loadedChoices.set(key, loaded); return loaded }).catch((error) => { choiceCache.delete(key); throw error }))
     const options = await choiceCache.get(key)!
     return options.filter((item) => item.label.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')))
   }
@@ -77,4 +80,9 @@ export async function resolveFilterOption(field: CatalogField, value: string): P
     } catch { /* O GUID pode pertencer a outro destino de lookup. */ }
   }
   return undefined
+}
+
+/** Lê as opções dos campos de escolha para a busca; falha de um campo o deixa fora da busca, sem quebrar os outros. */
+export async function preloadChoiceOptions(fields: CatalogField[]) {
+  await Promise.all(fields.map((field) => searchFilterOptions(field, '').catch(() => [])))
 }

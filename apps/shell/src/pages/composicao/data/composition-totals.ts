@@ -1,9 +1,19 @@
 import type { CompositionTotalRow } from './dataverse'
-import { moneyFields, type MoneyField } from './compositions'
+import { moneyFields, type Composition, type MoneyField } from './compositions'
+import { matchesKeywords, moneyToken } from '../../../app/keywordSearch'
 import { decimal, decimalString } from '../formula'
 
-export function matchesCompositionFilters(row: CompositionTotalRow, searchTerm: string, columnFilters: Record<string, string>) {
-  if (searchTerm && !`${row.client} ${row.route}`.toLocaleLowerCase('pt-BR').includes(searchTerm)) return false
+/** Busca do modo local: os mesmos tokens do servidor sobre os campos que o mock tem (texto, status e dinheiro por valor exato). */
+function matchesSearch(row: CompositionTotalRow & Partial<Pick<Composition, 'departureAddress' | 'destination' | 'status'>>, tokens: string[]) {
+  const money = Object.values(row.values)
+  return tokens.every((token) => {
+    const amount = moneyToken(token)
+    return matchesKeywords([token], [row.client, row.route, row.departureAddress ?? '', row.destination ?? '', row.status ?? '']) || amount !== null && money.some((value) => Number(value) === Number(amount))
+  })
+}
+
+export function matchesCompositionFilters(row: CompositionTotalRow & Partial<Pick<Composition, 'departureAddress' | 'destination' | 'status'>>, searchTokens: string[], columnFilters: Record<string, string>) {
+  if (searchTokens.length && !matchesSearch(row, searchTokens)) return false
   return Object.entries(columnFilters).every(([id, value]) => String(
     id === 'client' ? row.client : id === 'route' ? row.route : id === 'date' ? row.departureAt : row.values[id as MoneyField],
   ) === value)
