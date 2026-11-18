@@ -61,7 +61,7 @@ function ManutencoesAba({ ctx, dados, periodo }: DadosAba) {
   return <>
     <KpiLinha rotulo={ROTULO_KPIS} colunas={5}>
       <StatCard label={KPIS[0]} value={k ? int(k.total) : null} {...extrasKpi({ chips: [ma.ant?.total] })} />
-      <StatCard label={KPIS[1]} value={k ? brl(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
+      <StatCard label={KPIS[1]} value={k ? brlS(k.custoTotal) : null} {...extrasKpi({ chips: [ma.ant?.custoTotal], apoio: k ? [{ rotulo: '% da receita', texto: pct(k.pctReceita) }] : [] })} />
       <StatCard label={KPIS[2]} {...tomAtencao(k?.emAndamento)} value={k ? int(k.emAndamento) : null} {...extrasKpi({ apoio: k ? 'solicitadas, agendadas ou programadas' : undefined })} />
       <StatCard label={KPIS[3]} value={k ? brl(k.custoMedio) : null} />
       <StatCard label={KPIS[4]} value={prazo ? diasTexto(prazo.medio) : null} {...extrasKpi({ apoio: apoioPrazo })} />

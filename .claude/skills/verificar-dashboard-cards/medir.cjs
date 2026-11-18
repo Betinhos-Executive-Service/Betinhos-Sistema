@@ -12,9 +12,9 @@ const LARGURAS = [1440, 840, 390]
 const KPI = '.bt-stat, .dash-kpi'
 const VALOR = '.bt-stat__value, .dash-kpi__valor'
 const ALERTA = '.bt-alert-card, .dash-alerta'
-// 162 px vale para o card sem extras (conferido em verificar-stat-card do DS); com apoio em 2 linhas ou extras o card cresce
+// 167 px vale para o card sem extras (valor de 26 px, DS 3.1.1); com apoio em 2 linhas ou extras o card cresce
 // (decisão do Renan, 17/11/2026). O teto pega fileira estourada por quebra inesperada.
-const TETO_KPI = 180
+const TETO_KPI = 190
 
 ;(async () => {
   fs.mkdirSync(saida, { recursive: true })

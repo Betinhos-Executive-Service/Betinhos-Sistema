@@ -139,7 +139,7 @@ describe('ManutencoesTab', () => {
   it('mostra os cinco KPIs com % da receita e prazo médio', () => {
     semAvisoDeGrafico(() => render(<ManutencoesTab {...props(dados())} />))
     expect(within(kpi('Manutenções')).getByText('2')).toBeTruthy()
-    expect(within(kpi('Custo total')).getByText(/1\.500,00/)).toBeTruthy()
+    expect(within(kpi('Custo total')).getByText(/1,5k/)).toBeTruthy()
     expect(within(kpi('Custo total')).getByText('15,0%')).toBeTruthy()
     expect(within(kpi('Em andamento')).getByText('1')).toBeTruthy()
     expect(within(kpi('Em andamento')).getByText('solicitadas, agendadas ou programadas')).toBeTruthy()

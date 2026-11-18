@@ -73,9 +73,8 @@
 .dash-chip__icone { flex: 0 0 auto; margin-right: calc(-1 * var(--bt-space-0-5)); }
 
 .dash-apoio { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); line-height: var(--bt-typography-body-small-line-height); }
-.dash-comp { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
-/* Os extras do StatCard são grade: sem isto o selo (faixa da hospedagem) esticaria pela largura do card. */
-.bt-stat__extras > .bt-badge { justify-self: start; }
+.dash-kpi-extras { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.dash-kpi-extras > .dash-apoio { flex-basis: 100%; }
 .dash-apoio__rotulo { font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
 .dash-apoio--atencao, .dash-apoio--atencao .dash-apoio__rotulo { color: var(--bt-color-warning); }
 .dash-apoio__icone { vertical-align: -2px; margin-right: var(--bt-space-1); }
