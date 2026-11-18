@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Button, Field, Input, Textarea } from '@betinhos/ui'
-import type { DataSource, FlowResult } from '../data/source'
+import type { DataSource } from '../data/source'
 import type { Kind } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { applyTransition, bloqueio, StaleError, transitionsFor, validate, type FieldSpec, type RegistroStatus, type Transition } from '../domain/transitions'
@@ -12,9 +12,9 @@ type Props = {
   source: DataSource
   kind: Kind
   record: RegistroStatus
-  /** Só em sucesso: resultado do Flow, ou null em transição direta. */
-  onDone: (result: FlowResult | null) => void
-  /** Registro desatualizado ou Flow que falhou: a tela precisa mostrar o estado real. */
+  /** Só em sucesso. */
+  onDone: () => void
+  /** Registro desatualizado: a tela precisa mostrar o estado real. */
   onReload: () => void
 }
 
@@ -43,15 +43,13 @@ export function StatusPanel({ source, kind, record, onDone, onReload }: Props) {
     busy.current = true
     setSaving(true)
     try {
-      const result = await applyTransition(source, kind, record, active, values)
-      notify('success', result?.message ?? `${active.label}: concluído.`)
+      await applyTransition(source, kind, record, active, values)
+      notify('success', `${active.label}: concluído.`)
       setActive(null)
-      onDone(result)
+      onDone()
     } catch (reason) {
       notify('error', errorMessage(reason))
-      // Depois de falha em Flow o resultado pode ser incerto: volta à lista para exigir nova escolha deliberada.
-      if (active.flow) setActive(null)
-      if (reason instanceof StaleError || active.flow) onReload()
+      if (reason instanceof StaleError) onReload()
     } finally {
       busy.current = false
       setSaving(false)
@@ -90,9 +88,8 @@ export function StatusPanel({ source, kind, record, onDone, onReload }: Props) {
           })}
         </div>
       )}
-      {active.flow && <p className="frota-muted">Esta ação dispara o Flow "{active.label}" e pode levar até um minuto.</p>}
       <div className="frota-cluster">
-        <Button type="submit" variant={active.danger ? 'danger' : 'primary'} loading={saving}>{saving && active.flow ? 'Aguardando o Flow…' : 'Confirmar'}</Button>
+        <Button type="submit" variant={active.danger ? 'danger' : 'primary'} loading={saving}>Confirmar</Button>
         <Button variant="secondary" disabled={saving} onClick={() => setActive(null)}>Voltar</Button>
       </div>
     </form>

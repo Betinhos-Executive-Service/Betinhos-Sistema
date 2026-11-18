@@ -1,10 +1,10 @@
 // apps/shell/src/pages/frota/domain/transitions.test.ts
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { COLISAO, MANUT, MULTA } from '../data/schema'
-import type { DataSource, FlowResult } from '../data/source'
+import type { DataSource } from '../data/source'
 import { EMPTY_DATA } from '../data/source'
 import { manutencaoFalsa } from '../testUtils'
-import { acoesManutencao, applyTransition, bloqueio, buildPatch, desfechoDaAcao, executarAcaoManutencao, liberarFlows, rotuloAcao, StaleError, transitionsFor, validate, type RegistroStatus, type Transition } from './transitions'
+import { acoesManutencao, applyTransition, bloqueio, buildPatch, desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError, transitionsFor, validate, type RegistroStatus, type Transition } from './transitions'
 
 const ctx = { now: new Date('2026-10-02T15:00:00Z'), dateBehaviors: { cr40f_prazo: 'DateOnly' } as const }
 const ids = (kind: Parameters<typeof transitionsFor>[0], status: number | null) => transitionsFor(kind, status).map((item) => item.id)
@@ -30,8 +30,6 @@ function fakeSource(current: number | null) {
     currentStatus: vi.fn(async () => current),
     dateBehaviors: async () => ({}),
     update: vi.fn(async () => {}),
-    prepareFlow: vi.fn(async () => {}),
-    runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: 'ok', shareUrl: null })),
     openForm: async () => {},
     fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank', enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [],
   } satisfies DataSource
@@ -51,14 +49,6 @@ describe('transitionsFor', () => {
     expect(ids('colisao', COLISAO.ENVIADO)).toEqual(['analisar', 'cancelar'])
     expect(ids('colisao', COLISAO.ANALISE)).toEqual(['resolver', 'cancelar'])
     expect(ids('colisao', COLISAO.RESOLVIDO)).toEqual([])
-  })
-
-  it('nenhuma transição chama Flow: a multa anda pelo passo a passo e a manutenção pelas Custom APIs', () => {
-    for (const kind of ['manutencao', 'multa', 'colisao'] as const) {
-      for (const status of [...Object.values(MANUT), ...Object.values(MULTA), ...Object.values(COLISAO)]) {
-        for (const transition of transitionsFor(kind, status)) expect(transition.flow).toBeUndefined()
-      }
-    }
   })
 })
 
@@ -99,23 +89,16 @@ describe('validate', () => {
 })
 
 describe('applyTransition', () => {
-  beforeEach(() => liberarFlows())
-
-  it('transição direta relê o status, grava e não chama Flow', async () => {
+  it('transição direta relê o status e grava', async () => {
     const source = fakeSource(COLISAO.ENVIADO)
-    const result = await applyTransition(source, 'colisao', registro(COLISAO.ENVIADO), pick('colisao', COLISAO.ENVIADO, 'analisar'), {})
-    expect(result).toBeNull()
+    await applyTransition(source, 'colisao', registro(COLISAO.ENVIADO), pick('colisao', COLISAO.ENVIADO, 'analisar'), {})
     expect(source.update).toHaveBeenCalledWith('colisao', 'r1', { cr40f_statusoperacional: COLISAO.ANALISE })
-    expect(source.prepareFlow).not.toHaveBeenCalled()
-    expect(source.runFlow).not.toHaveBeenCalled()
   })
 
-  it('registro desatualizado: não grava, não resolve nem chama o Flow', async () => {
+  it('registro desatualizado: não grava', async () => {
     const colisao = fakeSource(COLISAO.RESOLVIDO)
     await expect(applyTransition(colisao, 'colisao', registro(COLISAO.ENVIADO), pick('colisao', COLISAO.ENVIADO, 'cancelar'), {})).rejects.toBeInstanceOf(StaleError)
     expect(colisao.update).not.toHaveBeenCalled()
-    expect(colisao.prepareFlow).not.toHaveBeenCalled()
-    expect(colisao.runFlow).not.toHaveBeenCalled()
   })
 
   it('rejeita transição que não está disponível no status atual, inclusive qualquer uma em manutenção', async () => {

@@ -7,7 +7,7 @@ import { BASELINE, CATEGORIA_DESPESA_TABLE, ENTITY_SET, FORMA_PAGAMENTO, ITEM_PL
 import type { Acordo } from '../domain/termoMulta'
 import { base64ToBlob, callSpFlow, escolherPrincipal, FOTO_MAX_BYTES, fileToBase64, nomeFoto, pastaFotoVeiculo, SP_VARS, toArquivo, type SpKey } from './sharepoint'
 import type { DadosPasso, Passo, Situacao } from '../domain/multaEtapas'
-import { EMPTY_DATA, FlowIncertoError, type ArquivoMulta, type ColunaArquivoMulta, type DataSource, type FlowId, type FlowResult, type ItemPlanoInput, type LoadResult } from './source'
+import { EMPTY_DATA, type ArquivoMulta, type ColunaArquivoMulta, type DataSource, type ItemPlanoInput, type LoadResult } from './source'
 import type { DespesaCombustivel, Dossie, FrotaData, Kind, TableKey, TelemetriaKm } from './types'
 import { ApiError, errorMessage, type XrmHost, type XrmWebApi } from './xrm'
 
@@ -36,19 +36,11 @@ const ORDER: Record<TableKey, string> = {
 
 const PAGE_SIZE = 5000
 
-
-type FlowDef = { envVar: string; body: (id: string) => Record<string, string>; timeoutMs: number; nome: string }
-const FLOWS: Record<FlowId, FlowDef> = {
-}
-
 export function createXrmSource(xrm: XrmHost): DataSource {
   const api = xrm.WebApi as XrmWebApi
   const clientUrl = xrm.Utility?.getGlobalContext().getClientUrl().replace(/\/+$/, '') ?? location.origin
   const apiUrl = `${clientUrl}/api/data/v9.2`
   const behaviorCache = new Map<string, Promise<Behaviors>>()
-  // A URL do Flow tem assinatura: fica só aqui, em memória, e nunca sai em mensagem, log ou retorno.
-  const flowUrls = new Map<FlowId, string>()
-
   /** Chama uma Custom API não vinculada; erro do servidor sai com a mensagem do Dataverse. */
   const customApi = (nome: string, body: Record<string, unknown>, falha: string) => chamarCustomApi(apiUrl, nome, body, falha)
 
@@ -90,16 +82,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
     if (override) return override
     const definitions = await api.retrieveMultipleRecords('environmentvariabledefinition', `?$select=defaultvalue&$filter=schemaname eq '${schemaName}'`)
     return definitions.entities.length > 0 ? ((definitions.entities[0].defaultvalue as string | null) ?? null) : null
-  }
-
-  async function flowUrl(flow: FlowId) {
-    const cached = flowUrls.get(flow)
-    if (cached) return cached
-    const { envVar, nome } = FLOWS[flow]
-    const url = await readEnvVar(envVar)
-    if (!url) throw new Error(`URL do Flow "${nome}" não configurada (variável ${envVar})`)
-    flowUrls.set(flow, url)
-    return url
   }
 
   const envLabel = getDataverseEnvironmentLabel(clientUrl)
@@ -229,39 +211,6 @@ export function createXrmSource(xrm: XrmHost): DataSource {
         if (id) params.set('id', cleanId(id))
         window.open(`${clientUrl}/main.aspx?${params}`, '_blank', 'noopener')
       }
-    },
-
-    async prepareFlow(flow: FlowId) {
-      await flowUrl(flow)
-    },
-
-    async runFlow(flow: FlowId, id: string): Promise<FlowResult> {
-      if (!GUID.test(id)) throw new Error('Identificador inválido')
-      const { body, timeoutMs, nome }: FlowDef = FLOWS[flow]
-      const url = await flowUrl(flow)
-
-      const controller = new AbortController()
-      let timedOut = false
-      const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
-      let response: Response
-      try {
-        response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(id)), signal: controller.signal })
-      } catch {
-        // O erro original pode citar a URL; só a mensagem própria sai daqui.
-        clearTimeout(timer)
-        if (timedOut) throw new FlowIncertoError(`O Flow "${nome}" não respondeu em ${timeoutMs / 1000} s. Confira o registro antes de tentar de novo`)
-        throw new FlowIncertoError(`Não foi possível chamar o Flow "${nome}" (rede ou bloqueio do navegador)`)
-      }
-
-      let payload: Record<string, unknown> = {}
-      try {
-        const parsed: unknown = await response.json()
-        if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>
-      } catch { /* Corpo vazio ou não JSON. */ } finally { clearTimeout(timer) }
-
-      const status = response.status
-      if (status < 200 || status > 299 || status === 207) throw new Error(`O Flow "${nome}" respondeu ${status}. Confira o registro antes de tentar de novo`)
-      return { message: typeof payload.message === 'string' ? payload.message : null, shareUrl: typeof payload.shareUrl === 'string' ? payload.shareUrl : null }
     },
 
     async fotoVeiculo(id: string) {

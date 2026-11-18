@@ -2,9 +2,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { COLISAO } from '../data/schema'
-import { EMPTY_DATA, type DataSource, type FlowResult } from '../data/source'
+import { EMPTY_DATA, type DataSource } from '../data/source'
 import type { Kind } from '../data/types'
-import { liberarFlows, type RegistroStatus } from '../domain/transitions'
+import type { RegistroStatus } from '../domain/transitions'
 import { StatusPanel } from './StatusPanel'
 import { ToastProvider } from '@betinhos/ui'
 import { manutencaoFalsa } from '../testUtils'
@@ -18,8 +18,7 @@ function fakeSource(overrides: Partial<DataSource> = {}): DataSource {
     dateBehaviors: async () => ({}),
     update: vi.fn(async () => {}),
     openForm: async () => {},
-    prepareFlow: vi.fn(async () => {}),
-    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, runFlow: vi.fn(async (): Promise<FlowResult> => ({ message: null, shareUrl: null })), salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank',
+    fotoVeiculo: async () => null, enviarFotoVeiculo: async () => {}, salvarItemPlano: async () => {}, inativarItemPlano: async () => {}, salvarBaseline: async () => {}, temAditivo: async () => false, listarTermos: async () => [], enviarTermoMulta: async () => 't1', cancelarTermoMulta: async () => {}, baixarPdfTermo: async () => ({ nome: 't.pdf', blob: new Blob() }), lembrarTermoMulta: async () => {}, listarParcelasTermo: async () => [], passoMulta: async () => { throw new Error('não usado neste teste') }, dossieMulta: async () => { throw new Error('não usado neste teste') }, enviarArquivoMulta: async () => {}, urlArquivoMulta: () => 'about:blank',
     ...overrides,
   }
 }
@@ -38,10 +37,7 @@ async function confirmar() {
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Confirmar' })) })
 }
 
-afterEach(() => {
-  cleanup()
-  liberarFlows()
-})
+afterEach(cleanup)
 
 describe('StatusPanel', () => {
   it('mostra só as ações permitidas para o status', () => {
@@ -57,16 +53,14 @@ describe('StatusPanel', () => {
     expect(screen.getByText('Sem ações de status para este registro.')).toBeTruthy()
   })
 
-  it('grava a transição direta com o status e avisa a tela com null', async () => {
+  it('grava a transição direta com o status e avisa a tela', async () => {
     const source = fakeSource()
     const { onDone, onReload } = renderPanel(source, COLISAO.ENVIADO)
     fireEvent.click(screen.getByRole('button', { name: 'Colocar em análise' }))
     await confirmar()
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
-    expect(onDone).toHaveBeenCalledWith(null)
     expect(onReload).not.toHaveBeenCalled()
     expect(source.update).toHaveBeenCalledWith('colisao', 'c1', { cr40f_statusoperacional: COLISAO.ANALISE })
-    expect(source.runFlow).not.toHaveBeenCalled()
     expect(await screen.findByText('Colocar em análise: concluído.')).toBeTruthy()
   })
 
