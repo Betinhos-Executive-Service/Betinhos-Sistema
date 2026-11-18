@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { CATEGORIA, COLISAO, MANUT, STATUS_OPTIONS, VEICULO, VEICULO_STATUS, label, type Option } from '../data/schema'
+import { CATEGORIA, COLISAO, GRAU, MANUT, STATUS_OPTIONS, VEICULO, VEICULO_STATUS, label, type Option } from '../data/schema'
 import type { Kind, Veiculo } from '../data/types'
 import type { custoVeiculo } from './indicadores'
 import type { Linha } from './linhas'
@@ -19,7 +19,7 @@ const withQuick = (conditions: FilterCondition[]): TableFilters => ({ ...emptyFi
 
 const configWith = (columns: ViewColumnDef[], sort: ViewSort, filters: TableFilters): ViewConfig => ({
   v: CONFIG_VERSION,
-  columns: columns.map((c) => ({ key: c.key, visible: true })),
+  columns: columns.map((c) => ({ key: c.key, visible: !c.defaultHidden })),
   sort,
   filters: filters as unknown as Record<string, unknown>,
 })
@@ -130,6 +130,7 @@ export const registroColumns = (kind: Kind): ViewColumnDef[] => kind === 'multa'
   : [
     { key: 'descricao', label: 'Descrição' }, { key: 'data', label: 'Data' }, { key: 'veiculo', label: 'Veículo' }, { key: 'pessoa', label: PESSOA[kind] },
     { key: 'extra', label: EXTRA[kind] }, { key: 'status', label: 'Status' },
+    ...(kind === 'manutencao' ? [{ key: 'grau', label: 'Grau', defaultHidden: true }] : []),
   ]
 
 /** Larguras padrão (px) das colunas da multa: em 1280 px Auto, Etapa, Próximo passo e Próximo prazo cabem inteiros, sem rolar. */
@@ -150,6 +151,8 @@ const filaMulta = (valor: string): TableFilters => {
 /** Visão padrão da lista de multas ("Comigo"): o que tem passo a dar. */
 export const MULTA_VISAO_PADRAO = 'Comigo'
 export const MULTA_FILTROS_PADRAO = filaMulta('comigo')
+/** Nome da visão padrão de cada lista, que é o título dela (DS §10.9.1): o nome da tela, nunca "Visão padrão". */
+export const VISAO_PADRAO: Record<Kind, string> = { manutencao: 'Manutenções', multa: MULTA_VISAO_PADRAO, colisao: 'Colisões' }
 
 export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; pessoas: FilterOption[] }): FilterField[] {
   if (kind === 'multa') {
@@ -171,7 +174,10 @@ export function registroFields(kind: Kind, opcoes: { veiculos: FilterOption[]; p
     { key: 'pessoa', label: PESSOA[kind], kind: 'choice', options: opcoes.pessoas },
     { key: 'extra', label: EXTRA[kind], kind: 'text' },
     { key: 'status', label: 'Status', kind: 'choice', options: options(STATUS_OPTIONS[kind]) },
-    ...(kind === 'manutencao' ? [{ key: 'categoria', label: 'Categoria', kind: 'choice' as const, options: options(CATEGORIAS_MANUT), advancedOnly: true }] : []),
+    ...(kind === 'manutencao' ? [
+      { key: 'grau', label: 'Grau', kind: 'choice' as const, options: options(GRAU) },
+      { key: 'categoria', label: 'Categoria', kind: 'choice' as const, options: options(CATEGORIAS_MANUT), advancedOnly: true },
+    ] : []),
   ]
 }
 
@@ -183,6 +189,7 @@ export function readRegistro(l: Linha, key: string): unknown {
     case 'pessoa': return l.pessoa?.id ?? null
     case 'extra': return l.extra
     case 'status': return l.status == null ? null : String(l.status)
+    case 'grau': return l.grau == null ? null : String(l.grau)
     case 'categoria': return l.categorias.map(String)
     case 'proximoPasso': return l.proximoPasso ?? null
     case 'proximoPrazo': return l.proximoPrazo ?? null
@@ -200,6 +207,12 @@ export const matchesRegistroKeyword = (l: Linha, query: string) => {
   return valores.some((valor) => valor.includes(termo))
 }
 
+/**
+ * Valor de ordenação do Grau: o grau manda e, no mesmo grau, o pedido mais antigo vem antes na ordem decrescente
+ * (a visão ordena por uma coluna só). Sem grau fica vazio e vai para o fim.
+ */
+const grauEData = (l: Linha) => (l.grau == null ? null : l.grau * 100_000 - (l.dia ? Date.parse(`${l.dia}T00:00:00Z`) / 86_400_000 : 0))
+
 export function sortRegistros(list: Linha[], kind: Kind, sort: ViewSort | null) {
   if (!sort) return list
   return sortRows(list, (l) => {
@@ -211,6 +224,7 @@ export function sortRegistros(list: Linha[], kind: Kind, sort: ViewSort | null) 
       case 'status': return l.status == null ? null : label(STATUS_OPTIONS[kind], l.status)
       case 'proximoPasso': return l.proximoPasso ?? null
       case 'proximoPrazo': return l.proximoPrazo ?? null
+      case 'grau': return grauEData(l)
       default: return null
     }
   }, sort.dir)
@@ -251,9 +265,9 @@ export function registroBuiltins(kind: Kind): StoredView[] {
   const view = builtin(registroColumns(kind), REGISTRO_SORT)
   const status = (values: number[]) => withQuick([quick('status', 'in', pick(STATUS_OPTIONS[kind], values))])
   if (kind === 'manutencao') {
-    // "A encaixar" (ex-sub-aba): só Solicitado, o pedido mais antigo primeiro (a Solicitada não tem data de realização,
-    // então "Data" é a do pedido). A visão ordena por uma coluna só: o grau não entra na ordenação.
-    const encaixar = builtin(registroColumns(kind), { key: 'data', dir: 'asc' })('encaixar', 'A encaixar', 2, status([MANUT.SOLICITADO]))
+    // "A encaixar" (ex-sub-aba): só Solicitado, o de maior grau primeiro e, no mesmo grau, o pedido mais antigo
+    // (a Solicitada não tem data de realização, então "Data" é a do pedido).
+    const encaixar = builtin(registroColumns(kind), { key: 'grau', dir: 'desc' })('encaixar', 'A encaixar', 2, status([MANUT.SOLICITADO]))
     return [view('abertas', 'Em aberto', 1, status([MANUT.SOLICITADO, MANUT.AGENDADO, MANUT.PROGRAMADO])), encaixar]
   }
   if (kind === 'multa') return [

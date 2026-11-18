@@ -14,12 +14,12 @@ import { useMedia } from '../../operacional/useMedia'
 import { useNotify } from '../components/Toasts'
 import { StatusBadge } from '../components/Ui'
 import { formatBR, todaySP } from '../data/dates'
-import { KIND_LABEL, KIND_TABLE } from '../data/schema'
+import { GRAU, KIND_LABEL, KIND_TABLE, label } from '../data/schema'
 import type { DataSource } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { linhas, type Linha } from '../domain/linhas'
-import { EXTRA, LARGURAS, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, PESSOA, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
+import { EXTRA, LARGURAS, MULTA_FILTROS_PADRAO, PESSOA, VISAO_PADRAO, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
 import { urgenciaDoPrazo } from '../domain/multaEstado'
 import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
@@ -68,7 +68,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     columns,
     defaultSort: REGISTRO_SORT,
     defaultFilters: kind === 'multa' ? MULTA_FILTROS_PADRAO : undefined,
-    defaultName: kind === 'multa' ? MULTA_VISAO_PADRAO : undefined,
+    defaultName: VISAO_PADRAO[kind],
     fields,
     ready: true,
     builtins: () => registroBuiltins(kind),
@@ -132,6 +132,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
         { key: 'pessoa', header: PESSOA[kind], label: PESSOA[kind], sortable: true, defaultWidth: largura('pessoa', 190), hideBelow: 'mobile', cell: (linha) => linha.pessoa?.label || '—' },
         ...(kind === 'multa' ? [] : [{ key: 'extra', header: EXTRA[kind], label: EXTRA[kind], defaultWidth: 160, hideBelow: 'compact' as const, cell: (linha: Linha) => <span className="frota-nowrap">{linha.extra}</span> }]),
         { key: 'status', header: titulo('status'), label: titulo('status'), sortable: true, defaultWidth: largura('status', 160), width: 'minmax(110px, .8fr)', cell: (linha) => <StatusBadge kind={linha.kind} value={linha.status} /> },
+        ...(kind === 'manutencao' ? [{ key: 'grau', header: 'Grau', label: 'Grau', sortable: true, defaultWidth: 110, hideBelow: 'compact' as const, cell: (linha: Linha) => (linha.grau == null ? <span className="frota-muted">—</span> : label(GRAU, linha.grau)) }] : []),
         ...(kind === 'multa' ? [
           { key: 'proximoPasso', header: 'Próximo passo', label: 'Próximo passo', sortable: true, defaultWidth: largura('proximoPasso', 190), width: 'minmax(140px, 1fr)', hideBelow: 'compact' as const, cell: (linha: Linha) => linha.proximoPasso || '—' },
           { key: 'proximoPrazo', header: 'Próximo prazo', label: 'Próximo prazo', sortable: true, defaultWidth: largura('proximoPrazo', 130), width: 'minmax(100px, .7fr)', cell: (linha: Linha) => (linha.proximoPrazo
