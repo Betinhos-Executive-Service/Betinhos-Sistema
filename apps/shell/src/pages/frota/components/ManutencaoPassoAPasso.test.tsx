@@ -47,10 +47,10 @@ describe('ManutencaoPassoAPasso', () => {
     expect(screen.getByRole('heading', { name: 'Quando vai ser?' })).toBeTruthy()
     expect(screen.queryByText('Quem leva e quando sai?')).toBeNull()
     expect(within(screen.getByRole('list', { name: 'Etapas' })).getByText('Agendar').closest('li')?.getAttribute('aria-current')).toBe('step')
-    expect(screen.getByText('há 3 dias')).toBeTruthy()
-    // O título é o da gaveta; o guia não repete placa e descrição.
-    expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
-    expect(screen.getByText('Média · pedido por Motorista Fictício')).toBeTruthy()
+    // Prazo, grau e quem pediu ficam no cabeçalho da gaveta (ManutencaoResumo).
+    expect(screen.queryByText('há 3 dias')).toBeNull()
+    expect(screen.queryByText(/pedido por/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Mais ações' })).toBeNull()
   })
 
   it('Agendar chama a API com o grau escolhido', async () => {
@@ -97,19 +97,10 @@ describe('ManutencaoPassoAPasso', () => {
     expect((screen.getByRole('radio', { name: 'Urgente' }) as HTMLInputElement).checked).toBe(true)
   })
 
-  it('Programado mostra aguardando o App e o ⋯ com Concluir por ele', async () => {
-    const props = montar(programada)
+  it('Programado mostra aguardando o App', async () => {
+    montar(programada)
     expect(screen.getByRole('heading', { name: 'Aguardando o motorista concluir no App' })).toBeTruthy()
     expect(screen.getByText(/Outro Fictício leva o carro em 24\/11\/2026 10:00/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Concluir por ele', hidden: true }))
-    expect(props.onExtra).toHaveBeenCalledWith('concluir')
-  })
-
-  it('o prazo atrasado diz "Atrasada" em texto, não só na cor', () => {
-    montar(m({ ...agendada, janelaInicio: '2026-11-09', janelaFim: '2026-11-15' }))
-    const prazo = screen.getByText('desde 15/11').closest('[data-perigo]')
-    expect(prazo?.textContent).toContain('Atrasada')
   })
 
   it('Realizada mostra a despesa e abre a gaveta dela', () => {
@@ -123,7 +114,6 @@ describe('ManutencaoPassoAPasso', () => {
   it('Reprovada: barra parada, motivo, sem botão nem ⋯', () => {
     montar({ ...base, status: MANUT.REPROVADO, comentarioAprovador: 'Duplicada' })
     expect(screen.getByText('Reprovada: Duplicada')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Mais ações' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Agendar' })).toBeNull()
     expect(within(screen.getByRole('list', { name: 'Etapas' })).getByText('Agendar').closest('li')?.hasAttribute('data-parada')).toBe(true)
   })
@@ -178,5 +168,10 @@ describe('ManutencaoPassoAPasso', () => {
   it('programação ilegível: aviso para reabrir a gaveta', () => {
     montar({ ...agendada, programacao: undefined })
     expect(screen.getByText('Não foi possível ler a programação. Feche e abra a gaveta de novo.')).toBeTruthy()
+  })
+
+  it('Programar não repete a dica da Geral', async () => {
+    montar(agendada)
+    expect(screen.queryByText('Também dá para programar pela linha na Geral.')).toBeNull()
   })
 })
