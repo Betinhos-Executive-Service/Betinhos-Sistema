@@ -1,7 +1,10 @@
 import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { digitsOnly } from '../../../app/format'
 import { sortRows } from '../../../app/listSort'
+import { searchWords } from '../../../app/search'
 import { COMPROVANTES_COLUMN, COMPROVANTES_FIELD } from '../../recebimentos/colunaOp'
 import type { Filters } from './filters'
+import { formatDate, formatMoney } from './messages'
 import { A_RECEBER, STATUS, hasFalha, label, reciboEnviado } from './status'
 import type { ChoiceSet, Contato, Pagante } from './types'
 
@@ -67,16 +70,23 @@ export function readPagante(p: Pagante, key: string): unknown {
   }
 }
 
-/** Busca por palavra-chave (não fica na visão): nome, PAG, OP e o contato da pessoa (telefone, e-mail, cliente). */
-/** Texto em que a busca procura: pagante, PAG, OP e o contato da pessoa (nome, telefone, e-mail, cliente). */
-export const paganteKeywordText = (p: Pagante, contato: Contato | undefined) =>
-  [p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato?.telefone.replace(/\D/g, ''), contato?.email, contato?.cliente].filter(Boolean).join(' ')
+/**
+ * Texto em que a busca procura (não fica na visão): tudo que a lista mostra na forma exibida (valor e data
+ * formatados, forma, pagamento, recibo, falha de envio) e o contato da pessoa (nome, telefone também só com dígitos,
+ * e-mail, cliente). Sem as opções de escolha (modo mock do servidor) os rótulos ficam de fora.
+ */
+export const paganteKeywordText = (p: Pagante, contato: Contato | undefined, choices?: ChoiceSet) => [
+  p.pessoa, p.codigo, p.op, contato?.nome, contato?.telefone, contato && digitsOnly(contato.telefone), contato?.email, contato?.cliente,
+  p.valor == null ? '' : formatMoney(p.valor), p.criadoEm ? formatDate(p.criadoEm) : '',
+  choices && p.forma != null ? label(choices.forma, p.forma, '') : '',
+  choices && p.status != null ? label(choices.status, p.status, '') : '',
+  choices && p.recibo != null ? label(choices.recibo, p.recibo, '') : '',
+  hasFalha(p) ? 'Falha de envio' : '',
+].filter(Boolean).join(' ')
 
-export function matchesKeyword(p: Pagante, query: string, contato: Contato | undefined) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const text = normalizeSearch(paganteKeywordText(p, contato))
-  return words.every((w) => text.includes(w))
+export function matchesKeyword(p: Pagante, query: string, contato: Contato | undefined, choices?: ChoiceSet) {
+  const text = normalizeSearch(paganteKeywordText(p, contato, choices))
+  return searchWords(query).every((w) => text.includes(w))
 }
 
 export function sortPagantes(list: Pagante[], sort: ViewSort | null, choices: ChoiceSet) {
@@ -84,8 +94,8 @@ export function sortPagantes(list: Pagante[], sort: ViewSort | null, choices: Ch
   return sortRows(list, (p) => {
     switch (sort.key) {
       case 'pessoa': return p.pessoa
-      case 'codigo': return Number(p.codigo.replace(/\D/g, '')) || p.codigo || null
-      case 'op': return Number(p.op.replace(/\D/g, '')) || p.op || null
+      case 'codigo': return Number(digitsOnly(p.codigo)) || p.codigo || null
+      case 'op': return Number(digitsOnly(p.op)) || p.op || null
       case 'valor': return p.valor
       case 'forma': return p.forma == null ? null : label(choices.forma, p.forma, '')
       case 'status': return p.status == null ? null : label(choices.status, p.status, '')

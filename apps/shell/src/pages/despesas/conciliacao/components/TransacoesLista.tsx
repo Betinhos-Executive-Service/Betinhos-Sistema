@@ -3,7 +3,7 @@ import { StatusBadge, todaySaoPaulo, type TableColumn } from '@betinhos/ui'
 import { ListTable } from '../../../../app/ListTable'
 import { fmtData } from '../../../equipamentos/components/EquipamentosList'
 import { openFromRow, openRowActions, selectionRowActions, type SelectionProps } from '../../../pagantes/components/PagantesList'
-import { formatMoney } from '../../../pagantes/domain/messages'
+import { formatMoney } from '../../../../app/format'
 import { abaDe, canalLabel, diasDesde, DIAS_ATRASO, idadeTexto, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Transacao } from '../domain/types'
 

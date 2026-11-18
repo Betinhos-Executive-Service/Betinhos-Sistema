@@ -23,6 +23,15 @@ describe('Infrações de trânsito', () => {
     expect(await within(ficha).findByText(/9 no total/)).toBeTruthy()
   })
 
+  it('busca por várias palavras destaca os termos (SearchHits) e filtra em AND', async () => {
+    const { container } = render(<InfracoesPage host={{ mode: 'mock' }} />)
+    await screen.findByText('5746')
+    const box = screen.getByRole('searchbox', { name: 'Buscar infrações' })
+    expect(container.querySelector('.search-hits')).toBeTruthy()
+    fireEvent.change(box, { target: { value: '5746 zzzzqq' } })
+    await waitFor(() => expect(screen.queryByText('5746')).toBeNull())
+  })
+
   it('edita, salva só o que mudou e atualiza a lista', async () => {
     render(<InfracoesPage host={{ mode: 'mock' }} />)
     fireEvent.click(within(await row('5185')).getByRole('button', { name: /^5185/ }))

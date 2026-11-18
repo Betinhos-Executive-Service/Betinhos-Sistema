@@ -18,6 +18,8 @@ import { PendenciasLista } from './components/PendenciasLista'
 import { RenovarDrawer, type AlvoRenovar } from './components/RenovarDrawer'
 import { ConfigDrawer } from './components/ConfigDrawer'
 import { FichaPessoaCentral, FichaVeiculoCentral } from './components/FichaCentral'
+import { SearchHits } from '../../app/SearchHits'
+import { searchWords, useDebouncedText } from '../../app/search'
 import { BrandLoader } from '../../app/BrandLoader'
 import './documentos.css'
 
@@ -49,7 +51,9 @@ function Documentos({ host }: { host: Host }) {
   const todas = useMemo(() => (data ? montarPendencias(data.tipos, data.donos, data.docs, hoje) : []), [data, hoje])
   const daAba = useMemo(() => todas.filter((p) => p.dono.categoria === filtro.aba), [todas, filtro.aba])
   const kpis = useMemo(() => contarKpis(daAba), [daAba])
-  const visiveis = useMemo(() => filtrarPendencias(todas, filtro), [todas, filtro])
+  const q = useDebouncedText(filtro.q)
+  const palavras = useMemo(() => searchWords(q), [q])
+  const visiveis = useMemo(() => filtrarPendencias(todas, { ...filtro, q }), [todas, filtro, q])
   const tiposDaAba = useMemo(() => (data?.tipos ?? []).filter((t) => t.categoria === filtro.aba && t.ativo), [data, filtro.aba])
 
   const refresh = useCallback(() => { void reload() }, [reload])
@@ -117,7 +121,7 @@ function Documentos({ host }: { host: Host }) {
           variant="filters"
           label="Filtros de documentos"
           start={<>
-            <SearchBox className="doc-toolbar__search" value={filtro.q} onChange={(q) => setFiltro({ ...filtro, q })} placeholder={filtro.aba === 'pessoas' ? 'Buscar funcionário ou documento' : 'Buscar placa ou documento'} aria-label="Buscar documentos" />
+            <SearchBox className="doc-toolbar__search" value={filtro.q} onChange={(q) => setFiltro({ ...filtro, q })} placeholder={filtro.aba === 'pessoas' ? 'Buscar por funcionário, documento, número, validade ou situação' : 'Buscar por placa, veículo, documento, número, validade ou situação'} aria-label="Buscar documentos" />
             <Select className="doc-toolbar__select" aria-label="Tipo de documento" placeholder="Todos os tipos" searchable={false} clearable value={filtro.tipo} onChange={(v) => setFiltro({ ...filtro, tipo: v })}
               options={tiposDaAba.map((t) => ({ value: t.id, label: t.nome }))} />
           </>}
@@ -136,7 +140,7 @@ function Documentos({ host }: { host: Host }) {
           ))}
         </div></div>
       ) : null}
-      {body}
+      <SearchHits tokens={palavras}>{body}</SearchHits>
       {source ? <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} /> : null}
       {source && donoFicha?.categoria === 'pessoas' ? <FichaPessoaCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={marcarSujo} /> : null}
       {source && donoFicha?.categoria === 'frota' ? <FichaVeiculoCentral host={host} docs={source} id={donoFicha.id} onClose={fecharFicha} onChanged={marcarSujo} /> : null}

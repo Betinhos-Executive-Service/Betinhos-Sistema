@@ -7,6 +7,7 @@ import type { Filters, SortKey } from '../data/filters'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from '../data/schema'
 import type { FuncionarioView } from '../data/types'
 import { AlertBadge, Avatar, EnvBadge, SemAppBadge, StatusBadge } from './Badges'
+import { SearchHits } from '../../../app/SearchHits'
 import { BrandLoader } from '../../../app/BrandLoader'
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
   visible: FuncionarioView[]
   /** Parte de `visible` já na tela (rolagem infinita); sem ela, todos. */
   shown?: FuncionarioView[]
+  /** Palavras da busca (já com debounce), para marcar onde cada uma foi achada. */
+  words: string[]
   /** Fim da lista (sentinela da rolagem infinita). */
   footer?: ReactNode
   counts: Record<AlertKind, number>
@@ -49,7 +52,7 @@ function filtrosExtras(filters: Filters) {
 }
 
 export function MobileHome(props: Props) {
-  const { views, visible, shown = visible, footer, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew } = props
+  const { views, visible, shown = visible, footer, words, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew } = props
   // A folha de filtros aberta vive na URL (`filtros=1`).
   const [sheet, setSheet] = useQueryBandeira('filtros')
   const extras = filtrosExtras(filters)
@@ -64,7 +67,7 @@ export function MobileHome(props: Props) {
           meta={<><span>{ativos} ativos de {views.length}</span><EnvBadge env={envLabel} /></>}
           actions={<Button variant="secondary" size="touch" icon={<RefreshCw size={20} className={loading ? 'spin' : ''} />} aria-label="Recarregar lista" onClick={onReload} disabled={loading} />}
         />
-        <SearchBox size="touch" aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={filters.search} onChange={(search) => update({ search })} />
+        <SearchBox size="touch" aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone, e-mail, função ou placa" value={filters.search} onChange={(search) => update({ search })} />
         <div className="m-chips" role="group" aria-label="Filtros rápidos">
           <button type="button" className={`m-chip m-chip--filter${extras ? ' m-chip--on' : ''}`} onClick={() => setSheet(true)} aria-haspopup="dialog">
             <SlidersHorizontal size={15} aria-hidden /> Filtros{extras > 0 && <strong>{extras}</strong>}
@@ -96,6 +99,7 @@ export function MobileHome(props: Props) {
             <EmptyState icon={<SearchX />} title="Nenhum colaborador encontrado para estes filtros." action={<Button variant="secondary" size="touch" onClick={reset}>Limpar filtros</Button>}>Revise a busca ou limpe os filtros.</EmptyState>
           </div>
         ) : (
+          <SearchHits tokens={words}>
           <ul className="m-list">
             {shown.map((row) => {
               const nome = String(row.values.cr40f_nomecompleto ?? '') || 'Sem nome'
@@ -115,6 +119,7 @@ export function MobileHome(props: Props) {
               )
             })}
           </ul>
+          </SearchHits>
         )}
         {footer}
       </main>

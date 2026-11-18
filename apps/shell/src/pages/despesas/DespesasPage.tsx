@@ -5,12 +5,13 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
+import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useQueryId, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
-import { formatMoney } from '../pagantes/domain/messages'
+import { formatMoney } from '../../app/format'
 import { createSource } from './data/source'
 import { createSource as createConciliacaoSource } from './conciliacao/data/source'
 import { useConciliacao } from './conciliacao/useConciliacao'
@@ -95,12 +96,12 @@ function Despesas({ host }: { host: Host }) {
   }, [list, choices, view.config.sort, compras, extra])
   const read = useMemo(() => extra.read(readDespesa, (d) => d.id), [extra])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
-  const index = useMemo(() => keywordIndex<Despesa>(despesaKeywordText), [])
+  const index = useMemo(() => keywordIndex<Despesa>((d) => despesaKeywordText(d, choices ?? undefined, compras.get(d.id))), [choices, compras])
+  const words = useMemo(() => searchWords(q), [q])
   const visible = useMemo(() => {
     if (!choices) return []
-    const words = searchWords(q)
     return words.length ? filtered.filter((d) => index.matches(d, words)) : filtered
-  }, [filtered, index, q, choices])
+  }, [filtered, index, words, choices])
   const totais = useMemo(() => resumo(visible), [visible])
   const visibleRef = useRef(visible)
   useEffect(() => { visibleRef.current = visible }, [visible])
@@ -188,7 +189,7 @@ function Despesas({ host }: { host: Host }) {
       <>
       <div role="toolbar" aria-label="Comandos de despesas">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_despesaoperacional', onOpenRecord: setSelectedId })} view={view} columns={DESPESA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, reserva ou protocolo" aria-label="Buscar despesas" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por despesa, local, motorista, categoria, status, reserva, protocolo ou valor" aria-label="Buscar despesas" />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar despesas" title="Atualizar despesas" loading={reloading} onClick={refresh} />}>
           {source.mock && !mobile ? <StatusBadge tone="info">Dados de exemplo</StatusBadge> : null}
         </ViewBar>
@@ -207,7 +208,7 @@ function Despesas({ host }: { host: Host }) {
           {despesas.error} {despesas.complete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só as despesas que chegaram; busca, filtros e totais valem para elas.'}
         </Alert>
       ) : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       </>
       )}
       <Dialog open={trocaPendente != null} onClose={() => setTrocaPendente(null)} title="Descartar alterações?"

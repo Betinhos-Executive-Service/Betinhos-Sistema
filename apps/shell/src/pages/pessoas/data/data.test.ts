@@ -58,9 +58,10 @@ describe('consultas de pessoas', () => {
     expect(() => guid("x' or 1 eq 1")).toThrow('Identificador inválido')
   })
 
-  it('busca no servidor: nome com contains, e-mail com startswith, junto do filtro de ativos', () => {
-    expect(pessoasSearchFilter("  d'ávila  ana ")).toBe("(startswith(cr40f_email,'d''ávila') or contains(cr40f_nomedopassageiro,'d''ávila')) and (startswith(cr40f_email,'ana') or contains(cr40f_nomedopassageiro,'ana'))")
+  it('busca no servidor: contains em nome, e-mail, telefone e demais textos, junto do filtro de ativos', () => {
+    const campos = (w: string) => ['cr40f_nomedopassageiro', 'cr40f_email', 'cr40f_telefone', 'cr40f_departamento', 'cr40f_cr', 'cr40f_enderecodesaida', 'cr40f_preferenciasdopassageiro'].map((f) => `contains(${f},'${w}')`).join(' or ')
+    expect(pessoasSearchFilter("  d'ávila  ana ")).toBe(`(${campos("d''ávila")}) and (${campos('ana')})`)
     expect(pessoasSearchFilter('a')).toBeNull()
-    expect(decodeURIComponent(pessoasPath('cr40f_bancodedadoses', pessoasSearchFilter('ana')))).toContain("$filter=statecode eq 0 and (startswith(cr40f_email,'ana') or contains(cr40f_nomedopassageiro,'ana'))")
+    expect(decodeURIComponent(pessoasPath('cr40f_bancodedadoses', pessoasSearchFilter('ana')))).toContain(`$filter=statecode eq 0 and (${campos('ana')})`)
   })
 })

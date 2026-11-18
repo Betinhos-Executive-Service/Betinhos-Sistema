@@ -264,3 +264,12 @@ export function mapMotoristas(employees: Row[], users: Row[]): Motorista[] {
 }
 
 export const plural = (count: number, one: string, many: string) => (count === 1 ? one : many)
+
+/** Destinatários como a lista mostra: "Todos" ou "N selecionados". */
+export const alvoTexto = (item: Comunicado) => (item.escopo === COMUNICADO_ESCOPO.selecionados ? `${item.alvoIds.length} ${plural(item.alvoIds.length, 'selecionado', 'selecionados')}` : 'Todos')
+
+/** Texto da busca por palavras: o que a lista mostra (título, mensagem, confirmação, destinatários, situação, data) mais o nome dos motoristas selecionados. */
+export function comunicadoKeywordText(item: Comunicado, motoristas: Motorista[]) {
+  const nomes = item.escopo === COMUNICADO_ESCOPO.selecionados ? motoristas.filter((m) => item.alvoIds.includes(m.id)).map((m) => m.nome) : []
+  return [item.titulo, item.corpo, item.tipo === COMUNICADO_TIPO.ciencia ? 'Assinatura' : 'Informativo', alvoTexto(item), ...nomes, isDisparado(item) ? 'Enviado' : 'Rascunho', formatDate(item.disparadoEm)].join(' ')
+}

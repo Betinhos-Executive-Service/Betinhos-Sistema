@@ -3,10 +3,11 @@ import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, Stethoscope
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { SearchHits } from '../../app/SearchHits'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
-import { useDebouncedText } from '../../app/search'
+import { searchWords, useDebouncedText } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useProgressiveData } from '../../app/useProgressiveData'
@@ -15,8 +16,8 @@ import { useHashQuery } from '../../nav/useHashRoute'
 import { destinoDeVolta } from './lib/voltar'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
-import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, saveFilters, withAlertas, type Filters } from './data/filters'
-import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, matchesKeyword, readFuncionario, sortFuncionarios } from './data/lista'
+import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, matchesWords, saveFilters, withAlertas, type Filters } from './data/filters'
+import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, readFuncionario, sortFuncionarios } from './data/lista'
 import { type AcessoInicial, createAcessoSource } from './data/acesso'
 import { createFuncionariosSource } from './data/hostSource'
 import { createSource as createComunicadosSource } from '../comunicados/data/source'
@@ -88,6 +89,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   // A busca filtra 200 ms depois da última tecla (celular e desktop); o texto de cada colaborador já vem normalizado.
   const buscaCelular = useDebouncedText(filters.search)
+  const palavrasCelular = useMemo(() => searchWords(buscaCelular), [buscaCelular])
   const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular }), [filters, buscaCelular])
   const views = useMemo(() => withAlertas(rows, today), [rows, today])
   const base = useMemo(() => applyBaseFilters(views, filtrosCelular), [views, filtrosCelular])
@@ -112,11 +114,12 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   })
   const [busca, setBusca] = useQueryTexto('q')
   const termo = useDebouncedText(busca)
+  const palavras = useMemo(() => searchWords(termo), [termo])
   const [alertaUrl, setAlerta] = useQueryTexto('alerta')
   const alerta = ALERTAS.find((kind) => kind === alertaUrl) ?? null
   const desktopRead = useMemo(() => lista.extra.read(readFuncionario, (row: FuncionarioView) => row.id), [lista.extra])
   const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, lista.fields, desktopRead), [views, lista.filters, lista.fields, desktopRead])
-  const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesKeyword(row, termo)), [desktopFiltrados, termo])
+  const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesWords(row, palavras)), [desktopFiltrados, palavras])
   const desktopCounts = useMemo(() => countAlertas(desktopBase), [desktopBase])
   const desktopVisible = useMemo<FuncionarioView[]>(
     () => lista.extra.sort(sortFuncionarios(desktopBase.filter((row) => matchesAlerta(row, alerta)), lista.view.config.sort), lista.view.config.sort, (row) => row.id),
@@ -172,6 +175,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           views={views}
           visible={visible}
           shown={mobileSlice.slice}
+          words={palavrasCelular}
           footer={<LazyFooter loaded={mobileSlice.slice.length} more={mobileSlice.more} onLoadMore={mobileSlice.loadMore} pending={pending} />}
           counts={counts}
           filters={filters}
@@ -215,7 +219,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}
-          search={<SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone ou placa" value={busca} onChange={setBusca} />}
+          search={<SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone, e-mail, função ou placa" value={busca} onChange={setBusca} />}
           more={moreActions}
           primary={<>
             <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Recarregar lista" title="Atualizar" loading={loading} onClick={() => void reload()} />
@@ -243,14 +247,16 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
         {error && !rows.length ? (
           <EmptyState className="surface" tone="danger" icon={<CloudOff />} title="Não foi possível carregar os colaboradores." action={<Button variant="secondary" icon={<RefreshCw size={16} />} onClick={() => void reload()}>Tentar de novo</Button>}>{error}</EmptyState>
         ) : (
-          groups ? (
-            <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} table={table} footer={footer} />
-          ) : (
-            <>
-              {table(desktopSlice.slice, footer)}
-              <LazyFooter loaded={desktopSlice.slice.length} more={desktopSlice.more} onLoadMore={desktopSlice.loadMore} pending={pending} />
-            </>
-          )
+          <SearchHits tokens={palavras}>
+            {groups ? (
+              <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} pending={pending} table={table} footer={footer} />
+            ) : (
+              <>
+                {table(desktopSlice.slice, footer)}
+                <LazyFooter loaded={desktopSlice.slice.length} more={desktopSlice.more} onLoadMore={desktopSlice.loadMore} pending={pending} />
+              </>
+            )}
+          </SearchHits>
         )}
       </main>
 

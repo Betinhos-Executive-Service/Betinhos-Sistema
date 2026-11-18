@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react'
 import { Alert, Button, Dialog, EmptyState, Grid, MetricCard, PageHeader, SearchBox, SegmentedControl, StatusBadge, Surface, useToast } from '@betinhos/ui'
 import { ChevronRight, Clock, FileEdit, FileText, Megaphone, Plus, RefreshCw, SearchX, Send, Trash2 } from 'lucide-react'
 import type { Source } from '../data/source'
-import { COMUNICADO_ESCOPO, COMUNICADO_TIPO, formatDate, isDisparado, matchLista, plural, type Comunicado, type ListaFiltro } from '../domain/comunicados'
+import { COMUNICADO_TIPO, alvoTexto, comunicadoKeywordText, formatDate, isDisparado, matchLista, type Comunicado, type ListaFiltro } from '../domain/comunicados'
 import type { useComunicados } from '../useComunicados'
 import { PdfMotoristaDialog } from './PdfMotoristaDialog'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { SearchHits } from '../../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../../app/search'
 
 type Props = {
   data: ReturnType<typeof useComunicados>
@@ -30,8 +32,10 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
   const [pdfMotorista, setPdfMotorista] = useState(false)
 
   const { items, loaded } = data
-  const termo = busca.trim().toLowerCase()
-  const buscados = useMemo(() => items.filter((item) => !termo || `${item.titulo} ${item.corpo}`.toLowerCase().includes(termo)), [items, termo])
+  const termo = useDebouncedText(busca)
+  const palavras = useMemo(() => searchWords(termo), [termo])
+  const indice = useMemo(() => keywordIndex<Comunicado>((item) => comunicadoKeywordText(item, data.motoristas)), [data.motoristas])
+  const buscados = useMemo(() => items.filter((item) => indice.matches(item, palavras)), [items, indice, palavras])
   const visiveis = buscados.filter((item) => matchLista(filtro, item))
   const enviados = items.filter(isDisparado).length
   const rascunhos = items.length - enviados
@@ -84,9 +88,10 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
       <Surface eyebrow="Histórico" title="Últimos comunicados" flush className="cm-list"
         action={<SegmentedControl aria-label="Filtrar comunicados" size="compact" value={filtro} onChange={setFiltro} options={FILTROS.map((f) => ({ value: f.value, label: `${f.label} · ${buscados.filter((item) => matchLista(f.value, item)).length}` }))} />}>
         <div className="cm-list__toolbar">
-          <SearchBox className="cm-search" value={busca} onChange={setBusca} placeholder="Buscar por título ou mensagem" aria-label="Buscar comunicado" />
+          <SearchBox className="cm-search" value={busca} onChange={setBusca} placeholder="Buscar por título, mensagem, motorista, situação ou data" aria-label="Buscar comunicado" />
         </div>
         <div className="cm-list__head" aria-hidden="true"><span>Comunicado</span><span>Confirmação</span><span>Destinatários</span><span>Situação</span><span /></div>
+        <SearchHits tokens={palavras}>
         <ul className="cm-list__body" aria-busy={!loaded}>
           {!loaded ? <li className="cm-list__skeleton"><BrandLoader variant="inline" size="md" label="Carregando comunicados" text="Carregando comunicados…" /></li> : null}
           {visiveis.map((item) => {
@@ -97,7 +102,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
                 <button type="button" className="cm-list__row" onClick={() => onOpen(item.id)}>
                   <span className="cm-list__title"><strong>{item.titulo}</strong><small>{item.corpo}</small></span>
                   <span><StatusBadge tone="info">{ciencia ? 'Assinatura' : 'Informativo'}</StatusBadge></span>
-                  <span className="cm-list__meta">{item.escopo === COMUNICADO_ESCOPO.selecionados ? `${item.alvoIds.length} ${plural(item.alvoIds.length, 'selecionado', 'selecionados')}` : 'Todos'}</span>
+                  <span className="cm-list__meta">{alvoTexto(item)}</span>
                   <span className="cm-list__status">
                     <StatusBadge tone={enviado ? 'success' : 'neutral'}>{enviado ? 'Enviado' : 'Rascunho'}</StatusBadge>
                     {enviado ? <small>{formatDate(item.disparadoEm)}</small> : null}
@@ -111,6 +116,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
             )
           })}
         </ul>
+        </SearchHits>
         {loaded && !items.length ? <EmptyState icon={<Megaphone size={36} />} title="Nenhum comunicado ainda" action={<Button icon={<Plus size={16} />} onClick={onNew}>Novo comunicado</Button>}>Crie o primeiro aviso para os motoristas.</EmptyState> : null}
         {loaded && items.length > 0 && !visiveis.length ? <EmptyState icon={<SearchX size={36} />} title="Nenhum comunicado encontrado" action={<Button variant="secondary" onClick={() => { setBusca(''); setFiltro('todos') }}>Limpar filtros</Button>}>Troque o filtro ou limpe a busca.</EmptyState> : null}
       </Surface>

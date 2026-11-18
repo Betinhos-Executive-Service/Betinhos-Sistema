@@ -1,11 +1,11 @@
 import { cleanId, type Row } from '@betinhos/dataverse'
-import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { recebimentosSource, type RecebimentosSource } from '../../recebimentos/source'
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import type { ChoiceSet, Contato, Pagante, ServicoOp } from '../domain/types'
 import type { KV } from '../domain/filters'
 import { withFallback } from '../domain/choices'
+import { matchesKeyword } from '../domain/lista'
 import { MOCK_CHOICES, MOCK_CONTATOS, createMockPagantes, mockServicos } from './mock'
 import { ENTITIES, guid, loadContatos, loadPagantes, loadServicos, opFilter, periodFilter, searchPagantes, type EntitySets } from './queries'
 import { abrirGeradorDeRecibo } from './recibo'
@@ -58,7 +58,7 @@ function createMockSource(): Omit<Source, 'recebimentos'> {
   return {
     mock: true,
     load: (since, onFirstPage) => mockProgressive(rows.filter((p) => !since || (p.criadoEm && p.criadoEm >= since)).map((p) => ({ ...p })), onFirstPage),
-    search: (since, q) => { const t = normalizeSearch(q); return mockSearch(rows, (p) => (!since || (p.criadoEm != null && p.criadoEm >= since)) && normalizeSearch(p.codigo).startsWith(t)) },
+    search: (since, q) => mockSearch(rows, (p) => (!since || (p.criadoEm != null && p.criadoEm >= since)) && matchesKeyword(p, q, undefined)),
     async get(id) { await wait(200); const p = rows.find((x) => x.id === id); return p ? { ...p } : null },
     choices: async () => MOCK_CHOICES,
     async contatos(ids) { await wait(150); return new Map(ids.flatMap((id) => (MOCK_CONTATOS.has(id) ? [[id, MOCK_CONTATOS.get(id)!] as const] : []))) },

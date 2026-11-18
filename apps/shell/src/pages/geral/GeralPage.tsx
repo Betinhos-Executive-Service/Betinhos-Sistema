@@ -7,6 +7,8 @@ import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
 import { useTableLabel } from '../../app/useListView'
+import { keywordTokens } from '../../app/keywordSearch'
+import { SearchHits } from '../../app/SearchHits'
 import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAberto'
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
@@ -574,6 +576,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const searchFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
   const searchQuickFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
   // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
+  // Destaque só das palavras já enviadas (após a pausa da digitação), as mesmas que a consulta usa.
+  const searchWords = useMemo(() => keywordTokens(query), [query])
   const [searchText, setSearchText] = useState(query)
   useEffect(() => setSearchText(query), [query])
   const renderCell = useCallback((row: Row, column: Column): ReactNode => {
@@ -721,11 +725,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }
 
   // Contagem do primário do painel ("Mostrar N resultados"): a mesma consulta de total, com o rascunho no lugar dos filtros.
-  const { viewFilters: { base: filtersBase }, query: geralQuery, quickFind, comManutencoes } = geral
+  const { viewFilters: { base: filtersBase }, query: geralQuery, comManutencoes } = geral
   const countPreview = useCallback(async (draft: TableFilters) => {
     if (!attributes || !view) return null
-    return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery, quickFind })
-  }, [attributes, view, source, filtersBase, filterFields, geralQuery, quickFind, comManutencoes])
+    return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery })
+  }, [attributes, view, source, filtersBase, filterFields, geralQuery, comManutencoes])
 
   return (
     <ProtecaoContext.Provider value={protecao}>
@@ -738,7 +742,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           columns={columnDefs}
           catalog={catalog}
           filters={{ fields: filterFields, search: searchFilter, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
-          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
+          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar OS, cliente, passageiro, placa…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
@@ -753,7 +757,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
-        {body}
+        <SearchHits tokens={searchWords}>{body}</SearchHits>
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}

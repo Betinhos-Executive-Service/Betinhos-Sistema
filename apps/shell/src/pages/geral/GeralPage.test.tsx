@@ -69,6 +69,23 @@ describe('Geral', () => {
     await waitFor(() => expect(screen.getAllByText(/OS-10\d/).length).toBeGreaterThan(0), { timeout: 4000 })
   })
 
+  it('busca por várias palavras filtra em AND e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) } } })
+    try {
+      render(<GeralPage host={{ mode: 'mock' }} />)
+      await screen.findAllByText(PAGE1)
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'unique gru' } })
+      const corpo = () => dataRows().filter((row) => !row.querySelector('[role="columnheader"]'))
+      const todas = () => corpo().length > 0 && corpo().every((row) => /unique/i.test(row.textContent ?? '') && /gru/i.test(row.textContent ?? ''))
+      await waitFor(() => expect(todas()).toBe(true), { timeout: 4000 })
+      await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toEqual(expect.arrayContaining(['unique', 'gru'])))
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar serviços' }), { target: { value: 'unique zzzzqq' } })
+      await waitFor(() => expect(corpo()).toHaveLength(0), { timeout: 4000 })
+    } finally { vi.unstubAllGlobals() }
+  })
+
   it('ocultar coluna some da tabela e volta com restaurar', async () => {
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findByRole('columnheader', { name: /Trajeto/, hidden: true })

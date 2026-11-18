@@ -6,7 +6,8 @@ import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
 import { useRowSelection } from '../../../app/Selecao'
 import { ListTable } from '../../../app/ListTable'
-import { useDebouncedText } from '../../../app/search'
+import { SearchHits } from '../../../app/SearchHits'
+import { searchWords, useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
 import { lerOpcao, useQueryTexto } from '../../../nav/queryState'
@@ -55,6 +56,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   const [busca, setBusca] = useQueryTexto('q')
   // A lista filtra 200 ms depois da última tecla.
   const termo = useDebouncedText(busca)
+  const palavras = useMemo(() => searchWords(termo), [termo])
 
   const todas = useMemo(() => linhas(kind, data), [kind, data])
   const opcoesRefs = useMemo(() => ({ veiculos: opcoes(todas.map((linha) => linha.veiculo)), pessoas: opcoes(todas.map((linha) => linha.pessoa)) }), [todas])
@@ -87,8 +89,8 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
 
   const read = useMemo(() => extra.read(readRegistro, (linha: Linha) => linha.id), [extra])
   const visiveis = useMemo(
-    () => extra.sort(sortRegistros(filterRows(todas, filters, allFields, read).filter((linha) => matchesRegistroKeyword(linha, termo)), kind, view.config.sort), view.config.sort, (linha) => linha.id),
-    [todas, filters, fields, termo, kind, view.config.sort, read],
+    () => extra.sort(sortRegistros(filterRows(todas, filters, allFields, read).filter((linha) => matchesRegistroKeyword(linha, palavras)), kind, view.config.sort), view.config.sort, (linha) => linha.id),
+    [todas, filters, fields, palavras, kind, view.config.sort, read],
   )
   // Rolagem infinita (sem paginação visível): trocar filtro, busca ou ordenação volta ao primeiro lote.
   const lazyKey = useMemo(() => JSON.stringify({ filters, termo, sort: view.config.sort }), [filters, termo, view.config.sort])
@@ -150,7 +152,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
     <>
       <div role="toolbar" aria-label="Comandos de registros" {...sel.bar}>
         <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
-          search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa ou pessoa' : 'Buscar descrição, placa ou pessoa'} value={busca} onChange={setBusca} />}
+          search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa, pessoa, status ou próximo passo' : 'Buscar descrição, placa, pessoa, status, valor ou data'} value={busca} onChange={setBusca} />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />
             <Button size={size} icon={<Plus size={16} />} onClick={() => void novo()}>Novo registro</Button>
@@ -158,14 +160,16 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
           {kinds.length > 1 && <SegmentedControl aria-label="Tipo de registro" options={kinds.map((item) => ({ value: item, label: PLURAL[item] }))} value={kind} onChange={trocar} />}
         </ViewBar>
       </div>
-      {groups ? (
-        <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
-      ) : (
-        <>
-          {table(slice, footer)}
-          <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
-        </>
-      )}
+      <SearchHits tokens={palavras}>
+        {groups ? (
+          <ListaAgrupada groups={groups} group={view.config.group} lazyKey={lazyKey} table={table} footer={footer} />
+        ) : (
+          <>
+            {table(slice, footer)}
+            <LazyFooter loaded={slice.length} more={more} onLoadMore={loadMore} />
+          </>
+        )}
+      </SearchHits>
     </>
   )
 }

@@ -1,10 +1,10 @@
-import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { getAllWithFirstPage, searchRows } from '../../../app/pagedLoad'
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { browserKV } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
 import { aplicarDecisao, patchDecisao, type Decisao } from '../domain/decisao'
+import { matchesKeyword } from '../domain/lista'
 import { withFallback } from '../domain/status'
 import type { Anexo, Arquivo, Despesa, DespesaChoices } from '../domain/types'
 import { createArquivos } from '../../../lib/comprovantes/leitura'
@@ -45,8 +45,7 @@ function createMockSource(): Source {
     mock: true,
     load: (since, onFirstPage) => mockProgressive(rows.filter((d) => !since || (d.data && d.data >= since)).map((d) => ({ ...d })), onFirstPage, 300),
     search: (since, q) => {
-      const t = normalizeSearch(q)
-      return mockSearch(rows, (d) => (!since || (d.data != null && d.data >= since)) && normalizeSearch(`${d.protocolo} ${d.nome} ${d.estabelecimento}`).includes(t))
+      return mockSearch(rows, (d) => (!since || (d.data != null && d.data >= since)) && matchesKeyword(d, q))
     },
     async get(id) { await wait(200); const d = rows.find((x) => x.id === id); return d ? { ...d } : null },
     async anexos(id) { await wait(250); const d = rows.find((x) => x.id === id); return d ? createMockAnexos(d) : [] },

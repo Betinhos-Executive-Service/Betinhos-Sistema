@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { keywordIndex, searchWords } from '../../../app/search'
 import {
-  COMUNICADO_ESCOPO, COMUNICADO_PUSH, COMUNICADO_TIPO, buildResultadosCsv, canResendPush, draftPayload, duplicateComunicado, emptyDraft,
+  COMUNICADO_ESCOPO, COMUNICADO_PUSH, COMUNICADO_TIPO, buildResultadosCsv, comunicadoKeywordText, canResendPush, draftPayload, duplicateComunicado, emptyDraft,
   mapDestinatario, mapMotoristas, matchResultado, parseEvidencia, parseTargetIds, statusLabel, validateDraft, type Destinatario,
 } from './comunicados'
 
@@ -111,5 +112,18 @@ describe('evidência do aparelho', () => {
     const mapped = mapDestinatario({ new_comunicadodestinatarioid: 'd', new_evidenciaaberturajson: completa, new_evidenciacienciajson: null })
     expect(mapped.evidenciaAbertura?.ip).toBe('203.0.113.7')
     expect(mapped.evidenciaCiencia).toBeNull()
+  })
+})
+
+describe('busca por palavras dos comunicados', () => {
+  const item = { ...emptyDraft(), id: '1', titulo: 'Revisão dos veículos', corpo: 'Levar o carro à oficina', tipo: COMUNICADO_TIPO.ciencia, escopo: COMUNICADO_ESCOPO.selecionados, alvoIds: ['m1'], estado: 100000001, disparadoEm: '2026-10-16T12:00:00Z' }
+  const motoristas = [{ id: 'm1', nome: 'Márcio Souza', email: 'a@x.com', problema: '' }]
+  const acha = (q: string) => keywordIndex<typeof item>((i) => comunicadoKeywordText(i, motoristas)).matches(item, searchWords(q))
+
+  it('acha por motorista selecionado, tipo, situação e data, e exige todas as palavras', () => {
+    expect(acha('marcio assinatura')).toBe(true)
+    expect(acha('enviado oficina')).toBe(true)
+    expect(acha('16/10/2026')).toBe(true)
+    expect(acha('marcio rascunho')).toBe(false)
   })
 })

@@ -1,5 +1,5 @@
 import { Button, Dialog } from '@betinhos/ui'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import type { Op } from '../domain/types'
 
 /** Confirma o cancelamento: não há volta pela tela, e os serviços continuam ligados à OP. */

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Drawer } from '@betinhos/ui'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { TIPO_LABEL, type Pendencia } from '../domain/types'
 import { AcaoPendencia, TipoBadge, servicosTexto, type Acoes } from './PendenciasList'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'

@@ -58,21 +58,21 @@ describe('mock', () => {
     const rows = createMockRows(now)
     expect(views.find((v) => v.padrao)?.nome).toContain('Agenda')
     expect(rows.length).toBe(MOCK_ROW_COUNT)
-    const page = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', quickFind: ['cr40f_id'], now })
+    const page = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', now })
     expect(page.rows.length).toBe(PAGE_SIZE)
     expect(page.more).toBe(true)
     expect(page.total).toBe(rows.length)
     // A OS-1013 (linha bloqueada dos testes) fica entre as 100 primeiras da Agenda.
     expect(page.rows.some((r) => r.cr40f_id === 'OS-1013')).toBe(true)
-    const hoje = applyMockFetch(rows, views.find((v) => v.nome === 'Hoje')!.fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', quickFind: [], now })
+    const hoje = applyMockFetch(rows, views.find((v) => v.nome === 'Hoje')!.fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: '', now })
     expect(hoje.rows.every((r) => String(r.cr40f_dataehorriodesada).startsWith('2026-10-08'))).toBe(true)
-    const busca = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: 'OS-10', quickFind: ['cr40f_id'], now })
+    const busca = applyMockFetch(rows, views[0].fetchxml, { page: 1, pageSize: PAGE_SIZE, sort: null, query: 'OS-10', now })
     expect(busca.rows.every((r) => String(r.cr40f_id).includes('OS-10'))).toBe(true)
   })
   it('source mock devolve páginas de 100 linhas', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const [view] = await source.views()
-    const request = { fetchxml: view.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] }
+    const request = { fetchxml: view.fetchxml, page: 1, cookie: null, sort: null, query: '' }
     expect((await source.page(request)).rows).toHaveLength(PAGE_SIZE)
     expect((await source.page({ ...request, page: 2 })).rows).toHaveLength(PAGE_SIZE)
     expect((await source.page({ ...request, page: 3 })).rows).toHaveLength(MOCK_ROW_COUNT - 2 * PAGE_SIZE)
@@ -81,10 +81,10 @@ describe('mock', () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const views = await source.views()
     const agenda = views.find((v) => v.padrao)!
-    expect(await source.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
+    expect(await source.count({ fetchxml: agenda.fetchxml, query: '' })).toBe(MOCK_ROW_COUNT)
     const sem = views.find((v) => v.nome.includes('Sem motorista'))!
-    const filtrado = await source.count({ fetchxml: sem.fetchxml, query: '', quickFind: [] })
-    const pagina = await source.page({ fetchxml: sem.fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    const filtrado = await source.count({ fetchxml: sem.fetchxml, query: '' })
+    const pagina = await source.page({ fetchxml: sem.fetchxml, page: 1, cookie: null, sort: null, query: '' })
     // Como no Dataverse, a página não traz total: ele vem só da contagem.
     expect(pagina.total).toBeNull()
     expect(pagina.more).toBe(false)
@@ -94,7 +94,7 @@ describe('mock', () => {
   it('source mock grava e relê', async () => {
     const source = createSource({ mode: 'mock' })
     const views = await source.views()
-    const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })).rows[0]
+    const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '' })).rows[0]
     const id = String(first.cr40f_reservadeveculosid)
     await source.update(id, { cr40f_trajeto: 'Nova rota' })
     expect((await source.reload(id, ['cr40f_trajeto'])).cr40f_trajeto).toBe('Nova rota')
@@ -110,7 +110,7 @@ describe('mock — contrato da tela', () => {
     const views = await source.views()
     expect(views[0].layoutxml).toContain('cr40f_trajeto')
     expect(views[0].layoutxml).toContain('cr40f_cotao')
-    const { rows } = await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    const { rows } = await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '' })
     const blocked = rows.find((r) => r.cr40f_id === 'OS-1013')
     expect(blocked).toBeDefined()
     await expect(source.update(String(blocked?.cr40f_reservadeveculosid), { cr40f_trajeto: 'x' })).rejects.toThrow('Sem permissão para alterar este serviço.')
@@ -118,7 +118,7 @@ describe('mock — contrato da tela', () => {
   it('Sem motorista só traz linhas sem motorista e a escolha de lookup atualiza o nome', async () => {
     const source = createSource({ mode: 'mock' })
     const views = await source.views()
-    const semMotorista = await source.page({ fetchxml: views[2].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    const semMotorista = await source.page({ fetchxml: views[2].fetchxml, page: 1, cookie: null, sort: null, query: '' })
     expect(semMotorista.rows.length).toBe(createMockRows(new Date()).filter((r) => r._cr40f_motorista_value == null).length)
     expect(semMotorista.rows.length).toBeLessThanOrEqual(50)
     expect(semMotorista.rows.every((r) => r._cr40f_motorista_value == null)).toBe(true)
@@ -174,34 +174,22 @@ describe('source Dataverse', () => {
     expect(await source.objectTypeCode()).toBe(10580)
   })
 
-  it('quickFind aquece a metadata da busca; a página busca choice pelo rótulo e lookup pelos IDs do nome, numa resolução só', async () => {
-    const quickFindXml = '<fetch><entity name="cr40f_reservadeveculos"><filter isquickfindfields="1">'
-      + ['cr40f_status', 'cr40f_receber', 'cr40f_motorista'].map((a) => `<condition attribute="${a}" operator="like" value="{0}" />`).join('')
-      + '</filter></entity></fetch>'
-    const { host, request } = fakeHost({
-      getAll: async () => [{ fetchxml: quickFindXml }],
-      request: (path) => (path.startsWith('cr40f_funcionarioss?') ? { value: [{ cr40f_funcionariosid: '{AAA}' }] } : { value: [] }),
-    })
-    const entity = vi.spyOn((host as Extract<Host, { mode: 'dataverse' }>).metadata, 'entity')
+  it('a página e a contagem levam a mesma busca: choice pelo rótulo, lookup por link-entity, sem consulta extra de IDs', async () => {
+    const { host, request } = fakeHost()
     const source = createSource(host)
-    const quickFind = await source.quickFind()
-    expect(quickFind).toEqual(['cr40f_status', 'cr40f_receber', 'cr40f_motorista'])
-    await vi.waitFor(() => expect(entity).toHaveBeenCalledWith('cr40f_funcionarios'))
-
     const view = '<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /></entity></fetch>'
-    await source.page({ fetchxml: view, page: 1, cookie: null, sort: null, query: 'confirm', quickFind })
-    await source.count({ fetchxml: view, query: 'confirm', quickFind })
+    await source.page({ fetchxml: view, page: 1, cookie: null, sort: null, query: 'confirm ana' })
+    await source.count({ fetchxml: view, query: 'confirm ana' })
     const fetches = request.mock.calls.map(([path]) => decodeURIComponent(path)).filter((path) => path.includes('?fetchXml='))
     expect(fetches).toHaveLength(2)
     for (const xml of fetches) {
       expect(xml).toContain('<condition attribute="cr40f_status" operator="in"><value>1</value></condition>')
-      expect(xml).toContain('<condition attribute="cr40f_motorista" operator="in"><value>aaa</value></condition>')
-      expect(xml).not.toContain('operator="like"')
+      expect(xml).toContain('<link-entity name="cr40f_funcionarios" from="cr40f_funcionariosid" to="cr40f_motorista" alias="busca_cr40f_motorista" link-type="outer"/>')
+      expect(xml).toContain('entityname="busca_cr40f_motorista"')
     }
-    // Página e contagem do mesmo termo reaproveitam a resolução dos IDs.
-    expect(request.mock.calls.filter(([path]) => path.startsWith('cr40f_funcionarioss?'))).toHaveLength(1)
+    expect(request.mock.calls.filter(([path]) => !String(path).includes('?fetchXml='))).toHaveLength(0)
+    expect(decodeURIComponent(String(request.mock.calls[0][0]))).not.toContain('returntotalrecordcount')
   })
-
   it('mock: cria, atualiza, renomeia e exclui visões pessoais em memória', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const created = await source.createView({ name: 'Minha', fetchxml: '<fetch/>', layoutxml: '<grid/>' })
@@ -226,7 +214,7 @@ describe('source Dataverse', () => {
   })
   it('page injeta paginação no FetchXML e decodifica o cookie', async () => {
     const { host, request } = fakeHost({ request: () => ({ value: [], '@Microsoft.Dynamics.CRM.morerecords': true, '@Microsoft.Dynamics.CRM.fetchxmlpagingcookie': '<cookie pagingcookie="%253cc%252f%253e" />' }) })
-    const page = await createSource(host).page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', page: 2, cookie: '<c/>', sort: null, query: '', quickFind: [] })
+    const page = await createSource(host).page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', page: 2, cookie: '<c/>', sort: null, query: '' })
     expect(page.cookie).toBe('<c/>')
     const url = decodeURIComponent(String(request.mock.calls[0][0]))
     expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
@@ -238,20 +226,19 @@ describe('source Dataverse', () => {
     const source = createSource(host)
     const controller = new AbortController()
     const fetchxml = '<fetch><entity name="cr40f_reservadeveculos" /></fetch>'
-    await source.page({ fetchxml, page: 1, cookie: null, sort: null, query: 'x', quickFind: ['cr40f_id'], signal: controller.signal })
-    await source.count({ fetchxml, query: 'x', quickFind: ['cr40f_id'], signal: controller.signal })
+    await source.page({ fetchxml, page: 1, cookie: null, sort: null, query: 'x', signal: controller.signal })
+    await source.count({ fetchxml, query: 'x', signal: controller.signal })
     expect(request.mock.calls.map((call) => call[1]?.signal)).toEqual([controller.signal, controller.signal])
     expect(decodeURIComponent(String(request.mock.calls[0][0]))).not.toContain('returntotalrecordcount')
   })
   it('count cancelado vira null, sem erro', async () => {
     const { host } = fakeHost({ request: () => { throw new DOMException('cancelado', 'AbortError') } })
-    expect(await createSource(host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '', quickFind: [] })).toBeNull()
+    expect(await createSource(host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '' })).toBeNull()
   })
   it('busca do mock segue o FetchXML real: termo em qualquer parte', async () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     const fetchxml = (await source.views()).find((v) => v.padrao)!.fetchxml
-    const quickFind = await source.quickFind()
-    const ask = async (query: string) => (await source.page({ fetchxml, page: 1, cookie: null, sort: null, query, quickFind })).rows
+    const ask = async (query: string) => (await source.page({ fetchxml, page: 1, cookie: null, sort: null, query })).rows
     expect((await ask('Unique')).every((r) => String(r.cr40f_trajeto).includes('Unique'))).toBe(true)
     expect((await ask('Unique')).length).toBeGreaterThan(0)
     // Meio do código e do trajeto também acham.
@@ -264,15 +251,15 @@ describe('source Dataverse', () => {
   })
   it('count pede a agregação por FetchXML e devolve o número; erro vira null', async () => {
     const { host, request } = fakeHost({ request: () => ({ value: [{ total: 1234 }] }) })
-    const total = await createSource(host).count({ fetchxml: '<fetch count="100" page="2"><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><order attribute="cr40f_id" /></entity></fetch>', query: '', quickFind: [] })
+    const total = await createSource(host).count({ fetchxml: '<fetch count="100" page="2"><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><order attribute="cr40f_id" /></entity></fetch>', query: '' })
     expect(total).toBe(1234)
     const url = decodeURIComponent(String(request.mock.calls[0][0]))
     expect(url).toContain('cr40f_reservadeveculoses?fetchXml=')
     expect(url).toContain('aggregate="true"')
     expect(url).not.toContain('<order')
     const ruim = fakeHost({ request: () => { throw new Error('boom') } })
-    expect(await createSource(ruim.host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '', quickFind: [] })).toBeNull()
-    expect(await createSource(fakeHost().host).count({ fetchxml: '<fetch><entity>', query: '', quickFind: [] })).toBeNull()
+    expect(await createSource(ruim.host).count({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos" /></fetch>', query: '' })).toBeNull()
+    expect(await createSource(fakeHost().host).count({ fetchxml: '<fetch><entity>', query: '' })).toBeNull()
   })
   it('lookupBind lê a relação e falha com mensagem clara quando não existe', async () => {
     const ok = fakeHost({ request: () => ({ value: [{ ReferencingEntityNavigationPropertyName: 'cr40f_Motorista', ReferencedEntity: 'cr40f_funcionarios' }] }) })
@@ -317,7 +304,7 @@ describe('mock — releitura com chave de lookup', () => {
   it('reload com _x_value devolve o lookup e o nome formatado', async () => {
     const source = createSource({ mode: 'mock' })
     const views = await source.views()
-    const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })).rows[0]
+    const first = (await source.page({ fetchxml: views[0].fetchxml, page: 1, cookie: null, sort: null, query: '' })).rows[0]
     const fresh = await source.reload(String(first.cr40f_reservadeveculosid), ['cr40f_id', '_cr40f_cliente_value'])
     expect(fresh._cr40f_cliente_value).toBe(first._cr40f_cliente_value)
   })
@@ -327,8 +314,8 @@ describe('mock: filtros por coluna', () => {
   const now = new Date('2026-10-08T12:00:00Z') // quinta-feira; semana de 05/10 a 11/10 em São Paulo
   const rows = createMockRows(now)
   const agenda = createMockViews()[0].fetchxml
-  const runAt = (at: Date, base: typeof rows, filters: FilterSet, extra: { query?: string; quickFind?: string[] } = {}) =>
-    applyMockFetch(base, injectTableFilters(agenda, fromLegacy(filters, MOCK_ATTRIBUTES), geralFilterFields(MOCK_ATTRIBUTES)), { page: 1, pageSize: 1000, sort: null, query: extra.query ?? '', quickFind: extra.quickFind ?? [], now: at })
+  const runAt = (at: Date, base: typeof rows, filters: FilterSet, extra: { query?: string } = {}) =>
+    applyMockFetch(base, injectTableFilters(agenda, fromLegacy(filters, MOCK_ATTRIBUTES), geralFilterFields(MOCK_ATTRIBUTES)), { page: 1, pageSize: 1000, sort: null, query: extra.query ?? '', now: at })
   const run = (filters: FilterSet) => runAt(now, rows, filters).rows
   type R = (typeof rows)[number]
   const day = (r: R) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date(String(r.cr40f_dataehorriodesada)))
@@ -436,7 +423,7 @@ describe('mock: filtros por coluna', () => {
     const combined = run({ cr40f_receber: { kind: 'bool', op: 'yes' }, cr40f_trajeto: { kind: 'text', op: 'contains', value: 'GRU' } })
     expect(combined.length).toBeGreaterThan(0)
     expect(combined.every((r) => r.cr40f_receber === true && String(r.cr40f_trajeto).includes('GRU'))).toBe(true)
-    const searched = runAt(now, rows, { cr40f_receber: { kind: 'bool', op: 'yes' } }, { query: 'OS-101', quickFind: ['cr40f_id'] })
+    const searched = runAt(now, rows, { cr40f_receber: { kind: 'bool', op: 'yes' } }, { query: 'OS-101' })
     expect(searched.rows.length).toBeGreaterThan(0)
     expect(searched.rows.every((r) => r.cr40f_receber === true && String(r.cr40f_id).includes('OS-101'))).toBe(true)
     expect(searched.total).toBe(searched.rows.length)
@@ -478,7 +465,7 @@ describe('comandos (caminhos e fonte)', () => {
     const source = createSource({ mode: 'mock' }, { latency: 0 })
     expect(await source.flowUrl('x')).toBe('https://flow.mock/op')
     expect(await source.triggerFlow('u', {})).toEqual({ status: 202 })
-    const page = await source.page({ fetchxml: createMockViews()[0].fetchxml, page: 1, cookie: null, sort: null, query: '', quickFind: [] })
+    const page = await source.page({ fetchxml: createMockViews()[0].fetchxml, page: 1, cookie: null, sort: null, query: '' })
     const ruim = page.rows.find((r) => r.cr40f_id === 'OS-1013')
     const bom = page.rows.find((r) => r.cr40f_id !== 'OS-1013')
     expect(ruim && bom).toBeTruthy()
@@ -537,9 +524,9 @@ describe('mock — linhas de manutenção (manutenções v2, plano 3)', () => {
     const sem = createSource({ mode: 'mock' }, { latency: 0 })
     const com = createSource({ mode: 'mock' }, { latency: 0, manutencoes: true })
     const agenda = (await com.views()).find((v) => v.padrao)!
-    expect(await sem.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
-    expect(await com.count({ fetchxml: agenda.fetchxml, query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT + MOCK_MANUTENCOES)
-    expect(await com.count({ fetchxml: aplicarManutencoes(agenda.fetchxml, false), query: '', quickFind: [] })).toBe(MOCK_ROW_COUNT)
+    expect(await sem.count({ fetchxml: agenda.fetchxml, query: '' })).toBe(MOCK_ROW_COUNT)
+    expect(await com.count({ fetchxml: agenda.fetchxml, query: '' })).toBe(MOCK_ROW_COUNT + MOCK_MANUTENCOES)
+    expect(await com.count({ fetchxml: aplicarManutencoes(agenda.fetchxml, false), query: '' })).toBe(MOCK_ROW_COUNT)
   })
 
   it('a visão de faturamento filtra o status de faturamento (vem com manutenções desligadas)', async () => {

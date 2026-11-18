@@ -38,8 +38,10 @@ export function readCliente(c: Cliente, key: string): unknown {
   }
 }
 
-/** Texto em que a busca procura: nome, registro e endereço. */
-export const clienteKeywordText = (c: Cliente) => [c.nome, c.registro, c.endereco].filter(Boolean).join(' ')
+const day = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })
+
+/** Texto em que a busca procura: nome, registro, endereço e a data de cadastro como aparece na coluna (dd/mm/aaaa). */
+export const clienteKeywordText = (c: Cliente) => [c.nome, c.registro, c.endereco, c.criadoEm ? day.format(c.criadoEm) : ''].filter(Boolean).join(' ')
 
 /** Ordena pela coluna da visão; vazios por último. */
 export function sortClientes(list: Cliente[], key: string, dir: 'asc' | 'desc') {

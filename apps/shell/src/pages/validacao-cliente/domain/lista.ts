@@ -1,7 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { normalize } from '../../infracoes/domain/filters'
-import { SITUACOES, entraNoFechamento, mesDe, mesLabel, situacaoLabel } from './regras'
+import { formatDay, formatMoney } from '../../../app/format'
+import { SITUACOES, entraNoFechamento, fechamentoSugerido, mesDe, mesLabel, podeMarcarFechamento, situacaoLabel } from './regras'
 import type { Cliente, Linha, Situacao } from './types'
 
 /** Validação do cliente no padrão de listas do DS (§10.9.1/§10.9.2). A Visão padrão esconde os retirados. */
@@ -63,13 +63,15 @@ export function readLinha(l: Linha, key: string): unknown {
   }
 }
 
-/** Busca (fora da visão): código, pedido, trajeto, cliente, CR e última mensagem. */
-export function matchesKeyword(l: Linha, query: string) {
-  const terms = normalize(query).split(/\s+/).filter(Boolean)
-  if (!terms.length) return true
-  const hay = normalize([l.codigo, l.pedido, l.trajeto, l.cliente.nome, l.cr, l.ultimaMensagem?.texto ?? ''].join(' '))
-  return terms.every((t) => hay.includes(t))
-}
+const FECHAMENTO_TEXTO = (l: Linha) =>
+  !podeMarcarFechamento(l.situacao) ? '' : l.fechamento === 'sim' ? 'Entra' : l.fechamento === 'nao' ? 'Próximo mês' : fechamentoSugerido(l) ? 'Sugerido' : 'A decidir'
+
+/** Texto da busca por palavras (fora da visão): o que a lista mostra (datas e valor como aparecem) mais pedido, CR e observação. */
+export const linhaKeywordText = (l: Linha) => [
+  l.codigo, l.pedido, formatDay(l.data), situacaoLabel(l.situacao), l.trajeto, l.cliente.nome, l.valorLiberado == null ? '' : formatMoney(l.valorLiberado),
+  formatDay(l.prazoTacita), l.ultimaMensagem && `${l.ultimaMensagem.lado === 'cliente' ? 'Cliente' : 'Betinhos'} ${l.ultimaMensagem.texto}`,
+  FECHAMENTO_TEXTO(l), l.cr, l.observacao, l.aprovadoPor,
+].filter(Boolean).join(' ')
 
 export function sortLinhas(list: Linha[], sort: ViewSort | null) {
   if (!sort) return list

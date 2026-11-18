@@ -93,33 +93,58 @@ export function matchesKeywords(tokens: string[], texts: string[]) {
   return tokens.every((token) => haystack.some((text) => text.includes(fold(token))))
 }
 
+/** Trechos `[início, fim)` do texto que casam com alguma palavra (sem acento nem caixa), já unidos e em ordem. */
+export function highlightRanges(text: string, tokens: string[]): [number, number][] {
+  const needles = tokens.map(fold).filter(Boolean)
+  if (!text || !needles.length) return []
+  const whole = fold(text)
+  const found = needles.filter((needle) => whole.includes(needle))
+  if (!found.length) return []
+  // Dobrar o texto inteiro mantém o tamanho quando nenhum caractere muda de comprimento; só então dá para mapear 1 a 1.
+  let folded = whole
+  let starts: number[] | null = null
+  let ends: number[] | null = null
+  if (whole.length !== text.length || [...text].length !== text.length) {
+    folded = ''
+    starts = []
+    ends = []
+    let offset = 0
+    for (const char of text) {
+      const piece = fold(char)
+      for (let index = 0; index < piece.length; index++) { starts.push(offset); ends.push(offset + char.length) }
+      folded += piece
+      offset += char.length
+    }
+  }
+  const marked = new Array<boolean>(text.length).fill(false)
+  for (const needle of found) {
+    for (let at = folded.indexOf(needle); at !== -1; at = folded.indexOf(needle, at + 1)) {
+      const from = starts ? starts[at] : at
+      const to = ends ? ends[at + needle.length - 1] : at + needle.length
+      for (let index = from; index < to; index++) marked[index] = true
+    }
+  }
+  const ranges: [number, number][] = []
+  for (let index = 0; index < text.length; index++) {
+    if (!marked[index]) continue
+    const last = ranges[ranges.length - 1]
+    if (last && last[1] === index) last[1] = index + 1
+    else ranges.push([index, index + 1])
+  }
+  return ranges
+}
+
 type HighlightPart = { text: string; hit: boolean }
 
 /** Divide o texto nos trechos que casam com alguma palavra (sem acento nem caixa), preservando o texto original. */
 export function highlightParts(text: string, tokens: string[]): HighlightPart[] {
-  const needles = tokens.map(fold).filter(Boolean)
-  if (!text || !needles.length) return [{ text, hit: false }]
-  let folded = ''
-  const starts: number[] = []
-  const ends: number[] = []
-  let offset = 0
-  for (const char of text) {
-    const piece = fold(char)
-    for (let index = 0; index < piece.length; index++) { starts.push(offset); ends.push(offset + char.length) }
-    folded += piece
-    offset += char.length
-  }
-  const marked = new Array<boolean>(text.length).fill(false)
-  for (const needle of needles) {
-    for (let at = folded.indexOf(needle); at !== -1; at = folded.indexOf(needle, at + 1)) {
-      for (let index = starts[at]; index < ends[at + needle.length - 1]; index++) marked[index] = true
-    }
-  }
   const parts: HighlightPart[] = []
-  for (let index = 0; index < text.length; index++) {
-    const last = parts[parts.length - 1]
-    if (last && last.hit === marked[index]) last.text += text[index]
-    else parts.push({ text: text[index], hit: marked[index] })
+  let at = 0
+  for (const [start, end] of highlightRanges(text, tokens)) {
+    if (start > at) parts.push({ text: text.slice(at, start), hit: false })
+    parts.push({ text: text.slice(start, end), hit: true })
+    at = end
   }
+  if (at < text.length || !parts.length) parts.push({ text: text.slice(at), hit: false })
   return parts
 }

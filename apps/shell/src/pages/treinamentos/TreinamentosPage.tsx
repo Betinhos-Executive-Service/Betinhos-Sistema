@@ -6,10 +6,12 @@ import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
-import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, type Linha, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos } from './domain/lista'
+import { TELA, TREINAMENTO_COLUMNS, TREINAMENTO_FIELDS, TREINAMENTO_SORT, type Linha, builtinViews, readTreinamento, sortTreinamentos, treinamentoKeywordText } from './domain/lista'
 import { copiaParaReciclagem, emptyDraft, isPublicado, plural, type Treinamento } from './domain/treinamentos'
 import { useTreinamentos } from './useTreinamentos'
 import { TreinamentosCards, TreinamentosTable } from './components/TreinamentosLista'
@@ -52,11 +54,14 @@ function Treinamentos({ host }: { host: Host }) {
   })
 
   const read = useMemo(() => extra.read(readTreinamento, (t) => t.id), [extra])
+  const q = useDebouncedText(query)
+  const words = useMemo(() => searchWords(q), [q])
+  const index = useMemo(() => keywordIndex<Linha>((t) => treinamentoKeywordText(t, data.funcionarios, data.progresso, todaySaoPaulo())), [data.items, data.funcionarios, data.progresso])
   const visible = useMemo(() => {
-    const list = data.items.filter((t) => matchesFilters(t, filters, allFields, read) && matchesKeyword(t, query))
+    const list = data.items.filter((t) => matchesFilters(t, filters, allFields, read) && index.matches(t, words))
     return extra.sort(sortTreinamentos(list, view.config.sort, data.progresso), view.config.sort, (t) => t.id)
-  }, [data.items, data.progresso, filters, allFields, query, view.config.sort, extra, read])
-  const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  }, [data.items, data.progresso, filters, allFields, index, words, view.config.sort, extra, read])
+  const lazyKey = useMemo(() => JSON.stringify({ filters, query: q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, allFields, read)
 
@@ -119,7 +124,7 @@ function Treinamentos({ host }: { host: Host }) {
     <div className="page tr-page">
       <div role="toolbar" aria-label="Comandos de treinamentos">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_treinamento', onOpenRecord: open })} view={view} columns={TREINAMENTO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por título ou descrição" aria-label="Buscar treinamentos" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por título, descrição, público, situação, validade ou conteúdo" aria-label="Buscar treinamentos" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
             <Button size={size} icon={<Plus size={16} />} disabled={!data.loaded} onClick={startNew}>Novo treinamento</Button>
@@ -128,7 +133,7 @@ function Treinamentos({ host }: { host: Host }) {
         </ViewBar>
       </div>
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
     </div>
   )
 }

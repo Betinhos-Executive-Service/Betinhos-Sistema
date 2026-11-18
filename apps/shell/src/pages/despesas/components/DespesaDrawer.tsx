@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Dialog, Drawer, StatusBadge } from '@betinhos/ui'
 import { ExternalLink, MapPin } from 'lucide-react'
-import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
+import { formatDateTime, formatMoney } from '../../../app/format'
 import { label } from '../../pagantes/domain/status'
 import type { Source } from '../data/source'
 import { LINKED } from '../data/queries'

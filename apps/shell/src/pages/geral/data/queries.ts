@@ -1,5 +1,5 @@
 import { cleanId, odataString, type Row } from '@betinhos/dataverse'
-import { escapeLike } from '../domain/search'
+import { escapeLike } from '../../../app/keywordSearch'
 import { ENTITY, ID_ATTRIBUTE, type Page, type View } from '../domain/types'
 import { AUDIT_LIMIT, CAMPOS_PROTEGIDOS } from '../domain/protecao'
 
@@ -9,7 +9,6 @@ export const viewsPaths = () => [
   `savedqueries?$select=savedqueryid,name,fetchxml,layoutxml,isdefault&$filter=${encodeURIComponent(`${RESERVA_FILTER} and querytype eq 0`)}&$orderby=name asc`,
   `userqueries?$select=userqueryid,name,fetchxml,layoutxml&$filter=${encodeURIComponent(RESERVA_FILTER)}&$orderby=name asc`,
 ]
-export const quickFindPath = () => `savedqueries?$select=fetchxml&$filter=${encodeURIComponent(`${RESERVA_FILTER} and isquickfindquery eq true`)}`
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
@@ -52,10 +51,6 @@ export function searchPath(set: string, idAttribute: string, nameAttribute: stri
   const filter = q ? `statecode eq 0 and contains(${nameAttribute},'${odataString(escapeLike(q))}')` : 'statecode eq 0'
   return `${set}?$select=${idAttribute},${nameAttribute}&$filter=${encodeURIComponent(filter)}&$orderby=${encodeURIComponent(`${nameAttribute} asc`)}&$top=25`
 }
-
-/** IDs dos registros com o termo em qualquer parte do nome primário, para a busca por palavra-chave achar o lookup pelo nome. Sem filtro de estado: serviço antigo aponta para cliente inativo. */
-export const lookupIdsPath = (set: string, idAttribute: string, nameAttribute: string, query: string, top: number) =>
-  `${set}?$select=${idAttribute}&$filter=${encodeURIComponent(`contains(${nameAttribute},'${odataString(escapeLike(query.trim()))}')`)}&$top=${top}`
 
 /** Releitura da linha com as colunas da visão (lookups ficam como `_x_value`, único formato aceito no `$select`; colunas de link ficam de fora). */
 export function reloadPath(set: string, id: string, keys: string[]) {

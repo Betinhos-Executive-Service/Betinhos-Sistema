@@ -72,7 +72,7 @@ describe('valorDaTenaris e textoDoValor', () => {
 describe('buildFetch', () => {
   it('traz new_camposprotegidos uma vez só, sem misturar com all-attributes', () => {
     const fx = '<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /></entity></fetch>'
-    const base = { page: 1, pageSize: 50, cookie: null, sort: null, search: [] }
+    const base = { page: 1, pageSize: 50, cookie: null, sort: null, search: null }
     const once = buildFetch(fx, base)
     expect(parse(buildFetch(once, base)).doc.querySelectorAll('entity > attribute[name="new_camposprotegidos"]').length).toBe(1)
     const all = '<fetch><entity name="cr40f_reservadeveculos"><all-attributes /></entity></fetch>'

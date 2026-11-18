@@ -83,9 +83,9 @@ export async function loadPagantes(client: DataverseClient, entitySet: string, f
 }
 
 /** Busca no servidor pelo começo do código (PAG-…); nomes e contatos aparecem quando o período chega inteiro. */
-export const pagantesSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_id'] })
+export const pagantesSearchFilter = (query: string) => odataSearchFilter(query, { contains: ['cr40f_id'] })
 
-/** Até 50 pagantes do período cujo código começa com o texto. */
+/** Até 50 pagantes do período cujo código contém o texto (pessoa e OP são vínculos: só a busca local os acha). */
 export async function searchPagantes(client: DataverseClient, entitySet: string, base: string, query: string) {
   const filter = pagantesSearchFilter(query)
   if (!filter) return []

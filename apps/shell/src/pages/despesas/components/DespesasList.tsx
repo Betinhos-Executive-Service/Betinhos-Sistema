@@ -3,7 +3,7 @@ import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView }
 import { ListTable } from '../../../app/ListTable'
 import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { Situacao } from '../conciliacao/components/TransacoesLista'
 import { label } from '../../pagantes/domain/status'
 import { suspeitaIA } from '../domain/ia'

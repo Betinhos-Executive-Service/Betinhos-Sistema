@@ -18,6 +18,16 @@ export function useDebouncedText(value: string, delay = 200) {
 export const searchWords = (query: string) => normalizeSearch(query).split(/\s+/).filter(Boolean)
 
 /**
+ * Busca só de números com máscara (CPF, telefone): "(11) 98765-4321" vira "11987654321". Vazio com letra
+ * ou menos de 3 dígitos. Serve para comparar com o campo gravado só com números.
+ */
+export function digitQuery(words: string[]) {
+  if (words.some((w) => /[a-z]/.test(w))) return ''
+  const digits = words.join('').replace(/\D/g, '')
+  return digits.length >= 3 ? digits : ''
+}
+
+/**
  * Texto normalizado de cada linha, calculado uma vez por lista (não a cada tecla).
  * Criar dentro de `useMemo([lista])`: a lista nova (recarga, gravação) refaz o índice.
  */

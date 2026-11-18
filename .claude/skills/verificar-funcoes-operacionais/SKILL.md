@@ -18,7 +18,7 @@ description: "Verifica a tela #/funcoes-operacionais do shell (Trocar motorista,
 
 ## Roteiro em mock
 `cd apps/shell && npx vite --port 36472 --strictPort` → `http://localhost:36472/#/funcoes-operacionais`.
-1. Motorista: 5 serviços (#11482–#11486) agrupados Hoje/Amanhã/dia; busca; "Trocar motorista" → toast com Desfazer.
+1. Motorista: 5 serviços (#11482–#11486) agrupados Hoje/Amanhã/dia; busca por várias palavras (E, sem acento: ID, passageiro, cliente, trajeto, motorista, status, data, horário; ex. "diego confirmado") com as palavras marcadas nos cards; "Trocar motorista" → toast com Desfazer.
 2. Pedido: "Duplicar este pedido" → escolher datas no calendário, horário e motorista → cria os novos.
 3. Carro: Tipo Troca, Motorista 1 Bruno e 2 Carla, Entre serviços, escolher posição na agenda → "Agendar troca" → resumo e toast. Devolução/Retirada pedem local (cadastro de local no select).
 4. Editar via `?aba=carro&troca=` (id do mock `MOCK_SWAP_ID`); Concluída/Cancelada ficam somente leitura; cancelar/reverter exigem motivo.

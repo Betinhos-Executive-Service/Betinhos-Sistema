@@ -3,7 +3,7 @@ import { formatDateTime, formatMoney, TZ } from '../domain/format'
 import { CAMPOS_PROTEGIDOS, SNAPSHOT_TENARIS, camposProtegidos, type Protecao } from '../domain/protecao'
 import { GROUP_MONTH, GROUP_TOTAL, GROUP_VALUE, GROUP_YEAR } from '../domain/grouping'
 import { ALIAS_MANUTENCAO, CATEGORIA_MANUTENCAO } from '../domain/manutencao'
-import { searchConditions } from '../domain/search'
+import { keywordTokens, matchesKeywords } from '../../../app/keywordSearch'
 import { segundaDe, somarDias } from '../../frota/domain/janela'
 import { mockRecebimentos } from '../../recebimentos/mock'
 import { ENTITY, ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type LookupBind, type LookupOption, type Page, type Sort, type View } from '../domain/types'
@@ -258,7 +258,7 @@ export function mockProtecao(row: Row): Protecao {
   return { audits: [{ changedata: JSON.stringify({ changedAttributes }), createdon: '2026-10-23T19:27:00Z', _userid_value: 'u-keila', [`_userid_value${F}`]: 'Keila, Deborah' }], snapshot }
 }
 
-export type MockFetchOptions = { page: number; pageSize: number; sort: Sort; query: string; quickFind: string[]; now: Date }
+export type MockFetchOptions = { page: number; pageSize: number; sort: Sort; query: string; now: Date }
 
 const fold = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
@@ -280,6 +280,9 @@ function likeRegex(pattern: string) {
   }
   return new RegExp(`^${source}$`, 's')
 }
+
+/** Campos que o mock pesquisa (o real tem a lista de `domain/search.ts`). */
+const MOCK_SEARCH = ['cr40f_id', 'cr40f_trajeto', 'cr40f_cliente', 'cr40f_passageirosetelefonedecontato', 'cr40f_solicitante', 'cr40f_motorista', 'cr40f_veiculo', 'cr40f_status']
 
 function likeMatches(row: Row, attribute: string, pattern: string) {
   const key = keyOf(attribute)
@@ -376,16 +379,16 @@ function mockEntity(fetchxml: string) {
 }
 
 /** Linhas da visão: condições da raiz e busca (as mesmas que o FetchXML real leva). */
-function filterRows(rows: Row[], entity: Element, { query, quickFind, now }: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>) {
+function filterRows(rows: Row[], entity: Element, { query, now }: Pick<MockFetchOptions, 'query' | 'now'>) {
   const roots = Array.from(entity.children).filter((c) => c.tagName === 'filter')
-  const search = searchConditions(query, quickFind)
+  const tokens = keywordTokens(query)
   return rows.filter((row) =>
     roots.every((root) => filter(root, row, now) !== false)
-    && (!search.length || search.some(({ attribute, value }) => likeMatches(row, attribute, value))))
+    && (!tokens.length || matchesKeywords(tokens, MOCK_SEARCH.map((attribute) => shown(row, keyOf(attribute))))))
 }
 
 /** Simula o FetchXML agregado de `buildGroupsFetch`: uma linha por grupo, com o apelido do valor (ou ano e mês) e `total`. */
-export function applyMockGroups(rows: Row[], fetchxml: string, options: Pick<MockFetchOptions, 'query' | 'quickFind' | 'now'>): Row[] {
+export function applyMockGroups(rows: Row[], fetchxml: string, options: Pick<MockFetchOptions, 'query' | 'now'>): Row[] {
   const entity = mockEntity(fetchxml)
   const attribute = Array.from(entity.children).find((c) => c.tagName === 'attribute' && c.getAttribute('groupby') === 'true')?.getAttribute('name') ?? ''
   const key = keyOf(attribute)
@@ -407,9 +410,9 @@ export function applyMockGroups(rows: Row[], fetchxml: string, options: Pick<Moc
 }
 
 /** Simula só o que o mock precisa do FetchXML: condições da raiz, busca, `<order>` da raiz e paginação. */
-export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, quickFind, now }: MockFetchOptions): Page {
+export function applyMockFetch(rows: Row[], fetchxml: string, { page, pageSize, sort, query, now }: MockFetchOptions): Page {
   const entity = mockEntity(fetchxml)
-  const filtered = filterRows(rows, entity, { query, quickFind, now })
+  const filtered = filterRows(rows, entity, { query, now })
 
   const order = Array.from(entity.children).find((c) => c.tagName === 'order')
   const orderAttribute = order?.getAttribute('attribute')

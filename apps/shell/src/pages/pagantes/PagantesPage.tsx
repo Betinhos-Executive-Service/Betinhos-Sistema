@@ -7,6 +7,7 @@ import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
 import { downloadCsv } from '../../app/csv'
 import { selectionActions, useRowSelection } from '../../app/Selecao'
+import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -81,13 +82,13 @@ function Pagantes({ host }: { host: Host }) {
   const { comLeitura, contada } = comprovantes
   const read = useMemo(() => comLeitura(extra.read(readPagante, (p) => p.id)), [extra, comLeitura])
   const filtered = useMemo(() => filterRows(sorted, filters, allFields, read), [sorted, filters, allFields, read])
-  const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId))), [pg.contatos])
+  const index = useMemo(() => keywordIndex<Pagante>((p) => paganteKeywordText(p, pg.contatos.get(p.pessoaId), choices ?? undefined)), [pg.contatos, choices])
+  const words = useMemo(() => searchWords(q), [q])
   const visible = useMemo(() => {
     if (!choices) return []
-    const words = searchWords(q)
     if (!contada && !words.length) return filtered
     return filtered.filter((p) => (!contada || contada(p)) && (!words.length || index.matches(p, words)))
-  }, [filtered, index, q, choices, contada])
+  }, [filtered, index, words, choices, contada])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ filters, q, sort: view.config.sort }), [filters, q, view.config.sort])
@@ -217,7 +218,7 @@ function Pagantes({ host }: { host: Host }) {
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone ou e-mail" aria-label="Buscar pagantes" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone, e-mail, cliente, pagamento ou valor" aria-label="Buscar pagantes" />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
           // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
           selection={{ count: selecting ? sel.rows.length : 0, onClear: sel.clear, actions: selectionActions(bulkActions(sel.rows)) }}>
@@ -231,7 +232,7 @@ function Pagantes({ host }: { host: Host }) {
       ) : null}
       {pg.contatosError && pg.choices ? <Alert tone="warning" title="Contatos não carregados">{pg.contatosError} Busca por telefone e WhatsApp ficam indisponíveis até atualizar.</Alert> : null}
       {comprovantes.aviso}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {pg.choices ? (
         <PaganteDrawer p={current} onClose={() => setSelected(null)} onOpen={setSelected} choices={pg.choices} contatos={pg.contatos} source={source} version={version}
           onStatus={(p, kind) => setStatusRequest({ p, kind })} onRecibo={(p) => void gerarRecibo([p])} onAbrirOp={abrirOp} busyId={busyId} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Dialog, Drawer, Radio, todaySaoPaulo, useToast } from '@betinhos/ui'
 import { fmtData } from '../../../equipamentos/components/EquipamentosList'
-import { formatDate, formatMoney } from '../../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../../app/format'
 import { acoes, cartaoVigente, diferencaCandidata, ehPluggy, janelaCandidatas, MOTIVO_CASADA, MOTIVO_REABERTA, motivoReprocessar, SITUACAO, tipoLabel } from '../domain/regras'
 import { message, type Source } from '../data/source'
 import type { Cartao, DespesaCandidata, Transacao } from '../domain/types'

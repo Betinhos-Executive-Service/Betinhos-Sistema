@@ -28,6 +28,15 @@ const blobText = (blob: Blob) => new Promise<string>((resolve) => {
 })
 
 describe('Ordens de Pagamento', () => {
+  it('busca por várias palavras destaca os termos (SearchHits) e filtra em AND', async () => {
+    const { container } = render(<OpsPage host={{ mode: 'mock' }} />)
+    await screen.findByText('OP-401')
+    const box = screen.getByRole('searchbox', { name: 'Buscar ordens de pagamento' })
+    expect(container.querySelector('.search-hits')).toBeTruthy()
+    fireEvent.change(box, { target: { value: 'OP-401 zzzzqq' } })
+    await waitFor(() => expect(screen.queryByText('OP-401')).toBeNull())
+  })
+
   it('seleção em lote: copia os números e exporta as OPs selecionadas', async () => {
     const writeText = vi.fn(async (_text: string) => undefined)
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })

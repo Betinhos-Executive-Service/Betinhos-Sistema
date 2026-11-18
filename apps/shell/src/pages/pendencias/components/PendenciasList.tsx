@@ -3,7 +3,7 @@ import { Button, StatusBadge, type StatusTone, type MenuAction, type TableColumn
 import { ListTable } from '../../../app/ListTable'
 import { CalendarCheck, ExternalLink, Split, Wrench } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { TIPO_LABEL, type Pendencia, type TipoPendencia } from '../domain/types'
 
 export type Acoes = {

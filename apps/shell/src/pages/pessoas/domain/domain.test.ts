@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { keywordIndex, searchWords } from '../../../app/search'
 import { createMockPessoas } from '../data/mock'
 import { FALLBACK_CHOICES, STATUS, label, withFallback } from './choices'
 import { duplicateIndex, duplicatesFor, emailKey, nameKey, phoneKey } from './duplicates'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EMPTY_FILTERS, VIEWS_KEY, clienteOptions, loadViews, parseStoredFilters, type KV } from './filters'
-import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, pessoaFields, readPessoa, sortPessoas } from './lista'
+import { builtinViews, fromLegacyFilters, legacyViewConfig, pessoaFields, pessoaKeywordText, readPessoa, sortPessoas } from './lista'
 import type { Pessoa } from './types'
 import { applyForm, buildPayload, emptyForm, isDirty, maskPhone, toForm, validateForm } from './form'
 import { mergeServicos, resumo } from './history'
@@ -54,10 +55,15 @@ describe('lista (visões e filtros do Design System)', () => {
   const viewFilters = (id: string) => (JSON.parse(builtinViews(FALLBACK_CHOICES).find((v) => v.id === id)!.config) as { filters: TableFilters }).filters
 
   it('busca sem acento por nome, cliente, celular sem máscara, e-mail e cargo', () => {
-    const q = (query: string) => list.filter((p) => matchesKeyword(p, query, cargo(p))).map((p) => p.nome)
+    const q = (query: string) => list.filter((p) => keywordIndex<Pessoa>((x) => pessoaKeywordText(x, FALLBACK_CHOICES)).matches(p, searchWords(query))).map((p) => p.nome)
     expect(q('lumen')).toEqual(expect.arrayContaining(['Helena Prado', 'Juliana Costa']))
     expect(q('97777')).toEqual(['Juliana Costa'])
     expect(q('ricardo@exemplo')).toEqual(['Ricardo Menezes'])
+    // AND entre palavras, OR entre campos: nome e cliente juntos; rótulo de status e classificação também casam.
+    expect(q('helena lumen')).toContain('Helena Prado')
+    expect(q('helena inexistente')).toEqual([])
+    expect(q('inativo')).toEqual(list.filter((p) => p.status === STATUS.inativo).map((p) => p.nome))
+    expect(q('inativo')).not.toEqual([])
     expect(q('assistente executiva')).toEqual(['Ricardo Menezes'])
     expect(q('saude')).toEqual(['Grupo Congresso Saúde'])
   })

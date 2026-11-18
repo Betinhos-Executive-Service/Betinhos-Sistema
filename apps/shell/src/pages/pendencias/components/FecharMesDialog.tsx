@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Dialog, EmptyState, Field, Select } from '@betinhos/ui'
 import { CalendarCheck } from 'lucide-react'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import type { FechamentoMes, Source } from '../data/source'
 import type { Pendencia } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'

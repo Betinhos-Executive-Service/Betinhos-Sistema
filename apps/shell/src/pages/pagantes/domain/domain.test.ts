@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createMockPagantes, MOCK_CHOICES, MOCK_CONTATOS } from '../data/mock'
 import { matchesFilters, readFilters, type TableFilters } from '@betinhos/ui'
 import { EMPTY_FILTERS, VIEWS_KEY, loadViews, parseStoredFilters, periodoStart, total, type KV } from './filters'
+import { formatMoney } from './messages'
 import { builtinViews, fromLegacyFilters, legacyViewConfig, matchesKeyword, paganteFields, readPagante, sortPagantes } from './lista'
 import { linkToShare, safeUrl, whatsappText, whatsappUrl } from './messages'
 import { FALLBACK_CHOICES, withFallback } from './choices'
@@ -58,6 +59,10 @@ describe('filtros', () => {
     expect(q('op-402')).toEqual(['PAG-1203'])
     expect(q('98765')).toContain('PAG-1202')
     expect(q('lumen')).toContain('PAG-1205')
+    // Todas as palavras precisam aparecer; valor formatado e data de criação também são buscáveis.
+    expect(q('mariana zzzz')).toEqual([])
+    const comValor = list.find((p) => p.valor)!
+    expect(q(formatMoney(comValor.valor))).toContain(comValor.codigo)
   })
 
   it('combina status, recibo e falhas (visões prontas e filtros antigos)', () => {

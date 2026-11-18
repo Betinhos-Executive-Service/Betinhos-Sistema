@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_LOGS, createMockLogs, logsPath, mapLog } from './data'
-import { formatPayload, logFields, matchesKeyword, periodoStart, periodoValido, severidadeLabel, severidadeTone, sortLogs } from './lista'
+import { formatPayload, logFields, logKeywordText, periodoStart, periodoValido, severidadeLabel, severidadeTone, sortLogs } from './lista'
+import { keywordIndex, searchWords } from '../../app/search'
 import { promptCorrecao, recorrencia } from './prompt'
+
+const matchesKeyword = (l: Parameters<typeof logKeywordText>[0], q: string) => keywordIndex(logKeywordText).matches(l, searchWords(q))
 
 describe('logs dos apps', () => {
   it('consulta só o período, do mais novo ao mais antigo, com teto', () => {
@@ -40,6 +43,14 @@ describe('logs dos apps', () => {
     const app = logFields(logs).find((f) => f.key === 'app')
     expect(app && 'options' in app ? app.options?.map((o) => o.value) : []).toEqual(['App Motoristas', 'Escala FDS', 'Sistema Betinhos'])
     expect(logs.filter((l) => matchesKeyword(l, 'FINALIZAR servico')).length).toBeGreaterThan(0)
+  })
+
+  it('busca por palavras: AND entre palavras e campos novos (plataforma, ação, versão, data) casam', () => {
+    const log = { ...createMockLogs(new Date('2026-10-28T12:00:00Z'))[0], plataforma: 'Android', acao: 'sincronizar', versao: '2.1.9', severidade: 'critical', data: new Date('2026-10-28T15:00:00Z') }
+    expect(matchesKeyword(log, 'android SINCRONIZAR')).toBe(true)
+    expect(matchesKeyword(log, 'crítico 2.1.9')).toBe(true)
+    expect(matchesKeyword(log, '28/10/2026 android')).toBe(true)
+    expect(matchesKeyword(log, 'android inexistente')).toBe(false)
   })
 
   it('ordena por severidade pelo peso, não pelo texto', () => {

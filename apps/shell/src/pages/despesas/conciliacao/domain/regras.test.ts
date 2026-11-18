@@ -5,6 +5,7 @@ import {
   abaDe, acoes, CANAL, cartaoParaForm, cartaoVigente, csvLinhas, diasDesde, diferencaCandidata, ehCandidata, filtrar, FILTROS_VAZIOS, idadeTexto, janelaCandidatas,
   ordenar, resumoRevisar, SITUACAO, TIPO, validarCartao,
 } from './regras'
+import { formatMoney } from '../../../../app/format'
 import { filtrosCodec } from './url'
 import type { Cartao, Transacao } from './types'
 
@@ -42,6 +43,10 @@ describe('filtros novos da fila', () => {
     expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'ELAINE' }))).toEqual([])
     expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'fjk2b19' }))).toEqual([t(11).id])
     expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'diego restaurante' }))).toEqual([t(2).id])
+    // Valor formatado e situação em texto também entram; todas as palavras precisam casar.
+    const comValor = trans.find((x) => x.valor)!
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: formatMoney(comValor.valor) }))).toContain(comValor.id)
+    expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, busca: 'posto zzzz' }))).toEqual([])
   })
   it('canal vazio no registro conta como Itaú; situação exata', () => {
     expect(ids(filtrar(trans, { ...FILTROS_VAZIOS, canal: CANAL.ctf }))).toEqual([t(10).id, t(11).id])
