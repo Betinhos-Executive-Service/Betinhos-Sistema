@@ -13,7 +13,9 @@ vi.setConfig({ testTimeout: 30_000 })
 
 const HOJE = todaySP().slice(0, 7)
 const host = () => ({ mode: 'mock' as const })
-const abrir = async (h = host()) => { render(<RhDescontosPage host={h} />); await screen.findByRole('heading', { name: `Folha de ${mesPorExtenso(HOJE)}` }); await screen.findAllByRole('article'); return h }
+const titulo = (mes: string) => ({ name: `Descontos de ${mesPorExtenso(mes)}` })
+const abrir = async (h = host()) => { render(<RhDescontosPage host={h} />); await screen.findByRole('table', titulo(HOJE)); return h }
+const linha = (nome: RegExp) => screen.getByRole('button', { name: nome }).closest('tr') as HTMLElement
 
 beforeEach(() => {
   window.location.hash = '#/rh-descontos'
@@ -22,82 +24,81 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
-const holerite = (nome: RegExp) => screen.getByRole('article', { name: nome })
-const passo = (nome: RegExp) => fireEvent.click(screen.getByRole('button', { name: nome }))
-
 describe('Descontos em folha', () => {
-  it('abre no mês atual, em Conferir, com título e total', async () => {
+  it('abre no mês atual com uma linha por parcela e o que falta lançar', async () => {
     await abrir()
-    expect(screen.getByRole('button', { name: /Conferir/ }).getAttribute('aria-current')).toBe('step')
-    expect(screen.getByText(/4 motoristas · 4 parcelas/)).toBeTruthy()
+    expect(screen.getByRole('heading', titulo(HOJE))).toBeTruthy()
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(4)
+    expect(screen.getByText(/Faltam/).textContent).toMatch(/Faltam 3 de 4 motoristas · R\$/)
+    expect(within(linha(/Bruno/)).getByRole('cell', { name: /^Multa .+ · parcela 2 de 3$/ })).toBeTruthy()
+    expect(within(linha(/Carla/)).getByText(/^Lançada/)).toBeTruthy()
+    expect(within(linha(/Ana/)).getByText('A lançar')).toBeTruthy()
   })
 
-  it('a faixa tem 7 meses e clicar troca a folha', async () => {
+  it('as setas trocam o mês e "Mês atual" volta', async () => {
     await abrir()
-    const faixa = screen.getByRole('group', { name: 'Meses da folha' })
-    const botoes = within(faixa).getAllByRole('button')
-    expect(botoes).toHaveLength(7)
-    fireEvent.click(botoes[3])
-    expect(await screen.findByRole('heading', { name: `Folha de ${mesPorExtenso(somaMes(HOJE, 1))}` })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
+    expect(await screen.findByRole('heading', titulo(somaMes(HOJE, 1)))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Mês atual' }))
+    expect(await screen.findByRole('heading', titulo(HOJE))).toBeTruthy()
   })
 
-  it('mostra um holerite por colaborador com subtotal e parcela x/y', async () => {
+  it('expandir a linha mostra a corrente de parcelas e abre a multa', async () => {
     await abrir()
-    expect(screen.getAllByRole('article')).toHaveLength(4)
-    const bruno = holerite(/Bruno/)
-    expect(within(bruno).getByText('2/3')).toBeTruthy()
-    expect(within(bruno).getByText(/Multa TST0002/)).toBeTruthy()
-    expect(within(bruno).getByText(/Subtotal/)).toBeTruthy()
-    expect(within(holerite(/Carla/)).getByText(/^Lançado/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Bruno/ }))
+    const corrente = await screen.findByRole('list', { name: 'Parcelas mês a mês' })
+    expect(within(corrente).getAllByRole('listitem').length).toBeGreaterThan(1)
+    expect(corrente.querySelector('[aria-current="date"]')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir a multa na Frota' }))
+    expect(window.location.hash).toMatch(/^#\/frota-multas\?registro=multa:/)
   })
 
-  it('a linha do tempo mostra colaborador × mês com a coluna da folha destacada', async () => {
+  it('o aviso de atrasadas leva ao mês mais antigo', async () => {
     await abrir()
-    fireEvent.click(screen.getByRole('radio', { name: 'Linha do tempo' }))
-    const grade = await screen.findByRole('table', { name: 'Descontos por colaborador e mês' })
-    expect(within(grade).getAllByRole('columnheader')).toHaveLength(8)
-    expect(grade.querySelectorAll('[aria-current="date"]').length).toBeGreaterThan(0)
+    const alvo = mesPorExtenso(somaMes(HOJE, -2))
+    expect(screen.getByRole('note').textContent).toMatch(new RegExp(`1 desconto de meses anteriores ainda não foi lançado, desde ${alvo}`))
+    fireEvent.click(screen.getByRole('button', { name: `Ver ${alvo}` }))
+    expect(await screen.findByRole('heading', titulo(somaMes(HOJE, -2)))).toBeTruthy()
   })
 
-  it('o aviso de atrasadas troca a folha para o mês mais antigo', async () => {
+  it('marca uma linha como lançada e desfaz', async () => {
     await abrir()
-    expect(await screen.findByText(/1 parcela de meses anteriores ainda prevista/)).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: `Ver ${mesPorExtenso(somaMes(HOJE, -2))}` }))
-    expect(await screen.findByRole('heading', { name: `Folha de ${mesPorExtenso(somaMes(HOJE, -2))}` })).toBeTruthy()
+    fireEvent.click(within(linha(/Ana/)).getByRole('button', { name: 'Marcar lançado' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^1 parcela · R\$ .+ marcada como lançada\.$/))
+    await waitFor(() => expect(within(linha(/Ana/)).getByText(/^Lançada/)).toBeTruthy())
+    fireEvent.click(within(linha(/Ana/)).getByRole('button', { name: 'Desfazer' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/voltou para a lançar/))
+    expect(within(linha(/Ana/)).getByText('A lançar')).toBeTruthy()
   })
 
-  it('lança os marcados e desfaz', async () => {
+  it('seleciona várias e marca em lote', async () => {
     await abrir()
-    passo(/Lançar/)
-    expect((screen.getByRole('button', { name: 'Marque quem já foi lançado' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Ana/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Diego/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Lançar os 2 marcados' }))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^2 parcelas · R\$ .+ lançadas\.$/))
-    passo(/Conferir/)
-    expect(await within(holerite(/Ana/)).findByText(/^Lançado/)).toBeTruthy()
-    passo(/Lançar/)
-    fireEvent.click(screen.getByRole('button', { name: /Ana Teste/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /^Desfazer 1 lançamento \(R\$/ }))
-    await waitFor(() => expect((screen.getByRole('checkbox', { name: /Marcar Ana/ }) as HTMLInputElement).disabled).toBe(false))
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/voltou a prevista/))
+    expect(screen.queryByRole('button', { name: /como lançadas?$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Selecionar Ana Teste/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Selecionar Diego Teste/ }))
+    expect(screen.getByText(/^2 selecionadas · R\$/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Marcar as 2 como lançadas' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^2 parcelas · R\$ .+ marcadas como lançadas\.$/))
+    expect(screen.getByText(/Faltam/).textContent).toMatch(/Faltam 1 de 4 motoristas/)
   })
 
-  it('mostra a recusa do servidor como veio', async () => {
+  it('selecionar todas marca só as que faltam lançar', async () => {
+    await abrir()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Selecionar todas a lançar' }))
+    expect(screen.getByRole('button', { name: 'Marcar as 3 como lançadas' })).toBeTruthy()
+  })
+
+  it('mostra a recusa do servidor na linha', async () => {
     const h = host()
     const source = createFrotaSource(h)
     vi.spyOn(source, 'lancarDescontoFolha').mockImplementation(async (ids) => ({ parcelas: ids.map((id) => ({ id, ok: false, erro: 'A multa foi cancelada (fictício).' })), encerradas: [], reabertas: [] }))
     await abrir(h)
-    passo(/Lançar/)
-    fireEvent.click(screen.getByRole('checkbox', { name: /Marcar Ana/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Lançar o 1 marcado' }))
-    passo(/Conferir/)
-    expect(await within(holerite(/Ana/)).findByText('A multa foi cancelada (fictício).')).toBeTruthy()
+    fireEvent.click(within(linha(/Ana/)).getByRole('button', { name: 'Marcar lançado' }))
+    expect(await within(linha(/Ana/)).findByText('A multa foi cancelada (fictício).')).toBeTruthy()
   })
 
-  it('Enviar baixa o Excel do mês', async () => {
+  it('Baixar Excel gera o arquivo do mês', async () => {
     await abrir()
-    passo(/Enviar/)
     fireEvent.click(screen.getByRole('button', { name: 'Baixar Excel' }))
     expect(baixarXlsx).toHaveBeenCalledWith(`descontos-folha-${HOJE}.xlsx`, expect.objectContaining({ colunas: expect.any(Array) }))
     expect(await screen.findByText(/Excel baixado às/)).toBeTruthy()
@@ -106,13 +107,6 @@ describe('Descontos em folha', () => {
   it('mês sem parcelas mostra o vazio', async () => {
     await abrir()
     for (let i = 0; i < 12; i++) fireEvent.click(screen.getByRole('button', { name: 'Próximo mês' }))
-    const alvo = mesPorExtenso(somaMes(HOJE, 12))
-    expect(await screen.findByText(`Nenhum desconto para ${alvo}.`)).toBeTruthy()
-  })
-
-  it('clicar numa linha de multa abre a multa na Frota', async () => {
-    await abrir()
-    fireEvent.click(within(holerite(/Ana/)).getByRole('button', { name: /Multa TST0001/ }))
-    expect(window.location.hash).toBe('#/frota-multas?registro=multa:u12')
+    expect(await screen.findByText(`Nenhum desconto para ${mesPorExtenso(somaMes(HOJE, 12))}.`)).toBeTruthy()
   })
 })
