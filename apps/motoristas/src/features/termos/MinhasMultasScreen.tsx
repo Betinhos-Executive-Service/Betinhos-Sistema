@@ -81,7 +81,7 @@ function Trilha({ etapa }: { etapa: number }) {
 }
 
 function Meta({ multa }: { multa: MinhaMulta }) {
-  const partes = [multa.placa || multa.auto, formatDataHora(multa.dataHora), multa.local].filter(Boolean);
+  const partes = [formatDataHora(multa.dataHora), multa.local].filter(Boolean);
   return (
     <p className="multa-meta">
       {partes.join(" · ")}
@@ -142,12 +142,12 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
   const proxima = parcelas.find((p) => p.status !== "descontada")?.numero;
   const resumo = `Falta descontar ${formatBrl(falta)} · ${descontadas} de ${total} descontadas`;
   return (
-    <Cartao className="multa-dinheiro" grupo={multa.grupo} titulo={multa.situacao} resumo={resumo} tour={destaqueTour ? "multas-parcelas" : undefined}>
+    <Cartao className="multa-dinheiro" grupo={multa.grupo} titulo={`Multa ${multa.placa || multa.auto} · ${diaMes(multa.dataHora)}`} resumo={resumo} tour={destaqueTour ? "multas-parcelas" : undefined}>
       <Trilha etapa={etapaDaMulta(multa)} />
       <p className="multa-rotulo">Falta descontar</p>
       <p className="multa-valor">{formatBrl(falta)}</p>
       <div className="multa-barra" aria-hidden="true">{parcelas.map((p) => <i key={p.numero} data-on={p.status === "descontada" || undefined} />)}</div>
-      <p className="multa-legenda">{legendaParcelas(descontadas, total)} · {multa.placa || multa.auto}, {diaMes(multa.dataHora)}</p>
+      <p className="multa-legenda">{legendaParcelas(descontadas, total)}</p>
       <ul className="multa-meses" aria-label="Parcelas do desconto em folha">
         {parcelas.map((p) => (
           <li key={p.numero} data-estado={p.status === "descontada" ? "descontada" : p.numero === proxima ? "proxima" : "futura"}>
@@ -163,12 +163,11 @@ function DescontoCard({ multa, somenteLeitura, destaqueTour }: { multa: MinhaMul
 
 /** Multa sem tarefa nem parcelas (em andamento ou encerrada): trilha e uma linha com a situação. */
 function SimplesCard({ multa, somenteLeitura }: { multa: MinhaMulta; somenteLeitura: boolean }) {
-  const resumo = [multa.placa || multa.auto, diaMes(multa.dataHora), multa.grupo === "encerrada" ? "Encerrada" : ""].filter(Boolean).join(" · ");
+  const resumo = [multa.placa || multa.auto, diaMes(multa.dataHora)].filter(Boolean).join(" · ");
   return (
     <Cartao grupo={multa.grupo} titulo={multa.situacao} resumo={resumo}>
       <Meta multa={multa} />
       <Trilha etapa={etapaDaMulta(multa)} />
-      <p className="multa-situacao">{multa.situacao}</p>
       <VerTermoAssinado multa={multa} somenteLeitura={somenteLeitura} />
     </Cartao>
   );
