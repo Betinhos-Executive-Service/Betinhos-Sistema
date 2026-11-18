@@ -37,8 +37,8 @@ test('seções na ordem da spec, cada linha com auto, placa, responsável, prazo
   assert.match(corpo, /#\/frota-multas\?status=202410006/)
 })
 
-test('aceite marca " · motorista declarou" quando o motorista declarou pelo app', () => {
-  assert.ok(tem.actions.Linhas_aceite.inputs.select.includes("equals(item()?['declarado'], true), ' · motorista declarou'"))
+test('aceite não repete o aviso de declarado: o passo já traz "motorista declarou em dd/mm"', () => {
+  assert.ok(!tem.actions.Linhas_aceite.inputs.select.includes(' · motorista declarou'))
   assert.equal(tem.actions.Linhas_contestadas.inputs.from, "@outputs('Dados')?['contestadas']")
 })
 
