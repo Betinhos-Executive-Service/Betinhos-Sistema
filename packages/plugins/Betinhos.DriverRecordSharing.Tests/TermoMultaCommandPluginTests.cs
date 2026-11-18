@@ -893,6 +893,95 @@ namespace Betinhos.DriverRecordSharing.Tests
             return termo;
         }
 
+        // ---------- Aditivo pelo gov.br ----------
+
+        private static Dictionary<string, object> DoFuncionario(Scenario s) => new Dictionary<string, object> { ["new_FuncionarioId"] = s.Motorista.Id };
+
+        private static byte[] AditivoAssinado(Scenario s)
+        {
+            var ctx = Run(s, "new_GerarAditivoMotorista", s.Gestor, DoFuncionario(s));
+            var baseBytes = Convert.FromBase64String((string)ctx.OutputParameters["new_PdfBase64"]);
+            var extra = Encoding.ASCII.GetBytes("\n<< /Type /Sig /ByteRange [0 10 20 30] >>\n%%EOF\n");
+            return baseBytes.Concat(extra).ToArray();
+        }
+
+        [Fact]
+        public void GerarAditivoDevolvePdfENomeSemAcento()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+
+            var ctx = Run(s, "new_GerarAditivoMotorista", s.Gestor, DoFuncionario(s));
+
+            Assert.Equal("aditivo-joao-motorista-a1.pdf", ctx.OutputParameters["new_NomeArquivo"]);
+            Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(Convert.FromBase64String((string)ctx.OutputParameters["new_PdfBase64"]), 0, 5));
+        }
+
+        [Fact]
+        public void GerarAditivoSemPrivilegioRecusa()
+        {
+            var s = Cenario();
+            Assert.Equal("Só a gestão gera e anexa o aditivo.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_GerarAditivoMotorista", s.Gestor, DoFuncionario(s))).Message);
+        }
+
+        [Fact]
+        public void RegistrarAditivoComPdfCertoGravaADataEOArquivo()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            var pdf = AditivoAssinado(s);
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(pdf);
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+
+            Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs);
+
+            Assert.Equal("new_aditivoassinatura", s.ColunaDoUpload);
+            Assert.Equal(pdf, s.UploadedPdf);
+            Assert.Equal(new DateTime(2026, 10, 21), s.Motorista.GetAttributeValue<DateTime>("new_aditivoassinaturaem"));
+        }
+
+        [Fact]
+        public void RegistrarAditivoComDataFuturaRecusa()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(AditivoAssinado(s));
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 23);
+
+            Assert.Equal("A data da assinatura não pode ser no futuro.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+            Assert.Null(s.UploadedPdf);
+        }
+
+        [Fact]
+        public void RegistrarAditivoSemPrivilegioRecusa()
+        {
+            var s = Cenario();
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(new byte[] { 1 });
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+            Assert.Equal("Só a gestão gera e anexa o aditivo.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+        }
+
+        [Fact]
+        public void RegistrarAditivoComPdfDeOutroTextoRecusa()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            var pdf = AditivoAssinado(s);
+            s.Rows("new_textotermomulta").First(r => r.GetAttributeValue<string>("new_versao") == "a1")["new_texto"] = "ADITIVO NOVO {motorista}";
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(pdf);
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+
+            Assert.StartsWith("Este PDF não é o aditivo gerado",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+        }
+
         private static RemoteExecutionContext Run(Scenario s, string message, Guid user, Dictionary<string, object> inputs)
         {
             var ctx = new RemoteExecutionContext { MessageName = message, InitiatingUserId = user, UserId = user, Depth = 1 };
@@ -987,6 +1076,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             public readonly List<OrganizationRequest> Executados = new List<OrganizationRequest>();
             public Action<OrganizationRequest> AoExecutar;
             public byte[] UploadedPdf;
+            public string ColunaDoUpload;
             public readonly HashSet<Guid> Privilegiados = new HashSet<Guid>();
             private readonly List<byte[]> blocks = new List<byte[]>();
 
@@ -1065,6 +1155,7 @@ namespace Betinhos.DriverRecordSharing.Tests
                         Grants.Add(Tuple.Create(target.Id, principal.Principal.Id));
                         return response;
                     case "InitializeFileBlocksUpload":
+                        ColunaDoUpload = (string)request.Parameters["FileAttributeName"];
                         blocks.Clear();
                         response.Results["FileContinuationToken"] = "tok";
                         return response;

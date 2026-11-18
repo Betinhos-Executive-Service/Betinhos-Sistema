@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Web.Script.Serialization;
 using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
@@ -59,6 +60,8 @@ namespace Betinhos.DriverRecordSharing
         private const int Guia = 100000000, Folha = 100000001;
         private const int Prevista = 100000000, Descontada = 100000001, ParcelaCancelada = 100000002;
         private const int TextoTipoTermo = 100000000;
+        private const int TextoTipoAditivo = 100000001;
+        private const string ColunaAditivo = "new_aditivoassinatura";
         private const string PassoMulta = "cr40f_PassoMulta";
         private const int MaxParcelas = 12;
         private const string VersaoProvisoria = "v0-placeholder";
@@ -118,6 +121,8 @@ namespace Betinhos.DriverRecordSharing
                     case "new_MinhasMultas": MinhasMultasDoMotorista(context, system, tracing); break;
                     case "new_DeclararAceiteMulta": DeclararAceite(context, system, tracing); break;
                     case "new_LembrarAceiteMulta": LembrarAceite(context, caller, system); break;
+                    case "new_GerarAditivoMotorista": GerarAditivo(context, system); break;
+                    case "new_RegistrarAditivoMotorista": RegistrarAditivo(context, system); break;
                     case "Create":
                     case "Update":
                     case "Delete":
@@ -361,14 +366,16 @@ namespace Betinhos.DriverRecordSharing
             funcionario.GetAttributeValue<DateTime?>("new_aditivoassinaturaem").HasValue
             && funcionario.Contains("new_aditivoassinatura") && funcionario["new_aditivoassinatura"] != null;
 
-        private static Entity TextoVigente(IOrganizationService system)
+        private static Entity TextoVigente(IOrganizationService system, int tipo = TextoTipoTermo)
         {
             var query = new QueryExpression("new_textotermomulta") { ColumnSet = new ColumnSet("new_versao", "new_texto") };
-            query.Criteria.AddCondition("new_tipo", ConditionOperator.Equal, TextoTipoTermo);
+            query.Criteria.AddCondition("new_tipo", ConditionOperator.Equal, tipo);
             query.Criteria.AddCondition("new_vigente", ConditionOperator.Equal, true);
             query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
             var rows = system.RetrieveMultiple(query).Entities;
-            if (rows.Count != 1) throw new InvalidPluginExecutionException("Cadastre exatamente um texto de termo vigente antes de enviar.");
+            if (rows.Count != 1) throw new InvalidPluginExecutionException(tipo == TextoTipoAditivo
+                ? "Cadastre exatamente um texto de aditivo vigente antes de gerar."
+                : "Cadastre exatamente um texto de termo vigente antes de enviar.");
             return rows[0];
         }
 
@@ -673,11 +680,11 @@ namespace Betinhos.DriverRecordSharing
             return result;
         }
 
-        private static void UploadPdf(IOrganizationService system, EntityReference target, string fileName, byte[] pdf)
+        private static void UploadPdf(IOrganizationService system, EntityReference target, string fileName, byte[] pdf, string coluna = "new_pdf")
         {
             var init = new OrganizationRequest("InitializeFileBlocksUpload");
             init["Target"] = target;
-            init["FileAttributeName"] = "new_pdf";
+            init["FileAttributeName"] = coluna;
             init["FileName"] = fileName;
             var token = (string)system.Execute(init).Results["FileContinuationToken"];
             const int BlockSize = 4 * 1024 * 1024;
@@ -827,6 +834,74 @@ namespace Betinhos.DriverRecordSharing
                 && TermoPrazos.LembrarAceite(indicacao.Value, multa.GetAttributeValue<DateTime?>("cr40f_ultimolembreteaceiteem"), hoje);
             if (lembrar) system.Update(new Entity(Multa, id) { ["cr40f_ultimolembreteaceiteem"] = hoje });
             context.OutputParameters["new_Lembrou"] = lembrar;
+        }
+
+        // ---------------- Aditivo pelo gov.br ----------------
+
+        private sealed class AditivoGerado
+        {
+            public Entity Funcionario;
+            public string Versao;
+            public byte[] Pdf;
+        }
+
+        // Só a gestão gera e anexa; o texto vigente do aditivo leva o nome e o CPF do funcionário.
+        private static AditivoGerado RegerarAditivo(IPluginExecutionContext context, IOrganizationService system)
+        {
+            if (!TemPrivilegio(system, context.InitiatingUserId, PrivilegioGestor)) throw new InvalidPluginExecutionException("Só a gestão gera e anexa o aditivo.");
+            var id = InputGuid(context, "new_FuncionarioId");
+            Entity funcionario;
+            try { funcionario = system.Retrieve(Funcionario, id, new ColumnSet("cr40f_nomecompleto", "cr40f_numerodocpf")); }
+            catch (Exception) { throw new InvalidPluginExecutionException("Funcionário não encontrado."); }
+            var texto = TextoVigente(system, TextoTipoAditivo);
+            var versao = texto.GetAttributeValue<string>("new_versao") ?? "";
+            if (versao == VersaoProvisoria) throw new InvalidPluginExecutionException("O texto do aditivo ainda é provisório.");
+            var corpo = (texto.GetAttributeValue<string>("new_texto") ?? "")
+                .Replace("{motorista}", funcionario.GetAttributeValue<string>("cr40f_nomecompleto") ?? "")
+                .Replace("{cpf}", funcionario.GetAttributeValue<string>("cr40f_numerodocpf") ?? "não informado");
+            return new AditivoGerado { Funcionario = funcionario, Versao = versao, Pdf = AditivoPdf.Gerar(corpo, versao, id) };
+        }
+
+        private static string SemAcento(string valor)
+        {
+            var decomposto = (valor ?? "").Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder();
+            foreach (var c in decomposto)
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark) continue;
+                sb.Append(char.IsLetterOrDigit(c) && c < 128 ? char.ToLowerInvariant(c) : '-');
+            }
+            return System.Text.RegularExpressions.Regex.Replace(sb.ToString(), "-+", "-").Trim('-');
+        }
+
+        private static void GerarAditivo(IPluginExecutionContext context, IOrganizationService system)
+        {
+            var aditivo = RegerarAditivo(context, system);
+            var nome = SemAcento(aditivo.Funcionario.GetAttributeValue<string>("cr40f_nomecompleto"));
+            context.OutputParameters["new_PdfBase64"] = Convert.ToBase64String(aditivo.Pdf);
+            context.OutputParameters["new_NomeArquivo"] = "aditivo-" + (nome.Length == 0 ? "funcionario" : nome) + "-" + SemAcento(aditivo.Versao) + ".pdf";
+        }
+
+        private void RegistrarAditivo(IPluginExecutionContext context, IOrganizationService system)
+        {
+            var aditivo = RegerarAditivo(context, system);
+            var base64 = InputString(context, "new_PdfBase64");
+            if (string.IsNullOrWhiteSpace(base64)) throw new InvalidPluginExecutionException("Envie o PDF assinado.");
+            // O limite vale antes de decodificar: 5 MB em bytes são cerca de 7 milhões de caracteres em base64.
+            if (base64.Length > (AditivoPdf.MaxBytes / 3 + 2) * 4) throw new InvalidPluginExecutionException("O PDF passa de 5 MB.");
+            byte[] assinado;
+            try { assinado = Convert.FromBase64String(base64); }
+            catch (FormatException) { throw new InvalidPluginExecutionException("Envie o PDF assinado."); }
+            var assinadoEm = context.InputParameters.Contains("new_AssinadoEm") && context.InputParameters["new_AssinadoEm"] is DateTime d ? d : (DateTime?)null;
+            if (assinadoEm == null) throw new InvalidPluginExecutionException("Informe a data da assinatura.");
+            var dia = assinadoEm.Value.Kind == DateTimeKind.Utc ? TimeZoneInfo.ConvertTimeFromUtc(assinadoEm.Value, SaoPaulo()).Date : assinadoEm.Value.Date;
+            var hoje = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date;
+            if (dia > hoje) throw new InvalidPluginExecutionException("A data da assinatura não pode ser no futuro.");
+            var erro = AditivoPdf.Conferir(assinado, aditivo.Pdf);
+            if (erro != null) throw new InvalidPluginExecutionException(erro);
+            var nome = "aditivo-" + SemAcento(aditivo.Funcionario.GetAttributeValue<string>("cr40f_nomecompleto")) + "-" + SemAcento(aditivo.Versao) + ".pdf";
+            UploadPdf(system, aditivo.Funcionario.ToEntityReference(), nome, assinado, ColunaAditivo);
+            system.Update(new Entity(Funcionario, aditivo.Funcionario.Id) { ["new_aditivoassinaturaem"] = assinadoEm.Value });
         }
 
         // ---------------- Utilitários ----------------
