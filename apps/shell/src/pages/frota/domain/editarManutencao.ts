@@ -34,7 +34,7 @@ export function valoresEdicaoIniciais(m: DetalheManutencao): ValoresEdicao {
   return {
     veiculoId: m.veiculo?.id ?? '', solicitanteId: m.solicitante?.id ?? '', descricao: m.descricao, km: texto(m.km), tipo: texto(m.tipo), grau: texto(m.grau), comentario: m.comentarioAprovador ?? '',
     janelaInicio: m.janelaInicio ?? '', janelaFim: m.janelaFim ?? '',
-    dataManutencao: dataHoraLocal(m.dataManutencao), kmRealizado: texto(m.kmRealizado), valor: m.valor === null ? '' : m.valor.toFixed(2).replace('.', ','), estabelecimento: m.estabelecimento ?? '', servicoRealizado: m.servicoRealizado ?? '',
+    dataManutencao: dataHoraLocal(m.dataManutencao), kmRealizado: texto(m.kmRealizado), valor: m.valor === null ? '' : m.valor.toFixed(2), estabelecimento: m.estabelecimento ?? '', servicoRealizado: m.servicoRealizado ?? '',
   }
 }
 
