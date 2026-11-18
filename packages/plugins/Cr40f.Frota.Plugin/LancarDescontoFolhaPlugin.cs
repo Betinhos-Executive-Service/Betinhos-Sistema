@@ -65,7 +65,7 @@ public sealed class LancarDescontoFolhaPlugin : IPlugin
     public static ResultadoLancamento Executar(IOrganizationService sistema, IReadOnlyList<Guid> ids, string acao, string hoje, Action<Guid, string, string> passo)
     {
         if (acao != "lancar" && acao != "desfazer") throw new InvalidPluginExecutionException("Ação inválida: use lancar ou desfazer.");
-        if (ids.Count < 1 || ids.Count > Maximo) throw new InvalidPluginExecutionException("Escolha de 1 a 200 parcelas.");
+        if (ids.Count < 1 || ids.Count > Maximo) throw new InvalidPluginExecutionException($"Escolha de 1 a {Maximo} parcelas.");
         var unicos = ids.Distinct().ToList();
         var q = new QueryExpression(PassoMultaPlugin.Parcelas) { ColumnSet = new ColumnSet("new_status", "new_multa") };
         q.Criteria.AddCondition("new_parcelamultafolhaid", ConditionOperator.In, unicos.Cast<object>().ToArray());
