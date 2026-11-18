@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { agruparMinhasMultas, descreverParcela, erroDeRede, parcelasVigentes, diaMes, mapMinhaMulta, textoAceite, type MinhaMulta } from "../src/features/termos/minhasMultas.ts";
+import { agruparMinhasMultas, etapaDaMulta, resumoDesconto, legendaParcelas, mesFolha, diasAteOPrazo, textoChipPrazo, descreverParcela, erroDeRede, parcelasVigentes, diaMes, mapMinhaMulta, textoAceite, type MinhaMulta } from "../src/features/termos/minhasMultas.ts";
 import { lerMinhasMultas, MINHAS_MULTAS_OFFLINE_KEY, salvarMinhasMultas } from "../src/features/termos/minhasMultasOffline.ts";
 
 const multa = (p: Partial<MinhaMulta>): MinhaMulta => ({ id: "m1", auto: "A000000001", placa: "TST1A23", dataHora: "2026-11-05T17:30:00Z", local: "Av. Exemplo, 100 (fictício)", infracao: "Infração fictícia", grupo: "andamento", situacao: "Aguardando o pagamento", acao: null, termoId: null, termoStatus: null, prazoAceite: null, aceiteDeclaradoEm: null, parcelas: [], ...p });
@@ -66,4 +66,41 @@ test("só falha de rede usa o cache; erro do servidor não", () => {
   assert.equal(erroDeRede(Object.assign(new Error("x"), { cause: new TypeError("f") })), true);
   assert.equal(erroDeRede(Object.assign(new Error("Falha ao registrar ação (500)."), { code: 500 })), false);
   assert.equal(erroDeRede(new SyntaxError("json")), false);
+});
+
+const parc = (numero: number, status: string, valor = 65.08) => ({ numero, competencia: `2026-${10 + numero}-01`, valor, status });
+
+test("etapa da multa: ação manda, encerrada fecha, parcelas decidem, resto se infere", () => {
+  assert.equal(etapaDaMulta(multa({ grupo: "precisa", acao: "assinar" })), 0);
+  assert.equal(etapaDaMulta(multa({ grupo: "precisa", acao: "aceite" })), 1);
+  assert.equal(etapaDaMulta(multa({ grupo: "encerrada", parcelas: [parc(1, "descontada")] })), 4);
+  assert.equal(etapaDaMulta(multa({ parcelas: [parc(1, "descontada"), parc(2, "prevista")] })), 2);
+  assert.equal(etapaDaMulta(multa({ parcelas: [parc(1, "descontada"), parc(2, "cancelada")] })), 3);
+  assert.equal(etapaDaMulta(multa({ termoStatus: "pendente" })), 0);
+  assert.equal(etapaDaMulta(multa({ aceiteDeclaradoEm: "2026-11-10" })), 1);
+  assert.equal(etapaDaMulta(multa({ termoStatus: "assinado" })), 2);
+  assert.equal(etapaDaMulta(multa({})), 2);
+});
+
+test("resumo do desconto soma só o que falta e ignora cancelada", () => {
+  const r = resumoDesconto([parc(1, "descontada"), parc(2, "prevista"), parc(3, "prevista"), parc(4, "cancelada", 99)]);
+  assert.deepEqual(r, { total: 3, descontadas: 1, falta: 130.16 });
+  assert.deepEqual(resumoDesconto([]), { total: 0, descontadas: 0, falta: 0 });
+  assert.equal(legendaParcelas(1, 3), "1 de 3 parcelas descontada");
+  assert.equal(legendaParcelas(2, 3), "2 de 3 parcelas descontadas");
+  assert.equal(legendaParcelas(0, 1), "0 de 1 parcela descontadas");
+});
+
+test("mês da folha e chip de prazo", () => {
+  assert.equal(mesFolha("2026-11-01"), "Nov/2026");
+  assert.equal(mesFolha("2027-01-01"), "Jan/2027");
+  assert.equal(mesFolha(null), "");
+  assert.equal(diasAteOPrazo("2026-11-25", "2026-11-18"), 7);
+  assert.equal(diasAteOPrazo("2026-12-01", "2026-11-30"), 1);
+  assert.equal(diasAteOPrazo(null, "2026-11-18"), null);
+  assert.equal(textoChipPrazo("2026-11-25", "2026-11-18"), "Até 25/11 · faltam 7 dias");
+  assert.equal(textoChipPrazo("2026-11-19", "2026-11-18"), "Até 19/11 · falta 1 dia");
+  assert.equal(textoChipPrazo("2026-11-18", "2026-11-18"), "Até 18/11 · é hoje");
+  assert.equal(textoChipPrazo("2026-11-10", "2026-11-18"), "Prazo vencido em 10/11");
+  assert.equal(textoChipPrazo(null, "2026-11-18"), "");
 });

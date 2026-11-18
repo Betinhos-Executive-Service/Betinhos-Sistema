@@ -92,6 +92,66 @@ export function descreverParcela(parcela: MinhaParcela, total: number) {
   return `Parcela ${parcela.numero} de ${total} · ${formatBrl(parcela.valor)}${folha} · ${parcela.status}`;
 }
 
+export const ETAPAS_MULTA = ["Termo", "CNH Digital", "Desconto", "Fim"] as const;
+
+/**
+ * Índice da etapa atual da multa na trilha Termo, CNH Digital, Desconto, Fim (4 = tudo feito).
+ * Regra: a ação pedida ao motorista manda (assinar = 0, aceite = 1); encerrada = 4; com parcelas vigentes,
+ * alguma ainda não descontada = 2 e todas descontadas (falta só encerrar) = 3. Sem parcelas, infere-se do que o
+ * servidor já mandou: termo pendente = 0, aceite declarado (em conferência) = 1, e o restante (termo assinado ou
+ * sem informação, aguardando pagamento ou desconto) = 2.
+ */
+export function etapaDaMulta(m: Pick<MinhaMulta, "acao" | "grupo" | "termoStatus" | "aceiteDeclaradoEm" | "parcelas">): 0 | 1 | 2 | 3 | 4 {
+  if (m.acao === "assinar") return 0;
+  if (m.acao === "aceite") return 1;
+  if (m.grupo === "encerrada") return 4;
+  const vigentes = parcelasVigentes(m.parcelas);
+  if (vigentes.length) return vigentes.some((p) => p.status !== "descontada") ? 2 : 3;
+  if (m.termoStatus === "pendente") return 0;
+  if (m.aceiteDeclaradoEm) return 1;
+  return 2;
+}
+
+/** Resumo do desconto em folha: quanto falta (parcelas vigentes ainda não descontadas) e quantas já saíram. */
+export function resumoDesconto(parcelas: MinhaParcela[]) {
+  const vigentes = parcelasVigentes(parcelas);
+  const descontadas = vigentes.filter((p) => p.status === "descontada").length;
+  const falta = vigentes.filter((p) => p.status !== "descontada").reduce((soma, p) => soma + p.valor, 0);
+  return { total: vigentes.length, descontadas, falta: Math.round(falta * 100) / 100 };
+}
+
+/** "1 de 3 parcelas descontada" / "2 de 3 parcelas descontadas". */
+export const legendaParcelas = (descontadas: number, total: number) =>
+  `${descontadas} de ${total} ${total === 1 ? "parcela" : "parcelas"} ${descontadas === 1 ? "descontada" : "descontadas"}`;
+
+const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+/** "Nov/2026" a partir da competência yyyy-MM-dd; vazio sem data válida. */
+export function mesFolha(competencia: string | null) {
+  const m = /^(\d{4})-(\d{2})/.exec(competencia ?? "");
+  return m && MESES[Number(m[2]) - 1] ? `${MESES[Number(m[2]) - 1]}/${m[1]}` : "";
+}
+
+/** Dias inteiros de hoje (yyyy-MM-dd, Brasília) até o prazo (yyyy-MM-dd); negativo = vencido. null sem prazo válido. */
+export function diasAteOPrazo(prazo: string | null, hoje: string) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(prazo ?? "");
+  const b = /^(\d{4})-(\d{2})-(\d{2})/.exec(hoje);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(+a[1], +a[2] - 1, +a[3]) - Date.UTC(+b[1], +b[2] - 1, +b[3])) / 86400000);
+}
+
+/** Hoje em Brasília, yyyy-MM-dd. */
+export const hojeEmBrasilia = (agora = new Date()) => agora.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+
+/** "Até 25/11 · faltam 7 dias", "Até 25/11 · falta 1 dia", "Até 25/11 · é hoje", "Prazo vencido em 25/11". */
+export function textoChipPrazo(prazo: string | null, hoje: string) {
+  const dias = diasAteOPrazo(prazo, hoje);
+  if (dias === null) return "";
+  const dia = diaMes(prazo);
+  if (dias < 0) return `Prazo vencido em ${dia}`;
+  if (dias === 0) return `Até ${dia} · é hoje`;
+  return `Até ${dia} · ${dias === 1 ? "falta 1 dia" : `faltam ${dias} dias`}`;
+}
+
 /** "14:32" no fuso de Brasília, para a faixa de modo offline. */
 export function horaDoCache(salvoEm: string) {
   return new Date(salvoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
