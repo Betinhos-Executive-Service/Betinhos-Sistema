@@ -1,5 +1,4 @@
-import { useEffect, useId, useMemo, useRef, type ReactNode } from 'react'
-import { AnimatePresence, LazyMotion, domMax, m, useReducedMotion, type Variants } from 'framer-motion'
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { Button, ProgressRing, buttonClassName, type TableColumn } from '@betinhos/ui'
 import { ArrowDownRight, ArrowUpRight, List, X } from 'lucide-react'
 import { Tabela } from './Tabela'
@@ -15,55 +14,122 @@ import { useMedia } from '../../operacional/useMedia'
 import { Chips } from './KpiChip'
 import { Lista } from './ListaDetalhe'
 import { MEDIA_MOBILE, juntar } from './Linhas'
-import { retanguloDe, type Conteudo, type GenericoAmpliado, type Origem, type Retangulo } from './DetalheProvider'
+import { ABRIR_MS, CORPO_ENTRA, FADE_MS, FECHAR_MS, FUNDO_MS, REDUZIDO_MS, animar, criarClone, reduzidoAgora, transformPara } from './morph'
+import type { Conteudo, GenericoAmpliado, Origem } from './DetalheProvider'
 
 /* Card ampliado (chunk carregado sob demanda): gráfico maior, tabela dos números, comparativo, top 5 e "Ver na lista". */
 
-const LAYOUT = 'dash-ampliado'
-const EASE = [0.23, 1, 0.32, 1] as const
-const ENTRADA = { duration: 0.3, ease: EASE }
-const SAIDA = { duration: 0.22, ease: EASE }
-
 type Props = {
-  conteudo: Conteudo | null; aberto: boolean; origem: Origem | null; clientUrl: string | null
-  onFechar: () => void; onOrigemPronta: () => void; onSaiu: () => void
+  conteudo: Conteudo; aberto: boolean; origem: Origem | null; clientUrl: string | null
+  onFechar: () => void; onSaiu: () => void
 }
 
-/** Tamanho e posição do item de origem agora (ele pode ter rolado ou mudado de tamanho desde o clique). */
-const retanguloAtual = (origem: Origem): Retangulo | null => {
-  return origem.el?.isConnected ? retanguloDe(origem.el) : origem.rect
-}
+/** Animações em curso, o clone e o item escondido: tudo que volta ao normal quando a transição acaba ou o painel desmonta. */
+type Vivo = { seq: number; anims: Animation[]; clone: HTMLElement | null; el: HTMLElement | null }
 
-/** Invisível, do tamanho do item clicado: o painel nasce dele e volta a ele ao fechar (mesmo `layoutId`). */
-function Fantasma({ rect, onMontou }: { rect: Retangulo; onMontou: () => void }) {
-  useEffect(() => {
-    // Dois quadros: o framer mede o fantasma no commit; só depois a URL abre o painel.
-    let b = 0
-    const a = requestAnimationFrame(() => { b = requestAnimationFrame(onMontou) })
-    return () => { cancelAnimationFrame(a); cancelAnimationFrame(b) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  return <m.div layoutId={LAYOUT} className="dash-ampliado__fantasma" aria-hidden="true" style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }} />
-}
-
-export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFechar, onOrigemPronta, onSaiu }: Props) {
-  const reduzido = useReducedMotion() ?? false
-  const rect = useMemo(() => (origem ? retanguloAtual(origem) : null), [origem, aberto]) // eslint-disable-line react-hooks/exhaustive-deps
-  const comOrigem = !reduzido && rect != null
-  return (
-    <LazyMotion features={domMax}>
-      {!aberto && comOrigem && rect ? <Fantasma key="fantasma" rect={rect} onMontou={onOrigemPronta} /> : null}
-      <AnimatePresence onExitComplete={onSaiu}>
-        {aberto && conteudo ? <Painel key="painel" conteudo={conteudo} reduzido={reduzido} compartilhado={comOrigem} clientUrl={clientUrl} onFechar={onFechar} /> : null}
-      </AnimatePresence>
-    </LazyMotion>
-  )
-}
-
-function Painel({ conteudo, reduzido, compartilhado, clientUrl, onFechar }: { conteudo: Conteudo; reduzido: boolean; compartilhado: boolean; clientUrl: string | null; onFechar: () => void }) {
+/** O painel monta já aberto (a URL muda no clique); `aberto` falso dispara a saída e `onSaiu` só vem depois dela. */
+export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFechar, onSaiu }: Props) {
   const id = useId()
+  const raiz = useRef<HTMLDivElement>(null)
+  const fundo = useRef<HTMLDivElement>(null)
   const painel = useRef<HTMLElement>(null)
   const fechar = useRef<HTMLButtonElement>(null)
+  const vivo = useRef<Vivo>({ seq: 0, anims: [], clone: null, el: null })
+
+  const encerrar = () => {
+    const v = vivo.current
+    v.anims.forEach((a) => a.cancel())
+    v.anims = []
+    v.clone?.remove()
+    v.clone = null
+    if (v.el) v.el.style.visibility = ''
+    v.el = null
+  }
+  const guardar = (...novas: (Animation | null | undefined)[]) => { vivo.current.anims.push(...novas.filter((a): a is Animation => a != null)) }
+  /** Chama `fim` quando as animações guardadas terminam (na hora, sem WAAPI); cancelar descarta o aviso. */
+  const aoTerminar = (fim: () => void) => {
+    const { anims } = vivo.current
+    if (!anims.length) fim()
+    else void Promise.all(anims.map((a) => a.finished)).then(fim, () => {})
+  }
+
+  useLayoutEffect(() => {
+    const v = vivo.current
+    const seq = ++v.seq
+    const p = painel.current
+    const f = fundo.current
+    const r = raiz.current
+    if (!p || !f || !r) return
+    const corpo = p.querySelector<HTMLElement>('.dash-ampliado__corpo')
+    const fadeFundo = (de: number, ate: number, ms: number) => animar(f, [{ opacity: de }, { opacity: ate }], ms)
+
+    if (aberto) {
+      v.anims.forEach((a) => a.cancel())
+      v.anims = []
+      if (reduzidoAgora()) { guardar(animar(p, [{ opacity: 0 }, { opacity: 1 }], REDUZIDO_MS, 'linear'), fadeFundo(0, 1, REDUZIDO_MS)); return }
+      const el = origem?.el?.isConnected ? origem.el : null
+      const de = el?.getBoundingClientRect()
+      const para = p.getBoundingClientRect()
+      if (!el || !de?.width || !de.height || !para.width || !para.height) {
+        p.style.transformOrigin = 'center'
+        guardar(animar(p, [{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], FADE_MS), fadeFundo(0, 1, FADE_MS))
+        return
+      }
+      const clone = criarClone(el, de)
+      r.append(clone)
+      v.clone = clone
+      v.el = el
+      el.style.visibility = 'hidden'
+      p.style.transformOrigin = 'top left'
+      ;[...(corpo?.children ?? [])].forEach((c, i) => (c as HTMLElement).style.setProperty('--i', String(i)))
+      p.dataset.entrando = ''
+      guardar(
+        animar(p, [{ transform: transformPara(de, para) }, { transform: 'none' }], ABRIR_MS),
+        animar(clone, [{ transform: 'none' }, { transform: transformPara(para, de) }], ABRIR_MS),
+        animar(clone, [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.55 }, { opacity: 0, offset: 1 }], ABRIR_MS, 'linear'),
+        corpo && animar(corpo, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: CORPO_ENTRA }, { opacity: 1, offset: 1 }], ABRIR_MS, 'linear'),
+        fadeFundo(0, 1, FUNDO_MS),
+      )
+      aoTerminar(() => { if (v.seq === seq) { v.clone?.remove(); v.clone = null } })
+      return
+    }
+
+    const sair = () => { if (v.seq === seq) { encerrar(); onSaiu() } }
+    // Fechar no meio da abertura: volta de onde está (reverse), sem reiniciar.
+    if (v.anims.some((a) => a.playState === 'running')) {
+      v.anims.forEach((a) => a.reverse())
+      aoTerminar(sair)
+      return
+    }
+    v.anims.forEach((a) => a.cancel())
+    v.anims = []
+    const el = v.el?.isConnected ? v.el : null
+    const para = el?.getBoundingClientRect()
+    if (reduzidoAgora()) guardar(animar(p, [{ opacity: 1 }, { opacity: 0 }], REDUZIDO_MS, 'linear'), fadeFundo(1, 0, REDUZIDO_MS))
+    else if (!el || !para?.width || !para.height) {
+      p.style.transformOrigin = 'center'
+      guardar(animar(p, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.97)' }], FECHAR_MS), fadeFundo(1, 0, FECHAR_MS))
+    } else {
+      const de = p.getBoundingClientRect()
+      const clone = criarClone(el, para)
+      r.append(clone)
+      v.clone?.remove()
+      v.clone = clone
+      p.style.transformOrigin = 'top left'
+      guardar(
+        animar(p, [{ transform: 'none' }, { transform: transformPara(para, de) }], FECHAR_MS),
+        animar(clone, [{ transform: transformPara(de, para) }, { transform: 'none' }], FECHAR_MS),
+        animar(clone, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.1 }, { opacity: 1, offset: 0.6 }, { opacity: 1, offset: 1 }], FECHAR_MS, 'linear'),
+        corpo && animar(corpo, [{ opacity: 1, offset: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 0, offset: 1 }], FECHAR_MS, 'linear'),
+        fadeFundo(1, 0, FECHAR_MS),
+      )
+    }
+    aoTerminar(sair)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto])
+
+  // Ao desmontar (inclusive troca de rota): cancela tudo e devolve o item de origem.
+  useEffect(() => () => { vivo.current.seq++; encerrar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Esc fecha; Tab fica dentro do painel; o foco entra no X.
   useEffect(() => {
@@ -97,23 +163,12 @@ function Painel({ conteudo, reduzido, compartilhado, clientUrl, onFechar }: { co
     }
   }, [onFechar])
 
-  const secoes: Variants = useMemo(() => ({
-    oculto: reduzido ? { opacity: 0 } : { opacity: 0, y: 8 },
-    visivel: { opacity: 1, y: 0, transition: ENTRADA },
-  }), [reduzido])
-  const lista = useMemo(() => ({ oculto: {}, visivel: { transition: { staggerChildren: reduzido ? 0 : 0.04, delayChildren: reduzido ? 0 : 0.12 } } }), [reduzido])
-  // Sem item de origem (link direto) ou com movimento reduzido: só aparece (fade); com origem, o `layoutId` faz o painel crescer dele.
-  const entrada = compartilhado ? {} : { initial: { opacity: 0 }, animate: { opacity: 1, transition: ENTRADA } }
-
   return (
-    <div className="dash-ampliado__raiz">
-      <m.div className="dash-ampliado__fundo" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: ENTRADA }} exit={{ opacity: 0, transition: SAIDA }} onClick={onFechar} />
-      <m.section
-        ref={painel} layoutId={reduzido ? undefined : LAYOUT} className="dash-ampliado" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`}
-        transition={ENTRADA} exit={{ opacity: 0, transition: SAIDA }} {...entrada}
-      >
-        <m.div className="dash-ampliado__corpo" variants={lista} initial="oculto" animate="visivel">
-          <m.header className="dash-ampliado__cabeca" variants={secoes}>
+    <div ref={raiz} className="dash-ampliado__raiz">
+      <div ref={fundo} className="dash-ampliado__fundo" onClick={onFechar} />
+      <section ref={painel} className="dash-ampliado" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`}>
+        <div className="dash-ampliado__corpo">
+          <header className="dash-ampliado__cabeca">
             <div className="dash-ampliado__titulos">
               <span className="dash-ampliado__eyebrow">Detalhe do indicador</span>
               <h2 className="dash-ampliado__titulo" id={`${id}-t`}>{conteudo.dado.titulo}</h2>
@@ -122,41 +177,41 @@ function Painel({ conteudo, reduzido, compartilhado, clientUrl, onFechar }: { co
               <p className="dash-ampliado__descricao">{conteudo.tipo === 'dominio' ? conteudo.dado.descricao : [conteudo.dado.sub, conteudo.dado.hint].filter(Boolean).join(' · ')}</p>
             </div>
             <Button ref={fechar} variant="ghost" size="touch" icon={<X size={18} />} aria-label="Fechar" onClick={onFechar} />
-          </m.header>
-          {conteudo.tipo === 'dominio' ? <ConteudoDominio dado={conteudo.dado} secoes={secoes} clientUrl={clientUrl} /> : <ConteudoGenerico dado={conteudo.dado} secoes={secoes} />}
-        </m.div>
-      </m.section>
+          </header>
+          {conteudo.tipo === 'dominio' ? <ConteudoDominio dado={conteudo.dado} clientUrl={clientUrl} /> : <ConteudoGenerico dado={conteudo.dado} />}
+        </div>
+      </section>
     </div>
   )
 }
 
-const Secao = ({ secoes, className = '', children }: { secoes: Variants; className?: string; children: ReactNode }) => (
-  <m.div className={`dash-ampliado__secao ${className}`.trim()} variants={secoes}>{children}</m.div>
+const Secao = ({ className = '', children }: { className?: string; children: ReactNode }) => (
+  <div className={`dash-ampliado__secao ${className}`.trim()}>{children}</div>
 )
 
-function ConteudoDominio({ dado, secoes, clientUrl }: { dado: Ampliado; secoes: Variants; clientUrl: string | null }) {
+function ConteudoDominio({ dado, clientUrl }: { dado: Ampliado; clientUrl: string | null }) {
   return <>
-    {dado.grafico ? <Secao secoes={secoes}><GraficoAmpliado g={dado.grafico} nome={dado.titulo} /></Secao> : null}
-    {dado.comparativo?.length ? <Secao secoes={secoes}><Comparativo itens={dado.comparativo} /></Secao> : null}
-    {dado.tops ? <Secao secoes={secoes}><Tops tops={dado.tops} /></Secao> : null}
-    <Secao secoes={secoes} className="dash-detalhe">
+    {dado.grafico ? <Secao><GraficoAmpliado g={dado.grafico} nome={dado.titulo} /></Secao> : null}
+    {dado.comparativo?.length ? <Secao><Comparativo itens={dado.comparativo} /></Secao> : null}
+    {dado.tops ? <Secao><Tops tops={dado.tops} /></Secao> : null}
+    <Secao className="dash-detalhe">
       {dado.tipo === 'indicador' ? <TabelaNumeros tabela={dado.tabela} /> : <Lista key={dado.titulo} detalhe={dado} clientUrl={clientUrl} />}
     </Secao>
-    {dado.lista ? <Secao secoes={secoes} className="dash-ampliado__rodape"><VerNaLista lista={dado.lista} /></Secao> : null}
+    {dado.lista ? <Secao className="dash-ampliado__rodape"><VerNaLista lista={dado.lista} /></Secao> : null}
   </>
 }
 
-function ConteudoGenerico({ dado, secoes }: { dado: GenericoAmpliado; secoes: Variants }) {
+function ConteudoGenerico({ dado }: { dado: GenericoAmpliado }) {
   const comparativo = comparativoDe(dado.chips.filter((c): c is Chip => c.tipo === 'valor'))
   return <>
-    {dado.apoio.length ? <Secao secoes={secoes}><span className="dash-card__chips dash-ampliado__chips"><Chips chips={[]} apoio={dado.apoio} /></span></Secao> : null}
-    {dado.grafico ? <Secao secoes={secoes} className="dash-ampliado__grafico">{dado.grafico}</Secao> : null}
-    {comparativo.length ? <Secao secoes={secoes}><Comparativo itens={comparativo} /></Secao> : null}
-    {dado.tops?.length ? <Secao secoes={secoes}><Tops tops={dado.tops} /></Secao> : null}
-    {dado.tabelaDados ? <Secao secoes={secoes} className="dash-detalhe"><TabelaNumeros tabela={dado.tabelaDados} /></Secao> : null}
-    {dado.tabela ? <Secao secoes={secoes} className="dash-detalhe">{dado.tabela}</Secao> : null}
-    <Secao secoes={secoes}><p className="dash-card__nota">{dado.periodo ? `${dado.periodo} · ` : ''}{dado.unidade}</p></Secao>
-    {dado.lista ? <Secao secoes={secoes} className="dash-ampliado__rodape"><VerNaLista lista={dado.lista} /></Secao> : null}
+    {dado.apoio.length ? <Secao><span className="dash-card__chips dash-ampliado__chips"><Chips chips={[]} apoio={dado.apoio} /></span></Secao> : null}
+    {dado.grafico ? <Secao className="dash-ampliado__grafico">{dado.grafico}</Secao> : null}
+    {comparativo.length ? <Secao><Comparativo itens={comparativo} /></Secao> : null}
+    {dado.tops?.length ? <Secao><Tops tops={dado.tops} /></Secao> : null}
+    {dado.tabelaDados ? <Secao className="dash-detalhe"><TabelaNumeros tabela={dado.tabelaDados} /></Secao> : null}
+    {dado.tabela ? <Secao className="dash-detalhe">{dado.tabela}</Secao> : null}
+    <Secao><p className="dash-card__nota">{dado.periodo ? `${dado.periodo} · ` : ''}{dado.unidade}</p></Secao>
+    {dado.lista ? <Secao className="dash-ampliado__rodape"><VerNaLista lista={dado.lista} /></Secao> : null}
   </>
 }
 

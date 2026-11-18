@@ -20,9 +20,8 @@ export type GenericoAmpliado = {
 /** Complemento de um card de análise ou KPI, calculado pela página com os dados carregados. */
 export type ExtrasGenerico = Pick<GenericoAmpliado, 'tops' | 'lista'> & { periodo?: string }
 export type Conteudo = { tipo: 'dominio'; dado: Ampliado } | { tipo: 'generico'; dado: GenericoAmpliado }
-export type Retangulo = { top: number; left: number; width: number; height: number }
 /** `el` é de onde o card cresce; `gatilho`, quem recebe o foco de volta ao fechar (o botão clicado, quando há). */
-export type Origem = { id: string; rect: Retangulo | null; el: HTMLElement | null; gatilho: HTMLElement | null }
+export type Origem = { id: string; el: HTMLElement | null; gatilho: HTMLElement | null }
 
 /** O card vive na URL (`detalhe=<id>`); `card:<título>` são os cards de análise, que se registram ao montar. */
 export const PREFIXO_CARD = 'card:'
@@ -51,22 +50,17 @@ export function useAmpliavel(titulo: string, dados: GenericoAmpliado) {
 const importar = () => import('./CardAmpliado')
 const CardAmpliado = lazy(importar)
 
-export const retanguloDe = (el: HTMLElement): Retangulo => { const r = el.getBoundingClientRect(); return { top: r.top, left: r.left, width: r.width, height: r.height } }
 const origemDe = (id: string) => [...document.querySelectorAll<HTMLElement>('[data-origem]')].find((e) => e.getAttribute('data-origem') === id) ?? null
-const reduzido = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-
 /**
  * O card aberto vive na URL (`detalhe=<id>`) e o conteúdo é refeito a partir dos dados da página (`resolver`), então recarregar ou
  * compartilhar o link reabre o mesmo card. Abrir cria uma entrada no histórico (o Voltar do navegador fecha o card); fechar volta
- * nela quando foi o clique que abriu. O painel (chunk carregado sob demanda) cresce a partir do item clicado: um "fantasma" do tamanho
- * do item monta antes e só então a URL muda. `clientUrl` só no modo Dataverse (links "Abrir no Dataverse").
+ * nela quando foi o clique que abriu. O painel (chunk carregado sob demanda) cresce a partir do item clicado (ver `morph.ts`). `clientUrl` só no modo Dataverse (links "Abrir no Dataverse").
  */
 export function DetalheProvider({ clientUrl, resolver, extras, children }: { clientUrl: string | null; resolver: (id: string) => Ampliado | null; extras?: (dado: GenericoAmpliado) => ExtrasGenerico | null; children: ReactNode }) {
   const id = useHashQuery().get('detalhe') || null
   const idRef = useRef(id)
   idRef.current = id
   const [origem, setOrigem] = useState<Origem | null>(null)
-  const [pendente, setPendente] = useState<string | null>(null)
   const registro = useRef(new Map<string, GenericoAmpliado>())
   const [, atualizar] = useReducer((n: number) => n + 1, 0)
 
@@ -91,9 +85,8 @@ export function DetalheProvider({ clientUrl, resolver, extras, children }: { cli
     const gatilho = el ?? ativo
     const alvo = origemDe(proximo) ?? gatilho
     void importar()
-    if (!alvo || reduzido()) { setOrigem(alvo ? { id: proximo, rect: null, el: alvo, gatilho } : null); empurrar(proximo); return }
-    setOrigem({ id: proximo, rect: retanguloDe(alvo), el: alvo, gatilho })
-    setPendente(proximo)
+    setOrigem(alvo ? { id: proximo, el: alvo, gatilho } : null)
+    empurrar(proximo)
   }, [empurrar])
   const registrar = useCallback((cardId: string, dados: GenericoAmpliado) => {
     registro.current.set(cardId, dados)
@@ -104,24 +97,31 @@ export function DetalheProvider({ clientUrl, resolver, extras, children }: { cli
     if (aberto && (history.state as { btDetalhe?: string } | null)?.btDetalhe === aberto) history.back()
     else patchHashQuery({ detalhe: null })
   }, [])
-  const origemPronta = useCallback(() => {
-    if (pendente) { empurrar(pendente); setPendente(null) }
-  }, [pendente, empurrar])
+  const devolver = useRef<HTMLElement | null>(null)
   const saiu = useCallback(() => {
     const el = origem?.gatilho?.isConnected ? origem.gatilho : origem?.el
     setOrigem(null)
     ultimo.current = null
-    if (el?.isConnected) (el.matches('button, a, [tabindex]') ? el : el.querySelector<HTMLElement>('button, a[href], [tabindex]:not([tabindex="-1"])') ?? el).focus({ preventScroll: true })
+    atualizar()
+    devolver.current = el ?? null
   }, [origem])
 
+  // O foco volta depois do commit que desmonta o painel (antes, a página ainda estaria inerte).
+  useEffect(() => {
+    const el = devolver.current
+    if (!el || (atual ?? ultimo.current)) return
+    devolver.current = null
+    if (el.isConnected) (el.matches('button, a, [tabindex]') ? el : el.querySelector<HTMLElement>('button, a[href], [tabindex]:not([tabindex="-1"])') ?? el).focus({ preventScroll: true })
+  })
+
   const valor = useMemo(() => ({ abrir, registrar, clientUrl }), [abrir, registrar, clientUrl])
-  const mostrar = id != null || origem != null
+  const conteudo = atual ?? ultimo.current
   return (
     <DetalheContexto.Provider value={valor}>
       {children}
-      {mostrar ? (
+      {conteudo ? (
         <Suspense fallback={null}>
-          <CardAmpliado conteudo={atual ?? ultimo.current} aberto={atual != null} origem={origem} clientUrl={clientUrl} onFechar={fechar} onOrigemPronta={origemPronta} onSaiu={saiu} />
+          <CardAmpliado conteudo={conteudo} aberto={atual != null} origem={origem} clientUrl={clientUrl} onFechar={fechar} onSaiu={saiu} />
         </Suspense>
       ) : null}
     </DetalheContexto.Provider>
