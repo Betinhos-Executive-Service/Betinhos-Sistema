@@ -682,7 +682,7 @@ namespace Betinhos.DriverRecordSharing
 
         private static string Json(object value) => new JavaScriptSerializer { MaxJsonLength = 1000000 }.Serialize(value);
 
-        private static TimeZoneInfo SaoPaulo()
+        internal static TimeZoneInfo SaoPaulo()
         {
             try { return TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time"); }
             catch (TimeZoneNotFoundException) { return TimeZoneInfo.CreateCustomTimeZone("BRT", TimeSpan.FromHours(-3), "BRT", "BRT"); }
