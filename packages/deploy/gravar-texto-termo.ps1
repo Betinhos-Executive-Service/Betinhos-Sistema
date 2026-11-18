@@ -16,7 +16,7 @@ foreach ($t in $tipos) {
   $texto = ([IO.File]::ReadAllText($caminho, [Text.Encoding]::UTF8) -replace '(?s)^<!--.*?-->\s*', '').Trim()
   $todos = @(Get-Rows "new_textotermomultas" "new_textotermomultaid,new_versao,new_texto,new_vigente" "new_tipo eq $($t.Tipo) and statecode eq 0")
   $atual = $todos | Where-Object { $_.new_versao -eq $Versao } | Select-Object -First 1
-  if (-not $Apply) { Write-Step "DRY RUN $($t.Arquivo) $Versao: $(if ($atual) { 'atualizaria' } else { 'criaria' }); desmarcaria $(@($todos | Where-Object { $_.new_vigente -and $_.new_versao -ne $Versao }).Count) vigente(s)"; continue }
+  if (-not $Apply) { Write-Step "DRY RUN $($t.Arquivo) ${Versao}: $(if ($atual) { 'atualizaria' } else { 'criaria' }); desmarcaria $(@($todos | Where-Object { $_.new_vigente -and $_.new_versao -ne $Versao }).Count) vigente(s)"; continue }
   if (-not $atual) {
     Invoke-Dv "POST" "new_textotermomultas" @{ new_name = "$($t.Arquivo) $Versao"; new_versao = $Versao; new_tipo = $t.Tipo; new_texto = $texto; new_vigente = $true } | Out-Null
     Write-Step "criado $($t.Arquivo) $Versao"
