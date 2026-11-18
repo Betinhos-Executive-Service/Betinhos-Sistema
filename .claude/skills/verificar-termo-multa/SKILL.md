@@ -63,6 +63,7 @@ No DEV, com o funcionário fictício "Motorista Teste (fictício)": gerar o adit
 `MinhasMultasScreen.tsx` (lista de `new_MinhasMultas`, só multas da etapa 2 em diante mais as contestadas, responsável diferente de Empresa; encerradas e canceladas dos últimos 12 meses), `AceiteCnhCard.tsx` ("Já aceitei"), `minhasMultasOffline.ts` (cache), `TermoMultaDetalheScreen.tsx` (assinar e contestar).
 - Testes: `pnpm --filter motoristas test` (node --test).
 - Mock: abrir Multas, assinar o termo, tocar em "Já aceitei" e repetir sem rede: o botão mostra "Sem conexão, tente de novo" e a lista mostra "Sem conexão. Mostrando as multas de <hora>."
+- Tour `multas` (`apps/motoristas/src/app/tourChapters.ts`): passos Precisa de você, Termo da multa, Aceite na CNH Digital e Parcelas, ancorados em `data-tour="multas-precisa|multas-aceite|multas-parcelas"` e no botão "Abrir termo"; todos opcionais, então conferir no mock que cada âncora existe com a multa certa (`tests/tour.test.ts` cobre a ordem). O contador "Precisa de você" no menu vem de `precisaDeVoce` (`useTermosMulta`).
 - DEV: com o motorista de teste (nunca real), conferir a lista e depois `cr40f_aceitedeclaradoem` na multa (só leitura).
 
 ## 9. Evidência
