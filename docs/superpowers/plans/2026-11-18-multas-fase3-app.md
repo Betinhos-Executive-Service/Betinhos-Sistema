@@ -44,7 +44,7 @@
    - Conferências, nesta ordem: PDF (`%PDF-`), até 5 MB, dicionário de assinatura (`/ByteRange` e `/Type /Sig` ou `/Type/Sig`), prefixo. Prefixo diferente: "Este PDF não é o aditivo gerado para este funcionário com o texto vigente. Gere o aditivo de novo e peça a assinatura."
    - Constante `AditivoPdf.ExigirIntegridade = true`. Se a prova manual (Task 15, passo DEV) mostrar que o gov.br reescreve o arquivo, vira `false` num PR de uma linha e fica só o dicionário (como a spec prevê).
    - Testes com fixture sintético montado no próprio teste: gerado + `"\n% assinatura\n<< /Type /Sig /ByteRange [0 10 20 30] >>\n%%EOF\n"`.
-2. **Aviso ao gestor.** Recomendação: o flow "Termo de multa | Aviso ao gestor" fica só para **Contestado** (pede ação imediata; o motorista devolveu a multa); Assinado sai, porque agora aparece no drawer e o próximo passo do e-mail diário já muda. Task 8 implementa a recomendação; se o Renan decidir manter os dois, a Task 8 pula o passo 3. **Decisão pendente no card do resumo.**
+2. **Aviso ao gestor.** Decisão do Renan (18/11/2026): o flow "Termo de multa | Aviso ao gestor" continua avisando **Assinado e Contestado**. A Task 9 só ajusta o texto do Contestado.
 3. **Prazo após contestação.** O `PrazoVencido` já vale na etapa 1. Regras novas:
    - a expiração em `dataParaIndicar - 3` deixa pelo menos 3 dias entre a contestação e o vencimento;
    - com `contestadaEm` preenchida e prazo vencido, o "indicou" exige escolher o motorista ("Escolha o motorista que foi indicado."), como se não houvesse responsável;
@@ -87,7 +87,7 @@
 - Create `packages/plugins/scripts/register-multas-fase3-customapis.ps1`.
 
 **Flows (`packages/deploy`)**
-- Modify `provision-flow-termo-multa.ps1`: expirar todos os pendentes, lembrete automático e do aceite, aviso ao gestor só Contestado.
+- Modify `provision-flow-termo-multa.ps1`: expirar todos os pendentes, lembrete automático e do aceite, aviso ao gestor em Assinado e Contestado (só o texto do Contestado muda).
 - Create `flows/multa-aceite-push.json`; Modify `flows-dev.mjs` (+ teste).
 - Modify `flows/multas-do-dia.json`: seção nova.
 
@@ -1352,7 +1352,7 @@ git commit -m "feat(termo-multa): aditivo gerado e conferido para assinatura no 
 
 - [ ] **Step 2: Expirar pendentes.** Filtro do List rows: `new_status eq 100000000` (todos os pendentes, sem o `enviadoem le addDays(-7)`). Para cada um, chamar `new_ExpirarTermoMulta` e só seguir para o push de "termo expirado" quando `outputs(...)?['body/new_Expirou']` for `true`. Manter o flow ligado.
 
-- [ ] **Step 3: Aviso ao gestor só Contestado** (pular este passo se o Renan decidir manter os dois no card do resumo). Trocar a condição do gatilho (`new_status` mudou para Assinado ou Contestado) por só `100000002`. Texto do e-mail: "O motorista contestou a multa {auto}. Abra a multa e decida o responsável."
+- [ ] **Step 3: Aviso ao gestor em Assinado e Contestado** (decisão do Renan, 18/11/2026). O gatilho continua nos dois status. Assinado: "O motorista assinou o termo da multa {auto}. O aviso já está registrado; siga para a indicação." Contestado: "O motorista contestou a multa {auto}. Abra a multa e decida o responsável."
 
 - [ ] **Step 4: Lembrete diário.** Chamar `new_LembrarTermoMulta` com `new_Automatico = true` para cada pendente e mandar o push "Você tem uma multa para resolver no app" só quando `new_Lembrou` for `true`. Nada de valor nem infração no push.
 
@@ -1628,7 +1628,7 @@ git commit -m "docs(multas): verificação da fase 3 e relatório do ux-audit"
 - Seção 3 (termo como aviso da etapa 2) → Tasks 2, 3, 6, 10.
 - Seção 4 (schema) → Task 1.
 - Seção 5.1 envio só folha/12/janela/etapa 2 → Tasks 6, 10. 5.2 expiração D-3 e lembretes → Tasks 5, 6, 9. 5.3 contestação → Tasks 2, 3, 4, 6, 10. 5.4 aceite na CNH Digital → Tasks 4, 5, 7, 9, 13. 5.5 aditivo gov.br → Tasks 8, 11. 5.6 acerto preso ao termo → Tasks 2, 3, 10.
-- Seção 6 (app) → Tasks 7, 13, 14. Seção 7 (e-mail diário) → Task 4. Seção 8 (textos v1) → Task 1. Seção 9 (verificação) → Task 15. Seção 10 → resolvida acima.
+- Seção 6 (app) → Tasks 7, 13, 14. Seção 7 (e-mail diário) → Task 4. Seção 8 (textos v1) → Task 1. Seção 9 (verificação) → Task 15. Seção 10 → resolvida acima (aviso ao gestor nos dois status; prefixo do gov.br com recuo).
 
 **Consistência de nomes:** `TermoAssinado`/`TermoContestado` (Tasks 2, 3, 6); `termoPendente`/`termoParcelas`/`termoPrimeiroMes`/`termoValor`/`contestadaEm`/`aceiteDeclaradoEm` (2, 3, 4, 10); `MesDoTermo`/`mesDoTermo` (2, 10); `new_Expirou`, `new_Lembrou`, `new_Automatico` (6, 8, 9); `new_MultasJson` (7, 8, 13); `CamposDasApisDoTermo` (3, 7).
 
