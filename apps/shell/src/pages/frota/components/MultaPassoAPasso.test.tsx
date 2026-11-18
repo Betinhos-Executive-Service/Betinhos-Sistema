@@ -14,7 +14,7 @@ const dossie: Dossie = { multa: { id: 'u1', auto: '1A2B3C', placa: 'TST1A11', da
 const ana = { id: 'f1', label: 'Ana Souza (fictício)' }
 
 function fonte(overrides: Partial<DataSource> = {}) {
-  return { passoMulta: vi.fn(async () => ({ etapa: 'pagar', pendentes: [], proximoPasso: 'Aguardando penalidade', proximoPrazo: null, prazoVencido: false, aguardandoPenalidade: true })), dossieMulta: vi.fn(async () => dossie), enviarArquivoMulta: vi.fn(async () => {}), ...overrides } as unknown as DataSource
+  return { passoMulta: vi.fn(async () => ({ etapa: 'pagar', pendentes: [], proximoPasso: 'Aguardando penalidade', proximoPrazo: null, prazoVencido: false, aguardandoPenalidade: true })), dossieMulta: vi.fn(async () => dossie), enviarArquivoMulta: vi.fn(async () => {}), temAditivo: vi.fn(async () => false), ...overrides } as unknown as DataSource
 }
 
 function renderPasso(source: DataSource, m: Multa = multa, data: FrotaData = { ...EMPTY_DATA, multas: [m] }) {
@@ -124,6 +124,7 @@ describe('MultaPassoAPasso', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn(async () => { throw new Error('negado') }) } })
     const source = fonte()
     renderPasso(source, { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
+    await act(async () => {})
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
     expect(source.dossieMulta).toHaveBeenCalledWith('u1')
     const texto = screen.getByLabelText('Mensagem para o WhatsApp') as HTMLTextAreaElement
@@ -136,6 +137,7 @@ describe('MultaPassoAPasso', () => {
     const writeText = vi.fn(async () => {})
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderPasso(fonte(), { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
+    await act(async () => {})
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(screen.queryByText(/Não deu para copiar sozinho/)).toBeNull()
@@ -145,6 +147,7 @@ describe('MultaPassoAPasso', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn(async () => {}) } })
     const source = fonte({ dossieMulta: vi.fn(async () => ({ ...dossie, infleet: { erro: 'Token da Infleet inválido (fictício)' } })) })
     renderPasso(source, { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
+    await act(async () => {})
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
     expect(screen.getByText(/Token da Infleet inválido \(fictício\)/)).toBeTruthy()
     const texto = screen.getByLabelText('Mensagem para o WhatsApp') as HTMLTextAreaElement
@@ -154,6 +157,7 @@ describe('MultaPassoAPasso', () => {
 
   it('falha ao montar o dossiê mostra a mensagem do dossiê, sem o erro técnico', async () => {
     renderPasso(fonte({ dossieMulta: vi.fn(async () => { throw new Error('Failed to fetch') }) }), { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
+    await act(async () => {})
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
     expect(await screen.findByText('Não foi possível montar o dossiê. Tente de novo.')).toBeTruthy()
     expect(screen.queryByText(/Failed to fetch/)).toBeNull()
@@ -319,6 +323,13 @@ describe('Termo dentro do passo a passo', () => {
     expect(screen.queryByRole('button', { name: 'Avisei' })).toBeNull()
   })
 
+  it('enquanto confere o aditivo: só o carregamento, sem WhatsApp e com Avisei desabilitado', () => {
+    renderPasso(fonte({ temAditivo: vi.fn(() => new Promise<boolean>(() => {})) }), avisar)
+    expect(screen.getByText('Conferindo o aditivo…')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copiar mensagem' })).toBeNull()
+    expect((screen.getByRole('button', { name: 'Avisei' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('termo pendente: mostra o andamento e deixa o Avisei desabilitado com o motivo', async () => {
     const m: Multa = { ...avisar, termo: { status: 'pendente', enviadoEm: termoBase.enviadoEm }, termoVigente: { id: 't1', label: 'Termo' } }
     renderPasso(fonte({ temAditivo: vi.fn(async () => true), listarTermos: vi.fn(async () => [termoBase]) }), m)
@@ -352,5 +363,15 @@ describe('Termo dentro do passo a passo', () => {
     renderPasso(fonte({ listarTermos: vi.fn(async () => [termo]) }), acertar)
     fireEvent.click(await screen.findByLabelText('Lancei na folha'))
     expect(await screen.findByText('O primeiro mês do termo (08/2026) já passou; as parcelas começam em 11/2026.')).toBeTruthy()
+  })
+
+  it('acerto com termo assinado mostra a evidência e baixa o PDF', async () => {
+    const termo = { ...termoBase, status: 'assinado' as const, assinadoEm: '2026-11-10T15:00:00Z', hashPdf: 'abcdef0123456789' }
+    const baixarPdfTermo = vi.fn(async () => ({ nome: 'Termo.pdf', blob: new Blob(['%PDF']) }))
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() })
+    renderPasso(fonte({ listarTermos: vi.fn(async () => [termo]), baixarPdfTermo }), acertar)
+    expect(await screen.findByText(/Termo assinado em 10\/11\/2026 · hash abcdef01/)).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Baixar PDF' })) })
+    expect(baixarPdfTermo).toHaveBeenCalledWith('t1')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularParcelas, expiraEm, rotuloTermo, validarAcordo, type Acordo } from './termoMulta'
+import { calcularParcelas, expiraEm, validarAcordo, type Acordo } from './termoMulta'
 
 const folha: Acordo = { forma: 'folha', parcelas: 3, valorTotal: 195.23, primeiraCompetencia: '2026-11-01' }
 const ctxOk = { temAditivo: true, recursoPendente: false, temMotorista: true, termoPendente: false, hoje: '2026-11-18', dataParaIndicar: '2026-12-10', avisado: false }
@@ -109,14 +109,5 @@ describe('prazo e rótulo do termo (v2)', () => {
   it('expira no que vier primeiro: 7 dias ou 3 dias antes do prazo de indicação', () => {
     expect(expiraEm('2026-10-20T13:00:00Z', '2026-11-30')).toBe('2026-10-27')
     expect(expiraEm('2026-10-20T13:00:00Z', '2026-10-25')).toBe('2026-10-22')
-  })
-  it('rótulo da coluna Termo', () => {
-    expect(rotuloTermo({ status: 'pendente', enviadoEm: '2026-10-20T13:00:00Z' })).toBe('Pendente · expira 27/10')
-    expect(rotuloTermo({ status: 'pendente', enviadoEm: null })).toBe('Pendente')
-    expect(rotuloTermo({ status: 'assinado', enviadoEm: null })).toBe('Assinado')
-    expect(rotuloTermo({ status: 'contestado', enviadoEm: null })).toBe('Contestado')
-    expect(rotuloTermo({ status: 'expirado', enviadoEm: null })).toBe('Expirado')
-    expect(rotuloTermo({ status: 'cancelado', enviadoEm: null })).toBe('Cancelado')
-    expect(rotuloTermo(null)).toBe('')
   })
 })

@@ -1,5 +1,5 @@
-import { addMonths, daysBetween, diaSP, formatBR } from '../data/dates'
-import type { ResumoTermo, TermoStatus } from '../data/types'
+import { addMonths, daysBetween, diaSP } from '../data/dates'
+import type { TermoStatus } from '../data/types'
 import { janelaCompetencia, mesBr } from './multaEtapas'
 
 export type FormaPagamento = 'guia' | 'folha'
@@ -70,10 +70,3 @@ export function expiraEm(enviadoEm: string | null, dataParaIndicar: string | nul
 export const TERMO_TOM: Record<TermoStatus, 'warning' | 'success' | 'danger' | 'neutral'> = { pendente: 'warning', assinado: 'success', contestado: 'danger', expirado: 'neutral', cancelado: 'neutral' }
 
 export const TERMO_ROTULO: Record<TermoStatus, string> = { pendente: 'Pendente', assinado: 'Assinado', contestado: 'Contestado', expirado: 'Expirado', cancelado: 'Cancelado' }
-
-/** Texto da coluna Termo da lista de multas. */
-export function rotuloTermo(termo: ResumoTermo | null | undefined): string {
-  if (!termo) return ''
-  const expira = termo.status === 'pendente' ? expiraEm(termo.enviadoEm) : null
-  return expira ? `${TERMO_ROTULO.pendente} · expira ${formatBR(expira).slice(0, 5)}` : TERMO_ROTULO[termo.status]
-}

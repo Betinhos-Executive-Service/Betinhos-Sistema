@@ -97,7 +97,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
     setTemAditivo(null)
     if (!motoristaDoAviso) return
     let atual = true
-    Promise.resolve().then(() => source.temAditivo(motoristaDoAviso)).then((ok) => { if (atual) setTemAditivo(ok) }, () => { if (atual) setTemAditivo(false) })
+    Promise.resolve().then(() => { return source.temAditivo(motoristaDoAviso) }).then((ok) => { if (atual) setTemAditivo(ok) }, () => { if (atual) setTemAditivo(false) })
     return () => { atual = false }
   }, [source, motoristaDoAviso])
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -231,7 +231,18 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   )
 
   const contestacao = !!estado.contestadaEm && ultimoTermo?.status === 'contestado' && (passo === 'DefinirResponsavel' || passo === 'AvisarMotorista')
-  const caminhoTermo = ultimoTermo?.status !== 'contestado' && (termoPendente !== null || temAditivo === true)
+  const termoAssinado = ultimoTermo?.status === 'assinado' ? ultimoTermo : null
+  async function baixarTermo(id: string) {
+    try {
+      const { nome, blob } = await source.baixarPdfTermo(id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = nome; a.click()
+      URL.revokeObjectURL(url)
+    } catch { setErro('Não foi possível baixar o PDF do termo. Tente de novo.') }
+  }
+  const aguardandoAditivo = passo === 'AvisarMotorista' && !termoPendente && temAditivo === null
+  const caminhoTermo = ultimoTermo?.status !== 'contestado' && (termoPendente !== null || temAditivo !== false)
   const termoDoAcerto = estado.termoParcelas != null
   const mesPassado = termoDoAcerto && estado.termoPrimeiroMes != null && mesDoTermo(estado, hoje) !== `${estado.termoPrimeiroMes.slice(0, 7)}-01`
   const valorCatalogo = data.infracoes.find((i) => i.id === multa.infracaoId)?.valor ?? null
@@ -261,7 +272,8 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
         </>
       case 'AvisarMotorista': {
         // Com aditivo (e sem contestação anterior) o aviso é o termo pelo app; sem ele, só o WhatsApp.
-        if (ultimoTermo?.status === 'contestado' || (!termoPendente && temAditivo !== true)) return avisoWhatsapp
+        if (ultimoTermo?.status === 'contestado' || (!termoPendente && temAditivo === false)) return avisoWhatsapp
+        if (!termoPendente && temAditivo === null) return <p className="frota-muted" role="status">Conferindo o aditivo…</p>
         return <AvisoPorTermo source={source} multa={multa} termoPendente={termoPendente} valorCatalogo={valorCatalogo} hoje={hoje} viaWhatsapp={viaWhatsapp} onViaWhatsapp={setViaWhatsapp} onChanged={() => { onChanged(); recarregarTermos() }} whatsapp={avisoWhatsapp} />
       }
       case 'RegistrarIndicacao':
@@ -284,6 +296,9 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
         </>
       case 'RegistrarAcerto':
         return <>
+          {termoAssinado && (
+            <p className="frota-muted">Termo assinado em {formatBR(termoAssinado.assinadoEm?.slice(0, 10) ?? '')}{termoAssinado.hashPdf ? ` · hash ${termoAssinado.hashPdf.slice(0, 8)}` : ''}{' '}<Button variant="ghost" size="compact" onClick={() => void baixarTermo(termoAssinado.id)}>Baixar PDF</Button></p>
+          )}
           <ChoiceGroup label="Acerto" inline>
             <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha', parcelas: estado.termoParcelas ?? 1, competencia: (mesDoTermo(estado, hoje) ?? hoje).slice(0, 7) })} />
             <Radio name={nome} label="Empresa assume" checked={dados.acerto === 'empresa'} onChange={() => setDados({ acerto: 'empresa' })} />
@@ -383,12 +398,12 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           {campos()}
           {erro && <Alert tone="danger">{erro}</Alert>}
           <div className="frota-cluster">
-            {!(passo === 'AvisarMotorista' && caminhoTermo && !viaWhatsapp && !termoPendente) && (
-              <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null || (passo === 'AvisarMotorista' && termoPendente !== null)} aria-describedby={faltando || termoPendente ? `${multa.id}-falta` : undefined} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
+            {!(passo === 'AvisarMotorista' && temAditivo === true && caminhoTermo && !viaWhatsapp && !termoPendente) && (
+              <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null || aguardandoAditivo} aria-describedby={faltando ? `${multa.id}-falta` : undefined} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
             )}
             {extra && <Button variant="secondary" disabled={salvando} onClick={() => setExtra(null)}>Voltar</Button>}
           </div>
-          {(passo === 'AvisarMotorista' && termoPendente) ? <p id={`${multa.id}-falta`} className="frota-muted">Cancele o termo antes de avisar pelo WhatsApp.</p> : faltando && <p id={`${multa.id}-falta`} className="frota-muted">{faltando}</p>}
+          {faltando && <p id={`${multa.id}-falta`} className="frota-muted">{faltando}</p>}
         </section>
       ) : situacao.aguardandoPenalidade ? (
         <section className="multa-passo" aria-labelledby={`${multa.id}-penalidade`}>
