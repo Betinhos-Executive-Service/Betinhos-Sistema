@@ -102,7 +102,7 @@ function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra, a
 }
 
 /** Grava pelo caminho de sempre (relê o status antes, StaleError vira recarga) e devolve a mensagem de falha, se houver. */
-function useGravar(onDesatualizada: () => void) {
+export function useGravar(onDesatualizada: () => void) {
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   // Trava síncrona: o 2º clique antes do render (o botão ainda não está em loading) não grava nem mostra falha.
