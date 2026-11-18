@@ -93,7 +93,7 @@ export function lerAgendaOffline(agora = new Date(), armazem: ArmazemTexto | und
 }
 
 /** Serviço enviado ou concluído sai do cache; sobra o resto da agenda. */
-export function removerDaAgendaOffline(detailId: string, armazem: ArmazemTexto | undefined = obterArmazem()) {
+export function removerDaAgendaOffline(detailId: string, armazem: ArmazemTexto | undefined = obterArmazem(), agora = new Date()) {
   if (!armazem) return;
   try {
     const bruto = armazem.getItem(AGENDA_OFFLINE_KEY);
@@ -102,7 +102,7 @@ export function removerDaAgendaOffline(detailId: string, armazem: ArmazemTexto |
     const inicios = { ...registro.inicios };
     delete inicios[detailId];
     const restante = registro.agenda.filter((item) => item.id !== detailId && item.detail?.id !== detailId);
-    armazem.setItem(AGENDA_OFFLINE_KEY, JSON.stringify({ ...registro, agenda: montar(restante, inicios, new Date()), inicios }));
+    armazem.setItem(AGENDA_OFFLINE_KEY, JSON.stringify({ ...registro, agenda: montar(restante, inicios, agora), inicios }));
   } catch {
     armazem.removeItem(AGENDA_OFFLINE_KEY);
   }
