@@ -6,7 +6,7 @@ function formatDateLabel(value: string) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function toDataverseDate(value: string) {
+export function toDataverseDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   if (!year || !month || !day) return new Date(value).toISOString();
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0)).toISOString();

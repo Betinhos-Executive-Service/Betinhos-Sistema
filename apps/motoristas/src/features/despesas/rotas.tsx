@@ -43,6 +43,7 @@ export function rotasDespesas(screen: Screen, {
   gastosCartaoStatus,
   limparAbrirDespesa,
   marcarDevolucaoEnviada,
+  marcarDevolucaoCancelada,
   motoristaIdRelatorio,
   isExpenseIdle,
   relatorioModelo,
@@ -244,6 +245,7 @@ export function rotasDespesas(screen: Screen, {
         onCompletarGasto={(id) => { const gasto = gastosCartaoPendentes.find((item) => item.id === id); if (gasto) abrirGastoCartao(gasto); }}
         motoristaId={motoristaIdRelatorio}
         onDevolucaoEnviada={marcarDevolucaoEnviada}
+        onDevolucaoCancelada={marcarDevolucaoCancelada}
         abrirDespesaId={abrirDespesaId}
         onDespesaAberta={limparAbrirDespesa}
         onPeriodo={setRelatorioPeriodo}

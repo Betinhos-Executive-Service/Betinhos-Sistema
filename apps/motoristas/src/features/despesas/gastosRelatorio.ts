@@ -319,7 +319,7 @@ function ordenarComDevolvidasNoTopo(doPeriodo: DespesaRelatorio[], todas: Despes
 
 // ---------------- Loader e mock ----------------
 
-const MOCK_VEICULO = "00000000-0000-4000-8000-0000000000bb";
+export const MOCK_VEICULO = "00000000-0000-4000-8000-0000000000bb";
 const mockParam = (name: string) => new URLSearchParams(window.location.search).get(name);
 const diasDoMes = (inicio: string) => Number(somarDias(inicioDoMes(inicio, 1), -1).slice(8, 10));
 

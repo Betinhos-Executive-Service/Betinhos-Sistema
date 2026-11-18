@@ -14296,6 +14296,12 @@ select,
 .gr-reenviada .termo-text-button { display:inline; min-height:0; padding:0; border:0; background:none; color:inherit; font:inherit; text-decoration:underline; cursor:pointer; }
 .dv-painel { display:grid; gap:10px; }
 .dv-acoes,.dv-confirmar-acoes { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.dv-acoes[data-colunas="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.dv-corrigir { display:grid; gap:12px; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; animation:dv-explicar-entra 180ms cubic-bezier(.23,1,.32,1) both; }
+.dv-corrigir-nota { color:#64748b; font-size:.75rem; font-weight:700; }
+.dv-dobro { justify-self:center; min-height:44px; padding:8px 12px; border:0; background:none; color:#475569; font:inherit; font-size:.85rem; font-weight:800; text-decoration:underline; cursor:pointer; }
+.dv-dobro:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.25); border-radius:8px; }
+.dv-dobro:disabled { opacity:.5; cursor:not-allowed; }
 .dv-acao { min-height:48px; padding:10px 12px; border:1.5px solid transparent; border-radius:12px; background:#e6edf8; color:#001a3d; font:inherit; font-size:.92rem; font-weight:800; cursor:pointer; transition:transform 140ms ease-out, background-color 140ms ease-out; }
 .dv-acao[aria-pressed="true"],.dv-acao[aria-expanded="true"] { background:#cfdcf1; border-color:#001a3d; }
 .dv-acao:active:not(:disabled) { transform:scale(.97); }

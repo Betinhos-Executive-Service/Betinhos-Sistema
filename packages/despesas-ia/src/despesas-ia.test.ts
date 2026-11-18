@@ -62,10 +62,19 @@ describe('prompt', () => {
     ['Nunca use as palavras "erro", "inválido" ou "fraude"'],
     ['Com "validar", mensagem_motorista = null'],
     ['no máximo 2 frases curtas, até uns 140 caracteres no total'],
-    ['Proibido na mensagem: valores de mediana ou média, km, comparação com outros lançamentos, contagem de despesas no dia'],
+    ['Proibido na mensagem: valores de mediana ou média, km de outros lançamentos, comparação com outros lançamentos, contagem de despesas no dia'],
     ['diga "nota fiscal" ou "cupom", nunca "NFC-e"'],
     ['A foto não é do cupom do almoço. Envie a foto da nota fiscal.'],
     ['Os detalhes antifraude ficam só em "motivos", que o gestor lê'],
+    ['o posto costuma imprimir a forma errada'],
+    ['Cupom CTF que perde o primeiro dígito da data na impressão'],
+    ['valide já na primeira análise, sem esperar a explicação do motorista'],
+    ['Lançamento repetido confirmado pelo motorista: cancelar esta despesa.'],
+    ['Peça só o que o motorista consegue fazer no App'],
+    ['corrigir categoria, veículo, data, forma de pagamento, km ou litros'],
+    ['Com valorDoExtratoCartao = true, data e forma de pagamento vêm do extrato e não podem ser corrigidas.'],
+    ['O valor nunca pode ser alterado'],
+    ['peça que toque em "Lancei em dobro" se repetiu o lançamento'],
   ])('fixa a regra "%s"', (trecho) => {
     expect(SYSTEM_PROMPT).toContain(trecho)
   })

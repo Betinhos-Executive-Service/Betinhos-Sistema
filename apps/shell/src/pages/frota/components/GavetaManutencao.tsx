@@ -1,22 +1,24 @@
 // apps/shell/src/pages/frota/components/GavetaManutencao.tsx
-import { ExternalLink } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Alert, Button, Drawer, EmptyState, Field, Textarea } from '@betinhos/ui'
+import { Alert, Button, Dialog, Drawer, EmptyState, Field, Textarea } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CarregandoRegistro } from '../../../app/BrandLoader'
 import { todaySP } from '../data/dates'
 import { NAO_INFORMADO } from '../data/format'
-import { LIMITE, MANUT, TIPO_REPARO, label } from '../data/schema'
+import { LIMITE, MANUT } from '../data/schema'
 import type { Classificacao, DataSource } from '../data/source'
 import type { DetalheManutencao } from '../data/types'
 import { comPontoFinal, errorMessage } from '../data/xrm'
 import { lerJanela, rotuloJanela, valoresJanelaIniciais, type ErrosJanela, type Janela, type ValoresJanela } from '../domain/janela'
-import { avaliar, chavePasso, type Extra } from '../domain/manutencaoEtapas'
+import { avaliar, chavePasso, rotuloExtra, type Extra } from '../domain/manutencaoEtapas'
 import { desfechoDaAcao, executarAcaoManutencao, rotuloAcao, StaleError } from '../domain/transitions'
 import { ClassificacaoManutencao } from './ClassificacaoManutencao'
 import { ConcluirManutencaoForm } from './ConcluirManutencaoForm'
+import { EditarManutencaoForm } from './EditarManutencaoForm'
 import { JanelaCampos } from './JanelaCampos'
-import { Arquivos, ManutencaoPassoAPasso } from './ManutencaoPassoAPasso'
+import { Bloco, CabecalhoManutencao, HistoricoManutencao, MaisAcoes, PedidoManutencao } from './ManutencaoResumo'
+import { ManutencaoPassoAPasso } from './ManutencaoPassoAPasso'
 import { useNotify } from './Toasts'
 
 const janelaDe = (m: DetalheManutencao): Janela | null => (m.janelaInicio && m.janelaFim ? { inicio: m.janelaInicio, fim: m.janelaFim } : null)
@@ -122,6 +124,11 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   const notify = useNotify()
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' })
   const [extra, setExtra] = useState<Extra | null>(null)
+  const [editando, setEditando] = useState(false)
+  /** Saída (Voltar ou fechar a gaveta) que espera a resposta de "Descartar alterações?". */
+  const [descartando, setDescartando] = useState<'voltar' | 'fechar' | null>(null)
+  const edicao = useRef({ sujo: false, salvando: false })
+  const aoMudarEdicao = useCallback((estado: { sujo: boolean; salvando: boolean }) => { edicao.current = estado }, [])
   const vivo = useRef(true)
   useEffect(() => {
     vivo.current = true
@@ -155,21 +162,41 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   }, [source, id])
   useEffect(() => { void carregar() }, [carregar])
 
-  // Foco: ao abrir uma exceção, no primeiro campo; ao voltar ao guia, no "Mais ações" que a abriu.
+  // Foco: ao abrir uma exceção, no primeiro campo; ao voltar ao guia, no "Mais ações" (nas actions do Drawer).
   const corpo = useRef<HTMLDivElement>(null)
+  const acoes = useRef<HTMLSpanElement>(null)
   const extraAnterior = useRef<Extra | null>(null)
   useEffect(() => {
-    const area = corpo.current
-    if (extra) area?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])')?.focus()
-    else if (extraAnterior.current) area?.querySelector<HTMLElement>('[aria-label="Mais ações"]')?.focus()
+    if (extra) corpo.current?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), select:not([disabled])')?.focus()
+    else if (extraAnterior.current) acoes.current?.querySelector<HTMLElement>('[aria-label="Mais ações"]')?.focus()
     extraAnterior.current = extra
   }, [extra])
+  // Edição: ao abrir, no primeiro campo; ao voltar, no lápis.
+  const editandoAntes = useRef(false)
+  useEffect(() => {
+    if (editando) corpo.current?.querySelector<HTMLElement>('input:not([disabled]):not([type="hidden"]), textarea:not([disabled]), [role="combobox"]:not([disabled])')?.focus()
+    else if (editandoAntes.current) acoes.current?.querySelector<HTMLElement>('[aria-label="Editar"]')?.focus()
+    editandoAntes.current = editando
+  }, [editando])
 
   function gravado(mensagem: string) {
     notify('success', mensagem)
     setExtra(null)
+    setEditando(false)
     void carregar()
     onChanged()
+  }
+
+  function sairDaEdicao() {
+    setDescartando(null)
+    edicao.current = { sujo: false, salvando: false }
+    setEditando(false)
+  }
+  const voltarDaEdicao = () => { if (edicao.current.sujo) setDescartando('voltar'); else sairDaEdicao() }
+  const fechar = () => {
+    if (!editando) { onClose(); return }
+    if (edicao.current.salvando) return
+    if (edicao.current.sujo) setDescartando('fechar'); else onClose()
   }
 
   /**
@@ -191,17 +218,6 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
       setExtra(null)
       notify('error', `${aviso} O que você digitou foi descartado porque a ação não se aplica mais.`)
     } else notify('error', `${aviso} Confira e confirme de novo.`)
-  }
-
-  async function abrirFormulario() {
-    try {
-      await source.openForm('manutencao', id)
-    } catch (reason) {
-      notify('error', errorMessage(reason))
-      return
-    }
-    void carregar()
-    onChanged()
   }
 
   if (estado.tipo === 'carregando') return <CarregandoRegistro label="Carregando manutenção" onCancel={onClose} />
@@ -249,34 +265,50 @@ export function GavetaManutencao({ source, id, hoje = todaySP(), onClose, onChan
   }
 
   const placa = m.veiculo?.label || NAO_INFORMADO
+  const situacao = avaliar(m, hoje)
+  const tituloPasso = situacao.etapa === 'realizada' ? 'Resultado' : situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada' ? 'Encerrada' : 'Próximo passo'
   return (
+    <>
     <Drawer
       open
       size="wide"
-      onClose={onClose}
+      onClose={fechar}
       eyebrow={m.codigo ? `Manutenção ${m.codigo}` : 'Manutenção'}
       title={<span className="frota-gaveta__titulo">{placa} · {m.descricao || 'Manutenção'}</span>}
-      actions={<BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />}
-      footer={<>
-        <span className="frota-muted">Edição completa no formulário do Dataverse.</span>
-        <Button variant="secondary" icon={<ExternalLink size={16} />} onClick={() => void abrirFormulario()}>Abrir formulário</Button>
+      actions={<>
+        <span ref={acoes}>
+          {extra || editando ? null : (
+            <>
+              <Button variant="ghost" size="compact" icon={<Pencil size={16} />} aria-label="Editar" onClick={() => setEditando(true)} />
+              <MaisAcoes situacao={situacao} onExtra={setExtra} />
+            </>
+          )}
+        </span>
+        <BotaoAuditoria entity="cr40f_manutencoes" ids={[m.id]} name={m.descricao} />
       </>}
     >
-      <div className="frota-drawer" ref={corpo}>
-        {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
-
-        <div className="frota-stack">
-          <p className="frota-muted">
-            Descrição do motorista: {m.descricao || NAO_INFORMADO}
-            {m.km !== null ? ` · Km no pedido: ${m.km.toLocaleString('pt-BR')} km` : ''}
-            {m.tipo !== null ? ` · Tipo de reparo: ${label(TIPO_REPARO, m.tipo)}` : ''}
-            {m.comentarioAoMotorista ? ` · Comentário ao motorista: ${m.comentarioAoMotorista}` : ''}
-          </p>
-          {m.veiculo && onOpenVeiculo ? <p className="frota-muted"><button type="button" className="frota-link" onClick={() => onOpenVeiculo(m.veiculo!.id)}>Ver o veículo {placa}</button></p> : null}
-          <Arquivos titulo="Fotos do pedido" links={m.fotosPedido} />
-          <p className="frota-muted">As alterações uma a uma ficam na auditoria, no botão do alto da gaveta.</p>
-        </div>
+      <div className="frota-gaveta-corpo" ref={corpo}>
+        {editando ? (
+          <EditarManutencaoForm source={source} m={m} onSalvo={() => gravado('Manutenção atualizada.')} onVoltar={voltarDaEdicao} onDesatualizada={desatualizada} onEstado={aoMudarEdicao} />
+        ) : (
+          <>
+            <CabecalhoManutencao m={m} situacao={situacao} />
+            <PedidoManutencao m={m} onOpenVeiculo={onOpenVeiculo} />
+            <Bloco titulo={extra ? rotuloExtra(extra, situacao.etapa) : tituloPasso} destaque>
+              {formulario ?? <ManutencaoPassoAPasso source={source} m={m} hoje={hoje} onFeito={gravado} onDesatualizada={desatualizada} onExtra={setExtra} autoFoco={extraAnterior.current === null} />}
+            </Bloco>
+            <HistoricoManutencao situacao={situacao} />
+          </>
+        )}
       </div>
     </Drawer>
+    <Dialog open={descartando !== null} onClose={() => setDescartando(null)} title="Descartar alterações?"
+      actions={<>
+        <Button variant="secondary" onClick={() => setDescartando(null)}>Continuar editando</Button>
+        <Button variant="danger" onClick={() => { if (descartando === 'fechar') onClose(); else sairDaEdicao() }}>Descartar</Button>
+      </>}>
+      O que você alterou ainda não foi gravado.
+    </Dialog>
+    </>
   )
 }
