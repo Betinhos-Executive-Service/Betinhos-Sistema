@@ -83,6 +83,7 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       p.style.transformOrigin = 'top left'
       ;[...(corpo?.children ?? [])].forEach((c, i) => (c as HTMLElement).style.setProperty('--i', String(i)))
       p.dataset.entrando = ''
+      p.dataset.movendo = ''
       guardar(
         animar(p, [{ transform: transformPara(de, para) }, { transform: 'none' }], ABRIR_MS),
         animar(clone, [{ transform: 'none' }, { transform: transformPara(para, de) }], ABRIR_MS),
@@ -90,7 +91,7 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
         corpo && animar(corpo, [{ opacity: 0, offset: 0 }, { opacity: 0, offset: CORPO_ENTRA }, { opacity: 1, offset: 1 }], ABRIR_MS, 'linear'),
         fadeFundo(0, 1, FUNDO_MS),
       )
-      aoTerminar(() => { if (v.seq === seq) { v.clone?.remove(); v.clone = null } })
+      aoTerminar(() => { if (v.seq === seq) { v.clone?.remove(); v.clone = null; delete p.dataset.movendo } })
       return
     }
 
@@ -111,6 +112,7 @@ export default function CardAmpliado({ conteudo, aberto, origem, clientUrl, onFe
       guardar(animar(p, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.97)' }], FECHAR_MS), fadeFundo(1, 0, FECHAR_MS))
     } else {
       const de = p.getBoundingClientRect()
+      p.dataset.movendo = ''
       const clone = criarClone(el, para)
       r.append(clone)
       v.clone?.remove()

@@ -281,6 +281,8 @@ button.dash-atencao__linha { cursor: pointer; }
 .dash-ampliado { position: relative; width: min(960px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--bt-radius-lg); border: 1px solid var(--bt-color-border-strong); background-color: var(--bt-color-surface); color: var(--bt-color-text-primary); box-shadow: var(--bt-shadow-drawer); font-family: var(--bt-font-family-sans); }
 .dash-ampliado[data-entrando] .dash-ampliado__corpo > * { animation: dash-ampliado-secao 200ms cubic-bezier(.23, 1, .32, 1) both; animation-delay: calc(112ms + var(--i, 0) * 40ms); }
 @keyframes dash-ampliado-secao { from { opacity: 0; transform: translateY(8px); } }
+/* Durante o morph o mouse fica parado sobre o gráfico que acabou de montar: sem tooltip nem cursor até a animação acabar. */
+.dash-ampliado[data-movendo] :is(.recharts-tooltip-wrapper, .recharts-tooltip-cursor, .recharts-active-dot) { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .dash-ampliado[data-entrando] .dash-ampliado__corpo > * { animation: none; } }
 .dash-ampliado__corpo { display: flex; flex-direction: column; gap: var(--bt-space-4); min-height: 0; overflow-y: auto; padding: var(--bt-space-5); }
 .dash-ampliado__cabeca { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-3); }
