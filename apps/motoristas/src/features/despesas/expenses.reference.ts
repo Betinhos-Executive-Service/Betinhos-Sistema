@@ -116,13 +116,11 @@ export function parseIntegerInput(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/** Vírgula é o decimal e o ponto, milhar ("1.045,75"). Sem vírgula, um ponto só é decimal ("23.02" = 23,02 L). */
 export function parseDecimalInput(value: string) {
-  const cleaned = String(value ?? "")
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".")
-    .trim();
-  const parsed = Number(cleaned);
+  const cleaned = String(value ?? "").replace(/[^\d,.-]/g, "");
+  const semMilhar = cleaned.includes(",") || cleaned.split(".").length > 2 ? cleaned.replace(/\./g, "") : cleaned;
+  const parsed = Number(semMilhar.replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
