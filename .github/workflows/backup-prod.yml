@@ -9,6 +9,8 @@ name: Backup do PROD
 #   (7 diárias, 8 semanais, 12 mensais, retencao.mjs) para caber nos 10 GB gratuitos. Nada vai para artefato do GitHub
 #   (repositório público). Configuração e restauração: packages/deploy/backup/README.md.
 # Os dois jobs são independentes: um falhar não impede o outro.
+# O environment prod só aceita a main, mas o schedule roda na branch padrão (develop). Por isso o agendamento só dispara
+# este mesmo workflow na main (job agendar, sem environment nem segredo) e os jobs de backup só rodam a partir da main.
 on:
   schedule:
     # 06:23 UTC = 03:23 em Brasília.
@@ -25,7 +27,20 @@ permissions:
   contents: read
 
 jobs:
+  agendar:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Disparar o backup na main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run "${{ github.workflow }}" --repo "${{ github.repository }}" --ref main
+
   power-platform:
+    if: github.event_name != 'schedule' && github.ref == 'refs/heads/main'
     runs-on: windows-latest
     timeout-minutes: 60
     environment: prod
@@ -66,6 +81,7 @@ jobs:
           "### Backups disponíveis`n``````text`n$lista`n``````" | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
 
   r2:
+    if: github.event_name != 'schedule' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: prod
