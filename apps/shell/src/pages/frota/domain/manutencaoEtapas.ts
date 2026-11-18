@@ -69,7 +69,7 @@ export function avaliar(m: DetalheManutencao, hoje: string): Situacao {
 }
 
 /** Dados de partida do passo: mudou, o passo remonta e o que foi digitado nele se perde. */
-export const chavePasso = (m: DetalheManutencao) => `${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}`
+export const chavePasso = (m: DetalheManutencao) => `${m.id}-${m.status}-${m.janelaInicio}-${m.janelaFim}-${m.programacao?.geralId}-${m.grau}-${m.comentarioAoMotorista}`
 
 const ROTULO_EXTRA: Record<Extra, string> = { reagendar: 'Reagendar', reprovar: 'Reprovar', cancelar: 'Cancelar manutenção', concluir: 'Já foi feita: concluir', corrigirClassificacao: 'Corrigir classificação' }
 export const rotuloExtra = (extra: Extra, etapa: Etapa) => (extra === 'concluir' && etapa === 'realizar' ? 'Concluir por ele' : ROTULO_EXTRA[extra])

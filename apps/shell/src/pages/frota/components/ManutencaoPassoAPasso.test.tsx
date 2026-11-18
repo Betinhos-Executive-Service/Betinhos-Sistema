@@ -61,6 +61,14 @@ describe('ManutencaoPassoAPasso', () => {
     expect(props.onFeito).toHaveBeenCalledWith(expect.stringMatching(/^Manutenção agendada: /))
   })
 
+  it('Agendar acompanha comentário e grau salvos pela edição', () => {
+    const props = { source: fonte(), m: base, hoje: HOJE, onFeito: vi.fn(), onDesatualizada: vi.fn(), onExtra: vi.fn() }
+    const { rerender } = render(<ManutencaoPassoAPasso {...props} />)
+    rerender(<ManutencaoPassoAPasso {...props} m={m({ comentarioAoMotorista: 'Levar na oficina X', grau: 4 })} />)
+    expect((screen.getByRole('textbox', { name: /Comentário ao motorista/ }) as HTMLTextAreaElement).value).toBe('Levar na oficina X')
+    expect((screen.getByRole('radio', { name: 'Urgente' }) as HTMLInputElement).checked).toBe(true)
+  })
+
   it('Programar exige motorista e avisa fora da janela, sem bloquear', async () => {
     const source = fonte()
     ;(source.currentStatus as ReturnType<typeof vi.fn>).mockResolvedValue(MANUT.AGENDADO)
