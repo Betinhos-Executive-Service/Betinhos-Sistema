@@ -30,11 +30,13 @@ namespace Betinhos.DriverRecordSharing
         {
             if (assinado.Length > MaxBytes) return "O PDF passa de 5 MB.";
             if (assinado.Length < 5 || Encoding.ASCII.GetString(assinado, 0, 5) != "%PDF-") return "Envie o PDF assinado.";
-            var texto = Encoding.ASCII.GetString(assinado);
-            var temSig = texto.Contains("/ByteRange") && (texto.Contains("/Type /Sig") || texto.Contains("/Type/Sig"));
-            if (!temSig) return "Este PDF não tem assinatura digital. Assine no gov.br e envie o arquivo que o gov.br devolveu.";
             if (ExigirIntegridade && !ComecaCom(assinado, gerado))
                 return "Este PDF não é o aditivo gerado para este funcionário com o texto vigente. Gere o aditivo de novo e peça a assinatura.";
+            // A assinatura tem de estar na parte acrescentada: um /Type /Sig já no PDF gerado não conta.
+            var inicio = ExigirIntegridade ? gerado.Length : 0;
+            var texto = Encoding.ASCII.GetString(assinado, inicio, assinado.Length - inicio);
+            var temSig = texto.Contains("/ByteRange") && (texto.Contains("/Type /Sig") || texto.Contains("/Type/Sig"));
+            if (!temSig) return "Este PDF não tem assinatura digital. Assine no gov.br e envie o arquivo que o gov.br devolveu.";
             return null;
         }
 

@@ -35,6 +35,14 @@ namespace Betinhos.DriverRecordSharing.Tests
                 AditivoPdf.Conferir(Assinado(outro), Gerado()));
         }
 
+        [Fact]
+        public void Assinatura_so_no_prefixo_recusa()
+        {
+            var comSig = Assinado(Gerado());
+            Assert.Equal("Este PDF não tem assinatura digital. Assine no gov.br e envie o arquivo que o gov.br devolveu.",
+                AditivoPdf.Conferir(Assinado(comSig, "\n%%EOF\n"), comSig));
+        }
+
         [Fact] public void Nao_pdf_recusa() => Assert.Equal("Envie o PDF assinado.", AditivoPdf.Conferir(Encoding.ASCII.GetBytes("oi"), Gerado()));
         [Fact] public void Grande_demais_recusa() => Assert.Equal("O PDF passa de 5 MB.", AditivoPdf.Conferir(new byte[AditivoPdf.MaxBytes + 1], Gerado()));
     }

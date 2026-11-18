@@ -982,6 +982,49 @@ namespace Betinhos.DriverRecordSharing.Tests
                 Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
         }
 
+        [Fact]
+        public void AditivoProvisorioRecusaNoGerarENoRegistrar()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            s.Rows("new_textotermomulta").First(r => r.GetAttributeValue<string>("new_versao") == "a1")["new_versao"] = "v0-placeholder";
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(new byte[] { 1 });
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+
+            Assert.Equal("O texto do aditivo ainda é provisório.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_GerarAditivoMotorista", s.Gestor, DoFuncionario(s))).Message);
+            Assert.Equal("O texto do aditivo ainda é provisório.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+        }
+
+        [Fact]
+        public void RegistrarAditivoComBase64InvalidoRecusa()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = "isto não é base64!";
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+
+            Assert.Equal("Envie o PDF assinado.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+        }
+
+        [Fact]
+        public void RegistrarAditivoAcimaDe5MbRecusa()
+        {
+            var s = Cenario();
+            s.Privilegiados.Add(s.Gestor);
+            var inputs = DoFuncionario(s);
+            inputs["new_PdfBase64"] = Convert.ToBase64String(new byte[AditivoPdf.MaxBytes + 1]);
+            inputs["new_AssinadoEm"] = new DateTime(2026, 10, 21);
+
+            Assert.Equal("O PDF passa de 5 MB.",
+                Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_RegistrarAditivoMotorista", s.Gestor, inputs)).Message);
+            Assert.Null(s.UploadedPdf);
+        }
+
         private static RemoteExecutionContext Run(Scenario s, string message, Guid user, Dictionary<string, object> inputs)
         {
             var ctx = new RemoteExecutionContext { MessageName = message, InitiatingUserId = user, UserId = user, Depth = 1 };
