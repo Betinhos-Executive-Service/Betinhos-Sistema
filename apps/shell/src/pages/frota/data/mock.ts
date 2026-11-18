@@ -60,8 +60,8 @@ function seed(): FrotaData {
       { id: 'v3', placa: 'TST3C33', marca: 'Nissan', modelo: 'Versa', cor: 'Branco', anoModelo: 2020, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
       // ID no formato GUID e inativo (vendido): o lookup de veículo do mock da Geral abre a ficha dele por cima da lista.
       { id: 'f2f2f2f2-0000-4000-8000-000000000001', placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', cor: 'Cinza', anoModelo: 2019, status: VEICULO.VENDIDO, categoria: 100000000, motorista: null, hodometro: null, hodometroEm: null },
-      { id: 'v5', placa: 'TST1A23', marca: 'Toyota', modelo: 'Etios', cor: 'Branco', anoModelo: 2022, status: VEICULO.ATIVO, categoria: 100000000, motorista: motTeste, hodometro: null, hodometroEm: null },
       { id: 'v4', placa: 'TST4D44', marca: 'Kia', modelo: 'Carnival', cor: 'Preto', anoModelo: 2025, status: null, categoria: 100000002, motorista: null, hodometro: null, hodometroEm: null },
+      { id: 'v5', placa: 'TST1A23', marca: 'Toyota', modelo: 'Etios', cor: 'Branco', anoModelo: 2022, status: VEICULO.ATIVO, categoria: 100000000, motorista: motTeste, hodometro: null, hodometroEm: null },
     ],
     manutencoes: [
       manut('m1', v1, { grau: 4, descricao: 'Freio com ruído (fictício)', servicos: [100000007], categorias: [100000001], origemClassificacao: ORIGEM.IA, confiancaIa: 0.93 }),
