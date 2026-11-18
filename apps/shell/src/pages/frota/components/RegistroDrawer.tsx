@@ -1,11 +1,11 @@
 import { Download, ExternalLink } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Button, Drawer, EmptyState } from '@betinhos/ui'
 import { diaSP, formatBR } from '../data/dates'
 import { brl, NAO_INFORMADO } from '../data/format'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { CANAL, GRAVIDADE, KIND_LABEL, KIND_TABLE, label, TIPO_COLISAO } from '../data/schema'
-import type { ColunaArquivoMulta, DataSource, FlowResult } from '../data/source'
+import type { ColunaArquivoMulta, DataSource } from '../data/source'
 import type { FrotaData, Kind, Ref } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { StatusPanel } from './StatusPanel'
@@ -50,11 +50,9 @@ function detalhe(kind: KindRegistro, id: string, data: FrotaData, urlArquivo: (m
 }
 
 export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onOpenVeiculo }: { source: DataSource; kind: KindRegistro; id: string; data: FrotaData; onClose: () => void; onChanged: () => void; onOpenVeiculo: (id: string) => void }) {
-  const [shareUrl, setShareUrl] = useState<string | null>(null)
   const notify = useNotify()
   const registro = detalhe(kind, id, data, (multaId, coluna) => source.urlArquivoMulta(multaId, coluna))
   const multa = kind === 'multa' ? data.multas.find((row) => row.id === id) : undefined
-  useEffect(() => { setShareUrl(null) }, [kind, id])
 
   async function abrirFormulario() {
     try {
@@ -63,11 +61,6 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onO
       notify('error', errorMessage(reason))
       return
     }
-    onChanged()
-  }
-
-  function concluido(result: FlowResult | null) {
-    if (result?.shareUrl) setShareUrl(result.shareUrl)
     onChanged()
   }
 
@@ -92,13 +85,12 @@ export function RegistroDrawer({ source, kind, id, data, onClose, onChanged, onO
           ) : (
             <section className="frota-group" aria-labelledby={`${id}-acoes`}>
               <h3 id={`${id}-acoes`} className="frota-group__title">Ações de status</h3>
-              {shareUrl && /^https?:\/\//i.test(shareUrl) && <p><a className="frota-link" href={shareUrl} target="_blank" rel="noreferrer">Abrir contrato gerado</a></p>}
               <StatusPanel
                 key={`${id}-${registro.status}`}
                 source={source}
                 kind={kind}
                 record={{ id, status: registro.status, temVeiculo: registro.veiculo !== null, temMotorista: registro.temMotorista }}
-                onDone={concluido}
+                onDone={onChanged}
                 onReload={onChanged}
               />
             </section>

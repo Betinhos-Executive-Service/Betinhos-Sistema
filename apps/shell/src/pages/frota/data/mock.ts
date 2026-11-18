@@ -6,7 +6,7 @@ import { estadoDaMulta } from '../domain/multaEstado'
 import { aplicarPasso, avaliar, validarPasso, type MultaEstado } from '../domain/multaEtapas'
 import { ANEXO_DESPESA, CANAL, COLISAO, MANUT, MOTIVO_EMPRESA, MULTA, PAGAMENTO, RESPONSAVEL, STATUS_FIELD, VEICULO } from './schema'
 import type { Acordo } from '../domain/termoMulta'
-import type { DataSource, FlowId, OpcaoBusca } from './source'
+import type { DataSource, OpcaoBusca } from './source'
 import { ApiError } from './xrm'
 import type { Colisao, DespesaCombustivel, DetalheManutencao, FrotaData, ItemPlano, Kind, Manutencao, Multa, ProgramacaoManutencao, Ref, TelemetriaKm, TermoMulta } from './types'
 import { latenciaMock } from '../../../app/latenciaMock'
@@ -208,7 +208,6 @@ export function createMockSource(): DataSource {
     async openForm(kind, id) {
       window.alert(`Mock: abriria o formulário nativo de ${kind}${id ? ` (${id})` : ' (novo)'}.`)
     },
-    async prepareFlow() {},
     async fotoVeiculo(id) {
       return fotos.get(id) ?? null
     },
@@ -243,10 +242,6 @@ export function createMockSource(): DataSource {
       const plano = data.planoPreventivo.find((row) => row.id === itemId)
       if (!veiculo || !plano) throw new Error('Registro não encontrado no mock.')
       data.baselines.push({ id: `b${data.baselines.length + 1}`, veiculo: { id: veiculo.id, label: veiculo.placa }, item: { id: plano.id, label: plano.nome }, km, data: dia })
-    },
-    async runFlow(_flow: FlowId, _id: string) {
-      await delay()
-      throw new Error('Flow desconhecido no mock.')
     },
     async temAditivo(funcionarioId) {
       return temAditivo(funcionarioId)

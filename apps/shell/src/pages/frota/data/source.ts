@@ -10,25 +10,10 @@ export const EMPTY_DATA: FrotaData = { veiculos: [], manutencoes: [], multas: []
 /** Classificação da manutenção, aplicada na tela sem recarregar tudo. */
 export type Classificacao = { servicos: number[]; categorias: number[]; origem: number | null; confianca: number | null }
 
-/**
- * Nenhuma transição dispara Flow hoje: a multa anda pela cr40f_PassoMulta ("Notificar condutor" e "Gerar contrato de indicação"
- * saíram na fase 1) e a manutenção pelas Custom APIs (aprovarManutencao saiu nas manutenções v2). A infraestrutura de Flow fica
- * para quando uma transição voltar a usar um; ao incluir o id aqui, preencha também FLOWS em dataverse.ts.
- */
-export type FlowId = never
 /** Colunas de arquivo livres da multa que a tela grava. */
 export type ArquivoMulta = 'cr40f_comprovantepagamento' | 'cr40f_pdfpenalidade'
 /** Colunas de arquivo da multa que a tela baixa (inclui o PDF da autuação, que só o SNE grava). */
 export type ColunaArquivoMulta = ArquivoMulta | 'cr40f_autodainfracao'
-export type FlowResult = { message: string | null; shareUrl: string | null }
-
-/** O Flow pode ter rodado no servidor mesmo sem resposta (tempo esgotado ou falha de rede). */
-export class FlowIncertoError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'FlowIncertoError'
-  }
-}
 
 export type ItemPlanoInput = { nome: string; servico: number; intervaloKm: number | null; intervaloMeses: number | null; avisoKm: number; avisoDias: number }
 
@@ -98,10 +83,6 @@ export interface DataSource extends ComandosManutencao, ArquivosManutencao {
   update(kind: Kind, id: string, patch: Record<string, unknown>): Promise<void>
   /** Abre o formulário nativo. Resolve quando o usuário fecha o formulário. */
   openForm(kind: Kind | 'veiculo', id?: string): Promise<void>
-  /** Garante que o Flow pode ser chamado (URL configurada e legível). Não chama o Flow. */
-  prepareFlow(flow: FlowId): Promise<void>
-  /** Dispara um dos Flows existentes para o registro. O Flow grava o status; a tela recarrega depois. */
-  runFlow(flow: FlowId, id: string): Promise<FlowResult>
   /** Foto principal do veículo no SharePoint (a mais recente da pasta). null = sem foto. */
   fotoVeiculo(id: string): Promise<Blob | null>
   /** Envia uma nova foto principal para o SharePoint. */

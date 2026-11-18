@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createXrmSource, getDataverseEnvironmentLabel } from './dataverse'
-import { FlowIncertoError } from './source'
 import type { XrmHost } from './xrm'
 
 function host(overrides: Partial<NonNullable<XrmHost['WebApi']>> = {}) {
