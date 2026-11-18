@@ -22,7 +22,7 @@ export function filasDaMulta(s: Situacao): string[] {
   if (s.pendentes.length) filas.push('comigo')
   if (s.prazoVencido) filas.push('prazo-vencido')
   if (s.aguardandoPenalidade) filas.push('aguardando-penalidade')
-  if (s.etapa === 'acertar') filas.push('aguardando-acerto')
+  if (s.etapa === 'acertar') filas.push(s.descontando ? 'descontando' : 'aguardando-acerto')
   if (s.etapa === 'encerrada' || s.etapa === 'cancelada') filas.push('encerradas')
   return filas
 }

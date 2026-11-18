@@ -47,7 +47,7 @@ public static class MultasDoDia
                 r.Indicar.Add(Linha(m, s, prazoPassado));
             else if (s.Etapa == MultaEtapas.Pagar && e.Vencimento != null && Regras.Dias(hoje, e.Vencimento) <= 5)
                 r.Pagar.Add(Linha(m, s, prazoPassado));
-            else if (s.Etapa == MultaEtapas.Acertar) r.AguardandoAcerto++;
+            else if (s.Etapa == MultaEtapas.Acertar && !s.Descontando) r.AguardandoAcerto++; // descontando em folha: nada para a Frota fazer
         }
         foreach (var lista in new[] { r.PrazoVencido, r.Indicar, r.Aceite, r.Pagar })
             lista.Sort((a, b) =>

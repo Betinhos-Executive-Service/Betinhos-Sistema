@@ -141,7 +141,7 @@ export const LARGURAS: Record<Kind, Record<string, number>> = {
 
 export const SITUACAO_OPCOES: FilterOption[] = [
   { value: 'comigo', label: 'Com passo a dar' }, { value: 'prazo-vencido', label: 'Prazo vencido' }, { value: 'aguardando-penalidade', label: 'Aguardando penalidade' },
-  { value: 'aguardando-acerto', label: 'Aguardando acerto' }, { value: 'encerradas', label: 'Encerradas e canceladas' },
+  { value: 'aguardando-acerto', label: 'Aguardando acerto' }, { value: 'descontando', label: 'Descontando em folha' }, { value: 'encerradas', label: 'Encerradas e canceladas' },
 ]
 const filaMulta = (valor: string): TableFilters => {
   const filtros = emptyFilters()
@@ -274,8 +274,9 @@ export function registroBuiltins(kind: Kind): StoredView[] {
     view('prazo-vencido', 'Prazo vencido', 1, filaMulta('prazo-vencido')),
     view('aguardando-penalidade', 'Aguardando penalidade', 2, filaMulta('aguardando-penalidade')),
     view('aguardando-acerto', 'Aguardando acerto', 3, filaMulta('aguardando-acerto')),
-    view('encerradas', 'Encerradas e canceladas', 4, filaMulta('encerradas')),
-    view('todas', 'Todas', 5, emptyFilters()),
+    view('descontando', 'Descontando', 4, filaMulta('descontando')),
+    view('encerradas', 'Encerradas e canceladas', 5, filaMulta('encerradas')),
+    view('todas', 'Todas', 6, emptyFilters()),
   ]
   return [view('andamento', 'Em andamento', 1, status([COLISAO.ENVIADO, COLISAO.ANALISE]))]
 }

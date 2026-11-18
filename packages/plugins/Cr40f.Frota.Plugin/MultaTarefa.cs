@@ -102,11 +102,14 @@ public sealed class MultaTarefa
         t["cr40f_prazo"] = s.ProximoPrazo == null ? null : MultaMapper.DataGravada(s.ProximoPrazo);
     }
 
+    // Descontando em folha: nada para a Frota fazer; o RH lança pela tela (decisão de 18/11/2026).
+    private static bool Aberta(MultaSituacao s) => MultaEtapas.Aberta(s.Etapa) && !s.Descontando;
+
     private void Criar(MultaResumo m, MultaSituacao s)
     {
         var t = new Entity(Tarefas)
         {
-            ["cr40f_status"] = new OptionSetValue(MultaEtapas.Aberta(s.Etapa) ? Afazer : Concluida),
+            ["cr40f_status"] = new OptionSetValue(Aberta(s) ? Afazer : Concluida),
             ["cr40f_origem"] = new OptionSetValue(OrigemMulta),
             ["cr40f_codigoorigem"] = Codigo(m.Id),
             ["cr40f_multa"] = new EntityReference(MultaMapper.Tabela, m.Id),
@@ -128,7 +131,7 @@ public sealed class MultaTarefa
         foreach (var a in desejado.Attributes)
             if (!Igual(tarefa, a.Key, a.Value)) u[a.Key] = a.Value;
         var atual = tarefa.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value ?? Afazer;
-        var aberta = MultaEtapas.Aberta(s.Etapa);
+        var aberta = Aberta(s);
         int? novo = !aberta && atual != Concluida ? Concluida : aberta && (atual == Concluida || atual == Cancelada) ? Afazer : null;
         if (novo is int n) u["cr40f_status"] = new OptionSetValue(n);
         Reparar(tarefa, m, u);
