@@ -13,14 +13,19 @@ type Entrada = {
   extra?: ReactNode
 }
 
+/** O que o card ampliado do KPI mostra (comparativos e apoios); `KpiAba` lê e não repassa ao `StatCard`. */
+export type DadosKpi = { chips: (Chip | ChipAnterior)[]; apoio: Apoio[] }
+
 /** Extras do `StatCard` logo abaixo do valor, como chips compactos: `<StatCard {...extrasKpi({ chips, apoio })} />`. */
-export function extrasKpi({ chips = [], apoio = [], extra }: Entrada): Pick<StatCardProps, 'children'> {
+export function extrasKpi({ chips = [], apoio = [], extra }: Entrada): Pick<StatCardProps, 'children'> & { dados: DadosKpi } {
   // Comparativo sem base ("ANO ANT. s/dado") só ocupa espaço: fica de fora.
   const comparativos = chips.filter((c): c is Chip | ChipAnterior => c != null && c.tipo !== 'sem-dado')
   const frase = typeof apoio === 'string' ? apoio : ''
   const rotulados = typeof apoio === 'string' ? [] : apoio
-  if (!comparativos.length && !rotulados.length && !frase && extra == null) return {}
+  const dados: DadosKpi = { chips: comparativos, apoio: frase ? [...rotulados, { rotulo: '', texto: frase }] : rotulados }
+  if (!comparativos.length && !rotulados.length && !frase && extra == null) return { dados }
   return {
+    dados,
     children: (
       <div className="dash-kpi-extras">
         <Chips chips={comparativos} apoio={rotulados} />
