@@ -46,6 +46,14 @@ var apis = new[]
         "Seções do e-mail diário de multas (prazo vencido, indicar em 7 dias, aceite pendente, pagar com 40%, aguardando acerto). Somente leitura.", null,
         new[] { new Param("Hoje", TipoDateTime, "Data de referência. Ausente: data atual em Brasília.", true) },
         new[] { new Param("MultasJson", TipoString, "{hoje, total, prazoVencido, indicar, aceite, pagar, aguardandoAcerto}") }),
+    new Api("Cr40f.Frota.Plugin.LancarDescontoFolhaPlugin", "cr40f_LancarDescontoFolha", "RH | Lançar desconto em folha",
+        "Lança ou desfaz parcelas de desconto em folha (new_parcelamultafolha) em lote; encerra ou reabre a multa pelo cr40f_PassoMulta. Recusa por parcela.", "prvWritecr40f_multas",
+        new[]
+        {
+            new Param("ParcelaIdsJson", TipoString, "Lista JSON de GUIDs de new_parcelamultafolha (até 200)."),
+            new Param("Acao", TipoString, "lancar | desfazer"),
+        },
+        new[] { new Param("ResultadoJson", TipoString, "{parcelas:[{id,ok,erro}], encerradas:[multaId], reabertas:[multaId]}") }),
 };
 
 // A imagem pre é a lista de GeralManutencaoEspelhoPlugin.AtributosPre (o registrador não referencia o projeto do plugin;
