@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -11,6 +12,8 @@ namespace Cr40f.Frota.Plugin;
 public sealed class PassoMultaPlugin : IPlugin
 {
     public const string Mensagem = "cr40f_PassoMulta";
+    public const string Parcelas = "new_parcelamultafolha";
+    public const int Prevista = 100000000, Descontada = 100000001;
 
     public void Execute(IServiceProvider serviceProvider)
     {
@@ -25,7 +28,8 @@ public sealed class PassoMultaPlugin : IPlugin
             var passo = context.InputParameters.Contains("Passo") ? Convert.ToString(context.InputParameters["Passo"]) ?? "" : "";
             var dados = context.InputParameters.Contains("DadosJson") ? Convert.ToString(context.InputParameters["DadosJson"]) : null;
             var hoje = FrotaPendenciasPlugin.ResolverHoje(null, DateTime.UtcNow);
-            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje);
+            // Parcelas: a trava do termo só deixa o servidor gravar; criadas pelo SYSTEM com o dono = quem fez o acerto.
+            context.OutputParameters["MultaJson"] = Executar(factory.CreateOrganizationService(context.UserId), multaId, passo, dados, hoje, factory.CreateOrganizationService(null), context.UserId);
             tracing.Trace("{0}: {1} gravado na multa {2}", Mensagem, passo, multaId);
         }
         catch (InvalidPluginExecutionException) { throw; }
@@ -37,20 +41,53 @@ public sealed class PassoMultaPlugin : IPlugin
         }
     }
 
-    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje)
+    public static string Executar(IOrganizationService service, Guid multaId, string passo, string? dadosJson, string hoje, IOrganizationService? sistema = null, Guid? dono = null)
     {
+        sistema ??= service;
         DadosPasso? dados;
         try { dados = string.IsNullOrWhiteSpace(dadosJson) ? null : Json.Ler<DadosPasso>(dadosJson!); }
         catch (Exception) { throw new InvalidPluginExecutionException("Dados do passo inválidos."); }
         dados ??= new DadosPasso(); // "null" no JSON vale dados vazios: a validação do passo recusa com a mensagem do que falta.
-        var antes = MultaMapper.Estado(service.Retrieve(MultaMapper.Tabela, multaId, new ColumnSet(MultaMapper.Colunas)));
+        var linha = service.Retrieve(MultaMapper.Tabela, multaId, new ColumnSet(MultaMapper.Colunas));
+        var antes = MultaMapper.Estado(linha);
+        ContarParcelas(sistema, multaId, antes);
         var erro = MultaEtapas.Validar(antes, passo, dados, hoje);
         if (erro != null) throw new InvalidPluginExecutionException(erro);
         var trocaMotorista = (passo == Passos.DefinirResponsavel && dados.Responsavel == "motorista") || !string.IsNullOrWhiteSpace(dados.MotoristaId);
         if (trocaMotorista && !Guid.TryParse(dados.MotoristaId, out _)) throw new InvalidPluginExecutionException("Motorista inválido.");
         var depois = MultaEtapas.Aplicar(antes, passo, dados, hoje);
+        if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha")
+            CriarParcelas(sistema, multaId, linha.GetAttributeValue<string>("cr40f_novacoluna") ?? "sem número", antes, dados, dono);
         var mudancas = MultaEtapas.Mudancas(antes, depois);
         if (mudancas.Count > 0) service.Update(MultaMapper.Gravacao(multaId, mudancas));
         return Json.Serializar(MultaEtapas.Avaliar(depois, hoje));
+    }
+
+    public static void ContarParcelas(IOrganizationService s, Guid multaId, MultaEstado e)
+    {
+        var q = new QueryExpression(Parcelas) { ColumnSet = new ColumnSet("new_status") };
+        q.Criteria.AddCondition("new_multa", ConditionOperator.Equal, multaId);
+        var status = s.RetrieveMultiple(q).Entities.Select(p => p.GetAttributeValue<OptionSetValue>("new_status")?.Value).ToList();
+        e.ParcelasPrevistas = status.Count(v => v == Prevista);
+        e.ParcelasDescontadas = status.Count(v => v == Descontada);
+    }
+
+    private static void CriarParcelas(IOrganizationService s, Guid multaId, string auto, MultaEstado m, DadosPasso d, Guid? dono)
+    {
+        foreach (var p in MultaParcelas.Dividir(m.ValorPago!.Value, d.Parcelas ?? 1, d.Competencia!))
+        {
+            var e = new Entity(Parcelas)
+            {
+                ["new_name"] = $"Multa {auto} · {p.Numero}/{p.Total}",
+                ["new_multa"] = new EntityReference(MultaMapper.Tabela, multaId),
+                ["new_motorista"] = new EntityReference("cr40f_funcionarios", Guid.Parse(m.MotoristaId!)),
+                ["new_numero"] = p.Numero,
+                ["new_competencia"] = MultaMapper.DataGravada(p.Competencia),
+                ["new_valor"] = new Money(p.Valor),
+                ["new_status"] = new OptionSetValue(Prevista),
+            };
+            if (dono is Guid u && u != Guid.Empty) e["ownerid"] = new EntityReference("systemuser", u);
+            s.Create(e);
+        }
     }
 }
