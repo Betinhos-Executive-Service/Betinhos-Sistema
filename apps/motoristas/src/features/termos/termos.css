@@ -145,6 +145,7 @@
 .multa-card-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
 .multa-card-head strong { font-size:1rem; font-weight:800; letter-spacing:.02em; }
 .multa-card-head small { color:#64748b; font-size:.75rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.multa-grupo[data-destaque] .multa-card-head small { color:#475569; }
 .multa-card-local { color:#475569; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
 .multa-card .termo-badge { justify-self:start; }
 .multa-parcelas { display:grid; gap:2px; margin:0; padding:0; list-style:none; color:#475569; font-size:.82rem; font-variant-numeric:tabular-nums; }

@@ -167,10 +167,10 @@ describe('Ficha', () => {
   describe('Assinatura eletrônica (aditivo)', () => {
     const comAditivo: Funcionario = { ...record, values: { ...record.values, new_aditivoassinaturaem: '2026-10-15' }, aditivo: { nome: 'aditivo.pdf', url: 'https://x/y/$value' } }
 
-    it('mostra a seção com explicação, o selo no cabeçalho e o link de download quando há aditivo', async () => {
+    it('mostra a seção com o selo no cabeçalho e o link de download quando há aditivo', async () => {
       await renderFicha(fakeSource(vi.fn(async () => 'f1'), { get: async () => structuredClone(comAditivo) }))
       expect(screen.getByText('Assinatura eletrônica')).toBeTruthy()
-      expect(screen.getByText(/sem o aditivo, o motorista não assina termos pelo app/i)).toBeTruthy()
+      expect(screen.queryByText(/sem o aditivo, o motorista não assina termos pelo app/i)).toBeNull()
       expect(screen.getByText('Aditivo assinado em 15/10/2026')).toBeTruthy()
       expect(screen.getByText('Assinado em 15/10/2026')).toBeTruthy()
       expect(screen.getByRole('link', { name: /Baixar/ }).getAttribute('href')).toBe('https://x/y/$value')

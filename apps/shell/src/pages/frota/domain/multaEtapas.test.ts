@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { aplicarPasso, avaliar, dividirParcelas, janelaCompetencia, mudancas, previaParcelas, PASSOS, ROTULO_PASSO, validarPasso, type DadosPasso, type MultaEstado } from './multaEtapas'
+import { aplicarPasso, avaliar, dataAceiteInicial, dividirParcelas, janelaCompetencia, mudancas, previaParcelas, PASSOS, ROTULO_PASSO, validarPasso, type DadosPasso, type MultaEstado } from './multaEtapas'
 
 type F = {
   hoje: string
@@ -65,5 +65,15 @@ describe('parcelas da folha', () => {
     expect(previaParcelas(100, 3)).toBe('3× R$ 33,33 · última R$ 33,34')
     expect(previaParcelas(100, 2)).toBe('2× R$ 50,00')
     expect(previaParcelas(130.16, 1)).toBe('1× R$ 130,16')
+  })
+})
+
+describe('aceite declarado pelo motorista', () => {
+  it('preenche a data do campo com a declarada', () => {
+    expect(dataAceiteInicial({ status: 202410000, aceiteDeclaradoEm: '2026-11-17' })).toBe('2026-11-17')
+    expect(dataAceiteInicial({ status: 202410000, aceiteDeclaradoEm: '2026-11-17T10:00:00Z' })).toBe('2026-11-17')
+  })
+  it('deixa o campo vazio quando não houve declaração', () => {
+    expect(dataAceiteInicial({ status: 202410000, aceiteDeclaradoEm: null })).toBeUndefined()
   })
 })

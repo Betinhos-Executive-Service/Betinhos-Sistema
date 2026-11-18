@@ -108,6 +108,9 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
   return { etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido: vencido, aguardandoPenalidade, descontando: emDesconto, aguardandoTermo }
 }
 
+/** Data inicial do campo do aceite: a que o motorista declarou (o gestor pode trocar). */
+export const dataAceiteInicial = (m: MultaEstado): string | undefined => m.aceiteDeclaradoEm?.slice(0, 10)
+
 function rotuloPendente(m: MultaEstado, passo: Passo): string {
   if (passo === 'DefinirResponsavel' && m.contestadaEm != null) return 'Decidir a contestação do motorista'
   if (passo === 'RegistrarAceite' && m.aceiteDeclaradoEm != null) return `Conferir o aceite na CNH Digital (motorista declarou em ${m.aceiteDeclaradoEm.slice(8, 10)}/${m.aceiteDeclaradoEm.slice(5, 7)})`

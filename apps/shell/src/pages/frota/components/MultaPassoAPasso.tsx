@@ -8,7 +8,7 @@ import type { DataSource } from '../data/source'
 import type { FrotaData, Multa, ParcelaFolha, Ref, TermoMulta } from '../data/types'
 import { mensagemDaAcao } from '../data/xrm'
 import { estadoDaMulta, responsavelDaMulta, urgenciaDoPrazo } from '../domain/multaEstado'
-import { aberta, avaliar, janelaCompetencia, mesBr, mesDoTermo, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
+import { aberta, avaliar, dataAceiteInicial, janelaCompetencia, mesBr, mesDoTermo, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
 import { mensagemWhatsApp } from '../domain/multaMensagem'
 import { AvisoPorTermo } from './TermoMultaPanel'
 import { useNotify } from './Toasts'
@@ -123,13 +123,13 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
 
   // Passo novo começa limpo; o responsável já sugere o motorista que veio no cadastro da multa.
   useEffect(() => {
-    setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : {})
+    setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : passo === 'RegistrarAceite' && estado.aceiteDeclaradoEm ? { data: dataAceiteInicial(estado) } : {})
     setArquivo(null)
     setPenalidade({ vencimento: '', valor: '' })
     setPdfPenalidade(null)
     setErro(null)
     setViaWhatsapp(false)
-  }, [passo, multa.id, motoristaId])
+  }, [passo, multa.id, motoristaId, estado.aceiteDeclaradoEm])
 
   const set = (patch: DadosPasso) => setDados((atual) => ({ ...atual, ...patch }))
   const envio = useMemo(() => dadosSemVazios(dados), [dados])
@@ -232,6 +232,9 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
 
   const contestacao = !!estado.contestadaEm && ultimoTermo?.status === 'contestado' && (passo === 'DefinirResponsavel' || passo === 'AvisarMotorista')
   const termoAssinado = ultimoTermo?.status === 'assinado' ? ultimoTermo : null
+  const linhaTermo = (t: NonNullable<typeof ultimoTermo>) => (
+    <p className="frota-muted">Termo assinado em {formatBR(t.assinadoEm?.slice(0, 10) ?? '')}{t.hashPdf ? ` · hash ${t.hashPdf.slice(0, 8)}` : ''}{' '}<Button variant="ghost" size="compact" onClick={() => void baixarTermo(t.id)}>Baixar PDF</Button></p>
+  )
   async function baixarTermo(id: string) {
     try {
       const { nome, blob } = await source.baixarPdfTermo(id)
@@ -279,7 +282,10 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       case 'RegistrarIndicacao':
         return <div className="frota-fields">{campoCanal()}{campoData('Data da indicação')}</div>
       case 'RegistrarAceite':
-        return <div className="frota-fields">{campoData('Data do aceite na CNH Digital')}</div>
+        return <>
+          {estado.aceiteDeclaradoEm && <p className="frota-muted">Motorista declarou o aceite em {formatBR(estado.aceiteDeclaradoEm)}.</p>}
+          <div className="frota-fields">{campoData('Data do aceite na CNH Digital')}</div>
+        </>
       case 'RegistrarPagamento':
         return <>
           <p className="frota-muted">Vencimento {formatBR(estado.vencimento)}{multa.valorComDesconto != null ? ` · com os 40%: ${brl(multa.valorComDesconto)}` : ''}</p>
@@ -296,9 +302,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
         </>
       case 'RegistrarAcerto':
         return <>
-          {termoAssinado && (
-            <p className="frota-muted">Termo assinado em {formatBR(termoAssinado.assinadoEm?.slice(0, 10) ?? '')}{termoAssinado.hashPdf ? ` · hash ${termoAssinado.hashPdf.slice(0, 8)}` : ''}{' '}<Button variant="ghost" size="compact" onClick={() => void baixarTermo(termoAssinado.id)}>Baixar PDF</Button></p>
-          )}
+          {termoAssinado && linhaTermo(termoAssinado)}
           <ChoiceGroup label="Acerto" inline>
             <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha', parcelas: estado.termoParcelas ?? 1, competencia: (mesDoTermo(estado, hoje) ?? hoje).slice(0, 7) })} />
             <Radio name={nome} label="Empresa assume" checked={dados.acerto === 'empresa'} onChange={() => setDados({ acerto: 'empresa' })} />
@@ -449,6 +453,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           <dl className="frota-detail">
             {lista.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
           </dl>
+          {termoAssinado && passo !== 'RegistrarAcerto' && linhaTermo(termoAssinado)}
         </section>
       )}
     </div>

@@ -79,7 +79,7 @@ export function AditivoAssinatura({ id, atual, assinadoEm, source, onRegistrado,
 
   return (
     <div className="aditivo field--wide">
-      <p className="hint">Sem o aditivo, o motorista não assina termos pelo app.</p>
+      {!atual && <p className="hint">Sem o aditivo, o motorista não assina termos pelo app.</p>}
       {!id && <p className="hint">Salve o colaborador para gerar o aditivo.</p>}
       {aviso && <p className="hint" role="status">{aviso}</p>}
       {atual && (
