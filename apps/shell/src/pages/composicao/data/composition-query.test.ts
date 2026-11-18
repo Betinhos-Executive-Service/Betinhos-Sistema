@@ -82,9 +82,11 @@ describe('consulta de composições no servidor', () => {
     expect(document.querySelector('condition[attribute="cr40f_idtenaris"]')).toBeNull()
   })
 
-  it('número vira igualdade em dinheiro e inteiro; palavra comum não', () => {
+  it('número vira igualdade em dinheiro e inteiro; valor total (calculado) só com vírgula ou ponto; palavra comum não', () => {
     const numeric = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, '12345 1.234,50', false), 'application/xml')
-    expect([...numeric.querySelectorAll('condition[operator="eq"]')].map((item) => [item.getAttribute('attribute'), item.getAttribute('value')])).toEqual(expect.arrayContaining([['new_valortotal', '12345'], ['cr40f_idtenaris', '12345'], ['new_valortotal', '1234.50']]))
+    const equals = [...numeric.querySelectorAll('condition[operator="eq"]')].map((item) => [item.getAttribute('attribute'), item.getAttribute('value')])
+    expect(equals).toEqual(expect.arrayContaining([['cr40f_idtenaris', '12345'], ['new_valortotal', '1234.50']]))
+    expect(equals).not.toContainEqual(['new_valortotal', '12345'])
     const text = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, 'embraer', false), 'application/xml')
     expect(text.querySelector('condition[operator="eq"][attribute="new_valortotal"]')).toBeNull()
   })
