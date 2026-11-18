@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { Copy, Paperclip, Sparkles, UserCheck } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { formatDate, formatMoney } from '../../pagantes/domain/messages'
@@ -70,7 +70,7 @@ export function DespesasTable({ list, choices, compras, onOpen, loading, view, q
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando despesas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando despesas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

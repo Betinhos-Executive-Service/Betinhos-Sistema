@@ -11,7 +11,7 @@ import {
   type SortingState,
   type TableFeatures,
 } from '@tanstack/react-table'
-import { useVirtualRows } from '../../../app/VirtualTable'
+import { useVirtualRows } from '../../../app/useVirtualRows'
 import { GridRowContext } from './grid-row-state'
 import { REVEAL_GRID_ROW, type RevealGridRow } from './grid-cell-focus'
 import { dataTableFeatures, type DataTableFeatures } from './features'

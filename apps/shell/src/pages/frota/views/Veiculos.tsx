@@ -5,7 +5,7 @@ import type { Host } from '../../../host'
 import { LazyFooter, useLazySlice } from '../../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../../app/ListaAgrupada'
 import { useRowSelection } from '../../../app/Selecao'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { useDebouncedText } from '../../../app/search'
 import { filterRows } from '../../../app/filterRows'
 import { useListView } from '../../../app/useListView'
@@ -75,7 +75,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
 
   const footer = <span className="frota-muted">{visiveis.length} de {linhas.length}</span>
   const table = (rows: LinhaVeiculo[], tableFooter?: ReactNode) => (
-    <VirtualTable<LinhaVeiculo>
+    <ListTable<LinhaVeiculo>
       rows={rows}
       rowKey={(linha) => linha.id}
       selection={sel.selection}

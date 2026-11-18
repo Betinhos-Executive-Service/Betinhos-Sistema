@@ -1,6 +1,6 @@
 import { memo, type MouseEvent, type ReactNode } from 'react'
 import { StatusBadge, todaySaoPaulo, type TableColumn } from '@betinhos/ui'
-import { VirtualTable } from '../../../../app/VirtualTable'
+import { ListTable } from '../../../../app/ListTable'
 import { fmtData } from '../../../equipamentos/components/EquipamentosList'
 import { openFromRow, openRowActions, selectionRowActions, type SelectionProps } from '../../../pagantes/components/PagantesList'
 import { formatMoney } from '../../../pagantes/domain/messages'
@@ -53,7 +53,7 @@ export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, l
   return (
     // Com seleção, um clique marca a linha e o duplo clique abre (como em Pagantes).
     <div {...(selection ? { onDoubleClick: abrirLinha } : { onClick: abrirLinha })}>
-      <VirtualTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
+      <ListTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
     </div>
   )
 })

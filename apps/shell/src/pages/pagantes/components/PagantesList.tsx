@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { type MenuAction, type TableColumn, type TableQuickFilters, type TableSelection, type TableView } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { ExternalLink } from 'lucide-react'
 import { formatDate, formatMoney } from '../domain/messages'
 import { hasFalha, label } from '../domain/status'
@@ -66,7 +66,7 @@ export function PagantesTable({ list, choices, contatos, onOpen, loading, view, 
   return (
     // Com seleção, o clique na linha seleciona (DS) e o duplo clique abre a ficha.
     <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pagantes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pagantes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
