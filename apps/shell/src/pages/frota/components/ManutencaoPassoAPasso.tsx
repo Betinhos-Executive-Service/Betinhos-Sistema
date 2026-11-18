@@ -49,7 +49,7 @@ export function Arquivos({ titulo, links }: { titulo: string; links: string[] })
   )
 }
 
-/** Guia da gaveta da manutenção: barra de três etapas e um passo por vez. Cabeçalho, "⋯" e histórico ficam na gaveta (ManutencaoResumo). */
+/** Guia da gaveta da manutenção: barra de três etapas e um passo por vez. */
 export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizada, onExtra, autoFoco = true }: Props) {
   const situacao = useMemo(() => avaliar(m, hoje), [m, hoje])
   return (

@@ -192,7 +192,7 @@
 .frota-fotos { margin: 0; font-size: var(--bt-font-size-13); }
 .frota-fotos .frota-link { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
 
-/* Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): topo, barra de três etapas, um passo por vez. */
+/* Guia da gaveta da manutenção (spec 2026-11-17-manutencoes-gaveta-passo-a-passo): barra de três etapas, um passo por vez. */
 .frota-guia { display: grid; gap: var(--bt-space-4); min-width: 0; }
 .frota-guia__passo { display: grid; gap: var(--bt-space-3); min-width: 0; }
 .frota-guia__passo h3 { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); }
@@ -202,6 +202,7 @@
 .frota-bloco[data-destaque] { background: var(--bt-color-surface); border-color: var(--bt-color-border-strong); }
 .frota-bloco__titulo { margin: 0; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
 .frota-bloco__citacao { margin: 0; font-size: var(--bt-font-size-14); }
+.frota-bloco .frota-detail { padding: 0; border: 0; background: none; }
 .frota-linha-tempo { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-13); }
 .frota-linha-tempo li { position: relative; padding-left: var(--bt-space-4); }
 .frota-linha-tempo li::before { content: ''; position: absolute; left: 0; top: .5em; width: 8px; height: 8px; border-radius: 50%; background: var(--bt-color-border-strong); }

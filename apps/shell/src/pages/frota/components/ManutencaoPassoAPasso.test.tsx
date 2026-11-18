@@ -111,7 +111,7 @@ describe('ManutencaoPassoAPasso', () => {
     expect(itens.every((li) => li.hasAttribute('data-feita'))).toBe(true)
   })
 
-  it('Reprovada: barra parada, motivo, sem botão nem ⋯', () => {
+  it('Reprovada: barra parada, motivo e sem botão', () => {
     montar({ ...base, status: MANUT.REPROVADO, comentarioAprovador: 'Duplicada' })
     expect(screen.getByText('Reprovada: Duplicada')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Agendar' })).toBeNull()
@@ -170,7 +170,7 @@ describe('ManutencaoPassoAPasso', () => {
     expect(screen.getByText('Não foi possível ler a programação. Feche e abra a gaveta de novo.')).toBeTruthy()
   })
 
-  it('Programar não repete a dica da Geral', async () => {
+  it('Programar não repete a dica da Geral', () => {
     montar(agendada)
     expect(screen.queryByText('Também dá para programar pela linha na Geral.')).toBeNull()
   })
