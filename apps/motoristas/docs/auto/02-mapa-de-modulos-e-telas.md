@@ -25,7 +25,7 @@ O hash vem de `SCREEN_HASH_PATHS` em `src/app/navigation.ts` (há aliases em ing
 | `meuCarro` | `meu-carro` | `MyVehicleScreen.tsx` | Carro atual (motorista terceiro escolhe) |
 | `comunicados` | `comunicados` | `ComunicadosScreen.tsx` | Comunicados e ciência com assinatura |
 | `checklists` | `checklists` | `ChecklistsScreen.tsx` | Checklist de vistoria |
-| `multas` | `multas` | `TermosMultaScreen.tsx`, `TermoMultaDetalheScreen.tsx` | Termos de multa com assinatura eletrônica |
+| `multas` | `multas` | `MinhasMultasScreen.tsx`, `AceiteCnhCard.tsx`, `TermoMultaDetalheScreen.tsx` | Termos de multa com assinatura eletrônica |
 | `treinamentos` | `treinamentos` | `TreinamentosScreen.tsx` | Treinamentos (texto, vídeo, assinatura, quiz) |
 | (sem `Screen`) | n/a | `ButtonPreviewScreen.tsx` | Pré-visualização de botões; **não confirmado** se é alcançável em produção |
 

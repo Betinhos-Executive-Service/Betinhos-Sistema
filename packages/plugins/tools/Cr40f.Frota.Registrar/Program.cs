@@ -25,7 +25,7 @@ const int StepComponentType = 92;
 const int TipoDateTime = 1, TipoString = 10, TipoGuid = 12;
 const string Multas = "cr40f_multas";
 // Igual a MultaTravaPlugin.CamposDePasso: filtro do step de Update da trava e colunas da imagem "pre".
-const string CamposDePasso = "cr40f_status,cr40f_responsavel,cr40f_motivoempresa,cr40f_canalindicacao,cr40f_datadeavisoaocondutor,cr40f_datadeindicacao,cr40f_aceiteem,cr40f_pagaem,cr40f_acertoem,cr40f_encerradaem,cr40f_canceladaem,cr40f_valorpago,cr40f_competenciadesconto,cr40f_motivocancelamento";
+const string CamposDePasso = "cr40f_status,cr40f_responsavel,cr40f_motivoempresa,cr40f_canalindicacao,cr40f_datadeavisoaocondutor,cr40f_datadeindicacao,cr40f_aceiteem,cr40f_pagaem,cr40f_acertoem,cr40f_encerradaem,cr40f_canceladaem,cr40f_valorpago,cr40f_competenciadesconto,cr40f_motivocancelamento,cr40f_contestadaem,cr40f_aceitedeclaradoem,cr40f_ultimolembreteaceiteem";
 
 var apis = new[]
 {

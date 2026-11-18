@@ -56,33 +56,42 @@ describe('createXrmSource().equipamentos', () => {
   })
 })
 
-describe('createXrmSource().uploadAditivo', () => {
-  it('envia o PDF em PATCH na coluna de arquivo com o nome do arquivo', async () => {
+describe('createXrmSource(): aditivo do motorista', () => {
+  const resposta = (corpo: unknown, status = 200) => vi.fn(async () => new Response(JSON.stringify(corpo), { status }))
+
+  it('gerarAditivo chama new_GerarAditivoMotorista e devolve o PDF e o nome do servidor', async () => {
+    const fetch = resposta({ new_PdfBase64: 'JVBERi0=', new_NomeArquivo: 'aditivo-ana-v1.pdf' })
+    vi.stubGlobal('fetch', fetch)
+    const { source } = sourceWith([])
+    expect(await source.gerarAditivo(`{${GUID.toUpperCase()}}`)).toEqual({ pdfBase64: 'JVBERi0=', nomeArquivo: 'aditivo-ana-v1.pdf' })
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/new_GerarAditivoMotorista')
+    expect(JSON.parse(String(init.body))).toEqual({ new_FuncionarioId: GUID })
+  })
+
+  it('registrarAditivo manda funcionário, PDF e a data ao meio-dia UTC (não cai na véspera em Brasília)', async () => {
     const fetch = vi.fn(async () => new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetch)
     const { source } = sourceWith([])
-    const file = new File(['%PDF'], 'aditivo ação.pdf', { type: 'application/pdf' })
-    await source.uploadAditivo(`{${GUID.toUpperCase()}}`, file)
+    await source.registrarAditivo(GUID, 'JVBERi0=', '2026-11-18')
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
-    expect(url).toBe(`https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_funcionarioses(${GUID})/new_aditivoassinatura`)
-    expect(init.method).toBe('PATCH')
-    const headers = init.headers as Record<string, string>
-    expect(headers['Content-Type']).toBe('application/octet-stream')
-    expect(headers['x-ms-file-name']).toBe(encodeURIComponent('aditivo ação.pdf'))
-    expect(init.body).toBe(file)
+    expect(url).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/new_RegistrarAditivoMotorista')
+    expect(JSON.parse(String(init.body))).toEqual({ new_FuncionarioId: GUID, new_PdfBase64: 'JVBERi0=', new_AssinadoEm: '2026-11-18T12:00:00Z' })
   })
 
-  it('erro do Dataverse vira exceção com a mensagem', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'Arquivo grande demais.' } }), { status: 400 })))
+  it('a recusa do servidor sobe com a mensagem original', async () => {
+    const msg = 'Este PDF não tem assinatura digital. Assine no gov.br e envie o arquivo que o gov.br devolveu.'
+    vi.stubGlobal('fetch', resposta({ error: { message: msg } }, 400))
     const { source } = sourceWith([])
-    await expect(source.uploadAditivo(GUID, new File(['x'], 'a.pdf'))).rejects.toThrow('Arquivo grande demais.')
+    await expect(source.registrarAditivo(GUID, 'x', '2026-11-18')).rejects.toThrow(msg)
   })
 
-  it('recusa id que não é GUID', async () => {
+  it('recusa id que não é GUID sem chamar a API', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     const { source } = sourceWith([])
-    await expect(source.uploadAditivo('x/../y', new File(['x'], 'a.pdf'))).rejects.toThrow('Id de funcionário inválido.')
+    await expect(source.gerarAditivo('x/../y')).rejects.toThrow('Id de funcionário inválido.')
+    await expect(source.registrarAditivo('x/../y', 'x', '2026-11-18')).rejects.toThrow('Id de funcionário inválido.')
     expect(fetch).not.toHaveBeenCalled()
   })
 })

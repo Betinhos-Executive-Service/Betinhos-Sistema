@@ -1,15 +1,16 @@
 import { MoreHorizontal } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Field, Input, Menu, Radio, Select, Textarea, type MenuAction } from '@betinhos/ui'
 import { daysBetween, formatBR, toDataverseDate, todaySP } from '../data/dates'
 import { brl } from '../data/format'
 import { CANAL, MOTIVO_EMPRESA, RESPONSAVEL } from '../data/schema'
 import type { DataSource } from '../data/source'
-import type { FrotaData, Multa, ParcelaFolha, Ref } from '../data/types'
+import type { FrotaData, Multa, ParcelaFolha, Ref, TermoMulta } from '../data/types'
 import { mensagemDaAcao } from '../data/xrm'
 import { estadoDaMulta, responsavelDaMulta, urgenciaDoPrazo } from '../domain/multaEstado'
-import { aberta, avaliar, janelaCompetencia, mesBr, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
+import { aberta, avaliar, dataAceiteInicial, janelaCompetencia, mesBr, mesDoTermo, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
 import { mensagemWhatsApp } from '../domain/multaMensagem'
+import { AvisoPorTermo } from './TermoMultaPanel'
 import { useNotify } from './Toasts'
 
 type Props = { source: DataSource; multa: Multa; data: FrotaData; onChanged: () => void; hoje?: string }
@@ -23,6 +24,7 @@ const BOTAO: Record<Passo, string> = {
   RegistrarPagamento: 'Registrar pagamento', RegistrarAcerto: 'Registrar acerto', PrazoVencido: 'Responder', Cancelar: 'Cancelar multa',
   Recorrer: 'Entrar com recurso', ResultadoRecurso: 'Registrar resultado',
   ConcluirDesconto: 'Concluir desconto', ReabrirDesconto: 'Reabrir desconto',
+  TermoAssinado: 'Termo assinado', TermoContestado: 'Termo contestado', // internos: a tela não oferece
 }
 const CANAIS = [{ value: 'senatran', label: 'Senatran' }, { value: 'dsv', label: 'DSV Digital' }, { value: 'prefeitura', label: 'Prefeitura' }]
 const MOTIVOS = [{ value: 'culpa-empresa', label: 'Culpa da empresa' }, { value: 'prazo-perdido', label: 'Prazo perdido' }]
@@ -65,7 +67,23 @@ export function penalidadeFaltando(p: { vencimento: string; valor: string }): st
 
 export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todaySP() }: Props) {
   const notify = useNotify()
-  const estado = useMemo(() => estadoDaMulta(multa), [multa])
+  // Termos da multa (do mais recente ao mais antigo): só lidos quando a multa tem termo; o último alimenta as regras do acerto e a contestação.
+  const [termos, setTermos] = useState<TermoMulta[]>([])
+  const [temAditivo, setTemAditivo] = useState<boolean | null>(null)
+  const [viaWhatsapp, setViaWhatsapp] = useState(false)
+  const [versaoTermos, setVersaoTermos] = useState(0)
+  const recarregarTermos = useCallback(() => setVersaoTermos((v) => v + 1), [])
+  const temTermo = !!multa.termo
+  useEffect(() => {
+    if (!temTermo) { setTermos([]); return }
+    let atual = true
+    // Fonte sem listarTermos (ou com falha) vale como "sem termos": o passo a passo segue pelas regras da multa.
+    Promise.resolve().then(() => source.listarTermos(multa.id)).then((lista) => { if (atual) setTermos(lista) }, () => { if (atual) setTermos([]) })
+    return () => { atual = false }
+  }, [source, multa.id, temTermo, multa.termo?.status, multa.termo?.enviadoEm, multa.termoVigente?.id, versaoTermos])
+  const ultimoTermo = termos[0] ?? null
+  const termoPendente = termos.find((t) => t.status === 'pendente') ?? null
+  const estado = useMemo(() => estadoDaMulta(multa, ultimoTermo), [multa, ultimoTermo])
   const situacao = useMemo(() => avaliar(estado, hoje), [estado, hoje])
   const responsavel = responsavelDaMulta(multa)
   const motoristaId = multa.motorista?.id ?? null
@@ -74,6 +92,14 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const [extra, setExtra] = useState<'Cancelar' | 'Recorrer' | null>(null)
   const passo: Passo | null = extra ?? situacao.pendentes[0] ?? null
   const [dados, setDados] = useState<DadosPasso>({})
+  const motoristaDoAviso = passo === 'AvisarMotorista' ? motoristaId : null
+  useEffect(() => {
+    setTemAditivo(null)
+    if (!motoristaDoAviso) return
+    let atual = true
+    Promise.resolve().then(() => { return source.temAditivo(motoristaDoAviso) }).then((ok) => { if (atual) setTemAditivo(ok) }, () => { if (atual) setTemAditivo(false) })
+    return () => { atual = false }
+  }, [source, motoristaDoAviso])
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
@@ -97,12 +123,13 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
 
   // Passo novo começa limpo; o responsável já sugere o motorista que veio no cadastro da multa.
   useEffect(() => {
-    setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : {})
+    setDados(passo === 'DefinirResponsavel' && motoristaId ? { responsavel: 'motorista', motoristaId } : passo === 'RegistrarAceite' && estado.aceiteDeclaradoEm ? { data: dataAceiteInicial(estado) } : {})
     setArquivo(null)
     setPenalidade({ vencimento: '', valor: '' })
     setPdfPenalidade(null)
     setErro(null)
-  }, [passo, multa.id, motoristaId])
+    setViaWhatsapp(false)
+  }, [passo, multa.id, motoristaId, estado.aceiteDeclaradoEm])
 
   const set = (patch: DadosPasso) => setDados((atual) => ({ ...atual, ...patch }))
   const envio = useMemo(() => dadosSemVazios(dados), [dados])
@@ -203,6 +230,33 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
     </Field>
   )
 
+  const contestacao = !!estado.contestadaEm && ultimoTermo?.status === 'contestado' && (passo === 'DefinirResponsavel' || passo === 'AvisarMotorista')
+  const termoAssinado = ultimoTermo?.status === 'assinado' ? ultimoTermo : null
+  const linhaTermo = (t: NonNullable<typeof ultimoTermo>) => (
+    <p className="frota-muted">Termo assinado em {formatBR(t.assinadoEm?.slice(0, 10) ?? '')}{t.hashPdf ? ` · hash ${t.hashPdf.slice(0, 8)}` : ''}{' '}<Button variant="ghost" size="compact" onClick={() => void baixarTermo(t.id)}>Baixar PDF</Button></p>
+  )
+  async function baixarTermo(id: string) {
+    try {
+      const { nome, blob } = await source.baixarPdfTermo(id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = nome; a.click()
+      URL.revokeObjectURL(url)
+    } catch { setErro('Não foi possível baixar o PDF do termo. Tente de novo.') }
+  }
+  const aguardandoAditivo = passo === 'AvisarMotorista' && !termoPendente && temAditivo === null
+  const caminhoTermo = ultimoTermo?.status !== 'contestado' && (termoPendente !== null || temAditivo !== false)
+  const termoDoAcerto = estado.termoParcelas != null
+  const mesPassado = termoDoAcerto && estado.termoPrimeiroMes != null && mesDoTermo(estado, hoje) !== `${estado.termoPrimeiroMes.slice(0, 7)}-01`
+  const valorCatalogo = data.infracoes.find((i) => i.id === multa.infracaoId)?.valor ?? null
+  const avisoWhatsapp = <>
+      <p className="frota-muted">Mande pelo WhatsApp a mensagem com o serviço do dia e o rastreador. Depois confirme em "Avisei".</p>
+      <div className="frota-cluster"><Button variant="secondary" loading={montando} onClick={() => void copiar()}>Copiar mensagem</Button></div>
+      {mensagem !== null && <textarea ref={textoRef} className="multa-mensagem" aria-label="Mensagem para o WhatsApp" rows={9} readOnly value={mensagem} />}
+      {copiaFalhou && <p className="frota-muted" role="status">Não deu para copiar sozinho: o texto está selecionado. Use Ctrl+C.</p>}
+      {erroRastreador && <Alert tone="warning">Rastreador (InFleet) indisponível. Este detalhe fica só aqui, fora da mensagem: {erroRastreador}</Alert>}
+    </>
+
   function campos() {
     const nome = `${multa.id}-${passo}`
     switch (passo) {
@@ -219,18 +273,19 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           )}
           {dados.responsavel === 'empresa' && <p className="frota-muted">A etapa 2 é pulada: a multa vai direto para Pagar.</p>}
         </>
-      case 'AvisarMotorista':
-        return <>
-          <p className="frota-muted">Mande pelo WhatsApp a mensagem com o serviço do dia e o rastreador. Depois confirme em "Avisei".</p>
-          <div className="frota-cluster"><Button variant="secondary" loading={montando} onClick={() => void copiar()}>Copiar mensagem</Button></div>
-          {mensagem !== null && <textarea ref={textoRef} className="multa-mensagem" aria-label="Mensagem para o WhatsApp" rows={9} readOnly value={mensagem} />}
-          {copiaFalhou && <p className="frota-muted" role="status">Não deu para copiar sozinho: o texto está selecionado. Use Ctrl+C.</p>}
-          {erroRastreador && <Alert tone="warning">Rastreador (InFleet) indisponível. Este detalhe fica só aqui, fora da mensagem: {erroRastreador}</Alert>}
-        </>
+      case 'AvisarMotorista': {
+        // Com aditivo (e sem contestação anterior) o aviso é o termo pelo app; sem ele, só o WhatsApp.
+        if (ultimoTermo?.status === 'contestado' || (!termoPendente && temAditivo === false)) return avisoWhatsapp
+        if (!termoPendente && temAditivo === null) return <p className="frota-muted" role="status">Conferindo o aditivo…</p>
+        return <AvisoPorTermo source={source} multa={multa} termoPendente={termoPendente} valorCatalogo={valorCatalogo} hoje={hoje} viaWhatsapp={viaWhatsapp} onViaWhatsapp={setViaWhatsapp} onChanged={() => { onChanged(); recarregarTermos() }} whatsapp={avisoWhatsapp} />
+      }
       case 'RegistrarIndicacao':
         return <div className="frota-fields">{campoCanal()}{campoData('Data da indicação')}</div>
       case 'RegistrarAceite':
-        return <div className="frota-fields">{campoData('Data do aceite na CNH Digital')}</div>
+        return <>
+          {estado.aceiteDeclaradoEm && <p className="frota-muted">Motorista declarou o aceite em {formatBR(estado.aceiteDeclaradoEm)}.</p>}
+          <div className="frota-fields">{campoData('Data do aceite na CNH Digital')}</div>
+        </>
       case 'RegistrarPagamento':
         return <>
           <p className="frota-muted">Vencimento {formatBR(estado.vencimento)}{multa.valorComDesconto != null ? ` · com os 40%: ${brl(multa.valorComDesconto)}` : ''}</p>
@@ -247,20 +302,24 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
         </>
       case 'RegistrarAcerto':
         return <>
+          {termoAssinado && linhaTermo(termoAssinado)}
           <ChoiceGroup label="Acerto" inline>
-            <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha', parcelas: 1, competencia: hoje.slice(0, 7) })} />
+            <Radio name={nome} label="Lancei na folha" checked={dados.acerto === 'folha'} onChange={() => setDados({ acerto: 'folha', parcelas: estado.termoParcelas ?? 1, competencia: (mesDoTermo(estado, hoje) ?? hoje).slice(0, 7) })} />
             <Radio name={nome} label="Empresa assume" checked={dados.acerto === 'empresa'} onChange={() => setDados({ acerto: 'empresa' })} />
           </ChoiceGroup>
           {dados.acerto === 'folha' && (
             <>
               <div className="frota-fields">
                 <Field label="Primeiro mês" required>
-                  <Input type="month" min={janelaCompetencia(hoje).de.slice(0, 7)} max={janelaCompetencia(hoje).ate.slice(0, 7)} disabled={salvando} value={dados.competencia ?? ''} onChange={(e: { target: { value: string } }) => set({ competencia: e.target.value })} />
+                  <Input type="month" min={janelaCompetencia(hoje).de.slice(0, 7)} max={janelaCompetencia(hoje).ate.slice(0, 7)} disabled={salvando || termoDoAcerto} value={dados.competencia ?? ''} onChange={(e: { target: { value: string } }) => set({ competencia: e.target.value })} />
                 </Field>
                 <Field label="Parcelas">
-                  <Input type="number" min={1} max={12} step={1} disabled={salvando} value={String(dados.parcelas ?? 1)} onChange={(e: { target: { value: string } }) => set({ parcelas: Math.max(1, Math.min(12, Math.trunc(Number(e.target.value)) || 1)) })} />
+                  {estado.termoParcelas != null
+                    ? <p className="frota-muted">{estado.termoParcelas} {estado.termoParcelas === 1 ? 'parcela' : 'parcelas'}, como assinado</p>
+                    : <Input type="number" min={1} max={12} step={1} disabled={salvando} value={String(dados.parcelas ?? 1)} onChange={(e: { target: { value: string } }) => set({ parcelas: Math.max(1, Math.min(12, Math.trunc(Number(e.target.value)) || 1)) })} />}
                 </Field>
               </div>
+              {mesPassado && <Alert tone="warning">O primeiro mês do termo ({mesBr(estado.termoPrimeiroMes!)}) já passou; as parcelas começam em {mesBr(mesDoTermo(estado, hoje)!)}.</Alert>}
               {estado.valorPago ? <p className="frota-muted">{previaParcelas(estado.valorPago, dados.parcelas ?? 1)}</p> : <p className="frota-muted">Registre o pagamento antes de lançar na folha.</p>}
             </>
           )}
@@ -335,10 +394,17 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
       {passo ? (
         <section className="multa-passo" data-vencido={passo === 'PrazoVencido' ? '' : undefined} aria-labelledby={`${multa.id}-passo`}>
           <h3 id={`${multa.id}-passo`}>{passo === 'PrazoVencido' ? 'O prazo de indicação venceu' : ROTULO_PASSO[passo]}</h3>
+          {contestacao && (
+            <Alert tone="warning" title="Contestação do motorista">
+              {ultimoTermo?.motivoContestacao ? `${ultimoTermo.motivoContestacao} ` : ''}(contestado em {formatBR(estado.contestadaEm!)})
+            </Alert>
+          )}
           {campos()}
           {erro && <Alert tone="danger">{erro}</Alert>}
           <div className="frota-cluster">
-            <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null} aria-describedby={faltando ? `${multa.id}-falta` : undefined} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
+            {!(passo === 'AvisarMotorista' && temAditivo === true && caminhoTermo && !viaWhatsapp && !termoPendente) && (
+              <Button variant={passo === 'Cancelar' ? 'danger' : 'primary'} loading={salvando} disabled={faltando !== null || aguardandoAditivo} aria-describedby={faltando ? `${multa.id}-falta` : undefined} onClick={() => void gravar()}>{BOTAO[passo]}</Button>
+            )}
             {extra && <Button variant="secondary" disabled={salvando} onClick={() => setExtra(null)}>Voltar</Button>}
           </div>
           {faltando && <p id={`${multa.id}-falta`} className="frota-muted">{faltando}</p>}
@@ -387,6 +453,7 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
           <dl className="frota-detail">
             {lista.map(([nome, valor]) => (<div key={nome} className="frota-detail__row"><dt>{nome}</dt><dd>{valor}</dd></div>))}
           </dl>
+          {termoAssinado && passo !== 'RegistrarAcerto' && linhaTermo(termoAssinado)}
         </section>
       )}
     </div>
