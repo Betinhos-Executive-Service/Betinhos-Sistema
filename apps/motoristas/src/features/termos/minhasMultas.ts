@@ -1,7 +1,7 @@
 // Multas do motorista como o servidor monta em new_MinhasMultas (MinhasMultas.cs): o app mostra a situação como vem e não recalcula.
 import { cleanGuid } from "../comunicados/comunicados.ts";
 import { executeCustomApi } from "../../data/dataverse/customApi.ts";
-import { formatBrl, isMockTermos } from "./termosMulta.ts";
+import { isMockTermos } from "./termosMulta.ts";
 
 export type CargaStatus = "loading" | "ready" | "error";
 export type GrupoMulta = "precisa" | "andamento" | "encerrada";
@@ -85,13 +85,6 @@ export function erroDeRede(error: unknown) {
   return error instanceof TypeError || e?.cause instanceof TypeError;
 }
 
-/** "Parcela 2 de 3 · R$ 65,08 · folha de 12/2026 · prevista". */
-export function descreverParcela(parcela: MinhaParcela, total: number) {
-  const m = /^(\d{4})-(\d{2})/.exec(parcela.competencia ?? "");
-  const folha = m ? ` · folha de ${m[2]}/${m[1]}` : "";
-  return `Parcela ${parcela.numero} de ${total} · ${formatBrl(parcela.valor)}${folha} · ${parcela.status}`;
-}
-
 export const ETAPAS_MULTA = ["Termo", "CNH Digital", "Desconto", "Fim"] as const;
 
 /**
@@ -158,8 +151,6 @@ export function horaDoCache(salvoEm: string) {
 }
 
 export const SEM_CONEXAO_TEXTO = "Sem conexão, tente de novo";
-export const textoAceite = (auto: string, prazo: string | null) =>
-  `Abra a CNH Digital, vá em Infrações e aceite a indicação da multa ${auto}${prazo ? ` até ${diaMes(prazo)}` : ""}.`;
 
 // ---------------- Dados ----------------
 
