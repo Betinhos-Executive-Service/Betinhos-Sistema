@@ -1236,8 +1236,8 @@ export type ResultadoLancamento = { parcelas: { id: string; ok: boolean; erro: s
 - Produces (em `DataSource`, `source.ts`):
 
 ```ts
-  /** Parcelas com competência no mês (`yyyy-MM`), de multa e de termo. */
-  listarDescontosMes(mes: string): Promise<ParcelaFolha[]>
+  /** Parcelas com competência de `inicio` a `fim` (`yyyy-MM`, inclusivos), de multa e de termo. Alimenta a linha do tempo e o mês. */
+  listarDescontosPeriodo(inicio: string, fim: string): Promise<ParcelaFolha[]>
   /** Parcelas Previstas com competência antes do mês; `maisAntigo` em yyyy-MM. */
   previstasAntes(mes: string): Promise<{ quantidade: number; maisAntigo: string | null }>
   listarParcelasMulta(multaId: string): Promise<ParcelaFolha[]>
@@ -1253,7 +1253,7 @@ export type ResultadoLancamento = { parcelas: { id: string; ok: boolean; erro: s
 
 - [ ] **Step 2: Testes.**
   - `mappers.test.ts`: `mapParcelaFolha` com uma linha que tem `new_Multa` expandido, `new_motorista` expandido e `new_lancadoem`. Confira `status: 'descontada'`, `lancadoEm: '2026-11-18'`, `origem: 'multa'` e `multa.auto`.
-  - `mock.test.ts`: no mês atual, `listarDescontosMes` devolve parcelas de 3 colaboradores, uma multa à vista e uma em 3 parcelas (a 1ª no mês atual). Depois de `lancarDescontoFolha([id], 'lancar')`, a parcela vira `descontada` com `lancadoEm` = `todaySP()`. Lançar de novo devolve `ok: false` com "Esta parcela já foi lançada.".
+  - `mock.test.ts`: `listarDescontosPeriodo(mesAtual, mesAtual)` devolve parcelas de 4 colaboradores fictícios (Ana, Bruno, Carla, Diego): uma multa à vista, uma em 3 parcelas (a 1ª no mês anterior, já lançada), uma em 2 parcelas (a 1ª no mês atual) e uma lançada; mais uma parcela Prevista de 2 meses atrás. `listarDescontosPeriodo(mesAnterior, mesAtual+2)` traz as parcelas dos outros meses. Depois de `lancarDescontoFolha([id], 'lancar')`, a parcela vira `descontada` com `lancadoEm` = `todaySP()`. Lançar de novo devolve `ok: false` com "Esta parcela já foi lançada.".
   - `dataverse.test.ts`: `lancarDescontoFolha` chama `cr40f_LancarDescontoFolha` com `{ ParcelaIdsJson: '["<id limpo>"]', Acao: 'lancar' }` e devolve o JSON de `ResultadoJson`. A recusa do servidor sai como `ApiError`, no mesmo estilo dos testes de `passoMulta` (linhas 315-331).
 
 - [ ] **Step 3: Implementar.**
@@ -1296,9 +1296,9 @@ export function mapParcelaFolha(row: Row, total: number): ParcelaFolha {
 `dataverse.ts` (ao lado de `listarParcelasTermo`):
 
 ```ts
-    async listarDescontosMes(mes: string) {
-      const de = `${mes}-01`
-      const ate = proximoMes(de)
+    async listarDescontosPeriodo(inicio: string, fim: string) {
+      const de = `${inicio}-01`
+      const ate = proximoMes(`${fim}-01`)
       const filtro = `new_competencia ge ${de} and new_competencia lt ${ate} and new_status ne 100000002`
       const rows = (await api.retrieveMultipleRecords('new_parcelamultafolha', `?$select=${SELECT_PARCELA_FOLHA.join(',')},_new_motorista_value&$expand=${EXPAND_PARCELA_FOLHA}&$filter=${filtro}&$orderby=new_competencia asc`)).entities
       const totais = await totaisPorOrigem(rows)
@@ -1555,7 +1555,7 @@ git commit -m "feat(shell): gerador de xlsx genérico (texto, número, moeda e n
 - Create: `apps/shell/src/pages/rh-descontos/rh-descontos.css`
 
 **Interfaces:**
-- Consumes: `createFrotaSource(host)`, `DataSource.listarDescontosMes/previstasAntes/lancarDescontoFolha` e `ParcelaFolha` (Task 9); `gerarXlsx`/`baixarXlsx` e `Planilha` (Task 11); `mesBr` (Task 4).
+- Consumes: `createFrotaSource(host)`, `DataSource.listarDescontosPeriodo/previstasAntes/lancarDescontoFolha` e `ParcelaFolha` (Task 9); `gerarXlsx`/`baixarXlsx` e `Planilha` (Task 11); `mesBr` (Task 4).
 - Produces:
   - `export function RhDescontosPage(): JSX.Element` (named export, como `TreinamentosPage`)
   - Em `descontos.ts`:
@@ -1575,36 +1575,56 @@ git commit -m "feat(shell): gerador de xlsx genérico (texto, número, moeda e n
     - no fim, `[{ valor: 'Total geral', negrito: true }, ..., { valor: total, formato: 'moeda' }, null]`;
     - a coluna Valor é a 9ª (índice 8).
   - `nomeArquivo('2026-11')` é `'descontos-folha-2026-11.xlsx'`.
+  - `porColaborador` agrupa por colaborador com subtotal em centavos; `totaisPorMes` separa lançado, a lançar e atrasada (prevista antes do mês atual); `mascararCpf('111.111.111-11')` é `'111.***.***-11'` e `null` vira `''`.
 
 - [ ] **Step 2: Rodar e ver falhar.** Run: `pnpm --filter shell exec vitest run src/pages/rh-descontos`. Expected: FAIL.
 
 - [ ] **Step 3: Implementar `descontos.ts`.** Funções puras, sem React. O subtotal usa centavos inteiros (`Math.round(v * 100)`) para não acumular erro de ponto flutuante. O formato de moeda do `grupo` usa o mesmo `formatMoney` do shell.
 
 - [ ] **Step 4: Testes da página** (`RhDescontosPage.test.tsx`, com o host em modo mock, no padrão de `TreinamentosPage.test.tsx`):
-  - abre no mês atual e mostra os 3 StatCards ("Total do mês", "Colaboradores", "Previstas × lançadas");
-  - mostra a faixa "1 parcela de meses anteriores ainda prevista" com o botão "Ver <mm/aaaa>", que troca o mês;
-  - selecionar 2 linhas e "Marcar como lançado" muda a situação para "Lançada em dd/mm";
-  - lançar uma linha já lançada mostra "Esta parcela já foi lançada." na própria linha;
+  - abre no mês atual, no passo "1 Conferir", com o título "Folha de <mês por extenso>" e o total do mês;
+  - a faixa de meses mostra 7 meses (mês anterior − 1 até mês atual + 5) com o total de cada um; clicar num mês troca a folha;
+  - mostra um holerite por colaborador, com subtotal e "2/3" na linha da parcela parcelada;
+  - a alternância "Linha do tempo" mostra a grade colaborador × mês, com a coluna do mês da folha destacada;
+  - o aviso de atrasadas ("1 parcela de meses anteriores ainda prevista") tem o botão "Ver <mês>", que troca a folha;
+  - no passo "2 Lançar", marcar 2 colaboradores e "Lançar os 2 marcados" muda o holerite para o carimbo "Lançado"; "Desfazer" volta;
+  - recusa do servidor aparece no holerite do colaborador, com o texto como veio;
+  - o passo "3 Enviar" tem o botão "Baixar Excel", que chama `baixarXlsx('descontos-folha-<mes>.xlsx', …)` (mock do módulo com `vi.mock('../../lib/xlsx')`);
   - um mês sem parcelas mostra "Nenhum desconto para <mês por extenso>." (ex.: "Nenhum desconto para março de 2027.");
-  - "Exportar Excel" chama `baixarXlsx('descontos-folha-<mes>.xlsx', …)` (mock do módulo com `vi.mock('../../lib/xlsx')`);
-  - o clique na linha navega para `#/frota-multas?registro=multa:<id>`.
+  - o clique numa linha de multa navega para `#/frota-multas?registro=multa:<id>`.
 
-- [ ] **Step 5: Implementar a página.** A estrutura segue `TreinamentosPage` e `PagantesPage`:
-  - `const { source, error } = useMemo(() => { try { return { source: createFrotaSource(host), error: null } } catch (e) { return { source: null, error: errorMessage(e) } } }, [host])`, como em `FrotaPage.tsx:81`.
-  - Erro de carga com `ApiError` de status 403 mostra "Sem acesso" (decisão 7); outro erro mostra a mensagem como veio.
-  - O estado `mes` (`yyyy-MM`) começa em `todaySP().slice(0, 7)`. A carga `Promise.all([source.listarDescontosMes(mes), mes === mesAtual ? source.previstasAntes(mes) : null])` tem token contra resposta fora de ordem.
-  - Cabeçalho do `PageLayout`: título "Descontos em folha", `Input type="month"` e o botão "Exportar Excel", desabilitado sem linhas.
-  - Resumo: 3 `StatCard` do `@betinhos/ui`.
-  - Faixa de atrasadas, só no mês atual e com `quantidade > 0`: "N parcela(s) de meses anteriores ainda prevista(s)" + `Button` "Ver mm/aaaa".
-  - Tabela `VirtualTable` com:
-    - colunas Colaborador, Origem, Infração, Parcela, Valor e Situação;
-    - `view.groupable` e o agrupamento padrão por `grupo`, usando o mesmo `view` de Pagantes (`PagantesPage.tsx:203`);
-    - seleção em lote no padrão de `PagantesTable` (`selection`, `bulkActions`, `selectionRowActions`);
-    - ações em lote "Marcar como lançado" (só com alguma Prevista) e "Desfazer lançamento" (só com alguma Lançada).
-  - Resultado por linha: um `Map<id, string>` de erros, mostrado na coluna Situação em vermelho (token `--color-danger`). Recusa do servidor (`r.parcelas[i].erro`) aparece como veio; outro erro (exceção) vira "Não foi possível lançar. Tente de novo." em todas as linhas do lote. Depois do lote, recarregue o mês.
-  - O clique na linha faz `location.hash = '#/frota-multas?registro=multa:' + id`. Linha de termo (sem multa) não navega.
-  - O estado vazio é o `empty` da tabela, "Nenhum desconto para <mês por extenso>.", com `new Date(Number(a), Number(m) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })`.
-  - O CSS usa só tokens do DS: sem `border-left` colorido e sem cor fixa.
+- [ ] **Step 5: Implementar a página.** Decisão do Renan (18/11/2026): tela visual, por motorista, por mês e por folha, em passo a passo; combina as 3 propostas (holerites, mapa motorista × mês e fita de fechamento). Prints aprovados em `~/.t3/userdata/attachments/rh-proposta-*.png`.
+  - **Base técnica** (como `TreinamentosPage` e `FrotaPage`):
+    - `const { source, error } = useMemo(() => { try { return { source: createFrotaSource(host), error: null } } catch (e) { return { source: null, error: errorMessage(e) } } }, [host])`, como em `FrotaPage.tsx:81`;
+    - erro de carga com `ApiError` de status 403 mostra "Sem acesso" (decisão 7); outro erro mostra a mensagem como veio;
+    - estado `mes` (`yyyy-MM`), que começa em `todaySP().slice(0, 7)`, e `passo` (`'conferir' | 'lancar' | 'enviar'`), que começa em `'conferir'`;
+    - uma carga só: `Promise.all([source.listarDescontosPeriodo(inicioJanela, fimJanela), source.previstasAntes(mesAtual)])`, com token contra resposta fora de ordem; a janela é do mês da folha − 2 ao mês da folha + 4 e só recarrega quando o mês sai dela; as parcelas do mês da folha são um filtro em memória.
+  - **Cabeçalho:** "RH · Descontos em folha" pequeno e, embaixo, o título "Folha de <mês por extenso>" na fonte display do DS. À direita, as setas de mês anterior e próximo e "Hoje".
+  - **Passos:** uma barra de 3 passos clicáveis ("1 Conferir", "2 Lançar", "3 Enviar à contabilidade"). Passo concluído ganha ✓: Lançar fica concluído quando todas as parcelas do mês estão lançadas, e Enviar depois do download do Excel nesta sessão.
+  - **Faixa de meses** (sempre visível): 7 cartões com uma minibarra empilhada (lançado em verde, a lançar em azul claro), o mês abreviado e o total. O mês da folha fica com fundo `brand`; o mês com parcela atrasada fica com fundo `warning-soft`. Clicar troca o mês.
+  - **Passo 1 Conferir:**
+    - resumo do mês: total grande (fonte display), barra de progresso lançado × a lançar, legenda com os valores, "N motoristas · M parcelas" e o aviso de atrasadas (só no mês atual e com `quantidade > 0`), com o botão "Ver <mês>";
+    - alternância `SegmentedControl` "Holerites | Linha do tempo";
+    - **Holerites:** grade `auto-fill minmax(320px,1fr)` de cartões, um por colaborador:
+      - cabeçalho com avatar das iniciais, nome e CPF mascarado (`111.***.***-11`);
+      - linhas "Multa <auto> · <placa>", com a infração e a data embaixo, o valor e as bolinhas da parcela (uma por parcela; lançada cheia em verde, a do mês com anel `action`) mais "x/y";
+      - rodapé com o subtotal;
+      - colaborador com tudo lançado ganha o carimbo "LANÇADO" girado, com a data;
+    - **Linha do tempo:** grade com colaboradores em linhas e os 7 meses em colunas. Cada parcela é uma pílula com o valor (lançada `success-soft` com ✓; a lançar `action-soft`; atrasada `warning-soft` tracejada). Parcelas do mesmo parcelamento em meses vizinhos se encostam (barra contínua). A coluna do mês da folha fica destacada e o rodapé mostra o total de cada mês. Clicar numa pílula de outro mês troca a folha.
+  - **Passo 2 Lançar:** duas colunas.
+    - À esquerda, a "fita de somar": uma linha por colaborador com círculo de marcação e subtotal; a lançada fica com ✓ verde e o nome riscado. Embaixo, "lançado", "falta lançar" e o TOTAL. Fonte mono do DS.
+    - À direita, o detalhe do colaborador ativo: nome, CPF e, por multa, a corrente de parcelas (cartões por mês: lançada em `success-soft`, a do mês com borda `action` e "agora", futuras neutras).
+    - Botões: "Lançar os N marcados" (só com prevista marcada) e "Lancei R$ x na folha" no detalhe (lança as previstas daquele colaborador no mês). No colaborador lançado, "Desfazer".
+    - O resultado de cada parcela aparece no holerite ou na fita (recusa do servidor como veio; outro erro, "Não foi possível lançar. Tente de novo." em todas do lote) e o período é recarregado depois.
+  - **Passo 3 Enviar:** cartão com o resumo (total, colaboradores, parcelas, quantas lançadas), aviso "Ainda há N parcelas a lançar" quando houver, e o botão primário "Baixar Excel" (`baixarXlsx(nomeArquivo(mes), planilhaDoMes(...))`). Depois do download, ✓ "Excel baixado às HH:mm".
+  - **Vazio:** sem parcelas no mês, os passos somem e fica `EmptyState` "Nenhum desconto para <mês por extenso>." (com `new Date(Number(a), Number(m) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })`). A faixa de meses continua.
+  - **Navegação:** clicar numa linha de multa (holerite, corrente ou pílula do mês da folha) faz `location.hash = '#/frota-multas?registro=multa:' + id`. Linha de termo (sem multa) não navega.
+  - **Componentes e estilo:**
+    - componentes em arquivos próprios em `rh-descontos/components/` (`FaixaMeses`, `Holerite`, `LinhaDoTempo`, `FitaFechamento`, `PassosFolha`), cada um com uma função;
+    - CSS só com tokens `--bt-*` do DS, sem `border-left` colorido e sem cor fixa;
+    - em tela estreita (container query), as duas colunas do passo 2 empilham e a linha do tempo rola na horizontal dentro do cartão;
+    - versão visível segue o padrão do shell.
+  - Mapeamento para o domínio: `descontos.ts` ganha `porColaborador(p)` (grupos com subtotal e parcelas ordenadas), `totaisPorMes(p)` (`Map<yyyy-MM, { lancado, aLancar, atrasada }>`) e `mascararCpf(cpf)`, todos testados no Step 1.
 
 - [ ] **Step 6: Rodar e ver passar.** Run: `pnpm --filter shell exec vitest run src/pages/rh-descontos` e `pnpm --filter shell typecheck`. Expected: PASS.
 
@@ -1612,7 +1632,7 @@ git commit -m "feat(shell): gerador de xlsx genérico (texto, número, moeda e n
 
 ```bash
 git add apps/shell/src/pages/rh-descontos
-git commit -m "feat(rh): tela Descontos em folha (mês, resumo, lançar em lote, atrasadas e Excel)"
+git commit -m "feat(rh): tela Descontos em folha em passos (holerites, linha do tempo, fita de fechamento e Excel)"
 ```
 
 ---
