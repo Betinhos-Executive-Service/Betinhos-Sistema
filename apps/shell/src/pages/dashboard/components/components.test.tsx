@@ -103,6 +103,22 @@ describe('componentes do Dashboard', () => {
     expect(faixa.querySelectorAll('svg').length).toBe(2)
   })
 
+  it('alerta zerado vai para o fim da faixa, discreto', () => {
+    render(<AlertList titulo="Operação" itens={[
+      { id: 'cnh', valor: '0', rotulo: 'CNH', status: 'OK', tom: 'ok' },
+      { id: 'multas', valor: '3', rotulo: 'Multas', status: '24% pendentes', tom: 'danger' },
+    ]} />)
+    const itens = within(screen.getByRole('region', { name: 'Operação' })).getAllByRole('listitem')
+    expect(itens.map((li) => li.textContent?.includes('CNH'))).toEqual([false, true])
+    expect(itens[1].classList.contains('dash-alerta--ok')).toBe(true)
+    expect(itens[0].classList.contains('dash-alerta--ok')).toBe(false)
+  })
+
+  it('card de análise não mostra comparativo sem base', () => {
+    render(<AnaliseCard titulo="Meta" periodo="p" unidade="R$" valor="R$ 10,00" chips={[{ rotulo: 'LY', tipo: 'sem-dado' }]} />)
+    expect(screen.queryByText('s/dado')).toBeNull()
+  })
+
   it('alerta indisponível aparece como s/dado em tom neutro, sem ícone de atenção', () => {
     render(<AlertList titulo="Operação" itens={[{ id: 'cnh', valor: '—', rotulo: 'CNH', status: 's/dado', tom: 'neutral' }]} />)
     expect(screen.getAllByText('s/dado').length).toBe(1)

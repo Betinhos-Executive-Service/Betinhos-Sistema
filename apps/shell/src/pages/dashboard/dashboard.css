@@ -1,6 +1,8 @@
 /* Dashboard em abas: composição densa do legado com tokens e componentes do DS. Só tokens --bt-*, tema claro. */
 
 .dash-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); font-variant-numeric: tabular-nums; }
+/* Separador só visual: o texto alternativo vazio evita que o leitor de tela leia o ponto. */
+.dash-meta > span + span:not([class])::before { content: '·'; content: '·' / ''; margin-right: var(--bt-space-2); }
 .dash-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* Contém os elementos absolutos da página (textos só para leitor de tela): sem isso eles escapam do `.bt-shell__main`
    rolável e alongam o documento. A `.dash-rolagem` também é relative, para os de dentro dela não alargarem a página. */
@@ -89,6 +91,8 @@
 .dash-faixa__lista { display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; gap: var(--bt-space-2) var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
 @container dash-faixa (min-width: 400px) { .dash-faixa__lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container dash-faixa (min-width: 860px) { .dash-faixa__lista { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Alerta em tom ok: sem a borda firme nem a sombra dos que pedem ação (o hover do clicável continua do DS). */
+.bt-alert-card.dash-alerta--ok:not(.bt-alert-card--open:hover) { border-color: var(--bt-color-border); box-shadow: none; }
 
 /* ---------- Grade de cards (destaques e análises) ---------- */
 .dash-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--bt-space-3); }

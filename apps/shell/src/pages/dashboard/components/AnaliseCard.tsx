@@ -31,11 +31,12 @@ type Props = {
  * Card de análise no formato do legado com o DS (§10.16): título em eyebrow, valor grande, apoio e chips à direita;
  * gráfico e tabela juntos; período e unidade no rodapé; valores do gráfico disponíveis em tabela.
  */
-export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false, copiar }: Props) {
+export function AnaliseCard({ titulo, periodo, unidade, valor, sub, chips: todos = [], apoio = [], extra, grafico, tabela, tabelaSobDemanda = false, largo = false, natural = false, copiar }: Props) {
   const id = useId()
   // A tabela sob demanda vive na URL (`tabela=<título do card>`): reabrir o link mostra as mesmas tabelas abertas.
   const { valores, alternar } = useQueryConjunto('tabela')
   const aberta = valores.has(titulo)
+  const chips = todos.filter((c) => c.tipo !== 'sem-dado')
   const temLado = chips.length > 0 || apoio.length > 0 || extra != null
   const mostrarTabela = tabela != null && (!tabelaSobDemanda || aberta)
   return (
