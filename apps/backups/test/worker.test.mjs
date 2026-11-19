@@ -111,7 +111,8 @@ test('destaque: em dia, parado há mais de 2 dias e vazio; uso do espaço', () =
   const feita = Date.UTC(2026, 10, 18, 6, 23)
   const emDia = paginaHtml({ grupos, email: 'a', versao: 'v', agora: feita + 5 * 3600_000 })
   assert.match(emDia, /Backup em dia/)
-  assert.match(emDia, /há 5 h · 512,0 MB/)
+  assert.match(emDia, /Baixar backup completo · 512,0 MB/)
+  assert.doesNotMatch(emDia, /planilha de operação<\/a>/)
   assert.match(emDia, /Espaço usado: 1,0 GB de 10 GB/)
   assert.match(emDia, /Cópias anteriores<span class="n">0</)
   assert.match(paginaHtml({ grupos, email: 'a', versao: 'v', downloads: [{ ms: feita, email: 'x', chave: 'mensal/betinhos-prod-20261101-0323.zip' }] }), /cópia de 01\/11\/2026 às 03:23/)
@@ -125,4 +126,23 @@ test('destaque: em dia, parado há mais de 2 dias e vazio; uso do espaço', () =
   assert.match(vazio, /Espaço usado: 0 MB/)
   assert.equal(haQuanto(30_000), 'agora há pouco')
   assert.equal(haQuanto(50 * 3600_000), 'há 2 dias')
+})
+
+test('planilha de operação: botão principal, completo secundário e os dois na lista de anteriores', () => {
+  const grupos = agrupar([
+    { key: 'diario/betinhos-prod-20261118-0323.zip', size: 20 * 1024 ** 2 },
+    { key: 'diario/betinhos-prod-operacao-20261118-0323.zip', size: 300 * 1024 },
+    { key: 'diario/betinhos-prod-20261117-0323.zip', size: 20 * 1024 ** 2 },
+    { key: 'diario/betinhos-prod-operacao-20261117-0323.zip', size: 300 * 1024 },
+    { key: 'semanal/betinhos-prod-operacao-20261117-0323.zip', size: 300 * 1024 },
+  ])
+  assert.equal(grupos.diario.filter((i) => i.operacao).length, 2)
+  const html = paginaHtml({ grupos, email: 'a', versao: 'v', agora: Date.UTC(2026, 10, 18, 8), downloads: [{ ms: 1, email: 'x', chave: 'diario/betinhos-prod-operacao-20261117-0323.zip' }] })
+  assert.match(html, /<a class="botao" href="\/baixar\/diario\/betinhos-prod-operacao-20261118-0323\.zip" download>.*Baixar planilha de operação<\/a>/)
+  assert.match(html, /<a class="botao sec" href="\/baixar\/diario\/betinhos-prod-20261118-0323\.zip" download>.*Baixar backup completo · 20,0 MB/)
+  assert.match(html, /Cópias anteriores<span class="n">1</)
+  assert.match(html, /17\/11\/2026 às 03:23<span class="tag">Semanal<\/span>/)
+  assert.match(html, /aria-label="Baixar planilha de operação de 17\/11\/2026 às 03:23"/)
+  assert.match(html, /aria-label="Baixar backup completo de 17\/11\/2026 às 03:23"/)
+  assert.match(html, /planilha de operação de 17\/11\/2026 às 03:23/)
 })

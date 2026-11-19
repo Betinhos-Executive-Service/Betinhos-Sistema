@@ -51,7 +51,7 @@ export function celula(valor) {
   return /[;"\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
-async function* registros(arquivo) {
+export async function* registros(arquivo) {
   const linhas = createInterface({ input: createReadStream(arquivo).pipe(createGunzip()), crlfDelay: Infinity })
   for await (const linha of linhas) if (linha) yield JSON.parse(linha)
 }
