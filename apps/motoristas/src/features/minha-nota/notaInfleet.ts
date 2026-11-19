@@ -45,6 +45,29 @@ export function oQueMelhorar(comportamentos: Comportamento[]): Comportamento[] {
   return comportamentos.filter((c) => c.nota < 90).sort((a, b) => a.nota - b.nota).slice(0, 2);
 }
 
+// Dica curta para o motorista saber o que fazer em cada comportamento da Infleet.
+export const DICAS: Record<string, string> = {
+  hardBraking: "Mantenha distância e freie com antecedência.",
+  hardCornering: "Reduza antes de entrar na curva.",
+  hardAcceleration: "Acelere aos poucos ao sair.",
+  deviceOverspeed: "Respeite o limite da via.",
+  deviceIdle: "Desligue o motor nas paradas longas."
+};
+
+// Pontos (arredondados) que faltam para a próxima faixa; null quando já é Ótima.
+export function proximaFaixa(nota: number): { rotulo: "Ótima" | "Boa"; faltam: number } | null {
+  const n = Math.round(nota);
+  if (n >= 90) return null;
+  return n >= 75 ? { rotulo: "Ótima", faltam: 90 - n } : { rotulo: "Boa", faltam: 75 - n };
+}
+
+// Diferença entre o último mês e o anterior, em pontos arredondados.
+export function variacaoMensal(meses: MesNota[]): { pontos: number; mesAnterior: MesNota } | null {
+  if (meses.length < 2) return null;
+  const [anterior, atual] = meses.slice(-2);
+  return { pontos: Math.round(atual.nota) - Math.round(anterior.nota), mesAnterior: anterior };
+}
+
 export function rotuloMes(ano: number, mes: number): string {
   return `${MESES[mes - 1] ?? ""}/${String(ano % 100).padStart(2, "0")}`;
 }
@@ -77,7 +100,8 @@ export async function carregarNotaInfleet(): Promise<NotaInfleet> {
     if (caso === "erro") throw new Error("Falha simulada.");
     if (caso === "sem") return { situacao: "sem_cadastro" };
     if (caso === "formacao") return { situacao: "em_formacao", inicio: "2026-08-21", fim: "2026-11-19", km: 32.4, comportamentos: [], meses: [] };
-    return MOCK;
+    const valor = Number(caso);
+    return caso && Number.isFinite(valor) ? { ...MOCK, nota: valor } : MOCK;
   }
   const resposta = await executeCustomApi("new_NotaInfleet", {});
   return lerNotaInfleet(String(resposta.new_Result ?? ""));

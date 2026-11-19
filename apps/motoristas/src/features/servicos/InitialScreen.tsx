@@ -7,6 +7,8 @@ import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
 import { filterAgendaGalleryItems, getAgendaItemStartDate } from "../../app/agendaVisibility.ts";
 import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import { WebPushLink } from "../../shared/ui/WebPushLink";
+import { faixaDaNota } from "../minha-nota/notaInfleet";
+import { useNotaInfleet } from "../minha-nota/useNotaInfleet";
 import type { AgendaItem } from "../../types";
 
 const baseModules = [
@@ -449,6 +451,8 @@ export function InitialScreen(props: InitialScreenProps) {
     [props.canGeneratePersonalReceipt]
   );
 
+  const { nota } = useNotaInfleet();
+  const notaNaGrade = nota?.situacao === "ok" ? { valor: String(Math.round(nota.nota)), ...faixaDaNota(nota.nota) } : null;
   const servicesModule = modules.find((module) => module.id === "services");
   const gridModules = modules.filter((module) => module.id !== "services");
   const multasPrazo = props.multasBanner?.split(" · ")[1];
@@ -543,6 +547,7 @@ export function InitialScreen(props: InitialScreenProps) {
       <section className="concept-tile-grid" aria-label="Módulos do aplicativo">
         {gridModules.map((module) => {
           const count = pendingCounts[module.id] ?? 0;
+          const notaTile = module.id === "minhaNota" ? notaNaGrade : null;
           return (
             <button
               className="concept-tile"
@@ -551,11 +556,11 @@ export function InitialScreen(props: InitialScreenProps) {
               data-tour={module.id}
               disabled={module.disabled}
               aria-disabled={module.disabled}
-              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.label}
+              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.id === "minhaNota" && notaTile ? `${module.label}, ${notaTile.valor}, ${notaTile.rotulo}` : module.label}
               onClick={() => navigateTo(module.id)}
             >
-              <span className="concept-tile-icon" aria-hidden="true">
-                <ModuleIcon name={module.icon} />
+              <span className={`concept-tile-icon${notaTile ? ` nota-tile--${notaTile.tom}` : ""}`} aria-hidden="true">
+                {module.id === "minhaNota" && notaTile ? <span className="nota-tile-valor">{notaTile.valor}</span> : <ModuleIcon name={module.icon} />}
                 {count > 0 ? <span className="concept-tile-badge">{count > 9 ? "9+" : count}</span> : null}
               </span>
               <span className="concept-tile-label">{module.label}</span>
