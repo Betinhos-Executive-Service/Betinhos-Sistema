@@ -34,20 +34,11 @@ namespace Betinhos.DriverRecordSharing
                 return gateway.Query(query, variables);
             };
 
-            try
-            {
-                var json = Resultado(infleetId, DateTime.UtcNow, consultar);
-                context.OutputParameters[ResultParameter] = json;
-                tracing?.Trace("nota-infleet: situacao=" + (string.IsNullOrWhiteSpace(infleetId) ? "sem_cadastro" : "consultada"));
-            }
-            catch (InvalidPluginExecutionException)
-            {
-                tracing?.Trace("nota-infleet: infleet indisponível");
-                throw;
-            }
+            context.OutputParameters[ResultParameter] = Resultado(infleetId, DateTime.UtcNow, consultar, tracing);
+            tracing?.Trace("nota-infleet: situacao=" + (string.IsNullOrWhiteSpace(infleetId) ? "sem_cadastro" : "consultada"));
         }
 
-        public static string Resultado(string infleetDriverId, DateTime agoraUtc, Func<string, Dictionary<string, object>, Dictionary<string, object>> consultar)
+        public static string Resultado(string infleetDriverId, DateTime agoraUtc, Func<string, Dictionary<string, object>, Dictionary<string, object>> consultar, ITracingService tracing = null)
         {
             var serializer = new JavaScriptSerializer();
             if (string.IsNullOrWhiteSpace(infleetDriverId))
@@ -59,8 +50,9 @@ namespace Betinhos.DriverRecordSharing
                 var data = consultar(NotaInfleet.Consulta(periodos), new Dictionary<string, object> { ["d"] = infleetDriverId.Trim() });
                 return serializer.Serialize(NotaInfleet.Montar(data, periodos));
             }
-            catch (InfleetUnavailableException)
+            catch (InfleetUnavailableException ex)
             {
+                tracing?.Trace("nota-infleet: infleet indisponível: " + ex.Message);
                 throw new InvalidPluginExecutionException("Não foi possível consultar a Infleet agora.");
             }
         }

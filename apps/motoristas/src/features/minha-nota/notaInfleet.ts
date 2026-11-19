@@ -49,7 +49,7 @@ export function rotuloMes(ano: number, mes: number): string {
   return `${MESES[mes - 1] ?? ""}/${String(ano % 100).padStart(2, "0")}`;
 }
 
-export const isMockNotaInfleet = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+const isMockNotaInfleet = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
 
 const MOCK: NotaInfleet = {
   situacao: "ok", inicio: "2026-08-21", fim: "2026-11-19", km: 5156.2, nota: 82.9,
@@ -76,7 +76,7 @@ export async function carregarNotaInfleet(): Promise<NotaInfleet> {
     const caso = new URLSearchParams(window.location.search).get("mockNota");
     if (caso === "erro") throw new Error("Falha simulada.");
     if (caso === "sem") return { situacao: "sem_cadastro" };
-    if (caso === "formacao") return { situacao: "em_formacao", inicio: MOCK.situacao === "ok" ? MOCK.inicio : "", fim: "2026-11-19", km: 32.4, comportamentos: [], meses: [] };
+    if (caso === "formacao") return { situacao: "em_formacao", inicio: "2026-08-21", fim: "2026-11-19", km: 32.4, comportamentos: [], meses: [] };
     return MOCK;
   }
   const resposta = await executeCustomApi("new_NotaInfleet", {});

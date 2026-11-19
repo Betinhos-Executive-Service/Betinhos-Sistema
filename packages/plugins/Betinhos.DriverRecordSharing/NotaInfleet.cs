@@ -113,10 +113,7 @@ namespace Betinhos.DriverRecordSharing
         }
 
         public static Dictionary<string, object> SemCadastro(DateTime agoraUtc)
-        {
-            var r = Base("sem_cadastro", agoraUtc.AddDays(-Dias), agoraUtc);
-            return r;
-        }
+            => Base("sem_cadastro", agoraUtc.AddDays(-Dias), agoraUtc);
 
         private static Dictionary<string, object> Base(string situacao, DateTime inicioUtc, DateTime fimUtc) => new Dictionary<string, object>
         {

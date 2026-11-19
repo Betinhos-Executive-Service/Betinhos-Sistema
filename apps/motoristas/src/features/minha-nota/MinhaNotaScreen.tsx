@@ -8,6 +8,7 @@ type Props = { onBack: () => void; carregar?: () => Promise<NotaInfleet> };
 
 const kmFmt = (km: number) => km.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 const notaFmt = (nota: number) => String(Math.round(nota));
+const percentual = (nota: number) => `${Math.max(0, Math.min(100, nota))}%`;
 
 export function MinhaNotaScreen({ onBack, carregar = carregarNotaInfleet }: Props) {
   const [nota, setNota] = useState<NotaInfleet | null>(null);
@@ -78,7 +79,7 @@ export function MinhaNotaScreen({ onBack, carregar = carregarNotaInfleet }: Prop
                           <li key={c.chave}>
                             <div className="nota-linha"><span>{c.rotulo}</span><strong>{notaFmt(c.nota)}</strong></div>
                             <div className="nota-barra" role="img" aria-label={`${c.rotulo}: ${notaFmt(c.nota)} de 100`}>
-                              <span className={`nota-barra-fill nota-barra-fill--${faixaDaNota(c.nota).tom}`} style={{ width: `${Math.max(0, Math.min(100, c.nota))}%` }} />
+                              <span className={`nota-barra-fill nota-barra-fill--${faixaDaNota(c.nota).tom}`} style={{ width: percentual(c.nota) }} />
                             </div>
                           </li>
                         ))}
@@ -94,7 +95,7 @@ export function MinhaNotaScreen({ onBack, carregar = carregarNotaInfleet }: Prop
                           <li key={`${m.ano}-${m.mes}`}>
                             <strong>{notaFmt(m.nota)}</strong>
                             <span className="nota-coluna" role="img" aria-label={`${rotuloMes(m.ano, m.mes)}: ${notaFmt(m.nota)} de 100`}>
-                              <span className={`nota-coluna-fill nota-barra-fill--${faixaDaNota(m.nota).tom}`} style={{ height: `${Math.max(0, Math.min(100, m.nota))}%` }} />
+                              <span className={`nota-coluna-fill nota-barra-fill--${faixaDaNota(m.nota).tom}`} style={{ height: percentual(m.nota) }} />
                             </span>
                             <span className="nota-mes">{rotuloMes(m.ano, m.mes)}</span>
                           </li>
