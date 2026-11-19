@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { AppShell } from "../../shared/ui/layout/AppShell";
 import { FormMenu } from "../../shared/ui/navigation/FormMenu";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
-import { DICAS, faixaDaNota, notaFmt, oQueMelhorar, proximaFaixa, rotuloMes, variacaoMensal } from "./notaInfleet";
+import { DICAS, atualizadaEm, faixaDaNota, notaFmt, oQueMelhorar, proximaFaixa, rotuloMes, variacaoMensal } from "./notaInfleet";
 import { useNotaInfleet } from "./useNotaInfleet";
 
 type Props = { onBack: () => void };
@@ -52,11 +52,13 @@ export function MinhaNotaScreen({ onBack }: Props) {
                         </span>
                       ) : null}
                       <span className="nota-periodo">Últimos 90 dias · {kmFmt(ok.km)} km</span>
+                      {ok.sincronizadoEm ? <span className="nota-atualizada">{atualizadaEm(ok.sincronizadoEm)}</span> : null}
                     </section>
                   ) : (
                     <section className="nota-resumo" aria-label="Nota em formação">
                       <strong className="nota-formacao-titulo">Sua nota está em formação: precisa de pelo menos 50 km nos últimos 90 dias</strong>
                       <span className="nota-periodo">Você rodou {kmFmt(nota.km)} km até agora</span>
+                      {nota.sincronizadoEm ? <span className="nota-atualizada">{atualizadaEm(nota.sincronizadoEm)}</span> : null}
                     </section>
                   )}
 

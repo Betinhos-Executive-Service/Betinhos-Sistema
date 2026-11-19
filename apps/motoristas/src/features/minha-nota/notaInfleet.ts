@@ -3,10 +3,8 @@ import { executeCustomApi } from "../../data/dataverse/customApi.ts";
 // Nota de condução da Infleet (Custom API new_NotaInfleet). Fora do Dataverse usa dados fictícios.
 export type Comportamento = { chave: string; rotulo: string; nota: number };
 export type MesNota = { ano: number; mes: number; nota: number; km: number };
-export type NotaInfleet =
-  | { situacao: "ok"; inicio: string; fim: string; km: number; nota: number; comportamentos: Comportamento[]; meses: MesNota[] }
-  | { situacao: "em_formacao"; inicio: string; fim: string; km: number; comportamentos: Comportamento[]; meses: MesNota[] }
-  | { situacao: "sem_cadastro" };
+type NotaBase = { inicio: string; fim: string; km: number; comportamentos: Comportamento[]; meses: MesNota[]; sincronizadoEm?: string };
+export type NotaInfleet = ({ situacao: "ok"; nota: number } & NotaBase) | ({ situacao: "em_formacao" } & NotaBase) | { situacao: "sem_cadastro" };
 export type Faixa = { rotulo: "Ótima" | "Boa" | "Atenção"; tom: "otima" | "boa" | "atencao" };
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -28,7 +26,8 @@ export function lerNotaInfleet(json: string): NotaInfleet {
   const meses = (Array.isArray(bruto.meses) ? bruto.meses : []).map((item: Record<string, unknown>) => ({
     ano: num(item.ano), mes: num(item.mes), nota: num(item.nota), km: num(item.km)
   }));
-  const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos, meses };
+  const sincronizadoEm = Number.isNaN(Date.parse(texto(bruto.sincronizadoEm))) ? undefined : texto(bruto.sincronizadoEm);
+  const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos, meses, sincronizadoEm };
   if (bruto.situacao === "em_formacao") return { situacao: "em_formacao", ...base };
   if (typeof bruto.nota !== "number") throw erroResposta();
   return { situacao: "ok", ...base, nota: bruto.nota };
@@ -78,10 +77,17 @@ export function rotuloMes(ano: number, mes: number): string {
   return `${MESES[mes - 1] ?? ""}/${String(ano % 100).padStart(2, "0")}`;
 }
 
+const FMT_ATUALIZADA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+export function atualizadaEm(iso: string): string {
+  const p = Object.fromEntries(FMT_ATUALIZADA.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `Atualizada em ${p.day}/${p.month} às ${p.hour}:${p.minute}`;
+}
+
 const isMockNotaInfleet = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
 
 const MOCK: Extract<NotaInfleet, { situacao: "ok" }> = {
-  situacao: "ok", inicio: "2026-08-21", fim: "2026-11-19", km: 5156.2, nota: 82.9,
+  situacao: "ok", inicio: "2026-08-21", fim: "2026-11-19", km: 5156.2, nota: 82.9, sincronizadoEm: "2026-11-19T08:00:05Z",
   comportamentos: [
     { chave: "hardBraking", rotulo: "Frenagem brusca", nota: 67 },
     { chave: "hardCornering", rotulo: "Curva brusca", nota: 78.4 },
@@ -105,7 +111,7 @@ export async function carregarNotaInfleet(): Promise<NotaInfleet> {
     const caso = new URLSearchParams(window.location.search).get("mockNota");
     if (caso === "erro") throw new Error("Falha simulada.");
     if (caso === "sem") return { situacao: "sem_cadastro" };
-    if (caso === "formacao") return { situacao: "em_formacao", inicio: "2026-08-21", fim: "2026-11-19", km: 32.4, comportamentos: [], meses: [] };
+    if (caso === "formacao") return { situacao: "em_formacao", inicio: "2026-08-21", fim: "2026-11-19", km: 32.4, comportamentos: [], meses: [], sincronizadoEm: "2026-11-19T08:00:05Z" };
     const valor = Number(caso);
     return caso && Number.isFinite(valor) ? { ...MOCK, nota: valor } : MOCK;
   }

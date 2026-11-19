@@ -2,27 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
+using Microsoft.Xrm.Sdk;
 
 namespace Betinhos.DriverRecordSharing
 {
-    public sealed class NotaPeriodo
-    {
-        public string Alias;
-        public DateTime InicioUtc;
-        public DateTime FimUtc;
-        public int Ano;
-        public int Mes; // 0 no p90
-    }
-
-    // Lógica pura da Custom API new_NotaInfleet: períodos, consulta GraphQL e montagem da resposta. Sem rede.
+    // Lógica pura da Custom API new_NotaInfleet: monta a resposta a partir de new_notamotorista. Sem rede.
     public static class NotaInfleet
     {
-        public const int Schema = 1;
-        public const int Dias = 90;
+        private const int Schema = 1;
         public const int Meses = 6;
-        public const double KmMinimo = 50;
-        private const int OffsetSaoPauloHoras = -3; // sem horário de verão
 
         public static readonly IReadOnlyList<KeyValuePair<string, string>> Comportamentos = new List<KeyValuePair<string, string>>
         {
@@ -43,77 +31,56 @@ namespace Betinhos.DriverRecordSharing
             new KeyValuePair<string, string>("vehicleTooClose", "Distância do veículo à frente")
         };
 
-        public static IReadOnlyList<NotaPeriodo> Periodos(DateTime agoraUtc)
+        public static Dictionary<string, object> MontarDaTabela(Entity p90, IEnumerable<Entity> meses, DateTime agoraUtc)
         {
-            var lista = new List<NotaPeriodo>
+            if (p90 == null)
             {
-                new NotaPeriodo { Alias = "p90", InicioUtc = agoraUtc.AddDays(-Dias), FimUtc = agoraUtc }
-            };
-            var local = agoraUtc.AddHours(OffsetSaoPauloHoras);
-            var primeiro = new DateTime(local.Year, local.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            for (var k = 0; k < Meses; k++)
-            {
-                var inicioLocal = primeiro.AddMonths(-k);
-                lista.Add(new NotaPeriodo
-                {
-                    Alias = "m" + k.ToString(CultureInfo.InvariantCulture),
-                    InicioUtc = inicioLocal.AddHours(-OffsetSaoPauloHoras),
-                    FimUtc = k == 0 ? agoraUtc : primeiro.AddMonths(-(k - 1)).AddHours(-OffsetSaoPauloHoras),
-                    Ano = inicioLocal.Year,
-                    Mes = inicioLocal.Month
-                });
+                var vazio = Base("em_formacao", agoraUtc.AddDays(-NotaSync.Dias), agoraUtc);
+                vazio["km"] = 0.0;
+                return vazio;
             }
-            return lista;
+            var nota = NotaOk(p90);
+            var r = Base(nota != null ? "ok" : "em_formacao", p90.GetAttributeValue<DateTime>("new_inicio"), p90.GetAttributeValue<DateTime>("new_fim"));
+            r["km"] = Km(p90);
+            if (nota != null) r["nota"] = nota.Value;
+            var sinc = p90.GetAttributeValue<DateTime?>("new_sincronizadoem");
+            if (sinc != null) r["sincronizadoEm"] = DateTime.SpecifyKind(sinc.Value, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+
+            var notas = new Dictionary<string, double>();
+            for (var k = 0; k < NotaSync.Conducao.Length; k++)
+            {
+                var n = p90.GetAttributeValue<decimal?>(NotaSync.ColunasConducao[k]);
+                if (n != null) notas[NotaSync.Conducao[k]] = (double)n.Value;
+            }
+            var outros = p90.GetAttributeValue<string>("new_outroscomportamentos");
+            if (!string.IsNullOrEmpty(outros))
+                foreach (var o in NotaSync.Json.Deserialize<List<Dictionary<string, object>>>(outros))
+                    notas[(string)o["chave"]] = Convert.ToDouble(o["nota"], CultureInfo.InvariantCulture);
+            // Comportamentos de câmera (celular, fadiga...) com 100 não dizem nada ao motorista: só os de condução ficam sempre.
+            r["comportamentos"] = Comportamentos.Select((c, i) => new { c, i }).Where(x => notas.ContainsKey(x.c.Key) && (NotaSync.Conducao.Contains(x.c.Key) || notas[x.c.Key] < 100))
+                .OrderBy(x => notas[x.c.Key]).ThenBy(x => x.i)
+                .Select(x => new Dictionary<string, object> { ["chave"] = x.c.Key, ["rotulo"] = x.c.Value, ["nota"] = Math.Round(notas[x.c.Key], 1) }).ToList();
+
+            r["meses"] = meses
+                .Select(m => new { Data = m.GetAttributeValue<DateTime>("new_data"), Nota = NotaOk(m), Km = Km(m) })
+                .Where(m => m.Nota != null)
+                .OrderByDescending(m => m.Data).Take(Meses).Reverse()
+                .Select(m => new Dictionary<string, object> { ["ano"] = m.Data.Year, ["mes"] = m.Data.Month, ["nota"] = m.Nota.Value, ["km"] = m.Km })
+                .ToList();
+            return r;
         }
 
-        public static string Consulta(IReadOnlyList<NotaPeriodo> periodos)
+        // Nota só conta com situação Ok; em formação a coluna fica vazia.
+        private static double? NotaOk(Entity e)
         {
-            var campos = string.Join(" ", Comportamentos.Select(c => c.Key));
-            var sb = new StringBuilder("query($d: ID!) { ");
-            foreach (var p in periodos)
-                sb.Append(p.Alias).Append(": driverProfile(filters:{driverId:$d, period:{startAt:\"").Append(Iso(p.InicioUtc))
-                  .Append("\", endAt:\"").Append(Iso(p.FimUtc)).Append("\"}}) { distanceTraveled currentDriverGrades { generalGrade ")
-                  .Append(campos).Append(" } } ");
-            return sb.Append("}").ToString();
+            var nota = e.GetAttributeValue<decimal?>("new_nota");
+            return e.GetAttributeValue<OptionSetValue>("new_situacao")?.Value == NotaSync.SituacaoOk && nota != null ? (double)nota.Value : (double?)null;
         }
 
-        public static Dictionary<string, object> Montar(Dictionary<string, object> data, IReadOnlyList<NotaPeriodo> periodos)
-        {
-            var p90 = periodos.First(p => p.Alias == "p90");
-            var perfil = Perfil(data, "p90");
-            var km = Km(perfil);
-            var grades = Grades(perfil);
-            var geral = Nota(grades, "generalGrade");
-            var resultado = Base("ok", p90.InicioUtc, p90.FimUtc);
-            resultado["km"] = Math.Round(km, 1);
-
-            if (km < KmMinimo || geral == null) resultado["situacao"] = "em_formacao";
-            else resultado["nota"] = Math.Round(geral.Value, 1);
-
-            var comps = new List<Dictionary<string, object>>();
-            foreach (var c in Comportamentos)
-            {
-                var n = Nota(grades, c.Key);
-                if (n == null) continue;
-                comps.Add(new Dictionary<string, object> { ["chave"] = c.Key, ["rotulo"] = c.Value, ["nota"] = Math.Round(n.Value, 1) });
-            }
-            resultado["comportamentos"] = comps.Select((c, i) => new { c, i }).OrderBy(x => (double)x.c["nota"]).ThenBy(x => x.i).Select(x => x.c).ToList();
-
-            var meses = new List<Dictionary<string, object>>();
-            foreach (var p in periodos.Where(x => x.Alias != "p90").OrderBy(x => x.InicioUtc))
-            {
-                var mp = Perfil(data, p.Alias);
-                var mk = Km(mp);
-                var mn = Nota(Grades(mp), "generalGrade");
-                if (mk <= 0 || mn == null) continue;
-                meses.Add(new Dictionary<string, object> { ["ano"] = p.Ano, ["mes"] = p.Mes, ["nota"] = Math.Round(mn.Value, 1), ["km"] = Math.Round(mk, 1) });
-            }
-            resultado["meses"] = meses;
-            return resultado;
-        }
+        private static double Km(Entity e) => (double)(e.GetAttributeValue<decimal?>("new_km") ?? 0);
 
         public static Dictionary<string, object> SemCadastro(DateTime agoraUtc)
-            => Base("sem_cadastro", agoraUtc.AddDays(-Dias), agoraUtc);
+            => Base("sem_cadastro", agoraUtc.AddDays(-NotaSync.Dias), agoraUtc);
 
         private static Dictionary<string, object> Base(string situacao, DateTime inicioUtc, DateTime fimUtc) => new Dictionary<string, object>
         {
@@ -124,19 +91,6 @@ namespace Betinhos.DriverRecordSharing
             ["meses"] = new List<Dictionary<string, object>>()
         };
 
-        private static string DiaSp(DateTime utc) => utc.AddHours(OffsetSaoPauloHoras).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        private static string Iso(DateTime utc) => utc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
-
-        private static Dictionary<string, object> Perfil(Dictionary<string, object> data, string alias) =>
-            data != null && data.TryGetValue(alias, out var v) ? v as Dictionary<string, object> : null;
-
-        private static Dictionary<string, object> Grades(Dictionary<string, object> perfil) =>
-            perfil != null && perfil.TryGetValue("currentDriverGrades", out var v) ? v as Dictionary<string, object> : null;
-
-        private static double Km(Dictionary<string, object> perfil) =>
-            perfil != null && perfil.TryGetValue("distanceTraveled", out var v) && v != null ? Convert.ToDouble(v, CultureInfo.InvariantCulture) : 0;
-
-        private static double? Nota(Dictionary<string, object> grades, string chave) =>
-            grades != null && grades.TryGetValue(chave, out var v) && v != null ? Convert.ToDouble(v, CultureInfo.InvariantCulture) : (double?)null;
+        private static string DiaSp(DateTime utc) => utc.AddHours(NotaSync.OffsetSaoPauloHoras).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 }

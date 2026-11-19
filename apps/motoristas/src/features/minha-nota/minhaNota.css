@@ -15,6 +15,7 @@
 .nota-valor { color: var(--tom, #001a3d); font-size: 3.4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .nota-selo { padding: 4px 14px; border-radius: 999px; font-size: .85rem; font-weight: 800; background: var(--tom-fundo, #e2e8f0); color: var(--tom, #001a3d); }
 .nota-periodo { color: #64748b; font-size: .85rem; font-weight: 700; }
+.nota-atualizada { display: block; color: #64748b; font-size: .75rem; font-weight: 600; }
 .nota-formacao-titulo { color: #001a3d; font-size: 1rem; font-weight: 800; line-height: 1.4; }
 
 .nota-bloco { display: grid; gap: 10px; font-family: "Manrope", sans-serif; }

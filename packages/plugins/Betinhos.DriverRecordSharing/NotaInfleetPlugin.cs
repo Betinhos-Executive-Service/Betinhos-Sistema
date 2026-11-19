@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Web.Script.Serialization;
+using System.Linq;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
 namespace Betinhos.DriverRecordSharing
 {
-    // Custom API new_NotaInfleet: devolve a nota de condução da Infleet do motorista logado (90 dias, comportamentos e 6 meses).
+    // Custom API new_NotaInfleet: devolve a nota de condução do motorista logado (90 dias, comportamentos e meses), lida de new_notamotorista.
     public sealed class NotaInfleetPlugin : IPlugin
     {
         public const string ApiName = "new_NotaInfleet";
@@ -26,35 +26,33 @@ namespace Betinhos.DriverRecordSharing
 
             var funcionario = system.Retrieve(driver.EmployeeReference.LogicalName, driver.EmployeeReference.Id, new ColumnSet(PluginConfig.EmployeeInfleetDriverId));
             var infleetId = funcionario.GetAttributeValue<string>(PluginConfig.EmployeeInfleetDriverId);
-
-            InfleetGraphQlGateway gateway = null;
-            Func<string, Dictionary<string, object>, Dictionary<string, object>> consultar = (query, variables) =>
-            {
-                if (gateway == null) gateway = new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, null, tracing));
-                return gateway.Query(query, variables);
-            };
-
-            context.OutputParameters[ResultParameter] = Resultado(infleetId, DateTime.UtcNow, consultar, tracing);
-            tracing?.Trace("nota-infleet: situacao=" + (string.IsNullOrWhiteSpace(infleetId) ? "sem_cadastro" : "consultada"));
+            var agora = DateTime.UtcNow;
+            var linhas = string.IsNullOrWhiteSpace(infleetId) ? new List<Entity>() : Linhas(system, driver.EmployeeReference.Id, agora);
+            Func<Entity, NotaTipo, bool> e = (l, tipo) => l.GetAttributeValue<OptionSetValue>("new_periodo")?.Value == (int)tipo;
+            context.OutputParameters[ResultParameter] = Resultado(infleetId,
+                linhas.FirstOrDefault(l => e(l, NotaTipo.Dias90)), linhas.Where(l => e(l, NotaTipo.Mes)), agora);
+            tracing?.Trace("nota-infleet: situacao=" + (string.IsNullOrWhiteSpace(infleetId) ? "sem_cadastro" : "lida da tabela"));
         }
 
-        public static string Resultado(string infleetDriverId, DateTime agoraUtc, Func<string, Dictionary<string, object>, Dictionary<string, object>> consultar, ITracingService tracing = null)
+        public static string Resultado(string infleetDriverId, Entity p90, IEnumerable<Entity> meses, DateTime agoraUtc)
         {
-            var serializer = new JavaScriptSerializer();
-            if (string.IsNullOrWhiteSpace(infleetDriverId))
-                return serializer.Serialize(NotaInfleet.SemCadastro(agoraUtc));
+            return NotaSync.Json.Serialize(string.IsNullOrWhiteSpace(infleetDriverId) ? NotaInfleet.SemCadastro(agoraUtc) : NotaInfleet.MontarDaTabela(p90, meses, agoraUtc));
+        }
 
-            var periodos = NotaInfleet.Periodos(agoraUtc);
-            try
-            {
-                var data = consultar(NotaInfleet.Consulta(periodos), new Dictionary<string, object> { ["d"] = infleetDriverId.Trim() });
-                return serializer.Serialize(NotaInfleet.Montar(data, periodos));
-            }
-            catch (InfleetUnavailableException ex)
-            {
-                tracing?.Trace("nota-infleet: infleet indisponível: " + ex.Message);
-                throw new InvalidPluginExecutionException("Não foi possível consultar a Infleet agora.");
-            }
+        private static readonly string[] Colunas = new[] { "new_periodo", "new_data", "new_inicio", "new_fim", "new_situacao", "new_nota", "new_km", "new_outroscomportamentos", "new_sincronizadoem" }
+            .Concat(NotaSync.ColunasConducao).ToArray();
+
+        private static List<Entity> Linhas(IOrganizationService system, Guid funcionarioId, DateTime agoraUtc)
+        {
+            var q = new QueryExpression(NotaSync.Tabela) { ColumnSet = new ColumnSet(Colunas), TopCount = 50 };
+            q.Criteria.AddCondition("new_motorista", ConditionOperator.Equal, funcionarioId);
+            q.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            var periodo = q.Criteria.AddFilter(LogicalOperator.Or);
+            periodo.AddCondition("new_periodo", ConditionOperator.Equal, (int)NotaTipo.Dias90);
+            var mes = periodo.AddFilter(LogicalOperator.And);
+            mes.AddCondition("new_periodo", ConditionOperator.Equal, (int)NotaTipo.Mes);
+            mes.AddCondition("new_data", ConditionOperator.OnOrAfter, agoraUtc.AddMonths(-(NotaInfleet.Meses + 1)).Date);
+            return system.RetrieveMultiple(q).Entities.ToList();
         }
     }
 }
