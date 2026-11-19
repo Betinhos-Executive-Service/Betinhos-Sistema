@@ -16,7 +16,7 @@ namespace Betinhos.DriverRecordSharing
         public const string ResultParameter = "new_Result";
         public const int MesesPadrao = 2;
         public const int DiasPadrao = 3;
-        public static readonly TimeSpan LimiteExecucao = TimeSpan.FromSeconds(100); // o sandbox derruba em 120 s
+        public static readonly TimeSpan LimiteExecucao = TimeSpan.FromSeconds(80); // o sandbox derruba em 120 s; um lote pode levar ~25 s (2 tentativas de 10 s + upserts)
 
         public void Execute(IServiceProvider serviceProvider)
         {
@@ -45,15 +45,20 @@ namespace Betinhos.DriverRecordSharing
             var gravadas = 0;
             var falhas = new List<string>();
             var incompleto = false;
-            foreach (var lote in NotaSync.Lotes(NotaSync.Itens(motoristas, janelas)))
+            var fila = new Queue<List<NotaItem>>(NotaSync.Lotes(NotaSync.Itens(motoristas, janelas)));
+            while (fila.Count > 0)
             {
                 if (decorrido() > LimiteExecucao) { incompleto = true; break; }
+                var lote = fila.Dequeue();
                 Dictionary<string, object> data;
                 try { data = consultar(NotaSync.Consulta(lote)); }
                 catch (InfleetUnavailableException error)
                 {
-                    tracing?.Trace("nota-sync: lote falhou: " + error.Message);
-                    falhas.AddRange(lote.Select(i => i.Motorista.Id.ToString()).Where(id => !falhas.Contains(id)));
+                    tracing?.Trace("nota-sync: lote de " + lote.Count + " falhou: " + error.Message);
+                    // Um id inválido derruba o lote inteiro (a Infleet devolve errors); refeito item a item, só ele fica em falha.
+                    if (lote.Count > 1) { foreach (var item in lote) fila.Enqueue(new List<NotaItem> { item }); continue; }
+                    var id = lote[0].Motorista.Id.ToString();
+                    if (!falhas.Contains(id)) falhas.Add(id);
                     continue;
                 }
                 foreach (var item in lote)

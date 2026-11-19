@@ -59,15 +59,32 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void Falha_de_um_lote_nao_para_os_outros()
+        public void Lote_que_falha_e_refeito_item_a_item()
         {
             var fake = new UpsertFake();
-            var ms = Motoristas(5); // 30 períodos = 2 lotes
             var n = 0;
-            var r = SincronizarNotasInfleetPlugin.Rodar(fake, ms, Agora, null, 2, 3,
+            var r = SincronizarNotasInfleetPlugin.Rodar(fake, Motoristas(5), Agora, null, 2, 3,
                 q => { if (n++ == 0) throw new InfleetUnavailableException("x"); return Tudo(q); }, () => TimeSpan.Zero);
-            Assert.Equal(15, r["gravadas"]);
-            Assert.Equal(3, ((List<string>)r["falhas"]).Count); // motoristas 0, 1 e 2 caíram no lote que falhou
+            Assert.Equal(30, r["gravadas"]);
+            Assert.Empty((List<string>)r["falhas"]);
+        }
+
+        [Fact]
+        public void Id_invalido_so_derruba_o_proprio_motorista()
+        {
+            var fake = new UpsertFake();
+            var ms = Motoristas(5);
+            var r = SincronizarNotasInfleetPlugin.Rodar(fake, ms, Agora, null, 2, 3,
+                q => { if (q.Contains("\"d2\"")) throw new InfleetUnavailableException("x"); return Tudo(q); }, () => TimeSpan.Zero);
+            Assert.Equal(24, r["gravadas"]);
+            Assert.Equal(new List<string> { ms[2].Id.ToString() }, (List<string>)r["falhas"]);
+        }
+
+        [Fact]
+        public void Noventa_dias_de_todos_saem_no_primeiro_lote()
+        {
+            var itens = NotaSync.Itens(Motoristas(5), NotaSync.Janelas(Agora, null, 2, 3));
+            Assert.All(itens.Take(5), i => Assert.Equal(NotaTipo.Dias90, i.Janela.Tipo));
         }
 
         [Fact]

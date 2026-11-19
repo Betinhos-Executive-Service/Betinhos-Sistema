@@ -71,7 +71,7 @@ cria nem altera steps, tipos de plugin ou Custom APIs; isso continua nas solucoe
 | Custom API | O que faz |
 |---|---|
 | `new_NotaInfleet` | Le `new_notamotorista` (linha 90 dias e meses do motorista logado) e devolve o contrato JSON `schema` 1 com `sincronizadoEm`. Nao chama a Infleet. |
-| `new_SincronizarNotasInfleet` | Consulta a Infleet (lotes de 15 periodos, token `infleet.token` da `cr40f_segredo`) e faz upsert em `new_notamotorista` pela chave `new_chave`: 90 dias, meses e dias de cada motorista com `new_infleetdriverid`. Entradas opcionais `Meses` (padrao 2), `Dias` (padrao 3) e `Ate`; saida `new_Result` (`motoristas`, `periodos`, `gravadas`, `falhas`, `incompleto`). Para antes de 100 s. Roda 1x por dia as 05:00 (flow) e na carga retroativa. |
+| `new_SincronizarNotasInfleet` | Consulta a Infleet (lotes de 15 periodos, token `infleet.token` da `cr40f_segredo`) e faz upsert em `new_notamotorista` pela chave `new_chave`: 90 dias, meses e dias de cada motorista com `new_infleetdriverid`. Entradas opcionais `Meses` (padrao 2), `Dias` (padrao 3) e `Ate`; saida `new_Result` (`motoristas`, `periodos`, `gravadas`, `falhas`, `incompleto`). Nao comeca lote depois de 80 s (o sandbox derruba em 120 s). Roda 1x por dia as 05:00 (flow) e na carga retroativa. |
 
 ## Parte 2: atualizar o assembly existente
 

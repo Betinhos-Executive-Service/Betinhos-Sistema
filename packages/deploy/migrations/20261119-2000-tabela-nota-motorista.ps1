@@ -29,7 +29,7 @@ function TextoLongo([string] $Schema, [string] $Nome, [string] $Desc, [int] $Max
 function Decimal([string] $Schema, [string] $Nome, [string] $Desc, [int] $Precisao, [double] $Min, [double] $Max) {
   $c = Base "DecimalAttributeMetadata" $Schema $Nome $Desc; $c.Precision = $Precisao; $c.MinValue = $Min; $c.MaxValue = $Max; return $c
 }
-function Data([string] $Schema, [string] $Nome, [string] $Desc) {
+function SoData([string] $Schema, [string] $Nome, [string] $Desc) {
   $c = Base "DateTimeAttributeMetadata" $Schema $Nome $Desc; $c.Format = "DateOnly"; $c.DateTimeBehavior = @{ Value = "DateOnly" }; return $c
 }
 function DataHora([string] $Schema, [string] $Nome, [string] $Desc) {
@@ -46,7 +46,7 @@ function Escolha([string] $Tipo, [string] $Schema, [string] $Nome, [string] $Des
 $colunas = @(
   (Texto "new_Chave" "Chave" "<funcionarioid>|90d, |AAAA-MM ou |AAAA-MM-DD. Chave alternativa do upsert." 100),
   (Escolha "PicklistAttributeMetadata" "new_Periodo" "Per$([char]0xED)odo" "" @("90 dias", "M$([char]0xEA)s", "Dia")),
-  (Data "new_Data" "Data" "Dia (linhas Dia) ou 1o dia do m$([char]0xEA)s (linhas M$([char]0xEA)s)."),
+  (SoData "new_Data" "Data" "Dia (linhas Dia) ou 1o dia do m$([char]0xEA)s (linhas M$([char]0xEA)s)."),
   (DataHora "new_Inicio" "In$([char]0xED)cio" "In$([char]0xED)cio da janela consultada na Infleet."),
   (DataHora "new_Fim" "Fim" "Fim da janela consultada na Infleet."),
   (Escolha "PicklistAttributeMetadata" "new_Situacao" "Situa$([char]0xE7)$([char]0xE3)o" "Em forma$([char]0xE7)$([char]0xE3)o: menos de 50 km ou nota vazia na Infleet." @("Ok", "Em forma$([char]0xE7)$([char]0xE3)o")),

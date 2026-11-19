@@ -80,7 +80,9 @@ export function rotuloMes(ano: number, mes: number): string {
 const FMT_ATUALIZADA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export function atualizadaEm(iso: string): string {
-  const p = Object.fromEntries(FMT_ATUALIZADA.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return "";
+  const p = Object.fromEntries(FMT_ATUALIZADA.formatToParts(data).map((x) => [x.type, x.value]));
   return `Atualizada em ${p.day}/${p.month} às ${p.hour}:${p.minute}`;
 }
 

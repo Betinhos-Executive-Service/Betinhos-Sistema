@@ -68,8 +68,10 @@ namespace Betinhos.DriverRecordSharing
         public static List<NotaItem> Itens(IEnumerable<NotaMotorista> motoristas, IReadOnlyList<NotaJanela> janelas)
         {
             var itens = new List<NotaItem>();
-            foreach (var m in motoristas)
-                foreach (var j in janelas)
+            // Janela por fora: a 90 dias de todos sai antes dos dias, então rodada cortada pelo tempo não deixa sempre os mesmos motoristas sem nota atual.
+            var lista = motoristas.ToList();
+            foreach (var j in janelas)
+                foreach (var m in lista)
                     itens.Add(new NotaItem { Alias = "a" + itens.Count.ToString(CultureInfo.InvariantCulture), Motorista = m, Janela = j });
             return itens;
         }
@@ -80,9 +82,10 @@ namespace Betinhos.DriverRecordSharing
         public static string Consulta(IEnumerable<NotaItem> lote)
         {
             var campos = string.Join(" ", NotaInfleet.Comportamentos.Select(c => c.Key));
+            var json = Json;
             var sb = new StringBuilder("query { ");
             foreach (var i in lote)
-                sb.Append(i.Alias).Append(": driverProfile(filters:{driverId:").Append(Json.Serialize(i.Motorista.InfleetId.Trim()))
+                sb.Append(i.Alias).Append(": driverProfile(filters:{driverId:").Append(json.Serialize(i.Motorista.InfleetId.Trim()))
                   .Append(", period:{startAt:\"").Append(Iso(i.Janela.InicioUtc)).Append("\", endAt:\"").Append(Iso(i.Janela.FimUtc))
                   .Append("\"}}) { distanceTraveled currentDriverGrades { generalGrade ").Append(campos).Append(" } } ");
             return sb.Append("}").ToString();
@@ -98,7 +101,8 @@ namespace Betinhos.DriverRecordSharing
             var ok = km >= KmMinimo && geral != null;
 
             var e = new Entity(Tabela, "new_chave", item.Motorista.Id.ToString() + "|" + item.Janela.Sufixo);
-            e["new_name"] = item.Motorista.Nome + " · " + (item.Janela.Tipo == NotaTipo.Dias90 ? "90 dias" : item.Janela.Sufixo);
+            var nome = item.Motorista.Nome + " · " + (item.Janela.Tipo == NotaTipo.Dias90 ? "90 dias" : item.Janela.Sufixo);
+            e["new_name"] = nome.Length > 100 ? nome.Substring(0, 100) : nome; // new_name tem 100 caracteres; nome longo derrubaria o upsert
             e["new_motorista"] = new EntityReference(PluginConfig.EmployeeTable, item.Motorista.Id);
             e["new_periodo"] = new OptionSetValue((int)item.Janela.Tipo);
             e["new_data"] = item.Janela.Tipo == NotaTipo.Dias90 ? (DateTime?)null : item.Janela.DataLocal;
