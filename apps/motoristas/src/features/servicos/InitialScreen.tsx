@@ -243,7 +243,7 @@ type InitialScreenProps = {
 };
 
 function getFirstName(name?: string) {
-  return name?.trim().split(/\s+/)[0] || "Renan";
+  return name?.trim().split(/\s+/)[0] ?? "";
 }
 
 function getServiceDate(value?: string | Date | null) {
@@ -488,7 +488,7 @@ export function InitialScreen(props: InitialScreenProps) {
     <PullToRefresh className="pull-refresh--home" scrollRef={shellRef} onRefresh={props.onRefresh ?? (() => window.location.reload())}>
     <main ref={shellRef} className="concept-shell">
       <header className="concept-topbar">
-        <h1><span className="concept-kicker">Olá,</span> {driverName}</h1>
+        <h1>{driverName ? <><span className="concept-kicker">Olá,</span> {driverName}</> : "Olá"}</h1>
         <img className="concept-avatar" src={betinhosLogo} alt="Betinhos" />
       </header>
 
