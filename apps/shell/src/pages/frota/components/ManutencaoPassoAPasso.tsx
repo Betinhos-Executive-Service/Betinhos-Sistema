@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Field, Input, Radio, Select } from '@betinhos/ui'
 import { abrirGavetaRegistro } from '../../../app/registroAberto'
@@ -52,27 +52,40 @@ export function Arquivos({ titulo, links }: { titulo: string; links: string[] })
 /** Guia da gaveta da manutenção: barra de três etapas e um passo por vez. */
 export function ManutencaoPassoAPasso({ source, m, hoje, onFeito, onDesatualizada, onExtra, autoFoco = true }: Props) {
   const situacao = useMemo(() => avaliar(m, hoje), [m, hoje])
+  const [confirmarVolta, setConfirmarVolta] = useState(false)
+  /** Volta uma etapa: para Agendar abre o Reagendar (nada grava até confirmar); para Programar pede confirmação no passo. */
+  const voltar = (etapa: number) => (etapa === 0 ? onExtra('reagendar') : setConfirmarVolta(true))
   return (
     <div className="frota-guia">
-      <Barra situacao={situacao} />
+      <Barra situacao={situacao} onVoltar={voltar} />
       {/* A chave remonta o passo quando os dados de partida mudam (ex.: reagendou e continua em Programar). */}
-      <Passo key={chavePasso(m)} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
+      <Passo key={chavePasso(m)} source={source} m={m} hoje={hoje} situacao={situacao} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco}
+        confirmarVolta={confirmarVolta} onConfirmarVolta={setConfirmarVolta} />
     </div>
   )
 }
 
-function Barra({ situacao }: { situacao: Situacao }) {
+/** Etapas concluídas antes da atual viram botão de volta enquanto a manutenção anda (Programar e Realizar). */
+function Barra({ situacao, onVoltar }: { situacao: Situacao; onVoltar: (etapa: number) => void }) {
   const parada = situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada'
+  const podeVoltar = situacao.etapa === 'programar' || situacao.etapa === 'realizar'
   return (
     <ol className="frota-etapas" aria-label="Etapas">
       {ETAPAS.map((e, i) => {
         const feita = situacao.atual === null || i < situacao.atual
         const atual = situacao.atual === i
         const parou = parada && atual
-        return (
-          <li key={e.chave} className="frota-etapas__item" data-feita={feita ? '' : undefined} data-parada={parou ? '' : undefined} aria-current={atual && !parada ? 'step' : undefined}>
+        const conteudo = (
+          <>
             <b aria-hidden="true">{feita ? '✓' : i + 1}</b><span>{e.rotulo}</span>
             {feita ? <span className="frota-sr-only">, concluída</span> : parou ? <span className="frota-sr-only">, parou aqui</span> : null}
+          </>
+        )
+        return (
+          <li key={e.chave} className="frota-etapas__item" data-feita={feita ? '' : undefined} data-parada={parou ? '' : undefined} aria-current={atual && !parada ? 'step' : undefined}>
+            {feita && podeVoltar
+              ? <button type="button" className="frota-etapas__voltar" title={`Voltar para ${e.rotulo}`} onClick={() => onVoltar(i)}>{conteudo}<span className="frota-sr-only">: voltar para esta etapa</span></button>
+              : conteudo}
           </li>
         )
       })}
@@ -80,22 +93,12 @@ function Barra({ situacao }: { situacao: Situacao }) {
   )
 }
 
-type PassoProps = Omit<Props, 'onExtra'> & { situacao: Situacao; onExtra: AbrirExtra }
+type PassoProps = Omit<Props, 'onExtra'> & { situacao: Situacao; onExtra: AbrirExtra; confirmarVolta: boolean; onConfirmarVolta: (v: boolean) => void }
 
-function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra, autoFoco }: PassoProps) {
+function Passo({ source, m, hoje, situacao, onFeito, onDesatualizada, onExtra, autoFoco, confirmarVolta, onConfirmarVolta }: PassoProps) {
   if (situacao.passo === 'Agendar') return <PassoAgendar source={source} m={m} hoje={hoje} onFeito={onFeito} onDesatualizada={onDesatualizada} autoFoco={autoFoco} />
   if (situacao.passo === 'Programar') return <PassoProgramar source={source} m={m} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} autoFoco={autoFoco} />
-  if (situacao.passo === 'AguardarConclusao') {
-    const p = m.programacao
-    return (
-      <section className="frota-guia__passo" aria-labelledby={`${m.id}-passo`}>
-        <h3 id={`${m.id}-passo`}>Aguardando o motorista concluir no App</h3>
-        {p?.motorista && p.saida
-          ? <Alert tone="info">{p.motorista.label} leva o carro em {textoSaida(p.saida)}, paga e conclui pelo App com a nota.</Alert>
-          : <Alert tone="info">O motorista leva o carro, paga e conclui pelo App com a nota.</Alert>}
-      </section>
-    )
-  }
+  if (situacao.passo === 'AguardarConclusao') return <PassoAguardar source={source} m={m} onFeito={onFeito} onDesatualizada={onDesatualizada} onExtra={onExtra} confirmar={confirmarVolta} onConfirmar={onConfirmarVolta} />
   if (situacao.etapa === 'realizada') return <Realizada m={m} />
   if (situacao.etapa === 'reprovada' || situacao.etapa === 'cancelada') return <Alert tone="info">{situacao.feitos.at(-1) ?? (situacao.etapa === 'reprovada' ? 'Reprovada' : 'Cancelada')}</Alert>
   return null
@@ -120,6 +123,43 @@ export function useGravar(onDesatualizada: () => void) {
     else setErro(desfecho.mensagem)
   }, [onDesatualizada])
   return { salvando, erro, gravar }
+}
+
+/** Programado: espera o App. "Voltar para Programar" reagenda na mesma janela (o plugin devolve a Agendado e tira o motorista da linha da Geral). */
+function PassoAguardar({ source, m, onFeito, onDesatualizada, onExtra, confirmar, onConfirmar }: Pick<Props, 'source' | 'm' | 'onFeito' | 'onDesatualizada' | 'onExtra'> & { confirmar: boolean; onConfirmar: (v: boolean) => void }) {
+  const p = m.programacao
+  const { salvando, erro, gravar } = useGravar(onDesatualizada)
+  const inicio = m.janelaInicio
+  const fim = m.janelaFim
+
+  function voltarParaProgramar() {
+    if (!inicio || !fim) { onExtra('reagendar'); return }
+    void gravar(
+      () => executarAcaoManutencao(source, m, 'encaixar', () => source.agendarManutencao({ manutencaoId: m.id, inicio, fim, comentario: null })),
+      () => { onConfirmar(false); onFeito('Voltou para Programar. Escolha o motorista e a saída de novo.') },
+    )
+  }
+
+  return (
+    <section className="frota-guia__passo" aria-labelledby={`${m.id}-passo`}>
+      <h3 id={`${m.id}-passo`}>Aguardando o motorista concluir no App</h3>
+      {p?.motorista && p.saida
+        ? <Alert tone="info">{p.motorista.label} leva o carro em {textoSaida(p.saida)}, paga e conclui pelo App com a nota.</Alert>
+        : <Alert tone="info">O motorista leva o carro, paga e conclui pelo App com a nota.</Alert>}
+      {erro && <Alert tone="danger" title="Não foi possível gravar">{erro}</Alert>}
+      {confirmar ? (
+        <Alert tone="warning" title="Voltar para Programar?">
+          {p?.motorista ? `${p.motorista.label} sai da programação` : 'O motorista sai da programação'} e a janela continua a mesma. Depois é só programar de novo.
+          <div className="frota-cluster">
+            <Button variant="primary" loading={salvando} onClick={voltarParaProgramar}>Voltar para Programar</Button>
+            <Button variant="secondary" disabled={salvando} onClick={() => onConfirmar(false)}>Manter programada</Button>
+          </div>
+        </Alert>
+      ) : (
+        <div className="frota-cluster"><Button variant="ghost" icon={<ArrowLeft size={16} />} onClick={() => onConfirmar(true)}>Voltar para Programar</Button></div>
+      )}
+    </section>
+  )
 }
 
 function PassoAgendar({ source, m, hoje, onFeito, onDesatualizada, autoFoco }: Pick<Props, 'source' | 'm' | 'hoje' | 'onFeito' | 'onDesatualizada' | 'autoFoco'>) {
@@ -202,7 +242,10 @@ function PassoProgramar({ source, m, onFeito, onDesatualizada, onExtra, autoFoco
           </div>
           {leitura.foraDaJanela && janela && <Alert tone="warning">A saída fica fora da janela ({janela}). Grava assim mesmo.</Alert>}
           {erro && <Alert tone="danger" title="Não foi possível gravar">{erro}</Alert>}
-          <div className="frota-cluster"><Button variant="primary" loading={salvando} onClick={programar}>Programar</Button></div>
+          <div className="frota-cluster">
+            <Button variant="primary" loading={salvando} onClick={programar}>Programar</Button>
+            <Button variant="ghost" icon={<ArrowLeft size={16} />} disabled={salvando} onClick={() => onExtra('reagendar')}>Voltar para Agendar</Button>
+          </div>
         </>
       )}
     </section>
