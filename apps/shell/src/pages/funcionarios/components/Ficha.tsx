@@ -245,7 +245,13 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
           )}
         </header>
 
-        <div className="drawer-tabs">
+        <div
+          className="drawer-tabs"
+          onWheel={(event) => {
+            const list = event.currentTarget.querySelector<HTMLElement>('.bt-tabs__list')
+            if (list && Math.abs(event.deltaY) > Math.abs(event.deltaX)) list.scrollLeft += event.deltaY
+          }}
+        >
           <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
         </div>
 
