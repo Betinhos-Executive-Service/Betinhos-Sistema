@@ -79,3 +79,8 @@ test("lê sincronizadoEm e mostra em São Paulo", () => {
   assert.equal(nota.situacao === "ok" && nota.sincronizadoEm, "2026-11-19T08:00:05Z");
   assert.equal(atualizadaEm("2026-11-19T08:00:05Z"), "Atualizada em 19/11 às 05:00");
 });
+
+test("sincronizadoEm inválido é descartado na leitura", () => {
+  const nota = lerNotaInfleet(JSON.stringify({ ...baseTabela, sincronizadoEm: "ontem", comportamentos: [] }));
+  assert.equal(nota.situacao === "ok" ? nota.sincronizadoEm : "x", undefined);
+});

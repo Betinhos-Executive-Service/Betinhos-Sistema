@@ -44,12 +44,15 @@ namespace Betinhos.DriverRecordSharing
             var janelas = NotaSync.Janelas(agoraUtc, ate, meses, dias);
             var gravadas = 0;
             var falhas = new List<string>();
+            var comFalha = new HashSet<Guid>();
             var incompleto = false;
             var fila = new Queue<List<NotaItem>>(NotaSync.Lotes(NotaSync.Itens(motoristas, janelas)));
             while (fila.Count > 0)
             {
                 if (decorrido() > LimiteExecucao) { incompleto = true; break; }
-                var lote = fila.Dequeue();
+                // Id que já falhou não volta à Infleet nas janelas seguintes.
+                var lote = fila.Dequeue().Where(i => !comFalha.Contains(i.Motorista.Id)).ToList();
+                if (lote.Count == 0) continue;
                 Dictionary<string, object> data;
                 try { data = consultar(NotaSync.Consulta(lote)); }
                 catch (InfleetUnavailableException error)
@@ -57,8 +60,7 @@ namespace Betinhos.DriverRecordSharing
                     tracing?.Trace("nota-sync: lote de " + lote.Count + " falhou: " + error.Message);
                     // Um id inválido derruba o lote inteiro (a Infleet devolve errors); refeito item a item, só ele fica em falha.
                     if (lote.Count > 1) { foreach (var item in lote) fila.Enqueue(new List<NotaItem> { item }); continue; }
-                    var id = lote[0].Motorista.Id.ToString();
-                    if (!falhas.Contains(id)) falhas.Add(id);
+                    if (comFalha.Add(lote[0].Motorista.Id)) falhas.Add(lote[0].Motorista.Id.ToString());
                     continue;
                 }
                 foreach (var item in lote)

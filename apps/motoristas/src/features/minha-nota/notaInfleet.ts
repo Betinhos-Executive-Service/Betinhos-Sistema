@@ -26,7 +26,7 @@ export function lerNotaInfleet(json: string): NotaInfleet {
   const meses = (Array.isArray(bruto.meses) ? bruto.meses : []).map((item: Record<string, unknown>) => ({
     ano: num(item.ano), mes: num(item.mes), nota: num(item.nota), km: num(item.km)
   }));
-  const sincronizadoEm = texto(bruto.sincronizadoEm) || undefined;
+  const sincronizadoEm = Number.isNaN(Date.parse(texto(bruto.sincronizadoEm))) ? undefined : texto(bruto.sincronizadoEm);
   const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos, meses, sincronizadoEm };
   if (bruto.situacao === "em_formacao") return { situacao: "em_formacao", ...base };
   if (typeof bruto.nota !== "number") throw erroResposta();
@@ -80,9 +80,7 @@ export function rotuloMes(ano: number, mes: number): string {
 const FMT_ATUALIZADA = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 export function atualizadaEm(iso: string): string {
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return "";
-  const p = Object.fromEntries(FMT_ATUALIZADA.formatToParts(data).map((x) => [x.type, x.value]));
+  const p = Object.fromEntries(FMT_ATUALIZADA.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
   return `Atualizada em ${p.day}/${p.month} às ${p.hour}:${p.minute}`;
 }
 

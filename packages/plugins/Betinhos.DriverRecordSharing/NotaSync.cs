@@ -65,13 +65,12 @@ namespace Betinhos.DriverRecordSharing
             return lista;
         }
 
-        public static List<NotaItem> Itens(IEnumerable<NotaMotorista> motoristas, IReadOnlyList<NotaJanela> janelas)
+        public static List<NotaItem> Itens(IReadOnlyList<NotaMotorista> motoristas, IReadOnlyList<NotaJanela> janelas)
         {
             var itens = new List<NotaItem>();
             // Janela por fora: a 90 dias de todos sai antes dos dias, então rodada cortada pelo tempo não deixa sempre os mesmos motoristas sem nota atual.
-            var lista = motoristas.ToList();
             foreach (var j in janelas)
-                foreach (var m in lista)
+                foreach (var m in motoristas)
                     itens.Add(new NotaItem { Alias = "a" + itens.Count.ToString(CultureInfo.InvariantCulture), Motorista = m, Janela = j });
             return itens;
         }
