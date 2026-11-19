@@ -34,11 +34,17 @@ export function lerNotaInfleet(json: string): NotaInfleet {
   return { situacao: "ok", ...base, nota: bruto.nota };
 }
 
+// Limites das faixas sobre a nota arredondada: ≥90 Ótima, 75–89 Boa, abaixo Atenção.
+const FAIXAS: Array<Faixa & { min: number }> = [
+  { min: 90, rotulo: "Ótima", tom: "otima" },
+  { min: 75, rotulo: "Boa", tom: "boa" },
+  { min: 0, rotulo: "Atenção", tom: "atencao" }
+];
+
+export const notaFmt = (nota: number) => String(Math.round(nota));
+
 export function faixaDaNota(nota: number): Faixa {
-  const n = Math.round(nota);
-  if (n >= 90) return { rotulo: "Ótima", tom: "otima" };
-  if (n >= 75) return { rotulo: "Boa", tom: "boa" };
-  return { rotulo: "Atenção", tom: "atencao" };
+  return FAIXAS.find((f) => Math.round(nota) >= f.min) ?? FAIXAS[FAIXAS.length - 1];
 }
 
 export function oQueMelhorar(comportamentos: Comportamento[]): Comportamento[] {
@@ -55,10 +61,10 @@ export const DICAS: Record<string, string> = {
 };
 
 // Pontos (arredondados) que faltam para a próxima faixa; null quando já é Ótima.
-export function proximaFaixa(nota: number): { rotulo: "Ótima" | "Boa"; faltam: number } | null {
+export function proximaFaixa(nota: number): { rotulo: Faixa["rotulo"]; faltam: number } | null {
   const n = Math.round(nota);
-  if (n >= 90) return null;
-  return n >= 75 ? { rotulo: "Ótima", faltam: 90 - n } : { rotulo: "Boa", faltam: 75 - n };
+  const proxima = [...FAIXAS].reverse().find((f) => f.min > n);
+  return proxima ? { rotulo: proxima.rotulo, faltam: proxima.min - n } : null;
 }
 
 // Diferença entre o último mês e o anterior, em pontos arredondados.
@@ -74,7 +80,7 @@ export function rotuloMes(ano: number, mes: number): string {
 
 const isMockNotaInfleet = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
 
-const MOCK: NotaInfleet = {
+const MOCK: Extract<NotaInfleet, { situacao: "ok" }> = {
   situacao: "ok", inicio: "2026-08-21", fim: "2026-11-19", km: 5156.2, nota: 82.9,
   comportamentos: [
     { chave: "hardBraking", rotulo: "Frenagem brusca", nota: 67 },

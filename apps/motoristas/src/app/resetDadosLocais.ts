@@ -1,6 +1,7 @@
 import { STORAGE_KEY, initialStore } from "./bootstrap";
 import { clearAllChaptersSeen } from "./tour";
 import { limparAgendaOffline } from "../features/servicos/agendaOffline";
+import { limparNotaCache } from "../features/minha-nota/notaCache";
 import { clearMediaDraft } from "../features/fotos/mediaDraftStore";
 import { revokePhotoPreviewUrls } from "../features/fotos/envioMidia";
 import { createEmptyCollisionDraft } from "../features/colisao/collisions";
@@ -91,6 +92,7 @@ export function resetDadosLocais({
   }
 
   limparAgendaOffline();
+  limparNotaCache();
   revokePhotoPreviewUrls(despesas.expensePhotos);
   Object.values(recebimento.receiveProofs).forEach((photos) => revokePhotoPreviewUrls(photos));
   revokePhotoPreviewUrls(colisao.collisionPhotos);
