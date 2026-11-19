@@ -1,5 +1,5 @@
 import { Alert, Button, buttonClassName, Dialog, Tabs } from '@betinhos/ui'
-import { ChevronLeft, ExternalLink, FolderOpen, Save, Undo2, X } from 'lucide-react'
+import { Car, ChevronLeft, ExternalLink, FileText, FolderOpen, KeyRound, Megaphone, Package, Save, StickyNote, TriangleAlert, Undo2, UserRound, X, type LucideIcon } from 'lucide-react'
 import { useQueryTexto } from '../../../nav/queryState'
 import { useIsMobile } from '../lib/useMediaQuery'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -30,15 +30,15 @@ import { VeiculoPicker } from './VeiculoPicker'
 import { BrandLoader } from '../../../app/BrandLoader'
 
 type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'comunicados' | 'anotacoes'
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'dados', label: 'Dados' },
-  { key: 'documentos', label: 'Documentos' },
-  { key: 'acesso', label: 'Acesso' },
-  { key: 'multas', label: 'Multas' },
-  { key: 'veiculos', label: 'Veículos' },
-  { key: 'equipamentos', label: 'Equipamentos' },
-  { key: 'comunicados', label: 'Comunicados' },
-  { key: 'anotacoes', label: 'Anotações' },
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: 'dados', label: 'Dados', icon: UserRound },
+  { key: 'documentos', label: 'Documentos', icon: FileText },
+  { key: 'acesso', label: 'Acesso', icon: KeyRound },
+  { key: 'multas', label: 'Multas', icon: TriangleAlert },
+  { key: 'veiculos', label: 'Veículos', icon: Car },
+  { key: 'equipamentos', label: 'Equipamentos', icon: Package },
+  { key: 'comunicados', label: 'Comunicados', icon: Megaphone },
+  { key: 'anotacoes', label: 'Anotações', icon: StickyNote },
 ]
 const GROUPS: FieldGroup[] = ['pessoais', 'vinculo', 'contato', 'detalhes', 'assinatura']
 
@@ -246,7 +246,13 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         </header>
 
         <div className="drawer-tabs">
-          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({ value: item.key, label: item.label, disabled: isNew && item.key !== 'dados' }))} />
+          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({
+              value: item.key,
+              icon: <item.icon aria-hidden />,
+              // Só a aba aberta mostra o nome; nas outras ele vira dica no hover (no celular, só para leitor de tela) e segue como nome acessível.
+              label: item.key === tab ? item.label : <span className={mobile ? 'sr-only' : 'aba-dica'}>{item.label}</span>,
+              disabled: isNew && item.key !== 'dados',
+            }))} />
         </div>
 
         <div className="drawer-body" role="tabpanel">
