@@ -4,7 +4,7 @@ import { obterArmazem } from "../termos/minhasMultasOffline.ts";
 import type { NotaInfleet } from "./notaInfleet.ts";
 
 export const NOTA_CACHE_KEY = "app-motoristas-nota-infleet-v1";
-export const NOTA_CACHE_VALIDADE_MS = 6 * 60 * 60 * 1000;
+export const NOTA_CACHE_VALIDADE_MS = 60 * 60 * 1000;
 
 type Registro = { salvoEm: string; usuario: string; nota: NotaInfleet };
 

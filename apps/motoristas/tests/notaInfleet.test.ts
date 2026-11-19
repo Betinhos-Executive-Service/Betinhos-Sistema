@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { faixaDaNota, lerNotaInfleet, oQueMelhorar, proximaFaixa, rotuloMes, variacaoMensal } from "../src/features/minha-nota/notaInfleet.ts";
+import { atualizadaEm, faixaDaNota, lerNotaInfleet, oQueMelhorar, proximaFaixa, rotuloMes, variacaoMensal } from "../src/features/minha-nota/notaInfleet.ts";
 import { NOTA_CACHE_KEY, lerNotaCache, salvarNotaCache } from "../src/features/minha-nota/notaCache.ts";
 
 test("lerNotaInfleet mapeia o resultado ok", () => {
@@ -62,12 +62,30 @@ function armazemFalso() {
   return { getItem: (k: string) => dados.get(k) ?? null, setItem: (k: string, v: string) => void dados.set(k, v), removeItem: (k: string) => void dados.delete(k), dados };
 }
 
-test("cache da nota vale 6 h e é do usuário que salvou", () => {
+test("cache da nota vale 1 h e é do usuário que salvou", () => {
   const armazem = armazemFalso();
   const nota = { situacao: "sem_cadastro" } as const;
   salvarNotaCache("u1", nota, armazem, new Date("2026-11-19T10:00:00Z"));
-  assert.deepEqual(lerNotaCache("u1", armazem, new Date("2026-11-19T15:59:00Z")), { nota, fresca: true });
-  assert.equal(lerNotaCache("u1", armazem, new Date("2026-11-19T16:01:00Z"))?.fresca, false);
+  assert.deepEqual(lerNotaCache("u1", armazem, new Date("2026-11-19T10:59:00Z")), { nota, fresca: true });
+  assert.equal(lerNotaCache("u1", armazem, new Date("2026-11-19T11:01:00Z"))?.fresca, false);
   assert.equal(lerNotaCache("u2", armazem), null);
   assert.equal(armazem.dados.has(NOTA_CACHE_KEY), false);
+});
+
+const baseTabela = { schema: 1, situacao: "ok", nota: 80, km: 100, periodo: { inicio: "2026-08-21", fim: "2026-11-19" }, meses: [] };
+
+test("lê sincronizadoEm e mostra em São Paulo", () => {
+  const nota = lerNotaInfleet(JSON.stringify({ ...baseTabela, sincronizadoEm: "2026-11-19T08:00:05Z", comportamentos: [] }));
+  assert.equal(nota.situacao === "ok" && nota.sincronizadoEm, "2026-11-19T08:00:05Z");
+  assert.equal(atualizadaEm("2026-11-19T08:00:05Z"), "Atualizada em 19/11 às 05:00");
+});
+
+test("esconde comportamento de câmera com 100 e mantém os de condução", () => {
+  const comportamentos = [
+    { chave: "deviceIdle", rotulo: "Motor ocioso", nota: 100 },
+    { chave: "usingPhone", rotulo: "Uso do celular", nota: 100 },
+    { chave: "fatigue", rotulo: "Fadiga", nota: 80 }
+  ];
+  const nota = lerNotaInfleet(JSON.stringify({ ...baseTabela, comportamentos }));
+  assert.deepEqual(nota.situacao === "ok" && nota.comportamentos.map((c) => c.chave), ["deviceIdle", "fatigue"]);
 });
