@@ -79,6 +79,13 @@ const baseModules = [
     detail: "Registro de colis\u00f5es",
     icon: "collisions",
     disabled: false,
+  },
+  {
+    id: "minhaNota",
+    label: "Minha nota",
+    detail: "Nota de condução",
+    icon: "minhaNota",
+    disabled: false,
   }
 ];
 
@@ -105,6 +112,7 @@ const screenAliases: Record<string, string[]> = {
   personalReceipt: ["reciboPersonalizado", "personalReceipt", "gerarReciboPersonalizado", "recibopersonalizado"],
   ideas: ["boasIdeias", "ideas", "ideias"],
   meuCarro: ["meuCarro"],
+  minhaNota: ["minhaNota"],
 };
 
 const moduleHandlers: Record<string, string[]> = {
@@ -112,6 +120,7 @@ const moduleHandlers: Record<string, string[]> = {
   checklists: [],
   multas: [],
   treinamentos: [],
+  minhaNota: [],
   postosProximos: [],
   services: [
     "onServices",
@@ -360,6 +369,11 @@ function ModuleIcon({ name }: { name: string }) {
   if (name === "treinamentos") {
     // Lucide graduation-cap: conteúdo de formação.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
+  if (name === "minhaNota") {
+    // Lucide gauge: nota de condução.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 14 4-4M3.34 19a10 10 0 1 1 17.32 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
   if (name === "postosProximos") {

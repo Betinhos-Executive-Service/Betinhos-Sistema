@@ -41,6 +41,7 @@ const SCREEN_HASH_PATHS: Record<Screen, string> = {
   meuCarro: "meu-carro",
   multas: "multas",
   treinamentos: "treinamentos",
+  minhaNota: "minha-nota",
   gastosCartao: "gastos-cartao",
   gastosRelatorio: "gastos-relatorio",
   postosProximos: "postos-proximos"
@@ -110,6 +111,7 @@ const SCREEN_HASH_ALIASES: Record<string, Screen> = {
   ideias: "boasIdeias",
   ideas: "boasIdeias",
   "meu-carro": "meuCarro",
+  "minha-nota": "minhaNota",
   meucarro: "meuCarro",
   multas: "multas",
   termos: "multas",
@@ -242,6 +244,7 @@ const SCREEN_DEPTH: Record<Screen, number> = {
   meuCarro: 1,
   multas: 1,
   treinamentos: 1,
+  minhaNota: 1,
   gastosCartao: 1,
   gastosRelatorio: 1,
   postosProximos: 1
@@ -280,7 +283,7 @@ const fastFade = {
   ease: "easeOut" as const
 };
 
-const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "gastosCartao" || screenName === "postosProximos";
+const isListScreen = (screenName: Screen) => screenName === "servicos" || screenName === "comunicados" || screenName === "checklists" || screenName === "historico" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "minhaNota" || screenName === "gastosCartao" || screenName === "postosProximos";
 const isDetailScreen = (screenName: Screen) => screenName === "detalhes" || screenName === "detalhesHistorico";
 const isTaskScreen = (screenName: Screen) =>
   screenName === "receber" || screenName === "voucher" || screenName === "finalizar" || screenName === "canceladoLocal";

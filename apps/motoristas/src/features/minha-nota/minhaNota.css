@@ -1,0 +1,32 @@
+/* Minha nota (Infleet): reaproveita o cartão das Boas ideias (ideas-*); só o que é da nota. */
+.nota-tela { gap: 16px; }
+.nota-resumo { display: grid; justify-items: center; gap: 6px; padding: 20px 16px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fcfcfb; text-align: center; font-family: "Manrope", sans-serif; }
+.nota-valor { color: #001a3d; font-size: 4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.nota-selo { padding: 4px 14px; border-radius: 999px; font-size: .85rem; font-weight: 800; background: #e2e8f0; color: #001a3d; }
+.nota-resumo--otima .nota-selo { background: #e3f1e4; color: #346538; }
+.nota-resumo--boa .nota-selo { background: #fff1d6; color: #956400; }
+.nota-resumo--atencao .nota-selo { background: #fbe4e3; color: #9f2f2d; }
+.nota-periodo { color: #64748b; font-size: .85rem; font-weight: 700; }
+.nota-formacao-titulo { color: #001a3d; font-size: 1rem; font-weight: 800; line-height: 1.4; }
+
+.nota-bloco { display: grid; gap: 10px; font-family: "Manrope", sans-serif; }
+.nota-bloco h3 { margin: 0; color: #001a3d; font-size: 1rem; font-weight: 800; }
+.nota-bloco ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.nota-melhorar li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 10px; background: #fbe4e3; color: #9f2f2d; font-size: .9rem; font-weight: 700; }
+.nota-melhorar strong { font-variant-numeric: tabular-nums; }
+
+.nota-linha { display: flex; justify-content: space-between; gap: 8px; color: #172033; font-size: .9rem; font-weight: 700; }
+.nota-linha strong { font-variant-numeric: tabular-nums; }
+.nota-barra { height: 8px; margin-top: 4px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.nota-barra-fill { display: block; height: 100%; border-radius: inherit; }
+.nota-barra-fill--otima { background: #346538; }
+.nota-barra-fill--boa { background: #956400; }
+.nota-barra-fill--atencao { background: #9f2f2d; }
+
+.nota-evolucao { grid-auto-flow: column; grid-auto-columns: 1fr; align-items: end; gap: 8px; }
+.nota-evolucao li { display: grid; justify-items: center; gap: 4px; color: #475569; font-size: .75rem; font-weight: 700; }
+.nota-evolucao strong { color: #001a3d; font-variant-numeric: tabular-nums; }
+.nota-coluna { display: flex; align-items: flex-end; width: 100%; max-width: 36px; height: 96px; border-radius: 6px; background: #e2e8f0; overflow: hidden; }
+.nota-coluna-fill { display: block; width: 100%; border-radius: 6px 6px 0 0; }
+.nota-mes { text-transform: lowercase; }
