@@ -1,6 +1,6 @@
 # Nota do motorista em tabela (Infleet → Dataverse)
 
-Data: 19/11/2026. Base: `2026-11-19-nota-infleet-app-design.md` (PR #626). Decisões do Renan em 19/11/2026: tabela no lugar da consulta sob demanda, sincronização 1x por dia às 05:00, histórico mês a mês completo sem apagar, 5 comportamentos de condução em colunas e o resto em JSON.
+Data: 19/11/2026. Base: `2026-11-19-nota-infleet-app-design.md` (PR #626). Decisões do Renan em 19/11/2026: tabela no lugar da consulta sob demanda, sincronização 1x por dia às 05:00, histórico completo sem apagar (dia a dia e mês a mês; nota do dia pedida em 19/11 e confirmada na Infleet), 5 comportamentos de condução em colunas e o resto em JSON.
 
 ## Por quê
 - O App abre a nota na hora: lê o Dataverse, não espera os ~3 s da Infleet.
@@ -12,11 +12,11 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
 
 | Coluna | Tipo | Conteúdo |
 |---|---|---|
-| `new_name` | texto (primária) | "<nome do motorista> · 90 dias" ou "<nome> · 2026-10" |
-| `new_chave` | texto 100, chave alternativa | `<cr40f_funcionariosid>|90d` ou `<id>|2026-10` (upsert idempotente) |
+| `new_name` | texto (primária) | "<nome do motorista> · 90 dias", "<nome> · 2026-10" ou "<nome> · 2026-11-18" |
+| `new_chave` | texto 100, chave alternativa | `<cr40f_funcionariosid>|90d`, `<id>|2026-10` ou `<id>|2026-11-18` (upsert idempotente) |
 | `new_motorista` | lookup `cr40f_funcionarios` | motorista |
-| `new_periodo` | choice | 90 dias (atual, sobrescrita) / Mês |
-| `new_mes` | data | 1º dia do mês (só linhas Mês) |
+| `new_periodo` | choice | 90 dias (atual, sobrescrita) / Mês / Dia |
+| `new_data` | data | dia (linhas Dia) ou 1º dia do mês (linhas Mês); vazio na 90 dias |
 | `new_inicio`, `new_fim` | data | janela consultada (fronteiras 00:00 America/Sao_Paulo) |
 | `new_situacao` | choice | Ok / Em formação (km < 50 ou nota nula) |
 | `new_nota` | decimal (1 casa) | `generalGrade` |
@@ -26,14 +26,16 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
 | `new_sincronizadoem` | data e hora | última gravação |
 
 - Motorista sem `new_infleetdriverid` não ganha linha.
-- Mês sem km não ganha linha. Linha existente nunca é apagada pela sincronização.
+- Dia ou mês sem km não ganha linha. Dia com km mas sem nota (a Infleet devolve nula abaixo de ~50–60 km) ganha linha "Em formação", com o km. Linha existente nunca é apagada pela sincronização.
 - Privilégios: nenhum papel de motorista; leitura para o papel de gestão (o mesmo que lê o dashboard). O plugin grava como SYSTEM.
 
 ## Sincronização
 - **Custom API `new_SincronizarNotasInfleet`** (unbound, action) no `Betinhos.DriverRecordSharing`, plugin como SYSTEM, token `infleet.token` da `cr40f_segredo`.
   - Entrada opcional `Meses` (inteiro, padrão 2: mês corrente, parcial, e o anterior, que fecha). Carga inicial: rodada única com `Meses` = 24 para trazer tudo o que a Infleet tiver.
   - Lê os funcionários ativos com `new_infleetdriverid` e consulta a Infleet em lotes de vários motoristas por chamada GraphQL (aliases), para 23 motoristas caberem folgado no limite de 2 min do plugin.
-  - Faz upsert pela `new_chave`: a linha 90 dias e as linhas Mês da janela.
+  - Entrada opcional `Dias` (inteiro, padrão 3: ontem e os dois anteriores, para pegar dado que a Infleet recebe atrasado).
+  - Faz upsert pela `new_chave`: a linha 90 dias, as linhas Mês e as linhas Dia da janela.
+  - Carga inicial diária: `packages/deploy/carga-notas-infleet.ps1` (à mão, só DEV e depois PROD com pedido) chama a Custom API mês a mês para trás com `Dias` = dias do mês, até um mês inteiro sem km em nenhum motorista; cada chamada cabe nos 2 min.
   - Resposta `new_Result` em JSON: motoristas lidos, linhas gravadas e falhas, só com ids, sem token.
   - Falha de um motorista não para os outros.
 - **Flow "Infleet - Sincronizar notas dos motoristas"**, novo: recorrência diária às 05:00 America/Sao_Paulo, chama a Custom API e manda e-mail de alerta se houver falha, no molde de `provision-flow-carro-atual.ps1`.
@@ -53,6 +55,8 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
 
 ## Riscos
 - O histórico da Infleet pode não chegar a 24 meses: meses vazios simplesmente não geram linha.
+- Volume: ~23 motoristas × 365 dias ≈ 8,4 mil linhas por ano; sem problema para o Dataverse.
+- A nota do dia oscila muito (ex.: 19,8 → 46,9 → 44,5 em três dias seguidos): o App continua mostrando a de 90 dias; a do dia é para histórico e dashboard.
 - Uma mudança de critério da Infleet altera notas passadas só dentro da janela de `Meses`; os meses mais antigos ficam congelados. É desejável, porque preserva o histórico.
 - Flow novo nasce na conta de serviço: o dono e a conexão seguem o passo manual de sempre.
 
@@ -60,7 +64,7 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
 - Testes do plugin, com a Infleet falsa:
   - lotes;
   - upsert idempotente, rodando duas vezes sem duplicar;
-  - mês sem km fica sem linha;
+  - dia/mês sem km fica sem linha; dia com km e nota nula vira "Em formação";
   - falha parcial.
-- DEV: carga com `Meses` = 24, conferindo as linhas por motorista. Depois o App abre a nota em menos de 1 s com o dado da tabela.
+- DEV: carga com `Meses` = 24 e carga diária, conferindo as linhas por motorista contra uma consulta avulsa na Infleet de 3 dias. Depois o App abre a nota em menos de 1 s com o dado da tabela.
 - Skill `verificar-minha-nota` atualizada; skill nova `verificar-nota-motorista-sync`.
