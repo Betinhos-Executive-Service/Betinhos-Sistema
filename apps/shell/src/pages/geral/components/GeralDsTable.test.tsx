@@ -4,7 +4,7 @@ import { act } from 'react'
 import type { Row } from '@betinhos/dataverse'
 import { emptyFilters, type TableViewState, type ViewConfig } from '@betinhos/ui'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ID_ATTRIBUTE, type Column } from '../domain/types'
+import { ID_ATTRIBUTE, type AttributeInfo, type AttributeMap, type CellStatus, type Column } from '../domain/types'
 import { useGeralViewState } from '../useGeralViewState'
 import { GeralDsTable } from './GeralDsTable'
 
@@ -90,4 +90,68 @@ it('useGeralViewState: coluna fixa vai para as preferências e volta como pinned
   rerender({ prefs: saved })
   expect(result.current.state.config.columns.find((c) => c.key === 'cr40f_cliente')?.pinned).toBe(true)
   expect(result.current.state.config.columns.find((c) => c.key === 'cr40f_id')?.pinned).toBeUndefined()
+})
+
+// ---------- parte 2: edição na célula ----------
+
+const meta = (logicalName: string, type: string): [string, AttributeInfo] => [logicalName, { logicalName, type, label: logicalName, updatable: true, targets: [], options: [] }]
+const attributes: AttributeMap = new Map([meta('cr40f_trajeto', 'String'), meta('cr40f_valor', 'Money'), meta('cr40f_receber', 'Boolean')])
+const editCols = [col('cr40f_id'), col('cr40f_trajeto'), col('cr40f_valor'), col('cr40f_receber')]
+const editRows: Row[] = [{ [ID_ATTRIBUTE]: 'a', cr40f_id: 'OS-1', cr40f_trajeto: 'GRU → Centro', cr40f_valor: 100, cr40f_receber: false }]
+const editConfig: ViewConfig = { v: 1, columns: editCols.map((c) => ({ key: c.key, visible: true })), sort: null, filters: {} }
+
+function montarEdicao(cells = new Map<string, CellStatus>()) {
+  const save = vi.fn(async () => true)
+  const reset = vi.fn()
+  montar({
+    columns: editCols, rows: editRows, attributes, view: { config: editConfig, setConfig: vi.fn(), density: 'dense' } as unknown as TableViewState,
+    edit: { editable: true, cells, save, reset, search: vi.fn(async () => []) },
+  })
+  return { save, reset }
+}
+const celula = (text: string) => screen.getByText(text).closest('[role="gridcell"]') as HTMLElement
+
+it('texto: duplo clique abre, Enter grava pela tela com o valor novo', () => {
+  const { save } = montarEdicao()
+  fireEvent.doubleClick(celula('GRU → Centro'))
+  const input = screen.getByRole('textbox', { name: 'cr40f_trajeto' })
+  fireEvent.change(input, { target: { value: 'GRU → Paulista' } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  expect(save).toHaveBeenCalledWith('a', editCols[1], 'GRU → Paulista')
+})
+
+it('dinheiro inválido recusa e a edição continua aberta, sem gravar', () => {
+  const { save } = montarEdicao()
+  fireEvent.doubleClick(celula('R$ 100,00'))
+  const input = screen.getByRole('textbox', { name: 'cr40f_valor' })
+  fireEvent.change(input, { target: { value: 'abc' } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  expect(save).not.toHaveBeenCalled()
+  expect(screen.getByRole('textbox', { name: 'cr40f_valor' })).toBeTruthy()
+})
+
+it('Sim/Não grava no clique do switch', () => {
+  const { save } = montarEdicao()
+  fireEvent.click(screen.getByRole('switch', { name: 'cr40f_receber' }))
+  expect(save).toHaveBeenCalledWith('a', editCols[3], true)
+})
+
+it('andamento da Geral vira o da célula do DS; erro com "Tentar de novo" limpa e regrava o último valor', () => {
+  const cells = new Map<string, CellStatus>([['a|cr40f_trajeto', { kind: 'error', message: 'Sem permissão' }], ['a|cr40f_valor', { kind: 'saving' }]])
+  const { save, reset } = montarEdicao(cells)
+  expect(celula('R$ 100,00').classList.contains('is-saving')).toBe(true)
+  const erro = celula('GRU → Centro')
+  expect(erro.classList.contains('is-error')).toBe(true)
+  // Sem valor tentado nesta sessão, o "Tentar de novo" só limpa o aviso.
+  fireEvent.click(screen.getByRole('button', { name: /Tentar de novo/ }))
+  expect(reset).toHaveBeenCalledWith('a', 'cr40f_trajeto')
+  expect(save).not.toHaveBeenCalled()
+})
+
+it('sem edição (metadata ainda chegando) as células ficam só leitura', () => {
+  const save = vi.fn(async () => true)
+  montar({ columns: editCols, rows: editRows, attributes, view: { config: editConfig, setConfig: vi.fn(), density: 'dense' } as unknown as TableViewState, edit: { editable: false, cells: new Map(), save, reset: vi.fn(), search: vi.fn(async () => []) } })
+  fireEvent.doubleClick(celula('GRU → Centro'))
+  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(screen.getByText('Não')).toBeTruthy()
 })
