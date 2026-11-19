@@ -10,40 +10,24 @@ namespace Betinhos.DriverRecordSharing.Tests
         private static readonly DateTime Agora = new DateTime(2026, 11, 19, 15, 0, 0, DateTimeKind.Utc);
 
         [Fact]
-        public void Sem_id_nao_chama_infleet()
+        public void Sem_id_devolve_sem_cadastro()
         {
-            var json = NotaInfleetPlugin.Resultado("  ", Agora, (q, v) => { Assert.Fail("não deveria consultar"); return null; });
+            var json = NotaInfleetPlugin.Resultado("  ", null, new Entity[0], Agora);
             Assert.Contains("\"situacao\":\"sem_cadastro\"", json);
         }
 
         [Fact]
-        public void Com_id_passa_variavel_d_e_monta()
+        public void Com_id_e_linha_90d_devolve_ok()
         {
-            Dictionary<string, object> capturadas = null;
-            var json = NotaInfleetPlugin.Resultado(" abc ", Agora, (q, v) =>
-            {
-                capturadas = v;
-                return new Dictionary<string, object>
-                {
-                    ["p90"] = new Dictionary<string, object>
-                    {
-                        ["distanceTraveled"] = 200,
-                        ["currentDriverGrades"] = new Dictionary<string, object> { ["generalGrade"] = 88 }
-                    }
-                };
-            });
-            Assert.Equal("abc", capturadas["d"]);
+            var p90 = new Entity(NotaSync.Tabela);
+            p90["new_situacao"] = new OptionSetValue(NotaSync.SituacaoOk);
+            p90["new_nota"] = 88m;
+            p90["new_km"] = 200m;
+            p90["new_inicio"] = new DateTime(2026, 8, 21, 8, 0, 0, DateTimeKind.Utc);
+            p90["new_fim"] = new DateTime(2026, 11, 19, 8, 0, 0, DateTimeKind.Utc);
+            var json = NotaInfleetPlugin.Resultado(" abc ", p90, new Entity[0], Agora);
             Assert.Contains("\"situacao\":\"ok\"", json);
             Assert.Contains("\"nota\":88", json);
-        }
-
-        [Fact]
-        public void Infleet_fora_vira_mensagem_curta()
-        {
-            var ex = Assert.Throws<InvalidPluginExecutionException>(() =>
-                NotaInfleetPlugin.Resultado("abc", Agora, (q, v) => throw new InfleetUnavailableException("HTTP 401 token xyz")));
-            Assert.Equal("Não foi possível consultar a Infleet agora.", ex.Message);
-            Assert.DoesNotContain("xyz", ex.Message);
         }
     }
 }
