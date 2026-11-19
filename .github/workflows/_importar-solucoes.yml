@@ -161,6 +161,11 @@ jobs:
         run: |
           $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados.json @extra
+      # Custom API que chegou no import sem mudança de metadata fica invisível para o conector do Power Automate (o carimbo de
+      # metadata não anda e o conector recebe 304). Sem API nova não muda nada. Não reprova a publicação: o import já valeu.
+      - name: Avançar o carimbo de metadata (Custom API nova)
+        continue-on-error: true
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/avancar-carimbo-metadata.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Aplicar
       - name: Foto depois
         if: always()
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
