@@ -8,9 +8,10 @@ O job `power-platform` do mesmo workflow faz o `pac admin backup` (ponto de rest
 
 ## O que vai
 
-- Todas as tabelas personalizadas do PROD (`cr40f_*`, `new_*` e demais), mais `account` e `contact`, um
+- As tabelas da Betinhos no PROD (`cr40f_*` e `new_*`), mais `account` e `contact`, um
   `<tabela>.ndjson.gz` por tabela (uma linha JSON por registro, como a Web API devolve) e `manifesto.json` (contagens e
-  falhas).
+  falhas). As personalizadas da plataforma (sem prefixo, `msdyn_*`) ficam fora: dados internos que não se restauram e
+  que em parte o Dataverse nem deixa ler (17 falhas no primeiro backup, 18/11/2026).
 - **Nunca** a `cr40f_segredo`: segredo não sai do Dataverse (ver CLAUDE.md, seção Segredos).
 - Não vão: arquivos do SharePoint (fotos, comprovantes, anexos), anexos de anotação, colunas de arquivo, soluções/flows
   (esses estão no repositório). Outras tabelas padrão entram por `BACKUP_TABELAS_EXTRA` em `exportar-dataverse.mjs`
