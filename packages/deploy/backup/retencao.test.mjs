@@ -40,3 +40,9 @@ test('poucas cópias: nada a apagar', () => {
   assert.deepEqual(aExcluir(['mensal/betinhos-prod-20261101-0323.zip']), [])
   assert.deepEqual(aExcluir([]), [])
 })
+
+test('planilha de operação tem o próprio limite, sem apagar o completo', () => {
+  const dias = ['20261110', '20261111', '20261112'].map((d) => `${d}-0323`)
+  const chaves = dias.flatMap((c) => [`diario/betinhos-prod-${c}.zip`, `diario/betinhos-prod-operacao-${c}.zip`])
+  assert.deepEqual(aExcluir(chaves, { diario: 2 }), ['diario/betinhos-prod-20261110-0323.zip', 'diario/betinhos-prod-operacao-20261110-0323.zip'])
+})

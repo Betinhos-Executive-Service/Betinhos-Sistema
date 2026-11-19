@@ -138,9 +138,24 @@ jobs:
           mkdir -p "$b/pacote/dados-tecnicos"
           # As planilhas são conveniência: se o script cair, o pacote sai só com os dados completos.
           node packages/deploy/backup/planilhas.mjs "$b" "$b/pacote/planilhas" || echo "::warning::As planilhas falharam; o pacote vai só com os dados completos."
+          command -v 7z >/dev/null || sudo apt-get install -y -qq p7zip-full >/dev/null
+          # Planilha de operação (serviços de hoje em diante e dos últimos 60 dias, contatos) num zip à parte, com a mesma
+          # senha e a mesma rotação. Também é conveniência: se falhar, o completo segue.
+          # Mesmo carimbo do completo: o site junta os dois arquivos pela data e hora do nome.
+          operacao="${nome/betinhos-prod-/betinhos-prod-operacao-}"
+          mkdir -p "$b/operacao"
+          # Tudo na condição do if: com bash -e, falha do cp ou do 7z dentro do then derrubaria o passo e o completo.
+          if node packages/deploy/backup/operacao.mjs "$b" "$b/operacao/operacao.xlsx" > "$RUNNER_TEMP/operacao.txt" \
+            && cp packages/deploy/backup/LEIA-ME-operacao.txt "$b/operacao/LEIA-ME.txt" \
+            && (cd "$b/operacao" && 7z a -bso0 -bsp0 -tzip -mem=AES256 -mx=7 "-p$BACKUP_SENHA" "$RUNNER_TEMP/$operacao" .); then
+            echo "NOME_OPERACAO=$operacao" >> "$GITHUB_ENV"
+          else
+            rm -f "$RUNNER_TEMP/$operacao"
+            echo "::warning::A planilha de operação falhou; só o backup completo vai ao R2."
+          fi
+          rm -rf "$b/operacao"
           mv "$b/tabelas" "$b/manifesto.json" "$b/pacote/dados-tecnicos/"
           cp packages/deploy/backup/LEIA-ME.txt "$b/pacote/"
-          command -v 7z >/dev/null || sudo apt-get install -y -qq p7zip-full >/dev/null
           (cd "$b/pacote" && 7z a -bso0 -bsp0 -tzip -mem=AES256 -mx=7 "-p$BACKUP_SENHA" "$RUNNER_TEMP/$nome" .)
           rm -rf "$b/pacote/planilhas" "$b/pacote/dados-tecnicos/tabelas"
           echo "NOME=$nome" >> "$GITHUB_ENV"
@@ -148,15 +163,18 @@ jobs:
           {
             echo "## Backup externo (R2): $nome"
             echo "Tamanho do zip: $tamanho"
+            cat "$RUNNER_TEMP/operacao.txt" 2>/dev/null || true
             node -e 'const m=require(process.argv[1]);console.log(`${m.tabelas.length} tabelas, ${m.totalRegistros} registros, ${m.falhas.length} falhas`);for(const f of m.falhas)console.log(`- falhou: ${f.tabela}`)' "$b/pacote/dados-tecnicos/manifesto.json"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Enviar ao R2
         run: |
           s3() { aws s3 --endpoint-url "$R2_ENDPOINT" "$@"; }
           for classe in $(node packages/deploy/backup/retencao.mjs classes); do
-            s3 cp --only-show-errors "$RUNNER_TEMP/$NOME" "s3://$R2_BUCKET/$classe/$NOME"
-            echo "Enviado: $classe/$NOME"
-            echo "- $classe/$NOME" >> "$GITHUB_STEP_SUMMARY"
+            for arquivo in "$NOME" ${NOME_OPERACAO:-}; do
+              s3 cp --only-show-errors "$RUNNER_TEMP/$arquivo" "s3://$R2_BUCKET/$classe/$arquivo"
+              echo "Enviado: $classe/$arquivo"
+              echo "- $classe/$arquivo" >> "$GITHUB_STEP_SUMMARY"
+            done
           done
       - name: Rotação das cópias
         # Só depois do envio desta execução: nunca fica sem cópia por causa da limpeza.
