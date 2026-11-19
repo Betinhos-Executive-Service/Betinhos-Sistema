@@ -5,7 +5,8 @@ param(
   [string] $Backup = "",
   # Tipos de componente (nomes de $tipos abaixo, separados por virgula). Vazio = todos. O _importar-solucoes.yml remove os
   # steps numa rodada propria, a ultima, para a configuracao do PROD voltar logo em seguida (preservar-config-steps.ps1).
-  [string] $Tipos = "",
+  # Nao se chama $Tipos: PowerShell nao diferencia maiusculas, e $tipos (o mapa abaixo) viraria string nesta variavel tipada.
+  [Alias("Tipos")] [string] $FiltroTipos = "",
   [switch] $Aplicar,
   [switch] $PermitirProd
 )
@@ -51,7 +52,7 @@ $Backup = (New-Item -ItemType Directory -Force (Join-Path $Backup (Get-Date -For
 
 # componenttype -> nome em msdyn_componentlayers; o nome logico da entidade (RemoveActiveCustomization) e o mesmo em minusculas.
 $tipos = [ordered]@{ 61 = "WebResource"; 29 = "Workflow"; 91 = "PluginAssembly"; 92 = "SdkMessageProcessingStep"; 60 = "SystemForm"; 80 = "AppModule"; 62 = "SiteMap" }
-$pedidoTipos = @($Tipos -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$pedidoTipos = @($FiltroTipos -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $tiposDesconhecidos = @($pedidoTipos | Where-Object { @($tipos.Values) -notcontains $_ })
 if ($tiposDesconhecidos.Count) { throw "-Tipos com tipo desconhecido: $($tiposDesconhecidos -join ', '). Validos: $(@($tipos.Values) -join ', ')." }
 if ($pedidoTipos.Count) {
