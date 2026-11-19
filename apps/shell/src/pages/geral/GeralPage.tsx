@@ -588,6 +588,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const searchWords = useMemo(() => keywordTokens(query), [query])
   const [searchText, setSearchText] = useState(query)
   useEffect(() => setSearchText(query), [query])
+  // Edição na célula da tabela do DS (`?tabela=ds`, parte 2): a mesma gravação, o mesmo andamento e a mesma busca do grid próprio.
+  const dsEdit = useMemo(() => ({ editable: attributes != null, cells, save: salvar, reset: resetCell, search: searchLookup }), [attributes, cells, salvar, resetCell, searchLookup])
   /** Conteúdo das colunas virtuais (Comprovantes e Portal), igual nas duas grades; `undefined` nas colunas do Dataverse. */
   const special = useCallback((row: Row, column: Column): ReactNode | undefined => {
     const id = String(row[ID_ATTRIBUTE])
@@ -703,7 +705,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             </div>
           )
           : tabelaDs && !grouped ? (
-            // Migração para o `Table` do DS (parte 1: só leitura). Agrupada, continua no grid próprio até a parte 4.
+            // Migração para o `Table` do DS (partes 1 e 2: leitura e edição na célula). Agrupada, continua no grid próprio até a parte 4.
             <GeralDsTable
               columns={allColumns}
               extraKeys={extraKeys}
@@ -718,6 +720,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               onRowContextMenu={openContext}
               virtualKeys={VIRTUAL_KEYS}
               special={special}
+              edit={dsEdit}
               scrollRef={scrollRef}
               afterRows={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
               footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
