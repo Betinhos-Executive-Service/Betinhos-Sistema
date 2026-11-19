@@ -100,16 +100,17 @@
   .drawer-title { flex: 1; display: grid; gap: var(--bt-space-1-5); min-width: 0; }
   .drawer-title h2 { overflow: hidden; font-size: var(--bt-typography-heading-detail-font-size); font-weight: var(--bt-typography-heading-detail-font-weight); line-height: var(--bt-typography-heading-detail-line-height); letter-spacing: var(--bt-typography-heading-detail-letter-spacing); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
   .drawer-title .muted { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
-  .drawer-tabs { padding: 0 var(--bt-space-4); background-color: var(--bt-color-surface); box-shadow: inset 0 calc(-1 * var(--bt-border-width-default)) 0 var(--bt-color-border); }
+  /* Abas: ícone em todas, nome só na aberta; o nome das outras aparece como dica no hover/foco (.aba-dica). */
+  .drawer-tabs { position: relative; z-index: 1; padding: 0 var(--bt-space-3); background-color: var(--bt-color-surface); }
   .drawer-tabs .bt-tabs { gap: 0; }
-  /* Oito abas não cabem em toda largura: sem a barra de rolagem nativa; a roda do mouse rola na horizontal (Ficha.tsx)
-     e as bordas esmaecem só do lado onde há aba escondida. A linha de base fica no contêiner para não esmaecer junto. */
-  .drawer-tabs .bt-tabs__list { box-shadow: none; scrollbar-width: none; scroll-padding-inline: var(--bt-space-6); }
-  .drawer-tabs .bt-tabs__list::-webkit-scrollbar { display: none; }
-  @supports (animation-timeline: scroll()) {
-    .drawer-tabs .bt-tabs__list { mask-image: linear-gradient(to right, transparent, black var(--func-tabs-fade-l), black calc(100% - var(--func-tabs-fade-r)), transparent); animation: func-tabs-fade linear both; animation-timeline: scroll(self inline); }
-  }
-  @container (max-width: 880px) { .drawer-tabs .bt-tabs__tab { padding-inline: var(--bt-space-2); } }
+  .drawer-tabs .bt-tabs__list { overflow: visible; }
+  .drawer-tabs .bt-tabs__tab { padding-inline: var(--bt-space-2-5); }
+  .drawer-tabs .bt-tabs__icon > svg { width: 18px; height: 18px; }
+  /* O nome escondido não ocupa espaço: sem o gap, a aba fechada fica só do tamanho do ícone. */
+  .drawer-tabs .bt-tabs__tab:not(.is-active) { gap: 0; }
+  .aba-dica { position: absolute; top: calc(100% + var(--bt-space-1)); left: 50%; translate: -50% 0; padding: var(--bt-space-1) var(--bt-space-2); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-brand); color: var(--bt-color-on-solid); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); white-space: nowrap; box-shadow: var(--bt-shadow-popover); pointer-events: none; opacity: 0; transition: opacity var(--bt-duration-fast) ease; }
+  @media (hover: hover) and (pointer: fine) { .drawer-tabs .bt-tabs__tab:hover .aba-dica { opacity: 1; transition-delay: 200ms; } }
+  .drawer-tabs .bt-tabs__tab:focus-visible .aba-dica { opacity: 1; }
   .drawer-body { overflow-y: auto; overscroll-behavior: contain; padding: var(--bt-space-4); }
   .drawer-foot { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; justify-content: space-between; padding: var(--bt-space-3) var(--bt-space-4); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface); }
   .drawer-foot-status { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
@@ -433,7 +434,11 @@
     .drawer-head { padding: var(--bt-space-1) var(--bt-space-4) var(--bt-space-3); gap: var(--bt-space-3); }
     .drawer-title h2 { white-space: normal; }
     .drawer-tabs { padding: 0 var(--bt-space-2); }
-    .drawer-tabs .bt-tabs__list { scrollbar-width: none; }
+    .drawer-tabs .bt-tabs__list { overflow-x: auto; scrollbar-width: none; }
+    .drawer-tabs .bt-tabs__list::-webkit-scrollbar { display: none; }
+    .drawer-tabs .bt-tabs__tab { flex: 1 0 auto; justify-content: center; padding-inline: var(--bt-space-1-5); }
+    /* Sem hover no toque; a dica fora da aba só alargaria a área de rolagem. */
+    .drawer-tabs .aba-dica { display: none; }
     .drawer-body { padding: var(--bt-space-4) var(--bt-space-4) calc(var(--bt-space-6) + env(safe-area-inset-bottom)); }
     .group { padding: var(--bt-space-3-5); }
     .fields { grid-template-columns: 1fr; }
@@ -457,9 +462,6 @@
 }
 
 @keyframes func-spin { to { transform: rotate(360deg); } }
-@property --func-tabs-fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
-@property --func-tabs-fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
-@keyframes func-tabs-fade { from { --func-tabs-fade-l: 0px; --func-tabs-fade-r: 32px; } to { --func-tabs-fade-l: 32px; --func-tabs-fade-r: 0px; } }
 @keyframes func-drawer-in { from { opacity: 0; transform: translateX(100%); } }
 @keyframes func-pop-in { from { opacity: 0; transform: translateY(-2px); } }
 @keyframes func-note-in { from { opacity: 0; transform: translateY(6px); } }
