@@ -249,8 +249,8 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
           <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({
               value: item.key,
               icon: <item.icon aria-hidden />,
-              // Só a aba aberta mostra o nome; nas outras ele vira dica no hover/foco (e segue como nome acessível).
-              label: item.key === tab ? item.label : <span className="aba-dica">{item.label}</span>,
+              // Só a aba aberta mostra o nome; nas outras ele vira dica no hover (no celular, só para leitor de tela) e segue como nome acessível.
+              label: item.key === tab ? item.label : <span className={mobile ? 'sr-only' : 'aba-dica'}>{item.label}</span>,
               disabled: isNew && item.key !== 'dados',
             }))} />
         </div>
