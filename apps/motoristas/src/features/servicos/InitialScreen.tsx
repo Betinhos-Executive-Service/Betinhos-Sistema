@@ -7,6 +7,7 @@ import invoiceReceiptIcon from "../../assets/icons/invoice-receipt.svg";
 import { filterAgendaGalleryItems, getAgendaItemStartDate } from "../../app/agendaVisibility.ts";
 import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import { WebPushLink } from "../../shared/ui/WebPushLink";
+import { useNotaNaGrade } from "../minha-nota/useNotaInfleet";
 import type { AgendaItem } from "../../types";
 
 const baseModules = [
@@ -79,6 +80,13 @@ const baseModules = [
     detail: "Registro de colis\u00f5es",
     icon: "collisions",
     disabled: false,
+  },
+  {
+    id: "minhaNota",
+    label: "Minha nota",
+    detail: "Nota de condução",
+    icon: "minhaNota",
+    disabled: false,
   }
 ];
 
@@ -105,6 +113,7 @@ const screenAliases: Record<string, string[]> = {
   personalReceipt: ["reciboPersonalizado", "personalReceipt", "gerarReciboPersonalizado", "recibopersonalizado"],
   ideas: ["boasIdeias", "ideas", "ideias"],
   meuCarro: ["meuCarro"],
+  minhaNota: ["minhaNota"],
 };
 
 const moduleHandlers: Record<string, string[]> = {
@@ -112,6 +121,7 @@ const moduleHandlers: Record<string, string[]> = {
   checklists: [],
   multas: [],
   treinamentos: [],
+  minhaNota: [],
   postosProximos: [],
   services: [
     "onServices",
@@ -362,6 +372,11 @@ function ModuleIcon({ name }: { name: string }) {
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.4 10.9 12.8 6.2a2 2 0 0 0-1.6 0L2.6 10.9a1 1 0 0 0 0 1.8l8.6 4.7a2 2 0 0 0 1.6 0l8.6-4.7a1 1 0 0 0 0-1.8ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
   }
 
+  if (name === "minhaNota") {
+    // Lucide gauge: nota de condução.
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 14 4-4M3.34 19a10 10 0 1 1 17.32 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
+  }
+
   if (name === "postosProximos") {
     // Lucide fuel: posto de combustível.
     return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 22h12M4 9h10M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>;
@@ -435,6 +450,7 @@ export function InitialScreen(props: InitialScreenProps) {
     [props.canGeneratePersonalReceipt]
   );
 
+  const notaNaGrade = useNotaNaGrade();
   const servicesModule = modules.find((module) => module.id === "services");
   const gridModules = modules.filter((module) => module.id !== "services");
   const multasPrazo = props.multasBanner?.split(" · ")[1];
@@ -529,6 +545,7 @@ export function InitialScreen(props: InitialScreenProps) {
       <section className="concept-tile-grid" aria-label="Módulos do aplicativo">
         {gridModules.map((module) => {
           const count = pendingCounts[module.id] ?? 0;
+          const notaTile = module.id === "minhaNota" ? notaNaGrade : null;
           return (
             <button
               className="concept-tile"
@@ -537,11 +554,11 @@ export function InitialScreen(props: InitialScreenProps) {
               data-tour={module.id}
               disabled={module.disabled}
               aria-disabled={module.disabled}
-              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : module.label}
+              aria-label={count > 0 ? `${module.label}, ${count} pendente${plural(count)}` : notaTile ? `${module.label}, ${notaTile.valor}, ${notaTile.rotulo}` : module.label}
               onClick={() => navigateTo(module.id)}
             >
-              <span className="concept-tile-icon" aria-hidden="true">
-                <ModuleIcon name={module.icon} />
+              <span className={`concept-tile-icon${notaTile ? ` nota-tom--${notaTile.tom}` : ""}`} aria-hidden="true">
+                {notaTile ? <span className="nota-tile-valor">{notaTile.valor}</span> : <ModuleIcon name={module.icon} />}
                 {count > 0 ? <span className="concept-tile-badge">{count > 9 ? "9+" : count}</span> : null}
               </span>
               <span className="concept-tile-label">{module.label}</span>

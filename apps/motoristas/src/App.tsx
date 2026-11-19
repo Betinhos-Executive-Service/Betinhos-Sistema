@@ -16,6 +16,7 @@ import { useAutoRefreshAgenda } from "./features/servicos/useAutoRefreshAgenda";
 import { usePersistenciaRascunhos } from "./app/usePersistenciaRascunhos";
 import { useAvisos } from "./app/useAvisos";
 import { rotasMeuCarro } from "./features/meu-carro/rotas";
+import { rotasMinhaNota } from "./features/minha-nota/rotas";
 import { rotasIdeias } from "./features/ideias/rotas";
 import { rotasChecklist } from "./features/checklist/rotas";
 import { rotasTermos } from "./features/termos/rotas";
@@ -431,7 +432,7 @@ function App() {
       setScreen("postosProximos");
       return;
     }
-    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos") {
+    if (screenName === "servicos" || screenName === "comunicados" || screenName === "historico" || screenName === "solicitarManutencao" || screenName === "gastos" || screenName === "colisoesInicio" || screenName === "boasIdeias" || screenName === "meuCarro" || screenName === "multas" || screenName === "treinamentos" || screenName === "minhaNota") {
       setComunicadoOrigin("");
       setScreen(screenName);
     }
@@ -486,6 +487,9 @@ function App() {
     setScreen
   });
   if (telaMeuCarro) return show(telaMeuCarro);
+
+  const telaMinhaNota = rotasMinhaNota(screen, { setScreen });
+  if (telaMinhaNota) return show(telaMinhaNota);
 
   const telaRecebimento = rotasRecebimento(screen, {
     ...recebimento,
