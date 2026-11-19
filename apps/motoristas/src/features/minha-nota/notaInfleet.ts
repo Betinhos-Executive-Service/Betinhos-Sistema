@@ -27,7 +27,6 @@ export function lerNotaInfleet(json: string): NotaInfleet {
     ano: num(item.ano), mes: num(item.mes), nota: num(item.nota), km: num(item.km)
   }));
   const sincronizadoEm = texto(bruto.sincronizadoEm) || undefined;
-  // Comportamentos de câmera (celular, fadiga...) com 100 não dizem nada ao motorista: só os de condução ficam sempre.
   const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos, meses, sincronizadoEm };
   if (bruto.situacao === "em_formacao") return { situacao: "em_formacao", ...base };
   if (typeof bruto.nota !== "number") throw erroResposta();

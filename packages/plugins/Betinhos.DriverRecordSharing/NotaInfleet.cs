@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Web.Script.Serialization;
 using Microsoft.Xrm.Sdk;
 
 namespace Betinhos.DriverRecordSharing
@@ -55,8 +54,9 @@ namespace Betinhos.DriverRecordSharing
             }
             var outros = p90.GetAttributeValue<string>("new_outroscomportamentos");
             if (!string.IsNullOrEmpty(outros))
-                foreach (var o in Json.Deserialize<List<Dictionary<string, object>>>(outros))
+                foreach (var o in NotaSync.Json.Deserialize<List<Dictionary<string, object>>>(outros))
                     notas[(string)o["chave"]] = Convert.ToDouble(o["nota"], CultureInfo.InvariantCulture);
+            // Comportamentos de câmera (celular, fadiga...) com 100 não dizem nada ao motorista: só os de condução ficam sempre.
             r["comportamentos"] = Comportamentos.Select((c, i) => new { c, i }).Where(x => notas.ContainsKey(x.c.Key) && (NotaSync.Conducao.Contains(x.c.Key) || notas[x.c.Key] < 100))
                 .OrderBy(x => notas[x.c.Key]).ThenBy(x => x.i)
                 .Select(x => new Dictionary<string, object> { ["chave"] = x.c.Key, ["rotulo"] = x.c.Value, ["nota"] = Math.Round(notas[x.c.Key], 1) }).ToList();
@@ -69,8 +69,6 @@ namespace Betinhos.DriverRecordSharing
                 .ToList();
             return r;
         }
-
-        private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
         // Nota só conta com situação Ok; em formação a coluna fica vazia.
         private static double? NotaOk(Entity e)

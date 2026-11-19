@@ -37,7 +37,8 @@ namespace Betinhos.DriverRecordSharing
         public const int Dias = 90;
         public const double KmMinimo = 50;
         internal const int OffsetSaoPauloHoras = -3; // sem horário de verão
-        private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
+        // Instância nova por uso: o JavaScriptSerializer não garante thread-safety e o plugin é compartilhado entre execuções.
+        internal static JavaScriptSerializer Json => new JavaScriptSerializer();
 
         private static DateTime Utc(DateTime diaLocal) => DateTime.SpecifyKind(diaLocal.AddHours(-OffsetSaoPauloHoras), DateTimeKind.Utc);
 

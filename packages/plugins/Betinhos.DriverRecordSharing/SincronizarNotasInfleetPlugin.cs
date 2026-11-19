@@ -34,7 +34,7 @@ namespace Betinhos.DriverRecordSharing
             var resumo = Rodar(system, LerMotoristas(system), DateTime.UtcNow, Data(context, "Ate"),
                 Inteiro(context, "Meses", MesesPadrao), Inteiro(context, "Dias", DiasPadrao),
                 q => gateway.Query(q, null), () => relogio.Elapsed, tracing);
-            context.OutputParameters[ResultParameter] = new JavaScriptSerializer().Serialize(resumo);
+            context.OutputParameters[ResultParameter] = NotaSync.Json.Serialize(resumo);
             tracing?.Trace("nota-sync: gravadas={0} falhas={1} incompleto={2}", resumo["gravadas"], ((List<string>)resumo["falhas"]).Count, resumo["incompleto"]);
         }
 

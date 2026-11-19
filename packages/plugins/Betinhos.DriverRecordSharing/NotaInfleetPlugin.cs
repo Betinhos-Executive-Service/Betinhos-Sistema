@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web.Script.Serialization;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
 
@@ -29,16 +28,15 @@ namespace Betinhos.DriverRecordSharing
             var infleetId = funcionario.GetAttributeValue<string>(PluginConfig.EmployeeInfleetDriverId);
             var agora = DateTime.UtcNow;
             var linhas = string.IsNullOrWhiteSpace(infleetId) ? new List<Entity>() : Linhas(system, driver.EmployeeReference.Id, agora);
+            Func<Entity, NotaTipo, bool> e = (l, tipo) => l.GetAttributeValue<OptionSetValue>("new_periodo")?.Value == (int)tipo;
             context.OutputParameters[ResultParameter] = Resultado(infleetId,
-                linhas.FirstOrDefault(l => l.GetAttributeValue<OptionSetValue>("new_periodo")?.Value == (int)NotaTipo.Dias90),
-                linhas.Where(l => l.GetAttributeValue<OptionSetValue>("new_periodo")?.Value == (int)NotaTipo.Mes), agora);
+                linhas.FirstOrDefault(l => e(l, NotaTipo.Dias90)), linhas.Where(l => e(l, NotaTipo.Mes)), agora);
             tracing?.Trace("nota-infleet: situacao=" + (string.IsNullOrWhiteSpace(infleetId) ? "sem_cadastro" : "lida da tabela"));
         }
 
         public static string Resultado(string infleetDriverId, Entity p90, IEnumerable<Entity> meses, DateTime agoraUtc)
         {
-            var serializer = new JavaScriptSerializer();
-            return serializer.Serialize(string.IsNullOrWhiteSpace(infleetDriverId) ? NotaInfleet.SemCadastro(agoraUtc) : NotaInfleet.MontarDaTabela(p90, meses, agoraUtc));
+            return NotaSync.Json.Serialize(string.IsNullOrWhiteSpace(infleetDriverId) ? NotaInfleet.SemCadastro(agoraUtc) : NotaInfleet.MontarDaTabela(p90, meses, agoraUtc));
         }
 
         private static readonly string[] Colunas = new[] { "new_periodo", "new_data", "new_inicio", "new_fim", "new_situacao", "new_nota", "new_km", "new_outroscomportamentos", "new_sincronizadoem" }
