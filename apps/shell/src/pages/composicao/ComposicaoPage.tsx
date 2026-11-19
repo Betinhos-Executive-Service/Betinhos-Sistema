@@ -21,7 +21,7 @@ import { EditableViewFieldCell } from './components/ViewFieldCell'
 import { adjacentGridCell } from './components/grid-cell-focus'
 import { isWritableMoneyField, moneyFields, type CellInput, type Composition, type MoneyField } from './data/compositions'
 import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, type CompositionPage, type FormulaMap } from './data/dataverse'
-import { buildNativeCompositionQuery, resolveCompositionQuery, type ResolvedCompositionQuery } from './data/composition-query'
+import { lockedNativeCopy, nativeSaveSource, resolveCompositionQuery, type ResolvedCompositionQuery } from './data/composition-query'
 import { collectCompositionPages, compositionWorkbook, freshPageRecords } from './data/composition-export'
 import { createColumnFilterLabels } from './data/column-filter-values'
 import { nextEditableCell } from './data/grid-navigation'
@@ -521,7 +521,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     if (!catalog.length || !definition.columns.length) throw new Error('Escolha ao menos uma coluna disponível.')
     const saved = dataSource === 'mock'
       ? saveMockView(name, kind, definition, overwrite ? activeView ?? undefined : undefined)
-      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, activeView?.nativeOnly && activeView.nativeFiltersEditable && activeView.sourceFetchXml ? buildNativeCompositionQuery(activeView.sourceFetchXml, definition, catalog, '', true) : undefined)
+      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, nativeSaveSource(activeView, definition, catalog, overwrite), lockedNativeCopy(activeView, overwrite))
     const all = await listViews()
     setViews(all)
     const selected = all.find((view) => view.id === saved.id) ?? saved

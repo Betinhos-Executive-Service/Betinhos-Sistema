@@ -99,6 +99,18 @@ export function buildNativeCompositionQuery(fetchXml: string, definition: ViewDe
   return new XMLSerializer().serializeToString(document)
 }
 
+/** View nativa com filtros que a tela não lê: "Salvar como" grava uma cópia ainda nativa, com esses filtros no FetchXML. */
+export function lockedNativeCopy(view: SavedView | null, overwrite: boolean) {
+  return Boolean(!overwrite && view?.nativeOnly && !view.nativeFiltersEditable && view.sourceFetchXml)
+}
+
+/** FetchXML para gravar a partir de uma view nativa: filtros editáveis substituem os originais; os travados ficam e a grade soma os dela. */
+export function nativeSaveSource(view: SavedView | null, definition: ViewDefinition, catalog: CatalogField[], overwrite: boolean) {
+  if (!view?.nativeOnly || !view.sourceFetchXml) return undefined
+  if (view.nativeFiltersEditable) return buildNativeCompositionQuery(view.sourceFetchXml, definition, catalog, '', true)
+  return lockedNativeCopy(view, overwrite) ? buildNativeCompositionQuery(view.sourceFetchXml, definition, catalog, '', false) : undefined
+}
+
 export type ResolvedCompositionQuery = { view: ViewQuery | undefined; error: string | null }
 
 function errorText(error: unknown, fallback: string) {
