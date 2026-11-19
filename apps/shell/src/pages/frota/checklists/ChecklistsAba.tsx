@@ -1,4 +1,4 @@
-import { useShellHeader } from '@betinhos/ui'
+import { ToastProvider, useShellHeader } from '@betinhos/ui'
 import { useState } from 'react'
 import type { Host } from '../../../host'
 import { GestaoChecklists } from './components/GestaoChecklists'
@@ -17,8 +17,8 @@ export function ChecklistsAba({ host, titulo }: { host: Host; titulo: string }) 
   useState(() => configurarProvas(createCarregarProvas(host)))
   useShellHeader({ title: titulo })
   return (
-    <div className="page page--full frota-page">
-      <div className="gestao-checklists"><GestaoChecklists /></div>
-    </div>
+    <ToastProvider>
+      <GestaoChecklists titulo={titulo} />
+    </ToastProvider>
   )
 }
