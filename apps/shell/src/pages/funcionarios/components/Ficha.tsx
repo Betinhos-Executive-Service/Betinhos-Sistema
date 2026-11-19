@@ -248,7 +248,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         <div className="drawer-tabs">
           <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({
               value: item.key,
-              icon: <item.icon size={18} aria-hidden />,
+              icon: <item.icon aria-hidden />,
               // Só a aba aberta mostra o nome; nas outras ele vira dica no hover/foco (e segue como nome acessível).
               label: item.key === tab ? item.label : <span className="aba-dica">{item.label}</span>,
               disabled: isNew && item.key !== 'dados',
