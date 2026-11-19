@@ -3,6 +3,8 @@ import { COMPROVANTES_OPCOES } from '../../recebimentos/domain'
 
 export const COMPOSITION_TABLE = 'cr40f_composicaodeprecos'
 export const VIEW_MARKER = 'TelaComposicaoPreco:v1'
+/** Descrição da cópia de view nativa: não começa com a marca, então a cópia continua nativa (ver `saveView`). */
+export const NATIVE_COPY_DESCRIPTION = 'Cópia feita pela Composição de Preço; filtros da view original preservados.'
 const PIN_TABLE = 'new_configuracaovisualizacaocomposicao'
 
 export type ViewColumn = { id: string; width: number; pinned: boolean }
@@ -234,8 +236,25 @@ export function viewValueKey(id: string, definition: ViewDefinition, catalog: Ca
   return alias ? `${alias}.${field.attribute}` : field.attribute
 }
 
-export function buildLayoutXml(definition: ViewDefinition, catalog: CatalogField[], objectTypeCode: number) {
-  const linkAliases = aliases(definition, catalog)
+/** Alias de cada caminho de vínculo do FetchXML; com o mesmo caminho repetido vale o último (o da grade, que traz as colunas). */
+function fetchLinkAliases(fetchXml: string) {
+  const result = new Map<string, string>()
+  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+  const scan = (parent: Element, path: string[]) => {
+    for (const link of [...parent.children].filter((child) => child.tagName === 'link-entity')) {
+      const next = [...path, `${link.getAttribute('name') ?? ''}@${link.getAttribute('to') ?? ''}`]
+      if (link.getAttribute('alias')) result.set(next.join('/'), link.getAttribute('alias')!)
+      scan(link, next)
+    }
+  }
+  const entity = document.querySelector('fetch > entity')
+  if (entity) scan(entity, [])
+  return result
+}
+
+export function buildLayoutXml(definition: ViewDefinition, catalog: CatalogField[], objectTypeCode: number, fetchXml?: string) {
+  // Sobre o FetchXML de uma view nativa os vínculos têm os aliases dela: a layout precisa apontar para eles.
+  const linkAliases = fetchXml ? fetchLinkAliases(fetchXml) : aliases(definition, catalog)
   const cells = definition.columns.filter(isNativeColumn).map(({ id, width }) => {
     const field = fieldParts(id, catalog)
     const alias = field.path.length ? `${linkAliases.get(pathSignature(field.path, field.relationships))}.` : ''
@@ -412,21 +431,32 @@ export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: C
   })
 }
 
-export async function saveView(name: string, kind: 'personal' | 'public', definition: ViewDefinition, catalog: CatalogField[], existing?: SavedView, fetchXmlOverride?: string) {
+/**
+ * `keepNative`: a cópia de uma view nativa com filtros que a tela não lê é gravada sem a marca da tela, para continuar nativa
+ * (filtros originais preservados no FetchXML e travados na grade). Com a marca, a tela passaria a montar a consulta só pela
+ * definição, que não tem esses filtros, e a cópia traria registros de fora da view original.
+ */
+export async function saveView(name: string, kind: 'personal' | 'public', definition: ViewDefinition, catalog: CatalogField[], existing?: SavedView, fetchXmlOverride?: string, keepNative = false) {
   const webApi = api()
   const entity = kind === 'personal' ? 'userquery' : 'savedquery'
   const objectTypeCode = (await entityMetadata(COMPOSITION_TABLE)).ObjectTypeCode
   if (!Number.isInteger(objectTypeCode)) throw new Error('ObjectTypeCode da Composição não encontrado.')
   const source = fetchXmlOverride ? new DOMParser().parseFromString(fetchXmlOverride, 'application/xml') : null
   source?.querySelector('fetch')?.removeAttribute('savedqueryid')
-  const payload = { name, description: VIEW_MARKER, returnedtypecode: COMPOSITION_TABLE, querytype: 0, fetchxml: source ? new XMLSerializer().serializeToString(source) : buildFetchXml(definition, catalog), layoutxml: buildLayoutXml(definition, catalog, objectTypeCode) }
+  if (keepNative && (!source || existing)) throw new Error('A cópia de uma view nativa precisa do FetchXML original e é sempre uma view nova.')
+  const fetchxml = source ? new XMLSerializer().serializeToString(source) : buildFetchXml(definition, catalog)
+  const layoutxml = keepNative
+    ? buildLayoutXml({ ...definition, columns: definition.columns.filter((column) => catalog.some((field) => field.id === column.id && field.available)) }, catalog, objectTypeCode, fetchxml)
+    : buildLayoutXml(definition, catalog, objectTypeCode)
+  const description = keepNative ? NATIVE_COPY_DESCRIPTION : VIEW_MARKER
+  const payload = { name, description, returnedtypecode: COMPOSITION_TABLE, querytype: 0, fetchxml, layoutxml }
   let created = false
   if (existing) {
     if (!existing.managed || existing.kind !== kind) throw new Error('Esta view existente não pode ser alterada por esta tela.')
-    await webApi.updateRecord(entity, existing.id, { name, description: VIEW_MARKER, fetchxml: payload.fetchxml, layoutxml: payload.layoutxml })
+    await webApi.updateRecord(entity, existing.id, { name, description, fetchxml: payload.fetchxml, layoutxml: payload.layoutxml })
   } else {
     const result = await webApi.createRecord(entity, payload)
-    existing = { id: result.id, kind, name, definition, managed: true }
+    existing = { id: result.id, kind, name, definition, managed: !keepNative }
     created = true
   }
   try {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildFetchXml, buildLayoutXml, COMPROVANTES_ID, deleteView, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
+import { buildFetchXml, buildViews, VIEW_MARKER, buildLayoutXml, COMPROVANTES_ID, deleteView, loadColumnCatalog, loadViews, parseLayoutXml, parseNativeFilters, saveView, type CatalogField, type ViewDefinition } from './views'
+import { lockedNativeCopy, nativeSaveSource, resolveCompositionQuery } from './composition-query'
 
 const catalog: CatalogField[] = [
   { id: 'client', label: 'Cliente', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos', 'cr40f_clientes1'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }, { from: 'cr40f_clientes1id', to: 'cr40f_cliente' }], type: 'String', available: true },
@@ -234,4 +235,38 @@ it('exclui visão pessoal criada no Dynamics e mantém a trava nas públicas de 
   expect(deleteRecord).toHaveBeenCalledWith('userquery', 'dyn')
   await expect(deleteView({ id: 'pub', kind: 'public', name: 'Pública', managed: false, definition })).rejects.toThrow('não pode ser excluída')
   vi.unstubAllGlobals()
+})
+
+it('Salvar como de view nativa com filtro que a tela não lê mantém o filtro e a cópia continua nativa', async () => {
+  const full: CatalogField[] = [...catalog, { id: 'route', label: 'Trajeto', table: 'cr40f_composicaodeprecos', attribute: 'cr40f_trajeto', path: [], type: 'String', available: true }]
+  // Filtro "or" junto com outro na raiz: parseNativeFilters não lê, então a grade trava o filtro (caso da view "Embraer").
+  const sourceFetchXml = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_valortotal" /><filter type="and"><condition attribute="new_valortotal" operator="gt" value="100" /></filter><filter type="or"><condition attribute="new_valortotal" operator="lt" value="900" /></filter></entity></fetch>'
+  expect(parseNativeFilters(sourceFetchXml, full)).toBeNull()
+  const view = { id: 'nativa', kind: 'personal' as const, name: 'Embraer', managed: false, nativeOnly: true, nativeFiltersEditable: false, sourceFetchXml, definition }
+  expect(lockedNativeCopy(view, false)).toBe(true)
+  expect(lockedNativeCopy(view, true)).toBe(false)
+  const fetchXml = nativeSaveSource(view, definition, full, false)!
+  expect(fetchXml).toContain('operator="gt" value="100"')
+  expect(fetchXml).toContain('operator="lt" value="900"')
+  const createRecord = vi.fn(async (_table: string, _payload: Record<string, unknown>) => ({ id: 'copia' }))
+  const retrieveMultipleRecords = vi.fn(async () => ({ entities: [] }))
+  const retrieveRecord = vi.fn(async () => ({}))
+  vi.stubGlobal('window', { Xrm: { WebApi: { createRecord, retrieveMultipleRecords, retrieveRecord }, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm.dynamics.com' }) } } })
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ ObjectTypeCode: 10342 }) })))
+  const saved = await saveView('Embraer 2', 'personal', definition, full, undefined, fetchXml, true)
+  expect(saved.managed).toBe(false)
+  const payload = createRecord.mock.calls[0]![1]
+  expect(payload.fetchxml).toContain('operator="lt" value="900"')
+  expect(String(payload.description).startsWith(VIEW_MARKER)).toBe(false)
+  // Relida, a cópia é nativa e com os mesmos filtros travados: não vira uma view só da definição (que traria todos os clientes).
+  const [copy] = buildViews({ personal: [{ userqueryid: 'copia', name: 'Embraer 2', ...payload }], publicViews: [], pins: [] }, full)
+  expect(copy).toMatchObject({ nativeOnly: true, managed: false })
+  // A consulta da grade ao abrir a cópia, e depois de mais uma coluna, mantém os filtros da original.
+  for (const current of [copy!.definition, { ...copy!.definition, columns: [...copy!.definition.columns, { id: 'modifiedon', width: 120, pinned: false }] }]) {
+    const view = resolveCompositionQuery(copy!, current, full, '').view
+    const query = view && 'fetchXml' in view ? String(view.fetchXml) : String(view && 'sourceFetchXml' in view ? view.sourceFetchXml : '')
+    expect(query).toContain('operator="gt" value="100"')
+    expect(query).toContain('operator="lt" value="900"')
+  }
+  expect(copy!.definition.columns.map((column) => column.id)).toEqual(definition.columns.map((column) => column.id).filter((id) => full.some((field) => field.id === id && field.available)))
 })
