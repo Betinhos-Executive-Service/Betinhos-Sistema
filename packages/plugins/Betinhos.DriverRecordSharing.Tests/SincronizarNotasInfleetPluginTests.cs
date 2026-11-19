@@ -44,6 +44,16 @@ namespace Betinhos.DriverRecordSharing.Tests
                 });
 
         [Fact]
+        public void Ate_omitido_chega_como_ano_1_e_vale_como_ausente()
+        {
+            var p = new ParameterCollection { ["Ate"] = DateTime.MinValue };
+            Assert.Null(SincronizarNotasInfleetPlugin.Data(p, "Ate"));
+            Assert.Null(SincronizarNotasInfleetPlugin.Data(new ParameterCollection(), "Ate"));
+            p["Ate"] = new DateTime(2026, 11, 18, 12, 0, 0, DateTimeKind.Utc);
+            Assert.Equal(new DateTime(2026, 11, 18), SincronizarNotasInfleetPlugin.Data(p, "Ate"));
+        }
+
+        [Fact]
         public void Grava_todas_as_janelas_e_e_idempotente()
         {
             var fake = new UpsertFake();

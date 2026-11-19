@@ -40,7 +40,9 @@
           "connectionName": "shared_commondataserviceforapps"
         },
         "parameters": {
-          "actionName": "new_SincronizarNotasInfleet"
+          "actionName": "new_SincronizarNotasInfleet",
+          "item/Meses": 2,
+          "item/Dias": 3
         },
         "authentication": "@parameters('$authentication')"
       }
