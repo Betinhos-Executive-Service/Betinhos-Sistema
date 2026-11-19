@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
-import { Icon } from "./icons";
+import { Alert, Button, Dialog, Drawer, EmptyState, Field, MetricCard, SearchBox, SegmentedControl, Select, StatusBadge, Surface, Table, TableTitle, Tabs, Textarea, useToast, type MetricTone, type TableColumn } from "@betinhos/ui";
+import { PageLayout } from "../../../../app/PageLayout";
+import { Icon, type IconName } from "./icons";
 import { PadroesTab } from "./PadroesTab";
 import { FotosChecklist } from "./FotosChecklist";
 import { ModeloEditor, type StatusSalvar } from "./ModeloEditor";
@@ -56,39 +57,33 @@ import {
   type VeiculoFrota
 } from "../domain/gestaoChecklists";
 import { PERIODO_PADROES_INICIAL, type PeriodoPadroes } from "../domain/padroesChecklists";
-import { BrandLoader } from "../../../../app/BrandLoader";
-
-
-// Dentro do Sistema Betinhos (iframe com ?host=shell) o selo do Sistema ocupa o canto inferior direito.
 
 type Tab = "veiculos" | "checklists" | "modelos" | "padroes";
-type Dialog =
+type Dialogo =
   | { kind: "solicitar"; veiculo: VeiculoFrota }
   | { kind: "cancelar"; checklist: ChecklistGestao }
   | { kind: "descartar" }
   | { kind: "padrao"; substitui: string }
   | { kind: "removerItem"; uid: string; nome: string; voltarFoco: string };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "veiculos", label: "Veículos" },
-  { id: "checklists", label: "Checklists" },
-  { id: "modelos", label: "Modelos" },
-  { id: "padroes", label: "Padrões" }
-];
-
 const isOpen = (item: ChecklistGestao) => item.estado === CHECKLIST_ESTADO.aguardandoMotorista || item.estado === CHECKLIST_ESTADO.pendente;
-const formatDate = (value: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(value)).replace(",", "") : "";
-const formatDay = (value: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(new Date(value)) : "";
+const dataHoraFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+const formatDate = (value: string | null) => value ? dataHoraFormat.format(new Date(value)).replace(",", "") : "";
+const diaFormat = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
+const numeroFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const formatDay = (value: string | null) => value ? diaFormat.format(new Date(value)) : "";
 const formatNumber = (value: string, unidade: string) => {
   const number = Number(value);
   if (!value || !Number.isFinite(number)) return value || "—";
-  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(number)}${unidade ? ` ${unidade}` : ""}`;
+  return `${numeroFormat.format(number)}${unidade ? ` ${unidade}` : ""}`;
 };
 const sameModelo = (a: Modelo | null, b: Modelo | null) => JSON.stringify(a) === JSON.stringify(b);
 const clonar = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-const horaAgora = () => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date());
+const horaFormat = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+const horaAgora = () => horaFormat.format(new Date());
 
-export function GestaoChecklists() {
+export function GestaoChecklists({ titulo }: { titulo: string }) {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("veiculos");
   useEffect(() => { setErrorLogContext({ screen: `frota-checklists/${tab}` }); }, [tab]);
   const [frota, setFrota] = useState<VeiculoFrota[]>([]);
@@ -97,8 +92,6 @@ export function GestaoChecklists() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [frotaSearch, setFrotaSearch] = useState("");
   const [chkFilter, setChkFilter] = useState<ChkFilter>("abertos");
   const [chkSearch, setChkSearch] = useState("");
@@ -117,10 +110,9 @@ export function GestaoChecklists() {
   const [padraoAoAbrir, setPadraoAoAbrir] = useState(false);
   // Elemento da lista que recebe o foco ao sair do editor (data-foco).
   const [focoLista, setFocoLista] = useState("");
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [dialog, setDialog] = useState<Dialogo | null>(null);
   const [dialogModeloId, setDialogModeloId] = useState("");
   const [dialogMotivo, setDialogMotivo] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
   const dialogVolta = useRef<HTMLElement | string | null>(null);
   // Padrões: lidos só ao abrir a aba (180 dias de checklists enviados) e recalculados no navegador ao trocar o período.
   const [padroesRows, setPadroesRows] = useState<ChecklistGestao[] | null>(null);
@@ -128,8 +120,6 @@ export function GestaoChecklists() {
   const [padroesFalhou, setPadroesFalhou] = useState(false);
   const [periodo, setPeriodo] = useState<PeriodoPadroes>(PERIODO_PADROES_INICIAL);
   const [padraoAberto, setPadraoAberto] = useState("");
-  // Checklist aberto de outra aba (Veículos ou Padrões): a lista rola até a linha e o foco vai para ela.
-  const [focarChkId, setFocarChkId] = useState("");
   // Prévia do filtro e situação por carro: universo da rotina e rótulos das choices, lidos ao abrir a tela.
   const [veiculosFiltro, setVeiculosFiltro] = useState<VeiculoFiltro[]>([]);
   const [opcoesFiltro, setOpcoesFiltro] = useState<OpcoesFiltro>({});
@@ -145,7 +135,7 @@ export function GestaoChecklists() {
     return new Map(frota.map((veiculo) => [veiculo.id, situacaoVeiculo(veiculo, checklists, periodicidadeDe(veiculo.id))]));
   }, [frota, checklists, veiculosFiltro, modelos]);
   // Lista de Modelos: ordem de prioridade (padrão por último) e quem recebe cada um.
-  const linhasModelos = useMemo(() => ordenarModelos(modelos).map((modelo) => ({ modelo, padrao: ehPadrao(modelo), recebe: resumoFiltro(modelo, opcoesFiltro) })), [modelos, opcoesFiltro]);
+  const linhasModelos = useMemo(() => ordenarModelos(modelos).map((modelo, index) => ({ modelo, index, padrao: ehPadrao(modelo), recebe: resumoFiltro(modelo, opcoesFiltro) })), [modelos, opcoesFiltro]);
   const totalOrdenaveis = linhasModelos.filter((linha) => !linha.padrao).length;
   const frotaTerm = frotaSearch.trim().toLowerCase();
   const frotaVisivel = frota
@@ -154,7 +144,7 @@ export function GestaoChecklists() {
   const chkTerm = chkSearch.trim().toLowerCase();
   const chkBuscados = checklists.filter((item) => !chkTerm || checklistBuscaTexto(item).toLowerCase().includes(chkTerm));
   const chkVisiveis = chkBuscados.filter((item) => matchChk(chkFilter, item));
-  const selectedChk = checklists.find((item) => item.id === selectedChkId) ?? chkVisiveis[0];
+  const selectedChk = checklists.find((item) => item.id === selectedChkId) ?? null;
   const contagem = {
     emDia: [...situacoes.values()].filter((item) => item.tone === "success").length,
     pendentes: veiculosComMotorista(checklists),
@@ -163,11 +153,8 @@ export function GestaoChecklists() {
   const dirty = Boolean(editing) && !sameModelo(editing, editingOriginal);
   const erroMotivo = dialog?.kind === "cancelar" ? erroMotivoCancelamento(dialogMotivo) : "";
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 3500);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
+  const avisar = (message: string) => toast({ tone: "success", message });
+  const falhar = (message: string) => toast({ tone: "danger", message });
 
   const load = async () => {
     const [loadedFrota, loadedChecklists, loadedModelos] = await Promise.all([loadFrota(), loadChecklistsGestao(), loadModelos()]);
@@ -181,7 +168,7 @@ export function GestaoChecklists() {
     load()
       .catch((cause) => {
         void logAppError(cause, { action: "carregar-checklists", phase: "load", component: "GestaoChecklists" });
-        setError(cause instanceof Error ? cause.message : "Não foi possível carregar os checklists.");
+        falhar(cause instanceof Error ? cause.message : "Não foi possível carregar os checklists.");
       })
       .finally(() => setLoading(false));
     // Em paralelo e com erro próprio: a situação por carro usa o modelo de cada um; sem estes dados vale o padrão.
@@ -191,18 +178,16 @@ export function GestaoChecklists() {
   // `conferir` lê a lista recarregada e devolve o erro a mostrar quando a ação terminou sem o efeito esperado.
   const run = async (action: () => Promise<void>, success: string, failure: string, conferir?: (checklists: ChecklistGestao[]) => string) => {
     setBusy(true);
-    setError("");
-    setNotice("");
     let done = false;
     try {
       await action();
       done = true;
       const lista = await load();
       const erro = conferir ? conferir(lista) : "";
-      if (erro) setError(erro); else setNotice(success);
+      if (erro) falhar(erro); else avisar(success);
     } catch (cause) {
       void logAppError(cause, { action: failure, phase: done ? "refresh" : "submit", component: "GestaoChecklists" });
-      setError(done ? `${success.replace(/\.$/, "")}, mas não foi possível atualizar a tela. Toque em Atualizar.` : cause instanceof Error && cause.message ? cause.message : failure);
+      falhar(done ? `${success.replace(/\.$/, "")}, mas não foi possível atualizar a tela. Toque em Atualizar.` : cause instanceof Error && cause.message ? cause.message : failure);
     } finally {
       setBusy(false);
     }
@@ -216,7 +201,7 @@ export function GestaoChecklists() {
     } catch (cause) {
       void logAppError(cause, { action: "carregar-padroes", phase: "load", component: "GestaoChecklists" });
       setPadroesFalhou(true);
-      setError(cause instanceof Error && cause.message ? cause.message : "Não foi possível carregar os padrões.");
+      falhar(cause instanceof Error && cause.message ? cause.message : "Não foi possível carregar os padrões.");
     } finally {
       setPadroesLoading(false);
     }
@@ -235,7 +220,7 @@ export function GestaoChecklists() {
       setPadroesFalhou(false);
     } catch (cause) {
       void logAppError(cause, { action: "atualizar-padroes", phase: "refresh", component: "GestaoChecklists" });
-      if (tab === "padroes") setError("Não foi possível atualizar os padrões. Os números são da última leitura.");
+      if (tab === "padroes") falhar("Não foi possível atualizar os padrões. Os números são da última leitura.");
     }
   };
 
@@ -251,25 +236,11 @@ export function GestaoChecklists() {
   const reatribuir = (id: string) => run(() => reatribuirChecklist(id), "Atribuição conferida de novo.", "Não foi possível atribuir.",
     (lista) => lista.find((item) => item.id === id)?.erroAtribuicao ?? "");
 
-  const openChecklist = (id: string) => {
-    setTab("checklists");
-    setChkFilter("todos");
-    setSelectedChkId(id);
-    setFocarChkId(id);
-  };
-
-  useEffect(() => {
-    if (!focarChkId || tab !== "checklists") return;
-    const row = document.querySelector<HTMLElement>(`[data-chk-id="${CSS.escape(focarChkId)}"]`);
-    row?.scrollIntoView({ block: "center" });
-    row?.focus({ preventScroll: true });
-    setFocarChkId("");
-  }, [focarChkId, tab]);
 
   // ---------- Diálogos ----------
 
   // Ao fechar, o foco volta para onde estava (ou para o seletor indicado quando o elemento de origem some).
-  const abrirDialog = (next: Dialog, volta?: string) => {
+  const abrirDialog = (next: Dialogo, volta?: string) => {
     dialogVolta.current = volta ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setDialog(next);
   };
@@ -310,16 +281,6 @@ export function GestaoChecklists() {
     }
   };
 
-  const onDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") { event.stopPropagation(); closeDialog(); return; }
-    if (event.key !== "Tab" || !dialogRef.current) return;
-    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not(:disabled), select, textarea"));
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-  };
 
   // ---------- Modelos ----------
 
@@ -407,8 +368,6 @@ export function GestaoChecklists() {
       return;
     }
     setBusy(true);
-    setError("");
-    setNotice("");
     try {
       const { modelo: salvo, aviso } = await saveModelo(editing, originalGravado, { padraoAoAbrir });
       setEditing(clonar(salvo));
@@ -420,10 +379,10 @@ export function GestaoChecklists() {
       setSalvoAs(horaAgora());
       if (!originalGravado) { usoPedido.current = salvo.id; setUso({ total: 0, abertos: 0 }); }
       setFocoLista(`modelo-${salvo.id}`);
-      setNotice(aviso || "Modelo salvo.");
+      avisar(aviso || "Modelo salvo.");
       try { await load(); } catch (cause) {
         void logAppError(cause, { action: "salvar-modelo", phase: "refresh", component: "GestaoChecklists" });
-        setError("Modelo salvo, mas não foi possível atualizar a lista. Toque em Atualizar.");
+        falhar("Modelo salvo, mas não foi possível atualizar a lista. Toque em Atualizar.");
       }
     } catch (cause) {
       void logAppError(cause, { action: "salvar-modelo", phase: "submit", component: "GestaoChecklists" });
@@ -436,7 +395,7 @@ export function GestaoChecklists() {
         if (!originalGravado && cause.persistido.id) { usoPedido.current = cause.persistido.id; setUso({ total: 0, abertos: 0 }); }
       }
       setFalhaSalvar(true);
-      setError(cause instanceof Error && cause.message ? cause.message : "Não foi possível salvar o modelo.");
+      falhar(cause instanceof Error && cause.message ? cause.message : "Não foi possível salvar o modelo.");
     } finally {
       setBusy(false);
     }
@@ -470,290 +429,232 @@ export function GestaoChecklists() {
 
   // ---------- Render ----------
 
-  const kpis = [
-    { label: "Frota própria", value: frota.length, tone: "navy", icon: "car" as const, foot: isMock ? "Mock local" : "Carros próprios ativos" },
-    { label: "Em dia", value: contagem.emDia, tone: "green", icon: "checkCircle" as const, foot: `Padrão: vistoria a cada ${periodicidade} dias` },
-    { label: "Com o motorista", value: contagem.pendentes, tone: "amber", icon: "clock" as const, foot: contagem.pendentes ? "Veículos com checklist aguardando envio pelo app" : "Nenhum pendente" },
-    { label: "Precisam de atenção", value: contagem.atencao, tone: contagem.atencao ? "red" : "green", icon: "alert" as const, foot: contagem.atencao ? "Vencidos, com problema, sem checklist ou sem motorista" : "Nenhum problema" }
+  const kpis: { label: string; value: number; tone: MetricTone; icon: IconName; hint: string }[] = [
+    { label: "Frota própria", value: frota.length, tone: "info", icon: "car", hint: isMock ? "Dados de exemplo" : "Carros próprios ativos" },
+    { label: "Em dia", value: contagem.emDia, tone: "success", icon: "checkCircle", hint: `Padrão: vistoria a cada ${periodicidade} dias` },
+    { label: "Com o motorista", value: contagem.pendentes, tone: contagem.pendentes ? "warning" : "info", icon: "clock", hint: contagem.pendentes ? "Aguardando envio pelo app" : "Nenhum pendente" },
+    { label: "Precisam de atenção", value: contagem.atencao, tone: contagem.atencao ? "danger" : "success", icon: "alert", hint: contagem.atencao ? "Vencidos, com problema, sem checklist ou sem motorista" : "Nenhum problema" }
   ];
 
-  const header = editing ? (
-    <header className="gestao-header">
-      <div className="gestao-header-text">
-        <nav className="gestao-crumbs" aria-label="Navegação">
-          <button type="button" className="gestao-back" disabled={busy} onClick={leaveEdit}><Icon name="arrowLeft" size={16} />Modelos</button>
-          <span aria-hidden="true">/</span><span aria-current="page">{editingOriginal?.id ? "Editar" : "Novo"}</span>
-        </nav>
-        <h1>{editingOriginal?.id ? editingOriginal.nome || "Modelo" : "Novo modelo"}</h1>
-        <p className="gestao-subtitle">Defina o que o motorista fotografa e confere. Checklists já criados mantêm a versão anterior.</p>
-      </div>
-    </header>
-  ) : (
-    // O título vem do cabeçalho do shell (`useShellHeader` na FrotaPage); aqui ficam só a descrição e as ações.
-    <header className="gestao-header">
-      <div className="gestao-header-text">
-        <p className="gestao-subtitle">Vistorias da frota própria enviadas pelos motoristas no App Motoristas.</p>
-      </div>
-      <div className="gestao-header-actions">
-        <button type="button" className="gestao-button is-secondary" disabled={busy} aria-busy={refreshing} onClick={() => void refreshView()}><Icon name="refresh" size={16} className={refreshing ? "is-spinning" : ""} />Atualizar</button>
-        {tab === "modelos" ? <button type="button" className="gestao-button is-primary" data-foco="novo-modelo" disabled={busy} onClick={() => startEdit(null, "novo-modelo")}><Icon name="plus" size={16} />Novo modelo</button> : null}
-      </div>
-    </header>
+  const tabs = [
+    { value: "veiculos" as const, label: "Veículos", badge: loading ? undefined : frota.length },
+    { value: "checklists" as const, label: "Checklists", badge: loading ? undefined : checklists.filter(isOpen).length },
+    { value: "modelos" as const, label: "Modelos", badge: loading ? undefined : modelos.length },
+    { value: "padroes" as const, label: "Padrões" }
+  ];
+
+  const colunasFrota: TableColumn<VeiculoFrota>[] = [
+    { key: "veiculo", header: "Veículo", width: "minmax(170px, 1fr)", cell: (veiculo) => <TableTitle title={veiculo.placa} meta={`${veiculo.modelo || "Modelo não informado"}${veiculo.hodometro != null ? ` · ${numeroFormat.format(veiculo.hodometro)} km` : ""}`} /> },
+    { key: "motorista", header: "Motorista atual", width: "minmax(180px, 1fr)", hideBelow: "mobile", cell: (veiculo) => veiculo.motoristaNome
+      ? <TableTitle title={<span className="chk-texto">{veiculo.motoristaNome}</span>} meta={veiculo.motoristaDesde ? `Desde ${formatDay(veiculo.motoristaDesde)}` : undefined} />
+      : <StatusBadge tone="danger">Sem motorista na Infleet</StatusBadge> },
+    { key: "ultima", header: "Última vistoria", width: "130px", hideBelow: "compact", cell: (veiculo) => { const ultimo = situacoes.get(veiculo.id)?.ultimo; return ultimo ? formatDay(ultimo.concluidoEm) : <span className="chk-vazio">—</span>; } },
+    { key: "situacao", header: "Situação", width: "minmax(200px, 1.3fr)", cell: (veiculo) => {
+      const situacao = situacoes.get(veiculo.id);
+      return <span className="chk-situacao"><StatusBadge tone={situacao?.tone ?? "neutral"} dot>{situacao?.label ?? "—"}</StatusBadge>{situacao?.detail ? <small>{situacao.detail}</small> : null}</span>;
+    } },
+    { key: "acao", header: <span className="bt-sr-only">Ação</span>, label: "Ação", width: "160px", align: "end", cell: (veiculo) => <AcaoVeiculo veiculo={veiculo} situacao={situacoes.get(veiculo.id)} busy={busy} onSolicitar={() => askSolicitar(veiculo)} onVer={setSelectedChkId} onReatribuir={(id) => void reatribuir(id)} /> }
+  ];
+
+  const colunasChecklists: TableColumn<ChecklistGestao>[] = [
+    { key: "veiculo", header: "Veículo", width: "minmax(170px, 1fr)", cell: (item) => <TableTitle title={item.placa || "Veículo"} meta={`${origemLabel(item)} · ${item.modeloNome || "Modelo"}`} /> },
+    { key: "motorista", header: "Motorista", width: "minmax(170px, 1fr)", hideBelow: "mobile", cell: (item) => item.motoristaNome ? <span className="chk-texto">{item.motoristaNome}</span> : <StatusBadge tone={item.erroAtribuicao ? "danger" : "info"}>{item.erroAtribuicao ? "Sem motorista" : "Atribuindo"}</StatusBadge> },
+    { key: "data", header: "Data", width: "120px", hideBelow: "compact", cell: (item) => formatDay(item.concluidoEm || item.canceladoEm || item.solicitadoEm) },
+    { key: "situacao", header: "Situação", width: "minmax(170px, .8fr)", cell: (item) => { const estado = estadoLabel(item); return <StatusBadge tone={estado.tone} dot>{estado.label}</StatusBadge>; } }
+  ];
+
+  type LinhaModelo = (typeof linhasModelos)[number];
+  const colunasModelos: TableColumn<LinhaModelo>[] = [
+    { key: "modelo", header: "Modelo", width: "minmax(240px, 2fr)", cell: ({ modelo, recebe, index }) => {
+      return (
+        <span className="chk-modelo">
+          <button type="button" className="chk-modelo__nome" data-foco={`modelo-${modelo.id}`} disabled={busy} onClick={() => startEdit(modelo, `modelo-${modelo.id}`)}>
+            <span className="chk-modelo__ordem">{index + 1}.</span> {modelo.nome}
+          </button>
+          <small>{modelo.descricao || "Sem descrição"}</small>
+          <small className="chk-modelo__recebe"><Icon name="car" size={14} />{recebe}</small>
+        </span>
+      );
+    } },
+    { key: "itens", header: "Itens", width: "90px", hideBelow: "mobile", cell: ({ modelo }) => `${modelo.itens.length} ${plural(modelo.itens.length, "item", "itens")}` },
+    { key: "periodicidade", header: "Periodicidade", width: "120px", hideBelow: "compact", cell: ({ modelo }) => `${modelo.periodicidadeDias} dias` },
+    { key: "situacao", header: "Situação", width: "minmax(140px, .8fr)", cell: ({ modelo, padrao: ehOPadrao }) => (
+      <span className="chk-badges"><StatusBadge tone={modelo.ativo ? "success" : "neutral"} dot>{modelo.ativo ? "Ativo" : "Inativo"}</StatusBadge>{ehOPadrao ? <StatusBadge tone="info">Padrão</StatusBadge> : null}</span>
+    ) },
+    { key: "acoes", header: <span className="bt-sr-only">Ações</span>, label: "Ações", width: "136px", align: "end", cell: ({ modelo, padrao: ehOPadrao, index }) => {
+      return (
+        <span className="chk-acoes">
+          {ehOPadrao ? null : <>
+            <Button variant="ghost" size="compact" icon={<Icon name="arrowUp" size={16} />} data-foco={`subir-${modelo.id}`} disabled={busy || index === 0} aria-label={`Subir ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Subir" onClick={() => void moverModelo(modelo, -1)} />
+            <Button variant="ghost" size="compact" icon={<Icon name="arrowDown" size={16} />} data-foco={`descer-${modelo.id}`} disabled={busy || index === totalOrdenaveis - 1} aria-label={`Descer ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Descer" onClick={() => void moverModelo(modelo, 1)} />
+          </>}
+          <Button variant="ghost" size="compact" icon={<Icon name="copy" size={16} />} data-foco={`duplicar-${modelo.id}`} disabled={busy} aria-label={`Duplicar ${modelo.nome}`} title="Duplicar modelo" onClick={() => startEdit(duplicarModelo(modelo), `duplicar-${modelo.id}`, true)} />
+        </span>
+      );
+    } }
+  ];
+
+  const acoes = editing ? undefined : (
+    <>
+      <Button variant="secondary" icon={<Icon name="refresh" size={16} />} loading={refreshing} disabled={busy} onClick={() => void refreshView()}>Atualizar</Button>
+      {tab === "modelos" ? <Button icon={<Icon name="plus" size={16} />} data-foco="novo-modelo" disabled={busy} onClick={() => startEdit(null, "novo-modelo")}>Novo modelo</Button> : null}
+    </>
   );
 
+  const dialogo = dialog ? dialogTexto(dialog) : null;
+
   return (
-    <div className="gestao-shell" aria-busy={loading}>
-      <main className="gestao-main">
-        {header}
+    <PageLayout
+      className="frota-page gestao-checklists"
+      eyebrow={editing ? undefined : "Frota"}
+      breadcrumb={editing ? <button type="button" className="chk-voltar" disabled={busy} onClick={leaveEdit}><Icon name="arrowLeft" size={14} />Modelos</button> : undefined}
+      title={editing ? (editingOriginal?.id ? editingOriginal.nome || "Modelo" : "Novo modelo") : titulo}
+      description={editing ? "Defina o que o motorista fotografa e confere. Checklists já criados mantêm a versão anterior." : "Vistorias da frota própria enviadas pelos motoristas no App Motoristas."}
+      meta={editing ? undefined : <StatusBadge tone={isMock ? "neutral" : "info"} dot>{isMock ? "Dados de exemplo" : "Dataverse"}</StatusBadge>}
+      actions={acoes}
+      tabs={editing ? undefined : <Tabs aria-label="Seções" tabs={tabs} value={tab} onChange={setTab} />}
+    >
+      {editing ? (
+        <ModeloEditor
+          modelo={editing}
+          original={originalGravado}
+          padraoAtual={padrao}
+          busy={busy}
+          dirty={dirty}
+          podeSalvar={podeSalvar({ busy, dirty, falhaSalvar })}
+          status={statusSalvar}
+          mostrarErros={mostrarErros}
+          pedidoErro={pedidoErro}
+          uso={uso}
+          filtro={{ outros: modelos, veiculos: veiculosFiltro, opcoes: opcoesFiltro, estado: estadoVeiculos, onTentar: () => void carregarVeiculosFiltro() }}
+          onChange={(change) => setEditing((current) => current && { ...current, ...change })}
+          onItens={(itens) => setEditing((current) => current && { ...current, itens })}
+          onPedirPadrao={() => abrirDialog({ kind: "padrao", substitui: padrao && padrao.id !== editing.id ? padrao.nome : "" }, "#mod-padrao")}
+          onPedirRemover={(uid, voltarFoco) => {
+            const item = editing.itens.find((entry) => (entry.uid || entry.id) === uid);
+            abrirDialog({ kind: "removerItem", uid, nome: item?.rotulo.trim() || "este item", voltarFoco });
+          }}
+          onCancel={leaveEdit}
+          onSave={() => void saveEditing()}
+        />
+      ) : (
+        <>
+          {tab !== "padroes" ? (
+            <div className="frota-kpis frota-kpis--4">
+              {kpis.map((kpi) => <MetricCard key={kpi.label} icon={<Icon name={kpi.icon} size={20} />} tone={kpi.tone} label={kpi.label} value={kpi.value} hint={kpi.hint} loading={loading} />)}
+            </div>
+          ) : null}
 
-        {editing ? (
-          <ModeloEditor
-            modelo={editing}
-            original={originalGravado}
-            padraoAtual={padrao}
-            busy={busy}
-            dirty={dirty}
-            podeSalvar={podeSalvar({ busy, dirty, falhaSalvar })}
-            status={statusSalvar}
-            mostrarErros={mostrarErros}
-            pedidoErro={pedidoErro}
-            uso={uso}
-            filtro={{ outros: modelos, veiculos: veiculosFiltro, opcoes: opcoesFiltro, estado: estadoVeiculos, onTentar: () => void carregarVeiculosFiltro() }}
-            onChange={(change) => setEditing((current) => current && { ...current, ...change })}
-            onItens={(itens) => setEditing((current) => current && { ...current, itens })}
-            onPedirPadrao={() => abrirDialog({ kind: "padrao", substitui: padrao && padrao.id !== editing.id ? padrao.nome : "" }, "#mod-padrao")}
-            onPedirRemover={(uid, voltarFoco) => {
-              const item = editing.itens.find((entry) => (entry.uid || entry.id) === uid);
-              abrirDialog({ kind: "removerItem", uid, nome: item?.rotulo.trim() || "este item", voltarFoco });
-            }}
-            onCancel={leaveEdit}
-            onSave={() => void saveEditing()}
-          />
-        ) : (
+          {tab === "veiculos" ? (
+            <Surface flush eyebrow="Frota própria" title="Situação por veículo" action={<span className="chk-hint">Motorista atual conforme a Infleet</span>}>
+              <div className="chk-toolbar">
+                <SearchBox className="chk-busca" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={frotaSearch} onChange={setFrotaSearch} />
+              </div>
+              <div className="chk-tabela-frota"><Table aria-label="Situação por veículo" columns={colunasFrota} rows={frotaVisivel} rowKey={(veiculo) => veiculo.id} loading={loading}
+                empty={frota.length
+                  ? <EmptyState compact icon={<Icon name="search" size={32} />} title="Nenhum veículo encontrado">Limpe a busca para ver a frota toda.</EmptyState>
+                  : <EmptyState compact icon={<Icon name="car" size={32} />} title="Nenhum carro próprio ativo">Cadastre a categoria e o status do veículo no Dataverse.</EmptyState>}
+                footer={loading ? undefined : <span className="chk-hint">{frotaVisivel.length} de {frota.length}</span>} /></div>
+            </Surface>
+          ) : null}
+
+          {tab === "checklists" ? (
+            <Surface flush eyebrow="Vistorias" title="Checklists">
+              <div className="chk-toolbar">
+                <SearchBox className="chk-busca" aria-label="Buscar checklist" placeholder="Buscar placa, motorista ou modelo" value={chkSearch} onChange={setChkSearch} />
+                <SegmentedControl aria-label="Filtrar checklists" size="compact" className="chk-filtros" value={chkFilter} onChange={setChkFilter}
+                  options={CHK_FILTERS.map((item) => ({ value: item.id, label: `${item.grupo === "origem" ? "Origem: " : ""}${item.label} · ${chkBuscados.filter((row) => matchChk(item.id, row)).length}` }))} />
+              </div>
+              <Table aria-label="Checklists" columns={colunasChecklists} rows={chkVisiveis} rowKey={(item) => item.id} loading={loading} onRowClick={(item) => setSelectedChkId(item.id)} rowActions={() => []}
+                empty={<EmptyState compact icon={<Icon name="clipboardCheck" size={32} />} title={chkFilter === "abertos" ? "Nenhum checklist em aberto" : chkFilter === "trocas" && !chkTerm ? "Nenhuma troca detectada" : "Nenhum checklist encontrado"}>
+                  {chkFilter === "abertos" ? "A rotina diária cria as vistorias quinzenais; use Solicitar na aba Veículos para pedir uma extra." : chkFilter === "trocas" && !chkTerm ? "Quando a Infleet mostrar um carro passando para outro motorista, o checklist de recebimento aparece aqui." : "Troque o filtro ou limpe a busca."}
+                </EmptyState>}
+                footer={loading ? undefined : <span className="chk-hint">{chkVisiveis.length} de {checklists.length}</span>} />
+            </Surface>
+          ) : null}
+
+          {tab === "modelos" ? (
+            <Surface flush eyebrow="Itens da vistoria" title="Modelos de checklist" action={<span className="chk-hint">{padrao ? `Rotina quinzenal usa: ${padrao.nome}` : "Nenhum modelo marcado para a rotina quinzenal"}</span>}>
+              {modelos.length > 1 ? <p className="chk-toolbar chk-hint">Quando um veículo se encaixa em dois modelos, vale o que está mais acima. Use Subir e Descer para mudar a ordem; o padrão fica sempre por último.</p> : null}
+              <Table aria-label="Modelos de checklist" columns={colunasModelos} rows={linhasModelos} rowKey={({ modelo }) => modelo.id} loading={loading}
+                empty={<EmptyState compact icon={<Icon name="list" size={32} />} title="Nenhum modelo ainda">Crie o primeiro pelo botão Novo modelo e marque para a rotina quinzenal.</EmptyState>} />
+            </Surface>
+          ) : null}
+
+          {tab === "padroes" ? (
+            <PadroesTab
+              checklists={padroesRows}
+              loading={padroesLoading}
+              failed={padroesFalhou}
+              periodo={periodo}
+              onPeriodo={setPeriodo}
+              aberta={padraoAberto}
+              onAberta={setPadraoAberto}
+              onRetry={() => void loadPadroes()}
+              podeAbrir={(id) => checklists.some((item) => item.id === id)}
+              onAbrir={setSelectedChkId}
+            />
+          ) : null}
+        </>
+      )}
+
+      <Drawer open={Boolean(selectedChk) && !editing} onClose={() => setSelectedChkId("")} eyebrow="Checklist" title={selectedChk?.placa || "Veículo"}>
+        {selectedChk ? (
+          <ChecklistDetail key={selectedChk.id} item={selectedChk} busy={busy}
+            onLembrar={() => void run(() => lembrarMotorista(selectedChk.id), "Lembrete enviado ao motorista.", "Não foi possível lembrar o motorista.")}
+            onReatribuir={() => void reatribuir(selectedChk.id)}
+            onCancelar={() => { setDialogMotivo(""); abrirDialog({ kind: "cancelar", checklist: selectedChk }); }} />
+        ) : null}
+      </Drawer>
+
+      <Dialog open={Boolean(dialog)} onClose={closeDialog} tone={dialogo?.perigo ? "danger" : "neutral"} title={dialogo?.titulo ?? ""}
+        actions={dialog ? (
           <>
-            <div className="gestao-kpis">
-              {kpis.map((kpi, index) => (
-                <div key={kpi.label} className="gestao-card gestao-kpi" style={{ "--i": index } as CSSProperties}>
-                  <div className="gestao-kpi-top">
-                    <span className={`gestao-kpi-icon is-${kpi.tone}`}><Icon name={kpi.icon} /></span>
-                    <div><span className="gestao-kpi-label">{kpi.label}</span><span className="gestao-kpi-value">{loading ? "…" : kpi.value}</span></div>
-                  </div>
-                  <span className="gestao-hint">{kpi.foot}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="gestao-tabs gestao-segmented-scroll">
-              <div className="gestao-segmented is-four" role="tablist" aria-label="Seções" style={{ "--pos": TABS.findIndex((item) => item.id === tab) } as CSSProperties}>
-                <span className="gestao-segmented-thumb" aria-hidden="true" />
-                {TABS.map((item) => (
-                  <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)}>
-                    {item.label}{item.id === "padroes" ? "" : ` · ${item.id === "veiculos" ? frota.length : item.id === "checklists" ? checklists.filter(isOpen).length : modelos.length}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {tab === "veiculos" ? (
-              <section className="gestao-card gestao-list" aria-labelledby="frota-title">
-                <div className="gestao-card-head">
-                  <div><span className="gestao-eyebrow">Frota própria</span><h2 id="frota-title">Situação por veículo</h2></div>
-                  <span className="gestao-hint">Motorista atual conforme a Infleet</span>
-                </div>
-                <div className="gestao-results-toolbar">
-                  <div className="gestao-search"><Icon name="search" size={16} /><input type="search" aria-label="Buscar veículo" placeholder="Buscar placa, modelo ou motorista" value={frotaSearch} onChange={(event) => setFrotaSearch(event.target.value)} /></div>
-                </div>
-                <div className="frota-head" aria-hidden="true"><span>Veículo</span><span>Motorista atual</span><span>Última vistoria</span><span>Situação</span><span /></div>
-                <div role="list">
-                  {loading ? <BrandLoader variant="inline" size="md" label="Carregando a frota" text="Carregando a frota…" /> : null}
-                  {frotaVisivel.map((veiculo, index) => (
-                    <FrotaRow key={veiculo.id} veiculo={veiculo} situacao={situacoes.get(veiculo.id)} index={index} busy={busy}
-                      onSolicitar={() => askSolicitar(veiculo)}
-                      onVer={(id) => openChecklist(id)}
-                      onReatribuir={(id) => void reatribuir(id)} />
-                  ))}
-                  {!loading && !frota.length ? <div className="gestao-empty"><Icon name="car" size={32} /><strong>Nenhum carro próprio ativo</strong><p>Cadastre a categoria e o status do veículo no Dataverse.</p></div> : null}
-                  {!loading && frota.length > 0 && !frotaVisivel.length ? <div className="gestao-empty"><Icon name="search" size={32} /><strong>Nenhum veículo encontrado</strong><p>Limpe a busca para ver a frota toda.</p></div> : null}
-                </div>
-              </section>
-            ) : null}
-
-            {tab === "checklists" ? (
-              <div className="gestao-report-columns">
-                <section className="gestao-card gestao-results" aria-labelledby="chk-title">
-                  <div className="gestao-card-head">
-                    <div><span className="gestao-eyebrow">Vistorias</span><h2 id="chk-title">Checklists</h2></div>
-                    <div className="gestao-segmented-scroll chk-filtros">
-                      {(["estado", "origem"] as const).map((grupo) => {
-                        const filtros = CHK_FILTERS.filter((item) => item.grupo === grupo);
-                        const pos = filtros.findIndex((item) => item.id === chkFilter);
-                        return (
-                          <div key={grupo} className={`gestao-segmented ${grupo === "estado" ? "is-four" : "is-one"}${pos < 0 ? " is-none" : ""}`} role="group" aria-label={grupo === "estado" ? "Filtrar por estado" : "Filtrar por origem"} style={{ "--pos": pos } as CSSProperties}>
-                            <span className="gestao-segmented-thumb" aria-hidden="true" />
-                            {filtros.map((item) => (
-                              <button key={item.id} type="button" aria-pressed={chkFilter === item.id} onClick={() => { setChkFilter(item.id); setSelectedChkId(""); }}>{grupo === "origem" ? "Origem: " : ""}{item.label} · {chkBuscados.filter((row) => matchChk(item.id, row)).length}</button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="gestao-results-toolbar">
-                    <div className="gestao-search"><Icon name="search" size={16} /><input type="search" aria-label="Buscar checklist" placeholder="Buscar placa, motorista ou modelo" value={chkSearch} onChange={(event) => setChkSearch(event.target.value)} /></div>
-                  </div>
-                  <div className="chk-head" aria-hidden="true"><span>Veículo</span><span>Motorista</span><span>Data</span><span>Situação</span><span /></div>
-                  <div role="list">
-                    {loading ? <BrandLoader variant="inline" size="md" label="Carregando checklists" text="Carregando checklists…" /> : null}
-                    {chkVisiveis.map((item, index) => {
-                      const estado = estadoLabel(item);
-                      const selected = selectedChk?.id === item.id;
-                      return (
-                        <div key={item.id} role="listitem">
-                          <button type="button" className={`chk-row ${selected ? "is-selected" : ""}`} aria-pressed={selected} data-chk-id={item.id} style={{ "--i": Math.min(index, 12) } as CSSProperties} onClick={() => setSelectedChkId(item.id)}>
-                            <span className="frota-cell"><strong>{item.placa || "Veículo"}</strong><small>{origemLabel(item)} · {item.modeloNome || "Modelo"}</small></span>
-                            <span className="frota-cell"><span className={item.motoristaNome ? "" : "is-missing"}>{item.motoristaNome || (item.erroAtribuicao ? "Sem motorista" : "Atribuindo")}</span></span>
-                            <span className="frota-cell"><span>{formatDay(item.concluidoEm || item.canceladoEm || item.solicitadoEm)}</span></span>
-                            <span><span className={`gestao-badge is-${estado.tone}`}>{estado.label}</span></span>
-                            <Icon name="chevronRight" size={16} className="gestao-list-chevron" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {!loading && !chkVisiveis.length ? <div className="gestao-empty"><Icon name="clipboardCheck" size={32} /><strong>{chkFilter === "abertos" ? "Nenhum checklist em aberto" : chkFilter === "trocas" && !chkTerm ? "Nenhuma troca detectada" : "Nenhum checklist encontrado"}</strong><p>{chkFilter === "abertos" ? "A rotina diária cria as vistorias quinzenais; use Solicitar na aba Veículos para pedir uma extra." : chkFilter === "trocas" && !chkTerm ? "Quando a Infleet mostrar um carro passando para outro motorista, o checklist de recebimento aparece aqui." : "Troque o filtro ou limpe a busca."}</p></div> : null}
-                  </div>
-                </section>
-                <aside className="gestao-side-stack" aria-label="Detalhe do checklist">
-                  {selectedChk ? (
-                    <ChecklistDetail key={selectedChk.id} item={selectedChk} busy={busy}
-                      onLembrar={() => void run(() => lembrarMotorista(selectedChk.id), "Lembrete enviado ao motorista.", "Não foi possível lembrar o motorista.")}
-                      onReatribuir={() => void reatribuir(selectedChk.id)}
-                      onCancelar={() => { setDialogMotivo(""); abrirDialog({ kind: "cancelar", checklist: selectedChk }); }} />
-                  ) : null}
-                </aside>
-              </div>
-            ) : null}
-
-            {tab === "modelos" ? (
-              <section className="gestao-card gestao-list" aria-labelledby="mod-title">
-                <div className="gestao-card-head">
-                  <div><span className="gestao-eyebrow">Itens da vistoria</span><h2 id="mod-title">Modelos de checklist</h2></div>
-                  <span className="gestao-hint">{padrao ? `Rotina quinzenal usa: ${padrao.nome}` : "Nenhum modelo marcado para a rotina quinzenal"}</span>
-                </div>
-                {modelos.length > 1 ? <p className="gestao-hint mod-ordem-ajuda">Quando um veículo se encaixa em dois modelos, vale o que está mais acima. Use Subir e Descer para mudar a ordem; o padrão fica sempre por último.</p> : null}
-                <div className="mod-head" aria-hidden="true"><span>Modelo</span><span>Itens</span><span>Periodicidade</span><span>Situação</span><span /></div>
-                <div role="list">
-                  {loading ? <BrandLoader variant="inline" size="md" label="Carregando modelos" text="Carregando modelos…" /> : null}
-                  {linhasModelos.map(({ modelo, padrao: ehOPadrao, recebe }, index) => (
-                    <div key={modelo.id} role="listitem" className={`mod-row-wrap ${ehOPadrao ? "" : "has-ordem"}`}>
-                      <button type="button" className="mod-row" data-foco={`modelo-${modelo.id}`} disabled={busy} style={{ "--i": index } as CSSProperties} onClick={() => startEdit(modelo, `modelo-${modelo.id}`)}>
-                        <span className="gestao-list-title"><strong><span className="mod-ordem">{index + 1}.</span> {modelo.nome}</strong><small>{modelo.descricao || "Sem descrição"}</small><small className="mod-recebe"><Icon name="car" size={14} />{recebe}</small></span>
-                        <span className="gestao-list-meta">{modelo.itens.length} {plural(modelo.itens.length, "item", "itens")}</span>
-                        <span className="gestao-list-meta">{modelo.periodicidadeDias} dias</span>
-                        <span className="mod-badges">
-                          <span className={`gestao-badge ${modelo.ativo ? "is-success" : "is-neutral"}`}>{modelo.ativo ? "Ativo" : "Inativo"}</span>
-                          {ehOPadrao ? <span className="gestao-badge is-info">Padrão</span> : null}
-                        </span>
-                        <Icon name="chevronRight" size={16} className="gestao-list-chevron" />
-                      </button>
-                      {ehOPadrao ? null : (
-                        <span className="mod-ordem-acoes">
-                          <button type="button" className="mod-icon-button" data-foco={`subir-${modelo.id}`} disabled={busy || index === 0} aria-label={`Subir ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Subir"
-                            onClick={() => void moverModelo(modelo, -1)}><Icon name="arrowUp" size={16} /><span className="mod-ordem-rotulo">Subir</span></button>
-                          <button type="button" className="mod-icon-button" data-foco={`descer-${modelo.id}`} disabled={busy || index === totalOrdenaveis - 1} aria-label={`Descer ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Descer"
-                            onClick={() => void moverModelo(modelo, 1)}><Icon name="arrowDown" size={16} /><span className="mod-ordem-rotulo">Descer</span></button>
-                        </span>
-                      )}
-                      <button type="button" className="mod-duplicar" data-foco={`duplicar-${modelo.id}`} disabled={busy} aria-label={`Duplicar ${modelo.nome}`} title="Duplicar modelo"
-                        onClick={() => startEdit(duplicarModelo(modelo), `duplicar-${modelo.id}`, true)}><Icon name="copy" size={16} /></button>
-                    </div>
-                  ))}
-                  {!loading && !modelos.length ? <div className="gestao-empty"><Icon name="list" size={32} /><strong>Nenhum modelo ainda</strong><p>Crie o primeiro pelo botão Novo modelo e marque para a rotina quinzenal.</p></div> : null}
-                </div>
-              </section>
-            ) : null}
-            {tab === "padroes" ? (
-              <PadroesTab
-                checklists={padroesRows}
-                loading={padroesLoading}
-                failed={padroesFalhou}
-                periodo={periodo}
-                onPeriodo={setPeriodo}
-                aberta={padraoAberto}
-                onAberta={setPadraoAberto}
-                onRetry={() => void loadPadroes()}
-                podeAbrir={(id) => checklists.some((item) => item.id === id)}
-                onAbrir={openChecklist}
-              />
-            ) : null}
+            <Button variant="secondary" autoFocus onClick={closeDialog}>{dialog.kind === "descartar" ? "Continuar editando" : "Voltar"}</Button>
+            {dialog.kind === "solicitar" ? <Button icon={<Icon name="send" size={16} />} disabled={!padrao && !dialogModeloId} onClick={() => void confirmDialog()}>Solicitar checklist</Button>
+              : dialog.kind === "cancelar" ? <Button variant="danger" icon={<Icon name="ban" size={16} />} disabled={Boolean(erroMotivo)} onClick={() => void confirmDialog()}>Cancelar checklist</Button>
+              : dialog.kind === "padrao" ? <Button icon={<Icon name="clipboardCheck" size={16} />} onClick={() => void confirmDialog()}>Usar na rotina</Button>
+              : dialog.kind === "removerItem" ? <Button variant="danger" icon={<Icon name="trash" size={16} />} onClick={() => void confirmDialog()}>Remover item</Button>
+              : <Button variant="danger" icon={<Icon name="trash" size={16} />} onClick={() => void confirmDialog()}>Descartar</Button>}
           </>
-        )}
-      </main>
-
-      {dialog ? (
-        <div className="gestao-modal">
-          <button type="button" className="gestao-modal-backdrop" aria-label="Fechar" tabIndex={-1} onClick={closeDialog} />
-          <div ref={dialogRef} className="gestao-dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title" aria-describedby="dlg-text" onKeyDown={onDialogKeyDown}>
-            <span className={`gestao-kpi-icon ${dialog.kind === "solicitar" || dialog.kind === "padrao" ? "is-blue" : "is-red"}`}><Icon name={dialog.kind === "solicitar" || dialog.kind === "padrao" ? "clipboardCheck" : dialog.kind === "cancelar" ? "ban" : dialog.kind === "removerItem" ? "trash" : "alert"} /></span>
-            <div>
-              <h2 id="dlg-title">{dialog.kind === "solicitar" ? `Solicitar checklist do ${dialog.veiculo.placa}?` : dialog.kind === "cancelar" ? `Cancelar o checklist do ${dialog.checklist.placa}?`
-                : dialog.kind === "padrao" ? "Usar este modelo na rotina quinzenal?" : dialog.kind === "removerItem" ? `Remover “${dialog.nome}”?` : "Descartar alterações?"}</h2>
-              <p id="dlg-text">{dialog.kind === "solicitar"
-                ? dialog.veiculo.motoristaNome ? `${dialog.veiculo.motoristaNome} recebe um push e o checklist aparece no App Motoristas.` : "A Infleet não mostra motorista neste carro agora. O checklist fica aguardando até alguém pegar o veículo."
-                : dialog.kind === "cancelar" ? "O checklist sai do app do motorista. As respostas já enviadas em outros checklists não mudam."
-                : dialog.kind === "padrao" ? `${dialog.substitui ? `Este modelo passa a ser usado na rotina quinzenal no lugar de ${dialog.substitui}.` : "Este modelo passa a ser usado na rotina quinzenal."} A troca vale quando você salvar.`
-                : dialog.kind === "removerItem" ? "O item sai dos próximos checklists quando você salvar. Checklists já criados mantêm as respostas."
-                : "As mudanças neste modelo ainda não foram salvas."}</p>
-            </div>
+        ) : null}>
+        {dialog ? (
+          <div className="chk-dialogo">
+            <p>{dialogo?.texto}</p>
             {dialog.kind === "solicitar" && modelosAtivos.length > 1 ? (
-              <div className="gestao-field">
-                <label htmlFor="dlg-modelo" className="gestao-label">Modelo</label>
-                <select id="dlg-modelo" value={dialogModeloId} onChange={(event) => setDialogModeloId(event.target.value)}>
-                  {modelosAtivos.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.nome}{modelo.padraoQuinzenal ? " (rotina quinzenal)" : ""}</option>)}
-                </select>
-              </div>
+              <Field label="Modelo">
+                <Select searchable={false} clearable={false} value={dialogModeloId || null} onChange={(value) => setDialogModeloId(value ?? "")}
+                  options={modelosAtivos.map((modelo) => ({ value: modelo.id, label: `${modelo.nome}${modelo.padraoQuinzenal ? " (rotina quinzenal)" : ""}` }))} />
+              </Field>
             ) : null}
             {dialog.kind === "cancelar" ? (
-              <div className="gestao-field">
-                <label htmlFor="dlg-motivo" className="gestao-label">Motivo</label>
-                <textarea id="dlg-motivo" maxLength={500} value={dialogMotivo} placeholder="Ex.: carro na oficina" aria-invalid={Boolean(erroMotivo)} aria-describedby={erroMotivo ? "dlg-motivo-erro" : undefined} onChange={(event) => setDialogMotivo(event.target.value)} />
-                {erroMotivo ? <p id="dlg-motivo-erro" className="gestao-field-error"><Icon name="alert" size={14} />{erroMotivo}</p> : null}
-              </div>
+              <Field label="Motivo" error={erroMotivo || undefined}>
+                <Textarea maxLength={500} value={dialogMotivo} placeholder="Ex.: carro na oficina" invalid={Boolean(erroMotivo)} onChange={(event) => setDialogMotivo(event.target.value)} />
+              </Field>
             ) : null}
-            <div className="gestao-dialog-actions">
-              <button type="button" className="gestao-button is-secondary" autoFocus onClick={closeDialog}>{dialog.kind === "descartar" ? "Continuar editando" : "Voltar"}</button>
-              {dialog.kind === "solicitar" ? <button type="button" className="gestao-button is-primary" disabled={!padrao && !dialogModeloId} onClick={() => void confirmDialog()}><Icon name="send" size={16} />Solicitar checklist</button>
-                : dialog.kind === "cancelar" ? <button type="button" className="gestao-button is-danger" disabled={Boolean(erroMotivo)} onClick={() => void confirmDialog()}><Icon name="ban" size={16} />Cancelar checklist</button>
-                : dialog.kind === "padrao" ? <button type="button" className="gestao-button is-primary" onClick={() => void confirmDialog()}><Icon name="clipboardCheck" size={16} />Usar na rotina</button>
-                : dialog.kind === "removerItem" ? <button type="button" className="gestao-button is-danger" onClick={() => void confirmDialog()}><Icon name="trash" size={16} />Remover item</button>
-                : <button type="button" className="gestao-button is-danger" onClick={() => void confirmDialog()}><Icon name="trash" size={16} />Descartar</button>}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="gestao-toasts">
-        {error ? (
-          <div className="gestao-toast is-error" role="alert" key={`e-${error}`}>
-            <Icon name="errorCircle" /><span>{error}</span>
-            <button type="button" aria-label="Fechar aviso" onClick={() => setError("")}><Icon name="close" size={16} /></button>
           </div>
         ) : null}
-        {notice ? (
-          <div className="gestao-toast is-success" role="status" key={`n-${notice}`}>
-            <Icon name="checkCircle" /><span>{notice}</span>
-            <button type="button" aria-label="Fechar aviso" onClick={() => setNotice("")}><Icon name="close" size={16} /></button>
-          </div>
-        ) : null}
-      </div>
-
-    </div>
+      </Dialog>
+    </PageLayout>
   );
 }
 
-function FrotaRow({ veiculo, situacao, index, busy, onSolicitar, onVer, onReatribuir }: {
+function dialogTexto(dialog: Dialogo): { titulo: string; texto: string; perigo: boolean } {
+  switch (dialog.kind) {
+    case "solicitar": return {
+      titulo: `Solicitar checklist do ${dialog.veiculo.placa}?`, perigo: false,
+      texto: dialog.veiculo.motoristaNome ? `${dialog.veiculo.motoristaNome} recebe um push e o checklist aparece no App Motoristas.` : "A Infleet não mostra motorista neste carro agora. O checklist fica aguardando até alguém pegar o veículo."
+    };
+    case "cancelar": return { titulo: `Cancelar o checklist do ${dialog.checklist.placa}?`, perigo: true, texto: "O checklist sai do app do motorista. As respostas já enviadas em outros checklists não mudam." };
+    case "padrao": return { titulo: "Usar este modelo na rotina quinzenal?", perigo: false, texto: `${dialog.substitui ? `Este modelo passa a ser usado na rotina quinzenal no lugar de ${dialog.substitui}.` : "Este modelo passa a ser usado na rotina quinzenal."} A troca vale quando você salvar.` };
+    case "removerItem": return { titulo: `Remover “${dialog.nome}”?`, perigo: true, texto: "O item sai dos próximos checklists quando você salvar. Checklists já criados mantêm as respostas." };
+    default: return { titulo: "Descartar alterações?", perigo: true, texto: "As mudanças neste modelo ainda não foram salvas." };
+  }
+}
+
+function AcaoVeiculo({ veiculo, situacao, busy, onSolicitar, onVer, onReatribuir }: {
   veiculo: VeiculoFrota;
   situacao?: SituacaoVeiculo;
-  index: number;
   busy: boolean;
   onSolicitar: () => void;
   onVer: (id: string) => void;
@@ -761,24 +662,9 @@ function FrotaRow({ veiculo, situacao, index, busy, onSolicitar, onVer, onReatri
 }) {
   const aberto = situacao?.aberto;
   const semMotorista = aberto?.estado === CHECKLIST_ESTADO.aguardandoMotorista && Boolean(aberto.erroAtribuicao);
-  return (
-    <div role="listitem" className="frota-row" style={{ "--i": Math.min(index, 12) } as CSSProperties}>
-      <span className="frota-cell"><strong>{veiculo.placa}</strong><small>{veiculo.modelo || "Modelo não informado"}{veiculo.hodometro != null ? ` · ${new Intl.NumberFormat("pt-BR").format(veiculo.hodometro)} km` : ""}</small></span>
-      <span className="frota-cell frota-driver">
-        {veiculo.motoristaNome ? <><span>{veiculo.motoristaNome}</span>{veiculo.motoristaDesde ? <small>Desde {formatDay(veiculo.motoristaDesde)}</small> : null}</> : <span className="is-missing">Sem motorista na Infleet</span>}
-      </span>
-      <span className="frota-cell frota-last"><span>{situacao?.ultimo ? formatDay(situacao.ultimo.concluidoEm) : "—"}</span></span>
-      <span className={`frota-status is-${situacao?.tone ?? "neutral"}`}>
-        <span className={`gestao-badge is-${situacao?.tone ?? "neutral"}`}>{situacao?.label ?? "—"}</span>
-        {situacao?.detail ? <small>{situacao.detail}</small> : null}
-      </span>
-      <span className="frota-action">
-        {semMotorista && aberto ? <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={() => onReatribuir(aberto.id)}><Icon name="refresh" size={14} />Tentar de novo</button>
-          : aberto ? <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={() => onVer(aberto.id)}><Icon name="eye" size={14} />Ver checklist</button>
-          : <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} aria-label={`Solicitar checklist do ${veiculo.placa}`} onClick={onSolicitar}><Icon name="clipboardCheck" size={14} />Solicitar</button>}
-      </span>
-    </div>
-  );
+  if (semMotorista && aberto) return <Button variant="secondary" size="compact" icon={<Icon name="refresh" size={14} />} disabled={busy} onClick={() => onReatribuir(aberto.id)}>Tentar de novo</Button>;
+  if (aberto) return <Button variant="secondary" size="compact" icon={<Icon name="eye" size={14} />} disabled={busy} onClick={() => onVer(aberto.id)}>Ver checklist</Button>;
+  return <Button variant="secondary" size="compact" icon={<Icon name="clipboardCheck" size={14} />} disabled={busy} aria-label={`Solicitar checklist do ${veiculo.placa}`} onClick={onSolicitar}>Solicitar</Button>;
 }
 
 function ChecklistDetail({ item, busy, onLembrar, onReatribuir, onCancelar }: {
@@ -806,55 +692,53 @@ function ChecklistDetail({ item, busy, onLembrar, onReatribuir, onCancelar }: {
   const isNok = (answer: ChecklistResposta) => answer.tipo === "okNok" && answer.valor === "nok";
   const respostas = [...item.respostas.filter(isNok), ...item.respostas.filter((answer) => !isNok(answer))];
   return (
-    <section className="gestao-card gestao-detail" aria-labelledby="chk-detail-title">
-      <div className="gestao-detail-head">
-        <span className="gestao-avatar is-large" aria-hidden="true"><Icon name="car" size={20} /></span>
-        <div><h2 id="chk-detail-title">{item.placa || "Veículo"}</h2><span className={`gestao-badge is-${estado.tone}`}>{estado.label}</span></div>
+    <div className="chk-detalhe">
+      <div className="chk-detalhe__resumo">
+        <StatusBadge tone={estado.tone} dot>{estado.label}</StatusBadge>
+        <span className="chk-hint">{origemLabel(item)} · {item.modeloNome || "Modelo"}</span>
       </div>
-      <div className="gestao-detail-body">
-        {item.erroAtribuicao && item.estado === CHECKLIST_ESTADO.aguardandoMotorista ? <p className="chk-alert"><Icon name="alert" size={16} />{item.erroAtribuicao}</p> : null}
-        <div className="gestao-timeline">
-          <span className="gestao-eyebrow">Linha do tempo</span>
-          {steps.map((step, index) => (
-            <div key={step.label} className={`gestao-step ${step.done ? "is-done" : step.error ? "is-error" : ""}`} style={{ "--i": index } as CSSProperties}>
-              <span className="gestao-step-dot" aria-hidden="true">{step.done ? <Icon name="check" size={14} /> : null}</span>
-              <span><strong>{step.label}</strong><small>{step.time}</small></span>
-            </div>
-          ))}
+      {item.erroAtribuicao && item.estado === CHECKLIST_ESTADO.aguardandoMotorista ? <Alert tone="danger">{item.erroAtribuicao}</Alert> : null}
+      <section className="gestao-timeline" aria-label="Linha do tempo">
+        <span className="gestao-eyebrow">Linha do tempo</span>
+        {steps.map((step) => (
+          <div key={step.label} className={`gestao-step ${step.done ? "is-done" : step.error ? "is-error" : ""}`}>
+            <span className="gestao-step-dot" aria-hidden="true">{step.done ? <Icon name="check" size={14} /> : null}</span>
+            <span><strong>{step.label}</strong><small>{step.time}</small></span>
+          </div>
+        ))}
+      </section>
+      {isOpen(item) ? (
+        <div className="chk-detalhe__acoes">
+          {canRemind(item) ? <Button variant="secondary" size="compact" icon={<Icon name="bell" size={14} />} disabled={busy} onClick={onLembrar}>{item.pushStatus === PUSH.falhou ? "Reenviar push" : "Lembrar motorista"}</Button> : null}
+          {reatribuicao.pode ? <Button variant="secondary" size="compact" icon={<Icon name="refresh" size={14} />} disabled={busy} onClick={onReatribuir}>Tentar atribuir de novo</Button> : null}
+          <Button variant="secondary" size="compact" icon={<Icon name="ban" size={14} />} disabled={busy} onClick={onCancelar}>Cancelar checklist</Button>
+          {reatribuicao.aviso ? <p className="chk-hint">{reatribuicao.aviso}</p> : null}
         </div>
-        {isOpen(item) ? (
-          <div className="chk-detail-actions">
-            {canRemind(item) ? <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={onLembrar}><Icon name="bell" size={14} />{item.pushStatus === PUSH.falhou ? "Reenviar push" : "Lembrar motorista"}</button> : null}
-            {reatribuicao.pode ? <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={onReatribuir}><Icon name="refresh" size={14} />Tentar atribuir de novo</button> : null}
-            <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={onCancelar}><Icon name="ban" size={14} />Cancelar checklist</button>
-            {reatribuicao.aviso ? <p className="gestao-hint">{reatribuicao.aviso}</p> : null}
-          </div>
-        ) : null}
-        {item.estado === CHECKLIST_ESTADO.concluido ? (
-          <div className="gestao-detail-block">
-            <span className="gestao-eyebrow">Respostas</span>
-            <dl className="chk-answers">
-              {respostas.map((answer) => (
-                <div key={answer.chave} className={isNok(answer) ? "is-problem" : undefined}>
-                  <dt>{answer.rotulo}</dt>
-                  <dd>
-                    {isNok(answer) ? (
-                      <span className="chk-problem">
-                        <span className="gestao-badge is-danger">Não OK</span>
-                        {answer.problemas.length ? <span>{answer.problemas.join(" · ")}</span> : null}
-                        {answer.observacao ? <small>{answer.observacao}</small> : null}
-                        {answer.fotos.length ? <FotosChecklist fotos={answer.fotos} rotulo={answer.rotulo} /> : null}
-                      </span>
-                    ) : answer.tipo === "okNok" ? (answer.valor === "ok" ? <span className="gestao-badge is-success">OK</span> : "—")
-                      : answer.tipo === "foto" ? (answer.fotos.length ? <FotosChecklist fotos={answer.fotos} rotulo={answer.rotulo} /> : "Sem foto")
-                      : answer.tipo === "numero" ? formatNumber(answer.valor, unidade(answer.chave)) : answer.valor || "—"}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        ) : null}
-      </div>
-    </section>
+      ) : null}
+      {item.estado === CHECKLIST_ESTADO.concluido ? (
+        <section className="gestao-detail-block" aria-label="Respostas">
+          <span className="gestao-eyebrow">Respostas</span>
+          <dl className="chk-answers">
+            {respostas.map((answer) => (
+              <div key={answer.chave} className={isNok(answer) ? "is-problem" : undefined}>
+                <dt>{answer.rotulo}</dt>
+                <dd>
+                  {isNok(answer) ? (
+                    <span className="chk-problem">
+                      <StatusBadge tone="danger">Não OK</StatusBadge>
+                      {answer.problemas.length ? <span>{answer.problemas.join(" · ")}</span> : null}
+                      {answer.observacao ? <small>{answer.observacao}</small> : null}
+                      {answer.fotos.length ? <FotosChecklist fotos={answer.fotos} rotulo={answer.rotulo} /> : null}
+                    </span>
+                  ) : answer.tipo === "okNok" ? (answer.valor === "ok" ? <StatusBadge tone="success">OK</StatusBadge> : "—")
+                    : answer.tipo === "foto" ? (answer.fotos.length ? <FotosChecklist fotos={answer.fotos} rotulo={answer.rotulo} /> : "Sem foto")
+                    : answer.tipo === "numero" ? formatNumber(answer.valor, unidade(answer.chave)) : answer.valor || "—"}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
+    </div>
   );
 }
