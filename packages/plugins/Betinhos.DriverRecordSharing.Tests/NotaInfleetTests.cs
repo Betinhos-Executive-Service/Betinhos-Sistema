@@ -32,7 +32,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal("2026-11-19T08:00:05Z", r["sincronizadoEm"]);
             Assert.Equal("2026-08-21", ((Dictionary<string, object>)r["periodo"])["inicio"]);
             var comps = (List<Dictionary<string, object>>)r["comportamentos"];
-            Assert.Equal(new[] { "hardBraking", "fatigue", "hardAcceleration", "deviceOverspeed", "deviceIdle", "usingPhone" }, comps.Select(c => (string)c["chave"]));
+            Assert.Equal(new[] { "hardBraking", "fatigue", "hardAcceleration", "deviceOverspeed", "deviceIdle" }, comps.Select(c => (string)c["chave"]));
             Assert.Equal("Fadiga", comps[1]["rotulo"]);
         }
 

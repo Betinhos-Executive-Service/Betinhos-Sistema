@@ -18,7 +18,7 @@ function buscar(carregar: () => Promise<NotaInfleet>) {
   return emAndamento;
 }
 
-// Mostra o cache na hora e só consulta a Infleet sem cache ou com ele vencido (6 h).
+// Mostra o cache na hora e só chama a new_NotaInfleet sem cache ou com ele vencido (1 h).
 export function useNotaInfleet() {
   const [cache] = useState(() => lerNotaCache(usuarioAtual()));
   const [nota, setNota] = useState<NotaInfleet | null>(cache?.nota ?? null);

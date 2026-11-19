@@ -79,13 +79,3 @@ test("lê sincronizadoEm e mostra em São Paulo", () => {
   assert.equal(nota.situacao === "ok" && nota.sincronizadoEm, "2026-11-19T08:00:05Z");
   assert.equal(atualizadaEm("2026-11-19T08:00:05Z"), "Atualizada em 19/11 às 05:00");
 });
-
-test("esconde comportamento de câmera com 100 e mantém os de condução", () => {
-  const comportamentos = [
-    { chave: "deviceIdle", rotulo: "Motor ocioso", nota: 100 },
-    { chave: "usingPhone", rotulo: "Uso do celular", nota: 100 },
-    { chave: "fatigue", rotulo: "Fadiga", nota: 80 }
-  ];
-  const nota = lerNotaInfleet(JSON.stringify({ ...baseTabela, comportamentos }));
-  assert.deepEqual(nota.situacao === "ok" && nota.comportamentos.map((c) => c.chave), ["deviceIdle", "fatigue"]);
-});

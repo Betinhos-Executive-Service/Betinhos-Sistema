@@ -10,11 +10,8 @@ namespace Betinhos.DriverRecordSharing
     // Lógica pura da Custom API new_NotaInfleet: monta a resposta a partir de new_notamotorista. Sem rede.
     public static class NotaInfleet
     {
-        public const int Schema = 1;
-        public const int Dias = 90;
+        private const int Schema = 1;
         public const int Meses = 6;
-        public const double KmMinimo = 50;
-        private const int OffsetSaoPauloHoras = -3; // sem horário de verão
 
         public static readonly IReadOnlyList<KeyValuePair<string, string>> Comportamentos = new List<KeyValuePair<string, string>>
         {
@@ -39,14 +36,14 @@ namespace Betinhos.DriverRecordSharing
         {
             if (p90 == null)
             {
-                var vazio = Base("em_formacao", agoraUtc.AddDays(-Dias), agoraUtc);
+                var vazio = Base("em_formacao", agoraUtc.AddDays(-NotaSync.Dias), agoraUtc);
                 vazio["km"] = 0.0;
                 return vazio;
             }
-            var ok = p90.GetAttributeValue<OptionSetValue>("new_situacao")?.Value == NotaSync.SituacaoOk && p90.GetAttributeValue<decimal?>("new_nota") != null;
-            var r = Base(ok ? "ok" : "em_formacao", p90.GetAttributeValue<DateTime>("new_inicio"), p90.GetAttributeValue<DateTime>("new_fim"));
-            r["km"] = (double)(p90.GetAttributeValue<decimal?>("new_km") ?? 0);
-            if (ok) r["nota"] = (double)p90.GetAttributeValue<decimal?>("new_nota").Value;
+            var nota = NotaOk(p90);
+            var r = Base(nota != null ? "ok" : "em_formacao", p90.GetAttributeValue<DateTime>("new_inicio"), p90.GetAttributeValue<DateTime>("new_fim"));
+            r["km"] = Km(p90);
+            if (nota != null) r["nota"] = nota.Value;
             var sinc = p90.GetAttributeValue<DateTime?>("new_sincronizadoem");
             if (sinc != null) r["sincronizadoEm"] = DateTime.SpecifyKind(sinc.Value, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
 
@@ -58,25 +55,34 @@ namespace Betinhos.DriverRecordSharing
             }
             var outros = p90.GetAttributeValue<string>("new_outroscomportamentos");
             if (!string.IsNullOrEmpty(outros))
-                foreach (var o in new JavaScriptSerializer().Deserialize<List<Dictionary<string, object>>>(outros))
+                foreach (var o in Json.Deserialize<List<Dictionary<string, object>>>(outros))
                     notas[(string)o["chave"]] = Convert.ToDouble(o["nota"], CultureInfo.InvariantCulture);
-            r["comportamentos"] = Comportamentos.Select((c, i) => new { c, i }).Where(x => notas.ContainsKey(x.c.Key))
+            r["comportamentos"] = Comportamentos.Select((c, i) => new { c, i }).Where(x => notas.ContainsKey(x.c.Key) && (NotaSync.Conducao.Contains(x.c.Key) || notas[x.c.Key] < 100))
                 .OrderBy(x => notas[x.c.Key]).ThenBy(x => x.i)
                 .Select(x => new Dictionary<string, object> { ["chave"] = x.c.Key, ["rotulo"] = x.c.Value, ["nota"] = Math.Round(notas[x.c.Key], 1) }).ToList();
 
             r["meses"] = meses
-                .Where(m => m.GetAttributeValue<OptionSetValue>("new_situacao")?.Value == NotaSync.SituacaoOk && m.GetAttributeValue<decimal?>("new_nota") != null)
-                .OrderByDescending(m => m.GetAttributeValue<DateTime>("new_data")).Take(Meses).Reverse()
-                .Select(m =>
-                {
-                    var d = m.GetAttributeValue<DateTime>("new_data");
-                    return new Dictionary<string, object> { ["ano"] = d.Year, ["mes"] = d.Month, ["nota"] = (double)m.GetAttributeValue<decimal?>("new_nota").Value, ["km"] = (double)(m.GetAttributeValue<decimal?>("new_km") ?? 0) };
-                }).ToList();
+                .Select(m => new { Data = m.GetAttributeValue<DateTime>("new_data"), Nota = NotaOk(m), Km = Km(m) })
+                .Where(m => m.Nota != null)
+                .OrderByDescending(m => m.Data).Take(Meses).Reverse()
+                .Select(m => new Dictionary<string, object> { ["ano"] = m.Data.Year, ["mes"] = m.Data.Month, ["nota"] = m.Nota.Value, ["km"] = m.Km })
+                .ToList();
             return r;
         }
 
+        private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
+
+        // Nota só conta com situação Ok; em formação a coluna fica vazia.
+        private static double? NotaOk(Entity e)
+        {
+            var nota = e.GetAttributeValue<decimal?>("new_nota");
+            return e.GetAttributeValue<OptionSetValue>("new_situacao")?.Value == NotaSync.SituacaoOk && nota != null ? (double)nota.Value : (double?)null;
+        }
+
+        private static double Km(Entity e) => (double)(e.GetAttributeValue<decimal?>("new_km") ?? 0);
+
         public static Dictionary<string, object> SemCadastro(DateTime agoraUtc)
-            => Base("sem_cadastro", agoraUtc.AddDays(-Dias), agoraUtc);
+            => Base("sem_cadastro", agoraUtc.AddDays(-NotaSync.Dias), agoraUtc);
 
         private static Dictionary<string, object> Base(string situacao, DateTime inicioUtc, DateTime fimUtc) => new Dictionary<string, object>
         {
@@ -87,6 +93,6 @@ namespace Betinhos.DriverRecordSharing
             ["meses"] = new List<Dictionary<string, object>>()
         };
 
-        private static string DiaSp(DateTime utc) => utc.AddHours(OffsetSaoPauloHoras).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        private static string DiaSp(DateTime utc) => utc.AddHours(NotaSync.OffsetSaoPauloHoras).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 }

@@ -34,7 +34,10 @@ namespace Betinhos.DriverRecordSharing
         public const int SituacaoEmFormacao = 100000001;
         public static readonly string[] Conducao = { "hardBraking", "hardCornering", "hardAcceleration", "deviceOverspeed", "deviceIdle" };
         public static readonly string[] ColunasConducao = { "new_frenagem", "new_curva", "new_aceleracao", "new_velocidade", "new_motorocioso" };
-        private const int OffsetSaoPauloHoras = -3; // sem horário de verão
+        public const int Dias = 90;
+        public const double KmMinimo = 50;
+        internal const int OffsetSaoPauloHoras = -3; // sem horário de verão
+        private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
         private static DateTime Utc(DateTime diaLocal) => DateTime.SpecifyKind(diaLocal.AddHours(-OffsetSaoPauloHoras), DateTimeKind.Utc);
 
@@ -45,7 +48,7 @@ namespace Betinhos.DriverRecordSharing
             var limite = Utc(ate.AddDays(1));
             var lista = new List<NotaJanela>();
             if (ateLocal == null)
-                lista.Add(new NotaJanela { Tipo = NotaTipo.Dias90, InicioUtc = agoraUtc.AddDays(-NotaInfleet.Dias), FimUtc = agoraUtc });
+                lista.Add(new NotaJanela { Tipo = NotaTipo.Dias90, InicioUtc = agoraUtc.AddDays(-Dias), FimUtc = agoraUtc });
             var primeiro = new DateTime(ate.Year, ate.Month, 1);
             for (var k = 0; k < meses; k++)
             {
@@ -76,10 +79,9 @@ namespace Betinhos.DriverRecordSharing
         public static string Consulta(IEnumerable<NotaItem> lote)
         {
             var campos = string.Join(" ", NotaInfleet.Comportamentos.Select(c => c.Key));
-            var json = new JavaScriptSerializer();
             var sb = new StringBuilder("query { ");
             foreach (var i in lote)
-                sb.Append(i.Alias).Append(": driverProfile(filters:{driverId:").Append(json.Serialize(i.Motorista.InfleetId.Trim()))
+                sb.Append(i.Alias).Append(": driverProfile(filters:{driverId:").Append(Json.Serialize(i.Motorista.InfleetId.Trim()))
                   .Append(", period:{startAt:\"").Append(Iso(i.Janela.InicioUtc)).Append("\", endAt:\"").Append(Iso(i.Janela.FimUtc))
                   .Append("\"}}) { distanceTraveled currentDriverGrades { generalGrade ").Append(campos).Append(" } } ");
             return sb.Append("}").ToString();
@@ -92,7 +94,7 @@ namespace Betinhos.DriverRecordSharing
             if (km <= 0 && item.Janela.Tipo != NotaTipo.Dias90) return null;
             var grades = perfil != null && perfil.TryGetValue("currentDriverGrades", out var g) ? g as Dictionary<string, object> : null;
             var geral = Num(grades, "generalGrade");
-            var ok = km >= NotaInfleet.KmMinimo && geral != null;
+            var ok = km >= KmMinimo && geral != null;
 
             var e = new Entity(Tabela, "new_chave", item.Motorista.Id.ToString() + "|" + item.Janela.Sufixo);
             e["new_name"] = item.Motorista.Nome + " · " + (item.Janela.Tipo == NotaTipo.Dias90 ? "90 dias" : item.Janela.Sufixo);
@@ -108,7 +110,7 @@ namespace Betinhos.DriverRecordSharing
             var outros = NotaInfleet.Comportamentos.Where(c => !Conducao.Contains(c.Key))
                 .Select(c => new { c.Key, Nota = Num(grades, c.Key) }).Where(x => x.Nota != null)
                 .Select(x => new Dictionary<string, object> { ["chave"] = x.Key, ["nota"] = Math.Round(x.Nota.Value, 1) }).ToList();
-            e["new_outroscomportamentos"] = new JavaScriptSerializer().Serialize(outros);
+            e["new_outroscomportamentos"] = Json.Serialize(outros);
             e["new_sincronizadoem"] = agoraUtc;
             return e;
         }

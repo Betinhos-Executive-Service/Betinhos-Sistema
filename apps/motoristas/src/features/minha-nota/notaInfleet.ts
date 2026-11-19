@@ -3,10 +3,8 @@ import { executeCustomApi } from "../../data/dataverse/customApi.ts";
 // Nota de condução da Infleet (Custom API new_NotaInfleet). Fora do Dataverse usa dados fictícios.
 export type Comportamento = { chave: string; rotulo: string; nota: number };
 export type MesNota = { ano: number; mes: number; nota: number; km: number };
-export type NotaInfleet =
-  | { situacao: "ok"; inicio: string; fim: string; km: number; nota: number; comportamentos: Comportamento[]; meses: MesNota[]; sincronizadoEm?: string }
-  | { situacao: "em_formacao"; inicio: string; fim: string; km: number; comportamentos: Comportamento[]; meses: MesNota[]; sincronizadoEm?: string }
-  | { situacao: "sem_cadastro" };
+type NotaBase = { inicio: string; fim: string; km: number; comportamentos: Comportamento[]; meses: MesNota[]; sincronizadoEm?: string };
+export type NotaInfleet = ({ situacao: "ok"; nota: number } & NotaBase) | ({ situacao: "em_formacao" } & NotaBase) | { situacao: "sem_cadastro" };
 export type Faixa = { rotulo: "Ótima" | "Boa" | "Atenção"; tom: "otima" | "boa" | "atencao" };
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -30,7 +28,7 @@ export function lerNotaInfleet(json: string): NotaInfleet {
   }));
   const sincronizadoEm = texto(bruto.sincronizadoEm) || undefined;
   // Comportamentos de câmera (celular, fadiga...) com 100 não dizem nada ao motorista: só os de condução ficam sempre.
-  const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos: comportamentos.filter((c) => c.chave in DICAS || c.nota < 100), meses, sincronizadoEm };
+  const base = { inicio: texto(periodo.inicio), fim: texto(periodo.fim), km: num(bruto.km), comportamentos, meses, sincronizadoEm };
   if (bruto.situacao === "em_formacao") return { situacao: "em_formacao", ...base };
   if (typeof bruto.nota !== "number") throw erroResposta();
   return { situacao: "ok", ...base, nota: bruto.nota };
