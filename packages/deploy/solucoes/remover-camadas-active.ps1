@@ -55,7 +55,8 @@ $pedidoTipos = @($Tipos -split "," | ForEach-Object { $_.Trim() } | Where-Object
 $tiposDesconhecidos = @($pedidoTipos | Where-Object { @($mapaTipos.Values) -notcontains $_ })
 if ($tiposDesconhecidos.Count) { throw "-Tipos com tipo desconhecido: $($tiposDesconhecidos -join ', '). Validos: $(@($mapaTipos.Values) -join ', ')." }
 if ($pedidoTipos.Count) {
-  foreach ($chave in @($mapaTipos.Keys)) { if ($pedidoTipos -notcontains $mapaTipos[$chave]) { $mapaTipos.Remove($chave) } }
+  # Chave inteira no [ordered] e posicao, nao chave ($mapaTipos[61] estoura): percorre os pares.
+  foreach ($par in @($mapaTipos.GetEnumerator())) { if ($pedidoTipos -notcontains $par.Value) { $mapaTipos.Remove($par.Key) } }
   Write-Step "tipos: $(@($mapaTipos.Values) -join ', ')"
 }
 $pares = @(); $vistos = @{}
