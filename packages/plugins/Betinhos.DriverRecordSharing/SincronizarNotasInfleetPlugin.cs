@@ -31,7 +31,7 @@ namespace Betinhos.DriverRecordSharing
             try { gateway = new InfleetGraphQlGateway(InfleetGraphQlGateway.ReadToken(system, null, tracing)); }
             catch (InfleetUnavailableException error) { throw new InvalidPluginExecutionException(error.Message); }
 
-            var resumo = Rodar(system, LerMotoristas(system), DateTime.UtcNow, Data(context, "Ate"),
+            var resumo = Rodar(system, LerMotoristas(system), DateTime.UtcNow, Data(context.InputParameters, "Ate"),
                 Inteiro(context, "Meses", MesesPadrao), Inteiro(context, "Dias", DiasPadrao),
                 q => gateway.Query(q, null), () => relogio.Elapsed, tracing);
             context.OutputParameters[ResultParameter] = NotaSync.Json.Serialize(resumo);
@@ -91,7 +91,9 @@ namespace Betinhos.DriverRecordSharing
         private static int Inteiro(IPluginExecutionContext c, string nome, int padrao) =>
             c.InputParameters.Contains(nome) && c.InputParameters[nome] is int v && v >= 0 ? v : padrao;
 
-        private static DateTime? Data(IPluginExecutionContext c, string nome) =>
-            c.InputParameters.Contains(nome) && c.InputParameters[nome] is DateTime v ? v.Date : (DateTime?)null;
+        // Parâmetro opcional omitido chega preenchido: data como DateTime.MinValue (ano 1, que a Infleet recusa) e inteiro como 0.
+        // Por isso a data em ano 1 é tratada como ausente e o flow diário manda Meses e Dias explícitos.
+        public static DateTime? Data(ParameterCollection p, string nome) =>
+            p.Contains(nome) && p[nome] is DateTime v && v > DateTime.MinValue ? v.Date : (DateTime?)null;
     }
 }
