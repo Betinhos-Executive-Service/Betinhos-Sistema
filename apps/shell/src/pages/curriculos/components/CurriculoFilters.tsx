@@ -18,7 +18,7 @@ export function CurriculoFilters({ filters, onChange, cargos, choices }: Props) 
       variant="filters"
       label="Filtros de currículos"
       start={<>
-        <SearchBox className="cv-filters__search" value={filters.query} onChange={(query) => onChange({ ...filters, query })} placeholder="Buscar por nome, telefone ou cidade" aria-label="Buscar currículos" />
+        <SearchBox className="cv-filters__search" value={filters.query} onChange={(query) => onChange({ ...filters, query })} placeholder="Buscar por nome, cargo, cidade, telefone, e-mail, origem ou etapa" aria-label="Buscar currículos" />
         <Select className="cv-filters__select" aria-label="Cargo" placeholder="Cargo" clearable options={cargos.map((cargo) => ({ value: cargo, label: cargo }))} value={filters.cargo} onChange={(cargo) => onChange({ ...filters, cargo })} />
         <Select className="cv-filters__select" aria-label="Categoria da CNH" placeholder="CNH" searchable={false} clearable options={toOptions(choices.cnh)} value={toText(filters.cnh)} onChange={(value) => onChange({ ...filters, cnh: toNumber(value) })} />
         <Select className="cv-filters__select" aria-label="Origem do currículo" placeholder="Origem" searchable={false} clearable options={toOptions(choices.origem)} value={toText(filters.origem)} onChange={(value) => onChange({ ...filters, origem: toNumber(value) })} />

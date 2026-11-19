@@ -3,7 +3,8 @@ import { decodeTableFilters, encodeTableFilters, hasActiveFilters } from './tabl
 import type { Sort } from './types'
 
 /** Estado da tela que viaja na URL (`#/geral?view=…&q=…&sort=…&f=…&g=…&m=…`). `manutencoes`: só quando difere da visão. */
-export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: TableFilters; group?: ViewGroup; manutencoes?: boolean }
+/** `tabela: 'ds'`: a grade no `Table` do Design System (migração em partes; sem o parâmetro, o grid próprio). */
+export type UrlState = { view?: string; q?: string; sort?: Sort; filters?: TableFilters; group?: ViewGroup; manutencoes?: boolean; tabela?: 'ds' }
 
 /** `attr:asc|desc`, com `alias.attr` quando a coluna vem de uma tabela ligada. */
 function parseSort(text: string | null): Sort | undefined {
@@ -46,6 +47,7 @@ export function readUrlState(params: URLSearchParams): UrlState {
   if (group) state.group = group
   const m = params.get('m')
   if (m === '1' || m === '0') state.manutencoes = m === '1'
+  if (params.get('tabela') === 'ds') state.tabela = 'ds'
   const f = params.get('f')
   if (f) {
     // Lê o formato novo e o antigo (links compartilhados antes dos filtros do Design System).
@@ -65,5 +67,6 @@ export function writeUrlState(state: UrlState): string {
   if (f) params.set('f', f)
   if (state.group) params.set('g', groupText(state.group))
   if (state.manutencoes != null) params.set('m', state.manutencoes ? '1' : '0')
+  if (state.tabela) params.set('tabela', state.tabela)
   return params.toString()
 }

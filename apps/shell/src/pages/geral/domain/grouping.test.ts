@@ -3,7 +3,8 @@ import { EMPTY_GROUP_ID, OTHERS_GROUP_ID } from '@betinhos/ui'
 import { describe, expect, it } from 'vitest'
 import { buildFetch, buildGroupsFetch } from './fetch'
 import { bucketsFromRows, GROUPS_LIMIT_MESSAGE, isAggregateLimit, periodRange, type GroupSpec } from './grouping'
-import { searchConditions } from './search'
+import { keywordTokens } from '../../../app/keywordSearch'
+import { searchFields } from './search'
 
 const AGENDA = `<fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false" count="25" page="3">
 <entity name="cr40f_reservadeveculos"><attribute name="cr40f_id" /><attribute name="cr40f_status" />
@@ -13,14 +14,14 @@ const AGENDA = `<fetch version="1.0" output-format="xml-platform" mapping="logic
 </entity></fetch>`
 
 const parse = (xml: string) => new DOMParser().parseFromString(xml, 'text/xml')
-const search = searchConditions('ana', ['cr40f_id', 'cr40f_trajeto'])
-const base = { page: 1, pageSize: 100, cookie: null, sort: null, search: [] }
+const search = { tokens: keywordTokens('ana'), fields: searchFields(() => []) }
+const base = { page: 1, pageSize: 100, cookie: null, sort: null, search: null }
 const groupAttributes = (xml: string) => Array.from(parse(xml).querySelectorAll('entity > attribute')).map((a) => ({ name: a.getAttribute('name'), alias: a.getAttribute('alias'), groupby: a.getAttribute('groupby'), dategrouping: a.getAttribute('dategrouping'), aggregate: a.getAttribute('aggregate') }))
 const conditions = (xml: string) => Array.from(parse(xml).querySelectorAll('entity > filter:last-of-type > condition')).map((c) => [c.getAttribute('attribute'), c.getAttribute('operator'), c.getAttribute('value')])
 
 describe('buildGroupsFetch', () => {
   it('escolha: agrupa o campo, conta e mantém filtro e link; sem ordem, colunas nem paginação', () => {
-    const xml = buildGroupsFetch(AGENDA, { search: [], spec: { attribute: 'cr40f_status', kind: 'choice', by: 'value' } })
+    const xml = buildGroupsFetch(AGENDA, { search: null, spec: { attribute: 'cr40f_status', kind: 'choice', by: 'value' } })
     const doc = parse(xml)
     expect(doc.documentElement.getAttribute('aggregate')).toBe('true')
     for (const name of ['count', 'page', 'distinct']) expect(doc.documentElement.hasAttribute(name)).toBe(false)
@@ -35,25 +36,25 @@ describe('buildGroupsFetch', () => {
 
   it('relação e Sim/Não agrupam o próprio campo, sem dategrouping', () => {
     for (const kind of ['lookup', 'bool'] as const) {
-      const [group] = groupAttributes(buildGroupsFetch(AGENDA, { search: [], spec: { attribute: 'new_motorista', kind, by: 'value' } }))
+      const [group] = groupAttributes(buildGroupsFetch(AGENDA, { search: null, spec: { attribute: 'new_motorista', kind, by: 'value' } }))
       expect(group).toMatchObject({ name: 'new_motorista', groupby: 'true', dategrouping: null })
     }
   })
 
   it('data por mês agrupa ano e mês; por ano, só o ano', () => {
     const attribute = 'cr40f_dataehorriodesada'
-    const month = groupAttributes(buildGroupsFetch(AGENDA, { search: [], spec: { attribute, kind: 'date', by: 'month' } }))
+    const month = groupAttributes(buildGroupsFetch(AGENDA, { search: null, spec: { attribute, kind: 'date', by: 'month' } }))
     expect(month.slice(0, 2)).toEqual([
       { name: attribute, alias: 'grupo_ano', groupby: 'true', dategrouping: 'year', aggregate: null },
       { name: attribute, alias: 'grupo_mes', groupby: 'true', dategrouping: 'month', aggregate: null },
     ])
-    const year = groupAttributes(buildGroupsFetch(AGENDA, { search: [], spec: { attribute, kind: 'date', by: 'year' } }))
+    const year = groupAttributes(buildGroupsFetch(AGENDA, { search: null, spec: { attribute, kind: 'date', by: 'year' } }))
     expect(year.map((a) => a.alias)).toEqual(['grupo_ano', 'total'])
   })
 
   it('a busca da barra continua valendo nos grupos', () => {
     const xml = buildGroupsFetch(AGENDA, { search, spec: { attribute: 'cr40f_status', kind: 'choice', by: 'value' } })
-    expect(parse(xml).querySelectorAll('entity > filter condition[operator="like"]').length).toBe(2)
+    expect(parse(xml).querySelectorAll('entity > filter[type="and"] > filter[type="or"] > condition[operator="like"]').length).toBeGreaterThan(5)
   })
 })
 
@@ -65,7 +66,7 @@ describe('buildFetch com grupo aberto', () => {
     expect(conditions(xml)).toEqual([['cr40f_status', 'eq', '202410001']])
     const doc = parse(xml)
     expect(doc.querySelector('entity > filter > condition[attribute="statecode"]')).not.toBeNull()
-    expect(doc.querySelectorAll('filter[type="or"] > condition').length).toBe(2)
+    expect(doc.querySelectorAll('filter[type="or"] > condition').length).toBeGreaterThan(5)
     expect(doc.querySelector('link-entity')).not.toBeNull()
     expect(doc.documentElement.getAttribute('count')).toBe('100')
   })

@@ -2,10 +2,11 @@
 name: verificar-multas
 description: "Verifica a fase 1 das multas: regras MultaEtapas (plugin e espelho do shell, paridade), Custom APIs cr40f_PassoMulta, cr40f_MultasDoDia e new_DossieMulta, trava (observar/travar), tarefa da multa no Planner, drawer passo a passo, lista e visões, Abrir multa no Planner, aba Multas da ficha e o e-mail Multas de hoje. Use após mudar packages/plugins/Cr40f.Frota.Plugin/Multa*.cs, PassoMultaPlugin.cs, MultasDoDia*.cs, DossieMultaPlugin.cs, frota/domain/multa*.ts, MultaPassoAPasso.tsx, frota/domain/{linhas,listas}.ts, planner/domain/multaTaskFlow.ts, flows/multas-do-dia.json as migrations 20261117-1200-multas-fase1.ps1 / 20261117-2100-multas-fase1-choice-local.ps1, ou o desconto em folha (MultaParcelas.cs, LancarDescontoFolhaPlugin.cs, Custom API cr40f_LancarDescontoFolha, apps/shell/src/pages/rh-descontos/**, lib/xlsx.ts, migration 20261118-1800-rh-descontos-parcelas.ps1)."
 ---
-# Verificar multas (fase 1)
+# Verificar multas (fases 1 e 3)
 
 Spec: `docs/superpowers/specs/2026-11-17-multas-fase1-design.md`. Plano: `docs/superpowers/plans/2026-11-17-multas-fase1.md`.
 Testes, builds e navegador rodam na Betinhos-Renan (este PC tem 8 GB). Só DEV; PROD é proibido aqui.
+Fase 3 (o motorista resolve no app): spec `docs/superpowers/specs/2026-11-18-multas-fase3-app-design.md`; seção 5 abaixo e skill `verificar-termo-multa`.
 Roteiro do SNE (rotina do Júnior, não é verificada aqui): `docs/multas/rotina-sne.md`.
 
 ## 1. Testes (sem Dataverse)
@@ -62,12 +63,44 @@ Leitura das parcelas de uma multa (critério de cada passo):
 
 Permissão: a tela só lê (`prvRead` em `new_parcelamultafolha` e `cr40f_multas`); grava pela Custom API, que exige `prvWritecr40f_multas`. Em 18/11/2026 o papel Acesso-Betinhos-MDA lê multas mas não lê parcelas.
 
+## 5. Fase 3: o motorista resolve a multa no app
+Mesmas regras da seção 3 (só DEV, leitura; nada de PROD nem dado real). Códigos fixos em `.superpowers/sdd/2026-11-18-multas-fase3-app/global-constraints.md`.
+
+Testes sem Dataverse (rodar um de cada vez; vitest pesado dá timeout por carga):
+```
+export PATH=$HOME/.dotnet:$PATH
+dotnet test packages/plugins/Cr40f.Frota.Plugin.Tests -p:SignAssembly=false --nologo -v q
+dotnet test packages/plugins/Betinhos.DriverRecordSharing.Tests -p:SignAssembly=false --nologo -v q
+pnpm --filter shell exec vitest run src/pages/frota
+```
+Esperado: tudo verde. As regras vivem em `MultaEtapas` (plugin) e no espelho do shell, com o mesmo fixture de paridade.
+
+Mock do shell (`#/frota-multas`, porta 36472): autos fictícios A000000101 a A000000106 (`apps/shell/src/pages/frota/data/mock.ts`), um caso por auto:
+- A000000101: etapa 2 sem termo, "Avisar o motorista" com o termo ainda não enviado.
+- A000000102: termo pendente (`termoVigente`): o passo mostra "Aguarde a assinatura do termo ou cancele o termo." e o WhatsApp recusa com "Cancele o termo antes de avisar pelo WhatsApp."; próximo passo "Aguardando o motorista assinar o termo".
+- A000000103: contestada (`contestadaEm`) na etapa 1: próximo passo "Decidir a contestação do motorista"; o prazo vencido exige escolher o motorista.
+- A000000104: indicada no canal Senatran com aceite declarado: "Conferir o aceite na CNH Digital (motorista declarou em dd/mm)".
+- A000000105 e A000000106: etapa Pagar; acerto preso ao termo (valor pago acima do termo recusa com "O valor pago passou do valor do termo; envie um termo novo ou registre como empresa assume."; primeiro mês já passado recusa com "O primeiro mês do termo (mm/aaaa) já passou; as parcelas começam em mm/aaaa.").
+
+Casos novos e leitura no DEV (só GET; `<host>` = `https://org23b93544.crm2.dynamics.com`):
+1. **Contestada no e-mail diário**: multa na etapa 1 com `cr40f_contestadaem` preenchida. Leitura: `<host>/api/data/v9.2/cr40f_multases?$select=cr40f_name,cr40f_status,cr40f_contestadaem,cr40f_dataparaindicar,_new_termovigente_value&$filter=cr40f_contestadaem ne null`. Esperado no `--testar-multas` (seção 3.2): seção "Contestadas pelo motorista" logo depois de "Prazo vencido"; a contestada com prazo vencido aparece só em "Prazo vencido".
+2. **Termo pendente bloqueia a indicação**: multa com `new_termovigente` apontando para termo Pendente (`new_termomultas(<id>)?$select=new_status` = 100000000). O `cr40f_PassoMulta` de "Avisar" (WhatsApp) e de indicar recusa com os textos acima.
+3. **Acerto preso ao termo**: termo Assinado e Folha; o `Acertar` só aceita folha dentro do termo (parcelas e primeiro mês do termo, valor pago no máximo o valor do termo). Leia `new_termomultas(<id>)?$select=new_status,new_formapagamento,new_parcelas,new_primeiracompetencia,new_valortotal` e as parcelas como na seção 4.
+4. **`PrazoVencido` cancela o termo**: responder o passo `PrazoVencido` com termo pendente deixa o termo Cancelado (100000004) e `new_termovigente` vazio, e limpa `cr40f_contestadaem`.
+5. **Datas novas**: `cr40f_aceitedeclaradoem` e `cr40f_ultimolembreteaceiteem` só mudam por `new_DeclararAceiteMulta` e `new_LembrarAceiteMulta` (a trava da multa aceita só esses dois caminhos). Uma gravação direta pela Web API, em `observar`, passa e deixa `Recusaria` no trace.
+6. **Schema**: migration `20261119-0900-multas-fase3.ps1` cria `cr40f_contestadaem`, `cr40f_aceitedeclaradoem` e `cr40f_ultimolembreteaceiteem` (datas, só dia) em `cr40f_multas` e sobe `new_termomulta.new_parcelas` para no máximo 12. Confirme na metadata (`EntityDefinitions(LogicalName='cr40f_multas')/Attributes(LogicalName='cr40f_contestadaem')`).
+
+Passos manuais depois do merge na `develop` (quem for verificar; nada disso é automático):
+- Rodar `packages/plugins/scripts/register-multas-fase3-customapis.ps1 -Apply` **logo depois do Deploy do merge**, do checkout principal: o flow do termo (`provision-flow-termo-multa.ps1`) passa `new_Automatico` e a API precisa já ter o parâmetro.
+- O flow "Multa | Push do aceite" (`provision-flow-multa-aceite-push.ps1`) é criado à mão no DEV, uma vez, e **ainda não tem mapa em `flows-dev.mjs`** (o Deploy não o atualiza até um PR seguinte; o "Termo de multa" já tem).
+- A conta da connection reference do Dataverse do flow do aceite precisa do privilégio de gestor (`prvCreatenew_TermoMulta`) que o `new_LembrarAceiteMulta` exige; sem ele a API recusa com "Sem permissao para lembrar o aceite.".
+
 ## Evidência obrigatória
-Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace do item 3.5, a tarefa do item 3.3 e o e-mail do item 3.8; no desconto em folha, a leitura das parcelas e da multa após os itens 4.2, 4.5 e 4.6 e o print da tela no item 4.3.
+Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace do item 3.5, a tarefa do item 3.3 e o e-mail do item 3.8; na fase 3, a saída dos três `dotnet test`/vitest da seção 5, os prints dos autos A000000101 a A000000106 e as leituras 5.1 a 5.4; no desconto em folha, a leitura das parcelas e da multa após os itens 4.2, 4.5 e 4.6 e o print da tela no item 4.3.
 
 ## Limites
 - Só prova o DEV. O PROD recebe tudo pelo "Publicar soluções" (ensaio no TEST e aprovação do Renan).
 - Bypass de administrador (correção de dados) usa o bypass nativo de lógica customizada; não é coberto aqui.
 - O sininho só toca quando a atribuição nasce na criação da tarefa; responsável colocado depois pelo reparo (ex.: equipe Frota vazia na criação) não gera sininho.
-- O termo de multa fica escondido nesta fase (skills `verificar-termo-multa` e `verificar-app-termo-multa`).
+- O termo volta na fase 3 (skill `verificar-termo-multa`; a tela do app está na seção 4 dela).
 - A rotina do SNE grava a placa e a infração por `@odata.bind` (`cr40f_Placa`, `cr40f_Codigodainfracao`) (nomes de navegação confirmados na metadata do PROD, para `cr40f_veiculoses` e `cr40f_infracaodetransitos`); a conferência da primeira multa criada continua no roteiro da rotina, como boa prática.

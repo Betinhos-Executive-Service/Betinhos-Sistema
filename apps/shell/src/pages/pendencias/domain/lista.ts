@@ -1,5 +1,6 @@
-import { CONFIG_VERSION, emptyFilters, normalizeSearch, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { CONFIG_VERSION, emptyFilters, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
+import { formatDate, formatMoney } from '../../../app/format'
 import { TIPOS } from './filters'
 import { TIPO_LABEL, type Pendencia, type TipoPendencia } from './types'
 
@@ -52,13 +53,9 @@ export function readPendencia(p: Pendencia, key: string): unknown {
   }
 }
 
-/** Busca por palavra-chave (não fica na visão): OP, OS, cliente, detalhe e tipo. */
-export function matchesKeyword(p: Pendencia, query: string) {
-  const words = normalizeSearch(query).split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const text = normalizeSearch([p.opCodigo, ...p.reservaCodigos, p.cliente, p.detalhe, TIPO_LABEL[p.tipo]].filter(Boolean).join(' '))
-  return words.every((w) => text.includes(w))
-}
+/** Texto da busca por palavras (não fica na visão): tudo que a lista mostra (tipo, OP, OS, detalhe, cliente, data e valor como aparecem). */
+export const pendenciaKeywordText = (p: Pendencia) =>
+  [TIPO_LABEL[p.tipo], p.opCodigo, ...p.reservaCodigos, p.detalhe, p.cliente, formatDate(p.data), formatMoney(p.valor)].join(' ')
 
 export function sortPendencias(list: Pendencia[], sort: ViewSort | null) {
   if (!sort) return list

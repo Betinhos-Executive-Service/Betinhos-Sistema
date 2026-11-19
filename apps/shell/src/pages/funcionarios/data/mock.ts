@@ -149,10 +149,17 @@ export function createMockSource(): DataSource {
       rows = rows.map((row) => (row.id === id ? { ...row, ...(field === 'cr40f_foto' ? { fotoThumb: null, fotoUrl: null } : { assinaturaUrl: null }) } : row))
       await delay(null)
     },
-    async uploadAditivo(id, file) {
-      const url = URL.createObjectURL(file)
-      rows = rows.map((row) => (row.id === id ? { ...row, aditivo: { nome: file.name, url } } : row))
+    async gerarAditivo(id) {
       await delay(null)
+      return { pdfBase64: btoa('%PDF-1.4\n% aditivo de teste (fictício)\n%%EOF\n'), nomeArquivo: `aditivo-${id}.pdf` }
+    },
+    async registrarAditivo(id, pdfBase64, assinadoEm) {
+      await delay(null)
+      // Simula a recusa do servidor: o conteúdo marcado como "sem-assinatura" não tem assinatura digital.
+      if (atob(pdfBase64).includes('sem-assinatura')) throw new Error('Este PDF não tem assinatura digital. Assine no gov.br e envie o arquivo que o gov.br devolveu.')
+      if (assinadoEm > todaySP()) throw new Error('A data da assinatura não pode ser no futuro.')
+      const url = URL.createObjectURL(new Blob([atob(pdfBase64)], { type: 'application/pdf' }))
+      rows = rows.map((row) => (row.id === id ? { ...row, values: { ...row.values, new_aditivoassinaturaem: assinadoEm }, aditivo: { nome: `aditivo-${id}.pdf`, url } } : row))
     },
     async saveLogins(id, html) {
       rows = rows.map((row) => (row.id === id ? { ...row, loginsesenhas: html } : row))

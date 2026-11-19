@@ -51,6 +51,14 @@ function EstadoDosFlows($entrada) {
   $estado
 }
 
+# Custom API registrada depois da ultima mudanca de metadata fica invisivel para o conector do Power Automate e o flow que a usa
+# nao grava (solucoes/avancar-carimbo-metadata.ps1). Falha aqui nao impede os flows: os que nao dependem de API nova seguem.
+$ErrorActionPreference = 'Continue'
+try {
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'solucoes\avancar-carimbo-metadata.ps1') -EnvironmentUrl $EnvironmentUrl -Aplicar 2>&1 | ForEach-Object { Write-Host (Limpar "$_") }
+  if ($LASTEXITCODE -ne 0) { Write-Host '::warning title=Carimbo de metadata::avancar-carimbo-metadata.ps1 falhou; flow que usa Custom API nova pode nao gravar.' }
+} finally { $ErrorActionPreference = 'Stop' }
+
 $resultados = @()
 foreach ($e in $entradas) {
   Write-Host "::group::flow $($e.nome)"

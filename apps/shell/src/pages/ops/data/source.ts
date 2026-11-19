@@ -1,9 +1,9 @@
-import { normalizeSearch } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { getAllWithFirstPage, searchRows } from '../../../app/pagedLoad'
 import { mockProgressive, mockSearch } from '../../../app/mockVolume'
 import { createSource as createPagantesSource, browserKV, type Source as PagantesSource } from '../../pagantes/data/source'
 import type { KV } from '../../pagantes/domain/filters'
+import { matchesKeyword } from '../domain/lista'
 import { OP_STATUS, withOpFallback } from '../domain/status'
 import type { Op, OpChoices } from '../domain/types'
 import { createMockOps } from './mock'
@@ -42,8 +42,7 @@ function createMockSource(host: Host): Source {
     mock: true,
     load: (since, onPartial) => mockProgressive(rows.filter((op) => !since || (op.criadoEm && op.criadoEm >= since)).map((op) => ({ ...op })), onPartial),
     search: (since, q) => {
-      const t = normalizeSearch(q)
-      return mockSearch(rows, (op) => (!since || (op.criadoEm != null && op.criadoEm >= since)) && normalizeSearch(`${op.codigo} ${op.cliente} ${op.passageiros}`).includes(t))
+      return mockSearch(rows, (op) => (!since || (op.criadoEm != null && op.criadoEm >= since)) && matchesKeyword(op, q))
     },
     async get(id) { const op = rows.find((x) => x.id === id); return op ? { ...op } : null },
     choices: async () => withOpFallback({}),

@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { LoadingTable } from '../../../app/VirtualTable'
+import { formatDay } from '../../../app/format'
+import { ListTable } from '../../../app/ListTable'
 import { CreditCard, Headphones, Keyboard, Laptop, Monitor, Mouse, Package, PcCase, Printer, Smartphone, Tablet, type LucideIcon } from 'lucide-react'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { iconeTipo, type IconeTipo } from '../domain/cadastros'
@@ -13,7 +14,7 @@ type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; 
 
 export const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 /** `aaaa-mm-dd` → `dd/mm/aaaa` sem passar por Date (evita deslocar o dia pelo fuso). */
-export const fmtData = (iso: string | null) => (iso ? iso.split('-').reverse().join('/') : '')
+export const fmtData = formatDay
 const fmtCompra = (e: Equipamento) => [fmtData(e.dataCompra), e.valorCompra == null ? '' : money.format(e.valorCompra)].filter(Boolean).join(' · ') || '—'
 
 const ICONE: Record<IconeTipo, LucideIcon> = {
@@ -75,7 +76,7 @@ export function EquipamentosTable({ list, inativos, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.eq-open')}>
-      <LoadingTable className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando equipamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando equipamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

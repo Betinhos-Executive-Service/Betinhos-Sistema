@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { Alert, StatusBadge } from '@betinhos/ui'
 import { Sparkles } from 'lucide-react'
-import { formatDateTime, formatMoney } from '../../pagantes/domain/messages'
+import { formatDateTime, formatMoney } from '../../../app/format'
 import { Item } from './Ficha'
 import { IA_DECISAO_LABEL, IA_STATUS, decisaoTone, diferencaValor, formatDataLida, type AnaliseIA as Analise } from '../domain/ia'
 

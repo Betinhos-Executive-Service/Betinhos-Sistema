@@ -1,9 +1,9 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { ASO_VALIDADE_MESES, type AlertKind } from './alerts'
-import { addMonths } from './dates'
-import { searchable, type Filters } from './filters'
-import { digitsOnly, normalizeSearch } from './format'
+import type { AlertKind } from './alerts'
+import { searchWords } from '../../../app/search'
+import { asoVence, matchesWords, type Filters } from './filters'
+import { normalizeSearch } from './format'
 import { EMPRESA, FUNCAO, STATUS, VINCULO, optionLabel, type Option } from './schema'
 import type { FuncionarioView } from './types'
 
@@ -49,7 +49,6 @@ export const FUNCIONARIO_FIELDS: FilterField[] = [
 
 const asText = (v: unknown) => (typeof v === 'number' ? String(v) : null)
 const day = (v: unknown) => (typeof v === 'string' && v ? v.slice(0, 10) : null)
-const asoVence = (row: FuncionarioView) => { const d = day(row.values.cr40f_datadoaso); return d ? addMonths(d, ASO_VALIDADE_MESES) : null }
 export const contato = (row: FuncionarioView) => String(row.values.cr40f_telefonecorporativo ?? row.values.cr40f_telefonepessoal ?? '')
 
 export function readFuncionario(row: FuncionarioView, key: string): unknown {
@@ -70,14 +69,8 @@ export function readFuncionario(row: FuncionarioView, key: string): unknown {
   }
 }
 
-/** Busca (não fica na visão): nome, apelido, CPF, telefones e placa; com 3+ dígitos também compara só os números. */
-export function matchesKeyword(row: FuncionarioView, search: string) {
-  const term = normalizeSearch(search.trim())
-  if (!term) return true
-  const { text, digits } = searchable(row)
-  const termDigits = digitsOnly(search)
-  return text.includes(term) || (termDigits.length >= 3 && digits.includes(termDigits))
-}
+/** Busca (não fica na visão): as palavras da busca contra o texto de `searchText` (ver `filters.ts`). */
+export const matchesKeyword = (row: FuncionarioView, search: string) => matchesWords(row, searchWords(search))
 
 export const matchesAlerta = (row: FuncionarioView, alerta: AlertKind | null) => !alerta || row.alertas.some((a) => a.kind === alerta)
 

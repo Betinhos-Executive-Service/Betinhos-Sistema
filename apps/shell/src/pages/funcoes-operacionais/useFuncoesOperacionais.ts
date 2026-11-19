@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { logAppError } from '@betinhos/ui/error-logger'
 import type { Source } from './data/source'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import {
   PAGE_SIZE, SWAP_STATUS_READ_ONLY, applyVehicleFieldChange, emptyVehicleForm, splitDateTime, toggleCloneDate, validateCloneDraft,
   validateVehicleForm, vehicleFormFromSwap, weekStart, type FieldErrors,
 } from './domain/forms'
-import { betweenServicesWindow, buildVehiclePreview, cloneServices, createCloneDraft, driverServices, passengerLinksByService, serviceById, usesBetweenServices } from './domain/logic'
+import { betweenServicesWindow, buildVehiclePreview, cloneServices, createCloneDraft, driverServices, passengerLinksByService, passengerLinksOf, serviceById, serviceKeywordText, usesBetweenServices } from './domain/logic'
 import { userErrorMessage } from './domain/payloads'
-import type { CloneDraft, DashboardData, ToastTone, VehicleForm, VehiclePreview, ViewName } from './domain/types'
+import type { CloneDraft, DashboardData, Service, ToastTone, VehicleForm, VehiclePreview, ViewName } from './domain/types'
 import { combineDateTime, displayDriverName, formatDate, formatTime, toDateInputValue, twoDigits } from './domain/utils'
 
 export type ToastAction = { label: string; run: () => void }
@@ -527,18 +528,30 @@ export function useFuncoesOperacionais({ source, notify, view, routeEditId, navi
   }
 
   // ── derivados ──
+  // A busca vale depois de uma pausa na digitação; as palavras também vão para o destaque (SearchHits).
+  const driverQuery = useDebouncedText(state.driver.query)
+  const cloneQuery = useDebouncedText(state.clone.query)
+  const driverWords = useMemo(() => searchWords(driverQuery), [driverQuery])
+  const cloneWords = useMemo(() => searchWords(cloneQuery), [cloneQuery])
+  const passengerLinks = state.data.passengerLinks
+  const serviceIndex = useMemo(
+    () => keywordIndex<Service>((service) => serviceKeywordText(service, passengerLinksOf(passengerLinks, service.id))),
+    [passengerLinks],
+  )
   const derived = useMemo(() => {
-    const driverAll = driverServices(state)
+    const driverAll = driverServices(state, (service) => serviceIndex.matches(service, driverWords))
     const driverList = state.driver.onlyMissing ? driverAll.filter((service) => !service.motoristaId) : driverAll
-    const cloneList = cloneServices(state)
+    const cloneList = cloneServices(state, (service) => serviceIndex.matches(service, cloneWords))
     return { driverAll, driverList, driverMissingCount: driverAll.filter((service) => !service.motoristaId).length, cloneList }
-  }, [state])
+  }, [state, serviceIndex, driverWords, cloneWords])
 
   return {
     state: current,
     today,
     readOnly,
     ...derived,
+    driverWords,
+    cloneWords,
     update,
     refreshNow,
     switchView,

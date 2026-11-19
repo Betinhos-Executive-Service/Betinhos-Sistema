@@ -24,6 +24,17 @@ describe('Comunicados', () => {
     expect(await screen.findByText('Push reenfileirado.')).toBeTruthy()
   })
 
+  it('busca por várias palavras na lista e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) }, delete: () => undefined } })
+    render(<ComunicadosPage host={{ mode: 'mock' }} />)
+    await screen.findByRole('button', { name: /^Revisão dos veículos/ })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar comunicado' }), { target: { value: 'revisao veiculos' } })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Novo procedimento de embarque/ })).toBeNull())
+    await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toContain('revisão'))
+  })
+
   it('Voltar fica no início do cabeçalho, antes do título, no relatório e no editor', async () => {
     render(<ComunicadosPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('button', { name: /Novo procedimento de embarque/ }))

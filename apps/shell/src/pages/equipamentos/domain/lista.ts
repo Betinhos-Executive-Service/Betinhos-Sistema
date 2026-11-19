@@ -1,8 +1,8 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import { formatDay, formatMoney } from '../../../app/format'
 import { sortRows } from '../../../app/listSort'
-import { normalize } from '../../infracoes/domain/filters'
 import { byNome } from './cadastros'
-import { STATUS, STATUS_OPTIONS } from './choices'
+import { STATUS, STATUS_OPTIONS, statusLabel } from './choices'
 import type { Equipamento, Pessoa, TipoEquipamento } from './types'
 
 /** Equipamentos no padrão de listas do DS (§10.9.1/§10.9.2). A Visão padrão esconde os baixados. */
@@ -76,13 +76,15 @@ export function readEquipamento(e: Equipamento, key: string): unknown {
   }
 }
 
-/** Busca (fora da visão): descrição, tipo, marca/modelo, série e responsável. */
-export function matchesKeyword(e: Equipamento, query: string) {
-  const terms = normalize(query).split(/\s+/).filter(Boolean)
-  if (!terms.length) return true
-  const hay = normalize([e.descricao, e.tipoNome, e.marcaModelo, e.numeroSerie, e.responsavelNome].join(' '))
-  return terms.every((t) => hay.includes(t))
-}
+
+/**
+ * Texto em que a busca procura (fora da visão): tudo o que a lista mostra (descrição, tipo, marca/modelo, responsável,
+ * status, série, compra em dd/mm/aaaa e valor) mais as observações.
+ */
+export const equipamentoKeywordText = (e: Equipamento) => [
+  e.descricao, e.tipoNome, e.marcaModelo, e.responsavelNome, statusLabel(e.status), e.numeroSerie,
+  formatDay(e.dataCompra), e.valorCompra == null ? '' : formatMoney(e.valorCompra), e.observacoes,
+].filter(Boolean).join(' ')
 
 export function sortEquipamentos(list: Equipamento[], sort: ViewSort | null) {
   if (!sort) return list

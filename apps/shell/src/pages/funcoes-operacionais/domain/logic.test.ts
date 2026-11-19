@@ -7,9 +7,11 @@ import {
   createCloneDraft,
   driverServices,
   passengerLinksByService,
+  serviceKeywordText,
   servicePassengerText,
   stripContactPhone
 } from "./logic";
+import { keywordIndex, searchWords } from "../../../app/search";
 import type { AppState, Driver, Possession, Service, Swap, Vehicle } from "./types";
 import { defaultVehicleWindow, toDateInputValue, toHourValue, toMinuteValue } from "./utils";
 
@@ -163,13 +165,31 @@ function swap(overrides: Partial<Swap>): Swap {
 }
 
 describe("operational logic", () => {
-  test("driverServices keeps only the driver window, filters text, and sorts by date", () => {
+  const normalizeForTest = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const matcher = (state: AppState, query: string) => {
+  const index = keywordIndex<Service>((item) => serviceKeywordText(item, passengerLinksByService(state, item.id)));
+  const words = searchWords(query);
+  return (item: Service) => index.matches(item, words);
+};
+
+test("driverServices keeps only the driver window, filters text, and sorts by date", () => {
     vi.setSystemTime(new Date("2026-06-26T03:00:00.000Z"));
     const state = baseState({ driver: { query: "tenaris", startDate: "2026-06-26" } });
 
-    const result = driverServices(state);
+    const result = driverServices(state, matcher(state, "tenaris"));
 
     expect(result.map((item) => item.id)).toEqual(["srv-2"]);
+  });
+
+  test("busca por várias palavras (E): passageiro do vínculo, status e motorista, sem acento", () => {
+    vi.setSystemTime(new Date("2026-06-26T03:00:00.000Z"));
+    const state = baseState({ driver: { query: "", startDate: "2026-06-26" } });
+    const ids = (query: string) => driverServices(state, matcher(state, query)).map((item) => item.id);
+    const [first] = state.data.services;
+
+    expect(ids("joao lima")).toContain("srv-1");
+    expect(ids(`joao ${normalizeForTest(first.statusLabel)}`)).toContain("srv-1");
+    expect(ids("joao palavra-que-nao-existe")).toEqual([]);
   });
 
   test("passenger details come from relationship rows and phone numbers are removed", () => {

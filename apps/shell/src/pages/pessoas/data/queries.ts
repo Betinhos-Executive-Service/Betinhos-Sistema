@@ -31,8 +31,10 @@ const dateOnly = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.
 export const pessoasPath = (set: string, search: string | null = null) =>
   `${set}?$select=${SELECT.join(',')}&$filter=${encodeURIComponent(andFilter('statecode eq 0', search))}&$orderby=${encodeURIComponent('cr40f_nomedopassageiro asc')}`
 
-/** Busca no servidor: nome em qualquer posição (sobrenome), e-mail pelo começo. */
-export const pessoasSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_email'], contains: ['cr40f_nomedopassageiro'] })
+/** Busca no servidor: nome, e-mail, telefone, departamento, CR, endereço e preferências, em qualquer posição do texto. */
+export const pessoasSearchFilter = (query: string) => odataSearchFilter(query, {
+  contains: ['cr40f_nomedopassageiro', 'cr40f_email', 'cr40f_telefone', 'cr40f_departamento', 'cr40f_cr', 'cr40f_enderecodesaida', 'cr40f_preferenciasdopassageiro'],
+})
 
 export function mapPessoa(row: Row): Pessoa {
   return {

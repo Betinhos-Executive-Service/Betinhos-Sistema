@@ -26,6 +26,15 @@ describe('Despesas operacionais', () => {
     expect(within(ficha).queryByRole('button', { name: /Pagar|Salvar/ })).toBeNull()
   })
 
+  it('busca por várias palavras destaca os termos (SearchHits) e filtra em AND', async () => {
+    const { container } = render(<DespesasPage host={{ mode: 'mock' }} />)
+    await screen.findAllByText('Ecovias Imigrantes')
+    const box = screen.getByRole('searchbox', { name: 'Buscar despesas' })
+    expect(container.querySelector('.search-hits')).toBeTruthy()
+    fireEvent.change(box, { target: { value: 'ecovias zzzzqq' } })
+    await waitFor(() => expect(screen.queryAllByText('Ecovias Imigrantes')).toHaveLength(0))
+  })
+
   it('abre o comprovante no visualizador e navega entre os arquivos', async () => {
     // jsdom não implementa <dialog>.showModal: o mínimo para o visualizador abrir e fechar.
     HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }

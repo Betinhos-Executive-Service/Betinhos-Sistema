@@ -67,4 +67,14 @@ describe('pendências', () => {
     expect(filtrarPendencias(lista, { aba: 'pessoas', kpi: null, tipo: 'cnh', q: '' })).toHaveLength(1)
     expect(filtrarPendencias(lista, { aba: 'frota', kpi: null, tipo: null, q: '' })).toHaveLength(0)
   })
+
+  it('busca por várias palavras: AND entre elas, campos novos (situação, validade, número, e-mail) casam', () => {
+    const ana = dono({ id: 'ana', nome: 'Ana Júlia' })
+    const lista = montarPendencias([CNH, RG], [ana], [doc({ tipoId: 'cnh', donoId: 'ana', validade: '2026-10-01', numero: '98765' })], HOJE)
+    const busca = (q: string) => filtrarPendencias(lista, { aba: 'pessoas', kpi: null, tipo: null, q }).map((p) => p.tipo.codigo)
+    expect(busca('ana vencido')).toEqual(['CNH'])
+    expect(busca('ana faltando')).toEqual(['RG'])
+    expect(busca('98765 01/10/2026')).toEqual(['CNH'])
+    expect(busca('ana inexistente')).toEqual([])
+  })
 })

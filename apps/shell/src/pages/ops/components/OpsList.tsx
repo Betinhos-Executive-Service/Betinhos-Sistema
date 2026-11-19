@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import { StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { VirtualTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { openFromRow, openOnRow, openRowActions, selectionRowActions, type SelectionProps } from '../../pagantes/components/PagantesList'
-import { formatDate, formatMoney } from '../../pagantes/domain/messages'
+import { formatDate, formatMoney } from '../../../app/format'
 import { label } from '../../pagantes/domain/status'
 import { opTone } from '../domain/status'
 import { valorOp, type Op, type OpChoices } from '../domain/types'
@@ -49,7 +49,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
   ]
   return (
     <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
-      <VirtualTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

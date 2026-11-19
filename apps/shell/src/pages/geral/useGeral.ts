@@ -51,7 +51,6 @@ export type GeralState = {
   columns: Column[]
   attributes: AttributeMap | null
   attributesError: string | null
-  quickFind: string[]
   rows: Row[]; total: number | null; more: boolean; pagesLoaded: number
   loading: boolean; loadingMore: boolean; pageError: string | null; loadError: string | null
   sort: Sort; query: string
@@ -144,7 +143,6 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   }, [layoutColumns, extras])
   const [attributes, setAttributes] = useState<AttributeMap | null>(null)
   const [attributesError, setAttributesError] = useState<string | null>(null)
-  const [quickFind, setQuickFind] = useState<string[]>([])
   const [rows, setRowsState] = useState<Row[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [more, setMore] = useState(false)
@@ -212,8 +210,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
   const bucketsRef = useRef<GroupBucket[]>([])
   const loadsRef = useRef(new Map<string, GroupLoad>())
   /** Visão, ordem e busca correntes: `loadMore` e `reload` pedem sempre com o contexto do último render. */
-  const context = useRef({ fetchxml: null as string | null, sort: null as Sort, query: '', quickFind: [] as string[], spec: null as typeof groupSpec })
-  context.current = { fetchxml: filtersPending ? null : effectiveFetch, sort, query, quickFind, spec: groupSpec }
+  const context = useRef({ fetchxml: null as string | null, sort: null as Sort, query: '', spec: null as typeof groupSpec })
+  context.current = { fetchxml: filtersPending ? null : effectiveFetch, sort, query, spec: groupSpec }
   // Um fim de "salvo" por célula: gravar de novo na mesma célula cancela o anterior.
   const settleTimers = useRef(new Map<string, number>())
   /** Cada primeira página ou releitura invalida as respostas que ainda estão a caminho. */
@@ -279,14 +277,13 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     setAttributesError(null)
   }, [])
 
-  // Efeito 1: visões e localização rápida em paralelo; a localização rápida nunca bloqueia a tela.
+  // Efeito 1: visões.
   useEffect(() => {
     let alive = true
-    void Promise.all([source.views(), source.quickFind().catch(() => [] as string[])]).then(
-      ([list, fields]) => {
+    void source.views().then(
+      (list) => {
         if (!alive) return
         setViews(list)
-        setQuickFind(fields)
         setViewsError(null)
         const initial = initialRef.current
         initialRef.current = undefined
@@ -328,12 +325,12 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     window.clearTimeout(countTimer.current)
     if (result.total != null && result.total >= 0) { setTotal(result.total); return }
     if (!result.more) { setTotal(null); return }
-    const { fetchxml, query: text, quickFind: fields } = context.current
+    const { fetchxml, query: text } = context.current
     if (!fetchxml) return
     const signal = requests.current?.signal
     const run = () => {
       if (token !== pageToken.current) return
-      void source.count({ fetchxml, query: text, quickFind: fields, signal }).then(
+      void source.count({ fetchxml, query: text, signal }).then(
         (count) => { if (token === pageToken.current && count != null) setTotal(count) },
         () => { /* sem contagem: o rodapé mostra só o que já carregou */ },
       )
@@ -365,7 +362,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     if (filtersPending) return
     const spec = context.current.spec
     if (spec) {
-      source.groups({ fetchxml: effectiveFetch, query, quickFind, spec, signal }).then(
+      source.groups({ fetchxml: effectiveFetch, query, spec, signal }).then(
         (list) => {
           if (token !== pageToken.current) return
           bucketsRef.current = list
@@ -382,7 +379,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
       )
       return
     }
-    source.page({ fetchxml: effectiveFetch, page: 1, cookie: null, sort, query, quickFind, signal }).then(
+    source.page({ fetchxml: effectiveFetch, page: 1, cookie: null, sort, query, signal }).then(
       (result) => {
         if (token !== pageToken.current) return
         rowsRef.current = result.rows
@@ -400,16 +397,16 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         setLoadingFlag(false)
       },
     )
-  }, [source, view, effectiveFetch, filtersPending, groupKey, sort, query, quickFind, resolveTotal, renewRequests, setLoads, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
+  }, [source, view, effectiveFetch, filtersPending, groupKey, sort, query, resolveTotal, renewRequests, setLoads, setLoadingFlag, setLoadingMoreFlag, setLoadErrorValue, setMoreValue])
 
   /** Pede a próxima página (rolagem infinita: o sentinela no fim da lista chama) e acrescenta só as linhas que ainda não estão na lista. */
   const loadMore = useCallback(() => {
-    const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
+    const { fetchxml, sort: order, query: text } = context.current
     if (!fetchxml || loadingRef.current || loadingMoreRef.current || !moreRef.current || loadErrorRef.current) return
     const token = pageToken.current
     const previous = cookieRef.current
     setLoadingMoreFlag(true)
-    source.page({ fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, quickFind: fields, signal: requests.current?.signal }).then(
+    source.page({ fetchxml, page: pagesRef.current + 1, cookie: previous, sort: order, query: text, signal: requests.current?.signal }).then(
       (result) => {
         if (token !== pageToken.current) return
         setLoadingMoreFlag(false)
@@ -436,14 +433,14 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   /** Abre o grupo na página 1 ou pede a próxima; cada grupo pagina sozinho, com o mesmo contexto (visão, filtros, busca, ordem) da lista. */
   const fetchGroupPage = useCallback((id: string) => {
-    const { fetchxml, sort: order, query: text, quickFind: fields, spec } = context.current
+    const { fetchxml, sort: order, query: text, spec } = context.current
     const bucket = bucketsRef.current.find((b) => b.id === id)
     const previous = loadsRef.current.get(id)
     if (!fetchxml || !spec || !bucket || previous?.loading || (previous && !previous.more)) return
     const token = pageToken.current
     const cookie = previous?.cookie ?? null
     patchLoad(id, { loading: true, error: null })
-    source.page({ fetchxml, page: (previous?.pages ?? 0) + 1, cookie, sort: order, query: text, quickFind: fields, signal: requests.current?.signal, group: targetOf(spec, bucket) }).then(
+    source.page({ fetchxml, page: (previous?.pages ?? 0) + 1, cookie, sort: order, query: text, signal: requests.current?.signal, group: targetOf(spec, bucket) }).then(
       (result) => {
         const current = loadsRef.current.get(id)
         if (token !== pageToken.current || !current) return
@@ -481,11 +478,11 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
    * a espera fica como está. Se falha ou é cancelada, tira o "carregando" dos grupos que estavam a caminho (a resposta deles foi descartada).
    */
   const reloadGroups = useCallback(async (fetchxml: string, token: number, signal: AbortSignal | undefined) => {
-    const { sort: order, query: text, quickFind: fields, spec } = context.current
+    const { sort: order, query: text, spec } = context.current
     if (!spec) return
     const started = new Map(loadsRef.current)
     try {
-      const list = await source.groups({ fetchxml, query: text, quickFind: fields, spec, signal })
+      const list = await source.groups({ fetchxml, query: text, spec, signal })
       if (token !== pageToken.current) return
       const reloaded = new Map<string, GroupLoad>()
       const fresh: Row[] = []
@@ -498,7 +495,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
           let more = false
           let pages = 0
           for (let n = 1; n <= Math.max(1, previous.pages); n += 1) {
-            const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields, signal, group: targetOf(spec, bucket) })
+            const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, signal, group: targetOf(spec, bucket) })
             if (token !== pageToken.current) return
             for (const row of result.rows) { const key = String(row[ID_ATTRIBUTE]); if (!ids.has(key)) { ids.add(key); fresh.push(row) } }
             cookie = result.cookie
@@ -535,7 +532,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
 
   /** Relê da página 1 até a última carregada, em sequência (cada página com o cookie da anterior). A lista só troca ao final. */
   const reload = useCallback(() => {
-    const { fetchxml, sort: order, query: text, quickFind: fields } = context.current
+    const { fetchxml, sort: order, query: text } = context.current
     if (!fetchxml) return
     const token = ++pageToken.current
     const signal = renewRequests()
@@ -560,7 +557,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         let loaded = 0
         let first: Page | null = null
         for (let n = 1; n <= target; n += 1) {
-          const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, quickFind: fields, signal })
+          const result: Page = await source.page({ fetchxml, page: n, cookie, sort: order, query: text, signal })
           if (token !== pageToken.current) return
           first ??= result
           for (const row of result.rows) {
@@ -691,6 +688,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return ids.length > 0 && ids.every((id) => s.has(id)) ? new Set() : new Set(ids)
   }), [])
   const clearSelection = useCallback(() => setSelected(new Set()), [])
+  /** Seleção inteira de uma vez (tabela do DS, que controla clique, Ctrl, Shift e o cabeçalho). */
+  const setSelection = useCallback((next: Set<string>) => setSelected(next), [])
 
   const setCell = useCallback((key: string, event: CellEvent) => setCells((m) => {
     const next = new Map(m)
@@ -757,8 +756,8 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
     return true
   }, [attributes, columns, source, group, reload, setCell, setRows, scheduleSettle])
 
-  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, quickFind, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells, mostrarManutencoes, manutencoesAlteradas }
+  const state: GeralState = { views, viewsError, view, columns, attributes, attributesError, rows, total, more, pagesLoaded, loading, loadingMore, pageError, loadError, sort, query, filters, group, buckets, groupNotice, filterFields, selected, cells, mostrarManutencoes, manutencoesAlteradas }
   /** Há filtros, mas a metadata falhou: a consulta segue sem eles. */
   const filtersIgnored = filtersOverride != null && hasActiveFilters(filtersOverride) && attributes == null && attributesError != null
-  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, save, resetCell }
+  return { ...state, filtersIgnored, defaultOrder, setMostrarManutencoes, resetManutencoes, comManutencoes, groupSpec, groupLoads, setGroup, toggleGroup, retryGroup, loadMoreGroup: fetchGroupPage, setExtras, selectView, reloadViews, setSort, setQuery, setFilters, setQuickFilter, clearFilters, resetFilters, viewFilters, loadMore, retryLoadMore, reload, refresh: reload, toggle, selectOnly, selectRange, toggleAll, clearSelection, setSelection, save, resetCell }
 }

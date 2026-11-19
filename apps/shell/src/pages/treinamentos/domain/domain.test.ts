@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TELA, builtinViews, matchesKeyword, readTreinamento, sortTreinamentos, type Linha } from './lista'
+import { keywordIndex, searchWords } from '../../../app/search'
+import { TELA, builtinViews, readTreinamento, sortTreinamentos, treinamentoKeywordText, type Linha } from './lista'
 import {
   ESTADO, FUNCAO_MOTORISTA, PUBLICO, anexoDaPasta, blocosDoConteudo, copiaParaReciclagem, edicaoPublicadoPayload, draftPayload, emptyDraft, isOrfa, isVencido, mapParticipacao, mapTreinamento, matchParticipacao, podeLembrar, pushLabel, PUSH, novaPergunta, publicoLabel, resolverPublico, statusParticipacao, trechos,
   validarAnexo, validarComConteudo, validarPublicacao, validarQuiz, validarRascunho, type Funcionario, type Participacao, type Pergunta, type Treinamento,
@@ -146,6 +147,16 @@ describe('conteúdo com marcação simples', () => {
 
 describe('lista', () => {
   const linha = (patch: Partial<Linha>): Linha => ({ ...draft(), criadoEm: '2026-10-01T00:00:00Z', ...patch })
+  const matchesKeyword = (t: Linha, q: string, progresso: Record<string, { concluidos: number; total: number }> = {}) =>
+    keywordIndex<Linha>((x) => treinamentoKeywordText(x, [], progresso, '2026-10-10')).matches(t, searchWords(q))
+  it('busca por várias palavras (AND) em campos novos: situação, conteúdo, exigências, validade e conclusão', () => {
+    const t = linha({ id: 't1', titulo: 'Direção defensiva', conteudo: 'Mantenha distância segura', estado: ESTADO.publicado, publicadoEm: '2026-10-05T12:00:00Z', exigeQuiz: true, validade: '2026-10-12' })
+    expect(matchesKeyword(t, 'publicado quiz')).toBe(true)
+    expect(matchesKeyword(t, 'DISTANCIA segura defensiva')).toBe(true)
+    expect(matchesKeyword(t, 'vence em 2 dias')).toBe(true)
+    expect(matchesKeyword(t, '1 de 3', { t1: { concluidos: 1, total: 3 } })).toBe(true)
+    expect(matchesKeyword(t, 'publicado rascunho')).toBe(false)
+  })
   it('busca sem acento, leitura das colunas e ordenação por criação', () => {
     expect(matchesKeyword(linha({ titulo: 'Direção defensiva' }), 'direcao')).toBe(true)
     expect(readTreinamento(linha({ estado: ESTADO.publicado, publicadoEm: '2026-10-05T12:00:00Z' }), 'publicadoEm')).toBe('2026-10-05')

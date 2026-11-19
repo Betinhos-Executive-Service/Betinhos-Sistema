@@ -6,23 +6,25 @@ import { test } from 'node:test'
 import { gunzipSync } from 'node:zlib'
 import { escolherTabelas, exportarTabela, obter } from './exportar-dataverse.mjs'
 
-const def = (LogicalName, extra = {}) => ({ LogicalName, EntitySetName: `${LogicalName}s`, IsCustomEntity: true, TableType: 'Standard', ...extra })
+const def = (LogicalName, extra = {}) => ({ LogicalName, EntitySetName: `${LogicalName}s`, TableType: 'Standard', ...extra })
 
-test('escolhe personalizadas e extras, nunca cr40f_segredo nem virtuais', () => {
+test('escolhe cr40f_, new_ e extras, nunca cr40f_segredo, virtuais nem personalizadas da plataforma', () => {
   const tabelas = escolherTabelas([
     def('cr40f_servico'),
     def('cr40f_segredo'),
     def('new_appmotoristaslog'),
     def('cr40f_virtual', { TableType: 'Virtual' }),
-    def('account', { IsCustomEntity: false }),
-    def('systemuser', { IsCustomEntity: false }),
+    def('account'),
+    def('systemuser'),
+    def('flowlog'),
+    def('msdyn_aioptimizationprivatedata'),
     def('cr40f_semconjunto', { EntitySetName: null }),
   ])
   assert.deepEqual(tabelas.map((t) => t.logico), ['account', 'cr40f_servico', 'new_appmotoristaslog'])
 })
 
 test('cr40f_segredo sai mesmo se pedida como extra; excluir tira outras', () => {
-  const tabelas = escolherTabelas([def('cr40f_segredo', { IsCustomEntity: false }), def('cr40f_a'), def('cr40f_b')], {
+  const tabelas = escolherTabelas([def('cr40f_segredo'), def('cr40f_a'), def('cr40f_b')], {
     extra: ['cr40f_segredo'],
     excluir: ['cr40f_b'],
   })

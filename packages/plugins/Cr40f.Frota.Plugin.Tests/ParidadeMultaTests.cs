@@ -32,6 +32,7 @@ public sealed class CasoAvaliacao
     [DataMember(Name = "prazoVencido")] public bool PrazoVencido { get; set; }
     [DataMember(Name = "aguardandoPenalidade")] public bool AguardandoPenalidade { get; set; }
     [DataMember(Name = "descontando")] public bool Descontando { get; set; }
+    [DataMember(Name = "aguardandoTermo")] public bool AguardandoTermo { get; set; }
 }
 
 [DataContract]
@@ -73,8 +74,8 @@ public sealed class CasoAplicacao
 
 public class ParidadeMultaTests
 {
-    private static string Linha(string nome, string etapa, IEnumerable<string> pendentes, string passo, string? prazo, bool vencido, bool penalidade, bool descontando)
-        => $"{nome} | {etapa} | {string.Join(",", pendentes)} | {passo} | {prazo ?? "null"} | {vencido} | {penalidade} | {descontando}";
+    private static string Linha(string nome, string etapa, IEnumerable<string> pendentes, string passo, string? prazo, bool vencido, bool penalidade, bool descontando, bool termo)
+        => $"{nome} | {etapa} | {string.Join(",", pendentes)} | {passo} | {prazo ?? "null"} | {vencido} | {penalidade} | {descontando} | {termo}";
 
     [Fact]
     public void Avalia_igual_ao_shell()
@@ -84,8 +85,8 @@ public class ParidadeMultaTests
         foreach (var c in f.Avaliacoes)
         {
             var s = MultaEtapas.Avaliar(c.Multa, f.Hoje);
-            Assert.Equal(Linha(c.Nome, c.Etapa, c.Pendentes, c.ProximoPasso, c.ProximoPrazo, c.PrazoVencido, c.AguardandoPenalidade, c.Descontando),
-                Linha(c.Nome, s.Etapa, s.Pendentes, s.ProximoPasso, s.ProximoPrazo, s.PrazoVencido, s.AguardandoPenalidade, s.Descontando));
+            Assert.Equal(Linha(c.Nome, c.Etapa, c.Pendentes, c.ProximoPasso, c.ProximoPrazo, c.PrazoVencido, c.AguardandoPenalidade, c.Descontando, c.AguardandoTermo),
+                Linha(c.Nome, s.Etapa, s.Pendentes, s.ProximoPasso, s.ProximoPrazo, s.PrazoVencido, s.AguardandoPenalidade, s.Descontando, s.AguardandoTermo));
         }
     }
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import type { CatalogField, ViewDefinition } from './views'
 
@@ -8,6 +8,19 @@ const catalog: CatalogField[] = [
   { id: 'route', label: 'Rota', table: 'cr40f_reservadeveculos', attribute: 'cr40f_trajeto', path: ['cr40f_reservadeveculos'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }], type: 'String', available: true },
   { id: 'new_valorlocacao', label: 'Locação', table: 'cr40f_composicaodeprecos', attribute: 'new_valorlocacao', path: [], type: 'Money', available: true },
 ]
+const RESERVA = 'cr40f_reservadeveculos'
+const rel = (...to: string[]) => to.map((item) => ({ from: `${item}id`, to: item }))
+const field = (table: string, attribute: string, type: string, via: string[], id = `${table}.${attribute}.${via.join('/')}`): CatalogField => ({ id: via.length ? id : attribute, label: attribute, table, attribute, path: via.length === 2 ? [RESERVA, table] : via.length ? [table] : [], relationships: rel(...via), type, available: true })
+const reserva = ['cr40f_servicorelacionadogeral']
+const richCatalog: CatalogField[] = [
+  ...catalog,
+  field('cr40f_composicaodeprecos', 'cr40f_id', 'String', []), field('cr40f_composicaodeprecos', 'new_status', 'Picklist', []),
+  field('cr40f_composicaodeprecos', 'new_valortotal', 'Money', []), field('cr40f_composicaodeprecos', 'new_subtotal', 'Money', []),
+  field('cr40f_terceirofavorecido', 'cr40f_name', 'String', ['cr40f_terceirofavorecido']), field('cr40f_pagamentoaterceiro', 'cr40f_name', 'String', ['cr40f_pagamentoaterceiro']),
+  ...['cr40f_id', 'cr40f_idnovo', 'cr40f_cr', 'cr40f_passageirosetelefonedecontato'].map((attribute) => field(RESERVA, attribute, attribute === 'cr40f_passageirosetelefonedecontato' ? 'Memo' : 'String', reserva)),
+  field(RESERVA, 'cr40f_idtenaris', 'Integer', reserva),
+  field('cr40f_bancodedados', 'cr40f_nomedopassageiro', 'String', [...reserva, 'cr40f_solicitante']), field('cr40f_veiculos', 'cr40f_placa', 'String', [...reserva, 'cr40f_veiculo']),
+].map((item) => item.attribute === 'cr40f_id' && item.table === RESERVA ? { ...item, id: 'reserva-os' } : item)
 const definition: ViewDefinition = { columns: [{ id: 'new_valorlocacao', width: 128, pinned: false }], filters: [{ id: 'new_valorlocacao', operator: 'ge', value: '100' }], sort: [] }
 
 describe('consulta de composições no servidor', () => {
@@ -40,12 +53,82 @@ describe('consulta de composições no servidor', () => {
     expect([...document.querySelectorAll('condition[attribute="cr40f_cliente"]')].map((item) => [item.getAttribute('entityname'), item.getAttribute('value')])).toEqual([['aa', '{novo}']])
   })
 
-  it('inclui busca por cliente ou rota e o filtro da view na mesma consulta', () => {
+  it('inclui a busca por palavras e o filtro da view na mesma consulta', () => {
     const xml = buildCompositionQuery(definition, catalog, 'Ana & Cia', true)
     const document = new DOMParser().parseFromString(xml, 'application/xml')
     expect(document.querySelector('parsererror')).toBeNull()
     expect([...document.querySelectorAll('condition')].map((item) => item.getAttribute('attribute'))).toEqual(expect.arrayContaining(['new_valorlocacao', 'statecode', 'cr40f_nomedocliente', 'cr40f_trajeto']))
-    expect([...document.querySelectorAll('condition[operator="like"]')].map((item) => item.getAttribute('value'))).toEqual(['%Ana & Cia%', '%Ana & Cia%'])
+    // "&" tem 1 caractere e fica fora: só "Ana" e "Cia", cada uma em um filtro or.
+    expect([...document.querySelectorAll('condition[operator="like"]')].map((item) => item.getAttribute('value'))).toEqual(['%Ana%', '%Ana%', '%Cia%', '%Cia%'])
+  })
+
+  it('exige cada palavra em algum campo: um filtro or por palavra, ligados por and, com os campos das tabelas ligadas', () => {
+    const xml = buildCompositionQuery(definition, richCatalog, 'embraer guarulhos', false)
+    const document = new DOMParser().parseFromString(xml, 'application/xml')
+    expect(document.querySelector('parsererror')).toBeNull()
+    const ands = [...document.querySelectorAll('fetch > entity > filter')].filter((filter) => filter.querySelector(':scope > filter[type="or"]'))
+    expect(ands).toHaveLength(1)
+    expect(ands[0].getAttribute('type')).toBe('and')
+    const ors = [...ands[0].querySelectorAll(':scope > filter')]
+    expect(ors.map((item) => item.getAttribute('type'))).toEqual(['or', 'or'])
+    for (const [index, token] of ['embraer', 'guarulhos'].entries()) {
+      const likes = [...ors[index].querySelectorAll('condition[operator="like"]')]
+      expect(likes.every((item) => item.getAttribute('value') === `%${token}%`)).toBe(true)
+      expect(likes.filter((item) => !item.hasAttribute('entityname')).map((item) => item.getAttribute('attribute'))).toEqual(['cr40f_id'])
+      expect(likes.map((item) => item.getAttribute('attribute'))).toEqual(expect.arrayContaining(['cr40f_nomedocliente', 'cr40f_nomedopassageiro', 'cr40f_placa', 'cr40f_name', 'cr40f_idnovo', 'cr40f_passageirosetelefonedecontato']))
+      // Todo alias usado na busca existe como link-entity outer.
+      for (const alias of likes.map((item) => item.getAttribute('entityname')).filter(Boolean)) expect(document.querySelector(`link-entity[alias="${alias}"]`)?.getAttribute('link-type')).toBe('outer')
+    }
+    expect(document.querySelector('condition[attribute="cr40f_idtenaris"]')).toBeNull()
+  })
+
+  it('número vira igualdade em dinheiro e inteiro; valor total (calculado) só com vírgula ou ponto; palavra comum não', () => {
+    const numeric = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, '12345 1.234,50', false), 'application/xml')
+    const equals = [...numeric.querySelectorAll('condition[operator="eq"]')].map((item) => [item.getAttribute('attribute'), item.getAttribute('value')])
+    expect(equals).toEqual(expect.arrayContaining([['cr40f_idtenaris', '12345'], ['new_valortotal', '1234.50']]))
+    expect(equals).not.toContainEqual(['new_valortotal', '12345'])
+    const text = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, 'embraer', false), 'application/xml')
+    expect(text.querySelector('condition[operator="eq"][attribute="new_valortotal"]')).toBeNull()
+  })
+
+  it('escapa aspas, %, _ e [ e continua XML válido', () => {
+    const xml = buildCompositionQuery(definition, richCatalog, "d'agua 50% a_b [x]", false)
+    const document = new DOMParser().parseFromString(xml, 'application/xml')
+    expect(document.querySelector('parsererror')).toBeNull()
+    const values = new Set([...document.querySelectorAll('condition[operator="like"]')].map((item) => item.getAttribute('value')))
+    expect(values).toEqual(new Set(["%d'agua%", '%50[%]%', '%a[_]b%', '%[[]x]%']))
+  })
+
+  it('busca vazia ou só com palavras de 1 caractere não adiciona filtro', () => {
+    for (const search of ['', '   ', 'a b']) {
+      const document = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, search, false), 'application/xml')
+      expect(document.querySelector('filter[type="or"]')).toBeNull()
+    }
+  })
+
+  it('aplica a mesma busca sobre a view nativa, editável ou não', () => {
+    const nativeXml = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="cr40f_composicaodeprecosid"/><filter type="and"><condition attribute="statecode" operator="eq" value="0"/></filter></entity></fetch>'
+    for (const editable of [true, false]) {
+      const document = new DOMParser().parseFromString(buildNativeCompositionQuery(nativeXml, definition, richCatalog, 'embraer guarulhos', editable), 'application/xml')
+      expect(document.querySelector('parsererror')).toBeNull()
+      expect(document.querySelectorAll('filter[type="or"]')).toHaveLength(2)
+      for (const condition of document.querySelectorAll('condition[entityname]')) expect(document.querySelector(`link-entity[alias="${condition.getAttribute('entityname')}"]`)).not.toBeNull()
+      expect(!!document.querySelector('condition[attribute="statecode"]')).toBe(!editable)
+    }
+  })
+
+  it('compara a palavra com os rótulos das escolhas já lidas, sem acento', async () => {
+    const { searchFilterOptions } = await import('./filter-options')
+    const status = richCatalog.find((field) => field.attribute === 'new_status')!
+    ;(globalThis as { Xrm?: unknown }).Xrm = undefined
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ OptionSet: { Options: [{ Value: 1, Label: { UserLocalizedLabel: { Label: 'Pendente' } } }, { Value: 2, Label: { UserLocalizedLabel: { Label: 'Concluído' } } }] } }) })))
+    vi.spyOn(await import('./xrm'), 'getXrmHost').mockReturnValue({ WebApi: {}, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://x' }) } } as never)
+    await searchFilterOptions(status, '')
+    const document = new DOMParser().parseFromString(buildCompositionQuery(definition, richCatalog, 'concluido', false), 'application/xml')
+    const choice = document.querySelector('condition[attribute="new_status"]')!
+    expect(choice.getAttribute('operator')).toBe('in')
+    expect([...choice.querySelectorAll('value')].map((item) => item.textContent)).toEqual(['2'])
+    vi.unstubAllGlobals()
   })
 
 })

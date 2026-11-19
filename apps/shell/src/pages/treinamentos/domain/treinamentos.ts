@@ -4,7 +4,7 @@ import { FUNCAO } from '../../funcionarios/data/schema'
 
 export { formatDate, plural } from '../../comunicados/domain/comunicados'
 /** `AAAA-MM-DD` → `dd/mm/aaaa` sem passar por Date. */
-export { fmtData as fmtDia } from '../../equipamentos/components/EquipamentosList'
+export { formatDay as fmtDia } from '../../../app/format'
 
 export const erroTexto = (reason: unknown, fallback = 'Algo deu errado.') => (reason instanceof Error && reason.message ? reason.message : fallback)
 

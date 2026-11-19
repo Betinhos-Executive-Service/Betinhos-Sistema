@@ -35,6 +35,9 @@ Subir o shell em porta própria para não derrubar o dev server de outra sessão
 7. Console sem erros depois da carga.
 Se o screenshot do navegador interno falhar (janela atrás), dirija pelo DOM (`dialog[open]`, `.vc-open`, `.vc-check input`) e leia o resultado no texto.
 
+## Busca da lista
+Várias palavras (E, sem acento) em código, pedido, data, situação, trajeto, cliente, valor, última mensagem, fechamento, CR e observação; as palavras ficam marcadas (`SearchHits`). Coberto por `domain/lista.test.ts` (sem teste de página).
+
 ## No DEV (schema criado em 29/10/2026)
 - Schema: `powershell.exe -File packages/deploy/provision-portal-cliente.ps1` (dry run) e `-Apply`, só da `main` no checkout principal → `SCHEMA OK` com as 5 tabelas e `cr40f_clientes1.cr40f_portalhabilitado` (Tenaris `564bdd2e-74cf-f011-8543-6045bd3adc1c` marcada no DEV). Relacionamentos precisam do prefixo `cr40f_` (o Dataverse recusa `systemuser_cr40f_…`).
 - Metadata conferida: sets `cr40f_validacaoservicos`, `cr40f_validadorclientes`, `cr40f_mensagemvalidacaos`, `cr40f_codigoacessos`, `cr40f_dispositivoconfiavels`; navegações `cr40f_Reserva`, `cr40f_Cliente`, `cr40f_LiberadoPor`, `cr40f_Validacao`, `cr40f_Validador`. Nome do cliente é `cr40f_nomedocliente` (não há `cr40f_name` em `cr40f_clientes1`).

@@ -32,16 +32,18 @@ it('ignora resposta antiga de Atualizar após mudar a busca', async () => {
 
   render(<ComposicaoPage host={{ mode: 'mock' }} />)
   expect(await screen.findByText('1 registro')).toBeTruthy()
-  await waitFor(() => expect((screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }) as HTMLInputElement).disabled).toBe(false))
+  await waitFor(() => expect((screen.getByRole('searchbox', { name: 'Buscar OS, cliente, passageiro, placa…' }) as HTMLInputElement).disabled).toBe(false))
 
   deferRefresh = true
   fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
   await waitFor(() => expect(finishRefresh).toBeTypeOf('function'))
-  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar cliente ou trajeto' }), { target: { value: 'Horizonte' } })
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar OS, cliente, passageiro, placa…' }), { target: { value: 'Horizonte' } })
   await waitFor(() => expect(load.mock.calls.some(([, view]) => view?.fetchXml?.includes('%Horizonte%'))).toBe(true))
-  expect((await screen.findAllByText('Horizonte Sistemas')).length).toBeGreaterThan(0)
+  // O destaque da busca divide o texto em <mark>: compara pelo texto inteiro do elemento.
+  const horizonte = (_: string, element: Element | null) => element?.textContent === 'Horizonte Sistemas' && !!element.querySelector(':scope > mark')
+  expect((await screen.findAllByText(horizonte)).length).toBeGreaterThan(0)
 
   await act(async () => { finishRefresh({ records: [initialCompositions[0]], source: 'dataverse', nextLink: null, formulas: Promise.resolve(new Map()) }) })
-  expect(screen.getAllByText('Horizonte Sistemas').length).toBeGreaterThan(0)
+  expect(screen.getAllByText(horizonte).length).toBeGreaterThan(0)
   expect(screen.queryAllByText('Aurora Logística')).toHaveLength(0)
 })

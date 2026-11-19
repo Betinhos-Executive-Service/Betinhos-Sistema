@@ -154,4 +154,34 @@ public class MultasDoDiaTests
     {
         Assert.Equal(0, MultasDoDia.Montar(Array.Empty<MultaResumo>(), Hoje).Total);
     }
+
+    private static MultaResumo Resumo(string auto, MultaEstado e) => M(auto, e);
+
+    [Fact]
+    public void Contestada_vai_para_secao_propria()
+    {
+        var r = MultasDoDia.Montar(new[] { Resumo("A1", new MultaEstado { Status = MultaCodigos.Identificar, MotoristaId = "f1", DataParaIndicar = "2026-11-30", ContestadaEm = "2026-11-16" }) }, "2026-11-17");
+        Assert.Single(r.Contestadas);
+        Assert.Empty(r.Indicar);
+        Assert.Equal("Decidir a contestação do motorista", r.Contestadas[0].Passo);
+        Assert.Equal(1, r.Total);
+    }
+
+    [Fact]
+    public void Contestada_com_prazo_vencido_fica_so_no_prazo_vencido()
+    {
+        var r = MultasDoDia.Montar(new[] { Resumo("A1", new MultaEstado { Status = MultaCodigos.Identificar, MotoristaId = "f1", DataParaIndicar = "2026-11-10", ContestadaEm = "2026-11-08" }) }, "2026-11-17");
+        Assert.Single(r.PrazoVencido);
+        Assert.Empty(r.Contestadas);
+    }
+
+    [Fact]
+    public void Aceite_declarado_sobe_para_o_topo()
+    {
+        var senatran = new MultaEstado { Status = MultaCodigos.Indicar, DataAviso = "2026-11-01", DataIndicacao = "2026-11-05", Canal = MultaCodigos.Senatran, DataParaIndicar = "2026-11-20" };
+        var declarada = senatran.Copia(); declarada.AceiteDeclaradoEm = "2026-11-15"; declarada.DataParaIndicar = "2026-11-28";
+        var r = MultasDoDia.Montar(new[] { Resumo("A1", senatran), Resumo("A2", declarada) }, "2026-11-17");
+        Assert.Equal(new[] { "A2", "A1" }, r.Aceite.Select(l => l.Auto));
+        Assert.True(r.Aceite[0].Declarado);
+    }
 }

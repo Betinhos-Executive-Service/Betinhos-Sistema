@@ -1,6 +1,6 @@
 import type { ChoiceOption } from '@betinhos/dataverse'
 import type { StatusTone } from '@betinhos/ui'
-import type { Curriculo } from './types'
+import type { ChoiceSet, Curriculo } from './types'
 import { digits, normalize } from './text'
 
 export type StageKey = 'novo' | 'analise' | 'aprovado' | 'contratado' | 'reprovado'
@@ -50,21 +50,18 @@ export const EMPTY_FILTERS: Filters = { query: '', cargo: null, cnh: null, orige
 
 export const hasFilters = (f: Filters) => f.query.trim() !== '' || f.cargo != null || f.cnh != null || f.origem != null || f.notaMin != null
 
-/** Sem letras e com 3+ dígitos: procura no telefone e no WhatsApp; senão, cada palavra no nome ou na cidade. */
-function matchesQuery(c: Curriculo, query: string) {
-  const q = normalize(query)
-  if (!q) return true
-  if (!/[a-z]/.test(q)) {
-    const d = digits(q)
-    if (d.length >= 3) return `${digits(c.telefone)} ${digits(c.whatsapp)}`.includes(d)
-  }
-  const text = normalize(`${c.nome} ${c.cidade}`)
-  return q.split(/\s+/).every((token) => text.includes(token))
+/** Texto da busca por palavras: o que o card mostra mais e-mail, telefones (com e sem máscara), origem, etapa e observações. */
+export function curriculoKeywordText(c: Curriculo, choices: ChoiceSet, stages: Stage[]) {
+  return [
+    c.nome, c.email, c.telefone, digits(c.telefone), c.whatsapp, digits(c.whatsapp), c.cidade, c.estado, c.cargo, c.ultimoCargo, c.ultimaEmpresa, c.indicadoPor,
+    c.nota != null ? `Nota ${c.nota}` : '', `CNH ${choiceLabel(choices.cnh, c.cnh)}`, choiceLabel(choices.origem, c.origem), stageFor(c, stages)?.label ?? '', c.observacoes,
+  ].join(' ')
 }
 
-export function filterCurriculos(list: Curriculo[], f: Filters) {
+/** Filtros do quadro, menos o texto: a busca por palavras roda na página (com debounce) pelo índice de `curriculoKeywordText`. */
+export function filterCurriculos(list: Curriculo[], f: Filters, matchesQuery: (c: Curriculo) => boolean) {
   return list.filter((c) =>
-    matchesQuery(c, f.query)
+    matchesQuery(c)
     && (f.cargo == null || normalize(c.cargo) === normalize(f.cargo))
     && (f.cnh == null || c.cnh === f.cnh)
     && (f.origem == null || c.origem === f.origem)

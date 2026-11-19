@@ -50,16 +50,15 @@ function hostWith(fetchImpl: typeof fetch): Host {
   return { mode: 'dataverse', clientUrl: 'https://org.example', client, metadata: createMetadata(client), insideModelDriven: false, appId: async () => undefined }
 }
 
-/** Abertura da Geral como o app faz: rótulos do menu (App.tsx) + quickFind/objectTypeCode/atributos (useGeral) ao mesmo tempo. */
+/** Abertura da Geral como o app faz: rótulos do menu (App.tsx) + objectTypeCode/atributos (useGeral) ao mesmo tempo. */
 async function abrirGeral(host: Host) {
   if (host.mode !== 'dataverse') throw new Error('host')
   const source = createSource(host)
   await Promise.all([
     host.metadata.entities(ENTITY_NAMES),
-    source.quickFind(),
     source.objectTypeCode(),
     source.attributes('cr40f_reservadeveculos'),
-    source.page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id"/></entity></fetch>', page: 1, cookie: null, sort: null, query: '', quickFind: [] }),
+    source.page({ fetchxml: '<fetch><entity name="cr40f_reservadeveculos"><attribute name="cr40f_id"/></entity></fetch>', page: 1, cookie: null, sort: null, query: '' }),
   ])
 }
 

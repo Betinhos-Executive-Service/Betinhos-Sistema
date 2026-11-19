@@ -7,7 +7,9 @@ name: Produção
 #    publicar a versão anterior resolve em minutos e nenhum dado se perde;
 #  - plugin: só código de plugin (Cr40f.*.Plugin e Betinhos.DriverRecordSharing) que já existe no PROD → copia para o PROD o assembly que o DEV já usa (decisão do Renan,
 #    05/11/2026: exportar-plugins-dev.ps1 com a trava do commit, depois push-plugins-prod.ps1, environment prod-front).
-#    Tela e plugin juntos (front-plugin) fazem os dois;
+#    Tela e plugin juntos (front-plugin) fazem os dois no mesmo job (plugin), um logo depois do outro e só depois de o export
+#    do DEV e o pnpm install terminarem: o plugin primeiro, a tela em seguida. Antes eram dois jobs e a tela chegava ao PROD
+#    minutos antes do plugin que ela chama (o plugin-dev espera o Deploy da develop na fila dataverse-dev);
 #  - solucoes: qualquer outra coisa (schema, flows, registrador, outros WebResources, arquivo desconhecido) → publicar.yml
 #    com test-e-prod: export do DEV, ensaio no TEST e PROD com os mesmos pacotes, backup e aprovação do Renan;
 #  - nada: só documentação, CI, skills → só move a tag.
@@ -60,9 +62,10 @@ jobs:
           echo "## Caminho: $caminho" >> "$GITHUB_STEP_SUMMARY"
           node -p "JSON.parse(process.argv[1]).motivo" "$resultado" >> "$GITHUB_STEP_SUMMARY"
 
+  # Só a tela. Com tela e plugin juntos (front-plugin), a tela vai no job plugin, logo depois do assembly.
   front:
     needs: caminho
-    if: contains(needs.caminho.outputs.caminho, 'front')
+    if: needs.caminho.outputs.caminho == 'front'
     runs-on: windows-latest
     timeout-minutes: 20
     # Environment sem revisor (a aprovação é o merge na main), com regra de branch: só a main.
@@ -117,10 +120,12 @@ jobs:
           path: plugins-prod/
           retention-days: 1
 
+  # Tudo o que é lento (export do DEV, download, pnpm install) termina antes da primeira escrita no PROD. Depois, plugin e tela
+  # seguem um atrás do outro: o backend primeiro, para a tela nova nunca chamar o plugin antigo.
   plugin:
     needs: [caminho, plugin-dev]
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     environment: prod-front
     concurrency:
       group: publicar-prod
@@ -136,10 +141,34 @@ jobs:
         with:
           name: plugins-prod
           path: plugins-prod
-      - run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-plugins-prod.ps1 -Pasta plugins-prod
-      - name: Plugins publicados
+      - uses: pnpm/action-setup@v4
+        if: needs.caminho.outputs.caminho == 'front-plugin'
+      - uses: actions/setup-node@v4
+        if: needs.caminho.outputs.caminho == 'front-plugin'
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - if: needs.caminho.outputs.caminho == 'front-plugin'
+        run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Plugins no PROD
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-plugins-prod.ps1 -Pasta plugins-prod
+      - name: Tela no PROD (logo depois dos plugins)
+        if: needs.caminho.outputs.caminho == 'front-plugin'
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-front-prod.ps1
+      - name: Publicado
         shell: bash
-        run: echo "Publicado no PROD (só código de plugin) - ${{ needs.caminho.outputs.plugins }}. Camada Active até o próximo import das soluções." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          CAMINHO: ${{ needs.caminho.outputs.caminho }}
+          PLUGINS: ${{ needs.caminho.outputs.plugins }}
+        run: |
+          echo "Publicado no PROD (código de plugin) - $PLUGINS. Camada Active até o próximo import das soluções." >> "$GITHUB_STEP_SUMMARY"
+          if [ "$CAMINHO" = "front-plugin" ]; then
+            echo "Tela publicada logo depois dos plugins - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   solucoes:
     needs: caminho
@@ -151,13 +180,12 @@ jobs:
 
   marcar:
     needs: [caminho, front, plugin, solucoes]
-    # Tela e plugin juntos: a tag só anda com os dois verdes.
+    # Tela e plugin juntos vão no job plugin: a tag só anda com os dois verdes (a tela é o último passo dele).
     if: >-
       !cancelled() && needs.caminho.result == 'success' &&
       (needs.caminho.outputs.caminho == 'nada' || needs.solucoes.result == 'success' ||
        (needs.caminho.outputs.caminho == 'front' && needs.front.result == 'success') ||
-       (needs.caminho.outputs.caminho == 'plugin' && needs.plugin.result == 'success') ||
-       (needs.caminho.outputs.caminho == 'front-plugin' && needs.front.result == 'success' && needs.plugin.result == 'success'))
+       ((needs.caminho.outputs.caminho == 'plugin' || needs.caminho.outputs.caminho == 'front-plugin') && needs.plugin.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -22,8 +22,8 @@ const SELECT = [
   'cr40f_iaestabelecimentolido', 'cr40f_iaconfianca', 'cr40f_iamodelo', 'cr40f_iadataanalise', 'createdon', 'modifiedon', '_createdby_value', '_modifiedby_value', ...LOOKUPS,
 ]
 
-/** Busca no servidor: protocolo pelo começo; nome da despesa e estabelecimento em qualquer posição. */
-export const despesasSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_protocolo'], contains: ['cr40f_nome', 'cr40f_estabelecimento'] })
+/** Busca no servidor: protocolo, nome da despesa e estabelecimento em qualquer posição (motorista e demais vínculos só na busca local). */
+export const despesasSearchFilter = (query: string) => odataSearchFilter(query, { contains: ['cr40f_protocolo', 'cr40f_nome', 'cr40f_estabelecimento'] })
 
 /** Despesas ativas com data do gasto a partir de `since` (null = todas), mais recentes primeiro. */
 export function despesasPath(entitySet: string, since: Date | null, search: string | null = null) {

@@ -52,8 +52,8 @@ const SELECT = [
   'cr40f_datado1servico', 'cr40f_datadoultimoservico', 'cr40f_idioma', 'createdon', 'modifiedon', '_createdby_value',
 ]
 
-/** Busca no servidor: número da OP pelo começo; cliente e passageiros (textos montados por flow) em qualquer posição. */
-export const opsSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_idfinanceiro'], contains: ['new_clientedaop', 'new_passageirosdaop'] })
+/** Busca no servidor: número da OP pelo começo; cliente, passageiros e trajetos (textos montados por flow) em qualquer posição. */
+export const opsSearchFilter = (query: string) => odataSearchFilter(query, { startsWith: ['cr40f_idfinanceiro'], contains: ['new_clientedaop', 'new_passageirosdaop', 'cr40f_trajetos'] })
 
 export function opsPath(entitySet: string, since: Date | null, search: string | null = null) {
   const filter = andFilter(since ? `statecode eq 0 and createdon ge ${since.toISOString()}` : 'statecode eq 0', search)

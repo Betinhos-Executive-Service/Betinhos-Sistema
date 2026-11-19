@@ -108,10 +108,10 @@ describe('FetchXML da consulta', () => {
 
   it('paginação e contagem seguem: a página leva as colunas do link; a contagem, o link sem colunas', () => {
     const ligado = aplicarManutencoes(fetchDe(), true)
-    const pagina = xml(buildFetch(ligado, { page: 2, pageSize: 100, cookie: '<cookie page="1" />', sort: null, search: [] }))
+    const pagina = xml(buildFetch(ligado, { page: 2, pageSize: 100, cookie: '<cookie page="1" />', sort: null, search: null }))
     expect(pagina.documentElement.getAttribute('page')).toBe('2')
     expect(pagina.querySelector('link-entity[alias="bt_manut"] > attribute')).toBeTruthy()
-    const contagem = xml(buildCountFetch(ligado, { search: [] }))
+    const contagem = xml(buildCountFetch(ligado, { search: null }))
     expect(contagem.querySelector('link-entity[alias="bt_manut"]')).toBeTruthy()
     expect(contagem.querySelector('link-entity[alias="bt_manut"] > attribute')).toBeNull()
     expect(contagem.querySelectorAll('entity > attribute').length).toBe(1)

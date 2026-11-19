@@ -1,8 +1,7 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { normalize } from '../../infracoes/domain/filters'
-import { progressoDe, type ProgressoConta } from './tabela'
-import { ESTADO, PUBLICO, type Treinamento } from './treinamentos'
+import { dataCurta, exigenciasDe, progressoDe, publicoCelula, validadeDe, type ProgressoConta } from './tabela'
+import { ESTADO, PUBLICO, formatDate, isPublicado, type Funcionario, type Treinamento } from './treinamentos'
 
 /** Treinamentos no padrão de listas do DS (§10.9.1/§10.9.2). A Visão padrão mostra rascunhos e publicados. */
 
@@ -53,11 +52,18 @@ export function readTreinamento(t: Linha, key: string): unknown {
   }
 }
 
-export function matchesKeyword(t: Treinamento, query: string) {
-  const terms = normalize(query).split(/\s+/).filter(Boolean)
-  if (!terms.length) return true
-  const hay = normalize(`${t.titulo} ${t.descricao}`)
-  return terms.every((term) => hay.includes(term))
+/**
+ * Texto da busca por palavras: o que a tabela mostra (título, descrição, situação, conclusão, público, exigências, validade,
+ * datas) mais o conteúdo do treinamento, que já vem na carga.
+ */
+export function treinamentoKeywordText(t: Linha, funcionarios: Funcionario[], progresso: Record<string, ProgressoConta>, hoje: string) {
+  const publico = publicoCelula(t, funcionarios)
+  const validade = validadeDe(t, hoje)
+  return [
+    t.titulo, t.descricao, isPublicado(t) ? 'Publicado' : 'Rascunho', progressoDe(progresso[t.id])?.texto, publico.principal, publico.detalhe,
+    ...exigenciasDe(t).map((e) => e.label), validade?.texto, validade?.completa,
+    t.publicadoEm && dataCurta(t.publicadoEm), t.publicadoEm && formatDate(t.publicadoEm), t.criadoEm && dataCurta(t.criadoEm), t.criadoEm && formatDate(t.criadoEm), t.conteudo,
+  ].filter(Boolean).join(' ')
 }
 
 export function sortTreinamentos(list: Linha[], sort: ViewSort | null, progresso: Record<string, ProgressoConta> = {}) {

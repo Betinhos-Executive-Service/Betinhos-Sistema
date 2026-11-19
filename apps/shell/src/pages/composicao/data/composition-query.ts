@@ -1,3 +1,5 @@
+import { keywordTokens } from '../../../app/keywordSearch'
+import { compositionKeywordFilter, compositionSearchCatalogFields } from './composition-search'
 import { buildFetchXml, COMPOSITION_TABLE, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewQuery } from './views'
 
 function addCondition(document: Document, filter: Element, attribute: string, alias: string | null, operator: string, value: string) {
@@ -16,7 +18,11 @@ function insertFilter(entity: Element, filter: Element) {
 
 export function buildCompositionQuery(definition: ViewDefinition, catalog: CatalogField[], search: string, activeOnly = false) {
   const queryDefinition = { ...definition, columns: [...definition.columns] }
-  for (const id of ['client', 'route']) {
+  const tokens = keywordTokens(search)
+  const searchFields = tokens.length ? compositionSearchCatalogFields(catalog, definition) : []
+  // Cliente e trajeto entram sempre (a linha os lê); os campos de outras tabelas só quando há busca, para o link-entity existir.
+  const extraIds = ['client', 'route', ...searchFields.filter((field) => field.path.length).map((field) => field.id)]
+  for (const id of extraIds) {
     if (!queryDefinition.columns.some((column) => column.id === id)) queryDefinition.columns.push({ id, width: 128, pinned: false })
   }
   const document = new DOMParser().parseFromString(buildFetchXml(queryDefinition, catalog), 'application/xml')
@@ -26,16 +32,12 @@ export function buildCompositionQuery(definition: ViewDefinition, catalog: Catal
     addCondition(document, filter, 'statecode', null, 'eq', '0')
     insertFilter(entity, filter)
   }
-  if (search.trim()) {
-    const filter = document.createElement('filter')
-    filter.setAttribute('type', 'or')
-    for (const id of ['client', 'route']) {
-      const field = catalog.find((candidate) => candidate.id === id)
-      if (!field) throw new Error(`Metadata de ${id} indisponível para a busca.`)
-      const key = viewValueKey(id, queryDefinition, catalog)
-      addCondition(document, filter, field.attribute, key.includes('.') ? key.split('.')[0] : null, 'like', `%${search.trim()}%`)
-    }
-    insertFilter(entity, filter)
+  if (tokens.length) {
+    const filter = compositionKeywordFilter(document, tokens, searchFields, (field) => {
+      const key = viewValueKey(field.id, queryDefinition, catalog)
+      return key.includes('.') ? key.split('.')[0] : null
+    })
+    if (filter) insertFilter(entity, filter)
   }
   return new XMLSerializer().serializeToString(document)
 }

@@ -74,6 +74,8 @@ Só na `main` do checkout principal (`Sistema Betinhos`), com `git pull`. Nunca 
      - sem a tabela de fotos (ambiente sem o provision novo): a lista carrega sem miniaturas e só a seção Fotos mostra "Tabela cr40f_fotoequipamento não encontrada na metadata.".
    Apague os itens de teste depois. Informar ao Renan a versão publicada.
 
+Busca (desde 18/11/2026): `equipamentoKeywordText` em `domain/lista.ts` (descrição, tipo, marca/modelo, série, responsável, status, data e valor da compra, observações), palavras com AND e sem acento; destaque pelo `SearchHits` na tabela. No mock, `baixado` e uma palavra do modelo com outra do responsável filtram; palavra inexistente mostra o vazio.
+
 ## Casos de borda
 - Funcionário inativo = desligado (`cr40f_status` 1) ou registro inativo (`statecode` 1); Afastado conta como ativo e pode receber equipamento (confirmado pelo Renan, 21/10/2026). Inativo continua no item com selo, fora do seletor.
 - Item Baixado com responsável gravado fora do shell: o campo fica habilitado só para limpar.

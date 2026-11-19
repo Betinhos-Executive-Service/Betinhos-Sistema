@@ -9,7 +9,9 @@ import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { statusPatch } from './data/mutations'
 import type { Curriculo } from './domain/types'
-import { EMPTY_FILTERS, buildStages, cargoOptions, filterCurriculos, groupByStage, stageFor, type Stage } from './domain/funnel'
+import { EMPTY_FILTERS, buildStages, cargoOptions, curriculoKeywordText, filterCurriculos, groupByStage, stageFor, type Stage } from './domain/funnel'
+import { SearchHits } from '../../app/SearchHits'
+import { digitQuery, keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { curriculosQuery } from './domain/query'
 import { useCurriculos } from './useCurriculos'
 import { useBoardDrag } from './useBoardDrag'
@@ -42,7 +44,12 @@ function Curriculos({ host }: { host: Host }) {
 
   const now = useMemo(() => new Date(), [cv.list])
   const stages = useMemo(() => buildStages(cv.choices?.status ?? []), [cv.choices])
-  const visible = useMemo(() => filterCurriculos(cv.list, filters), [cv.list, filters])
+  const query = useDebouncedText(filters.query)
+  const words = useMemo(() => searchWords(query), [query])
+  // Telefone com máscara ou espaço também acha o gravado só com números.
+  const numeros = useMemo(() => digitQuery(words), [words])
+  const index = useMemo(() => keywordIndex<Curriculo>((c) => curriculoKeywordText(c, cv.choices ?? { status: [], cnh: [], origem: [], disponibilidade: [] }, stages)), [cv.choices, stages])
+  const visible = useMemo(() => filterCurriculos(cv.list, filters, (c) => index.matches(c, words) || (!!numeros && index.matches(c, [numeros]))), [cv.list, filters, index, words, numeros])
   const groups = useMemo(() => groupByStage(visible, stages), [visible, stages])
   const cargos = useMemo(() => cargoOptions(cv.list), [cv.list])
 
@@ -98,7 +105,7 @@ function Curriculos({ host }: { host: Host }) {
       actions={<Button icon={<Plus size={16} />} onClick={openCreate}>Novo currículo</Button>}
       toolbar={cv.choices && cv.list.length ? <CurriculoFilters filters={filters} onChange={setFilters} cargos={cargos} choices={cv.choices} /> : undefined}
     >
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {cv.choices ? (
         <CurriculoDrawer target={target} onTarget={setTarget} list={cv.list} choices={cv.choices} stages={stages} source={source} onSaved={cv.upsert} onMove={requestMove} />
       ) : null}

@@ -24,7 +24,7 @@ Fonte: `apps/shell/src/main.tsx`, `host.ts`, `App.tsx`, `packages/deploy/loader.
 
 ## 2. Carga de listas (módulos com visões e filtros)
 
-Os módulos usam `useListView`, `pagedLoad`, `listCache`, `filterRows` e `VirtualTable`/`LazyList` (`apps/shell/src/app/`). Fluxo: a página pede páginas OData via `@betinhos/dataverse`, o cache em memória evita recarga, filtros e ordem vão para a URL (`filtersUrl.ts`, `queryState.ts`) e as visões do usuário são guardadas por `viewStore.ts`. Onde as visões persistem (local ou Dataverse): **não confirmado**; ver `viewStore.ts`.
+Os módulos usam `useListView`, `pagedLoad`, `listCache`, `filterRows` e `ListTable`/`LazyList` (`apps/shell/src/app/`). Fluxo: a página pede páginas OData via `@betinhos/dataverse`, o cache em memória evita recarga, filtros e ordem vão para a URL (`filtersUrl.ts`, `queryState.ts`) e as visões do usuário são guardadas por `viewStore.ts`. Onde as visões persistem (local ou Dataverse): **não confirmado**; ver `viewStore.ts`.
 
 ## 3. Captura de erros e plantão
 

@@ -1,12 +1,9 @@
 // components/StatusDoc.tsx
 import { StatusBadge, type StatusTone } from '@betinhos/ui'
 import { rotuloPrazo } from '../domain/vencimento'
+import { ESTADO_LABEL } from '../domain/pendencias'
 import type { EstadoItem } from '../domain/types'
 
-export const ESTADO_LABEL: Record<EstadoItem, string> = {
-  vencido: 'Vencido', vence7: 'Vence em até 7 dias', vence30: 'Vence em até 30 dias', vence60: 'Vence em até 60 dias',
-  ok: 'Em dia', semValidade: 'Sem validade', faltando: 'Faltando', opcional: 'Não enviado',
-}
 const TOM: Record<EstadoItem, StatusTone> = {
   vencido: 'danger', vence7: 'danger', vence30: 'warning', vence60: 'warning', ok: 'success', semValidade: 'neutral', faltando: 'danger', opcional: 'neutral',
 }

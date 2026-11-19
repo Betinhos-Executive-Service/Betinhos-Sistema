@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_FILTERS, buildStages, cargoOptions, choiceLabel, filterCurriculos, groupByStage, hasFilters, type Filters } from './funnel'
+import { keywordIndex, searchWords } from '../../../app/search'
+import { EMPTY_FILTERS, buildStages, cargoOptions, choiceLabel, curriculoKeywordText, filterCurriculos, groupByStage, hasFilters, type Filters } from './funnel'
 import { makeCurriculo as make } from './fixtures'
 
 const STATUS = [
@@ -31,13 +32,26 @@ describe('filtros', () => {
     make({ id: '2', nome: 'Elaine Souza', cidade: 'Santo André', telefone: '(11) 3333-4444', cargo: 'motorista executivo ', cnh: 2, origem: 3, nota: 5 }),
     make({ id: '3', nome: 'Karina', cidade: 'Rio', cargo: 'Assistente' }),
   ]
-  const ids = (f: Partial<Filters>) => filterCurriculos(list, { ...EMPTY_FILTERS, ...f }).map((c) => c.id)
+  const choices = { status: STATUS, cnh: [{ value: 1, label: 'B' }, { value: 2, label: 'D' }], origem: [{ value: 2, label: 'Indicação' }, { value: 3, label: 'Site' }], disponibilidade: [] }
+  const stages = buildStages(STATUS)
+  const index = keywordIndex<(typeof list)[number]>((c) => curriculoKeywordText(c, choices, stages))
+  const ids = ({ query = '', ...f }: Partial<Filters>) => {
+    const words = searchWords(query)
+    return filterCurriculos(list, { ...EMPTY_FILTERS, ...f }, (c) => index.matches(c, words)).map((c) => c.id)
+  }
 
   it('busca sem acento por nome, cidade e telefone', () => {
     expect(ids({ query: 'joao' })).toEqual(['1'])
     expect(ids({ query: 'santo andre' })).toEqual(['2'])
     expect(ids({ query: '3333-44' })).toEqual(['2'])
     expect(ids({ query: '98888' })).toEqual(['1'])
+  })
+  it('busca por várias palavras (E) em mais campos: origem, CNH, etapa e telefone só com dígitos', () => {
+    expect(ids({ query: 'indicacao joao' })).toEqual(['1'])
+    expect(ids({ query: 'indicacao elaine' })).toEqual([])
+    expect(ids({ query: 'site novo' })).toEqual(['2'])
+    expect(ids({ query: '1133334444' })).toEqual(['2'])
+    expect(ids({ query: 'nota 9' })).toEqual(['1'])
   })
   it('combina cargo, CNH, origem e nota mínima', () => {
     expect(ids({ cargo: 'Motorista executivo' })).toEqual(['1', '2'])

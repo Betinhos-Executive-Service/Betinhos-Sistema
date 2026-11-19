@@ -3,6 +3,7 @@ import { PAGE_SIZE, dayLabel, startsNewDay } from '../domain/forms'
 import { passengerLinksByService } from '../domain/logic'
 import { formatDate } from '../domain/utils'
 import type { FuncoesOperacionais } from '../useFuncoesOperacionais'
+import { SearchHits } from '../../../app/SearchHits'
 import { Icon } from './Icon'
 import { ListHead, LoadMoreSentinel, SkeletonList } from './ListParts'
 import { ServiceCard } from './ServiceCard'
@@ -30,7 +31,7 @@ export function MotoristaTab({ fo }: { fo: FuncoesOperacionais }) {
         label="Filtros de serviços"
         start={(
           <>
-            <SearchBox id="driverSearch" name="driverSearch" className="list-toolbar__search" value={state.driver.query} placeholder="ID, PAX, trajeto ou motorista" aria-label="Buscar serviço" onChange={(value) => setDriver({ query: value, visible: PAGE_SIZE })} />
+            <SearchBox id="driverSearch" name="driverSearch" className="list-toolbar__search" value={state.driver.query} placeholder="ID, passageiro, cliente, trajeto, motorista, status, data ou horário" aria-label="Buscar serviço" onChange={(value) => setDriver({ query: value, visible: PAGE_SIZE })} />
             <Button
               variant="secondary"
               className={`driver-filter-toggle ${state.driver.filterOpen ? 'is-open' : ''}`}
@@ -56,6 +57,7 @@ export function MotoristaTab({ fo }: { fo: FuncoesOperacionais }) {
         </div>
       )}
       {state.firstLoadDone && <p className="list-count" aria-live="polite">{count}</p>}
+      <SearchHits tokens={fo.driverWords}>
       <section className="stack-list">
         {state.firstLoadDone && visible.length > 0 && <ListHead />}
         {visible.length ? visible.map((service, index) => [
@@ -83,6 +85,7 @@ export function MotoristaTab({ fo }: { fo: FuncoesOperacionais }) {
         )}
         {hasMore && <LoadMoreSentinel label="Carregando mais serviços" text="Carregando mais serviços..." onVisible={() => update((s) => ({ ...s, driver: { ...s.driver, visible: Math.min(s.driver.visible + PAGE_SIZE, fo.driverList.length) } }))} />}
       </section>
+      </SearchHits>
     </>
   )
 }
@@ -97,9 +100,10 @@ export function PedidoTab({ fo }: { fo: FuncoesOperacionais }) {
       <PageToolbar
         className="list-toolbar"
         label="Filtros de pedidos"
-        start={<SearchBox id="cloneSearch" name="cloneSearch" className="list-toolbar__search" value={state.clone.query} placeholder="ID, PAX, cliente ou trajeto" aria-label="Buscar pedido" onChange={(value) => update((s) => ({ ...s, clone: { ...s.clone, query: value, visible: PAGE_SIZE } }))} />}
+        start={<SearchBox id="cloneSearch" name="cloneSearch" className="list-toolbar__search" value={state.clone.query} placeholder="ID, passageiro, cliente, trajeto, motorista, status, data ou horário" aria-label="Buscar pedido" onChange={(value) => update((s) => ({ ...s, clone: { ...s.clone, query: value, visible: PAGE_SIZE } }))} />}
       />
       {state.firstLoadDone && <p className="list-count" aria-live="polite">{plural(fo.cloneList.length)}</p>}
+      <SearchHits tokens={fo.cloneWords}>
       <section className="stack-list">
         {state.firstLoadDone && visible.length > 0 && <ListHead />}
         {visible.length ? visible.map((service, index) => [
@@ -112,6 +116,7 @@ export function PedidoTab({ fo }: { fo: FuncoesOperacionais }) {
         )}
         {hasMore && <LoadMoreSentinel label="Carregando mais pedidos" text="Carregando mais pedidos..." onVisible={() => update((s) => ({ ...s, clone: { ...s.clone, visible: Math.min(s.clone.visible + PAGE_SIZE, fo.cloneList.length) } }))} />}
       </section>
+      </SearchHits>
     </>
   )
 }

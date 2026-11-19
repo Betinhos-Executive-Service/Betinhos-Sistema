@@ -2,10 +2,12 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Alert, Button, Dialog, EmptyState, Field, Input, MetricCard, SearchBox, SegmentedControl, Select, useToast, type MenuAction } from '@betinhos/ui'
 import { AlertTriangle, Ban, Clock, Download, RotateCcw, SearchX, UserX } from 'lucide-react'
 import { downloadCsv, toCsv } from '../../../app/csv'
+import { SearchHits } from '../../../app/SearchHits'
+import { searchWords, useDebouncedText } from '../../../app/search'
 import { SelectionBar, useRowSelection } from '../../../app/Selecao'
 import { useQueryFilters, useQueryTexto } from '../../../nav/queryState'
 import { filtrosCodec } from './domain/url'
-import { formatMoney } from '../../pagantes/domain/messages'
+import { formatMoney } from '../../../app/format'
 import { dateKey } from '../../operacional/domain/time'
 import {
   abaDe, CANAIS, canalLabel, CSV_CABECALHO, csvLinhas, filtrar, FILTROS_VAZIOS, MOTIVO_REABERTA, ordenar, ORDENS, resumoRevisar, SITUACAO,
@@ -42,7 +44,11 @@ export function ComprasSemDespesa({ data, source, mobile, onOpen, onRefresh }: P
   const [filtros, setFiltros] = useQueryFilters(filtrosCodec)
 
   // Contagens e resumo ignoram o filtro de situação: o cartão clicado continua mostrando o total das outras.
-  const semSituacao = useMemo(() => filtrar(data.transacoes, { ...filtros, situacao: null }), [data.transacoes, filtros])
+  // A busca filtra 200 ms depois da última tecla; os outros filtros valem na hora.
+  const busca = useDebouncedText(filtros.busca)
+  const palavras = useMemo(() => searchWords(busca), [busca])
+  const { cartaoId, motoristaId, canal, de, ate } = filtros
+  const semSituacao = useMemo(() => filtrar(data.transacoes, { busca, cartaoId, motoristaId, canal, situacao: null, de, ate }), [data.transacoes, busca, cartaoId, motoristaId, canal, de, ate])
   const porSub = useMemo(() => {
     const m: Record<SubFila, Transacao[]> = { revisar: [], ignoradas: [] }
     for (const t of semSituacao) {
@@ -135,7 +141,7 @@ export function ComprasSemDespesa({ data, source, mobile, onOpen, onRefresh }: P
             <div className="cc-filtros">
               <SegmentedControl aria-label="Situação da compra" value={sub} onChange={trocarSub}
                 options={[{ value: 'revisar', label: `Para revisar${data.loaded ? ` (${porSub.revisar.length})` : ''}` }, { value: 'ignoradas', label: `Ignoradas${data.loaded ? ` (${porSub.ignoradas.length})` : ''}` }]} />
-              <SearchBox className="cc-busca" value={filtros.busca} onChange={(v) => set('busca', v)} placeholder="Buscar por estabelecimento, motorista, cartão ou placa" aria-label="Buscar compras" />
+              <SearchBox className="cc-busca" value={filtros.busca} onChange={(v) => set('busca', v)} placeholder="Buscar por estabelecimento, motorista, cartão, placa, valor ou data" aria-label="Buscar compras" />
               <Button variant="secondary" icon={<Download size={16} />} disabled={!list.length} onClick={() => exportar(list)}>Exportar</Button>
             </div>
           )}
@@ -164,7 +170,7 @@ export function ComprasSemDespesa({ data, source, mobile, onOpen, onRefresh }: P
         </div></div>
       ) : null}
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={onRefresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={palavras}>{body}</SearchHits>
       <Dialog open={lote != null} onClose={() => !gravando && setLote(null)}
         title={lote?.acao === 'ignorar' ? `Ignorar ${plural(lote.rows.length, 'compra', 'compras')}?` : `Reabrir ${plural(lote?.rows.length ?? 0, 'compra', 'compras')}?`}
         actions={<>

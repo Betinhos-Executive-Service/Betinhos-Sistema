@@ -5,11 +5,13 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { useListView } from '../../app/useListView'
+import { SearchHits } from '../../app/SearchHits'
+import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { baixarPlanilha, nomeArquivo, planilhaFechamento } from './domain/excel'
-import { TELA, VALIDACAO_COLUMNS, VALIDACAO_DEFAULT_FILTERS, VALIDACAO_SORT, builtinViews, matchesKeyword, readLinha, sortLinhas, validacaoFields } from './domain/lista'
+import { TELA, VALIDACAO_COLUMNS, VALIDACAO_DEFAULT_FILTERS, VALIDACAO_SORT, builtinViews, linhaKeywordText, readLinha, sortLinhas, validacaoFields } from './domain/lista'
 import { aplicarLiberacao, linhasDoFechamento, mesDe, mesLabel, podeLiberar, podeMarcarFechamento, podeRetirar, valorFechamento } from './domain/regras'
 import type { Fechamento, Linha } from './domain/types'
 import type { Lote } from './data/source'
@@ -69,11 +71,14 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   const [exportOpen, setExportOpen] = useState(false)
   const [marcando, setMarcando] = useState(false)
 
+  const q = useDebouncedText(query)
+  const words = useMemo(() => searchWords(q), [q])
+  const index = useMemo(() => keywordIndex<Linha>(linhaKeywordText), [data.linhas])
   const visible = useMemo(() => {
-    const list = data.linhas.filter((l) => matchesFilters(l, filters, allFields, readLinha) && matchesKeyword(l, query))
+    const list = data.linhas.filter((l) => matchesFilters(l, filters, allFields, readLinha) && index.matches(l, words))
     return sortLinhas(list, view.config.sort)
-  }, [data.linhas, filters, allFields, query, view.config.sort])
-  const lazyKey = useMemo(() => JSON.stringify({ filters, query, sort: view.config.sort }), [filters, query, view.config.sort])
+  }, [data.linhas, filters, allFields, index, words, view.config.sort])
+  const lazyKey = useMemo(() => JSON.stringify({ filters, query: q, sort: view.config.sort }), [filters, q, view.config.sort])
   const { slice, more, loadMore } = useLazySlice(visible, lazyKey)
   const groups = useRowGroups(visible, view.config.group, allFields, readLinha)
   const clearAll = () => { clearFilters(); setQuery('') }
@@ -186,7 +191,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
     <div className="page vc-page">
       <div role="toolbar" aria-label="Comandos da validação do cliente">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar serviço, pedido, trajeto ou mensagem" aria-label="Buscar serviços" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por serviço, pedido, cliente, trajeto, situação, data, valor ou mensagem" aria-label="Buscar serviços" />}
           more={moreActions}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
@@ -209,7 +214,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
         </div>
       ) : null}
       {data.error && data.loaded ? <Alert tone="danger" title="A última atualização falhou" action={<Button variant="secondary" onClick={refresh}>Tentar de novo</Button>}>{data.error} A lista mostra os dados da carga anterior.</Alert> : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {data.loaded ? (
         <ValidacaoDrawer linha={linhaAberta} missing={!!aberto && !linhaAberta} onClose={() => setAberto('')} source={source} mobile={mobile}
           onRespondida={(l, m, prazoTacita) => data.patchLinhas([l.id], { situacao: 'respondido', prazoTacita, ultimaMensagem: m })}

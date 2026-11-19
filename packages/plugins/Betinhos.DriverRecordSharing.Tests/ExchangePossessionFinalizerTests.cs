@@ -154,9 +154,9 @@ namespace Betinhos.DriverRecordSharing.Tests
             InvokeFinalize(service, exchange.Id, new DateTime(2026, 8, 3, 14, 10, 0, DateTimeKind.Utc), tracing);
 
             Assert.Contains(tracing.Entries, entry =>
-                entry.Contains("Open possession lookup", StringComparison.Ordinal) &&
-                entry.Contains(driver.ToString("D"), StringComparison.Ordinal) &&
-                entry.Contains("count=1", StringComparison.Ordinal));
+                entry.IndexOf("Open possession lookup", StringComparison.Ordinal) >= 0 &&
+                entry.IndexOf(driver.ToString("D"), StringComparison.Ordinal) >= 0 &&
+                entry.IndexOf("count=1", StringComparison.Ordinal) >= 0);
         }
 
         [Fact]

@@ -20,7 +20,13 @@ public sealed class MultaTravaPlugin : IPlugin
     {
         "cr40f_status", "cr40f_responsavel", "cr40f_motivoempresa", "cr40f_canalindicacao", "cr40f_datadeavisoaocondutor", "cr40f_datadeindicacao",
         "cr40f_aceiteem", "cr40f_pagaem", "cr40f_acertoem", "cr40f_encerradaem", "cr40f_canceladaem", "cr40f_valorpago",
-        "cr40f_competenciadesconto", "cr40f_motivocancelamento",
+        "cr40f_competenciadesconto", "cr40f_motivocancelamento", "cr40f_contestadaem", "cr40f_aceitedeclaradoem", "cr40f_ultimolembreteaceiteem",
+    };
+
+    public static readonly IReadOnlyDictionary<string, string> CamposDasApisDoTermo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["cr40f_aceitedeclaradoem"] = "new_DeclararAceiteMulta",
+        ["cr40f_ultimolembreteaceiteem"] = "new_LembrarAceiteMulta",
     };
 
     public void Execute(IServiceProvider serviceProvider)
@@ -55,7 +61,7 @@ public sealed class MultaTravaPlugin : IPlugin
         if (VemDoPasso(context)) return recusas;
         var pre = context.PreEntityImages.Contains("pre") ? context.PreEntityImages["pre"] : null;
         var mudou = alvo.Attributes
-            .Where(a => CamposDePasso.Contains(a.Key) && !MesmoValor(a.Value, pre != null && pre.Contains(a.Key) ? pre[a.Key] : null))
+            .Where(a => CamposDePasso.Contains(a.Key) && !(CamposDasApisDoTermo.TryGetValue(a.Key, out var api) && TemPai(context, api)) && !MesmoValor(a.Value, pre != null && pre.Contains(a.Key) ? pre[a.Key] : null))
             .Select(a => a.Key).OrderBy(k => k, StringComparer.Ordinal).ToList();
         if (mudou.Count > 0) recusas.Add(Mensagem(mudou));
         return recusas;
@@ -63,8 +69,13 @@ public sealed class MultaTravaPlugin : IPlugin
 
     public static bool VemDoPasso(IPluginExecutionContext context)
     {
+        return TemPai(context, PassoMultaPlugin.Mensagem);
+    }
+
+    public static bool TemPai(IPluginExecutionContext context, params string[] mensagens)
+    {
         for (var pai = context.ParentContext; pai != null; pai = pai.ParentContext)
-            if (pai.MessageName == PassoMultaPlugin.Mensagem) return true;
+            if (mensagens.Contains(pai.MessageName)) return true;
         return false;
     }
 

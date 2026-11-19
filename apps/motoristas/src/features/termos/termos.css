@@ -130,3 +130,65 @@
   .termo-tabpanel { animation:termo-fade 160ms ease-out backwards; }
 }
 .termo-flow-scroll:focus-visible { outline:0; box-shadow:inset 0 0 0 2px rgba(33,89,210,.25); }
+
+/* Tela Multas: tarefas, desconto em folha, em andamento e encerradas. Cartão branco, sem borda lateral colorida, sem sombra pesada. */
+.multa-grupos { display:grid; gap:22px; font-family:Manrope, Arial, sans-serif; }
+.multa-grupo { display:grid; gap:10px; }
+.multa-grupo-titulo { display:flex; align-items:center; gap:8px; margin:0; color:#5b6472; font-size:.75rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.multa-grupo-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:48px; padding:0; border:0; background:none; color:#001a3d; font:inherit; font-size:.9375rem; font-weight:700; letter-spacing:0; text-transform:none; cursor:pointer; }
+.multa-grupo-toggle[aria-expanded="true"] .multa-seta { transform:rotate(225deg); }
+.multa-grupo-toggle:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); border-radius:6px; }
+.multa-card { display:grid; padding:0; border:1px solid #ebebe6; border-radius:16px; background:#fff; color:#001a3d; }
+.multa-chip { justify-self:start; display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:.75rem; font-weight:700; background:#f0f0ec; color:#5b6472; }
+.multa-chip[data-tom="prazo"] { background:#fff4d6; color:#7a5700; }
+.multa-chip[data-tom="vencido"] { background:#fff0f3; color:#9f2940; }
+.multa-cabeca { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:48px; padding:16px; border:0; border-radius:16px; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.multa-cabeca:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+.multa-cabeca-texto { display:grid; gap:6px; min-width:0; justify-items:start; }
+.multa-resumo { color:#5b6472; font-size:.8125rem; line-height:1.4; overflow-wrap:anywhere; }
+.multa-seta { flex:none; width:8px; height:8px; margin-right:4px; border-right:2px solid #5b6472; border-bottom:2px solid #5b6472; transform:rotate(45deg); transition:transform 200ms cubic-bezier(.23,1,.32,1); }
+.multa-card[data-aberto] .multa-seta { transform:rotate(225deg); }
+.multa-corpo { display:grid; grid-template-rows:0fr; visibility:hidden; transition:grid-template-rows 200ms cubic-bezier(.23,1,.32,1), visibility 0s linear 200ms; }
+.multa-card[data-aberto] .multa-corpo { grid-template-rows:1fr; visibility:visible; transition:grid-template-rows 200ms cubic-bezier(.23,1,.32,1), visibility 0s; }
+.multa-corpo-int { overflow:hidden; min-height:0; }
+.multa-detalhes { display:grid; gap:10px; padding:0 16px 16px; }
+.multa-titulo { margin:0; font-size:1.0625rem; font-weight:800; letter-spacing:-.01em; line-height:1.3; }
+.multa-meta { margin:0; color:#5b6472; font-size:.8125rem; line-height:1.5; overflow-wrap:anywhere; }
+.multa-frase { margin:0; color:#5b6472; font-size:.875rem; line-height:1.5; }
+
+/* Trilha de etapas: feita azul-marinho, atual âmbar com rótulo em negrito, futura cinza. */
+.multa-trilha { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; margin:0; padding:0; list-style:none; }
+.multa-trilha li { display:grid; gap:6px; min-width:0; color:#8a919c; font-size:.6875rem; }
+.multa-trilha i { display:block; height:4px; border-radius:2px; background:#e6e6e2; }
+.multa-trilha li[data-estado="feita"] { color:#001a3d; font-weight:700; }
+.multa-trilha li[data-estado="feita"] i { background:#001a3d; }
+.multa-trilha li[data-estado="atual"] { color:#7a5700; font-weight:800; }
+.multa-trilha li[data-estado="atual"] i { background:#c98f00; }
+.multa-trilha span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Passos do aceite na CNH Digital. */
+.multa-aceite { display:grid; gap:10px; }
+.multa-passos { margin:0; padding:0; list-style:none; counter-reset:passo; }
+.multa-passos li { counter-increment:passo; display:flex; gap:10px; padding:6px 0; font-size:.875rem; line-height:1.45; }
+.multa-passos li::before { content:counter(passo); flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:#f0f0ec; color:#001a3d; font-size:.75rem; font-weight:800; }
+
+/* Desconto em folha. */
+.multa-rotulo { margin:0; color:#5b6472; font-size:.8125rem; }
+.multa-valor { margin:0; color:#001a3d; font-size:1.75rem; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.multa-barra { display:flex; gap:4px; }
+.multa-barra i { flex:1; height:6px; border-radius:3px; background:#e6e6e2; }
+.multa-barra i[data-on] { background:#001a3d; }
+.multa-legenda { margin:0; color:#5b6472; font-size:.75rem; }
+.multa-meses { display:grid; margin:0; padding:0; list-style:none; }
+.multa-meses li { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid #f0f0ec; color:#001a3d; font-size:.875rem; font-variant-numeric:tabular-nums; }
+.multa-meses li:first-child { border-top:0; }
+.multa-meses li[data-estado="descontada"] span:last-child { color:#147a4b; font-weight:700; }
+.multa-meses li[data-estado="futura"] span:last-child { color:#5b6472; }
+
+/* Botões da tela: 48 px, toque com escala. */
+.multa-botao { width:100%; min-height:48px; border-radius:12px; transition:transform 140ms cubic-bezier(.23,1,.32,1); }
+.multa-botao:not(:disabled):active { transform:scale(.97); }
+.multa-botao-sec { display:inline-flex; align-items:center; justify-content:center; padding:0 16px; border:1px solid #d9d9d4; background:transparent; color:#001a3d; font:inherit; font-size:.9375rem; font-weight:700; cursor:pointer; }
+.multa-botao-sec:focus-visible { outline:0; box-shadow:0 0 0 3px rgba(33,89,210,.11); }
+.multa-botao-sec:disabled { opacity:.55; cursor:not-allowed; }
+@media (prefers-reduced-motion:reduce) { .multa-botao,.multa-seta,.multa-corpo,.multa-card[data-aberto] .multa-corpo { transition:none; } .multa-botao:not(:disabled):active { transform:none; } }

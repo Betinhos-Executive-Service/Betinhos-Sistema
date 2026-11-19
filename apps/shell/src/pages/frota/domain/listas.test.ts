@@ -3,9 +3,11 @@ import { MANUT } from '../data/schema'
 import { EMPTY_DATA } from '../data/source'
 import type { FrotaData } from '../data/types'
 import { toCsv } from '../../../app/csv'
+import { searchWords } from '../../../app/search'
 import { linhas } from './linhas'
-import { matchesRegistroKeyword, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, readRegistro, registroBuiltins, registroColumns, sortRegistros } from './listas'
+import { matchesRegistroKeyword, matchesVeiculoKeyword, MULTA_FILTROS_PADRAO, MULTA_VISAO_PADRAO, readRegistro, registroBuiltins, registroColumns, sortRegistros } from './listas'
 import type { Linha } from './linhas'
+import type { LinhaVeiculo } from './listas'
 import { buildTimeline } from './timeline'
 
 const v1 = { id: 'v1', label: 'ABC1D23' }
@@ -112,7 +114,22 @@ describe('toCsv', () => {
 describe('busca de registros', () => {
   it('acha a multa pelo código citado no resumo diário', () => {
     const [linha] = linhas('multa', data)
-    expect(matchesRegistroKeyword(linha, 'nt-1073')).toBe(true)
-    expect(matchesRegistroKeyword(linha, 'NT-9999')).toBe(false)
+    expect(matchesRegistroKeyword(linha, searchWords('nt-1073'))).toBe(true)
+    expect(matchesRegistroKeyword(linha, searchWords('NT-9999'))).toBe(false)
+  })
+
+  it('exige todas as palavras e olha o status e a data em dd/mm/aaaa', () => {
+    const base = { kind: 'manutencao', id: 'm1', titulo: 'Troca de pneus', veiculo: { id: 'v', label: 'AAA1A11' }, pessoa: null, status: MANUT.REALIZADO, dia: '2026-11-05', extra: 'R$ 100,00', categorias: [], termo: '', termoStatus: null } as Linha
+    expect(matchesRegistroKeyword(base, searchWords('pneus aaa1a11 realizado'))).toBe(true)
+    expect(matchesRegistroKeyword(base, searchWords('05/11/2026'))).toBe(true)
+    expect(matchesRegistroKeyword(base, searchWords('pneus cancelado'))).toBe(false)
+  })
+})
+
+describe('busca de veículos', () => {
+  it('exige todas as palavras, em qualquer campo, sem acento nem caixa', () => {
+    const l = { id: 'v1', veiculo: { id: 'v1', placa: 'AAA1A11', marca: 'Marca', modelo: 'Modelo', cor: 'Prata', anoModelo: 2024, status: 100000000, categoria: 100000001, motorista: null, hodometro: null, hodometroEm: null }, motorista: 'José Teste', pendencias: 0, custo: { qtd: 0, semValor: 0, total: 0 } } as unknown as LinhaVeiculo
+    expect(matchesVeiculoKeyword(l, searchWords('jose prata terceiro'))).toBe(true)
+    expect(matchesVeiculoKeyword(l, searchWords('aaa1a11 azul'))).toBe(false)
   })
 })

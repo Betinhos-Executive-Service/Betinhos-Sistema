@@ -121,6 +121,10 @@ export const ENTRADAS = [
     flows: ['Termo de multa | Cópia ao motorista', 'Termo de multa | Expirar pendentes', 'Termo de multa | Lembrete diário', 'Termo de multa | Aviso ao gestor', 'Termo de multa | Push ao motorista'],
     arquivos: [script('termo-multa'), flowsDir('termo-multa-push\\.json', SINCRONIZAR)],
   },
+  {
+    nome: 'multa-aceite-push', script: 'provision-flow-multa-aceite-push.ps1', flows: ['Multa | Push do aceite'], apply: true,
+    arquivos: [script('multa-aceite-push'), flowsDir('multa-aceite-push\\.json', SINCRONIZAR)],
+  },
 ]
 
 // arquivos: lista do git diff --name-only desde a tag flows-dev-publicado. null = sem base: nada pendente.

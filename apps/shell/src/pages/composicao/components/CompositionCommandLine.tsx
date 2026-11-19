@@ -65,7 +65,7 @@ function CompositionCommandLine(p: Props) {
         filters={p.ready ? { fields: p.view.filterFields, search: p.view.search, locked: p.view.locked, onRemoveLocked: p.view.removeLockedFilter, noun: NOUN } : undefined}
         // Sem seleção, a auditoria da tabela; com seleção, a das composições marcadas.
         onAudit={run('audit')}
-        search={<SearchBox size={size} value={p.search} onChange={p.onSearch} disabled={!p.ready} placeholder="Buscar cliente ou trajeto" aria-label="Buscar cliente ou trajeto" />}
+        search={<SearchBox size={size} value={p.search} onChange={p.onSearch} disabled={!p.ready} placeholder="Buscar OS, cliente, passageiro, placa…" aria-label="Buscar OS, cliente, passageiro, placa…" />}
         more={more}
         // "Atualizar" fica na primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
         primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={p.commandPhase === 'refresh' ? 'Atualizando…' : 'Recarregar dados sem perder filtros, seleção ou posição'} loading={p.commandPhase === 'refresh'} disabled={p.commandLocked} onClick={run('refresh')} />}

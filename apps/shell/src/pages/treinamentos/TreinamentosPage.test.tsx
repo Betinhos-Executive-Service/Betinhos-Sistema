@@ -18,6 +18,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('Treinamentos', () => {
+  it('busca por várias palavras (AND), inclusive em campos fora do título, e marca onde achou', async () => {
+    const marcados = new Set<Range>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: { set: (_: string, h: Set<Range>) => { h.add = marcados.add.bind(marcados); h.delete = marcados.delete.bind(marcados) } } })
+    render(<TreinamentosPage host={{ mode: 'mock' }} />)
+    await screen.findByText('Embarque no GRU: novo procedimento')
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar treinamentos' }), { target: { value: 'embarque rascunho' } })
+    await waitFor(() => expect(screen.queryByText('Direção defensiva: revisão anual')).toBeNull())
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar treinamentos' }), { target: { value: 'embarque gru' } })
+    await waitFor(() => expect([...marcados].map((r) => r.toString().toLowerCase())).toContain('gru'))
+  })
+
   it('lista e abre o painel com status por motorista, assinatura e nota', async () => {
     render(<TreinamentosPage host={{ mode: 'mock' }} />)
     fireEvent.click(await screen.findByRole('row', { name: /Embarque no GRU/ }))

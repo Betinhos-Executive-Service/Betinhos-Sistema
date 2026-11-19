@@ -5,6 +5,7 @@ import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
 import { listCache } from '../../app/listCache'
+import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText, useMergedById, useServerSearch } from '../../app/search'
 import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
@@ -76,12 +77,12 @@ function Pessoas({ host }: { host: Host }) {
   }, [list, choices, view.config.sort, extra])
   const read = useMemo(() => extra.read((p: Pessoa, key: string) => readPessoa(p, key, dupIds), (p) => p.id), [extra, dupIds])
   const filtered = useMemo(() => filterRows(sorted, valid, allFields, read), [sorted, valid, allFields, read])
-  const index = useMemo(() => keywordIndex<Pessoa>((p) => pessoaKeywordText(p, choices ? label(choices.cargo, p.cargo) : '')), [choices])
+  const index = useMemo(() => keywordIndex<Pessoa>((p) => pessoaKeywordText(p, choices!)), [choices])
+  const words = useMemo(() => searchWords(q), [q])
   const visible = useMemo(() => {
     if (!choices) return []
-    const words = searchWords(q)
     return words.length ? filtered.filter((p) => index.matches(p, words)) : filtered
-  }, [filtered, index, q, choices])
+  }, [filtered, index, words, choices])
   // Rolagem infinita: trocar filtro, busca ou ordenação volta ao primeiro lote; a lista crescer (carga em segundo
   // plano) ou recarregar não. A chave é texto para não mudar quando só a identidade dos filtros muda.
   const lazyKey = useMemo(() => JSON.stringify({ valid, q, sort: view.config.sort }), [valid, q, view.config.sort])
@@ -126,7 +127,7 @@ function Pessoas({ host }: { host: Host }) {
     <div className="page page--full ps-page">
       <div role="toolbar" aria-label="Comandos de pessoas">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_bancodedados', onOpenRecord: (id) => setTarget({ mode: 'view', id }) })} view={view} columns={PESSOA_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
-          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, celular ou e-mail" aria-label="Buscar pessoas" />}
+          search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por nome, cliente, cargo, celular, e-mail ou departamento" aria-label="Buscar pessoas" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ps.loading && Boolean(choices)} onClick={refresh} />
             <Button size={size} icon={<Plus size={16} />} disabled={!choices} onClick={() => setTarget({ mode: 'create' })}>Nova pessoa</Button>
@@ -139,7 +140,7 @@ function Pessoas({ host }: { host: Host }) {
           {ps.error} {ps.complete ? 'A lista mostra os dados da carga anterior.' : 'A lista mostra só os primeiros registros; busca, filtros e totais valem para eles.'}
         </Alert>
       ) : null}
-      {body}
+      <SearchHits tokens={words}>{body}</SearchHits>
       {choices ? <PessoaDrawer target={target} onTarget={setTarget} list={list} dups={dups} choices={choices} source={source} onSaved={ps.upsert} /> : null}
     </div>
   )

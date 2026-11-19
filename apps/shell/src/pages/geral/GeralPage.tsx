@@ -7,6 +7,8 @@ import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
 import { useTableLabel } from '../../app/useListView'
+import { keywordTokens } from '../../app/keywordSearch'
+import { SearchHits } from '../../app/SearchHits'
 import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAberto'
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
@@ -20,6 +22,8 @@ import { GeralSheet } from './components/GeralSheet'
 import { recebimentosSource } from '../recebimentos/source'
 import { useContagemRecebimentos } from '../recebimentos/useContagemRecebimentos'
 import { ComprovantesServicoDrawer, IndicadorRecebimentos, type ServicoAberto } from '../recebimentos/ComprovantesServicoDrawer'
+import { fromConfigKey } from './domain/extraLinks'
+import { GeralDsTable } from './components/GeralDsTable'
 import { GeralTable, type Grouping } from './components/GeralTable'
 import { CopyDialog, DispararDialog, GerarOpDialog, LinkDialog, MockFormDialog, StateDialog, type DispararRequest, type LinkRequest, type OpRequest, type StateRequest } from './components/Dialogs'
 import { ContagemDrawer, shiftDay, todayIso } from './components/ContagemDrawer'
@@ -97,10 +101,12 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [toast])
   // O estado da tela vive na URL (`#/geral?view=…`): lido uma vez ao montar e regravado sem empilhar histórico.
   const [initial] = useState(() => readUrlState(queryFromHash(window.location.hash)))
+  // `?tabela=ds`: a grade no `Table` do Design System (migração em partes); fica na URL enquanto a tela regrava o estado.
+  const tabelaDs = initial.tabela === 'ds'
   const onStateChange = useCallback((state: UrlState) => {
-    const next = hrefFor('geral', new URLSearchParams(writeUrlState(state)))
+    const next = hrefFor('geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
     if (next !== window.location.hash) window.history.replaceState(null, '', next)
-  }, [])
+  }, [initial.tabela])
   const geral = useGeral(source, { onSaveFail, initial, onStateChange })
   const { view, rows, total, more, loading, loadingMore, loadError, query, attributes } = geral
 
@@ -130,6 +136,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     return real > 0 ? [cols[real], ...cols.slice(0, real), ...cols.slice(real + 1)] : cols
   }, [allColumns, viewPrefs])
   const dataColumns = useMemo(() => visibleColumns.filter((c) => !VIRTUAL_KEYS.has(c.key)), [visibleColumns])
+  // Colunas adicionadas pelo painel (`x__…`): na visão do DS usam a chave `x:`.
+  const extraKeys = useMemo(() => new Set((prefs?.extra ?? []).map((e) => fromConfigKey(e.key))), [prefs])
   const setPrefs = useCallback((next: ColumnPrefs | null) => {
     if (viewId == null) return
     saveColumnPrefs(source.kv, viewId, next)
@@ -226,8 +234,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
     if (!view) return
     await source.updateView(view.id, await viewPayload())
     // A visão agora carrega as colunas e larguras: das preferências locais só fica a coluna virtual oculta (não entra no layoutxml).
+    // As colunas fixas também ficam: não entram no layoutxml.
     const hiddenVirtual = (prefs?.hidden ?? []).filter((k) => VIRTUAL_KEYS.has(k))
-    setPrefs(hiddenVirtual.length ? { hidden: hiddenVirtual, order: [] } : null)
+    const pinned = prefs?.pinned ?? []
+    setPrefs(hiddenVirtual.length || pinned.length ? { hidden: hiddenVirtual, order: [], ...(pinned.length ? { pinned } : {}) } : null)
     await reloadViews()
   }, [view, source, viewPayload, prefs, setPrefs, reloadViews])
   const renameView = useCallback(async (name: string) => {
@@ -574,15 +584,26 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const searchFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
   const searchQuickFilter = useMemo(() => debounceSearch(filterOptions), [filterOptions])
   // Busca por palavra-chave: o texto fica local; a busca de verdade sai depois da pausa.
+  // Destaque só das palavras já enviadas (após a pausa da digitação), as mesmas que a consulta usa.
+  const searchWords = useMemo(() => keywordTokens(query), [query])
   const [searchText, setSearchText] = useState(query)
   useEffect(() => setSearchText(query), [query])
-  const renderCell = useCallback((row: Row, column: Column): ReactNode => {
+  // Edição na célula da tabela do DS (`?tabela=ds`, parte 2): a mesma gravação, o mesmo andamento e a mesma busca do grid próprio.
+  const dsEdit = useMemo(() => ({ editable: attributes != null, cells, save: salvar, reset: resetCell, search: searchLookup }), [attributes, cells, salvar, resetCell, searchLookup])
+  /** Conteúdo das colunas virtuais (Comprovantes e Portal), igual nas duas grades; `undefined` nas colunas do Dataverse. */
+  const special = useCallback((row: Row, column: Column): ReactNode | undefined => {
     const id = String(row[ID_ATTRIBUTE])
-    if (column.key === COMPROVANTES_KEY) return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{besideId(id, formatCell('readonly', row, 'cr40f_id'))}</div>
+    if (column.key === COMPROVANTES_KEY) return besideId(id, formatCell('readonly', row, 'cr40f_id'))
     if (column.key === PORTAL_KEY) {
       const st = portalStatus.get(id)
-      return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{st ? <StatusBadge tone={tomStatus(st)}>{rotuloStatus(st)}</StatusBadge> : <span className="gr-cell__value">—</span>}</div>
+      return st ? <StatusBadge tone={tomStatus(st)}>{rotuloStatus(st)}</StatusBadge> : <span className="gr-cell__value">—</span>
     }
+    return undefined
+  }, [portalStatus, besideId])
+  const renderCell = useCallback((row: Row, column: Column): ReactNode => {
+    const id = String(row[ID_ATTRIBUTE])
+    const virtual = special(row, column)
+    if (virtual !== undefined) return <div role="gridcell" className="bt-table__cell gr-cell gr-cell--readonly">{virtual}</div>
     return (
       <Cell
         row={row}
@@ -596,7 +617,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         editable={attributes != null}
       />
     )
-  }, [attributes, cells, salvar, resetCell, searchLookup, selectForEdit, portalStatus, besideId])
+  }, [attributes, cells, salvar, resetCell, searchLookup, selectForEdit, special])
 
   const editRow = editId == null ? undefined : rowOf(editId)
   const editManutencao = editRow ? lerManutencao(editRow) : null
@@ -683,6 +704,29 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
             </div>
           )
+          : tabelaDs && !grouped ? (
+            // Migração para o `Table` do DS (partes 1 e 2: leitura e edição na célula). Agrupada, continua no grid próprio até a parte 4.
+            <GeralDsTable
+              columns={allColumns}
+              extraKeys={extraKeys}
+              attributes={attributes}
+              rows={rows}
+              loading={loading}
+              view={viewState}
+              quickFilters={{ fields: filterFields, value: valid.quick, onChange: setQuickFilter, search: searchQuickFilter, filtered: filteredKeys }}
+              selected={geral.selected}
+              onSelectionChange={geral.setSelection}
+              onOpen={(id) => { void openForm('edit', id) }}
+              onRowContextMenu={openContext}
+              virtualKeys={VIRTUAL_KEYS}
+              special={special}
+              edit={dsEdit}
+              scrollRef={scrollRef}
+              afterRows={<LoadSentinel root={scrollRef} active={sentinel} loaded={rows.length} onLoadMore={loadMore} />}
+              footer={<LoadMore root={scrollRef} sentinel={false} {...loadMoreProps} />}
+              empty={geral.pageError ? null : empty}
+            />
+          )
           : (
             <GeralTable
               density={viewState.density}
@@ -721,11 +765,11 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }
 
   // Contagem do primário do painel ("Mostrar N resultados"): a mesma consulta de total, com o rascunho no lugar dos filtros.
-  const { viewFilters: { base: filtersBase }, query: geralQuery, quickFind, comManutencoes } = geral
+  const { viewFilters: { base: filtersBase }, query: geralQuery, comManutencoes } = geral
   const countPreview = useCallback(async (draft: TableFilters) => {
     if (!attributes || !view) return null
-    return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery, quickFind })
-  }, [attributes, view, source, filtersBase, filterFields, geralQuery, quickFind, comManutencoes])
+    return source.count({ fetchxml: comManutencoes(injectTableFilters(filtersBase, draft, filterFields)), query: geralQuery })
+  }, [attributes, view, source, filtersBase, filterFields, geralQuery, comManutencoes])
 
   return (
     <ProtecaoContext.Provider value={protecao}>
@@ -738,7 +782,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           columns={columnDefs}
           catalog={catalog}
           filters={{ fields: filterFields, search: searchFilter, locked: geral.viewFilters.locked, countPreview, noun: SERVICOS }}
-          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar por ID, trajeto, cliente…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
+          search={<SearchBox className="gr-filters__search" size={size} aria-label="Buscar serviços" placeholder="Buscar OS, cliente, passageiro, placa…" value={searchText} onChange={setSearchText} onSearch={(value) => { if (value.trim() !== query) setQuery(value.trim()) }} debounce={300} loading={loading && query !== ''} />}
           more={moreActions}
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
@@ -753,7 +797,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         </ViewBar>
         </div>
         <Stack gap="4" className="gr-body">
-        {body}
+        <SearchHits tokens={searchWords}>{body}</SearchHits>
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}

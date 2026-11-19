@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Checkbox, StatusBadge, type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
-import { LoadingTable } from '../../../app/VirtualTable'
+import { ListTable } from '../../../app/ListTable'
 import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import { fechamentoSugerido, podeMarcarFechamento, prazoVencido, situacaoLabel, situacaoTone } from '../domain/regras'
 import type { Linha } from '../domain/types'
@@ -8,8 +8,9 @@ import type { Linha } from '../domain/types'
 type Props = { list: Linha[]; hoje: string; selecionados: Set<string>; onToggle: (id: string) => void; onOpen: (id: string) => void; loading?: boolean }
 type TableProps = Props & { view?: TableView; quickFilters?: TableQuickFilters; footer?: ReactNode; empty?: ReactNode; extraCell?: (id: string, key: string) => string }
 
+import { formatDay } from '../../../app/format'
 export const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
-export const fmtData = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '')
+export const fmtData = formatDay
 const fmtValor = (v: number | null) => (v == null ? '—' : money.format(v))
 
 export function Situacao({ l }: { l: Linha }) {
@@ -67,7 +68,7 @@ export function ValidacaoTable({ list, hoje, selecionados, onToggle, onOpen, loa
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.vc-open')}>
-      <LoadingTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

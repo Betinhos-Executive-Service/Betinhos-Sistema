@@ -26,6 +26,9 @@ import { collectCompositionPages, compositionWorkbook, freshPageRecords } from '
 import { createColumnFilterLabels } from './data/column-filter-values'
 import { nextEditableCell } from './data/grid-navigation'
 import { CompositionSaveQueue } from './data/composition-save-queue'
+import { keywordTokens } from '../../app/keywordSearch'
+import { SearchHighlight, SearchTokensContext } from '../../app/SearchHighlight'
+import { preloadSearchChoices } from './data/composition-search'
 import { matchesCompositionFilters, sumSelectedCompositions } from './data/composition-totals'
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './data/mock-views'
 import { withCalculatedTotals } from './data/composition-calculated'
@@ -211,7 +214,7 @@ const hasRouteCard = (item: Composition) => Boolean(item.serviceId || item.depar
 
 /** Texto do trajeto na célula com o cartão de saída e destino no hover, cabendo ou não na coluna. */
 function RouteDisplay({ item, text }: { item: Composition; text: string }) {
-  return <span className="lookup-preview grid-route"><span className="grid-client-name">{text}</span><RouteCard item={item} /></span>
+  return <span className="lookup-preview grid-route"><span className="grid-client-name"><SearchHighlight text={text} /></span><RouteCard item={item} /></span>
 }
 
 function provisionalField(id: string): CatalogField {
@@ -301,10 +304,21 @@ function ComposicaoContent({ host }: { host: Host }) {
   const blurTimerRef = useRef<number | null>(null)
   const saveRequestIdsRef = useRef(new Map<string, number>())
   const keepEditorDuringMenuRef = useRef(false)
-  const searchTerm = search.trim().toLocaleLowerCase('pt-BR')
+  const searchTokens = useMemo(() => keywordTokens(search), [search])
+  // Os rótulos das escolhas (status, tipo de serviço…) entram na busca: lidos na primeira digitação, e a consulta se refaz uma vez com eles.
+  const [searchChoicesReady, setSearchChoicesReady] = useState(false)
+  useEffect(() => {
+    if (!searchTokens.length || !catalogReady || searchChoicesReady || dataSource !== 'dataverse') return
+    let cancelled = false
+    void preloadSearchChoices(catalog, viewDefinitionRef.current).then(() => { if (!cancelled) setSearchChoicesReady(true) })
+    return () => { cancelled = true }
+  }, [catalog, catalogReady, dataSource, searchChoicesReady, searchTokens.length])
   useEffect(() => { const timer = window.setTimeout(() => setServerSearch(search.trim()), 250); return () => window.clearTimeout(timer) }, [search])
+  // No Dataverse o destaque segue a busca já enviada: marca o que a grade mostra e não redesenha as células a cada tecla.
+  const serverTokens = useMemo(() => keywordTokens(serverSearch), [serverSearch])
+  const highlightTokens = dataSource === 'mock' ? searchTokens : serverTokens
   const projectedRows = useMemo(() => projectPendingInputs(rows, optimisticInputs), [rows, optimisticInputs])
-  const visibleRows = useMemo(() => dataSource === 'mock' ? applyMockView(projectedRows, viewDefinition).filter((row) => matchesCompositionFilters(row, searchTerm, columnFilters)) : projectedRows, [columnFilters, dataSource, projectedRows, searchTerm, viewDefinition])
+  const visibleRows = useMemo(() => dataSource === 'mock' ? applyMockView(projectedRows, viewDefinition).filter((row) => matchesCompositionFilters(row, searchTokens, columnFilters)) : projectedRows, [columnFilters, dataSource, projectedRows, searchTokens, viewDefinition])
   const rowsRef = useRef(rows)
   const commandLockedRef = useRef(false)
   const visibleRowsRef = useRef(visibleRows)
@@ -349,7 +363,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     () => usingMockData ? { view: undefined, error: null } : openActive ? { view: openQuery!.view, error: null } : resolveCompositionQuery(activeView, viewDefinitionRef.current, catalog, serverSearch),
     // Larguras e fixação de colunas não mudam a consulta; só ids, filtros e ordenação.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeView, catalog, openActive, openQuery?.view, usingMockData, queryColumnIds, serverSearch, viewDefinition.filters, viewDefinition.filterGroups, viewDefinition.groupOperator, viewDefinition.sort])
+    [activeView, catalog, openActive, openQuery?.view, usingMockData, queryColumnIds, serverSearch, searchChoicesReady, viewDefinition.filters, viewDefinition.filterGroups, viewDefinition.groupOperator, viewDefinition.sort])
   const totalCount = useTotalCount(queryView, dataSource === 'dataverse' && !queryError, countTick)
   const applyViewDefinition = useCallback((definition: ViewDefinition) => setViewDefinition({ ...definition, columns: [...definition.columns.filter((item) => item.pinned), ...definition.columns.filter((item) => !item.pinned)] }), [])
   const trackFormulas = useCallback((records: Composition[], formulas: Promise<FormulaMap>, request: number) => {
@@ -1213,11 +1227,11 @@ function ComposicaoContent({ host }: { host: Host }) {
             {clientId ? (
               <span className="lookup-preview">
                 <button type="button" className="lookup-link" onClick={() => { void openGridRecord('cr40f_clientes1', clientId) }} aria-label={`Abrir cliente ${item.client}`}>
-                  {item.client}
+                  <SearchHighlight text={item.client} />
                 </button>
                 <ClientCard item={item} />
               </span>
-            ) : <span className="grid-client-name" title={item.client}>{item.client}</span>}
+            ) : <span className="grid-client-name" title={item.client}><SearchHighlight text={item.client} /></span>}
           </span>
         )
       },
@@ -1229,16 +1243,16 @@ function ComposicaoContent({ host }: { host: Host }) {
         return serviceId ? (
           <span className="lookup-preview">
             <button type="button" className="lookup-link grid-route" onClick={() => { void openGridRecord('cr40f_reservadeveculos', serviceId) }} aria-label={`Abrir serviço relacionado: ${item.route}`}>
-              {item.route}
+              <SearchHighlight text={item.route} />
             </button>
             <RouteCard item={item} />
           </span>
         ) : item.departureAddress || item.destination ? (
           <span className="lookup-preview">
-            <span className="grid-route">{item.route}</span>
+            <span className="grid-route"><SearchHighlight text={item.route} /></span>
             <RouteCard item={item} />
           </span>
-        ) : <span className="grid-route" title={item.route}>{item.route}</span>
+        ) : <span className="grid-route" title={item.route}><SearchHighlight text={item.route} /></span>
       },
     }), column.accessor((row) => row.departureAt, {
       id: 'date', meta: { className: 'fixed-col fixed-col--date' }, header: sortableHeader('date', 'Data'),
@@ -1492,7 +1506,7 @@ function ComposicaoContent({ host }: { host: Host }) {
           if ((id === 'new_status' || color) && value !== null && value !== undefined && value !== '') {
             const formattedValue = readViewField(row.original.viewFields, valueKey).formatted
             const title = typeof formattedValue === 'string' && formattedValue ? formattedValue : String(value)
-            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className={`grid-choice-badge${color ? '' : title.toLocaleLowerCase('pt-BR').startsWith('conclu') ? ' grid-choice-badge--done' : ' grid-choice-badge--pending'}`} style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}>{title}</span>} />
+            return <EditableViewFieldCell field={field} value={value} formatted={formattedValue} viewFields={row.original.viewFields} valueKey={valueKey} baseRecordId={row.original.id} editable={editable} {...interactionProps(row.original.id, id)} onSaved={applySavedViewField} display={<span className={`grid-choice-badge${color ? '' : title.toLocaleLowerCase('pt-BR').startsWith('conclu') ? ' grid-choice-badge--done' : ' grid-choice-badge--pending'}`} style={color ? { '--grid-choice': color } as CSSProperties : undefined} title={title}><SearchHighlight text={title} /></span>} />
           }
           const formatted = readViewField(row.original.viewFields, valueKey).formatted
           // Trajeto do serviço relacionado vindo da própria view: mesmo cartão da coluna Trajeto, sempre no hover.
@@ -1517,7 +1531,7 @@ function ComposicaoContent({ host }: { host: Host }) {
           const title = id === 'client' ? item.client : id === 'route' ? item.route : formatDepartureDate(item.departureAt)
           const target = id === 'client' ? item.clientId : id === 'route' ? item.serviceId : null
           const display = <span className={id === 'client' ? 'grid-client lookup-preview' : 'lookup-preview grid-route'}>
-            <span className="grid-client-name" title={title}>{title}</span>
+            <span className="grid-client-name" title={title}><SearchHighlight text={title} /></span>
             {id === 'client' && <ClientCard item={item} />}
             {id === 'route' && (target || item.departureAddress || item.destination) && <RouteCard item={item} />}
           </span>
@@ -1719,7 +1733,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         <LookupHoverIntent />
         {loading ? <PriceGridSkeleton />
           : connectionError && rows.length === 0 ? <LoadFailure message={connectionError} />
-            : <DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} />}
+            : <SearchTokensContext.Provider value={highlightTokens}><DataTable rowRenderKeys={rowRenderKeys} headerRenderKeys={headerRenderKeys} resetKey={openActive ? `open:${openQuery?.viewId ?? 'default'}` : `${activeView?.id ?? 'default'}:${JSON.stringify(viewDefinition.filters)}:${JSON.stringify(viewDefinition.filterGroups)}:${viewDefinition.groupOperator}:${JSON.stringify(viewDefinition.sort)}`} data={visibleRows} columns={displayedColumns} layout={tableLayout} onResizeColumn={resizeColumn} footerValues={footerValues} getRowId={(row) => row.id} footerLabel={footerLabel} footerCells={footerCells} scroller={tableScroller} selectionResetKey={selectionResetKey} rowHeight={ROW_HEIGHTS[viewBar.state.density]} onSelectionChange={handleSelectionChange} emptyContent={<div className="composition-empty-state"><div className="composition-empty-state__icon" aria-hidden="true"><SearchX /></div><strong>{hasActiveFilters ? 'Nenhum resultado para os filtros atuais' : 'Nenhuma composição encontrada'}</strong><p>{hasActiveFilters ? 'Ajuste a busca ou os filtros para encontrar composições.' : 'Não há composições para exibir nesta view.'}</p>{hasActiveFilters && <button type="button" onClick={clearFilters}>Zerar filtros</button>}</div>} /></SearchTokensContext.Provider>}
         {!loading && nextLink && !connectionError ? (
           <div ref={loadMoreRef} className="composition-load-more" role="status" aria-busy={loadingMore}>
             <LoaderCircle aria-hidden="true" />Carregando mais registros…

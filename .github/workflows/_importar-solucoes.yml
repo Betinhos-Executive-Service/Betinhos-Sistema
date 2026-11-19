@@ -7,6 +7,10 @@ name: Importar soluções (reutilizável)
 # upgrade, remoção das camadas Active (hotfixes e telas publicadas direto no ambiente; a main já contém todos), estados
 # ligado/desligado devolvidos ao que a foto registrou, foto depois e comparação. Qualquer perda reprova.
 # Ordem pensada para o PROD nunca servir versão antiga: as camadas Active só saem depois de a versão nova estar importada.
+# Ordem pensada também para encurtar a janela em que o PROD roda com parte nova e parte errada: logo depois do import, a
+# configuração dos steps (o pacote traz a do DEV) e os estados ligado/desligado voltam ao de antes; as camadas Active saem
+# primeiro de tudo menos os steps e, por último, dos steps, com a configuração restaurada de novo em seguida. Assim a janela
+# com a configuração do DEV cai do tempo de toda a remoção para o de remover só as camadas dos steps.
 # No TEST (cópia travada do PROD) a comparação usa --travado e os fluxos/steps novos são desligados, para o ensaio não
 # mandar nada a clientes reais.
 on:
@@ -124,6 +128,16 @@ jobs:
           if ($env:ESCOLHER_MODO -eq 'true') { $extra += '-Escolher' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/importar-solucoes.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Pasta pacotes -Alvo $env:ALVO_PS -Publicadas publicadas-antes.json @extra
           if ($LASTEXITCODE -ne 0) { throw "importar-solucoes.ps1 falhou ($LASTEXITCODE)." }
+      # Antecipação: a restauração definitiva é a de depois das camadas Active. Falha aqui não para o job (a remoção das camadas
+      # tem de rodar), e a de depois reprova se o problema continuar.
+      - name: Restaurar configuração dos steps (logo depois do import)
+        continue-on-error: true
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json -Restaurar
+      - name: Restaurar estados ligado/desligado (logo depois do import)
+        continue-on-error: true
+        run: |
+          $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados-import.json @extra
       - name: Remover camadas Active (hotfixes já na main)
         # Publicação parcial (input solucoes) só mexe nas camadas das soluções importadas. Sem isso, publicar só a BetinhosCore
         # apagaria no PROD a camada Active de tela, flows e plugins da Automação e da Interface, e o PROD voltaria à versão
@@ -134,8 +148,12 @@ jobs:
           $extra = @()
           if (@($todas | Where-Object { $nomes -notcontains $_ }).Count) { $extra = @('-Solucoes', ($nomes -join ',')) }
           Write-Host "camadas Active de: $(if ($extra) { $nomes -join ', ' } else { 'AppBetinhos e as 4 soluções' })"
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd @extra
+          # Os steps ficam para a rodada seguinte: a configuração restaurada logo depois do import continua valendo enquanto isto roda.
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd -Tipos 'WebResource,Workflow,PluginAssembly,SystemForm,AppModule,SiteMap' @extra
           if ($LASTEXITCODE -ne 0) { throw "remover-camadas-active.ps1 falhou ($LASTEXITCODE)." }
+          Write-Host "camadas Active dos steps (por último, a configuração volta no passo seguinte)"
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/remover-camadas-active.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Backup camadas-active -Aplicar -PermitirProd -Tipos 'SdkMessageProcessingStep' @extra
+          if ($LASTEXITCODE -ne 0) { throw "remover-camadas-active.ps1 (steps) falhou ($LASTEXITCODE)." }
       - name: Restaurar configuração dos steps (depois das camadas Active, que a apagariam)
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/preservar-config-steps.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Arquivo config-steps/antes.json -Restaurar
       - name: Restaurar estados ligado/desligado
@@ -143,6 +161,11 @@ jobs:
         run: |
           $extra = @(); if ($env:DESLIGAR_NOVOS -eq 'true') { $extra += '-DesligarNovos' }
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/restaurar-estados.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Alvo $env:ALVO_PS -Foto fotos/antes.json -Saida fotos/estados.json @extra
+      # Custom API que chegou no import sem mudança de metadata fica invisível para o conector do Power Automate (o carimbo de
+      # metadata não anda e o conector recebe 304). Sem API nova não muda nada. Não reprova a publicação: o import já valeu.
+      - name: Avançar o carimbo de metadata (Custom API nova)
+        continue-on-error: true
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/avancar-carimbo-metadata.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Aplicar
       - name: Foto depois
         if: always()
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/solucoes/foto-ambiente.ps1 -EnvironmentUrl $env:DV_ENVIRONMENT_URL -Saida fotos/depois.json
