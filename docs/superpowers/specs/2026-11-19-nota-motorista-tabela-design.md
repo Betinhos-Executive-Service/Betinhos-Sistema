@@ -40,7 +40,7 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
   - Carga inicial: `packages/deploy/carga-notas-infleet.ps1` (à mão; DEV, e PROD só com pedido do Renan) chama a Custom API para trás em janelas de 15 dias (`Ate`, `Dias` = 15, `Meses` = 0; 23 motoristas × 15 = 23 chamadas ≈ 76 s) e, a cada mês fechado, uma chamada com `Meses` = 1 e `Dias` = 0. Para depois de 2 meses seguidos sem linha gravada ou em 36 meses. A Infleet tem histórico de mais de 2 anos, então a carga leva cerca de 1 h.
   - Resposta `new_Result` em JSON: motoristas lidos, linhas gravadas e falhas, só com ids, sem token.
   - Falha de um motorista não para os outros.
-- **Flow "Infleet - Sincronizar notas dos motoristas"**, novo: recorrência diária às 05:00 America/Sao_Paulo, chama a Custom API e manda e-mail de alerta se houver falha, no molde de `provision-flow-carro-atual.ps1`.
+- **Flow "Infleet - Sincronizar notas dos motoristas"**, novo: recorrência diária às 05:00 America/Sao_Paulo, chama a Custom API e termina Failed se a chamada falhar, houver falha de motorista ou a rodada ficar incompleta. Sem e-mail (decisão do Renan, 19/11/2026): a falha aparece no histórico do flow e no plantão de erros.
   - Flow novo continua à mão: `provision-flow-nota-motorista.ps1`, rodado do checkout principal na `develop`.
 
 ## App Motoristas

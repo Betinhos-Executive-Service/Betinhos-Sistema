@@ -30,7 +30,7 @@
 - **Mensagens:**
   - commits em português, terminando com `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`;
   - o PR vai para a `develop` e o corpo termina com `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- **Repositório público:** sem e-mail, segredo nem dado de motorista no código. Destinatários entram por parâmetro.
+- **Repositório público:** sem e-mail, segredo nem dado de motorista no código. Sem e-mail de alerta (decisão do Renan, 19/11/2026): o flow só termina Failed.
 - **Rodar só do checkout principal na `develop`:** o registro da Custom API, a carga e o flow novo. Nunca de worktree.
 
 ## Mapa de arquivos
@@ -836,16 +836,15 @@ Pode chamar com a data só (`yyyy-MM-dd`) porque o parâmetro `Ate` é DateTime:
     - `@not(equals(outputs('Sincronizar_notas')?['statusCode'], 200))`;
     - `@greater(length(coalesce(outputs('Resumo')?['falhas'], json('[]'))), 0)`;
     - `@equals(outputs('Resumo')?['incompleto'], true)`.
-  - **Dentro de `Alertar`:** `SendEmailV2` com `To = "__DESTINATARIOS__"`, assunto `[Infleet] Notas dos motoristas não sincronizaram por completo` e corpo com `@{outputs('Resumo')}` mais a mensagem de erro (`coalesce(outputs('Sincronizar_notas')?['body']?['error']?['message'], 'sem mensagem')`).
   - **`Manter_falha`:** `Terminate` Failed, quando a ação falhou, igual ao carro-atual, para o histórico ficar vermelho.
 - [ ] **Passo 2: script.**
-  - Parâmetros: `-Destinatarios` (obrigatório, mesmo `ValidatePattern` do aniversariantes), `-ReferenciaDataverse` e `-ReferenciaOutlook`.
+  - Parâmetro: `-ReferenciaDataverse` (opcional). Sem Outlook nem destinatários.
   - Sem variável de ambiente nem `__SET_FUNCIONARIOS__`.
-  - `$flowName = 'Infleet - Sincronizar notas dos motoristas'`. A descrição diz: "Todo dia às 05:00 grava em new_notamotorista a nota da Infleet (90 dias, meses e dias) e avisa por e-mail se algo falhar."
+  - `$flowName = 'Infleet - Sincronizar notas dos motoristas'`. A descrição diz: "Todo dia às 05:00 grava em new_notamotorista a nota da Infleet (90 dias, meses e dias) e termina com falha se algo não sincronizar."
   - Mantém a trava de organização DEV (`OrganizationId`).
 - [ ] **Passo 3: `flows-dev.mjs`.** Siga o padrão das entradas que criam e atualizam (como `aniversariantes`; confira se elas usam `apply: false` e argumentos `FLOW_*`):
   - `{ nome: 'nota-motorista', script: 'provision-flow-nota-motorista.ps1', flows: ['Infleet - Sincronizar notas dos motoristas'], arquivos: [script('nota-motorista'), flowsDir('nota-motorista-diario\\.json')] }`;
-  - os destinatários entram pela variável `FLOW_NOTA_MOTORISTA_DESTINATARIOS` do environment `dev`, documentada na skill `verificar-deploy-dev`;
+  - sem `args`: o flow não pede variável `FLOW_*`;
   - atualize as listas em `flows-dev.test.mjs`.
 - [ ] **Passo 4:** `node --test packages/deploy/flows-dev.test.mjs` passa.
 - [ ] **Passo 5:** commit: `feat(flows): flow diário das notas dos motoristas`.
@@ -946,6 +945,6 @@ Nos outros arquivos:
   2. Rode `register-sincronizarnotas-customapi.ps1`, primeiro sem e depois com `-Apply`.
   3. Faça um POST em `new_SincronizarNotasInfleet` com `{}` e confira o resumo.
   4. Rode a carga: `carga-notas-infleet.ps1` (~1 h).
-  5. Rode `provision-flow-nota-motorista.ps1 -Destinatarios <o do Renan>`.
+  5. Rode `provision-flow-nota-motorista.ps1`.
   6. Prove o App: POST em `new_NotaInfleet` com `MSCRMCallerID` de um motorista real, em < 1 s e com `sincronizadoEm`.
 - [ ] Registre na memória `score-motorista-infleet.md` e na wiki (`/wiki`). O PROD fica pendente: chega pelas soluções no próximo develop→main, e depois disso vêm a carga e o flow lá, com o pedido do Renan.

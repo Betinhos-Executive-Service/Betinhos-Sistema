@@ -7,7 +7,7 @@ description: "Verifica a sincronização das notas Infleet → new_notamotorista
 ## Cobre
 - Tabela `new_notamotorista`: uma linha por motorista e período, upsert pela chave `new_chave` (`<funcionarioid>|90d`, `|AAAA-MM`, `|AAAA-MM-DD`). `new_periodo`: 100000000 90 dias, 100000001 Mês, 100000002 Dia. `new_situacao`: 100000000 Ok, 100000001 Em formação (km < 50 ou nota nula). Dia/mês sem km não ganha linha; linha nunca é apagada.
 - Custom API `new_SincronizarNotasInfleet` (SYSTEM, token `infleet.token` da `cr40f_segredo`): entradas `Meses` (2), `Dias` (3), `Ate` (com `Ate`, não grava a 90 dias). Lotes de 15 períodos por chamada GraphQL (complexidade máxima 300); a 90 dias de todos sai primeiro; lote recusado é refeito item a item e só o motorista com id ruim fica em `falhas`; para aos 80 s com `incompleto: true`. Resposta `{motoristas, periodos, gravadas, falhas, incompleto}`, só ids.
-- Flow diário às 05:00 (São Paulo): alerta por e-mail (`FLOW_NOTA_MOTORISTA_DESTINATARIOS`) quando a chamada falha, há `falhas` ou `incompleto`, e termina Failed.
+- Flow diário às 05:00 (São Paulo): sem e-mail; termina Failed quando a chamada falha, há `falhas` ou `incompleto` (aparece no histórico do flow e no plantão).
 
 ## Local (sem Dataverse)
 1. `export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$PATH; dotnet test packages/plugins/Betinhos.DriverRecordSharing.Tests -p:SignAssembly=false` → `NotaSyncTests` e `SincronizarNotasInfleetPluginTests` passam (lotes, upsert idempotente, sem km sem linha, nota nula em formação, falha isolada, limite de tempo).

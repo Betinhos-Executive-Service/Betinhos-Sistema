@@ -56,7 +56,7 @@
       },
       "inputs": "@json(coalesce(outputs('Sincronizar_notas')?['body/new_Result'], '{}'))"
     },
-    "Alertar": {
+    "Falhar_se_incompleto": {
       "type": "If",
       "runAfter": {
         "Resumo": [
@@ -90,33 +90,9 @@
         ]
       },
       "actions": {
-        "Enviar_alerta": {
-          "type": "OpenApiConnection",
-          "runAfter": {},
-          "inputs": {
-            "host": {
-              "operationId": "SendEmailV2",
-              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
-              "connectionName": "shared_office365"
-            },
-            "parameters": {
-              "emailMessage/To": "__DESTINATARIOS__",
-              "emailMessage/Subject": "[Infleet] Notas dos motoristas não sincronizaram por completo",
-              "emailMessage/Body": "<p>A sincronização diária das notas da Infleet (<b>Infleet - Sincronizar notas dos motoristas</b>) não terminou por completo no ambiente @{workflow()?['tags']?['environmentName']}.</p><p>Resumo: @{outputs('Resumo')}</p><p>Erro: @{coalesce(outputs('Sincronizar_notas')?['body']?['error']?['message'], 'sem mensagem')}</p><p>Rodada incompleta ou com falha de motorista não apaga nada: a próxima rodada das 05:00 regrava os últimos dias.</p>",
-              "emailMessage/Importance": "High"
-            },
-            "authentication": "@parameters('$authentication')"
-          }
-        },
         "Manter_falha": {
           "type": "Terminate",
-          "runAfter": {
-            "Enviar_alerta": [
-              "Succeeded",
-              "Failed",
-              "TimedOut"
-            ]
-          },
+          "runAfter": {},
           "inputs": {
             "runStatus": "Failed",
             "runError": {

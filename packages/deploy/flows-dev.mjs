@@ -51,7 +51,6 @@ export const ENTRADAS = [
   },
   {
     nome: 'nota-motorista', script: 'provision-flow-nota-motorista.ps1', flows: ['Infleet - Sincronizar notas dos motoristas'],
-    args: [['Destinatarios', 'FLOW_NOTA_MOTORISTA_DESTINATARIOS']],
     arquivos: [script('nota-motorista'), flowsDir('nota-motorista-diario\\.json')],
   },
   {

@@ -1,13 +1,11 @@
 ﻿# Cria (ou atualiza) no DEV o flow "Infleet - Sincronizar notas dos motoristas" na solução AppBetinhos.
-# A definição vem de flows/nota-motorista-diario.json; os destinatários do alerta entram por parâmetro (nunca no repo).
-# Todo dia às 05:00 chama a Custom API new_SincronizarNotasInfleet (grava new_notamotorista) e avisa por e-mail se algo falhar.
-# Pré-requisitos: tabela new_notamotorista (migration), Custom API registrada, connection references de Dataverse e
-# Office 365 Outlook na solução e `az login --use-device-code` no DEV. Flow novo nasce à mão, do checkout principal na develop.
+# A definição vem de flows/nota-motorista-diario.json.
+# Todo dia às 05:00 chama a Custom API new_SincronizarNotasInfleet (grava new_notamotorista) e termina com falha (sem e-mail)
+# se a chamada falhar, ficar incompleta ou tiver falha de motorista: aparece no histórico do flow e no plantão.
+# Pré-requisitos: tabela new_notamotorista (migration), Custom API registrada, connection reference de Dataverse na solução e `az login --use-device-code` no DEV. Flow novo nasce à mão, do checkout principal na develop.
 # Idempotente.
 param(
-  [Parameter(Mandatory = $true)] [ValidatePattern('^[^@\s;]+@[^@\s;]+(;[^@\s;]+@[^@\s;]+)*$')] [string] $Destinatarios,
-  [string] $ReferenciaDataverse,
-  [string] $ReferenciaOutlook
+  [string] $ReferenciaDataverse
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -43,7 +41,7 @@ function Include([string] $id, [int] $type) {
   if (-not @((Dv GET $filter).value).Count) { throw "Componente $type/$id não entrou na $solutionName." }
 }
 
-# 1. Connection references (Dataverse e Office 365 Outlook).
+# 1. Connection reference do Dataverse.
 $refs = @((Dv GET "connectionreferences?`$select=connectionreferencelogicalname,connectorid&`$filter=statecode eq 0").value)
 # Flow que já existe mantém a referência que usa: com várias no DEV, só o flow novo pede o parâmetro.
 $flows = @((Dv GET "workflows?`$select=workflowid,statecode,clientdata&`$filter=name eq '$flowName' and category eq 5").value)
@@ -59,20 +57,16 @@ function Referencia([string] $conector, [string] $preferida) {
   }
   if ($candidatas.Count -eq 1) { return $candidatas[0].connectionreferencelogicalname }
   $nomes = ($candidatas | ForEach-Object { $_.connectionreferencelogicalname }) -join ', '
-  throw "Há $($candidatas.Count) connection references de $conector ($nomes). Informe uma com -Referencia$(if ($conector -eq 'shared_office365') { 'Outlook' } else { 'Dataverse' })."
+  throw "Há $($candidatas.Count) connection references de $conector ($nomes). Informe uma com -ReferenciaDataverse."
 }
 $refDataverse = Referencia 'shared_commondataserviceforapps' $ReferenciaDataverse
-$refOutlook = Referencia 'shared_office365' $ReferenciaOutlook
 
-# 2. Definição do flow com os tokens trocados.
+# 2. Definição do flow.
 $raw = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'flows\nota-motorista-diario.json'), [Text.Encoding]::UTF8)
-$raw = $raw.Replace('__DESTINATARIOS__', $Destinatarios)
-if ($raw -match '__[A-Z_]+__') { throw "Token não substituído na definição do flow: $($Matches[0])" }
 $definition = $raw | ConvertFrom-Json
 
 $connectionReferences = @{
   shared_commondataserviceforapps = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $refDataverse }; api = @{ name = 'shared_commondataserviceforapps' } }
-  shared_office365 = @{ runtimeSource = 'embedded'; connection = @{ connectionReferenceLogicalName = $refOutlook }; api = @{ name = 'shared_office365' } }
 }
 $clientData = @{ properties = @{ definition = $definition; connectionReferences = $connectionReferences }; schemaVersion = '1.0.0.0' } | ConvertTo-Json -Depth 90 -Compress
 
@@ -91,7 +85,7 @@ if ($flows.Count) {
     Dv PATCH "workflows($flowId)" @{ clientdata = $clientData } | Out-Null
   }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia às 05:00 grava em new_notamotorista a nota da Infleet (90 dias, meses e dias) e avisa por e-mail se algo falhar.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Todo dia às 05:00 grava em new_notamotorista a nota da Infleet (90 dias, meses e dias) e termina com falha se algo não sincronizar.' } | Out-Null
   $flowId = @((Dv GET "workflows?`$select=workflowid&`$filter=name eq '$flowName' and category eq 5").value)[0].workflowid
 }
 Include $flowId 29
