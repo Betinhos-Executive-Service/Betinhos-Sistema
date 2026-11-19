@@ -3,7 +3,7 @@ param(
   # Nao se chama $Solucoes: solucoes.ps1 atribui $script:Solucoes no mesmo escopo (ver exportar-do-dev.ps1).
   [Alias("Solucoes")] [string] $Pedido = "AppBetinhos,BetinhosCore,BetinhosAutomacao,BetinhosMotoristas,BetinhosInterface",
   [string] $Backup = "",
-  # Tipos de componente (nomes de $tipos abaixo, separados por virgula). Vazio = todos. O _importar-solucoes.yml remove os
+  # Tipos de componente (nomes de $mapaTipos abaixo, separados por virgula). Vazio = todos. O _importar-solucoes.yml remove os
   # steps numa rodada propria, a ultima, para a configuracao do PROD voltar logo em seguida (preservar-config-steps.ps1).
   [string] $Tipos = "",
   [switch] $Aplicar,
@@ -50,16 +50,16 @@ if (-not $Backup) { $Backup = Join-Path (Get-Location) "backup\solucoes\camadas-
 $Backup = (New-Item -ItemType Directory -Force (Join-Path $Backup (Get-Date -Format "yyyyMMdd-HHmmss"))).FullName
 
 # componenttype -> nome em msdyn_componentlayers; o nome logico da entidade (RemoveActiveCustomization) e o mesmo em minusculas.
-$tipos = [ordered]@{ 61 = "WebResource"; 29 = "Workflow"; 91 = "PluginAssembly"; 92 = "SdkMessageProcessingStep"; 60 = "SystemForm"; 80 = "AppModule"; 62 = "SiteMap" }
+$mapaTipos = [ordered]@{ 61 = "WebResource"; 29 = "Workflow"; 91 = "PluginAssembly"; 92 = "SdkMessageProcessingStep"; 60 = "SystemForm"; 80 = "AppModule"; 62 = "SiteMap" }
 $pedidoTipos = @($Tipos -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$tiposDesconhecidos = @($pedidoTipos | Where-Object { @($tipos.Values) -notcontains $_ })
-if ($tiposDesconhecidos.Count) { throw "-Tipos com tipo desconhecido: $($tiposDesconhecidos -join ', '). Validos: $(@($tipos.Values) -join ', ')." }
+$tiposDesconhecidos = @($pedidoTipos | Where-Object { @($mapaTipos.Values) -notcontains $_ })
+if ($tiposDesconhecidos.Count) { throw "-Tipos com tipo desconhecido: $($tiposDesconhecidos -join ', '). Validos: $(@($mapaTipos.Values) -join ', ')." }
 if ($pedidoTipos.Count) {
-  foreach ($chave in @($tipos.Keys)) { if ($pedidoTipos -notcontains $tipos[$chave]) { $tipos.Remove($chave) } }
-  Write-Step "tipos: $(@($tipos.Values) -join ', ')"
+  foreach ($chave in @($mapaTipos.Keys)) { if ($pedidoTipos -notcontains $mapaTipos[$chave]) { $mapaTipos.Remove($chave) } }
+  Write-Step "tipos: $(@($mapaTipos.Values) -join ', ')"
 }
 $pares = @(); $vistos = @{}
-foreach ($t in $tipos.GetEnumerator()) {
+foreach ($t in $mapaTipos.GetEnumerator()) {
   $componentes = @(foreach ($solutionId in $ids) { Read-DvAll $dv "solutioncomponents?`$select=objectid&`$filter=_solutionid_value eq $solutionId and componenttype eq $($t.Key)" })
   foreach ($c in $componentes) {
     # O mesmo componente esta na AppBetinhos e numa das 4: uma consulta de camadas por componente.
