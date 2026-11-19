@@ -32,10 +32,12 @@ Uma linha por motorista e período. Dona: organização. Entra pela migration `p
 ## Sincronização
 - **Custom API `new_SincronizarNotasInfleet`** (unbound, action) no `Betinhos.DriverRecordSharing`, plugin como SYSTEM, token `infleet.token` da `cr40f_segredo`.
   - Entrada opcional `Meses` (inteiro, padrão 2: mês corrente, parcial, e o anterior, que fecha). Carga inicial: rodada única com `Meses` = 24 para trazer tudo o que a Infleet tiver.
-  - Lê os funcionários ativos com `new_infleetdriverid` e consulta a Infleet em lotes de vários motoristas por chamada GraphQL (aliases), para 23 motoristas caberem folgado no limite de 2 min do plugin.
+  - Lê os funcionários ativos com `new_infleetdriverid` e consulta a Infleet em lotes de 15 períodos por chamada GraphQL (aliases). Medido em 19/11/2026: a Infleet recusa complexidade acima de 300 (19 por período com os 16 campos, então 15 cabem) e cada chamada cheia leva ~3,3 s. A rodada diária (23 motoristas × 6 períodos ≈ 10 chamadas) fica em ~35 s, dentro dos 2 min do plugin.
+  - Entrada opcional `Ate` (data, padrão ontem em São Paulo): com `Ate` informado, não grava a linha 90 dias (uso da carga retroativa).
+  - Para antes de 100 s de execução e devolve `incompleto: true` com o que já gravou, em vez de estourar o limite e perder a transação.
   - Entrada opcional `Dias` (inteiro, padrão 3: ontem e os dois anteriores, para pegar dado que a Infleet recebe atrasado).
   - Faz upsert pela `new_chave`: a linha 90 dias, as linhas Mês e as linhas Dia da janela.
-  - Carga inicial diária: `packages/deploy/carga-notas-infleet.ps1` (à mão, só DEV e depois PROD com pedido) chama a Custom API mês a mês para trás com `Dias` = dias do mês, até um mês inteiro sem km em nenhum motorista; cada chamada cabe nos 2 min.
+  - Carga inicial: `packages/deploy/carga-notas-infleet.ps1` (à mão; DEV, e PROD só com pedido do Renan) chama a Custom API para trás em janelas de 15 dias (`Ate`, `Dias` = 15, `Meses` = 0; 23 motoristas × 15 = 23 chamadas ≈ 76 s) e, a cada mês fechado, uma chamada com `Meses` = 1 e `Dias` = 0. Para depois de 2 meses seguidos sem linha gravada ou em 36 meses. A Infleet tem histórico de mais de 2 anos, então a carga leva cerca de 1 h.
   - Resposta `new_Result` em JSON: motoristas lidos, linhas gravadas e falhas, só com ids, sem token.
   - Falha de um motorista não para os outros.
 - **Flow "Infleet - Sincronizar notas dos motoristas"**, novo: recorrência diária às 05:00 America/Sao_Paulo, chama a Custom API e manda e-mail de alerta se houver falha, no molde de `provision-flow-carro-atual.ps1`.
