@@ -431,7 +431,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
 
   const kpis: { label: string; value: number; tone: MetricTone; icon: IconName; hint: string }[] = [
     { label: "Frota própria", value: frota.length, tone: "info", icon: "car", hint: isMock ? "Dados de exemplo" : "Carros próprios ativos" },
-    { label: "Em dia", value: contagem.emDia, tone: "success", icon: "checkCircle", hint: `Padrão: vistoria a cada ${periodicidade} dias` },
+    { label: "Em dia", value: contagem.emDia, tone: "success", icon: "checkCircle", hint: `Padrão: vistoria a cada ${periodicidade} ${plural(periodicidade, "dia", "dias")}` },
     { label: "Com o motorista", value: contagem.pendentes, tone: contagem.pendentes ? "warning" : "info", icon: "clock", hint: contagem.pendentes ? "Aguardando envio pelo app" : "Nenhum pendente" },
     { label: "Precisam de atenção", value: contagem.atencao, tone: contagem.atencao ? "danger" : "success", icon: "alert", hint: contagem.atencao ? "Vencidos, com problema, sem checklist ou sem motorista" : "Nenhum problema" }
   ];
@@ -477,7 +477,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
       );
     } },
     { key: "itens", header: "Itens", width: "90px", hideBelow: "mobile", cell: ({ modelo }) => `${modelo.itens.length} ${plural(modelo.itens.length, "item", "itens")}` },
-    { key: "periodicidade", header: "Periodicidade", width: "120px", hideBelow: "compact", cell: ({ modelo }) => `${modelo.periodicidadeDias} dias` },
+    { key: "periodicidade", header: "Periodicidade", width: "120px", hideBelow: "compact", cell: ({ modelo }) => `${modelo.periodicidadeDias} ${plural(modelo.periodicidadeDias, "dia", "dias")}` },
     { key: "situacao", header: "Situação", width: "minmax(140px, .8fr)", cell: ({ modelo, padrao: ehOPadrao }) => (
       <span className="chk-badges"><StatusBadge tone={modelo.ativo ? "success" : "neutral"} dot>{modelo.ativo ? "Ativo" : "Inativo"}</StatusBadge>{ehOPadrao ? <StatusBadge tone="info">Padrão</StatusBadge> : null}</span>
     ) },
