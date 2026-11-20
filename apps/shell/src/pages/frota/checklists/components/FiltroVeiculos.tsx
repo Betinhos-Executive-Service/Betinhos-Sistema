@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Icon } from "./icons";
+import { Alert, Button, Input, SegmentedControl, Select } from "@betinhos/ui";
+import { Car, Check, CircleAlert, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { plural, type Modelo } from "../domain/gestaoChecklists";
 import {
   CAMPOS_FILTRO,
@@ -69,7 +70,7 @@ export function FiltroVeiculos({ modelo, outros, veiculos, opcoes, estado, busy,
     return (
       <section className="mod-filtro" aria-labelledby="mod-filtro-titulo">
         <h3 id="mod-filtro-titulo" className="mod-items-title">Quais veículos recebem este modelo</h3>
-        <p className="mod-info"><Icon name="car" size={16} />Recebe os veículos próprios e ativos que não se encaixam em outro modelo.</p>
+        <Alert tone="info">Recebe os veículos próprios e ativos que não se encaixam em outro modelo.</Alert>
         <Previa estado={estado} onTentar={onTentar} vazio="" previa={previa} inativo={!modelo.ativo} />
       </section>
     );
@@ -86,15 +87,14 @@ export function FiltroVeiculos({ modelo, outros, veiculos, opcoes, estado, busy,
       <div className="mod-items-head">
         <div>
           <h3 id="mod-filtro-titulo" className="mod-items-title">Quais veículos recebem este modelo</h3>
-          <p className="gestao-hint">{condicoes.length > 1 ? "O veículo precisa atender a todas as condições." : "Monte condições com os dados do veículo, como marca ou blindado."}</p>
+          <p className="bt-field__hint">{condicoes.length > 1 ? "O veículo precisa atender a todas as condições." : "Monte condições com os dados do veículo, como marca ou blindado."}</p>
         </div>
       </div>
 
       {filtro.invalido ? (
-        <div className="mod-filtro-alerta" role="alert">
-          <p><Icon name="alert" size={16} />O filtro gravado não pôde ser lido. Enquanto isso, nenhum veículo recebe este modelo.</p>
-          <button type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={() => onFiltro("")}>Limpar filtro</button>
-        </div>
+        <Alert tone="danger" action={<Button variant="secondary" size="compact" disabled={busy} onClick={() => onFiltro("")}>Limpar filtro</Button>}>
+          O filtro gravado não pôde ser lido. Enquanto isso, nenhum veículo recebe este modelo.
+        </Alert>
       ) : null}
 
       {condicoes.length ? (
@@ -107,11 +107,11 @@ export function FiltroVeiculos({ modelo, outros, veiculos, opcoes, estado, busy,
         </ol>
       ) : null}
       <div>
-        <button id="mod-filtro-add" type="button" className="gestao-button is-secondary is-compact" disabled={busy} onClick={adicionar}><Icon name="plus" size={14} />Adicionar condição</button>
+        <Button id="mod-filtro-add" variant="secondary" size="compact" icon={<Plus size={14} />} disabled={busy} onClick={adicionar}>Adicionar condição</Button>
       </div>
 
       <Previa estado={estado} onTentar={onTentar} previa={previa} inativo={!modelo.ativo} vazio={vazio} />
-      {previa.incompletas && !soIncompletas ? <p className="gestao-hint">Condições ainda sem valor não entram na conta.</p> : null}
+      {previa.incompletas && !soIncompletas ? <p className="bt-field__hint">Condições ainda sem valor não entram na conta.</p> : null}
     </section>
   );
 }
@@ -132,18 +132,18 @@ function CondicaoLinha({ indice, condicao, opcoes, carregando, busy, erro, onCha
   const numero = indice + 1;
   const erroId = `mod-filtro-${indice}-erro`;
   const remover = (
-    <button type="button" className="mod-icon-button mod-cond-remover" disabled={busy} aria-label={`Remover condição ${numero}: ${descreverCondicao(condicao, opcoes)}`} onClick={onRemover}><Icon name="trash" size={16} /></button>
+    <Button variant="ghost" size="compact" className="mod-cond-remover" icon={<Trash2 size={16} />} disabled={busy} aria-label={`Remover condição ${numero}: ${descreverCondicao(condicao, opcoes)}`} onClick={onRemover} />
   );
   if (!definicao) {
     return (
       <li className="mod-cond is-invalid">
-        <p className="mod-cond-naosuportado"><Icon name="alert" size={16} /><span><strong>Campo não suportado</strong> ({condicao.campo || "sem nome"}). Enquanto esta condição existir, nenhum veículo recebe este modelo.</span></p>
+        <Alert tone="danger" title="Campo não suportado" className="mod-cond-naosuportado">({condicao.campo || "sem nome"}). Enquanto esta condição existir, nenhum veículo recebe este modelo.</Alert>
         {remover}
       </li>
     );
   }
   const operadores = OPERADORES[definicao.tipo];
-  const aria = erro ? { "aria-invalid": true as const, "aria-describedby": erroId } : {};
+  const aria = { invalid: Boolean(erro), "aria-describedby": erro ? erroId : undefined };
   const trocarCampo = (campo: string) => onChange(condicaoPara(campo));
   const trocarOperador = (operador: Operador) => {
     const mudouForma = (operador === "entre") !== (condicao.operador === "entre");
@@ -152,31 +152,30 @@ function CondicaoLinha({ indice, condicao, opcoes, carregando, busy, erro, onCha
 
   let valor;
   if (definicao.tipo === "texto") {
-    valor = <input id={filtroValorId(indice)} {...aria} className="mod-cond-input" value={typeof condicao.valor === "string" ? condicao.valor : ""} maxLength={100} disabled={busy}
+    valor = <Input id={filtroValorId(indice)} {...aria} size="compact" className="mod-cond-input" value={typeof condicao.valor === "string" ? condicao.valor : ""} maxLength={100} disabled={busy}
       aria-label={`Valor da condição ${numero}`} placeholder={definicao.exemplo}
       onChange={(event) => onChange({ ...condicao, valor: event.target.value })} />;
   } else if (definicao.tipo === "inteiro" && condicao.operador === "entre") {
     const [min, max] = Array.isArray(condicao.valor) ? condicao.valor : [null, null];
     valor = (
       <span className="mod-cond-entre">
-        <input id={filtroValorId(indice)} {...aria} className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(min)} disabled={busy} aria-label={`Condição ${numero}: de`} placeholder="De"
+        <Input id={filtroValorId(indice)} {...aria} size="compact" className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(min)} disabled={busy} aria-label={`Condição ${numero}: de`} placeholder="De"
           onChange={(event) => onChange({ ...condicao, valor: [numeroDe(event.target.value), max ?? null] })} />
         <span aria-hidden="true">e</span>
-        <input {...aria} className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(max)} disabled={busy} aria-label={`Condição ${numero}: até`} placeholder="Até"
+        <Input {...aria} size="compact" className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(max)} disabled={busy} aria-label={`Condição ${numero}: até`} placeholder="Até"
           onChange={(event) => onChange({ ...condicao, valor: [min ?? null, numeroDe(event.target.value)] })} />
       </span>
     );
   } else if (definicao.tipo === "inteiro") {
-    valor = <input id={filtroValorId(indice)} {...aria} className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(condicao.valor)} disabled={busy}
+    valor = <Input id={filtroValorId(indice)} {...aria} size="compact" className="mod-cond-input" inputMode="numeric" autoComplete="off" value={textoDe(condicao.valor)} disabled={busy}
       aria-label={`Valor da condição ${numero}`} placeholder={definicao.exemplo}
       onChange={(event) => onChange({ ...condicao, valor: numeroDe(event.target.value) })} />;
   } else if (definicao.tipo === "booleano") {
     valor = (
-      <span className="mod-tipo-group is-dois" role="group" aria-label={`Valor da condição ${numero}`}>
-        {[true, false].map((opcao, posicao) => (
-          <button key={String(opcao)} id={posicao === 0 ? filtroValorId(indice) : undefined} type="button" aria-pressed={condicao.valor === opcao} disabled={busy}
-            onClick={() => onChange({ ...condicao, valor: opcao })}>{opcao ? "Sim" : "Não"}</button>
-        ))}
+      <span id={filtroValorId(indice)}>
+        <SegmentedControl aria-label={`Valor da condição ${numero}`} size="compact" value={condicao.valor === true ? "sim" : condicao.valor === false ? "nao" : ""}
+          options={[{ value: "sim", label: "Sim", disabled: busy }, { value: "nao", label: "Não", disabled: busy }]}
+          onChange={(escolha) => onChange({ ...condicao, valor: escolha === "sim" })} />
       </span>
     );
   } else {
@@ -191,11 +190,11 @@ function CondicaoLinha({ indice, condicao, opcoes, carregando, busy, erro, onCha
           return (
             <button key={opcao.valor} id={posicao === 0 ? filtroValorId(indice) : undefined} type="button" className="mod-opcao" aria-pressed={marcado} disabled={busy}
               onClick={() => onChange({ ...condicao, valor: marcado ? escolhidos.filter((item) => item !== opcao.valor) : [...escolhidos, opcao.valor] })}>
-              {marcado ? <Icon name="check" size={14} /> : null}{opcao.rotulo}
+              {marcado ? <Check size={14}/> : null}{opcao.rotulo}
             </button>
           );
         })}
-        {!lista.length && !extras.length ? <span className="gestao-hint">{carregando ? "Carregando as opções…" : "Nenhuma opção encontrada para este campo."}</span> : null}
+        {!lista.length && !extras.length ? <span className="bt-field__hint">{carregando ? "Carregando as opções…" : "Nenhuma opção encontrada para este campo."}</span> : null}
       </span>
     );
   }
@@ -203,17 +202,15 @@ function CondicaoLinha({ indice, condicao, opcoes, carregando, busy, erro, onCha
   return (
     <li className={`mod-cond ${definicao.tipo === "choice" || condicao.operador === "entre" ? "is-larga" : ""} ${erro ? "is-invalid" : ""}`}>
       <span className="mod-cond-num" aria-hidden="true">{numero > 1 ? "e" : "Se"}</span>
-      <select id={`mod-filtro-${indice}-campo`} className="mod-cond-select" value={definicao.campo} disabled={busy} aria-label={`Campo da condição ${numero}`} onChange={(event) => trocarCampo(event.target.value)}>
-        {CAMPOS_FILTRO.map((campo) => <option key={campo.campo} value={campo.campo}>{campo.rotulo}</option>)}
-      </select>
+      <Select id={`mod-filtro-${indice}-campo`} className="mod-cond-select" size="compact" searchable={false} clearable={false} value={definicao.campo} disabled={busy} aria-label={`Campo da condição ${numero}`}
+        options={CAMPOS_FILTRO.map((campo) => ({ value: campo.campo, label: campo.rotulo }))} onChange={(campo) => campo && trocarCampo(campo)} />
       {operadores.length > 1 ? (
-        <select className="mod-cond-select" value={condicao.operador} disabled={busy} aria-label={`Comparação da condição ${numero}`} onChange={(event) => trocarOperador(event.target.value as Operador)}>
-          {operadores.map((operador) => <option key={operador} value={operador}>{ROTULO_OPERADOR[operador]}</option>)}
-        </select>
+        <Select className="mod-cond-select" size="compact" searchable={false} clearable={false} value={condicao.operador} disabled={busy} aria-label={`Comparação da condição ${numero}`}
+          options={operadores.map((operador) => ({ value: operador, label: ROTULO_OPERADOR[operador] }))} onChange={(operador) => operador && trocarOperador(operador as Operador)} />
       ) : <span className="mod-cond-op">{ROTULO_OPERADOR[operadores[0]]}</span>}
       <span className="mod-cond-valor">{valor}</span>
       {remover}
-      {erro ? <p id={erroId} className="gestao-field-error mod-cond-erro"><Icon name="errorCircle" size={14} />{erro}</p> : null}
+      {erro ? <p id={erroId} className="bt-field__error mod-cond-erro"><CircleAlert size={14} />{erro}</p> : null}
     </li>
   );
 }
@@ -235,16 +232,17 @@ function Previa({ estado, onTentar, vazio, previa, inativo }: {
   if (estado === "erro") {
     return (
       <div className="mod-previa-filtro">
-        <p className="mod-aviso" role="alert"><Icon name="alert" size={14} />Não foi possível carregar os veículos para a prévia.</p>
-        <div><button type="button" className="gestao-button is-secondary is-compact" onClick={onTentar}><Icon name="refresh" size={14} />Tentar de novo</button></div>
+        <Alert tone="danger" action={<Button variant="secondary" size="compact" icon={<RefreshCw size={14} />} onClick={onTentar}>Tentar de novo</Button>}>
+          Não foi possível carregar os veículos para a prévia.
+        </Alert>
       </div>
     );
   }
   return (
     <div className="mod-previa-filtro">
-      <p className="mod-previa-total" role="status"><Icon name="car" size={16} /><strong>{contagem(previa.recebem.length)}</strong></p>
-      {inativo ? <p className="mod-aviso"><Icon name="alert" size={14} />Modelo inativo: a rotina só usa este modelo depois que você ativar.</p> : null}
-      {!previa.recebem.length && vazio ? <p className="gestao-hint">{vazio}</p> : null}
+      <p className="mod-previa-total" role="status"><Car size={16}/><strong>{contagem(previa.recebem.length)}</strong></p>
+      {inativo ? <Alert tone="warning">Modelo inativo: a rotina só usa este modelo depois que você ativar.</Alert> : null}
+      {!previa.recebem.length && vazio ? <p className="bt-field__hint">{vazio}</p> : null}
       {previa.recebem.length ? (
         <ul className="mod-veiculos" aria-label="Veículos que recebem este modelo">
           {previa.recebem.map(({ veiculo, tambem }) => (

@@ -1,505 +1,6 @@
-/* Copiado de tela-gestao-checklists (src/gestao/gestao.css) com todas as regras sob .gestao-checklists, para não vazar para o shell. */
-/* Apelidos locais para os tokens do Design System: seguem o tema claro/escuro do shell. */
-.gestao-checklists {
-  --navy-900: var(--bt-color-brand);
-  --navy-800: var(--bt-color-brand-hover);
-  --blue-600: var(--bt-color-action);
-  --blue-100: var(--bt-color-action-soft);
-  --ink-950: var(--bt-color-text-primary);
-  --ink-900: var(--bt-color-text-primary);
-  --slate-700: var(--bt-color-text-control);
-  --slate-500: var(--bt-color-text-secondary);
-  --slate-400: var(--bt-color-text-tertiary);
-  --canvas: var(--bt-color-canvas);
-  --surface: var(--bt-color-surface);
-  --surface-soft: var(--bt-color-surface-soft);
-  --surface-neutral: var(--bt-color-surface-neutral);
-  --border: var(--bt-color-border);
-  --border-hover: var(--bt-color-border-strong);
-  --focus-border: var(--bt-color-action);
-  --focus-ring: var(--bt-focus-ring);
-  --success: var(--bt-color-success);
-  --warning: var(--bt-color-warning);
-  --warning-soft: var(--bt-color-warning-soft);
-  --danger: var(--bt-color-danger);
-  --danger-soft: var(--bt-color-danger-soft);
-  --shadow-surface: var(--bt-shadow-surface);
-  --shadow-panel: var(--bt-shadow-panel);
-  --shadow-popover: var(--bt-shadow-popover);
-  --ease-out: cubic-bezier(.23, 1, .32, 1);
-  --ease-drawer: cubic-bezier(.32, .72, 0, 1);
-  font-family: var(--bt-font-family-sans, "Manrope", "Segoe UI", sans-serif);
-  color: var(--ink-950);
-  font-synthesis: none;
-}
-.gestao-checklists *, .gestao-checklists { box-sizing: border-box; }
+/* Checklists de Veículos: só o layout que o Design System não cobre. Cores, espaços e raios vêm dos tokens --bt-*. */
 
-/* Especificidade zero: os componentes do Design System (Button, Tabs, SegmentedControl, SearchBox) mantêm a própria fonte. */
-:where(.gestao-checklists) :where(button, input, textarea, select) { font: inherit; }
-:where(.gestao-checklists) :where(button) { cursor: pointer; }
-:where(.gestao-checklists) :where(button:disabled) { cursor: not-allowed; }
-
-@keyframes gestao-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes gestao-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes gestao-pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes gestao-spin { to { transform: rotate(360deg); } }
-@keyframes gestao-sheet { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
-
-.gestao-checklists .gestao-icon { flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.gestao-checklists .gestao-icon.is-spinning { animation: gestao-spin 800ms linear infinite; }
-
-/* Shell */
-
-/* Main + header */
-
-.gestao-checklists .gestao-eyebrow { color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
-
-.gestao-checklists .gestao-eyebrow span { padding: 0 4px; color: var(--slate-400); }
-
-/* Buttons */
-.gestao-checklists .gestao-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 10px; font-size: 13px; font-weight: 800; white-space: nowrap; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .gestao-button.is-primary { border: 1px solid var(--navy-900); background: var(--navy-900); color: var(--bt-color-on-solid); }
-.gestao-checklists .gestao-button.is-secondary { border: 1px solid var(--border); background: var(--surface); color: var(--navy-800); }
-.gestao-checklists .gestao-button.is-compact { min-height: 32px; padding: 0 10px; border-radius: 8px; font-size: 12px; }
-.gestao-checklists .gestao-button.is-danger { border: 1px solid var(--danger); background: var(--danger); color: var(--bt-color-on-solid); }
-
-.gestao-checklists .gestao-button:disabled { opacity: .55; }
-.gestao-checklists .gestao-button:active:not(:disabled) { transform: scale(.97); }
-
-.gestao-checklists .gestao-link-button { padding: 4px 2px; border: 0; border-radius: 6px; background: transparent; color: var(--blue-600); font-size: 12px; font-weight: 800; transition: color 150ms var(--ease-out); }
-.gestao-checklists .gestao-link-button:disabled { color: var(--slate-400); }
-
-.gestao-checklists :focus-visible { outline: 0; }
-.gestao-checklists .gestao-modal :focus-visible { box-shadow: var(--focus-ring); }
-
-/* Cards */
-.gestao-checklists .gestao-card { min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-surface); }
-.gestao-checklists .gestao-card-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.gestao-checklists .gestao-card-head > div:first-child { display: grid; gap: 2px; }
-.gestao-checklists .gestao-card-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; }
-.gestao-checklists .gestao-hint { color: var(--slate-500); font-size: 12px; line-height: 17px; }
-
-.gestao-checklists .gestao-badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 24px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out); }
-.gestao-checklists .gestao-badge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
-.gestao-checklists .gestao-badge.is-neutral { background: var(--surface-soft); color: var(--slate-700); }
-.gestao-checklists .gestao-badge.is-success { background: var(--bt-color-success-soft); color: var(--success); }
-.gestao-checklists .gestao-badge.is-info { background: var(--blue-100); color: var(--blue-600); }
-.gestao-checklists .gestao-badge.is-warning { background: var(--warning-soft); color: var(--warning); }
-.gestao-checklists .gestao-badge.is-danger { background: var(--danger-soft); color: var(--danger); }
-
-/* Editor */
-.gestao-checklists .gestao-columns { display: grid; grid-template-areas: "form preview"; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .9fr); align-items: start; gap: 16px; }
-.gestao-checklists .gestao-form { grid-area: form; animation: gestao-rise 260ms var(--ease-out) 70ms both; }
-.gestao-checklists .gestao-preview { grid-area: preview; position: sticky; top: 22px; animation: gestao-rise 260ms var(--ease-out) 140ms both; }
-.gestao-checklists .gestao-form-body { display: grid; gap: 20px; padding: 20px; }
-.gestao-checklists .gestao-field { display: grid; gap: 6px; min-width: 0; }
-.gestao-checklists .gestao-field-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.gestao-checklists .gestao-field-label span { color: var(--slate-500); font-size: 12px; font-variant-numeric: tabular-nums; }
-.gestao-checklists .gestao-field label, .gestao-checklists .gestao-label { color: var(--slate-700); font-size: 12px; font-weight: 800; }
-.gestao-checklists .gestao-form input:not([type=checkbox]), .gestao-checklists .gestao-form textarea, .gestao-checklists .gestao-form select { display: block; width: 100%; min-height: 40px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); color: var(--ink-950); font-size: 13px; outline: 0; transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out); }
-.gestao-checklists .gestao-form textarea { min-height: 148px; padding: 10px 12px; line-height: 20px; resize: vertical; }
-.gestao-checklists .gestao-form input::placeholder, .gestao-checklists .gestao-form textarea::placeholder { color: var(--slate-400); }
-.gestao-checklists .gestao-form input:not([type=checkbox]):focus, .gestao-checklists .gestao-form textarea:focus, .gestao-checklists .gestao-form select:focus { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
-.gestao-checklists .gestao-form input:disabled, .gestao-checklists .gestao-form textarea:disabled, .gestao-checklists .gestao-form select:disabled { background: var(--surface-soft); color: var(--slate-700); }
-.gestao-checklists .gestao-two-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-
-.gestao-checklists .gestao-segmented { --count: 2; position: relative; display: grid; grid-template-columns: repeat(var(--count), minmax(0, 1fr)); padding: 4px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-neutral); }
-.gestao-checklists .gestao-segmented.is-three { --count: 3; }
-.gestao-checklists .gestao-segmented-thumb { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--count)); border-radius: 8px; background: var(--navy-900); box-shadow: 0 2px 7px rgba(15, 23, 42, .08); transform: translateX(calc(var(--pos, 0) * 100%)); transition: transform 240ms var(--ease-drawer); }
-.gestao-checklists .gestao-segmented button { position: relative; z-index: 1; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--slate-700); font-size: 13px; font-weight: 800; white-space: nowrap; transition: color 200ms var(--ease-out); }
-.gestao-checklists .gestao-segmented button[aria-pressed="true"] { color: var(--bt-color-on-solid); }
-
-/* Preview */
-.gestao-checklists .gestao-preview-body { padding: 20px; }
-.gestao-checklists .gestao-device { max-width: 340px; margin: 0 auto; padding: 10px; border: 1px solid var(--border); border-radius: 28px; background: var(--surface); box-shadow: var(--shadow-panel); }
-.gestao-checklists .gestao-device-screen { overflow: hidden; border-radius: 20px; background: var(--canvas); }
-.gestao-checklists .gestao-device-bar { display: flex; align-items: center; gap: 10px; padding: 16px; background: var(--navy-900); color: var(--bt-color-on-solid); font-size: 14px; }
-.gestao-checklists .gestao-device-bar span { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: var(--blue-600); font-size: 11px; font-weight: 800; }
-.gestao-checklists .gestao-device-content { display: flex; flex-direction: column; gap: 12px; min-height: 360px; padding: 14px; }
-
-.gestao-checklists .gestao-device-button { display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 10px; background: var(--navy-900); color: var(--bt-color-on-solid); font-size: 13px; font-weight: 800; }
-.gestao-checklists .gestao-preview-foot { max-width: 340px; margin: 14px auto 0; text-align: center; }
-
-/* Acompanhamento */
-
-/* Home: lista de comunicados */
-
-.gestao-checklists .gestao-list-chevron { color: var(--slate-400); }
-.gestao-checklists .gestao-empty { display: grid; justify-items: center; gap: 8px; padding: 40px 16px; color: var(--slate-400); text-align: center; animation: gestao-rise 260ms var(--ease-out) both; }
-.gestao-checklists .gestao-empty strong { color: var(--ink-900); font-size: 14px; }
-.gestao-checklists .gestao-empty p { margin: 0; color: var(--slate-500); font-size: 12px; }
-
-.gestao-checklists .gestao-timeline, .gestao-checklists .gestao-detail-block { display: grid; gap: 10px; }
-.gestao-checklists .gestao-step { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 10px; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(120ms + var(--i, 0) * 60ms); }
-.gestao-checklists .gestao-step-dot { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--bt-color-on-solid); }
-.gestao-checklists .gestao-step.is-done .gestao-step-dot { border-color: var(--success); background: var(--success); }
-.gestao-checklists .gestao-step.is-error .gestao-step-dot { border-color: var(--danger); }
-.gestao-checklists .gestao-step > span:last-child { display: grid; }
-.gestao-checklists .gestao-step strong { color: var(--ink-900); font-size: 13px; font-weight: 700; }
-.gestao-checklists .gestao-step small { color: var(--slate-500); font-size: 12px; overflow-wrap: anywhere; }
-.gestao-checklists .gestao-step.is-error small { color: var(--danger); }
-
-/* Modal + toast */
-.gestao-checklists .gestao-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.gestao-checklists .gestao-modal-backdrop { position: absolute; inset: 0; padding: 0; border: 0; background: var(--shell-veu); cursor: default; animation: gestao-fade 180ms var(--ease-out) both; }
-
-.gestao-checklists .gestao-modal.is-closing .gestao-modal-backdrop { animation: gestao-fade 150ms var(--ease-out) reverse both; }
-
-@media (hover: hover) and (pointer: fine) {
-
-  .gestao-checklists .gestao-button.is-primary:hover:not(:disabled) { border-color: var(--navy-800); background: var(--navy-800); }
-  .gestao-checklists .gestao-button.is-secondary:hover:not(:disabled) { border-color: var(--border-hover); background: var(--surface-soft); }
-  .gestao-checklists .gestao-button.is-danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger); }
-  .gestao-checklists .gestao-link-button:hover:not(:disabled) { color: var(--navy-800); }
-  .gestao-checklists .gestao-form input:not([type=checkbox]):hover:not(:disabled):not(:focus), .gestao-checklists .gestao-form textarea:hover:not(:disabled):not(:focus), .gestao-checklists .gestao-form select:hover:not(:disabled):not(:focus) { border-color: var(--border-hover); }
-  .gestao-checklists .gestao-segmented button:hover:not([aria-pressed="true"]):not([aria-selected="true"]):not(:disabled) { color: var(--navy-900); }
-
-}
-
-@media (max-width: 1120px) {
-  .gestao-checklists .gestao-columns { grid-template-areas: "form" "preview"; grid-template-columns: minmax(0, 1fr); }
-.gestao-checklists .gestao-preview { position: static; }
-
-}
-@media (max-width: 820px) {
-
-  .gestao-checklists .gestao-list-chevron { display: none; }
-
-}
-@media (max-width: 560px) {
-
-  .gestao-checklists .gestao-form-body, .gestao-checklists .gestao-preview-body { padding: 16px; }
-.gestao-checklists .gestao-card-head { padding-left: 16px; padding-right: 16px; }
-  .gestao-checklists .gestao-two-fields { grid-template-columns: minmax(0, 1fr); }
-
-}
-@media (prefers-reduced-motion: reduce) {
-  .gestao-checklists *, .gestao-checklists, .gestao-checklists *::before, .gestao-checklists *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
-}
-
-/* ---------- Checklist de veículos ---------- */
-
-.gestao-checklists .gestao-segmented button[aria-selected="true"] { color: var(--bt-color-on-solid); }
-/* Eyebrow sobre o canvas cinza: slate-500 fica abaixo de 4,5:1; usa slate-700. */
-
-.gestao-checklists .frota-cell { display: grid; gap: 2px; min-width: 0; }
-.gestao-checklists .frota-cell strong { overflow: hidden; color: var(--navy-900); font-size: 14px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-checklists .frota-cell span, .gestao-checklists .frota-cell small { overflow: hidden; color: var(--slate-500); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-checklists .frota-cell .is-missing { color: var(--danger); font-weight: 700; }
-
-.gestao-checklists .chk-answers { display: grid; gap: 8px; margin: 0; }
-.gestao-checklists .chk-answers > div { min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); }
-.gestao-checklists .chk-answers dt { color: var(--slate-500); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-.gestao-checklists .chk-answers dd { margin: 2px 0 0; color: var(--ink-950); font-size: 13px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
-/* Miniaturas das fotos: 72 px fixos em todos os estados (skeleton, foto, falha) para não mexer no layout. */
-.gestao-checklists .chk-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; white-space: normal; }
-/* Foto com a prova de captura do App Motoristas embaixo (origem e selos). */
-.gestao-checklists .chk-foto-prova { display: inline-grid; gap: 4px; align-content: start; max-width: 200px; }
-.gestao-checklists .chk-thumb-slot { display: block; min-width: 72px; height: 72px; }
-.gestao-checklists .chk-thumb { display: block; width: 72px; height: 72px; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); cursor: zoom-in; transition: border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .chk-thumb:active { transform: scale(.97); }
-.gestao-checklists .chk-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.gestao-checklists .chk-thumb.is-loading { display: grid; place-items: center; cursor: default; }
-.gestao-checklists .chk-thumb-falha { display: grid; align-content: center; justify-items: center; gap: 2px; width: 72px; height: 72px; padding: 4px; border: 1px dashed var(--border-hover); border-radius: 8px; background: var(--surface-neutral); text-align: center; }
-.gestao-checklists .chk-thumb-falha a { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 32px; color: var(--blue-600); font-size: 12px; font-weight: 800; line-height: 15px; text-decoration: none; }
-.gestao-checklists .chk-thumb-falha small, .gestao-checklists .chk-problem .chk-thumb-falha small { color: var(--slate-500); font-size: 11px; font-weight: 600; line-height: 14px; }
-.gestao-checklists .chk-thumb-falha.is-large { width: auto; height: auto; padding: 24px; }
-
-/* Visualizador: mesmo overlay do diálogo; a foto ocupa o espaço que sobra. */
-.gestao-checklists .foto-viewer { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; width: 100%; max-width: 960px; max-height: calc(100dvh - 32px); padding: 16px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); animation: gestao-pop 200ms var(--ease-out) both; }
-.gestao-checklists .foto-viewer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
-.gestao-checklists .foto-viewer-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; overflow-wrap: anywhere; }
-.gestao-checklists .foto-viewer-head small { color: var(--slate-500); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.gestao-checklists .foto-viewer-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 240px; overflow: hidden; border-radius: 10px; background: var(--surface-neutral); }
-.gestao-checklists .foto-viewer-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 180px); object-fit: contain; }
-.gestao-checklists .foto-viewer-nav { position: absolute; top: calc(50% - 18px); width: 36px; height: 36px; }
-.gestao-checklists .foto-viewer-nav.is-prev { left: 8px; }
-.gestao-checklists .foto-viewer-nav.is-next { right: 8px; }
-.gestao-checklists .foto-viewer-actions { display: flex; justify-content: flex-end; }
-.gestao-checklists .foto-viewer-actions a { text-decoration: none; }
-@media (max-width: 560px) {
-  .gestao-checklists .foto-viewer { padding: 12px; }
-  .gestao-checklists .foto-viewer-nav { top: calc(50% - 22px); width: 44px; height: 44px; }
-}
-.gestao-checklists .chk-answers > div.is-problem { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); }
-.gestao-checklists .chk-problem { display: grid; gap: 6px; }
-.gestao-checklists .chk-problem small { color: var(--slate-700); font-size: 12px; font-weight: 600; line-height: 17px; }
-.gestao-checklists .mod-item .gestao-hint { margin: 0; }
-
-.gestao-checklists .mod-toggles { display: grid; gap: 10px; }
-.gestao-checklists .mod-check { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); cursor: pointer; }
-.gestao-checklists .mod-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--blue-600); }
-.gestao-checklists .mod-check span { display: grid; gap: 2px; }
-.gestao-checklists .mod-check strong { color: var(--ink-900); font-size: 13px; font-weight: 700; }
-.gestao-checklists .mod-check small { color: var(--slate-500); font-size: 12px; line-height: 17px; }
-.gestao-checklists .mod-check.is-invalid { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); }
-
-/* Editor de modelo: campos, erros e avisos */
-.gestao-checklists .gestao-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.gestao-checklists .gestao-field-error { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--danger); font-size: 12px; font-weight: 700; line-height: 17px; }
-.gestao-checklists .gestao-form input[aria-invalid="true"], .gestao-checklists .gestao-form textarea[aria-invalid="true"], .gestao-checklists .mod-chips.is-invalid { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); }
-.gestao-checklists .mod-ajuda { margin: 0; }
-.gestao-checklists .gestao-form textarea.mod-textarea-curta { min-height: 64px; }
-.gestao-checklists .mod-head-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
-.gestao-checklists .mod-ver-previa { display: none; }
-.gestao-checklists .mod-erros { display: grid; gap: 6px; padding: 12px 16px; border-radius: 10px; background: var(--danger-soft); color: var(--ink-900); font-size: 13px; animation: gestao-rise 200ms var(--ease-out) both; }
-.gestao-checklists .mod-erros p { display: flex; align-items: center; gap: 8px; margin: 0; }
-.gestao-checklists .mod-erros p .gestao-icon { color: var(--danger); }
-.gestao-checklists .mod-erros ul { display: grid; gap: 2px; margin: 0; padding: 0 0 0 24px; }
-.gestao-checklists .mod-erros .gestao-link-button { min-height: 32px; color: var(--navy-800); font-size: 13px; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
-.gestao-checklists .mod-info { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 16px; border-radius: 10px; background: var(--blue-100); color: var(--ink-900); font-size: 13px; font-weight: 600; line-height: 20px; }
-.gestao-checklists .mod-info .gestao-icon { color: var(--blue-600); }
-.gestao-checklists .mod-aviso { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--warning); font-size: 12px; font-weight: 700; }
-
-/* Itens */
-.gestao-checklists .mod-items { display: grid; gap: 12px; }
-.gestao-checklists .mod-items-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
-.gestao-checklists .mod-items-head > div:first-child { display: grid; gap: 2px; }
-.gestao-checklists .mod-items-title { margin: 0; color: var(--navy-900); font-size: 14px; font-weight: 800; }
-.gestao-checklists .mod-items-head .gestao-hint { margin: 0; }
-.gestao-checklists .mod-add-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.gestao-checklists .mod-painel { display: grid; justify-items: start; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); animation: gestao-rise 200ms var(--ease-out) both; }
-.gestao-checklists .mod-painel-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0; color: var(--ink-900); font-size: 13px; font-weight: 800; }
-.gestao-checklists .mod-tipos-grid, .gestao-checklists .mod-prontos-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.gestao-checklists .mod-tipo-opcao, .gestao-checklists .mod-pronto { display: grid; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink-900); text-align: left; transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .mod-tipo-opcao { grid-template-columns: 28px minmax(0, 1fr); }
-.gestao-checklists .mod-tipo-opcao > span:last-child, .gestao-checklists .mod-pronto-text { display: grid; gap: 2px; min-width: 0; }
-.gestao-checklists .mod-tipo-opcao strong, .gestao-checklists .mod-pronto-text strong { font-size: 13px; font-weight: 800; }
-.gestao-checklists .mod-tipo-opcao small, .gestao-checklists .mod-pronto-text small { color: var(--slate-500); font-size: 12px; line-height: 17px; }
-.gestao-checklists .mod-pronto { grid-template-columns: 28px minmax(0, 1fr) auto; }
-.gestao-checklists .mod-pronto-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-checklists .mod-pronto-state { display: inline-flex; align-items: center; gap: 4px; color: var(--blue-600); font-size: 12px; font-weight: 800; white-space: nowrap; }
-.gestao-checklists .mod-pronto.is-added { background: var(--surface-soft); cursor: default; }
-.gestao-checklists .mod-pronto-state.is-added { color: var(--success); }
-.gestao-checklists .mod-pronto.is-added .mod-pronto-text small { color: var(--slate-700); }
-.gestao-checklists .mod-tipo-opcao:active, .gestao-checklists .mod-pronto:not(.is-added):active { transform: scale(.97); }
-
-.gestao-checklists .mod-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.gestao-checklists .mod-list.is-reordering { user-select: none; }
-.gestao-checklists .mod-list.is-reordering > .mod-item:not(.is-dragging) { transition: transform 150ms var(--ease-out); }
-.gestao-checklists .mod-item { position: relative; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); scroll-margin: 16px 0 112px; animation: gestao-rise 220ms var(--ease-out) both; transition: border-color 150ms var(--ease-out); }
-.gestao-checklists .mod-item.is-open { border-color: var(--border-hover); }
-.gestao-checklists .mod-item.is-invalid { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); }
-.gestao-checklists .mod-item.is-dragging { z-index: 2; border-color: var(--focus-border); background: var(--surface-neutral); box-shadow: var(--shadow-surface); }
-.gestao-checklists .mod-item-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 2px; min-height: 60px; padding: 4px 8px 4px 2px; }
-.gestao-checklists .mod-handle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--slate-500); cursor: grab; touch-action: none; }
-.gestao-checklists .mod-handle:disabled { cursor: default; opacity: .55; }
-.gestao-checklists .mod-item.is-dragging .mod-handle { cursor: grabbing; color: var(--blue-600); }
-.gestao-checklists .mod-item-toggle { display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 52px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-900); text-align: left; }
-.gestao-checklists .mod-item-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--blue-100); color: var(--blue-600); }
-.gestao-checklists .mod-item-text { display: grid; gap: 4px; min-width: 0; }
-.gestao-checklists .mod-item-text strong { overflow: hidden; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-checklists .mod-item-text strong.is-empty { color: var(--slate-500); }
-.gestao-checklists .mod-item-num { color: var(--slate-500); font-variant-numeric: tabular-nums; }
-.gestao-checklists .mod-item-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
-.gestao-checklists .mod-item-tipo { color: var(--slate-500); font-size: 12px; font-weight: 600; }
-.gestao-checklists .mod-item-chevron { color: var(--slate-500); transition: transform 150ms var(--ease-out); }
-.gestao-checklists .mod-item.is-open .mod-item-chevron { transform: rotate(180deg); }
-.gestao-checklists .mod-item-arrows { display: flex; gap: 4px; }
-.gestao-checklists .mod-item-arrows.is-body { display: none; }
-.gestao-checklists .mod-icon-button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--slate-700); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .mod-icon-button:disabled { opacity: .55; }
-.gestao-checklists .mod-icon-button:active:not(:disabled) { transform: scale(.97); }
-.gestao-checklists .mod-item-body { display: grid; gap: 14px; padding: 14px 16px 16px 54px; border-top: 1px solid var(--border); animation: gestao-fade 150ms var(--ease-out) both; }
-.gestao-checklists .mod-tipo-group { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-.gestao-checklists .mod-tipo-group button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-neutral); color: var(--slate-700); font-size: 12px; font-weight: 800; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .mod-tipo-group button[aria-pressed="true"] { border-color: var(--navy-900); background: var(--navy-900); color: var(--bt-color-on-solid); }
-.gestao-checklists .mod-tipo-group button:active:not(:disabled) { transform: scale(.97); }
-.gestao-checklists .mod-item-fields { display: grid; gap: 12px; }
-.gestao-checklists .mod-item-fields.is-number { grid-template-columns: 180px minmax(0, 1fr); align-items: end; }
-.gestao-checklists .mod-item-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.gestao-checklists .mod-item-actions .mod-remover { margin-left: auto; color: var(--danger); }
-
-/* Problemas como chips */
-.gestao-checklists .mod-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 44px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); cursor: text; transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out); }
-.gestao-checklists .mod-chips:focus-within { border-color: var(--focus-border); box-shadow: var(--focus-ring); }
-.gestao-checklists .gestao-form .mod-chips input:not([type=checkbox]) { flex: 1 1 140px; width: auto; min-width: 120px; min-height: 32px; padding: 0 4px; border: 0; background: transparent; box-shadow: none; }
-.gestao-checklists .gestao-form .mod-chips input:not([type=checkbox]):focus { border: 0; box-shadow: none; }
-.gestao-checklists .mod-chip { display: inline-flex; align-items: center; gap: 2px; min-height: 30px; padding: 0 2px 0 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-900); font-size: 12px; font-weight: 700; animation: gestao-pop 150ms var(--ease-out) both; }
-.gestao-checklists .mod-chip.is-invalid { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); color: var(--danger); }
-.gestao-checklists .mod-chip button { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--slate-500); transition: background-color 150ms var(--ease-out), color 150ms var(--ease-out); }
-.gestao-checklists .mod-chip.is-sugestao { gap: 4px; padding: 0 10px 0 8px; border-style: dashed; border-color: var(--border-hover); color: var(--navy-800); animation: none; transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .mod-chip.is-sugestao:active:not(:disabled) { transform: scale(.97); }
-.gestao-checklists .mod-sugestoes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.gestao-checklists .mod-vazio { display: grid; justify-items: center; gap: 8px; padding: 28px 16px; border: 1px dashed var(--border-hover); border-radius: 10px; background: var(--surface-neutral); color: var(--slate-500); text-align: center; }
-.gestao-checklists .mod-vazio strong { color: var(--ink-900); font-size: 14px; }
-.gestao-checklists .mod-vazio p { max-width: 420px; margin: 0; color: var(--slate-500); font-size: 12px; line-height: 17px; }
-
-/* Barra fixa do editor: Salvar e Cancelar sempre à vista; a faixa de baixo é do selo de versão. */
-.gestao-checklists .mod-barra { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 26px; border-top: 1px solid var(--border); border-radius: 0 0 12px 12px; background: var(--surface); }
-.gestao-checklists .mod-barra-status { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 0; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 18px; }
-.gestao-checklists .mod-barra.is-neutro .mod-barra-status .gestao-icon { color: var(--slate-500); }
-.gestao-checklists .mod-barra.is-aviso .mod-barra-status .gestao-icon { color: var(--warning); }
-.gestao-checklists .mod-barra.is-salvando .mod-barra-status .gestao-icon { color: var(--blue-600); }
-.gestao-checklists .mod-barra.is-sucesso .mod-barra-status .gestao-icon { color: var(--success); }
-.gestao-checklists .mod-barra.is-erro .mod-barra-status { color: var(--danger); }
-.gestao-checklists .mod-barra.is-erro .mod-barra-status .gestao-icon { color: var(--danger); }
-.gestao-checklists .mod-barra-acoes { display: flex; flex: none; gap: 8px; }
-
-/* Filtro de veículos do modelo: condições como frase e prévia de quem recebe */
-.gestao-checklists .mod-filtro { display: grid; gap: 10px; }
-.gestao-checklists .mod-filtro > .mod-items-title { margin: 0; }
-.gestao-checklists .mod-filtro-alerta { display: grid; justify-items: start; gap: 8px; padding: 12px 16px; border-radius: 10px; background: var(--warning-soft); color: var(--ink-900); font-size: 13px; }
-.gestao-checklists .mod-filtro-alerta p { display: flex; align-items: center; gap: 8px; margin: 0; }
-.gestao-checklists .mod-filtro-alerta .gestao-icon { color: var(--warning); }
-.gestao-checklists .mod-conds { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.gestao-checklists .mod-cond { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.3fr) 40px; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); animation: gestao-rise 200ms var(--ease-out) both; }
-.gestao-checklists .mod-cond.is-larga { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 40px; }
-.gestao-checklists .mod-cond.is-larga .mod-cond-valor { grid-column: 2 / 4; grid-row: 2; }
-.gestao-checklists .mod-cond.is-invalid { border-color: color-mix(in srgb, var(--danger) 45%, var(--surface)); }
-.gestao-checklists .mod-cond-num { color: var(--slate-500); font-size: 12px; font-weight: 800; }
-.gestao-checklists .mod-cond-op { color: var(--ink-900); font-size: 13px; font-weight: 700; }
-.gestao-checklists .mod-cond-valor { min-width: 0; }
-.gestao-checklists .mod-cond-remover { justify-self: end; width: 40px; height: 40px; }
-.gestao-checklists .mod-cond.is-larga .mod-cond-remover { grid-column: 4; grid-row: 1; }
-.gestao-checklists .mod-cond-erro { grid-column: 2 / -1; }
-.gestao-checklists .gestao-form .mod-cond-select { padding: 0 8px; }
-.gestao-checklists .mod-cond-entre { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; color: var(--slate-700); font-size: 13px; font-weight: 700; }
-.gestao-checklists .mod-tipo-group.is-dois { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.gestao-checklists .mod-opcoes { display: flex; flex-wrap: wrap; gap: 6px; }
-.gestao-checklists .mod-opcao { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--ink-900); font-size: 12px; font-weight: 700; transition: background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .mod-opcao[aria-pressed="true"] { border-color: var(--blue-600); background: var(--blue-100); color: var(--navy-900); }
-.gestao-checklists .mod-opcao[aria-pressed="true"] .gestao-icon { color: var(--blue-600); }
-.gestao-checklists .mod-opcao:active:not(:disabled) { transform: scale(.97); }
-.gestao-checklists .mod-opcao:disabled { opacity: .55; }
-.gestao-checklists .mod-cond-naosuportado { display: flex; align-items: flex-start; gap: 8px; grid-column: 1 / 5; margin: 0; color: var(--danger); font-size: 13px; line-height: 20px; }
-.gestao-checklists .mod-cond-naosuportado .gestao-icon { flex: none; margin-top: 2px; }
-.gestao-checklists .mod-previa-filtro { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-.gestao-checklists .mod-previa-filtro .gestao-hint, .gestao-checklists .mod-previa-filtro .mod-aviso { margin: 0; }
-.gestao-checklists .mod-previa-total { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--navy-900); font-size: 14px; }
-.gestao-checklists .mod-previa-total .gestao-icon { color: var(--blue-600); }
-.gestao-checklists .mod-previa-sub { margin: 4px 0 0; color: var(--slate-700); font-size: 12px; font-weight: 800; }
-.gestao-checklists .mod-veiculos { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-neutral); }
-.gestao-checklists .mod-veiculos li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2px 12px; min-height: 44px; padding: 6px 12px; border-top: 1px solid var(--border); }
-.gestao-checklists .mod-veiculos li:first-child { border-top: 0; }
-.gestao-checklists .mod-veiculo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; min-width: 0; }
-.gestao-checklists .mod-veiculo strong { color: var(--navy-900); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.gestao-checklists .mod-veiculo small, .gestao-checklists .mod-veiculo-nota { color: var(--slate-700); font-size: 12px; line-height: 17px; }
-.gestao-checklists .mod-veiculos.is-outro .mod-veiculo-nota { font-weight: 700; }
-
-/* Prévia em painel (até 1120 px) */
-.gestao-checklists .mod-previa-sheet { position: relative; width: 100%; max-width: 420px; max-height: calc(100dvh - 32px); overflow: auto; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-popover); animation: gestao-pop 200ms var(--ease-out) both; }
-.gestao-checklists .mod-previa-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.gestao-checklists .mod-previa-head h2 { margin: 0; color: var(--navy-900); font-size: 17px; font-weight: 800; letter-spacing: -.02em; line-height: 22px; }
-.gestao-checklists .mod-phone-empty { margin: 0; padding: 24px 8px; color: var(--slate-700); font-size: 12px; text-align: center; }
-
-.gestao-checklists .mod-phone-list { display: grid; gap: 8px; }
-.gestao-checklists .mod-phone-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.gestao-checklists .mod-phone-item .gestao-icon { color: var(--blue-600); }
-.gestao-checklists .mod-phone-item strong { display: block; overflow: hidden; color: var(--ink-950); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.gestao-checklists .mod-phone-item small { color: var(--slate-500); font-size: 11px; }
-.gestao-checklists .mod-phone-item .is-empty { color: var(--slate-500); }
-
-@media (hover: hover) and (pointer: fine) {
-
-  .gestao-checklists .chk-thumb:hover { border-color: var(--border-hover); }
-.gestao-checklists .mod-icon-button:hover:not(:disabled) { background: var(--surface-soft); color: var(--navy-900); }
-  .gestao-checklists .mod-handle:hover:not(:disabled), .gestao-checklists .mod-item-toggle:hover { background: var(--surface-soft); }
-  .gestao-checklists .mod-tipo-opcao:hover, .gestao-checklists .mod-pronto:not(.is-added):hover { border-color: var(--border-hover); }
-  .gestao-checklists .mod-tipo-group button:hover:not([aria-pressed="true"]):not(:disabled) { border-color: var(--border-hover); color: var(--navy-900); }
-  .gestao-checklists .mod-chip button:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
-  .gestao-checklists .mod-chip.is-sugestao:hover:not(:disabled) { background: var(--surface-soft); }
-  .gestao-checklists .mod-opcao:hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--border-hover); background: var(--surface-soft); }
-}
-
-@media (max-width: 820px) {
-  /* Alvos de toque de 44 px no editor. */
-  .gestao-checklists .mod-icon-button { width: 44px; height: 44px; }
-
-  .gestao-checklists .mod-tipo-group button { min-height: 44px; }
-  /* X do chip com alvo de 44 px; o chip cresce junto e a margem negativa esconde a sobra da borda. */
-  .gestao-checklists .mod-chip { min-height: 44px; padding-right: 0; }
-  .gestao-checklists .mod-chip button { width: 44px; height: 44px; margin: -1px 0; }
-  .gestao-checklists .mod-erros .gestao-link-button { min-height: 44px; }
-
-  /* Celular: Subir e Descer com texto numa linha própria embaixo; nome e filtro usam a largura toda. */
-
-  .gestao-checklists .mod-opcao, .gestao-checklists .gestao-form .mod-cond-select, .gestao-checklists .mod-cond-remover { min-height: 44px; }
-  .gestao-checklists .mod-cond-remover { width: 44px; height: 44px; }
-}
-@media (max-width: 1120px) {
-  .gestao-checklists .gestao-preview { display: none; }
-  .gestao-checklists .mod-ver-previa { display: inline-flex; }
-}
-@media (max-width: 560px) {
-  .gestao-checklists .mod-item-arrows.is-row { display: none; }
-  .gestao-checklists .mod-item-arrows.is-body { display: flex; }
-  .gestao-checklists .mod-item-row { grid-template-columns: 44px minmax(0, 1fr); padding-right: 4px; }
-  .gestao-checklists .mod-item-body { padding: 12px; }
-  /* Linha fechada em uma linha só no celular: o ícone já diz o tipo e os selos perdem o ponto. */
-  .gestao-checklists .mod-item-meta .mod-item-tipo:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .gestao-checklists .mod-item-meta .gestao-badge::before { display: none; }
-  .gestao-checklists .mod-item-row { min-height: 0; padding-top: 2px; padding-bottom: 2px; }
-  .gestao-checklists .mod-item-toggle { gap: 8px; min-height: 48px; padding: 4px; }
-  .gestao-checklists .mod-tipo-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .gestao-checklists .mod-item-fields.is-number, .gestao-checklists .mod-tipos-grid, .gestao-checklists .mod-prontos-grid { grid-template-columns: minmax(0, 1fr); }
-  .gestao-checklists .mod-add-actions, .gestao-checklists .mod-add-actions .gestao-button { width: 100%; }
-  .gestao-checklists .mod-add-actions .gestao-button { min-height: 44px; }
-  .gestao-checklists .mod-barra { padding: 10px 16px 26px; }
-  .gestao-checklists .mod-barra-status { font-size: 12px; line-height: 16px; }
-  .gestao-checklists .mod-barra-acoes .gestao-button { min-height: 44px; padding: 0 14px; }
-  .gestao-checklists .mod-hide-small { display: none; }
-  /* Condição no celular: campo e comparação na primeira linha, valor na linha de baixo. */
-  .gestao-checklists .mod-cond, .gestao-checklists .mod-cond.is-larga { grid-template-columns: minmax(0, 1fr) 44px; padding: 8px; }
-  .gestao-checklists .mod-cond-num, .gestao-checklists .mod-cond-op { display: none; }
-  .gestao-checklists .mod-cond > .mod-cond-select:first-of-type { grid-column: 1; grid-row: 1; }
-  .gestao-checklists .mod-cond-remover, .gestao-checklists .mod-cond.is-larga .mod-cond-remover { grid-column: 2; grid-row: 1; }
-  .gestao-checklists .mod-cond > .mod-cond-select + .mod-cond-select { grid-column: 1 / -1; grid-row: 2; }
-  .gestao-checklists .mod-cond-valor, .gestao-checklists .mod-cond.is-larga .mod-cond-valor { grid-column: 1 / -1; grid-row: 3; }
-  .gestao-checklists .mod-cond-erro { grid-column: 1 / -1; }
-  .gestao-checklists .mod-cond-naosuportado { grid-column: 1; }
-  .gestao-checklists .mod-previa-modal { align-items: flex-end; padding: 0; }
-  .gestao-checklists .mod-previa-sheet { max-width: none; max-height: 92dvh; border-radius: 12px 12px 0 0; animation: gestao-sheet 220ms var(--ease-drawer) both; }
-}
-
-/* ---------- Padrões ---------- */
-/* Abas: com Padrões são quatro; mantêm a altura e o texto das três de antes. */
-
-.gestao-checklists .padroes-stack { display: grid; gap: 16px; }
-.gestao-checklists .padroes-periodo { min-width: 264px; }
-.gestao-checklists .padroes-resumo { margin: 0; padding: 12px 20px; }
-.gestao-checklists .padroes-destaques { display: grid; gap: 8px; padding: 0 20px 16px; }
-.gestao-checklists .padroes-destaques [role="list"] { display: grid; gap: 8px; }
-.gestao-checklists .padroes-row { display: grid; align-items: center; gap: 16px; width: 100%; min-height: 62px; padding: 10px 20px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--ink-950); font-size: 13px; text-align: left; animation: gestao-rise 240ms var(--ease-out) both; animation-delay: calc(80ms + var(--i, 0) * 35ms); transition: background-color 150ms var(--ease-out), transform 140ms var(--ease-out); }
-.gestao-checklists .padroes-row:active { transform: scale(.99); }
-.gestao-checklists .padroes-row[aria-expanded="true"] { background: var(--blue-100); }
-/* slate-500 sobre blue-100 fica abaixo de 4,5:1; usa slate-700. */
-.gestao-checklists .padroes-row[aria-expanded="true"] small { color: var(--slate-700); }
-.gestao-checklists .padroes-row .gestao-list-chevron { transition: transform 150ms var(--ease-out); }
-.gestao-checklists .padroes-row[aria-expanded="true"] .gestao-list-chevron { transform: rotate(90deg); }
-.gestao-checklists .padroes-row.is-entregador { grid-template-columns: minmax(0, 1.6fr) 90px 120px 70px 16px; }
-.gestao-checklists .padroes-row.is-veiculo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 110px 16px; }
-.gestao-checklists .padroes-row.is-frota { grid-template-columns: 28px minmax(0, 1fr) 120px 16px; }
-.gestao-checklists .padroes-row.is-destaque { grid-template-columns: 16px minmax(0, 1fr) 16px; min-height: 44px; padding: 10px 12px; border-radius: 10px; background: var(--warning-soft); color: var(--ink-900); }
-.gestao-checklists .padroes-row.is-destaque[aria-expanded="true"] { background: var(--warning-soft); }
-.gestao-checklists .padroes-row.is-destaque > .gestao-icon:first-child { color: var(--warning); }
-.gestao-checklists .padroes-num { color: var(--navy-900); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.gestao-checklists .padroes-item { min-width: 0; color: var(--ink-900); font-size: 13px; font-weight: 700; line-height: 20px; overflow-wrap: anywhere; }
-.gestao-checklists .padroes-sep { margin: 0; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface-neutral); color: var(--slate-700); font-size: 12px; font-weight: 700; }
-.gestao-checklists .padroes-lista { display: grid; gap: 8px; padding: 12px 20px 16px; border-bottom: 1px solid var(--border); background: var(--surface-neutral); animation: gestao-fade 180ms var(--ease-out) both; }
-.gestao-checklists .padroes-destaques .padroes-lista { margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; }
-.gestao-checklists .padroes-chk { display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 13px; }
-.gestao-checklists .padroes-chk-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-.gestao-checklists .padroes-chk-top strong { color: var(--navy-900); font-size: 13px; font-weight: 800; }
-.gestao-checklists .padroes-chk > small { color: var(--slate-500); font-size: 12px; line-height: 17px; overflow-wrap: anywhere; }
-.gestao-checklists .padroes-problema { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--ink-950); font-size: 13px; font-weight: 600; }
-
-@media (hover: hover) and (pointer: fine) {
-  .gestao-checklists .padroes-row:not(.is-destaque):not([aria-expanded="true"]):hover { background: var(--surface-neutral); }
-}
-@media (max-width: 820px) {
-
-  .gestao-checklists .padroes-periodo { width: 100%; min-width: 0; }
-  .gestao-checklists .padroes-row:not(.is-destaque) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-left: 16px; padding-right: 16px; }
-  .gestao-checklists .padroes-row > .frota-cell, .gestao-checklists .padroes-row.is-veiculo > .padroes-item { flex: 1 1 100%; }
-  .gestao-checklists .padroes-row.is-frota > .padroes-item { flex: 1 1 0; }
-  /* O chevron some nas outras listas do mobile; aqui ele indica que a linha abre. */
-  .gestao-checklists .padroes-row > .gestao-list-chevron { display: block; }
-  .gestao-checklists .padroes-row:not(.is-destaque) > .gestao-list-chevron { margin-left: auto; }
-  .gestao-checklists .padroes-resumo, .gestao-checklists .padroes-sep, .gestao-checklists .padroes-lista, .gestao-checklists .padroes-destaques { padding-left: 16px; padding-right: 16px; }
-}
-
-/* Tela no Design System: só o que os componentes do DS não cobrem. */
+/* ---------- Lista e filtros ---------- */
 .chk-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2) var(--bt-space-3); padding: var(--bt-space-3) var(--bt-space-4); margin: 0; border-bottom: 1px solid var(--bt-color-border); }
 .chk-busca { flex: 1 1 280px; max-width: 420px; }
 .chk-filtros { flex: 0 1 auto; max-width: 100%; overflow-x: auto; }
@@ -516,20 +17,288 @@
 @media (hover: hover) and (pointer: fine) { .chk-modelo__nome:hover:not(:disabled) { text-decoration: underline; } }
 .chk-modelo__ordem { color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
 .chk-modelo__recebe { display: inline-flex; align-items: center; gap: var(--bt-space-1); }
-.chk-voltar { display: inline-flex; align-items: center; gap: var(--bt-space-1); padding: 0; border: 0; background: none; color: var(--bt-color-text-secondary); font: inherit; font-size: var(--bt-font-size-13); cursor: pointer; border-radius: var(--bt-radius-xs); }
-.chk-voltar:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
-@media (hover: hover) and (pointer: fine) { .chk-voltar:hover:not(:disabled) { color: var(--bt-color-text-primary); } }
+.frota-cell { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.frota-cell strong { overflow: hidden; color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-extrabold); text-overflow: ellipsis; white-space: nowrap; }
+.frota-cell span, .frota-cell small { overflow: hidden; color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); text-overflow: ellipsis; white-space: nowrap; }
+.frota-cell .is-missing { color: var(--bt-color-danger); font-weight: var(--bt-font-weight-bold); }
+.gestao-list-chevron { color: var(--bt-color-text-tertiary); }
+@media (max-width: 560px) { .gestao-checklists .frota-kpis--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* No celular a Table vira duas colunas: a situação e a ação descem para linhas próprias; Subir, Descer e Duplicar ganham alvo de 44 px. */
+@media (max-width: 820px) {
+  .chk-tabela-frota .bt-table__row > .bt-table__cell:last-child,
+  .chk-tabela-frota .bt-table__cell:has(> .chk-situacao) { grid-column: 1 / -1; justify-self: start; }
+  .chk-acoes .bt-button { min-width: 44px; min-height: 44px; }
+  .gestao-list-chevron { display: none; }
+}
+
+/* ---------- Detalhe e diálogos ---------- */
 .chk-dialogo { display: grid; gap: var(--bt-space-3); }
 .chk-dialogo p { margin: 0; color: var(--bt-color-text-secondary); }
 .chk-detalhe { display: grid; gap: var(--bt-space-4); }
 .chk-detalhe__resumo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
 .chk-detalhe__acoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
 .chk-detalhe__acoes p { flex-basis: 100%; margin: 0; }
-@media (max-width: 560px) { .gestao-checklists .frota-kpis--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-/* No celular a Table vira duas colunas: a situação e a ação descem para linhas próprias.
-   Subir, Descer e Duplicar ganham alvo de toque de 44 px. */
+.gestao-timeline, .gestao-detail-block { display: grid; gap: var(--bt-space-2-5); }
+.gestao-step { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: var(--bt-space-2-5); }
+.gestao-step-dot { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border: 2px solid var(--bt-color-border); border-radius: var(--bt-radius-full); color: var(--bt-color-on-solid); }
+.gestao-step.is-done .gestao-step-dot { border-color: var(--bt-color-success); background: var(--bt-color-success); }
+.gestao-step.is-error .gestao-step-dot { border-color: var(--bt-color-danger); }
+.gestao-step > span:last-child { display: grid; }
+.gestao-step strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
+.gestao-step small { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); overflow-wrap: anywhere; }
+.gestao-step.is-error small { color: var(--bt-color-danger); }
+.chk-answers { display: grid; gap: var(--bt-space-2); margin: 0; }
+.chk-answers > div { min-width: 0; padding: var(--bt-space-2) var(--bt-space-2-5); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+.chk-answers > div.is-problem { border-color: var(--bt-color-danger); }
+.chk-answers dt { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-extrabold); letter-spacing: .06em; text-transform: uppercase; }
+.chk-answers dd { margin: var(--bt-space-0-5) 0 0; font-weight: var(--bt-font-weight-semibold); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chk-problem { display: grid; gap: var(--bt-space-1-5); }
+.chk-problem small { color: var(--bt-color-text-control); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
+
+/* ---------- Fotos ---------- */
+/* Miniaturas de 72 px fixos em todos os estados (carregando, foto, falha) para o layout não mexer. */
+.chk-thumbs { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); margin-top: var(--bt-space-0-5); white-space: normal; }
+.chk-foto-prova { display: inline-grid; gap: var(--bt-space-1); align-content: start; max-width: 200px; }
+.chk-thumb-slot { display: block; min-width: 72px; height: 72px; }
+.chk-thumb { display: block; width: 72px; height: 72px; padding: 0; overflow: hidden; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background: var(--bt-color-surface-neutral); cursor: pointer; }
+.chk-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.chk-thumb.is-loading { display: grid; place-items: center; cursor: default; }
+.chk-thumb:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) { .chk-thumb:hover { border-color: var(--bt-color-border-strong); } }
+.chk-thumb-falha { display: grid; align-content: center; justify-items: center; gap: var(--bt-space-0-5); width: 72px; height: 72px; padding: var(--bt-space-1); border: 1px dashed var(--bt-color-border-strong); border-radius: var(--bt-radius-sm); background: var(--bt-color-surface-neutral); text-align: center; }
+.chk-thumb-falha.is-large { width: auto; height: auto; padding: var(--bt-space-6); }
+/* Visualizador: overlay próprio (o Dialog do DS é pequeno demais para a foto). */
+.gestao-modal { position: fixed; inset: 0; z-index: var(--bt-z-index-drawer); display: flex; align-items: center; justify-content: center; padding: var(--bt-space-4); }
+.gestao-modal-backdrop { position: absolute; inset: 0; padding: 0; border: 0; background: var(--shell-veu); cursor: default; }
+.foto-viewer { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--bt-space-3); width: 100%; max-width: 960px; max-height: calc(100dvh - 32px); padding: var(--bt-space-4); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); }
+.foto-viewer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--bt-space-3); min-width: 0; }
+.foto-viewer-head h2 { margin: 0; font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); overflow-wrap: anywhere; }
+.foto-viewer-head small { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-variant-numeric: tabular-nums; }
+.foto-viewer-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 240px; overflow: hidden; border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+.foto-viewer-stage img { display: block; max-width: 100%; max-height: calc(100dvh - 180px); object-fit: contain; }
+.foto-viewer-nav { position: absolute; top: calc(50% - 18px); }
+.foto-viewer-nav.is-prev { left: var(--bt-space-2); }
+.foto-viewer-nav.is-next { right: var(--bt-space-2); }
+.foto-viewer-actions { display: flex; justify-content: flex-end; }
+@media (max-width: 560px) { .foto-viewer { padding: var(--bt-space-3); } .foto-viewer-nav { top: calc(50% - 22px); min-width: 44px; min-height: 44px; } }
+
+/* ---------- Editor de modelo ---------- */
+.gestao-columns { display: grid; grid-template-areas: "form preview"; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .9fr); align-items: start; gap: var(--bt-space-4); }
+.mod-form { grid-area: form; }
+.gestao-preview { grid-area: preview; position: sticky; top: var(--bt-space-5); }
+.gestao-form-body { display: grid; gap: var(--bt-space-5); padding: var(--bt-space-5); }
+.gestao-two-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-4); }
+.gestao-sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.mod-head-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-2) var(--bt-space-3); }
+.mod-ver-previa { display: none; }
+.mod-erros { display: grid; gap: var(--bt-space-0-5); margin: 0; padding: 0 0 0 var(--bt-space-5); }
+.mod-toggles { display: grid; gap: var(--bt-space-2-5); }
+.mod-items { display: grid; gap: var(--bt-space-3); }
+.mod-items-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: var(--bt-space-2) var(--bt-space-3); }
+.mod-items-head > div:first-child { display: grid; gap: var(--bt-space-0-5); }
+.mod-items-title { margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); }
+.mod-add-actions { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
+.mod-painel { display: grid; justify-items: start; gap: var(--bt-space-2-5); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+.mod-painel-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--bt-space-1) var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); }
+.mod-tipos-grid, .mod-prontos-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-2); width: 100%; }
+.mod-tipo-opcao, .mod-pronto { display: grid; align-items: center; gap: var(--bt-space-2-5); min-height: 52px; padding: var(--bt-space-2) var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); color: var(--bt-color-text-primary); text-align: left; cursor: pointer; }
+.mod-tipo-opcao { grid-template-columns: 28px minmax(0, 1fr); }
+.mod-tipo-opcao > span:last-child, .mod-pronto-text { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.mod-tipo-opcao strong, .mod-pronto-text strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); }
+.mod-tipo-opcao small, .mod-pronto-text small { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); }
+.mod-pronto { grid-template-columns: 28px minmax(0, 1fr) auto; }
+.mod-pronto-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mod-pronto-state { display: inline-flex; align-items: center; gap: var(--bt-space-1); color: var(--bt-color-action); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); white-space: nowrap; }
+.mod-pronto.is-added { background: var(--bt-color-surface-soft); cursor: default; }
+.mod-pronto-state.is-added { color: var(--bt-color-success); }
+.mod-tipo-opcao:focus-visible, .mod-pronto:focus-visible, .mod-item-toggle:focus-visible, .mod-handle:focus-visible, .mod-opcao:focus-visible, .mod-chip button:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+@media (hover: hover) and (pointer: fine) {
+  .mod-tipo-opcao:hover, .mod-pronto:not(.is-added):hover { border-color: var(--bt-color-border-strong); }
+}
+
+/* Itens do modelo: lista reordenável (arraste pela alça ou setas). */
+.mod-list { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.mod-list.is-reordering { user-select: none; }
+.mod-list.is-reordering > .mod-item:not(.is-dragging) { transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.mod-item { position: relative; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); scroll-margin: 16px 0 112px; }
+.mod-item.is-open { border-color: var(--bt-color-border-strong); }
+.mod-item.is-invalid { border-color: var(--bt-color-danger); }
+.mod-item.is-dragging { z-index: 2; border-color: var(--bt-color-action); background: var(--bt-color-surface-neutral); box-shadow: var(--bt-shadow-surface); }
+.mod-item-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: var(--bt-space-0-5); min-height: 60px; padding: var(--bt-space-1) var(--bt-space-2) var(--bt-space-1) var(--bt-space-0-5); }
+.mod-handle { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: grab; touch-action: none; }
+.mod-handle:disabled { cursor: default; opacity: var(--bt-opacity-disabled); }
+.mod-item.is-dragging .mod-handle { cursor: grabbing; color: var(--bt-color-action); }
+.mod-item-toggle { display: grid; grid-template-columns: 28px minmax(0, 1fr) 16px; align-items: center; gap: var(--bt-space-2-5); width: 100%; min-width: 0; min-height: 52px; padding: var(--bt-space-1-5) var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-primary); text-align: left; cursor: pointer; }
+.mod-item-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--bt-radius-sm); background: var(--bt-color-action-soft); color: var(--bt-color-action); }
+.mod-item-text { display: grid; gap: var(--bt-space-1); min-width: 0; }
+.mod-item-text strong { overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+.mod-item-text strong.is-empty { color: var(--bt-color-text-secondary); }
+.mod-item-num { color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.mod-item-index { color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.mod-item-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-1) var(--bt-space-2); }
+.mod-item-tipo { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
+.mod-item-chevron { color: var(--bt-color-text-secondary); transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.mod-item.is-open .mod-item-chevron { transform: rotate(180deg); }
+.mod-item-arrows { display: flex; gap: var(--bt-space-1); }
+.mod-item-arrows.is-body { display: none; }
+.mod-item-body { display: grid; gap: var(--bt-space-3-5); padding: var(--bt-space-3-5) var(--bt-space-4) var(--bt-space-4) 54px; border-top: 1px solid var(--bt-color-border); }
+.mod-item-fields { display: grid; gap: var(--bt-space-3); }
+.mod-item-fields.is-number { grid-template-columns: 180px minmax(0, 1fr); align-items: end; }
+.mod-item-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--bt-space-2); }
+.mod-item-actions .mod-remover { margin-left: auto; }
+@media (hover: hover) and (pointer: fine) {
+  .mod-handle:hover:not(:disabled), .mod-item-toggle:hover { background: var(--bt-color-surface-soft); }
+}
+
+/* Problemas como chips */
+.mod-chips { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-1-5); min-height: 44px; padding: var(--bt-space-1) var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); cursor: text; }
+.mod-chips:focus-within { border-color: var(--bt-focus-border); box-shadow: var(--bt-focus-ring); }
+.mod-chips.is-invalid { border-color: var(--bt-color-danger); }
+.mod-chips input { flex: 1 1 140px; min-width: 120px; min-height: 32px; padding: 0 var(--bt-space-1); border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.mod-chip { display: inline-flex; align-items: center; gap: var(--bt-space-0-5); min-height: 30px; padding: 0 var(--bt-space-0-5) 0 var(--bt-space-2-5); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background: var(--bt-color-surface); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.mod-chip.is-invalid { border-color: var(--bt-color-danger); color: var(--bt-color-danger); }
+.mod-chip button { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--bt-radius-full); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.mod-chip.is-sugestao { gap: var(--bt-space-1); padding: 0 var(--bt-space-2-5) 0 var(--bt-space-2); border-style: dashed; border-color: var(--bt-color-border-strong); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
+.mod-sugestoes { display: flex; align-items: center; flex-wrap: wrap; gap: var(--bt-space-1-5); }
+@media (hover: hover) and (pointer: fine) {
+  .mod-chip button:hover:not(:disabled) { background: var(--bt-color-danger-soft); color: var(--bt-color-danger); }
+  .mod-chip.is-sugestao:hover:not(:disabled) { background: var(--bt-color-surface-soft); }
+}
+
+/* Barra fixa do editor: Salvar e Cancelar sempre à vista; a faixa de baixo é do selo de versão. */
+.mod-barra { position: sticky; bottom: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-3); padding: var(--bt-space-3) var(--bt-space-5) 26px; border-top: 1px solid var(--bt-color-border); border-radius: 0 0 var(--bt-radius-lg) var(--bt-radius-lg); background: var(--bt-color-surface); }
+.mod-barra-status { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; margin: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
+.mod-barra.is-neutro .mod-barra-status svg { color: var(--bt-color-text-secondary); }
+.mod-barra.is-aviso .mod-barra-status svg { color: var(--bt-color-warning); }
+.mod-barra.is-salvando .mod-barra-status svg { color: var(--bt-color-action); }
+.mod-barra.is-sucesso .mod-barra-status svg { color: var(--bt-color-success); }
+.mod-barra.is-erro .mod-barra-status, .mod-barra.is-erro .mod-barra-status svg { color: var(--bt-color-danger); }
+.mod-barra-acoes { display: flex; flex: none; gap: var(--bt-space-2); }
+
+/* Prévia do celular */
+.gestao-preview-body { padding: var(--bt-space-5); }
+.gestao-device { max-width: 340px; margin: 0 auto; padding: var(--bt-space-2-5); border: 1px solid var(--bt-color-border); border-radius: 28px; background: var(--bt-color-surface); box-shadow: var(--bt-shadow-panel); }
+.gestao-device-screen { overflow: hidden; border-radius: 20px; background: var(--bt-color-canvas); }
+.gestao-device-bar { display: flex; align-items: center; gap: var(--bt-space-2-5); padding: var(--bt-space-4); background: var(--bt-color-brand); color: var(--bt-color-on-solid); font-size: var(--bt-font-size-14); }
+.gestao-device-content { display: flex; flex-direction: column; gap: var(--bt-space-3); min-height: 360px; padding: var(--bt-space-3-5); }
+.gestao-device-button { display: flex; align-items: center; justify-content: center; height: 44px; border-radius: var(--bt-radius-md); background: var(--bt-color-brand); color: var(--bt-color-on-solid); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); }
+.gestao-preview-foot { max-width: 340px; margin: var(--bt-space-3-5) auto 0; text-align: center; }
+.mod-phone-empty { margin: 0; padding: var(--bt-space-6) var(--bt-space-2); color: var(--bt-color-text-control); font-size: var(--bt-font-size-12); text-align: center; }
+.mod-phone-list { display: grid; gap: var(--bt-space-2); }
+.mod-phone-item { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: var(--bt-space-2-5); padding: var(--bt-space-2-5) var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background: var(--bt-color-surface); }
+.mod-phone-item > svg { color: var(--bt-color-action); }
+.mod-phone-item strong { display: block; overflow: hidden; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
+.mod-phone-item small { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-11); }
+.mod-phone-item .is-empty { color: var(--bt-color-text-secondary); }
+
+/* ---------- Filtro de veículos do modelo ---------- */
+.mod-filtro { display: grid; gap: var(--bt-space-2-5); }
+.mod-conds { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.mod-cond { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.3fr) 40px; align-items: center; gap: var(--bt-space-2); padding: var(--bt-space-2-5) var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+.mod-cond.is-larga { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 40px; }
+.mod-cond.is-larga .mod-cond-valor { grid-column: 2 / 4; grid-row: 2; }
+.mod-cond.is-invalid { border-color: var(--bt-color-danger); }
+.mod-cond-num { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); }
+.mod-cond-op { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
+.mod-cond-valor { min-width: 0; }
+.mod-cond-remover { justify-self: end; }
+.mod-cond.is-larga .mod-cond-remover { grid-column: 4; grid-row: 1; }
+.mod-cond-erro { grid-column: 2 / -1; }
+.mod-cond-naosuportado { grid-column: 1 / 5; }
+.mod-cond-entre { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--bt-space-2); color: var(--bt-color-text-control); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); }
+.mod-opcoes { display: flex; flex-wrap: wrap; gap: var(--bt-space-1-5); }
+.mod-opcao { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-height: 32px; padding: 0 var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-full); background: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
+.mod-opcao[aria-pressed="true"] { border-color: var(--bt-color-action); background: var(--bt-color-action-soft); }
+.mod-opcao[aria-pressed="true"] svg { color: var(--bt-color-action); }
+.mod-opcao:disabled { opacity: var(--bt-opacity-disabled); cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .mod-opcao:hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--bt-color-border-strong); background: var(--bt-color-surface-soft); }
+}
+.mod-previa-filtro { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); }
+.mod-previa-total { display: flex; align-items: center; gap: var(--bt-space-2); margin: 0; font-size: var(--bt-font-size-14); }
+.mod-previa-total svg { color: var(--bt-color-action); }
+.mod-previa-sub { margin: var(--bt-space-1) 0 0; color: var(--bt-color-text-control); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-extrabold); }
+.mod-veiculos { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface-neutral); }
+.mod-veiculos li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--bt-space-0-5) var(--bt-space-3); min-height: 44px; padding: var(--bt-space-1-5) var(--bt-space-3); border-top: 1px solid var(--bt-color-border); }
+.mod-veiculos li:first-child { border-top: 0; }
+.mod-veiculo { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--bt-space-0-5) var(--bt-space-2); min-width: 0; }
+.mod-veiculo strong { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); font-variant-numeric: tabular-nums; }
+.mod-veiculo small, .mod-veiculo-nota { color: var(--bt-color-text-control); font-size: var(--bt-font-size-12); }
+.mod-veiculos.is-outro .mod-veiculo-nota { font-weight: var(--bt-font-weight-bold); }
+
+/* ---------- Responsivo do editor ---------- */
+@media (max-width: 1120px) {
+  .gestao-columns { grid-template-areas: "form" "preview"; grid-template-columns: minmax(0, 1fr); }
+  .gestao-preview { display: none; }
+  .mod-ver-previa { display: inline-flex; }
+}
 @media (max-width: 820px) {
-  .chk-tabela-frota .bt-table__row > .bt-table__cell:last-child,
-  .chk-tabela-frota .bt-table__cell:has(> .chk-situacao) { grid-column: 1 / -1; justify-self: start; }
-  .chk-acoes .bt-button { min-width: 44px; min-height: 44px; }
+  /* X do chip com alvo de 44 px; o chip cresce junto e a margem negativa esconde a sobra da borda. */
+  .mod-chip { min-height: 44px; padding-right: 0; }
+  .mod-chip button { width: 44px; height: 44px; margin: -1px 0; }
+  .mod-opcao { min-height: 44px; }
+}
+@media (max-width: 560px) {
+  .gestao-form-body, .gestao-preview-body { padding: var(--bt-space-4); }
+  .gestao-two-fields { grid-template-columns: minmax(0, 1fr); }
+  .mod-item-arrows.is-row { display: none; }
+  .mod-item-arrows.is-body { display: flex; }
+  .mod-item-row { grid-template-columns: 44px minmax(0, 1fr); min-height: 0; padding: 2px 4px 2px 2px; }
+  .mod-item-body { padding: var(--bt-space-3); }
+  .mod-item-toggle { gap: var(--bt-space-2); min-height: 48px; padding: var(--bt-space-1); }
+  /* Linha fechada em uma linha só: o ícone já diz o tipo. */
+  .mod-item-meta .mod-item-tipo:first-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .mod-item-fields.is-number, .mod-tipos-grid, .mod-prontos-grid { grid-template-columns: minmax(0, 1fr); }
+  .mod-add-actions, .mod-add-actions .bt-button { width: 100%; }
+  .mod-barra { padding: var(--bt-space-2-5) var(--bt-space-4) 26px; }
+  .mod-barra-status { font-size: var(--bt-font-size-12); }
+  .mod-hide-small { display: none; }
+  /* Condição no celular: campo e comparação na primeira linha, valor embaixo. */
+  .mod-cond, .mod-cond.is-larga { grid-template-columns: minmax(0, 1fr) 44px; padding: var(--bt-space-2); }
+  .mod-cond-num, .mod-cond-op { display: none; }
+  .mod-cond > .mod-cond-select:first-of-type { grid-column: 1; grid-row: 1; }
+  .mod-cond-remover, .mod-cond.is-larga .mod-cond-remover { grid-column: 2; grid-row: 1; }
+  .mod-cond > .mod-cond-select + .mod-cond-select { grid-column: 1 / -1; grid-row: 2; }
+  .mod-cond-valor, .mod-cond.is-larga .mod-cond-valor { grid-column: 1 / -1; grid-row: 3; }
+  .mod-cond-erro { grid-column: 1 / -1; }
+  .mod-cond-naosuportado { grid-column: 1; }
+}
+
+/* ---------- Padrões ---------- */
+.padroes-stack { display: grid; gap: var(--bt-space-4); }
+.padroes-resumo { margin: 0; padding: var(--bt-space-3) var(--bt-space-5); }
+.padroes-destaques { display: grid; gap: var(--bt-space-2); padding: 0 var(--bt-space-5) var(--bt-space-4); }
+.padroes-destaques [role="list"] { display: grid; gap: var(--bt-space-2); }
+.padroes-row { display: grid; align-items: center; gap: var(--bt-space-4); width: 100%; min-height: 62px; padding: var(--bt-space-2-5) var(--bt-space-5); border: 0; border-bottom: 1px solid var(--bt-color-border); background: var(--bt-color-surface); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-13); text-align: left; cursor: pointer; }
+.padroes-row:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
+.padroes-row[aria-expanded="true"] { background: var(--bt-color-action-soft); }
+.padroes-row[aria-expanded="true"] small { color: var(--bt-color-text-control); }
+.padroes-row .gestao-list-chevron { transition: transform var(--bt-duration-fast) var(--bt-ease-out); }
+.padroes-row[aria-expanded="true"] .gestao-list-chevron { transform: rotate(90deg); }
+.padroes-row.is-entregador { grid-template-columns: minmax(0, 1.6fr) 90px 120px 70px 16px; }
+.padroes-row.is-veiculo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 110px 16px; }
+.padroes-row.is-frota { grid-template-columns: 28px minmax(0, 1fr) 120px 16px; }
+.padroes-row.is-destaque { grid-template-columns: 16px minmax(0, 1fr) 16px; min-height: 44px; padding: var(--bt-space-2-5) var(--bt-space-3); border-radius: var(--bt-radius-md); background: var(--bt-color-warning-soft); }
+.padroes-row.is-destaque[aria-expanded="true"] { background: var(--bt-color-warning-soft); }
+.padroes-row.is-destaque > svg:first-child { color: var(--bt-color-warning); }
+.padroes-num { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.padroes-item { min-width: 0; font-weight: var(--bt-font-weight-bold); overflow-wrap: anywhere; }
+.padroes-sep { margin: 0; padding: var(--bt-space-2-5) var(--bt-space-5); border-bottom: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); color: var(--bt-color-text-control); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.padroes-lista { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3) var(--bt-space-5) var(--bt-space-4); border-bottom: 1px solid var(--bt-color-border); background: var(--bt-color-surface-neutral); }
+.padroes-destaques .padroes-lista { margin-top: var(--bt-space-2); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); }
+.padroes-chk { display: grid; gap: var(--bt-space-1-5); min-width: 0; padding: var(--bt-space-2-5) var(--bt-space-3); border: 1px solid var(--bt-color-border); border-radius: var(--bt-radius-md); background: var(--bt-color-surface); font-size: var(--bt-font-size-13); }
+.padroes-chk-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--bt-space-2); }
+.padroes-chk > small { color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-12); overflow-wrap: anywhere; }
+.padroes-problema { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5); font-weight: var(--bt-font-weight-semibold); }
+@media (hover: hover) and (pointer: fine) {
+  .padroes-row:not(.is-destaque):not([aria-expanded="true"]):hover { background: var(--bt-color-surface-neutral); }
+}
+@media (max-width: 820px) {
+  .padroes-row:not(.is-destaque) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1-5) var(--bt-space-3); padding-left: var(--bt-space-4); padding-right: var(--bt-space-4); }
+  .padroes-row > .frota-cell, .padroes-row.is-veiculo > .padroes-item { flex: 1 1 100%; }
+  .padroes-row.is-frota > .padroes-item { flex: 1 1 0; }
+  /* O chevron some nas outras listas do mobile; aqui ele indica que a linha abre. */
+  .padroes-row > .gestao-list-chevron { display: block; }
+  .padroes-row:not(.is-destaque) > .gestao-list-chevron { margin-left: auto; }
+  .padroes-resumo, .padroes-sep, .padroes-lista, .padroes-destaques { padding-left: var(--bt-space-4); padding-right: var(--bt-space-4); }
 }
