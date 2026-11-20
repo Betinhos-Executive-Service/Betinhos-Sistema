@@ -1,0 +1,27 @@
+{
+  "name": "@betinhos/mcp-dataverse",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor MCP remoto (Cloudflare Worker) para o Dataverse: login Microsoft Entra delegado, Web API como a pessoa logada",
+  "scripts": {
+    "dev": "wrangler dev --port 8788",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@modelcontextprotocol/server": "2.4.0",
+    "agents": "0.32.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260702.1",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7",
+    "wrangler": "4.151.3"
+  }
+}
