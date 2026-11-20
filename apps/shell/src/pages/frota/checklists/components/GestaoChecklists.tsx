@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Dialog, Drawer, EmptyState, Field, MetricCard, SearchBox, SegmentedControl, Select, StatusBadge, Surface, Table, TableTitle, Tabs, Textarea, useToast, type MetricTone, type TableColumn } from "@betinhos/ui";
 import { PageLayout } from "../../../../app/PageLayout";
-import { Icon, type IconName } from "./icons";
+import { ArrowDown, ArrowLeft, ArrowUp, Ban, Bell, Car, Check, CircleCheck, Clock, ClipboardCheck, Copy, Eye, List, Plus, RefreshCw, Search, Send, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { PadroesTab } from "./PadroesTab";
 import { FotosChecklist } from "./FotosChecklist";
 import { ModeloEditor, type StatusSalvar } from "./ModeloEditor";
@@ -429,11 +429,11 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
 
   // ---------- Render ----------
 
-  const kpis: { label: string; value: number; tone: MetricTone; icon: IconName; hint: string }[] = [
-    { label: "Frota própria", value: frota.length, tone: "info", icon: "car", hint: isMock ? "Dados de exemplo" : "Carros próprios ativos" },
-    { label: "Em dia", value: contagem.emDia, tone: "success", icon: "checkCircle", hint: `Padrão: vistoria a cada ${periodicidade} dias` },
-    { label: "Com o motorista", value: contagem.pendentes, tone: contagem.pendentes ? "warning" : "info", icon: "clock", hint: contagem.pendentes ? "Aguardando envio pelo app" : "Nenhum pendente" },
-    { label: "Precisam de atenção", value: contagem.atencao, tone: contagem.atencao ? "danger" : "success", icon: "alert", hint: contagem.atencao ? "Vencidos, com problema, sem checklist ou sem motorista" : "Nenhum problema" }
+  const kpis: { label: string; value: number; tone: MetricTone; icon: LucideIcon; hint: string }[] = [
+    { label: "Frota própria", value: frota.length, tone: "info", icon: Car, hint: isMock ? "Dados de exemplo" : "Carros próprios ativos" },
+    { label: "Em dia", value: contagem.emDia, tone: "success", icon: CircleCheck, hint: `Padrão: vistoria a cada ${periodicidade} ${plural(periodicidade, "dia", "dias")}` },
+    { label: "Com o motorista", value: contagem.pendentes, tone: contagem.pendentes ? "warning" : "info", icon: Clock, hint: contagem.pendentes ? "Aguardando envio pelo app" : "Nenhum pendente" },
+    { label: "Precisam de atenção", value: contagem.atencao, tone: contagem.atencao ? "danger" : "success", icon: TriangleAlert, hint: contagem.atencao ? "Vencidos, com problema, sem checklist ou sem motorista" : "Nenhum problema" }
   ];
 
   const tabs = [
@@ -472,12 +472,12 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
             <span className="chk-modelo__ordem">{index + 1}.</span> {modelo.nome}
           </button>
           <small>{modelo.descricao || "Sem descrição"}</small>
-          <small className="chk-modelo__recebe"><Icon name="car" size={14} />{recebe}</small>
+          <small className="chk-modelo__recebe"><Car size={14}/>{recebe}</small>
         </span>
       );
     } },
     { key: "itens", header: "Itens", width: "90px", hideBelow: "mobile", cell: ({ modelo }) => `${modelo.itens.length} ${plural(modelo.itens.length, "item", "itens")}` },
-    { key: "periodicidade", header: "Periodicidade", width: "120px", hideBelow: "compact", cell: ({ modelo }) => `${modelo.periodicidadeDias} dias` },
+    { key: "periodicidade", header: "Periodicidade", width: "120px", hideBelow: "compact", cell: ({ modelo }) => `${modelo.periodicidadeDias} ${plural(modelo.periodicidadeDias, "dia", "dias")}` },
     { key: "situacao", header: "Situação", width: "minmax(140px, .8fr)", cell: ({ modelo, padrao: ehOPadrao }) => (
       <span className="chk-badges"><StatusBadge tone={modelo.ativo ? "success" : "neutral"} dot>{modelo.ativo ? "Ativo" : "Inativo"}</StatusBadge>{ehOPadrao ? <StatusBadge tone="info">Padrão</StatusBadge> : null}</span>
     ) },
@@ -485,10 +485,10 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
       return (
         <span className="chk-acoes">
           {ehOPadrao ? null : <>
-            <Button variant="ghost" size="compact" icon={<Icon name="arrowUp" size={16} />} data-foco={`subir-${modelo.id}`} disabled={busy || index === 0} aria-label={`Subir ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Subir" onClick={() => void moverModelo(modelo, -1)} />
-            <Button variant="ghost" size="compact" icon={<Icon name="arrowDown" size={16} />} data-foco={`descer-${modelo.id}`} disabled={busy || index === totalOrdenaveis - 1} aria-label={`Descer ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Descer" onClick={() => void moverModelo(modelo, 1)} />
+            <Button variant="ghost" size="compact" icon={<ArrowUp size={16}/>} data-foco={`subir-${modelo.id}`} disabled={busy || index === 0} aria-label={`Subir ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Subir" onClick={() => void moverModelo(modelo, -1)} />
+            <Button variant="ghost" size="compact" icon={<ArrowDown size={16}/>} data-foco={`descer-${modelo.id}`} disabled={busy || index === totalOrdenaveis - 1} aria-label={`Descer ${modelo.nome} na ordem (posição ${index + 1} de ${totalOrdenaveis})`} title="Descer" onClick={() => void moverModelo(modelo, 1)} />
           </>}
-          <Button variant="ghost" size="compact" icon={<Icon name="copy" size={16} />} data-foco={`duplicar-${modelo.id}`} disabled={busy} aria-label={`Duplicar ${modelo.nome}`} title="Duplicar modelo" onClick={() => startEdit(duplicarModelo(modelo), `duplicar-${modelo.id}`, true)} />
+          <Button variant="ghost" size="compact" icon={<Copy size={16}/>} data-foco={`duplicar-${modelo.id}`} disabled={busy} aria-label={`Duplicar ${modelo.nome}`} title="Duplicar modelo" onClick={() => startEdit(duplicarModelo(modelo), `duplicar-${modelo.id}`, true)} />
         </span>
       );
     } }
@@ -496,8 +496,8 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
 
   const acoes = editing ? undefined : (
     <>
-      <Button variant="secondary" icon={<Icon name="refresh" size={16} />} loading={refreshing} disabled={busy} onClick={() => void refreshView()}>Atualizar</Button>
-      {tab === "modelos" ? <Button icon={<Icon name="plus" size={16} />} data-foco="novo-modelo" disabled={busy} onClick={() => startEdit(null, "novo-modelo")}>Novo modelo</Button> : null}
+      <Button variant="secondary" icon={<RefreshCw size={16}/>} loading={refreshing} disabled={busy} onClick={() => void refreshView()}>Atualizar</Button>
+      {tab === "modelos" ? <Button icon={<Plus size={16}/>} data-foco="novo-modelo" disabled={busy} onClick={() => startEdit(null, "novo-modelo")}>Novo modelo</Button> : null}
     </>
   );
 
@@ -507,7 +507,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
     <PageLayout
       className="frota-page gestao-checklists"
       eyebrow={editing ? undefined : "Frota"}
-      breadcrumb={editing ? <button type="button" className="chk-voltar" disabled={busy} onClick={leaveEdit}><Icon name="arrowLeft" size={14} />Modelos</button> : undefined}
+      breadcrumb={editing ? <Button variant="ghost" size="compact" icon={<ArrowLeft size={14} />} disabled={busy} onClick={leaveEdit}>Modelos</Button> : undefined}
       title={editing ? (editingOriginal?.id ? editingOriginal.nome || "Modelo" : "Novo modelo") : titulo}
       description={editing ? "Defina o que o motorista fotografa e confere. Checklists já criados mantêm a versão anterior." : "Vistorias da frota própria enviadas pelos motoristas no App Motoristas."}
       meta={editing ? undefined : <StatusBadge tone={isMock ? "neutral" : "info"} dot>{isMock ? "Dados de exemplo" : "Dataverse"}</StatusBadge>}
@@ -541,7 +541,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
         <>
           {tab !== "padroes" ? (
             <div className="frota-kpis frota-kpis--4">
-              {kpis.map((kpi) => <MetricCard key={kpi.label} icon={<Icon name={kpi.icon} size={20} />} tone={kpi.tone} label={kpi.label} value={kpi.value} hint={kpi.hint} loading={loading} />)}
+              {kpis.map((kpi) => <MetricCard key={kpi.label} icon={<kpi.icon size={20} />} tone={kpi.tone} label={kpi.label} value={kpi.value} hint={kpi.hint} loading={loading} />)}
             </div>
           ) : null}
 
@@ -552,8 +552,8 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
               </div>
               <div className="chk-tabela-frota"><Table aria-label="Situação por veículo" columns={colunasFrota} rows={frotaVisivel} rowKey={(veiculo) => veiculo.id} loading={loading}
                 empty={frota.length
-                  ? <EmptyState compact icon={<Icon name="search" size={32} />} title="Nenhum veículo encontrado">Limpe a busca para ver a frota toda.</EmptyState>
-                  : <EmptyState compact icon={<Icon name="car" size={32} />} title="Nenhum carro próprio ativo">Cadastre a categoria e o status do veículo no Dataverse.</EmptyState>}
+                  ? <EmptyState compact icon={<Search size={32}/>} title="Nenhum veículo encontrado">Limpe a busca para ver a frota toda.</EmptyState>
+                  : <EmptyState compact icon={<Car size={32}/>} title="Nenhum carro próprio ativo">Cadastre a categoria e o status do veículo no Dataverse.</EmptyState>}
                 footer={loading ? undefined : <span className="chk-hint">{frotaVisivel.length} de {frota.length}</span>} /></div>
             </Surface>
           ) : null}
@@ -566,7 +566,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
                   options={CHK_FILTERS.map((item) => ({ value: item.id, label: `${item.grupo === "origem" ? "Origem: " : ""}${item.label} · ${chkBuscados.filter((row) => matchChk(item.id, row)).length}` }))} />
               </div>
               <Table aria-label="Checklists" columns={colunasChecklists} rows={chkVisiveis} rowKey={(item) => item.id} loading={loading} onRowClick={(item) => setSelectedChkId(item.id)} rowActions={() => []}
-                empty={<EmptyState compact icon={<Icon name="clipboardCheck" size={32} />} title={chkFilter === "abertos" ? "Nenhum checklist em aberto" : chkFilter === "trocas" && !chkTerm ? "Nenhuma troca detectada" : "Nenhum checklist encontrado"}>
+                empty={<EmptyState compact icon={<ClipboardCheck size={32}/>} title={chkFilter === "abertos" ? "Nenhum checklist em aberto" : chkFilter === "trocas" && !chkTerm ? "Nenhuma troca detectada" : "Nenhum checklist encontrado"}>
                   {chkFilter === "abertos" ? "A rotina diária cria as vistorias quinzenais; use Solicitar na aba Veículos para pedir uma extra." : chkFilter === "trocas" && !chkTerm ? "Quando a Infleet mostrar um carro passando para outro motorista, o checklist de recebimento aparece aqui." : "Troque o filtro ou limpe a busca."}
                 </EmptyState>}
                 footer={loading ? undefined : <span className="chk-hint">{chkVisiveis.length} de {checklists.length}</span>} />
@@ -577,7 +577,7 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
             <Surface flush eyebrow="Itens da vistoria" title="Modelos de checklist" action={<span className="chk-hint">{padrao ? `Rotina quinzenal usa: ${padrao.nome}` : "Nenhum modelo marcado para a rotina quinzenal"}</span>}>
               {modelos.length > 1 ? <p className="chk-toolbar chk-hint">Quando um veículo se encaixa em dois modelos, vale o que está mais acima. Use Subir e Descer para mudar a ordem; o padrão fica sempre por último.</p> : null}
               <Table aria-label="Modelos de checklist" columns={colunasModelos} rows={linhasModelos} rowKey={({ modelo }) => modelo.id} loading={loading}
-                empty={<EmptyState compact icon={<Icon name="list" size={32} />} title="Nenhum modelo ainda">Crie o primeiro pelo botão Novo modelo e marque para a rotina quinzenal.</EmptyState>} />
+                empty={<EmptyState compact icon={<List size={32}/>} title="Nenhum modelo ainda">Crie o primeiro pelo botão Novo modelo e marque para a rotina quinzenal.</EmptyState>} />
             </Surface>
           ) : null}
 
@@ -611,11 +611,11 @@ export function GestaoChecklists({ titulo }: { titulo: string }) {
         actions={dialog ? (
           <>
             <Button variant="secondary" autoFocus onClick={closeDialog}>{dialog.kind === "descartar" ? "Continuar editando" : "Voltar"}</Button>
-            {dialog.kind === "solicitar" ? <Button icon={<Icon name="send" size={16} />} disabled={!padrao && !dialogModeloId} onClick={() => void confirmDialog()}>Solicitar checklist</Button>
-              : dialog.kind === "cancelar" ? <Button variant="danger" icon={<Icon name="ban" size={16} />} disabled={Boolean(erroMotivo)} onClick={() => void confirmDialog()}>Cancelar checklist</Button>
-              : dialog.kind === "padrao" ? <Button icon={<Icon name="clipboardCheck" size={16} />} onClick={() => void confirmDialog()}>Usar na rotina</Button>
-              : dialog.kind === "removerItem" ? <Button variant="danger" icon={<Icon name="trash" size={16} />} onClick={() => void confirmDialog()}>Remover item</Button>
-              : <Button variant="danger" icon={<Icon name="trash" size={16} />} onClick={() => void confirmDialog()}>Descartar</Button>}
+            {dialog.kind === "solicitar" ? <Button icon={<Send size={16}/>} disabled={!padrao && !dialogModeloId} onClick={() => void confirmDialog()}>Solicitar checklist</Button>
+              : dialog.kind === "cancelar" ? <Button variant="danger" icon={<Ban size={16}/>} disabled={Boolean(erroMotivo)} onClick={() => void confirmDialog()}>Cancelar checklist</Button>
+              : dialog.kind === "padrao" ? <Button icon={<ClipboardCheck size={16}/>} onClick={() => void confirmDialog()}>Usar na rotina</Button>
+              : dialog.kind === "removerItem" ? <Button variant="danger" icon={<Trash2 size={16}/>} onClick={() => void confirmDialog()}>Remover item</Button>
+              : <Button variant="danger" icon={<Trash2 size={16}/>} onClick={() => void confirmDialog()}>Descartar</Button>}
           </>
         ) : null}>
         {dialog ? (
@@ -662,9 +662,9 @@ function AcaoVeiculo({ veiculo, situacao, busy, onSolicitar, onVer, onReatribuir
 }) {
   const aberto = situacao?.aberto;
   const semMotorista = aberto?.estado === CHECKLIST_ESTADO.aguardandoMotorista && Boolean(aberto.erroAtribuicao);
-  if (semMotorista && aberto) return <Button variant="secondary" size="compact" icon={<Icon name="refresh" size={14} />} disabled={busy} onClick={() => onReatribuir(aberto.id)}>Tentar de novo</Button>;
-  if (aberto) return <Button variant="secondary" size="compact" icon={<Icon name="eye" size={14} />} disabled={busy} onClick={() => onVer(aberto.id)}>Ver checklist</Button>;
-  return <Button variant="secondary" size="compact" icon={<Icon name="clipboardCheck" size={14} />} disabled={busy} aria-label={`Solicitar checklist do ${veiculo.placa}`} onClick={onSolicitar}>Solicitar</Button>;
+  if (semMotorista && aberto) return <Button variant="secondary" size="compact" icon={<RefreshCw size={14}/>} disabled={busy} onClick={() => onReatribuir(aberto.id)}>Tentar de novo</Button>;
+  if (aberto) return <Button variant="secondary" size="compact" icon={<Eye size={14}/>} disabled={busy} onClick={() => onVer(aberto.id)}>Ver checklist</Button>;
+  return <Button variant="secondary" size="compact" icon={<ClipboardCheck size={14}/>} disabled={busy} aria-label={`Solicitar checklist do ${veiculo.placa}`} onClick={onSolicitar}>Solicitar</Button>;
 }
 
 function ChecklistDetail({ item, busy, onLembrar, onReatribuir, onCancelar }: {
@@ -699,25 +699,25 @@ function ChecklistDetail({ item, busy, onLembrar, onReatribuir, onCancelar }: {
       </div>
       {item.erroAtribuicao && item.estado === CHECKLIST_ESTADO.aguardandoMotorista ? <Alert tone="danger">{item.erroAtribuicao}</Alert> : null}
       <section className="gestao-timeline" aria-label="Linha do tempo">
-        <span className="gestao-eyebrow">Linha do tempo</span>
+        <span className="bt-surface__eyebrow">Linha do tempo</span>
         {steps.map((step) => (
           <div key={step.label} className={`gestao-step ${step.done ? "is-done" : step.error ? "is-error" : ""}`}>
-            <span className="gestao-step-dot" aria-hidden="true">{step.done ? <Icon name="check" size={14} /> : null}</span>
+            <span className="gestao-step-dot" aria-hidden="true">{step.done ? <Check size={14}/> : null}</span>
             <span><strong>{step.label}</strong><small>{step.time}</small></span>
           </div>
         ))}
       </section>
       {isOpen(item) ? (
         <div className="chk-detalhe__acoes">
-          {canRemind(item) ? <Button variant="secondary" size="compact" icon={<Icon name="bell" size={14} />} disabled={busy} onClick={onLembrar}>{item.pushStatus === PUSH.falhou ? "Reenviar push" : "Lembrar motorista"}</Button> : null}
-          {reatribuicao.pode ? <Button variant="secondary" size="compact" icon={<Icon name="refresh" size={14} />} disabled={busy} onClick={onReatribuir}>Tentar atribuir de novo</Button> : null}
-          <Button variant="secondary" size="compact" icon={<Icon name="ban" size={14} />} disabled={busy} onClick={onCancelar}>Cancelar checklist</Button>
+          {canRemind(item) ? <Button variant="secondary" size="compact" icon={<Bell size={14}/>} disabled={busy} onClick={onLembrar}>{item.pushStatus === PUSH.falhou ? "Reenviar push" : "Lembrar motorista"}</Button> : null}
+          {reatribuicao.pode ? <Button variant="secondary" size="compact" icon={<RefreshCw size={14}/>} disabled={busy} onClick={onReatribuir}>Tentar atribuir de novo</Button> : null}
+          <Button variant="secondary" size="compact" icon={<Ban size={14}/>} disabled={busy} onClick={onCancelar}>Cancelar checklist</Button>
           {reatribuicao.aviso ? <p className="chk-hint">{reatribuicao.aviso}</p> : null}
         </div>
       ) : null}
       {item.estado === CHECKLIST_ESTADO.concluido ? (
         <section className="gestao-detail-block" aria-label="Respostas">
-          <span className="gestao-eyebrow">Respostas</span>
+          <span className="bt-surface__eyebrow">Respostas</span>
           <dl className="chk-answers">
             {respostas.map((answer) => (
               <div key={answer.chave} className={isNok(answer) ? "is-problem" : undefined}>
