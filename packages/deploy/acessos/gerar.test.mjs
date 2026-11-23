@@ -57,6 +57,8 @@ test('nenhum papel toca cr40f_segredo nem pede privilegio proibido', () => {
   for (const [nome, papel] of Object.entries(gerado.papeis)) {
     assert.equal(papel.tabelas.cr40f_segredo, undefined, nome)
     for (const priv of Object.keys(papel.privilegios)) assert.ok(!proibido.test(priv), `${nome}: ${priv}`)
+    for (const [tabela, acoes] of Object.entries(papel.tabelas))
+      for (const acao of Object.keys(acoes)) assert.ok(!proibido.test(`prv${acao}${tabela}`), `${nome}: prv${acao}${tabela}`)
   }
 })
 
