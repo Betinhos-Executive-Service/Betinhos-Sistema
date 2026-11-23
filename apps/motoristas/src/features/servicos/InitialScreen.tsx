@@ -8,6 +8,7 @@ import { filterAgendaGalleryItems, getAgendaItemStartDate } from "../../app/agen
 import { PullToRefresh } from "../../shared/ui/PullToRefresh";
 import { WebPushLink } from "../../shared/ui/WebPushLink";
 import type { AgendaItem } from "../../types";
+import { MULTAS_OCULTO } from "../../app/modulosOcultos.ts";
 
 const baseModules = [
   {
@@ -436,7 +437,7 @@ export function InitialScreen(props: InitialScreenProps) {
   );
 
   const servicesModule = modules.find((module) => module.id === "services");
-  const gridModules = modules.filter((module) => module.id !== "services");
+  const gridModules = modules.filter((module) => module.id !== "services" && !(MULTAS_OCULTO && module.id === "multas"));
   const multasPrazo = props.multasBanner?.split(" · ")[1];
   const pendingTypes = [
     { id: "checklists", count: props.pendingChecklists ?? 0, text: (n: number) => `${n} checklist${plural(n)}` },
@@ -447,7 +448,7 @@ export function InitialScreen(props: InitialScreenProps) {
   ];
   const pendingCounts: Record<string, number> = Object.fromEntries(pendingTypes.map((type) => [type.id === "gastosCartao" ? "expenses" : type.id, type.count]));
   const pendencias = pendingTypes
-    .filter((type) => type.count > 0)
+    .filter((type) => type.count > 0 && !(MULTAS_OCULTO && type.id === "multas"))
     .map((type) => ({ id: type.id, text: type.text(type.count) }));
 
   useEffect(() => {

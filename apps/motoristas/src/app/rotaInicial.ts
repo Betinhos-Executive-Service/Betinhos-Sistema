@@ -1,5 +1,6 @@
 import { findDetailByParams, type LocalStore } from "../lib/localWorkflow";
 import type { DetailData, Screen } from "../types";
+import { MULTAS_OCULTO } from "./modulosOcultos.ts";
 import { getHashRouteFallbackScreen, getHashRouteRestoreScreen, screenNeedsHashDetail, type HashRoute } from "./navigation";
 
 // Tela e detalhe iniciais a partir da rota hash (localhost), antes da carga remota.
@@ -9,6 +10,7 @@ export function findDetailFromHashRoute(store: LocalStore, route: HashRoute | nu
 }
 
 export function getInitialScreenFromHashRoute(route: HashRoute, detail: DetailData | null): Screen {
+  if (MULTAS_OCULTO && route.screen === "multas") return "inicio";
   const restoredScreen = getHashRouteRestoreScreen(route.screen);
   if (screenNeedsHashDetail(restoredScreen) && !detail) {
     return getHashRouteFallbackScreen(restoredScreen);

@@ -2,6 +2,7 @@
 // Cada passo aponta para um elemento real da tela por seletor CSS; passo `optional` some sem erro quando
 // o elemento não existe (outro tipo de serviço, lista vazia, recurso não liberado para o motorista).
 import type { TourChapter, TourStep } from "./tour";
+import { MULTAS_OCULTO } from "./modulosOcultos.ts";
 
 type StepExtras = Pick<TourStep, "target" | "match" | "within" | "optional">;
 
@@ -65,7 +66,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("multas", "Multas", [
         "Termos de multa para você assinar ou contestar. Cada termo mostra o prazo e o que você estaria aceitando, como o desconto em folha.",
         "A assinatura é feita no celular, com selfie e localização. Se não concordar, você contesta e conversa com o gestor de frota."
-      ], { target: dt("multas") }),
+      ], { target: dt("multas"), optional: MULTAS_OCULTO }),
       step("treinamentos", "Treinamentos", [
         "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
         "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { getInitialDespesaId, getInitialDetail, getInitialGastosCartaoLink, getInitialTermoMultaId, getInitialTreinamentoParticipacaoId, loadStore } from "./bootstrap";
 import { parseHashRoute, type HashRoute } from "./navigation";
+import { MULTAS_OCULTO } from "./modulosOcultos.ts";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "./rotaInicial";
 import { loadFinalizeDraftAssets } from "../features/finalizar/rascunhos";
 import type { LocalStore } from "../lib/localWorkflow";
@@ -23,6 +24,6 @@ export function useEstadoInicial(hashRoutingActive: boolean) {
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
   const initialScreen: Screen = initialHashRouteRef.current
     ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
+    : (initialDetailRef.current ? "detalhes" : !MULTAS_OCULTO && getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
   return { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store };
 }
