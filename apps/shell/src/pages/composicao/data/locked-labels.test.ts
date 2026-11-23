@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { lockedItems, LOCKED_REASON, nativeLockedItems, withoutLocked } from './locked-labels'
+import { lockedItems, LOCKED_REASON, nativeLockedItems, nativeValueRefs, withoutLocked } from './locked-labels'
 import { fromTableFilters, toTableFilters, type LockedFilters } from './table-view'
 import type { CatalogField, ViewDefinition } from './views'
 
@@ -57,5 +57,44 @@ describe('nativeLockedItems', () => {
       { id: 'n:1', label: 'uma destas: Valor maior que 1; Valor está vazio', reason: LOCKED_REASON, removable: false },
     ])
     expect(nativeLockedItems(null, catalog)).toEqual([])
+  })
+
+  const GUID = '00000000-0000-4000-8000-000000000001'
+  const GUID_SEM_NOME = '00000000-0000-4000-8000-000000000002'
+  const statusField: CatalogField = { ...base, id: 'new_status', label: 'Status', attribute: 'new_status', type: 'Picklist' }
+  const withNames = [...catalog, statusField]
+  const nameOf = (field: CatalogField, value: string) => ({ 'new_status|1': 'Aprovada', [`cr40f_cliente|${GUID}`]: 'Cliente Exemplo' } as Record<string, string>)[`${field.id}|${value}`]
+
+  it('(a) choice e lookup aparecem com o nome; GUID sem nome vira "registro selecionado"', () => {
+    const xml = `<fetch><entity name="x"><filter type="and"><condition attribute="new_status" operator="eq" value="1" /><condition attribute="cr40f_cliente" operator="eq" value="{${GUID.toUpperCase()}}" /><condition attribute="cr40f_cliente" operator="ne" value="${GUID_SEM_NOME}" /></filter></entity></fetch>`
+    const labels = nativeLockedItems(xml, withNames, nameOf).map((item) => item.label)
+    expect(labels).toEqual(['Status igual a Aprovada', 'Cliente da OP igual a Cliente Exemplo', 'Cliente da OP diferente de registro selecionado'])
+    expect(labels.join()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i)
+  })
+
+  it('(a) pede ao hook os nomes que faltam: campos de choice e lookup com seus valores', () => {
+    const xml = `<fetch><entity name="x"><filter type="and"><condition attribute="new_status" operator="in"><value>1</value><value>2</value></condition><condition attribute="cr40f_cliente" operator="eq" value="{${GUID.toUpperCase()}}" /><condition attribute="cr40f_regiao" operator="eq" value="Sul" /></filter></entity></fetch>`
+    expect(nativeValueRefs(xml, withNames).map(({ field, values }) => [field.id, values])).toEqual([['new_status', ['1', '2']], ['cr40f_cliente', [GUID]]])
+  })
+
+  it('(b) filtro de tabela relacionada usa o rótulo do catálogo; sem campo no catálogo, "Campo de tabela relacionada"', () => {
+    const related: CatalogField = { id: 'client', label: 'Nome', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }], type: 'String', available: true }
+    const xml = '<fetch><entity name="x"><link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" alias="a_1" link-type="inner"><filter type="and"><condition attribute="cr40f_nomedocliente" operator="like" value="%Exemplo%" /><condition attribute="cr40f_outro" operator="eq" value="Sul" /></filter></link-entity></entity></fetch>'
+    const labels = nativeLockedItems(xml, [...catalog, related]).map((item) => item.label)
+    expect(labels).toHaveLength(2)
+    expect(labels[0]).toMatch(/^(?!Campo de tabela relacionada).* contém .*Exemplo/)
+    expect(labels[1]).toBe('Campo de tabela relacionada igual a Sul')
+    expect(nativeLockedItems(xml, catalog).map((item) => item.label)).toEqual(['Campo de tabela relacionada contém "…Exemplo…"', 'Campo de tabela relacionada igual a Sul'])
+  })
+
+  it('(b) condição da raiz com entityname também é tabela relacionada', () => {
+    const xml = '<fetch><entity name="x"><link-entity name="cr40f_reservadeveculos" from="a" to="b" alias="a_1" link-type="inner" /><filter type="and"><condition entityname="a_1" attribute="cr40f_desconhecido" operator="eq" value="Sul" /></filter></entity></fetch>'
+    expect(nativeLockedItems(xml, catalog).map((item) => item.label)).toEqual(['Campo de tabela relacionada igual a Sul'])
+  })
+
+  it('(c) grupo com uma condição não escreve "todas estas:" nem "uma destas:"', () => {
+    const xml = '<fetch><entity name="x"><filter type="and"><filter type="or"><condition attribute="cr40f_regiao" operator="eq" value="Sul" /></filter><filter type="and"><condition attribute="cr40f_valor" operator="gt" value="1" /></filter></filter></entity></fetch>'
+    const labels = nativeLockedItems(xml, catalog).map((item) => item.label)
+    expect(labels).toEqual(['Região igual a Sul', 'Valor maior que 1'])
   })
 })
