@@ -1,4 +1,5 @@
 import { executeCustomApi } from "../../data/dataverse/customApi.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { cleanGuid, validateSignature, type SignatureStrokes } from "../comunicados/comunicados.ts";
 import { retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
@@ -286,7 +287,7 @@ export function createSingleFlight<T>(fn: () => Promise<T>) {
 
 // ---------------- Dados ----------------
 
-export const isMockTermos = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+export const isMockTermos = () => isMockRuntime();
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const mockParam = (name: string) => new URLSearchParams(window.location.search).get(name);

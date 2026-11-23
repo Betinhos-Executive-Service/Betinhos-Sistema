@@ -11,7 +11,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -85,6 +85,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'equipamentos', label: 'Equipamentos', page: 'equipamentos' },
       { kind: 'page', id: 'treinamentos', label: 'Treinamentos', page: 'treinamentos' },
       { kind: 'page', id: 'cartoes', label: 'Cartões corporativos', page: 'cartoes' },
+      { kind: 'page', id: 'app-motoristas', label: 'App Motoristas', page: 'app-motoristas' },
     ],
   },
   {
@@ -99,6 +100,7 @@ export const MENU: MenuGroup[] = [
       // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
+      { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.

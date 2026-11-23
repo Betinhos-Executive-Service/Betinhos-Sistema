@@ -1,4 +1,5 @@
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { canFetchOnDataverseHost, retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
 import { createFetchWebApi } from "../../data/dataverse/fetchWebApi.ts";
 
@@ -74,7 +75,7 @@ export type ChecklistDraft = {
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const cleanGuid = (value: string) => value.replace(/[{}]/g, "").toLowerCase();
-export const isMockChecklists = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+export const isMockChecklists = () => isMockRuntime();
 // Só no mock: `?mockChecklistFalha=foto` derruba um envio de foto sim, outro não (testa a retomada);
 // `?mockChecklistFalha=registro` derruba o registro final.
 export function mockChecklistFailure(search = globalThis.window?.location?.search ?? "") {

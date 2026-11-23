@@ -49,7 +49,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             ["new_veiculoatualdesde"] = since,
             ["new_infleetdriverid"] = infleetDriverId,
             ["cr40f_status"] = 0,
-            ["cr40f_tipodevinculo"] = 0
+            ["cr40f_tipodevinculo"] = new OptionSetValue(0)
         });
 
         public Entity User(string email) => Add(new Entity("systemuser") { ["internalemailaddress"] = email, ["isdisabled"] = false });

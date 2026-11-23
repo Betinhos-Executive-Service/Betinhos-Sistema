@@ -18,7 +18,8 @@ description: "Verifica a Tela Gerar Pagantes (apps/gerar-pagantes), o gerador de
 
 6. Destinatário: em `/?recordId=<guid>&demo=edit`, clicar em Trocar destinatário, digitar um e-mail inválido (erro) e um válido. O chip mostra o e-mail, aparece "Enviar também o recibo" marcado, e desmarcar mantém a linha como alterada.
 7. Pagante sem e-mail: em `/?recordId=<guid>&demo=edit`, adicionar uma pessoa sem e-mail. Em Trocar destinatário, o "Ou digite um e-mail" mostra "Usar e cadastrar" (primário, grava no cadastro ao salvar) e "Usar só neste envio" (secundário, não grava); nos dois casos o resumo não pergunta de novo. Sem informar nada e clicando em Gerar, o "Confirmar alterações" mostra "Pagantes sem e-mail no cadastro" com o campo vazio; e-mail inválido marcado bloqueia "Confirmar e salvar" até corrigir, limpar ou desmarcar. Destinatário cadastrado não é copiado; pagante quitado ou removido não aparece.
-8. Transformação dos flows: `node --test packages/deploy/flows/recibo-destinatario.test.mjs` e `powershell -File packages/deploy/provision-flow-recibo-destinatario.ps1 -SomenteValidar` (só leitura).
+8. Popup Gerar recibo (`cr40f_GerarRecibo.js`) com pagante sem e-mail: chamar `mostrarModalGaleria_GR` numa página com `Xrm.WebApi.updateRecord` simulado. "Salvar no cadastro" aparece desabilitado, habilita com e-mail válido, grava `cr40f_email` no destinatário do recibo (ou no passageiro) e o campo continua editável depois de gerar até salvar.
+9. Transformação dos flows: `node --test packages/deploy/flows/recibo-destinatario.test.mjs` e `powershell -File packages/deploy/provision-flow-recibo-destinatario.ps1 -SomenteValidar` (só leitura).
 
 ## Roteiro no DEV (sessão autenticada, só com o Deploy concluído)
 1. `Tela_GerarPagantes/index.html` com descrição `vX.Y.Z <sha>` da `develop`.

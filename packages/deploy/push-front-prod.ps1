@@ -2,7 +2,9 @@ param(
   [string] $AppDir = "apps/shell",
   [string] $ResourceName = "cr40f_SistemaBetinhos.html",
   [string] $DisplayName = "Sistema Betinhos",
-  [string] $LoaderName = "cr40f_SistemaBetinhosLoader.html"
+  [string] $LoaderName = "cr40f_SistemaBetinhosLoader.html",
+  # Hotfix da tela (hotfix-tela.yml): versao do DEV, para o hotfix numerar acima dela. Vazio = so a do PROD (producao.yml).
+  [string] $VersaoMinima = ""
 )
 
 # Caminho "front" do PROD (workflow Producao, so na main): compila a tela e atualiza os WebResources dela no PROD.
@@ -14,7 +16,7 @@ param(
 
 if ($PSVersionTable.PSEdition -eq "Core") {
   $windowsPowerShell = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
-  & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -AppDir $AppDir -ResourceName $ResourceName -DisplayName $DisplayName -LoaderName $LoaderName
+  & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -AppDir $AppDir -ResourceName $ResourceName -DisplayName $DisplayName -LoaderName $LoaderName -VersaoMinima $VersaoMinima
   exit $LASTEXITCODE
 }
 
@@ -56,6 +58,11 @@ if ($who.OrganizationId -ne $ProdOrgId) { throw "A API nao respondeu pela organi
 $publishedDescription = @((Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset?`$select=description&`$filter=name eq '$(Escape-OData $ResourceName)'" -Headers $headers).value | ForEach-Object { $_.description })
 if ($publishedDescription.Count -ne 1) { throw "$ResourceName ausente ou duplicado no PROD. Publique pelas solucoes primeiro." }
 $env:PUBLISHED_VERSION = if ($publishedDescription[0] -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { "" }
+if ($VersaoMinima) {
+  if ($VersaoMinima -notmatch '^v?(\d+\.\d+\.\d+)$') { throw "VersaoMinima invalida: $VersaoMinima" }
+  $minima = $Matches[1]
+  if (-not $env:PUBLISHED_VERSION -or [version] $minima -gt [version] $env:PUBLISHED_VERSION) { $env:PUBLISHED_VERSION = $minima }
+}
 Write-Step "versao publicada no PROD: $(if ($env:PUBLISHED_VERSION) { "v$env:PUBLISHED_VERSION" } else { 'desconhecida' })"
 Push-Location $appRoot
 try { & pnpm build; if ($LASTEXITCODE -ne 0) { throw "pnpm build falhou ($LASTEXITCODE)." } }

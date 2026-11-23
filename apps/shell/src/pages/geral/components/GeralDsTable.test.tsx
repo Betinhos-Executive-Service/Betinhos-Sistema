@@ -136,6 +136,36 @@ it('Sim/Não grava no clique do switch', () => {
   expect(save).toHaveBeenCalledWith('a', editCols[3], true)
 })
 
+it('Sim/Não passa por gravando e salvo como as outras células', () => {
+  const gravando = new Map<string, CellStatus>([['a|cr40f_receber', { kind: 'saving' }]])
+  montarEdicao(gravando)
+  const celulaSwitch = screen.getByRole('switch', { name: 'cr40f_receber' }).closest('[role="gridcell"]') as HTMLElement
+  expect(celulaSwitch.classList.contains('is-saving')).toBe(true)
+  expect(screen.getByRole('status', { name: 'Gravando' })).toBeTruthy()
+  cleanup()
+  montarEdicao(new Map<string, CellStatus>([['a|cr40f_receber', { kind: 'saved', at: 0 }]]))
+  const salva = screen.getByRole('switch', { name: 'cr40f_receber' }).closest('[role="gridcell"]') as HTMLElement
+  expect(salva.classList.contains('is-saved')).toBe(true)
+  expect(screen.getByRole('img', { name: 'Salvo' })).toBeTruthy()
+})
+
+it('Sim/Não: Enter abre o switch na célula e grava o valor trocado', () => {
+  const { save } = montarEdicao()
+  const alvo = screen.getByRole('switch', { name: 'cr40f_receber' }).closest('[role="gridcell"]') as HTMLElement
+  fireEvent.keyDown(alvo, { key: 'Enter' })
+  fireEvent.click(screen.getAllByRole('switch', { name: 'cr40f_receber' })[0])
+  expect(save).toHaveBeenCalledWith('a', editCols[3], true)
+})
+
+it('larguras como no grid próprio: Sim/Não 96 px e as demais, no mínimo 90 px', () => {
+  const estreitas = [col('cr40f_id', 72), col('cr40f_receber', 140)]
+  montar({ columns: estreitas, attributes, view: { config: { ...editConfig, columns: estreitas.map((c) => ({ key: c.key, visible: true })) }, setConfig: vi.fn(), density: 'dense' } as unknown as TableViewState, virtualKeys: new Set() })
+  const tabela = document.querySelector('.gr-ds') as HTMLElement
+  const trilhas = tabela.style.getPropertyValue('--bt-table-columns')
+  expect(trilhas).toContain('minmax(90px, 90fr)')
+  expect(trilhas).toMatch(/(^|\s)96px(\s|$)|minmax\(96px, 96fr\)/)
+})
+
 it('andamento da Geral vira o da célula do DS; erro com "Tentar de novo" limpa e regrava o último valor', () => {
   const cells = new Map<string, CellStatus>([['a|cr40f_trajeto', { kind: 'error', message: 'Sem permissão' }], ['a|cr40f_valor', { kind: 'saving' }]])
   const { save, reset } = montarEdicao(cells)

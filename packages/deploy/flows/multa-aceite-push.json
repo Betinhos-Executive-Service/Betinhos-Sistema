@@ -46,7 +46,7 @@
     },
     "Aceites_pendentes": {
       "runAfter": {
-        "Init_web_push_entregue": [
+        "Init_modulo_desligado": [
           "Succeeded"
         ]
       },
@@ -115,7 +115,11 @@
           },
           "actions": {
             "Zerar_web_push_entregue": {
-              "runAfter": {},
+              "runAfter": {
+                "Zerar_modulo_desligado": [
+                  "Succeeded"
+                ]
+              },
               "type": "SetVariable",
               "inputs": {
                 "name": "Web_Push_Entregue",
@@ -387,28 +391,103 @@
                 }
               },
               "runAfter": {
-                "Get_driver": [
-                  "Succeeded"
+                "Config_App": [
+                  "Succeeded",
+                  "Failed",
+                  "TimedOut"
                 ]
               },
               "else": {
                 "actions": {}
               },
               "expression": {
-                "not": {
-                  "equals": [
-                    "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
-                    true
-                  ]
-                }
+                "and": [
+                  {
+                    "not": {
+                      "equals": [
+                        "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
+                        true
+                      ]
+                    }
+                  },
+                  {
+                    "equals": [
+                      "@variables('Modulo_Desligado')",
+                      false
+                    ]
+                  }
+                ]
               },
               "type": "If"
+            },
+            "Zerar_modulo_desligado": {
+              "runAfter": {},
+              "type": "SetVariable",
+              "inputs": {
+                "name": "Modulo_Desligado",
+                "value": false
+              }
+            },
+            "Config_App": {
+              "runAfter": {
+                "Get_driver": [
+                  "Succeeded"
+                ]
+              },
+              "type": "Scope",
+              "actions": {
+                "Config_efetiva": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "PerformUnboundAction",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "actionName": "cr40f_AppConfigEfetiva",
+                      "item/Funcionario": "@items('Aceite_cada')?['_cr40f_motorista_value']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Set_modulo_desligado": {
+                  "runAfter": {
+                    "Config_efetiva": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "SetVariable",
+                  "inputs": {
+                    "name": "Modulo_Desligado",
+                    "value": "@equals(json(coalesce(outputs('Config_efetiva')?['body/Resultado'], '{}'))?['chaves']?['multas'], false)"
+                  }
+                }
+              }
             }
           },
           "else": {
             "actions": {}
           }
         }
+      }
+    },
+    "Init_modulo_desligado": {
+      "runAfter": {
+        "Init_web_push_entregue": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Modulo_Desligado",
+            "type": "boolean",
+            "value": false
+          }
+        ]
       }
     }
   },

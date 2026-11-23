@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mockup — Configuração do App Motoristas</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #001a35; --navy-app: #001a3d; --gold: #cfa85d; --ink: #1d1d1b;
+    --bg: #f5f5f2; --surface: #ffffff; --border: #e2e2dc; --border-strong: #cfcfc7;
+    --muted: #6b7280; --soft: #f0f0ec; --warn-bg: #fbf1d9; --warn: #956400; --info: #1f6c9f; --ok: #346538;
+  }
+  * { box-sizing: border-box; font-family: "Manrope", Arial, sans-serif; }
+  html, body { margin: 0; width: 1440px; height: 960px; background: var(--bg); color: var(--ink); font-size: 13px; overflow: hidden; }
+  svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+  .app { display: grid; grid-template-columns: 216px 1fr 392px; grid-template-areas: "nav main preview"; height: 960px; }
+
+  /* sidebar */
+  .nav { grid-area: nav; background: var(--navy); color: #c9d2de; padding: 18px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { color: #fff; font-weight: 800; font-size: 15px; padding: 2px 8px 14px; display: flex; align-items: center; gap: 8px; }
+  .brand b { width: 22px; height: 22px; border-radius: 6px; background: var(--gold); display: inline-block; }
+  .grp { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #7f8ea3; padding: 14px 8px 6px; font-weight: 700; }
+  .it { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; font-weight: 600; }
+  .it.on { background: rgba(255,255,255,.12); color: #fff; }
+  .ver { margin-top: auto; font-size: 10.5px; color: #6f7f95; padding: 0 8px; }
+
+  /* main */
+  .main { grid-area: main; padding: 26px 28px 0; display: flex; flex-direction: column; min-width: 0; }
+  h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 27px; color: var(--navy); letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin-top: 4px; font-size: 13px; }
+  .tabs { display: flex; gap: 22px; margin-top: 18px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 9px 0; font-weight: 700; color: var(--muted); }
+  .tab.on { color: var(--navy); box-shadow: inset 0 -2px 0 var(--navy); }
+  .tab small { font-weight: 700; background: var(--soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; color: var(--muted); }
+
+  .card { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,26,53,.04); }
+  .row { display: grid; grid-template-columns: 1fr 150px 150px 150px; align-items: center; min-height: 40px; border-top: 1px solid #eeeee9; }
+  .row.head { min-height: 68px; border-top: 0; background: #fafaf8; align-items: stretch; }
+  .head > div { padding: 11px 0 10px; }
+  .head .hmod { padding-left: 16px; display: flex; align-items: flex-end; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .ph { text-align: center; }
+  .ph b { display: block; font-size: 13.5px; color: var(--navy); }
+  .ph span { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .ph em { display: block; font-style: normal; font-size: 10.5px; color: #8a8f98; margin-top: 3px; }
+  .mod { display: flex; align-items: center; gap: 10px; padding-left: 16px; font-weight: 700; color: var(--navy); min-width: 0; }
+  .mod .ic { width: 26px; height: 26px; border-radius: 8px; background: rgba(0,26,53,.06); display: grid; place-items: center; color: var(--navy); }
+  .mod.child { padding-left: 52px; font-weight: 600; color: #33415a; }
+  .mod.child .ic { width: 22px; height: 22px; background: transparent; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+  .tag svg.i { width: 11px; height: 11px; }
+  .tag.sens { background: #eaf2f8; color: var(--info); }
+  .cell { display: grid; place-items: center; height: 100%; }
+  .cellin { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 999px; }
+  .cellin.chg { background: var(--warn-bg); }
+  .cellin.chg i { font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--warn); }
+  .tg { width: 34px; height: 20px; border-radius: 999px; background: #c9ccd2; position: relative; }
+  .tg::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .tg.on { background: var(--navy); }
+  .tg.on::after { left: 16px; }
+  .tg.lock { opacity: .45; }
+
+  .bar { margin: 14px 0 18px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 6px 18px rgba(0,26,53,.08); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+  .bar b { color: var(--navy); } .bar > div { white-space: nowrap; }
+  .bar span { color: var(--muted); }
+  .sp { flex: 1; }
+  .btn { white-space: nowrap; padding: 8px 14px; border-radius: 9px; font-weight: 700; border: 1px solid var(--border-strong); background: #fff; color: var(--navy); }
+  .btn.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  /* preview */
+  .preview { grid-area: preview; background: #ecece7; border-left: 1px solid var(--border); padding: 22px 22px 0; display: flex; flex-direction: column; align-items: center; }
+  .pvh { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+  .pvh b { font-size: 14px; color: var(--navy); }
+  .seg { display: inline-flex; background: #dcdcd5; border-radius: 9px; padding: 3px; font-weight: 700; font-size: 12px; }
+  .seg span { padding: 5px 11px; border-radius: 7px; color: #5b6472; }
+  .seg span.on { background: #fff; color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .ctl { width: 100%; display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .sel { flex: 1; background: #fff; border: 1px solid var(--border-strong); border-radius: 9px; padding: 7px 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--navy); }
+  .sel small { color: var(--muted); font-weight: 600; }
+
+  .phone { margin-top: 16px; width: 296px; height: 612px; border-radius: 40px; background: #0b0f16; padding: 9px; box-shadow: 0 18px 40px rgba(0,26,53,.25); position: relative; }
+  .phone::before { content: ""; position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: 84px; height: 20px; border-radius: 999px; background: #0b0f16; z-index: 2; }
+  .scr { width: 100%; height: 100%; border-radius: 32px; background: #fcfcfb; color: #000e23; padding: 46px 14px 14px; display: flex; flex-direction: column; overflow: hidden; }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .kick { color: #687789; font-weight: 600; font-size: 11.5px; }
+  .top h2 { margin: 0; font-size: 18px; font-weight: 800; line-height: 1.1; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--navy-app); display: grid; place-items: center; color: var(--gold); font-weight: 800; font-size: 14px; }
+  .prim { margin-top: 14px; background: var(--navy-app); color: #fff; border-radius: 18px; padding: 13px; display: flex; align-items: center; gap: 11px; box-shadow: 0 12px 28px rgba(0,26,61,.22); }
+  .prim .m { width: 40px; height: 40px; border-radius: 13px; background: #fff; color: #000e23; display: grid; place-items: center; }
+  .prim .m svg.i { width: 20px; height: 20px; }
+  .prim b { display: block; font-size: 14.5px; }
+  .prim span { font-size: 11.5px; opacity: .8; }
+  .pend { margin-top: 10px; border: 1px solid rgba(0,14,35,.1); border-radius: 14px; background: #fff; padding: 8px 11px; display: grid; gap: 6px; font-size: 11.5px; font-weight: 600; }
+  .pend div { display: flex; align-items: center; gap: 7px; }
+  .pend u { width: 7px; height: 7px; border-radius: 50%; background: #c8102e; }
+  .tiles { margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .tile { background: #fff; border: 1px solid rgba(0,14,35,.1); border-radius: 16px; padding: 9px 3px; display: grid; justify-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,14,35,.06), 0 6px 16px rgba(0,14,35,.07); }
+  .tile .ti { width: 36px; height: 36px; border-radius: 12px; background: rgba(0,26,61,.06); color: var(--navy-app); display: grid; place-items: center; }
+  .tile .ti svg.i { width: 19px; height: 19px; }
+  .tile span { font-size: 10.5px; font-weight: 800; text-align: center; line-height: 1.15; }
+  .appver { margin-top: auto; text-align: center; font-size: 9.5px; color: #9aa3b0; }
+
+  .hid { width: 100%; margin-top: 14px; font-size: 11.5px; color: #4f5866; line-height: 1.7; }
+  .hid b { color: var(--navy); }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #dcdcd5; font-weight: 700; margin: 0 3px 3px 0; }
+  .chip.d { background: var(--warn-bg); color: var(--warn); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="services" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="comunicados" viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/></symbol>
+    <symbol id="checklists" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+    <symbol id="multas" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M12 10v4M12 17h.01"/></symbol>
+    <symbol id="treinamentos" viewBox="0 0 24 24"><path d="m2 9 10-5 10 5-10 5z"/><path d="M6 11.5V16c2 2 10 2 12 0v-4.5"/></symbol>
+    <symbol id="postosProximos" viewBox="0 0 24 24"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h12M6 8h6"/><path d="M14 10h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3"/></symbol>
+    <symbol id="maintenancePhoto" viewBox="0 0 24 24"><path d="M15 5a4 4 0 0 0 4.9 4.9L10 20a2.1 2.1 0 0 1-3-3l10-9.9A4 4 0 0 0 15 5z"/></symbol>
+    <symbol id="expenses" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+    <symbol id="collisions" viewBox="0 0 24 24"><path d="M4 17v-3l2-5a2 2 0 0 1 2-1.3h8A2 2 0 0 1 18 9l2 5v3z"/><circle cx="8" cy="17" r="1.5"/><circle cx="16" cy="17" r="1.5"/></symbol>
+    <symbol id="minhaNota" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8z"/></symbol>
+    <symbol id="ideas" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="qr" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"/></symbol>
+    <symbol id="recibo" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M9 12h6M9 16h6"/></symbol>
+    <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6"/></symbol>
+    <symbol id="car" viewBox="0 0 24 24"><path d="M4 17v-3l2-5a2 2 0 0 1 2-1.3h8A2 2 0 0 1 18 9l2 5v3z"/><circle cx="8" cy="17" r="1.5"/><circle cx="16" cy="17" r="1.5"/></symbol>
+    <symbol id="key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/></symbol>
+    <symbol id="phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/></symbol>
+    <symbol id="grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="nav">
+    <div class="brand"><b></b>Betinhos</div>
+    <div class="grp">Operacional</div>
+    <div class="it"><svg class="i"><use href="#grid"/></svg>Resumo</div>
+    <div class="it"><svg class="i"><use href="#checklists"/></svg>Planner</div>
+    <div class="it"><svg class="i"><use href="#ideas"/></svg>Projetos</div>
+    <div class="grp">Cadastros</div>
+    <div class="it"><svg class="i"><use href="#users"/></svg>Funcionários</div>
+    <div class="it"><svg class="i"><use href="#car"/></svg>Veículos</div>
+    <div class="it"><svg class="i"><use href="#key"/></svg>Acessos</div>
+    <div class="it on"><svg class="i"><use href="#phone"/></svg>App Motoristas</div>
+    <div class="ver">v0.0.0 · 23/11/2026 12:00</div>
+  </aside>
+
+  <main class="main">
+    <h1>App Motoristas</h1>
+    <div class="sub">O que cada perfil de motorista vê no App. As mudanças só valem depois de publicar.</div>
+    <div class="tabs">
+      <div class="tab on">Perfis</div>
+      <div class="tab">Motoristas <small>4 exceções</small></div>
+      <div class="tab">Histórico</div>
+    </div>
+
+    <div class="card" id="matriz"></div>
+
+    <div class="bar">
+      <span class="dot"></span>
+      <div><b>Rascunho com 3 mudanças</b> <span>· Renan, 11:32 · no ar: versão 7</span></div>
+      <div class="sp"></div>
+      <div class="btn">Descartar rascunho</div>
+      <div class="btn pri">Publicar…</div>
+    </div>
+  </main>
+
+  <aside class="preview">
+    <div class="pvh"><b>Preview do App</b><span class="tag">Dados de exemplo</span></div>
+    <div class="ctl">
+      <div class="seg"><span class="on">Perfil</span><span>Motorista</span></div>
+      <div class="sel">Terceiro <svg class="i"><use href="#chev"/></svg></div>
+    </div>
+    <div class="ctl" style="justify-content:space-between">
+      <div class="seg"><span class="on">Rascunho</span><span>Publicado</span></div>
+      <span style="color:#5b6472;font-size:11.5px;font-weight:600">2 diferenças do publicado</span>
+    </div>
+
+    <div class="phone"><div class="scr">
+      <div class="top">
+        <div><div class="kick">Olá,</div><h2>Motorista Exemplo</h2></div>
+        <div class="logo">B</div>
+      </div>
+      <div class="prim">
+        <div class="m"><svg class="i"><use href="#services"/></svg></div>
+        <div><b>Serviços</b><span>2 serviços hoje · próximo às 14:30</span></div>
+      </div>
+      <div class="pend">
+        <div><u></u>1 checklist para responder</div>
+        <div><u></u>1 treinamento novo</div>
+      </div>
+      <div class="tiles" id="tiles"></div>
+      <div class="appver">v2.1.930 · preview</div>
+    </div></div>
+
+    <div class="hid">
+      <b>Oculto para Terceiro:</b><br>
+      <span class="chip">Multas</span><span class="chip">Cobrar por QR</span><span class="chip">Recibo personalizado</span><span class="chip d">Gastos · rascunho</span><span class="chip d">Minha nota · rascunho</span>
+    </div>
+  </aside>
+</div>
+
+<script>
+  // [chave, rótulo, ícone, tipo, rascunho[proprio,terceiro], publicado[proprio,terceiro]]
+  const L = [
+    ['services', 'Serviços', 'services', 'fixo', [1,1], [1,1]],
+    ['qr', 'Cobrar por QR', 'qr', 'filho', [0,0], [0,0]],
+    ['recibo', 'Recibo personalizado', 'recibo', 'filho', [0,0], [0,0]],
+    ['comunicados', 'Comunicados', 'comunicados', 'fixo', [1,1], [1,1]],
+    ['history', 'Histórico', 'history', '', [1,1], [1,1]],
+    ['checklists', 'Checklist', 'checklists', '', [1,1], [1,1]],
+    ['multas', 'Multas', 'multas', 'sens', [1,0], [0,0]],
+    ['treinamentos', 'Treinamentos', 'treinamentos', '', [1,1], [1,1]],
+    ['postosProximos', 'Postos próximos', 'postosProximos', '', [1,1], [1,1]],
+    ['maintenancePhoto', 'Manutenção', 'maintenancePhoto', '', [1,1], [1,1]],
+    ['expenses', 'Gastos', 'expenses', '', [1,0], [1,1]],
+    ['collisions', 'Colisões', 'collisions', '', [1,1], [1,1]],
+    ['minhaNota', 'Minha nota', 'minhaNota', '', [1,0], [1,1]],
+    ['ideas', 'Boas ideias', 'ideas', '', [1,1], [1,1]],
+  ];
+  const ic = (id) => `<svg class="i"><use href="#${id}"/></svg>`;
+  const tg = (on, lock) => `<span class="tg ${on ? 'on' : ''} ${lock ? 'lock' : ''}"></span>`;
+  let h = `<div class="row head">
+    <div class="hmod">Módulo ou função</div>
+    <div class="ph"><b>Próprio</b><span>18 motoristas</span><em>histórico de 5 dias</em></div>
+    <div class="ph"><b>Terceiro</b><span>41 motoristas</span><em>45 dias · carro pela posse</em></div>
+    <div class="ph"><b>Admin</b><span>3 no grupo piloto</span><em>sempre tudo ligado</em></div>
+  </div>`;
+  for (const [, label, icon, tipo, r, p] of L) {
+    const fixo = tipo === 'fixo';
+    const tag = fixo ? `<span class="tag">${ic('lock')}sempre ligado</span>`
+      : (tipo === 'sens' || tipo === 'filho') ? `<span class="tag sens">servidor recusa</span>` : '';
+    const cel = (i) => {
+      const mudou = r[i] !== p[i];
+      return `<div class="cell"><span class="cellin ${mudou ? 'chg' : ''}">${tg(r[i], fixo)}${mudou ? `<i>era ${p[i] ? 'ligado' : 'desligado'}</i>` : ''}</span></div>`;
+    };
+    h += `<div class="row">
+      <div class="mod ${tipo === 'filho' ? 'child' : ''}"><span class="ic">${ic(icon)}</span>${label}${tag}</div>
+      ${cel(0)}${cel(1)}
+      <div class="cell"><span class="cellin">${tg(1, true)}</span></div>
+    </div>`;
+  }
+  document.getElementById('matriz').innerHTML = h;
+
+  const grade = L.filter(([k, , , tipo, r]) => k !== 'services' && tipo !== 'filho' && r[1]);
+  document.getElementById('tiles').innerHTML = grade
+    .map(([, label, icon]) => `<div class="tile"><span class="ti">${ic(icon)}</span><span>${label}</span></div>`).join('');
+</script>
+</body>
+</html>

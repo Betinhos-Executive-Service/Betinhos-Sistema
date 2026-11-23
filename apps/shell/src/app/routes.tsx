@@ -31,6 +31,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   despesas: () => import('../pages/despesas/DespesasPage').then((m) => m.DespesasPage),
   documentos: () => import('../pages/documentos/DocumentosPage').then((m) => m.DocumentosPage),
   equipamentos: () => import('../pages/equipamentos/EquipamentosPage').then((m) => m.EquipamentosPage),
+  projetos: () => import('../pages/projetos/ProjetosPage').then((m) => m.ProjetosPage),
   clientes: () => import('../pages/clientes/ClientesPage').then((m) => m.ClientesPage),
   comunicados: () => import('../pages/comunicados/ComunicadosPage').then((m) => m.ComunicadosPage),
   agentes: () => import('../pages/agentes/AgentesPage').then((m) => m.AgentesPage),
@@ -45,6 +46,7 @@ export const PAGE_LOADERS: Record<PageId, () => Promise<ComponentType<PageProps>
   composicao: () => import('../pages/composicao/ComposicaoPage').then((m) => m.ComposicaoPage),
   cartoes: () => import('../pages/cartoes/CartoesPage').then((m) => m.CartoesPage),
   'rh-descontos': () => import('../pages/rh-descontos/RhDescontosPage').then((m) => m.RhDescontosPage),
+  'app-motoristas': () => import('../pages/app-motoristas/AppMotoristasPage').then((m) => m.AppMotoristasPage),
 }
 
 const pending = new Map<PageId, Promise<ComponentType<PageProps>>>()

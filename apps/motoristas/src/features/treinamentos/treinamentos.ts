@@ -1,4 +1,5 @@
 import { cleanGuid, GUID_PATTERN, validateSignature, type SignatureStrokes } from "../comunicados/comunicados.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { retrieveMultiple, updateOne } from "../../data/dataverse/cliente.ts";
 import { reportAppError } from "../../shared/appErrorLogger.ts";
@@ -50,7 +51,7 @@ export type Participacao = {
 /** Um treinamento como o motorista vê: o conteúdo e a participação dele. */
 export type TreinamentoMotorista = { treinamento: Treinamento; participacao: Participacao };
 
-export const isMockTreinamentos = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+export const isMockTreinamentos = () => isMockRuntime();
 
 // ---------------- Leitura dos registros ----------------
 

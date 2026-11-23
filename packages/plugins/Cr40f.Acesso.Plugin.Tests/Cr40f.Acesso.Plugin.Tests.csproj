@@ -12,6 +12,10 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Mesmos casos do pacote TypeScript (packages/app-config): a paridade TS/C# sai deste arquivo. -->
+    <Content Include="..\..\app-config\casos.json" Link="casos.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Cr40f.Acesso.Plugin\Cr40f.Acesso.Plugin.csproj" />
   </ItemGroup>
 </Project>

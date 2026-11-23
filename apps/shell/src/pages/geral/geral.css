@@ -359,3 +359,10 @@
 .gr-card.gr-card--manutencao:not(.is-selected) { background-color: color-mix(in srgb, var(--bt-color-warning-soft) 55%, var(--bt-color-surface)); }
 .gr-manut-chave { display: inline-flex; flex: 0 0 auto; align-items: center; }
 .gr-manut-chave--celular { padding: 0 var(--bt-space-1) var(--bt-space-2); }
+
+/* Geral no Table do DS (?tabela=ds): a largura da coluna vale a célula inteira, como no grid próprio (a do DS é só o conteúdo e
+   soma o espaço entre colunas, 12 px a mais por coluna, mais o respiro das bordas). Sem espaço entre colunas, a linha divisória
+   cai na beira da célula e o respiro volta como padding da célula. Seleção e chevron mantêm o desenho do DS. */
+.bt-table.gr-ds { --bt-table-gap: 0px; --bt-table-pad: 0px; }
+.bt-table.gr-ds .bt-table__cell:not(.bt-table__cell--select) { padding-inline: var(--bt-space-3); }
+.bt-table.gr-ds .bt-table__headcell { padding-right: var(--bt-space-3); }

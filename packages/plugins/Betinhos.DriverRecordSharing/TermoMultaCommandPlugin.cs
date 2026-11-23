@@ -77,6 +77,7 @@ namespace Betinhos.DriverRecordSharing
         // criam e lançam as parcelas do Acertar -> folha (RH bloco 1).
         private static readonly string[] Apis = { "new_EnviarTermoMulta", "new_AssinarTermoMulta", "new_ContestarTermoMulta", "new_CancelarTermoMulta", "new_ExpirarTermoMulta", "new_LembrarTermoMulta", "cr40f_PassoMulta", "cr40f_LancarDescontoFolha" };
         private const string NaoESeu = "Este termo não é seu.";
+        private const string MultasDesligado = "Multas não está disponível no seu App no momento. Procure o escritório.";
         private const string PrivilegioGestor = "prvCreatenew_TermoMulta";
         private const string CadastroDuplicado = "Seu cadastro está duplicado. Procure o escritório.";
         private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
@@ -395,6 +396,7 @@ namespace Betinhos.DriverRecordSharing
             var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
             var dono = termo.GetAttributeValue<EntityReference>("new_motorista");
             if (!EhDono(driver, dono)) throw new InvalidPluginExecutionException(NaoESeu);
+            ExigirMultas(system, driver.EmployeeReference.Id);
             if (Choice(termo, "new_status") != Pendente)
                 throw new InvalidPluginExecutionException("Este termo não está mais pendente.");
             return termo;
@@ -530,6 +532,14 @@ namespace Betinhos.DriverRecordSharing
             var multa = system.Retrieve(Multa, multaRef.Id, new ColumnSet("new_termovigente"));
             if (multa.GetAttributeValue<EntityReference>("new_termovigente")?.Id == id)
                 system.Update(new Entity(Multa, multaRef.Id) { ["new_termovigente"] = null });
+        }
+
+        // Configuração do App (fase B2): com o módulo "multas" desligado para o motorista, o servidor recusa mesmo que o App antigo chame.
+        // Falha de leitura da configuração não é engolida: sem a regra, o sensível não abre.
+        private void ExigirMultas(IOrganizationService system, Guid funcionarioId)
+        {
+            if (!new AppConfigLeitor(system, clock).Ligado(funcionarioId, AppConfigLeitor.ChaveMultas))
+                throw new InvalidPluginExecutionException(MultasDesligado);
         }
 
         private static bool EhDono(ResolvedDriver driver, EntityReference dono) =>
@@ -720,6 +730,7 @@ namespace Betinhos.DriverRecordSharing
             var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
             RecusarSeDuplicado(system, driver, tracing);
             if (driver?.EmployeeReference == null) { context.OutputParameters["new_MultasJson"] = "[]"; return; }
+            ExigirMultas(system, driver.EmployeeReference.Id);
 
             var query = new QueryExpression(Multa)
             {
@@ -816,6 +827,7 @@ namespace Betinhos.DriverRecordSharing
             var driver = new DriverResolver(system, tracing ?? NullTrace.Instance).ResolveFromUser(new EntityReference("systemuser", context.InitiatingUserId));
             RecusarSeDuplicado(system, driver, tracing);
             if (!EhDono(driver, multa.GetAttributeValue<EntityReference>("cr40f_motorista"))) throw new InvalidPluginExecutionException("Esta multa não é sua.");
+            ExigirMultas(system, driver.EmployeeReference.Id);
             if (multa.GetAttributeValue<DateTime?>("cr40f_aceitedeclaradoem") != null) return;
             if (!AceitePendente(multa)) throw new InvalidPluginExecutionException("Esta multa não espera o aceite na CNH Digital.");
             system.Update(new Entity(Multa, multa.Id) { ["cr40f_aceitedeclaradoem"] = TimeZoneInfo.ConvertTimeFromUtc(clock(), SaoPaulo()).Date });

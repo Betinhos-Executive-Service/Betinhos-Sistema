@@ -68,3 +68,6 @@ A suíte inteira (`npx vitest run` em `apps/shell`) também deve ficar verde: o 
 
 ## Não verificável na nuvem
 Tudo que toca Dataverse, conector ou API: só local, com o DEV.
+
+## Configuração do App (fase B2)
+- O flow diário chama `cr40f_AppConfigEfetiva` por motorista (`Config_efetiva` em `Cada_motorista`) e só manda o push de gastos do cartão com `expenses` ligado; falha na leitura envia como antes (o foreach pode marcar `Houve_erro`). Teste: `node --test packages/deploy/flows/conciliacao-cartao-diario.test.mjs`. No DEV: exceção `expenses` `Ligado=false` num motorista com gasto pendente e conferir que não há push.

@@ -1,3 +1,5 @@
+// Primeiro: em ?preview=1 isola o armazenamento antes de qualquer outro módulo ler localStorage/indexedDB.
+import "./shared/previewIsolamento";
 import React from "react";
 import * as ReactDOM from "react-dom";
 import App from "./App";

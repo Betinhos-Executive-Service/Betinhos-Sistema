@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
-  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
+  FileText, FolderCheck, FolderCog, FolderKanban, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
+  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Smartphone, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
@@ -43,6 +43,8 @@ type Props = {
   connection: { ok: boolean; text: string }
   /** Contador por id de item do menu (ex.: `documentos`). */
   badges?: Record<string, ReactNode>
+  /** Ids de itens do menu que o usuário não pode abrir (ex.: `app-motoristas` sem a função de gestor): somem da navegação. */
+  ocultos?: readonly string[]
   /** A tela ativa pede a navegação recolhida no trilho (grades largas), se o usuário não escolheu outra coisa. */
   defaultCollapsed?: boolean
   children: ReactNode
@@ -97,6 +99,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   new_curriculo: <ScrollText />,
   curriculos: <ScrollText />,
   equipamentos: <Laptop />,
+  projetos: <FolderKanban />,
   treinamentos: <GraduationCap />,
   'rh-descontos': <HandCoins />,
   new_marketing: <Megaphone />,
@@ -104,6 +107,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   cr40f_categoriadespesaoperacional: <Tag />,
   'despesas-operacionais': <ReceiptText />,
   cartoes: <CreditCard />,
+  'app-motoristas': <Smartphone />,
   cr40f_formapagamentodespesa: <Wallet />,
   comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,
@@ -112,7 +116,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
 }
 
 /** Traduz o sitemap do app para a navegação do AppShell do Design System. */
-function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>): NavGroup {
+function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?: Record<string, ReactNode>, ocultos?: readonly string[]): NavGroup {
   if (group.link) {
     const [item] = group.items
     return { id: item.id, label: itemLabel(item, entityLabels), icon: ITEM_ICONS[item.id], href: hrefFor(item.id), items: [] }
@@ -122,7 +126,7 @@ function toNavGroup(group: MenuGroup, entityLabels: Map<string, string>, badges?
     label: group.label,
     icon: GROUP_ICONS[group.id],
     admin: group.id === 'back-end',
-    items: group.items.map((item) => ({
+    items: group.items.filter((item) => !ocultos?.includes(item.id)).map((item) => ({
       id: item.id,
       label: itemLabel(item, entityLabels),
       href: hrefFor(item.id),
@@ -146,7 +150,7 @@ function useShellQuery(chave: string) {
 }
 
 /** Chrome persistente do Sistema Betinhos: AppShell do pacote alimentado pelo sitemap e pelo estado de conexão. */
-export function AppShell({ activeId, title, entityLabels, connection, badges, defaultCollapsed, children }: Props) {
+export function AppShell({ activeId, title, entityLabels, connection, badges, ocultos, defaultCollapsed, children }: Props) {
   const install = useInstallPrompt()
   // Gaveta do menu no celular e busca de telas também vivem na URL (`menu=1`, `busca=…`).
   const [menu, setMenu] = useShellQuery('menu')
@@ -160,7 +164,7 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, de
     setSearch('')
   }, [activeId, setSearch])
   // Grupos estáveis entre renders: sem isto o menu inteiro (ícones e filtro da busca) era refeito a cada render do shell.
-  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges)), [entityLabels, badges])
+  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges, ocultos)), [entityLabels, badges, ocultos])
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', logo: <img src={BRAND_LOGO} alt="" />, href: hrefFor(MENU[0].items[0].id) }}

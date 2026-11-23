@@ -15,6 +15,36 @@ namespace Betinhos.DriverRecordSharing.Tests
         // ---------- criar ----------
 
         [Fact]
+        public void CriarLiberadoPelaMatrizDaConfiguracaoSemColunaLegada()
+        {
+            var world = new World(canCharge: false);
+            world.Service.Rows("cr40f_appconfigversao").Add(new Entity("cr40f_appconfigversao", Guid.NewGuid())
+            {
+                ["cr40f_numero"] = 1, ["cr40f_estado"] = new OptionSetValue(100000001), ["cr40f_conteudo"] = "{\"proprio\":{\"services.qrCharge\":true},\"terceiro\":{}}"
+            });
+
+            var result = world.Run(world.CreateCommand(38000));
+
+            Assert.DoesNotContain("Você não está liberado", result);
+        }
+
+        [Fact]
+        public void CriarComColunaLegadaSimMasExcecaoDesligandoRecusaSemChamarStripe()
+        {
+            var world = new World(canCharge: true);
+            world.Service.Rows("cr40f_appconfigpessoa").Add(new Entity("cr40f_appconfigpessoa", Guid.NewGuid())
+            {
+                ["cr40f_funcionario"] = world.Driver.ToEntityReference(), ["cr40f_tipo"] = new OptionSetValue(100000000),
+                ["cr40f_chave"] = "services.qrCharge", ["cr40f_ligado"] = false, ["createdon"] = Now.AddDays(-1)
+            });
+
+            var result = world.Run(world.CreateCommand(38000));
+
+            Assert.Equal("Você não está liberado para cobrar por QR code.", Erro(result));
+            Assert.Empty(world.Stripe.Posts);
+        }
+
+        [Fact]
         public void CriarSemPermissaoDevolveErroSemChamarStripe()
         {
             var world = new World(canCharge: false);

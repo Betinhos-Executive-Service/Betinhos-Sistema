@@ -5,6 +5,7 @@ import icon512 from "../assets/pwa/icon-512.png";
 import iconMaskable512 from "../assets/pwa/icon-maskable-512.png";
 import appleTouch180 from "../assets/pwa/apple-touch-180.png";
 
+import { isPreviewMode } from "../shared/modoPreview.ts";
 import { buildManifest, isPwaContext, PWA_SW_NAME, THEME_COLOR } from "./pwaManifest.ts";
 
 function addHead(tag: string, attrs: Record<string, string>) {
@@ -14,7 +15,7 @@ function addHead(tag: string, attrs: Record<string, string>) {
 }
 
 export function installPwa() {
-  if (!isPwaContext()) return;
+  if (isPreviewMode() || !isPwaContext()) return;
   const { origin, pathname } = window.location;
 
   const manifest = buildManifest(origin, pathname, { icon192, icon512, iconMaskable512 });

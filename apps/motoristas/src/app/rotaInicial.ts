@@ -8,6 +8,11 @@ export function findDetailFromHashRoute(store: LocalStore, route: HashRoute | nu
   return findDetailByParams([...store.agenda, ...store.history], route.detailId, route.detailType ?? "");
 }
 
+/** Tela pedida por rota ou link que o motorista não pode usar (módulo desligado na configuração do App) cai no Início. */
+export function telaPermitida(tela: Screen, telaLigada: (tela: Screen) => boolean): Screen {
+  return telaLigada(tela) ? tela : "inicio";
+}
+
 export function getInitialScreenFromHashRoute(route: HashRoute, detail: DetailData | null): Screen {
   const restoredScreen = getHashRouteRestoreScreen(route.screen);
   if (screenNeedsHashDetail(restoredScreen) && !detail) {

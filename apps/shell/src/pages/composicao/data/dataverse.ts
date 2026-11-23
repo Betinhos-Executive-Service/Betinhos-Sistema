@@ -1,5 +1,6 @@
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FORMULA_ENGINE_VERSION, FormulaError } from '../formula'
 import type { ViewQuery } from './views'
+import { expandLinkAliases, prepareFetchXml, removedLinksNotice, type RemovedLink } from '../../../app/fetchLinks'
 import { buildCountQuery, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withLinkKeys, withRowLinks, withoutRowLinks } from './composition-query'
 import { isWritableMoneyField, moneyFields, type ApplyCellInputResult, type CellFormula, type CellInput, type Composition, type DecimalString, type MoneyField } from './compositions'
 import { getMockRows, saveMockCell } from './mock-store'
@@ -157,6 +158,8 @@ export type CompositionPage = {
   nextLink: string | null
   /** false quando o usuário não lê reserva ou cliente e a página veio pela leitura em lote. */
   rowLinks?: boolean
+  /** Colunas de outras tabelas que voltaram vazias porque a view passa do limite de 15 vínculos do Dataverse. */
+  aviso?: string
   /** Fórmulas das células por composição: chegam depois da página e não bloqueiam a grade. Rejeita só para quem aguarda. */
   formulas: Promise<FormulaMap>
 }
@@ -196,13 +199,32 @@ function reservationFromLinks(row: DataverseEntity): DataverseEntity {
 type RowQuery = { entities: DataverseEntity[]; nextLink?: string; fetchXmlPagingCookie?: string }
 
 /** Consulta FetchXML com os vínculos da linha; sem privilégio na reserva ou no cliente, o Dataverse recusa tudo e a consulta se repete sem eles. */
-async function retrieveWithRowLinks(api: XrmWebApi, query: string): Promise<{ result: RowQuery; query: string; linked: boolean }> {
-  const linked = query.startsWith('?fetchXml=') && decodeURIComponent(query.slice('?fetchXml='.length)).includes(`alias="${ROW_LINKS.reserva}"`)
-  try { return { result: await api.retrieveMultipleRecords(compositionTable, query), query, linked } }
+async function retrieveWithRowLinks(api: XrmWebApi, query: string): Promise<{ result: RowQuery; query: string; linked: boolean; removed: RemovedLink[] }> {
+  try { return await retrievePrepared(api, query) }
   catch (error) {
-    if (!linked || !isPrivilegeDenied(error)) throw error
-    const plain = `?fetchXml=${encodeURIComponent(withoutRowLinks(decodeURIComponent(query.slice('?fetchXml='.length))))}`
-    return { result: await api.retrieveMultipleRecords(compositionTable, plain), query: plain, linked: false }
+    if (!query.startsWith('?fetchXml=') || !isPrivilegeDenied(error)) throw error
+    const source = decodeURIComponent(query.slice('?fetchXml='.length))
+    if (!source.includes(`alias="${ROW_LINKS.reserva}"`)) throw error
+    return retrievePrepared(api, `?fetchXml=${encodeURIComponent(withoutRowLinks(source))}`)
+  }
+}
+
+/**
+ * Envia o FetchXML dentro do limite de 15 link-entity (ver `prepareFetchXml`) e devolve as linhas com os aliases originais.
+ * Se o limite só cabe sem os vínculos da linha, a consulta segue sem eles (`linked: false`) e a reserva vem em lotes.
+ */
+async function retrievePrepared(api: XrmWebApi, query: string): Promise<{ result: RowQuery; query: string; linked: boolean; removed: RemovedLink[] }> {
+  if (!query.startsWith('?fetchXml=')) return { result: await api.retrieveMultipleRecords(compositionTable, query), query, linked: false, removed: [] }
+  const source = decodeURIComponent(query.slice('?fetchXml='.length))
+  const linked = source.includes(`alias="${ROW_LINKS.reserva}"`)
+  const prepared = prepareFetchXml(source, { dropRowLinks: withoutRowLinks })
+  const sent = prepared.fetchXml === source ? query : `?fetchXml=${encodeURIComponent(prepared.fetchXml)}`
+  const result: RowQuery = await api.retrieveMultipleRecords(compositionTable, sent)
+  return {
+    result: prepared.aliases.length ? { ...result, entities: result.entities.map((row) => expandLinkAliases(row, prepared.aliases)) } : result,
+    query: prepared.degraded.rowLinks ? `?fetchXml=${encodeURIComponent(withoutRowLinks(source))}` : query,
+    linked: linked && !prepared.degraded.rowLinks,
+    removed: prepared.degraded.removed,
   }
 }
 
@@ -252,7 +274,7 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
   const query = nextLink ? toQueryOptions(nextLink) : gridFetchXml ? `?fetchXml=${encodeURIComponent(withFetchPageSize(gridFetchXml, PAGE_SIZE))}` : `?${view && 'kind' in view && view.kind === 'personal' ? 'userQuery' : 'savedQuery'}=${view && 'id' in view ? view.id : ''}`
   const isFetchXml = query.startsWith('?fetchXml=')
   // Em FetchXML o tamanho vem do count; maxPageSize faz o Dataverse ignorar page/paging-cookie e repetir a página 1.
-  const read = isFetchXml ? await retrieveWithRowLinks(api, query) : { result: await api.retrieveMultipleRecords(compositionTable, query, PAGE_SIZE) as RowQuery, query, linked: false }
+  const read = isFetchXml ? await retrieveWithRowLinks(api, query) : { result: await api.retrieveMultipleRecords(compositionTable, query, PAGE_SIZE) as RowQuery, query, linked: false, removed: [] as RemovedLink[] }
   const result = read.result
   let rowLinks = read.linked
   let orderedRows = result.entities
@@ -299,7 +321,7 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
       rowVersion: typeof row['@odata.etag'] === 'string' ? row['@odata.etag'] : String(row.versionnumber ?? ''),
     }
   })
-  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(read.query, result), rowLinks, formulas }
+  return { records, source: 'dataverse', nextLink: result.nextLink ?? nextFetchXmlLink(read.query, result), rowLinks, aviso: removedLinksNotice(read.removed) ?? undefined, formulas }
 }
 
 /** Total de composições da consulta atual; null quando a view não permite agregação ou o limite é excedido. */
@@ -309,9 +331,10 @@ export async function countCompositions(view?: ViewQuery): Promise<number | null
   const source = !view
     ? `<fetch><entity name="${compositionTable}"><filter><condition attribute="statecode" operator="eq" value="0"/></filter></entity></fetch>`
     : 'fetchXml' in view ? view.fetchXml : view.sourceFetchXml
-  const fetchXml = source ? buildCountQuery(source) : null
-  if (!fetchXml) return null
+  const counted = source ? buildCountQuery(source) : null
+  if (!counted) return null
   try {
+    const { fetchXml } = prepareFetchXml(counted)
     const result = await api.retrieveMultipleRecords(compositionTable, `?fetchXml=${encodeURIComponent(fetchXml)}`)
     const total = Number(result.entities[0]?.total)
     return Number.isFinite(total) ? total : null
@@ -335,7 +358,7 @@ export async function applyCompositionCellInput(
   input: CellInput,
   source: 'dataverse' | 'mock',
 ): Promise<ApplyCellInputResult> {
-  if (!isWritableMoneyField(field)) throw new FormulaError('FIELD_NOT_WRITABLE', `${moneyFields.find(({ key }) => key === field)?.label ?? field} é calculado pelo Dataverse e não pode ser editado.`)
+  if (!isWritableMoneyField(field)) throw new FormulaError('FIELD_NOT_WRITABLE', `${moneyFieldLabel(field)} é calculado pelo Dataverse e não pode ser editado.`)
 
   if (source === 'mock') {
     const formulas = Object.fromEntries(Object.entries(row.formulas).map(([key, formula]) => [key, formula?.expression])) as Partial<Record<MoneyField, string>>
@@ -390,10 +413,29 @@ export async function applyCompositionCellInput(
   const response = await online.execute(request)
   const body = await response.json()
   if (!response.ok) throw new Error(typeof body.error === 'object' && body.error && 'message' in body.error ? String(body.error.message) : 'Falha ao aplicar valor no Dataverse.')
+  const sent = JSON.parse(String(body.UpdatedCellsJson ?? '{}')) as Partial<Record<MoneyField, DecimalString>>
   return {
     rowId: row.id,
     rowVersion: String(body.NewRowVersion ?? ''),
-    updatedValues: JSON.parse(String(body.UpdatedCellsJson ?? '{}')),
+    updatedValues: await confirmSavedValues(row.id, field, sent[field] ?? (input.kind === 'literal' ? input.value : undefined), sent),
     formulas: JSON.parse(String(body.FormulaStateJson ?? '{}')),
   }
+}
+
+export class SaveNotConfirmedError extends Error {}
+
+const moneyFieldLabel = (field: MoneyField) => moneyFields.find(({ key }) => key === field)?.label ?? field
+
+// A Custom API devolve o que recebeu, não o que ficou gravado: uma regra de negócio que troca o valor na mesma
+// transação passava como "salvo" (Ajuste zerado em 23/11/2026). Relê a linha e só confirma o valor que o Dataverse manteve.
+async function confirmSavedValues(id: string, field: MoneyField, expected: DecimalString | undefined, sent: Partial<Record<MoneyField, DecimalString>>) {
+  const fields = [...new Set([field, ...Object.keys(sent) as MoneyField[], 'new_subtotal', 'new_valortotal'] as MoneyField[])]
+  let saved: DataverseEntity
+  try { saved = await getWebApi().retrieveRecord(compositionTable, id, `?$select=${fields.join(',')}`) }
+  catch { throw new SaveNotConfirmedError(`Não foi possível confirmar ${moneyFieldLabel(field)} no Dataverse. A linha foi recarregada; confira o valor.`) }
+  const values = Object.fromEntries(fields.map((key) => [key, decimalValue(saved[key])])) as Partial<Record<MoneyField, DecimalString>>
+  if (expected !== undefined && values[field] !== decimalValue(expected)) {
+    throw new SaveNotConfirmedError(`O Dataverse não manteve ${moneyFieldLabel(field)}: ficou ${values[field]} em vez de ${decimalValue(expected)}.`)
+  }
+  return values
 }

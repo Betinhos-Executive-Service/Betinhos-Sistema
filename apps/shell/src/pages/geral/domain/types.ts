@@ -14,7 +14,7 @@ export type AttributeInfo = AttributeMeta & { options: ChoiceOption[] }
 export type AttributeMap = Map<string, AttributeInfo>
 
 export type Sort = { attribute: string; alias: string | null; descending: boolean } | null
-export type Page = { rows: Row[]; cookie: string | null; more: boolean; total: number | null }
+export type Page = { rows: Row[]; cookie: string | null; more: boolean; total: number | null; /** Colunas de outras tabelas que voltaram vazias pelo limite de 15 vínculos do Dataverse. */ aviso?: string }
 
 export type CellStatus =
   | { kind: 'idle' }

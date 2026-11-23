@@ -6,7 +6,7 @@ import {
   columnCatalogOf, columnDefsOf, columnIdOf, columnsFromConfig, configOf, extraColumnKey, filterFieldsOf, filterKindOf, fromTableFilters, sortFromConfig, toTableFilters,
   type FilterLabel,
 } from './data/table-view'
-import { lockedItems, nativeLockedItems, withoutLocked } from './data/locked-labels'
+import { lockedItems, nativeLockedItems, nativeValueRefs, withoutLocked } from './data/locked-labels'
 import { allViewFilters, defaultViewDefinition, type CatalogField, type SavedView, type ViewDefinition } from './data/views'
 
 type Kind = SavedView['kind']
@@ -101,10 +101,14 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
   const fieldFor = useCallback((id: string) => fieldById.get(keyOf(id)), [fieldById, keyOf])
   const tableFilters = useMemo(() => toTableFilters(definition, fieldFor, label), [definition, fieldFor, label])
 
+  // Filtros originais da visão nativa (só leitura): os nomes das opções e dos registros citados também vêm do Dataverse.
+  const nativeFetchXml = active?.nativeOnly && !active.nativeFiltersEditable ? active.sourceFetchXml ?? null : null
+  const nativeRefs = useMemo(() => nativeValueRefs(nativeFetchXml, catalog), [nativeFetchXml, catalog])
+
   useEffect(() => {
     if (mock || !ready) return
     const pending = (key: string) => !requested.current.has(key) && Boolean(requested.current.add(key))
-    const choices = [...new Set([...definition.columns.map((column) => column.id), ...allViewFilters(definition).map((filter) => filter.id)])].flatMap((id) => {
+    const choices = [...new Set([...definition.columns.map((column) => column.id), ...allViewFilters(definition).map((filter) => filter.id), ...nativeRefs.map((ref) => ref.field.id)])].flatMap((id) => {
       const field = byId.get(id)
       return field && filterKindOf(field.type) === 'choice' && pending(`opcoes:${id}`) ? [field] : []
     })
@@ -115,16 +119,19 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
           if (found.length) setOptions((current) => new Map([...current, ...found]))
         })
     }
-    const lookups = allViewFilters(definition).flatMap((filter) => {
-      const field = byId.get(filter.id)
+    const wanted = [
+      ...allViewFilters(definition).map((filter) => ({ field: byId.get(filter.id), values: filter.values?.length ? filter.values : [filter.value] })),
+      ...nativeRefs.map(({ field, values }) => ({ field, values })),
+    ]
+    const lookups = wanted.flatMap(({ field, values }) => {
       if (field?.type !== 'Lookup') return []
-      return (filter.values?.length ? filter.values : [filter.value]).filter((value) => value && !seen.current.has(labelKey(filter.id, value)) && pending(labelKey(filter.id, value))).map((value) => ({ field, value }))
+      return values.filter((value) => value && !seen.current.has(labelKey(field.id, value)) && pending(labelKey(field.id, value))).map((value) => ({ field, value }))
     })
     if (lookups.length) {
       void Promise.all(lookups.map(({ field, value }) => resolveFilterOption(field, value).then((option) => option ? [{ id: field.id, option }] : [], () => [])))
         .then((found) => remember(found.flat()))
     }
-  }, [byId, definition, mock, ready, remember])
+  }, [byId, definition, mock, nativeRefs, ready, remember])
 
   const search = useCallback<LookupSearch>(async (field, text) => {
     const source = byId.get(columnIdOf(field.key))
@@ -139,7 +146,7 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
 
   const views = useMemo<TableViewEntry[]>(() => {
     const entry = (scope: TableViewEntry['scope']) => (view: SavedView): TableViewEntry => ({
-      id: view.id, name: view.name, scope, canEdit: view.managed && (!view.nativeOnly || Boolean(view.nativeFiltersEditable)), config: baseConfig,
+      id: view.id, name: view.name, scope, canEdit: Boolean(view.nativeCopy) || view.managed && (!view.nativeOnly || Boolean(view.nativeFiltersEditable)), config: baseConfig,
     })
     return [
       { id: '', name: DEFAULT_NAME, scope: 'padrao', canEdit: false, config: baseConfig },
@@ -199,8 +206,11 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
     if ('error' in patch) onError(patch.error)
     else onChange({ ...definition, ...patch })
   }, [definition, fieldById, onChange, onError, tableFilters])
-  const nativeFetchXml = active?.nativeOnly && !active.nativeFiltersEditable ? active.sourceFetchXml ?? null : null
-  const locked = useMemo(() => [...nativeLockedItems(nativeFetchXml, catalog), ...lockedItems(tableFilters.locked, byId, label)], [nativeFetchXml, catalog, tableFilters.locked, byId, label])
+  const nativeName = useCallback((field: CatalogField, value: string) => {
+    const text = label(field.id, value)
+    return text === value ? undefined : text
+  }, [label])
+  const locked = useMemo(() => [...nativeLockedItems(nativeFetchXml, catalog, nativeName), ...lockedItems(tableFilters.locked, byId, label)], [nativeFetchXml, catalog, nativeName, tableFilters.locked, byId, label])
 
   const save = useCallback(async () => { if (!active) throw new Error('Escolha uma visão salva.'); await saveView(active.name, active.kind, true, definition) }, [active, definition, saveView])
   const saveAs = useCallback((name: string) => saveView(name, 'personal', false, definition), [definition, saveView])

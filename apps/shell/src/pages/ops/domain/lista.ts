@@ -48,7 +48,7 @@ export function opFields(choices: OpChoices): FilterField[] {
 
 export function readOp(op: Op, key: string): unknown {
   switch (key) {
-    case 'op': return [op.codigo, op.cliente].filter(Boolean).join(' ')
+    case 'op': return op.codigo
     case 'servicos': return op.primeiroServico
     case 'passageiros': return op.passageiros
     case 'valor': return valorOp(op)

@@ -20,7 +20,7 @@ import type { DataTableFeatures } from './components/features'
 import { EditableViewFieldCell } from './components/ViewFieldCell'
 import { adjacentGridCell } from './components/grid-cell-focus'
 import { isWritableMoneyField, moneyFields, type CellInput, type Composition, type MoneyField } from './data/compositions'
-import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, type CompositionPage, type FormulaMap } from './data/dataverse'
+import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, SaveNotConfirmedError, type CompositionPage, type FormulaMap } from './data/dataverse'
 import { lockedNativeCopy, nativeSaveSource, resolveCompositionQuery, type ResolvedCompositionQuery } from './data/composition-query'
 import { collectCompositionPages, compositionWorkbook, freshPageRecords } from './data/composition-export'
 import { createColumnFilterLabels } from './data/column-filter-values'
@@ -533,9 +533,10 @@ function ComposicaoContent({ host }: { host: Host }) {
   const removeView = useCallback(async (view: SavedView) => { if (dataSource === 'mock') deleteMockView(view); else await deleteView(view) }, [dataSource])
   const saveCurrentView = useCallback(async (name: string, kind: 'personal' | 'public', overwrite: boolean, definition: ViewDefinition) => {
     if (!catalog.length || !definition.columns.length) throw new Error('Escolha ao menos uma coluna disponível.')
+    const keepNative = lockedNativeCopy(activeView, overwrite)
     const saved = dataSource === 'mock'
       ? saveMockView(name, kind, definition, overwrite ? activeView ?? undefined : undefined)
-      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, nativeSaveSource(activeView, definition, catalog, overwrite), lockedNativeCopy(activeView, overwrite))
+      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, nativeSaveSource(activeView, definition, catalog, overwrite), keepNative, keepNative ? activeView?.sourceFetchXml : undefined)
     const all = await listViews()
     setViews(all)
     const selected = all.find((view) => view.id === saved.id) ?? saved
@@ -578,7 +579,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     const personal = activeView
     if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
     // Filtros nativos que a tela não lê não iriam para a cópia: publicar e excluir a pessoal os perderia.
-    if (personal.nativeOnly && !personal.nativeFiltersEditable) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
+    if (personal.nativeOnly && !personal.nativeFiltersEditable && !personal.nativeCopy) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
     // Pública é outra tabela (savedquery): cria a cópia pública e só depois retira a pessoal.
     await saveCurrentView(personal.name, 'public', false, personal.definition)
     try { await removeView(personal) } catch (error) {
@@ -731,6 +732,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     loadCompositions(undefined, queryView).then((page) => {
       if (!active) return
       applyFirstPage(page, request)
+      if (page.aviso) setNotice({ tone: 'warning', title: 'Algumas colunas ficaram vazias', detail: page.aviso })
     }).catch((error: unknown) => {
       if (!active) return
       void logAppError(error, { action: 'carregar-composicoes', phase: 'load', component: 'ComposicaoPage' })
@@ -938,7 +940,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         const message = formulaErrorMessage(error) || errorMessage(error, 'Não foi possível salvar no Dataverse.')
         // Erro de fórmula é validação do usuário; só falha de gravação vai para o log.
         if (!(error instanceof FormulaError)) void logAppError(error, { action: 'salvar-celula', phase: 'submit', component: 'ComposicaoPage', detailId: row.id, detailType: 'cr40f_composicaodeprecos' })
-        if (dataSource === 'dataverse' && message.includes('CONCURRENCY_CONFLICT')) {
+        if (dataSource === 'dataverse' && (message.includes('CONCURRENCY_CONFLICT') || error instanceof SaveNotConfirmedError)) {
           try {
             const refreshedRow = await loadCompositionById(row.id)
             if (refreshedRow) {

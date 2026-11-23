@@ -8,5 +8,10 @@
     "migration": "20261117-1200-multas-fase1.ps1",
     "por": "20261117-2100-multas-fase1-choice-local.ps1",
     "motivo": "Falhou no DEV (Deploy 44169786825) ao chamar UpdateOptionValue pelo nome do choice local cr40f_multas_cr40f_status; a 2100 tem o mesmo conteudo e decide global/local por OptionSet.IsGlobal."
+  },
+  {
+    "migration": "20261123-0845-projetos.ps1",
+    "por": "20261123-1115-projetos-privilegio-nota.ps1",
+    "motivo": "Falhou no DEV (Deploy 45189830881) ao procurar prvCreateAnnotation; o privilegio da anotacao se chama prv*Note. A 1115 tem o mesmo conteudo com prvCreateNote, prvReadNote e prvAppendNote."
   }
 ]

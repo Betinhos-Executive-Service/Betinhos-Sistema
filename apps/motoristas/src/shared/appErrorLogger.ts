@@ -20,6 +20,7 @@ import {
   withCauseLabel,
   type RepeatGroup
 } from "./errorLogGrouping.ts";
+import { isPreviewMode } from "./modoPreview.ts";
 import { SEM_CONEXAO_MESSAGE, ehErroDeRede, estaOnline } from "./erroDeRede.ts";
 
 // Wrapper do App Motoristas sobre o logger compartilhado (@betinhos-executive-service/ui/error-logger).
@@ -284,6 +285,8 @@ function scheduleRepeatSummary() {
 }
 
 export function reportAppError(error: unknown, context: AppErrorLogContext = {}) {
+  // Preview da tela de Configuração não grava log de erro no Dataverse.
+  if (isPreviewMode()) return;
   ensureConfigured();
   const raw = normalizeLoggedError(error);
   const normalized = {
