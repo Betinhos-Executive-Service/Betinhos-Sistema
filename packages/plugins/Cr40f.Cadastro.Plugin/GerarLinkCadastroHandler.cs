@@ -49,7 +49,7 @@ public sealed class GerarLinkCadastroHandler
         try
         {
             // Serviço do usuário iniciador: só gera link quem consegue ler a reserva.
-            reserva = _usuario.Retrieve("cr40f_reservadeveculos", reservaId, new ColumnSet("cr40f_status", "cr40f_passageiro1", "cr40f_passageiro2", "cr40f_passageiro3", "cr40f_passageiro4"));
+            reserva = _usuario.Retrieve("cr40f_reservadeveculos", reservaId, new ColumnSet("cr40f_status"));
         }
         catch (Exception)
         {

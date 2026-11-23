@@ -26,9 +26,8 @@ describe('consultas', () => {
     const r = mapReserva({
       cr40f_reservadeveculosid: 'ABC', cr40f_idnovo: 'R-77', cr40f_id: '77', cr40f_status: 202410001, [`cr40f_status${F}`]: 'Confirmado',
       cr40f_dataehorriodesada: '2026-10-05T11:30:00Z', _cr40f_motorista_value: 'M1', [`_cr40f_motorista_value${F}`]: 'Carlos',
-      _cr40f_passageiro1_value: 'P1', [`_cr40f_passageiro1_value${F}`]: 'Ana',
     })
-    expect(r).toMatchObject({ id: 'abc', codigo: 'R-77', statusValue: 202410001, status: 'Confirmado', motoristaId: 'm1', motorista: 'Carlos', tipoServico: 'Outros', passageirosLookup: [{ id: 'p1', nome: 'Ana' }] })
+    expect(r).toMatchObject({ id: 'abc', codigo: 'R-77', statusValue: 202410001, status: 'Confirmado', motoristaId: 'm1', motorista: 'Carlos', tipoServico: 'Outros' })
     expect(r.saida?.toISOString()).toBe('2026-10-05T11:30:00.000Z')
   })
   it('cai no modo seguro e deriva motoristas das reservas quando a lista falha', async () => {

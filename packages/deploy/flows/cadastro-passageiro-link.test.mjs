@@ -64,10 +64,11 @@ test('link vencido ou revogado responde 410 e marca Expirado (3)', () => {
   assert.equal(todas.get('Status_erro_410').inputs.value, 410)
 })
 
-test('escopo: passageiro do link, filhos por _cr40f_geral_value, fallback passageiro1..4', () => {
+test('escopo: passageiro do link, filhos por _cr40f_geral_value, sem lookups passageiro1..4', () => {
   assert.match(todas.get('Listar_filhos').inputs.parameters.$filter, /^_cr40f_geral_value eq /)
   assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value')
-  for (const n of [1, 2, 3, 4]) assert.match(todas.get('Obter_reserva').inputs.parameters.$select, new RegExp(`_cr40f_passageiro${n}_value`))
+  assert.doesNotMatch(raw, /passageiro[1-4]/i, 'a reserva não lê mais os lookups passageiro1..4')
+  assert.ok(!todas.has('Filtrar_lookups'))
   assert.match(todas.get('Escopo').inputs, /_cr40f_passageiro_value/)
 })
 

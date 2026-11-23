@@ -18,8 +18,6 @@ const linkedRow = {
   [`cmp_res.cr40f_status${F}`]: 'Confirmada',
   [`cmp_res.cr40f_tipodoservico${F}`]: 'Transfer',
   [`cmp_res.cr40f_tipodeveiculo${F}`]: 'Sedan',
-  [`cmp_res.cr40f_passageiro1${F}`]: 'Ana',
-  [`cmp_res.cr40f_passageiro2${F}`]: 'Bia',
   'cmp_cli.cr40f_nomedocliente': 'Cliente Teste',
   'cmp_cli.cr40f_registro': '123',
   'cmp_cli.cr40f_endereco': 'Rua A',
@@ -37,7 +35,7 @@ it('lê reserva e cliente na própria consulta, em uma chamada por página', asy
   expect(retrieveMultipleRecords.mock.calls.filter(([entity]) => entity === 'cr40f_composicaodeprecos')).toHaveLength(1)
   expect(retrieveMultipleRecords.mock.calls.map(([entity]) => entity).filter((entity) => ['cr40f_reservadeveculos', 'cr40f_clientes1'].includes(entity))).toEqual([])
   expect(page.rowLinks).toBe(true)
-  expect(page.records[0]).toMatchObject({ client: 'Cliente Teste', clientId: 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', clientRegistration: '123', clientAddress: 'Rua A', route: 'Aeroporto', departureAddress: 'Rua de Saída, 10', destination: 'Aeroporto de Guarulhos, Terminal 3', serviceStatus: 'Confirmada', serviceType: 'Transfer', vehicleType: 'Sedan', passengers: ['Ana', 'Bia'] })
+  expect(page.records[0]).toMatchObject({ client: 'Cliente Teste', clientId: 'cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee', clientRegistration: '123', clientAddress: 'Rua A', route: 'Aeroporto', departureAddress: 'Rua de Saída, 10', destination: 'Aeroporto de Guarulhos, Terminal 3', serviceStatus: 'Confirmada', serviceType: 'Transfer', vehicleType: 'Sedan' })
 })
 
 it('a consulta padrão (sem view) também leva os vínculos', async () => {

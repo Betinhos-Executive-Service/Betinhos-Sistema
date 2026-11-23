@@ -33,18 +33,17 @@ public class ObterFotoPassageiroHandlerTests
     private string Executar(Guid? usuario = null, Guid? passageiro = null) =>
         new ObterFotoPassageiroHandler(_svc, _arquivos, _trace.Add).Executar(usuario ?? _usuario, _reserva.ToString(), (passageiro ?? _ana).ToString());
 
-    private void Cenario(int status = ObterFotoPassageiroHandler.StatusProgramado, bool comMotorista = true, string? link = Link, bool viaFilho = true)
+    private void Cenario(int status = ObterFotoPassageiroHandler.StatusProgramado, bool comMotorista = true, string? link = Link)
     {
         var reserva = new Entity("cr40f_reservadeveculos", _reserva) { ["cr40f_status"] = new OptionSetValue(status) };
         if (comMotorista) reserva["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", _motorista);
-        if (!viaFilho) reserva["cr40f_passageiro1"] = new EntityReference("cr40f_bancodedados", _ana);
         var pessoa = new Entity("cr40f_bancodedados", _ana) { ["cr40f_nomedopassageiro"] = "Ana" };
         if (link is not null) pessoa["new_linkdafoto"] = link;
         _svc.Com(reserva, pessoa,
             new Entity("cr40f_funcionarios", _motorista) { ["cr40f_emailmicrosoft"] = " Joao.Motorista@Betinhos.com.br " },
             new Entity("systemuser", _usuario) { ["domainname"] = "joao.motorista@betinhos.com.br", ["internalemailaddress"] = "joao.motorista@betinhos.com.br" },
             new Entity("systemuser", _outroUsuario) { ["domainname"] = "maria@betinhos.com.br", ["internalemailaddress"] = "maria@betinhos.com.br" });
-        if (viaFilho) _svc.Com(new Entity("cr40f_servicosporpassageiro", Guid.NewGuid()) { ["cr40f_geral"] = new EntityReference("cr40f_reservadeveculos", _reserva), ["cr40f_bancodedados"] = new EntityReference("cr40f_bancodedados", _ana), ["cr40f_ordemdeselecao"] = 1 });
+        _svc.Com(new Entity("cr40f_servicosporpassageiro", Guid.NewGuid()) { ["cr40f_geral"] = new EntityReference("cr40f_reservadeveculos", _reserva), ["cr40f_bancodedados"] = new EntityReference("cr40f_bancodedados", _ana), ["cr40f_ordemdeselecao"] = 1 });
     }
 
     [Fact]
@@ -53,13 +52,6 @@ public class ObterFotoPassageiroHandlerTests
         Cenario();
         Assert.Equal("{\"ok\":true,\"mimeType\":\"image/jpeg\",\"conteudoBase64\":\"" + Base64 + "\"}", Executar());
         Assert.Equal("/Documentos Compartilhados/Passageiros/Fotos/DEV/abc.jpg|abc.jpg", Assert.Single(_arquivos.Caminhos));
-    }
-
-    [Fact]
-    public void FallbackPassageiro1a4_DevolveFoto()
-    {
-        Cenario(viaFilho: false);
-        Assert.StartsWith("{\"ok\":true", Executar());
     }
 
     [Fact]
