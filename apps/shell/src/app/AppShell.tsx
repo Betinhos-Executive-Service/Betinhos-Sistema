@@ -4,9 +4,11 @@ import {
   FileText, FolderCheck, FolderCog, FolderKanban, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
   Scale, ScrollText, Shield, ShieldCheck, Shuffle, Smartphone, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
 } from 'lucide-react'
-import { AppShell as Shell, formatBuild, type NavGroup } from '@betinhos/ui'
+import { Alert, AppShell as Shell, Button, formatBuild, type NavGroup } from '@betinhos/ui'
+import { menuVisivel } from '../nav/acessosMenu'
 import { MENU, itemLabel, type MenuGroup } from '../nav/menu'
 import { hrefFor, patchHashQuery, readHashQuery } from '../nav/useHashRoute'
+import { acessosDe, useAcessos } from './AcessosProvider'
 import { useInstallPrompt } from './useInstallPrompt'
 import { TEMAS, useTema, type Tema } from './tema'
 
@@ -164,7 +166,9 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, oc
     setSearch('')
   }, [activeId, setSearch])
   // Grupos estáveis entre renders: sem isto o menu inteiro (ícones e filtro da busca) era refeito a cada render do shell.
-  const groups = useMemo(() => MENU.map((group) => toNavGroup(group, entityLabels, badges, ocultos)), [entityLabels, badges, ocultos])
+  const acesso = useAcessos()
+  const visivel = useMemo(() => menuVisivel(acessosDe(acesso)), [acesso])
+  const groups = useMemo(() => visivel.map((group) => toNavGroup(group, entityLabels, badges, ocultos)), [visivel, entityLabels, badges, ocultos])
   return (
     <Shell
       brand={{ name: 'Betinhos', subtitle: 'Sistema interno', logo: <img src={BRAND_LOGO} alt="" />, href: hrefFor(MENU[0].items[0].id) }}
@@ -190,6 +194,11 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, oc
       )}
       version={BUILD}
     >
+      {acesso.status === 'erro' ? (
+        <Alert tone="warning" title="Não foi possível carregar seus acessos" action={<Button variant="secondary" onClick={acesso.recarregar}>Tentar de novo</Button>}>
+          O menu mostra só as telas liberadas para todos.
+        </Alert>
+      ) : null}
       {children}
     </Shell>
   )
