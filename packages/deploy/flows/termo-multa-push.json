@@ -116,8 +116,8 @@
                         },
                         "parameters": {
                           "body/payload/tag": "new_termomulta-@{triggerOutputs()?['body/new_termomultaid']}",
-                          "body/payload/body": "Você tem uma multa para resolver no app\nToque para abrir.",
-                          "body/payload/title": "App Motoristas",
+                          "body/payload/body": "Leia o termo e assine ou conteste pelo app.\nToque para abrir.",
+                          "body/payload/title": "Termo de multa para assinar",
                           "body/subscriptions": "@body('Select_subs_Send_push')",
                           "body/payload/url": "/WebResources/new_app-motoristas-v2?termoMultaId=@{triggerOutputs()?['body/new_termomultaid']}"
                         },

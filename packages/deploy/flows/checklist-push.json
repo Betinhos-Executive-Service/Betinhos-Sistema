@@ -236,8 +236,8 @@
                         },
                         "parameters": {
                           "body/payload/tag": "new_checklistveiculo-@{triggerOutputs()?['body/new_checklistveiculoid']}",
-                          "body/payload/body": "@{if(equals(triggerOutputs()?['body/new_origem'], 100000002), concat('Você recebeu o carro ', coalesce(triggerOutputs()?['body/_new_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), '. Faça o checklist de recebimento.'), concat('Checklist do veículo pendente: ', triggerOutputs()?['body/new_name']))}",
-                          "body/payload/title": "App Motoristas",
+                          "body/payload/body": "@{if(equals(triggerOutputs()?['body/new_origem'], 100000002), concat('Você recebeu o carro ', coalesce(triggerOutputs()?['body/_new_veiculo_value@OData.Community.Display.V1.FormattedValue'], ''), '. Faça o checklist de recebimento.'), concat(triggerOutputs()?['body/new_name'], '. Toque para fazer agora.'))}",
+                          "body/payload/title": "@{if(equals(triggerOutputs()?['body/new_origem'], 100000002), 'Checklist de recebimento do carro', 'Checklist do veículo pendente')}",
                           "body/subscriptions": "@body('Select_subs_Send_push')",
                           "body/payload/url": "/WebResources/new_app-motoristas-v2?checklistId=@{triggerOutputs()?['body/new_checklistveiculoid']}"
                         },

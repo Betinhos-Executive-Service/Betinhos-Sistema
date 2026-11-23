@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { getInitialDespesaId, getInitialDetail, getInitialGastosCartaoLink, getInitialTermoMultaId, getInitialTreinamentoParticipacaoId, loadStore } from "./bootstrap";
+import { getInitialAgendaLink, getInitialDespesaId, getInitialDetail, getInitialGastosCartaoLink, getInitialTermoMultaId, getInitialTreinamentoParticipacaoId, loadStore } from "./bootstrap";
 import { parseHashRoute, type HashRoute } from "./navigation";
 import { configApp } from "./configApp.ts";
 import { findDetailFromHashRoute, getInitialScreenFromHashRoute, telaPermitida } from "./rotaInicial";
@@ -27,7 +27,7 @@ export function useEstadoInicial(hashRoutingActive: boolean) {
   if (!initialRef.current) {
     const pedida: Screen = initialHashRouteRef.current
       ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-      : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
+      : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : getInitialAgendaLink() ? "servicos" : "inicio");
     const permitida = telaPermitida(pedida, configApp.telaLigada);
     initialRef.current = { screen: permitida, bloqueada: permitida !== pedida };
   }

@@ -202,8 +202,8 @@
                     },
                     "parameters": {
                       "body/payload/tag": "new_comunicadodestinatario-@{triggerOutputs()?['body/new_comunicadodestinatarioid']}",
-                      "body/payload/body": "Novo comunicado da operacao: @{triggerOutputs()?['body/new_titulo']}",
-                      "body/payload/title": "App Motoristas",
+                      "body/payload/body": "@{triggerOutputs()?['body/new_titulo']}\nToque para ler.",
+                      "body/payload/title": "Novo comunicado da operação",
                       "body/subscriptions": "@body('Select_subs_Send_push')",
                       "body/payload/url": "/WebResources/new_app-motoristas-v2?comunicadoId=@{triggerOutputs()?['body/new_comunicadodestinatarioid']}"
                     },

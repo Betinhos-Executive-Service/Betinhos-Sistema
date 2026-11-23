@@ -203,7 +203,8 @@ $worker = @{
       "body/subscriptions" = "@body('Select_subs')"
       "body/payload/title" = $title
       "body/payload/body" = "@outputs('Compose_mensagem')"
-      "body/payload/url" = "/WebResources/new_app-motoristas-v2?servicoId=$reservaIdInline"
+      # Serviço retirado abre direto a agenda (Serviços); novo abre o detalhe.
+      "body/payload/url" = "@{if($isNovo, concat('/WebResources/new_app-motoristas-v2?servicoId=', outputs('Get_aviso')?['body/_new_reserva_value']), '/WebResources/new_app-motoristas-v2?agenda=1')}"
       "body/payload/tag" = "cr40f_reservadeveculos-$reservaIdInline"
     }
     authentication = $auth

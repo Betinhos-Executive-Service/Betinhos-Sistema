@@ -99,7 +99,8 @@ test('treinamentos-push.json: Web Push por funcionário do gatilho, com tag e me
   const [[, worker]] = achar(flow, (n) => n === 'Worker_Send_push')
   const p = worker.inputs.parameters
   assert.equal(p['body/payload/url'], "/WebResources/new_app-motoristas-v2?treinamentoParticipacaoId=@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}")
-  assert.equal(p['body/payload/body'], "Novo treinamento: @{outputs('Get_treinamento')?['body/cr40f_name']}")
+  assert.equal(p['body/payload/title'], 'Novo treinamento')
+  assert.equal(p['body/payload/body'], "@{outputs('Get_treinamento')?['body/cr40f_name']}\nToque para começar.")
   // O escopo do Web Push fica dentro de Se_modulo_ligado, que só roda depois de Get_treinamento (via Config_App).
   assert.deepEqual(flow.actions.Config_App.runAfter, { Get_treinamento: ['Succeeded'] })
   assert.deepEqual(flow.actions.Se_modulo_ligado.runAfter, { Config_App: ['Succeeded', 'Failed', 'TimedOut'] })

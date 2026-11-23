@@ -100,6 +100,12 @@ export function getInitialGastosCartaoLink(search = window.location.search) {
   return flag === "1" || flag === "true";
 }
 
+// Deep link da agenda (?agenda=1): botão "Ver agenda" da notificação e aviso de serviço retirado.
+export function getInitialAgendaLink(search = window.location.search) {
+  const flag = readLaunchParam(search, "agenda").trim().toLowerCase();
+  return flag === "1" || flag === "true";
+}
+
 export function getVoucherDraftKey(detail: DetailData) {
   return `${detail.type}:${detail.id}`;
 }

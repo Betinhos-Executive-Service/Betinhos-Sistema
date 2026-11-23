@@ -227,8 +227,8 @@
                     },
                     "parameters": {
                       "body/payload/tag": "cr40f_treinamentoparticipacao-@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}",
-                      "body/payload/body": "Novo treinamento: @{outputs('Get_treinamento')?['body/cr40f_name']}",
-                      "body/payload/title": "App Motoristas",
+                      "body/payload/body": "@{outputs('Get_treinamento')?['body/cr40f_name']}\nToque para começar.",
+                      "body/payload/title": "Novo treinamento",
                       "body/subscriptions": "@body('Select_subs_Send_push')",
                       "body/payload/url": "/WebResources/new_app-motoristas-v2?treinamentoParticipacaoId=@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}"
                     },

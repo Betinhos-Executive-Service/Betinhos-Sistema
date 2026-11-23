@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getInitialDespesaId, getInitialGastosCartaoLink } from "../src/app/bootstrap.ts";
+import { getInitialAgendaLink, getInitialDespesaId, getInitialGastosCartaoLink } from "../src/app/bootstrap.ts";
 import type { ExpenseDraft, ExpensePhoto, ExpenseReferenceData } from "../src/features/despesas/expenses.ts";
 import {
   acharGastoCartaoDuplicado,
@@ -216,4 +216,10 @@ test("leitura no modo cartão nunca muda valor, data, forma, estabelecimento nem
   const preenchido = aplicarLeituraNoGastoCartao(draft({ litros: "10" }), leitura, referenceData);
   assert.equal(preenchido.categoriaId, "cat-almoco");
   assert.equal(preenchido.litros, "10");
+});
+
+test("deep link da agenda (?agenda=1, direto ou dentro de data=) abre Serviços", () => {
+  assert.equal(getInitialAgendaLink("?agenda=1"), true);
+  assert.equal(getInitialAgendaLink("?data=agenda%3D1"), true);
+  assert.equal(getInitialAgendaLink("?servicoId=abc"), false);
 });

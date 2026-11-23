@@ -218,8 +218,8 @@
                                 },
                                 "parameters": {
                                   "body/payload/tag": "multa-aceite-@{items('Aceite_cada')?['cr40f_multasid']}",
-                                  "body/payload/body": "Você tem uma multa para resolver no app\nToque para abrir.",
-                                  "body/payload/title": "App Motoristas",
+                                  "body/payload/body": "Confira os detalhes da multa no app.\nToque para abrir.",
+                                  "body/payload/title": "Multa para resolver",
                                   "body/subscriptions": "@body('Select_subs_Send_push')",
                                   "body/payload/url": "/WebResources/new_app-motoristas-v2"
                                 },
