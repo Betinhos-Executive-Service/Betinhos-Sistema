@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, EmptyState, PageHeader, SegmentedControl, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
-import { CarFront, FileText, Plus, RefreshCw } from 'lucide-react'
+import { Alert, Button, Dialog, EmptyState, PageHeader, SegmentedControl, StatusBadge, Table, useToast, type TableColumn } from '@betinhos/ui'
+import { CarFront, FileText, Plus, RefreshCw, X } from 'lucide-react'
+import { ErroPortal } from '../api/PortalApi'
 import { useApi } from '../api/ApiContext'
-import { statusPedidoInfo } from '../domain/pedidos'
+import { podeCancelar, statusPedidoInfo } from '../domain/pedidos'
 import type { Pedido } from '../domain/types'
 import { colunasTrajeto, ResumoServico } from './colunas'
 import './MeusServicos.css'
@@ -17,7 +18,7 @@ export function daAbaPedidos(pedidos: Pedido[], aba: Aba, agoraMs: number): Pedi
   return [...lista].sort((a, b) => (aba === 'todos' ? ms(b) - ms(a) : ms(a) - ms(b)))
 }
 
-const colunas: TableColumn<Pedido>[] = [
+const colunas = (onCancelar: (p: Pedido) => void): TableColumn<Pedido>[] => [
   {
     key: 'servico', header: 'Serviço', width: 'minmax(190px, 1.1fr)',
     cell: (p) => <span className="pc-servico pc-meus__servico"><ResumoServico numero={p.numero || 'Aguardando número'} saida={p.saida} origem={p.origem} destino={p.destino} /></span>,
@@ -32,6 +33,9 @@ const colunas: TableColumn<Pedido>[] = [
           <StatusBadge tone={info.tom} dot>{info.rotulo}</StatusBadge>
           {p.veiculo && <span className="pc-meus__veiculo"><CarFront size={12} aria-hidden /> {p.veiculo}</span>}
           {p.voucherUrl && <a className="pc-meus__voucher" href={p.voucherUrl} target="_blank" rel="noopener noreferrer"><FileText size={12} aria-hidden /> Voucher</a>}
+          {podeCancelar(p.status) && (
+            <Button variant="ghost" size="compact" onClick={() => onCancelar(p)} icon={<X size={14} aria-hidden />} aria-label={`Cancelar pedido ${p.numero || ''}`.trim()}>Cancelar</Button>
+          )}
         </span>
       )
     },
@@ -43,6 +47,9 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [carga, setCarga] = useState<'carregando' | 'erro' | 'ok'>('carregando')
   const [aba, setAba] = useState<Aba>('proximos')
+  const [cancelando, setCancelando] = useState<Pedido | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const toast = useToast()
 
   const carregar = useCallback(async () => {
     setCarga('carregando')
@@ -55,6 +62,22 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
   }, [api])
 
   useEffect(() => { void carregar() }, [carregar])
+
+  async function confirmarCancelamento() {
+    if (!cancelando) return
+    setEnviando(true)
+    try {
+      const atualizado = await api.cancelarPedido(cancelando.id)
+      setPedidos((lista) => lista.map((p) => (p.id === atualizado.id ? atualizado : p)))
+      toast({ tone: 'success', message: atualizado.numero ? `Pedido ${atualizado.numero} cancelado.` : 'Pedido cancelado.' })
+    } catch (e) {
+      toast({ tone: 'danger', message: e instanceof ErroPortal && e.message !== e.codigo ? e.message : 'Não foi possível cancelar agora. Tente de novo.' })
+      void carregar()
+    } finally {
+      setEnviando(false)
+      setCancelando(null)
+    }
+  }
 
   const agoraMs = Date.now()
   const proximos = daAbaPedidos(pedidos, 'proximos', agoraMs)
@@ -86,7 +109,7 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
         </Alert>
       ) : (
         <Table
-          columns={colunas}
+          columns={colunas(setCancelando)}
           rows={linhas}
           rowKey={(p) => p.id}
           loading={carga === 'carregando'}
@@ -98,6 +121,18 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
           footer={<span className="pc-rodape">Pedidos: {linhas.length}</span>}
         />
       )}
+
+      <Dialog
+        open={cancelando !== null}
+        onClose={() => { if (!enviando) setCancelando(null) }}
+        title={cancelando?.numero ? `Cancelar o pedido ${cancelando.numero}?` : 'Cancelar este pedido?'}
+        actions={<>
+          <Button variant="secondary" onClick={() => setCancelando(null)} disabled={enviando}>Manter pedido</Button>
+          <Button variant="danger" onClick={() => void confirmarCancelamento()} loading={enviando}>Cancelar pedido</Button>
+        </>}
+      >
+        A Betinhos não vai programar este serviço. Para pedir de novo, faça um novo pedido.
+      </Dialog>
     </main>
   )
 }

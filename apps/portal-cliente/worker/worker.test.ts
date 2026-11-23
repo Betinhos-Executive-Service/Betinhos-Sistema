@@ -193,6 +193,24 @@ describe('pedidos', () => {
     ;[meu] = (await (await chamar('GET', '/pedidos', undefined, paula)).json()) as Array<Record<string, unknown>>
     expect(meu).toMatchObject({ status: 'programado', voucherUrl: 'https://v/RV-48500.pdf', veiculo: 'Sedan executivo' })
   })
+
+  it('cancelar: só o dono e só em Solicitado; nota na observação interna', async () => {
+    const paula = await logar('paula@latasa.com.br')
+    const compras = await logar('compras@latasa.com.br')
+    const criado = (await (await chamar('POST', '/pedidos', pedido(), paula)).json()) as { id: string }
+    expect((await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, compras)).status).toBe(404)
+    const r = await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, paula)
+    expect(r.status).toBe(200)
+    expect(await r.json()).toMatchObject({ id: criado.id, status: 'cancelado' })
+    const reg = banco.reservadeveculoses[0]
+    expect(reg.cr40f_status).toBe(202410002)
+    expect(String(reg.cr40f_observaointerna)).toMatch(/^Pedido pelo portal por .*\nCancelado pelo cliente no portal por .* \(paula@latasa\.com\.br\) em \d\d\/\d\d\/\d{4}/)
+    // Já com a operação: recusa com a mensagem para a tela.
+    reg.cr40f_status = 202410001
+    const tarde = await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, paula)
+    expect(tarde.status).toBe(409)
+    expect(await tarde.json()).toMatchObject({ mensagem: expect.stringContaining('fale com a Betinhos') })
+  })
 })
 
 describe('serviços', () => {

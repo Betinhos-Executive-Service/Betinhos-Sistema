@@ -1,5 +1,5 @@
 import { Secret, TOTP } from 'otpauth'
-import { chaveDuplicado, dominioDe, JANELA_DUPLICADO_MS, nomeDoEmail, normalizarPedido, primeiroErroPedido } from '../domain/pedidos'
+import { chaveDuplicado, dominioDe, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
 import type { Modulo, Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { gerarPedidos, gerarServicos, type PedidoMock } from './mockDados'
@@ -211,6 +211,16 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       await espera()
       const { email } = exigirSessao('meus_servicos')
       return pedidos.filter((p) => p.solicitante === email).map(semSolicitante)
+    },
+    async cancelarPedido(id) {
+      await espera()
+      const { email } = exigirSessao('meus_servicos')
+      const atual = pedidos.find((p) => p.id === id && p.solicitante === email)
+      if (!atual) throw new ErroPortal('nao_permitido', 'Pedido não encontrado.')
+      if (!podeCancelar(atual.status)) throw new ErroPortal('nao_permitido', MSG_NAO_CANCELA)
+      const cancelado: PedidoMock = { ...atual, status: 'cancelado' }
+      pedidos = pedidos.map((p) => (p.id === id ? cancelado : p))
+      return semSolicitante(cancelado)
     },
   }
 }

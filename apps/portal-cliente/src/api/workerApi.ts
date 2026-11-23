@@ -47,5 +47,6 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     responder: (id: string, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/responder`, { texto }),
     pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
     meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
+    cancelarPedido: (id: string) => chamar<Pedido>('POST', `/pedidos/${encodeURIComponent(id)}/cancelar`),
   }
 }

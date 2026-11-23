@@ -83,8 +83,8 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[
     return linhas.filter((c) => c.cr40f_portalhabilitado && String(c.cr40f_portaldominios ?? '').includes(dominio))
   }
   if (tabela === 'reservadeveculoses') {
-    const [usuario, cliente] = guids(filtro)
-    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente)
+    const [usuario, cliente, id] = guids(filtro)
+    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
   if (tabela === 'codigoacessos') return linhas.filter((c) => c._cr40f_validador_value === guids(filtro)[0] && !c.cr40f_usado).slice(-1)
   if (tabela === 'dispositivoconfiavels') {
