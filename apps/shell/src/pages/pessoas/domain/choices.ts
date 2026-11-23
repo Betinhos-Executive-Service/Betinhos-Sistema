@@ -14,7 +14,7 @@ export const FALLBACK_CHOICES: ChoiceSet = {
   idioma: opts([[202410000, 'Português'], [202410001, 'Inglês'], [202410002, 'Espanhol']]),
   status: opts([[202410000, 'Ativo'], [202410001, 'Inativo']]),
   sexo: opts([[202410000, 'Masculino'], [202410001, 'Feminino']]),
-  tipoVeiculo: opts([[202410000, 'Básico'], [202410001, 'Executivo'], [202410002, 'Blindado'], [202410003, 'Van'], [202410004, 'Van Blindado'], [202410005, 'Spin'], [202410006, 'Somente Motorista'], [100000001, 'Micro-ônibus'], [100000002, 'Minivan']]),
+  tipoVeiculo: opts([[202410000, 'Básico'], [202410001, 'Executivo'], [202410002, 'Blindado'], [202410003, 'Van'], [202410004, 'Van Blindado'], [202410005, 'Spin'], [202410006, 'Somente Motorista'], [100000001, 'Micro-ônibus'], [100000002, 'Minivan'], [100000003, 'Furgão']]),
 }
 
 export const CHOICE_ATTRIBUTES: Record<ChoiceKey, string> = {
