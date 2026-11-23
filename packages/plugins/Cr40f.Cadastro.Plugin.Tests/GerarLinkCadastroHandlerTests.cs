@@ -128,16 +128,10 @@ public class GerarLinkCadastroHandlerTests
     }
 
     [Fact]
-    public void SemFilhos_UsaLookupsPassageiro1a4_ComDedupe()
+    public void SemFilhos_Erro()
     {
-        var reserva = Reserva();
-        reserva["cr40f_passageiro1"] = new EntityReference("cr40f_bancodedados", _caio);
-        reserva["cr40f_passageiro2"] = new EntityReference("cr40f_bancodedados", _ana);
-        reserva["cr40f_passageiro4"] = new EntityReference("cr40f_bancodedados", _caio);
-        _svc.Com(reserva, Pessoa(_ana, "Ana"), Pessoa(_caio, "Caio"));
-        var json = Handler().Executar(_reserva.ToString(), null);
-        Assert.Equal(2, json.Split(new[] { "\"id\":" }, StringSplitOptions.None).Length - 1);
-        Assert.True(json.IndexOf(_caio.ToString()) < json.IndexOf(_ana.ToString()));
+        _svc.Com(Reserva(), Pessoa(_ana, "Ana"));
+        Assert.Contains("Este serviço não tem passageiros.", Handler().Executar(_reserva.ToString(), null));
     }
 
     [Fact]

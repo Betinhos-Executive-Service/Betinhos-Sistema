@@ -332,21 +332,9 @@
                           "parameters": {
                             "entityName": "__SET_RESERVAS__",
                             "recordId": "@outputs('Link')?['_cr40f_reserva_value']",
-                            "$select": "cr40f_dataehorriodesada,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value"
+                            "$select": "cr40f_dataehorriodesada"
                           },
                           "authentication": "@parameters('$authentication')"
-                        }
-                      },
-                      "Filtrar_lookups": {
-                        "type": "Query",
-                        "runAfter": {
-                          "Obter_reserva": [
-                            "Succeeded"
-                          ]
-                        },
-                        "inputs": {
-                          "from": "@createArray(toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro1_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro2_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro3_value'], '')), toLower(coalesce(body('Obter_reserva')?['_cr40f_passageiro4_value'], '')))",
-                          "where": "@not(empty(item()))"
                         }
                       },
                       "Escopo": {
@@ -355,11 +343,11 @@
                           "Filtrar_filhos": [
                             "Succeeded"
                           ],
-                          "Filtrar_lookups": [
+                          "Obter_reserva": [
                             "Succeeded"
                           ]
                         },
-                        "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))), union(if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups')), if(greater(length(body('Filtrar_filhos')), 0), body('Filtrar_filhos'), body('Filtrar_lookups'))))"
+                        "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), body('Filtrar_filhos')), union(body('Filtrar_filhos'), body('Filtrar_filhos')))"
                       },
                       "Por_operacao": {
                         "type": "Switch",

@@ -43,14 +43,14 @@ export function definirCelula(matriz: Matriz | null | undefined, perfil: Perfil,
 /** Mudanças do rascunho em relação ao publicado (nada publicado = padrão do catálogo). */
 export const contarMudancas = (publicada: Matriz | null | undefined, rascunho: Matriz | null | undefined) => compararMatrizes(publicada, rascunho).length
 
-export type Celula = { ligado: boolean; travada: boolean; sensivel: boolean; mudou: 'era-ligado' | 'era-desligado' | null }
+export type Celula = { ligado: boolean; travada: boolean; mudou: 'era-ligado' | 'era-desligado' | null }
 
 /** Célula de um perfil para a matriz da tela: valor do rascunho (ou do publicado), trava e marca de mudança. */
 export function celula(entrada: EntradaCatalogo, perfil: Perfil | 'admin', publicada: Matriz | null | undefined, rascunho: Matriz | null | undefined): Celula {
-  if (perfil === 'admin' || entrada.fixa) return { ligado: true, travada: true, sensivel: entrada.sensivel, mudou: null }
+  if (perfil === 'admin' || entrada.fixa) return { ligado: true, travada: true, mudou: null }
   const agora = valorNaMatriz(rascunho, perfil, entrada).ligado
   const antes = valorNaMatriz(publicada, perfil, entrada).ligado
-  return { ligado: agora, travada: false, sensivel: entrada.sensivel, mudou: agora === antes ? null : antes ? 'era-ligado' : 'era-desligado' }
+  return { ligado: agora, travada: false, mudou: agora === antes ? null : antes ? 'era-ligado' : 'era-desligado' }
 }
 
 // ───────────────────────── pessoas ─────────────────────────

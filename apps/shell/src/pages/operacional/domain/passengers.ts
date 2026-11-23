@@ -1,7 +1,7 @@
 import type { PassageiroServico, Reserva } from './types'
 import { normalizeStatus as normalize } from './serviceState'
 
-export type Passageiro = { key: string; nome: string; telefone: string; endereco: string; origem: 'servico' | 'lookup' | 'texto' }
+export type Passageiro = { key: string; nome: string; telefone: string; endereco: string; origem: 'servico' | 'texto' }
 
 // O "(" inicial entra no match para "Nome - (11) 98888-7777" não deixar um parêntese solto no nome.
 const PHONE = /\(?\+?\d[\d\s().-]{7,}\d\)?/
@@ -23,11 +23,10 @@ export function parsePassengerText(text: string) {
 
 const sameName = (a: string, b: string) => normalize(a).replace(/\s+/g, ' ') === normalize(b).replace(/\s+/g, ' ')
 
-/** Ordem canônica: filhos (cr40f_servicosporpassageiro) > lookups passageiro1..4 > texto livre. */
+/** Ordem canônica: filhos (cr40f_servicosporpassageiro) > texto livre. */
 export function passengerList(reserva: Reserva, filhos: PassageiroServico[] = []): Passageiro[] {
   const parsed = parsePassengerText(reserva.passageirosTexto)
   const phoneFor = (nome: string) => parsed.find((p) => sameName(p.nome, nome))?.telefone ?? ''
   if (filhos.length) return filhos.map((f) => ({ key: f.id, nome: f.nome, telefone: phoneFor(f.nome), endereco: f.enderecoSaida, origem: 'servico' }))
-  if (reserva.passageirosLookup.length) return reserva.passageirosLookup.map((p) => ({ key: p.id, nome: p.nome, telefone: phoneFor(p.nome), endereco: '', origem: 'lookup' }))
   return parsed.map((p, index) => ({ key: `texto-${index}`, nome: p.nome, telefone: p.telefone, endereco: '', origem: 'texto' }))
 }

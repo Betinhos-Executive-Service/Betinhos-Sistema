@@ -18,13 +18,12 @@ describe('passageiros', () => {
       { nome: 'Bruno', telefone: '+55 21 3333-4444' },
     ])
   })
-  it('prefere filhos, depois lookups, depois texto; telefone vem do texto pelo nome', () => {
-    const r = reserva({ passageirosTexto: 'Ana Souza - 11988887777', passageirosLookup: [{ id: 'p9', nome: 'Zé' }] })
+  it('prefere filhos, depois texto; telefone vem do texto pelo nome', () => {
+    const r = reserva({ passageirosTexto: 'Ana Souza - 11988887777' })
     expect(passengerList(r, [{ id: 's1', ordem: 1, nome: 'Ana  Souza', enderecoSaida: 'Rua A, 10' }])).toEqual([
       { key: 's1', nome: 'Ana  Souza', telefone: '11988887777', endereco: 'Rua A, 10', origem: 'servico' },
     ])
-    expect(passengerList(r, [])[0]).toMatchObject({ key: 'p9', nome: 'Zé', origem: 'lookup' })
-    expect(passengerList({ ...r, passageirosLookup: [] })[0]).toMatchObject({ nome: 'Ana Souza', origem: 'texto' })
+    expect(passengerList(r, [])[0]).toMatchObject({ nome: 'Ana Souza', origem: 'texto' })
   })
 })
 

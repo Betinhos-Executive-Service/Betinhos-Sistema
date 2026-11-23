@@ -75,3 +75,14 @@ test('manual só marca Recibo Enviado quando o e-mail saiu', () => {
   const auto = aplicarDestinatario(definicao(), { manual: false }).actions.Scope_Processo.actions
   assert.equal(auto.Update_a_row_1.inputs.parameters['item/cr40f_statusdorecibo'], 202410001)
 })
+
+test('sem filhos, o Compose de passageiros vira array vazio e o $select larga os lookups passageiro1..4', () => {
+  const d = definicao()
+  const lookups = ['1', '2', '3', '4'].map((n) => `@outputs('Get_a_row_by_ID_OP')?['body/_cr40f_passageiro${n}_value@OData.Community.Display.V1.FormattedValue']`)
+  d.actions.Scope_Processo.actions['Compose_—_ArrayPassageirosDoServico'] = { type: 'Compose', inputs: `@createArray(${lookups.join(', ')})` }
+  d.actions.Scope_Processo.actions.Listar = { type: 'OpenApiConnection', inputs: { parameters: { $select: 'cr40f_id,_cr40f_passageiro1_value,_cr40f_passageiro4_value,cr40f_destino' } } }
+  const r = aplicarDestinatario(d, { manual: false })
+  assert.deepEqual(r.actions.Scope_Processo.actions['Compose_—_ArrayPassageirosDoServico'].inputs, [])
+  assert.equal(r.actions.Scope_Processo.actions.Listar.inputs.parameters.$select, 'cr40f_id,cr40f_destino')
+  assert.deepEqual(aplicarDestinatario(r, { manual: false }), r, 'idempotente')
+})

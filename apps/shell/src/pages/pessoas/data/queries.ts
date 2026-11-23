@@ -70,12 +70,11 @@ export async function searchClientes(client: DataverseClient, set: string, query
   return page.value.map((r) => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: text(r.cr40f_nomedocliente) })).filter((c) => c.nome)
 }
 
-const PASSAGEIRO_LOOKUPS = ['_cr40f_passageiro1_value', '_cr40f_passageiro2_value', '_cr40f_passageiro3_value', '_cr40f_passageiro4_value']
-const RESERVA_SELECT = ['cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_destino', 'cr40f_status', 'cr40f_tipodoservico', '_cr40f_solicitante_value', ...PASSAGEIRO_LOOKUPS].join(',')
+const RESERVA_SELECT = ['cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_destino', 'cr40f_status', 'cr40f_tipodoservico', '_cr40f_solicitante_value'].join(',')
 
 function mapServico(row: Row, pessoaId: string, fallback: Papel): Omit<ServicoPessoa, 'papeis'> & { papel: Papel } {
   const id = (k: string) => (row[k] ? cleanId(str(row[k])) : '')
-  const papel: Papel = id('_cr40f_solicitante_value') === pessoaId ? 'Solicitante' : PASSAGEIRO_LOOKUPS.some((k) => id(k) === pessoaId) ? 'Passageiro' : fallback
+  const papel: Papel = id('_cr40f_solicitante_value') === pessoaId ? 'Solicitante' : fallback
   return {
     id: cleanId(str(row.cr40f_reservadeveculosid)), codigo: text(row.cr40f_id), data: date(row.cr40f_dataehorriodesada),
     destino: text(row.cr40f_destino), status: formatted(row, 'cr40f_status'), tipo: formatted(row, 'cr40f_tipodoservico'), papel,
@@ -86,12 +85,12 @@ function mapServico(row: Row, pessoaId: string, fallback: Papel): Omit<ServicoPe
 export const HIST_TOP = 500
 
 /**
- * Reservas como solicitante ou passageiro 1–4 e as ligadas por Serviços por Passageiro, as mais recentes primeiro.
+ * Reservas como solicitante e as ligadas por Serviços por Passageiro, as mais recentes primeiro.
  * As duas consultas saem juntas; as reservas que só aparecem pelos vínculos vêm em blocos de 15, 4 por vez.
  */
 export async function loadServicosDaPessoa(client: DataverseClient, sets: Pick<EntitySets, 'reserva' | 'passageiro'>, pessoaId: string) {
   const id = guid(pessoaId)
-  const direct = ['_cr40f_solicitante_value', ...PASSAGEIRO_LOOKUPS].map((k) => `${k} eq ${id}`).join(' or ')
+  const direct = `_cr40f_solicitante_value eq ${id}`
   const recentes = encodeURIComponent('cr40f_dataehorriodesada desc')
   const [diretas, vinculos] = await Promise.all([
     client.request<{ value: Row[] }>(`${sets.reserva}?$select=${RESERVA_SELECT}&$filter=${encodeURIComponent(direct)}&$orderby=${recentes}&$top=${HIST_TOP}`),

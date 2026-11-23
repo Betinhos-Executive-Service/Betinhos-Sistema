@@ -38,8 +38,23 @@ function destinoRecibo(manual) {
   }
 }
 
+// As colunas cr40f_passageiro1..4 da reserva saem do schema: o Compose de fallback (quando não há filhos em
+// cr40f_servicosporpassageiro) vira array vazio e qualquer $select deixa de pedi-las. Sem essas colunas, não muda nada.
+const COLUNA_PASSAGEIRO = /_cr40f_passageiro[1-4]_value/i
+
+function semLookupsPassageiro(no) {
+  if (Array.isArray(no)) return no.forEach(semLookupsPassageiro)
+  if (!no || typeof no !== 'object') return
+  for (const [chave, valor] of Object.entries(no)) {
+    if (/ArrayPassageirosDoServico/.test(chave) && valor?.type === 'Compose' && COLUNA_PASSAGEIRO.test(JSON.stringify(valor.inputs))) valor.inputs = []
+    else if (chave === '$select' && typeof valor === 'string') no[chave] = valor.split(',').filter((c) => !COLUNA_PASSAGEIRO.test(c)).join(',')
+    else semLookupsPassageiro(valor)
+  }
+}
+
 export function aplicarDestinatario(definition, { manual }) {
   const definicao = structuredClone(definition)
+  semLookupsPassageiro(definicao.actions)
   const escopo = escopoComAcao(definicao.actions, 'Get_a_row_by_ID_BD')
   if (!escopo?.Get_a_row_by_ID_OP) throw new Error('Get_a_row_by_ID_BD ou Get_a_row_by_ID_OP não encontrado.')
 

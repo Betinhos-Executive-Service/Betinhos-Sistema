@@ -22,6 +22,7 @@ namespace Betinhos.DriverRecordSharing
             var system = factory.CreateOrganizationService(null);
             var driver = new DriverResolver(system, tracing).ResolveFromUser(new EntityReference(PluginConfig.UserTable, context.InitiatingUserId));
             if (driver?.EmployeeReference == null) throw new InvalidPluginExecutionException("Motorista não encontrado para este usuário.");
+            AppConfigGuarda.Exigir(system, driver.EmployeeReference.Id, AppConfigLeitor.ChavePostosProximos, AppConfigGuarda.PostosProximosDesligado, tracing, () => DateTime.UtcNow);
             var json = context.InputParameters.Contains(InputParameter) ? context.InputParameters[InputParameter] as string : null;
             context.OutputParameters[ResultParameter] = Salvar(system, driver.EmployeeReference.Id, json, DateTime.UtcNow);
         }

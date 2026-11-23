@@ -42,7 +42,7 @@ assert.ok(schedule.actions.For_each_service.actions.Find_existing_reservation.in
 assert.equal(schedule.actions.For_each_service.actions.Find_existing_reservation.inputs.parameters["$top"], 1);
 assert.equal(schedule.actions.For_each_service.actions.Create_or_reuse_reservation.actions.Create_reservation.inputs.parameters["item/cr40f_status"], 202410004);
 const reservationFields = schedule.actions.For_each_service.actions.Create_or_reuse_reservation.actions.Create_reservation.inputs.parameters;
-for (const navigationProperty of ["cr40f_Cliente", "cr40f_Solicitante", "cr40f_Passageiro1", "cr40f_Passageiro2", "cr40f_Passageiro3", "cr40f_Passageiro4", "cr40f_ConversaoIAAgendamento"]) {
+for (const navigationProperty of ["cr40f_Cliente", "cr40f_Solicitante", "cr40f_ConversaoIAAgendamento"]) {
   assert.ok(reservationFields[`item/${navigationProperty}@odata.bind`], `${navigationProperty} deve usar o nome de navegação publicado no DEV`);
 }
 assert.ok(schedule.actions.For_each_service.actions.Create_or_reuse_reservation.actions.Create_reservation.inputs.parameters["item/cr40f_observaointerna"], "observacao interna deve usar nome logico do DEV");

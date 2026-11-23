@@ -32,6 +32,7 @@ import {
   type TreinamentoMotorista
 } from "./treinamentos";
 import { BrandLoader } from "../../shared/ui/BrandLoader";
+import { ehRecusaDaConfiguracao, mensagemDaRecusa } from "../../shared/recusaDaConfiguracao";
 
 export type TreinamentosLoadStatus = "loading" | "ready" | "error";
 
@@ -149,7 +150,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       .then((p) => onParticipacaoChange({ ...participacaoRef.current, abertoEm: p.abertoEm }))
       .catch((cause) => {
         reportAppError(cause, { source: "treinamentos", action: "abrirTreinamento", screen: "Treinamentos", detailId: treinamento.id, notifyUser: false });
-        if (ativo) setErroAbertura("Não foi possível registrar a abertura. Verifique a internet e tente de novo.");
+        if (ativo) setErroAbertura(mensagemDaRecusa(cause, "Não foi possível registrar a abertura. Verifique a internet e tente de novo."));
       });
     return () => { ativo = false; };
   }, [participacao.id, participacao.abertoEm, tentativa]);
@@ -182,7 +183,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
       onParticipacaoChange(p);
     } catch (cause) {
       reportAppError(cause, { source: "treinamentos", action: nome, screen: "Treinamentos", detailId: treinamento.id, notifyUser: false });
-      setErro(cause instanceof ErroTreinamento ? cause.message : fallback);
+      setErro(cause instanceof ErroTreinamento ? cause.message : mensagemDaRecusa(cause, fallback));
     } finally {
       setBusy(false);
     }
@@ -213,7 +214,7 @@ function TreinamentoDetalhe({ item, driverName, onParticipacaoChange, onClose }:
         {erroAbertura ? (
           <p className="termo-alert" data-tone="erro" role="alert">
             {erroAbertura}{" "}
-            <button type="button" className="termo-text-button" onClick={() => { setErroAbertura(""); setTentativa((n) => n + 1); }}>Tentar de novo</button>
+            {ehRecusaDaConfiguracao(erroAbertura) ? null : <button type="button" className="termo-text-button" onClick={() => { setErroAbertura(""); setTentativa((n) => n + 1); }}>Tentar de novo</button>}
           </p>
         ) : null}
         {treinamento.descricao ? <p className="trn-descricao">{treinamento.descricao}</p> : null}

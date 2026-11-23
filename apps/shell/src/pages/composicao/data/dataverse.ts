@@ -181,7 +181,7 @@ function isPrivilegeDenied(error: unknown) {
   })
 }
 
-const LINK_LOOKUPS = ['cliente', 'passageiro1', 'passageiro2', 'passageiro3', 'passageiro4']
+const LINK_LOOKUPS = ['cliente']
 
 /** Reserva no formato da leitura em lote, montada a partir das colunas cmp_res.* / cmp_cli.* da linha. */
 function reservationFromLinks(row: DataverseEntity): DataverseEntity {
@@ -236,7 +236,7 @@ async function loadReservationsInBatches(api: XrmWebApi, rows: DataverseEntity[]
     const filter = batch.map((id) => `cr40f_reservadeveculosid eq ${id}`).join(' or ')
     return api.retrieveMultipleRecords(
       reservationTable,
-      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_endereodesada,cr40f_destino,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo,_cr40f_passageiro1_value,_cr40f_passageiro2_value,_cr40f_passageiro3_value,_cr40f_passageiro4_value&$filter=${encodeURIComponent(`(${filter})`)}`,
+      `?$select=cr40f_reservadeveculosid,cr40f_trajeto,cr40f_endereodesada,cr40f_destino,cr40f_dataehorriodesada,_cr40f_cliente_value,cr40f_status,cr40f_tipodoservico,cr40f_tipodeveiculo&$filter=${encodeURIComponent(`(${filter})`)}`,
     )
   }))
   pages.forEach((related) => related.entities.forEach((row) => {
@@ -315,7 +315,6 @@ export async function loadCompositions(nextLink?: string, view?: ViewQuery): Pro
       serviceStatus: stringValue(reservation?.[`cr40f_status${formatted}`], ''),
       serviceType: stringValue(reservation?.[`cr40f_tipodoservico${formatted}`], ''),
       vehicleType: stringValue(reservation?.[`cr40f_tipodeveiculo${formatted}`], ''),
-      passengers: [1, 2, 3, 4].map((index) => reservation?.[`_cr40f_passageiro${index}_value${formatted}`]).filter((name): name is string => typeof name === 'string' && name.length > 0),
       values,
       formulas: {},
       rowVersion: typeof row['@odata.etag'] === 'string' ? row['@odata.etag'] : String(row.versionnumber ?? ''),

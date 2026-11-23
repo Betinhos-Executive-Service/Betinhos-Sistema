@@ -339,7 +339,7 @@ describe('vínculos da linha (reserva e cliente)', () => {
   it('pede os mesmos atributos que a leitura em lote pedia', () => {
     const document = new DOMParser().parseFromString(withRowLinks(base), 'application/xml')
     const names = (alias: string) => [...document.querySelectorAll(`link-entity[alias="${alias}"] > attribute`)].map((item) => item.getAttribute('name'))
-    expect(names('cmp_res')).toEqual(['cr40f_trajeto', 'cr40f_endereodesada', 'cr40f_destino', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo', 'cr40f_passageiro1', 'cr40f_passageiro2', 'cr40f_passageiro3', 'cr40f_passageiro4'])
+    expect(names('cmp_res')).toEqual(['cr40f_trajeto', 'cr40f_endereodesada', 'cr40f_destino', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo'])
     expect(names('cmp_cli')).toEqual(['cr40f_nomedocliente', 'cr40f_registro', 'cr40f_endereco'])
   })
 
