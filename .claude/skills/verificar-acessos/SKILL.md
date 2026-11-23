@@ -1,6 +1,6 @@
 ---
 name: verificar-acessos
-description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabelas e colunas por perfil, gerador e motor dos papéis `Perfil - *`, migrations de acessos, Custom API `cr40f_AcessoDefinirPerfis` (handler, travas e histórico) e a prova no DEV por impersonação. Use ao mudar `apps/shell/src/nav/acessos*`, `packages/deploy/acessos/**` ou os arquivos `DefinirPerfis*`/`AcessoCatalogo*`/`PapeisDoUsuario*` do `Cr40f.Acesso.Plugin`."
+description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabelas e colunas por perfil, gerador e motor dos papéis `Perfil - *`, migrations de acessos, Custom API `cr40f_AcessoDefinirPerfis` (handler, travas e histórico) a prova no DEV por impersonação e, no shell, o menu por perfil, a guarda de rota e a tela `#/acessos`. Use ao mudar `apps/shell/src/nav/acessos*`, `apps/shell/src/app/acessos*`, `apps/shell/src/pages/acessos/**`, `packages/deploy/acessos/**` ou os arquivos `DefinirPerfis*`/`AcessoCatalogo*`/`PapeisDoUsuario*` do `Cr40f.Acesso.Plugin`."
 ---
 # Verificar acessos por perfil
 
@@ -30,6 +30,21 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
    ```
    → 9 linhas `cenario ...: OK` (1, 2, 3a, 3b, 4, 5, 6, 7, 8) e `prova dos acessos: OK`. O 6 é `Perfis` ausente (qualquer recusa serve, mesmo da plataforma, desde que os perfis do alvo não mudem) e o 7 é `"[]"` explícito (200 e só o Base). Códigos de saída: 2 = pré-condição (token, dono do token sem Administrador do Sistema, usuários com papel antigo), 3 = inconclusivo, 1 = falha ou limpeza final falhou (`LIMPEZA FALHOU`: voltar os dois usuários ao Base à mão no DEV). A saída não leva ids; pode ir como evidência. `INCONCLUSIVO` = o DEV não tem linha com as colunas preenchidas (Funcionário com CPF, RG e CNH; OP com valor): não é aprovação.
 7. Informativo para o plano do corte: `node packages/deploy/acessos/quem-le.mjs` no DEV e no PROD (mesmas variáveis, sem os ids) lista quem hoje lê `cr40f_bancodedados` sem perfil de coluna de administrador ou `Motoristas`. `DEPENDENTES > 0` é esperado e não reprova este plano. A saída do PROD nunca vai para o repositório, commit, PR ou issue.
+
+## Shell (menu por perfil e tela `#/acessos`)
+- Código: `apps/shell/src/app/{acessos.ts,AcessosProvider.tsx}`, `apps/shell/src/nav/acessosMenu.ts`, guarda no `layouts/RouteLayout.tsx`, `pages/inicio/InicioSemAcesso.tsx`, `apps/shell/src/pages/acessos/**`.
+- Testes: `pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 src/pages/acessos src/nav src/app/acessos.test.ts` → todos passam; `pnpm --filter @betinhos/shell exec tsc --noEmit` limpo.
+- Mock (`pnpm dev`, porta 36472; fora do Dataverse a pessoa tem todos os perfis). Parâmetros antes do `#`: `?acessos=financeiro:operador,rh:gestor,acessos` escolhe os perfis, `?acessos=nenhum` deixa só o Base, `?acessos=erro` simula falha na leitura, `?falha=salvar` faz a gravação responder `PERFIL_INDISPONIVEL`.
+  1. `#/acessos`: 4 pessoas de exemplo, chips de perfil, "Só o Base" em quem não tem perfil, busca "Buscar por nome, e-mail ou perfil", botões Atualizar e Histórico.
+  2. Clicar em "Bruno Modelo" → gaveta com abas Perfis e Histórico; marcar Financeiro em Gestor → bloco "O que muda ao salvar" com `Financeiro: Operador → Gestor`. Esc (ou clique fora) abre "Descartar alterações?"; "Continuar editando" mantém a gaveta. Salvar fecha a gaveta e a linha já mostra `Financeiro · Gestor`.
+  3. `?falha=salvar#/acessos` + Salvar → alerta "Não foi possível salvar" acima das abas e "Ainda não publicado neste ambiente" na área recusada; a gaveta fica aberta com o rascunho.
+  4. `?acessos=financeiro:operador#/inicio` → menu sem Frota e RH; Operacional só com o Planner; Cadastros com Pessoas, Clientes e Cartões. `?acessos=financeiro:operador#/acessos` → "Sem acesso a este módulo" com "Ir para a Página Inicial".
+  5. `?acessos=nenhum#/inicio` → "Você ainda não tem acesso aos módulos"; menu só com Página Inicial e Planner.
+  6. `?acessos=erro` → aviso "Não foi possível carregar seus acessos" no shell.
+  7. Repetir 1, 2 e 5 em 375 px (lista vira cartões; gaveta ocupa a tela). Console sem erro nem aviso.
+- A própria linha e quem é Administrador do Sistema abrem a gaveta só para leitura (rodapé "Fechar"); o Switch "Administrador de acessos" só edita para o Administrador do Sistema.
+- Não verificável em mock: leitura real de papéis e equipes (`systemuserroles_association`, `teamroles_association`), a Custom API e o histórico real. No DEV: abrir `#/acessos` como Administrador do Sistema, trocar o perfil de um usuário de teste, conferir a linha em `cr40f_acessohistorico` e voltar ao Base.
+- O shell não é a fronteira de segurança: o menu só esconde; quem barra é o Dataverse (papéis e colunas).
 
 ## Casos de borda
 - Papel novo demora alguns segundos para valer: a prova repete cada cenário até 5 vezes; falha só depois disso.
