@@ -73,9 +73,10 @@
 .am-prev { display: grid; gap: var(--space-3, 12px); container-type: inline-size; }
 .am-prev__controles { display: grid; gap: var(--space-2, 8px); }
 .am-prev__campo { display: grid; gap: 4px; }
-.am-celular { position: relative; width: 100%; max-width: 320px; margin-inline: auto; aspect-ratio: 9 / 18; padding: 10px; background: var(--text, #101828); border-radius: 36px; }
-.am-celular__tela { width: 100%; height: 100%; border: 0; border-radius: 28px; background: var(--surface, #fff); }
+/* O App é desenhado em 390 × 780 (largura de celular) e reduzido para caber: o preview quebra as linhas como no aparelho. */
+.am-celular { --am-escala: 0.64; position: relative; width: calc(390px * var(--am-escala) + 20px); height: calc(780px * var(--am-escala) + 20px); margin-inline: auto; background: var(--text, #101828); border-radius: 36px; overflow: hidden; }
+.am-celular__tela { position: absolute; top: 10px; left: 10px; width: 390px; height: 780px; border: 0; border-radius: calc(28px / var(--am-escala)); background: var(--surface, #fff); transform: scale(var(--am-escala)); transform-origin: 0 0; }
+@media (min-height: 1000px) { .am-celular { --am-escala: 0.78; } }
 .am-celular__carregando { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .am-prev__ocultos { display: grid; gap: var(--space-2, 8px); }
 .am-regras li { display: flex; flex-direction: column; gap: 2px; }
-.am-celular { max-height: min(56vh, 520px); width: auto; max-width: 100%; margin-inline: auto; }
