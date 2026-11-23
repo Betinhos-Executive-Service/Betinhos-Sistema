@@ -70,7 +70,7 @@ export function DespesasTable({ list, choices, compras, onOpen, loading, view, q
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando despesas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(d) => d.id} audit={{ entity: 'cr40f_despesaoperacional', onOpenRecord: onOpen }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando despesas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

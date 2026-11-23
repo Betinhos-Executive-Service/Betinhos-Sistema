@@ -53,7 +53,7 @@ export const TransacoesTabela = memo(function TransacoesTabela({ list, onOpen, l
   return (
     // Com seleção, um clique marca a linha e o duplo clique abre (como em Pagantes).
     <div {...(selection ? { onDoubleClick: abrirLinha } : { onClick: abrirLinha })}>
-      <ListTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
+      <ListTable className="cc-table" columns={columns} rows={list} rowKey={(t) => t.id} audit={{ entity: 'cr40f_transacaocartao', onOpenRecord: onOpen }} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando transações" empty={empty} footer={footer} />
     </div>
   )
 })

@@ -44,7 +44,7 @@ export function InfracoesTable({ list, uso, onOpen, loading, view, quickFilters,
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.if-open')}>
-      <ListTable className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando infrações" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="if-table" columns={columns} rows={list} rowKey={(i) => i.id} audit={{ entity: 'cr40f_infracaodetransito', onOpenRecord: onOpen }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando infrações" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

@@ -48,7 +48,7 @@ export function MotoristasTable({ list, hoje, onOpen, view, quickFilters, footer
     { key: 'excecoes', header: 'Exceções', label: 'Exceções', sortable: true, defaultWidth: 320, width: 'minmax(240px, 2.4fr)', cell: (m) => <ChipsExcecao m={m} hoje={hoje} /> },
     { key: 'push', header: 'Push', label: 'Push', sortable: true, defaultWidth: 110, width: 'minmax(100px, .6fr)', hideBelow: 'compact', cell: (m) => (m.push ? <span className="am-push"><BellRing size={14} aria-hidden="true" /> Ativo</span> : <span className="am-push am-muted"><BellOff size={14} aria-hidden="true" /> Sem push</span>) },
   ], [hoje])
-  return <ListTable className="am-table" columns={columns} rows={list} rowKey={(m) => m.id} onRowClick={(m) => onOpen(m.id)} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+  return <ListTable className="am-table" columns={columns} rows={list} rowKey={(m) => m.id} audit={{ entity: 'cr40f_funcionarios' }} onRowClick={(m) => onOpen(m.id)} view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
 }
 
 export function MotoristasCards({ list, hoje, onOpen }: Pick<Props, 'list' | 'hoje' | 'onOpen'>) {

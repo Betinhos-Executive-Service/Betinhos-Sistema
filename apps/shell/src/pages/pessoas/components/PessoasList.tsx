@@ -49,7 +49,7 @@ export function PessoasTable({ list, choices, dups, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.ps-open')}>
-      <ListTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pessoas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="ps-table" columns={columns} rows={list} rowKey={(p) => p.id} audit={{ entity: 'cr40f_bancodedados', onOpenRecord: onOpen }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando pessoas" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

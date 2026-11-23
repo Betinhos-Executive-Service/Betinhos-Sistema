@@ -49,7 +49,7 @@ export function OpsTable({ list, choices, onOpen, loading, view, quickFilters, f
   ]
   return (
     <div className="pg-table-wrap" {...openOnRow(Boolean(selection))}>
-      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(op) => op.id} audit={{ entity: 'cr40f_financeiro', onOpenRecord: onOpen }} selection={selection} rowActions={bulkActions ? selectionRowActions(onOpen, bulkActions) : openRowActions(onOpen)} loading={loading} loadingLabel="Carregando OPs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

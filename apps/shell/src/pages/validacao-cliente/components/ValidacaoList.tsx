@@ -68,7 +68,7 @@ export function ValidacaoTable({ list, hoje, selecionados, onToggle, onOpen, loa
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.vc-open')}>
-      <ListTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="vc-table" columns={columns} rows={list} rowKey={(l) => l.id} audit={{ entity: 'cr40f_validacaoservico', ids: (l) => [l.validacaoId] }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando validações" view={view ? { ...view, extraCell } : undefined} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
