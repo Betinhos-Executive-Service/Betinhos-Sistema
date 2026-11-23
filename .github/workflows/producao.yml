@@ -41,10 +41,17 @@ jobs:
     outputs:
       caminho: ${{ steps.decidir.outputs.caminho }}
       plugins: ${{ steps.decidir.outputs.plugins }}
+      base: ${{ steps.base.outputs.base }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Commit da publicação anterior (tag prod-publicado antes de andar), para o job projetos ler o intervalo publicado.
+      - id: base
+        run: |
+          if base=$(git rev-parse -q --verify 'refs/tags/prod-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
+            echo "base=$base" >> "$GITHUB_OUTPUT"
+          fi
       - id: decidir
         env:
           FORCADO: ${{ inputs.caminho }}
@@ -194,3 +201,35 @@ jobs:
         run: |
           git tag -f prod-publicado "$GITHUB_SHA"
           git push -f origin refs/tags/prod-publicado
+
+  # Módulo Projetos: grava "Publicado no PROD" nas etapas PRJ-n.m citadas nos commits e PRs do intervalo publicado
+  # (packages/deploy/projetos/publicados.mjs). Vale para os três caminhos (tela, plugin e soluções) porque só roda depois de a
+  # tag andar. Best-effort: nunca derruba nem atrasa a publicação; tabela ausente ou código não encontrado viram aviso no resumo.
+  projetos:
+    needs: [caminho, marcar]
+    if: >-
+      !cancelled() && needs.marcar.result == 'success' &&
+      needs.caminho.outputs.caminho != 'nada' && needs.caminho.outputs.base != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    # Mesma conta de serviço da tela no PROD (sem revisor, só a main).
+    environment: prod-front
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publicado no PROD nas etapas
+        continue-on-error: true
+        env:
+          BASE: ${{ needs.caminho.outputs.base }}
+        run: node packages/deploy/projetos/publicados.mjs --base "$BASE" --head "$GITHUB_SHA"

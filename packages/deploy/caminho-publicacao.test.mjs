@@ -132,3 +132,8 @@ test('migration de schema vai pelas soluções; o script que decide e testa as m
   assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/20261110-1600-postos-aceita-ctf.ps1', 'apps/shell/src/x.ts']).caminho, 'solucoes')
   assert.equal(caminhoDaPublicacao(['packages/deploy/migrations/README.md', 'packages/deploy/migrations-dev.mjs', 'packages/deploy/migrations-ci.test.mjs']).caminho, 'nada')
 })
+
+test('registro "Publicado no PROD" do módulo Projetos não muda o PROD', () => {
+  assert.equal(caminhoDoArquivo('packages/deploy/projetos/publicados.mjs'), 'nada')
+  assert.equal(caminhoDoArquivo('packages/deploy/projetos/publicados.test.mjs'), 'nada')
+})
