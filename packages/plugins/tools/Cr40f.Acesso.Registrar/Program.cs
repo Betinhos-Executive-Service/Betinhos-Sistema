@@ -20,6 +20,15 @@ const string ApiCadastrar = "cr40f_CadastrarAcessoMotorista";
 const string ApiEncerrar = "cr40f_EncerrarAcessoMotorista";
 const string TipoReativar = "Cr40f.Acesso.Plugin.ReativarAcessoMotoristaPlugin";
 const string ApiReativar = "cr40f_ReativarAcessoMotorista";
+// Configuracao do App Motoristas (fase A): 4 Custom APIs sem configuracao no step (nao usam Entra nem segredo).
+const string TipoAppConfigEfetiva = "Cr40f.Acesso.Plugin.AppConfigEfetivaPlugin";
+const string TipoAppConfigRascunho = "Cr40f.Acesso.Plugin.AppConfigSalvarRascunhoPlugin";
+const string TipoAppConfigPublicar = "Cr40f.Acesso.Plugin.AppConfigPublicarPlugin";
+const string TipoAppConfigPessoa = "Cr40f.Acesso.Plugin.AppConfigDefinirPessoaPlugin";
+const string ApiAppConfigEfetiva = "cr40f_AppConfigEfetiva";
+const string ApiAppConfigRascunho = "cr40f_AppConfigSalvarRascunho";
+const string ApiAppConfigPublicar = "cr40f_AppConfigPublicar";
+const string ApiAppConfigPessoa = "cr40f_AppConfigDefinirPessoa";
 const int PluginAssemblyComponentType = 91;
 
 Log("autenticando no Dataverse");
@@ -46,6 +55,10 @@ EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyC
 var tipoCadastrar = UpsertPluginType(service, assemblyId, TipoCadastrar);
 var tipoEncerrar = UpsertPluginType(service, assemblyId, TipoEncerrar);
 var tipoReativar = UpsertPluginType(service, assemblyId, TipoReativar);
+var tipoAppConfigEfetiva = UpsertPluginType(service, assemblyId, TipoAppConfigEfetiva);
+var tipoAppConfigRascunho = UpsertPluginType(service, assemblyId, TipoAppConfigRascunho);
+var tipoAppConfigPublicar = UpsertPluginType(service, assemblyId, TipoAppConfigPublicar);
+var tipoAppConfigPessoa = UpsertPluginType(service, assemblyId, TipoAppConfigPessoa);
 
 // Tipos de parametro/resposta (customapirequestparameter.type): 0 = Boolean, 7 = Integer, 10 = String, 12 = Guid (8 seria Money).
 EnsureCustomApi(service, ApiCadastrar, "Acesso | Cadastrar acesso de motorista", "Cria conta Microsoft, licenca, grupo e funcionario; devolve credenciais e etapas.", solutionUniqueName,
@@ -57,9 +70,25 @@ EnsureCustomApi(service, ApiEncerrar, "Acesso | Encerrar acesso de motorista", "
 EnsureCustomApi(service, ApiReativar, "Acesso | Reativar acesso de motorista", "Reativa a conta no Entra, redefine a senha e devolve licenca, grupo e usuario do Dataverse.", solutionUniqueName,
     requestParams: new[] { ("FuncionarioId", 12, false) },
     responseProps: new[] { ("EmailMicrosoft", 10), ("SenhaTemporaria", 10), ("LinkApp", 10), ("Etapas", 10) });
+EnsureCustomApi(service, ApiAppConfigEfetiva, "Configuracao do App | Efetiva", "Configuracao efetiva do App Motoristas (modulos e funcoes ligados) de um motorista.", solutionUniqueName,
+    requestParams: new[] { ("Funcionario", 12, true) },
+    responseProps: new[] { ("Resultado", 10) });
+EnsureCustomApi(service, ApiAppConfigRascunho, "Configuracao do App | Salvar rascunho", "Grava ou descarta o rascunho da matriz de modulos e funcoes do App Motoristas.", solutionUniqueName,
+    requestParams: new[] { ("Conteudo", 10, true), ("Base", 10, true), ("Descartar", 0, true) },
+    responseProps: new[] { ("Marca", 10) });
+EnsureCustomApi(service, ApiAppConfigPublicar, "Configuracao do App | Publicar", "Publica o rascunho como a versao seguinte da configuracao do App Motoristas.", solutionUniqueName,
+    requestParams: new[] { ("Nota", 10, true) },
+    responseProps: new[] { ("Numero", 7) });
+EnsureCustomApi(service, ApiAppConfigPessoa, "Configuracao do App | Definir pessoa", "Cria ou encerra a excecao de um motorista a uma chave da configuracao, ou a entrada dele no grupo piloto.", solutionUniqueName,
+    requestParams: new[] { ("Funcionario", 12, false), ("Tipo", 10, false), ("Chave", 10, true), ("Ligado", 0, true), ("Motivo", 10, true), ("Validade", 10, true), ("Encerrar", 0, true) },
+    responseProps: new[] { ("Resultado", 10) });
 EnsureApiStep(service, tipoCadastrar, ApiCadastrar, "Cr40f.Acesso: cadastrar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoEncerrar, ApiEncerrar, "Cr40f.Acesso: encerrar acesso", config, solutionUniqueName);
 EnsureApiStep(service, tipoReativar, ApiReativar, "Cr40f.Acesso: reativar acesso", config, solutionUniqueName);
+EnsureApiStep(service, tipoAppConfigEfetiva, ApiAppConfigEfetiva, "Cr40f.Acesso: configuracao do App efetiva", "", solutionUniqueName);
+EnsureApiStep(service, tipoAppConfigRascunho, ApiAppConfigRascunho, "Cr40f.Acesso: configuracao do App salvar rascunho", "", solutionUniqueName);
+EnsureApiStep(service, tipoAppConfigPublicar, ApiAppConfigPublicar, "Cr40f.Acesso: configuracao do App publicar", "", solutionUniqueName);
+EnsureApiStep(service, tipoAppConfigPessoa, ApiAppConfigPessoa, "Cr40f.Acesso: configuracao do App definir pessoa", "", solutionUniqueName);
 
 if (publish)
 {
