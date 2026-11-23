@@ -33,7 +33,7 @@ public sealed class Transcricao
     public const string Segredo = "groq.transcricao";
     // Limite de upload da Groq (o mesmo do WhatsApp Inbox).
     public const long MaxBytes = 25L * 1024 * 1024;
-    // Igual ao cr40f_texto da atualização (memo de 20000).
+    // Mesmo corte do cr40f_texto (20000); a coluna cr40f_transcricao aceita 100000.
     public const int MaxTexto = 20000;
     public const string MsgGrande = "Áudio grande demais para transcrever (limite de 25 MB).";
     public const string MsgVazio = "Áudio sem conteúdo para transcrever.";

@@ -38,11 +38,11 @@ export function proximaEtapa(projeto: Pick<Projeto, 'id' | 'codigo'>, etapas: Et
   return { numero, codigo: projeto.codigo ? `${projeto.codigo}.${numero}` : '' }
 }
 
-const aberta = (e: Etapa) => e.status !== STATUS.concluida && e.status !== STATUS.pausada
+/** Aberta: nem concluída nem pausada. */
+export const aberta = (e: Pick<Etapa, 'status'>) => e.status !== STATUS.concluida && e.status !== STATUS.pausada
 
-/** Atrasada: tem prazo vencido (antes de `hoje`, `aaaa-mm-dd`) e não está concluída nem pausada. */
-export const atrasada = (e: Pick<Etapa, 'prazo' | 'status'>, hoje: string) =>
-  e.prazo != null && e.prazo < hoje && e.status !== STATUS.concluida && e.status !== STATUS.pausada
+/** Atrasada: tem prazo vencido (antes de `hoje`, `aaaa-mm-dd`) e está aberta. */
+export const atrasada = (e: Pick<Etapa, 'prazo' | 'status'>, hoje: string) => e.prazo != null && e.prazo < hoje && aberta(e)
 
 /** Ordem de atenção entre as etapas abertas: em validação (espera o Renan), em andamento, ideia. */
 const PESO: Record<number, number> = { [STATUS.validacao]: 0, [STATUS.andamento]: 1, [STATUS.ideia]: 2 }

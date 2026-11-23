@@ -27,11 +27,14 @@ export function AnexoMiniatura({ anexo, source }: Props) {
   }, [anexo, imagem, source])
 
   async function abrir() {
+    if (url) { window.open(url, '_blank', 'noopener'); return }
+    // A aba abre no clique (depois do download o navegador bloquearia o popup); o blob é liberado alguns minutos depois.
+    const janela = window.open('', '_blank')
     try {
-      const blob = url ? null : await source.baixarAnexo(anexo)
-      const href = url ?? URL.createObjectURL(blob as Blob)
-      window.open(href, '_blank', 'noopener')
-    } catch { setEstado('erro') }
+      const href = URL.createObjectURL(await source.baixarAnexo(anexo))
+      if (janela) { janela.opener = null; janela.location.href = href } else window.open(href, '_blank', 'noopener')
+      window.setTimeout(() => URL.revokeObjectURL(href), 5 * 60000)
+    } catch { janela?.close(); setEstado('erro') }
   }
 
   const Icone = ehVideo(anexo.tipo) ? Film : FileText

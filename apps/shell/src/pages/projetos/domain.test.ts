@@ -136,7 +136,7 @@ describe('lista e dados', () => {
     expect(path).toContain('_cr40f_etapa_value')
     expect(path).toContain('cr40f_transcricao')
     const a = mapAtualizacao({ cr40f_projetoatualizacaoid: 'ID1', _cr40f_projeto_value: 'P1', _cr40f_etapa_value: 'E1', cr40f_data: '2026-11-20T10:00:00Z', cr40f_autor: AUTOR.agente, cr40f_texto: 't', cr40f_eprova: true, cr40f_transcricao: 'oi', cr40f_projetoatualizacao_Annotations: [{ annotationid: 'N1', filename: 'a.webm', mimetype: 'audio/webm', filesize: 5 }] })
-    expect(a).toMatchObject({ id: 'id1', projetoId: 'p1', etapaId: 'e1', prova: true, transcricao: 'oi' })
+    expect(a).toMatchObject({ id: 'id1', projetoId: 'p1', etapaId: 'e1', data: '2026-11-20T07:00:00', prova: true, transcricao: 'oi' })
     const e = mapEtapa({ cr40f_projetoetapaid: 'E1', _cr40f_projeto_value: 'P1', cr40f_numero: 2, cr40f_codigo: 'PRJ-1.2', cr40f_name: 'X', cr40f_status: STATUS.validacao, cr40f_andamento: 90 })
     expect(e).toMatchObject({ id: 'e1', projetoId: 'p1', numero: 2, codigo: 'PRJ-1.2', status: STATUS.validacao, andamento: 90 })
     const sets = { projeto: 'cr40f_projetos', etapa: 'cr40f_projetoetapas', atualizacao: 'cr40f_projetoatualizacaos' }

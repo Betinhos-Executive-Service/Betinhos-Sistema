@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Dialog, Field, Textarea, useToast } from '@betinhos/ui'
 import { Paperclip, X } from 'lucide-react'
-import type { Source } from '../data/source'
+import { reasonText, type Source } from '../data/source'
 import { autorLabel } from '../domain/choices'
 import { MAX_ANEXOS, erroDoAnexo } from '../domain/anexos'
 import type { Atualizacao } from '../domain/types'
@@ -27,7 +27,6 @@ type Props = {
 }
 
 const agoraIso = () => { const d = new Date(), p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00` }
-const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 /** "Nova atualização": texto, marca de prova (só em etapa), anexos e áudio gravado (até 5 MB cada). */
 export function NovaAtualizacao({ projetoId, etapaId, autor, source, onSaved, onBusy, onDirty, rotulo = 'Nova atualização', pedido, semBotao }: Props) {
@@ -77,7 +76,7 @@ export function NovaAtualizacao({ projetoId, etapaId, autor, source, onSaved, on
   }
 
   function gravado(f: File | null) {
-    const e = f ? erroDoAnexo(f) : null
+    const e = !f ? null : erroDoAnexo(f) ?? (arquivos.length >= MAX_ANEXOS ? `Máximo de ${MAX_ANEXOS} arquivos por atualização; remova um para guardar o áudio.` : null)
     setAvisos(e ? [e] : [])
     setAudio(e ? null : f)
   }

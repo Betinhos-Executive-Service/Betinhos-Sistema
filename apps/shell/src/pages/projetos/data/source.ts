@@ -33,6 +33,9 @@ export type Source = {
   perfil: () => Promise<Perfil>
 }
 
+/** Mensagem do erro para mostrar na tela. */
+export const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, latenciaMock(ms)))
 
 /** Arquivo → base64 puro (sem o prefixo `data:`), em blocos para não estourar a pilha. */
@@ -152,8 +155,9 @@ export function createSource(host: Host): Source {
         }
       } catch (reason) {
         // Sem os anexos a atualização perderia a prova: exclui (as notas gravadas vão junto) e mostra o erro original.
-        await host.client.remove(st.atualizacao, id).catch(() => undefined)
-        throw reason
+        const removida = await host.client.remove(st.atualizacao, id).then(() => true, () => false)
+        if (removida) throw reason
+        throw new Error(`${reasonText(reason)} A atualização ficou registrada sem todos os anexos e não pôde ser excluída; confira a linha do tempo antes de tentar de novo.`)
       }
       return { id, projetoId: cleanId(nova.projetoId), etapaId: nova.etapaId ? cleanId(nova.etapaId) : null, data: nova.data, autor: nova.autor, texto: nova.texto, prova: nova.prova, transcricao: '', anexos }
     },

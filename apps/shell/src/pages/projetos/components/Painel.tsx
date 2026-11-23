@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button, StatusBadge, useToast } from '@betinhos/ui'
 import { Check, ExternalLink, Mic, Pencil, Plus, X } from 'lucide-react'
 import { formatDay } from '../../../app/format'
-import type { Source } from '../data/source'
+import { reasonText, type Source } from '../data/source'
 import { STATUS, autorDoPerfil, statusLabel, statusTone } from '../domain/choices'
 import { ehAudio } from '../domain/anexos'
 import { motivoSemConcluir, trilha } from '../domain/painel'
@@ -35,7 +35,6 @@ type Props = {
 }
 
 const quando = (iso: string) => `${formatDay(iso)} ${iso.slice(11, 16)}`
-const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 /** Briefing do gestor: texto do projeto e anexos fora de etapa (áudio com transcrição ou "Transcrição pendente"). */
 function Briefing({ projeto, atualizacoes, source }: { projeto: Projeto; atualizacoes: Atualizacao[]; source: Source }) {

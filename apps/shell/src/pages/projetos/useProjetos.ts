@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Carga, Source } from './data/source'
+import { reasonText, type Carga, type Source } from './data/source'
 import type { Atualizacao, Etapa, Projeto } from './domain/types'
 
 type State = Carga & {
@@ -8,7 +8,6 @@ type State = Carga & {
   loading: boolean
   error: string | null
 }
-const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const byNome = (a: Projeto, b: Projeto) => a.nome.localeCompare(b.nome, 'pt-BR')
 const trocar = <T extends { id: string }>(lista: T[], item: T) => (lista.some((x) => x.id === item.id) ? lista.map((x) => (x.id === item.id ? item : x)) : [...lista, item])
 
@@ -26,7 +25,7 @@ export function useProjetos(source: Source) {
       setState({ projetos: [...c.projetos].sort(byNome), etapas: c.etapas, atualizacoes: c.atualizacoes, loaded: true, loading: false, error: null })
     } catch (reason) {
       if (current !== token.current) return
-      setState((s) => ({ ...s, loading: false, error: message(reason) }))
+      setState((s) => ({ ...s, loading: false, error: reasonText(reason) }))
     }
   }, [source])
 

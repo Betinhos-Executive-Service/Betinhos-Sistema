@@ -21,6 +21,10 @@ const ATUALIZACAO_SELECT = [
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const text = (v: unknown) => { const t = str(v).trim(); return /^(null|undefined)$/i.test(t) ? '' : t }
+
+const SP = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+/** Data e hora do Dataverse (UTC, `…Z`) → horário de São Paulo sem fuso (`aaaa-mm-ddTHH:mm:ss`), a convenção da tela. Sem fuso fica como veio. */
+export const localIso = (v: string) => (v && /(Z|[+-]\d{2}:?\d{2})$/.test(v) ? SP.format(new Date(v)).replace(' ', 'T') : v)
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 export const projetosPath = (set: string) => `${set}?$select=${PROJETO_SELECT.join(',')}&$orderby=${encodeURIComponent('cr40f_name asc')}`
@@ -40,7 +44,7 @@ export const mapEtapa = (row: Row): Etapa => ({
   id: cleanId(str(row.cr40f_projetoetapaid)), projetoId: cleanId(str(row._cr40f_projeto_value)), numero: num(row.cr40f_numero) ?? 0,
   codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), status: num(row.cr40f_status) ?? STATUS.ideia, descricao: str(row.cr40f_descricao),
   prazo: text(row.cr40f_prazo).slice(0, 10) || null, andamento: Math.min(100, Math.max(0, num(row.cr40f_andamento) ?? 0)),
-  linkPr: text(row.cr40f_linkpr), publicadoProd: text(row.cr40f_publicadoprod) || null,
+  linkPr: text(row.cr40f_linkpr), publicadoProd: localIso(text(row.cr40f_publicadoprod)) || null,
 })
 
 export const mapAnexo = (row: Row): Anexo => ({ id: cleanId(str(row.annotationid)), nome: text(row.filename) || 'arquivo', tipo: text(row.mimetype), tamanho: num(row.filesize) })
@@ -50,7 +54,7 @@ export function mapAtualizacao(row: Row): Atualizacao {
   const etapa = text(row._cr40f_etapa_value)
   return {
     id: cleanId(str(row.cr40f_projetoatualizacaoid)), projetoId: cleanId(str(row._cr40f_projeto_value)), etapaId: etapa ? cleanId(etapa) : null,
-    data: text(row.cr40f_data) || text(row.createdon), autor: num(row.cr40f_autor) ?? AUTOR.agente, texto: str(row.cr40f_texto),
+    data: localIso(text(row.cr40f_data) || text(row.createdon)), autor: num(row.cr40f_autor) ?? AUTOR.agente, texto: str(row.cr40f_texto),
     prova: row.cr40f_eprova === true, transcricao: str(row.cr40f_transcricao).trim(), anexos,
   }
 }
@@ -61,7 +65,7 @@ export const resumo = (texto: string) => (texto.trim().replace(/\s+/g, ' ').slic
 export type NovaAtualizacaoDados = { projetoId: string; etapaId: string | null; data: string; autor: number; texto: string; prova: boolean }
 
 export const atualizacaoPayload = (a: NovaAtualizacaoDados, sets: EntitySets): Row => ({
-  cr40f_name: resumo(a.texto), cr40f_data: a.data, cr40f_autor: a.autor, cr40f_texto: a.texto, cr40f_eprova: a.prova,
+  cr40f_name: resumo(a.texto), cr40f_data: new Date(a.data).toISOString(), cr40f_autor: a.autor, cr40f_texto: a.texto, cr40f_eprova: a.prova,
   [`${NAV_PROJETO}@odata.bind`]: `/${sets.projeto}(${cleanId(a.projetoId)})`,
   ...(a.etapaId ? { [`${NAV_ETAPA}@odata.bind`]: `/${sets.etapa}(${cleanId(a.etapaId)})` } : {}),
 })

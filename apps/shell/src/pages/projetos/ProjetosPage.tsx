@@ -55,12 +55,14 @@ function Projetos({ host }: { host: Host }) {
   // Atualização não registrada no painel: trocar de seleção ou fechar pergunta "Descartar alterações?".
   const [painelSujo, setPainelSujo] = useState(false)
   const [painelOcupado, setPainelOcupado] = useState(false)
-  const [pendente, setPendente] = useState<{ s: Selecao } | null>(null)
-  const selecionar = useCallback((s: Selecao) => {
+  const [pendente, setPendente] = useState<{ seguir: () => void } | null>(null)
+  /** Roda a ação que tira o painel da tela (trocar seleção ou aba) só depois de confirmar o descarte. */
+  const guardar = useCallback((seguir: () => void) => {
     if (painelOcupado) { toast({ tone: 'info', message: 'Aguarde o envio da atualização terminar.' }); return }
-    if (painelSujo) { setPendente({ s }); return }
-    aplicar(s)
-  }, [painelOcupado, painelSujo, aplicar, toast])
+    if (painelSujo) { setPendente({ seguir }); return }
+    seguir()
+  }, [painelOcupado, painelSujo, toast])
+  const selecionar = useCallback((s: Selecao) => guardar(() => aplicar(s)), [guardar, aplicar])
 
   const [recolhidos, setRecolhidos] = useState<Set<string>>(() => new Set())
   const alternar = (id: string) => setRecolhidos((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -111,7 +113,7 @@ function Projetos({ host }: { host: Host }) {
   return (
     <div className={`page pj-page${painelAberto && !estreito ? ' pj-page--painel' : ''}`}>
       <div className="pj-barra-topo" role="toolbar" aria-label="Comandos de projetos">
-        <SegmentedControl aria-label="Visão" value={aba} onChange={(v) => setAba(v === 'lista' ? '' : v)} options={ABAS} />
+        <SegmentedControl aria-label="Visão" value={aba} onChange={(v) => guardar(() => setAba(v === 'lista' ? '' : v))} options={ABAS} />
         <div className="pj-barra-topo__busca">
           <SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar projeto, etapa ou PRJ…" aria-label="Buscar projeto, etapa ou PRJ" />
         </div>
@@ -151,7 +153,7 @@ function Projetos({ host }: { host: Host }) {
       <Dialog open={pendente != null} onClose={() => setPendente(null)} title="Descartar alterações?"
         actions={<>
           <Button variant="secondary" onClick={() => setPendente(null)}>Continuar editando</Button>
-          <Button variant="danger" onClick={() => { const s = pendente?.s ?? null; setPendente(null); setPainelSujo(false); aplicar(s) }}>Descartar</Button>
+          <Button variant="danger" onClick={() => { const seguir = pendente?.seguir; setPendente(null); setPainelSujo(false); seguir?.() }}>Descartar</Button>
         </>}>
         A atualização deste painel ainda não foi registrada.
       </Dialog>

@@ -1,6 +1,6 @@
 import { AUTOR, STATUS } from './choices'
 import { ehAudio, ehImagem, ehVideo } from './anexos'
-import { atrasada, daEtapa, doProjeto, etapasDo, ordemDoCodigo, provas } from './regras'
+import { aberta, atrasada, daEtapa, doProjeto, etapasDo, ordemDoCodigo, podeConcluir, provas } from './regras'
 import type { Anexo, Atualizacao, Etapa, Perfil, Projeto } from './types'
 
 /** As 5 fases da trilha, na ordem: Ideia → Fazendo → DEV → PROD → Prova. */
@@ -48,16 +48,15 @@ export function trilha(e: Etapa, atualizacoes: Atualizacao[], hoje: string): Tri
 
 /** Ação que a etapa espera agora; null = nada pendente. */
 export function acaoPendente(e: Etapa, atualizacoes: Atualizacao[]): string | null {
-  if (e.status === STATUS.concluida || e.status === STATUS.pausada) return null
-  const comProva = provas(daEtapa(atualizacoes, e.id)).length > 0
-  if (e.publicadoProd) return comProva ? 'Concluir' : 'Anexar prova'
+  if (!aberta(e)) return null
+  if (e.publicadoProd) return podeConcluir(atualizacoes, e.id) ? 'Concluir' : 'Anexar prova'
   if (e.status === STATUS.validacao) return 'Conferir'
   if (e.status === STATUS.ideia && daEtapa(atualizacoes, e.id).length) return 'Montar brief'
   return null
 }
 
 /** Briefing do gestor: texto do projeto ou anexos/atualizações fora de etapa. */
-export const temBriefing = (p: Projeto, atualizacoes: Atualizacao[]) =>
+const temBriefing = (p: Projeto, atualizacoes: Atualizacao[]) =>
   Boolean(p.briefing.trim()) || atualizacoes.some((a) => a.projetoId === p.id && !a.etapaId)
 
 const DIA = 86400000
@@ -70,7 +69,7 @@ export const ultimaDaEtapa = (atualizacoes: Atualizacao[], etapaId: string) => d
 
 /** Etapa parada: não está concluída nem pausada e a última atualização tem mais de 7 dias (sem atualização não conta). */
 export function parada(e: Etapa, atualizacoes: Atualizacao[], hoje: string): boolean {
-  if (e.status === STATUS.concluida || e.status === STATUS.pausada) return false
+  if (!aberta(e)) return false
   const u = ultimaDaEtapa(atualizacoes, e.id)
   return u != null && diasDesde(u.data, hoje) > DIAS_PARADO
 }
@@ -80,19 +79,15 @@ export function parada(e: Etapa, atualizacoes: Atualizacao[], hoje: string): boo
  * e briefing do gestor sem etapas. A regra é só do Renan: para o gestor nada conta (a tela esconde o filtro).
  */
 export function precisaDeMim(perfil: Perfil, e: Etapa, atualizacoes: Atualizacao[]): boolean {
-  if (perfil === 'renan') {
-    if (e.status === STATUS.validacao) return true
-    return Boolean(e.publicadoProd) && e.status !== STATUS.concluida && e.status !== STATUS.pausada && !provas(daEtapa(atualizacoes, e.id)).length
-  }
-  return false
+  if (perfil !== 'renan') return false
+  return e.status === STATUS.validacao || (Boolean(e.publicadoProd) && aberta(e) && !podeConcluir(atualizacoes, e.id))
 }
 export function projetoPrecisaDeMim(perfil: Perfil, p: Projeto, etapas: Etapa[], atualizacoes: Atualizacao[]): boolean {
   if (perfil !== 'renan') return false
   return !etapas.some((e) => e.projetoId === p.id) && temBriefing(p, atualizacoes)
 }
 
-export const concluidaComProva = (e: Etapa, atualizacoes: Atualizacao[]) =>
-  e.status === STATUS.concluida && provas(daEtapa(atualizacoes, e.id)).length > 0
+const concluidaComProva = (e: Etapa, atualizacoes: Atualizacao[]) => e.status === STATUS.concluida && podeConcluir(atualizacoes, e.id)
 
 export const FILTROS = [
   { value: 'todos', label: 'Todos' },
@@ -162,7 +157,7 @@ export function agrupar(c: Ctx & { filtro: Filtro; busca: string }): Grupo[] {
     const total = todas.length
     const conta = (f: (e: Etapa) => boolean) => (total ? todas.filter(f).length / total : 0)
     const ultima = doProjeto(c.atualizacoes, p.id)[0] ?? null
-    const abertas = todas.some((e) => e.status !== STATUS.concluida && e.status !== STATUS.pausada)
+    const abertas = todas.some(aberta)
     const dias = ultima ? diasDesde(ultima.data, c.hoje) : null
     out.push({
       projeto: p,
@@ -212,6 +207,6 @@ export function galeriaDeProvas(d: Dados, filtro: { projetoId?: string | null; t
 export function motivoSemConcluir(perfil: Perfil, e: Etapa, atualizacoes: Atualizacao[]): string | null {
   if (e.status === STATUS.concluida) return 'já concluída'
   if (perfil !== 'renan') return 'só o Renan'
-  if (!provas(daEtapa(atualizacoes, e.id)).length) return 'falta prova'
+  if (!podeConcluir(atualizacoes, e.id)) return 'falta prova'
   return null
 }

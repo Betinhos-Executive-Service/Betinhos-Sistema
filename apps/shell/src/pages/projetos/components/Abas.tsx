@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button, EmptyState, Field, SegmentedControl, Select, Textarea, useToast } from '@betinhos/ui'
 import { Images, Pencil } from 'lucide-react'
 import { formatDay } from '../../../app/format'
-import type { Source } from '../data/source'
+import { reasonText, type Source } from '../data/source'
 import { autorLabel } from '../domain/choices'
 import { MAX_LENGTH } from '../domain/form'
 import { galeriaDeProvas, type TipoProva } from '../domain/painel'
@@ -13,7 +13,6 @@ import type { Selecao } from './Lista'
 
 const porCodigo = (a: Projeto, b: Projeto) => (ordemDoCodigo(a.codigo) ?? Infinity) - (ordemDoCodigo(b.codigo) ?? Infinity)
 const TIPOS = [{ value: '', label: 'Todos' }, { value: 'print', label: 'Prints' }, { value: 'video', label: 'Vídeos' }, { value: 'audio', label: 'Áudios' }]
-const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 type Dados = { projetos: Projeto[]; etapas: Etapa[]; atualizacoes: Atualizacao[]; source: Source }
 

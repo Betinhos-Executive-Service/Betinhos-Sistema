@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { cleanId } from '@betinhos/dataverse'
 import { Alert, Button, Dialog, Drawer, useToast } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
-import type { Source } from '../data/source'
+import { reasonText, type Source } from '../data/source'
 import { applyProjeto, diffProjeto, emptyProjetoForm, hasChanges, projetoSujo, toProjetoForm, validateProjeto, type ProjetoErrors, type ProjetoForm as FormValues } from '../domain/form'
 import type { Projeto } from '../domain/types'
 import { ProjetoForm } from './ProjetoForm'
@@ -20,7 +20,6 @@ type Props = {
   onSaved: (p: Projeto) => void
 }
 
-const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const vazioProjeto = (id: string, codigo: string): Projeto => ({ id, codigo, nome: '', area: '', responsavel: '', briefing: '', instrucoes: '' })
 
 /** Cadastro e edição do projeto (nome, área, responsável, briefing, instruções). O detalhe fica no painel lateral. */

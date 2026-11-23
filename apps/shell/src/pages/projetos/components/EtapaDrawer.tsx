@@ -3,7 +3,7 @@ import { cleanId } from '@betinhos/dataverse'
 import { Alert, Button, Dialog, Drawer, Field, Input, Select, Textarea, useToast } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { formatDay } from '../../../app/format'
-import type { Source } from '../data/source'
+import { reasonText, type Source } from '../data/source'
 import { STATUS, STATUS_OPTIONS } from '../domain/choices'
 import { MAX_LENGTH, applyEtapa, diffEtapa, emptyEtapaForm, etapaSuja, hasChanges, toEtapaForm, validateEtapa, type EtapaErrors, type EtapaForm } from '../domain/form'
 import { AVISO_SO_RENAN, daEtapa, provas, proximaEtapa } from '../domain/regras'
@@ -22,7 +22,6 @@ type Props = {
   onSaved: (e: Etapa) => void
 }
 
-const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const STATUS_SELECT = STATUS_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))
 const quando = (iso: string) => `${formatDay(iso)} ${iso.slice(11, 16)}`
 
@@ -49,7 +48,6 @@ export function EtapaDrawer({ alvo, onClose, onCriada, projeto, etapas, atualiza
 
   const open = key != null && ready === key
   const formSujo = open && etapaSuja(base, form)
-  const dirty = formSujo
   const itens = current ? daEtapa(atualizacoes, current.id) : []
   const nProvas = provas(itens).length
   const renan = perfil === 'renan'
@@ -58,7 +56,7 @@ export function EtapaDrawer({ alvo, onClose, onCriada, projeto, etapas, atualiza
 
   function close() {
     if (saving) return
-    if (dirty) { setPendingExit(true); return }
+    if (formSujo) { setPendingExit(true); return }
     onClose()
   }
 
