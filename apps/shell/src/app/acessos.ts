@@ -6,6 +6,7 @@ import { param } from './mockVolume'
 
 export const AREAS = ['operacional', 'financeiro', 'frota', 'rh'] as const
 export type Area = (typeof AREAS)[number]
+export const ehArea = (valor: unknown): valor is Area => AREAS.some((area) => area === valor)
 export type Nivel = 'operador' | 'gestor'
 export type Perfil = Area | 'acessos'
 export type PerfisDeArea = Partial<Record<Area, Nivel>>
@@ -50,17 +51,17 @@ export const semModulos = (a: Acessos) => !a.admin && !a.acessos && AREAS.every(
 
 type Linhas<T> = { value: T[] }
 
-/** Nomes dos papéis da pessoa: os diretos e os herdados das equipes (o administrador costuma vir por equipe). */
-export async function nomesDosPapeis(client: DataverseClient, userId?: string): Promise<string[]> {
+/** Nomes dos papéis da pessoa: os diretos e os herdados das equipes (o administrador costuma vir por equipe). `parcial` = alguma equipe não pôde ser lida. */
+export async function nomesDosPapeis(client: DataverseClient, userId?: string): Promise<{ nomes: string[]; parcial: boolean }> {
   const uid = userId ?? cleanId((await client.request<{ UserId: string }>('WhoAmI')).UserId)
   const [diretos, equipes] = await Promise.all([
     client.request<Linhas<{ name: string }>>(`systemusers(${uid})/systemuserroles_association?$select=name`),
     client.request<Linhas<{ teamid: string }>>(`systemusers(${uid})/teammembership_association?$select=teamid`),
   ])
-  // Equipe ilegível conta como sem papéis; falha no WhoAmI, nos papéis diretos ou na lista de equipes continua sendo erro.
+  // Equipe ilegível não derruba a leitura (vira `parcial`); falha no WhoAmI, nos papéis diretos ou na lista de equipes continua sendo erro.
   const deEquipe = await Promise.allSettled(equipes.value.map((e) => client.request<Linhas<{ name: string }>>(`teams(${e.teamid})/teamroles_association?$select=name`)))
   const herdados = deEquipe.flatMap((r) => (r.status === 'fulfilled' ? r.value.value : []))
-  return [...diretos.value, ...herdados].map((r) => r.name)
+  return { nomes: [...diretos.value, ...herdados].map((r) => r.name), parcial: deEquipe.some((r) => r.status === 'rejected') }
 }
 
 /** `?acessos=financeiro:operador,rh:gestor,acessos` | `nenhum` | `erro`; sem o parâmetro, todos os perfis. */
@@ -73,12 +74,13 @@ export function acessosDoMock(texto: string | null): Acessos {
   for (const parte of texto.split(',')) {
     const [perfil, nivel] = parte.trim().split(':')
     if (perfil === 'acessos') acessos = true
-    else if ((AREAS as readonly string[]).includes(perfil)) areas[perfil as Area] = nivel === 'gestor' ? 'gestor' : 'operador'
+    else if (ehArea(perfil)) areas[perfil] = nivel === 'gestor' ? 'gestor' : 'operador'
   }
   return { admin: false, areas, acessos }
 }
 
-export async function carregarAcessos(host: Host): Promise<Acessos> {
-  if (host.mode === 'mock') return acessosDoMock(param('acessos'))
-  return lerPapeis(await nomesDosPapeis(host.client))
+export async function carregarAcessos(host: Host): Promise<{ acessos: Acessos; parcial: boolean }> {
+  if (host.mode === 'mock') return { acessos: acessosDoMock(param('acessos')), parcial: false }
+  const { nomes, parcial } = await nomesDosPapeis(host.client)
+  return { acessos: lerPapeis(nomes), parcial }
 }

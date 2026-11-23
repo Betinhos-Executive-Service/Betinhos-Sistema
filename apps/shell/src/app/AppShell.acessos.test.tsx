@@ -35,4 +35,15 @@ describe('AppShell com perfis', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(recarregar).toHaveBeenCalledOnce()
   })
+
+  it('leitura parcial (equipe ilegível): avisa que o menu pode estar incompleto', () => {
+    shell({ status: 'pronto', acessos: lerPapeis(['Perfil - Financeiro - Operador']), parcial: true, recarregar: () => {} })
+    expect(screen.getByText('Não foi possível carregar seus acessos')).toBeTruthy()
+    expect(screen.getByText(/menu pode estar incompleto/)).toBeTruthy()
+  })
+
+  it('leitura completa: sem aviso', () => {
+    shell({ status: 'pronto', acessos: lerPapeis(['Perfil - Financeiro - Operador']), recarregar: () => {} })
+    expect(screen.queryByText('Não foi possível carregar seus acessos')).toBeNull()
+  })
 })

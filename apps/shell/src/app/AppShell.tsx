@@ -195,9 +195,9 @@ export function AppShell({ activeId, title, entityLabels, connection, badges, oc
       )}
       version={BUILD}
     >
-      {acesso.status === 'erro' ? (
+      {acesso.status === 'erro' || (acesso.status === 'pronto' && acesso.parcial) ? (
         <Alert tone="warning" title="Não foi possível carregar seus acessos" action={<Button variant="secondary" onClick={acesso.recarregar}>Tentar de novo</Button>}>
-          O menu mostra só as telas liberadas para todos.
+          {acesso.status === 'erro' ? 'O menu mostra só as telas liberadas para todos.' : 'Parte dos acessos que vêm das suas equipes não carregou; o menu pode estar incompleto.'}
         </Alert>
       ) : null}
       {children}

@@ -52,7 +52,7 @@ describe('nomesDosPapeis', () => {
         throw new Error(`caminho inesperado: ${path}`)
       },
     } as unknown as DataverseClient
-    expect(await nomesDosPapeis(client)).toEqual(['Perfil - Base', 'Administrador do Sistema'])
+    expect((await nomesDosPapeis(client)).nomes).toEqual(['Perfil - Base', 'Administrador do Sistema'])
     expect(pedidos[1]).toContain('systemusers(aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa)')
   })
 })
@@ -69,7 +69,7 @@ describe('nomesDosPapeis com equipe ilegível', () => {
         throw new Error(`caminho inesperado: ${path}`)
       },
     } as unknown as DataverseClient
-    expect(await nomesDosPapeis(client)).toEqual(['Perfil - Base', 'Perfil - RH - Gestor'])
+    expect(await nomesDosPapeis(client)).toEqual({ nomes: ['Perfil - Base', 'Perfil - RH - Gestor'], parcial: true })
   })
 })
 

@@ -85,7 +85,7 @@ export function createDataverseViewStore(client: DataverseClient, onWarn?: (mess
       await client.update(VIEW_ENTITY_SET, id, { 'ownerid@odata.bind': `/teams(${tid})`, cr40f_publica: true })
     },
     canPublish() {
-      return (publisher ??= userId().then((uid) => nomesDosPapeis(client, uid)).then((nomes) => nomes.some((n) => PUBLISHER_ROLES.includes(n))).catch((e) => { publisher = null; throw e }))
+      return (publisher ??= userId().then((uid) => nomesDosPapeis(client, uid)).then(({ nomes }) => nomes.some((n) => PUBLISHER_ROLES.includes(n))).catch((e) => { publisher = null; throw e }))
     },
   }
 }

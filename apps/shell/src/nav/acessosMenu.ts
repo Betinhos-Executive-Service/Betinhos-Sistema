@@ -1,11 +1,13 @@
-import { temAlgum, type Acessos, type Perfil } from '../app/acessos'
+import { ehArea, temAlgum, type Acessos, type Perfil } from '../app/acessos'
 import mapaJson from './acessosMapa.json'
 import { MENU, type MenuGroup } from './menu'
 
-const ROTAS = (mapaJson as unknown as { rotas: Record<string, { perfis?: Perfil[] }> }).rotas
+const ehPerfil = (valor: string): valor is Perfil => valor === 'acessos' || ehArea(valor)
+const rotas: Record<string, { perfis?: string[]; pastas: string[] }> = mapaJson.rotas
+const ROTAS = new Map(Object.entries(rotas).map(([id, rota]) => [id, rota.perfis?.filter(ehPerfil)]))
 
 /** Perfis que abrem a rota; `undefined` = livre para todos. A fonte é o mapa, o mesmo que gera os papéis. */
-export const perfisDoItem = (id: string): Perfil[] | undefined => ROTAS[id]?.perfis
+export const perfisDoItem = (id: string): Perfil[] | undefined => ROTAS.get(id)
 
 /** O menu que a pessoa alcança; grupo sem item visível some. */
 export function menuVisivel(acessos: Acessos, menu: MenuGroup[] = MENU): MenuGroup[] {

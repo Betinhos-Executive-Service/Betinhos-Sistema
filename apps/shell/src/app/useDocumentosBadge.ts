@@ -16,7 +16,7 @@ export const contarUrgentes = (data: DocsData, hoje: string) => urgentes(contarK
 export function useDocumentosBadge(host: Host, habilitado = true) {
   const [total, setTotal] = useState<number | null>(null)
   useEffect(() => {
-    if (!habilitado) { setTotal(null); return }
+    if (!habilitado) return
     let vivo = true
     let desligar = () => {}
     const cancelarOcioso = quandoOcioso(() => {
@@ -34,5 +34,5 @@ export function useDocumentosBadge(host: Host, habilitado = true) {
     })
     return () => { vivo = false; cancelarOcioso(); desligar() }
   }, [host, habilitado])
-  return total
+  return habilitado ? total : null
 }

@@ -34,7 +34,7 @@ function Sistema({ host }: { host: Host }) {
   const docsUrgentes = useDocumentosBadge(host, acesso.status === 'pronto' && temAlgum(acesso.acessos, perfisDoItem('documentos')))
   const badges = useMemo(() => (docsUrgentes ? { documentos: docsUrgentes } : undefined), [docsUrgentes])
   // Enquanto lê os papéis (acesso nulo) o item fica fora do menu: não pisca para quem não pode abrir.
-  const ocultos = useAcessoConfigApp(host)?.gestor ? undefined : SEM_GESTOR
+  const ocultos = useAcessoConfigApp()?.gestor ? undefined : SEM_GESTOR
   const route = useHashRoute()
   const query = useHashQuery()
   usePrefetchOnIntent()

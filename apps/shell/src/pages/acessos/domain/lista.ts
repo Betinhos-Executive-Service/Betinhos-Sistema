@@ -1,5 +1,5 @@
 import type { FilterField, StoredView, ViewColumnDef } from '@betinhos/ui'
-import { AREAS, AREA_LABEL, PERFIL_LABEL } from '../../../app/acessos'
+import { AREAS, AREA_LABEL, PERFIL_LABEL, ehArea } from '../../../app/acessos'
 import { rotulos } from './perfis'
 import type { Pessoa } from './types'
 
@@ -40,7 +40,7 @@ export function readPessoa(p: Pessoa, key: string): unknown {
     case 'acessos': return p.perfis.acessos ? 'sim' : 'nao'
     case 'admin': return p.admin ? 'sim' : 'nao'
     case 'alterado': return p.alteradoEm ? diaSaoPaulo(p.alteradoEm) : null
-    default: return (AREAS as readonly string[]).includes(key) ? (p.perfis.areas[key as (typeof AREAS)[number]] ?? 'nenhum') : null
+    default: return ehArea(key) ? (p.perfis.areas[key] ?? 'nenhum') : null
   }
 }
 

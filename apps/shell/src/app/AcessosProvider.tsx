@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Host } from '../host'
 import { NENHUM, TODOS, carregarAcessos, type Acessos } from './acessos'
 
-export type EstadoAcessos = { status: 'carregando' } | { status: 'erro' } | { status: 'pronto'; acessos: Acessos }
+export type EstadoAcessos = { status: 'carregando' } | { status: 'erro' } | { status: 'pronto'; acessos: Acessos; /** Alguma equipe não pôde ser lida: o menu pode estar incompleto. */ parcial?: boolean }
 export type ValorAcessos = EstadoAcessos & { recarregar: () => void }
 
 /** Sem provider (testes de tela isolada) vale "todos os perfis": o shell não é a fronteira de segurança. */
@@ -16,7 +16,7 @@ export function AcessosProvider({ host, children }: { host: Host; children: Reac
     let vivo = true
     setEstado({ status: 'carregando' })
     carregarAcessos(host).then(
-      (acessos) => { if (vivo) setEstado({ status: 'pronto', acessos }) },
+      ({ acessos, parcial }) => { if (vivo) setEstado({ status: 'pronto', acessos, parcial }) },
       () => { if (vivo) setEstado({ status: 'erro' }) },
     )
     return () => { vivo = false }

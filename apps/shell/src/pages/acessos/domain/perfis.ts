@@ -1,4 +1,4 @@
-import { AREAS, AREA_LABEL, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Area, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
+import { AREAS, AREA_LABEL, ehArea, NIVEL_LABEL, PERFIL_LABEL, nomeDoPapel, type Nivel, type Perfil, type PerfisDeArea } from '../../../app/acessos'
 import type { ErroApi, ItemPedido, PerfisPessoa } from './types'
 
 /** JSON do pedido (e do histórico): áreas na ordem fixa, Administrador de acessos no fim. Lista vazia = só o Base. */
@@ -15,7 +15,7 @@ export function doPedido(texto: unknown): PerfisPessoa {
   let acessos = false
   for (const item of Array.isArray(itens) ? (itens as { perfil?: unknown; nivel?: unknown }[]) : []) {
     if (item?.perfil === 'acessos') acessos = true
-    else if ((AREAS as readonly unknown[]).includes(item?.perfil)) areas[item.perfil as Area] = item.nivel === 'gestor' ? 'gestor' : 'operador'
+    else if (ehArea(item?.perfil)) areas[item.perfil] = item.nivel === 'gestor' ? 'gestor' : 'operador'
   }
   return { areas, acessos }
 }
