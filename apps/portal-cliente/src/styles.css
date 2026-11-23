@@ -2,7 +2,6 @@
 
 .pc-parceria { display: flex; align-items: center; gap: var(--bt-space-3); flex-shrink: 0; }
 .pc-parceria img { display: block; width: auto; }
-.pc-parceria__cliente { border-radius: var(--bt-radius-sm); }
 .pc-parceria__x { font-size: var(--bt-font-size-14); color: var(--bt-color-text-secondary); }
 .pc-parceria--topo img { height: 36px; }
 .pc-parceria--entrar { margin-bottom: var(--bt-space-4); }
