@@ -20,6 +20,7 @@ function fakeClient(roles: string[] = []) {
       }
     }
     if (path.includes('systemuserroles_association')) return { value: roles.map((name) => ({ name })) }
+    if (path.includes('teammembership_association')) return { value: [] }
     throw new Error(`caminho inesperado ${path}`)
   })
   const client = { apiUrl: '', request, getAll: vi.fn(), create: vi.fn(async () => '{dddd0000-0000-0000-0000-000000000004}'), update: vi.fn(async () => undefined), remove: vi.fn(async () => undefined) }

@@ -1,6 +1,7 @@
 import { createMemoryViewStore, type StoredView, type ViewStore } from '@betinhos/ui'
 import type { DataverseClient } from '@betinhos/dataverse'
 import type { Host } from '../host'
+import { nomesDosPapeis } from './acessos'
 
 /**
  * Onde as listas guardam as visões salvas (DS §10.9.1): tabela `cr40f_visaodetabela` no Dataverse
@@ -83,9 +84,8 @@ export function createDataverseViewStore(client: DataverseClient, onWarn?: (mess
       await client.update(VIEW_ENTITY_SET, id, { 'ownerid@odata.bind': `/teams(${tid})`, cr40f_publica: true })
     },
     async canPublish() {
-      const uid = await userId()
-      const roles = await client.request<{ value: { name: string }[] }>(`systemusers(${uid})/systemuserroles_association?$select=name`)
-      return roles.value.some((r) => PUBLISHER_ROLES.includes(r.name))
+      const nomes = await nomesDosPapeis(client, await userId())
+      return nomes.some((n) => PUBLISHER_ROLES.includes(n))
     },
   }
 }

@@ -5,7 +5,7 @@ import { latenciaMock } from './latenciaMock'
  * Modo mock com listas grandes, para testar desempenho no `pnpm dev`: `?volume=5000` antes do `#` multiplica os
  * registros de exemplo; `?falha=carga` faz a carga completa falhar depois da primeira página.
  */
-function param(name: string) {
+export function param(name: string) {
   try {
     return new URLSearchParams(window.location.search).get(name)
   } catch {
