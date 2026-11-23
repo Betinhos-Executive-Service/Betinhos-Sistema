@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AuditButton, AuditPanel, type AuditEvent, type AuditStatus } from '@betinhos/ui'
 import type { Host } from '../../host'
-import { createAuditSource, createMockAuditSource, isForbidden, MAX_IDS, type AuditTarget } from './source'
+import { auditScope, createAuditSource, createMockAuditSource, isForbidden, withLabels, type AuditTarget } from './source'
 
 export type { AuditTarget } from './source'
+export { auditLabels } from './source'
 
 type State = {
   target: AuditTarget | null
@@ -72,8 +73,8 @@ export function AuditoriaProvider({ host, children }: { host: Host; children: Re
 
   const { target } = state
   const ids = target?.ids ?? []
-  const scope = ids.length === 1 ? target?.name || '1 registro' : ids.length > 1 ? `${Math.min(ids.length, MAX_IDS)} registros` : 'Alterações recentes'
-  const eyebrow = [state.tableLabel, scope].filter(Boolean).join(' · ')
+  const eyebrow = [state.tableLabel, target && auditScope(target)].filter(Boolean).join(' · ')
+  const events = useMemo(() => withLabels(state.events, target?.labels), [state.events, target])
   const openRecord = target?.onOpenRecord
 
   return (
@@ -84,7 +85,7 @@ export function AuditoriaProvider({ host, children }: { host: Host; children: Re
         onClose={close}
         eyebrow={eyebrow}
         status={state.status}
-        events={state.events}
+        events={events}
         error={state.error}
         onRetry={target ? () => open(target) : undefined}
         hasMore={state.next != null}

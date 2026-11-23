@@ -20,7 +20,7 @@ import { custoVeiculo, ultimos12Meses } from '../domain/indicadores'
 import { TELA_VEICULOS, VEICULO_COLUMNS, VEICULO_DEFAULT_FILTERS, VEICULO_FIELDS, VEICULO_SORT, matchesVeiculoKeyword, readVeiculo, sortVeiculos, veiculoBuiltins, veiculoLegacy, type LinhaVeiculo } from '../domain/listas'
 import { motoristaAtual, possesAbertas, rotuloMotoristaAtual } from '../domain/motoristaAtual'
 import { buildPendencias } from '../domain/pendencias'
-import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { auditLabels, useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import { useMedia } from '../../operacional/useMedia'
 
 const MOCK_HOST: Host = { mode: 'mock' }
@@ -107,7 +107,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
   return (
     <>
       <div role="toolbar" aria-label="Comandos de veículos" {...sel.bar}>
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', ids: sel.rows.map((v) => v.id), onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', ids: sel.rows.map((v) => v.id), labels: auditLabels(visiveis, (v) => [v.veiculo.placa, v.veiculo.modelo]), onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
           search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, marca, modelo, cor, motorista, categoria ou status" value={busca} onChange={setBusca} />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>
