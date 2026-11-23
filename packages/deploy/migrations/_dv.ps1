@@ -24,8 +24,9 @@ function Connect-Dv([string] $EnvironmentUrl, [string] $Arquivo, [bool] $Apply) 
 }
 
 # Repete em 429 e 5xx (espera 2, 4, 8, 16 s); outros erros falham na hora com o corpo da resposta.
-function Invoke-Dv([string] $Method, [string] $Path, $Body = $null) {
+function Invoke-Dv([string] $Method, [string] $Path, $Body = $null, [hashtable] $ExtraHeaders = @{}) {
   $headers = @{ Authorization = "Bearer $script:DvToken"; Accept = "application/json"; "OData-MaxVersion" = "4.0"; "OData-Version" = "4.0"; "MSCRM.SolutionUniqueName" = $script:SolucaoDev }
+  foreach ($k in $ExtraHeaders.Keys) { $headers[$k] = $ExtraHeaders[$k] }
   $params = @{ Method = $Method; Uri = "$script:DvApi/$Path"; Headers = $headers }
   if ($null -ne $Body) {
     # OData so le @odata.type se ele vier antes das propriedades; hashtable nao garante ordem.
