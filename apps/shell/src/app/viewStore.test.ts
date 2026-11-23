@@ -34,6 +34,20 @@ describe('createDataverseViewStore', () => {
     expect(client.request.mock.calls.some(([p]) => String(p).includes("cr40f_tela eq 'pessoas''x'"))).toBe(true)
   })
 
+  it('equipe das públicas ilegível: devolve só as minhas, avisa e não rejeita', async () => {
+    const client = fakeClient()
+    const base = client.request.getMockImplementation()!
+    client.request.mockImplementation(async (path: string) => {
+      if (path.startsWith('teams?')) throw new Error('Privilégio insuficiente.')
+      return base(path)
+    })
+    const avisos: string[] = []
+    const list = await createDataverseViewStore(client, (m) => avisos.push(m)).list('pessoas')
+    expect(list.map((v) => [v.id, v.mine, v.publica])).toEqual([['v1', true, false]])
+    expect(avisos).toHaveLength(1)
+    expect(avisos[0]).toContain('Privilégio insuficiente.')
+  })
+
   it('cria, regrava e publica atribuindo à equipe', async () => {
     const client = fakeClient()
     const store = createDataverseViewStore(client)

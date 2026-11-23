@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
 import { sortRows } from '../../../app/listSort'
-import { dataCurta, exigenciasDe, progressoDe, publicoCelula, validadeDe, type ProgressoConta } from './tabela'
+import { dataCurta, diaSp, exigenciasDe, progressoDe, publicoCelula, validadeDe, type ProgressoConta } from './tabela'
 import { ESTADO, PUBLICO, formatDate, isPublicado, type Funcionario, type Treinamento } from './treinamentos'
 
 /** Treinamentos no padrão de listas do DS (§10.9.1/§10.9.2). A Visão padrão mostra rascunhos e publicados. */
@@ -38,6 +38,13 @@ export const TREINAMENTO_FIELDS: FilterField[] = [
 /** Linha da lista: o treinamento mais a data de criação (ordenação padrão). */
 export type Linha = Treinamento & { criadoEm: string }
 
+/** Dia (AAAA-MM-DD) da publicação no fuso de São Paulo; texto só com a data não tem hora para converter e vale como está. */
+const diaPublicacao = (value: string) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value.slice(0, 10) : diaSp(date)
+}
+
 export function readTreinamento(t: Linha, key: string): unknown {
   switch (key) {
     case 'titulo': return t.titulo
@@ -45,7 +52,7 @@ export function readTreinamento(t: Linha, key: string): unknown {
     case 'estado': return String(t.estado)
     case 'publico': return String(t.publicoTipo)
     case 'validade': return t.validade || null
-    case 'publicadoEm': return t.publicadoEm ? t.publicadoEm.slice(0, 10) : null
+    case 'publicadoEm': return t.publicadoEm ? diaPublicacao(t.publicadoEm) : null
     case 'exigeAssinatura': return t.exigeAssinatura
     case 'exigeQuiz': return t.exigeQuiz
     default: return null
