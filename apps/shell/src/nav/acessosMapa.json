@@ -42,29 +42,17 @@
         {"tabela": "cr40f_fluxocaixalancamento", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_funcionarios", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_reservadeveculos", "motivo": "card de outra area, some sem perfil (plano 3)"},
-        {"tabela": "cr40f_servicosporpassageiro", "motivo": "card de outra area, some sem perfil (plano 3)"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "cr40f_servicosporpassageiro", "motivo": "card de outra area, some sem perfil (plano 3)"}
       ]
     },
     "geral": {
       "perfis": ["operacional"],
-      "pastas": ["apps/shell/src/pages/geral"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/geral"]
     },
     "dashboard": {
       "perfis": ["operacional"],
       "pastas": ["apps/shell/src/pages/dashboard"],
       "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
         {"tabela": "cr40f_anexodespesaoperacional", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"},
         {"tabela": "cr40f_baselinepreventiva", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"},
         {"tabela": "cr40f_composicaodeprecos", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"},
@@ -80,28 +68,15 @@
     "operacional": {"perfis": ["operacional"], "pastas": ["apps/shell/src/pages/operacional"]},
     "funcoes-operacionais": {
       "perfis": ["operacional"],
-      "pastas": ["apps/shell/src/pages/funcoes-operacionais"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/funcoes-operacionais"]
     },
     "comunicados": {
       "perfis": ["operacional"],
-      "pastas": ["apps/shell/src/pages/comunicados"],
-      "ignorar": [
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/comunicados"]
     },
     "qualidade": {
       "perfis": ["operacional"],
-      "pastas": ["apps/shell/src/pages/qualidade"],
-      "ignorar": [
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/qualidade"]
     },
     "infleet": {"perfis": ["operacional"], "pastas": []},
     "planner": {
@@ -111,319 +86,123 @@
         {"tabela": "cr40f_cotacaopropostaversao", "motivo": "cotações só para Operacional e Financeiro (plano 3)"},
         {"tabela": "cr40f_cotacaoopcao", "motivo": "cotações só para Operacional e Financeiro (plano 3)"},
         {"tabela": "cr40f_cotacaoopcaoitem", "motivo": "cotações só para Operacional e Financeiro (plano 3)"},
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "comment", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
         {"tabela": "cr40f_acaooperacional", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_bancodedados", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_clientes1", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_errooperacional", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_funcionarios", "motivo": "card de outra area, some sem perfil (plano 3)"},
         {"tabela": "cr40f_multas", "motivo": "card de outra area, some sem perfil (plano 3)"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area, some sem perfil (plano 3)"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area, some sem perfil (plano 3)"}
       ]
     },
     "composicao": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/composicao"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/composicao"]
     },
     "new_telacomposicaopreco": {"perfis": ["financeiro"], "pastas": []},
     "ops": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/ops"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/ops"]
     },
     "pagantes": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/pagantes", "apps/shell/src/pages/recebimentos"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/pagantes", "apps/shell/src/pages/recebimentos"]
     },
     "pendencias": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/pendencias"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/pendencias"]
     },
     "validacao-cliente": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/validacao-cliente"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/validacao-cliente"]
     },
     "pagamento-fornecedores": {
       "perfis": ["financeiro"],
       "pastas": ["apps/shell/src/pages/pagamento-fornecedores"],
       "ignorar": [
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "new_appmotoristaslog", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"}
       ]
     },
     "despesas-operacionais": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/despesas"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/despesas"]
     },
     "frota": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-veiculos": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-manutencoes": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-multas": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-infracoes": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/infracoes"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/infracoes"]
     },
     "frota-colisoes": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-indicadores": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-plano": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "frota-checklists": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/frota"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "chat", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "signal", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/frota"]
     },
     "pessoas": {
       "perfis": ["operacional", "financeiro"],
       "pastas": ["apps/shell/src/pages/pessoas"],
       "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "cr40f_pagantes", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "cr40f_pagantes", "motivo": "card de outra area; nao ampliar a leitura do perfil (decisao de acesso, plano 3)"}
       ]
     },
     "clientes": {
       "perfis": ["operacional", "financeiro"],
-      "pastas": ["apps/shell/src/pages/clientes"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/clientes"]
     },
     "funcionarios": {
       "perfis": ["rh"],
-      "pastas": ["apps/shell/src/pages/funcionarios"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "credential", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariabledefinition", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "environmentvariablevalue", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/funcionarios"]
     },
     "documentos": {
       "perfis": ["rh"],
-      "pastas": ["apps/shell/src/pages/documentos"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "package", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/documentos"]
     },
     "curriculos": {
       "perfis": ["rh"],
-      "pastas": ["apps/shell/src/pages/curriculos"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/curriculos"]
     },
     "equipamentos": {
       "perfis": ["frota"],
-      "pastas": ["apps/shell/src/pages/equipamentos"],
-      "ignorar": [
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/equipamentos"]
     },
     "treinamentos": {
       "perfis": ["rh"],
-      "pastas": ["apps/shell/src/pages/treinamentos"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "catalog", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "tag", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/treinamentos"]
     },
     "cartoes": {
       "perfis": ["financeiro"],
-      "pastas": ["apps/shell/src/pages/cartoes"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/cartoes"]
     },
     "rh-descontos": {"perfis": ["rh"], "pastas": ["apps/shell/src/pages/rh-descontos"]},
     "new_dashboard": {"perfis": ["operacional"], "pastas": []},
     "logs-apps": {
       "perfis": ["operacional"],
-      "pastas": ["apps/shell/src/pages/logs"],
-      "ignorar": [
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
-      ]
+      "pastas": ["apps/shell/src/pages/logs"]
     },
     "cr40f_categoriadespesaoperacional": {"perfis": ["financeiro"], "pastas": []},
     "cr40f_formapagamentodespesa": {"perfis": ["financeiro"], "pastas": []},
@@ -439,9 +218,7 @@
         {"tabela": "cr40f_appconfigpessoa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_appconfigversao", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_funcionarios", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
-        {"tabela": "new_inscricaopushmotorista", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
-        {"tabela": "card", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "new_inscricaopushmotorista", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"}
       ]
     },
     "projetos": {
@@ -450,9 +227,7 @@
       "ignorar": [
         {"tabela": "cr40f_projeto", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_projetoatualizacao", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
-        {"tabela": "cr40f_projetoetapa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
-        {"tabela": "bot", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"},
-        {"tabela": "plugin", "motivo": "palavra comum do codigo que casou com tabela de sistema; a tela nao le essa tabela"}
+        {"tabela": "cr40f_projetoetapa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"}
       ]
     }
   }

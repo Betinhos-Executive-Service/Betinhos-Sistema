@@ -15,7 +15,8 @@ const mapa = mapaJson as unknown as Mapa
 const RAIZ = fileURLToPath(new URL('../../../../', import.meta.url))
 const catalogo = JSON.parse(readFileSync(join(RAIZ, 'packages/deploy/acessos/tabelas.json'), 'utf8')) as { logico: string; conjunto: string }[]
 const porNome = new Map<string, string>()
-for (const t of catalogo) {
+// Tabela sem prefixo de publicador (bot, card, tag...) e de sistema: casa com palavra comum do codigo e o Base ja a cobre pela copia do Basic User.
+for (const t of catalogo.filter((c) => c.logico.includes('_'))) {
   porNome.set(t.logico, t.logico)
   porNome.set(t.conjunto, t.logico)
 }
