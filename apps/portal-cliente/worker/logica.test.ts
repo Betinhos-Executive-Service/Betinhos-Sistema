@@ -67,6 +67,11 @@ describe('filtros OData', () => {
       expect(f).not.toContain('100000005')
     }
   })
+  it('usa os nomes reais do Dataverse (metadata DEV/PROD 23/11/2026)', () => {
+    const f = decodeURIComponent(listarServicos(TENARIS))
+    expect(f).toContain('$expand=new_ComposicaodePreco(')
+    expect(f).toContain('cr40f_tipodeveiculo')
+  })
   it('recusa id que não é GUID (sem injeção no $filter)', () => {
     expect(() => servicosPorIds(["x' or 1 eq 1"], TENARIS)).toThrow()
     expect(() => listarServicos('qualquer')).toThrow()
@@ -89,7 +94,7 @@ describe('mapearServico', () => {
         { _cr40f_bancodedados_value: 'p2', [`_cr40f_bancodedados_value${FV}`]: 'Bruno', cr40f_ordemdeselecao: 2 },
       ],
       [`_cr40f_solicitante_value${FV}`]: 'Carla',
-      new_composicaodepreco: { new_valortotal: 1000, cr40f_valorhoramotorista: 800, new_valorpedagios: 200, new_ajuste: 0 },
+      [NAV.composicao]: { new_valortotal: 1000, cr40f_valorhoramotorista: 800, new_valorpedagios: 200, new_ajuste: 0 },
     },
   }
   it('monta o Servico com composição sem linhas zeradas e só o nome dos passageiros', () => {
