@@ -16,14 +16,14 @@
     }
   },
   "triggers": {
-    "Dias_uteis_7h": {
+    "Quarta_8h": {
       "type": "Recurrence",
       "recurrence": {
         "frequency": "Week",
         "interval": 1,
         "timeZone": "E. South America Standard Time",
-        "startTime": "2026-11-18T07:00:00",
-        "schedule": { "weekDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "hours": ["7"], "minutes": [0] }
+        "startTime": "2026-11-25T08:00:00",
+        "schedule": { "weekDays": ["Wednesday"], "hours": ["8"], "minutes": [0] }
       }
     }
   },

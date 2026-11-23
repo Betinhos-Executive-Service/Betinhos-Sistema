@@ -50,6 +50,10 @@ export const ENTRADAS = [
     arquivos: [script('carro-atual'), flowsDir('carro-atual\\.json', SINCRONIZAR)],
   },
   {
+    nome: 'nota-motorista', script: 'provision-flow-nota-motorista.ps1', flows: ['Infleet - Sincronizar notas dos motoristas'],
+    arquivos: [script('nota-motorista'), flowsDir('nota-motorista-diario\\.json')],
+  },
+  {
     nome: 'checklist-planner', script: 'provision-flow-checklist-planner.ps1', flows: ['Flow Checklist Não OK | Planner'], apply: true,
     arquivos: [script('checklist-planner'), flowsDir('checklist-planner\\.json', SINCRONIZAR)],
   },

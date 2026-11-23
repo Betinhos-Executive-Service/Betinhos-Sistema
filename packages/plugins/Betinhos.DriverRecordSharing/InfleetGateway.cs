@@ -143,6 +143,9 @@ namespace Betinhos.DriverRecordSharing
             return VehicleHandover.PickPrevious(entries, receiverInfleetDriverId);
         }
 
+        // Consulta GraphQL livre (usada pela nota do motorista); mesmo timeout e tentativas das demais.
+        public Dictionary<string, object> Query(string query, Dictionary<string, object> variables) => Execute(query, variables);
+
         private Dictionary<string, object> Execute(string query, Dictionary<string, object> variables)
         {
             var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };

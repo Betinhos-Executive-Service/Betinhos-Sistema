@@ -5,6 +5,7 @@ import { BrandLoader } from '../../../app/BrandLoader'
 import { cellKind, isBadgeValue, lookupTarget, readonlyHint } from '../domain/cells'
 import { toConfigKey } from '../domain/extraLinks'
 import { formatCell } from '../domain/format'
+import { MIN_WIDTH } from '../domain/columns'
 import { columnLabel, rowKey } from '../domain/layout'
 import type { EditValue } from '../domain/edit'
 import { isProtegido } from '../domain/protecao'
@@ -48,6 +49,8 @@ type Props = {
     search: (attribute: string, text: string) => Promise<LookupOption[]>
   }
 }
+
+const BOOLEAN_WIDTH = 96
 
 const rowId = (row: Row) => String(row[ID_ATTRIBUTE])
 
@@ -96,7 +99,8 @@ export function GeralDsTable({ columns, extraKeys, attributes, rows, loading, vi
       key: extraKeys.has(column.key) ? toConfigKey(column.key) : column.key,
       header: label,
       label,
-      defaultWidth: column.width,
+      // Como no grid próprio: Sim/Não tem largura fixa e as demais, no mínimo 90 px.
+      defaultWidth: kind === 'boolean' ? BOOLEAN_WIDTH : Math.max(MIN_WIDTH, column.width),
       sortable: !virtualKeys.has(column.key),
       opens: index === 0,
       // Cada célula leva o id do serviço: o clique direito acha o serviço pela linha clicada (a ordem é da visão).

@@ -61,6 +61,8 @@ test('script que escolhe connection reference reusa a do flow existente: o Deplo
 test('mudança no script ou no JSON publica só aquele flow', () => {
   assert.deepEqual(nomes(['packages/deploy/provision-flow-hodometro.ps1']), ['hodometro'])
   assert.deepEqual(nomes(['packages/deploy/flows/aniversariantes-diario.json']), ['aniversariantes'])
+  assert.deepEqual(nomes(['packages/deploy/flows/nota-motorista-diario.json']), ['nota-motorista'])
+  assert.deepEqual(nomes(['packages/deploy/provision-flow-nota-motorista.ps1']), ['nota-motorista'])
   assert.deepEqual(nomes(['packages/deploy/flows/portal-cliente-emails/codigo.html']), ['portal-cliente-emails'])
   assert.deepEqual(nomes(['packages/deploy/flows/lembrete-pagamento.ps1']), ['lembrete-pagamento'])
   assert.deepEqual(nomes(['packages/deploy/flows/multas-do-dia.json']), ['multas-do-dia'])

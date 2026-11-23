@@ -6,7 +6,7 @@ const MS_DIA = 86_400_000
 const diaUtc = (dia: string) => Date.UTC(Number(dia.slice(0, 4)), Number(dia.slice(5, 7)) - 1, Number(dia.slice(8, 10)))
 const diasAte = (dia: string, hoje: string) => Math.round((diaUtc(dia) - diaUtc(hoje)) / MS_DIA)
 /** Dia (`AAAA-MM-DD`) de um instante no fuso de São Paulo. */
-const diaSp = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(value)
+export const diaSp = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(value)
 
 export const JANELA_A_VENCER = 7
 

@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Icon } from "./icons";
+import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import { isMockChecklists, type ChecklistFotoEnviada } from "../domain/checklists";
 import { createFotos, createFotosMock, type CarregarFoto, type FotoCarregada } from "../data/fotosChecklist";
 import { BrandLoader } from "../../../../app/BrandLoader";
-import { Spinner } from "@betinhos/ui";
+import { Button, buttonClassName, Spinner } from "@betinhos/ui";
 import type { CarregarProvas } from "../../../../lib/comprovantes/provaMidia";
 import { SelosProva, useProvasMidia } from "../../../../lib/comprovantes/SelosProva";
 
@@ -62,7 +62,7 @@ function useVisivel<T extends Element>() {
 function Falha({ foto, erro, className }: { foto: ChecklistFotoEnviada; erro: string; className: string }) {
   return (
     <span className={className} title={erro}>
-      <a href={foto.link} target="_blank" rel="noreferrer"><Icon name="externalLink" size={14} />Abrir foto</a>
+      <a className={buttonClassName({ variant: "ghost", size: "compact" })} href={foto.link} target="_blank" rel="noreferrer"><ExternalLink size={14} />Abrir foto</a>
       <small>Sem prévia</small>
     </span>
   );
@@ -148,7 +148,7 @@ function Visualizador({ fotos, rotulo, indice, onIndice, onFechar }: {
       <div ref={painel} className="foto-viewer" role="dialog" aria-modal="true" aria-labelledby={titulo}>
         <div className="foto-viewer-head">
           <div><h2 id={titulo}>{rotulo}</h2><small aria-live="polite">Foto {indice + 1} de {fotos.length}</small></div>
-          <button ref={fecharRef} type="button" className="mod-icon-button" aria-label="Fechar" onClick={onFechar}><Icon name="close" size={16} /></button>
+          <Button ref={fecharRef} variant="ghost" size="compact" aria-label="Fechar" icon={<X size={16} />} onClick={onFechar} />
         </div>
         <div className="foto-viewer-stage">
           {estado.status === "pronta" ? <img src={estado.foto.url} alt={`${rotulo}, foto ${indice + 1}`} onError={onImagemErro} />
@@ -156,13 +156,13 @@ function Visualizador({ fotos, rotulo, indice, onIndice, onFechar }: {
             : <BrandLoader variant="inline" size="md" label={`Carregando ${rotulo}, foto ${indice + 1}`} text="Carregando a foto…" />}
           {varias ? (
             <>
-              <button type="button" className="mod-icon-button foto-viewer-nav is-prev" aria-label="Foto anterior" onClick={() => ir(-1)}><Icon name="chevronLeft" size={16} /></button>
-              <button type="button" className="mod-icon-button foto-viewer-nav is-next" aria-label="Próxima foto" onClick={() => ir(1)}><Icon name="chevronRight" size={16} /></button>
+              <Button variant="secondary" size="compact" className="foto-viewer-nav is-prev" aria-label="Foto anterior" icon={<ChevronLeft size={16} />} onClick={() => ir(-1)} />
+              <Button variant="secondary" size="compact" className="foto-viewer-nav is-next" aria-label="Próxima foto" icon={<ChevronRight size={16} />} onClick={() => ir(1)} />
             </>
           ) : null}
         </div>
         <div className="foto-viewer-actions">
-          <a className="gestao-button is-secondary is-compact" href={foto.link} target="_blank" rel="noreferrer"><Icon name="externalLink" size={14} />Abrir original</a>
+          <a className={buttonClassName({ variant: "secondary", size: "compact" })} href={foto.link} target="_blank" rel="noreferrer"><ExternalLink size={14}/>Abrir original</a>
         </div>
       </div>
     </div></div>,

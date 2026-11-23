@@ -31,6 +31,7 @@ export type Screen =
   | "meuCarro"
   | "multas"
   | "treinamentos"
+  | "minhaNota"
   | "gastosCartao"
   | "gastosRelatorio"
   | "postosProximos";

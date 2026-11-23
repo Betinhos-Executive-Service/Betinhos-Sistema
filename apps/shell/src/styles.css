@@ -89,9 +89,9 @@ a.bt-shell__group-toggle > .bt-shell__group-label { flex: 0 1 auto; }
   :where(.bt-table:not(.gr-table)) :where(.bt-table__head) > :where(.bt-table__cell:not(:last-child, .bt-table__cell--pinned)) > .bt-table__resize { right: -4px; }
 }
 
-/* Telas migradas do legado com paleta própria só em tema claro (Planner, Pagamento de fornecedores, Checklists da frota):
+/* Telas migradas do legado com paleta própria só em tema claro (Planner, Pagamento de fornecedores):
    mantêm o claro mesmo com o tema escuro ligado, redefinindo os tokens que o escuro troca (valores de design-tokens.css, :root). */
-:where(.pf-root, .planner-page, .planner-portal, .gestao-checklists) {
+:where(.pf-root, .planner-page, .planner-portal) {
   color-scheme: light;
   --bt-color-canvas: var(--bt-color-gray-100);
   --bt-color-surface: var(--bt-color-white);

@@ -1,0 +1,112 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "Todo_dia_05h": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Day",
+        "interval": 1,
+        "timeZone": "E. South America Standard Time",
+        "schedule": {
+          "hours": [
+            "5"
+          ],
+          "minutes": [
+            0
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Sincronizar_notas": {
+      "type": "OpenApiConnection",
+      "runAfter": {},
+      "inputs": {
+        "host": {
+          "operationId": "PerformUnboundAction",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "actionName": "new_SincronizarNotasInfleet",
+          "item/Meses": 2,
+          "item/Dias": 3
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Resumo": {
+      "type": "Compose",
+      "runAfter": {
+        "Sincronizar_notas": [
+          "Succeeded",
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "inputs": "@json(coalesce(outputs('Sincronizar_notas')?['body/new_Result'], '{}'))"
+    },
+    "Falhar_se_incompleto": {
+      "type": "If",
+      "runAfter": {
+        "Resumo": [
+          "Succeeded",
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "expression": {
+        "or": [
+          {
+            "not": {
+              "equals": [
+                "@actions('Sincronizar_notas')?['status']",
+                "Succeeded"
+              ]
+            }
+          },
+          {
+            "greater": [
+              "@length(coalesce(outputs('Resumo')?['falhas'], json('[]')))",
+              0
+            ]
+          },
+          {
+            "equals": [
+              "@outputs('Resumo')?['incompleto']",
+              true
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Manter_falha": {
+          "type": "Terminate",
+          "runAfter": {},
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "SincronizacaoIncompleta",
+              "message": "Sincronizar_notas falhou, ficou incompleta ou teve falha de motorista; veja o Resumo."
+            }
+          }
+        }
+      },
+      "else": {
+        "actions": {}
+      }
+    }
+  }
+}

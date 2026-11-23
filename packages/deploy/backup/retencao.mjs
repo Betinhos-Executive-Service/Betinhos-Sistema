@@ -10,7 +10,8 @@ import { pathToFileURL } from 'node:url'
 
 export const LIMITES = { diario: 7, semanal: 8, mensal: 12 }
 const FUSO = 'America/Sao_Paulo'
-const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(\d{8}-\d{4})\.zip$/
+// O completo e a planilha de operação (betinhos-prod-operacao-*) têm cada um o próprio limite por classe.
+const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(operacao-)?(\d{8}-\d{4})\.zip$/
 
 export function partesBrasilia(data) {
   const p = Object.fromEntries(
@@ -36,14 +37,14 @@ export function classes(data) {
 
 // Chaves fora do padrão (arquivo posto à mão, outra pasta) nunca são apagadas.
 export function aExcluir(chaves, limites = LIMITES) {
-  const porClasse = {}
+  const grupos = {}
   for (const chave of chaves) {
     const m = PADRAO.exec(chave)
     if (!m) continue
-    ;(porClasse[m[1]] ??= []).push({ chave, carimbo: m[2] })
+    ;(grupos[`${m[1]}/${m[2] ?? ''}`] ??= { classe: m[1], itens: [] }).itens.push({ chave, carimbo: m[3] })
   }
   const excluir = []
-  for (const [classe, itens] of Object.entries(porClasse)) {
+  for (const { classe, itens } of Object.values(grupos)) {
     const limite = limites[classe]
     if (!Number.isInteger(limite) || limite < 1) continue
     itens.sort((a, b) => b.carimbo.localeCompare(a.carimbo))

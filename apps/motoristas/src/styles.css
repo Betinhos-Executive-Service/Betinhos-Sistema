@@ -4,6 +4,7 @@
 @import "./features/termos/termos.css";
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "./features/treinamentos/treinamentos.css";
+@import "./features/minha-nota/minhaNota.css";
 @import "./features/postos/postos.css";
 @import "./app/tour.css";
 @import "./shared/ui/brand-loader.css";

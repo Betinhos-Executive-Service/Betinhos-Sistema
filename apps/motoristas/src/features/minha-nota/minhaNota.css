@@ -1,0 +1,43 @@
+/* Minha nota (Infleet): reaproveita o cartão das Boas ideias (ideas-*); só o que é da nota. */
+.nota-tela { gap: 16px; }
+.nota-resumo { display: grid; justify-items: center; gap: 6px; padding: 20px 16px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fcfcfb; text-align: center; font-family: "Manrope", sans-serif; }
+.nota-anel { display: grid; place-content: center; justify-items: center; width: 148px; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(closest-side, #fcfcfb 80%, transparent 81%), conic-gradient(var(--tom, #64748b) var(--nota), #e2e8f0 0); }
+/* Cor de cada faixa, definida uma vez: texto/traço (--tom) e fundo claro (--tom-fundo). */
+.nota-tom--otima { --tom: #346538; --tom-fundo: #e3f1e4; }
+.nota-tom--boa { --tom: #956400; --tom-fundo: #fff1d6; }
+.nota-tom--atencao { --tom: #9f2f2d; --tom-fundo: #fbe4e3; }
+.nota-de { color: #64748b; font-size: .75rem; font-weight: 700; }
+.nota-proxima { color: #001a3d; font-size: .95rem; font-weight: 800; }
+.nota-variacao { font-size: .85rem; font-weight: 700; color: #475569; }
+.nota-variacao--sobe { color: #346538; }
+.nota-variacao--cai { color: #9f2f2d; }
+.nota-como { margin: 0; color: #64748b; font-size: .8rem; line-height: 1.5; font-family: "Manrope", sans-serif; }
+.nota-valor { color: var(--tom, #001a3d); font-size: 3.4rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.nota-selo { padding: 4px 14px; border-radius: 999px; font-size: .85rem; font-weight: 800; background: var(--tom-fundo, #e2e8f0); color: var(--tom, #001a3d); }
+.nota-periodo { color: #64748b; font-size: .85rem; font-weight: 700; }
+.nota-atualizada { display: block; color: #64748b; font-size: .75rem; font-weight: 600; }
+.nota-formacao-titulo { color: #001a3d; font-size: 1rem; font-weight: 800; line-height: 1.4; }
+
+.nota-bloco { display: grid; gap: 10px; font-family: "Manrope", sans-serif; }
+.nota-bloco h3 { margin: 0; color: #001a3d; font-size: 1rem; font-weight: 800; }
+.nota-bloco ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+.nota-melhorar li { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--tom-fundo); }
+.nota-melhorar .nota-linha { color: var(--tom); }
+.nota-melhorar small { color: var(--tom); font-size: .8rem; font-weight: 600; }
+
+.nota-linha { display: flex; justify-content: space-between; gap: 8px; color: #172033; font-size: .9rem; font-weight: 700; }
+.nota-linha strong { font-variant-numeric: tabular-nums; }
+.nota-barra { height: 8px; margin-top: 4px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.nota-barra-fill { display: block; height: 100%; border-radius: inherit; background: var(--tom); }
+
+.nota-evolucao { grid-auto-flow: column; grid-auto-columns: 1fr; align-items: end; gap: 8px; }
+.nota-evolucao li { display: grid; justify-items: center; gap: 4px; color: #475569; font-size: .75rem; font-weight: 700; }
+.nota-evolucao strong { color: #001a3d; font-variant-numeric: tabular-nums; }
+.nota-coluna { display: flex; align-items: flex-end; width: 100%; max-width: 36px; height: 96px; border-radius: 6px; background: #e2e8f0; overflow: hidden; }
+.nota-coluna-fill { display: block; width: 100%; background: var(--tom); border-radius: 6px 6px 0 0; }
+.nota-mes { text-transform: lowercase; }
+
+/* Grade do Início: a nota no lugar do ícone, na cor da faixa. */
+.concept-tile-icon[class*="nota-tom--"] { color: var(--tom); background: var(--tom-fundo); }
+.nota-tile-valor { font-family: "Manrope", sans-serif; font-size: clamp(1.05rem, 22cqh, 1.5rem); font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; }

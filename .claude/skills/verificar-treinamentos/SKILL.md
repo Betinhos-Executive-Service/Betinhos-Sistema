@@ -19,6 +19,8 @@ description: "Verifica o módulo de Treinamentos do shell (#/treinamentos: lista
 3. `pnpm typecheck` na raiz → sem erros.
 4. Virada de dia: as datas do mock (validade, `dia(n)`) contam a partir do dia de São Paulo (`todaySaoPaulo`), o mesmo "hoje" da tela. Rodar o passo 1 entre 21h e 24h de Brasília (já é o dia seguinte em UTC) também tem que passar ("Venceu há 3 dias").
 
+- Filtro e agrupamento por "Publicado em" usam o dia em São Paulo (`diaSp`, `domain/lista.ts` › `diaPublicacao`): publicação 2026-11-11T01:30Z conta como 2026-11-10; texto só com a data vale como está; texto que não é data não quebra a lista (`pages/colunasCompostas.test.ts`).
+
 ## Dados do mock (`pnpm dev`; nesta sessão porta 36484)
 - "Embarque no GRU: novo procedimento": publicado hoje, todos os motoristas, assinatura + quiz (3 perguntas, mínimo 70%), vídeo, 2 anexos, validade em 15 dias. Carlos concluído (assinatura desenhada, 100%), Márcio reprovado 33%, Rafael só abriu.
 - "Direção defensiva: revisão anual": publicado ontem para Carlos, Márcio e Gustavo (desligado), validade vencida há 3 dias → selo "Vencido"; Carlos concluído, Márcio não aberto, Gustavo aberto com selo "Desligado".
