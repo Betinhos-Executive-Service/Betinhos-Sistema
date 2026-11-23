@@ -18,7 +18,14 @@ public static class AcessoCatalogo
     private static readonly Dictionary<string, string> Niveis = new(StringComparer.Ordinal) { ["operador"] = "Operador", ["gestor"] = "Gestor" };
 
     public static string NomeDoPapel(string area, string nivel) => Prefixo + Areas[area] + " - " + Niveis[nivel];
-    public static bool EhDoCatalogo(string nome) => nome.StartsWith(Prefixo, StringComparison.Ordinal);
+
+    /// <summary>A lista fixa de perfis válidos: Base, Administrador de acessos e as 8 combinações área x nível.</summary>
+    public static IReadOnlyCollection<string> Lista { get; } = new HashSet<string>(
+        new[] { Base, AdminAcessos }.Concat(Areas.Keys.SelectMany(a => Niveis.Keys.Select(n => NomeDoPapel(a, n)))),
+        StringComparer.Ordinal);
+
+    /// <summary>Só pertence ao catálogo quem está na lista fixa; um "Perfil - Outro" criado à mão não.</summary>
+    public static bool EhDoCatalogo(string nome) => Lista.Contains(nome);
     public static bool EhAdminDoSistema(IEnumerable<string> papeis) => papeis.Any(p => AdminDoSistema.Contains(p));
 
     /// <summary>Perfis de coluna da pessoa: um por área, com o mesmo nome do papel.</summary>

@@ -21,9 +21,11 @@ public sealed class DefinirPerfisHandler
             throw new AcessoException("SEM_PERMISSAO", "Só o Administrador de acessos altera perfis.");
         if (chamador == usuario) throw new AcessoException("PROPRIO_ACESSO", "Ninguém altera o próprio acesso.");
 
+        // Pedido ausente não pode virar "[]" (só o Base): só a lista vazia explícita retira as áreas.
+        if (string.IsNullOrWhiteSpace(perfisJson)) throw new AcessoException("PERFIL_INVALIDO", "A lista de perfis é obrigatória (use [] para ficar só com o Base).");
         var pedido = AcessoCatalogo.LerPedido(perfisJson);
         var alvo = Alvo(usuario) ?? throw new AcessoException("USUARIO_INVALIDO", "Usuário não encontrado, desativado ou de aplicação.");
-        var papeis = Catalogo("role", alvo.GetAttributeValue<EntityReference>("businessunitid").Id);
+        var papeis = Catalogo("role", alvo.GetAttributeValue<EntityReference>("businessunitid")!.Id);
         var colunas = Catalogo("fieldsecurityprofile", null);
         var papeisAtuais = PapeisDoUsuario.IdsDiretos(_sistema, usuario);
         var antes = AcessoCatalogo.DosPapeis(papeis.Where(p => papeisAtuais.Contains(p.Value)).Select(p => p.Key));
@@ -65,11 +67,12 @@ public sealed class DefinirPerfisHandler
         var q = new QueryExpression("systemuser") { ColumnSet = new ColumnSet("isdisabled", "applicationid", "businessunitid", "fullname") };
         q.Criteria.AddCondition("systemuserid", ConditionOperator.Equal, usuario);
         var e = _sistema.RetrieveMultiple(q).Entities.FirstOrDefault();
-        if (e == null || e.GetAttributeValue<bool>("isdisabled") || e.GetAttributeValue<Guid?>("applicationid") != null) return null;
+        if (e == null || e.GetAttributeValue<bool>("isdisabled") || e.GetAttributeValue<Guid?>("applicationid") != null
+            || e.GetAttributeValue<EntityReference>("businessunitid") == null) return null;
         return e;
     }
 
-    /// <summary>Nome → id dos registros "Perfil - *" da tabela (papéis: só os da unidade de negócio do alvo).</summary>
+    /// <summary>Nome → id dos registros da lista fixa (<see cref="AcessoCatalogo.Lista"/>) na tabela (papéis: só os da unidade de negócio do alvo). Nome repetido é recusado.</summary>
     private Dictionary<string, Guid> Catalogo(string tabela, Guid? unidade)
     {
         var q = new QueryExpression(tabela) { ColumnSet = new ColumnSet("name") };
@@ -78,7 +81,9 @@ public sealed class DefinirPerfisHandler
         foreach (var e in _sistema.RetrieveMultiple(q).Entities)
         {
             var nome = e.GetAttributeValue<string>("name");
-            if (nome != null && AcessoCatalogo.EhDoCatalogo(nome)) mapa[nome] = e.Id;
+            if (nome == null || !AcessoCatalogo.EhDoCatalogo(nome)) continue;
+            if (mapa.ContainsKey(nome)) throw new AcessoException("PERFIL_INDISPONIVEL", "Há mais de um registro chamado " + nome + " neste ambiente.");
+            mapa[nome] = e.Id;
         }
         return mapa;
     }

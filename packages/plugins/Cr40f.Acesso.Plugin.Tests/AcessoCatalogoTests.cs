@@ -82,4 +82,14 @@ public sealed class AcessoCatalogoTests
         Assert.Equal(json, AcessoCatalogo.Json(AcessoCatalogo.LerPedido(json)));
         Assert.Equal("[]", AcessoCatalogo.Json(new PerfisDoUsuario()));
     }
+
+    [Fact]
+    public void Lista_fixa_tem_dez_nomes_e_recusa_o_que_so_comeca_com_o_prefixo()
+    {
+        Assert.Equal(10, AcessoCatalogo.Lista.Count);
+        Assert.True(AcessoCatalogo.EhDoCatalogo("Perfil - Base"));
+        Assert.True(AcessoCatalogo.EhDoCatalogo("Perfil - RH - Gestor"));
+        Assert.False(AcessoCatalogo.EhDoCatalogo("Perfil - Outro"));
+        Assert.False(AcessoCatalogo.EhDoCatalogo("Perfil - Financeiro"));
+    }
 }

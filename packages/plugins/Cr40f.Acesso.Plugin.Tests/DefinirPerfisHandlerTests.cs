@@ -53,7 +53,7 @@ public sealed class DefinirPerfisHandlerTests
     }
 
     private void Vincular(Guid usuario, string papel) => _svc.Com(new Entity("systemuserroles", Guid.NewGuid()) { ["systemuserid"] = usuario, ["roleid"] = _papeis[papel] });
-    private string Executar(Guid chamador, Guid usuario, string perfis) => new DefinirPerfisHandler(_svc).Executar(chamador, usuario, perfis);
+    private string Executar(Guid chamador, Guid usuario, string? perfis) => new DefinirPerfisHandler(_svc).Executar(chamador, usuario, perfis);
     private bool Tem(Guid usuario, string papel) => PapeisDoUsuario.IdsDiretos(_svc, usuario).Contains(_papeis[papel]);
     private bool TemColuna(Guid usuario, string perfil) => PapeisDoUsuario.Ids(_svc, "systemuserprofiles", "systemuserid", usuario, "fieldsecurityprofileid").Contains(_colunas[perfil]);
     private List<Entity> Historico() => _svc.Criados.Where(e => e.LogicalName == "cr40f_acessohistorico").ToList();
@@ -223,5 +223,97 @@ public sealed class DefinirPerfisHandlerTests
         Assert.True(Tem(alvo, Antigo));
         Assert.DoesNotContain(_svc.Desassociados, d => d.Alvo == _papeis[Antigo] || d.Alvo == _papeis[AcessoCatalogo.Base]);
         Assert.Equal("[]", Historico()[1].GetAttributeValue<string>("cr40f_perfisdepois"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Pedido_ausente_e_recusado_e_nao_zera_o_acesso(string? perfis)
+    {
+        var admin = Usuario(Admin); var alvo = Usuario();
+        Executar(admin, alvo, FinanceiroOperador);
+        var associados = _svc.Associados.Count;
+
+        Assert.Equal("PERFIL_INVALIDO", Codigo(() => Executar(admin, alvo, perfis)));
+        Assert.True(Tem(alvo, "Perfil - Financeiro - Operador"));
+        Assert.True(TemColuna(alvo, "Perfil - Financeiro - Operador"));
+        Assert.Empty(_svc.Desassociados);
+        Assert.Equal(associados, _svc.Associados.Count);
+        Assert.Single(Historico());
+    }
+
+    [Fact]
+    public void Papel_e_perfil_de_coluna_fora_da_lista_fixa_nao_sao_lidos_nem_retirados()
+    {
+        var admin = Usuario(Admin);
+        Papel("Perfil - Outro"); PerfilDeColuna("Perfil - Outro");
+        var alvo = Usuario("Perfil - Outro");
+        _svc.Com(new Entity("systemuserprofiles", Guid.NewGuid()) { ["systemuserid"] = alvo, ["fieldsecurityprofileid"] = _colunas["Perfil - Outro"] });
+
+        var resultado = Executar(admin, alvo, "[]");
+
+        Assert.True(Tem(alvo, "Perfil - Outro"));
+        Assert.True(TemColuna(alvo, "Perfil - Outro"));
+        Assert.DoesNotContain(_svc.Desassociados, d => d.Alvo == _papeis["Perfil - Outro"] || d.Alvo == _colunas["Perfil - Outro"]);
+        Assert.StartsWith("{\"antes\":[],\"depois\":[]", resultado);
+    }
+
+    [Fact]
+    public void Papeis_homonimos_da_lista_fixa_na_unidade_do_alvo_sao_recusados()
+    {
+        var admin = Usuario(Admin); var alvo = Usuario();
+        _svc.Com(new Entity("role", Guid.NewGuid()) { ["name"] = "Perfil - Financeiro - Operador", ["businessunitid"] = new EntityReference("businessunit", _bu) });
+
+        Assert.Equal("PERFIL_INDISPONIVEL", Codigo(() => Executar(admin, alvo, FinanceiroOperador)));
+        Assert.Empty(_svc.Associados);
+        Assert.Empty(Historico());
+    }
+
+    [Fact]
+    public void Alvo_sem_unidade_de_negocio_e_recusado_como_usuario_invalido()
+    {
+        var admin = Usuario(Admin);
+        var alvo = new Entity("systemuser", Guid.NewGuid()) { ["fullname"] = "Sem unidade", ["isdisabled"] = false };
+        _svc.Com(alvo);
+
+        Assert.Equal("USUARIO_INVALIDO", Codigo(() => Executar(admin, alvo.Id, FinanceiroOperador)));
+        Assert.Empty(_svc.Associados);
+    }
+
+    [Fact]
+    public void Falha_ao_gravar_o_historico_faz_o_Executar_lancar()
+    {
+        var admin = Usuario(Admin); var alvo = Usuario();
+        _svc.FalharCriacaoEm = "cr40f_acessohistorico";
+
+        Assert.Throws<InvalidOperationException>(() => Executar(admin, alvo, FinanceiroOperador));
+        Assert.Empty(Historico());
+    }
+
+    [Fact]
+    public void Chamador_so_de_equipe_sem_papel_de_administrador_e_recusado()
+    {
+        var chamador = Usuario(); var alvo = Usuario(); var equipe = Guid.NewGuid();
+        _svc.Com(new Entity("teammembership", Guid.NewGuid()) { ["systemuserid"] = chamador, ["teamid"] = equipe });
+        _svc.Com(new Entity("teamroles", Guid.NewGuid()) { ["teamid"] = equipe, ["roleid"] = _papeis[Antigo] });
+
+        Assert.Equal("SEM_PERMISSAO", Codigo(() => Executar(chamador, alvo, FinanceiroOperador)));
+        Assert.Empty(_svc.Associados);
+        Assert.Empty(Historico());
+    }
+
+    [Theory]
+    [InlineData("Administrador do Sistema")]
+    [InlineData("System Administrator")]
+    public void Alvo_administrador_do_sistema_continua_com_o_papel(string papelAdmin)
+    {
+        if (!_papeis.ContainsKey(papelAdmin)) Papel(papelAdmin);
+        var admin = Usuario(Admin); var alvo = Usuario(papelAdmin);
+
+        Executar(admin, alvo, "[]");
+
+        Assert.True(Tem(alvo, papelAdmin));
+        Assert.DoesNotContain(_svc.Desassociados, d => d.Alvo == _papeis[papelAdmin]);
     }
 }
