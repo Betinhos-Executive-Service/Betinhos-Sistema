@@ -13,12 +13,14 @@ import { ChecklistOkNokField } from "./ChecklistOkNokField";
 import { MediaCaptureScreen } from "../fotos/MediaCaptureScreen";
 import { MaintenancePhotoPreviewScreen } from "../fotos/MaintenancePhotoPreviewScreen";
 import { SendStepsOverlay } from "../../shared/ui/SendStepsOverlay";
+import { ChecklistManutencaoSheet } from "./ChecklistManutencaoSheet";
 import { useCameraScroll } from "../../app/cameraScroll";
 import { describeChecklistSend, holdChecklistSend, type ChecklistSendState } from "./checklistSend";
 import { clearMediaDraft, loadMediaDraft, saveMediaDraft } from "../fotos/mediaDraftStore";
 
 import {
   buildChecklistRespostasJson,
+  checklistPedidoManutencao,
   CHECKLIST_MAX_FOTOS_POR_ITEM,
   CHECKLIST_MAX_TEXTO,
   checklistDraftKey,
@@ -35,6 +37,7 @@ import {
   type ChecklistDraft,
   type ChecklistFotoEnviada,
   type ChecklistItem,
+  type ChecklistPedidoManutencao,
   type ChecklistResposta,
   type ChecklistVeiculo
 } from "./checklists";
@@ -54,6 +57,8 @@ type Props = {
   /** Quando definido, o Voltar no detalhe chama isto em vez de voltar para a lista (ex.: aberto pela aba Serviços). */
   onCloseDetail?: () => void;
   onReload: () => Promise<void>;
+  /** Abre "Solicitar manutenção" já preenchida com os itens Não OK. Sem ela (módulo desligado), o app não pergunta. */
+  onCriarManutencao?: (pedido: ChecklistPedidoManutencao) => void;
 };
 
 type PhotoView = { chave: string; dataUrl: string; photoId: string };
@@ -103,7 +108,7 @@ const orderChecklistAnswers = (answers: ChecklistResposta[]) => [
 const newPhotoId = () => globalThis.crypto?.randomUUID?.() ?? `foto-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const itemDomId = (chave: string) => `checklist-item-${chave}`;
 
-export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload }: Props) {
+export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload, onCriarManutencao }: Props) {
   const dados = useDados();
   const selected = items.find((item) => item.id === selectedId);
   const pending = items.filter(isChecklistPending);
@@ -117,6 +122,8 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
   const [capturingChave, setCapturingChave] = useState("");
   const [photoView, setPhotoView] = useState<PhotoView | null>(null);
   const [retrying, setRetrying] = useState(false);
+  // Checklist enviado com itens Não OK: pergunta se o motorista quer abrir a manutenção antes de voltar.
+  const [pedidoManutencao, setPedidoManutencao] = useState<ChecklistPedidoManutencao | null>(null);
   const saveTimerRef = useRef(0);
   const sendingRef = useRef(false);
   const cameraScroll = useCameraScroll(`checklist:${selectedId}`);
@@ -353,7 +360,17 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
     if (!listUpdated) setPageError("Checklist enviado, mas não foi possível atualizar a lista. Toque em Atualizar.");
     setSend(null);
     sendingRef.current = false;
+    const pedido = onCriarManutencao ? checklistPedidoManutencao(selected, working) : null;
+    if (pedido) { setPedidoManutencao(pedido); return; }
     if (onCloseDetail) onCloseDetail(); else onSelectedIdChange("");
+  };
+
+  const answerManutencao = (criar: boolean) => {
+    const pedido = pedidoManutencao;
+    setPedidoManutencao(null);
+    if (onCloseDetail) onCloseDetail(); else onSelectedIdChange("");
+    // Depois de fechar o detalhe: a tela de manutenção é a última a ser escolhida.
+    if (criar && pedido) onCriarManutencao?.(pedido);
   };
 
   const reviewAfterError = () => {
@@ -378,6 +395,11 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
         { label: "Voltar e revisar", variant: "secondary", onClick: reviewAfterError }
       ]}
     />,
+    document.body
+  ) : null;
+
+  const manutencaoDialog = pedidoManutencao ? createPortal(
+    <ChecklistManutencaoSheet pedido={pedidoManutencao} onPedir={() => answerManutencao(true)} onDepois={() => answerManutencao(false)} />,
     document.body
   ) : null;
 
@@ -498,6 +520,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
         </section>
       </AppShell>
       {sendOverlay}
+      {manutencaoDialog}
       </>
     );
   }
@@ -578,6 +601,7 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
       </section>
     </AppShell>
     {sendOverlay}
+    {manutencaoDialog}
     </>
   );
 }

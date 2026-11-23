@@ -7,6 +7,7 @@ import {
   checklistCardTexto,
   CHECKLIST_MAX_PROBLEMAS,
   CHECKLIST_PROBLEMAS_PADRAO,
+  checklistPedidoManutencao,
   checklistPhotoItems,
   concluirChecklist,
   countChecklistProgress,
@@ -321,4 +322,32 @@ test("texto do card por origem", () => {
   assert.equal(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.manual }).label, "SOLICITADO PELA OPERAÇÃO");
   assert.equal(checklistCardTexto({ ...base, origem: CHECKLIST_ORIGEM.quinzenal }).label, "VISTORIA QUINZENAL");
   assert.equal(checklistCardTexto({ ...base, estado: CHECKLIST_ESTADO.concluido, origem: CHECKLIST_ORIGEM.troca }).label, "CHECKLIST ENVIADO");
+});
+
+test("pedido de manutenção do checklist: só os Não OK, com km, problemas, observação e fotos", () => {
+  const lista = [
+    ...itens,
+    okNokItem({ chave: "pneus", rotulo: "Pneus" }),
+    okNokItem({ chave: "farol", ordem: 6, rotulo: "Farol" }),
+    okNokItem({ chave: "limpeza", ordem: 7, rotulo: "Limpeza" })
+  ];
+  const draft = draftWith({
+    valores: { "k-km": "45.210", pneus: "nok", farol: "nok", limpeza: "ok" },
+    problemas: { pneus: ["Murcho", "Gasto"], farol: ["Quebrado"] },
+    observacoes: { pneus: "  dianteiro esquerdo " },
+    fotos: { pneus: [{ id: "f1", dataUrl: "data:image/jpeg;base64,AA" }, { id: "f2", dataUrl: "data:image/jpeg;base64,BB" }], farol: [{ id: "f3", dataUrl: "data:image/jpeg;base64,CC" }] }
+  });
+  const pedido = checklistPedidoManutencao(checklist({ itens: lista }), draft);
+  assert.ok(pedido);
+  assert.equal(pedido.veiculoId, "v1");
+  assert.equal(pedido.kmAtual, "45210");
+  assert.deepEqual(pedido.itens.map((item) => item.rotulo), ["Pneus", "Farol"]);
+  assert.equal(pedido.itens[0].foto, "data:image/jpeg;base64,AA");
+  assert.deepEqual(pedido.fotos, ["data:image/jpeg;base64,AA", "data:image/jpeg;base64,BB", "data:image/jpeg;base64,CC"]);
+  assert.equal(pedido.descricao, "Itens Não OK no checklist do ABC1D23:\n- Pneus: Murcho, Gasto (dianteiro esquerdo)\n- Farol: Quebrado");
+});
+
+test("pedido de manutenção do checklist: sem Não OK não pergunta", () => {
+  const lista = [...itens, okNokItem()];
+  assert.equal(checklistPedidoManutencao(checklist({ itens: lista }), draftWith({ valores: { pneus: "ok" } })), null);
 });

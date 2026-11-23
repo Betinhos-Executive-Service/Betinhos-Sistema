@@ -11,6 +11,7 @@ import { wait } from "../../shared/wait";
 import { isVideoMediaDraft, prepareMediaDraftForUpload, revokePhotoPreviewUrls } from "../fotos/envioMidia";
 import { useMediaDraftState } from "../fotos/useMediaDraftState";
 import { EMPTY_MAINTENANCE_REQUEST_DRAFT } from "./rascunho";
+import type { ChecklistPedidoManutencao } from "../checklist/checklists";
 
 type Options = {
   logAppError: (error: unknown, action: string, phase?: string) => void;
@@ -93,6 +94,22 @@ export function useMaintenanceRequestFlow({ logAppError, maintenanceCurrentVehic
       setRemoteOperation(null);
       setCriticalError(error instanceof Error ? error.message : "Falha ao solicitar manutenção.");
     }
+  };
+
+  // Atalho do fim do checklist: veículo, km, descrição e fotos dos itens Não OK já entram no formulário.
+  // Um pedido já começado não se perde: a descrição do checklist vem depois do texto e as fotos somam.
+  const preencherManutencaoDoChecklist = (pedido: ChecklistPedidoManutencao) => {
+    const stamp = Date.now();
+    setMaintenanceRequestDraft((current) => ({
+      ...current,
+      veiculoId: pedido.veiculoId || current.veiculoId,
+      kmAtual: pedido.kmAtual || current.kmAtual,
+      descricao: current.descricao.trim() ? `${current.descricao.trim()}\n\n${pedido.descricao}` : pedido.descricao
+    }));
+    setMaintenanceRequestPhotos((current) => [
+      ...current,
+      ...pedido.fotos.map((dataUrl, index): MaintenanceRequestPhoto => ({ id: `checklist-photo-${stamp}-${index + 1}`, dataUrl, mediaType: "foto" }))
+    ]);
   };
 
   const openMaintenanceRequestCamera = () => {
@@ -190,6 +207,7 @@ export function useMaintenanceRequestFlow({ logAppError, maintenanceCurrentVehic
     openMaintenanceRequestCamera,
     openMaintenanceRequestPreview,
     openMaintenanceRequestVideoPreview,
+    preencherManutencaoDoChecklist,
     setMaintenanceRequestDraft,
     setMaintenanceRequestPhotoDraft,
     setMaintenanceRequestPhotoDurationLabel,
