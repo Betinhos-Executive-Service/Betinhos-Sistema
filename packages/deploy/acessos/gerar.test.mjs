@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { CAMINHO_COLUNAS, CAMINHO_GERADO, CAMINHO_MAPA, COPIAR_SEM, PROIBIDO, gerarPerfis } from './gerar.mjs'
+import { CAMINHO_COLUNAS, CAMINHO_GERADO, CAMINHO_MAPA, COPIAR_SEM, PROIBIDO, gerarPerfis, hashDe } from './gerar.mjs'
 
 const mapa = JSON.parse(readFileSync(CAMINHO_MAPA, 'utf8'))
 const colunas = JSON.parse(readFileSync(CAMINHO_COLUNAS, 'utf8'))
@@ -88,10 +89,12 @@ test('colunas: matriz da spec', () => {
   assert.equal(coluna('Perfil - RH - Gestor', 'cr40f_funcionarios', 'cr40f_numerodocpf').editar, true)
   assert.equal(coluna('Perfil - Frota - Operador', 'cr40f_funcionarios', 'cr40f_cnh').editar, false)
   assert.equal(coluna('Perfil - Frota - Operador', 'cr40f_funcionarios', 'cr40f_numerodocpf'), undefined)
-  assert.equal(coluna('Perfil - Operacional - Operador', 'cr40f_bancodedados', 'cr40f_telefone').editar, true)
-  assert.equal(coluna('Perfil - Financeiro - Operador', 'cr40f_bancodedados', 'cr40f_telefone').editar, false)
-  assert.equal(coluna('Perfil - Frota - Operador', 'cr40f_bancodedados', 'cr40f_telefone'), undefined)
-  assert.equal(coluna('Perfil - RH - Gestor', 'cr40f_bancodedados', 'cr40f_telefone'), undefined)
+})
+
+test('contato do passageiro fica fora ate o corte', () => {
+  const protegidas = ['cr40f_telefone', 'cr40f_email', 'cr40f_datadenascimento', 'cr40f_enderecodesaida']
+  for (const [nome, lista] of Object.entries(gerado.colunas))
+    for (const p of lista) assert.ok(!(p.tabela === 'cr40f_bancodedados' && protegidas.includes(p.coluna)), `${nome}: ${p.coluna}`)
 })
 
 test('colunas: senhas em nenhum perfil', () => {
@@ -107,4 +110,16 @@ test('grupo de colunas desconhecido falha', () => {
 test('perfis.gerado.json esta em dia com os mapas', () => {
   const emDisco = readFileSync(CAMINHO_GERADO, 'utf8').replace(/\r\n/g, '\n')
   assert.equal(emDisco, JSON.stringify(gerado, null, 2) + '\n', 'Rode: node packages/deploy/acessos/gerar.mjs')
+})
+
+test('o hash do perfis.gerado.json esta numa migration', () => {
+  const hash = hashDe(readFileSync(CAMINHO_GERADO, 'utf8'))
+  const pasta = join(dirname(CAMINHO_GERADO), '..', 'migrations')
+  const achou = readdirSync(pasta)
+    .filter((f) => f.endsWith('.ps1'))
+    .some((f) => readFileSync(join(pasta, f), 'utf8').includes(hash))
+  assert.ok(
+    achou,
+    'Regenerou os perfis? Crie uma migration nova chamando Invoke-PerfisDeAcesso com o hash novo (node packages/deploy/acessos/gerar.mjs --hash).',
+  )
 })

@@ -31,7 +31,7 @@ O inventário detalhado da auditoria fica fora do repositório (repositório pú
 3. **Dois níveis** para Operacional, Financeiro, Frota e RH: **Operador** (lê, cria, edita) e **Gestor** (também exclui e vê/edita as colunas sensíveis do módulo). Base e Administrador de acessos não têm nível.
 4. **Papel direto na pessoa**, não por equipe. Papel herdado de equipe não cobre os registros da própria pessoa em profundidade Básica sem ajuste em cada papel, e equipe é dado por ambiente.
 5. **Só Administrador do Sistema concede o perfil Administrador de acessos.** O Administrador de acessos distribui os demais.
-6. **Dados pessoais de passageiros** (telefone, e-mail, nascimento, endereço de saída): Operacional e Financeiro veem. Frota e RH veem nome e empresa.
+6. **Dados pessoais de passageiros** (telefone, e-mail, nascimento, endereço de saída): Operacional e Financeiro veem. Frota e RH veem nome e empresa. A segurança de coluna desses quatro campos entra no plano 4 (corte), porque hoje a equipe dos motoristas, os flows e o backup leem esses campos sem perfil de coluna.
 7. **`cr40f_loginsesenhas`:** nenhum perfil novo recebe. Só Administrador do Sistema lê.
 8. **Tela no grupo Cadastros** do menu, item "Acessos".
 9. **Transição em paralelo, corte no fim** (seção 8).

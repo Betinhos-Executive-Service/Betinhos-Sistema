@@ -1568,30 +1568,6 @@
         "editar": false
       },
       {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_datadenascimento",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_email",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_enderecodesaida",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_telefone",
-        "ler": true,
-        "editar": false
-      },
-      {
         "tabela": "cr40f_financeiro",
         "coluna": "cr40f_valor",
         "ler": true,
@@ -1740,30 +1716,6 @@
       {
         "tabela": "cr40f_bancodedados",
         "coluna": "cr40f_cr",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_datadenascimento",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_email",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_enderecodesaida",
-        "ler": true,
-        "editar": false
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_telefone",
         "ler": true,
         "editar": false
       },
@@ -2410,30 +2362,6 @@
         "editar": true
       },
       {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_datadenascimento",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_email",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_enderecodesaida",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_telefone",
-        "ler": true,
-        "editar": true
-      },
-      {
         "tabela": "cr40f_funcionarios",
         "coluna": "cr40f_emailbetinhos",
         "ler": true,
@@ -2600,30 +2528,6 @@
       {
         "tabela": "cr40f_bancodedados",
         "coluna": "cr40f_cr",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_datadenascimento",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_email",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_enderecodesaida",
-        "ler": true,
-        "editar": true
-      },
-      {
-        "tabela": "cr40f_bancodedados",
-        "coluna": "cr40f_telefone",
         "ler": true,
         "editar": true
       },

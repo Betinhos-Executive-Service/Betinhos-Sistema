@@ -18,7 +18,6 @@
     },
     "cr40f_financeiro": { "valor": ["cr40f_valor"] },
     "cr40f_bancodedados": {
-      "contato": ["cr40f_datadenascimento", "cr40f_email", "cr40f_enderecodesaida", "cr40f_telefone"],
       "cr": ["cr40f_cr"]
     },
     "new_termomulta": { "pdf": ["new_pdf", "new_hashpdf"], "prova": ["new_selfie", "new_latitude", "new_longitude"] }
@@ -27,13 +26,13 @@
     "operacional": {
       "operador": {
         "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico", "cr40f_veiculos.operacao"],
-        "editar": ["cr40f_reservadeveculos.operacao", "cr40f_reservadeveculos.cotacao", "cr40f_bancodedados.contato", "cr40f_bancodedados.cr"]
+        "editar": ["cr40f_reservadeveculos.operacao", "cr40f_reservadeveculos.cotacao", "cr40f_bancodedados.cr"]
       },
       "gestor": { "ler": [], "editar": [] }
     },
     "financeiro": {
       "operador": {
-        "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico", "cr40f_reservadeveculos.*", "cr40f_financeiro.valor", "cr40f_bancodedados.contato", "cr40f_bancodedados.cr"],
+        "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico", "cr40f_reservadeveculos.*", "cr40f_financeiro.valor", "cr40f_bancodedados.cr"],
         "editar": []
       },
       "gestor": { "ler": [], "editar": ["cr40f_reservadeveculos.cotacao", "cr40f_reservadeveculos.composicao", "cr40f_financeiro.valor"] }
