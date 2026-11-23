@@ -104,3 +104,8 @@ Saída dos testes do item 1, prints do item 2, o MultasJson do item 3.2, o trace
 - O sininho só toca quando a atribuição nasce na criação da tarefa; responsável colocado depois pelo reparo (ex.: equipe Frota vazia na criação) não gera sininho.
 - O termo volta na fase 3 (skill `verificar-termo-multa`; a tela do app está na seção 4 dela).
 - A rotina do SNE grava a placa e a infração por `@odata.bind` (`cr40f_Placa`, `cr40f_Codigodainfracao`) (nomes de navegação confirmados na metadata do PROD, para `cr40f_veiculoses` e `cr40f_infracaodetransitos`); a conferência da primeira multa criada continua no roteiro da rotina, como boa prática.
+
+## 6. Configuração do App (fase B2)
+- `Betinhos.DriverRecordSharing` tem cópia idêntica do resolvedor (`AppConfigResolver.cs`) e o leitor `AppConfigLeitor`; `dotnet test packages/plugins/Betinhos.DriverRecordSharing.Tests -p:SignAssembly=false --filter "FullyQualifiedName~AppConfigLeitor|FullyQualifiedName~TermoMulta|FullyQualifiedName~QrCharge"` com "Com falha: 0". Os testes de multa semeiam a matriz publicada (`ChecklistFakeService`).
+- Com `multas` desligado para o motorista, as Custom APIs de multa recusam (`MultasDesligado`, mensagem "O módulo Multas não está disponível…"); o desligamento vem do perfil, piloto ou exceção da pessoa. Falha ao ler a configuração recusa também (fail-closed).
+- DEV: com `cr40f_AppConfigDefinirPessoa` (`Tipo='excecao'`, `Chave='multas'`, `Ligado=false`) num motorista de teste, chamar a API de multa por ele e esperar a recusa; encerrar a exceção depois.

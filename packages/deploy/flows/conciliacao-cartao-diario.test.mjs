@@ -109,6 +109,15 @@ test('grava a transação antes de criar despesa, depois situação e motivo, e 
   assert.ok(acao('Vincular_cartao').inputs.parameters['item/__NAV_T_CARTAO__@odata.bind'])
 })
 
+test('só avisa o motorista com o módulo Gastos ligado no App; falha ao ler a configuração envia como hoje', () => {
+  const cfg = acao('Config_efetiva').inputs
+  assert.equal(cfg.host.operationId, 'PerformUnboundAction')
+  assert.equal(cfg.parameters.actionName, 'cr40f_AppConfigEfetiva')
+  assert.equal(cfg.parameters['item/Funcionario'], "@items('Cada_motorista')")
+  assert.deepEqual(acao('Inscricoes').runAfter, { Config_efetiva: ['Succeeded', 'Failed', 'TimedOut'] })
+  assert.match(JSON.stringify(acao('Tem_inscricao').expression), /chaves'\]\?\['expenses'\].*false/)
+})
+
 test('avisa cada motorista com pendência por push e limpa inscrições expiradas', () => {
   assert.match(acao('Pendentes').inputs.parameters.$filter, /cr40f_origem eq 100000002 and cr40f_statusoperacional eq 100000001/)
   assert.equal(acao('Cada_motorista').foreach, "@union(body('Motoristas'), body('Motoristas'))")

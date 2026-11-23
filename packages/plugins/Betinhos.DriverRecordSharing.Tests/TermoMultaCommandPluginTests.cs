@@ -187,6 +187,26 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Pendente, Status(termo));
         }
 
+        private static void DesligarMultas(Scenario s)
+            => s.Rows("cr40f_appconfigversao").Single()["cr40f_conteudo"] = "{\"proprio\":{\"multas\":false},\"terceiro\":{\"multas\":false}}";
+
+        [Fact]
+        public void ApisDeMultaRecusamComOModuloMultasDesligadoParaOMotorista()
+        {
+            var s = Cenario();
+            AceitePendente(s, new DateTime(2026, 10, 20));
+            var termo = TermoPendente(s, Folha, 3, 100m);
+            DesligarMultas(s);
+            const string mensagem = "Multas não está disponível no seu App no momento. Procure o escritório.";
+
+            Assert.Equal(mensagem, Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_MinhasMultas", s.MotoristaUser.Id, new Dictionary<string, object>())).Message);
+            Assert.Equal(mensagem, Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_DeclararAceiteMulta", s.MotoristaUser.Id, DaMulta(s))).Message);
+            Assert.Equal(mensagem, Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_AssinarTermoMulta", s.MotoristaUser.Id, Assinatura(termo))).Message);
+            Assert.Equal(mensagem, Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_ContestarTermoMulta", s.MotoristaUser.Id,
+                new Dictionary<string, object> { ["new_TermoId"] = termo.Id, ["new_Motivo"] = "Não era eu dirigindo naquele dia." })).Message);
+            Assert.Equal(Pendente, ((OptionSetValue)termo["new_status"]).Value);
+        }
+
         [Fact]
         public void AssinarSemAditivoEhRecusado()
         {
@@ -1107,6 +1127,8 @@ namespace Betinhos.DriverRecordSharing.Tests
                 ["cr40f_dataparaindicar"] = new DateTime(2026, 11, 20),
             });
             s.Add(new Entity("new_textotermomulta") { ["new_versao"] = "v1", ["new_tipo"] = new OptionSetValue(100000000), ["new_vigente"] = true, ["new_texto"] = "Eu, {motorista}, CPF {cpf}, reconheço a infração {infracao} com o veículo {placa}, no valor de {valor}: {forma} ({parcelas} parcela(s))." });
+            // Configuração do App: "multas" vem desligada no catálogo; o cenário publica a matriz com o módulo ligado.
+            s.Add(new Entity("cr40f_appconfigversao") { ["cr40f_numero"] = 1, ["cr40f_estado"] = new OptionSetValue(100000001), ["cr40f_conteudo"] = "{\"proprio\":{\"multas\":true},\"terceiro\":{\"multas\":true}}" });
             s.Add(new Entity("new_textotermomulta") { ["new_versao"] = "a1", ["new_tipo"] = new OptionSetValue(100000001), ["new_vigente"] = true, ["new_texto"] = "ADITIVO {motorista}" });
             return s;
         }

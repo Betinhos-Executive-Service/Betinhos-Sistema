@@ -2,6 +2,8 @@
 // ARQUIVO AUTÔNOMO: só usa a BCL (sem Xrm, sem JsonLeve, sem tipos do plugin), para ser copiado inteiro para outro assembly
 // (Betinhos.DriverRecordSharing, na fase B), como já acontece com o SecretReader.cs. Mantenha-o assim.
 // Paridade: packages/app-config (TypeScript) e este arquivo são conferidos contra packages/app-config/casos.json.
+// Cópia idêntica em Betinhos.DriverRecordSharing/AppConfigResolver.cs (teste AppConfigCopiaTests); mude os dois juntos.
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -239,5 +241,29 @@ public static class AppConfigResolver
             catch (InvalidTimeZoneException) { }
         }
         return utc.AddHours(-3).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+}
+
+/// <summary>
+/// Transição sem perda (fase B2): a coluna legada da ficha vale uma exceção implícita "ligado" da chave equivalente,
+/// só enquanto NÃO existe linha de exceção (vigente ou encerrada) dessa chave para a pessoa. Quem monta a pessoa chama aqui.
+/// </summary>
+public static class AppConfigLegado
+{
+    public const string ColunaCobrarQr = "cr40f_podecobrarqrcode";
+    public const string ColunaReciboPersonalizado = "cr40f_gerarrecibopersonalizado";
+    public const string ChaveCobrarQr = "services.qrCharge";
+    public const string ChaveReciboPersonalizado = "services.personalReceipt";
+
+    public static void Aplicar(AppConfigPessoa pessoa, bool podeCobrarQr, bool geraReciboPersonalizado)
+    {
+        Aplicar(pessoa, ChaveCobrarQr, podeCobrarQr);
+        Aplicar(pessoa, ChaveReciboPersonalizado, geraReciboPersonalizado);
+    }
+
+    private static void Aplicar(AppConfigPessoa pessoa, string chave, bool colunaSim)
+    {
+        if (!colunaSim || pessoa.Excecoes.Any(e => e.Chave == chave)) return;
+        pessoa.Excecoes.Insert(0, new AppConfigExcecao { Chave = chave, Ligado = true });
     }
 }

@@ -264,4 +264,46 @@ public sealed class AppConfigHandlersTests
         Assert.Equal("{\"proprio\":{\"history\":true,\"ideas\":false},\"terceiro\":{\"multas\":true}}", AppConfigConteudo.Escrever(m));
         Assert.Null(AppConfigConteudo.Ler("  "));
     }
+
+    // ---- Transição: colunas legadas da ficha viram exceção implícita "ligado" ----
+
+    private void ColunaLegada(Guid id, string coluna, bool valor) => _svc.Linhas("cr40f_funcionarios").Single(f => f.Id == id)[coluna] = valor;
+
+    [Fact]
+    public void Legado_coluna_sim_sem_linha_liga_a_chave_por_excecao()
+    {
+        ColunaLegada(_bia, AppConfigLegado.ColunaCobrarQr, true);
+        ColunaLegada(_bia, AppConfigLegado.ColunaReciboPersonalizado, true);
+        var json = Efetiva.Executar(_gestor, _bia);
+        Assert.Contains("\"services.qrCharge\":true", json);
+        Assert.Contains("\"services.qrCharge\":\"excecao\"", json);
+        Assert.Contains("\"services.personalReceipt\":true", json);
+    }
+
+    [Fact]
+    public void Legado_coluna_sim_com_excecao_desligando_fica_desligado()
+    {
+        ColunaLegada(_bia, AppConfigLegado.ColunaCobrarQr, true);
+        Pessoa.Executar(_gestor, _bia, "excecao", "services.qrCharge", false, "teste", null, false);
+        Assert.Contains("\"services.qrCharge\":false", Efetiva.Executar(_gestor, _bia));
+    }
+
+    [Fact]
+    public void Legado_coluna_sim_com_excecao_encerrada_segue_a_matriz()
+    {
+        ColunaLegada(_bia, AppConfigLegado.ColunaCobrarQr, true);
+        Pessoa.Executar(_gestor, _bia, "excecao", "services.qrCharge", false, "teste", null, false);
+        Pessoa.Executar(_gestor, _bia, "excecao", "services.qrCharge", false, null, null, true);
+        var json = Efetiva.Executar(_gestor, _bia);
+        Assert.DoesNotContain("\"services.qrCharge\":\"excecao\"", json);
+        Assert.Contains("\"services.qrCharge\":\"padrao\"", json);
+    }
+
+    [Fact]
+    public void Legado_coluna_nao_segue_a_matriz()
+    {
+        ColunaLegada(_bia, AppConfigLegado.ColunaCobrarQr, false);
+        var json = Efetiva.Executar(_gestor, _bia);
+        Assert.Contains("\"services.qrCharge\":\"padrao\"", json);
+    }
 }

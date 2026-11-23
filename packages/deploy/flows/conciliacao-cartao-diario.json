@@ -2008,11 +2008,33 @@
             "where": "@equals(item()?['_cr40f_motorista_value'], items('Cada_motorista'))"
           }
         },
-        "Inscricoes": {
-          "type": "OpenApiConnection",
+        "Config_efetiva": {
           "runAfter": {
             "Do_motorista": [
               "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "operationId": "PerformUnboundAction",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "actionName": "cr40f_AppConfigEfetiva",
+              "item/Funcionario": "@items('Cada_motorista')"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Inscricoes": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Config_efetiva": [
+              "Succeeded",
+              "Failed",
+              "TimedOut"
             ]
           },
           "inputs": {
@@ -2037,9 +2059,21 @@
             ]
           },
           "expression": {
-            "greater": [
-              "@length(outputs('Inscricoes')?['body/value'])",
-              0
+            "and": [
+              {
+                "greater": [
+                  "@length(outputs('Inscricoes')?['body/value'])",
+                  0
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@json(coalesce(outputs('Config_efetiva')?['body/Resultado'], '{}'))?['chaves']?['expenses']",
+                    false
+                  ]
+                }
+              }
             ]
           },
           "actions": {
