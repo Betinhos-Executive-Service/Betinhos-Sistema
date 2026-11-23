@@ -172,6 +172,10 @@ Rota `#/app-motoristas`, em `apps/shell/src/pages/app-motoristas/`, com componen
 
 Estrutura: configuração à esquerda, preview fixo à direita. Abaixo de 1100 px o preview vira drawer, aberto pelo botão "Ver no App".
 
+Desenho de referência, aprovado pelo Renan em 23/11/2026 (aba Perfis com o preview como Terceiro no rascunho; dados inventados): `2026-11-23-config-app-motoristas-mockup.png`, gerado de `2026-11-23-config-app-motoristas-mockup.html`. O título usa serifada genérica no lugar da Centabel e os ícones são aproximados; a implementação usa os componentes do `@betinhos/ui`.
+
+![Mockup da aba Perfis com o preview](2026-11-23-config-app-motoristas-mockup.png)
+
 ```
 +--------------------------------------+  +-----------+
 | Perfis | Motoristas | Histórico      |  | Ver como: |
