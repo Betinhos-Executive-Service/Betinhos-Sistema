@@ -137,3 +137,8 @@ test('registro "Publicado no PROD" do módulo Projetos não muda o PROD', () => 
   assert.equal(caminhoDoArquivo('packages/deploy/projetos/publicados.mjs'), 'nada')
   assert.equal(caminhoDoArquivo('packages/deploy/projetos/publicados.test.mjs'), 'nada')
 })
+
+test('hotfix-tela.mjs e o teste dele não mudam o PROD', () => {
+  assert.equal(caminhoDoArquivo('packages/deploy/hotfix-tela.mjs'), 'nada')
+  assert.equal(caminhoDoArquivo('packages/deploy/hotfix-tela.test.mjs'), 'nada')
+})
