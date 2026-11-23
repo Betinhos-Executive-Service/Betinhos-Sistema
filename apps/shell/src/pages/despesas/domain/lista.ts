@@ -65,7 +65,7 @@ export const alertasDe = (d: Despesa): Alerta[] => [
 /** Valor de cada campo na despesa (para `matchesFilters`). */
 export function readDespesa(d: Despesa, key: string): unknown {
   switch (key) {
-    case 'despesa': return [d.estabelecimento, d.nome].filter(Boolean).join(' ')
+    case 'despesa': return d.estabelecimento || d.nome || null
     case 'data': return d.data
     case 'motorista': return d.motoristaId || null
     case 'valor': return d.valor
