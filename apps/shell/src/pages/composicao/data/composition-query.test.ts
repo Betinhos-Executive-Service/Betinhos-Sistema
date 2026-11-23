@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, fetchPageSize, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
+import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, dedupeLinks, expandLinkAliases, fetchPageSize, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
 import { buildLayoutXml, type CatalogField, type ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
@@ -369,5 +369,29 @@ describe('withLinkKeys', () => {
     expect(withLinkKeys(aggregate)).toBe(aggregate)
     const all = source.replace('<attribute name="cr40f_trajeto"/>', '<all-attributes/>')
     expect(withLinkKeys(all)).toBe(all)
+  })
+})
+
+describe('dedupeLinks', () => {
+  it('funde a reserva e o cliente repetidos da view nativa, da grade e da linha abaixo do limite de 15 link-entity', () => {
+    const native = '<fetch><entity name="cr40f_composicaodeprecos"><attribute name="new_status"/><filter><condition attribute="cr40f_trajeto" operator="like" value="%GRU%" entityname="a_67d5"/></filter><link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" alias="a_67d5" link-type="outer"><attribute name="cr40f_trajeto"/></link-entity></entity></fetch>'
+    const definition: ViewDefinition = { columns: [{ id: 'client', width: 128, pinned: false }, { id: 'route', width: 128, pinned: false }], filters: [], sort: [] }
+    const full = withRowLinks(buildNativeCompositionQuery(native, definition, catalog, ''))
+    const before = new DOMParser().parseFromString(full, 'application/xml').querySelectorAll('link-entity').length
+    const { fetchXml, aliases } = dedupeLinks(full)
+    const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+    expect(before).toBe(5)
+    expect([...document.querySelectorAll('link-entity')].map((link) => link.getAttribute('alias'))).toEqual(['a_67d5', 'r2'])
+    expect(aliases).toEqual([['r1', 'a_67d5'], ['cmp_res', 'a_67d5'], ['cmp_cli', 'r2']])
+    expect(document.querySelector('condition')?.getAttribute('entityname')).toBe('a_67d5')
+    expect([...document.querySelectorAll('link-entity[alias="a_67d5"] > attribute')].filter((item) => item.getAttribute('name') === 'cr40f_trajeto')).toHaveLength(1)
+    const row = expandLinkAliases({ 'a_67d5.cr40f_trajeto': 'GRU', 'r2.cr40f_nomedocliente': 'J&J', 'r2.cr40f_nomedocliente@OData.Community.Display.V1.FormattedValue': 'J&J' }, aliases)
+    expect(row).toMatchObject({ 'r1.cr40f_trajeto': 'GRU', 'cmp_res.cr40f_trajeto': 'GRU', 'cmp_cli.cr40f_nomedocliente': 'J&J', 'cmp_cli.cr40f_nomedocliente@OData.Community.Display.V1.FormattedValue': 'J&J' })
+  })
+
+  it('não funde vínculo inner ou com filtro próprio', () => {
+    const xml = '<fetch><entity name="x"><link-entity name="r" from="a" to="b" alias="k" link-type="outer"><filter><condition attribute="s" operator="eq" value="1"/></filter></link-entity><link-entity name="r" from="a" to="b" alias="i" link-type="inner"/><link-entity name="r" from="a" to="b" alias="o" link-type="outer"/></entity></fetch>'
+    const { aliases } = dedupeLinks(xml)
+    expect(aliases).toEqual([['o', 'i']])
   })
 })
