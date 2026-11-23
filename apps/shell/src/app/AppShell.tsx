@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
-  FileText, FolderCheck, FolderCog, FolderKanban, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
+  FileText, Fingerprint, FolderCheck, FolderCog, FolderKanban, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
   Scale, ScrollText, Shield, ShieldCheck, Shuffle, Smartphone, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { Alert, AppShell as Shell, Button, formatBuild, type NavGroup } from '@betinhos/ui'
@@ -110,6 +110,7 @@ export const ITEM_ICONS: Record<string, ReactNode> = {
   'despesas-operacionais': <ReceiptText />,
   cartoes: <CreditCard />,
   'app-motoristas': <Smartphone />,
+  acessos: <Fingerprint />,
   cr40f_formapagamentodespesa: <Wallet />,
   comunicados: <Megaphone />,
   cr40f_gerenciarcomunicados: <Megaphone />,

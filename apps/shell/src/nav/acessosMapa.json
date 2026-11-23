@@ -229,6 +229,10 @@
         {"tabela": "cr40f_projetoatualizacao", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_projetoetapa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"}
       ]
+    },
+    "acessos": {
+      "perfis": ["acessos"],
+      "pastas": ["apps/shell/src/pages/acessos"]
     }
   }
 }

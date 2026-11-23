@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { NENHUM, TODOS, lerPapeis, temAlgum } from '../app/acessos'
+import { NENHUM, TODOS, lerPapeis, temAlgum, type Acessos } from '../app/acessos'
 import { menuVisivel, perfisDoItem } from './acessosMenu'
 import { MENU } from './menu'
 
@@ -27,5 +27,12 @@ describe('menuVisivel', () => {
   it('rota livre não tem perfis', () => {
     expect(perfisDoItem('inicio')).toBeUndefined()
     expect(perfisDoItem('geral')).toEqual(['operacional'])
+  })
+
+  it('Acessos aparece só para Administrador de acessos e para o Administrador do Sistema', () => {
+    const ver = (a: Acessos) => ids(menuVisivel(a))
+    expect(ver({ admin: false, areas: { financeiro: 'gestor' }, acessos: false })).not.toContain('acessos')
+    expect(ver({ admin: false, areas: {}, acessos: true })).toContain('acessos')
+    expect(ver(TODOS)).toContain('acessos')
   })
 })
