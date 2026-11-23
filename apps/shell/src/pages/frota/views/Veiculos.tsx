@@ -82,6 +82,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
       rowKey={(linha) => linha.id}
       selection={sel.selection}
       onRowClick={(linha) => onOpenVeiculo(linha.veiculo.id)}
+      audit={{ entity: 'cr40f_veiculos', ids: (linha) => [linha.veiculo.id], name: (linha) => linha.veiculo.placa || undefined, onOpenRecord: onOpenVeiculo }}
       view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }}
       quickFilters={quickFilters}
       footer={tableFooter}

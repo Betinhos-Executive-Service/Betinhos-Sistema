@@ -76,7 +76,7 @@ export function EquipamentosTable({ list, inativos, onOpen, loading, view, quick
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.eq-open')}>
-      <ListTable className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando equipamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="eq-table" columns={columns} rows={list} rowKey={(e) => e.id} audit={{ entity: 'cr40f_equipamento', onOpenRecord: onOpen }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando equipamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

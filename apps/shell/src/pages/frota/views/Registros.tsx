@@ -126,6 +126,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
       rowKey={(linha) => linha.id}
       selection={sel.selection}
       onRowClick={(linha) => onOpen(linha.kind, linha.id)}
+      audit={{ entity: (linha) => KIND_TABLE[linha.kind], name: (linha) => linha.titulo || undefined, onOpenRecord: (id) => onOpen(kind, id) }}
       view={{ config: view.config, onChange: view.setConfig, density: view.density, pinnable: true, groupable: true, extraCell: extra.cell }}
       quickFilters={quickFilters}
       footer={tableFooter}

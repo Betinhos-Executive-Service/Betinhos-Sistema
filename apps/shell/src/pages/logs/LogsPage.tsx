@@ -142,7 +142,7 @@ function LogsTable({ list, onOpen, loading, view, quickFilters, footer, empty }:
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.lg-open')}>
-      <ListTable className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando logs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="lg-table" columns={columns} rows={list} rowKey={(l) => l.id} audit={{ entity: 'new_appmotoristaslog', onOpenRecord: onOpen }} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando logs" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

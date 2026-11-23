@@ -82,7 +82,7 @@ export function PendenciasTable({ list, onOpen, loading, view, quickFilters, foo
   ]
   return (
     <div className="pg-table-wrap" onClick={(event) => openFromRow(event, '.bt-table__row', '.pg-open')}>
-      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} rowActions={pendenciaActions(onOpen, acoes)} loading={loading} loadingLabel="Carregando pendências" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="pg-table" columns={columns} rows={list} rowKey={(p) => p.id} audit={{ entity: (p) => (p.opId ? 'cr40f_financeiro' : 'cr40f_reservadeveculos'), ids: (p) => (p.opId ? [p.opId] : p.reservaIds) }} rowActions={pendenciaActions(onOpen, acoes)} loading={loading} loadingLabel="Carregando pendências" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }

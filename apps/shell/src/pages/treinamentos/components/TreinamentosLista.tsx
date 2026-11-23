@@ -90,7 +90,7 @@ export function TreinamentosTable({ list, funcionarios = [], progresso = {}, onO
     { key: 'publicadoEm', header: 'Publicado em', label: 'Publicado em', sortable: true, defaultWidth: 110, width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (t) => <Quando value={t.publicadoEm} vazio="Não publicado" /> },
     { key: 'criado', header: 'Criado em', label: 'Criado em', sortable: true, defaultWidth: 130, width: 'minmax(100px, .7fr)', hideBelow: 'compact', cell: (t) => <Quando value={t.criadoEm || null} vazio="—" /> },
   ]
-  return <ListTable className="tr-table" columns={columns} rows={list} rowKey={(t) => t.id} onRowClick={(t) => onOpen(t.id)} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando treinamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+  return <ListTable className="tr-table" columns={columns} rows={list} rowKey={(t) => t.id} audit={{ entity: 'cr40f_treinamento', onOpenRecord: onOpen }} onRowClick={(t) => onOpen(t.id)} rowActions={openRowActions(onOpen)} loading={loading} loadingLabel="Carregando treinamentos" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
 }
 
 export function TreinamentosCards({ list, funcionarios = [], progresso = {}, onOpen }: Pick<Props, 'list' | 'funcionarios' | 'progresso' | 'onOpen'>) {

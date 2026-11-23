@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { type TableColumn, type TableQuickFilters, type TableView } from '@betinhos/ui'
 import { ListTable } from '../../../app/ListTable'
-import { openFromRow } from '../../pagantes/components/PagantesList'
+import { openFromRow, openRowActions } from '../../pagantes/components/PagantesList'
 import type { Cliente } from '../domain/types'
 
 type Props = { list: Cliente[]; onOpen: (id: string) => void; loading?: boolean }
@@ -23,7 +23,7 @@ export function ClientesTable({ list, onOpen, loading, view, quickFilters, foote
   ]
   return (
     <div onClick={(event) => openFromRow(event, '.bt-table__row', '.cl-open')}>
-      <ListTable className="cl-table" columns={columns} rows={list} rowKey={(c) => c.id} loading={loading} loadingLabel="Carregando clientes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
+      <ListTable className="cl-table" columns={columns} rows={list} rowKey={(c) => c.id} rowActions={openRowActions(onOpen)} audit={{ entity: 'cr40f_clientes1', onOpenRecord: onOpen }} loading={loading} loadingLabel="Carregando clientes" view={view} quickFilters={quickFilters} footer={footer} empty={empty} />
     </div>
   )
 }
