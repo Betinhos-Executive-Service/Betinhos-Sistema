@@ -41,13 +41,15 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void Validity_IsClampedBetweenHalfHourAndOneDay()
+        public void Validity_IsClampedBetweenHalfHourAndFourteenDays()
         {
             var past = Valid(); past.DepartureUtc = Now.AddHours(-10);
-            var far = Valid(); far.DepartureUtc = Now.AddDays(3);
+            var far = Valid(); far.DepartureUtc = Now.AddDays(30);
+            var week = Valid(); week.DepartureUtc = Now.AddDays(7);
 
             Assert.Equal(0.5, TrackingLinkRequest.Build(past, Now).Payload["validadeHoras"]);
-            Assert.Equal(24.0, TrackingLinkRequest.Build(far, Now).Payload["validadeHoras"]);
+            Assert.Equal(336.0, TrackingLinkRequest.Build(far, Now).Payload["validadeHoras"]);
+            Assert.Equal(172.0, TrackingLinkRequest.Build(week, Now).Payload["validadeHoras"]);
         }
 
         [Theory]

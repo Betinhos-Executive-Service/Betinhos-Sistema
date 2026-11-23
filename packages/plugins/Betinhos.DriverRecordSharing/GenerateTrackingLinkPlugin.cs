@@ -58,12 +58,16 @@ namespace Betinhos.DriverRecordSharing
                     return;
                 }
 
+                // Credencial de cadastro do portal: falha aqui só tira a seção Passageiros, o link sai igual.
+                var cadastro = TryCreateCadastro(system, serviceId, built.Payload, context.OrganizationName, tracing);
                 var link = RequestLink(config, built.Payload, tracing);
                 if (link == null)
                 {
+                    RevokeCadastro(system, cadastro, tracing);
                     context.OutputParameters[ResultParameter] = Fail(GenericError);
                     return;
                 }
+                if (cadastro != null && link.Item2.HasValue) SyncCadastroExpiry(system, cadastro, link.Item2.Value, tracing);
 
                 var update = new Entity(PluginConfig.ServiceTable, serviceId);
                 update[PluginConfig.ServiceTrackingLink] = link.Item1;
@@ -132,6 +136,52 @@ namespace Betinhos.DriverRecordSharing
             var enriched = TrackingLinkPayload.Build(built.Payload, extras);
             foreach (var warning in enriched.Warnings) tracing?.Trace("GenerateTrackingLink: {0}.", warning);
             return new TrackingLinkRequest.Result(null, enriched.Payload);
+        }
+
+        // Cria o link de cadastro e acrescenta "cadastro" ao payload; sem validade ou em falha devolve null e o payload fica como está.
+        public static TrackingLinkCadastro.Created TryCreateCadastro(IOrganizationService system, Guid serviceId, Dictionary<string, object> payload, string organizationName, ITracingService tracing)
+        {
+            try
+            {
+                var expires = CadastroExpiry(payload, DateTime.UtcNow);
+                if (!expires.HasValue) return null;
+                var created = TrackingLinkCadastro.Create(system, serviceId, expires.Value);
+                payload["cadastro"] = CadastroPayload(created.Hash, organizationName);
+                return created;
+            }
+            catch (Exception error)
+            {
+                tracing?.Trace("GenerateTrackingLink: link de cadastro indisponível: {0}", error.GetType().Name);
+                return null;
+            }
+        }
+
+        // Mesma conta do Worker: agora + validadeHoras.
+        public static DateTime? CadastroExpiry(Dictionary<string, object> payload, DateTime nowUtc)
+        {
+            object hours;
+            if (payload == null || !payload.TryGetValue("validadeHoras", out hours) || hours == null) return null;
+            return nowUtc.AddHours(Convert.ToDouble(hours, CultureInfo.InvariantCulture));
+        }
+
+        public static Dictionary<string, object> CadastroPayload(string hash, string organizationName)
+        {
+            var isDev = string.Equals(organizationName, PluginConfig.DevOrganizationName, StringComparison.OrdinalIgnoreCase);
+            return new Dictionary<string, object> { ["hash"] = hash, ["ambiente"] = isDev ? "dev" : "prod" };
+        }
+
+        // Worker falhou: o link de cadastro não tem a quem servir.
+        public static void RevokeCadastro(IOrganizationService system, TrackingLinkCadastro.Created cadastro, ITracingService tracing)
+        {
+            if (cadastro == null) return;
+            try { TrackingLinkCadastro.Revoke(system, cadastro.Id); }
+            catch (Exception error) { tracing?.Trace("GenerateTrackingLink: revogação do link de cadastro falhou: {0}", error.GetType().Name); }
+        }
+
+        public static void SyncCadastroExpiry(IOrganizationService system, TrackingLinkCadastro.Created cadastro, DateTime expiresUtc, ITracingService tracing)
+        {
+            try { TrackingLinkCadastro.SetExpiry(system, cadastro.Id, expiresUtc); }
+            catch (Exception error) { tracing?.Trace("GenerateTrackingLink: expiração do link de cadastro não atualizada: {0}", error.GetType().Name); }
         }
 
         // Falha aqui não derruba o link: devolve lista vazia e a saída cai nos demais critérios.
