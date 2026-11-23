@@ -387,6 +387,9 @@ importers:
       '@azure/msal-browser':
         specifier: ^5.26.0
         version: 5.26.0
+      '@betinhos/app-config':
+        specifier: workspace:*
+        version: link:../../packages/app-config
       '@betinhos/dataverse':
         specifier: workspace:*
         version: link:../../packages/dataverse

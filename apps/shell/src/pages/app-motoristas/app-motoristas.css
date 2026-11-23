@@ -1,0 +1,82 @@
+/* Configuração do App Motoristas (#/app-motoristas). Prefixo am-. Cores só por tokens do DS. */
+.am-page { display: flex; flex-direction: column; gap: var(--space-3, 12px); }
+.am-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, 12px); flex-wrap: wrap; }
+.am-topo__fim { display: inline-flex; align-items: center; gap: var(--space-2, 8px); }
+.am-vazio { padding: var(--space-6, 24px); color: var(--text-muted, #667085); }
+.am-muted { color: var(--text-muted, #667085); }
+.am-corte { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* grade: conteúdo + preview fixo à direita (≥ 1101 px); abaixo disso o preview vira drawer */
+.am-grade { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4, 16px); align-items: start; }
+@media (min-width: 1101px) { .am-grade { grid-template-columns: minmax(0, 1fr) 360px; } }
+.am-principal { display: flex; flex-direction: column; gap: var(--space-3, 12px); min-width: 0; container-type: inline-size; }
+.am-lateral { position: sticky; top: var(--space-3, 12px); max-height: calc(100vh - 96px); overflow: auto; background: var(--surface, #fff); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); padding: var(--space-3, 12px); }
+
+/* barra do rascunho */
+.am-barra { display: flex; align-items: center; gap: var(--space-3, 12px); flex-wrap: wrap; padding: var(--space-3, 12px) var(--space-4, 16px); background: var(--surface, #fff); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); }
+.am-barra__texto { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; }
+.am-barra__acoes { display: inline-flex; gap: var(--space-2, 8px); flex-wrap: wrap; }
+.am-salvo { font-size: var(--text-sm, 13px); color: var(--text-muted, #667085); }
+.am-salvo--erro { color: var(--danger, #b42318); font-weight: 600; }
+
+/* matriz */
+.am-matriz-wrap { overflow-x: auto; background: var(--surface, #fff); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); container-type: inline-size; }
+.am-matriz { width: 100%; border-collapse: collapse; min-width: 520px; }
+.am-matriz th, .am-matriz td { padding: var(--space-2, 8px) var(--space-3, 12px); text-align: left; border-bottom: 1px solid var(--border, #e4e7ec); vertical-align: middle; }
+.am-matriz thead th { font-weight: 600; font-size: var(--text-sm, 13px); color: var(--text-muted, #667085); }
+.am-matriz__col, .am-matriz__celula { text-align: center; width: 110px; }
+.am-matriz__funcao th { padding-left: var(--space-6, 28px); font-weight: 400; }
+.am-matriz__nome { display: inline-flex; align-items: center; gap: var(--space-2, 8px); flex-wrap: wrap; }
+.am-matriz__celula { white-space: nowrap; }
+.am-matriz .is-mudou { background: var(--warning-soft, #fffaeb); }
+.am-era { display: block; font-size: var(--text-xs, 11px); color: var(--warning-strong, #b54708); }
+.am-fixo { display: block; font-size: var(--text-xs, 11px); color: var(--text-muted, #667085); }
+.am-regras { display: grid; gap: var(--space-2, 8px); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 0; padding: var(--space-3, 12px) var(--space-4, 16px); list-style: none; background: var(--surface-subtle, #f9fafb); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); }
+
+/* lista de motoristas */
+.am-perfil { display: inline-flex; align-items: center; gap: var(--space-2, 8px); flex-wrap: wrap; }
+.am-alerta { display: inline-flex; align-items: center; gap: 4px; color: var(--warning-strong, #b54708); font-size: var(--text-sm, 13px); }
+.am-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.am-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: var(--text-xs, 12px); border: 1px solid var(--border, #e4e7ec); background: var(--surface-subtle, #f9fafb); }
+.am-chip--liga { border-color: var(--success, #12b76a); color: var(--success-strong, #027a48); }
+.am-chip--desliga { border-color: var(--danger, #f04438); color: var(--danger-strong, #b42318); }
+.am-chip__validade { display: inline-flex; align-items: center; gap: 3px; color: var(--text-muted, #667085); }
+.am-push { display: inline-flex; align-items: center; gap: 4px; }
+.am-cards { display: grid; gap: var(--space-2, 8px); margin: 0; padding: 0; list-style: none; }
+.am-card { background: var(--surface, #fff); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); }
+.am-open { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--space-2, 8px); width: 100%; padding: var(--space-3, 12px); cursor: pointer; }
+.am-open:focus-visible { outline: 2px solid var(--focus, #2e90fa); outline-offset: 2px; border-radius: var(--radius-lg, 12px); }
+.am-card__top, .am-card__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2, 8px); flex-wrap: wrap; }
+
+/* drawer do motorista, publicar, histórico */
+.am-drawer { display: flex; flex-direction: column; gap: var(--space-4, 16px); container-type: inline-size; }
+.am-drawer__resumo { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); align-items: center; }
+.am-valores { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-1, 4px); }
+.am-valores li { display: grid; grid-template-columns: minmax(0, 1.3fr) 96px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3, 12px); padding: 6px 0; border-bottom: 1px solid var(--border, #e4e7ec); }
+@container (max-width: 560px) { .am-valores li { grid-template-columns: minmax(0, 1fr) auto; } .am-valores li > :nth-child(3) { grid-column: 1 / -1; } }
+.am-valores li.is-funcao { padding-left: var(--space-4, 16px); }
+.am-form { display: grid; gap: var(--space-3, 12px); }
+.am-excecoes { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2, 8px); }
+.am-publicar { display: grid; gap: var(--space-3, 12px); }
+.am-publicar__lista { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2, 8px); }
+.am-publicar__lista li { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3, 12px); flex-wrap: wrap; }
+.am-tempo { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-3, 12px); container-type: inline-size; }
+.am-tempo__item--versao, .am-tempo__item--pessoa { display: grid; gap: var(--space-2, 8px); padding: var(--space-3, 12px) var(--space-4, 16px); background: var(--surface, #fff); border: 1px solid var(--border, #e4e7ec); border-radius: var(--radius-lg, 12px); }
+.am-tempo__item--pessoa { background: var(--surface-subtle, #f9fafb); }
+.am-tempo__topo { display: flex; justify-content: space-between; gap: var(--space-3, 12px); flex-wrap: wrap; }
+.am-tempo__nota { margin: 0; color: var(--text-muted, #667085); }
+.am-tempo__mudancas { margin: 0; padding-left: var(--space-4, 16px); }
+.am-tempo__acoes { display: flex; gap: var(--space-2, 8px); }
+
+/* preview */
+.am-prev { display: grid; gap: var(--space-3, 12px); container-type: inline-size; }
+.am-prev__controles { display: grid; gap: var(--space-2, 8px); }
+.am-prev__campo { display: grid; gap: 4px; }
+/* O App é desenhado em 390 × 780 (largura de celular) e reduzido para caber: o preview quebra as linhas como no aparelho. */
+.am-celular { --am-escala: 0.64; position: relative; width: calc(390px * var(--am-escala) + 20px); height: calc(780px * var(--am-escala) + 20px); margin-inline: auto; background: var(--text, #101828); border-radius: 36px; overflow: hidden; }
+.am-celular__tela { position: absolute; top: 10px; left: 10px; width: 390px; height: 780px; border: 0; border-radius: calc(28px / var(--am-escala)); background: var(--surface, #fff); transform: scale(var(--am-escala)); transform-origin: 0 0; }
+@media (min-height: 1000px) { .am-celular { --am-escala: 0.78; } }
+.am-celular__carregando { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.am-prev__ocultos { display: grid; gap: var(--space-2, 8px); }
+.am-regras li { display: flex; flex-direction: column; gap: 2px; }

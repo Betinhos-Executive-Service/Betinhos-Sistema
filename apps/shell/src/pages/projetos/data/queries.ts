@@ -81,6 +81,5 @@ export const anexoPayload = (atualizacaoSet: string, atualizacaoId: string, nome
   [`objectid_${ENTITIES.atualizacao}@odata.bind`]: `/${atualizacaoSet}(${cleanId(atualizacaoId)})`,
 })
 
-/** Papéis que identificam o Renan (administrador do ambiente); o gestor não tem nenhum deles. */
-export const PAPEIS_RENAN = ['System Administrator', 'Administrador do Sistema']
-export const papeisPath = (userId: string) => `systemusers(${cleanId(userId)})/systemuserroles_association?$select=name`
+// Papéis do Renan (administrador do ambiente) e leitura dos papéis do usuário: `app/papeisUsuario.ts`, comum a outras telas.
+export { PAPEIS_RENAN, papeisPath } from '../../../app/papeisUsuario'
