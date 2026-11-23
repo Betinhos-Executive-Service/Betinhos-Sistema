@@ -156,13 +156,15 @@ $email = "outputs('Get_funcionario')?['body/cr40f_emailmicrosoft']"
 $isNovo = "equals(outputs('Get_aviso')?['body/new_tipo'], $tipoNovo)"
 $stillValid = "or(not($isNovo), and(equals(outputs('Get_reserva')?['body/cr40f_status'], $programado), equals(outputs('Get_reserva')?['body/_cr40f_motorista_value'], outputs('Get_aviso')?['body/_new_funcionario_value'])))"
 $attempts = "@add(coalesce(outputs('Get_aviso')?['body/new_tentativas'], 0), 1)"
-# Rotulo de dia igual ao do "Novo Servico": HOJE/AMANHA/ONTEM as HH:mm, no fuso de Sao Paulo.
+# Rotulo de dia: Hoje/Amanhã/Ontem às HH:mm (senão dd/MM às HH:mm), no fuso de Sao Paulo.
 $departureUtc = "outputs('Get_reserva')?['body/cr40f_dataehorriodesada']"
 $departureDay = "formatDateTime(convertFromUtc($departureUtc, '$tz'), 'yyyy-MM-dd')"
 $time = "formatDateTime(convertFromUtc($departureUtc, '$tz'), 'HH:mm')"
 $today = "convertFromUtc(utcNow(), '$tz')"
-$day = "if(empty($departureUtc), 'horário a definir', if(equals($departureDay, formatDateTime($today, 'yyyy-MM-dd')), concat('HOJE às ', $time), if(equals($departureDay, formatDateTime(addDays($today, 1), 'yyyy-MM-dd')), concat('AMANHÃ às ', $time), if(equals($departureDay, formatDateTime(addDays($today, -1), 'yyyy-MM-dd')), concat('ONTEM às ', $time), formatDateTime(convertFromUtc($departureUtc, '$tz'), 'dd/MM/yyyy HH:mm')))))"
-$message = "@{if($isNovo, 'NOVO SERVIÇO para ', 'O Serviço de ')}@{$day}@{if($isNovo, ' foi adicionado na sua agenda pelo gestor!', ' foi RETIRADO DA SUA AGENDA pelo gestor!')}`nID: @{outputs('Get_reserva')?['body/cr40f_id']}`nConfira a sua agenda atualizada!"
+$day = "if(empty($departureUtc), 'Horário a definir', if(equals($departureDay, formatDateTime($today, 'yyyy-MM-dd')), concat('Hoje às ', $time), if(equals($departureDay, formatDateTime(addDays($today, 1), 'yyyy-MM-dd')), concat('Amanhã às ', $time), if(equals($departureDay, formatDateTime(addDays($today, -1), 'yyyy-MM-dd')), concat('Ontem às ', $time), formatDateTime(convertFromUtc($departureUtc, '$tz'), 'dd/MM ''às'' HH:mm')))))"
+# Notificação em duas partes: título diz o que aconteceu, corpo diz qual serviço e quando (sem caixa alta).
+$title = "@{if($isNovo, 'Novo serviço na sua agenda', 'Serviço retirado da sua agenda')}"
+$message = "@{outputs('Get_reserva')?['body/cr40f_id']} · @{$day}`n@{if($isNovo, 'Adicionado pelo gestor. Toque para ver os detalhes.', 'Removido pelo gestor. Toque para ver a agenda atualizada.')}"
 
 $sendPush = @{
   type = "OpenApiConnection"
@@ -173,7 +175,7 @@ $sendPush = @{
     parameters = @{
       "payload/playerType" = "PowerApps"
       "payload/recipients" = @("@$email")
-      "payload/message" = "@outputs('Compose_mensagem')"
+      "payload/message" = "$title`n@{outputs('Compose_mensagem')}"
       "payload/openApp" = $true
       "payload/app" = (@{ type = "AppModule"; displayName = [string]$apps[0].name; appIdentifier = [string]$apps[0].uniquename } | ConvertTo-Json -Compress)
       "payload/dynamicParams/entityLogicalName" = "cr40f_reservadeveculos"
@@ -199,9 +201,10 @@ $worker = @{
     host = @{ apiId = "/providers/Microsoft.PowerApps/apis/$webPushApi"; connectionName = $webPushApi; operationId = "EnviarPush" }
     parameters = @{
       "body/subscriptions" = "@body('Select_subs')"
-      "body/payload/title" = "App Motoristas"
+      "body/payload/title" = $title
       "body/payload/body" = "@outputs('Compose_mensagem')"
-      "body/payload/url" = "/WebResources/new_app-motoristas-v2?servicoId=$reservaIdInline"
+      # Serviço retirado abre direto a agenda (Serviços); novo abre o detalhe.
+      "body/payload/url" = "@{if($isNovo, concat('/WebResources/new_app-motoristas-v2?servicoId=', outputs('Get_aviso')?['body/_new_reserva_value']), '/WebResources/new_app-motoristas-v2?agenda=1')}"
       "body/payload/tag" = "cr40f_reservadeveculos-$reservaIdInline"
     }
     authentication = $auth

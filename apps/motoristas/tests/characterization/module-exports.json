@@ -85,6 +85,7 @@
     "STORAGE_KEY",
     "findFirstPendingDetail",
     "findFirstPendingServiceDetail",
+    "getInitialAgendaLink",
     "getInitialChecklistId",
     "getInitialComunicadoId",
     "getInitialDespesaId",
