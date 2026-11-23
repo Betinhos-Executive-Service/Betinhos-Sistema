@@ -7,7 +7,7 @@
 // (new_statusgeracaorecibo, new_errogeracaorecibo, cr40f_linkdorecibo) e envia o e-mail.
 // O modal acompanha o registro; Abrir/Baixar usam o PDF local assim que ele fica pronto.
 
-var GR_VERSAO = "v0.0.5 · 11/11/2026 11:15";         // gravada por publicar-dev.js a cada publicação
+var GR_VERSAO = "v0.0.6 · 23/11/2026 14:00";         // gravada por publicar-dev.js a cada publicação
 var TAG_GR = "[BT-GERAR-RECIBO]";
 var GR_MAX_PARALELO = 4;          // entregas simultâneas ao Flow
 var GR_TIMEOUT_MS = 30000;        // POST de início; o Flow responde 202 em ~2 s
@@ -108,7 +108,7 @@ function carregarPagante_GR(reg) {
     return Xrm.WebApi.retrieveRecord(
         reg.entityName,
         reg.id,
-        "?$select=cr40f_id,cr40f_valor,cr40f_formadepagamento,new_observacaodorecibo,_cr40f_bancodedados_value,_cr40f_financeiro_value,cr40f_emailrecibo&$expand=cr40f_DestinatarioRecibo($select=cr40f_email)"
+        "?$select=cr40f_id,cr40f_valor,cr40f_formadepagamento,new_observacaodorecibo,_cr40f_bancodedados_value,_cr40f_financeiro_value,_cr40f_destinatariorecibo_value,cr40f_emailrecibo&$expand=cr40f_DestinatarioRecibo($select=cr40f_email)"
     )
         .then(function (record) {
             return montarDescricaoPadrao_GR(record._cr40f_financeiro_value)
@@ -170,6 +170,12 @@ function carregarPagante_GR(reg) {
                 "?$select=cr40f_email,cr40f_nomedopassageiro,_cr40f_cliente_value")
                 .then(function (pax) {
                     var pessoaRecibo = record.cr40f_DestinatarioRecibo || pax;
+                    // Quem recebe o e-mail no cadastro: o destinatário do recibo, senão o passageiro.
+                    var destId = record._cr40f_destinatariorecibo_value;
+                    var destEnt = record["_cr40f_destinatariorecibo_value@Microsoft.Dynamics.CRM.lookuplogicalname"];
+                    pagamento.cadastroEmail = destId && destEnt
+                        ? { entidade: destEnt, id: String(destId).replace(/[{}]/g, "") }
+                        : { entidade: paxEntityName, id: passageiroGuid };
                     pagamento.emailPassageiro = record.cr40f_emailrecibo || (pessoaRecibo && pessoaRecibo.cr40f_email) || "";
                     if (pax && pax.cr40f_nomedopassageiro) pagamento.nomeNoRecibo = pax.cr40f_nomedopassageiro;
                     var cliId = pax && pax._cr40f_cliente_value;
@@ -528,6 +534,11 @@ function garantirEstilos_GR(doc) {
         R + ".gr-email-input{flex:1;min-width:0;border:0;border-bottom:1px solid var(--bt-color-border);background:transparent;font:inherit;color:inherit}",
         R + ".gr-email-input[aria-invalid=true]{border-bottom-color:var(--bt-color-danger)}",
         R + ".gr-email-sem{color:var(--bt-color-warning);font-weight:600}",
+        R + ".gr-cadastro{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:20px;font:500 12px/17px var(--bt-font)}",
+        R + ".gr-cadastro .gr-link{font-size:12px}",
+        R + ".gr-cadastro-msg{color:var(--bt-color-text-secondary)}",
+        R + ".gr-cadastro-msg[data-tone=ok]{color:var(--bt-color-success)}",
+        R + ".gr-cadastro-msg[data-tone=erro]{color:var(--bt-color-danger)}",
         R + ".gr-valor{margin-top:2px;font:600 12px/17px var(--bt-font);color:var(--bt-color-slate-700);" +
         "font-variant-numeric:tabular-nums}",
         R + ".gr-ico{display:inline-flex;flex-shrink:0}",
@@ -767,6 +778,49 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         emailEl.appendChild(emailInput);
         info.appendChild(emailEl);
 
+        // Sem e-mail no cadastro: grava o digitado na pessoa (vale para os próximos recibos).
+        var btnCadastrar = null, cadastroMsg = null;
+        if (!p.emailPassageiro && p.cadastroEmail) {
+            var cadastroLinha = criarEl("div", "gr-cadastro");
+            btnCadastrar = criarEl("button", "gr-link gr-foco", "Salvar no cadastro");
+            btnCadastrar.type = "button";
+            btnCadastrar.disabled = true;
+            cadastroMsg = criarEl("span", "gr-cadastro-msg");
+            cadastroMsg.setAttribute("aria-live", "polite");
+            cadastroLinha.appendChild(btnCadastrar);
+            cadastroLinha.appendChild(cadastroMsg);
+            info.appendChild(cadastroLinha);
+
+            emailInput.addEventListener("input", function () {
+                btnCadastrar.disabled = !/^\S+@\S+\.\S+$/.test(item.emailDestino);
+                cadastroMsg.textContent = "";
+                cadastroMsg.removeAttribute("data-tone");
+            });
+            btnCadastrar.addEventListener("click", function () {
+                var email = item.emailDestino;
+                if (!/^\S+@\S+\.\S+$/.test(email)) return;
+                btnCadastrar.disabled = true;
+                cadastroMsg.removeAttribute("data-tone");
+                cadastroMsg.textContent = "Salvando…";
+                Xrm.WebApi.updateRecord(p.cadastroEmail.entidade, p.cadastroEmail.id, { cr40f_email: email })
+                    .then(function () {
+                        p.emailPassageiro = email;
+                        emailEl.classList.remove("gr-email-sem");
+                        emailEl.replaceChild(icone_GR(doc, "email", 14), emailEl.firstChild);
+                        cadastroMsg.setAttribute("data-tone", "ok");
+                        cadastroMsg.textContent = "E-mail salvo no cadastro.";
+                        btnCadastrar.style.display = "none";
+                        if (estado !== "idle") emailInput.disabled = true;
+                    })
+                    .catch(function (e) {
+                        console.error(TAG_GR, "E-mail não salvo no cadastro:", p.id, e);
+                        btnCadastrar.disabled = false;
+                        cadastroMsg.setAttribute("data-tone", "erro");
+                        cadastroMsg.textContent = "Não foi possível salvar: " + ((e && e.message) || "erro desconhecido") + ".";
+                    });
+            });
+        }
+
         var valorStr = p.valor != null
             ? "R$ " + Number(p.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : "—";
@@ -858,7 +912,7 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
         lista.appendChild(card);
 
         item.els = {
-            card: card, track: track, toggleLabel: toggleLabel, pill: pill, emailInput: emailInput,
+            card: card, track: track, toggleLabel: toggleLabel, pill: pill, emailInput: emailInput, btnCadastrar: btnCadastrar,
             rodapeCard: rodapeCard, msg: msg, acoes: acoes, desc: desc, btnRestaurar: btnRestaurar
         };
     });
@@ -1110,7 +1164,8 @@ function mostrarModalGaleria_GR(flowUrl, pagantes, primaryControl) {
     }
 
     function iniciarExecucao() {
-        itens.forEach(function (i) { i.els.emailInput.disabled = true; });
+        // Quem ainda não tem e-mail continua podendo digitar para salvar no cadastro.
+        itens.forEach(function (i) { i.els.emailInput.disabled = !i.els.btnCadastrar; });
         estado = "rodando";
         atualizarRodape();
         processarFila();
