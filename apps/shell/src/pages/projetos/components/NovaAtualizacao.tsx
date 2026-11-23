@@ -103,7 +103,7 @@ export function NovaAtualizacao({ projetoId, etapaId, autor, source, onSaved, on
         <Textarea name="atualizacaoTexto" rows={3} value={texto} disabled={salvando} onChange={(e) => setTexto(e.target.value)} />
       </Field>
       <p className="pj-muted">Registrado como <strong>{autorLabel(autor)}</strong>.</p>
-      {etapaId ? <Checkbox checked={prova} disabled={salvando} onChange={(e) => setProva(e.target.checked)} label="É prova (libera o Concluída desta etapa)" /> : null}
+      {etapaId ? <Checkbox checked={prova} disabled={salvando} onChange={(e) => setProva(e.target.checked)} label="É prova (libera o Pronto do projeto)" /> : null}
       <div className="pj-nova__arquivos">
         <input ref={input} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf" aria-label="Escolher anexos" onChange={(e) => escolher(e.target.files)} />
         <Button variant="secondary" icon={<Paperclip size={16} />} disabled={salvando} onClick={() => input.current?.click()}>Anexar arquivos</Button>

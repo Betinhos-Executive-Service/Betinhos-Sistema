@@ -17,21 +17,17 @@ export function createMockProjetos(): Projeto[] {
   ]
 }
 
-const etapa = (n: number, projeto: number, numero: number, nome: string, status: number, over: Partial<Etapa> = {}): Etapa => ({
-  id: eid(n), projetoId: pid(projeto), numero, codigo: `PRJ-${projeto}.${numero}`, nome, status, descricao: '', prazo: null, andamento: 0, linkPr: '', publicadoProd: null, ...over,
+const etapa = (projeto: number, nome: string, status: number, over: Partial<Etapa> = {}): Etapa => ({
+  id: eid(projeto), projetoId: pid(projeto), numero: 1, codigo: `PRJ-${projeto}.1`, nome, status, prazo: null, andamento: 0, linkPr: '', publicadoProd: null, ...over,
 })
 
-/** Etapas de exemplo: o PRJ-4 fica sem etapas (só o briefing). */
+/** Etapa única (`PRJ-n.1`) de cada projeto de exemplo; o PRJ-4 fica sem etapa (só o briefing). */
 export function createMockEtapas(): Etapa[] {
   return [
-    etapa(1, 1, 1, 'Cartões do mês', STATUS.concluida, { prazo: '2026-11-10', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/98', publicadoProd: '2026-11-12T18:40:00' }),
-    etapa(2, 1, 2, 'Seletor de período', STATUS.validacao, { descricao: 'Escolher o mês no topo da tela.', prazo: '2026-12-10', andamento: 90, linkPr: 'https://github.com/exemplo/sistema/pull/101' }),
-    etapa(3, 1, 3, 'Filtro por cliente', STATUS.ideia),
-    etapa(4, 2, 1, 'Tabela e tela de cadastro', STATUS.andamento, { prazo: '2026-12-20', andamento: 55, linkPr: 'https://github.com/exemplo/sistema/pull/102' }),
-    etapa(5, 3, 1, 'Aviso por e-mail', STATUS.concluida, { prazo: '2026-11-15', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/99', publicadoProd: '2026-11-16T09:10:00' }),
-    etapa(6, 5, 1, 'Mapa do fluxo atual', STATUS.pausada, { prazo: '2026-10-30', andamento: 30 }),
-    etapa(7, 2, 2, 'Alerta de vencimento', STATUS.andamento, { prazo: '2026-11-20', andamento: 20 }),
-    etapa(8, 3, 2, 'Resumo semanal', STATUS.andamento, { prazo: '2026-11-28', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/104', publicadoProd: '2026-11-20T18:00:00' }),
+    etapa(1, 'Conferir os valores com o relatório de outubro', STATUS.validacao, { prazo: '2026-12-10', andamento: 90, linkPr: 'https://github.com/exemplo/sistema/pull/101' }),
+    etapa(2, 'Tela de cadastro e alerta de vencimento', STATUS.andamento, { prazo: '2026-12-20', andamento: 55, linkPr: 'https://github.com/exemplo/sistema/pull/102' }),
+    etapa(3, '', STATUS.concluida, { prazo: '2026-11-15', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/99', publicadoProd: '2026-11-16T09:10:00' }),
+    etapa(5, 'Definir quem aprova cada valor', STATUS.pausada, { prazo: '2026-10-30', andamento: 30 }),
   ]
 }
 
@@ -59,13 +55,12 @@ export function createMockAtualizacoes(): Atualizacao[] {
   return [
     mk(1, 1, null, '2026-11-01T09:00:00', AUTOR.gestor, 'Print do relatório que uso hoje.', { anexos: [{ id: xid(3), nome: 'relatorio-atual.svg', tipo: 'image/svg+xml', tamanho: 900 }] }),
     mk(2, 1, 1, '2026-11-11T10:05:00', AUTOR.agente, 'Publicado no DEV. Print dos cartões carregados.', { prova: true, anexos: [{ id: xid(1), nome: 'dashboard-dev.svg', tipo: 'image/svg+xml', tamanho: 900 }] }),
-    mk(3, 1, 2, '2026-11-20T14:30:00', AUTOR.agente, 'PR aberto com o seletor de período.'),
-    mk(4, 1, 2, '2026-11-22T09:00:00', AUTOR.gestor, 'Conferi os valores com o relatório de outubro.', { anexos: [{ id: xid(4), nome: 'audio-conferencia.wav', tipo: 'audio/wav', tamanho: 8044 }], transcricao: 'Conferi outubro e bateu com o relatório. Só falta o filtro por cliente.' }),
-    mk(5, 3, 5, '2026-11-14T16:20:00', AUTOR.renan, 'Aviso recebido por e-mail no teste real. Prova anexada.', { prova: true, anexos: [{ id: xid(2), nome: 'email-aviso.svg', tipo: 'image/svg+xml', tamanho: 900 }, { id: xid(6), nome: 'video-aviso.webm', tipo: 'video/webm', tamanho: 4 }] }),
-    mk(6, 2, 4, '2026-11-19T11:40:00', AUTOR.agente, 'Migration aplicada no DEV; tela de cadastro em ajuste.'),
+    mk(3, 1, 1, '2026-11-20T14:30:00', AUTOR.agente, 'PR aberto com o seletor de período.'),
+    mk(4, 1, 1, '2026-11-22T09:00:00', AUTOR.gestor, 'Conferi os valores com o relatório de outubro.', { anexos: [{ id: xid(4), nome: 'audio-conferencia.wav', tipo: 'audio/wav', tamanho: 8044 }], transcricao: 'Conferi outubro e bateu com o relatório. Só falta o filtro por cliente.' }),
+    mk(5, 3, 3, '2026-11-14T16:20:00', AUTOR.renan, 'Aviso recebido por e-mail no teste real. Prova anexada.', { prova: true, anexos: [{ id: xid(2), nome: 'email-aviso.svg', tipo: 'image/svg+xml', tamanho: 900 }, { id: xid(6), nome: 'video-aviso.webm', tipo: 'video/webm', tamanho: 4 }] }),
+    mk(6, 2, 2, '2026-11-12T11:40:00', AUTOR.agente, 'Migration aplicada no DEV; tela de cadastro em ajuste.'),
     mk(7, 4, null, '2026-11-22T17:15:00', AUTOR.gestor, '', { anexos: [{ id: xid(5), nome: 'audio-briefing.wav', tipo: 'audio/wav', tamanho: 8044 }] }),
-    mk(8, 2, 7, '2026-11-12T15:00:00', AUTOR.renan, 'Falta definir o texto do alerta.'),
-    mk(9, 3, 8, '2026-11-20T18:05:00', AUTOR.agente, 'Publicado no PROD pelo workflow Produção.'),
+    mk(8, 3, 3, '2026-11-20T18:05:00', AUTOR.agente, 'Publicado no PROD pelo workflow Produção.'),
   ]
 }
 

@@ -28,6 +28,7 @@ export type Projeto = {
   instrucoes: string
 }
 
+/** Etapa única e escondida do projeto (número 1): guarda a situação, o "o que falta", o prazo, o PR e a publicação no PROD. */
 export type Etapa = {
   id: string
   projetoId: string
@@ -36,7 +37,6 @@ export type Etapa = {
   codigo: string
   nome: string
   status: number
-  descricao: string
   /** `aaaa-mm-dd`; null = sem prazo. */
   prazo: string | null
   /** 0 a 100. */
@@ -46,21 +46,5 @@ export type Etapa = {
   publicadoProd: string | null
 }
 
-/** Quem está usando a tela: só o Renan muda status de etapa. */
+/** Quem está usando a tela: só o Renan muda a situação do projeto. */
 export type Perfil = 'renan' | 'gestor'
-
-/** Resumo do projeto derivado das etapas. */
-export type Progresso = {
-  total: number
-  concluidas: number
-  /** "1 de 3 concluídas" ou "Sem etapas". */
-  rotulo: string
-  /** Etapa que resume a situação (atrasada, em validação, em andamento...); null = sem etapas. */
-  destaque: Etapa | null
-  atrasada: boolean
-  /** Menor prazo entre as etapas abertas e não pausadas. */
-  proximoPrazo: string | null
-}
-
-/** Projeto com o que a lista mostra das etapas e atualizações. */
-export type ProjetoLinha = Projeto & { progresso: Progresso; ultimaEm: string | null }
