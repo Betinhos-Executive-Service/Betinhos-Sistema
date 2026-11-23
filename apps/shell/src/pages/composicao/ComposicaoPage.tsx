@@ -20,7 +20,7 @@ import type { DataTableFeatures } from './components/features'
 import { EditableViewFieldCell } from './components/ViewFieldCell'
 import { adjacentGridCell } from './components/grid-cell-focus'
 import { isWritableMoneyField, moneyFields, type CellInput, type Composition, type MoneyField } from './data/compositions'
-import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, type CompositionPage, type FormulaMap } from './data/dataverse'
+import { applyCompositionCellInput, getDataverseEnvironmentLabel, getDataverseUrl, loadCompositionById, loadCompositions, SaveNotConfirmedError, type CompositionPage, type FormulaMap } from './data/dataverse'
 import { lockedNativeCopy, nativeSaveSource, resolveCompositionQuery, type ResolvedCompositionQuery } from './data/composition-query'
 import { collectCompositionPages, compositionWorkbook, freshPageRecords } from './data/composition-export'
 import { createColumnFilterLabels } from './data/column-filter-values'
@@ -938,7 +938,7 @@ function ComposicaoContent({ host }: { host: Host }) {
         const message = formulaErrorMessage(error) || errorMessage(error, 'Não foi possível salvar no Dataverse.')
         // Erro de fórmula é validação do usuário; só falha de gravação vai para o log.
         if (!(error instanceof FormulaError)) void logAppError(error, { action: 'salvar-celula', phase: 'submit', component: 'ComposicaoPage', detailId: row.id, detailType: 'cr40f_composicaodeprecos' })
-        if (dataSource === 'dataverse' && message.includes('CONCURRENCY_CONFLICT')) {
+        if (dataSource === 'dataverse' && (message.includes('CONCURRENCY_CONFLICT') || error instanceof SaveNotConfirmedError)) {
           try {
             const refreshedRow = await loadCompositionById(row.id)
             if (refreshedRow) {

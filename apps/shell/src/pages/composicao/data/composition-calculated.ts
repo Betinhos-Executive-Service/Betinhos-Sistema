@@ -4,14 +4,14 @@ import type { DecimalString, MoneyField } from './compositions'
 
 // Espelho das colunas calculadas do Dataverse (FormulaDefinition de new_subtotal e new_valortotal),
 // para o Subtotal e o Total mudarem na hora em que a célula muda. Arco Metropolitano entra uma vez
-// (migration 20261111-1500-subtotal-arco-uma-vez no Sistema).
+// (migration 20261111-1500-subtotal-arco-uma-vez no Sistema). Ajuste entra no Total (migration 20261123-1500-total-soma-ajuste).
 const SUBTOTAL: MoneyField[] = [
   'cr40f_valorhoramotorista', 'cr40f_valortempodeespera', 'cr40f_valordadiaria', 'new_valorlocacao',
   'cr40f_valoradequacaoderota', 'cr40f_valoradequacaoderotaporkmrodado', 'cr40f_valordesviosentrecidades',
   'cr40f_valorpassageirosadicionais', 'cr40f_valorarcometropolitano',
   'cr40f_valorayrtonsenna', 'cr40f_valorrodoanel',
 ]
-const TOTAL_EXTRAS: MoneyField[] = ['new_valorpedagios', 'new_valorpassagens', 'new_valorestacionamento', 'cr40f_valorcombustivel']
+const TOTAL_EXTRAS: MoneyField[] = ['new_valorpedagios', 'new_valorpassagens', 'new_valorestacionamento', 'cr40f_valorcombustivel', 'new_ajuste']
 
 function sum(values: Partial<Record<MoneyField, DecimalString>>, fields: MoneyField[], start = new Big(0)) {
   return fields.reduce((total, field) => {

@@ -343,7 +343,7 @@ export async function applyCompositionCellInput(
   input: CellInput,
   source: 'dataverse' | 'mock',
 ): Promise<ApplyCellInputResult> {
-  if (!isWritableMoneyField(field)) throw new FormulaError('FIELD_NOT_WRITABLE', `${moneyFields.find(({ key }) => key === field)?.label ?? field} é calculado pelo Dataverse e não pode ser editado.`)
+  if (!isWritableMoneyField(field)) throw new FormulaError('FIELD_NOT_WRITABLE', `${moneyFieldLabel(field)} é calculado pelo Dataverse e não pode ser editado.`)
 
   if (source === 'mock') {
     const formulas = Object.fromEntries(Object.entries(row.formulas).map(([key, formula]) => [key, formula?.expression])) as Partial<Record<MoneyField, string>>
@@ -398,10 +398,29 @@ export async function applyCompositionCellInput(
   const response = await online.execute(request)
   const body = await response.json()
   if (!response.ok) throw new Error(typeof body.error === 'object' && body.error && 'message' in body.error ? String(body.error.message) : 'Falha ao aplicar valor no Dataverse.')
+  const sent = JSON.parse(String(body.UpdatedCellsJson ?? '{}')) as Partial<Record<MoneyField, DecimalString>>
   return {
     rowId: row.id,
     rowVersion: String(body.NewRowVersion ?? ''),
-    updatedValues: JSON.parse(String(body.UpdatedCellsJson ?? '{}')),
+    updatedValues: await confirmSavedValues(row.id, field, sent[field] ?? (input.kind === 'literal' ? input.value : undefined), sent),
     formulas: JSON.parse(String(body.FormulaStateJson ?? '{}')),
   }
+}
+
+export class SaveNotConfirmedError extends Error {}
+
+const moneyFieldLabel = (field: MoneyField) => moneyFields.find(({ key }) => key === field)?.label ?? field
+
+// A Custom API devolve o que recebeu, não o que ficou gravado: uma regra de negócio que troca o valor na mesma
+// transação passava como "salvo" (Ajuste zerado em 23/11/2026). Relê a linha e só confirma o valor que o Dataverse manteve.
+async function confirmSavedValues(id: string, field: MoneyField, expected: DecimalString | undefined, sent: Partial<Record<MoneyField, DecimalString>>) {
+  const fields = [...new Set([field, ...Object.keys(sent) as MoneyField[], 'new_subtotal', 'new_valortotal'] as MoneyField[])]
+  let saved: DataverseEntity
+  try { saved = await getWebApi().retrieveRecord(compositionTable, id, `?$select=${fields.join(',')}`) }
+  catch { throw new SaveNotConfirmedError(`Não foi possível confirmar ${moneyFieldLabel(field)} no Dataverse. A linha foi recarregada; confira o valor.`) }
+  const values = Object.fromEntries(fields.map((key) => [key, decimalValue(saved[key])])) as Partial<Record<MoneyField, DecimalString>>
+  if (expected !== undefined && values[field] !== decimalValue(expected)) {
+    throw new SaveNotConfirmedError(`O Dataverse não manteve ${moneyFieldLabel(field)}: ficou ${values[field]} em vez de ${decimalValue(expected)}.`)
+  }
+  return values
 }
