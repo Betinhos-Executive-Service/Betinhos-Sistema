@@ -24,6 +24,7 @@ namespace Betinhos.DriverRecordSharing
             var driver = new DriverResolver(system, tracing).ResolveFromUser(new EntityReference(PluginConfig.UserTable, context.InitiatingUserId));
             if (driver?.EmployeeReference == null) throw new InvalidPluginExecutionException("Motorista não encontrado para este usuário.");
 
+            AppConfigGuarda.Exigir(system, driver.EmployeeReference.Id, AppConfigLeitor.ChaveMinhaNota, AppConfigGuarda.MinhaNotaDesligada, tracing, () => DateTime.UtcNow);
             var funcionario = system.Retrieve(driver.EmployeeReference.LogicalName, driver.EmployeeReference.Id, new ColumnSet(PluginConfig.EmployeeInfleetDriverId));
             var infleetId = funcionario.GetAttributeValue<string>(PluginConfig.EmployeeInfleetDriverId);
             var agora = DateTime.UtcNow;

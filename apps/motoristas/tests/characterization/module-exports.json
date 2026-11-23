@@ -289,6 +289,10 @@
   "src/shared/previewIsolamento.ts": [
     "isolarArmazenamentoDoPreview"
   ],
+  "src/shared/recusaDaConfiguracao.ts": [
+    "ehRecusaDaConfiguracao",
+    "mensagemDaRecusa"
+  ],
   "src/shared/useDitado.ts": [
     "DITADO_IDLE",
     "DitadoCtor",
