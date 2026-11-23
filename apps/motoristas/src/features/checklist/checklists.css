@@ -66,3 +66,15 @@
 .checklist-answer-nok { display: grid; justify-items: start; gap: 4px; }
 .checklist-answer-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff0f3; color: #9f2940; font-size: 11px; font-weight: 800; }
 .checklist-answer-note { color: #475569; font-weight: 500; }
+
+/* Fim do checklist com Não OK: folha com os itens e o atalho para Solicitar manutenção. */
+.checklist-manutencao-ok { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; background: #eaf8f1; color: #147a4b; font-size: 12px; font-weight: 800; }
+.checklist-manutencao-itens { display: grid; gap: 8px; width: 100%; margin: 0; padding: 0; list-style: none; text-align: left; }
+.checklist-manutencao-itens li { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 10px; border: 1px solid #f2c2cc; border-radius: 12px; background: #fff0f3; }
+.checklist-manutencao-itens img,
+.checklist-manutencao-sem-foto { width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: cover; background: #fff; }
+.checklist-manutencao-sem-foto { display: grid; place-items: center; color: #9f2940; font-weight: 800; }
+.checklist-manutencao-itens div { display: grid; gap: 2px; min-width: 0; }
+.checklist-manutencao-itens strong { color: #0f172a; font-size: 14px; font-weight: 800; overflow-wrap: anywhere; }
+.checklist-manutencao-itens span { color: #9f2940; font-size: 12px; font-weight: 700; }
+.checklist-manutencao-pronto { margin: 0; color: #475569; font-size: 13px; font-weight: 600; line-height: 1.42; }

@@ -617,7 +617,7 @@ function App() {
   const telaTreinamentos = rotasTreinamentos(screen, { ...treinamentosLista, driverContext, setScreen });
   if (telaTreinamentos) return show(telaTreinamentos);
 
-  const telaChecklist = rotasChecklist(screen, { ...checklistsLista, setScreen });
+  const telaChecklist = rotasChecklist(screen, { ...checklistsLista, preencherManutencao: manutencao.preencherManutencaoDoChecklist, setScreen });
   if (telaChecklist) return show(telaChecklist);
 
   return show(

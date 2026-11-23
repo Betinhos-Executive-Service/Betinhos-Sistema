@@ -422,3 +422,46 @@ export async function uploadChecklistPhotoMock(fileName: string): Promise<Checkl
   if (mockChecklistFailure() === "foto" && mockPhotoUploads % 2 === 0) throw new Error("Sem conexão para enviar a foto.");
   return { link: `https://example.com/mock/${encodeURIComponent(fileName)}`, caminho: "Checklists/DEV/mock", nomeArquivo: fileName };
 }
+
+// ---------- Manutenção a partir dos itens Não OK ----------
+
+export const CHECKLIST_MAX_FOTOS_MANUTENCAO = 10;
+
+export type ChecklistItemNaoOk = { chave: string; rotulo: string; problemas: string[]; observacao: string; foto: string };
+
+export type ChecklistPedidoManutencao = {
+  veiculoId: string;
+  placa: string;
+  kmAtual: string;
+  descricao: string;
+  itens: ChecklistItemNaoOk[];
+  /** Fotos dos itens Não OK (as mesmas do checklist), na ordem dos itens. */
+  fotos: string[];
+};
+
+// No fim do envio o app oferece abrir a manutenção com os itens Não OK, já preenchida.
+// Devolve null quando nada ficou Não OK; a descrição tem uma linha por item com problemas e observação.
+export function checklistPedidoManutencao(checklist: ChecklistVeiculo, draft: ChecklistDraft): ChecklistPedidoManutencao | null {
+  const itens = checklist.itens
+    .filter((item) => item.tipo === "okNok" && draft.valores[item.chave] === "nok")
+    .map((item): ChecklistItemNaoOk => ({
+      chave: item.chave,
+      rotulo: item.rotulo,
+      problemas: draft.problemas?.[item.chave] ?? [],
+      observacao: (draft.observacoes?.[item.chave] ?? "").trim(),
+      foto: draft.fotos[item.chave]?.[0]?.dataUrl ?? ""
+    }));
+  if (!itens.length) return null;
+  const linhas = itens.map((item) => `- ${item.rotulo}${item.problemas.length ? `: ${item.problemas.join(", ")}` : ""}${item.observacao ? ` (${item.observacao})` : ""}`);
+  const odometro = checklist.itens.find(isOdometerItem);
+  const km = odometro ? normalizeChecklistNumber(draft.valores[odometro.chave] ?? "") : null;
+  const fotos = itens.flatMap((item) => (draft.fotos[item.chave] ?? []).map((foto) => foto.dataUrl)).filter(Boolean).slice(0, CHECKLIST_MAX_FOTOS_MANUTENCAO);
+  return {
+    veiculoId: checklist.veiculoId,
+    placa: checklist.placa,
+    kmAtual: km ? String(Math.round(Number(km))) : "",
+    descricao: [`Itens Não OK no checklist${checklist.placa ? ` do ${checklist.placa}` : ""}:`, ...linhas].join("\n"),
+    itens,
+    fotos
+  };
+}
