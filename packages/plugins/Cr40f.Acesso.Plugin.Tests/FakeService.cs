@@ -76,6 +76,34 @@ public sealed class FakeService : IOrganizationService
             _tabelas["systemuser"].Single(e => e.Id == estado.EntityMoniker.Id)["isdisabled"] = estado.State.Value == 1;
         return new OrganizationResponse();
     }
-    public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();
-    public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities) => throw new NotSupportedException();
+    public List<(string Relacao, Guid Id, Guid Alvo)> Associados { get; } = new();
+    public List<(string Relacao, Guid Id, Guid Alvo)> Desassociados { get; } = new();
+
+    private static (string Tabela, string Coluna) Intersecao(string relacao) => relacao switch
+    {
+        "systemuserroles_association" => ("systemuserroles", "roleid"),
+        "systemuserprofiles_association" => ("systemuserprofiles", "fieldsecurityprofileid"),
+        _ => throw new NotSupportedException(relacao),
+    };
+
+    public void Associate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
+    {
+        var (tabela, coluna) = Intersecao(relationship.SchemaName);
+        foreach (var alvo in relatedEntities)
+        {
+            Com(new Entity(tabela, Guid.NewGuid()) { ["systemuserid"] = entityId, [coluna] = alvo.Id });
+            Associados.Add((relationship.SchemaName, entityId, alvo.Id));
+        }
+    }
+
+    public void Disassociate(string entityName, Guid entityId, Relationship relationship, EntityReferenceCollection relatedEntities)
+    {
+        var (tabela, coluna) = Intersecao(relationship.SchemaName);
+        foreach (var alvo in relatedEntities)
+        {
+            if (_tabelas.TryGetValue(tabela, out var linhas))
+                linhas.RemoveAll(e => e.GetAttributeValue<Guid>("systemuserid") == entityId && e.GetAttributeValue<Guid>(coluna) == alvo.Id);
+            Desassociados.Add((relationship.SchemaName, entityId, alvo.Id));
+        }
+    }
 }

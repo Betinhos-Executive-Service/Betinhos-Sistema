@@ -1,0 +1,55 @@
+{
+  "grupos": {
+    "cr40f_funcionarios": {
+      "basico": ["cr40f_funcao", "cr40f_status", "cr40f_nomedaempresa", "new_apelido", "cr40f_veiculoatual", "cr40f_telefonecorporativo", "cr40f_emailbetinhos", "cr40f_emailmicrosoft"],
+      "cnh": ["cr40f_cnh", "cr40f_validadedacnh"],
+      "rh": ["cr40f_relacaotrabalhista", "cr40f_tipodevinculo", "cr40f_datadeadmissao", "cr40f_datadedemissao", "cr40f_datadoaso", "new_notificacoesfinanceiras", "new_notificacoesmotoristas", "new_notificacoesoperacionais", "cr40f_gerarrecibopersonalizado", "cr40f_folderid", "cr40f_assinatura"],
+      "pessoal": ["cr40f_numerodocpf", "cr40f_numerodorg", "cr40f_enderecocompleto", "cr40f_filiacao", "cr40f_telefonepessoal", "cr40f_celular", "cr40f_telefonedeemergencia", "cr40f_datadeaniversario", "cr40f_linkparadocumentos"]
+    },
+    "cr40f_veiculos": {
+      "basico": ["cr40f_id", "cr40f_marca", "cr40f_modelo", "cr40f_cor", "cr40f_anodefabricacao", "cr40f_anodemodelo", "cr40f_blindado", "new_categoriadoveiculo"],
+      "operacao": ["cr40f_statusdoveiculo", "cr40f_motoristaatual", "cr40f_medidasdospneus", "cr40f_oleorecomendadopelofabricante", "cr40f_comentariosextras"],
+      "patrimonio": ["cr40f_chassi", "cr40f_renavam", "cr40f_datadacompra", "cr40f_datadavenda", "cr40f_detalhesdocomprador", "cr40f_nomedaloja", "cr40f_notafiscaldacompra", "cr40f_notafiscaldavenda", "cr40f_valordacompra", "cr40f_valordavenda"]
+    },
+    "cr40f_reservadeveculos": {
+      "operacao": ["cr40f_cr", "cr40f_endereodesada", "cr40f_observaointerna", "cr40f_tipodeveiculo"],
+      "cotacao": ["cr40f_cotao", "cr40f_statusdefaturamento"],
+      "composicao": ["new_composicaodepreco"]
+    },
+    "cr40f_financeiro": { "valor": ["cr40f_valor"] },
+    "cr40f_bancodedados": {
+      "cr": ["cr40f_cr"]
+    },
+    "new_termomulta": { "pdf": ["new_pdf", "new_hashpdf"], "prova": ["new_selfie", "new_latitude", "new_longitude"] }
+  },
+  "perfis": {
+    "operacional": {
+      "operador": {
+        "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico", "cr40f_veiculos.operacao"],
+        "editar": ["cr40f_reservadeveculos.operacao", "cr40f_reservadeveculos.cotacao", "cr40f_bancodedados.cr"]
+      },
+      "gestor": { "ler": [], "editar": [] }
+    },
+    "financeiro": {
+      "operador": {
+        "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico", "cr40f_reservadeveculos.*", "cr40f_financeiro.valor", "cr40f_bancodedados.cr"],
+        "editar": []
+      },
+      "gestor": { "ler": [], "editar": ["cr40f_reservadeveculos.cotacao", "cr40f_reservadeveculos.composicao", "cr40f_financeiro.valor"] }
+    },
+    "frota": {
+      "operador": {
+        "ler": ["cr40f_funcionarios.basico", "cr40f_funcionarios.cnh", "cr40f_veiculos.*", "new_termomulta.pdf"],
+        "editar": ["cr40f_veiculos.operacao", "cr40f_reservadeveculos.operacao"]
+      },
+      "gestor": { "ler": ["new_termomulta.prova"], "editar": ["cr40f_veiculos.*"] }
+    },
+    "rh": {
+      "operador": {
+        "ler": ["cr40f_veiculos.basico", "new_termomulta.pdf"],
+        "editar": ["cr40f_funcionarios.basico", "cr40f_funcionarios.cnh", "cr40f_funcionarios.rh"]
+      },
+      "gestor": { "ler": ["new_termomulta.prova"], "editar": ["cr40f_funcionarios.pessoal"] }
+    }
+  }
+}

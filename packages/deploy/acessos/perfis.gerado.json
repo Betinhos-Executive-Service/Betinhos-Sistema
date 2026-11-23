@@ -1,0 +1,3146 @@
+{
+  "proibido": "^prv(Create|Write|Delete|Assign|Share)(WebResource|Workflow|Solution|Publisher|Entity|Attribute|Relationship|OptionSet|SystemForm|Query|SavedQueryVisualizations|AppModule|SiteMap|PluginAssembly|PluginType|SdkMessage\\w*|CustomAPI\\w*|Role|FieldSecurityProfile|FieldPermission|EnvironmentVariable\\w*|ConnectionReference|Connector|Customization)$|^prv(Publish|Import|Export)Customization$|^prvActOnBehalfOfAnotherUser$|cr40f_segredo",
+  "copiarSem": "^prv[A-Za-z]+?(cr40f_|new_)",
+  "papeis": {
+    "Perfil - Administrador de acessos": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_acessohistorico": {
+          "Read": "Global"
+        }
+      },
+      "privilegios": {
+        "prvReadRole": "Global",
+        "prvReadTeam": "Global",
+        "prvReadUser": "Global"
+      }
+    },
+    "Perfil - Base": {
+      "copiarDe": [
+        "App Opener",
+        "Basic User"
+      ],
+      "app": "cr40f_ModelDrivenBetinhos",
+      "tabelas": {
+        "annotation": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Basic",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_boasideias": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_categoriadespesaoperacional": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_cidade": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_comunicadohome": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_errodosistema": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global"
+        },
+        "cr40f_formapagamentodespesa": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_noticiaexterna": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_plannerdisparo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannerequipe": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannerequipemembro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannernotificacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertagpessoal": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertagpessoaltarefa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertarearelacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertarearesponsavel": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertarefa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertarefaequipe": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_plannertarefaevento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_tipodocumento": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_tipoequipamento": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_visaodetabela": {
+          "Append": "Basic",
+          "AppendTo": "Basic",
+          "Create": "Basic",
+          "Delete": "Basic",
+          "Read": "Global",
+          "Write": "Basic"
+        },
+        "new_appmotoristaslog": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global"
+        },
+        "new_localdebase": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {
+        "prvReadRole": "Global",
+        "prvReadTeam": "Global",
+        "prvReadUser": "Global"
+      }
+    },
+    "Perfil - Financeiro - Gestor": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexodespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_anexorecebimento_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_bancodedados": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cartaocorporativo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_categoriadespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_composicaodeprecos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcaoitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaopropostaversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_despesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_eventopagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_financeiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixalancamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_formapagamentodespesa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_itempagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_manutencoes": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_mensagemvalidacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pagantes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_servicosporpassageiro": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_terceirofavorecido": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_transacaocartao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validadorcliente": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_vinculomotoristafavorecido": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_configuracaovisualizacaocomposicao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_formuladecelulacomposicao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - Financeiro - Operador": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexodespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_anexorecebimento_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_bancodedados": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cartaocorporativo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_categoriadespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_composicaodeprecos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcaoitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaopropostaversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_despesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_eventopagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_financeiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fluxocaixalancamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_formapagamentodespesa": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_itempagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_manutencoes": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_mensagemvalidacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pagamentoaterceiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pagantes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_servicosporpassageiro": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_terceirofavorecido": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_transacaocartao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validadorcliente": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_vinculomotoristafavorecido": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_configuracaovisualizacaocomposicao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_formuladecelulacomposicao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - Frota - Gestor": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexodespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_baselinepreventiva": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_colisao_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_despesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_equipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fotoequipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_infracaodetransito": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_itemplanopreventivo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_manutencoes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_multas": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistmodelo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistmodeloitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistveiculofoto": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_eventoinfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_fotomanutencao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_parcelamultafolha": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_telemetriadiariainfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_termomulta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_viageminfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - Frota - Operador": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexodespesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_baselinepreventiva": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_colisao_v2": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_despesaoperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_equipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_fotoequipamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_infracaodetransito": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_itemplanopreventivo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_manutencoes": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_multas": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistmodelo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistmodeloitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_checklistveiculofoto": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_eventoinfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_fotomanutencao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_parcelamultafolha": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_telemetriadiariainfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_termomulta": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_viageminfleet": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - Operacional - Gestor": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_acaooperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexorecebimento_v2": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_bancodedados": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcaoitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaopropostaversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_errodosistema": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_errooperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_errooperacionalarquivo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_financeiro": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_manutencoes": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_servicosporpassageiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_trocasdecarro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_appmotoristaslog": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_comunicadodestinatario": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_comunicadomotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_marketing": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - Operacional - Operador": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_acaooperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_anexorecebimento_v2": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_bancodedados": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_clientes1": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaoopcaoitem": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_cotacaopropostaversao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_errodosistema": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_errooperacional": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_errooperacionalarquivo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_financeiro": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_manutencoes": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_pedidodecotacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_reservadeveculos": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_servicosporpassageiro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_trocasdecarro": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_validacaoservico": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_appmotoristaslog": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_comunicadodestinatario": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_comunicadomotorista": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_marketing": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - RH - Gestor": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_avisodestinatario": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_documento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_multas": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_tipodocumento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_treinamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_treinamentoparticipacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_curriculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_parcelamultafolha": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_termomulta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    },
+    "Perfil - RH - Operador": {
+      "copiarDe": [],
+      "app": null,
+      "tabelas": {
+        "cr40f_agenteexecucao": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_agenteproposta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_avisodestinatario": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_documento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_funcionarios": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_multas": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_tipodocumento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_treinamento": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_treinamentoparticipacao": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_curriculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_parcelamultafolha": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_possedeveiculo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "new_termomulta": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        }
+      },
+      "privilegios": {}
+    }
+  },
+  "colunas": {
+    "Perfil - Financeiro - Gestor": [
+      {
+        "tabela": "cr40f_bancodedados",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_financeiro",
+        "coluna": "cr40f_valor",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cotao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_statusdefaturamento",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "new_composicaodepreco",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - Financeiro - Operador": [
+      {
+        "tabela": "cr40f_bancodedados",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_financeiro",
+        "coluna": "cr40f_valor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cotao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_statusdefaturamento",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "new_composicaodepreco",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - Frota - Gestor": [
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_cnh",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_validadedacnh",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_chassi",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_comentariosextras",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_datadacompra",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_datadavenda",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_detalhesdocomprador",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_medidasdospneus",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_motoristaatual",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_nomedaloja",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_notafiscaldacompra",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_notafiscaldavenda",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_oleorecomendadopelofabricante",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_renavam",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_statusdoveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_valordacompra",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_valordavenda",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_hashpdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_latitude",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_longitude",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_pdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_selfie",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - Frota - Operador": [
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_cnh",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_validadedacnh",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_chassi",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_comentariosextras",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_datadacompra",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_datadavenda",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_detalhesdocomprador",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_medidasdospneus",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_motoristaatual",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_nomedaloja",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_notafiscaldacompra",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_notafiscaldavenda",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_oleorecomendadopelofabricante",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_renavam",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_statusdoveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_valordacompra",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_valordavenda",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_hashpdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_pdf",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - Operacional - Gestor": [
+      {
+        "tabela": "cr40f_bancodedados",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cotao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_statusdefaturamento",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_comentariosextras",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_medidasdospneus",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_motoristaatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_oleorecomendadopelofabricante",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_statusdoveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - Operacional - Operador": [
+      {
+        "tabela": "cr40f_bancodedados",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cotao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_cr",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_endereodesada",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_observaointerna",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_statusdefaturamento",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_reservadeveculos",
+        "coluna": "cr40f_tipodeveiculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_comentariosextras",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_medidasdospneus",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_motoristaatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_oleorecomendadopelofabricante",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_statusdoveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - RH - Gestor": [
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_assinatura",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_celular",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_cnh",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadeadmissao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadeaniversario",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadedemissao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadoaso",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_enderecocompleto",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_filiacao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_folderid",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_gerarrecibopersonalizado",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_linkparadocumentos",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_numerodocpf",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_numerodorg",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_relacaotrabalhista",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonedeemergencia",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonepessoal",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_tipodevinculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_validadedacnh",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesfinanceiras",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesmotoristas",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesoperacionais",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_hashpdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_latitude",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_longitude",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_pdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_selfie",
+        "ler": true,
+        "editar": false
+      }
+    ],
+    "Perfil - RH - Operador": [
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_assinatura",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_cnh",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadeadmissao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadedemissao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_datadoaso",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_folderid",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_gerarrecibopersonalizado",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_relacaotrabalhista",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_tipodevinculo",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_validadedacnh",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesfinanceiras",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesmotoristas",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_notificacoesoperacionais",
+        "ler": true,
+        "editar": true
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_hashpdf",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "new_termomulta",
+        "coluna": "new_pdf",
+        "ler": true,
+        "editar": false
+      }
+    ]
+  }
+}

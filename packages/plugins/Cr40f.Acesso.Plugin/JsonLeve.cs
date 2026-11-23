@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -16,6 +17,12 @@ public static class JsonLeve
         using var reader = JsonReaderWriterFactory.CreateJsonReader(Encoding.UTF8.GetBytes(json), XmlDictionaryReaderQuotas.Max);
         var raiz = XElement.Load(reader);
         return (Dictionary<string, object?>)Converter(raiz)!;
+    }
+
+    public static List<object?> LerLista(string json)
+    {
+        using var reader = JsonReaderWriterFactory.CreateJsonReader(Encoding.UTF8.GetBytes(json), XmlDictionaryReaderQuotas.Max);
+        return Converter(XElement.Load(reader)) as List<object?> ?? throw new FormatException("JSON não é uma lista.");
     }
 
     public static string Texto(string? valor)
