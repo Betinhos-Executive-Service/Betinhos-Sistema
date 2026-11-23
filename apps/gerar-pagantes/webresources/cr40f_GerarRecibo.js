@@ -7,7 +7,7 @@
 // (new_statusgeracaorecibo, new_errogeracaorecibo, cr40f_linkdorecibo) e envia o e-mail.
 // O modal acompanha o registro; Abrir/Baixar usam o PDF local assim que ele fica pronto.
 
-var GR_VERSAO = "v0.0.5 · 11/11/2026 11:15";         // gravada por publicar-dev.js a cada publicação
+var GR_VERSAO = "v0.0.6 · 23/11/2026 14:00";         // gravada por publicar-dev.js a cada publicação
 var TAG_GR = "[BT-GERAR-RECIBO]";
 var GR_MAX_PARALELO = 4;          // entregas simultâneas ao Flow
 var GR_TIMEOUT_MS = 30000;        // POST de início; o Flow responde 202 em ~2 s
