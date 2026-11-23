@@ -66,10 +66,11 @@ export function Preview({ url, config, nome, ver, onVer, modo, onModo, motorista
 
   const controles = (
     <div className="am-prev__controles">
-      <label className="am-prev__campo">
-        <span className="am-muted">Ver como</span>
-        <Select options={opcoes} value={escreverVer(ver)} clearable={false} searchable searchPlaceholder="Buscar motorista" onChange={(v) => { if (v) onVer(verDe(v)) }} />
-      </label>
+      {/* div, não label: clicar numa opção dentro de um label reativa o botão e reabre o painel. */}
+      <div className="am-prev__campo">
+        <span className="am-muted" aria-hidden="true">Ver como</span>
+        <Select aria-label="Ver como" options={opcoes} value={escreverVer(ver)} clearable={false} searchable searchPlaceholder="Buscar motorista" onChange={(v) => { if (v) onVer(verDe(v)) }} />
+      </div>
       <SegmentedControl aria-label="Configuração a mostrar" size="compact" value={modo} onChange={onModo}
         options={[{ value: 'rascunho', label: 'Rascunho' }, { value: 'publicado', label: 'Publicado', disabled: !temPublicada }]} />
     </div>
