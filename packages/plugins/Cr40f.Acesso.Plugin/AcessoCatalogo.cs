@@ -44,7 +44,7 @@ public static class AcessoCatalogo
         var perfis = new PerfisDoUsuario();
         var lista = nomes.ToList();
         foreach (var area in Areas.Keys)
-            foreach (var nivel in new[] { "operador", "gestor" })
+            foreach (var nivel in Niveis.Keys)
                 if (lista.Contains(NomeDoPapel(area, nivel))) perfis.Areas[area] = nivel;
         perfis.Acessos = lista.Contains(AdminAcessos);
         return perfis;

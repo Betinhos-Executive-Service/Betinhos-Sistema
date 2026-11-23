@@ -131,4 +131,4 @@ console.log(`  com o perfil Motoristas (passam a ler so o telefone): ${motorista
 for (const [origem, c] of [...dependentes].sort()) console.log(`  DEPENDE: ${origem}: ${c.pessoas} pessoa(s), ${c.aplicacoes} aplicacao(oes)`)
 for (const nome of equipesExpostas.sort()) console.log(`  EQUIPE SEM COBERTURA: "${nome}" le a tabela e nao tem perfil de coluna`)
 const total = [...dependentes.values()].reduce((s, c) => s + c.pessoas + c.aplicacoes, 0)
-console.log(`DEPENDENTES: ${dependentes.size ? total : 0}`)
+console.log(`DEPENDENTES: ${total}`)
