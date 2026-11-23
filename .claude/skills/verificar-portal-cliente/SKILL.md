@@ -32,6 +32,7 @@ description: "Verifica o portal do cliente (apps/portal-cliente, React multi-cli
    - Voltar a Pedir e enviar o mesmo pedido de novo → alerta de duplicado (1 minuto). Mudar o destino → entra normalmente.
    - Meus serviços: Próximos mostra o Solicitado e um "Programado" com veículo e link "Voucher"; Todos mostra 6 + os criados (Concluído, Cancelado). "Atualizar" recarrega.
    - `paula.ribeiro@latasa.com.br` entra como "Paula Ribeiro · Latasa" e Meus serviços começa vazio com o botão "Pedir serviço".
+   - Co-branding: `/?c=latasa` mostra no login Betinhos × ReciclaBR; sem `?c` o login mostra só a Betinhos até o e-mail digitado ser de um domínio parceiro (`reciclabr.com.br`). Depois do login da Latasa o topo mostra os dois logos (pelo nome do cliente da sessão); Tenaris mostra só a Betinhos. Parceiras em `src/domain/marcas.ts`.
 4. Mobile (`resize_window` preset mobile, 375 px): a etapa do QR cabe sem rolagem horizontal; a lista vira card com trajeto dentro do título; "Selecionar todos" aparece na barra; o detalhe abre em Sheet com o rodapé colado embaixo. Confira `document.querySelector('dialog.bt-sheet[open]').scrollTop === 0` (corrigido no `@betinhos/ui` 1.15.4). Na Latasa o seletor de módulo ocupa a 2ª linha do topo; o formulário de pedido e a lista de Meus serviços cabem sem rolagem horizontal.
 5. Console sem erros nem avisos; `document.documentElement.scrollWidth === innerWidth` (sem rolagem horizontal). Versão `v0.0.x · dd/mm/aaaa HH:mm` visível no canto em todas as telas.
 
