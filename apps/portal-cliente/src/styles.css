@@ -6,6 +6,6 @@
 .pc-parceria__divisor { align-self: stretch; width: 1px; margin-block: 2px; background-color: var(--bt-color-border); }
 .pc-parceria--topo .pc-parceria__betinhos { height: 32px; }
 .pc-parceria--topo .pc-parceria__cliente { height: 22px; }
-.pc-parceria--entrar { gap: var(--bt-space-4); margin-bottom: var(--bt-space-5); }
+.pc-parceria--entrar { justify-content: center; gap: var(--bt-space-4); margin-bottom: var(--bt-space-5); }
 .pc-parceria--entrar .pc-parceria__betinhos { height: 44px; }
 .pc-parceria--entrar .pc-parceria__cliente { height: 30px; }
