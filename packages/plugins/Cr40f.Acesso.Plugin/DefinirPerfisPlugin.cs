@@ -21,7 +21,7 @@ public sealed class DefinirPerfisPlugin : IPlugin
             var sistema = factory.CreateOrganizationService(null);
             var usuario = context.InputParameters.Contains("Usuario") && context.InputParameters["Usuario"] is Guid id ? id : Guid.Empty;
             var perfis = context.InputParameters.Contains("Perfis") ? context.InputParameters["Perfis"] as string : null;
-            context.OutputParameters["Resultado"] = new DefinirPerfisHandler(sistema).Executar(context.InitiatingUserId, usuario, perfis ?? "[]");
+            context.OutputParameters["Resultado"] = new DefinirPerfisHandler(sistema).Executar(context.InitiatingUserId, usuario, perfis);
         }
         catch (AcessoException erro)
         {
@@ -31,7 +31,7 @@ public sealed class DefinirPerfisPlugin : IPlugin
         catch (Exception erro) when (erro is not InvalidPluginExecutionException)
         {
             tracing.Trace("{0}: {1}", Mensagem, erro);
-            throw new InvalidPluginExecutionException("Não foi possível definir os perfis. " + erro.Message, erro);
+            throw new InvalidPluginExecutionException("Não foi possível definir os perfis.", erro);
         }
     }
 }
