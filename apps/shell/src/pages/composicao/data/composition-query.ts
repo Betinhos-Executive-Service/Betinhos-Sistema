@@ -1,6 +1,7 @@
 import { keywordTokens } from '../../../app/keywordSearch'
 import { compositionKeywordFilter, compositionSearchCatalogFields } from './composition-search'
-import { buildFetchXml, COMPOSITION_TABLE, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewQuery } from './views'
+import { pruneOwnLinks } from './fetch-links'
+import { allViewFilters, buildFetchXml, COMPOSITION_TABLE, viewValueKey, type CatalogField, type SavedView, type ViewDefinition, type ViewQuery } from './views'
 
 function addCondition(document: Document, filter: Element, attribute: string, alias: string | null, operator: string, value: string) {
   const condition = document.createElement('condition')
@@ -53,6 +54,8 @@ export function buildNativeCompositionQuery(fetchXml: string, definition: ViewDe
     [...entity.children].filter((child) => child.tagName === 'filter').forEach((filter) => filter.remove())
     entity.querySelectorAll('link-entity filter').forEach((filter) => filter.remove())
   }
+  // Vínculos que a tela criou em salvamentos anteriores e que nada usa: sem isto cada "Salvar" soma `r1, r2, ui_r1…`.
+  pruneOwnLinks(entity)
 
   const available = new Set(catalog.filter((field) => field.available).map((field) => field.id))
   // A ordem escolhida na grade (Crescente/Decrescente) substitui a da view nativa; sem ela, vale a da view.
@@ -113,6 +116,16 @@ export function nativeSaveSource(view: SavedView | null, definition: ViewDefinit
   return lockedNativeCopy(view, overwrite) ? buildNativeCompositionQuery(view.sourceFetchXml, definition, catalog, '', false) : undefined
 }
 
+/** FetchXML sem os vínculos que a tela deixou para trás; `null` quando não havia nenhum (ou o XML não é legível). */
+function withoutOwnLinks(fetchXml: string) {
+  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
+  const entity = document.querySelector('parsererror') ? null : document.querySelector('fetch > entity')
+  if (!entity) return null
+  const before = entity.querySelectorAll('link-entity').length
+  pruneOwnLinks(entity)
+  return entity.querySelectorAll('link-entity').length === before ? null : new XMLSerializer().serializeToString(document)
+}
+
 export type ResolvedCompositionQuery = { view: ViewQuery | undefined; error: string | null }
 
 function errorText(error: unknown, fallback: string) {
@@ -123,12 +136,19 @@ function errorText(error: unknown, fallback: string) {
 export function resolveCompositionQuery(activeView: SavedView | null, definition: ViewDefinition, catalog: CatalogField[], search: string): ResolvedCompositionQuery {
   const unchanged = Boolean(activeView) && !search && JSON.stringify(definition) === JSON.stringify(activeView!.definition)
   if (activeView?.nativeOnly) {
-    if (unchanged) {
+    // Filtro da definição que não está no FetchXML da visão (cópia nativa com os filtros do usuário) precisa entrar na consulta.
+    const definitionFilters = activeView.nativeFiltersEditable || !allViewFilters(definition).length
+    if (unchanged && definitionFilters) {
       // A grade lê colunas vinculadas pelos aliases gerados (r1, r2…), não pelos aliases da view nativa (a_67d5…).
       const linked = definition.columns.some((column) => catalog.find((field) => field.id === column.id && field.available)?.path.length)
-      if (!linked) return { view: activeView, error: null }
-      try { return { view: { fetchXml: buildNativeCompositionQuery(activeView.sourceFetchXml ?? '', { ...definition, filters: [], filterGroups: [] }, catalog, '') }, error: null } }
-      catch (error) { return { view: undefined, error: errorText(error, 'Não foi possível carregar a visualização nativa.') } }
+      try {
+        if (!linked) {
+          // Visão gravada com vínculos da tela que sobraram: a consulta sai sem eles, sem precisar salvar de novo.
+          const lean = withoutOwnLinks(activeView.sourceFetchXml ?? '')
+          return { view: lean ? { fetchXml: lean } : activeView, error: null }
+        }
+        return { view: { fetchXml: buildNativeCompositionQuery(activeView.sourceFetchXml ?? '', { ...definition, filters: [], filterGroups: [] }, catalog, '') }, error: null }
+      } catch (error) { return { view: undefined, error: errorText(error, 'Não foi possível carregar a visualização nativa.') } }
     }
     try { return { view: { fetchXml: buildNativeCompositionQuery(activeView.sourceFetchXml ?? '', definition, catalog, search, activeView.nativeFiltersEditable) }, error: null } }
     catch (error) { return { view: undefined, error: errorText(error, 'Não foi possível aplicar os filtros à visualização nativa.') } }
