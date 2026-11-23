@@ -1,0 +1,82 @@
+import { AUTOR, STATUS } from '../domain/choices'
+import type { Atualizacao, Etapa, Projeto } from '../domain/types'
+
+const pid = (n: number) => `bbbbbbbb-0000-4000-8000-${String(n).padStart(12, '0')}`
+const eid = (n: number) => `eeeeeeee-0000-4000-8000-${String(n).padStart(12, '0')}`
+const aid = (n: number) => `cccccccc-0000-4000-8000-${String(n).padStart(12, '0')}`
+const xid = (n: number) => `dddddddd-0000-4000-8000-${String(n).padStart(12, '0')}`
+
+/** Projetos de exemplo, genéricos e fictícios. */
+export function createMockProjetos(): Projeto[] {
+  return [
+    { id: pid(1), codigo: 'PRJ-1', nome: 'Painel de indicadores', area: 'Dashboard', responsavel: 'Equipe de TI', briefing: 'Quero ver num lugar só os números do mês: serviços feitos, cancelados e o faturamento por cliente.', instrucoes: 'Abra o menu Dashboard.\nEscolha o período no topo da tela.\nOs cartões atualizam sozinhos a cada 5 minutos.' },
+    { id: pid(2), codigo: 'PRJ-2', nome: 'Cadastro de documentos', area: 'Cadastros', responsavel: 'Equipe de TI', briefing: 'Guardar os documentos de cada veículo com a data de vencimento.', instrucoes: '' },
+    { id: pid(3), codigo: 'PRJ-3', nome: 'Aviso de vencimento', area: 'Frota', responsavel: 'Equipe de TI', briefing: '', instrucoes: 'O aviso chega por e-mail 30 dias antes do vencimento.' },
+    { id: pid(4), codigo: 'PRJ-4', nome: 'Relatório mensal automático', area: 'Financeiro', responsavel: '', briefing: 'Gravei um áudio explicando o relatório que preciso.', instrucoes: '' },
+    { id: pid(5), codigo: 'PRJ-5', nome: 'Revisão do fluxo de aprovação', area: 'Operacional', responsavel: 'Equipe de TI', briefing: '', instrucoes: '' },
+  ]
+}
+
+const etapa = (n: number, projeto: number, numero: number, nome: string, status: number, over: Partial<Etapa> = {}): Etapa => ({
+  id: eid(n), projetoId: pid(projeto), numero, codigo: `PRJ-${projeto}.${numero}`, nome, status, descricao: '', prazo: null, andamento: 0, linkPr: '', publicadoProd: null, ...over,
+})
+
+/** Etapas de exemplo: o PRJ-4 fica sem etapas (só o briefing). */
+export function createMockEtapas(): Etapa[] {
+  return [
+    etapa(1, 1, 1, 'Cartões do mês', STATUS.concluida, { prazo: '2026-11-10', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/98', publicadoProd: '2026-11-12T18:40:00' }),
+    etapa(2, 1, 2, 'Seletor de período', STATUS.validacao, { descricao: 'Escolher o mês no topo da tela.', prazo: '2026-12-10', andamento: 90, linkPr: 'https://github.com/exemplo/sistema/pull/101' }),
+    etapa(3, 1, 3, 'Filtro por cliente', STATUS.ideia),
+    etapa(4, 2, 1, 'Tabela e tela de cadastro', STATUS.andamento, { prazo: '2026-12-20', andamento: 55, linkPr: 'https://github.com/exemplo/sistema/pull/102' }),
+    etapa(5, 3, 1, 'Aviso por e-mail', STATUS.concluida, { prazo: '2026-11-15', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/99', publicadoProd: '2026-11-16T09:10:00' }),
+    etapa(6, 5, 1, 'Mapa do fluxo atual', STATUS.pausada, { prazo: '2026-10-30', andamento: 30 }),
+    etapa(7, 2, 2, 'Alerta de vencimento', STATUS.andamento, { prazo: '2026-11-20', andamento: 20 }),
+    etapa(8, 3, 2, 'Resumo semanal', STATUS.andamento, { prazo: '2026-11-28', andamento: 100, linkPr: 'https://github.com/exemplo/sistema/pull/104', publicadoProd: '2026-11-20T18:00:00' }),
+  ]
+}
+
+/** Imagem de exemplo (SVG) usada como anexo de prova no modo mock. */
+export const mockSvg = (rotulo: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" fill="#e8eef5"/><rect x="16" y="16" width="288" height="28" rx="6" fill="#b8c7da"/><rect x="16" y="60" width="130" height="124" rx="6" fill="#cfd9e6"/><rect x="160" y="60" width="144" height="56" rx="6" fill="#cfd9e6"/><rect x="160" y="128" width="144" height="56" rx="6" fill="#cfd9e6"/><text x="24" y="36" font-family="sans-serif" font-size="14" fill="#2b3a4d">${rotulo}</text></svg>`
+
+/** Áudio de exemplo: WAV de silêncio (8 kHz, 8 bits, mono). */
+export function mockWav(segundos: number): Blob {
+  const n = 8000 * segundos
+  const buf = new DataView(new ArrayBuffer(44 + n))
+  const ascii = (o: number, s: string) => { for (let i = 0; i < s.length; i += 1) buf.setUint8(o + i, s.charCodeAt(i)) }
+  ascii(0, 'RIFF'); buf.setUint32(4, 36 + n, true); ascii(8, 'WAVEfmt '); buf.setUint32(16, 16, true); buf.setUint16(20, 1, true); buf.setUint16(22, 1, true)
+  buf.setUint32(24, 8000, true); buf.setUint32(28, 8000, true); buf.setUint16(32, 1, true); buf.setUint16(34, 8, true); ascii(36, 'data'); buf.setUint32(40, n, true)
+  for (let i = 0; i < n; i += 1) buf.setUint8(44 + i, 128)
+  return new Blob([buf.buffer], { type: 'audio/wav' })
+}
+
+const mk = (n: number, projeto: number, etapaN: number | null, data: string, autor: number, texto: string, over: Partial<Atualizacao> = {}): Atualizacao => ({
+  id: aid(n), projetoId: pid(projeto), etapaId: etapaN == null ? null : eid(etapaN), data, autor, texto, prova: false, transcricao: '', anexos: [], ...over,
+})
+
+/** Atualizações de exemplo; os anexos apontam para arquivos fabricados em `createMockArquivos`. */
+export function createMockAtualizacoes(): Atualizacao[] {
+  return [
+    mk(1, 1, null, '2026-11-01T09:00:00', AUTOR.gestor, 'Print do relatório que uso hoje.', { anexos: [{ id: xid(3), nome: 'relatorio-atual.svg', tipo: 'image/svg+xml', tamanho: 900 }] }),
+    mk(2, 1, 1, '2026-11-11T10:05:00', AUTOR.agente, 'Publicado no DEV. Print dos cartões carregados.', { prova: true, anexos: [{ id: xid(1), nome: 'dashboard-dev.svg', tipo: 'image/svg+xml', tamanho: 900 }] }),
+    mk(3, 1, 2, '2026-11-20T14:30:00', AUTOR.agente, 'PR aberto com o seletor de período.'),
+    mk(4, 1, 2, '2026-11-22T09:00:00', AUTOR.gestor, 'Conferi os valores com o relatório de outubro.', { anexos: [{ id: xid(4), nome: 'audio-conferencia.wav', tipo: 'audio/wav', tamanho: 8044 }], transcricao: 'Conferi outubro e bateu com o relatório. Só falta o filtro por cliente.' }),
+    mk(5, 3, 5, '2026-11-14T16:20:00', AUTOR.renan, 'Aviso recebido por e-mail no teste real. Prova anexada.', { prova: true, anexos: [{ id: xid(2), nome: 'email-aviso.svg', tipo: 'image/svg+xml', tamanho: 900 }, { id: xid(6), nome: 'video-aviso.webm', tipo: 'video/webm', tamanho: 4 }] }),
+    mk(6, 2, 4, '2026-11-19T11:40:00', AUTOR.agente, 'Migration aplicada no DEV; tela de cadastro em ajuste.'),
+    mk(7, 4, null, '2026-11-22T17:15:00', AUTOR.gestor, '', { anexos: [{ id: xid(5), nome: 'audio-briefing.wav', tipo: 'audio/wav', tamanho: 8044 }] }),
+    mk(8, 2, 7, '2026-11-12T15:00:00', AUTOR.renan, 'Falta definir o texto do alerta.'),
+    mk(9, 3, 8, '2026-11-20T18:05:00', AUTOR.agente, 'Publicado no PROD pelo workflow Produção.'),
+  ]
+}
+
+/** Conteúdo dos anexos de exemplo, por id. */
+export function createMockArquivos(): Map<string, Blob> {
+  return new Map([
+    [xid(1), new Blob([mockSvg('Dashboard (DEV)')], { type: 'image/svg+xml' })],
+    [xid(2), new Blob([mockSvg('E-mail de aviso')], { type: 'image/svg+xml' })],
+    [xid(3), new Blob([mockSvg('Relatório atual')], { type: 'image/svg+xml' })],
+    [xid(4), mockWav(1)],
+    [xid(5), mockWav(1)],
+    [xid(6), new Blob(['mock'], { type: 'video/webm' })],
+  ])
+}
