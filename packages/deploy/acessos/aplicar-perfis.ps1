@@ -77,6 +77,7 @@ function Find-PapelRaiz([string] $Nome) {
 }
 
 function Set-PapelDoPerfil([string] $Nome, $Def, [string] $BuId, [hashtable] $IdPorNome, [hashtable] $NomePorId, [string] $Proibido, [string] $CopiarSem) {
+  if ($Nome -notlike 'Perfil - *') { throw "O motor so grava papel e perfil de coluna 'Perfil - *': recusado '$Nome'." }
   # 1. O que o papel deve ter: copia dos papeis de origem (sem o proibido e sem tabela customizada) + tabelas + privilegios soltos.
   $alvo = @{}
   foreach ($origem in @($Def.copiarDe)) {
@@ -161,6 +162,7 @@ function Get-PermissoesDoPerfil([string] $PerfilId) {
 }
 
 function Set-PerfilDeColuna([string] $Nome, $Permissoes) {
+  if ($Nome -notlike 'Perfil - *') { throw "O motor so grava papel e perfil de coluna 'Perfil - *': recusado '$Nome'." }
   # 4 = permitido, 0 = nao. So entra coluna que ja tem seguranca de coluna (IsSecured).
   $alvo = @{}
   foreach ($p in @($Permissoes)) {
