@@ -12,7 +12,7 @@ export const NAV_ANEXOS = 'cr40f_projetoatualizacao_Annotations'
 
 const PROJETO_SELECT = ['cr40f_projetoid', 'cr40f_codigo', 'cr40f_name', 'cr40f_area', 'cr40f_responsavel', 'cr40f_briefing', 'cr40f_instrucoes']
 const ETAPA_SELECT = [
-  'cr40f_projetoetapaid', '_cr40f_projeto_value', 'cr40f_numero', 'cr40f_codigo', 'cr40f_name', 'cr40f_status', 'cr40f_descricao',
+  'cr40f_projetoetapaid', '_cr40f_projeto_value', 'cr40f_numero', 'cr40f_codigo', 'cr40f_name', 'cr40f_status',
   'cr40f_prazo', 'cr40f_andamento', 'cr40f_linkpr', 'cr40f_publicadoprod',
 ]
 const ATUALIZACAO_SELECT = [
@@ -42,7 +42,7 @@ export const mapProjeto = (row: Row): Projeto => ({
 
 export const mapEtapa = (row: Row): Etapa => ({
   id: cleanId(str(row.cr40f_projetoetapaid)), projetoId: cleanId(str(row._cr40f_projeto_value)), numero: num(row.cr40f_numero) ?? 0,
-  codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), status: num(row.cr40f_status) ?? STATUS.ideia, descricao: str(row.cr40f_descricao),
+  codigo: text(row.cr40f_codigo), nome: text(row.cr40f_name), status: num(row.cr40f_status) ?? STATUS.ideia,
   prazo: text(row.cr40f_prazo).slice(0, 10) || null, andamento: Math.min(100, Math.max(0, num(row.cr40f_andamento) ?? 0)),
   linkPr: text(row.cr40f_linkpr), publicadoProd: localIso(text(row.cr40f_publicadoprod)) || null,
 })

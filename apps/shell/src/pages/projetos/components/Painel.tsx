@@ -1,32 +1,27 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Button, StatusBadge, useToast } from '@betinhos/ui'
-import { Check, ExternalLink, Mic, Pencil, Plus, X } from 'lucide-react'
+import { Check, ExternalLink, Mic, Paperclip, Pencil, Plus, X } from 'lucide-react'
 import { formatDay } from '../../../app/format'
 import { reasonText, type Source } from '../data/source'
 import { STATUS, autorDoPerfil, statusLabel, statusTone } from '../domain/choices'
 import { ehAudio } from '../domain/anexos'
-import { motivoSemConcluir, trilha } from '../domain/painel'
-import { atrasada, daEtapa, doProjeto, etapasDo, provas } from '../domain/regras'
+import { doBriefing, motivoSemConcluir, trilha } from '../domain/painel'
+import { atrasada, daEtapa, etapaDoProjeto, provas } from '../domain/regras'
 import type { Atualizacao, Etapa, Perfil, Projeto } from '../domain/types'
 import { AnexoAudio, AnexoMiniatura } from './AnexoMiniatura'
-import type { Selecao } from './Lista'
 import { NovaAtualizacao } from './NovaAtualizacao'
 import { Timeline } from './Timeline'
 import { Trilha } from './Trilha'
 
 type Props = {
-  selecao: NonNullable<Selecao>
-  projetos: Projeto[]
+  projeto: Projeto
   etapas: Etapa[]
   atualizacoes: Atualizacao[]
   perfil: Perfil
   source: Source
   hoje: string
-  onSelect: (s: Selecao) => void
   onAtualizacao: (a: Atualizacao) => void
   onEtapaSalva: (e: Etapa) => void
-  onEditarEtapa: (id: string) => void
-  onNovaEtapa: () => void
   onEditarProjeto: (id: string) => void
   onDirty: (dirty: boolean) => void
   onBusy: (busy: boolean) => void
@@ -34,11 +29,13 @@ type Props = {
   onClose?: () => void
 }
 
+type Pedido = { n: number; prova?: boolean; gravar?: boolean }
+
 const quando = (iso: string) => `${formatDay(iso)} ${iso.slice(11, 16)}`
 
 /** Briefing do gestor: texto do projeto e anexos fora de etapa (áudio com transcrição ou "Transcrição pendente"). */
 function Briefing({ projeto, atualizacoes, source }: { projeto: Projeto; atualizacoes: Atualizacao[]; source: Source }) {
-  const itens = doProjeto(atualizacoes, projeto.id).filter((a) => !a.etapaId)
+  const itens = doBriefing(atualizacoes, projeto.id)
   if (!projeto.briefing.trim() && !itens.length) return <p className="pj-muted">O gestor ainda não escreveu o briefing.</p>
   return (
     <div className="pj-brief" role="group" aria-label="Briefing do gestor">
@@ -59,49 +56,31 @@ function Briefing({ projeto, atualizacoes, source }: { projeto: Projeto; atualiz
   )
 }
 
-function Cabeca({ eyebrow, titulo, onClose }: { eyebrow: string; titulo: string; onClose?: () => void }) {
-  return (
-    <div className="pj-painel__cabeca">
-      <div className="pj-painel__titulos">
-        <span className="pj-cod">{eyebrow}</span>
-        <h2 className="pj-painel__titulo">{titulo}</h2>
-      </div>
-      {onClose ? <Button variant="ghost" size="compact" icon={<X size={16} />} aria-label="Fechar painel" title="Fechar (Esc)" onClick={onClose} /> : null}
-    </div>
-  )
-}
-
-/** Painel lateral da etapa ou do projeto selecionado: trilha, propriedades, provas, briefing, linha do tempo e ações. */
-export function Painel(props: Props) {
-  const { selecao, projetos, etapas } = props
-  if (selecao.tipo === 'etapa') {
-    const e = etapas.find((x) => x.id === selecao.id)
-    const p = e ? projetos.find((x) => x.id === e.projetoId) : undefined
-    if (!e || !p) return <p className="pj-muted">Etapa não encontrada. Atualize a lista.</p>
-    return <PainelEtapa {...props} etapa={e} projeto={p} />
-  }
-  const p = projetos.find((x) => x.id === selecao.id)
-  if (!p) return <p className="pj-muted">Projeto não encontrado. Atualize a lista.</p>
-  return <PainelProjeto {...props} projeto={p} />
-}
-
-function PainelEtapa({ etapa: e, projeto: p, atualizacoes, perfil, source, hoje, onAtualizacao, onEtapaSalva, onEditarEtapa, onDirty, onBusy, onClose }: Props & { etapa: Etapa; projeto: Projeto }) {
+/** Painel lateral do projeto selecionado: trilha, situação, provas, briefing, como usar, linha do tempo e ações. */
+export function Painel({ projeto: p, etapas, atualizacoes, perfil, source, hoje, onAtualizacao, onEtapaSalva, onEditarProjeto, onDirty, onBusy, onClose }: Props) {
   const toast = useToast()
-  const [pedido, setPedido] = useState<{ n: number; prova?: boolean; gravar?: boolean }>({ n: 0 })
+  const e = etapaDoProjeto(etapas, p.id)
+  const [pedido, setPedido] = useState<Pedido>({ n: 0 })
+  const [destino, setDestino] = useState<'etapa' | 'briefing'>('etapa')
   const [concluindo, setConcluindo] = useState(false)
-  const pedir = (o: { prova?: boolean; gravar?: boolean } = {}) => setPedido((cur) => ({ n: cur.n + 1, ...o }))
-  const itens = useMemo(() => daEtapa(atualizacoes, e.id), [atualizacoes, e.id])
+  const [sujo, setSujo] = useState(false)
+  const aoSujar = useCallback((dirty: boolean) => { setSujo(dirty); onDirty(dirty) }, [onDirty])
+  const itens = useMemo(() => (e ? daEtapa(atualizacoes, e.id) : []), [atualizacoes, e])
+
+  // Sem etapa ainda, tudo o que se anexa é do briefing (a etapa nasce na primeira edição da situação).
+  const alvo = e && destino === 'etapa' ? 'etapa' : 'briefing'
+  // Com rascunho aberto o destino não muda (trocar descartaria o texto sem perguntar).
+  const pedir = (para: 'etapa' | 'briefing', o: Omit<Pedido, 'n'> = {}) => { if (!sujo) setDestino(para); setPedido((cur) => ({ n: cur.n + 1, ...o })) }
   const anexosProva = provas(itens).flatMap((a) => a.anexos)
-  const t = trilha(e, atualizacoes, hoje)
-  const motivo = motivoSemConcluir(perfil, e, atualizacoes)
+  const motivo = e ? motivoSemConcluir(perfil, e, atualizacoes) : null
 
   async function concluir() {
-    if (motivo || concluindo) return
+    if (!e || motivo || concluindo) return
     setConcluindo(true)
     try {
       await source.updateEtapa(e.id, { cr40f_status: STATUS.concluida })
       onEtapaSalva({ ...e, status: STATUS.concluida })
-      toast({ tone: 'success', message: `Etapa ${e.codigo} concluída.` })
+      toast({ tone: 'success', message: `Projeto ${p.codigo} marcado como Pronto.` })
     } catch (reason) {
       toast({ tone: 'danger', message: `Não foi possível concluir. ${reasonText(reason)}` })
     } finally { setConcluindo(false) }
@@ -109,87 +88,67 @@ function PainelEtapa({ etapa: e, projeto: p, atualizacoes, perfil, source, hoje,
 
   return (
     <div className="pj-painel__corpo">
-      <Cabeca eyebrow={`${e.codigo} · ${p.nome}`} titulo={e.nome || 'Sem nome'} onClose={onClose} />
-      <Trilha t={t} grande />
-      <dl className="pj-props">
-        <dt>Status</dt><dd><StatusBadge tone={statusTone(e.status)}>{statusLabel(e.status)}</StatusBadge></dd>
-        <dt>Prazo</dt><dd className="pj-num">{e.prazo ? formatDay(e.prazo) : 'Sem prazo'}{atrasada(e, hoje) ? <> <StatusBadge tone="danger">Vencido</StatusBadge></> : null}</dd>
-        <dt>Andamento</dt><dd className="pj-num">{e.andamento}%</dd>
-        <dt>PR</dt><dd>{e.linkPr ? <a className="pj-link" href={e.linkPr} target="_blank" rel="noreferrer">Abrir PR <ExternalLink size={12} aria-hidden="true" /></a> : '—'}</dd>
-        <dt>PROD</dt><dd className="pj-num">{e.publicadoProd ? quando(e.publicadoProd) : 'ainda não'}</dd>
-      </dl>
-      {e.descricao ? <p className="pj-timeline__texto">{e.descricao}</p> : null}
-
-      <h3 className="pj-lbl">Provas · {anexosProva.length}</h3>
-      <div className="pj-gal">
-        {anexosProva.map((x) => (ehAudio(x.tipo) ? <AnexoAudio key={x.id} anexo={x} source={source} /> : <AnexoMiniatura key={x.id} anexo={x} source={source} />))}
-        <button type="button" className="pj-gal__add" onClick={() => pedir({ prova: true })}><Plus size={14} aria-hidden="true" /> Adicionar</button>
+      <div className="pj-painel__cabeca">
+        <div className="pj-painel__titulos">
+          <span className="pj-cod">{p.codigo}{p.area ? ` · ${p.area}` : ''}</span>
+          <h2 className="pj-painel__titulo">{p.nome || 'Sem nome'}</h2>
+        </div>
+        {onClose ? <Button variant="ghost" size="compact" icon={<X size={16} />} aria-label="Fechar painel" title="Fechar (Esc)" onClick={onClose} /> : null}
       </div>
-
-      <h3 className="pj-lbl">Briefing do gestor</h3>
-      <Briefing projeto={p} atualizacoes={atualizacoes} source={source} />
-
-      <NovaAtualizacao key={e.id} semBotao pedido={pedido} projetoId={p.id} etapaId={e.id} autor={autorDoPerfil(perfil)} source={source} onSaved={onAtualizacao} onBusy={onBusy} onDirty={onDirty} />
-
-      <h3 className="pj-lbl">Linha do tempo</h3>
-      <Timeline itens={itens} source={source} rotulo="Atualizações da etapa" vazio="Nenhuma atualização nesta etapa ainda." />
-
-      <div className="pj-painel__acoes">
-        <Button icon={<Plus size={16} />} onClick={() => pedir()}>Nova atualização</Button>
-        <Button variant="secondary" icon={<Mic size={16} />} onClick={() => pedir({ gravar: true })}>Gravar áudio</Button>
-        {e.status === STATUS.concluida ? null : (
-          <Button variant="secondary" icon={<Check size={16} />} disabled={Boolean(motivo)} loading={concluindo} title={motivo ? `Concluir: ${motivo}` : 'Marcar como Concluída'} onClick={() => void concluir()}>
-            {motivo ? `Concluir (${motivo})` : 'Concluir'}
-          </Button>
-        )}
-        <Button variant="ghost" icon={<Pencil size={16} />} onClick={() => onEditarEtapa(e.id)}>Editar etapa</Button>
-      </div>
-    </div>
-  )
-}
-
-function PainelProjeto({ projeto: p, etapas, atualizacoes, perfil, source, hoje, onSelect, onAtualizacao, onNovaEtapa, onEditarProjeto, onDirty, onBusy, onClose }: Props & { projeto: Projeto }) {
-  const [pedido, setPedido] = useState<{ n: number; gravar?: boolean }>({ n: 0 })
-  const pedir = (o: { gravar?: boolean } = {}) => setPedido((cur) => ({ n: cur.n + 1, ...o }))
-  const lista = useMemo(() => etapasDo(etapas, p.id), [etapas, p.id])
-  const codigos = useMemo(() => new Map(lista.map((x) => [x.id, x.codigo])), [lista])
-  const dasEtapas = doProjeto(atualizacoes, p.id).filter((a) => a.etapaId)
-  const concluidas = lista.filter((x) => x.status === STATUS.concluida).length
-
-  return (
-    <div className="pj-painel__corpo">
-      <Cabeca eyebrow={`${p.codigo}${p.area ? ` · ${p.area}` : ''}`} titulo={p.nome || 'Sem nome'} onClose={onClose} />
+      {e ? <Trilha t={trilha(e, atualizacoes, hoje)} /> : null}
       <dl className="pj-props">
-        <dt>Etapas</dt><dd className="pj-num">{lista.length ? `${concluidas} de ${lista.length} concluídas` : 'Sem etapas'}</dd>
+        <dt>Situação</dt><dd><StatusBadge tone={statusTone(e?.status ?? STATUS.ideia)}>{statusLabel(e?.status ?? STATUS.ideia)}</StatusBadge></dd>
+        <dt>O que falta</dt><dd>{e?.nome.trim() || '—'}</dd>
         <dt>Responsável</dt><dd>{p.responsavel || '—'}</dd>
+        {e ? (
+          <>
+            <dt>Prazo</dt><dd className="pj-num">{e.prazo ? formatDay(e.prazo) : 'Sem prazo'}{atrasada(e, hoje) ? <> <StatusBadge tone="danger">Vencido</StatusBadge></> : null}</dd>
+            <dt>Andamento</dt><dd className="pj-num">{e.andamento}%</dd>
+            <dt>PR</dt><dd>{e.linkPr ? <a className="pj-link" href={e.linkPr} target="_blank" rel="noreferrer">Abrir PR <ExternalLink size={12} aria-hidden="true" /></a> : '—'}</dd>
+            <dt>PROD</dt><dd className="pj-num">{e.publicadoProd ? quando(e.publicadoProd) : 'ainda não'}</dd>
+          </>
+        ) : null}
       </dl>
+
+      {e ? (
+        <>
+          <h3 className="pj-lbl">Provas · {anexosProva.length}</h3>
+          <div className="pj-gal">
+            {anexosProva.map((x) => (ehAudio(x.tipo) ? <AnexoAudio key={x.id} anexo={x} source={source} /> : <AnexoMiniatura key={x.id} anexo={x} source={source} />))}
+            <button type="button" className="pj-gal__add" onClick={() => pedir('etapa', { prova: true })}><Plus size={14} aria-hidden="true" /> Adicionar</button>
+          </div>
+        </>
+      ) : null}
 
       <h3 className="pj-lbl">Briefing do gestor</h3>
       <Briefing projeto={p} atualizacoes={atualizacoes} source={source} />
-      <NovaAtualizacao key={p.id} semBotao pedido={pedido} projetoId={p.id} etapaId={null} autor={autorDoPerfil(perfil)} source={source} onSaved={onAtualizacao} onBusy={onBusy} onDirty={onDirty} rotulo="Anexar ao briefing" />
 
-      {p.instrucoes.trim() ? <><h3 className="pj-lbl">Como usar</h3><p className="pj-timeline__texto">{p.instrucoes}</p></> : null}
+      <NovaAtualizacao key={`${p.id}:${alvo}`} semBotao pedido={pedido} projetoId={p.id} etapaId={alvo === 'etapa' && e ? e.id : null} autor={autorDoPerfil(perfil)} source={source}
+        onSaved={onAtualizacao} onBusy={onBusy} onDirty={aoSujar} rotulo={alvo === 'etapa' ? 'Nova atualização' : 'Anexar ao briefing'} />
 
-      <h3 className="pj-lbl">Etapas · {lista.length}</h3>
-      {lista.length ? (
-        <ul className="pj-painel__etapas">
-          {lista.map((x) => (
-            <li key={x.id}>
-              <button type="button" className="pj-painel__etapa" onClick={() => onSelect({ tipo: 'etapa', id: x.id })}>
-                <span className="pj-cod">{x.codigo}</span><span className="pj-linha__nome">{x.nome || 'Sem nome'}</span><Trilha t={trilha(x, atualizacoes, hoje)} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="pj-muted">Nenhuma etapa ainda. Os agentes criam a etapa em Ideia quando o brief é confirmado.</p>}
+      {p.instrucoes.trim() ? (
+        <details className="pj-como">
+          <summary>Como usar</summary>
+          <p className="pj-timeline__texto">{p.instrucoes}</p>
+        </details>
+      ) : null}
 
-      <h3 className="pj-lbl">Linha do tempo</h3>
-      <Timeline itens={dasEtapas} source={source} codigos={codigos} vazio="Nenhuma atualização nas etapas ainda." />
+      {e ? (
+        <>
+          <h3 className="pj-lbl">Linha do tempo</h3>
+          <Timeline itens={itens} source={source} vazio="Nenhuma atualização ainda." />
+        </>
+      ) : null}
 
       <div className="pj-painel__acoes">
-        <Button icon={<Plus size={16} />} onClick={() => pedir()}>Anexar ao briefing</Button>
-        <Button variant="secondary" icon={<Mic size={16} />} onClick={() => pedir({ gravar: true })}>Gravar áudio</Button>
-        <Button variant="secondary" icon={<Plus size={16} />} onClick={onNovaEtapa}>Nova etapa</Button>
+        {e ? <Button icon={<Plus size={16} />} onClick={() => pedir('etapa')}>Nova atualização</Button> : null}
+        <Button variant={e ? 'secondary' : 'primary'} icon={<Paperclip size={16} />} onClick={() => pedir('briefing')}>Anexar ao briefing</Button>
+        <Button variant="secondary" icon={<Mic size={16} />} onClick={() => pedir(e ? 'etapa' : 'briefing', { gravar: true })}>Gravar áudio</Button>
+        {e && e.status !== STATUS.concluida ? (
+          <Button variant="secondary" icon={<Check size={16} />} disabled={Boolean(motivo)} loading={concluindo} title={motivo ? `Pronto: ${motivo}` : 'Marcar como Pronto'} onClick={() => void concluir()}>
+            {motivo ? `Marcar como Pronto (${motivo})` : 'Marcar como Pronto'}
+          </Button>
+        ) : null}
         <Button variant="ghost" icon={<Pencil size={16} />} onClick={() => onEditarProjeto(p.id)}>Editar projeto</Button>
       </div>
     </div>

@@ -12,28 +12,24 @@ const hora = (iso: string) => iso.slice(11, 16)
 type Props = {
   itens: Atualizacao[]
   source: Source
-  /** Código da etapa por id, para o selo; ausente = não mostra. */
-  codigos?: Map<string, string>
   vazio?: string
   rotulo?: string
 }
 
-/** Linha do tempo: autor, data, etapa, texto, anexos e transcrição do áudio; mais recente primeiro. */
-export function Timeline({ itens, source, codigos, vazio = 'Nenhuma atualização ainda.', rotulo = 'Linha do tempo' }: Props) {
+/** Linha do tempo: autor, data, texto, anexos e transcrição do áudio; mais recente primeiro. */
+export function Timeline({ itens, source, vazio = 'Nenhuma atualização ainda.', rotulo = 'Linha do tempo' }: Props) {
   if (!itens.length) return <p className="pj-muted">{vazio}</p>
   return (
     <ol className="pj-timeline" aria-label={rotulo}>
       {itens.map((a) => {
         const audios = a.anexos.filter((x) => ehAudio(x.tipo))
         const outros = a.anexos.filter((x) => !ehAudio(x.tipo))
-        const etapa = a.etapaId ? codigos?.get(a.etapaId) : undefined
         return (
           <li key={a.id} className="pj-timeline__item">
             <div className="pj-timeline__head">
               <AvatarAutor autor={a.autor} />
               <strong>{autorLabel(a.autor)}</strong>
               <span className="pj-num pj-muted">{formatDay(a.data)} {hora(a.data)}</span>
-              {etapa ? <StatusBadge tone="neutral">{etapa}</StatusBadge> : null}
               {a.prova ? <StatusBadge tone="success">Prova</StatusBadge> : null}
             </div>
             {a.texto ? <p className="pj-timeline__texto">{a.texto}</p> : null}

@@ -84,7 +84,7 @@ function createMockSource(): Source {
       if (etapas.some((e) => e.codigo === nova.codigo)) throw new Error(`Já existe a etapa ${nova.codigo}. Atualize a lista e tente de novo.`)
       const e: Etapa = {
         id: next('eeeeeeee'), projetoId: cleanId(nova.projetoId), numero: nova.numero, codigo: nova.codigo, nome: s(c.cr40f_name),
-        status: Number(c.cr40f_status ?? STATUS.ideia), descricao: s(c.cr40f_descricao), prazo: s(c.cr40f_prazo) || null,
+        status: Number(c.cr40f_status ?? STATUS.ideia), prazo: s(c.cr40f_prazo) || null,
         andamento: Number(c.cr40f_andamento ?? 0), linkPr: s(c.cr40f_linkpr), publicadoProd: null,
       }
       etapas = [...etapas, e]
