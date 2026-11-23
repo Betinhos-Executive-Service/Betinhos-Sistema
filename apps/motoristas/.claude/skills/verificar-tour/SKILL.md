@@ -13,6 +13,7 @@ description: "Verifica o tour guiado por capítulos do App Motoristas: abertura 
 
 ## Preparar ambiente
 - `node --test --experimental-strip-types tests/tour.test.ts` (não depende de `node_modules`): confere ids únicos, tamanho dos textos, que toda tela do app tem capítulo e que não há capítulo órfão.
+- Módulo desligado na configuração do App (`src/app/configApp.ts`): o passo com `modulo: "<chave do catálogo>"` some do capítulo (`tourChaptersForScreen(tela, ligado)`). Teste: `node --import ./tests/helpers/resolver-sem-extensao.mjs --test --experimental-strip-types tests/configApp.test.ts` (o `--import` deixa o Node resolver os imports sem extensão de `@betinhos/app-config`; o `pnpm test` já o traz). No preview (`?preview=1`) o guia não abre sozinho.
 - Dev server na porta reservada em `~/.codex/dev-ports.json`: `PORT=<porta> node scripts/dev-server.cjs --strictPort`. Conferir que `dist/` é do código atual (o watcher pode perder edições): `node scripts/build-react-singlefile.cjs --no-version`. Modo mock: motorista `localhost-driver`.
 - Simular primeiro acesso: `localStorage.clear()` e recarregar. Dispensar o guia: `localStorage.setItem("app-motoristas-tour-v2:localhost-driver:*", "visto")`.
 
@@ -44,3 +45,4 @@ Cada afirmação em `tourChapters.ts` tem que ter evidência no código das tela
 
 ## Limites
 - Dataverse real e comportamento dentro do Power Apps/model-driven não são verificáveis em localhost.
+- O capítulo `multas` não abre sozinho no mock enquanto Multas estiver desligada (padrão do catálogo sem versão publicada, antes `MULTAS_OCULTO`): o FAIL "multas: abre sozinho na primeira visita" é esperado nesse estado. O roteiro completo passa de 240 s; rode por capítulos (`verify-tour.cjs <pasta> inicio,servicos,...`).

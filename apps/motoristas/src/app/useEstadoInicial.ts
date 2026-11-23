@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { getInitialDespesaId, getInitialDetail, getInitialGastosCartaoLink, getInitialTermoMultaId, getInitialTreinamentoParticipacaoId, loadStore } from "./bootstrap";
 import { parseHashRoute, type HashRoute } from "./navigation";
-import { MULTAS_OCULTO } from "./modulosOcultos.ts";
-import { findDetailFromHashRoute, getInitialScreenFromHashRoute } from "./rotaInicial";
+import { configApp } from "./configApp.ts";
+import { findDetailFromHashRoute, getInitialScreenFromHashRoute, telaPermitida } from "./rotaInicial";
 import { loadFinalizeDraftAssets } from "../features/finalizar/rascunhos";
 import type { LocalStore } from "../lib/localWorkflow";
 import type { DetailData, Screen } from "../types";
@@ -22,8 +22,16 @@ export function useEstadoInicial(hashRoutingActive: boolean) {
   const initialHashRouteRef = useRef<HashRoute | null>(hashRoutingActive ? parseHashRoute(window.location.hash) : null);
   const initialHashDetail = initialHashRouteRef.current ? findDetailFromHashRoute(store, initialHashRouteRef.current) : null;
   const initialDetailRef = useRef<DetailData | null>(initialHashRouteRef.current ? initialHashDetail : getInitialDetail(store));
-  const initialScreen: Screen = initialHashRouteRef.current
-    ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
-    : (initialDetailRef.current ? "detalhes" : !MULTAS_OCULTO && getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
-  return { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store };
+  // Link ou push para módulo desligado na configuração do App cai no Início, com aviso (avisoModuloDesligado).
+  const initialRef = useRef<{ screen: Screen; bloqueada: boolean } | null>(null);
+  if (!initialRef.current) {
+    const pedida: Screen = initialHashRouteRef.current
+      ? getInitialScreenFromHashRoute(initialHashRouteRef.current, initialHashDetail)
+      : (initialDetailRef.current ? "detalhes" : getInitialTermoMultaId() ? "multas" : getInitialTreinamentoParticipacaoId() ? "treinamentos" : (getInitialDespesaId() || getInitialGastosCartaoLink()) ? "gastosCartao" : "inicio");
+    const permitida = telaPermitida(pedida, configApp.telaLigada);
+    initialRef.current = { screen: permitida, bloqueada: permitida !== pedida };
+  }
+  const initialScreen: Screen = initialRef.current.screen;
+  const avisoModuloDesligado = initialRef.current.bloqueada;
+  return { avisoModuloDesligado, initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store };
 }

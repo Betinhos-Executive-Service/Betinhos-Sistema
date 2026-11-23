@@ -1,4 +1,5 @@
 import { executeCustomApi } from "../../data/dataverse/customApi.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { createOne, deleteOne, retrieveMultiple, retrieveOne, updateOne } from "../../data/dataverse/cliente.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 
@@ -43,7 +44,7 @@ export type SignaturePoint = [number, number];
 export type SignatureStrokes = SignaturePoint[][];
 
 const LOCAL_DRIVER_ID = "11111111-1111-4111-8111-111111111111";
-export const isMockComunicados = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+export const isMockComunicados = () => isMockRuntime();
 
 // Arquivo canônico: a Tela Gestão de Comunicados copia este módulo via scripts/sync-shared.cjs.
 // A Gestão serve o mock na mesma origem e chama configureComunicadosMock("/api/mock").

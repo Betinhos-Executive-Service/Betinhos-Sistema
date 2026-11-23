@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getInitialParams } from "./app/bootstrap";
 import { isHashRoutingEnabled } from "./app/navigation";
 import type { MaintenanceRequestVehicleOption } from "./features/manutencao/remoto";
@@ -6,6 +6,7 @@ import type { DriverContext } from "./data/dataverse/cliente";
 import { useDados } from "./app/DataProvider";
 import { AppShell } from "./app/AppShell";
 import { resetDadosLocais } from "./app/resetDadosLocais";
+import { AVISO_MODULO_DESLIGADO, configApp, iniciarPreview, useConfigApp } from "./app/configApp";
 import { useEstadoInicial } from "./app/useEstadoInicial";
 import { useCarregarRascunhoMidia } from "./app/useCarregarRascunhoMidia";
 import { useAvisosGlobais } from "./app/useAvisosGlobais";
@@ -66,6 +67,7 @@ import { ReceiptPreviewScreen } from "./features/recibo/ReceiptScreen";
 import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";
 import type { DetailData, MaintenancePhotoKind, Screen } from "./types";
 import type { RemoteOperation } from "./shared/ui/FlowProgressOverlay";
+import { isMockRuntime, isPreviewMode } from "./shared/modoPreview";
 
 function App() {
   // Dados pela porta (src/data/porta.ts): o adaptador vem da entrada do app (main.tsx) e não muda
@@ -75,12 +77,12 @@ function App() {
   const previewHashActive = useMemo(() => /^#\/?preview(?:[/?]|$)/i.test(window.location.hash), []);
   const isButtonPreviewMode = devMode === "preview" || previewHashActive;
   const isReceiptPreviewMode = devMode === "recibo";
-  const isLocalhostRuntime = useMemo(() => ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname), []);
+  const isLocalhostRuntime = useMemo(() => isMockRuntime(), []);
   const hashRoutingActive = useMemo(
     () => isHashRoutingEnabled() && !isButtonPreviewMode && !isReceiptPreviewMode,
     [isButtonPreviewMode, isReceiptPreviewMode]
   );
-  const { initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store } = useEstadoInicial(hashRoutingActive);
+  const { avisoModuloDesligado, initialDetailRef, initialHashDetail, initialHashRouteRef, initialScreen, setStore, store } = useEstadoInicial(hashRoutingActive);
   const [screen, setScreen] = useState<Screen>(initialScreen);
   // Tela de onde os postos foram abertos (início ou registrar gasto): o Voltar devolve para lá.
   const [postosOrigem, setPostosOrigem] = useState<Screen>("inicio");
@@ -97,9 +99,7 @@ function App() {
   const [remoteMode, setRemoteMode] = useState(false);
   const [driverContext, setDriverContext] = useState<DriverContext | null>(null);
   const recibo = useReciboPersonalizado({
-    driverContext,
     inicial: initialScreen === "reciboPersonalizado" && initialHashDetail ? "service" : "home",
-    isLocalhostRuntime,
     selectedDetail,
     setScreen,
     setToast
@@ -148,7 +148,6 @@ function App() {
     blockIfNotFirstPending,
     checkReceiveProof: despesas.checkReceiveProof,
     driverContext,
-    isLocalhostRuntime,
     logAppError,
     remoteMode,
     remoteOperation,
@@ -299,8 +298,26 @@ function App() {
     selectedDetail
   });
 
+  useConfigApp(); // re-renderiza quando a config aplicada muda (nome do preview, módulos da grade)
+  // Configuração do App por perfil: relê ao abrir e ao voltar do segundo plano (máx. a cada 5 min); config nova só vale no Início.
+  useEffect(() => { configApp.definirNoInicio(screen === "inicio"); }, [screen]);
+  useEffect(() => {
+    const vinculo = driverContext?.funcionario?.cr40f_tipodevinculo;
+    configApp.definirVinculo(vinculo === null || vinculo === undefined ? undefined : Number(vinculo));
+  }, [driverContext]);
+  useEffect(() => {
+    if (avisoModuloDesligado) setToast(AVISO_MODULO_DESLIGADO, "warning");
+    // Preview (tela de Configuração): a config chega por postMessage e o App volta ao Início.
+    if (isPreviewMode()) return iniciarPreview(window, configApp, () => setScreen("inicio"));
+    void configApp.reler();
+    const aoVoltar = () => { if (document.visibilityState === "visible") void configApp.reler(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+  }, []);
+
   const tour = useTour({
-    blocked: Boolean(finalizar.vehicleChoiceRequest || remoteOperation || despesas.expenseSend),
+    // Preview da tela de Configuração: o guia não abre sozinho por cima da simulação.
+    blocked: Boolean(finalizar.vehicleChoiceRequest || remoteOperation || despesas.expenseSend) || isPreviewMode(),
     criticalError: avisos.criticalError,
     // Agenda carregando conta como carga: o tour espera a lista aparecer.
     dataLoading: Boolean(avisos.dataLoading) || agendaCarregando,
@@ -609,7 +626,7 @@ function App() {
       onOpenPersonalReceipt={openPersonalReceiptFromHome}
       onPersonalReceipt={openPersonalReceiptFromHome}
       openPersonalReceipt={openPersonalReceiptFromHome}
-      onRefresh={refreshLocal}
+      onRefresh={() => { void configApp.reler({ forcar: true }); return refreshLocal(); }}
       canGeneratePersonalReceipt={canGeneratePersonalReceipt}
       isThirdParty={isThirdPartyDriver(driverContext?.funcionario)}
       services={store.agenda}
@@ -620,7 +637,7 @@ function App() {
       pendingGastosCartao={cartao.gastosCartaoPendentes.length}
       multasBanner={resumoPendentes(termosMulta)}
       driverId={driverContext?.id}
-      driverName={driverContext?.fullName}
+      driverName={driverContext?.fullName || (isPreviewMode() ? configApp.nomePreview() : undefined)}
       showLocalReset={isLocalhostRuntime && !remoteMode}
       onResetLocalData={resetLocalData}
       onShowTour={tour.restartTour}

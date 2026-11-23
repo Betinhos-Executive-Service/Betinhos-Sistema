@@ -1,4 +1,5 @@
 import { createFetchWebApi } from "./fetchWebApi.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { DATAVERSE, ENTITY_COLLECTION_ALIASES, ENTITY_SET_TO_ENTITY_NAME } from "./entidades.ts";
 
 // Cliente do Dataverse no web resource: escolhe o runtime (Xrm.WebApi da janela/parent,
@@ -38,9 +39,9 @@ export type DriverContext = {
 const DV_LOG_PREFIX = "[AppMotoristas:Dataverse]";
 let lastRuntimeLogKey = "";
 
+// Dados de exemplo: localhost (dev) ou ?preview=1 (iframe da tela de Configuração).
 export function isLocalhostRuntime() {
-  if (typeof window === "undefined") return false;
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+  return isMockRuntime();
 }
 
 // Mock só em localhost. Fora dele, sem Xrm.WebApi o app abre pela URL direta do
@@ -419,7 +420,6 @@ async function getCurrentUserEmail() {
   return email;
 }
 
-let qrPermissionColumnMissing = false;
 
 // Id do motorista no fallback local (sem Xrm); também identifica as preferências locais, como o tour.
 export const LOCAL_DRIVER_ID = "localhost-driver";
@@ -436,8 +436,6 @@ export async function getDriverContext(): Promise<DriverContext> {
         cr40f_funcionariosid: LOCAL_DRIVER_ID,
         cr40f_nomecompleto: "Localhost",
         cr40f_emailmicrosoft: "",
-        cr40f_gerarrecibopersonalizado: true,
-        cr40f_podecobrarqrcode: true,
         // Teste local do "Meu carro": abra com ?mockTerceiro=1.
         ...(new URLSearchParams(window.location.search).get("mockTerceiro") === "1" ? { cr40f_tipodevinculo: 1 } : {})
       }
@@ -445,18 +443,8 @@ export async function getDriverContext(): Promise<DriverContext> {
   }
   if (!email) throw new Error("Email Microsoft do usuario atual nao foi encontrado no Dataverse.");
 
-  const driverQuery = (extraColumns: string) =>
-    `$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_emailmicrosoft,_cr40f_veiculoatual_value,cr40f_tipodevinculo,cr40f_gerarrecibopersonalizado${extraColumns}&$filter=cr40f_status eq 0 and cr40f_emailmicrosoft eq '${escapeODataText(email)}'&$top=2`;
-  // A coluna da cobrança por QR pode ainda não existir no ambiente; sem ela o login não pode cair.
-  // Guarda a falha para não repetir a consulta inválida em cada chamada da sessão.
-  const result = await retrieveMultiple(DATAVERSE.funcionarios, driverQuery(qrPermissionColumnMissing ? "" : ",cr40f_podecobrarqrcode")).catch((error: unknown) => {
-    // Xrm.WebApi rejeita com objeto { message }, não com Error.
-    const message = String((error as { message?: unknown } | null)?.message ?? error);
-    if (qrPermissionColumnMissing || !message.includes("cr40f_podecobrarqrcode")) throw error;
-    qrPermissionColumnMissing = true;
-    dataverseWarn("Coluna cr40f_podecobrarqrcode ausente; cobrança por QR desativada.");
-    return retrieveMultiple(DATAVERSE.funcionarios, driverQuery(""));
-  });
+  // Recibo personalizado e cobrança por QR vêm da configuração do App (cr40f_AppConfigEfetiva), não de colunas do funcionário.
+  const result = await retrieveMultiple(DATAVERSE.funcionarios, `$select=cr40f_funcionariosid,cr40f_nomecompleto,cr40f_emailmicrosoft,_cr40f_veiculoatual_value,cr40f_tipodevinculo&$filter=cr40f_status eq 0 and cr40f_emailmicrosoft eq '${escapeODataText(email)}'&$top=2`);
   if (result.entities.length > 1) {
     throw new Error("Mais de um funcionario ativo usa o mesmo Email Microsoft. Corrija o cadastro antes de continuar.");
   }
@@ -467,8 +455,7 @@ export async function getDriverContext(): Promise<DriverContext> {
     id: funcionario.cr40f_funcionariosid,
     email,
     fullName: funcionario.cr40f_nomecompleto,
-    tipoDeVinculo: funcionario.cr40f_tipodevinculo,
-    gerarReciboPersonalizado: funcionario.cr40f_gerarrecibopersonalizado
+    tipoDeVinculo: funcionario.cr40f_tipodevinculo
   });
 
   return {

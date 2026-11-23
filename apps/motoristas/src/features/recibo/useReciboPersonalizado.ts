@@ -1,26 +1,22 @@
 import { useState } from "react";
-import { isTrueLike } from "../../shared/isTrueLike";
-import type { DriverContext } from "../../data/dataverse/cliente";
+import { useConfigApp } from "../../app/configApp";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import type { DetailData, Screen } from "../../types";
 import type { ReceiptEntrySource } from "./origem";
 
 type Options = {
-  driverContext: DriverContext | null;
   inicial: ReceiptEntrySource;
-  isLocalhostRuntime: boolean;
   selectedDetail: DetailData | null;
   setScreen: React.Dispatch<React.SetStateAction<Screen>>;
   setToast: (message: string, tone?: ToastTone) => void;
 };
 
 // Recibo personalizado: permissão do motorista, origem (Home ou serviço) e abertura da tela.
-export function useReciboPersonalizado({ driverContext, inicial, isLocalhostRuntime, selectedDetail, setScreen, setToast }: Options) {
+export function useReciboPersonalizado({ inicial, selectedDetail, setScreen, setToast }: Options) {
   const [receiptEntrySource, setReceiptEntrySource] = useState<ReceiptEntrySource>(() => inicial);
   const receiptDetail = receiptEntrySource === "service" ? selectedDetail ?? undefined : undefined;
-  const canGeneratePersonalReceipt =
-    isTrueLike(driverContext?.funcionario?.cr40f_gerarrecibopersonalizado) ||
-    isLocalhostRuntime;
+  // Vem da configuração do App por perfil (chave services.personalReceipt), não mais da coluna do funcionário.
+  const canGeneratePersonalReceipt = useConfigApp().ligado("services.personalReceipt");
 
   const openPersonalReceipt = () => {
     if (!selectedDetail) return;

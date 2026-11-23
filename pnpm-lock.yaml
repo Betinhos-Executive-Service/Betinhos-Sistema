@@ -274,6 +274,9 @@ importers:
       '@betinhos-executive-service/ui':
         specifier: 1.18.0
         version: 1.18.0(@types/react@18.3.30)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@betinhos/app-config':
+        specifier: workspace:*
+        version: link:../../packages/app-config
       chart.js:
         specifier: 4.4.1
         version: 4.4.1
@@ -476,8 +479,11 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0(@noble/hashes@2.4.0)(supports-color@10.2.2))(supports-color@10.2.2)(terser@5.51.2)
 
-  packages/dataverse:
+  packages/app-config:
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -485,11 +491,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0(@noble/hashes@2.4.0)(supports-color@10.2.2))(supports-color@10.2.2)(terser@5.51.2)
 
-  packages/app-config:
+  packages/dataverse:
     devDependencies:
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.19.2
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

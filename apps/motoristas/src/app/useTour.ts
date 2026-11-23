@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearAllChaptersSeen, closesWhenReadingEnds, hasSeenChapter, markChapterSeen, missingRequiredSteps, pickChapter, type TourChapter, type TourCloseReason } from "./tour";
+import { useConfigApp } from "./configApp";
 import { tourChaptersForScreen } from "./tourChapters";
 import { findTourTarget, hasTourProbe } from "./tourDom";
 import { hasDataverseRuntime, LOCAL_DRIVER_ID } from "../data/dataverse/cliente";
@@ -33,7 +34,8 @@ export function useTour({ blocked, criticalError, dataLoading, driverContextId, 
   // Tour por capítulos: cada tela tem o seu, aberto sozinho na primeira visita (por motorista, neste aparelho)
   // e sempre reabrível pelo botão "?" do cabeçalho. Capítulo que fecha por "indisponivel" (nenhum elemento na
   // tela) não grava "visto"; o conjunto evita reabrir em loop até a tela mudar.
-  const tourCandidates = useMemo(() => tourChaptersForScreen(screen), [screen]);
+  const { ligado, config } = useConfigApp();
+  const tourCandidates = useMemo(() => tourChaptersForScreen(screen, ligado), [screen, ligado, config]);
   const tourUnavailableRef = useRef(new Set<string>());
   const tourBlocked = blocked;
   // Sub-estados dentro da mesma tela (ler comunicado, preencher checklist) também disparam o capítulo certo.
@@ -97,7 +99,7 @@ export function useTour({ blocked, criticalError, dataLoading, driverContextId, 
   const restartTour = () => {
     if (tourDriverId) clearAllChaptersSeen(localStorage, tourDriverId);
     tourUnavailableRef.current.clear();
-    const inicio = tourChaptersForScreen("inicio")[0];
+    const inicio = tourChaptersForScreen("inicio", ligado)[0];
     if (inicio) setTourChapter(inicio);
   };
 

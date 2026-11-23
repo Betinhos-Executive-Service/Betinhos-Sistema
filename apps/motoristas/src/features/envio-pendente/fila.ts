@@ -1,5 +1,6 @@
 // Fila de envios pendentes do aparelho: o que o motorista finalizou sem conexão fica aqui até o Dataverse confirmar.
 // Não expira enquanto pendente. O backend é injetável (IndexedDB no app, memória nos testes).
+import { isPreviewMode } from "../../shared/modoPreview.ts";
 import type { DetailData, MaintenancePhotoKind } from "../../types";
 import type { ChecklistDraft, ChecklistItem } from "../checklist/checklists";
 import type { DriverVehicleChoice, InfleetVehicleResolution } from "../../lib/serviceVehicleInfleet";
@@ -201,7 +202,8 @@ export function createFila(backend: FilaBackend) {
   };
 }
 
-export const filaDeEnvio: Fila = createFila(createIndexedDbBackend());
+// Preview (?preview=1): fila só em memória, nada fica guardado no aparelho.
+export const filaDeEnvio: Fila = createFila(isPreviewMode() ? createMemoryBackend() : createIndexedDbBackend());
 
 /** Serviço com envio guardado no aparelho: continua na agenda, mas não pode ser finalizado de novo. */
 export const temEnvioPendente = (detail: Pick<DetailData, "type" | "id" | "dataverse">) =>
