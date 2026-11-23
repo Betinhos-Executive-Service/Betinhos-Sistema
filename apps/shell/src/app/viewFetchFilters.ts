@@ -125,9 +125,13 @@ export function readFetchCondition(el: Element, field: FilterField): FilterCondi
   }
 }
 
-/** Valor de uma condição só leitura já com nome: lookup pelo `uiname`, escolha pela opção, data em dd/mm/aaaa. */
-function describeValue(el: Element, field: FilterField | undefined): string {
-  const raw = el.getAttribute('value') != null ? [{ text: el.getAttribute('value') as string, name: el.getAttribute('uiname') }] : valuesOf(el).map((v) => ({ text: v.textContent ?? '', name: v.getAttribute('uiname') }))
+/**
+ * Valor de uma condição só leitura já com nome: lookup pelo `uiname`, escolha pela opção, data em dd/mm/aaaa.
+ * `nameOf` dá o nome de um valor que o FetchXML traz só como código ou GUID (lido do Dataverse); sem nome, GUID vira "registro selecionado".
+ */
+export function describeValue(el: Element, field: FilterField | undefined, nameOf?: (text: string) => string | undefined): string {
+  const single = el.getAttribute('value')
+  const raw = single != null ? [{ text: single, name: el.getAttribute('uiname') }] : valuesOf(el).map((v) => ({ text: v.textContent ?? '', name: v.getAttribute('uiname') }))
   const operator = el.getAttribute('operator') ?? ''
   const state = el.getAttribute('attribute') === 'statecode'
   const shown = raw.map(({ text, name }) => {
@@ -136,6 +140,8 @@ function describeValue(el: Element, field: FilterField | undefined): string {
     if (state && (text === '0' || text === '1')) return text === '0' ? 'Ativo' : 'Inativo'
     const option = field?.options?.find((o) => o.value === text.trim())
     if (option) return option.label
+    const known = nameOf?.(text)
+    if (known) return known
     const day = DAY.exec(text.trim())?.[1]
     if (day) return day.split('-').reverse().join('/')
     if (guid(text)) return 'registro selecionado'

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { buildCompositionQuery, buildCountQuery, buildNativeCompositionQuery, dedupeLinks, expandLinkAliases, fetchPageSize, nextFetchXmlPage, resolveCompositionQuery, withBaseAttributes, withFetchPageSize, withRowLinks, withoutRowLinks } from './composition-query'
-import type { CatalogField, ViewDefinition } from './views'
+import { buildLayoutXml, type CatalogField, type ViewDefinition } from './views'
 
 const catalog: CatalogField[] = [
   { id: 'client', label: 'Cliente', table: 'cr40f_clientes1', attribute: 'cr40f_nomedocliente', path: ['cr40f_reservadeveculos', 'cr40f_clientes1'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }, { from: 'cr40f_clientes1id', to: 'cr40f_cliente' }], type: 'String', available: true },
@@ -131,6 +131,50 @@ describe('consulta de composições no servidor', () => {
     vi.unstubAllGlobals()
   })
 
+
+  describe('vínculos que a própria tela acumulou', () => {
+    const RES = 'cr40f_reservadeveculos'
+    const link = (alias: string, inner = '') => `<link-entity name="${RES}" from="${RES}id" to="cr40f_servicorelacionadogeral" alias="${alias}" link-type="outer">${inner}</link-entity>`
+    const stale = ['r1', 'r2', 'ui_r1', 'ui_r2', 'ui_ui_r1', 'ui_ui_r2'].map((alias) => link(alias)).join('')
+    const gridDefinition: ViewDefinition = { columns: [{ id: 'route', width: 160, pinned: false }], filters: [], sort: [] }
+    const aliasesOf = (xml: string) => [...new DOMParser().parseFromString(xml, 'application/xml').querySelectorAll('link-entity')].map((item) => item.getAttribute('alias'))
+
+    it('(e) r1, r2, ui_r1, ui_r2, ui_ui_r1, ui_ui_r2 sem filtro ficam em um vínculo por caminho (reserva e, dentro dela, cliente)', () => {
+      const nativeXml = `<fetch><entity name="cr40f_composicaodeprecos"><attribute name="cr40f_composicaodeprecosid"/>${stale}</entity></fetch>`
+      expect(aliasesOf(buildNativeCompositionQuery(nativeXml, gridDefinition, catalog, '', false))).toEqual(['r1', 'r2'])
+    })
+
+    it('(e) o vínculo citado por condição não sai, nem o que tem filtro ou é da visão original', () => {
+      const nativeXml = `<fetch><entity name="cr40f_composicaodeprecos"><filter type="and"><condition entityname="ui_r1" attribute="cr40f_cliente" operator="eq" value="00000000-0000-4000-8000-000000000001" /></filter>${stale}<link-entity name="cr40f_veiculos" from="cr40f_veiculosid" to="cr40f_veiculo" alias="a_veiculo" link-type="inner"><filter><condition attribute="cr40f_placa" operator="eq" value="AAA0A00" /></filter></link-entity></entity></fetch>`
+      const result = aliasesOf(buildNativeCompositionQuery(nativeXml, gridDefinition, catalog, '', false))
+      expect(result).toContain('ui_r1')
+      expect(result).toContain('a_veiculo')
+      // Sobram o citado e os dois da grade (reserva e cliente); os outros quatro acumulados saem.
+      expect(result.filter((alias) => /^(ui_)*r\d+$/.test(String(alias))).sort()).toEqual(['r1', 'r2', 'ui_r1'])
+    })
+
+    it('(f) a layout aponta para aliases que existem no FetchXML gravado', () => {
+      const nativeXml = `<fetch><entity name="cr40f_composicaodeprecos"><attribute name="cr40f_composicaodeprecosid"/>${stale}</entity></fetch>`
+      const fetchXml = buildNativeCompositionQuery(nativeXml, gridDefinition, catalog, '', false)
+      const layout = new DOMParser().parseFromString(buildLayoutXml(gridDefinition, catalog, 10342, fetchXml), 'application/xml')
+      const existing = aliasesOf(fetchXml)
+      const cells = [...layout.querySelectorAll('cell')].map((cell) => String(cell.getAttribute('name')))
+      expect(cells).toHaveLength(1)
+      expect(existing).toContain(cells[0].split('.')[0])
+      expect(cells[0]).toMatch(/\.cr40f_trajeto$/)
+    })
+
+    it('(g) visão nativa normal (aliases a_xxx, vínculos internos com filtro) fica com a mesma consulta', () => {
+      const nativeXml = `<fetch><entity name="cr40f_composicaodeprecos"><attribute name="cr40f_composicaodeprecosid"/><filter type="and"><condition attribute="statecode" operator="eq" value="0" /></filter><link-entity name="${RES}" from="${RES}id" to="cr40f_servicorelacionadogeral" alias="a_reserva" link-type="inner"><filter><condition attribute="cr40f_trajeto" operator="like" value="%Norte%" /></filter></link-entity><link-entity name="cr40f_veiculos" from="cr40f_veiculosid" to="cr40f_veiculo" alias="a_veiculo" link-type="outer"><attribute name="cr40f_placa"/></link-entity></entity></fetch>`
+      const semGrade: ViewDefinition = { columns: [{ id: 'new_valorlocacao', width: 128, pinned: false }], filters: [], sort: [] }
+      const result = new DOMParser().parseFromString(buildNativeCompositionQuery(nativeXml, semGrade, catalog, '', false), 'application/xml')
+      const original = new DOMParser().parseFromString(nativeXml, 'application/xml')
+      // Os vínculos da visão original seguem intactos; a grade só acrescenta os seus (r1 reserva, r2 cliente), como antes.
+      expect(aliasesOf(buildNativeCompositionQuery(nativeXml, semGrade, catalog, '', false))).toEqual(['a_reserva', 'a_veiculo', 'r1', 'r2'])
+      for (const alias of ['a_reserva', 'a_veiculo']) expect(new XMLSerializer().serializeToString(result.querySelector(`link-entity[alias="${alias}"]`)!)).toBe(new XMLSerializer().serializeToString(original.querySelector(`link-entity[alias="${alias}"]`)!))
+      expect(new XMLSerializer().serializeToString(result.querySelector('entity > filter')!)).toBe(new XMLSerializer().serializeToString(original.querySelector('entity > filter')!))
+    })
+  })
 })
 
 describe('buildCountQuery', () => {

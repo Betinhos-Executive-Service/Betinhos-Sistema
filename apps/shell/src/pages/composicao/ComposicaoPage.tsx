@@ -533,9 +533,10 @@ function ComposicaoContent({ host }: { host: Host }) {
   const removeView = useCallback(async (view: SavedView) => { if (dataSource === 'mock') deleteMockView(view); else await deleteView(view) }, [dataSource])
   const saveCurrentView = useCallback(async (name: string, kind: 'personal' | 'public', overwrite: boolean, definition: ViewDefinition) => {
     if (!catalog.length || !definition.columns.length) throw new Error('Escolha ao menos uma coluna disponível.')
+    const keepNative = lockedNativeCopy(activeView, overwrite)
     const saved = dataSource === 'mock'
       ? saveMockView(name, kind, definition, overwrite ? activeView ?? undefined : undefined)
-      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, nativeSaveSource(activeView, definition, catalog, overwrite), lockedNativeCopy(activeView, overwrite))
+      : await saveView(name, kind, definition, catalog, overwrite ? activeView ?? undefined : undefined, nativeSaveSource(activeView, definition, catalog, overwrite), keepNative, keepNative ? activeView?.sourceFetchXml : undefined)
     const all = await listViews()
     setViews(all)
     const selected = all.find((view) => view.id === saved.id) ?? saved
