@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@azure/msal-browser": "^5.26.0",
+    "@betinhos/app-config": "workspace:*",
     "@betinhos/dataverse": "workspace:*",
     "@betinhos/ui": "npm:@betinhos-executive-service/ui@^3.8.2",
     "@fontsource/manrope": "^5.2.6",

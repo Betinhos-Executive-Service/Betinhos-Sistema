@@ -384,6 +384,9 @@ importers:
       '@azure/msal-browser':
         specifier: ^5.26.0
         version: 5.26.0
+      '@betinhos/app-config':
+        specifier: workspace:*
+        version: link:../../packages/app-config
       '@betinhos/dataverse':
         specifier: workspace:*
         version: link:../../packages/dataverse
@@ -476,8 +479,11 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0(@noble/hashes@2.4.0)(supports-color@10.2.2))(supports-color@10.2.2)(terser@5.51.2)
 
-  packages/dataverse:
+  packages/app-config:
     devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -485,11 +491,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.19.2)(jsdom@27.4.0(@noble/hashes@2.4.0)(supports-color@10.2.2))(supports-color@10.2.2)(terser@5.51.2)
 
-  packages/app-config:
+  packages/dataverse:
     devDependencies:
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.19.2
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

@@ -3,6 +3,7 @@ import { AppShell } from './app/AppShell'
 import { AuditoriaProvider } from './app/auditoria/AuditoriaProvider'
 import { GavetaRegistro } from './app/GavetaRegistro'
 import { RegistrosAbriveis } from './app/RegistrosAbriveis'
+import { useAcessoConfigApp } from './app/useAcessoConfigApp'
 import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
 import { usePrefetchOnIntent } from './app/routes'
@@ -11,12 +12,17 @@ import { createHost } from './host'
 import { DEFAULT_ITEM, ENTITY_NAMES, findItem, itemLabel, rotaAtualizada } from './nav/menu'
 import { hrefFor, parseHash, useHashQuery, useHashRoute } from './nav/useHashRoute'
 
+/** Itens do menu que só o gestor abre (constante: mantém o `ocultos` estável entre renders). */
+const SEM_GESTOR = ['app-motoristas']
+
 type LabelsState = { labels: Map<string, string>; error: string | null }
 
 export function App() {
   const host = useMemo(createHost, [])
   const docsUrgentes = useDocumentosBadge(host)
   const badges = useMemo(() => (docsUrgentes ? { documentos: docsUrgentes } : undefined), [docsUrgentes])
+  // Enquanto lê os papéis (acesso nulo) o item fica fora do menu: não pisca para quem não pode abrir.
+  const ocultos = useAcessoConfigApp(host)?.gestor ? undefined : SEM_GESTOR
   const route = useHashRoute()
   const query = useHashQuery()
   usePrefetchOnIntent()
@@ -57,7 +63,7 @@ export function App() {
   return (
     <AuditoriaProvider host={host}>
       <RegistrosAbriveis>
-        <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
+        <AppShell activeId={activeId} title={label} entityLabels={labels} connection={connection} badges={badges} ocultos={ocultos} defaultCollapsed={found?.item.kind === 'page' && found.item.page === 'geral'}>
           <RouteLayout host={host} group={found?.group ?? null} item={found?.item ?? null} label={label} />
         </AppShell>
         <GavetaRegistro host={host} />
