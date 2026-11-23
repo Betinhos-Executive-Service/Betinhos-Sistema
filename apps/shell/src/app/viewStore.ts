@@ -32,6 +32,7 @@ export const messageOf = (error: unknown) => (error instanceof Error && error.me
 export function createDataverseViewStore(client: DataverseClient, onWarn?: (message: string) => void): ViewStore {
   let me: Promise<string> | null = null
   const userId = () => (me ??= client.request<{ UserId: string }>('WhoAmI').then((r) => r.UserId.toLowerCase()).catch((e) => { me = null; throw e }))
+  let publisher: Promise<boolean> | null = null
   let teamWarned = false
   let team: Promise<string | null> | null = null
   const teamId = () => (team ??= client.request<{ value: { teamid: string }[] }>(`teams?$select=teamid&$filter=name eq '${odata(PUBLIC_TEAM)}' and teamtype eq 0`)
@@ -83,9 +84,8 @@ export function createDataverseViewStore(client: DataverseClient, onWarn?: (mess
       // Atribuir à equipe exige o privilégio Assign: o Dataverse recusa quem não é gestor.
       await client.update(VIEW_ENTITY_SET, id, { 'ownerid@odata.bind': `/teams(${tid})`, cr40f_publica: true })
     },
-    async canPublish() {
-      const nomes = await nomesDosPapeis(client, await userId())
-      return nomes.some((n) => PUBLISHER_ROLES.includes(n))
+    canPublish() {
+      return (publisher ??= userId().then((uid) => nomesDosPapeis(client, uid)).then((nomes) => nomes.some((n) => PUBLISHER_ROLES.includes(n))).catch((e) => { publisher = null; throw e }))
     },
   }
 }

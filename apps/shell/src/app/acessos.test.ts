@@ -57,6 +57,22 @@ describe('nomesDosPapeis', () => {
   })
 })
 
+describe('nomesDosPapeis com equipe ilegível', () => {
+  it('uma equipe rejeita: voltam os papéis diretos e os da outra equipe', async () => {
+    const client = {
+      request: async (path: string) => {
+        if (path === 'WhoAmI') return { UserId: '{AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA}' }
+        if (path.includes('systemuserroles_association')) return { value: [{ name: 'Perfil - Base' }] }
+        if (path.includes('teammembership_association')) return { value: [{ teamid: 't1' }, { teamid: 't2' }] }
+        if (path.startsWith('teams(t1)/')) throw new Error('equipe ilegível')
+        if (path.startsWith('teams(t2)/')) return { value: [{ name: 'Perfil - RH - Gestor' }] }
+        throw new Error(`caminho inesperado: ${path}`)
+      },
+    } as unknown as DataverseClient
+    expect(await nomesDosPapeis(client)).toEqual(['Perfil - Base', 'Perfil - RH - Gestor'])
+  })
+})
+
 describe('acessosDoMock', () => {
   it('sem parâmetro assume todos os perfis', () => {
     expect(acessosDoMock(null)).toEqual(TODOS)

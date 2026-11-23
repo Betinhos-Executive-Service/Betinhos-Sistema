@@ -45,9 +45,11 @@ describe('guarda de perfil', () => {
     expect(screen.queryByText('Sem acesso a este módulo')).toBeNull()
   })
 
-  it('falha na leitura: aviso com "Tentar de novo"', () => {
+  it('falha na leitura: aviso com "Tentar de novo", sem montar a tela', async () => {
     const recarregar = vi.fn()
     rota('despesas-operacionais', { status: 'erro', recarregar })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.queryByText('Tela de despesas')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }))
     expect(recarregar).toHaveBeenCalledOnce()
   })

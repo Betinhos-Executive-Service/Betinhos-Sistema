@@ -57,8 +57,10 @@ export async function nomesDosPapeis(client: DataverseClient, userId?: string): 
     client.request<Linhas<{ name: string }>>(`systemusers(${uid})/systemuserroles_association?$select=name`),
     client.request<Linhas<{ teamid: string }>>(`systemusers(${uid})/teammembership_association?$select=teamid`),
   ])
-  const deEquipe = await Promise.all(equipes.value.map((e) => client.request<Linhas<{ name: string }>>(`teams(${e.teamid})/teamroles_association?$select=name`)))
-  return [...diretos.value, ...deEquipe.flatMap((r) => r.value)].map((r) => r.name)
+  // Equipe ilegível conta como sem papéis; falha no WhoAmI, nos papéis diretos ou na lista de equipes continua sendo erro.
+  const deEquipe = await Promise.allSettled(equipes.value.map((e) => client.request<Linhas<{ name: string }>>(`teams(${e.teamid})/teamroles_association?$select=name`)))
+  const herdados = deEquipe.flatMap((r) => (r.status === 'fulfilled' ? r.value.value : []))
+  return [...diretos.value, ...herdados].map((r) => r.name)
 }
 
 /** `?acessos=financeiro:operador,rh:gestor,acessos` | `nenhum` | `erro`; sem o parâmetro, todos os perfis. */

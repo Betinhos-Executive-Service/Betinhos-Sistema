@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Host } from '../host'
 import { acessoPorPapeis, SEM_ACESSO, type Acesso } from '../pages/app-motoristas/domain/acesso'
-import { lerPapeisDiretos } from './papeisUsuario'
+import { nomesDosPapeis } from './acessos'
 
 const TUDO: Acesso = { gestor: true, admin: true }
 
@@ -11,7 +11,7 @@ const leituras = new WeakMap<Host, Promise<Acesso>>()
 function lerAcesso(host: Extract<Host, { mode: 'dataverse' }>): Promise<Acesso> {
   let leitura = leituras.get(host)
   if (!leitura) {
-    leitura = lerPapeisDiretos(host).then(acessoPorPapeis)
+    leitura = nomesDosPapeis(host.client).then(acessoPorPapeis)
     leitura.catch(() => leituras.delete(host))
     leituras.set(host, leitura)
   }
