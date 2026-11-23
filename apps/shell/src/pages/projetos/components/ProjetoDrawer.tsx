@@ -3,120 +3,108 @@ import { cleanId } from '@betinhos/dataverse'
 import { Alert, Button, Dialog, Drawer, useToast } from '@betinhos/ui'
 import { BotaoAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 import type { Source } from '../data/source'
-import { applyForm, diffForm, emptyForm, emptyProjeto, hasChanges, isDirty, toForm, validateForm, type FormErrors, type ProjetoForm as FormValues } from '../domain/form'
-import { doProjeto } from '../domain/regras'
-import type { Atualizacao, Projeto } from '../domain/types'
-import { NovaAtualizacao } from './NovaAtualizacao'
+import { applyProjeto, diffProjeto, emptyProjetoForm, hasChanges, projetoSujo, toProjetoForm, validateProjeto, type ProjetoErrors, type ProjetoForm as FormValues } from '../domain/form'
+import type { Projeto } from '../domain/types'
 import { ProjetoForm } from './ProjetoForm'
-import { Timeline } from './Timeline'
 
 export type DrawerTarget = { mode: 'view' | 'edit'; id: string } | { mode: 'create' } | null
 
 type Props = {
+  /** `novo=1` cadastra; `editar=<id>` edita. `ver` é do painel lateral e não abre o drawer. */
   target: DrawerTarget
-  onTarget: (target: DrawerTarget) => void
-  list: Projeto[]
-  atualizacoes: Atualizacao[]
+  onClose: () => void
+  /** Depois de salvar: o id do projeto (o painel passa a mostrar ele). */
+  onDone: (id: string) => void
+  projetos: Projeto[]
   source: Source
   onSaved: (p: Projeto) => void
-  onAtualizacao: (a: Atualizacao) => void
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
+const vazioProjeto = (id: string, codigo: string): Projeto => ({ id, codigo, nome: '', area: '', responsavel: '', briefing: '', instrucoes: '' })
 
-/** Cadastro, edição e acompanhamento no mesmo drawer; fechar com alteração pede confirmação; salvando não fecha. */
-export function ProjetoDrawer({ target, onTarget, list, atualizacoes, source, onSaved, onAtualizacao }: Props) {
+/** Cadastro e edição do projeto (nome, área, responsável, briefing, instruções). O detalhe fica no painel lateral. */
+export function ProjetoDrawer({ target, onClose, onDone, projetos, source, onSaved }: Props) {
   const toast = useToast()
   const formId = useId()
   const creating = target?.mode === 'create'
-  const targetId = target && target.mode !== 'create' ? cleanId(target.id) : null
-  const current = targetId ? list.find((p) => cleanId(p.id) === targetId) ?? null : null
-  const key = target == null ? null : target.mode === 'create' ? 'create' : current ? `item:${current.id}` : null
+  const targetId = target?.mode === 'edit' ? cleanId(target.id) : null
+  const current = targetId ? projetos.find((p) => cleanId(p.id) === targetId) ?? null : null
+  const aberto = target != null && target.mode !== 'view'
+  const key = !aberto ? null : creating ? 'create' : current ? `item:${current.id}` : null
 
   const [ready, setReady] = useState<string | null>(null)
-  const [base, setBase] = useState<FormValues>(emptyForm)
+  const [base, setBase] = useState<FormValues>(emptyProjetoForm)
   const [form, setForm] = useState<FormValues>(base)
-  const [errors, setErrors] = useState<FormErrors>({})
+  const [errors, setErrors] = useState<ProjetoErrors>({})
   const [saving, setSaving] = useState(false)
-  const [busy, setBusy] = useState(false)
   const [pendingExit, setPendingExit] = useState(false)
 
   useEffect(() => {
     if (!key) { setReady(null); return }
-    const start = current ? toForm(current) : emptyForm()
+    const start = current ? toProjetoForm(current) : emptyProjetoForm()
     setBase(start); setForm(start); setErrors({}); setReady(key)
   }, [key])
 
   const open = key != null && ready === key
-  const dirty = open && isDirty(base, form)
-  const doProj = current ? doProjeto(atualizacoes, current.id) : []
+  const dirty = open && projetoSujo(base, form)
 
   function close() {
     if (saving) return
-    if (busy) { toast({ tone: 'info', message: 'Aguarde o envio da atualização terminar.' }); return }
     if (dirty) { setPendingExit(true); return }
-    onTarget(null)
+    onClose()
   }
 
   async function save() {
     if (saving) return
-    const found = validateForm(form, doProj)
+    const found = validateProjeto(form)
     setErrors(found)
     if (Object.keys(found).length) { document.getElementById(formId)?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); return }
     setSaving(true)
     try {
       if (creating) {
-        const id = await source.create(diffForm(null, form))
-        const saved = applyForm(emptyProjeto(id), form)
+        const { id, codigo } = await source.createProjeto(diffProjeto(null, form))
+        const saved = applyProjeto(vazioProjeto(id, codigo), form)
         onSaved(saved)
-        toast({ tone: 'success', message: `Projeto ${saved.nome} cadastrado.` })
+        setBase(form)
+        toast({ tone: 'success', message: `Projeto ${saved.codigo} cadastrado. Agora anexe prints ou grave um áudio no briefing.` })
+        onDone(id)
       } else if (current) {
-        const changes = diffForm(base, form)
-        if (hasChanges(changes)) await source.update(current.id, changes)
-        const saved = applyForm(current, form)
-        onSaved(saved)
-        toast({ tone: 'success', message: `Projeto ${saved.nome} salvo.` })
+        const changes = diffProjeto(base, form)
+        if (hasChanges(changes)) await source.updateProjeto(current.id, changes)
+        onSaved(applyProjeto(current, form))
+        setBase(form)
+        toast({ tone: 'success', message: `Projeto ${current.codigo} salvo.` })
+        onDone(current.id)
       }
-      setBase(form)
-      onTarget(null)
     } catch (reason) {
       toast({ tone: 'danger', message: `Não foi possível salvar. Nada foi perdido do formulário. ${reasonText(reason)}` })
     } finally { setSaving(false) }
   }
 
-  const missing = target != null && !creating && !current
-  const title = creating ? 'Novo projeto' : current?.nome || 'Projeto'
-  const footer = missing ? <Button variant="secondary" onClick={() => onTarget(null)}>Voltar à lista</Button> : (
+  const missing = aberto && !creating && !current
+  const title = creating ? 'Novo projeto' : current ? `${current.codigo} · ${current.nome || 'Projeto'}` : 'Projeto'
+  const footer = missing ? <Button variant="secondary" onClick={onClose}>Voltar à lista</Button> : (
     <>
-      <Button variant="secondary" disabled={saving} onClick={close}>Cancelar</Button>
+      <Button variant="secondary" disabled={saving} onClick={close}>{creating || projetoSujo(base, form) ? 'Cancelar' : 'Fechar'}</Button>
       <Button type="submit" form={formId} loading={saving}>{creating ? 'Cadastrar projeto' : 'Salvar alterações'}</Button>
     </>
   )
 
   return (
     <>
-      <Drawer actions={<BotaoAuditoria entity="cr40f_projeto" ids={[current?.id]} name={title} />} open={target != null} onClose={close} size="wide" eyebrow="Projetos" title={title} footer={footer}>
+      <Drawer actions={<BotaoAuditoria entity="cr40f_projeto" ids={[current?.id]} name={title} />} open={aberto} onClose={close} size="wide" eyebrow="Projetos" title={title} footer={footer}>
         {missing
           ? <Alert tone="warning" title="Projeto não encontrado">O link pode ser de um projeto de outro ambiente ou já removido. Atualize a lista e procure pela busca.</Alert>
           : open ? <ProjetoForm formId={formId} form={form} errors={errors} onChange={setForm} onSubmit={() => void save()} disabled={saving} /> : null}
-        {open && !missing ? (
-          <section className="pj-sec" aria-labelledby={`${formId}-hist`}>
-            <h3 id={`${formId}-hist`} className="pj-form__legend">Linha do tempo</h3>
-            {creating ? <p className="pj-muted">As atualizações ficam disponíveis depois de cadastrar o projeto.</p> : current ? (
-              <>
-                <NovaAtualizacao projetoId={current.id} source={source} onSaved={onAtualizacao} onBusy={setBusy} />
-                <Timeline itens={doProj} source={source} />
-              </>
-            ) : null}
-          </section>
-        ) : null}
+        {open && !missing && creating ? <p className="pj-muted">Prints, áudio e etapas ficam no painel do projeto depois de cadastrar.</p> : null}
       </Drawer>
       <Dialog open={pendingExit} onClose={() => setPendingExit(false)} title="Descartar alterações?"
         actions={<>
           <Button variant="secondary" onClick={() => setPendingExit(false)}>Continuar editando</Button>
-          <Button variant="danger" onClick={() => { setPendingExit(false); setForm(base); onTarget(null) }}>Descartar</Button>
+          <Button variant="danger" onClick={() => { setPendingExit(false); setForm(base); onClose() }}>Descartar</Button>
         </>}>
-        {creating ? 'O cadastro deste projeto ainda não foi salvo.' : 'As alterações deste projeto ainda não foram salvas.'}
+        {creating ? 'O cadastro deste projeto ainda não foi salvo.' : 'Há alterações neste projeto que ainda não foram salvas.'}
       </Dialog>
     </>
   )

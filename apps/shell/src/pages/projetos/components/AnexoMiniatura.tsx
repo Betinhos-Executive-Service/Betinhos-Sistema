@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { FileText, Film, ImageOff, LoaderCircle } from 'lucide-react'
+import { Button } from '@betinhos/ui'
+import { FileText, Film, ImageOff, LoaderCircle, Volume2 } from 'lucide-react'
 import type { Source } from '../data/source'
 import { ehImagem, ehVideo } from '../domain/anexos'
 import type { Anexo } from '../domain/types'
@@ -43,5 +44,25 @@ export function AnexoMiniatura({ anexo, source }: Props) {
       </span>
       <span className="pj-anexo__nome">{anexo.nome}</span>
     </button>
+  )
+}
+
+/** Áudio anexado: baixa só quando pedem para ouvir e mostra o player. */
+export function AnexoAudio({ anexo, source }: Props) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [estado, setEstado] = useState<'parado' | 'carregando' | 'erro'>('parado')
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
+
+  async function ouvir() {
+    setEstado('carregando')
+    try { setUrl(URL.createObjectURL(await source.baixarAnexo(anexo))); setEstado('parado') } catch { setEstado('erro') }
+  }
+
+  return (
+    <div className="pj-audio">
+      {url ? <audio className="pj-audio__player" controls autoPlay src={url} aria-label={`Áudio ${anexo.nome}`} />
+        : <Button variant="secondary" size="compact" icon={<Volume2 size={16} />} loading={estado === 'carregando'} onClick={() => void ouvir()} aria-label={`Ouvir áudio ${anexo.nome}`}>Ouvir áudio</Button>}
+      {estado === 'erro' ? <span className="pj-muted">Não foi possível baixar o áudio.</span> : null}
+    </div>
   )
 }

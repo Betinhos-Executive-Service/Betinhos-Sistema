@@ -1,33 +1,66 @@
-import { useRef, useState } from 'react'
-import { Alert, Button, Checkbox, Dialog, Field, Select, Textarea, useToast, type SelectOption } from '@betinhos/ui'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Button, Checkbox, Dialog, Field, Textarea, useToast } from '@betinhos/ui'
 import { Paperclip, X } from 'lucide-react'
 import type { Source } from '../data/source'
-import { AUTOR, AUTOR_OPTIONS } from '../domain/choices'
+import { autorLabel } from '../domain/choices'
 import { MAX_ANEXOS, erroDoAnexo } from '../domain/anexos'
 import type { Atualizacao } from '../domain/types'
+import { GravadorAudio } from './GravadorAudio'
 
-type Props = { projetoId: string; source: Source; onSaved: (a: Atualizacao) => void; onBusy: (busy: boolean) => void }
+type Props = {
+  projetoId: string
+  /** null = briefing/comentário do projeto (sem marca de prova). */
+  etapaId: string | null
+  /** Autor gravado: o do perfil de quem usa a tela. */
+  autor: number
+  source: Source
+  onSaved: (a: Atualizacao) => void
+  onBusy: (busy: boolean) => void
+  /** Avisa o drawer que há texto ou anexo não registrado (para pedir "Descartar alterações?"). */
+  onDirty?: (dirty: boolean) => void
+  /** Rótulo do botão que abre o formulário. */
+  rotulo?: string
+  /** Pedido de fora (ações do painel): cada `n` novo abre o formulário, com a prova marcada ou já gravando. */
+  pedido?: { n: number; prova?: boolean; gravar?: boolean }
+  /** Sem o botão próprio: o formulário só abre pelo `pedido`. */
+  semBotao?: boolean
+}
 
-const AUTOR_SELECT: SelectOption[] = AUTOR_OPTIONS.map((o) => ({ value: String(o.value), label: o.label }))
 const agoraIso = () => { const d = new Date(), p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00` }
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
-/** "Nova atualização": texto, autor, marca de prova e anexos (imagem, vídeo ou PDF, até 5 MB cada). */
-export function NovaAtualizacao({ projetoId, source, onSaved, onBusy }: Props) {
+/** "Nova atualização": texto, marca de prova (só em etapa), anexos e áudio gravado (até 5 MB cada). */
+export function NovaAtualizacao({ projetoId, etapaId, autor, source, onSaved, onBusy, onDirty, rotulo = 'Nova atualização', pedido, semBotao }: Props) {
   const toast = useToast()
   const input = useRef<HTMLInputElement>(null)
   const [aberto, setAberto] = useState(false)
   const [texto, setTexto] = useState('')
-  const [autor, setAutor] = useState(String(AUTOR.renan))
   const [prova, setProva] = useState(false)
   const [arquivos, setArquivos] = useState<File[]>([])
+  const [audio, setAudio] = useState<File | null>(null)
+  const [gravador, setGravador] = useState(0)
   const [avisos, setAvisos] = useState<string[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [descartar, setDescartar] = useState(false)
+  const [autoGravar, setAutoGravar] = useState(false)
 
-  const sujo = Boolean(texto.trim() || arquivos.length || prova)
-  const reset = () => { setTexto(''); setAutor(String(AUTOR.renan)); setProva(false); setArquivos([]); setAvisos([]); setErro(null); setAberto(false) }
+  useEffect(() => {
+    if (!pedido?.n) return
+    setAberto(true)
+    if (pedido.prova && etapaId) setProva(true)
+    if (pedido.gravar) { setAutoGravar(true); setGravador((n) => n + 1) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedido?.n])
+
+  const todos = audio ? [...arquivos, audio] : arquivos
+  const sujo = Boolean(texto.trim() || todos.length || prova)
+  useEffect(() => { onDirty?.(sujo) }, [sujo, onDirty])
+  useEffect(() => () => onDirty?.(false), [onDirty])
+
+  const reset = () => {
+    setTexto(''); setProva(false); setArquivos([]); setAudio(null); setGravador((n) => n + 1); setAutoGravar(false); setAvisos([]); setErro(null); setAberto(false)
+  }
 
   function escolher(files: FileList | null) {
     const novos: File[] = []
@@ -35,7 +68,7 @@ export function NovaAtualizacao({ projetoId, source, onSaved, onBusy }: Props) {
     for (const f of Array.from(files ?? [])) {
       const e = erroDoAnexo(f)
       if (e) problemas.push(e)
-      else if (arquivos.length + novos.length >= MAX_ANEXOS) { problemas.push(`Máximo de ${MAX_ANEXOS} arquivos por atualização.`); break }
+      else if (todos.length + novos.length >= MAX_ANEXOS) { problemas.push(`Máximo de ${MAX_ANEXOS} arquivos por atualização.`); break }
       else novos.push(f)
     }
     setAvisos(problemas)
@@ -43,13 +76,19 @@ export function NovaAtualizacao({ projetoId, source, onSaved, onBusy }: Props) {
     if (input.current) input.current.value = ''
   }
 
+  function gravado(f: File | null) {
+    const e = f ? erroDoAnexo(f) : null
+    setAvisos(e ? [e] : [])
+    setAudio(e ? null : f)
+  }
+
   async function salvar() {
     if (salvando) return
-    if (!texto.trim() && !arquivos.length) { setErro('Escreva o texto da atualização ou anexe um arquivo.'); return }
-    if (prova && !arquivos.length) { setErro('Uma prova precisa de ao menos um anexo (print, foto ou vídeo).'); return }
+    if (!texto.trim() && !todos.length) { setErro('Escreva o texto da atualização, anexe um arquivo ou grave um áudio.'); return }
+    if (prova && !todos.length) { setErro('Uma prova precisa de ao menos um anexo (print, foto ou vídeo).'); return }
     setErro(null); setSalvando(true); onBusy(true)
     try {
-      const a = await source.addAtualizacao({ projetoId, data: agoraIso(), autor: Number(autor), texto: texto.trim(), prova }, arquivos)
+      const a = await source.addAtualizacao({ projetoId, etapaId, data: agoraIso(), autor, texto: texto.trim(), prova: etapaId ? prova : false }, todos)
       onSaved(a)
       toast({ tone: 'success', message: 'Atualização registrada.' })
       reset()
@@ -58,21 +97,20 @@ export function NovaAtualizacao({ projetoId, source, onSaved, onBusy }: Props) {
     } finally { setSalvando(false); onBusy(false) }
   }
 
-  if (!aberto) return <Button variant="secondary" icon={<Paperclip size={16} />} onClick={() => setAberto(true)}>Nova atualização</Button>
+  if (!aberto) return semBotao ? null : <Button variant="secondary" icon={<Paperclip size={16} />} onClick={() => setAberto(true)}>{rotulo}</Button>
   return (
-    <div className="pj-nova" role="group" aria-label="Nova atualização">
-      <Field label="Texto" hint="O que mudou, o que foi provado ou o que falta.">
+    <div className="pj-nova" role="group" aria-label={rotulo}>
+      <Field label="Texto" hint={etapaId ? 'O que mudou, o que foi provado ou o que falta.' : 'Complemento do briefing: explique o pedido, anexe prints ou grave um áudio.'}>
         <Textarea name="atualizacaoTexto" rows={3} value={texto} disabled={salvando} onChange={(e) => setTexto(e.target.value)} />
       </Field>
-      <Field label="Autor">
-        <Select name="atualizacaoAutor" options={AUTOR_SELECT} searchable={false} clearable={false} disabled={salvando} value={autor} onChange={(v) => setAutor(v ?? String(AUTOR.renan))} />
-      </Field>
-      <Checkbox checked={prova} disabled={salvando} onChange={(e) => setProva(e.target.checked)} label="É prova (libera o Concluído)" />
+      <p className="pj-muted">Registrado como <strong>{autorLabel(autor)}</strong>.</p>
+      {etapaId ? <Checkbox checked={prova} disabled={salvando} onChange={(e) => setProva(e.target.checked)} label="É prova (libera o Concluída desta etapa)" /> : null}
       <div className="pj-nova__arquivos">
-        <input ref={input} type="file" multiple hidden accept="image/*,video/*,application/pdf" aria-label="Escolher anexos" onChange={(e) => escolher(e.target.files)} />
+        <input ref={input} type="file" multiple hidden accept="image/*,video/*,audio/*,application/pdf" aria-label="Escolher anexos" onChange={(e) => escolher(e.target.files)} />
         <Button variant="secondary" icon={<Paperclip size={16} />} disabled={salvando} onClick={() => input.current?.click()}>Anexar arquivos</Button>
-        <span className="pj-muted">Imagem, vídeo ou PDF, até 5 MB cada.</span>
+        <span className="pj-muted">Imagem, vídeo, áudio ou PDF, até 5 MB cada.</span>
       </div>
+      <GravadorAudio key={gravador} onChange={gravado} disabled={salvando} autoIniciar={autoGravar} />
       {arquivos.length ? (
         <ul className="pj-nova__lista" aria-label="Arquivos escolhidos">
           {arquivos.map((f, i) => (

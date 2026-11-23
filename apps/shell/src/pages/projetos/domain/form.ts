@@ -1,30 +1,15 @@
 import type { Row } from '@betinhos/dataverse'
 import { STATUS } from './choices'
 import { erroDeStatus } from './regras'
-import type { Atualizacao, Projeto } from './types'
-
-/** Valores do formulário como texto; '' = vazio; status como string do número. */
-export type ProjetoForm = { nome: string; area: string; status: string; responsavel: string; prazo: string; andamento: string; linkPr: string; instrucoes: string }
-export type FormKey = keyof ProjetoForm
-export type FormErrors = Partial<Record<FormKey, string>>
+import type { Atualizacao, Etapa, Perfil, Projeto } from './types'
 
 /** Tamanhos das colunas (migration). */
-export const MAX_LENGTH = { nome: 200, area: 100, responsavel: 100, linkPr: 500, instrucoes: 100000 } as const
+export const MAX_LENGTH = { nome: 200, area: 100, responsavel: 100, briefing: 100000, instrucoes: 100000, descricao: 20000, linkPr: 500 } as const
 
-const COLUMNS = {
-  nome: 'cr40f_name', area: 'cr40f_area', status: 'cr40f_status', responsavel: 'cr40f_responsavel',
-  prazo: 'cr40f_prazo', andamento: 'cr40f_andamento', linkPr: 'cr40f_linkpr', instrucoes: 'cr40f_instrucoes',
-} as const
-
-export const emptyProjeto = (id: string): Projeto => ({ id, nome: '', area: '', status: STATUS.ideia, responsavel: '', prazo: null, andamento: 0, linkPr: '', instrucoes: '' })
-export const emptyForm = (): ProjetoForm => ({ nome: '', area: '', status: String(STATUS.ideia), responsavel: '', prazo: '', andamento: '0', linkPr: '', instrucoes: '' })
-
-export const toForm = (p: Projeto): ProjetoForm => ({
-  nome: p.nome, area: p.area, status: p.status == null ? '' : String(p.status), responsavel: p.responsavel,
-  prazo: p.prazo ?? '', andamento: String(p.andamento), linkPr: p.linkPr, instrucoes: p.instrucoes,
-})
-
-export const isDirty = (a: ProjetoForm, b: ProjetoForm) => (Object.keys(a) as FormKey[]).some((k) => a[k] !== b[k])
+const mudou = <F extends Record<string, string>>(a: F, b: F) => (Object.keys(a) as (keyof F)[]).some((k) => a[k] !== b[k])
+const maxLen = (e: Record<string, string | undefined>, f: Record<string, string>, chaves: (keyof typeof MAX_LENGTH)[]) => {
+  for (const k of chaves) if ((f[k] ?? '').length > MAX_LENGTH[k]) e[k] = `No máximo ${MAX_LENGTH[k]} caracteres.`
+}
 
 /** `aaaa-mm-dd` que existe no calendário (rejeita 2026-02-30). */
 function dataValida(s: string): boolean {
@@ -39,42 +24,88 @@ export function urlValida(s: string): boolean {
   try { const u = new URL(s); return u.protocol === 'https:' || u.protocol === 'http:' } catch { return false }
 }
 
-/** Erros por campo; a regra do Concluído usa as atualizações do projeto (cadastro novo não tem nenhuma). */
-export function validateForm(f: ProjetoForm, atualizacoes: Atualizacao[]): FormErrors {
-  const e: FormErrors = {}
+/* ---------- Projeto ---------- */
+
+export type ProjetoForm = { nome: string; area: string; responsavel: string; briefing: string; instrucoes: string }
+export type ProjetoErrors = Partial<Record<keyof ProjetoForm, string>>
+
+const PROJETO_COLUNAS: Record<keyof ProjetoForm, string> = {
+  nome: 'cr40f_name', area: 'cr40f_area', responsavel: 'cr40f_responsavel', briefing: 'cr40f_briefing', instrucoes: 'cr40f_instrucoes',
+}
+
+export const emptyProjetoForm = (): ProjetoForm => ({ nome: '', area: '', responsavel: '', briefing: '', instrucoes: '' })
+export const toProjetoForm = (p: Projeto): ProjetoForm => ({ nome: p.nome, area: p.area, responsavel: p.responsavel, briefing: p.briefing, instrucoes: p.instrucoes })
+export const projetoSujo = (a: ProjetoForm, b: ProjetoForm) => mudou(a, b)
+
+export function validateProjeto(f: ProjetoForm): ProjetoErrors {
+  const e: ProjetoErrors = {}
+  maxLen(e, f, ['nome', 'area', 'responsavel', 'briefing', 'instrucoes'])
   if (!f.nome.trim()) e.nome = 'Informe o nome do projeto.'
-  else if (f.nome.length > MAX_LENGTH.nome) e.nome = `No máximo ${MAX_LENGTH.nome} caracteres.`
-  if (f.area.length > MAX_LENGTH.area) e.area = `No máximo ${MAX_LENGTH.area} caracteres.`
-  if (f.responsavel.length > MAX_LENGTH.responsavel) e.responsavel = `No máximo ${MAX_LENGTH.responsavel} caracteres.`
-  if (!f.status) e.status = 'Escolha o status.'
-  else { const aviso = erroDeStatus(Number(f.status), atualizacoes); if (aviso) e.status = aviso }
-  if (f.prazo && !dataValida(f.prazo)) e.prazo = 'Data inválida.'
-  const pct = f.andamento.trim()
-  if (!/^\d{1,3}$/.test(pct) || Number(pct) > 100) e.andamento = 'Informe um número de 0 a 100.'
-  if (f.linkPr.trim() && !urlValida(f.linkPr.trim())) e.linkPr = 'Use um link completo, começando com https://.'
-  else if (f.linkPr.length > MAX_LENGTH.linkPr) e.linkPr = `No máximo ${MAX_LENGTH.linkPr} caracteres.`
-  if (f.instrucoes.length > MAX_LENGTH.instrucoes) e.instrucoes = `No máximo ${MAX_LENGTH.instrucoes} caracteres.`
   return e
 }
 
 /** Colunas que mudaram (cadastro novo: todas as preenchidas). Vazio vira null para limpar a coluna. */
-export function diffForm(base: ProjetoForm | null, f: ProjetoForm): Row {
+export function diffProjeto(base: ProjetoForm | null, f: ProjetoForm): Row {
   const out: Row = {}
-  for (const key of Object.keys(COLUMNS) as FormKey[]) {
-    if (base && base[key] === f[key]) continue
-    const raw = key === 'nome' ? f[key].trim() : f[key]
-    if (key === 'status') out[COLUMNS[key]] = Number(raw)
-    else if (key === 'andamento') out[COLUMNS[key]] = Number(raw)
-    else if (key === 'linkPr') out[COLUMNS[key]] = raw.trim() || null
-    else out[COLUMNS[key]] = raw === '' ? (base ? null : undefined) : raw
+  for (const k of Object.keys(PROJETO_COLUNAS) as (keyof ProjetoForm)[]) {
+    if (base && base[k] === f[k]) continue
+    const v = k === 'nome' ? f[k].trim() : f[k]
+    if (v !== '') out[PROJETO_COLUNAS[k]] = v
+    else if (base) out[PROJETO_COLUNAS[k]] = null
   }
-  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k]
   return out
 }
 
-export const hasChanges = (c: Row) => Object.keys(c).length > 0
+export const applyProjeto = (p: Projeto, f: ProjetoForm): Projeto => ({ ...p, ...f, nome: f.nome.trim() })
 
-export const applyForm = (p: Projeto, f: ProjetoForm): Projeto => ({
-  ...p, nome: f.nome.trim(), area: f.area, status: f.status ? Number(f.status) : null, responsavel: f.responsavel,
-  prazo: f.prazo || null, andamento: Number(f.andamento), linkPr: f.linkPr.trim(), instrucoes: f.instrucoes,
+/* ---------- Etapa ---------- */
+
+export type EtapaForm = { nome: string; status: string; descricao: string; prazo: string; andamento: string; linkPr: string }
+export type EtapaErrors = Partial<Record<keyof EtapaForm, string>>
+
+const ETAPA_COLUNAS: Record<keyof EtapaForm, string> = {
+  nome: 'cr40f_name', status: 'cr40f_status', descricao: 'cr40f_descricao', prazo: 'cr40f_prazo', andamento: 'cr40f_andamento', linkPr: 'cr40f_linkpr',
+}
+
+/** Etapa nova nasce em Ideia (quem cria não escolhe status). */
+export const emptyEtapaForm = (): EtapaForm => ({ nome: '', status: String(STATUS.ideia), descricao: '', prazo: '', andamento: '0', linkPr: '' })
+export const toEtapaForm = (e: Etapa): EtapaForm => ({
+  nome: e.nome, status: String(e.status), descricao: e.descricao, prazo: e.prazo ?? '', andamento: String(e.andamento), linkPr: e.linkPr,
 })
+export const etapaSuja = (a: EtapaForm, b: EtapaForm) => mudou(a, b)
+
+/** Erros por campo; a troca de status segue `erroDeStatus` (perfil e prova da própria etapa). */
+export function validateEtapa(f: EtapaForm, ctx: { base: EtapaForm | null; perfil: Perfil; etapaId: string | null; atualizacoes: Atualizacao[] }): EtapaErrors {
+  const e: EtapaErrors = {}
+  maxLen(e, f, ['nome', 'descricao', 'linkPr'])
+  if (!f.nome.trim()) e.nome = 'Informe o nome da etapa.'
+  const atual = Number(ctx.base?.status ?? STATUS.ideia)
+  const aviso = ctx.etapaId
+    ? erroDeStatus({ novo: Number(f.status), atual, perfil: ctx.perfil, etapaId: ctx.etapaId, atualizacoes: ctx.atualizacoes })
+    : (Number(f.status) === STATUS.ideia ? null : 'Etapa nova nasce em Ideia.')
+  if (aviso) e.status = aviso
+  if (f.prazo && !dataValida(f.prazo)) e.prazo = 'Data inválida.'
+  const pct = f.andamento.trim()
+  if (!/^\d{1,3}$/.test(pct) || Number(pct) > 100) e.andamento = 'Informe um número de 0 a 100.'
+  if (f.linkPr.trim() && !urlValida(f.linkPr.trim())) e.linkPr = 'Use um link completo, começando com https://.'
+  return e
+}
+
+/** Colunas que mudaram; cadastro novo leva também projeto, número, código e status Ideia. */
+export function diffEtapa(base: EtapaForm | null, f: EtapaForm): Row {
+  const out: Row = {}
+  for (const k of Object.keys(ETAPA_COLUNAS) as (keyof EtapaForm)[]) {
+    if (base && base[k] === f[k]) continue
+    const raw = k === 'nome' || k === 'linkPr' ? f[k].trim() : f[k]
+    if (k === 'status' || k === 'andamento') out[ETAPA_COLUNAS[k]] = Number(raw)
+    else if (raw !== '') out[ETAPA_COLUNAS[k]] = raw
+    else if (base) out[ETAPA_COLUNAS[k]] = null
+  }
+  return out
+}
+
+export const applyEtapa = (e: Etapa, f: EtapaForm): Etapa => ({
+  ...e, nome: f.nome.trim(), status: Number(f.status), descricao: f.descricao, prazo: f.prazo || null, andamento: Number(f.andamento), linkPr: f.linkPr.trim(),
+})
+
+export const hasChanges = (c: Row) => Object.keys(c).length > 0
