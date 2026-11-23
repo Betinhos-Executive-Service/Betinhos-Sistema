@@ -1,0 +1,59 @@
+/* Projetos: lista, cards, drawer e linha do tempo. Só tokens do Design System. */
+.pj-num { font-variant-numeric: tabular-nums; }
+.pj-muted { margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.pj-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1); }
+.pj-spin { animation: pj-spin 1s linear infinite; }
+@keyframes pj-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pj-spin { animation: none; } }
+
+.pj-open { display: block; max-width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.pj-open strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.pj-table .bt-table__cell { white-space: nowrap; }
+.pj-table .bt-table__cell > * { min-width: 0; max-width: 100%; overflow: clip; overflow-clip-margin: 4px; text-overflow: ellipsis; }
+.pj-open:focus-visible, .pj-card__open:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-table .bt-table__row:not(.bt-table__row--loading), .pj-card { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) {
+  .pj-table .bt-table__row:not(.bt-table__row--loading):hover, .pj-card:hover { background-color: var(--bt-color-surface-soft); }
+  .pj-open:hover strong { color: var(--bt-color-action); }
+}
+
+/* Barra de andamento com o número ao lado. */
+.pj-prog { display: inline-flex; align-items: center; gap: var(--bt-space-2); }
+.pj-prog__bar { display: block; width: 72px; height: 6px; overflow: hidden; border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); border: var(--bt-border-width-default) solid var(--bt-color-border); }
+.pj-prog__bar > span { display: block; height: 100%; background-color: var(--bt-color-action); }
+
+.pj-cards { display: grid; gap: var(--bt-space-2); margin: 0; padding: 0; list-style: none; }
+.pj-card { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.pj-card__open { display: grid; gap: var(--bt-space-1); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-3) var(--bt-space-3) var(--bt-space-2); border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pj-card__name { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-brand); }
+.pj-card__meta { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.pj-card__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: 0 var(--bt-space-3) var(--bt-space-3); }
+
+/* Formulário */
+.pj-form { display: grid; gap: var(--bt-space-4); }
+.pj-form__section { display: grid; gap: var(--bt-space-3); margin: 0; padding: 0; border: 0; min-width: 0; }
+.pj-form__legend { margin: 0 0 var(--bt-space-2); padding: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text); }
+.pj-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bt-space-3); }
+.pj-form__wide { grid-column: 1 / -1; }
+@media (max-width: 560px) { .pj-form__grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Linha do tempo e nova atualização */
+.pj-sec { display: grid; gap: var(--bt-space-3); margin-top: var(--bt-space-5); padding-top: var(--bt-space-4); border-top: var(--bt-border-width-default) solid var(--bt-color-border); }
+.pj-nova { display: grid; gap: var(--bt-space-3); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-soft); }
+.pj-nova__arquivos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.pj-nova__lista { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; font-size: var(--bt-font-size-13); }
+.pj-nova__lista li { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); overflow-wrap: anywhere; }
+.pj-nova__rm { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.pj-nova__rm:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-nova__acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--bt-space-2); }
+
+.pj-timeline { display: grid; gap: var(--bt-space-3); margin: 0; padding: 0; list-style: none; }
+.pj-timeline__item { display: grid; gap: var(--bt-space-2); padding: var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.pj-timeline__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-2); }
+.pj-timeline__texto { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--bt-font-size-13); }
+.pj-anexos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
+.pj-anexo { display: grid; gap: var(--bt-space-1); width: 96px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-sm); }
+.pj-anexo:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.pj-anexo__thumb { display: grid; place-items: center; width: 96px; height: 64px; overflow: hidden; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-surface-soft); color: var(--bt-color-text-secondary); }
+.pj-anexo__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pj-anexo__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }

@@ -39,6 +39,16 @@ Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secre
 
 Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta tabela e leitura pela tabela no consumidor. As chaves Anthropic dos flows migram no PR seguinte (flows).
 
+## Projetos (cr40f_projeto)
+
+Módulo `#/projetos` (Operacional, depois do Planner), de 23/11/2026: o Renan e o gestor acompanham cada projeto (status, andamento, prazo, PR, instruções de uso e provas). Agentes de IA atualizam pelo Dataverse; só o Renan marca Concluído, e só com prova anexada.
+
+- **Schema** (migration `packages/deploy/migrations/20261123-0845-projetos.ps1`, só DEV; o PROD recebe pelas soluções). `cr40f_projeto`: `cr40f_name` (nome), `cr40f_area`, `cr40f_status` (Ideia 100000000, Em andamento 100000001, Em validação 100000002, Concluído 100000003, Pausado 100000004), `cr40f_responsavel`, `cr40f_prazo` (data), `cr40f_andamento` (0 a 100), `cr40f_linkpr` (URL), `cr40f_instrucoes` (memo). `cr40f_projetoatualizacao` (com anotações): `cr40f_name` (título curto), `cr40f_data`, `cr40f_autor` (Renan 100000000, Gestor 100000001, Agente 100000002), `cr40f_texto`, `cr40f_eprova` (Sim/Não) e o lookup obrigatório `cr40f_Projeto` (navegação `cr40f_Projeto`, relação `cr40f_projeto_cr40f_projetoatualizacao_projeto`, exclusão Restrict). Anexos de prova são anotações (`annotations`, `objectid_cr40f_projetoatualizacao@odata.bind`), expandidas por `cr40f_projetoatualizacao_Annotations`.
+- **Regra do Concluído.** Só vale com ao menos uma atualização com `cr40f_eprova = Sim` e pelo menos um anexo. A tela bloqueia o salvamento e mostra o aviso (`domain/regras.ts`). O Dataverse não impõe a regra: um agente ou a Web API gravam `cr40f_status = Concluído` sem prova, então agente nunca marca Concluído e a conferência periódica é de quem acompanha.
+- **Agente atualiza** criando uma linha em `cr40f_projetoatualizacao` (`cr40f_autor = Agente`, `cr40f_Projeto@odata.bind`) e, se houver prova, anotações com `documentbody` em base64 (imagem, vídeo ou PDF, até 5 MB cada); pode ajustar `cr40f_andamento` e o status, menos Concluído.
+- **Privilégios.** Papéis `Acesso-Betinhos-MDA` e `DEV - Usuário` (Global nas duas tabelas). Anotação: criar Basic, ler/anexar Global, para o gestor ver as provas dos agentes; é mais permissivo que o ideal.
+- **Tela.** `apps/shell/src/pages/projetos`: `domain/` (regra, form, lista, anexos), `data/` (Source mock ou Dataverse), `components/`. Modo mock com dados fictícios. Verificação: skill `verificar-projetos`.
+
 ## Ambiente cloud (sessões cloud do Claude Code)
 
 - Ambiente em claude.ai/code: variável `NODE_AUTH_TOKEN` (token GitHub com `read:packages`), sem credenciais do Dataverse. O preparo da VM roda no hook SessionStart (`.claude/hooks/session-start.sh` → `scripts/cloud-setup.sh`, log em `/tmp/cloud-setup.log`), porque o token não chega ao setup script do ambiente; o setup script pode ficar vazio.
