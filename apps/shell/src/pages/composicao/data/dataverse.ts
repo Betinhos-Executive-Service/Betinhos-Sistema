@@ -1,6 +1,6 @@
 import { analyzeFormula, decimal, decimalString, evaluateFormulaSet, FORMULA_ENGINE_VERSION, FormulaError } from '../formula'
 import type { ViewQuery } from './views'
-import { buildCountQuery, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withLinkKeys, withRowLinks, withoutRowLinks } from './composition-query'
+import { buildCountQuery, dedupeLinks, expandLinkAliases, fetchPageSize, nextFetchXmlPage, ROW_LINKS, withBaseAttributes, withFetchPageSize, withLinkKeys, withRowLinks, withoutRowLinks } from './composition-query'
 import { isWritableMoneyField, moneyFields, type ApplyCellInputResult, type CellFormula, type CellInput, type Composition, type DecimalString, type MoneyField } from './compositions'
 import { getMockRows, saveMockCell } from './mock-store'
 import { getXrmHost, type XrmWebApi } from './xrm'
@@ -198,12 +198,20 @@ type RowQuery = { entities: DataverseEntity[]; nextLink?: string; fetchXmlPaging
 /** Consulta FetchXML com os vínculos da linha; sem privilégio na reserva ou no cliente, o Dataverse recusa tudo e a consulta se repete sem eles. */
 async function retrieveWithRowLinks(api: XrmWebApi, query: string): Promise<{ result: RowQuery; query: string; linked: boolean }> {
   const linked = query.startsWith('?fetchXml=') && decodeURIComponent(query.slice('?fetchXml='.length)).includes(`alias="${ROW_LINKS.reserva}"`)
-  try { return { result: await api.retrieveMultipleRecords(compositionTable, query), query, linked } }
+  try { return { result: await retrieveDeduped(api, query), query, linked } }
   catch (error) {
     if (!linked || !isPrivilegeDenied(error)) throw error
     const plain = `?fetchXml=${encodeURIComponent(withoutRowLinks(decodeURIComponent(query.slice('?fetchXml='.length))))}`
-    return { result: await api.retrieveMultipleRecords(compositionTable, plain), query: plain, linked: false }
+    return { result: await retrieveDeduped(api, plain), query: plain, linked: false }
   }
+}
+
+/** Envia o FetchXML com os vínculos repetidos fundidos (limite de 15 link-entity) e devolve as linhas com os aliases originais. */
+async function retrieveDeduped(api: XrmWebApi, query: string): Promise<RowQuery> {
+  if (!query.startsWith('?fetchXml=')) return api.retrieveMultipleRecords(compositionTable, query)
+  const { fetchXml, aliases } = dedupeLinks(decodeURIComponent(query.slice('?fetchXml='.length)))
+  const result: RowQuery = await api.retrieveMultipleRecords(compositionTable, aliases.length ? `?fetchXml=${encodeURIComponent(fetchXml)}` : query)
+  return aliases.length ? { ...result, entities: result.entities.map((row) => expandLinkAliases(row, aliases)) } : result
 }
 
 /** Leitura antiga das reservas, em lotes de 50: só para quem não pode lê-las junto da consulta principal. */
