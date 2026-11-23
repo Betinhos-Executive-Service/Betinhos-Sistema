@@ -38,6 +38,8 @@ jobs:
           # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso,driverrecordsharing,autonumberguard
           # (este último mora em apps/formulario-geral/power-platform/plugins; plannernotifications e quoteautonumberguard, em packages/planner/power-platform/plugins).
           plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar|Betinhos\.(DriverRecordSharing|ExpenseUpload)(\.Tests)?)/.*#\2\4\5#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p; s#^apps/formulario-geral/power-platform/plugins/(AutoNumberGuard)(\.Tests)?/.*#\1#p; s#^packages/planner/power-platform/plugins/(PlannerNotifications|QuoteAutoNumberGuard)(\.Tests)?/.*#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
+          # O casos.json do pacote app-config é lido também pelos testes C# do plugin Acesso (paridade TS/C#).
+          if echo "$arquivos" | grep -qE '^packages/app-config/casos\.json$'; then plugins=$(printf '%s\n%s\n' "$(echo "$plugins" | tr ',' '\n')" acesso | sed '/^$/d' | sort -u | paste -sd, -); fi
           if echo "$arquivos" | grep -qE '^\.github/workflows/ci\.yml$'; then plugins=todos; fi
           echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
           if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
