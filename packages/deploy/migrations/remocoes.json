@@ -48,5 +48,25 @@
     "alvo": "cr40f_provamidia.cr40f_datalida",
     "migration": "20261116-2200-remover-chave-nota-fiscal.ps1",
     "decisao": "Renan, 16/11/2026"
+  },
+  {
+    "alvo": "cr40f_reservadeveculos.cr40f_passageiro1",
+    "migration": "20261123-1900-remover-passageiro1-4.ps1",
+    "decisao": "Renan, 23/11/2026"
+  },
+  {
+    "alvo": "cr40f_reservadeveculos.cr40f_passageiro2",
+    "migration": "20261123-1900-remover-passageiro1-4.ps1",
+    "decisao": "Renan, 23/11/2026"
+  },
+  {
+    "alvo": "cr40f_reservadeveculos.cr40f_passageiro3",
+    "migration": "20261123-1900-remover-passageiro1-4.ps1",
+    "decisao": "Renan, 23/11/2026"
+  },
+  {
+    "alvo": "cr40f_reservadeveculos.cr40f_passageiro4",
+    "migration": "20261123-1900-remover-passageiro1-4.ps1",
+    "decisao": "Renan, 23/11/2026"
   }
 ]
