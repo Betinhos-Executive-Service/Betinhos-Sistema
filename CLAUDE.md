@@ -36,6 +36,7 @@ Decisão do Renan, 10/11/2026: sem Azure (sem Key Vault nem variável tipo Secre
 | `infleet.token` | — (configuração segura do step, fallback) | `Betinhos.DriverRecordSharing` (`ResolveServiceVehiclePlugin`, `SyncCurrentVehiclePlugin`, `HandoverChecklistPlugin`, `TermoMultaCommandPlugin`, via `InfleetGraphQlGateway.ReadToken`) |
 | `link-acompanhamento.worker` | — (configuração segura do step, fallback) | `Betinhos.DriverRecordSharing` (`GenerateTrackingLinkPlugin`, `UpdateTrackingLinkPlugin`, `RevokeTrackingLinkPlugin`, via `TrackingLinkWorkerConfig.Load`); valor é o JSON `{"url":"https://<worker>/api/links","segredo":"..."}` |
 | `stripe.cobranca-qr` | — (configuração segura do step, fallback) | `Betinhos.DriverRecordSharing` (`QrChargePlugin`, via `QrChargeConfig.Load`); valor é a chave `sk_`/`rk_` ou o JSON `{"chave","successUrl"}`; sem chave a cobrança recusa no criar e o liga/desliga continua só em `cr40f_funcionarios.cr40f_podecobrarqrcode` |
+| `groq.transcricao` | — (sem fallback: ausente = áudio fica sem transcrição, só registra no trace) | `Cr40f.Projetos.Plugin` (`TranscreverAudioPlugin`, step assíncrono no Create de annotation, via `SecretReader.ReadTable`); chave da Groq (`whisper-large-v3-turbo`) que transcreve o áudio anexado à `cr40f_projetoatualizacao` em `cr40f_transcricao` |
 
 Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta tabela e leitura pela tabela no consumidor. As chaves Anthropic dos flows migram no PR seguinte (flows).
 
