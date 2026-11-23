@@ -12,7 +12,7 @@ import { useQueryAlvo, useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
 import { createSource } from './data/source'
 import { PESSOA_COLUMNS, TELA, builtinViews, pessoaFields, pessoaKeywordText, readPessoa, sortPessoas } from './domain/lista'
-import type { Dados, Pessoa } from './domain/types'
+import type { Dados, PerfisPessoa, Pessoa } from './domain/types'
 import { AcessosCards, AcessosTable } from './components/AcessosList'
 import { AcessoDrawer } from './components/AcessoDrawer'
 import { HistoricoLista } from './components/HistoricoLista'
@@ -57,7 +57,13 @@ function Acessos({ host }: { host: Host }) {
   const clearAll = () => { clearFilters(); setQuery('') }
   const open = (id: string) => setTarget({ mode: 'view', id })
   const aberta = target && target.mode !== 'create' ? list.find((p) => p.id === target.id) ?? null : null
-  const salvo = () => { setTarget(null); refresh() }
+  const salvo = (perfis: PerfisPessoa) => {
+    const id = target && target.mode !== 'create' ? target.id : null
+    const quando = new Date()
+    if (id) cs.mutate((d) => ({ ...d, pessoas: d.pessoas.map((p) => (p.id === id ? { ...p, perfis, alteradoEm: quando } : p)) }))
+    setTarget(null)
+    refresh()
+  }
 
   let body
   if (cs.error && !ready) {

@@ -5,6 +5,10 @@ import type { Pessoa } from './types'
 const p = (nome: string, extra: Partial<Pessoa> = {}): Pessoa => ({ id: nome, nome, email: `${nome.toLowerCase()}@exemplo.test`, perfis: { areas: {}, acessos: false }, admin: false, alteradoEm: null, ...extra })
 
 describe('lista de acessos', () => {
+  it('o filtro de última alteração usa o dia de São Paulo', () => {
+    expect(readPessoa(p('Ana', { alteradoEm: new Date('2026-11-21T01:00:00Z') }), 'alterado')).toBe('2026-11-20')
+  })
+
   it('lê o nível de cada área para o filtro', () => {
     const pessoa = p('Bruno', { perfis: { areas: { financeiro: 'gestor' }, acessos: true } })
     expect(readPessoa(pessoa, 'financeiro')).toBe('gestor')

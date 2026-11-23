@@ -5,6 +5,18 @@ import type { Host } from '../../host'
 import { AcessosProvider } from '../../app/AcessosProvider'
 import { AcessosPage } from './AcessosPage'
 
+let falharReleitura = false
+vi.mock('./data/source', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('./data/source')>()
+  return {
+    ...mod,
+    createSource: (h: Host) => {
+      const s = mod.createSource(h)
+      return { ...s, load: () => (falharReleitura ? Promise.reject(new Error('Falha na releitura.')) : s.load()) }
+    },
+  }
+})
+
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
 
@@ -13,6 +25,7 @@ const tela = () => render(<AcessosProvider host={host}><AcessosPage host={host} 
 const row = async (nome: string) => (await screen.findAllByText(nome))[0].closest('.bt-table__row') as HTMLElement
 
 beforeEach(() => {
+  falharReleitura = false
   localStorage.clear()
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }))
 })
@@ -51,5 +64,16 @@ describe('AcessosPage', () => {
     const gaveta = await screen.findByRole('dialog', { name: 'Histórico de acessos' })
     expect(gaveta.textContent).toContain('Carla Amostra')
     expect(gaveta.textContent).toContain('Operacional: Operador → Gestor')
+  })
+
+  it('depois de salvar a linha já mostra o perfil novo, mesmo se a releitura falhar', async () => {
+    tela()
+    fireEvent.click((await row('Diego Teste')).querySelectorAll('[role="cell"]')[1])
+    await screen.findByRole('dialog', { name: 'Diego Teste' })
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Operador' })[1])
+    falharReleitura = true
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await screen.findByText('A última atualização falhou')
+    expect((await row('Diego Teste')).textContent).toContain('Financeiro · Operador')
   })
 })

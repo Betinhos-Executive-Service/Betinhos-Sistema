@@ -37,7 +37,7 @@ export function montar(usuarios: Row[], equipes: Row[], historico: Row[], euId: 
     nomePorId.set(id, str(u.fullname))
     return { id, nome: str(u.fullname), email: str(u.internalemailaddress), perfis: perfisDosPapeis(papeis), admin: ehAdmin(papeis) || adminsPorEquipe.has(id) }
   })
-  const quem = (id: string) => nomePorId.get(id) ?? 'Usuário desativado'
+  const quem = (id: string) => nomePorId.get(id) ?? 'Usuário não listado'
   const linhas: Historico[] = historico.map((h) => {
     const usuarioId = cleanId(str(h._cr40f_usuario_value))
     return { id: str(h.cr40f_acessohistoricoid), usuarioId, usuario: quem(usuarioId), alteradoPor: quem(cleanId(str(h._cr40f_alteradopor_value))), antes: doPedido(h.cr40f_perfisantes), depois: doPedido(h.cr40f_perfisdepois), quando: date(h.createdon) }

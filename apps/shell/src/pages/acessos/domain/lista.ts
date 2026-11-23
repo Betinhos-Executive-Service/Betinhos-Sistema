@@ -28,6 +28,10 @@ export function pessoaFields(): FilterField[] {
   ]
 }
 
+const DIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+/** Dia (aaaa-mm-dd) no fuso da tela, para o filtro bater com o que se lê. */
+export const diaSaoPaulo = (d: Date) => DIA.format(d)
+
 export function readPessoa(p: Pessoa, key: string): unknown {
   switch (key) {
     case 'nome': return p.nome
@@ -35,7 +39,7 @@ export function readPessoa(p: Pessoa, key: string): unknown {
     case 'perfis': return rotulos(p.perfis).join(', ')
     case 'acessos': return p.perfis.acessos ? 'sim' : 'nao'
     case 'admin': return p.admin ? 'sim' : 'nao'
-    case 'alterado': return p.alteradoEm ? p.alteradoEm.toISOString().slice(0, 10) : null
+    case 'alterado': return p.alteradoEm ? diaSaoPaulo(p.alteradoEm) : null
     default: return (AREAS as readonly string[]).includes(key) ? (p.perfis.areas[key as (typeof AREAS)[number]] ?? 'nenhum') : null
   }
 }
