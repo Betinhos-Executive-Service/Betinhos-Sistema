@@ -165,7 +165,7 @@ Reversão: devolver os papéis anteriores à equipe (estado salvo no passo anter
 - **Shell:** `temPerfil`, filtro do menu (grupo vazio some, rota sem `perfis` nas áreas restritas reprova), página "Sem acesso", e a tela `#/acessos` em mock (desktop e 375 px).
 - **Prova no DEV com usuário de teste sem administrador**, uma por perfil:
   1. Só com Base: abre o sistema; leitura das tabelas `cr40f_financeiro`, `cr40f_funcionarios` e `cr40f_veiculos` pela Web API devolve 403.
-  2. Financeiro Operador: lê e edita Financeiro com o valor preenchido; excluir devolve 403; `cr40f_funcionarios` devolve 403.
+  2. Financeiro Operador: lê e edita Financeiro com o valor preenchido; excluir devolve 403; `cr40f_funcionarios` abre só para leitura, com CPF e RG vazios; editar devolve 403. Escrita e exclusão são conferidas pelos privilégios efetivos (`RetrieveUserPrivileges`), sem gravar em dado de negócio.
   3. RH Operador: lê Funcionários com CPF e RG vazios; RH Gestor lê preenchidos.
   4. Frota Operador: de Funcionários lê nome, CNH e validade; CPF vazio.
   5. Administrador de acessos: atribui um perfil pela tela e o histórico registra; tentar alterar o próprio acesso ou conceder Administrador de acessos é recusado.
