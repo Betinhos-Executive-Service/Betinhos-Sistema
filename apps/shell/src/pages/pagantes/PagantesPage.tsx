@@ -217,7 +217,7 @@ function Pagantes({ host }: { host: Host }) {
   return (
     <div className="page page--full pg-page">
       <div role="toolbar" aria-label="Comandos de pagantes">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_pagantes', ids: selecting ? sel.rows.map((p) => p.id) : undefined, onOpenRecord: setSelectedId })} view={view} columns={PAGANTE_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
           search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por pagante, PAG, OP, telefone, e-mail, cliente, pagamento ou valor" aria-label="Buscar pagantes" />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={pg.loading && Boolean(choices)} onClick={refresh} />}
           // As mesmas ações com ou sem seleção: o DS mede a reserva com elas (§10.9.6).
