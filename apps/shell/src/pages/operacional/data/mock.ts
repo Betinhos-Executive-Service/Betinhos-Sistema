@@ -32,7 +32,7 @@ export function createMockData(now: Date): OperacionalData {
       saida: at(minutes), retorno: at(minutes + 120), destino: 'Av. Brigadeiro Faria Lima, 3477', enderecoSaida: 'Aeroporto de Guarulhos, Terminal 3',
       trajeto: seq % 2 ? 'GRU → Faria Lima' : 'Congonhas → Paulista', obsOperacao: seq === 2 ? 'Placa de recepção com o nome do cliente.' : '', obsInterna: '',
       motoristaId: motorista?.id ?? null, motorista: motorista?.nome ?? '', veiculo: motorista ? `Placa ABC-${1000 + seq}` : '',
-      cliente: 'Cliente Exemplo S.A.', solicitante: 'Paula Martins', passageirosLookup: [],
+      cliente: 'Cliente Exemplo S.A.', solicitante: 'Paula Martins',
       passageirosTexto: 'Ana Souza - (11) 97777-0001\nBruno Teixeira - (21) 97777-0002',
       veiculoId: label === 'Concluído' ? motorista?.veiculoAtualId ?? null : null, linkAcompanhamento: '', linkExpiraEm: null, ...extra,
     }

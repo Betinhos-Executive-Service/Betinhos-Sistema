@@ -15,7 +15,8 @@ const VISIVEIS = [STATUS_DV.liberado, STATUS_DV.em_duvida, STATUS_DV.respondido,
 
 const expandReserva =
   `${NAV.reserva}($select=${RESERVA_CAMPOS.join(',')};` +
-  `$expand=${NAV.composicao}($select=new_valortotal,${COMPOSICAO_LINHAS.map(([c]) => c).join(',')}))`
+  `$expand=${NAV.composicao}($select=new_valortotal,${COMPOSICAO_LINHAS.map(([c]) => c).join(',')}),` +
+  `${NAV.passageiros}($select=_cr40f_bancodedados_value,cr40f_ordemdeselecao;$orderby=cr40f_ordemdeselecao asc))`
 
 const consulta = (filtro: string) =>
   `${SET.validacao}?$select=${VALIDACAO_CAMPOS.join(',')}&$expand=${expandReserva}&$filter=${encodeURIComponent(filtro)}`

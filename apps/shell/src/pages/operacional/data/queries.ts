@@ -10,8 +10,7 @@ const BASE = [
   'cr40f_dataehorriodesada', 'cr40f_horrioprevistoderetorno', 'cr40f_destino', 'cr40f_endereodesada', 'cr40f_passageirosetelefonedecontato',
   'cr40f_trajeto', 'cr40f_obsdeoperao', 'cr40f_observaointerna', '_cr40f_solicitante_value',
 ]
-const PASSAGEIRO_LOOKUPS = ['_cr40f_passageiro1_value', '_cr40f_passageiro2_value', '_cr40f_passageiro3_value', '_cr40f_passageiro4_value']
-const EXTRA = ['_cr40f_motorista_value', '_cr40f_veiculo_value', '_cr40f_cliente_value', 'new_linkacompanhamento', 'new_linkacompanhamentoexpiraem', ...PASSAGEIRO_LOOKUPS]
+const EXTRA = ['_cr40f_motorista_value', '_cr40f_veiculo_value', '_cr40f_cliente_value', 'new_linkacompanhamento', 'new_linkacompanhamentoexpiraem']
 
 /** Erros de coluna inexistente que fazem o legado repetir a consulta só com os campos base. */
 export const SAFE_MODE_ERROR = /column metadata is not available|could not find a property named|does not contain a definition/i
@@ -48,7 +47,6 @@ export function mapReserva(row: Row): Reserva {
     veiculo: text(row, '_cr40f_veiculo_value'),
     cliente: text(row, '_cr40f_cliente_value'),
     solicitante: text(row, '_cr40f_solicitante_value'),
-    passageirosLookup: PASSAGEIRO_LOOKUPS.flatMap((field) => (id(row[field]) ? [{ id: id(row[field])!, nome: text(row, field) }] : [])),
     passageirosTexto: text(row, 'cr40f_passageirosetelefonedecontato'),
     veiculoId: id(row._cr40f_veiculo_value),
     linkAcompanhamento: String(row.new_linkacompanhamento ?? ''),

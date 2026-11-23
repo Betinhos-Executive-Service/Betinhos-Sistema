@@ -57,12 +57,12 @@ export const LADO_DV = { cliente: 100000000, betinhos: 100000001 } as const
 export const MOTIVO_DV = { espera: 100000000, km_rota: 100000001, valor: 100000002, passageiro: 100000003, outro: 100000004 } as const
 
 /** Navigation property do lookup cr40f_Reserva (schema name) e do lookup legado da composição na reserva. */
-export const NAV = { reserva: 'cr40f_Reserva', composicao: 'new_composicaodepreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario' }
+export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_composicaodepreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario' }
 
 export const RESERVA_CAMPOS = [
   'cr40f_id', 'cr40f_idtenaris', 'cr40f_cr', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',
   'new_linkdovoucher', 'new_categoriadoveiculo',
-  '_cr40f_solicitante_value', '_cr40f_passageiro1_value', '_cr40f_passageiro2_value', '_cr40f_passageiro3_value', '_cr40f_passageiro4_value',
+  '_cr40f_solicitante_value',
 ]
 
 /** Linhas do preço (metadata do DEV, 28/10/2026); o repasse a terceiro é custo e não aparece para o cliente. */

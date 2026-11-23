@@ -18,7 +18,6 @@ export type Reserva = {
   veiculo: string
   cliente: string
   solicitante: string
-  passageirosLookup: { id: string; nome: string }[]
   /** Campo VIEW gerado por flow; só é fonte de último recurso. */
   passageirosTexto: string
   veiculoId: string | null

@@ -62,7 +62,8 @@ public class UrlFlowConsultaTests
         // Handler sem consulta (URL ausente) nega com o motivo no trace.
         var reserva = Guid.NewGuid(); var motorista = Guid.NewGuid(); var usuario = Guid.NewGuid(); var ana = Guid.NewGuid();
         _svc.Com(
-            new Entity("cr40f_reservadeveculos", reserva) { ["cr40f_status"] = new OptionSetValue(ObterFotoPassageiroHandler.StatusProgramado), ["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", motorista), ["cr40f_passageiro1"] = new EntityReference("cr40f_bancodedados", ana) },
+            new Entity("cr40f_reservadeveculos", reserva) { ["cr40f_status"] = new OptionSetValue(ObterFotoPassageiroHandler.StatusProgramado), ["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", motorista) },
+            new Entity("cr40f_servicosporpassageiro", Guid.NewGuid()) { ["cr40f_geral"] = new EntityReference("cr40f_reservadeveculos", reserva), ["cr40f_bancodedados"] = new EntityReference("cr40f_bancodedados", ana), ["cr40f_ordemdeselecao"] = 1 },
             new Entity("cr40f_funcionarios", motorista) { ["cr40f_emailmicrosoft"] = "joao@betinhos.com.br" },
             new Entity("systemuser", usuario) { ["domainname"] = "joao@betinhos.com.br" },
             new Entity("cr40f_bancodedados", ana) { ["new_linkdafoto"] = ObterFotoPassageiroHandler.PrefixoLink + "Passageiros/Fotos/DEV/a.jpg" });

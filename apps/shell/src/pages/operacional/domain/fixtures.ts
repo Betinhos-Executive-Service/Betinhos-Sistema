@@ -9,7 +9,7 @@ export function reserva(partial: Partial<Reserva> & { hora?: string } = {}): Res
   return {
     id: `r${seq}`, codigo: String(1000 + seq), statusValue: null, status: 'Confirmado', faturamento: '', tipoServico: 'Transfer', tipoVeiculo: '',
     saida: hora ? new Date(`2026-10-05T${hora}:00-03:00`) : null, retorno: null, destino: '', enderecoSaida: '', trajeto: '', obsOperacao: '', obsInterna: '',
-    motoristaId: 'm1', motorista: 'Carlos', veiculo: '', cliente: '', solicitante: '', passageirosLookup: [], passageirosTexto: '',
+    motoristaId: 'm1', motorista: 'Carlos', veiculo: '', cliente: '', solicitante: '', passageirosTexto: '',
     veiculoId: null, linkAcompanhamento: '', linkExpiraEm: null,
     ...rest,
   }

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { base32, cifrar, decifrar, deBase32, totp, verificarTotp } from './cripto'
 import { mapearModulos, mapearPedido, mapearServico } from './mapear'
+import { NAV } from './schema'
 import { nomeDoEmail, normalizarPedido, validarPedido } from '../src/domain/pedidos'
 import { listarServicos, servicosPorIds, tacitaVencida } from './odata'
 import { feriados, prazoTacito, venceu } from './prazo'
@@ -83,7 +84,10 @@ describe('mapearServico', () => {
     cr40f_Reserva: {
       cr40f_id: '10801', cr40f_idtenaris: 'PO-1', cr40f_cr: 'CR9', cr40f_dataehorriodesada: '2026-10-27T10:00:00Z',
       cr40f_endereodesada: 'GRU', cr40f_destino: 'Centro', new_linkdovoucher: 'https://x/v.pdf',
-      [`_cr40f_passageiro1_value${FV}`]: 'Ana', _cr40f_passageiro1_value: 'p1', [`_cr40f_passageiro2_value${FV}`]: 'Bruno',
+      [NAV.passageiros]: [
+        { _cr40f_bancodedados_value: 'p2', [`_cr40f_bancodedados_value${FV}`]: 'Bruno', cr40f_ordemdeselecao: 2 },
+        { _cr40f_bancodedados_value: 'p1', [`_cr40f_bancodedados_value${FV}`]: 'Ana', cr40f_ordemdeselecao: 1 },
+      ],
       [`_cr40f_solicitante_value${FV}`]: 'Carla',
       new_composicaodepreco: { new_valortotal: 1000, cr40f_valorhoramotorista: 800, new_valorpedagios: 200, new_ajuste: 0 },
     },

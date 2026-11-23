@@ -271,7 +271,7 @@ export function withLinkKeys(fetchXml: string) {
 /** Aliases fixos dos vínculos que levam reserva e cliente na consulta principal; não colidem com os da view (a_…, r1…). */
 export const ROW_LINKS = { reserva: 'cmp_res', cliente: 'cmp_cli' } as const
 
-const RESERVATION_LINK_ATTRIBUTES = ['cr40f_trajeto', 'cr40f_endereodesada', 'cr40f_destino', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo', 'cr40f_passageiro1', 'cr40f_passageiro2', 'cr40f_passageiro3', 'cr40f_passageiro4']
+const RESERVATION_LINK_ATTRIBUTES = ['cr40f_trajeto', 'cr40f_endereodesada', 'cr40f_destino', 'cr40f_dataehorriodesada', 'cr40f_cliente', 'cr40f_status', 'cr40f_tipodoservico', 'cr40f_tipodeveiculo']
 const CLIENT_LINK_ATTRIBUTES = ['cr40f_nomedocliente', 'cr40f_registro', 'cr40f_endereco']
 
 function linkWithAttributes(document: Document, attributes: { entity: string; from: string; to: string; alias: string; names: string[] }) {

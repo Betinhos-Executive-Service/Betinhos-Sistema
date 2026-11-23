@@ -29,7 +29,7 @@ public sealed class ObterFotoPassageiroHandler
         if (!Guid.TryParse(reservaIdTexto, out var reservaId) || reservaId == Guid.Empty) return Negar("reserva inválida");
         if (!Guid.TryParse(passageiroIdTexto, out var passageiroId) || passageiroId == Guid.Empty) return Negar("passageiro inválido");
 
-        var reserva = Buscar("cr40f_reservadeveculos", reservaId, new[] { "cr40f_status", "cr40f_motorista" }.Concat(PassageirosDoServico.ColunasReserva).ToArray());
+        var reserva = Buscar("cr40f_reservadeveculos", reservaId, new[] { "cr40f_status", "cr40f_motorista" });
         if (reserva is null) return Negar("reserva não encontrada");
         if (reserva.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value != StatusProgramado) return Negar("status diferente de Programado");
 
