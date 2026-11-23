@@ -8,7 +8,7 @@ const FV = '@OData.Community.Display.V1.FormattedValue'
 const str = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'string' ? (r[campo] as string) : '')
 const num = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'number' ? (r[campo] as number) : undefined)
 const rotulo = (r: Registro | undefined, lookup: string) => str(r, `${lookup}${FV}`)
-const veiculoDe = (r: Registro | undefined) => rotulo(r, 'new_categoriadoveiculo') || str(r, 'new_categoriadoveiculo')
+const veiculoDe = (r: Registro | undefined) => rotulo(r, 'cr40f_tipodeveiculo')
 
 const inverter = <K extends string>(mapa: Record<K, number>) =>
   new Map(Object.entries(mapa).map(([k, v]) => [v as number, k as K]))

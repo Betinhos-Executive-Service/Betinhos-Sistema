@@ -189,7 +189,7 @@ describe('pedidos', () => {
     let [meu] = (await (await chamar('GET', '/pedidos', undefined, paula)).json()) as Array<Record<string, unknown>>
     expect(meu).toMatchObject({ status: 'solicitado' })
     // A operação programa no shell: status Programado, veículo e voucher.
-    Object.assign(banco.reservadeveculoses[0], { cr40f_status: 202410005, new_linkdovoucher: 'https://v/RV-48500.pdf', 'new_categoriadoveiculo@OData.Community.Display.V1.FormattedValue': 'Sedan executivo' })
+    Object.assign(banco.reservadeveculoses[0], { cr40f_status: 202410005, new_linkdovoucher: 'https://v/RV-48500.pdf', 'cr40f_tipodeveiculo@OData.Community.Display.V1.FormattedValue': 'Sedan executivo' })
     ;[meu] = (await (await chamar('GET', '/pedidos', undefined, paula)).json()) as Array<Record<string, unknown>>
     expect(meu).toMatchObject({ status: 'programado', voucherUrl: 'https://v/RV-48500.pdf', veiculo: 'Sedan executivo' })
   })

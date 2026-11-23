@@ -66,8 +66,8 @@ Detalhes confirmados no código:
 | `cr40f_dispositivoconfiavel` | "lembrar este computador" | `cr40f_hashtoken`, `cr40f_expiraem`, lookup `cr40f_Validador` |
 | `cr40f_validacaoservico` | validação de cada serviço | `cr40f_status` (Liberado 100000000, Em dúvida …01, Respondido …02, Aprovado …03, Aprovado tácito …04, Retirado …05), `cr40f_liberadoem`, `cr40f_prazotacita`, `cr40f_aprovadoem`, `cr40f_aprovadopor`, `cr40f_valorliberado`, `cr40f_valoranterior`, `cr40f_observacao`, lookups `cr40f_Reserva`, `cr40f_Cliente` |
 | `cr40f_mensagemvalidacao` | conversa da dúvida | `cr40f_lado` (cliente 100000000, Betinhos …01), `cr40f_autor`, `cr40f_texto`, `cr40f_motivo`, lookup `cr40f_Validacao` |
-| `cr40f_reservadeveculos` | reserva (leitura; criação no módulo Pedir) | leitura: `cr40f_id`, `cr40f_idtenaris`, `cr40f_cr`, `cr40f_dataehorriodesada`, `cr40f_endereodesada`, `cr40f_destino`, `new_linkdovoucher`, `new_categoriadoveiculo`, passageiros e solicitante; criação: `cr40f_status`, saída, origem, destino, `cr40f_portalpedido` (JSON), `cr40f_passageirosetelefonedecontato`, `cr40f_observaointerna`, lookups `cr40f_Cliente` e `cr40f_PortalUsuario` |
-| `cr40f_composicaodeprecos` | preço exibido ao cliente | `new_valortotal` e linhas de composição (via `$expand` na reserva) |
+| `cr40f_reservadeveculos` | reserva (leitura; criação no módulo Pedir) | leitura: `cr40f_id`, `cr40f_idtenaris`, `cr40f_cr`, `cr40f_dataehorriodesada`, `cr40f_endereodesada`, `cr40f_destino`, `new_linkdovoucher`, `cr40f_tipodeveiculo` (choice, rótulo pela anotação), passageiros e solicitante; criação: `cr40f_status`, saída, origem, destino, `cr40f_portalpedido` (JSON), `cr40f_passageirosetelefonedecontato`, `cr40f_observaointerna`, lookups `cr40f_Cliente` e `cr40f_PortalUsuario` |
+| `cr40f_composicaodeprecos` | preço exibido ao cliente | `new_valortotal` e linhas de composição (via `$expand=new_ComposicaodePreco` na reserva) |
 
 ### Variáveis, bindings e secrets (só nomes; `wrangler.jsonc`, `worker/env.ts`)
 
