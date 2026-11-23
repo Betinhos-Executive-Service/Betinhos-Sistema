@@ -83,7 +83,9 @@ async function sobras(usuario) {
 const definir = (usuario, perfis, como) =>
   chamar('cr40f_AcessoDefinirPerfis', { como, metodo: 'POST', corpo: { Usuario: usuario, Perfis: JSON.stringify(perfis) } })
 
+let abortado = false
 async function preparar(usuario, perfis) {
+  if (abortado) throw new Error('Interrompido.')
   const r = await definir(usuario, perfis)
   if (r.status !== 200) throw new Error(limpo(`Nao consegui preparar o cenario (${r.status}): ${r.erro}`))
 }
@@ -145,6 +147,7 @@ let inconclusivos = 0
 async function cenario(nome, passos) {
   let resultado = []
   for (let tentativa = 1; tentativa <= 5; tentativa++) {
+    if (abortado) throw new Error('Interrompido.')
     resultado = await passos()
     if (!resultado.some(([, ok]) => ok === false)) break
     if (tentativa < 5) await espera(3000)
@@ -209,6 +212,7 @@ function limpar() {
   return limpezaFeita
 }
 process.on('SIGINT', async () => {
+  abortado = true
   const falhou = await limpar()
   process.exit(falhou.length ? 1 : 130)
 })
@@ -315,7 +319,7 @@ try {
       ['Perfis "[]" devolve 200', vazia.status === 200],
       [
         'o alvo fica so com o Base',
-        papeis === null ? 'releitura dos perfis falhou' : papeis.filter((nome) => nome !== BASE_PAPEL).length === 0,
+        papeis === null ? 'releitura dos perfis falhou' : papeis.length === 1 && papeis[0] === BASE_PAPEL,
       ],
     ]
   })
