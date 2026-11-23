@@ -91,6 +91,18 @@ function Remove-Coluna([string] $Tabela, [string] $Coluna) {
   Write-Step "OK: $Tabela.$Coluna removida."
 }
 
+# Remove uma coluna Lookup do DEV: o lookup e parte de um relacionamento 1:N, e apagar o relacionamento (o jeito suportado)
+# apaga o atributo junto. $Relacionamento = SchemaName do 1:N (ex.: <tabela>_<Lookup>_<tabelaalvo>). Sai da AppBetinhos junto.
+function Remove-Lookup([string] $Tabela, [string] $Coluna, [string] $Relacionamento) {
+  Assert-Destrutiva "$Tabela.$Coluna"
+  $c = Get-Coluna $Tabela $Coluna
+  if (-not $c) { Write-Step "coluna $Tabela.$Coluna ja nao existe."; return }
+  if (-not $script:Apply) { Write-Step "DRY RUN removeria $Tabela.$Coluna (relacionamento $Relacionamento). Use -Apply para aplicar."; return }
+  Invoke-Dv "DELETE" "RelationshipDefinitions(SchemaName='$Relacionamento')" | Out-Null
+  Publish-Tabela $Tabela
+  Write-Step "OK: $Tabela.$Coluna removida (relacionamento $Relacionamento)."
+}
+
 # Apaga a tabela do DEV, com os registros dela.
 function Remove-Tabela([string] $Tabela) {
   Assert-Destrutiva $Tabela
