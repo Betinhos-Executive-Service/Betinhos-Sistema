@@ -15,9 +15,9 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
 - A prova só roda no DEV. No PROD só `quem-le.mjs` (GET).
 
 ## Roteiro
-1. Mapas e gerador: `cd apps/shell && npx vitest run src/nav/acessosMapa && cd ../..` → todos passam; `node --test packages/deploy/acessos/gerar.test.mjs` → `fail 0` (o teste reprova o gerado desatualizado, personalização, `cr40f_segredo` e Delete no Operador).
+1. Mapas e gerador: `pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 src/nav/acessosMapa` → todos passam; `node --test packages/deploy/acessos/gerar.test.mjs` → `fail 0` (o teste reprova o gerado desatualizado, personalização, `cr40f_segredo` e Delete no Operador).
 2. Mudou `acessosMapa.json` ou `acessosColunas.json`: `node packages/deploy/acessos/gerar.mjs` e criar migration nova `AAAAMMDD-HHMM-acessos-perfis-<motivo>.ps1` com o hash novo (a `20261123-1410` é imutável depois de publicada).
-3. Motor em dry-run no DEV (não grava): `~/.dotnet/tools/pwsh -NoProfile -File packages/deploy/acessos/aplicar-perfis.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com 2>&1 | tail -n 25` → sem pendência depois do Deploy; nunca passar `-Apply` à mão.
+3. Motor em dry-run no DEV (não grava): `aplicar-perfis.ps1` é biblioteca (dot-source), não roda sozinho; rode a migration SEM `-Apply`: `export DOTNET_ROOT=~/.dotnet PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"; pwsh -NoProfile -File packages/deploy/migrations/20261123-1410-acessos-perfis.ps1 -EnvironmentUrl https://org23b93544.crm2.dynamics.com 2>&1 | tail -n 25` → sem pendência depois do Deploy; nunca `-Apply` à mão: quem aplica é o Deploy do DEV.
 4. Plugin: `~/.dotnet/dotnet test packages/plugins/Cr40f.Acesso.Plugin.Tests/Cr40f.Acesso.Plugin.Tests.csproj -p:SignAssembly=false 2>&1 | tail -n 6` → 0 falhas (18 de `AcessoCatalogoTests` e 13 de `DefinirPerfisHandlerTests` em 23/11/2026).
 5. Custom API no DEV (só leitura): `customapis?$select=uniquename&$filter=uniquename eq 'cr40f_AcessoDefinirPerfis'` devolve 1 linha; `roles?$select=name&$filter=startswith(name,'Perfil - ')` devolve os 10 papéis.
 6. Prova no DEV:
@@ -28,8 +28,8 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
    DV_TESTE_ID="$DV_TESTE_ID" DV_ALVO_ID="$DV_ALVO_ID" \
    node packages/deploy/acessos/prova.mjs
    ```
-   → 7 linhas `cenario ...: OK` (1, 2, 3a, 3b, 4, 5, 6) e `prova dos acessos: OK`. `INCONCLUSIVO` = o DEV não tem linha com as colunas preenchidas (Funcionário com CPF, RG e CNH; OP com valor): não é aprovação.
-7. Proteção das colunas de passageiro: `node packages/deploy/acessos/quem-le.mjs` no DEV e no PROD (mesmas variáveis, sem os ids) → `DEPENDENTES: 0` e nenhuma `EQUIPE SEM COBERTURA`. A saída do PROD não entra em commit, PR nem issue.
+   → 9 linhas `cenario ...: OK` (1, 2, 3a, 3b, 4, 5, 6, 7, 8) e `prova dos acessos: OK`. O 6 é `Perfis` ausente (qualquer recusa serve, mesmo da plataforma, desde que os perfis do alvo não mudem) e o 7 é `"[]"` explícito (200 e só o Base). Códigos de saída: 2 = pré-condição (token, dono do token sem Administrador do Sistema, usuários com papel antigo), 3 = inconclusivo, 1 = falha ou limpeza final falhou (`LIMPEZA FALHOU`: voltar os dois usuários ao Base à mão no DEV). A saída não leva ids; pode ir como evidência. `INCONCLUSIVO` = o DEV não tem linha com as colunas preenchidas (Funcionário com CPF, RG e CNH; OP com valor): não é aprovação.
+7. Informativo para o plano do corte: `node packages/deploy/acessos/quem-le.mjs` no DEV e no PROD (mesmas variáveis, sem os ids) lista quem hoje lê `cr40f_bancodedados` sem perfil de coluna de administrador ou `Motoristas`. `DEPENDENTES > 0` é esperado e não reprova este plano. A saída do PROD nunca vai para o repositório, commit, PR ou issue.
 
 ## Casos de borda
 - Papel novo demora alguns segundos para valer: a prova repete cada cenário até 5 vezes; falha só depois disso.
@@ -39,5 +39,6 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
 
 ## Fora do alcance
 - A prova não cobre telefone, e-mail, nascimento nem endereço de saída do passageiro (`cr40f_bancodedados`): essas colunas ficaram sem segurança de coluna até o plano do corte; só `cr40f_cr` está protegida.
+- Limite da prova: `RetrieveUserPrivileges` confere o privilégio, não a profundidade (Basic conta como "pode").
 - A prova não grava em dado de negócio: edição e exclusão são conferidas pelos privilégios efetivos, não por tentativa.
 - PROD: nenhuma atribuição de papel a pessoa ou equipe sem pedido explícito do Renan.

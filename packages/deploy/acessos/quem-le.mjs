@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Somente leitura. Quem le cr40f_bancodedados hoje e deixaria de ler telefone, e-mail, nascimento e
-// endereco quando a seguranca de coluna ligar (migration 20261123-1405).
+// Somente leitura. Informativo para o plano do corte: lista quem hoje le cr40f_bancodedados sem perfil de coluna
+// de administrador ou Motoristas e deixaria de ler telefone, e-mail, nascimento e endereco quando a protecao dessas
+// colunas ligar (adiada para o plano do corte; nao existe migration para ela). DEPENDENTES > 0 e esperado.
+// A saida do PROD nunca vai para repositorio, commit, PR ou issue.
 // Uso: DV_URL=https://<org>.crm2.dynamics.com DV_ACCESS_TOKEN=<token> node packages/deploy/acessos/quem-le.mjs
 // Imprime so nomes de papeis e equipes e contagens; nunca nomes de pessoas.
 
