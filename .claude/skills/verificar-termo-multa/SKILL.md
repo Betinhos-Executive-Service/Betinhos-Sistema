@@ -69,3 +69,6 @@ No DEV, com o funcionário fictício "Motorista Teste (fictício)": gerar o adit
 
 ## 9. Evidência
 Testes das seções 4 e 8, prints do mock do shell (autos A000000101 a A000000106) e do app, e o resultado da prova manual da seção 7 (aceito ou recusado, nunca o PDF).
+
+## Configuração do App (fase B2)
+- O flow "Termo de multa | Push ao motorista" chama `cr40f_AppConfigEfetiva` e pula o push com `multas` desligado (sem status novo; falha na leitura envia como antes). A Custom API de termo recusa com o módulo desligado (`TermoMultaCommandPluginTests`, 114 testes). Prova no DEV: exceção `multas` `Ligado=false` num motorista de teste, termo enviado e conferir que o flow não envia push.

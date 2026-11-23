@@ -29,6 +29,9 @@ const string ApiAppConfigEfetiva = "cr40f_AppConfigEfetiva";
 const string ApiAppConfigRascunho = "cr40f_AppConfigSalvarRascunho";
 const string ApiAppConfigPublicar = "cr40f_AppConfigPublicar";
 const string ApiAppConfigPessoa = "cr40f_AppConfigDefinirPessoa";
+// Recibo personalizado (fase B2): step sincrono PreOperation no Create de cr40f_recibos_v2, sem configuracao.
+const string TipoReciboPersonalizado = "Cr40f.Acesso.Plugin.ReciboPersonalizadoPlugin";
+const string StepReciboPersonalizado = "Cr40f.Acesso: recibo personalizado (Create cr40f_recibos_v2)";
 const int PluginAssemblyComponentType = 91;
 
 Log("autenticando no Dataverse");
@@ -59,6 +62,7 @@ var tipoAppConfigEfetiva = UpsertPluginType(service, assemblyId, TipoAppConfigEf
 var tipoAppConfigRascunho = UpsertPluginType(service, assemblyId, TipoAppConfigRascunho);
 var tipoAppConfigPublicar = UpsertPluginType(service, assemblyId, TipoAppConfigPublicar);
 var tipoAppConfigPessoa = UpsertPluginType(service, assemblyId, TipoAppConfigPessoa);
+var tipoReciboPersonalizado = UpsertPluginType(service, assemblyId, TipoReciboPersonalizado);
 
 // Tipos de parametro/resposta (customapirequestparameter.type): 0 = Boolean, 7 = Integer, 10 = String, 12 = Guid (8 seria Money).
 EnsureCustomApi(service, ApiCadastrar, "Acesso | Cadastrar acesso de motorista", "Cria conta Microsoft, licenca, grupo e funcionario; devolve credenciais e etapas.", solutionUniqueName,
@@ -89,6 +93,7 @@ EnsureApiStep(service, tipoAppConfigEfetiva, ApiAppConfigEfetiva, "Cr40f.Acesso:
 EnsureApiStep(service, tipoAppConfigRascunho, ApiAppConfigRascunho, "Cr40f.Acesso: configuracao do App salvar rascunho", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigPublicar, ApiAppConfigPublicar, "Cr40f.Acesso: configuracao do App publicar", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigPessoa, ApiAppConfigPessoa, "Cr40f.Acesso: configuracao do App definir pessoa", "", solutionUniqueName);
+EnsureEntityStep(service, tipoReciboPersonalizado, "Create", "cr40f_recibos_v2", StepReciboPersonalizado, solutionUniqueName);
 
 if (publish)
 {
@@ -186,6 +191,40 @@ static void EnsureApiStep(ServiceClient service, Guid pluginTypeId, string messa
     });
     EnsureSolutionComponent(service, stepId, solution, 92);
     Log($"step criado: {name}");
+}
+
+/// <summary>Step sincrono PreOperation (stage 20) idempotente por nome numa mensagem de tabela (ex.: Create).</summary>
+static void EnsureEntityStep(ServiceClient service, Guid pluginTypeId, string messageName, string entidade, string name, string solution)
+{
+    var dados = new Entity("sdkmessageprocessingstep")
+    {
+        ["stage"] = new OptionSetValue(20), ["mode"] = new OptionSetValue(0), ["rank"] = 1, ["eventhandler"] = Ref("plugintype", pluginTypeId),
+    };
+    Guid stepId;
+    if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
+    {
+        stepId = existing.Id;
+        dados.Id = stepId;
+        service.Update(dados);
+        Log($"step reconciliado: {name}");
+    }
+    else
+    {
+        var message = FindSingleOrNone(service, "sdkmessage", ("name", messageName)) ?? throw new InvalidOperationException($"sdkmessage {messageName} nao encontrada.");
+        var filtro = service.RetrieveMultiple(new QueryExpression("sdkmessagefilter")
+        {
+            ColumnSet = new ColumnSet("sdkmessagefilterid"),
+            Criteria = { Conditions = { new ConditionExpression("sdkmessageid", ConditionOperator.Equal, message.Id), new ConditionExpression("primaryobjecttypecode", ConditionOperator.Equal, entidade) } },
+        }).Entities.Single();
+        dados["name"] = name;
+        dados["supporteddeployment"] = new OptionSetValue(0);
+        dados["sdkmessageid"] = Ref("sdkmessage", message.Id);
+        dados["sdkmessagefilterid"] = Ref("sdkmessagefilter", filtro.Id);
+        dados["asyncautodelete"] = false;
+        stepId = service.Create(dados);
+        Log($"step criado: {name}");
+    }
+    EnsureSolutionComponent(service, stepId, solution, 92);
 }
 
 static bool ChildExists(ServiceClient service, string logicalName, Guid customApiId, string uniqueName)

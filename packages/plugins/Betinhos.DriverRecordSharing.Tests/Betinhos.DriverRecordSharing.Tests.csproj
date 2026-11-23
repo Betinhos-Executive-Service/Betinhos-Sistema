@@ -14,6 +14,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Mesmos casos do pacote TypeScript e do Cr40f.Acesso.Plugin; as duas cópias do resolvedor precisam ser idênticas. -->
+    <Content Include="..\..\app-config\casos.json" Link="casos.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Cr40f.Acesso.Plugin\AppConfigResolver.cs" Link="copias\acesso\AppConfigResolver.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Betinhos.DriverRecordSharing\AppConfigResolver.cs" Link="copias\driver\AppConfigResolver.cs" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
     <PackageReference Include="xunit" Version="2.9.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">

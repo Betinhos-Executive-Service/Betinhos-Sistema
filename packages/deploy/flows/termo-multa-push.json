@@ -289,26 +289,38 @@
         }
       },
       "runAfter": {
-        "Get_driver": [
-          "Succeeded"
+        "Config_App": [
+          "Succeeded",
+          "Failed",
+          "TimedOut"
         ]
       },
       "else": {
         "actions": {}
       },
       "expression": {
-        "not": {
-          "equals": [
-            "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
-            true
-          ]
-        }
+        "and": [
+          {
+            "not": {
+              "equals": [
+                "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
+                true
+              ]
+            }
+          },
+          {
+            "equals": [
+              "@variables('Modulo_Desligado')",
+              false
+            ]
+          }
+        ]
       },
       "type": "If"
     },
     "Get_driver": {
       "runAfter": {
-        "Init_web_push_entregue": [
+        "Init_modulo_desligado": [
           "Succeeded"
         ]
       },
@@ -325,6 +337,61 @@
           "recordId": "@triggerOutputs()?['body/_new_motorista_value']"
         },
         "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Init_modulo_desligado": {
+      "runAfter": {
+        "Init_web_push_entregue": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Modulo_Desligado",
+            "type": "boolean",
+            "value": false
+          }
+        ]
+      }
+    },
+    "Config_App": {
+      "runAfter": {
+        "Get_driver": [
+          "Succeeded"
+        ]
+      },
+      "type": "Scope",
+      "actions": {
+        "Config_efetiva": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "operationId": "PerformUnboundAction",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "actionName": "cr40f_AppConfigEfetiva",
+              "item/Funcionario": "@triggerOutputs()?['body/_new_motorista_value']"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Set_modulo_desligado": {
+          "runAfter": {
+            "Config_efetiva": [
+              "Succeeded"
+            ]
+          },
+          "type": "SetVariable",
+          "inputs": {
+            "name": "Modulo_Desligado",
+            "value": "@equals(json(coalesce(outputs('Config_efetiva')?['body/Resultado'], '{}'))?['chaves']?['multas'], false)"
+          }
+        }
       }
     }
   },

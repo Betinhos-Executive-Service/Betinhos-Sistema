@@ -60,7 +60,6 @@ namespace Betinhos.DriverRecordSharing
     {
         private const string ChargeTable = "cr40f_cobrancastripe";
         private const string ServiceReceivable = "cr40f_valor_a_receber";
-        private const string EmployeeCanCharge = "cr40f_podecobrarqrcode";
         private const string ChargeService = "cr40f_reserva";
         private const string ChargeDriver = "cr40f_motorista";
         private const string ChargeSession = "cr40f_sessionid";
@@ -129,8 +128,8 @@ namespace Betinhos.DriverRecordSharing
         private string Create(Dictionary<string, object> command)
         {
             var driverId = CallerDriverId();
-            var employee = _system.Retrieve(PluginConfig.EmployeeTable, driverId, new ColumnSet(EmployeeCanCharge));
-            if (employee.GetAttributeValue<bool?>(EmployeeCanCharge) != true) throw new Refusal("Você não está liberado para cobrar por QR code.");
+            // Configuração do App (services.qrCharge): matriz, exceção, piloto ou, na transição, a coluna legada da ficha.
+            if (!new AppConfigLeitor(_system, _utcNow).Ligado(driverId, AppConfigLeitor.ChaveCobrarQr)) throw new Refusal("Você não está liberado para cobrar por QR code.");
 
             var reservaId = ReservaId(command);
             var valorCentavos = QrChargeRules.Long(command, "valorCentavos") ?? 0;

@@ -80,8 +80,9 @@ for (const { arquivo, status } of FLOWS) {
 
   if (status) {
     test(`${arquivo}: Enviado se qualquer canal entregou; Falhou só se o Web Push não entregou e o V2 falhou`, () => {
-      const sent = flow.actions.Mark_sent
-      const failed = flow.actions.Mark_failed
+      // Nos flows com respeito à configuração do App, o envio inteiro fica dentro de Se_modulo_ligado.
+      const sent = achar(flow, (n) => n === 'Mark_sent')[0][1]
+      const failed = achar(flow, (n) => n === 'Mark_failed')[0][1]
       assert.deepEqual(sent.runAfter, { Fallback_V2: ['Succeeded'] })
       assert.deepEqual(failed.runAfter, { Fallback_V2: ['Failed', 'TimedOut'] })
       const campos = (a) => Object.entries(a.inputs.parameters).filter(([k]) => k.endsWith('pushstatus')).map(([, v]) => v)
@@ -99,7 +100,10 @@ test('treinamentos-push.json: Web Push por funcionário do gatilho, com tag e me
   const p = worker.inputs.parameters
   assert.equal(p['body/payload/url'], "/WebResources/new_app-motoristas-v2?treinamentoParticipacaoId=@{triggerOutputs()?['body/cr40f_treinamentoparticipacaoid']}")
   assert.equal(p['body/payload/body'], "Novo treinamento: @{outputs('Get_treinamento')?['body/cr40f_name']}")
-  assert.deepEqual(flow.actions.Web_Push_Send_push.runAfter, { Get_treinamento: ['Succeeded'] })
+  // O escopo do Web Push fica dentro de Se_modulo_ligado, que só roda depois de Get_treinamento (via Config_App).
+  assert.deepEqual(flow.actions.Config_App.runAfter, { Get_treinamento: ['Succeeded'] })
+  assert.deepEqual(flow.actions.Se_modulo_ligado.runAfter, { Config_App: ['Succeeded', 'Failed', 'TimedOut'] })
+  assert.ok(flow.actions.Se_modulo_ligado.actions.Web_Push_Send_push)
 })
 
 test('treinamentos-push.json: gatilho só em alteração, senão o motorista recebe o aviso duas vezes', () => {

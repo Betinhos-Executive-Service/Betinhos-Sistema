@@ -26,6 +26,9 @@ public sealed class AppConfigFicha
     public string? Email;
     public int? Status;
     public int? Vinculo;
+    /// <summary>Colunas legadas da ficha (transição): valem exceção implícita "ligado" enquanto não houver linha da chave.</summary>
+    public bool PodeCobrarQr;
+    public bool GeraReciboPersonalizado;
     /// <summary>Ativo e com e-mail Microsoft = tem acesso ao App.</summary>
     public bool TemAcesso => Status == FuncionarioRepository.StatusAtivo && !string.IsNullOrWhiteSpace(Email);
 }
@@ -96,7 +99,7 @@ public sealed class AppConfigRepository
 
     // ---- funcionário e usuário ----
 
-    private static readonly ColumnSet ColunasFicha = new("cr40f_nomecompleto", "cr40f_emailmicrosoft", "cr40f_status", "cr40f_tipodevinculo");
+    private static readonly ColumnSet ColunasFicha = new("cr40f_nomecompleto", "cr40f_emailmicrosoft", "cr40f_status", "cr40f_tipodevinculo", AppConfigLegado.ColunaCobrarQr, AppConfigLegado.ColunaReciboPersonalizado);
 
     public AppConfigFicha? Ficha(Guid id)
     {
@@ -130,6 +133,8 @@ public sealed class AppConfigRepository
         Email = e.GetAttributeValue<string>("cr40f_emailmicrosoft"),
         Status = e.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value,
         Vinculo = e.GetAttributeValue<OptionSetValue>("cr40f_tipodevinculo")?.Value,
+        PodeCobrarQr = e.GetAttributeValue<bool>(AppConfigLegado.ColunaCobrarQr),
+        GeraReciboPersonalizado = e.GetAttributeValue<bool>(AppConfigLegado.ColunaReciboPersonalizado),
     };
 
     // ---- exceções e piloto ----
@@ -145,21 +150,33 @@ public sealed class AppConfigRepository
         return _service.RetrieveMultiple(q).Entities.OrderBy(e => e.GetAttributeValue<DateTime?>("createdon") ?? DateTime.MinValue).ToList();
     }
 
+    /// <summary>Todas as linhas do funcionário (abertas e encerradas), da mais antiga para a mais recente.</summary>
+    private List<Entity> TodasAsLinhas(Guid funcionarioId)
+    {
+        var q = new QueryExpression(TabelaPessoa) { ColumnSet = ColunasPessoa };
+        q.Criteria.AddCondition("cr40f_funcionario", ConditionOperator.Equal, funcionarioId);
+        return _service.RetrieveMultiple(q).Entities.OrderBy(e => e.GetAttributeValue<DateTime?>("createdon") ?? DateTime.MinValue).ToList();
+    }
+
+    /// <summary>Ponto único que monta a pessoa: linhas da tabela mais o legado da ficha (AppConfigLegado), igual no DriverRecordSharing.</summary>
     public AppConfigPessoa PessoaDe(AppConfigFicha ficha)
     {
         var pessoa = new AppConfigPessoa { Vinculo = ficha.Vinculo };
-        foreach (var linha in LinhasAbertas(ficha.Id))
+        foreach (var linha in TodasAsLinhas(ficha.Id))
         {
+            var encerrada = linha.GetAttributeValue<DateTime?>("cr40f_encerradoem") != null;
             var tipo = linha.GetAttributeValue<OptionSetValue>("cr40f_tipo")?.Value;
-            if (tipo == TipoPiloto) pessoa.Piloto = true;
+            if (tipo == TipoPiloto) { if (!encerrada) pessoa.Piloto = true; }
             else if (tipo == TipoExcecao)
                 pessoa.Excecoes.Add(new AppConfigExcecao
                 {
                     Chave = linha.GetAttributeValue<string>("cr40f_chave") ?? "",
                     Ligado = linha.GetAttributeValue<bool>("cr40f_ligado"),
                     Validade = linha.GetAttributeValue<DateTime?>("cr40f_validade") is { } v ? v.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : null,
+                    Encerrada = encerrada,
                 });
         }
+        AppConfigLegado.Aplicar(pessoa, ficha.PodeCobrarQr, ficha.GeraReciboPersonalizado);
         return pessoa;
     }
 
