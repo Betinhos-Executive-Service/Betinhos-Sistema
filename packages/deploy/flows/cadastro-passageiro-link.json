@@ -289,7 +289,7 @@
                           },
                           "parameters": {
                             "entityName": "__SET_SERVICOS__",
-                            "$select": "_cr40f_bancodedados_value",
+                            "$select": "_cr40f_bancodedados_value,cr40f_ordemdeselecao",
                             "$filter": "_cr40f_geral_value eq @{outputs('Link')?['_cr40f_reserva_value']}",
                             "$top": 20
                           },
@@ -307,6 +307,27 @@
                           "from": "@body('Listar_filhos')?['value']",
                           "select": "@toLower(coalesce(item()?['_cr40f_bancodedados_value'], ''))"
                         }
+                      },
+                      "Ordens_filhos": {
+                        "type": "Select",
+                        "runAfter": {
+                          "Listar_filhos": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@body('Listar_filhos')?['value']",
+                          "select": "@concat('\"', toLower(coalesce(item()?['_cr40f_bancodedados_value'], '')), '\":', coalesce(item()?['cr40f_ordemdeselecao'], 'null'))"
+                        }
+                      },
+                      "Ordens": {
+                        "type": "Compose",
+                        "runAfter": {
+                          "Ordens_filhos": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": "@json(concat('{', join(body('Ordens_filhos'), ','), '}'))"
                       },
                       "Filtrar_filhos": {
                         "type": "Query",
@@ -344,6 +365,9 @@
                             "Succeeded"
                           ],
                           "Obter_reserva": [
+                            "Succeeded"
+                          ],
+                          "Ordens": [
                             "Succeeded"
                           ]
                         },
@@ -400,6 +424,7 @@
                                       "value": {
                                         "id": "@{items('Por_passageiro')}",
                                         "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
+                                        "ordem": "@outputs('Ordens')?[items('Por_passageiro')]",
                                         "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))",
                                         "foto": null,
                                         "temTelefone": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], ''))))",

@@ -66,10 +66,37 @@ test('link vencido ou revogado responde 410 e marca Expirado (3)', () => {
 
 test('escopo: passageiro do link, filhos por _cr40f_geral_value, sem lookups passageiro1..4', () => {
   assert.match(todas.get('Listar_filhos').inputs.parameters.$filter, /^_cr40f_geral_value eq /)
-  assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value')
+  assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value,cr40f_ordemdeselecao')
   assert.doesNotMatch(raw, /passageiro[1-4]/i, 'a reserva não lê mais os lookups passageiro1..4')
   assert.ok(!todas.has('Filtrar_lookups'))
   assert.match(todas.get('Escopo').inputs, /_cr40f_passageiro_value/)
+})
+
+test('ler: cada passageiro leva ordem = cr40f_ordemdeselecao do filho (nula quando o filho não tem)', () => {
+  const filhos = todas.get('Listar_filhos')
+  assert.match(filhos.inputs.parameters.$filter, /^_cr40f_geral_value eq /)
+  assert.match(filhos.inputs.parameters.$select, /(^|,)cr40f_ordemdeselecao(,|$)/)
+  // mapa id -> ordem montado fora do loop e ligado ao Escopo (o loop só enxerga ancestrais)
+  assert.deepEqual(todas.get('Ordens_filhos').runAfter, { Listar_filhos: ['Succeeded'] })
+  assert.deepEqual(todas.get('Ordens').runAfter, { Ordens_filhos: ['Succeeded'] })
+  assert.deepEqual(todas.get('Escopo').runAfter.Ordens, ['Succeeded'])
+  assert.equal(todas.get('Incluir_passageiro').inputs.value.ordem, "@outputs('Ordens')?[items('Por_passageiro')]")
+  // o mapa vira JSON válido, com ordem numérica ou null, mesmo sem filhos
+  const linha = todas.get('Ordens_filhos').inputs.select
+  const monta = (filhos) => {
+    const fns = { concat: (...a) => a.join(''), toLower: (s) => s.toLowerCase(), coalesce: (...a) => a.find((x) => x != null) }
+    const js = linha.slice(1).replace(/item\(\)\?\['(\w+)'\]/g, "F['$1']")
+    const itens = filhos.map((F) => new Function('F', ...Object.keys(fns), `return ${js}`)(F, ...Object.values(fns)))
+    return JSON.parse(`{${itens.join(',')}}`)
+  }
+  const A = 'AAAAAAAA-0000-0000-0000-000000000001', B = 'bbbbbbbb-0000-0000-0000-000000000002', C = 'cccccccc-0000-0000-0000-000000000003'
+  const mapa = monta([
+    { _cr40f_bancodedados_value: A, cr40f_ordemdeselecao: 2 },
+    { _cr40f_bancodedados_value: B, cr40f_ordemdeselecao: 1 },
+    { _cr40f_bancodedados_value: C, cr40f_ordemdeselecao: null },
+  ])
+  assert.deepEqual(mapa, { [A.toLowerCase()]: 2, [B]: 1, [C]: null })
+  assert.deepEqual(monta([]), {})
 })
 
 test('salvar: passageiro fora do escopo 404, limite de 30 envios 429', () => {
