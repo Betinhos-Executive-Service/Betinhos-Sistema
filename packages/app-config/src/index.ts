@@ -1,2 +1,2 @@
-export * from './catalogo.ts'
-export * from './resolver.ts'
+export * from './catalogo'
+export * from './resolver'

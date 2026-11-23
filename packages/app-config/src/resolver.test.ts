@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import casos from '../casos.json'
-import { CATALOGO } from './catalogo.ts'
+import { CATALOGO } from './catalogo'
 import {
   compararMatrizes,
   configuracaoEfetiva,
@@ -10,7 +10,7 @@ import {
   type Excecao,
   type Matriz,
   type Origem,
-} from './resolver.ts'
+} from './resolver'
 
 interface Caso {
   nome: string

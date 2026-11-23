@@ -1,4 +1,4 @@
-import { CATALOGO, entradaDoCatalogo, type EntradaCatalogo, type Perfil } from './catalogo.ts'
+import { CATALOGO, entradaDoCatalogo, type EntradaCatalogo, type Perfil } from './catalogo'
 
 /** Onde o valor de uma chave nasceu. */
 export type Origem = 'fixa' | 'excecao' | 'piloto' | 'perfil' | 'padrao' | 'modulo-pai'
