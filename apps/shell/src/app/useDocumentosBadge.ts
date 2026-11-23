@@ -13,9 +13,10 @@ export const contarUrgentes = (data: DocsData, hoje: string) => urgentes(contarK
  * Vencidos + vencem em até 7 dias, para o badge de "Documentos" no menu. Recarrega a cada 10 min e quando a tela de documentos salva. Falha silenciosa: sem número, sem badge.
  * A fonte de documentos (e o que ela puxa de Funcionários/SharePoint) vem num chunk separado, baixado quando o navegador fica ocioso, para não pesar na carga inicial nem competir com os dados da tela aberta.
  */
-export function useDocumentosBadge(host: Host) {
+export function useDocumentosBadge(host: Host, habilitado = true) {
   const [total, setTotal] = useState<number | null>(null)
   useEffect(() => {
+    if (!habilitado) { setTotal(null); return }
     let vivo = true
     let desligar = () => {}
     const cancelarOcioso = quandoOcioso(() => {
@@ -32,6 +33,6 @@ export function useDocumentosBadge(host: Host) {
       }).catch(() => { if (vivo) setTotal(null) })
     })
     return () => { vivo = false; cancelarOcioso(); desligar() }
-  }, [host])
+  }, [host, habilitado])
   return total
 }

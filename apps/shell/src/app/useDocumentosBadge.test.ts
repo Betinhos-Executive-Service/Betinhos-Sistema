@@ -21,6 +21,12 @@ describe('contador de documentos', () => {
     expect(contarUrgentes(createMockData('2026-10-13'), '2026-10-13')).toBe(4)
   })
 
+  it('desabilitado não consulta e devolve null', () => {
+    const { result } = renderHook(() => useDocumentosBadge({ mode: 'mock' }, false))
+    expect(result.current).toBeNull()
+    expect(carregar).not.toHaveBeenCalled()
+  })
+
   it('recarrega quando a tela de documentos avisa que salvou, e para de ouvir ao desmontar', async () => {
     const host = { mode: 'mock' } as const
     const { result, unmount } = renderHook(() => useDocumentosBadge(host))

@@ -2,9 +2,13 @@ import { useCallback, useMemo } from 'react'
 import { Alert, Button, SegmentedControl, useShellHeader } from '@betinhos/ui'
 import { CalendarPlus, ChevronRight, RefreshCw } from 'lucide-react'
 import type { Host } from '../../host'
+import { useAcessos } from '../../app/AcessosProvider'
+import { semModulos } from '../../app/acessos'
+import { PageFallback } from '../../app/routes'
 import { hrefFor } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
 import { VISOES, VISAO_LABEL, type Destino, type Indicador } from './domain/types'
+import { InicioSemAcesso } from './InicioSemAcesso'
 import { useInicio } from './useInicio'
 import { FaixaComunicado, FraseDoDia, Indicadores, PainelPlanner, Radar, ServicosAReceber } from './components/Paineis'
 import './inicio.css'
@@ -21,6 +25,13 @@ const irPara = (rota: string, params?: Record<string, string>) => { location.has
  * A visão e o filtro de tarefas ficam na URL (`visao=`, `tarefas=`).
  */
 export function InicioPage({ host }: { host: Host }) {
+  const acesso = useAcessos()
+  if (acesso.status === 'carregando') return <PageFallback title="Página Inicial" />
+  if (acesso.status === 'pronto' && semModulos(acesso.acessos)) return <InicioSemAcesso />
+  return <InicioCompleto host={host} />
+}
+
+function InicioCompleto({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
   const inicio = useInicio(source)
 
