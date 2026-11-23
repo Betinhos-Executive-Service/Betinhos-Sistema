@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ehErroDeRede, SEM_CONEXAO_MESSAGE } from "../src/shared/erroDeRede.ts";
 import { reportAppError, type AppErrorNotice } from "../src/shared/appErrorLogger.ts";
-import { descreverIndicador } from "../src/features/envio-pendente/textoIndicador.ts";
+import { descreverIndicador, ehRecusaDaConfiguracao } from "../src/features/envio-pendente/textoIndicador.ts";
 import { createFila, createMemoryBackend, type FilaItem } from "../src/features/envio-pendente/fila.ts";
 import { createProcessador, MENSAGEM_SESSAO } from "../src/features/envio-pendente/processador.ts";
 
@@ -106,4 +106,32 @@ test("logger: falha de rede com aparelho online vira um aviso curto, sem repetir
     assert.equal(avisos[0].severity, "info");
     assert.doesNotMatch(avisos[0].userMessage, /feche e reabra|falhou/i);
   });
+});
+
+test("indicador: recusa da configuração do App mostra a frase do servidor e não oferece reenvio", () => {
+  const recusado = item("7", { estado: "falhou", ultimoErro: "Checklists não estão disponíveis no seu App no momento. Procure o escritório." });
+  const descricao = descreverIndicador({ itens: [recusado], online: true, total: 1, agendaOfflineEm: null });
+  assert.equal(descricao.situacao, "recusado");
+  assert.equal(descricao.texto, "OS-7: Checklists não estão disponíveis no seu App no momento. Procure o escritório.");
+  assert.equal(descreverIndicador({ itens: [recusado], online: false, total: 1, agendaOfflineEm: null }).texto.startsWith("Sem conexão · OS-7: Checklists"), true);
+  // Falha comum continua com o texto genérico e a ação de tentar de novo.
+  assert.equal(descreverIndicador({ itens: [item("8", { estado: "falhou", ultimoErro: "Serviço cancelado" })], online: true, total: 1, agendaOfflineEm: null }).situacao, "falhou");
+  assert.equal(ehRecusaDaConfiguracao("Boas ideias não estão disponíveis no seu App no momento. Procure o escritório."), true);
+  assert.equal(ehRecusaDaConfiguracao("Minha nota não está disponível no seu App no momento. Procure o escritório."), true);
+  assert.equal(ehRecusaDaConfiguracao(undefined), false);
+});
+
+test("fila: recusa da configuração do App vira 'falhou' e não repete o envio sozinha", async () => {
+  const fila = createFila(createMemoryBackend());
+  await fila.adicionar(item("9", { estado: "pendente" }));
+  let chamadas = 0;
+  const processador = createProcessador({
+    fila,
+    enviar: async () => { chamadas += 1; throw Object.assign(new Error("Treinamentos não estão disponíveis no seu App no momento. Procure o escritório."), { status: 400 }); }
+  });
+  await processador.processar();
+  await processador.processar(true);
+  assert.equal(chamadas, 1);
+  assert.equal(fila.getSnapshot()[0].estado, "falhou");
+  assert.match(fila.getSnapshot()[0].ultimoErro ?? "", /Procure o escritório/);
 });

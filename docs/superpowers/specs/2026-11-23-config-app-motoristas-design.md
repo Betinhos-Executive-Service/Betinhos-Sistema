@@ -43,7 +43,7 @@ Ponto de atenção: o App grava na própria ficha do funcionário (`meu-carro/re
 8. **Módulo ou função nova nasce ligada** para todos os perfis.
 9. **Exceção por motorista**, para ligar ou para desligar, com motivo obrigatório e validade opcional. Vencida, volta ao perfil.
 10. **Módulo desligado some por completo:** grade, pendências e tour. Link ou push antigo abre o Início com aviso. O push do módulo não é enviado.
-11. **O servidor recusa** cobrança por QR, recibo personalizado e termo de multa para quem não tem a função.
+11. **O servidor recusa** cobrança por QR, recibo personalizado e termo de multa para quem não tem a função, e (decisão de 23/11/2026, depois da fase B2) também checklists, treinamentos, boas ideias, postos próximos e minha nota quando desligados para o motorista. Gastos, colisões, manutenção e histórico continuam só ocultos no App.
 12. **Matriz dos perfis:** um rascunho único, compartilhado, e Publicar. A confirmação mostra o que muda, quantos motoristas são afetados e quantas pendências ficam sem aviso; nota opcional.
 13. **Exceções e grupo piloto valem na hora**, com histórico.
 14. **Voltar a uma versão** carrega a versão como rascunho; só vale depois de Publicar.
@@ -148,6 +148,13 @@ Publicar cria a versão seguinte como Publicada, marca a anterior como Substitu�
 - **Cobrança por QR:** o `QrChargePlugin` troca a leitura de `cr40f_podecobrarqrcode` pela chave `services.qrCharge`.
 - **Termo de multa:** as Custom APIs do módulo (`new_MinhasMultas`, `new_DeclararAceiteMulta`, `new_AssinarTermoMulta`, `new_ContestarTermoMulta`) recusam com a chave `multas` desligada.
 - **Recibo personalizado:** hoje não passa por plugin. Entra um step síncrono no Create de `cr40f_recibos_v2` que recusa com `services.personalReceipt` desligada.
+- **Demais módulos (decisão de 23/11/2026).** Só recusa quando quem chama é o próprio motorista (usuário → ficha por e-mail, ficha ativa); gestão, administrador, conta de serviço e usuário sem ficha nunca são recusados. Falha ao ler a configuração libera (só trace). Mensagem curta no padrão "<Módulo> não está disponível no seu App no momento. Procure o escritório.".
+  - `checklists`: Custom API `new_ConcluirChecklistVeiculo` (`ChecklistCommandPlugin.Conclude`), depois do vínculo conferido e do retorno idempotente de checklist já concluído (reenvio após resposta perdida nunca vira erro). Pedir, reatribuir, cancelar e reenviar push são da gestão e não são barrados.
+  - `postosProximos`: Custom APIs `new_ObterRankingPostos` (`FuelRankingPlugin.Run`) e `new_AvaliarPosto` (`PostoAvaliacaoPlugin`), depois de resolver o motorista do usuário.
+  - `minhaNota`: Custom API `new_NotaInfleet` (`NotaInfleetPlugin`), idem.
+  - Esses três usam `AppConfigGuarda.Exigir` (`Betinhos.DriverRecordSharing`), sobre o `AppConfigLeitor` já existente.
+  - `ideas` (Create em `cr40f_boasideias`) e `treinamentos` (Update em `cr40f_treinamentoparticipacao`): um único plugin genérico por tabela, `Cr40f.Acesso.Plugin.AppConfigBloqueioPlugin` (regras em `AppConfigBloqueios`, escolhidas por mensagem + tabela), dois steps síncronos PreOperation registrados pelo `Cr40f.Acesso.Registrar`. Ideias: o Create do Planner do shell passa (gestão). Treinamentos: só recusa quando o `cr40f_funcionario` da participação é a ficha do chamador, e o step só dispara pelas colunas que o motorista grava (abertura, confirmação, assinatura, quiz, conteúdo lido); o push e o lembrete do flow não passam por aqui.
+  - No App, a fila offline (`features/envio-pendente`) já trata a recusa como erro de negócio (`falhou`, sem reenvio automático); o indicador agora mostra a frase do servidor e oferece só "Descartar". Treinamentos mostra a frase em vez do texto genérico.
 
 Esses plugins estão no assembly `Betinhos.DriverRecordSharing`, e as Custom APIs novas no `Cr40f.Acesso.Plugin`. O resolvedor em C# é um arquivo de código incluído nos dois, como já acontece com o `SecretReader.cs` (existe uma cópia em cada assembly que o usa).
 
@@ -236,7 +243,7 @@ O PR #648 (hotfix do `MULTAS_OCULTO`) entra na `develop` antes da fase B.
 
 ## 10. Limites conhecidos
 
-- O servidor só recusa as três funções sensíveis. Para os outros módulos, desligar esconde no App mas não impede uma chamada direta à Web API por quem tem o papel do motorista.
+- O servidor recusa as três funções sensíveis e, desde 23/11/2026, checklists, treinamentos, boas ideias, postos próximos e minha nota. Para Gastos, Colisões, Manutenção e Histórico, desligar esconde no App mas não impede uma chamada direta à Web API por quem tem o papel do motorista.
 - A mudança publicada só chega quando o App confere a configuração. Quem deixa o App aberto na mesma tela continua vendo o que já estava aberto.
 - Um aparelho que nunca leu a configuração e está sem rede mostra o padrão do catálogo, que pode ser diferente da versão publicada.
 - O preview usa dados de exemplo: mostra o que aparece e o que some, não os serviços reais do motorista.

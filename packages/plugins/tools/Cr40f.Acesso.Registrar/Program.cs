@@ -32,6 +32,12 @@ const string ApiAppConfigPessoa = "cr40f_AppConfigDefinirPessoa";
 // Recibo personalizado (fase B2): step sincrono PreOperation no Create de cr40f_recibos_v2, sem configuracao.
 const string TipoReciboPersonalizado = "Cr40f.Acesso.Plugin.ReciboPersonalizadoPlugin";
 const string StepReciboPersonalizado = "Cr40f.Acesso: recibo personalizado (Create cr40f_recibos_v2)";
+// Bloqueio generico dos modulos desligados no App (ideias e treinamentos): um tipo, dois steps sincronos PreOperation, sem configuracao.
+// O Update da participacao so dispara pelas colunas que o motorista grava (o push e o lembrete do flow nao passam por aqui).
+const string TipoAppConfigBloqueio = "Cr40f.Acesso.Plugin.AppConfigBloqueioPlugin";
+const string StepBloqueioIdeias = "Cr40f.Acesso: bloqueio ideias (Create cr40f_boasideias)";
+const string StepBloqueioTreinamentos = "Cr40f.Acesso: bloqueio treinamentos (Update cr40f_treinamentoparticipacao)";
+const string ColunasBloqueioTreinamentos = "cr40f_abertoem,cr40f_confirmadoem,cr40f_assinadoem,cr40f_nomeassinante,cr40f_assinaturajson,cr40f_nota,cr40f_aprovado,cr40f_tentativas,cr40f_respostasjson,cr40f_concluidoem,cr40f_conteudosnapshot,cr40f_conteudohash";
 const int PluginAssemblyComponentType = 91;
 
 Log("autenticando no Dataverse");
@@ -63,6 +69,7 @@ var tipoAppConfigRascunho = UpsertPluginType(service, assemblyId, TipoAppConfigR
 var tipoAppConfigPublicar = UpsertPluginType(service, assemblyId, TipoAppConfigPublicar);
 var tipoAppConfigPessoa = UpsertPluginType(service, assemblyId, TipoAppConfigPessoa);
 var tipoReciboPersonalizado = UpsertPluginType(service, assemblyId, TipoReciboPersonalizado);
+var tipoAppConfigBloqueio = UpsertPluginType(service, assemblyId, TipoAppConfigBloqueio);
 
 // Tipos de parametro/resposta (customapirequestparameter.type): 0 = Boolean, 7 = Integer, 10 = String, 12 = Guid (8 seria Money).
 EnsureCustomApi(service, ApiCadastrar, "Acesso | Cadastrar acesso de motorista", "Cria conta Microsoft, licenca, grupo e funcionario; devolve credenciais e etapas.", solutionUniqueName,
@@ -94,6 +101,8 @@ EnsureApiStep(service, tipoAppConfigRascunho, ApiAppConfigRascunho, "Cr40f.Acess
 EnsureApiStep(service, tipoAppConfigPublicar, ApiAppConfigPublicar, "Cr40f.Acesso: configuracao do App publicar", "", solutionUniqueName);
 EnsureApiStep(service, tipoAppConfigPessoa, ApiAppConfigPessoa, "Cr40f.Acesso: configuracao do App definir pessoa", "", solutionUniqueName);
 EnsureEntityStep(service, tipoReciboPersonalizado, "Create", "cr40f_recibos_v2", StepReciboPersonalizado, solutionUniqueName);
+EnsureEntityStep(service, tipoAppConfigBloqueio, "Create", "cr40f_boasideias", StepBloqueioIdeias, solutionUniqueName);
+EnsureEntityStep(service, tipoAppConfigBloqueio, "Update", "cr40f_treinamentoparticipacao", StepBloqueioTreinamentos, solutionUniqueName, ColunasBloqueioTreinamentos);
 
 if (publish)
 {
@@ -193,13 +202,14 @@ static void EnsureApiStep(ServiceClient service, Guid pluginTypeId, string messa
     Log($"step criado: {name}");
 }
 
-/// <summary>Step sincrono PreOperation (stage 20) idempotente por nome numa mensagem de tabela (ex.: Create).</summary>
-static void EnsureEntityStep(ServiceClient service, Guid pluginTypeId, string messageName, string entidade, string name, string solution)
+/// <summary>Step sincrono PreOperation (stage 20) idempotente por nome numa mensagem de tabela (ex.: Create). filteringAttributes (Update) limita as colunas que disparam o step.</summary>
+static void EnsureEntityStep(ServiceClient service, Guid pluginTypeId, string messageName, string entidade, string name, string solution, string? filteringAttributes = null)
 {
     var dados = new Entity("sdkmessageprocessingstep")
     {
         ["stage"] = new OptionSetValue(20), ["mode"] = new OptionSetValue(0), ["rank"] = 1, ["eventhandler"] = Ref("plugintype", pluginTypeId),
     };
+    if (filteringAttributes is not null) dados["filteringattributes"] = filteringAttributes;
     Guid stepId;
     if (FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name)) is { } existing)
     {

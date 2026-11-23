@@ -21,6 +21,9 @@ namespace Betinhos.DriverRecordSharing
         public const string ChaveMultas = "multas";
         public const string ChaveCobrarQr = AppConfigLegado.ChaveCobrarQr;
         public const string ChaveReciboPersonalizado = AppConfigLegado.ChaveReciboPersonalizado;
+        public const string ChaveChecklists = "checklists";
+        public const string ChavePostosProximos = "postosProximos";
+        public const string ChaveMinhaNota = "minhaNota";
 
         private readonly IOrganizationService system;
         private readonly Func<DateTime> utcNow;

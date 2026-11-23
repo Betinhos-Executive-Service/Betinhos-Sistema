@@ -33,6 +33,9 @@ export function EnvioPendenteIndicador({ agendaOfflineEm = null, descartar, esco
     acoes = <button type="button" onClick={() => void escolherCarro(comAcao)}>Escolher carro</button>;
   } else if (situacao === "sessao") {
     acoes = <button type="button" onClick={() => window.location.reload()}>Entrar de novo</button>;
+  } else if (comAcao && situacao === "recusado") {
+    // Recusa da configuração do App: reenviar não resolve; só dá para descartar.
+    acoes = <button type="button" onClick={() => setDescartando(comAcao)}>Descartar</button>;
   } else if (comAcao) {
     acoes = (
       <>

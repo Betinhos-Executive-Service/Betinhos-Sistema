@@ -115,6 +115,10 @@ public sealed class AppConfigRepository
         return _service.RetrieveMultiple(q).Entities.Select(MapearFicha).FirstOrDefault();
     }
 
+    /// <summary>Funcionário apontado por um lookup de outro registro (ex.: dono de uma participação de treinamento). null se o lookup está vazio.</summary>
+    public Guid? DonoDoRegistro(string tabela, Guid id, string colunaFuncionario) =>
+        _service.Retrieve(tabela, id, new ColumnSet(colunaFuncionario)).GetAttributeValue<EntityReference>(colunaFuncionario)?.Id;
+
     /// <summary>E-mail do usuário do Dataverse (internalemailaddress, ou domainname se vazio).</summary>
     public string? EmailDoUsuario(Guid userId)
     {

@@ -28,6 +28,7 @@ namespace Betinhos.DriverRecordSharing
         {
             var driver = new DriverResolver(system, tracing).ResolveFromUser(new EntityReference(PluginConfig.UserTable, userId));
             if (driver?.EmployeeReference == null) return FuelReportPlugin.SemMotoristaJson();
+            AppConfigGuarda.Exigir(system, driver.EmployeeReference.Id, AppConfigLeitor.ChavePostosProximos, AppConfigGuarda.PostosProximosDesligado, tracing, () => nowUtc);
 
             var repo = new FuelRepository(system);
             var abastecimentos = repo.LoadFleetFuelings(nowUtc.AddDays(-FuelRanking.JanelaDias)).Select(Mapear).ToList();

@@ -21,6 +21,7 @@ namespace Betinhos.DriverRecordSharing
             var factory = (IOrganizationServiceFactory)serviceProvider.GetService(typeof(IOrganizationServiceFactory));
             var caller = factory.CreateOrganizationService(context.InitiatingUserId);
             var system = factory.CreateOrganizationService(null);
+            var tracing = (ITracingService)serviceProvider.GetService(typeof(ITracingService));
 
             try
             {
@@ -36,7 +37,7 @@ namespace Betinhos.DriverRecordSharing
                         RequestAssignment(context, caller, system);
                         break;
                     case "new_ConcluirChecklistVeiculo":
-                        Conclude(context, system);
+                        Conclude(context, system, tracing);
                         break;
                     case "new_CancelarChecklistVeiculo":
                         Cancel(context, caller, system);
@@ -208,13 +209,15 @@ namespace Betinhos.DriverRecordSharing
             return checklist;
         }
 
-        private static void Conclude(IPluginExecutionContext context, IOrganizationService system)
+        private static void Conclude(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
         {
             var checklist = ChecklistForCaller(context, system);
             var state = Choice(checklist, "new_estado");
             // Repetição após resposta perdida não deve falhar nem duplicar fotos.
             if (state == Concluido) return;
             if (state != Pendente) throw new InvalidPluginExecutionException("Este checklist não está mais pendente.");
+            // Módulo desligado para o motorista na configuração do App: recusa só aqui, depois do vínculo conferido (quem chega é o próprio motorista).
+            AppConfigGuarda.Exigir(system, checklist.GetAttributeValue<EntityReference>("new_motorista").Id, AppConfigLeitor.ChaveChecklists, AppConfigGuarda.ChecklistsDesligado, tracing, () => DateTime.UtcNow);
 
             var answers = ChecklistAnswers.Validate(checklist.GetAttributeValue<string>("new_itensjson"), InputString(context, "new_RespostasJson"));
             var owner = new EntityReference("systemuser", context.InitiatingUserId);

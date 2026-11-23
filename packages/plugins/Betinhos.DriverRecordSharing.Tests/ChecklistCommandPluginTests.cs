@@ -282,6 +282,40 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Empty(service.Updated);
         }
 
+        private static void DesligarChecklists(FakeService service) => service.Rows("cr40f_appconfigversao").Add(new Entity("cr40f_appconfigversao", Guid.NewGuid())
+        {
+            ["cr40f_numero"] = 1, ["cr40f_estado"] = new OptionSetValue(100000001), ["cr40f_conteudo"] = "{\"proprio\":{\"checklists\":false},\"terceiro\":{}}"
+        });
+
+        [Fact]
+        public void ConclusaoComChecklistsDesligadosNoAppEhRecusadaSemGravar()
+        {
+            var service = new FakeService();
+            var pending = PendingForDriver(service);
+            DesligarChecklists(service);
+            var answers = Answers(pending.Items, "https://x.test/1", "1", "");
+
+            var error = Assert.Throws<TargetInvocationException>(() => Invoke("Conclude", Context(pending.User.Id, P("new_ChecklistId", pending.Checklist.Id), P("new_RespostasJson", answers)), service));
+
+            Assert.Equal(AppConfigGuarda.ChecklistsDesligado, error.InnerException.Message);
+            Assert.Equal(Pendente, Choice(pending.Checklist, "new_estado"));
+            Assert.DoesNotContain(service.Created, row => row.LogicalName == "new_checklistveiculofoto");
+        }
+
+        [Fact]
+        public void ConclusaoRepetidaDepoisDeConcluidoPassaMesmoComChecklistsDesligados()
+        {
+            var service = new FakeService();
+            var pending = PendingForDriver(service);
+            var context = Context(pending.User.Id, P("new_ChecklistId", pending.Checklist.Id), P("new_RespostasJson", Answers(pending.Items, "https://x.test/1", "1", "")));
+            Invoke("Conclude", context, service);
+            DesligarChecklists(service);
+
+            Invoke("Conclude", context, service); // resposta perdida: o reenvio não pode virar erro
+
+            Assert.Equal(Concluido, Choice(pending.Checklist, "new_estado"));
+        }
+
         [Fact]
         public void MotoristaConcluiComFotosEValores()
         {
@@ -657,7 +691,10 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var flags = BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public;
             var target = typeof(ChecklistCommandPlugin).GetMethod(method, flags) ?? typeof(ChecklistFactory).GetMethod(method, flags);
-            target.Invoke(null, args);
+            // Parâmetros extras opcionais (ex.: ITracingService do Conclude) ficam nulos.
+            var completo = new object[target.GetParameters().Length];
+            Array.Copy(args, completo, args.Length);
+            target.Invoke(null, completo);
         }
 
         private static KeyValuePair<string, object> P(string key, object value) => new KeyValuePair<string, object>(key, value);
