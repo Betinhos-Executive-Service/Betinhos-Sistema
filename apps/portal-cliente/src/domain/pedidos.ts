@@ -66,3 +66,7 @@ export function nomeDoEmail(email: string): string {
 }
 
 export const dominioDe = (email: string) => email.split('@')[1] ?? ''
+
+/** Só pedido ainda em Solicitado (antes de a operação mexer) pode ser cancelado pelo portal. */
+export const podeCancelar = (status: StatusPedido) => status === 'solicitado'
+export const MSG_NAO_CANCELA = 'Este pedido já está com a operação. Para cancelar, fale com a Betinhos.'

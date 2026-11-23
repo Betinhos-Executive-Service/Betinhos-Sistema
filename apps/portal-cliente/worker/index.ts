@@ -7,7 +7,7 @@ import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
 import type { Env } from './env'
 import { erro } from './http'
-import { criarPedido, listarPedidos } from './pedidos'
+import { cancelarPedido, criarPedido, listarPedidos } from './pedidos'
 import { abrirDuvida, aprovar, listar, responder } from './servicos'
 
 const SEGURANCA: Record<string, string> = {
@@ -59,6 +59,8 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   const com = (modulo: Modulo, rodar: () => Promise<Response>) => (sessao.modulos.includes(modulo) ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
   if (rota === 'POST /pedidos') return com('pedir', () => criarPedido(req, c, sessao))
   if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
+  const cancelar = /^POST \/pedidos\/([^/]+)\/cancelar$/.exec(rota)
+  if (cancelar) return com('meus_servicos', () => cancelarPedido(c, sessao, cancelar[1]))
   if (rota === 'GET /servicos') return com('validar', () => listar(c, sessao))
   if (rota === 'POST /servicos/aprovar') return com('validar', () => aprovar(req, c, sessao))
   const m = /^POST \/servicos\/([^/]+)\/(duvida|responder)$/.exec(rota)

@@ -33,4 +33,6 @@ export interface PortalApi {
   pedir(novo: NovoPedido): Promise<Pedido>
   /** Módulo Meus serviços: pedidos feitos pelo e-mail da sessão, do mais recente para o mais antigo. */
   meusServicos(): Promise<Pedido[]>
+  /** Cancela um pedido do próprio usuário ainda em Solicitado; senão `nao_permitido` com a mensagem para a tela. */
+  cancelarPedido(id: string): Promise<Pedido>
 }

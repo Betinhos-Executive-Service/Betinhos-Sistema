@@ -188,6 +188,8 @@ describe('mockApi multi-cliente', () => {
     relogio.t += 61_000
     await expect(api.pedir(novo)).resolves.toMatchObject({ status: 'solicitado' })
     await expect(api.pedir({ ...novo, origem: '' })).rejects.toMatchObject({ message: 'Informe o endereço de saída.' })
+    await expect(api.cancelarPedido(criado.id)).resolves.toMatchObject({ id: criado.id, status: 'cancelado' })
+    await expect(api.cancelarPedido(criado.id)).rejects.toMatchObject({ message: expect.stringContaining('fale com a Betinhos') })
   })
 
   it('outro e-mail do mesmo domínio começa sem pedidos', async () => {

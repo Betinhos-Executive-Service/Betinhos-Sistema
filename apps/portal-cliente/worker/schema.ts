@@ -19,6 +19,7 @@ export const MODULO_DV = { validar: 100000000, pedir: 100000001, meus_servicos: 
 
 /** cr40f_status da reserva (metadata DEV 08/10/2026) → situação vista pelo solicitante. */
 export const RESERVA_SOLICITADO = 202410004
+export const RESERVA_CANCELADO = 202410002
 export const PEDIDO_STATUS: Record<number, StatusPedido> = {
   [RESERVA_SOLICITADO]: 'solicitado',
   202410000: 'em_analise', // Pré-reserva

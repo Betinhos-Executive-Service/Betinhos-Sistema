@@ -76,5 +76,9 @@ export const clientesPorDominio = (dominio: string) =>
 export const pedidosDe = (validadorId: string, clienteId: string) =>
   `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
 
+/** Um pedido do usuário (e do cliente da sessão), com a observação interna para o cancelamento acrescentar a nota. */
+export const pedidoDe = (id: string, validadorId: string, clienteId: string) =>
+  `${SET.reserva}?$select=${[...PEDIDO_CAMPOS, 'cr40f_observaointerna'].join(',')}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)} and cr40f_reservadeveculosid eq ${guid(id)}`)}`
+
 /** Caminho do POST da reserva: o `$select` define o que volta no `return=representation`. */
 export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}`
