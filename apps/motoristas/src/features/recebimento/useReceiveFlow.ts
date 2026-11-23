@@ -9,7 +9,7 @@ import { hasMediaDraftContent, revokePreviewUrl } from "../fotos/mediaDrafts";
 import type { CapturedVideoDraft, DetailData, Screen } from "../../types";
 import type { RemoteOperation } from "../../shared/ui/FlowProgressOverlay";
 import { wait } from "../../shared/wait";
-import { isTrueLike } from "../../shared/isTrueLike";
+import { useConfigApp } from "../../app/configApp";
 import { loadFinalizeDraftAssets } from "../finalizar/rascunhos";
 import { isVideoMediaDraft, prepareMediaDraftForUpload } from "../fotos/envioMidia";
 import { useMediaDraftState } from "../fotos/useMediaDraftState";
@@ -18,7 +18,6 @@ type Options = {
   blockIfNotFirstPending: (detail?: DetailData | null) => boolean;
   checkReceiveProof: (photo: ExpensePhoto) => Promise<number | null>;
   driverContext: DriverContext | null;
-  isLocalhostRuntime: boolean;
   logAppError: (error: unknown, action: string, phase?: string) => void;
   remoteMode: boolean;
   remoteOperation: RemoteOperation | null;
@@ -30,7 +29,7 @@ type Options = {
 };
 
 // Recebimento do serviço: comprovantes (fotos/vídeos), cobrança por QR (pagos nesta sessão e resumo do plugin) e passo seguinte do fluxo.
-export function useReceiveFlow({ blockIfNotFirstPending, checkReceiveProof, driverContext, isLocalhostRuntime, logAppError, remoteMode, remoteOperation, screen, selectedDetail, setCriticalError, setRemoteOperation, setScreen }: Options) {
+export function useReceiveFlow({ blockIfNotFirstPending, checkReceiveProof, driverContext, logAppError, remoteMode, remoteOperation, screen, selectedDetail, setCriticalError, setRemoteOperation, setScreen }: Options) {
   const [receiveProofs, setReceiveProofs] = useState<Record<string, ExpensePhoto[]>>(() => loadFinalizeDraftAssets().receiveProofs);
   // Cobranças pagas por QR nesta sessão (serviço → sessão do Stripe → centavos). O registro definitivo fica no
   // Dataverse (cr40f_cobrancastripe) e volta pelo resumo do plugin, que sobrevive a recarregar a página.
@@ -50,7 +49,8 @@ export function useReceiveFlow({ blockIfNotFirstPending, checkReceiveProof, driv
     clear: clearReceivePhotoDraftState
   } = useMediaDraftState();
   const [receivePreviewPhotoId, setReceivePreviewPhotoId] = useState("");
-  const canChargeByQr = isTrueLike(driverContext?.funcionario?.cr40f_podecobrarqrcode) || isLocalhostRuntime;
+  // Vem da configuração do App por perfil (chave services.qrCharge), não mais da coluna do funcionário.
+  const canChargeByQr = useConfigApp().ligado("services.qrCharge");
   const sumQrChargesPaid = (paid: Record<string, number> | undefined) => Object.values(paid ?? {}).reduce((total, cents) => total + cents, 0);
   const qrChargeState = (detail: DetailData, localPaid = qrChargesPaid[detail.id]) =>
     getQrChargeReceiveState(getReceivableCents(detail), qrChargeSummaries[detail.id]?.summary, sumQrChargesPaid(localPaid));

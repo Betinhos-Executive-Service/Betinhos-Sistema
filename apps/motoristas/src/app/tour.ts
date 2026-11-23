@@ -14,6 +14,8 @@ export type TourStep = {
   within?: string;
   /** Passo que só existe em certas situações (sem dado, outro tipo de serviço). Ausente: pulado sem erro. */
   optional?: boolean;
+  /** Chave do catálogo da configuração do App (ex.: "multas"): o passo some quando o módulo está desligado para o motorista. */
+  modulo?: string;
 };
 
 export type TourChapter = {

@@ -110,6 +110,28 @@
     "restoreScroll",
     "useCameraScroll"
   ],
+  "src/app/configApp.ts": [
+    "AVISO_MODULO_DESLIGADO",
+    "CONFIG_STORAGE_KEY",
+    "ConfigGuardada",
+    "Dependencias",
+    "FonteConfig",
+    "INTERVALO_RELEITURA_MS",
+    "MENSAGEM_PREVIEW_CONFIG",
+    "MENSAGEM_PREVIEW_PRONTO",
+    "chaveDaTela",
+    "configApp",
+    "criarConfigApp",
+    "iniciarPreview",
+    "lerGuardada",
+    "lerResultado",
+    "ligado",
+    "ligadoEm",
+    "precisaReler",
+    "reservaDoPadrao",
+    "useConfigApp",
+    "validarConfig"
+  ],
   "src/app/detailFlow.ts": [
     "getScreenAfterQrPayment",
     "getServiceTaskBackScreen",
@@ -128,9 +150,6 @@
   "src/app/modo.ts": [
     "Modo",
     "detectarModo"
-  ],
-  "src/app/modulosOcultos.ts": [
-    "MULTAS_OCULTO"
   ],
   "src/app/navigation.ts": [
     "AUTO_REFRESH_INTERVAL_MS",
@@ -152,7 +171,8 @@
   ],
   "src/app/rotaInicial.ts": [
     "findDetailFromHashRoute",
-    "getInitialScreenFromHashRoute"
+    "getInitialScreenFromHashRoute",
+    "telaPermitida"
   ],
   "src/app/tour.ts": [
     "READING_TOUR_ID",
@@ -258,6 +278,16 @@
   ],
   "src/shared/isTrueLike.ts": [
     "isTrueLike"
+  ],
+  "src/shared/modoPreview.ts": [
+    "isLocalHostname",
+    "isMockRuntime",
+    "isPreviewMode",
+    "isPreviewOriginAllowed",
+    "isPreviewSearch"
+  ],
+  "src/shared/previewIsolamento.ts": [
+    "isolarArmazenamentoDoPreview"
   ],
   "src/shared/useDitado.ts": [
     "DITADO_IDLE",

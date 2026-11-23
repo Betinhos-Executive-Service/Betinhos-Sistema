@@ -1,6 +1,7 @@
 // Web Push do PWA: decide se o botão "Ativar notificações" aparece, inscreve o aparelho e grava a
 // inscrição no Dataverse. Fica desligado enquanto WEB_PUSH_PUBLIC_KEY estiver vazia (chave VAPID
 // pública entregue pela fatia do emissor; ver docs/plano-web-push-pwa.md).
+import { isPreviewMode } from "../shared/modoPreview.ts";
 import { isPwaContext, PWA_SW_NAME } from "./pwaManifest.ts";
 
 export const WEB_PUSH_PUBLIC_KEY = "BK2LY-2VoaOD-NeaKUWES7tlTkiRp6hi9m0HIXjl9h2esv9Pf3RJw3JptCJ3wrJrt5cLGGQVUcVACN5wvot7jMo";
@@ -75,7 +76,8 @@ async function getRegistration() {
 }
 
 export async function getWebPushState(driverId?: string): Promise<WebPushState> {
-  const pwaContext = isPwaContext();
+  // Preview da tela de Configuração: sem push (estado "off").
+  const pwaContext = isPwaContext() && !isPreviewMode();
   const hasApis = typeof navigator !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   let subscribed = false;
   if (WEB_PUSH_PUBLIC_KEY && pwaContext && hasApis) {

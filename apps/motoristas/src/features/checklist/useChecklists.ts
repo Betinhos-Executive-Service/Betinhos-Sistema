@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { ToastTone } from "../../shared/ui/LocalToast";
 import { getInitialChecklistId } from "../../app/bootstrap";
+import { AVISO_MODULO_DESLIGADO, configApp } from "../../app/configApp";
 import type { PortaDados } from "../../data/porta";
 import { hasDataverseRuntime } from "../../data/dataverse/cliente";
 import { reportAppError } from "../../shared/appErrorLogger";
@@ -39,6 +40,12 @@ export function useChecklists({ dados, driverIdRef, previewMode, setScreen, setT
   useEffect(() => {
     const deepLinkId = pendingChecklistDeepLinkRef.current;
     if (!deepLinkId || previewMode) return;
+    // Módulo Checklists desligado na configuração do App: o push não abre o checklist, o motorista fica no Início.
+    if (!configApp.ligado("checklists")) {
+      pendingChecklistDeepLinkRef.current = "";
+      setToast(AVISO_MODULO_DESLIGADO, "warning");
+      return;
+    }
     if (!hasDataverseRuntime() && !isMockChecklists()) return;
     let alive = true;
     dados.carregarChecklist(deepLinkId)

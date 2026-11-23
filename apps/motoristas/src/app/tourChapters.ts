@@ -2,9 +2,8 @@
 // Cada passo aponta para um elemento real da tela por seletor CSS; passo `optional` some sem erro quando
 // o elemento não existe (outro tipo de serviço, lista vazia, recurso não liberado para o motorista).
 import type { TourChapter, TourStep } from "./tour";
-import { MULTAS_OCULTO } from "./modulosOcultos.ts";
 
-type StepExtras = Pick<TourStep, "target" | "match" | "within" | "optional">;
+type StepExtras = Pick<TourStep, "target" | "match" | "within" | "optional" | "modulo">;
 
 const dt = (value: string) => `[data-tour="${value}"]`;
 const step = (id: string, title: string, text: readonly string[], extras: StepExtras = {}): TourStep => ({ id, title, text, ...extras });
@@ -54,7 +53,7 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       ], { target: ".concept-tile-grid" }),
       step("historico", "Histórico", [
         "Os serviços que você já finalizou, em ordem, com busca. É só consulta: dá para rever horário, trajeto e dados, mas não editar."
-      ], { target: dt("history") }),
+      ], { target: dt("history"), modulo: "history" }),
       step("comunicados", "Comunicados", [
         "Avisos da operação para os motoristas. Alguns são só informativos; outros exigem ciência com assinatura na tela.",
         "O número no ícone é quantos ainda esperam por você."
@@ -62,41 +61,41 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       step("checklists", "Checklist", [
         "A vistoria do seu veículo, feita com fotos. A operação pede uma vistoria a cada 15 dias e avisa por notificação.",
         "Inclui o recebimento do carro, com o nome de quem o entregou."
-      ], { target: dt("checklists") }),
+      ], { target: dt("checklists"), modulo: "checklists" }),
       step("multas", "Multas", [
         "Termos de multa para você assinar ou contestar. Cada termo mostra o prazo e o que você estaria aceitando, como o desconto em folha.",
         "A assinatura é feita no celular, com selfie e localização. Se não concordar, você contesta e conversa com o gestor de frota."
-      ], { target: dt("multas"), optional: MULTAS_OCULTO }),
+      ], { target: dt("multas"), modulo: "multas" }),
       step("treinamentos", "Treinamentos", [
         "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
         "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."
-      ], { target: dt("treinamentos") }),
+      ], { target: dt("treinamentos"), modulo: "treinamentos" }),
       step("minha-nota", "Minha nota", [
         "A nota de condução da Infleet, com as notas por comportamento e a evolução dos últimos 6 meses."
-      ], { target: dt("minhaNota") }),
+      ], { target: dt("minhaNota"), modulo: "minhaNota" }),
       step("postos-proximos", "Postos próximos", [
         "Um mapa com os postos da rede CTF perto de você, para abastecer com o cartão. Toque num pino para ver o endereço e abrir a rota no Maps ou no Waze."
-      ], { target: dt("postosProximos") }),
+      ], { target: dt("postosProximos"), modulo: "postosProximos" }),
       step("manutencao", "Manutenção", [
         "Notou ruído, luz acesa no painel ou pneu vibrando? Solicite o reparo aqui, com a gravidade, a descrição e fotos.",
         "O pedido é enviado para a equipe da Betinhos."
-      ], { target: dt("maintenancePhoto") }),
+      ], { target: dt("maintenancePhoto"), modulo: "maintenancePhoto" }),
       step("gastos", "Gastos", [
         "Abastecimento, pedágio, estacionamento, hospedagem e outras despesas: fotografe o comprovante e registre.",
         "Se não há nada em andamento, o botão já abre a câmera. O app lê a foto e preenche os dados por você."
-      ], { target: dt("expenses") }),
+      ], { target: dt("expenses"), modulo: "expenses" }),
       step("colisoes", "Colisões", [
         "Em caso de batida, abra aqui. A primeira pergunta é se alguém se feriu, com ligação direta para SAMU (192) e Polícia (190).",
         "Depois você escolhe \"Eu bati\" ou \"Bateram em mim\" e registra o ocorrido com fotos."
-      ], { target: dt("collisions") }),
+      ], { target: dt("collisions"), modulo: "collisions" }),
       step("recibo", "Recibo personalizado", [
         "Gera, na hora, um recibo em PDF com o nome do pagante, o cliente, o idioma e o valor total, e permite enviá-lo ao cliente.",
         "Esse botão só aparece para quem tem a permissão liberada pela operação."
-      ], { target: dt("personalReceipt"), optional: true }),
+      ], { target: dt("personalReceipt"), optional: true, modulo: "services.personalReceipt" }),
       step("ideias", "Boas ideias", [
         "Sugira melhorias para a operação: um título e, se quiser, como a ideia funcionaria.",
         "A equipe avalia, e você acompanha o status das suas ideias na mesma tela."
-      ], { target: dt("ideas") }),
+      ], { target: dt("ideas"), modulo: "ideas" }),
       step("atualizar", "Puxar para atualizar", [
         "Arraste a tela para baixo e solte para atualizar a agenda e os avisos na hora.",
         "O app também atualiza sozinho, a cada minuto."
@@ -889,8 +888,11 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
 const CHAPTERS_BY_ID = new Map(TOUR_CHAPTERS.map((chapter) => [chapter.id, chapter]));
 
 /** Capítulos candidatos da tela, do mais específico (com probe) para o mais geral. */
-export function tourChaptersForScreen(screen: string): TourChapter[] {
-  return (CHAPTER_IDS_BY_SCREEN[screen] ?? []).flatMap((id) => CHAPTERS_BY_ID.get(id) ?? []);
+export function tourChaptersForScreen(screen: string, ligado: (chave: string) => boolean = () => true): TourChapter[] {
+  return (CHAPTER_IDS_BY_SCREEN[screen] ?? [])
+    .flatMap((id) => CHAPTERS_BY_ID.get(id) ?? [])
+    // Passo de módulo desligado na configuração do App some do tour.
+    .map((chapter) => ({ ...chapter, steps: chapter.steps.filter((item) => !item.modulo || ligado(item.modulo)) }));
 }
 
 export function tourScreensWithChapters(): string[] {

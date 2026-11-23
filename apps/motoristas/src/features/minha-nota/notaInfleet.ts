@@ -1,4 +1,5 @@
 import { executeCustomApi } from "../../data/dataverse/customApi.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 
 // Nota de condução da Infleet (Custom API new_NotaInfleet). Fora do Dataverse usa dados fictícios.
 export type Comportamento = { chave: string; rotulo: string; nota: number };
@@ -84,7 +85,7 @@ export function atualizadaEm(iso: string): string {
   return `Atualizada em ${p.day}/${p.month} às ${p.hour}:${p.minute}`;
 }
 
-const isMockNotaInfleet = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+const isMockNotaInfleet = () => isMockRuntime();
 
 const MOCK: Extract<NotaInfleet, { situacao: "ok" }> = {
   situacao: "ok", inicio: "2026-08-21", fim: "2026-11-19", km: 5156.2, nota: 82.9, sincronizadoEm: "2026-11-19T08:00:05Z",

@@ -9,13 +9,14 @@
     "typecheck": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "deploy:webresource": "powershell -ExecutionPolicy Bypass -File scripts/deploy-webresource.ps1",
     "check:hygiene": "node --test --experimental-strip-types tests/repositoryHygiene.test.ts",
-    "test": "node --test --experimental-strip-types tests/*.test.ts",
+    "test": "node --import ./tests/helpers/resolver-sem-extensao.mjs --test --experimental-strip-types tests/*.test.ts",
     "preview": "node scripts/serve-dist.cjs",
     "demo:capture": "node scripts/capture-demo-screens.cjs",
     "demo:render": "remotion render remotion/index.ts AppMotoristasDemo remotion-output/app-motoristas-demo.mp4",
     "demo:video": "pnpm demo:capture && pnpm demo:render"
   },
   "dependencies": {
+    "@betinhos/app-config": "workspace:*",
     "@betinhos-executive-service/ui": "1.18.0",
     "chart.js": "4.4.1",
     "chartjs-plugin-datalabels": "2.2.0",

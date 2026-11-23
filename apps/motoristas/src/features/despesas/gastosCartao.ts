@@ -1,4 +1,5 @@
 import { cleanGuid, GUID_PATTERN } from "../comunicados/comunicados.ts";
+import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { retrieveMultiple } from "../../data/dataverse/cliente.ts";
 import { normalizeExpenseFields } from "./expenses.reference.ts";
@@ -32,7 +33,7 @@ export type GastoCartao = {
 
 export type GastosCartaoLoadStatus = "loading" | "ready" | "error";
 
-export const isMockGastosCartao = () => ["localhost", "127.0.0.1"].includes(window.location?.hostname ?? "");
+export const isMockGastosCartao = () => isMockRuntime();
 
 const GASTO_SELECT = "$select=cr40f_despesaoperacionalid,cr40f_nome,cr40f_valor,cr40f_datagasto,cr40f_estabelecimento,cr40f_observacao,cr40f_kminformado,cr40f_litros,_cr40f_categoria_value,_cr40f_formapagamento_value,_cr40f_cidade_value,_cr40f_veiculo_value";
 
