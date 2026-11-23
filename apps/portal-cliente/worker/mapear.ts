@@ -33,8 +33,8 @@ export function mapearServico(v: Registro, mensagens: Mensagem[] = []): Servico 
   if (!status || status === 'retirado') return null
   const reserva = (v[NAV.reserva] ?? undefined) as Registro | undefined
   const comp = (reserva?.[NAV.composicao] ?? undefined) as Registro | undefined
-  // A ordem vem do $orderby do $expand (odata.ts).
-  const filhos = (reserva?.[NAV.passageiros] ?? []) as Registro[]
+  // O Dataverse recusa $orderby no 1:N aninhado; a ordem sai daqui.
+  const filhos = ((reserva?.[NAV.passageiros] ?? []) as Registro[]).slice().sort((a, b) => (num(a, 'cr40f_ordemdeselecao') ?? 1e9) - (num(b, 'cr40f_ordemdeselecao') ?? 1e9))
   const passageiros = filhos.map((f) => rotulo(f, '_cr40f_bancodedados_value')).filter(Boolean)
   const valorAnterior = num(v, 'cr40f_valoranterior')
   return {
