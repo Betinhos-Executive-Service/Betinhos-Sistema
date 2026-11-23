@@ -31,7 +31,7 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             public Mundo(int? vinculo = 0, bool colunaQr = false, bool colunaRecibo = false)
             {
-                Ficha = Service.Driver("Motorista", "m@betinhos.com.br", null, null);
+                Ficha = Service.Driver("Motorista", "m@exemplo.test", null, null);
                 if (vinculo.HasValue) Ficha["cr40f_tipodevinculo"] = new OptionSetValue(vinculo.Value);
                 Ficha["cr40f_podecobrarqrcode"] = colunaQr;
                 Ficha["cr40f_gerarrecibopersonalizado"] = colunaRecibo;

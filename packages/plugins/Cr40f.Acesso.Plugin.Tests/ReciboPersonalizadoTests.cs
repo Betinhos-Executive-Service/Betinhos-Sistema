@@ -17,11 +17,11 @@ public sealed class ReciboPersonalizadoTests
     {
         var roleId = Guid.NewGuid();
         _svc.Com(new Entity("role", roleId) { ["name"] = AppConfigAutorizacao.FuncaoGestor }, new Entity("systemuserroles", Guid.NewGuid()) { ["systemuserid"] = _gestor, ["roleid"] = roleId },
-            new Entity("systemuser", _gestor) { ["internalemailaddress"] = "gestor@betinhos.com" });
-        _svc.Com(new Entity("systemuser", _usuarioBia) { ["internalemailaddress"] = "bia.souza@betinhos.com" });
-        _svc.Com(new Entity("systemuser", _usuarioSemFicha) { ["internalemailaddress"] = "ninguem@betinhos.com" });
-        Ficha(_bia, "Bia Souza", "bia.souza@betinhos.com");
-        Ficha(_ana, "Ana Lima", "ana.lima@betinhos.com");
+            new Entity("systemuser", _gestor) { ["internalemailaddress"] = "gestor@exemplo.test" });
+        _svc.Com(new Entity("systemuser", _usuarioBia) { ["internalemailaddress"] = "bia.souza@exemplo.test" });
+        _svc.Com(new Entity("systemuser", _usuarioSemFicha) { ["internalemailaddress"] = "ninguem@exemplo.test" });
+        Ficha(_bia, "Bia Souza", "bia.souza@exemplo.test");
+        Ficha(_ana, "Ana Lima", "ana.lima@exemplo.test");
     }
 
     private void Ficha(Guid id, string nome, string email)
