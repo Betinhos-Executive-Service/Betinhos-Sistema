@@ -83,12 +83,12 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
       <p className="op-detail__route"><strong>{reserva.saida ? formatHour(reserva.saida) : '--:--'}</strong> {reserva.trajeto || reserva.destino || 'Trajeto não informado'}</p>
 
       <div className="op-detail__controls">
-        <label className="op-detail__control"><span>Status</span>
+        <div className="op-detail__control"><span aria-hidden="true">Status</span>
           <Select aria-label="Status do serviço" disabled={busy} options={statusOptions.map((o) => ({ value: String(o.value), label: o.label }))}
             value={reserva.statusValue == null ? null : String(reserva.statusValue)}
             onChange={(value) => { const option = statusOptions.find((o) => String(o.value) === value); if (option) onStatus(option) }} />
-        </label>
-        <label className="op-detail__control"><span>Motorista</span>
+        </div>
+        <div className="op-detail__control"><span aria-hidden="true">Motorista</span>
           <Select aria-label="Motorista do serviço" disabled={busy} searchable clearable placeholder="Sem motorista" options={options}
             value={reserva.motoristaId} onChange={(value) => {
               if (value === reserva.motoristaId) return
@@ -96,7 +96,7 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
               if (value !== null && !motorista) return // motorista atual fora da lista: não trocar nem remover
               onMotorista(motorista ?? null)
             }} />
-        </label>
+        </div>
       </div>
 
       <dl className="op-detail__grid">
