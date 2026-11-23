@@ -146,7 +146,7 @@ export function useComposicaoViewState(o: Options): ComposicaoViewState {
 
   const views = useMemo<TableViewEntry[]>(() => {
     const entry = (scope: TableViewEntry['scope']) => (view: SavedView): TableViewEntry => ({
-      id: view.id, name: view.name, scope, canEdit: view.managed && (!view.nativeOnly || Boolean(view.nativeFiltersEditable)), config: baseConfig,
+      id: view.id, name: view.name, scope, canEdit: Boolean(view.nativeCopy) || view.managed && (!view.nativeOnly || Boolean(view.nativeFiltersEditable)), config: baseConfig,
     })
     return [
       { id: '', name: DEFAULT_NAME, scope: 'padrao', canEdit: false, config: baseConfig },

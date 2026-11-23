@@ -34,16 +34,19 @@ export function fetchLinkAliases(fetchXml: string) {
   return result
 }
 
+/** Alias que as colunas sem campo no catálogo citam (`r1.cr40f_x`, ex.: metadata indisponível): o vínculo delas fica. */
+export const columnAliases = (columns: { id: string }[]) => columns.filter(({ id }) => id.includes('.')).map(({ id }) => id.slice(0, id.indexOf('.')))
+
 /** Alias que a tela dá aos vínculos que cria (`r1`, `r2`…; `ui_r1` quando o FetchXML de origem já tinha o mesmo). */
 const OWN_ALIAS = /^(ui_)*r\d+$/
 
 /**
  * Tira do FetchXML os vínculos que a própria tela criou e que não servem a nada: alias `r<n>` (com prefixos `ui_`),
- * junção externa, sem filtro e sem condição ou ordem que os cite. Cada salvamento antigo somava vínculos novos; o
+ * junção externa, sem filtro e sem condição, ordem ou coluna (`keep`) que os cite. Cada salvamento antigo somava vínculos novos; o
  * Dataverse aceita só 15. Os vínculos da visão original (alias `a_…`, junção interna, com filtro) nunca saem.
  */
-export function pruneOwnLinks(entity: Element) {
-  const referenced = new Set([...entity.querySelectorAll('condition[entityname], order[entityname]')].map((node) => node.getAttribute('entityname')!))
+export function pruneOwnLinks(entity: Element, keep: Iterable<string> = []) {
+  const referenced = new Set([...keep, ...[...entity.querySelectorAll('condition[entityname], order[entityname]')].map((node) => node.getAttribute('entityname')!)])
   // Do mais fundo para o mais raso: o vínculo pai só sai depois dos filhos.
   for (const link of [...entity.querySelectorAll('link-entity')].reverse()) {
     const alias = link.getAttribute('alias') ?? ''

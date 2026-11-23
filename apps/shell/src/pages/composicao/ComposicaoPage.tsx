@@ -579,7 +579,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     const personal = activeView
     if (!personal || personal.kind !== 'personal') throw new Error('Só visões pessoais podem virar públicas.')
     // Filtros nativos que a tela não lê não iriam para a cópia: publicar e excluir a pessoal os perderia.
-    if (personal.nativeOnly && !personal.nativeFiltersEditable) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
+    if (personal.nativeOnly && !personal.nativeFiltersEditable && !personal.nativeCopy) throw new Error('Esta visão tem filtros originais que a tela não edita; torne-a pública pelo Dynamics.')
     // Pública é outra tabela (savedquery): cria a cópia pública e só depois retira a pessoal.
     await saveCurrentView(personal.name, 'public', false, personal.definition)
     try { await removeView(personal) } catch (error) {

@@ -58,6 +58,26 @@ describe('cópia de visão nativa com filtros do usuário', () => {
     expect(conditions(String(query && 'fetchXml' in query ? query.fetchXml : ''))).toEqual(expect.arrayContaining(['new_valortotal gt 100', 'new_valortotal lt 900', 'new_status eq 3']))
   })
 
+  it('Salvar sobre a própria cópia atualiza no lugar e mantém a base da visão original', async () => {
+    const { rows } = await saveCopy(original)
+    const [copy] = buildViews(rows, catalog)
+    expect(copy).toMatchObject({ nativeCopy: true })
+    const changed: ViewDefinition = { ...copy.definition, filters: [{ id: 'new_status', operator: 'eq', value: '3' }] }
+    expect(lockedNativeCopy(copy, true)).toBe(true)
+    const fetchXml = nativeSaveSource(copy, changed, catalog, true)!
+    const updateRecord = vi.fn(async (..._args: unknown[]) => ({}))
+    vi.stubGlobal('window', { Xrm: { WebApi: { createRecord: vi.fn(), updateRecord, retrieveMultipleRecords: vi.fn(async () => ({ entities: [{ new_configuracaovisualizacaocomposicaoid: 'pin' }] })), retrieveRecord: vi.fn(async () => ({})) }, Utility: { getGlobalContext: () => ({ getClientUrl: () => 'https://org.crm.dynamics.com' }) } } })
+    await saveView('Cópia', 'personal', changed, catalog, copy, fetchXml, true, copy.sourceFetchXml)
+    const call = (own: boolean) => updateRecord.mock.calls.find(([table]) => (table === 'userquery') === own)![2] as Record<string, unknown>
+    expect(call(true).description).toBe(rows.personal[0].description)
+    expect(conditions(String(call(true).fetchxml))).toEqual(['new_valortotal gt 100', 'new_valortotal lt 900', 'new_status eq 3'])
+    expect(JSON.parse(String(call(false).new_definition))).toMatchObject({ nativeBase: original, filters: [{ id: 'new_status', value: '3' }] })
+  })
+
+  it('visão nativa que não é cópia da tela continua sem sobrescrever', () => {
+    expect(lockedNativeCopy(source, true)).toBe(false)
+  })
+
   it('(d) com divergência na cópia antiga, continua travada como antes', async () => {
     const { rows } = await saveCopy()
     const edited = String(rows.personal[0].fetchxml).replace('value="900"', 'value="950"').replace('value="2"', 'value="7"')

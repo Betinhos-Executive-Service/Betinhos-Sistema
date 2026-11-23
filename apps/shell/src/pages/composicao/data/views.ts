@@ -25,7 +25,7 @@ export type ViewSort = { id: string; descending: boolean }
 export type ViewDefinition = { columns: ViewColumn[]; filters: ViewFilter[]; filterGroups?: ViewFilterGroup[]; groupOperator?: 'and' | 'or'; sort: ViewSort[] }
 /** Condições soltas e as dos grupos, na ordem da definição. */
 export const allViewFilters = (definition: Pick<ViewDefinition, 'filters' | 'filterGroups'>) => [...definition.filters, ...(definition.filterGroups ?? []).flatMap((group) => group.filters)]
-export type SavedView = { id: string; kind: 'personal' | 'public'; name: string; definition: ViewDefinition; managed: boolean; nativeOnly?: boolean; nativeFiltersEditable?: boolean; sourceFetchXml?: string }
+export type SavedView = { id: string; kind: 'personal' | 'public'; name: string; definition: ViewDefinition; managed: boolean; nativeOnly?: boolean; nativeFiltersEditable?: boolean; sourceFetchXml?: string; /** Cópia de visão nativa feita por esta tela: atualizável no lugar, mantendo o FetchXML original. */ nativeCopy?: boolean }
 export type ViewQuery = SavedView | { fetchXml: string }
 export type CatalogField = { id: string; label: string; table: string; tableLabel?: string; attribute: string; primaryIdAttribute?: string; primaryNameAttribute?: string; path: string[]; relationships?: { from: string; to: string }[]; type: string; available: boolean; pickerEligible?: boolean; writable?: boolean; reason?: string }
 
@@ -411,7 +411,7 @@ export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: C
     const fetchXml = String(row.fetchxml ?? '')
     const withPins = (definition: ViewDefinition): ViewDefinition => ({ ...definition, columns: definition.columns.map((item) => ({ ...item, pinned: (pinned.get(id) ?? []).includes(item.id) })) })
     const copy = description === NATIVE_COPY_DESCRIPTION ? nativeCopyOf(fetchXml, definitions.get(id) ?? '', catalog) : null
-    if (copy) return { id, kind, name: String(row.name ?? ''), managed: false, nativeOnly: true, nativeFiltersEditable: false, sourceFetchXml: copy.base, definition: withPins(copy.definition) }
+    if (copy) return { id, kind, name: String(row.name ?? ''), managed: false, nativeOnly: true, nativeFiltersEditable: false, nativeCopy: true, sourceFetchXml: copy.base, definition: withPins(copy.definition) }
     let stored: ViewDefinition | null = null
     if (description.startsWith(VIEW_MARKER)) {
       try { stored = JSON.parse(definitions.get(id) ?? '') as ViewDefinition } catch { stored = null }
@@ -436,7 +436,7 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
   if (!Number.isInteger(objectTypeCode)) throw new Error('ObjectTypeCode da Composição não encontrado.')
   const source = fetchXmlOverride ? new DOMParser().parseFromString(fetchXmlOverride, 'application/xml') : null
   source?.querySelector('fetch')?.removeAttribute('savedqueryid')
-  if (keepNative && (!source || existing)) throw new Error('A cópia de uma view nativa precisa do FetchXML original e é sempre uma view nova.')
+  if (keepNative && (!source || existing && !existing.nativeCopy)) throw new Error('A cópia de uma view nativa precisa do FetchXML original e só atualiza outra cópia.')
   const fetchxml = source ? new XMLSerializer().serializeToString(source) : buildFetchXml(definition, catalog)
   const layoutxml = keepNative
     ? buildLayoutXml({ ...definition, columns: definition.columns.filter((column) => catalog.some((field) => field.id === column.id && field.available)) }, catalog, objectTypeCode, fetchxml)
@@ -445,11 +445,11 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
   const payload = { name, description, returnedtypecode: COMPOSITION_TABLE, querytype: 0, fetchxml, layoutxml }
   let created = false
   if (existing) {
-    if (!existing.managed || existing.kind !== kind) throw new Error('Esta view existente não pode ser alterada por esta tela.')
+    if (!(existing.managed || keepNative) || existing.kind !== kind) throw new Error('Esta view existente não pode ser alterada por esta tela.')
     await webApi.updateRecord(entity, existing.id, { name, description, fetchxml: payload.fetchxml, layoutxml: payload.layoutxml })
   } else {
     const result = await webApi.createRecord(entity, payload)
-    existing = { id: result.id, kind, name, definition, managed: !keepNative }
+    existing = { id: result.id, kind, name, definition, managed: !keepNative, nativeCopy: keepNative }
     created = true
   }
   try {
@@ -472,7 +472,7 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
 
 export async function deleteView(view: SavedView) {
   // Visão pessoal criada no Dynamics (sem a marca da tela) é do próprio usuário: pode ir para a lixeira.
-  if (!view.managed && view.kind !== 'personal') throw new Error('Esta view existente não pode ser excluída por esta tela.')
+  if (!view.managed && !view.nativeCopy && view.kind !== 'personal') throw new Error('Esta view existente não pode ser excluída por esta tela.')
   const webApi = api()
   await webApi.deleteRecord(view.kind === 'personal' ? 'userquery' : 'savedquery', view.id)
   const pins = await webApi.retrieveMultipleRecords(PIN_TABLE, `?$select=new_configuracaovisualizacaocomposicaoid&$filter=new_viewid eq '${view.id}'`)

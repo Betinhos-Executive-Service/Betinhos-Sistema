@@ -108,7 +108,7 @@ export function nativeLockedItems(fetchXml: string | null, catalog: CatalogField
     return sentence(name, node.getAttribute('operator') ?? 'condição', describeValue(node, undefined, nameOf))
   }
   const describeFilter = (filter: Element, linkPath: string): string => {
-    const parts = [...filter.children].map((child) => (child.tagName === 'filter' ? `(${describeFilter(child, linkPath)})` : describeNative(child, linkPath)))
+    const parts = [...filter.children].map((child) => (child.tagName === 'filter' ? (child.children.length > 1 ? `(${describeFilter(child, linkPath)})` : describeFilter(child, linkPath)) : describeNative(child, linkPath)))
     return parts.length > 1 ? `${filter.getAttribute('type') === 'or' ? 'uma destas' : 'todas estas'}: ${parts.join('; ')}` : parts.join('')
   }
   const labels = nativeFilters(entity).flatMap(({ filter, linkPath }) => (filter.getAttribute('type') === 'or'
