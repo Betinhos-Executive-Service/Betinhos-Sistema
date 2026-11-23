@@ -39,11 +39,11 @@ it('Equipamentos é rota React em Cadastros', () => {
   expect(findItem('equipamentos')?.item).toMatchObject({ kind: 'page', page: 'equipamentos', label: 'Equipamentos' })
 })
 
-it('Projetos é rota React em Operacional, logo após o Planner', () => {
-  expect(findItem('projetos')?.group.id).toBe('operacional')
+it('Projetos é rota React no Back-End, logo após os Logs dos apps', () => {
+  expect(findItem('projetos')?.group.id).toBe('back-end')
   expect(findItem('projetos')?.item).toMatchObject({ kind: 'page', page: 'projetos', label: 'Projetos' })
   const ids = findItem('projetos')!.group.items.map((item) => item.id)
-  expect(ids.indexOf('projetos')).toBe(ids.indexOf('planner') + 1)
+  expect(ids.indexOf('projetos')).toBe(ids.indexOf('logs-apps') + 1)
 })
 
 it('Frota tem um item por visão, sem as tabelas legadas', () => {
