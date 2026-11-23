@@ -1,4 +1,4 @@
-﻿# Cria (ou atualiza) no DEV o flow "Multas | Multas de hoje" (dias uteis 07:00, Brasilia) na solucao AppBetinhos.
+﻿# Cria (ou atualiza) no DEV o flow "Multas | Multas de hoje" (semanal, quarta 08:00, Brasilia) na solucao AppBetinhos.
 # A definicao vem de flows/multas-do-dia.json; o e-mail da noreply entra por parametro (nunca no repo). Usa as variaveis
 # new_URLSistemaBetinhos e new_EmailAdminAvisos (criadas por provision-flow-documentos-resumo.ps1).
 # Pre-requisitos: migration 20261117-1200-multas-fase1.ps1 aplicada (coluna cr40f_recebeemailmultas), Custom API
@@ -96,7 +96,7 @@ if ($flows.Count) {
     Dv PATCH "workflows($flowId)" @{ clientdata = $clientData } | Out-Null
   }
 } else {
-  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Dias uteis as 07:00 envia as multas que pedem atencao (Custom API cr40f_MultasDoDia) a quem tem E-mail diario de multas marcado. Sem itens, nao envia.' } | Out-Null
+  Dv POST workflows @{ name = $flowName; category = 5; type = 1; primaryentity = 'none'; clientdata = $clientData; description = 'Toda quarta as 08:00 envia as multas que pedem atencao (Custom API cr40f_MultasDoDia) a quem tem E-mail diario de multas marcado. Sem itens, nao envia.' } | Out-Null
   $flowId = @((Dv GET "workflows?`$select=workflowid&`$filter=name eq '$flowName' and category eq 5").value)[0].workflowid
 }
 Include $flowId 29

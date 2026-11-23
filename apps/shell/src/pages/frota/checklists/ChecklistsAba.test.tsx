@@ -12,7 +12,7 @@ describe('Frota › Checklists de Veículos', () => {
     render(<FrotaPage host={{ mode: 'mock' }} aba="checklists" />)
     const subabas = within(await screen.findByRole('tablist', { name: 'Seções' }))
     const nomes = subabas.getAllByRole('tab').map((tab) => tab.textContent)
-    expect(nomes.map((nome) => nome?.split(' · ')[0])).toEqual(['Veículos', 'Checklists', 'Modelos', 'Padrões'])
+    expect(nomes.map((nome) => nome?.replace(/\d+$/, ''))).toEqual(['Veículos', 'Checklists', 'Modelos', 'Padrões'])
 
     expect(await screen.findByRole('heading', { name: 'Situação por veículo' })).toBeTruthy()
     fireEvent.click(subabas.getByRole('tab', { name: /^Checklists/ }))
@@ -23,11 +23,11 @@ describe('Frota › Checklists de Veículos', () => {
     expect(subabas.getByRole('tab', { name: 'Padrões' }).getAttribute('aria-selected')).toBe('true')
   })
 
-  it('não mostra título nem versão próprios: o cabeçalho é o do shell', async () => {
+  it('usa o cabeçalho do Design System como as outras abas da Frota, sem versão própria', async () => {
     const { container } = render(<FrotaPage host={{ mode: 'mock' }} aba="checklists" />)
     await screen.findByRole('tablist', { name: 'Seções' })
     expect(container.querySelector('.gestao-checklists')).toBeTruthy()
     expect(container.querySelector('.gestao-version')).toBeNull()
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(screen.getByRole('heading', { level: 1, name: 'Checklists de Veículos' })).toBeTruthy()
   })
 })

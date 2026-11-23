@@ -48,7 +48,7 @@ const asText = (v: number | null) => (v == null ? null : String(v))
 /** Valor de cada campo; `multas` = quantas multas usam a infração. */
 export function readInfracao(i: Infracao, key: string, multas: (id: string) => number): unknown {
   switch (key) {
-    case 'infracao': return [i.codigo, i.descricao, i.enquadramento].filter(Boolean).join(' ')
+    case 'infracao': return i.codigo
     case 'descricao': return i.descricao
     case 'gravidade': return asText(i.gravidade)
     case 'pontos': return i.pontos

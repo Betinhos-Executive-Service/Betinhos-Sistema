@@ -1,6 +1,7 @@
 import { useId, useMemo } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Icon } from "./icons";
+import { Button, EmptyState, SegmentedControl, StatusBadge, Surface, type StatusTone } from "@betinhos/ui";
+import { Car, ChevronRight, CircleAlert, CircleCheck, ClipboardCheck, Eye, RefreshCw, TriangleAlert, Users } from "lucide-react";
 import { FotosChecklist } from "./FotosChecklist";
 import { CHECKLIST_ORIGEM } from "../domain/checklists";
 import { origemLabel, PADROES_DIAS_CARREGADOS, plural, type ChecklistGestao } from "../domain/gestaoChecklists";
@@ -25,7 +26,7 @@ type Abrir = { podeAbrir: (id: string) => boolean; onAbrir: (id: string) => void
 type Linha = Abrir & { aberta: string; alternar: (chave: string) => void; porId: Map<string, ChecklistGestao> };
 
 const formatDay = (value: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }).format(new Date(value)) : "";
-const tomPercentual = (percentual: number) => (percentual >= 50 ? "is-danger" : percentual > 0 ? "is-warning" : "is-neutral");
+const tomPercentual = (percentual: number): StatusTone => (percentual >= 50 ? "danger" : percentual > 0 ? "warning" : "neutral");
 const paresTexto = (pares: ParContagem[]) => pares.map((par) => `${par.item}: ${par.problema} (${par.quantidade})`).join(" · ") || "Nenhum item Não OK";
 
 // `aberta` vem do pai para a linha continuar aberta ao voltar de "Abrir checklist".
@@ -49,64 +50,52 @@ export function PadroesTab({ checklists, loading, failed, periodo, onPeriodo, ab
 
   return (
     <div className="padroes-stack">
-      <section className="gestao-card" aria-labelledby="pad-title">
-        <div className="gestao-card-head">
-          <div><span className="gestao-eyebrow">Checklists enviados</span><h2 id="pad-title">Padrões</h2></div>
-          <div className="gestao-segmented is-three padroes-periodo" role="group" aria-label="Período" style={{ "--pos": PERIODOS_PADROES.indexOf(periodo) } as CSSProperties}>
-            <span className="gestao-segmented-thumb" aria-hidden="true" />
-            {PERIODOS_PADROES.map((dias) => <button key={dias} type="button" aria-pressed={periodo === dias} onClick={() => trocarPeriodo(dias)}>{dias} dias</button>)}
-          </div>
-        </div>
-        {resumo ? <p className="gestao-hint padroes-resumo" aria-live="polite">{resumo}</p> : null}
+      <Surface eyebrow="Checklists enviados" title="Padrões" action={
+        <SegmentedControl aria-label="Período" size="compact" value={String(periodo)} options={PERIODOS_PADROES.map((dias) => ({ value: String(dias), label: `${dias} dias` }))}
+          onChange={(dias) => trocarPeriodo(Number(dias) as PeriodoPadroes)} />
+      }>
+        {resumo ? <p className="bt-field__hint padroes-resumo" aria-live="polite">{resumo}</p> : null}
         {padroes?.destaques.length ? (
           <div className="padroes-destaques">
-            <span className="gestao-eyebrow">Destaques</span>
+            <span className="bt-surface__eyebrow">Destaques</span>
             <div role="list">
               {padroes.destaques.map((destaque, index) => (
                 <PadraoLinha key={destaque.chave} chave={`des-${destaque.chave}`} className="is-destaque" index={index} ids={destaque.checklistIds} foco={normalizarRotulo(destaque.item)} {...linha}>
-                  <Icon name="alert" size={16} />
+                  <TriangleAlert size={16}/>
                   <span className="padroes-item">{destaque.texto}</span>
                 </PadraoLinha>
               ))}
             </div>
           </div>
         ) : null}
-      </section>
+      </Surface>
 
       {loading && !checklists ? (
-        <section className="gestao-card">
+        <Surface>
           <BrandLoader variant="inline" size="md" label="Carregando padrões" text="Carregando padrões…" />
-        </section>
+        </Surface>
       ) : null}
 
       {failed && !checklists && !loading ? (
-        <section className="gestao-card">
-          <div className="gestao-empty">
-            <Icon name="errorCircle" size={32} />
-            <strong>Não foi possível carregar os padrões</strong>
-            <p>Confira a conexão e tente de novo.</p>
-            <button type="button" className="gestao-button is-secondary is-compact" onClick={onRetry}><Icon name="refresh" size={14} />Tentar de novo</button>
-          </div>
-        </section>
+        <Surface>
+          <EmptyState tone="danger" icon={<CircleAlert size={32} />} title="Não foi possível carregar os padrões"
+            action={<Button variant="secondary" size="compact" icon={<RefreshCw size={14} />} onClick={onRetry}>Tentar de novo</Button>}>
+            Confira a conexão e tente de novo.
+          </EmptyState>
+        </Surface>
       ) : null}
 
       {padroes && !padroes.total ? (
-        <section className="gestao-card">
-          <div className="gestao-empty">
-            <Icon name="clipboardCheck" size={32} />
-            <strong>Nenhum checklist enviado nos últimos {periodo} dias</strong>
-            <p>Escolha um período maior ou volte depois das próximas vistorias.</p>
-          </div>
-        </section>
+        <Surface>
+          <EmptyState icon={<ClipboardCheck size={32} />} title={`Nenhum checklist enviado nos últimos ${periodo} dias`}>
+            Escolha um período maior ou volte depois das próximas vistorias.
+          </EmptyState>
+        </Surface>
       ) : null}
 
       {padroes && padroes.total ? (
         <>
-          <section className="gestao-card" aria-labelledby="pad-ent-title">
-            <div className="gestao-card-head">
-              <div><span className="gestao-eyebrow">Checklists de troca</span><h2 id="pad-ent-title">Por quem entregou</h2></div>
-              <span className="gestao-hint">Só quem entregou {MIN_TROCAS_ENTREGADOR} carros ou mais no período</span>
-            </div>
+          <Surface eyebrow="Checklists de troca" title="Por quem entregou" action={<span className="bt-field__hint">Só quem entregou {MIN_TROCAS_ENTREGADOR} carros ou mais no período</span>}>
             {padroes.porEntregador.length ? (
               <div role="list">
                 {padroes.porEntregador.map((item, index) => (
@@ -116,11 +105,9 @@ export function PadroesTab({ checklists, loading, failed, periodo, onPeriodo, ab
                 ))}
               </div>
             ) : (
-              <div className="gestao-empty">
-                <Icon name="users" size={32} />
-                <strong>Ninguém com {MIN_TROCAS_ENTREGADOR} trocas ou mais</strong>
-                <p>Para não marcar ninguém por um caso isolado, a tabela só mostra quem entregou pelo menos {MIN_TROCAS_ENTREGADOR} carros no período.</p>
-              </div>
+              <EmptyState compact icon={<Users size={24} />} title={`Ninguém com ${MIN_TROCAS_ENTREGADOR} trocas ou mais`}>
+                Para não marcar ninguém por um caso isolado, a tabela só mostra quem entregou pelo menos {MIN_TROCAS_ENTREGADOR} carros no período.
+              </EmptyState>
             )}
             {padroes.naoIdentificado ? (
               <>
@@ -132,37 +119,27 @@ export function PadroesTab({ checklists, loading, failed, periodo, onPeriodo, ab
                 </div>
               </>
             ) : null}
-          </section>
+          </Surface>
 
-          <section className="gestao-card" aria-labelledby="pad-vei-title">
-            <div className="gestao-card-head">
-              <div><span className="gestao-eyebrow">Frota própria</span><h2 id="pad-vei-title">Por veículo</h2></div>
-              <span className="gestao-hint">Mesmo item Não OK em {RECORRENCIA_MINIMO} dos últimos {RECORRENCIA_JANELA} checklists</span>
-            </div>
+          <Surface eyebrow="Frota própria" title="Por veículo" action={<span className="bt-field__hint">Mesmo item Não OK em {RECORRENCIA_MINIMO} dos últimos {RECORRENCIA_JANELA} checklists</span>}>
             {padroes.porVeiculo.length ? (
               <div role="list">
                 {padroes.porVeiculo.map((item, index) => (
                   <PadraoLinha key={`${item.veiculoId}-${item.item}`} chave={`vei-${item.veiculoId}-${normalizarRotulo(item.item)}`} className="is-veiculo" index={index} ids={item.checklistIds} foco={normalizarRotulo(item.item)} {...linha}>
                     <span className="frota-cell"><strong>{item.placa || "Veículo"}</strong><small>Último Não OK em {formatDay(item.ultimaEm)}</small></span>
                     <span className="padroes-item">{item.item} — {item.problemas.join(", ")} ({item.ocorrencias} de {item.janela})</span>
-                    <span><span className="gestao-badge is-danger">Recorrente</span></span>
+                    <span><StatusBadge tone="danger">Recorrente</StatusBadge></span>
                   </PadraoLinha>
                 ))}
               </div>
             ) : (
-              <div className="gestao-empty">
-                <Icon name="car" size={32} />
-                <strong>Nenhum item recorrente</strong>
-                <p>Aparece aqui quando o mesmo item fica Não OK em {RECORRENCIA_MINIMO} dos últimos {RECORRENCIA_JANELA} checklists do carro.</p>
-              </div>
+              <EmptyState compact icon={<Car size={24} />} title="Nenhum item recorrente">
+                Aparece aqui quando o mesmo item fica Não OK em {RECORRENCIA_MINIMO} dos últimos {RECORRENCIA_JANELA} checklists do carro.
+              </EmptyState>
             )}
-          </section>
+          </Surface>
 
-          <section className="gestao-card" aria-labelledby="pad-fro-title">
-            <div className="gestao-card-head">
-              <div><span className="gestao-eyebrow">Item e problema</span><h2 id="pad-fro-title">Problemas mais comuns da frota</h2></div>
-              <span className="gestao-hint">Os {TOP_PROBLEMAS_FROTA} mais frequentes no período</span>
-            </div>
+          <Surface eyebrow="Item e problema" title="Problemas mais comuns da frota" action={<span className="bt-field__hint">Os {TOP_PROBLEMAS_FROTA} mais frequentes no período</span>}>
             {padroes.problemasFrota.length ? (
               <div role="list">
                 {padroes.problemasFrota.map((par, index) => (
@@ -174,13 +151,11 @@ export function PadroesTab({ checklists, loading, failed, periodo, onPeriodo, ab
                 ))}
               </div>
             ) : (
-              <div className="gestao-empty">
-                <Icon name="checkCircle" size={32} />
-                <strong>Nenhum item Não OK no período</strong>
-                <p>Todos os checklists enviados vieram com os itens OK.</p>
-              </div>
+              <EmptyState compact icon={<CircleCheck size={24} />} title="Nenhum item Não OK no período">
+                Todos os checklists enviados vieram com os itens OK.
+              </EmptyState>
             )}
-          </section>
+          </Surface>
         </>
       ) : null}
     </div>
@@ -193,7 +168,7 @@ function EntregadorCelulas({ linha }: { linha: PadraoEntregador }) {
       <span className="frota-cell"><strong>{linha.nome}</strong><small>{paresTexto(linha.principais)}</small></span>
       <span className="padroes-num">{linha.trocas} {plural(linha.trocas, "troca", "trocas")}</span>
       <span className="padroes-num">{linha.comProblema} com problema</span>
-      <span><span className={`gestao-badge ${tomPercentual(linha.percentual)}`}>{linha.percentual}%</span></span>
+      <span><StatusBadge tone={tomPercentual(linha.percentual)}>{linha.percentual}%</StatusBadge></span>
     </>
   );
 }
@@ -213,7 +188,7 @@ function PadraoLinha({ chave, className, index, ids, foco, aberta, alternar, por
     <div role="listitem">
       <button type="button" className={`padroes-row ${className}`} aria-expanded={expandida} aria-controls={expandida ? painel : undefined} style={{ "--i": Math.min(index, 12) } as CSSProperties} onClick={() => alternar(chave)}>
         {children}
-        <Icon name="chevronRight" size={16} className="gestao-list-chevron" />
+        <ChevronRight size={16} className="gestao-list-chevron"/>
       </button>
       {expandida ? <ChecklistsDoNumero id={painel} ids={ids} foco={foco} porId={porId} podeAbrir={podeAbrir} onAbrir={onAbrir} /> : null}
     </div>
@@ -224,7 +199,7 @@ function ChecklistsDoNumero({ id, ids, foco, porId, podeAbrir, onAbrir }: Abrir 
   const lista = ids.map((chk) => porId.get(chk)).filter((item): item is ChecklistGestao => Boolean(item));
   return (
     <div id={id} className="padroes-lista">
-      <span className="gestao-eyebrow">{lista.length} {plural(lista.length, "checklist", "checklists")} neste número</span>
+      <span className="bt-surface__eyebrow">{lista.length} {plural(lista.length, "checklist", "checklists")} neste número</span>
       {lista.map((item) => {
         const problemas = itensNaoOk(item).filter((entry) => !foco || normalizarRotulo(entry.item) === foco);
         const quem = item.origem === CHECKLIST_ORIGEM.troca
@@ -234,16 +209,16 @@ function ChecklistsDoNumero({ id, ids, foco, porId, podeAbrir, onAbrir }: Abrir 
           <div key={item.id} className="padroes-chk">
             <div className="padroes-chk-top">
               <strong>{item.placa || "Veículo"} · {formatDay(item.concluidoEm)}</strong>
-              {podeAbrir(item.id) ? <button type="button" className="gestao-button is-secondary is-compact" onClick={() => onAbrir(item.id)}><Icon name="eye" size={14} />Abrir checklist</button> : null}
+              {podeAbrir(item.id) ? <Button variant="secondary" size="compact" icon={<Eye size={14} />} onClick={() => onAbrir(item.id)}>Abrir checklist</Button> : null}
             </div>
             <small>{quem}</small>
             {problemas.length ? problemas.map((entry) => (
               <span key={entry.resposta.chave} className="chk-problem">
-                <span className="padroes-problema"><span className="gestao-badge is-danger">Não OK</span>{entry.item}: {entry.problemas.join(" · ")}</span>
+                <span className="padroes-problema"><StatusBadge tone="danger">Não OK</StatusBadge>{entry.item}: {entry.problemas.join(" · ")}</span>
                 {entry.resposta.observacao ? <small>{entry.resposta.observacao}</small> : null}
                 {entry.resposta.fotos.length ? <FotosChecklist fotos={entry.resposta.fotos} rotulo={entry.item} /> : null}
               </span>
-            )) : <span className="gestao-badge is-success">Itens OK</span>}
+            )) : <StatusBadge tone="success">Itens OK</StatusBadge>}
           </div>
         );
       })}

@@ -1,9 +1,10 @@
 // HTML da página (sem JavaScript), no visual do Design System Betinhos (tokens copiados como variáveis CSS; fontes e logo
-// em public/estatico). Uma coluna: a cópia mais recente com o botão de baixar; cópias anteriores e downloads recolhidos.
+// em public/estatico). Uma coluna: a cópia mais recente com os botões de baixar; cópias anteriores e downloads recolhidos.
+// Cada execução grava dois arquivos com o mesmo carimbo: o completo e a planilha de operação (betinhos-prod-operacao-*).
 const FUSO = 'America/Sao_Paulo'
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
-export const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})\.zip$/
+export const PADRAO = /^(diario|semanal|mensal)\/betinhos-prod-(operacao-)?(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})\.zip$/
 // Roda todo dia às 03:23; dois dias sem cópia nova = parou.
 const PARADO_MS = 48 * 3600_000
 const ETIQUETA = { diario: '', semanal: 'Semanal', mensal: 'Mensal' }
@@ -18,34 +19,37 @@ export function haQuanto(ms) {
   return `há ${Math.round(h / 24)} dias`
 }
 
-// [{ key, size }] → { diario: [{ chave, ms, quando, tamanho, bytes }], ... }. O carimbo do nome é hora de Brasília (UTC−3).
+// [{ key, size }] → { diario: [{ chave, operacao, ms, quando, tamanho, bytes }], ... }. O carimbo do nome é hora de Brasília (UTC−3).
 export function agrupar(objetos) {
   const grupos = { diario: [], semanal: [], mensal: [] }
   for (const o of objetos) {
     const m = PADRAO.exec(o.key)
     if (!m) continue
-    const [, classe, a, me, d, h, mi] = m
-    grupos[classe].push({ chave: o.key, ms: Date.UTC(+a, me - 1, +d, +h + 3, +mi), quando: `${d}/${me}/${a} às ${h}:${mi}`, tamanho: tamanho(o.size), bytes: o.size })
+    const [, classe, operacao, a, me, d, h, mi] = m
+    grupos[classe].push({ chave: o.key, operacao: Boolean(operacao), ms: Date.UTC(+a, me - 1, +d, +h + 3, +mi), quando: `${d}/${me}/${a} às ${h}:${mi}`, tamanho: tamanho(o.size), bytes: o.size })
   }
   for (const g of Object.values(grupos)) g.sort((x, y) => y.ms - x.ms)
   return grupos
 }
 
-// A mesma cópia pode estar em diario/, semanal/ e mensal/: na lista aparece uma vez, com as etiquetas juntas.
+// A mesma execução pode estar em diario/, semanal/ e mensal/, em dois arquivos: na lista aparece uma vez, com as
+// etiquetas juntas e um link para cada arquivo ({ completo, operacao }, cada um { chave, tamanho } ou ausente).
 function unicas(grupos) {
-  const porNome = new Map()
+  const porCarimbo = new Map()
   for (const [classe, itens] of Object.entries(grupos)) {
     for (const i of itens) {
-      const nome = i.chave.split('/').pop()
-      const ja = porNome.get(nome)
-      if (ja) { if (ETIQUETA[classe]) ja.etiquetas.push(ETIQUETA[classe]) } else porNome.set(nome, { ...i, etiquetas: ETIQUETA[classe] ? [ETIQUETA[classe]] : [] })
+      const e = porCarimbo.get(i.ms) ?? { ms: i.ms, quando: i.quando, etiquetas: new Set() }
+      porCarimbo.set(i.ms, e)
+      if (ETIQUETA[classe]) e.etiquetas.add(ETIQUETA[classe])
+      e[i.operacao ? 'operacao' : 'completo'] ??= { chave: i.chave, tamanho: i.tamanho }
     }
   }
-  return [...porNome.values()].sort((x, y) => y.ms - x.ms)
+  return [...porCarimbo.values()].sort((x, y) => y.ms - x.ms)
 }
 
 const icone = (d) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`
 const BAIXAR = icone('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>')
+const PLANILHA = icone('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/>')
 const ALERTA = icone('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>')
 
 const CSS = `
@@ -76,6 +80,8 @@ main{padding-top:24px;display:grid;gap:12px}
 .alerta{display:flex;gap:10px;align-items:flex-start;background:var(--perigo-suave);color:var(--perigo);border-radius:var(--r-lg);padding:12px 14px;font-weight:600;margin:0}
 .botao{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--acao);color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:12px 20px;border-radius:var(--r-md);min-height:48px}
 .botao:hover{background:var(--acao-hover)}
+.botao.sec{background:var(--superficie);color:var(--acao);border:1px solid var(--borda);font-size:15px}.botao.sec:hover{background:var(--acao-suave)}
+.botoes{display:grid;gap:8px}
 a:focus-visible,summary:focus-visible{outline:3px solid var(--acao);outline-offset:2px}
 .como{margin:0;color:var(--texto-2);font-size:13px}.como b{color:var(--texto)}.como a{color:var(--acao)}
 details{padding:0 8px}
@@ -98,10 +104,10 @@ summary .n{color:var(--texto-2);font-weight:500;margin-left:6px;margin-right:aut
 
 const fmtData = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-// "mensal/betinhos-prod-20261101-0323.zip" → "cópia de 01/11/2026 às 03:23".
+// "mensal/betinhos-prod-20261101-0323.zip" → "cópia de 01/11/2026 às 03:23"; com operacao-, "planilha de operação de ...".
 const nomeCopia = (chave) => {
   const m = PADRAO.exec(chave ?? '')
-  return m ? `cópia de ${m[4]}/${m[3]}/${m[2]} às ${m[5]}:${m[6]}` : String(chave ?? '')
+  return m ? `${m[2] ? 'planilha de operação' : 'cópia'} de ${m[5]}/${m[4]}/${m[3]} às ${m[6]}:${m[7]}` : String(chave ?? '')
 }
 
 function principal(maisNova, agora) {
@@ -113,15 +119,18 @@ function principal(maisNova, agora) {
   const parou = idade > PARADO_MS
   return `<section class="cartao principal" aria-label="Última cópia">
 ${parou ? `<p class="alerta" role="alert">${ALERTA}<span>Backup parado: nenhuma cópia nova ${esc(haQuanto(idade))}. Avise o Renan.</span></p>` : '<span class="status">Backup em dia</span>'}
-<div><div class="rotulo">Última cópia</div><p class="data">${esc(maisNova.quando)}</p><p class="meta">${esc(haQuanto(idade))} · ${esc(maisNova.tamanho)}</p></div>
-<a class="botao" href="/baixar/${esc(maisNova.chave)}" download>${BAIXAR}Baixar</a>
-<p class="como">Abra com o <b>7-Zip</b> (<a href="https://7-zip.org" rel="noreferrer">7-zip.org</a>) e a senha dos backups do gerenciador de senhas. As tabelas para o Excel ficam na pasta <b>planilhas</b>.</p>
+<div><div class="rotulo">Última cópia</div><p class="data">${esc(maisNova.quando)}</p><p class="meta">${esc(haQuanto(idade))}</p></div>
+<div class="botoes">${maisNova.operacao ? `<a class="botao" href="/baixar/${esc(maisNova.operacao.chave)}" download>${PLANILHA}Baixar planilha de operação</a>` : ''}
+${maisNova.completo ? `<a class="botao${maisNova.operacao ? ' sec' : ''}" href="/baixar/${esc(maisNova.completo.chave)}" download>${BAIXAR}Baixar backup completo · ${esc(maisNova.completo.tamanho)}</a>` : ''}</div>
+<p class="como">Abra com o <b>7-Zip</b> (<a href="https://7-zip.org" rel="noreferrer">7-zip.org</a>) e a senha dos backups do gerenciador de senhas. A <b>planilha de operação</b> traz os serviços de hoje em diante, os dos últimos 60 dias e os contatos; o <b>completo</b> tem todas as tabelas na pasta <b>planilhas</b>.</p>
 </section>`
 }
 
 function anteriores(itens) {
   const linhas = itens.length
-    ? itens.map((i) => `<li><span class="q">${esc(i.quando)}${i.etiquetas.map((e) => `<span class="tag">${e}</span>`).join('')}</span><span class="t">${esc(i.tamanho)}</span><a href="/baixar/${esc(i.chave)}" download aria-label="Baixar cópia de ${esc(i.quando)}" title="Baixar">${BAIXAR}</a></li>`).join('')
+    ? itens.map((i) => `<li><span class="q">${esc(i.quando)}${[...i.etiquetas].map((e) => `<span class="tag">${e}</span>`).join('')}</span>${i.completo ? `<span class="t">${esc(i.completo.tamanho)}</span>` : ''}${
+      i.operacao ? `<a href="/baixar/${esc(i.operacao.chave)}" download aria-label="Baixar planilha de operação de ${esc(i.quando)}" title="Planilha de operação">${PLANILHA}</a>` : ''}${
+      i.completo ? `<a href="/baixar/${esc(i.completo.chave)}" download aria-label="Baixar backup completo de ${esc(i.quando)}" title="Backup completo">${BAIXAR}</a>` : ''}</li>`).join('')
     : '<li class="vazio">Nenhuma outra cópia.</li>'
   return `<details class="cartao"><summary>Cópias anteriores<span class="n">${itens.length}</span></summary><ul class="lista">${linhas}</ul></details>`
 }

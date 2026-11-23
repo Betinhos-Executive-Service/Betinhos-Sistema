@@ -210,6 +210,9 @@
 .frota-etapas__item[data-feita] b { border-color: var(--bt-color-success); background-color: var(--bt-color-success); color: var(--bt-color-white); }
 .frota-etapas__item[aria-current="step"] { color: var(--bt-color-action); border-bottom-color: var(--bt-color-action); }
 .frota-etapas__item[aria-current="step"] b { border-color: var(--bt-color-action); }
+.frota-etapas__voltar { display: inherit; align-items: inherit; gap: inherit; min-width: 0; margin: calc(var(--bt-space-1) * -1); padding: var(--bt-space-1); border: 0; border-radius: var(--bt-radius-xs); background: none; color: inherit; font: inherit; cursor: pointer; }
+.frota-etapas__voltar:hover span:not(.frota-sr-only) { text-decoration: underline; }
+.frota-etapas__voltar:focus-visible { outline: 0; box-shadow: var(--bt-focus-ring); }
 .frota-etapas__item[data-parada] { color: var(--bt-color-text-secondary); border-bottom-color: var(--bt-color-border); }
 @media (max-width: 560px) { .frota-etapas__item { padding: var(--bt-space-2) var(--bt-space-1); font-size: var(--bt-font-size-11); } }
 /* Gaveta da manutenção: o título "placa · descrição" quebra linha em vez de cortar (no celular a descrição sumia). */

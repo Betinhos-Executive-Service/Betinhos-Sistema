@@ -1,0 +1,11 @@
+PLANILHA DE OPERAÇÃO DO SISTEMA BETINHOS (PROD)
+
+operacao.xlsx   Abre no Excel. Para operar sem o sistema:
+  Próximos serviços   De hoje (00:00, horário de Brasília) em diante, do mais cedo para o mais tarde.
+  Últimos 60 dias     Serviços dos 60 dias antes de hoje, do mais recente para o mais antigo.
+  Contatos            Telefones e e-mails dos motoristas e solicitantes desses serviços.
+Cancelados aparecem com o status na coluna Status. Use o filtro do cabeçalho para achar cliente, motorista ou data.
+Os dados são de quando a cópia foi feita (o horário está no nome do arquivo); o que mudou depois não aparece.
+
+Os dados são de clientes e passageiros (LGPD): não envie por WhatsApp ou e-mail, não salve em pendrive
+e apague a cópia do computador quando terminar.

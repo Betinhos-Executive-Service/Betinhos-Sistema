@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { isExtraColumn, readFilters, storedFilters, useTableFilters, useTableView, type ColumnCatalog, type FilterField, type StoredView, type TableFilters, type TableViewState, type ViewColumnDef, type ViewSort, type ViewStore } from '@betinhos/ui'
+import { isExtraColumn, readFilters, storedFilters, useOptionalToast, useTableFilters, useTableView, type ColumnCatalog, type FilterField, type StoredView, type TableFilters, type TableViewState, type ViewColumnDef, type ViewSort, type ViewStore } from '@betinhos/ui'
 import type { Host } from '../host'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, extraFields, resolveExtras, sortByExtra, type ExtraSource, type ExtraValues, type ResolvedExtra } from './extraColumns'
-import { patchHashQuery, readHashQuery } from '../nav/useHashRoute'
+import { patchHashQuery, readHashQuery, useHashQuery } from '../nav/useHashRoute'
 import { decodeTableFilters, encodeTableFilters } from './filtersUrl'
-import { viewStoreFor, withBuiltinViews } from './viewStore'
+import { messageOf, viewStoreFor, withBuiltinViews } from './viewStore'
 
 /** Visão salva no navegador pela barra antiga de uma lista, já no formato novo. */
 export type LegacyView = { name: string; config: string }
@@ -107,8 +107,12 @@ export function useListView(o: Options) {
     return { ready, open: () => open() }
   })
   useEffect(() => { if (o.ready) gate.open() }, [o.ready, gate])
+  // Falha ao listar as visões não derruba a lista: avisa por toast (quando a tela tem ToastProvider) e segue com o que há.
+  const toast = useOptionalToast()
+  const notify = useRef(toast)
+  notify.current = toast
   const store = useMemo<ViewStore>(() => {
-    const base = withBuiltinViews(viewStoreFor(o.host), () => latest.current.builtins())
+    const base = withBuiltinViews(viewStoreFor(o.host, (message) => notify.current?.({ tone: 'warning', message })), () => latest.current.builtins())
     return { ...base, list: async (tela) => { await gate.ready; return base.list(tela) } }
   }, [o.host, gate])
   const defaultFilters = useMemo(() => (o.defaultFilters ? storedFilters(o.defaultFilters) : undefined), [JSON.stringify(o.defaultFilters ?? null)]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -128,16 +132,20 @@ export function useListView(o: Options) {
 
   const urlApplied = useRef(false)
   const linked = useRef<TableFilters | null | undefined>(undefined)
+  // Último `f` que a lista leu ou gravou na URL: distingue o link novo da própria escrita.
+  const seenF = useRef('')
   const { status, views, reload } = raw
   const applyConfig = raw.setConfig
   useEffect(() => {
-    if (status !== 'ready' || !o.ready) return
+    // Com a lista de visões falhada (`error`) o filtro do link vale do mesmo jeito; só espera enquanto carrega.
+    if (status === 'loading' || !o.ready) return
     if (linked.current === undefined) {
       const q = readHashQuery()
       const f = q.get('f')
       const legacy = latest.current.legacy
       const old = legacy && legacy.keys.some((k) => q.has(k)) ? legacy.read(q) : null
       linked.current = (f ? decodeTableFilters(f) : null) ?? old
+      seenF.current = f ?? ''
       if (old && legacy) patchHashQuery(Object.fromEntries(legacy.keys.map((k) => [k, null])))
     }
     const next = linked.current
@@ -149,8 +157,37 @@ export function useListView(o: Options) {
   useEffect(() => {
     if (!urlApplied.current) return
     const f = encodeTableFilters(valid)
+    seenF.current = f
     if ((readHashQuery().get('f') ?? '') !== f) patchHashQuery({ f: f || null })
   }, [valid])
+
+  // Outro link da mesma lista (alerta, atalho, Voltar) só troca o hash: a página não remonta (a chave da rota é o id),
+  // então o `f` novo é lido aqui. A própria escrita acima não conta (`seenF`), e `f` ausente ou inválido não limpa a grade.
+  const hashF = useHashQuery().get('f') ?? ''
+  const showing = useRef(valid)
+  showing.current = valid
+  useEffect(() => {
+    if (!urlApplied.current || hashF === seenF.current) return
+    seenF.current = hashF
+    const next = hashF ? decodeTableFilters(hashF) : null
+    const shown = encodeTableFilters(showing.current)
+    if (!next) {
+      // Sem `f` (ou inválido) a grade fica como está; a URL volta a descrever o que está na tela.
+      if (hashF !== shown) { seenF.current = shown; patchHashQuery({ f: shown || null }) }
+      return
+    }
+    if (hashF === shown) return
+    linked.current = next
+    touched.current = false
+    applyConfig((c) => ({ ...c, filters: storedFilters(next) }))
+  }, [hashF, applyConfig])
+
+  // Lista de visões que falhou por inteiro: a tela segue na visão padrão, com o filtro do link, e o erro aparece.
+  const failure = raw.status === 'error' ? raw.error : null
+  useEffect(() => {
+    if (failure == null) return
+    notify.current?.({ tone: 'danger', message: `Não foi possível carregar as visões salvas. ${messageOf(failure)}` })
+  }, [failure])
 
   const imported = useRef(false)
   useEffect(() => {

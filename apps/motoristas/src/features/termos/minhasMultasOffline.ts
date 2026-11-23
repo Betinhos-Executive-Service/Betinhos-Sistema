@@ -5,7 +5,7 @@ import type { MinhaMulta } from "./minhasMultas.ts";
 
 export const MINHAS_MULTAS_OFFLINE_KEY = "app-motoristas-minhas-multas-v1";
 
-type ArmazemTexto = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+export type ArmazemTexto = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type Registro = { salvoEm: string; usuario: string; itens: MinhaMulta[] };
 
 export function usuarioAtual() {
@@ -16,7 +16,7 @@ export function usuarioAtual() {
   }
 }
 
-function obterArmazem(): ArmazemTexto | undefined {
+export function obterArmazem(): ArmazemTexto | undefined {
   try {
     return typeof localStorage === "undefined" ? undefined : localStorage;
   } catch {

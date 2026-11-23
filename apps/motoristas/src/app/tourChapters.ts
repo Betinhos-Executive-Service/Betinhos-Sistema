@@ -70,6 +70,9 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
         "Conteúdos que o RH publicou para você: texto, vídeo e arquivos. Alguns pedem assinatura ou um quiz curto no fim.",
         "O que falta fazer aparece nas pendências; o que você concluiu fica guardado para consultar."
       ], { target: dt("treinamentos") }),
+      step("minha-nota", "Minha nota", [
+        "A nota de condução da Infleet, com as notas por comportamento e a evolução dos últimos 6 meses."
+      ], { target: dt("minhaNota") }),
       step("postos-proximos", "Postos próximos", [
         "Um mapa com os postos da rede CTF perto de você, para abastecer com o cartão. Toque num pino para ver o endereço e abrir a rota no Maps ou no Waze."
       ], { target: dt("postosProximos") }),
@@ -825,6 +828,21 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
       ], { target: ".vehicle-choice-list, .ideas-intro", optional: true }),
       helpStep()
     ]
+  },
+  {
+    id: "minha-nota",
+    title: "Minha nota",
+    steps: [
+      backStep("Volta para o Início."),
+      step("nota", "Sua nota", [
+        "A nota de condução da Infleet nos últimos 90 dias, de 0 a 100: Ótima a partir de 90, Boa de 75 a 89 e Atenção abaixo de 75.",
+        "Ela só aparece depois de 50 km rodados no período."
+      ], { target: ".nota-resumo", optional: true }),
+      step("melhorar", "O que melhorar e evolução", [
+        "O que melhorar mostra os dois comportamentos com a menor nota. Por comportamento detalha cada um, e Evolução compara os últimos 6 meses."
+      ], { target: ".nota-bloco", optional: true }),
+      helpStep()
+    ]
   }
 ];
 
@@ -854,6 +872,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   colisoes: ["colisao-registro"],
   boasIdeias: ["ideias"],
   meuCarro: ["meu-carro"],
+  minhaNota: ["minha-nota"],
   fotoReceber: ["camera"],
   fotoGasto: ["camera"],
   fotoColisao: ["camera"],

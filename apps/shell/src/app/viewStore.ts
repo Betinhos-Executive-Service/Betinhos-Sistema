@@ -22,22 +22,38 @@ type Row = {
 
 const odata = (text: string) => text.replace(/'/g, "''")
 
-/** Store do Dataverse. `client` é o da Web API do shell; WhoAmI, equipe e papéis são lidos uma vez. */
-export function createDataverseViewStore(client: DataverseClient): ViewStore {
+export const messageOf = (error: unknown) => (error instanceof Error && error.message ? error.message : 'Tente de novo em instantes.')
+
+/**
+ * Store do Dataverse. `client` é o da Web API do shell; WhoAmI, equipe e papéis são lidos uma vez.
+ * `onWarn` recebe o aviso quando a lista sai incompleta (equipe das visões públicas ilegível): a lista segue só com as pessoais.
+ */
+export function createDataverseViewStore(client: DataverseClient, onWarn?: (message: string) => void): ViewStore {
   let me: Promise<string> | null = null
   const userId = () => (me ??= client.request<{ UserId: string }>('WhoAmI').then((r) => r.UserId.toLowerCase()).catch((e) => { me = null; throw e }))
+  let teamWarned = false
   let team: Promise<string | null> | null = null
   const teamId = () => (team ??= client.request<{ value: { teamid: string }[] }>(`teams?$select=teamid&$filter=name eq '${odata(PUBLIC_TEAM)}' and teamtype eq 0`)
     .then((r) => r.value[0]?.teamid.toLowerCase() ?? null).catch((e) => { team = null; throw e }))
 
   return {
     async list(tela) {
+      let teamFailure: { error: unknown } | null = null
       const [uid, tid, page] = await Promise.all([
         userId(),
-        teamId(),
+        // Sem a equipe não há como separar as públicas: elas somem da lista (as pessoais seguem).
+        teamId().catch((error: unknown) => {
+          teamFailure = { error }
+          return undefined
+        }),
         client.request<{ value: Row[] }>(`${VIEW_ENTITY_SET}?$select=cr40f_visaodetabelaid,cr40f_name,cr40f_configuracao,cr40f_ordem,_ownerid_value&$filter=cr40f_tela eq '${odata(tela)}'&$orderby=cr40f_name asc`),
       ])
-      return page.value.map((r): StoredView => {
+      // Só avisa quando o resto carregou (se tudo falhou, quem chamou mostra o erro) e uma vez por store.
+      if (teamFailure && !teamWarned) {
+        teamWarned = true
+        onWarn?.(`Não foi possível carregar as visões públicas. ${messageOf((teamFailure as { error: unknown }).error)} As suas visões continuam disponíveis.`)
+      }
+      return page.value.filter((r) => tid !== undefined || (r._ownerid_value ?? '').toLowerCase() === uid).map((r): StoredView => {
         const owner = (r._ownerid_value ?? '').toLowerCase()
         return {
           id: r.cr40f_visaodetabelaid,
@@ -91,7 +107,7 @@ export function withBuiltinViews(store: ViewStore, builtins: (tela: string) => S
 let mockStore: ViewStore | null = null
 
 /** Store da tela: Dataverse no app publicado, memória no `pnpm dev`. */
-export function viewStoreFor(host: Host): ViewStore {
+export function viewStoreFor(host: Host, onWarn?: (message: string) => void): ViewStore {
   if (host.mode === 'mock') return (mockStore ??= createMemoryViewStore([], { canPublish: true }))
-  return createDataverseViewStore(host.client)
+  return createDataverseViewStore(host.client, onWarn)
 }

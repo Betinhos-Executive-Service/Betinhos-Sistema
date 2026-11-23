@@ -6,12 +6,12 @@ const raw = readFileSync(new URL('./multas-do-dia.json', import.meta.url), 'utf8
 const flow = JSON.parse(raw)
 const tem = flow.actions.Try.actions.Tem_itens
 
-test('dias úteis às 07:00 no horário de Brasília', () => {
-  const r = flow.triggers.Dias_uteis_7h.recurrence
+test('semanal, quarta às 08:00 no horário de Brasília', () => {
+  const r = flow.triggers.Quarta_8h.recurrence
   assert.equal(r.frequency, 'Week')
   assert.equal(r.interval, 1)
   assert.equal(r.timeZone, 'E. South America Standard Time')
-  assert.deepEqual(r.schedule, { weekDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], hours: ['7'], minutes: [0] })
+  assert.deepEqual(r.schedule, { weekDays: ['Wednesday'], hours: ['8'], minutes: [0] })
 })
 
 test('lê a Custom API cr40f_MultasDoDia e só envia com itens', () => {

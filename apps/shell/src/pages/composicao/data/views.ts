@@ -1,3 +1,5 @@
+import { fetchAliasPaths, fetchLinkAliases, pathSignature } from './fetch-links'
+import { legacyNativeBase } from './native-copy'
 import { getXrmHost } from './xrm'
 import { COMPROVANTES_OPCOES } from '../../recebimentos/domain'
 
@@ -23,7 +25,7 @@ export type ViewSort = { id: string; descending: boolean }
 export type ViewDefinition = { columns: ViewColumn[]; filters: ViewFilter[]; filterGroups?: ViewFilterGroup[]; groupOperator?: 'and' | 'or'; sort: ViewSort[] }
 /** Condições soltas e as dos grupos, na ordem da definição. */
 export const allViewFilters = (definition: Pick<ViewDefinition, 'filters' | 'filterGroups'>) => [...definition.filters, ...(definition.filterGroups ?? []).flatMap((group) => group.filters)]
-export type SavedView = { id: string; kind: 'personal' | 'public'; name: string; definition: ViewDefinition; managed: boolean; nativeOnly?: boolean; nativeFiltersEditable?: boolean; sourceFetchXml?: string }
+export type SavedView = { id: string; kind: 'personal' | 'public'; name: string; definition: ViewDefinition; managed: boolean; nativeOnly?: boolean; nativeFiltersEditable?: boolean; sourceFetchXml?: string; /** Cópia de visão nativa feita por esta tela: atualizável no lugar, mantendo o FetchXML original. */ nativeCopy?: boolean }
 export type ViewQuery = SavedView | { fetchXml: string }
 export type CatalogField = { id: string; label: string; table: string; tableLabel?: string; attribute: string; primaryIdAttribute?: string; primaryNameAttribute?: string; path: string[]; relationships?: { from: string; to: string }[]; type: string; available: boolean; pickerEligible?: boolean; writable?: boolean; reason?: string }
 
@@ -72,7 +74,6 @@ export function attributeLabel(attribute: Pick<AttributeMetadata, 'LogicalName' 
 }
 
 const SIMPLE_TYPES = new Set(['String', 'Memo', 'Integer', 'BigInt', 'Decimal', 'Double', 'Money', 'DateTime', 'Boolean', 'Picklist', 'State', 'Status', 'Lookup', 'Uniqueidentifier'])
-const pathSignature = (path: string[], relationships?: { from: string; to: string }[], count = path.length) => path.slice(0, count).map((table, index) => `${table}@${relationships?.[index]?.to ?? ''}`).join('/')
 
 export async function loadColumnCatalog(): Promise<CatalogField[]> {
   const cache = new Map<string, Promise<EntityMetadata>>()
@@ -236,22 +237,6 @@ export function viewValueKey(id: string, definition: ViewDefinition, catalog: Ca
   return alias ? `${alias}.${field.attribute}` : field.attribute
 }
 
-/** Alias de cada caminho de vínculo do FetchXML; com o mesmo caminho repetido vale o último (o da grade, que traz as colunas). */
-function fetchLinkAliases(fetchXml: string) {
-  const result = new Map<string, string>()
-  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
-  const scan = (parent: Element, path: string[]) => {
-    for (const link of [...parent.children].filter((child) => child.tagName === 'link-entity')) {
-      const next = [...path, `${link.getAttribute('name') ?? ''}@${link.getAttribute('to') ?? ''}`]
-      if (link.getAttribute('alias')) result.set(next.join('/'), link.getAttribute('alias')!)
-      scan(link, next)
-    }
-  }
-  const entity = document.querySelector('fetch > entity')
-  if (entity) scan(entity, [])
-  return result
-}
-
 export function buildLayoutXml(definition: ViewDefinition, catalog: CatalogField[], objectTypeCode: number, fetchXml?: string) {
   // Sobre o FetchXML de uma view nativa os vínculos têm os aliases dela: a layout precisa apontar para eles.
   const linkAliases = fetchXml ? fetchLinkAliases(fetchXml) : aliases(definition, catalog)
@@ -273,15 +258,7 @@ export function parseNativeFilters(fetchXml: string, catalog: CatalogField[]): P
   const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
   const entity = document.querySelector('fetch > entity')
   if (!entity || document.querySelector('parsererror')) return null
-  const aliases = new Map<string, string>()
-  const scan = (parent: Element, path: string[]) => {
-    for (const link of [...parent.children].filter((child) => child.tagName === 'link-entity')) {
-      const next = [...path, `${link.getAttribute('name') ?? ''}@${link.getAttribute('to') ?? ''}`]
-      if (link.getAttribute('alias')) aliases.set(link.getAttribute('alias')!, next.join('/'))
-      scan(link, next)
-    }
-  }
-  scan(entity, [])
+  const aliases = fetchAliasPaths(entity)
   const condition = (node: Element, link?: Element): ViewFilter | null => {
     const alias = node.getAttribute('entityname')
     const attribute = node.getAttribute('attribute')
@@ -371,16 +348,8 @@ function parseNativeDefinition(fetchXml: string, layoutXml: string, catalog: Cat
 
 function nativeLayoutDefinition(fetchXml: string, layoutXml: string, catalog: CatalogField[]): ViewDefinition {
   const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
-  const aliases = new Map<string, string>()
-  const scan = (parent: Element, relations: string[]) => {
-    for (const link of [...parent.children].filter((child) => child.tagName === 'link-entity')) {
-      const next = [...relations, `${link.getAttribute('name') ?? ''}@${link.getAttribute('to') ?? ''}`]
-      if (link.getAttribute('alias')) aliases.set(link.getAttribute('alias')!, next.join('/'))
-      scan(link, next)
-    }
-  }
   const entity = document.querySelector('fetch > entity')
-  if (entity) scan(entity, [])
+  const aliases = entity ? fetchAliasPaths(entity) : new Map<string, string>()
   const columns = parseLayoutXml(layoutXml).map(({ id, width }) => {
     const dot = id.indexOf('.')
     const prefix = dot < 0 ? '' : aliases.get(id.slice(0, dot))
@@ -410,6 +379,26 @@ export async function loadViews(catalog: CatalogField[] | Promise<CatalogField[]
   return buildViews(rows, fields)
 }
 
+/**
+ * Cópia de visão nativa feita por esta tela: o pin guarda a definição do usuário (filtros editáveis) e, nas cópias novas,
+ * o FetchXML original em `nativeBase`; nas antigas ele é recuperado do FetchXML gravado (`legacyNativeBase`).
+ * `null` = não dá para separar os filtros do usuário, e a cópia continua nativa, com tudo travado.
+ */
+function nativeCopyOf(fetchXml: string, pinText: string, catalog: CatalogField[]): { base: string; definition: ViewDefinition } | null {
+  let pin: (ViewDefinition & { nativeBase?: unknown }) | null
+  try { pin = JSON.parse(pinText) as ViewDefinition & { nativeBase?: unknown } } catch { return null }
+  if (!pin || !Array.isArray(pin.columns) || !Array.isArray(pin.filters) || !Array.isArray(pin.sort)) return null
+  const { nativeBase, ...definition } = pin
+  const usable = new Set(catalog.filter((field) => field.available).map((field) => field.id))
+  if (![...definition.columns, ...allViewFilters(definition), ...definition.sort].every((item) => usable.has(item.id))) return null
+  if (typeof nativeBase === 'string' && nativeBase) return { base: nativeBase, definition }
+  if (!allViewFilters(definition).length) return null
+  try {
+    const base = legacyNativeBase(fetchXml, buildFetchXml(definition, catalog))
+    return base ? { base, definition } : null
+  } catch { return null }
+}
+
 /** Interpreta as views já buscadas com o catálogo disponível. */
 export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: CatalogField[]): SavedView[] {
   const pinned = new Map(pins.map((row) => [String(row.new_viewid), String(row.new_pins ?? '').split(',').filter(Boolean)]))
@@ -419,15 +408,19 @@ export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: C
     ...publicViews.map((row) => ({ row, kind: 'public' as const, id: String(row.savedqueryid) })),
   ].map(({ row, kind, id }) => {
     const description = String(row.description ?? '')
+    const fetchXml = String(row.fetchxml ?? '')
+    const withPins = (definition: ViewDefinition): ViewDefinition => ({ ...definition, columns: definition.columns.map((item) => ({ ...item, pinned: (pinned.get(id) ?? []).includes(item.id) })) })
+    const copy = description === NATIVE_COPY_DESCRIPTION ? nativeCopyOf(fetchXml, definitions.get(id) ?? '', catalog) : null
+    if (copy) return { id, kind, name: String(row.name ?? ''), managed: false, nativeOnly: true, nativeFiltersEditable: false, nativeCopy: true, sourceFetchXml: copy.base, definition: withPins(copy.definition) }
     let stored: ViewDefinition | null = null
     if (description.startsWith(VIEW_MARKER)) {
       try { stored = JSON.parse(definitions.get(id) ?? '') as ViewDefinition } catch { stored = null }
     }
-    const parsed = stored ?? parseNativeDefinition(String(row.fetchxml ?? ''), String(row.layoutxml ?? ''), catalog)
+    const parsed = stored ?? parseNativeDefinition(fetchXml, String(row.layoutxml ?? ''), catalog)
     const supported = parsed && parsed.columns.every((column) => catalog.some((field) => field.id === column.id && field.available))
-    const definition = supported ? parsed : nativeLayoutDefinition(String(row.fetchxml ?? ''), String(row.layoutxml ?? ''), catalog)
+    const definition = supported ? parsed : nativeLayoutDefinition(fetchXml, String(row.layoutxml ?? ''), catalog)
     const hasNativeAlias = allViewFilters(definition).some((filter) => filter.nativeAlias)
-    return { id, kind, name: String(row.name ?? ''), managed: description.startsWith(VIEW_MARKER), nativeOnly: !supported || !description.startsWith(VIEW_MARKER) || hasNativeAlias, nativeFiltersEditable: Boolean(parseNativeFilters(String(row.fetchxml ?? ''), catalog) || stored && hasNativeAlias), sourceFetchXml: String(row.fetchxml ?? ''), definition: { ...definition, columns: definition.columns.map((item) => ({ ...item, pinned: (pinned.get(id) ?? []).includes(item.id) })) } }
+    return { id, kind, name: String(row.name ?? ''), managed: description.startsWith(VIEW_MARKER), nativeOnly: !supported || !description.startsWith(VIEW_MARKER) || hasNativeAlias, nativeFiltersEditable: Boolean(parseNativeFilters(fetchXml, catalog) || stored && hasNativeAlias), sourceFetchXml: fetchXml, definition: withPins(definition) }
   })
 }
 
@@ -436,14 +429,14 @@ export function buildViews({ personal, publicViews, pins }: ViewRows, catalog: C
  * (filtros originais preservados no FetchXML e travados na grade). Com a marca, a tela passaria a montar a consulta só pela
  * definição, que não tem esses filtros, e a cópia traria registros de fora da view original.
  */
-export async function saveView(name: string, kind: 'personal' | 'public', definition: ViewDefinition, catalog: CatalogField[], existing?: SavedView, fetchXmlOverride?: string, keepNative = false) {
+export async function saveView(name: string, kind: 'personal' | 'public', definition: ViewDefinition, catalog: CatalogField[], existing?: SavedView, fetchXmlOverride?: string, keepNative = false, nativeBase?: string) {
   const webApi = api()
   const entity = kind === 'personal' ? 'userquery' : 'savedquery'
   const objectTypeCode = (await entityMetadata(COMPOSITION_TABLE)).ObjectTypeCode
   if (!Number.isInteger(objectTypeCode)) throw new Error('ObjectTypeCode da Composição não encontrado.')
   const source = fetchXmlOverride ? new DOMParser().parseFromString(fetchXmlOverride, 'application/xml') : null
   source?.querySelector('fetch')?.removeAttribute('savedqueryid')
-  if (keepNative && (!source || existing)) throw new Error('A cópia de uma view nativa precisa do FetchXML original e é sempre uma view nova.')
+  if (keepNative && (!source || existing && !existing.nativeCopy)) throw new Error('A cópia de uma view nativa precisa do FetchXML original e só atualiza outra cópia.')
   const fetchxml = source ? new XMLSerializer().serializeToString(source) : buildFetchXml(definition, catalog)
   const layoutxml = keepNative
     ? buildLayoutXml({ ...definition, columns: definition.columns.filter((column) => catalog.some((field) => field.id === column.id && field.available)) }, catalog, objectTypeCode, fetchxml)
@@ -452,18 +445,20 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
   const payload = { name, description, returnedtypecode: COMPOSITION_TABLE, querytype: 0, fetchxml, layoutxml }
   let created = false
   if (existing) {
-    if (!existing.managed || existing.kind !== kind) throw new Error('Esta view existente não pode ser alterada por esta tela.')
+    if (!(existing.managed || keepNative) || existing.kind !== kind) throw new Error('Esta view existente não pode ser alterada por esta tela.')
     await webApi.updateRecord(entity, existing.id, { name, description, fetchxml: payload.fetchxml, layoutxml: payload.layoutxml })
   } else {
     const result = await webApi.createRecord(entity, payload)
-    existing = { id: result.id, kind, name, definition, managed: !keepNative }
+    existing = { id: result.id, kind, name, definition, managed: !keepNative, nativeCopy: keepNative }
     created = true
   }
   try {
     const pinRows = await webApi.retrieveMultipleRecords(PIN_TABLE, `?$select=new_configuracaovisualizacaocomposicaoid&$filter=new_viewid eq '${existing.id}'`)
     const pins = definition.columns.filter((item) => item.pinned).map((item) => item.id).join(',')
-    if (pinRows.entities[0]) await webApi.updateRecord(PIN_TABLE, String(pinRows.entities[0].new_configuracaovisualizacaocomposicaoid), { new_pins: pins, new_definition: JSON.stringify(definition) })
-    else await webApi.createRecord(PIN_TABLE, { new_name: name, new_viewid: existing.id, new_pins: pins, new_definition: JSON.stringify(definition) })
+    // Cópia nativa: o FetchXML original vai junto, para os filtros do usuário voltarem editáveis ao reabrir.
+    const stored = JSON.stringify(keepNative && nativeBase ? { ...definition, nativeBase } : definition)
+    if (pinRows.entities[0]) await webApi.updateRecord(PIN_TABLE, String(pinRows.entities[0].new_configuracaovisualizacaocomposicaoid), { new_pins: pins, new_definition: stored })
+    else await webApi.createRecord(PIN_TABLE, { new_name: name, new_viewid: existing.id, new_pins: pins, new_definition: stored })
   } catch (error) {
     if (created) {
       try { await webApi.deleteRecord(entity, existing.id) } catch { throw new Error(`View ${existing.id} foi criada, mas a configuração falhou e não pôde ser revertida: ${String(error)}`) }
@@ -477,7 +472,7 @@ export async function saveView(name: string, kind: 'personal' | 'public', defini
 
 export async function deleteView(view: SavedView) {
   // Visão pessoal criada no Dynamics (sem a marca da tela) é do próprio usuário: pode ir para a lixeira.
-  if (!view.managed && view.kind !== 'personal') throw new Error('Esta view existente não pode ser excluída por esta tela.')
+  if (!view.managed && !view.nativeCopy && view.kind !== 'personal') throw new Error('Esta view existente não pode ser excluída por esta tela.')
   const webApi = api()
   await webApi.deleteRecord(view.kind === 'personal' ? 'userquery' : 'savedquery', view.id)
   const pins = await webApi.retrieveMultipleRecords(PIN_TABLE, `?$select=new_configuracaovisualizacaocomposicaoid&$filter=new_viewid eq '${view.id}'`)

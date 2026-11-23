@@ -1,6 +1,6 @@
 {
   "triggers": {
-    "Todo_dia_0630": {
+    "Todo_dia_0900": {
       "type": "Recurrence",
       "recurrence": {
         "frequency": "Day",
@@ -8,10 +8,10 @@
         "timeZone": "E. South America Standard Time",
         "schedule": {
           "hours": [
-            "6"
+            "9"
           ],
           "minutes": [
-            30
+            0
           ]
         }
       }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Row } from '@betinhos/dataverse'
-import { Input, Select, Textarea, type SelectOption, type TableCellEdit, type TableCellStatus, type TableEditorProps } from '@betinhos/ui'
+import { Input, Select, Switch, Textarea, type SelectOption, type TableCellEdit, type TableCellStatus, type TableEditorProps } from '@betinhos/ui'
 import { MOTORISTA_TITLE } from '../domain/cells'
 import type { EditValue } from '../domain/edit'
 import { decideChoice, decideCommit, draftOf, lookupOptions, sameId, type PickedOption } from '../domain/editing'
@@ -63,7 +63,7 @@ function ChoiceEditor({ kind, column, info, current, search, props }: { kind: Ce
   return column.attribute === 'cr40f_motorista' && !column.alias ? <div title={MOTORISTA_TITLE}>{select}</div> : select
 }
 
-/** `column.edit` da coluna, ou `undefined` quando o tipo não edita na célula (só leitura e Sim/Não, que é um switch). */
+/** `column.edit` da coluna, ou `undefined` quando o tipo não edita na célula (só leitura). */
 export function editOf(kind: CellKind, column: Column, info: AttributeInfo | undefined, deps: EditDeps, idOf: (row: Row) => string): TableCellEdit<Row, unknown> | undefined {
   const key = rowKey(column, info)
   if (kind === 'choice' || kind === 'lookup') {
@@ -79,6 +79,15 @@ export function editOf(kind: CellKind, column: Column, info: AttributeInfo | und
         const decision = decideChoice(kind, value, row[key], label ?? '')
         if (decision) deps.save(idOf(row), column, decision.submit)
       },
+    }
+    return edit as TableCellEdit<Row, unknown>
+  }
+  if (kind === 'boolean') {
+    // O switch da célula (`ReadValue`) grava no clique; esta edição é o que dá à célula o andamento (gravando, salvo, erro) e o Enter/F2.
+    const edit: TableCellEdit<Row, boolean> = {
+      start: (row) => row[key] === true,
+      editor: (_row, props) => <Switch label={null} aria-label={props.label} checked={props.draft} onChange={(event) => props.commit(event.target.checked)} />,
+      commit: (row, draft) => { if (draft !== (row[key] === true)) deps.save(idOf(row), column, draft) },
     }
     return edit as TableCellEdit<Row, unknown>
   }

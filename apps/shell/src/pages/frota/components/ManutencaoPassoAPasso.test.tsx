@@ -105,6 +105,29 @@ describe('ManutencaoPassoAPasso', () => {
     expect((screen.getByRole('radio', { name: 'Urgente' }) as HTMLInputElement).checked).toBe(true)
   })
 
+  it('Programar: "Voltar para Agendar" e a etapa Agendar da barra abrem o Reagendar, sem gravar', () => {
+    const props = montar(agendada)
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar para Agendar' }))
+    fireEvent.click(screen.getByTitle('Voltar para Agendar'))
+    expect(props.onExtra).toHaveBeenCalledTimes(2)
+    expect(props.onExtra).toHaveBeenCalledWith('reagendar')
+    expect(props.source.agendarManutencao).not.toHaveBeenCalled()
+  })
+
+  it('Programado: "Voltar para Programar" confirma e reagenda na mesma janela', async () => {
+    const source = fonte()
+    ;(source.currentStatus as ReturnType<typeof vi.fn>).mockResolvedValue(MANUT.PROGRAMADO)
+    const props = montar(programada, source)
+    fireEvent.click(screen.getByTitle('Voltar para Programar'))
+    expect(screen.getByText('Voltar para Programar?')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Manter programada' }))
+    expect(screen.queryByText('Voltar para Programar?')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar para Programar' }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Voltar para Programar' })) })
+    await waitFor(() => expect(source.agendarManutencao).toHaveBeenCalledWith({ manutencaoId: 'm1', inicio: '2026-11-23', fim: '2026-11-29', comentario: null }))
+    expect(props.onFeito).toHaveBeenCalledWith('Voltou para Programar. Escolha o motorista e a saída de novo.')
+  })
+
   it('Programado mostra aguardando o App', async () => {
     montar(programada)
     expect(screen.getByRole('heading', { name: 'Aguardando o motorista concluir no App' })).toBeTruthy()

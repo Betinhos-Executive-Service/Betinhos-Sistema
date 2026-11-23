@@ -55,7 +55,7 @@ const asText = (v: number | null) => (v == null ? null : String(v))
 
 export function readPagante(p: Pagante, key: string): unknown {
   switch (key) {
-    case 'pessoa': return [p.pessoa, p.codigo].filter(Boolean).join(' ')
+    case 'pessoa': return p.pessoa
     case 'codigo': return p.codigo
     case 'op': return p.op
     case 'valor': return p.valor

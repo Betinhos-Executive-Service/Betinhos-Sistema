@@ -42,7 +42,7 @@ export const PENDENCIA_FIELDS: FilterField[] = [
 export function readPendencia(p: Pendencia, key: string): unknown {
   switch (key) {
     case 'tipo': return p.tipo
-    case 'op': return [p.opCodigo, ...p.reservaCodigos].filter(Boolean).join(' ')
+    case 'op': return p.opCodigo || p.reservaCodigos[0] || null
     case 'detalhe': return p.detalhe
     case 'cliente': return p.cliente
     case 'servicos': return p.reservaIds.length

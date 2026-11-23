@@ -100,8 +100,17 @@
   .drawer-title { flex: 1; display: grid; gap: var(--bt-space-1-5); min-width: 0; }
   .drawer-title h2 { overflow: hidden; font-size: var(--bt-typography-heading-detail-font-size); font-weight: var(--bt-typography-heading-detail-font-weight); line-height: var(--bt-typography-heading-detail-line-height); letter-spacing: var(--bt-typography-heading-detail-letter-spacing); color: var(--bt-color-brand); text-overflow: ellipsis; white-space: nowrap; }
   .drawer-title .muted { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
-  .drawer-tabs { padding: 0 var(--bt-space-4); background-color: var(--bt-color-surface); }
+  /* Abas: ícone em todas, nome só na aberta; o nome das outras aparece como dica no hover (.aba-dica). */
+  .drawer-tabs { position: relative; z-index: var(--bt-z-index-content); padding: 0 var(--bt-space-3); background-color: var(--bt-color-surface); }
   .drawer-tabs .bt-tabs { gap: 0; }
+  .drawer-tabs .bt-tabs__list { overflow: visible; }
+  .drawer-tabs .bt-tabs__tab { padding-inline: var(--bt-space-2-5); }
+  .drawer-tabs .bt-tabs__icon > svg { width: 18px; height: 18px; }
+  /* O nome escondido não ocupa espaço: sem o gap, a aba fechada fica só do tamanho do ícone. */
+  .drawer-tabs .bt-tabs__tab:not(.is-active) { gap: 0; }
+  .aba-dica { position: absolute; top: calc(100% + var(--bt-space-1)); left: 50%; translate: -50% 0; padding: var(--bt-space-1) var(--bt-space-2); border-radius: var(--bt-radius-sm); background-color: var(--bt-color-brand); color: var(--bt-color-on-solid); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); white-space: nowrap; box-shadow: var(--bt-shadow-popover); pointer-events: none; opacity: 0; transition: opacity var(--bt-duration-fast) ease; }
+  @media (hover: hover) and (pointer: fine) { .drawer-tabs .bt-tabs__tab:hover .aba-dica { opacity: 1; transition-delay: 200ms; } }
+  @media (prefers-reduced-motion: reduce) { .aba-dica { transition: none; } }
   .drawer-body { overflow-y: auto; overscroll-behavior: contain; padding: var(--bt-space-4); }
   .drawer-foot { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); align-items: center; justify-content: space-between; padding: var(--bt-space-3) var(--bt-space-4); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background-color: var(--bt-color-surface); }
   .drawer-foot-status { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
@@ -425,7 +434,9 @@
     .drawer-head { padding: var(--bt-space-1) var(--bt-space-4) var(--bt-space-3); gap: var(--bt-space-3); }
     .drawer-title h2 { white-space: normal; }
     .drawer-tabs { padding: 0 var(--bt-space-2); }
-    .drawer-tabs .bt-tabs__list { scrollbar-width: none; }
+    .drawer-tabs .bt-tabs__list { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    .drawer-tabs .bt-tabs__list::-webkit-scrollbar { display: none; }
+    .drawer-tabs .bt-tabs__tab { flex: 1 0 auto; justify-content: center; padding-inline: var(--bt-space-1-5); }
     .drawer-body { padding: var(--bt-space-4) var(--bt-space-4) calc(var(--bt-space-6) + env(safe-area-inset-bottom)); }
     .group { padding: var(--bt-space-3-5); }
     .fields { grid-template-columns: 1fr; }

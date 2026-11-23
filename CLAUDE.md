@@ -46,3 +46,8 @@ Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta
 - Comportamento que depende de dados reais, Custom API, plugin ou Flow não é verificável na VM: a sessão cloud entrega o PR e declara essa parte como "não verificada na nuvem"; a verificação com Dataverse DEV é feita localmente.
 - Sessões cloud nunca executam `pnpm push`, `pnpm wr` de publicação, `sitemap:*`, `push:plugin:*` nem scripts de `packages/deploy/provision-*` (todos alteram o Dataverse e exigem a `develop` no checkout principal).
 - Skills de verificação ficam em `.claude/skills/` (versionadas) para valerem também nas VMs.
+
+## Testes locais (decisão do Renan, 23/11/2026)
+
+- A máquina local é compartilhada por várias sessões ao mesmo tempo; suíte grande em paralelo satura CPU e RAM. Localmente, rode só os testes dos arquivos alterados (`pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 <arquivos ou pastas tocados>`), nunca mais que 2 workers e nunca a suíte inteira do shell.
+- A suíte completa roda no CI do PR (`ci.yml`, 3 fatias `--shard`) ou numa sessão cloud do Claude Code (`pnpm test` na VM, ver "Ambiente cloud"). Para provar antes do PR, abra o PR e use o resultado do CI, ou delegue a uma sessão cloud.
