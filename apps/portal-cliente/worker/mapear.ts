@@ -83,7 +83,7 @@ export type PedidoPortal = { passageiros: string[]; observacao?: string }
 
 const PROGRAMADO = new Set<StatusPedido>(['programado', 'em_execucao', 'concluido'])
 
-/** Reserva → pedido do solicitante. Voucher e veículo só depois de programado. */
+/** Reserva → pedido do solicitante. Voucher, veículo, motorista e placa só depois de programado. */
 export function mapearPedido(r: Registro): Pedido {
   const status = PEDIDO_STATUS[num(r, 'cr40f_status') ?? -1] ?? 'em_analise'
   let portal: PedidoPortal = { passageiros: [] }
@@ -91,6 +91,9 @@ export function mapearPedido(r: Registro): Pedido {
     portal = { ...portal, ...(JSON.parse(str(r, 'cr40f_portalpedido') || '{}') as PedidoPortal) }
   } catch { /* coluna editada à mão: mostra sem passageiros */ }
   const veiculo = veiculoDe(r)
+  const programado = PROGRAMADO.has(status)
+  const motorista = rotulo(r, '_cr40f_motorista_value')
+  const placa = rotulo(r, '_cr40f_veiculo_value')
   return {
     id: str(r, 'cr40f_reservadeveculosid'),
     numero: str(r, 'cr40f_id'),
@@ -101,7 +104,9 @@ export function mapearPedido(r: Registro): Pedido {
     passageiros: portal.passageiros,
     criadoEm: str(r, 'createdon'),
     ...(portal.observacao ? { observacao: portal.observacao } : {}),
-    ...(PROGRAMADO.has(status) && veiculo ? { veiculo } : {}),
-    ...(PROGRAMADO.has(status) && str(r, 'new_linkdovoucher') ? { voucherUrl: str(r, 'new_linkdovoucher') } : {}),
+    ...(programado && veiculo ? { veiculo } : {}),
+    ...(programado && motorista ? { motorista } : {}),
+    ...(programado && placa ? { placa } : {}),
+    ...(programado && str(r, 'new_linkdovoucher') ? { voucherUrl: str(r, 'new_linkdovoucher') } : {}),
   }
 }
