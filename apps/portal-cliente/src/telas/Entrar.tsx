@@ -4,7 +4,9 @@ import { ArrowLeft, Mail } from 'lucide-react'
 import { renderSVG } from 'uqr'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal, type CodigoErro } from '../api/PortalApi'
+import { marcaParceira } from '../domain/marcas'
 import type { Sessao } from '../domain/types'
+import { Parceria } from './Parceria'
 import './Entrar.css'
 
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -38,6 +40,8 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const codigoRef = useRef<HTMLInputElement>(null)
+  const chaveLink = useMemo(() => new URLSearchParams(window.location.search).get('c'), [])
+  const parceira = marcaParceira({ chave: chaveLink, email: EMAIL_VALIDO.test(email.trim()) ? email : undefined })
 
   async function enviarCodigo(e: FormEvent) {
     e.preventDefault()
@@ -134,7 +138,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
   return (
     <main className="pc-entrar">
       <section className="pc-entrar__card" aria-labelledby="pc-entrar-titulo">
-        <p className="pc-marca">Betinhos Executive Service</p>
+        <Parceria parceira={parceira} tamanho="entrar" />
         <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Portal do cliente</h1>
         {etapa === 'email' ? (
           <form className="pc-entrar__form" onSubmit={enviarCodigo} noValidate>

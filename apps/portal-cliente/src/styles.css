@@ -1,10 +1,8 @@
 /* Estilos globais do portal. Tokens e componentes vêm do @betinhos/ui. */
 
-.pc-marca {
-  margin: 0;
-  font-size: var(--bt-font-size-12);
-  font-weight: var(--bt-font-weight-extrabold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bt-color-brand);
-}
+.pc-parceria { display: flex; align-items: center; gap: var(--bt-space-3); flex-shrink: 0; }
+.pc-parceria img { display: block; width: auto; }
+.pc-parceria__x { font-size: var(--bt-font-size-14); color: var(--bt-color-text-secondary); }
+.pc-parceria--topo img { height: 36px; }
+.pc-parceria--entrar { margin-bottom: var(--bt-space-4); }
+.pc-parceria--entrar img { height: 56px; }

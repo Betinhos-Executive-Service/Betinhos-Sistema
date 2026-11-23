@@ -1,7 +1,9 @@
 import { Button, SegmentedControl } from '@betinhos/ui'
 import { LogOut } from 'lucide-react'
+import { marcaParceira } from '../domain/marcas'
 import { MODULO_LABEL } from '../domain/pedidos'
 import type { Modulo, Sessao } from '../domain/types'
+import { Parceria } from './Parceria'
 
 type Props = { sessao: Sessao; onSair: () => void; ativo: Modulo; onModulo: (m: Modulo) => void }
 
@@ -10,7 +12,7 @@ export function Topo({ sessao, onSair, ativo, onModulo }: Props) {
   return (
     <header className="pc-topo">
       <div className="pc-topo__inicio">
-        <p className="pc-marca">Betinhos Executive Service</p>
+        <Parceria parceira={marcaParceira({ cliente: sessao.cliente, email: sessao.email })} tamanho="topo" />
         {sessao.modulos.length > 1 && (
           <SegmentedControl<Modulo>
             className="pc-topo__modulos"
