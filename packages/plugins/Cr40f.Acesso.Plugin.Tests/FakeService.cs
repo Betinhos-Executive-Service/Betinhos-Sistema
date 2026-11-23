@@ -28,8 +28,18 @@ public sealed class FakeService : IOrganizationService
     public string? FalharCriacaoEm { get; set; }
 
     public Action<Entity>? AoCriar { get; set; }
-    public Guid Create(Entity entity) { AoCriar?.Invoke(entity); if (entity.LogicalName == FalharCriacaoEm) throw new InvalidOperationException("Create recusado em " + entity.LogicalName);  if (entity.Id == Guid.Empty) entity.Id = Guid.NewGuid(); Com(entity); Criados.Add(entity); return entity.Id; }
-    public void Update(Entity entity) { Atualizados.Add(entity); var alvo = _tabelas[entity.LogicalName].Single(e => e.Id == entity.Id); foreach (var kv in entity.Attributes) alvo[kv.Key] = kv.Value; }
+    public Guid Create(Entity entity) { AoCriar?.Invoke(entity); if (entity.LogicalName == FalharCriacaoEm) throw new InvalidOperationException("Create recusado em " + entity.LogicalName);  if (entity.Id == Guid.Empty) entity.Id = Guid.NewGuid(); Carimbar(entity, true); Com(entity); Criados.Add(entity); return entity.Id; }
+    public void Update(Entity entity) { Atualizados.Add(entity); var alvo = _tabelas[entity.LogicalName].Single(e => e.Id == entity.Id); foreach (var kv in entity.Attributes) alvo[kv.Key] = kv.Value; Carimbar(alvo, false); }
+
+    private static int _relogio;
+    /// <summary>Só nas tabelas da configuração do App: a plataforma carimba createdon/modifiedon, e a marca do rascunho e a ordem das exceções dependem deles.</summary>
+    private static void Carimbar(Entity e, bool criacao)
+    {
+        if (!e.LogicalName.StartsWith("cr40f_appconfig", StringComparison.Ordinal)) return;
+        var agora = new DateTime(2026, 11, 23, 12, 0, 0, DateTimeKind.Utc).AddSeconds(System.Threading.Interlocked.Increment(ref _relogio));
+        if (criacao) e["createdon"] = agora;
+        e["modifiedon"] = agora;
+    }
     public Entity Retrieve(string entityName, Guid id, ColumnSet columnSet) => _tabelas[entityName].Single(e => e.Id == id);
 
     public EntityCollection RetrieveMultiple(QueryBase query)
@@ -49,7 +59,9 @@ public sealed class FakeService : IOrganizationService
         return e[atributo] switch { OptionSetValue o => o.Value, EntityReference r => r.Id, string s => s.ToLowerInvariant(), var v => v };
     }
 
-    public void Delete(string entityName, Guid id) => throw new NotSupportedException();
+    public List<(string Tabela, Guid Id)> Excluidos { get; } = new();
+    public void Delete(string entityName, Guid id) { _tabelas[entityName].RemoveAll(e => e.Id == id); Excluidos.Add((entityName, id)); }
+    public List<Entity> Linhas(string tabela) => _tabelas.TryGetValue(tabela, out var lista) ? lista : new List<Entity>();
     public List<OrganizationRequest> Executados { get; } = new();
     /// <summary>Execute falha (simula SetState recusado pelo Dataverse).</summary>
     public bool FalharExecute { get; set; }
