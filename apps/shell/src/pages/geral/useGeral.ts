@@ -388,6 +388,7 @@ export function useGeral(initialSource: Source, options: GeralOptions = {}) {
         pagesRef.current = 1
         setPagesLoaded(1)
         setMoreValue(result.more)
+        if (result.aviso) setGroupNotice(result.aviso)
         resolveTotal(result, token)
         setLoadingFlag(false)
       },

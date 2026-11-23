@@ -732,6 +732,7 @@ function ComposicaoContent({ host }: { host: Host }) {
     loadCompositions(undefined, queryView).then((page) => {
       if (!active) return
       applyFirstPage(page, request)
+      if (page.aviso) setNotice({ tone: 'warning', title: 'Algumas colunas ficaram vazias', detail: page.aviso })
     }).catch((error: unknown) => {
       if (!active) return
       void logAppError(error, { action: 'carregar-composicoes', phase: 'load', component: 'ComposicaoPage' })

@@ -1,3 +1,4 @@
+import { dedupeLinks } from '../../../app/fetchLinks'
 import { keywordTokens } from '../../../app/keywordSearch'
 import { compositionKeywordFilter, compositionSearchCatalogFields } from './composition-search'
 import { columnAliases, pruneOwnLinks } from './fetch-links'
@@ -303,55 +304,6 @@ export function withRowLinks(fetchXml: string) {
   reservation.appendChild(linkWithAttributes(document, { entity: 'cr40f_clientes1', from: 'cr40f_clientes1id', to: 'cr40f_cliente', alias: ROW_LINKS.cliente, names: CLIENT_LINK_ATTRIBUTES }))
   entity.appendChild(reservation)
   return new XMLSerializer().serializeToString(document)
-}
-
-const linkType = (link: Element) => link.getAttribute('link-type') ?? 'inner'
-const hasFilter = (link: Element) => [...link.children].some((child) => child.tagName === 'filter')
-
-/**
- * Funde vínculos repetidos (mesma tabela, from e to sob o mesmo pai): a view nativa, as colunas da grade e a linha
- * pedem a mesma reserva/cliente com aliases diferentes, e o Dataverse recusa mais de 15 link-entity.
- * Só funde vínculo outer sem filtro num igual sem filtro (o inner já restringe as linhas). `aliases` = [removido, mantido].
- */
-export function dedupeLinks(fetchXml: string): { fetchXml: string; aliases: [string, string][] } {
-  const document = new DOMParser().parseFromString(fetchXml, 'application/xml')
-  const entity = document.querySelector('fetch > entity')
-  if (document.querySelector('parsererror') || !entity) return { fetchXml, aliases: [] }
-  const aliases: [string, string][] = []
-  const merge = (parent: Element) => {
-    const kept: Element[] = []
-    for (const link of [...parent.children].filter((child) => child.tagName === 'link-entity')) {
-      const alias = link.getAttribute('alias')
-      const target = alias && linkType(link) === 'outer' && !hasFilter(link)
-        ? kept.find((candidate) => ['name', 'from', 'to'].every((name) => candidate.getAttribute(name) === link.getAttribute(name)) && candidate.getAttribute('alias') && ['inner', 'outer'].includes(linkType(candidate)) && !hasFilter(candidate))
-        : undefined
-      if (!target) { kept.push(link); continue }
-      const keptAlias = target.getAttribute('alias')!
-      const names = new Set([...target.children].filter((child) => child.tagName === 'attribute').map((child) => child.getAttribute('name')))
-      for (const child of [...link.children]) {
-        if (child.tagName === 'attribute' && names.has(child.getAttribute('name'))) continue
-        target.appendChild(child)
-      }
-      link.remove()
-      document.querySelectorAll(`[entityname="${alias}"]`).forEach((node) => node.setAttribute('entityname', keptAlias))
-      for (const pair of aliases) if (pair[1] === alias) pair[1] = keptAlias
-      aliases.push([alias!, keptAlias])
-    }
-    kept.forEach(merge)
-  }
-  merge(entity)
-  return aliases.length ? { fetchXml: new XMLSerializer().serializeToString(document), aliases } : { fetchXml, aliases }
-}
-
-/** Devolve à linha as colunas dos vínculos fundidos com o alias original (`removido.campo`), como se a consulta não tivesse sido fundida. */
-export function expandLinkAliases<T extends Record<string, unknown>>(row: T, aliases: [string, string][]): T {
-  if (!aliases.length) return row
-  const result: Record<string, unknown> = { ...row }
-  for (const [removed, kept] of aliases) {
-    const prefix = `${kept}.`
-    for (const [key, value] of Object.entries(row)) if (key.startsWith(prefix)) result[`${removed}.${key.slice(prefix.length)}`] = value
-  }
-  return result as T
 }
 
 /** Tira os vínculos da linha (caminho de quem não tem leitura na reserva ou no cliente). */
