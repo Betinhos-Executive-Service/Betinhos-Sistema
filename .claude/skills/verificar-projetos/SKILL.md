@@ -7,7 +7,7 @@ description: "Verifica o módulo Projetos do Sistema Betinhos (#/projetos, tabel
 Complementa `verificar-shell` (typecheck, testes e ambiente do shell); aqui só o que é do módulo.
 
 ## Cobre
-- Código: `apps/shell/src/pages/projetos/**`, `nav/menu.ts` (item no grupo Operacional, depois do Planner), `app/routes.tsx`, `app/AppShell.tsx` (ícone `FolderKanban`) e `packages/deploy/migrations/20261123-0845-projetos.ps1`.
+- Código: `apps/shell/src/pages/projetos/**`, `nav/menu.ts` (item no grupo Back-End, depois dos Logs dos apps), `app/routes.tsx`, `app/AppShell.tsx` (ícone `FolderKanban`) e `packages/deploy/migrations/20261123-0845-projetos.ps1`.
 - Seção "Projetos (cr40f_projeto)" do `CLAUDE.md` da raiz (nomes lógicos, choices, papel, regras dos agentes, como o Renan é identificado).
 
 ## Roteiro local (sem Dataverse)

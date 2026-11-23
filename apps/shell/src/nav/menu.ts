@@ -41,7 +41,6 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'qualidade', label: 'Gestão de Qualidade', page: 'qualidade' },
       { kind: 'site', id: 'infleet', label: 'Infleet', url: 'https://app.infleet.com.br/monitoring' },
       { kind: 'page', id: 'planner', label: 'Planner', page: 'planner' },
-      { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
     ],
   },
   {
@@ -100,6 +99,7 @@ export const MENU: MenuGroup[] = [
       // O dashboard React substitui o antigo no uso diário; o legado fica como modo TV (link "Abrir modo TV" no Dashboard).
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
+      { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.

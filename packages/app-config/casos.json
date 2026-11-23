@@ -1,0 +1,756 @@
+{
+  "catalogo": [
+    {
+      "chave": "services",
+      "rotulo": "Serviços",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": true,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "comunicados",
+      "rotulo": "Comunicados",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": true,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "history",
+      "rotulo": "Histórico",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "checklists",
+      "rotulo": "Checklists",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "multas",
+      "rotulo": "Multas",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": true,
+      "padrao": {
+        "proprio": false,
+        "terceiro": false,
+        "admin": true
+      }
+    },
+    {
+      "chave": "treinamentos",
+      "rotulo": "Treinamentos",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "postosProximos",
+      "rotulo": "Postos próximos",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "maintenancePhoto",
+      "rotulo": "Manutenção",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "expenses",
+      "rotulo": "Gastos",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "collisions",
+      "rotulo": "Colisões",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "minhaNota",
+      "rotulo": "Minha nota",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "ideas",
+      "rotulo": "Boas ideias",
+      "tipo": "modulo",
+      "pai": null,
+      "fixa": false,
+      "sensivel": false,
+      "padrao": {
+        "proprio": true,
+        "terceiro": true,
+        "admin": true
+      }
+    },
+    {
+      "chave": "services.qrCharge",
+      "rotulo": "Cobrar por QR",
+      "tipo": "funcao",
+      "pai": "services",
+      "fixa": false,
+      "sensivel": true,
+      "padrao": {
+        "proprio": false,
+        "terceiro": false,
+        "admin": true
+      }
+    },
+    {
+      "chave": "services.personalReceipt",
+      "rotulo": "Recibo personalizado",
+      "tipo": "funcao",
+      "pai": "services",
+      "fixa": false,
+      "sensivel": true,
+      "padrao": {
+        "proprio": false,
+        "terceiro": false,
+        "admin": true
+      }
+    }
+  ],
+  "casos": [
+    {
+      "nome": "sem versão publicada, Próprio: vale o padrão do catálogo",
+      "hoje": "2026-11-23",
+      "matriz": null,
+      "pessoa": {
+        "vinculo": 0
+      },
+      "esperado": {
+        "services": true,
+        "history": true,
+        "multas": false,
+        "services.qrCharge": false,
+        "services.personalReceipt": false
+      },
+      "origens": {
+        "services": "fixa",
+        "multas": "padrao",
+        "history": "padrao"
+      }
+    },
+    {
+      "nome": "sem versão publicada, Terceiro: vale o padrão do catálogo",
+      "hoje": "2026-11-23",
+      "matriz": null,
+      "pessoa": {
+        "vinculo": 1
+      },
+      "esperado": {
+        "checklists": true,
+        "multas": false,
+        "services.qrCharge": false
+      }
+    },
+    {
+      "nome": "matriz sem nenhuma chave equivale a sem versão publicada",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {},
+        "terceiro": {}
+      },
+      "pessoa": {
+        "vinculo": 0
+      },
+      "esperado": {
+        "history": true,
+        "multas": false,
+        "services.qrCharge": false
+      }
+    },
+    {
+      "nome": "Próprio lê a coluna Próprio da matriz",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0
+      },
+      "esperado": {
+        "history": false,
+        "multas": true,
+        "services.qrCharge": true,
+        "services.personalReceipt": true
+      },
+      "origens": {
+        "history": "perfil",
+        "multas": "perfil"
+      }
+    },
+    {
+      "nome": "Terceiro (vínculo 1) lê a coluna Terceiro da matriz",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 1
+      },
+      "esperado": {
+        "history": true,
+        "multas": false,
+        "services.qrCharge": true,
+        "services.personalReceipt": true
+      }
+    },
+    {
+      "nome": "vínculo vazio vale como Próprio",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": null
+      },
+      "esperado": {
+        "history": false,
+        "multas": true
+      },
+      "perfil": "proprio",
+      "semVinculo": true
+    },
+    {
+      "nome": "vínculo fora de 0/1 vale como Próprio",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 7
+      },
+      "esperado": {
+        "history": false,
+        "multas": true
+      },
+      "perfil": "proprio",
+      "semVinculo": true
+    },
+    {
+      "nome": "chave ausente numa matriz com conteúdo fica ligada",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 1
+      },
+      "esperado": {
+        "checklists": true,
+        "treinamentos": true,
+        "ideas": true
+      }
+    },
+    {
+      "nome": "chave fixa não desliga pela matriz",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "services": false,
+          "comunicados": false
+        },
+        "terceiro": {}
+      },
+      "pessoa": {
+        "vinculo": 0
+      },
+      "esperado": {
+        "services": true,
+        "comunicados": true
+      },
+      "origens": {
+        "services": "fixa"
+      }
+    },
+    {
+      "nome": "chave fixa não aceita exceção",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "services",
+            "ligado": false
+          }
+        ]
+      },
+      "esperado": {
+        "services": true
+      },
+      "origens": {
+        "services": "fixa"
+      }
+    },
+    {
+      "nome": "piloto tem tudo ligado, mesmo com a matriz desligada",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 1,
+        "piloto": true
+      },
+      "esperado": {
+        "history": true,
+        "multas": true,
+        "services.qrCharge": true,
+        "services.personalReceipt": true
+      },
+      "origens": {
+        "multas": "piloto"
+      },
+      "piloto": true
+    },
+    {
+      "nome": "piloto com a matriz vazia também tem tudo ligado",
+      "hoje": "2026-11-23",
+      "matriz": null,
+      "pessoa": {
+        "vinculo": 0,
+        "piloto": true
+      },
+      "esperado": {
+        "multas": true,
+        "services.qrCharge": true
+      }
+    },
+    {
+      "nome": "exceção que liga vence o perfil",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 1,
+        "excecoes": [
+          {
+            "chave": "multas",
+            "ligado": true
+          }
+        ]
+      },
+      "esperado": {
+        "multas": true
+      },
+      "origens": {
+        "multas": "excecao"
+      }
+    },
+    {
+      "nome": "exceção que desliga vence o perfil",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "multas",
+            "ligado": false
+          }
+        ]
+      },
+      "esperado": {
+        "multas": false
+      },
+      "origens": {
+        "multas": "excecao"
+      }
+    },
+    {
+      "nome": "exceção vence o piloto",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "piloto": true,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": false
+          }
+        ]
+      },
+      "esperado": {
+        "history": false,
+        "multas": true
+      },
+      "origens": {
+        "history": "excecao",
+        "multas": "piloto"
+      }
+    },
+    {
+      "nome": "exceção com validade igual a hoje ainda vale",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": true,
+            "validade": "2026-11-23"
+          }
+        ]
+      },
+      "esperado": {
+        "history": true
+      },
+      "origens": {
+        "history": "excecao"
+      }
+    },
+    {
+      "nome": "exceção com validade futura vale",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": true,
+            "validade": "2026-12-31"
+          }
+        ]
+      },
+      "esperado": {
+        "history": true
+      }
+    },
+    {
+      "nome": "exceção vencida (validade antes de hoje) não vale",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": true,
+            "validade": "2026-11-22"
+          }
+        ]
+      },
+      "esperado": {
+        "history": false
+      },
+      "origens": {
+        "history": "perfil"
+      }
+    },
+    {
+      "nome": "exceção encerrada não vale",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": true,
+            "encerrada": true
+          }
+        ]
+      },
+      "esperado": {
+        "history": false
+      }
+    },
+    {
+      "nome": "duas exceções vigentes para a mesma chave: vale a última",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "history",
+            "ligado": true
+          },
+          {
+            "chave": "history",
+            "ligado": false
+          }
+        ]
+      },
+      "esperado": {
+        "history": false
+      }
+    },
+    {
+      "nome": "exceção de uma chave não afeta as outras",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "history": false,
+          "multas": true,
+          "services.qrCharge": true
+        },
+        "terceiro": {
+          "history": true,
+          "multas": false,
+          "services.personalReceipt": true
+        }
+      },
+      "pessoa": {
+        "vinculo": 0,
+        "excecoes": [
+          {
+            "chave": "multas",
+            "ligado": false
+          }
+        ]
+      },
+      "esperado": {
+        "history": false,
+        "services.qrCharge": true
+      }
+    },
+    {
+      "nome": "função segue o módulo pai ligado (Serviços é fixo)",
+      "hoje": "2026-11-23",
+      "matriz": {
+        "proprio": {
+          "services.qrCharge": true
+        },
+        "terceiro": {}
+      },
+      "pessoa": {
+        "vinculo": 0
+      },
+      "esperado": {
+        "services": true,
+        "services.qrCharge": true
+      }
+    }
+  ]
+}

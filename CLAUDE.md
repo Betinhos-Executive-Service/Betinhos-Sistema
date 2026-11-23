@@ -43,7 +43,7 @@ Segredo novo: nome em minúsculas com `.` e `-` (`<servico>.<uso>`), linha nesta
 
 ## Projetos (cr40f_projeto)
 
-Módulo `#/projetos` (Operacional, depois do Planner), de 23/11/2026. Na tela o projeto é uma linha só (nome, situação, o que falta); por baixo, cada projeto tem uma etapa escondida (`PRJ-n.1`) que guarda status, prazo, andamento, PR, publicação no PROD e provas. O gestor cadastra o projeto e escreve o briefing (texto, prints e áudio). Agentes de IA atualizam pelo Dataverse; só o Renan muda a situação e marca Pronto (Concluída), e só com prova.
+Módulo `#/projetos` (Back-End, depois dos Logs dos apps; saiu do Operacional em 23/11/2026 a pedido do Renan), de 23/11/2026. Na tela o projeto é uma linha só (nome, situação, o que falta); por baixo, cada projeto tem uma etapa escondida (`PRJ-n.1`) que guarda status, prazo, andamento, PR, publicação no PROD e provas. O gestor cadastra o projeto e escreve o briefing (texto, prints e áudio). Agentes de IA atualizam pelo Dataverse; só o Renan muda a situação e marca Pronto (Concluída), e só com prova.
 
 - **Schema** (migration `packages/deploy/migrations/20261123-0845-projetos.ps1`; o Deploy aplica no DEV, o PROD recebe pelas soluções, tudo na BetinhosCore).
   - `cr40f_projeto`: `cr40f_codigo` (autonumber `PRJ-{SEQNUM:1}`, só leitura), `cr40f_name`, `cr40f_area`, `cr40f_responsavel`, `cr40f_briefing` (o pedido do gestor), `cr40f_instrucoes` (como usar).
