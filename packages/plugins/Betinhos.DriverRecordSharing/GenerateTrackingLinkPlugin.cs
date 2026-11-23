@@ -67,7 +67,7 @@ namespace Betinhos.DriverRecordSharing
                     context.OutputParameters[ResultParameter] = Fail(GenericError);
                     return;
                 }
-                if (cadastro != null && link.Item2.HasValue) SyncCadastroExpiry(system, cadastro, link.Item2.Value, tracing);
+                ConfirmCadastro(system, serviceId, cadastro, link.Item2, tracing);
 
                 var update = new Entity(PluginConfig.ServiceTable, serviceId);
                 update[PluginConfig.ServiceTrackingLink] = link.Item1;
@@ -160,7 +160,7 @@ namespace Betinhos.DriverRecordSharing
         public static DateTime? CadastroExpiry(Dictionary<string, object> payload, DateTime nowUtc)
         {
             object hours;
-            if (payload == null || !payload.TryGetValue("validadeHoras", out hours) || hours == null) return null;
+            if (!payload.TryGetValue("validadeHoras", out hours) || hours == null) return null;
             return nowUtc.AddHours(Convert.ToDouble(hours, CultureInfo.InvariantCulture));
         }
 
@@ -178,10 +178,16 @@ namespace Betinhos.DriverRecordSharing
             catch (Exception error) { tracing?.Trace("GenerateTrackingLink: revogação do link de cadastro falhou: {0}", error.GetType().Name); }
         }
 
-        public static void SyncCadastroExpiry(IOrganizationService system, TrackingLinkCadastro.Created cadastro, DateTime expiresUtc, ITracingService tracing)
+        // Worker confirmou: os links de cadastro anteriores saem e a expiração fica a do Worker.
+        public static void ConfirmCadastro(IOrganizationService system, Guid serviceId, TrackingLinkCadastro.Created cadastro, DateTime? workerExpiresUtc, ITracingService tracing)
         {
-            try { TrackingLinkCadastro.SetExpiry(system, cadastro.Id, expiresUtc); }
-            catch (Exception error) { tracing?.Trace("GenerateTrackingLink: expiração do link de cadastro não atualizada: {0}", error.GetType().Name); }
+            if (cadastro == null) return;
+            try
+            {
+                TrackingLinkCadastro.RevokeWholeService(system, serviceId, cadastro.Id);
+                if (workerExpiresUtc.HasValue) TrackingLinkCadastro.SetExpiry(system, cadastro.Id, workerExpiresUtc.Value);
+            }
+            catch (Exception error) { tracing?.Trace("GenerateTrackingLink: link de cadastro não confirmado: {0}", error.GetType().Name); }
         }
 
         // Falha aqui não derruba o link: devolve lista vazia e a saída cai nos demais critérios.

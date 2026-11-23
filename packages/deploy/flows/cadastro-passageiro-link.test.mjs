@@ -72,31 +72,22 @@ test('escopo: passageiro do link, filhos por _cr40f_geral_value, sem lookups pas
   assert.match(todas.get('Escopo').inputs, /_cr40f_passageiro_value/)
 })
 
-test('ler: cada passageiro leva ordem = cr40f_ordemdeselecao do filho (nula quando o filho não tem)', () => {
+test('ler: cada passageiro leva ordem = cr40f_ordemdeselecao do filho (nula quando o filho não tem), sem json() de chaves montadas', () => {
   const filhos = todas.get('Listar_filhos')
   assert.match(filhos.inputs.parameters.$filter, /^_cr40f_geral_value eq /)
   assert.match(filhos.inputs.parameters.$select, /(^|,)cr40f_ordemdeselecao(,|$)/)
-  // mapa id -> ordem montado fora do loop e ligado ao Escopo (o loop só enxerga ancestrais)
+  // lista {id, ordem} fora do loop (o loop só enxerga ancestrais) e busca por id dentro dele: passageiro repetido na reserva
+  // não gera chave repetida num json() (que derrubaria o flow inteiro com 500)
   assert.deepEqual(todas.get('Ordens_filhos').runAfter, { Listar_filhos: ['Succeeded'] })
-  assert.deepEqual(todas.get('Ordens').runAfter, { Ordens_filhos: ['Succeeded'] })
-  assert.deepEqual(todas.get('Escopo').runAfter.Ordens, ['Succeeded'])
-  assert.equal(todas.get('Incluir_passageiro').inputs.value.ordem, "@outputs('Ordens')?[items('Por_passageiro')]")
-  // o mapa vira JSON válido, com ordem numérica ou null, mesmo sem filhos
-  const linha = todas.get('Ordens_filhos').inputs.select
-  const monta = (filhos) => {
-    const fns = { concat: (...a) => a.join(''), toLower: (s) => s.toLowerCase(), coalesce: (...a) => a.find((x) => x != null) }
-    const js = linha.slice(1).replace(/item\(\)\?\['(\w+)'\]/g, "F['$1']")
-    const itens = filhos.map((F) => new Function('F', ...Object.keys(fns), `return ${js}`)(F, ...Object.values(fns)))
-    return JSON.parse(`{${itens.join(',')}}`)
-  }
-  const A = 'AAAAAAAA-0000-0000-0000-000000000001', B = 'bbbbbbbb-0000-0000-0000-000000000002', C = 'cccccccc-0000-0000-0000-000000000003'
-  const mapa = monta([
-    { _cr40f_bancodedados_value: A, cr40f_ordemdeselecao: 2 },
-    { _cr40f_bancodedados_value: B, cr40f_ordemdeselecao: 1 },
-    { _cr40f_bancodedados_value: C, cr40f_ordemdeselecao: null },
-  ])
-  assert.deepEqual(mapa, { [A.toLowerCase()]: 2, [B]: 1, [C]: null })
-  assert.deepEqual(monta([]), {})
+  assert.deepEqual(todas.get('Escopo').runAfter.Ordens_filhos, ['Succeeded'])
+  assert.ok(!todas.has('Ordens'))
+  assert.doesNotMatch(raw, /@json\(/)
+  assert.deepEqual(Object.keys(todas.get('Ordens_filhos').inputs.select).sort(), ['id', 'ordem'])
+  assert.deepEqual(todas.get('Ordem_do_passageiro').runAfter, {})
+  assert.equal(todas.get('Ordem_do_passageiro').inputs.from, "@body('Ordens_filhos')")
+  assert.match(todas.get('Ordem_do_passageiro').inputs.where, /items\('Por_passageiro'\)/)
+  assert.deepEqual(todas.get('Incluir_passageiro').runAfter.Ordem_do_passageiro, ['Succeeded'])
+  assert.equal(todas.get('Incluir_passageiro').inputs.value.ordem, "@first(body('Ordem_do_passageiro'))?['ordem']")
 })
 
 test('salvar: passageiro fora do escopo 404, limite de 30 envios 429', () => {
@@ -122,7 +113,7 @@ test('ler: passageiros em paralelo e sem foto (a foto vem da op foto)', () => {
   assert.ok(loop.runtimeConfiguration.concurrency.repetitions >= 10, 'loop paralelo')
   assert.ok(!('Ler_foto' in loop.actions) && !('Tem_foto_lida' in loop.actions), 'o ler não baixa fotos')
   const incluir = todas.get('Incluir_passageiro')
-  assert.deepEqual(incluir.runAfter, { Obter_passageiro: ['Succeeded'] })
+  assert.deepEqual(incluir.runAfter, { Obter_passageiro: ['Succeeded'], Ordem_do_passageiro: ['Succeeded'] })
   assert.match(incluir.inputs.value.temFoto, /new_linkdafoto/)
   assert.equal(incluir.inputs.value.foto, null)
 })

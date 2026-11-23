@@ -31,10 +31,9 @@ namespace Betinhos.DriverRecordSharing
             public string Hash { get; set; }
         }
 
-        // Revoga os links ativos do serviço inteiro da reserva e cria o novo. `tokenBytes` só existe para teste.
+        // Cria o link de serviço inteiro; os anteriores só saem depois que o Worker confirma (RevokeWholeService). `tokenBytes` só existe para teste.
         public static Created Create(IOrganizationService system, Guid serviceId, DateTime expiresUtc, Func<byte[]> tokenBytes = null)
         {
-            RevokeWholeService(system, serviceId);
             var hash = Sha256Hex(Base64Url((tokenBytes ?? RandomBytes)()));
             var link = new Entity(Table)
             {
@@ -49,17 +48,14 @@ namespace Betinhos.DriverRecordSharing
         }
 
         // Marca Revogado os links ativos (1/2) sem passageiro, isto é, de serviço inteiro. Link de um passageiro só fica.
-        public static void RevokeWholeService(IOrganizationService system, Guid serviceId)
+        public static void RevokeWholeService(IOrganizationService system, Guid serviceId, Guid? keep = null)
         {
             var query = new QueryExpression(Table) { ColumnSet = new ColumnSet(Status, Passenger) };
             query.Criteria.AddCondition(Reservation, ConditionOperator.Equal, serviceId);
             query.Criteria.AddCondition(Status, ConditionOperator.In, StatusActive, StatusPartiallyUsed);
             foreach (var link in system.RetrieveMultiple(query).Entities)
             {
-                var status = link.GetAttributeValue<OptionSetValue>(Status);
-                if (status == null || (status.Value != StatusActive && status.Value != StatusPartiallyUsed)) continue;
-                if (link.GetAttributeValue<EntityReference>(Passenger) != null) continue;
-                Revoke(system, link.Id);
+                if (link.Id != keep && link.GetAttributeValue<EntityReference>(Passenger) == null) Revoke(system, link.Id);
             }
         }
 

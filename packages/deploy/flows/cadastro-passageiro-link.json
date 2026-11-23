@@ -317,17 +317,11 @@
                         },
                         "inputs": {
                           "from": "@body('Listar_filhos')?['value']",
-                          "select": "@concat('\"', toLower(coalesce(item()?['_cr40f_bancodedados_value'], '')), '\":', coalesce(item()?['cr40f_ordemdeselecao'], 'null'))"
+                          "select": {
+                            "id": "@toLower(coalesce(item()?['_cr40f_bancodedados_value'], ''))",
+                            "ordem": "@item()?['cr40f_ordemdeselecao']"
+                          }
                         }
-                      },
-                      "Ordens": {
-                        "type": "Compose",
-                        "runAfter": {
-                          "Ordens_filhos": [
-                            "Succeeded"
-                          ]
-                        },
-                        "inputs": "@json(concat('{', join(body('Ordens_filhos'), ','), '}'))"
                       },
                       "Filtrar_filhos": {
                         "type": "Query",
@@ -367,7 +361,7 @@
                           "Obter_reserva": [
                             "Succeeded"
                           ],
-                          "Ordens": [
+                          "Ordens_filhos": [
                             "Succeeded"
                           ]
                         },
@@ -417,6 +411,9 @@
                                     "runAfter": {
                                       "Obter_passageiro": [
                                         "Succeeded"
+                                      ],
+                                      "Ordem_do_passageiro": [
+                                        "Succeeded"
                                       ]
                                     },
                                     "inputs": {
@@ -424,7 +421,7 @@
                                       "value": {
                                         "id": "@{items('Por_passageiro')}",
                                         "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
-                                        "ordem": "@outputs('Ordens')?[items('Por_passageiro')]",
+                                        "ordem": "@first(body('Ordem_do_passageiro'))?['ordem']",
                                         "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))",
                                         "foto": null,
                                         "temTelefone": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], ''))))",
@@ -432,6 +429,14 @@
                                         "temEmail": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], ''))))",
                                         "emailMascarado": "@if(less(indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'), 1), if(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], ''))), '', '•••'), concat(substring(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), 0, min(2, indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'))), '•••', substring(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'))))"
                                       }
+                                    }
+                                  },
+                                  "Ordem_do_passageiro": {
+                                    "type": "Query",
+                                    "runAfter": {},
+                                    "inputs": {
+                                      "from": "@body('Ordens_filhos')",
+                                      "where": "@equals(item()?['id'], items('Por_passageiro'))"
                                     }
                                   }
                                 }

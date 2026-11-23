@@ -44,7 +44,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void Create_RevokesWholeServiceLinksOnly_AndWritesNewOne()
+        public void Create_WritesNewOne_AndKeepsExistingLinksUntilWorkerConfirms()
         {
             var fake = new Fake();
             var active = AddLink(fake, ServiceId, 1);
@@ -56,8 +56,8 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             var created = TrackingLinkCadastro.Create(fake, ServiceId, Expires, () => bytes);
 
-            Assert.Equal(4, Status(fake, active));
-            Assert.Equal(4, Status(fake, partial));
+            Assert.Equal(1, Status(fake, active));
+            Assert.Equal(2, Status(fake, partial));
             Assert.Equal(3, Status(fake, expired));
             Assert.Equal(1, Status(fake, single));
             Assert.Equal(1, Status(fake, other));
@@ -83,8 +83,6 @@ namespace Betinhos.DriverRecordSharing.Tests
             var second = TrackingLinkCadastro.Create(fake, ServiceId, Expires);
 
             Assert.NotEqual(first.Hash, second.Hash);
-            Assert.Equal(4, Status(fake, first.Id));
-            Assert.Equal(1, Status(fake, second.Id));
         }
 
         [Fact]
@@ -147,17 +145,36 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void SyncCadastroExpiry_UsesWorkerExpiry_AndToleratesErrors()
+        public void ConfirmCadastro_RevokesPreviousWholeServiceLinks_KeepsNewOne_AndUsesWorkerExpiry()
         {
             var fake = new Fake();
+            var active = AddLink(fake, ServiceId, 1);
+            var partial = AddLink(fake, ServiceId, 2);
+            var single = AddLink(fake, ServiceId, 1, passenger: true);
             var created = TrackingLinkCadastro.Create(fake, ServiceId, Expires);
             var worker = Expires.AddHours(1);
 
-            GenerateTrackingLinkPlugin.SyncCadastroExpiry(fake, created, worker, null);
+            GenerateTrackingLinkPlugin.ConfirmCadastro(fake, ServiceId, created, worker, null);
+
+            Assert.Equal(4, Status(fake, active));
+            Assert.Equal(4, Status(fake, partial));
+            Assert.Equal(1, Status(fake, single));
+            Assert.Equal(1, Status(fake, created.Id));
             Assert.Equal(worker, fake.Rows.Single(r => r.Id == created.Id).GetAttributeValue<DateTime>("cr40f_expiraem"));
+        }
+
+        [Fact]
+        public void ConfirmCadastro_WithoutWorkerExpiry_KeepsOwnExpiry_AndToleratesNullAndErrors()
+        {
+            var fake = new Fake();
+            var created = TrackingLinkCadastro.Create(fake, ServiceId, Expires);
+
+            GenerateTrackingLinkPlugin.ConfirmCadastro(fake, ServiceId, null, Expires, null);
+            GenerateTrackingLinkPlugin.ConfirmCadastro(fake, ServiceId, created, null, null);
+            Assert.Equal(Expires, fake.Rows.Single(r => r.Id == created.Id).GetAttributeValue<DateTime>("cr40f_expiraem"));
 
             fake.FailOnUpdate = true;
-            GenerateTrackingLinkPlugin.SyncCadastroExpiry(fake, created, Expires, null);
+            GenerateTrackingLinkPlugin.ConfirmCadastro(fake, ServiceId, created, Expires, null);
         }
 
         [Theory]
