@@ -1,5 +1,5 @@
 import { CATALOGO, type Matriz, type Perfil } from '@betinhos/app-config'
-import { Button, StatusBadge, Switch } from '@betinhos/ui'
+import { Button, Switch } from '@betinhos/ui'
 import { Lock, Send, Undo2 } from 'lucide-react'
 import { dataHora } from '../domain/formato'
 import { celula, REGRA_VINCULO, ROTULO_PERFIL } from '../domain/regras'
@@ -62,10 +62,7 @@ export function MatrizPerfis({ matriz, publicada, onAlterar }: MatrizProps) {
             return (
               <tr key={e.chave} className={e.pai ? 'am-matriz__funcao' : undefined}>
                 <th scope="row">
-                  <span className="am-matriz__nome">
-                    {e.rotulo}
-                    {e.sensivel ? <StatusBadge tone="warning" title="Chave sensível: o servidor recusa ligar sem escolha explícita (vem desligada por padrão).">servidor recusa</StatusBadge> : null}
-                  </span>
+                  <span className="am-matriz__nome">{e.rotulo}</span>
                 </th>
                 {COLUNAS.map((perfil) => {
                   const c = celula(e, perfil, publicada, matriz)

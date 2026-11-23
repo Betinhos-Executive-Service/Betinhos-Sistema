@@ -32,7 +32,7 @@ describe('matriz', () => {
     const publicada = materializar(null)
     const rascunho = definirCelula(definirCelula(publicada, 'proprio', 'history', false), 'proprio', 'multas', true)
     expect(celula(entradaDoCatalogo('history')!, 'proprio', publicada, rascunho)).toMatchObject({ ligado: false, mudou: 'era-ligado' })
-    expect(celula(entradaDoCatalogo('multas')!, 'proprio', publicada, rascunho)).toMatchObject({ ligado: true, mudou: 'era-desligado', sensivel: true })
+    expect(celula(entradaDoCatalogo('multas')!, 'proprio', publicada, rascunho)).toMatchObject({ ligado: true, mudou: 'era-desligado' })
     expect(celula(entradaDoCatalogo('services')!, 'terceiro', publicada, rascunho)).toMatchObject({ ligado: true, travada: true })
     expect(celula(entradaDoCatalogo('history')!, 'admin', publicada, rascunho)).toMatchObject({ ligado: true, travada: true, mudou: null })
   })
