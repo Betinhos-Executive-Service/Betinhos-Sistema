@@ -106,7 +106,7 @@ export function Veiculos({ data, today, source, host = MOCK_HOST, onOpenVeiculo,
   return (
     <>
       <div role="toolbar" aria-label="Comandos de veículos" {...sel.bar}>
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_veiculos', ids: sel.rows.map((v) => v.id), onOpenRecord: onOpenVeiculo })} view={view} columns={VEICULO_COLUMNS} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
           search={<SearchBox size={size} aria-label="Buscar veículo" placeholder="Buscar placa, marca, modelo, cor, motorista, categoria ou status" value={busca} onChange={setBusca} />}
           primary={<Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />} />
       </div>

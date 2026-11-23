@@ -222,7 +222,7 @@ function Ops({ host }: { host: Host }) {
   return (
     <div className="page page--full op-page">
       <div role="toolbar" aria-label="Comandos de ordens de pagamento">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_financeiro', ids: selecting ? sel.rows.map((op) => op.id) : undefined, onOpenRecord: setSelectedId })} view={view} columns={OP_COLUMNS} catalog={extra.catalog} filters={choices ? { fields: allFields } : undefined}
           search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por OP, cliente, passageiro, telefone, trajeto, status ou valor" aria-label="Buscar ordens de pagamento" />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={ops.loading && Boolean(choices)} onClick={refresh} />
