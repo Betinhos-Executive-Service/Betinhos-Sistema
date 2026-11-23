@@ -365,6 +365,7 @@ jobs:
           PLUGIN_SNK_FROTA: ${{ secrets.PLUGIN_SNK_FROTA }}
           PLUGIN_SNK_GERARPAGANTES: ${{ secrets.PLUGIN_SNK_GERARPAGANTES }}
           PLUGIN_SNK_PORTAL: ${{ secrets.PLUGIN_SNK_PORTAL }}
+          PLUGIN_SNK_PROJETOS: ${{ secrets.PLUGIN_SNK_PROJETOS }}
           PLUGIN_SNK_PRONTUARIO: ${{ secrets.PLUGIN_SNK_PRONTUARIO }}
           PLUGIN_SNK_PROTECAO: ${{ secrets.PLUGIN_SNK_PROTECAO }}
           # Configuração não segura do step do plugin de acesso (no local vem do .env).

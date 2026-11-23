@@ -50,11 +50,13 @@ export const NEUTRO = [
   /^packages\/deploy\/solucoes\//,
   // Backup externo (job r2 do backup-prod.yml): só lê o PROD.
   /^packages\/deploy\/backup\//,
+  // Registro "Publicado no PROD" do módulo Projetos (job projetos do producao.yml): só grava dados, não muda o que é publicado.
+  /^packages\/deploy\/projetos\//,
   /^packages\/deploy\/(push-dev|push-webresources-dev|push-formulario-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.
   /^packages\/plugins\/Betinhos\.ExpenseUpload\//,
-  /^packages\/deploy\/(bump-version|caminho-publicacao|mudancas-dev|flows-dev|migrations-dev|migrations-ci|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
+  /^packages\/deploy\/(bump-version|caminho-publicacao|hotfix-tela|mudancas-dev|flows-dev|migrations-dev|migrations-ci|scan-secrets|dv-token|dev-restart)(\.test)?\.mjs$/,
   /^packages\/deploy\/flows\/backup\//,
   /^packages\/deploy\/package\.json$/,
   /(^|\/)[^/]+\.md$/,

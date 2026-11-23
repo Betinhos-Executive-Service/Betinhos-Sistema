@@ -1,0 +1,203 @@
+name: Hotfix da tela
+
+run-name: Hotfix da tela - ${{ github.ref_name }}
+
+# Exceção formal à regra "PROD só pela main" (decisão do Renan, 23/11/2026): publica no PROD só a tela do Sistema Betinhos
+# (apps/shell) a partir de uma branch hotfix/*, com a conta de serviço, no lugar de copiar o push-tela-prod.ps1 à mão e rodar
+# com o az login de alguém. Reaproveita packages/deploy/push-front-prod.ps1 (o mesmo do caminho front do producao.yml).
+#
+# Uso: criar hotfix/<nome> a partir da tag prod-publicado, corrigir a tela, abrir o PR hotfix/<nome> → develop (obrigatório: sem
+# ele o próximo develop → main republica a tela sem a correção) e disparar este workflow nessa branch (Actions > Hotfix da tela >
+# Run workflow, escolhendo a branch). Se a main ainda não tem este arquivo, a branch precisa dele (cherry-pick): o dispatch roda
+# o arquivo da branch escolhida, e a trava de arquivos aceita só este workflow fora da tela.
+#
+# Travas (job travas, antes de qualquer acesso ao Dataverse):
+#  - a branch é hotfix/*;
+#  - a branch contém a tag prod-publicado e só muda a tela em relação a ela (hotfix-tela.mjs, que reusa a classificação de
+#    caminho-publicacao.mjs: schema, plugin, flow, solução e outro WebResource vão pelas soluções);
+#  - existe PR aberto ou mesclado da branch para a develop.
+# Travas no job publicar, antes do build: o commit que o PROD registra na descrição de cr40f_SistemaBetinhos.html é ancestral da
+# branch (senão a publicação apagaria outro hotfix ou uma publicação mais nova da main).
+# Versão: maior entre a do PROD e a do DEV (descrição do WebResource, lida no environment dev, só leitura) + 1, para o número
+# nunca repetir um que o DEV já usou com outro código.
+# Não move a tag prod-publicado: o hotfix vira camada Active no PROD, que o próximo import das soluções remove (publicar.yml).
+# Mesma fila do Produção (concurrency producao) e do job front (publicar-prod): nunca dois publicando no PROD ao mesmo tempo.
+# Atenção: com a fila cheia, um run pendente do Produção é substituído pelo mais novo; como o caminho é calculado desde a tag,
+# o que ficar de fora volta a contar no próximo push na main.
+# Pré-requisito: o environment prod-front precisa aceitar a branch hotfix/* (Settings > Environments > prod-front > Deployment
+# branches); sem isso o job publicar fica bloqueado.
+on:
+  workflow_dispatch:
+    inputs:
+      motivo:
+        description: 'Motivo do hotfix (vai no resumo da execução)'
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: producao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  travas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Branch hotfix/*
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/hotfix/* ]]; then
+            echo "::error::Este workflow só roda em branch hotfix/* (recebeu $GITHUB_REF). Escolha a branch do hotfix em Run workflow."
+            exit 1
+          fi
+      - name: Base prod-publicado
+        run: |
+          if ! git rev-parse -q --verify 'refs/tags/prod-publicado^{commit}' > /dev/null; then
+            echo "::error::A tag prod-publicado não existe: não há como saber o que o PROD tem. Publique pelo Produção."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor prod-publicado HEAD; then
+            echo "::error::A branch não contém a tag prod-publicado ($(git rev-parse --short prod-publicado)). Refaça o hotfix a partir dela: git switch -c hotfix/<nome> prod-publicado."
+            exit 1
+          fi
+      - name: Só a tela mudou desde prod-publicado
+        run: |
+          git diff --name-only prod-publicado...HEAD > arquivos.txt
+          echo "Arquivos desde prod-publicado: $(wc -l < arquivos.txt)"
+          node packages/deploy/hotfix-tela.mjs < arquivos.txt
+      - name: PR da branch para a develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --base develop --state all --json number,state --jq '[.[] | select(.state == "OPEN" or .state == "MERGED")] | .[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "::error::Não há PR aberto nem mesclado de $BRANCH para a develop. Abra o PR (gh pr create --base develop): sem ele o próximo develop → main republica a tela sem a correção."
+            exit 1
+          fi
+          echo "PR #$pr de $BRANCH para a develop."
+
+  # Só leitura: a versão que o DEV já usa (descrição vX.Y.Z <sha> do WebResource da tela). O environment dev não restringe branch.
+  versao-dev:
+    needs: travas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: dev
+    outputs:
+      versao: ${{ steps.ler.outputs.versao }}
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+    steps:
+      - id: ler
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = $env:DV_ENVIRONMENT_URL.TrimEnd('/')
+          $token = (Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$($env:DV_TENANT_ID)/oauth2/v2.0/token" -Body @{ grant_type = 'client_credentials'; client_id = $env:DV_CLIENT_ID; client_secret = $env:DV_CLIENT_SECRET; scope = "$url/.default" }).access_token
+          if (-not $token) { throw 'Falha ao obter token do DEV.' }
+          $linhas = @((Invoke-RestMethod -Uri "$url/api/data/v9.2/webresourceset?`$select=description&`$filter=name eq 'cr40f_SistemaBetinhos.html'" -Headers @{ Authorization = "Bearer $token" }).value)
+          $versao = if ($linhas.Count -eq 1 -and "$($linhas[0].description)" -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
+          if (-not $versao) { Write-Host '::warning::Versão do DEV não encontrada; o hotfix numera só pela do PROD.' }
+          "versao=$versao" >> $env:GITHUB_OUTPUT
+          Write-Host "DEV: $(if ($versao) { "v$versao" } else { 'desconhecida' })"
+
+  publicar:
+    needs: [travas, versao-dev]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # Sem revisor (a aprovação é o PR do hotfix e quem dispara); a regra de branch do environment precisa incluir hotfix/*.
+    environment: prod-front
+    concurrency:
+      group: publicar-prod
+      cancel-in-progress: false
+    env:
+      DV_ENVIRONMENT_URL: ${{ vars.DV_ENVIRONMENT_URL }}
+      DV_TENANT_ID: ${{ vars.DV_TENANT_ID }}
+      DV_CLIENT_ID: ${{ vars.DV_CLIENT_ID }}
+      DV_CLIENT_SECRET: ${{ secrets.DV_CLIENT_SECRET }}
+      VERSAO_DEV: ${{ needs.versao-dev.outputs.versao }}
+      MOTIVO: ${{ inputs.motivo }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: O PROD não está à frente da branch
+        id: prod
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = $env:DV_ENVIRONMENT_URL.TrimEnd('/')
+          $token = (Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$($env:DV_TENANT_ID)/oauth2/v2.0/token" -Body @{ grant_type = 'client_credentials'; client_id = $env:DV_CLIENT_ID; client_secret = $env:DV_CLIENT_SECRET; scope = "$url/.default" }).access_token
+          if (-not $token) { throw 'Falha ao obter token do PROD.' }
+          $linhas = @((Invoke-RestMethod -Uri "$url/api/data/v9.2/webresourceset?`$select=description&`$filter=name eq 'cr40f_SistemaBetinhos.html'" -Headers @{ Authorization = "Bearer $token" }).value)
+          if ($linhas.Count -ne 1) { throw 'cr40f_SistemaBetinhos.html ausente ou duplicado no PROD. Publique pelas soluções primeiro.' }
+          $descricao = "$($linhas[0].description)"
+          Write-Host "Descrição no PROD: $descricao"
+          $versao = if ($descricao -match '^v(\d+\.\d+\.\d+)') { $Matches[1] } else { '' }
+          "versao=$versao" >> $env:GITHUB_OUTPUT
+          if ($descricao -match '\b([0-9a-f]{40})\b') {
+            $sha = $Matches[1]
+            "sha=$sha" >> $env:GITHUB_OUTPUT
+            git cat-file -e "$sha^{commit}" 2>$null
+            if ($LASTEXITCODE -ne 0) { throw "O commit $($sha.Substring(0, 7)) que o PROD registra não existe neste repositório (hotfix de branch apagada?). Publicar agora poderia apagar essa correção; confira antes." }
+            git merge-base --is-ancestor $sha HEAD
+            if ($LASTEXITCODE -ne 0) { throw "O PROD está em $($sha.Substring(0, 7)), que não é ancestral desta branch: há uma publicação no PROD (outro hotfix ou a main) que a branch não contém. Atualize a branch com ela antes, para não apagá-la." }
+          }
+          else { Write-Host '::warning::A descrição do PROD não registra commit; a trava de ancestralidade não pôde rodar.' }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publicar a tela no PROD
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File packages/deploy/push-front-prod.ps1 -VersaoMinima "$env:VERSAO_DEV" 2>&1 | Tee-Object -FilePath hotfix-tela.log
+          if ($LASTEXITCODE -ne 0) { throw "push-front-prod.ps1 falhou ($LASTEXITCODE)." }
+      - name: Resumo
+        if: success()
+        shell: pwsh
+        run: |
+          $log = @(Get-Content hotfix-tela.log)
+          $criados = @($log | Select-String -Pattern '\] criando ').Count
+          $atualizados = @($log | Select-String -Pattern '\] atualizando ').Count
+          $iguais = @($log | Select-String -Pattern '\] .+ sem mudanca').Count
+          $conclusao = @($log | Select-String -Pattern 'PUSH PROD CONCLUIDO: (v\S+)')[0].Matches[0].Groups[1].Value
+          $versaoDev = if ($env:VERSAO_DEV) { "v$env:VERSAO_DEV" } else { 'desconhecida' }
+          $versaoProd = if ('${{ steps.prod.outputs.versao }}') { 'v${{ steps.prod.outputs.versao }}' } else { 'desconhecida' }
+          $resumo = @(
+            "## Hotfix da tela publicado no PROD: $conclusao",
+            '',
+            "- Branch: ``${{ github.ref_name }}`` em ``$($env:GITHUB_SHA.Substring(0, 7))``",
+            "- Versão: $conclusao (PROD estava em $versaoProd, DEV em $versaoDev)",
+            "- WebResources: $criados criado(s), $atualizados atualizado(s), $iguais sem mudança; todos conferidos depois da publicação (nome, tipo e conteúdo)",
+            "- Motivo: $(if ($env:MOTIVO) { $env:MOTIVO } else { 'não informado' })",
+            '',
+            '**Lembretes**',
+            '- Vira camada Active no PROD; o próximo import das soluções (Publicar soluções) a remove.',
+            '- A correção tem de estar no PR da branch para a develop; sem ele o próximo develop → main republica a tela sem ela.',
+            '- A tag prod-publicado não andou.'
+          )
+          $resumo | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+      - name: Resumo da falha
+        if: failure()
+        shell: pwsh
+        run: |
+          "## Hotfix da tela NÃO publicado`nVeja o passo que falhou. Nada além do que o log mostra como criado/atualizado foi gravado; a tag prod-publicado não andou." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
