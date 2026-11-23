@@ -458,7 +458,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   }, [dispRequest, source, toast, refresh, clearSelection, labelOf])
 
   // Com seleção, só as OS selecionadas; sem seleção, as alterações recentes da tabela.
-  const openAuditoria = useCallback(() => auditoria({ entity: ENTITY, ids: selectedIds }), [auditoria, selectedIds])
+  const openAuditoria = useCallback(() => {
+    const labels = Object.fromEntries(selectedIds.flatMap((id) => { const name = rowOf(id)?.cr40f_id; return typeof name === 'string' && name ? [[id.toLowerCase(), name]] : [] }))
+    auditoria({ entity: ENTITY, ids: selectedIds, labels })
+  }, [auditoria, selectedIds, rowOf])
 
   const registrarErro = useCallback(async () => {
     try {

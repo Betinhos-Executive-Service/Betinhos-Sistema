@@ -278,7 +278,7 @@ describe('Geral: comandos Auditoria, Gerar OP, Disparar e Registrar Erro', () =>
     // Auditoria é botão fixo da linha (DS §10.9.4), depois de Filtros.
     fireEvent.click(within(toolbar()).getByRole('button', { name: 'Auditoria' }))
     const painel = await screen.findByRole('dialog', { name: 'Auditoria', hidden: true })
-    expect(within(painel).getByText(/1 registro/)).toBeTruthy()
+    expect(within(painel).getByText(/· OS-1005/)).toBeTruthy()
     expect(await within(painel).findAllByText('Status', {}, { timeout: 2000 })).not.toHaveLength(0)
     fireEvent.click(within(painel).getByRole('button', { name: 'Fechar painel', hidden: true }))
     await acao('Registrar Erro')

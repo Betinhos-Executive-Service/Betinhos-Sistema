@@ -11,6 +11,8 @@ export type AuditTarget = {
   ids?: string[]
   /** Nome do registro quando há um só (vai para o subtítulo do painel). */
   name?: string
+  /** Como cada linha aparece na lista (ex.: "OP-401 · Cliente"), por id: vira o nome do registro em cada evento e nomeia a seleção no topo. */
+  labels?: Record<string, string>
   /** Abre o registro clicado no painel; sem isso o nome do registro não é link. */
   onOpenRecord?: (id: string) => void
 }
@@ -38,6 +40,36 @@ export const MAX_IDS = 100
 type Options = { Options?: { Value: number; Label?: { UserLocalizedLabel?: { Label?: string } | null } }[] }
 type WithOptions = { LogicalName: string; OptionSet?: Options | null; GlobalOptionSet?: Options | null }
 type DateDefinition = { LogicalName: string; Format?: string | null; DateTimeBehavior?: { Value?: string } | null }
+
+/** Rótulos das linhas da lista por id (ver `AuditTarget.labels`); linha sem rótulo fica com o nome do Dataverse. */
+export function auditLabels<T extends { id: string }>(rows: readonly T[], label: (row: T) => (string | null | undefined)[]) {
+  const labels: Record<string, string> = {}
+  for (const row of rows) {
+    const text = label(row).map((part) => part?.trim()).filter(Boolean).join(' · ')
+    if (text) labels[cleanId(row.id)] = text
+  }
+  return labels
+}
+
+/** Troca o nome do registro de cada evento pelo rótulo da lista, quando houver. */
+export function withLabels(events: AuditEvent[], labels: Record<string, string> | undefined) {
+  if (!labels) return events
+  return events.map((event) => {
+    const name = event.record && labels[cleanId(event.record.id)]
+    return name ? { ...event, record: { ...event.record!, name } } : event
+  })
+}
+
+/** Topo do painel: o registro único, os três primeiros selecionados pelo rótulo ou "N registros". */
+export function auditScope(target: AuditTarget) {
+  const ids = (target.ids ?? []).slice(0, MAX_IDS)
+  if (!ids.length) return 'Alterações recentes'
+  const named = ids.map((id) => target.labels?.[cleanId(id)]).filter((name): name is string => Boolean(name))
+  if (ids.length === 1) return target.name || named[0] || '1 registro'
+  if (named.length !== ids.length) return `${ids.length} registros`
+  const first = named.slice(0, 3).map((name) => name.split(' · ')[0]).join(', ')
+  return ids.length > 3 ? `${first} e mais ${ids.length - 3}` : first
+}
 
 /** Cursor da página seguinte: "createdon|auditid" do último evento recebido. */
 export const cursorOf = (row: Row) => `${String(row.createdon)}|${cleanId(String(row.auditid))}`

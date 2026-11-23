@@ -24,7 +24,7 @@ import { linhas, type Linha } from '../domain/linhas'
 import { EXTRA, LARGURAS, MULTA_FILTROS_PADRAO, PESSOA, VISAO_PADRAO, REGISTRO_SORT, matchesRegistroKeyword, readRegistro, registroBuiltins, registroColumns, registroFields, registroLegacy, sortRegistros, telaRegistros } from '../domain/listas'
 import { CATEGORIAS_MANUT } from '../domain/manutencaoCatalogo'
 import { EMPRESA, urgenciaDoPrazo } from '../domain/multaEstado'
-import { useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
+import { auditLabels, useAuditoria } from '../../../app/auditoria/AuditoriaProvider'
 
 const PLURAL: Record<Kind, string> = { manutencao: 'Manutenções', multa: 'Multas', colisao: 'Colisões' }
 const LEGACY_KEYS = ['status', 'veiculo', 'pessoa', 'categoria', 'de', 'ate'] as const
@@ -152,7 +152,7 @@ function Lista({ kind, kinds, data, source, host = MOCK_HOST, onOpen, onReload, 
   return (
     <>
       <div role="toolbar" aria-label="Comandos de registros" {...sel.bar}>
-        <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], ids: sel.rows.map((r) => r.id), onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: KIND_TABLE[kind], ids: sel.rows.map((r) => r.id), labels: auditLabels(visiveis, (r) => [r.codigo, r.titulo]), onOpenRecord: (id) => onOpen(kind, id) })} view={view} columns={columns} catalog={extra.catalog} filters={{ fields: allFields }} selection={{ count: sel.rows.length, onClear: sel.clear, actions: [] }}
           search={<SearchBox size={size} aria-label="Buscar registro" placeholder={kind === 'multa' ? 'Buscar código, descrição, placa, pessoa, status ou próximo passo' : 'Buscar descrição, placa, pessoa, status, valor ou data'} value={busca} onChange={setBusca} />}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={loading} onClick={onReload} />
