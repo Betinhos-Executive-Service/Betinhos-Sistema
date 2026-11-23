@@ -210,3 +210,32 @@ test('ler: telefone e e-mail só mascarados, nunca o valor completo', () => {
   assert.equal(mail(null), '')
   assert.equal(avaliar(v.temEmail, { cr40f_email: 'a@b.co' }), true)
 })
+
+test('toda ação referenciada está no caminho do runAfter (o Power Automate recusa o salvamento)', () => {
+  const pai = new Map(), irmaos = new Map()
+  const indexar = (acoes, dono) => {
+    for (const [nome, acao] of Object.entries(acoes ?? {})) {
+      pai.set(nome, dono); irmaos.set(nome, acoes)
+      indexar(acao.actions, nome); indexar(acao.else?.actions, nome); indexar(acao.default?.actions, nome)
+      for (const c of Object.values(acao.cases ?? {})) indexar(c.actions, nome)
+    }
+  }
+  indexar(flow.actions, null)
+  const descendentes = (nome) => [...pai].filter(([, p]) => p === nome).flatMap(([f]) => [f, ...descendentes(f)])
+  const antes = (nome, vistos = new Set()) => {
+    for (const p of Object.keys(irmaos.get(nome)[nome].runAfter ?? {})) {
+      if (!vistos.has(p)) { vistos.add(p); descendentes(p).forEach((d) => vistos.add(d)); antes(p, vistos) }
+    }
+    return vistos
+  }
+  const erros = []
+  for (const [nome, acao] of todas) {
+    const { actions, else: _e, cases, default: _d, ...propria } = acao
+    const alcance = new Set()
+    for (let n = nome; n; n = pai.get(n)) antes(n).forEach((a) => alcance.add(a))
+    for (const [, ref] of JSON.stringify(propria).matchAll(/(?:body|outputs|actions|result)\('([^']+)'\)/g)) {
+      if (todas.has(ref) && !alcance.has(ref)) erros.push(`${nome} -> ${ref}`)
+    }
+  }
+  assert.deepEqual(erros, [])
+})
