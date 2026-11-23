@@ -129,6 +129,9 @@
     "Modo",
     "detectarModo"
   ],
+  "src/app/modulosOcultos.ts": [
+    "MULTAS_OCULTO"
+  ],
   "src/app/navigation.ts": [
     "AUTO_REFRESH_INTERVAL_MS",
     "HashRoute",
