@@ -20,6 +20,7 @@ Complementa `verificar-shell` (typecheck, testes e ambiente do shell); aqui só 
 
 ## DEV (só leitura até o Renan pedir)
 - O Deploy aplica a migration no DEV (tag `schema-dev-publicado`). Depois: as três tabelas na BetinhosCore, chave alternativa `cr40f_codigo` na etapa, lookups Restrict, coluna `cr40f_transcricao`, papel `Projetos` na solução. O papel é atribuído à mão (Renan, gestor, conta dos agentes).
+- Notas: `EntityDefinitions(LogicalName='cr40f_projetoatualizacao')?$select=HasNotes` tem de dar `true` e a relação `cr40f_projetoatualizacao_Annotations` tem de existir. O POST que criou a tabela pediu notas e o Dataverse gravou `false` (23/11/2026, tela com "Could not find a property named 'cr40f_projetoatualizacao_Annotations'"); a migration `20261123-1700-projetos-habilitar-notas.ps1` liga e confere. Conferir o mesmo no TEST e no PROD depois do import.
 - Na tela publicada, como Renan (Administrador do Sistema): criar projeto e etapa, tentar Concluída sem prova (bloqueado), registrar prova com print (vira anotação; abrir pela miniatura), concluir. Como usuário só com o papel `Projetos`: Status desabilitado, atualização grava com autor Gestor.
 - Agente: criar etapa e `cr40f_projetoatualizacao` pela Web API (`cr40f_Projeto@odata.bind`, `cr40f_Etapa@odata.bind`, `cr40f_autor = 100000002`) e conferir na linha do tempo da etapa com o autor "Agente".
 
