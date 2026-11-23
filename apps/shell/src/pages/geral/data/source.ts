@@ -6,6 +6,7 @@ import { dayWindow, programarPatch, type Motorista } from '../domain/commands'
 import { COPY_SELECT } from '../domain/copy'
 import { buildCountFetch, buildFetch, buildGroupsFetch, withGroup } from '../domain/fetch'
 import { bucketsFromRows, GROUPS_LIMIT_MESSAGE, isAggregateLimit, type GroupBucket, type GroupSpec, type GroupTarget } from '../domain/grouping'
+import { expandLinkAliases, prepareFetchXml, removedLinksNotice } from '../../../app/fetchLinks'
 import { keywordTokens } from '../../../app/keywordSearch'
 import { searchFields, type Search } from '../domain/search'
 import { parseLinkJson, type LinkResult } from '../domain/link'
@@ -351,18 +352,21 @@ export function createSource(host: Host, options: SourceOptions = {}): Source {
     async page(req) {
       const search = await resolveSearch(req.query)
       const fetchxml = buildFetch(req.fetchxml, { page: req.page, pageSize: PAGE_SIZE, cookie: req.cookie, sort: req.sort, search, group: req.group })
-      return parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
+      const prepared = prepareFetchXml(fetchxml)
+      const page = parsePage(await host.client.request<FetchResponse>(fetchPath(await entitySet(), prepared.fetchXml), { signal: req.signal }))
+      const aviso = removedLinksNotice(prepared.degraded.removed)
+      return { ...page, rows: prepared.aliases.length ? page.rows.map((row) => expandLinkAliases(row, prepared.aliases)) : page.rows, ...(aviso ? { aviso } : {}) }
     },
     async count(req) {
       try {
         const fetchxml = buildCountFetch(req.fetchxml, { search: await resolveSearch(req.query) })
-        return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal }))
+        return parseCount(await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), prepareFetchXml(fetchxml).fetchXml), { signal: req.signal }))
       } catch { return null }
     },
     async groups(req) {
       const fetchxml = buildGroupsFetch(req.fetchxml, { search: await resolveSearch(req.query), spec: req.spec })
       try {
-        const body = await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), fetchxml), { signal: req.signal })
+        const body = await host.client.request<{ value: Row[] }>(fetchPath(await entitySet(), prepareFetchXml(fetchxml).fetchXml), { signal: req.signal })
         return bucketsFromRows(body.value, req.spec)
       } catch (error) {
         throw isAggregateLimit(error) ? new Error(GROUPS_LIMIT_MESSAGE) : error

@@ -1,3 +1,4 @@
+import { prepareFetchXml } from '../../app/fetchLinks'
 import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import type { FinanceiroServico, Recebimento } from './domain'
 
@@ -69,7 +70,7 @@ export function fetchContagemPorOp(opIds: string[]) {
 /** Quantos comprovantes cada OP tem (soma dos serviços); OP sem comprovante não entra no mapa (o agregado só devolve grupos com anexo).
  * 50 ids em `<value>` cabem folgados na URL do FetchXML. */
 export async function contarPorOp(client: DataverseClient, opIds: string[]) {
-  const rows = await emOndas(client, opIds, 50, (ids) => `${ENTITY_SET}?fetchXml=${encodeURIComponent(fetchContagemPorOp(ids))}`)
+  const rows = await emOndas(client, opIds, 50, (ids) => `${ENTITY_SET}?fetchXml=${encodeURIComponent(prepareFetchXml(fetchContagemPorOp(ids)).fetchXml)}`)
   return new Map(rows.map((row) => [cleanId(String(row.op_id ?? '')), Number(row.qtd)]))
 }
 

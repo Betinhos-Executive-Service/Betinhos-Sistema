@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import type { DataverseClient } from '@betinhos/dataverse'
 import { agruparPorServico, metaRecebimento, mostraStatus, ordenar, tomStatus, type Recebimento } from './domain'
