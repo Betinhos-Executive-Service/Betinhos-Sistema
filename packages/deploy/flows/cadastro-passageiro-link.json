@@ -342,6 +342,9 @@
                         "runAfter": {
                           "Filtrar_filhos": [
                             "Succeeded"
+                          ],
+                          "Obter_reserva": [
+                            "Succeeded"
                           ]
                         },
                         "inputs": "@if(not(empty(outputs('Link')?['_cr40f_passageiro_value'])), intersection(createArray(toLower(outputs('Link')?['_cr40f_passageiro_value'])), body('Filtrar_filhos')), union(body('Filtrar_filhos'), body('Filtrar_filhos')))"
