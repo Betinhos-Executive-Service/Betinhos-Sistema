@@ -10,6 +10,9 @@ import type { Funcionario } from '../data/types'
 import { Ficha } from './Ficha'
 import { RETENTATIVA_MS } from './AcessoProgresso'
 import { ToastProvider } from '@betinhos/ui'
+import type { Host } from '../../../host'
+import { AcessosContext } from '../../../app/AcessosProvider'
+import { createSource as createAcessosSource } from '../../acessos/data/source'
 
 const record: Funcionario = {
   id: 'f1',
@@ -400,6 +403,28 @@ describe('Ficha', () => {
     expect(screen.getByText('ana.souza@betinhos.onmicrosoft.com')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Logins e senhas' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Assinatura eletrônica' })).toBeTruthy()
+  })
+
+  it('perfis alterados seguram a troca de aba e pedem confirmação ao fechar', async () => {
+    const comEmail = { ...fakeSource(async () => 'f1'), get: async () => structuredClone({ ...record, values: { ...record.values, cr40f_emailmicrosoft: 'bruno@exemplo.test' } }) }
+    const onClose = vi.fn()
+    render(
+      <ToastProvider>
+        <AcessosContext.Provider value={{ status: 'pronto', acessos: { admin: false, areas: {}, acessos: true }, recarregar: () => {} }}>
+          <Ficha source={comEmail} id="f1" onClose={onClose} onSaved={() => {}} acessosSistema={createAcessosSource({ mode: 'mock' } as Host)} />
+        </AcessosContext.Provider>
+      </ToastProvider>,
+    )
+    await screen.findByDisplayValue('Ana Souza')
+    await abrirAcesso()
+    await screen.findByRole('button', { name: 'Salvar perfis' }, { timeout: 8000 })
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Gestor' })[1])
+    fireEvent.click(screen.getByRole('tab', { name: /Dados/ }))
+    await screen.findByText('Salve ou descarte os perfis antes de trocar de aba.')
+    expect(screen.getByRole('button', { name: 'Salvar perfis' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar ficha' }))
+    await screen.findByText('Descartar alterações?')
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('sem e-mail oferece cadastrar acesso', async () => {

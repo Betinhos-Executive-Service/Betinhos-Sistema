@@ -1,6 +1,7 @@
 import { createMemoryViewStore, type StoredView, type ViewStore } from '@betinhos/ui'
 import type { DataverseClient } from '@betinhos/dataverse'
 import type { Host } from '../host'
+import { nomesDosPapeis } from './acessos'
 
 /**
  * Onde as listas guardam as visões salvas (DS §10.9.1): tabela `cr40f_visaodetabela` no Dataverse
@@ -31,6 +32,7 @@ export const messageOf = (error: unknown) => (error instanceof Error && error.me
 export function createDataverseViewStore(client: DataverseClient, onWarn?: (message: string) => void): ViewStore {
   let me: Promise<string> | null = null
   const userId = () => (me ??= client.request<{ UserId: string }>('WhoAmI').then((r) => r.UserId.toLowerCase()).catch((e) => { me = null; throw e }))
+  let publisher: Promise<boolean> | null = null
   let teamWarned = false
   let team: Promise<string | null> | null = null
   const teamId = () => (team ??= client.request<{ value: { teamid: string }[] }>(`teams?$select=teamid&$filter=name eq '${odata(PUBLIC_TEAM)}' and teamtype eq 0`)
@@ -82,10 +84,8 @@ export function createDataverseViewStore(client: DataverseClient, onWarn?: (mess
       // Atribuir à equipe exige o privilégio Assign: o Dataverse recusa quem não é gestor.
       await client.update(VIEW_ENTITY_SET, id, { 'ownerid@odata.bind': `/teams(${tid})`, cr40f_publica: true })
     },
-    async canPublish() {
-      const uid = await userId()
-      const roles = await client.request<{ value: { name: string }[] }>(`systemusers(${uid})/systemuserroles_association?$select=name`)
-      return roles.value.some((r) => PUBLISHER_ROLES.includes(r.name))
+    canPublish() {
+      return (publisher ??= userId().then((uid) => nomesDosPapeis(client, uid)).then(({ nomes }) => nomes.some((n) => PUBLISHER_ROLES.includes(n))).catch((e) => { publisher = null; throw e }))
     },
   }
 }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { entradaDoCatalogo } from '@betinhos/app-config'
-import { acessoPorPapeis } from './domain/acesso'
 import {
   afetadosPorMudanca, celula, codigoDoErro, contarMudancas, definirCelula, linhaDoTempo, materializar, mensagemDoErro, normalizarMarca, ocultos, origemPorChave,
   readMotorista, statusExcecao, validarExcecao, configDoPreview,
@@ -152,12 +151,6 @@ describe('erros do servidor', () => {
 })
 
 describe('acesso e URL', () => {
-  it('administrador e a função de gestor veem; outros não; piloto é só do administrador', () => {
-    expect(acessoPorPapeis(['Administrador do Sistema'])).toEqual({ admin: true, gestor: true })
-    expect(acessoPorPapeis(['Perfil - Operacional - Gestor'])).toEqual({ admin: false, gestor: true })
-    expect(acessoPorPapeis(['Projetos'])).toEqual({ admin: false, gestor: false })
-  })
-
   it('lê aba, ver, modo e motorista com padrões seguros', () => {
     const q = new URLSearchParams('aba=historico&ver=motorista:abc&modo=publicado&motorista=m1')
     expect(lerAba(q)).toBe('historico')

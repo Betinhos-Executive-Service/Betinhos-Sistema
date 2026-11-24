@@ -23,5 +23,15 @@
     "migration": "20261124-1200-boas-ideias-anexos.ps1",
     "por": "20261124-1205-boas-ideias-anexos-navegacao.ps1",
     "motivo": "Falhou no DEV (Deploy 45401949365) no PUT parcial de RelationshipDefinitions para renomear a colecao (0x80060888, Nullable object must have a value). A 1205 tem o mesmo conteudo sem o PUT: o App usa so a navegacao cr40f_ideia, que ja nasce certa, e a migration confere."
+  },
+  {
+    "migration": "20261124-1700-portal-senhahash-segura.ps1",
+    "por": "20261124-1900-portal-senhahash-segura-tipo.ps1",
+    "motivo": "Falhou no DEV (Deploy 45457471435) ao criar a fieldpermission antes de proteger cr40f_senhahash (0x8004f508: coluna nao secured). A 1830 tem o mesmo conteudo e protege a coluna primeiro. A 1830 tambem falhou (PUT sem @odata.type); a substituta final e a 1900."
+  },
+  {
+    "migration": "20261124-1830-portal-senhahash-segura-ordem.ps1",
+    "por": "20261124-1900-portal-senhahash-segura-tipo.ps1",
+    "motivo": "Falhou no DEV (Deploy 45459498448) no PUT de cr40f_senhahash sem @odata.type (0x80048d19, propriedade Format invalida em AttributeMetadata). A 1900 tem o mesmo conteudo com o tipo StringAttributeMetadata primeiro no corpo."
   }
 ]
