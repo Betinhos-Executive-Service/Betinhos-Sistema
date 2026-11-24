@@ -143,9 +143,9 @@ export async function acao(name: string) {
   fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(`^${name}`), hidden: true }))
 }
 
-/** Celular: a sheet de campos abre marcando o card pela caixa e usando "Editar campos" no "Mais ações" da barra de seleção (fora da barra de comandos). */
+/** Celular: a sheet de campos abre marcando o card pela caixa e usando "Editar campos", direto na barra de seleção do celular. */
 export async function editarCamposDoCard(card: HTMLElement) {
   fireEvent.click(within(card).getByRole('checkbox'))
-  fireEvent.click(screen.getByRole('button', { name: /^Mais ações \(\d+ da seleção\)$/ }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: /^Editar campos/, hidden: true }))
+  const barra = await screen.findByRole('group', { name: 'Comandos da seleção' })
+  fireEvent.click(within(barra).getByRole('button', { name: 'Editar campos' }))
 }

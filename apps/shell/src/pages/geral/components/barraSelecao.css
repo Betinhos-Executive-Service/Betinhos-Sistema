@@ -1,63 +1,28 @@
-/* Laboratório: barra de seleção do celular (#/geral?barra=a|b|c). Só tokens do DS; vai para o DS depois de escolhida. */
-.gs-barra { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: var(--bt-space-2) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom, 0px)); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-drawer); }
-.gs-icone { display: inline-grid; place-items: center; flex: 0 0 auto; width: var(--bt-control-height-touch); height: var(--bt-control-height-touch); padding: 0; border: 0; border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-primary); cursor: pointer; }
-.gs-icone:hover { background: var(--bt-color-surface-soft); }
-.gs-icone:focus-visible, .gs-ferramenta:focus-visible, .gs-pilula button:focus-visible, .gs-folha__item:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
-.gs-icone[aria-disabled='true'], .gs-ferramenta[aria-disabled='true'], .gs-folha__item[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
-.gs-contagem { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); white-space: nowrap; }
+/* Barra de seleção do celular (Geral). Só tokens do DS; candidata a substituir o SelectionBar do DS. */
+.gs-barra { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-2-5) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom, 0px)); border: var(--bt-border-width-default) solid var(--bt-color-border); border-bottom: 0; border-radius: var(--bt-radius-xl) var(--bt-radius-xl) 0 0; background: var(--bt-color-surface); box-shadow: var(--bt-shadow-drawer); animation: gs-sobe .22s cubic-bezier(.2, .8, .2, 1); }
+.gs-barra.is-saindo { animation: gs-desce .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
 
-/* A · uma linha: ✕, contagem e as ações principais só com ícone; o resto no ⋮. */
-.gs-barra--a { display: flex; align-items: center; gap: var(--bt-space-1); }
-.gs-barra--a .gs-contagem { flex: 1; min-width: 0; }
+/* Topo na mesma grade das 4 ações: ✕ no eixo da primeira, contagem no centro, "Todos" no eixo do "Mais". */
+.gs-topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); align-items: center; gap: var(--bt-space-1); }
+.gs-fechar { justify-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.gs-fechar:hover { background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); }
+.gs-selo { justify-self: center; display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-height: 28px; padding: 0 var(--bt-space-2-5); border-radius: var(--bt-radius-full); background: var(--bt-color-action-soft); color: var(--bt-color-action); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); white-space: nowrap; }
+.gs-numero { display: inline-block; animation: gs-pulsa .2s ease-out; }
+.gs-todos { justify-self: center; min-height: 36px; padding: 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
 
-/* B · barra de ferramentas: cantos de cima arredondados, selo da contagem e "Desmarcar" em cima; embaixo ícone com rótulo. */
-.gs-barra--b { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-2-5) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom, 0px)); border: var(--bt-border-width-default) solid var(--bt-color-border); border-bottom: 0; border-radius: var(--bt-radius-xl) var(--bt-radius-xl) 0 0; }
-.gs-b__topo { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); padding: 0 var(--bt-space-1); }
-.gs-b__selo { display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-height: 28px; padding: 0 var(--bt-space-2-5); border-radius: var(--bt-radius-full); background: var(--bt-color-action-soft); color: var(--bt-color-action); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); white-space: nowrap; }
-.gs-b__ferramentas { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--bt-space-1); }
-.gs-ferramenta { display: grid; justify-items: center; align-content: center; gap: var(--bt-space-1); min-height: 56px; padding: var(--bt-space-1-5) var(--bt-space-0-5); border: 0; border-radius: var(--bt-radius-lg); background: transparent; color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); line-height: 1.2; text-align: center; cursor: pointer; transition: background-color .12s ease, transform .12s ease; }
+/* Ações: colunas iguais; o "Mais" vem dentro do contêiner do Menu do DS e estica como as outras. */
+.gs-ferramentas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--bt-space-1); }
+.gs-ferramentas > .bt-menu { display: grid; min-width: 0; }
+.gs-ferramentas > .bt-menu > .gs-ferramenta { width: 100%; }
+.gs-ferramenta { display: grid; justify-items: center; align-content: center; gap: var(--bt-space-1); min-width: 0; min-height: 56px; padding: var(--bt-space-1-5) var(--bt-space-0-5); border: 0; border-radius: var(--bt-radius-lg); background: transparent; color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); line-height: 1.2; text-align: center; cursor: pointer; transition: background-color .12s ease, transform .12s ease; }
 .gs-ferramenta svg { width: 20px; height: 20px; color: var(--bt-color-action); }
+.gs-ferramenta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gs-ferramenta:hover { background: var(--bt-color-surface-soft); }
 .gs-ferramenta:active { background: var(--bt-color-action-soft); transform: scale(.96); }
+.gs-ferramenta[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+.gs-fechar:focus-visible, .gs-todos:focus-visible, .gs-ferramenta:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
 
-/* C · pílula flutuante: contagem, "Ações" (abre a folha com tudo, com rótulo) e ✕; ocupa o mínimo da tela. */
-.gs-pilula { position: fixed; left: 50%; bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom, 0px)); z-index: 30; display: flex; align-items: center; gap: var(--bt-space-1); padding: var(--bt-space-1) var(--bt-space-1) var(--bt-space-1) var(--bt-space-4); border-radius: var(--bt-radius-full); background: var(--bt-color-text-primary); color: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); transform: translateX(-50%); white-space: nowrap; }
-.gs-pilula .gs-contagem { color: inherit; }
-.gs-pilula__acoes { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-height: 40px; padding: 0 var(--bt-space-3); border: 0; border-radius: var(--bt-radius-full); background: var(--bt-color-action); color: var(--bt-color-on-solid); font: inherit; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
-.gs-pilula__fechar { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--bt-radius-full); background: transparent; color: inherit; cursor: pointer; }
-.gs-folha { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
-.gs-folha__grupo { margin: var(--bt-space-3) 0 var(--bt-space-1); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
-.gs-folha__grupo:first-child { margin-top: 0; }
-.gs-folha__item { display: flex; align-items: center; gap: var(--bt-space-3); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-2) var(--bt-space-3); border: 0; border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); text-align: left; cursor: pointer; }
-.gs-folha__item--perigo { color: var(--bt-color-danger); }
-.gs-folha__item small { display: block; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
-
-/* B · topo em três colunas: ✕ (desmarcar) | contagem centralizada | "Todos". Entrada subindo do pé e contagem que pulsa. */
-.gs-barra--b .gs-b__topo { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--bt-space-2); padding: 0; }
-.gs-b__fechar { justify-self: start; width: 36px; height: 36px; color: var(--bt-color-text-secondary); }
-.gs-barra--b .gs-b__selo { justify-self: center; }
-.gs-b__todos { justify-self: end; min-height: 36px; padding: 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
-.gs-b__todos:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
-.gs-b__numero { display: inline-block; }
-.gs-barra--b { animation: gs-sobe .22s cubic-bezier(.2, .8, .2, 1); }
-.gs-barra--b .gs-b__numero { animation: gs-pulsa .2s ease-out; }
-.gs-barra--b .gs-ferramenta { min-width: 0; }
-.gs-barra--b .gs-ferramenta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes gs-sobe { from { transform: translateY(100%); opacity: .6; } to { transform: none; opacity: 1; } }
-@keyframes gs-pulsa { from { transform: scale(.85); opacity: .4; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .gs-barra--b, .gs-barra--b .gs-b__numero { animation: none; } .gs-ferramenta:active { transform: none; } }
-
-/* B · alinhamento: cada ação ocupa a coluna inteira (o "Mais" vem dentro do contêiner do Menu do DS) e o ✕ e o
-   "Todos" ficam no eixo da primeira e da última ação; topo e ações com a mesma grade de 4 colunas. */
-.gs-barra--b .gs-b__ferramentas { grid-auto-columns: minmax(0, 1fr); }
-.gs-b__ferramentas > .bt-menu { display: grid; min-width: 0; }
-.gs-b__ferramentas > .bt-menu > .gs-ferramenta { width: 100%; }
-.gs-barra--b .gs-ferramenta { font-size: var(--bt-font-size-12); }
-.gs-barra--b .gs-b__topo { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: var(--bt-space-1); }
-.gs-barra--b .gs-b__fechar { justify-self: center; }
-.gs-barra--b .gs-b__todos { justify-self: center; }
-
-/* B · saída: desce e esmaece; inerte enquanto sai. */
-.gs-barra--b.is-saindo { animation: gs-desce .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
 @keyframes gs-desce { from { transform: none; opacity: 1; } to { transform: translateY(100%); opacity: .4; } }
-@media (prefers-reduced-motion: reduce) { .gs-barra--b.is-saindo { animation: none; } }
+@keyframes gs-pulsa { from { transform: scale(.85); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gs-barra, .gs-barra.is-saindo, .gs-numero { animation: none; } .gs-ferramenta:active { transform: none; } }

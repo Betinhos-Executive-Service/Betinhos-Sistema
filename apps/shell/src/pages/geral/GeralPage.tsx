@@ -13,7 +13,7 @@ import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAber
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
 import { usePaxServicos } from './data/paxServicos'
-import { BarraSelecaoAnimada, lerVarianteBarra } from './components/BarraSelecao'
+import { BarraSelecaoAnimada } from './components/BarraSelecao'
 import type { EditValue } from './domain/edit'
 import { avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, SAIDA, type LinhaManutencao } from './domain/manutencao'
 import { ProtecaoContext } from './components/ProtecaoLock'
@@ -110,14 +110,10 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const [initial] = useState(() => readUrlState(queryFromHash(window.location.hash)))
   // `?tabela=ds`: a grade no `Table` do Design System (migração em partes); fica na URL enquanto a tela regrava o estado.
   const tabelaDs = initial.tabela === 'ds'
-  // Laboratório da barra de seleção do celular (`?barra=a|b|c`): lido ao abrir e mantido na URL regravada.
-  const [varianteBarra] = useState(() => lerVarianteBarra(window.location.hash))
   const onStateChange = useCallback((state: UrlState) => {
-    const params = new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela }))
-    if (varianteBarra) params.set('barra', varianteBarra)
-    const next = hrefFor('geral', params)
+    const next = hrefFor('geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
     if (next !== window.location.hash) window.history.replaceState(null, '', next)
-  }, [initial.tabela, varianteBarra])
+  }, [initial.tabela])
   const geral = useGeral(source, { onSaveFail, initial, onStateChange })
   const { view, rows, total, more, loading, loadingMore, loadError, query, attributes } = geral
 
@@ -723,7 +719,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
-              {mobile && varianteBarra ? <BarraSelecaoAnimada ativo={selectedIds.length > 0} variante={varianteBarra} selection={selection} total={rows.length} onTodos={() => geral.setSelection(new Set(rows.map((r) => String(r[ID_ATTRIBUTE]))))} /> : null}
+              {/* Celular: barra de seleção própria (topo com ✕/contagem/Todos e 3 ações com rótulo) no lugar da barra do DS. */}
+              {mobile ? <BarraSelecaoAnimada ativo={selectedIds.length > 0} selection={selection} total={rows.length} onTodos={() => geral.setSelection(new Set(rows.map((r) => String(r[ID_ATTRIBUTE]))))} /> : null}
               {mobile && selectedIds.length === 0 ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )
@@ -813,7 +810,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             {/* No celular, o "+" fixo no pé da tela substitui este. */}
             {mobile ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
           </>}
-          selection={mobile && varianteBarra ? undefined : selection}
+          selection={mobile ? undefined : selection}
         >
           {/* Depois da busca; continua visível com seleção (DS 1.26). Não encolhe: no celular empurraria "Criar serviço" para fora. */}
           {!mobile ? <span className="gr-manut-chave">{chaveManutencoes}</span> : null}
