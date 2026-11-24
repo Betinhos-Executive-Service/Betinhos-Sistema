@@ -189,10 +189,13 @@ describe('Portal do cliente', () => {
       expect((screen.getByLabelText(/^Passageiro/) as HTMLInputElement).value).toBe('Hiroshi Tanaka')
     })
 
-    it('e-mail de domínio não autorizado recebe a mesma mensagem de código incorreto', async () => {
+    it('e-mail sem acesso ouve isso na hora e não vai para a etapa do código', async () => {
       abrir()
-      await pedirCodigo('alguem@example.com')
-      expect(await screen.findByText(/Código incorreto/)).toBeTruthy()
+      fireEvent.click(await screen.findByRole('button', { name: 'Primeiro acesso ou esqueci a senha' }))
+      fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'alguem@example.com' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+      expect(await screen.findByText(/não tem acesso ao portal/)).toBeTruthy()
+      expect(screen.queryByLabelText(/Código/)).toBeNull()
     })
 
     it('erros por campo: sem origem e data no passado', async () => {

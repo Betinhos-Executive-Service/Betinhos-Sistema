@@ -137,8 +137,9 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       if (!usuario || !guardada || guardada !== senha) return errou('senha_invalida')
       return abrirSessao(usuario, emailNorm)
     },
-    async solicitarCodigo() {
+    async solicitarCodigo(email) {
       await espera()
+      if (!usuarioMock(email.trim().toLowerCase())) throw new ErroPortal('sem_acesso')
     },
     async confirmarCodigo(email, codigo) {
       await espera()

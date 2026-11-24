@@ -17,6 +17,8 @@ import { abrir, apagarCookie, COOKIE, erro, ETAPA_S, json, lerJson, selar, SESSA
 const CODIGO_MS = 10 * 60 * 1000
 const MAX_FALHAS = 5
 const BLOQUEIO_S = 15 * 60
+/** Respostas "sem acesso" por IP em 15 min: freia quem testa e-mails. Passou do teto, o IP inteiro espera (até quem tem acesso); senão o 429 revelaria quem não tem. */
+const MAX_SEM_ACESSO_IP = 10
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const SENHA_MAX = 200
 
@@ -127,25 +129,28 @@ export async function entrarComSenha(req: Request, c: Ctx): Promise<Response> {
 
 export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
   const email = normalizarEmail((await lerJson<{ email?: string }>(req))?.email)
-  if (!EMAIL.test(email)) return new Response(null, { status: 204 })
-  // Busca e envio fora da resposta: o tempo de resposta não revela se o e-mail existe.
-  c.waitUntil(
-    (async () => {
-      const v = await buscarOuCriarUsuario(c.dv, email)
-      if (!v) return
-      const vid = String(v.cr40f_validadorclienteid)
-      const codigo = novoCodigo()
-      await c.dv.post(SET.codigo, {
-        cr40f_name: email.slice(0, 100),
-        'cr40f_Validador@odata.bind': `/${SET.validador}(${vid})`,
-        cr40f_hashcodigo: await hashCodigo(vid, codigo),
-        cr40f_expiraem: new Date(c.agora + CODIGO_MS).toISOString(),
-        cr40f_tentativas: 0,
-        cr40f_usado: false,
-      })
-      await enviarEmail(c.env, 'codigo', [email], { nome: String(v.cr40f_name || nomeDoEmail(email)), codigo, validadeMinutos: 10 })
-    })().catch((e) => console.error('auth/codigo', String(e))),
-  )
+  if (!EMAIL.test(email)) return erro(400, 'nao_permitido')
+  const chaveIp = `semacesso:${await sha256Hex(req.headers.get('CF-Connecting-IP') ?? 'local')}`
+  const negados = Number((await c.env.KV.get(chaveIp)) ?? 0)
+  if (negados >= MAX_SEM_ACESSO_IP) return erro(429, 'bloqueado')
+  // Decisão do Renan (24/11/2026): e-mail sem acesso ouve isso na hora, em vez do "enviado" genérico.
+  const v = await buscarOuCriarUsuario(c.dv, email)
+  if (!v) {
+    await c.env.KV.put(chaveIp, String(negados + 1), { expirationTtl: BLOQUEIO_S })
+    return erro(403, 'sem_acesso')
+  }
+  const vid = String(v.cr40f_validadorclienteid)
+  const codigo = novoCodigo()
+  // Sem waitUntil: se gravar ou enviar falhar, a tela mostra o erro em vez de "enviado".
+  await c.dv.post(SET.codigo, {
+    cr40f_name: email.slice(0, 100),
+    'cr40f_Validador@odata.bind': `/${SET.validador}(${vid})`,
+    cr40f_hashcodigo: await hashCodigo(vid, codigo),
+    cr40f_expiraem: new Date(c.agora + CODIGO_MS).toISOString(),
+    cr40f_tentativas: 0,
+    cr40f_usado: false,
+  })
+  await enviarEmail(c.env, 'codigo', [email], { nome: String(v.cr40f_name || nomeDoEmail(email)), codigo, validadeMinutos: 10 })
   return new Response(null, { status: 204 })
 }
 

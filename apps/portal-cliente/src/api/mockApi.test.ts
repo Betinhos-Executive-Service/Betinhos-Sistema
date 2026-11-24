@@ -127,9 +127,9 @@ describe('mockApi', () => {
     await expect(m.api.entrar(EMAIL, SENHA)).resolves.toMatchObject({ email: EMAIL })
   })
 
-  it('código errado conta para o bloqueio; e-mail não liberado falha igual a código errado', async () => {
+  it('código errado conta para o bloqueio; e-mail não liberado ouve sem_acesso', async () => {
     const m = montar()
-    await m.api.solicitarCodigo('alguem@outra.com')
+    await expect(m.api.solicitarCodigo('alguem@outra.com')).rejects.toMatchObject({ codigo: 'sem_acesso' })
     await expect(m.api.confirmarCodigo('alguem@outra.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'codigo_invalido' })
     for (let i = 0; i < 3; i++) await expect(m.api.confirmarCodigo(EMAIL, '000000')).rejects.toMatchObject({ codigo: 'codigo_invalido' })
     await expect(m.api.confirmarCodigo(EMAIL, '000000')).rejects.toMatchObject({ codigo: 'bloqueado' })

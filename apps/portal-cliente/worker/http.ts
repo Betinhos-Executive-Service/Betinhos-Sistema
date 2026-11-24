@@ -4,7 +4,7 @@ import { cifrar, decifrar } from './cripto'
 import type { Env } from './env'
 
 /** Mesmos códigos do `ErroPortal` do app (contrato das duas etapas). */
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export const json = (corpo: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } })

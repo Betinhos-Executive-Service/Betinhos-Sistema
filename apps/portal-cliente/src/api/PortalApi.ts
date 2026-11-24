@@ -1,6 +1,6 @@
 import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export class ErroPortal extends Error {
   constructor(public codigo: CodigoErro, message: string = codigo) {
