@@ -4,7 +4,7 @@ import { canFetchOnDataverseHost } from "./cliente.ts";
 // Execução de Custom API (Action não vinculada) pelo Xrm.WebApi.online.execute, compartilhada por comunicados e termos de multa.
 type XrmApi = { WebApi?: { online?: { execute?: (request: Record<string, unknown>) => Promise<Response> } } };
 
-export type CustomApiParameters = Record<string, string | number>;
+export type CustomApiParameters = Record<string, string | number | boolean>;
 
 /** Mensagem para o motorista: a do servidor quando existir (ex.: "Este termo não é seu."). */
 export function customApiErrorMessage(error: unknown, fallback: string) {
@@ -33,7 +33,7 @@ export async function executeCustomApi(operationName: string, parameters: Custom
   if (!execute) throw new Error("Abra o app pelo Power Apps ou pelo link do Dataverse para registrar esta ação.");
   const parameterTypes = Object.fromEntries(Object.entries(parameters).map(([key, value]) => [key, {
     // Com "Edm.Guid" o Xrm serializa a string como 'undefined'; o servidor converte o texto para Guid.
-    typeName: typeof value === "number" ? "Edm.Decimal" : "Edm.String",
+    typeName: typeof value === "number" ? "Edm.Decimal" : typeof value === "boolean" ? "Edm.Boolean" : "Edm.String",
     structuralProperty: 1
   }]));
   let response: Response;

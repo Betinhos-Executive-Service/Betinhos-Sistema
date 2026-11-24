@@ -129,6 +129,10 @@ export const ENTRADAS = [
     nome: 'multa-aceite-push', script: 'provision-flow-multa-aceite-push.ps1', flows: ['Multa | Push do aceite'], apply: true,
     arquivos: [script('multa-aceite-push'), flowsDir('multa-aceite-push\\.json', SINCRONIZAR)],
   },
+  {
+    nome: 'multa-aviso-motorista', script: 'provision-flow-multa-aviso-motorista.ps1', flows: ['Multa | Aviso ao motorista'], apply: true,
+    arquivos: [script('multa-aviso-motorista'), flowsDir('multa-aviso-motorista\\.json', SINCRONIZAR)],
+  },
 ]
 
 // arquivos: lista do git diff --name-only desde a tag flows-dev-publicado. null = sem base: nada pendente.

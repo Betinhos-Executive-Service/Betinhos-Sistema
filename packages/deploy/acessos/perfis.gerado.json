@@ -8,6 +8,26 @@
       "tabelas": {
         "cr40f_acessohistorico": {
           "Read": "Global"
+        },
+        "cr40f_documento": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_funcionarios": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_multas": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "cr40f_veiculos": {
+          "AppendTo": "Global",
+          "Read": "Global"
+        },
+        "new_possedeveiculo": {
+          "AppendTo": "Global",
+          "Read": "Global"
         }
       },
       "privilegios": {
@@ -28,6 +48,14 @@
           "AppendTo": "Global",
           "Create": "Global",
           "Delete": "Basic",
+          "Read": "Global",
+          "Write": "Global"
+        },
+        "cr40f_boasideiaanexo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
           "Read": "Global",
           "Write": "Global"
         },
@@ -1560,6 +1588,104 @@
     }
   },
   "colunas": {
+    "Perfil - Administrador de acessos": [
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailbetinhos",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_emailmicrosoft",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_funcao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_nomedaempresa",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_status",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_telefonecorporativo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "cr40f_veiculoatual",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_funcionarios",
+        "coluna": "new_apelido",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodefabricacao",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_anodemodelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_blindado",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_cor",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_id",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_marca",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "cr40f_modelo",
+        "ler": true,
+        "editar": false
+      },
+      {
+        "tabela": "cr40f_veiculos",
+        "coluna": "new_categoriadoveiculo",
+        "ler": true,
+        "editar": false
+      }
+    ],
     "Perfil - Financeiro - Gestor": [
       {
         "tabela": "cr40f_bancodedados",

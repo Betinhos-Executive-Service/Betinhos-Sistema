@@ -1,40 +1,7 @@
-// Criptografia do Worker (Web Crypto): TOTP (RFC 6238), AES-GCM para segredos e cookies, SHA-256 de códigos e tokens.
+// Criptografia do Worker (Web Crypto): senha (PBKDF2-SHA256), AES-GCM para os cookies, SHA-256 de códigos.
 
 const enc = new TextEncoder()
 const dec = new TextDecoder()
-
-const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-
-export function base32(bytes: Uint8Array): string {
-  let bits = 0, valor = 0, saida = ''
-  for (const b of bytes) {
-    valor = (valor << 8) | b
-    bits += 8
-    while (bits >= 5) {
-      saida += B32[(valor >>> (bits - 5)) & 31]
-      bits -= 5
-    }
-  }
-  if (bits > 0) saida += B32[(valor << (5 - bits)) & 31]
-  return saida
-}
-
-export function deBase32(texto: string): Uint8Array<ArrayBuffer> {
-  const limpo = texto.toUpperCase().replace(/[\s=]/g, '')
-  const saida: number[] = []
-  let bits = 0, valor = 0
-  for (const c of limpo) {
-    const i = B32.indexOf(c)
-    if (i < 0) throw new Error('base32 inválido')
-    valor = (valor << 5) | i
-    bits += 5
-    if (bits >= 8) {
-      saida.push((valor >>> (bits - 8)) & 255)
-      bits -= 8
-    }
-  }
-  return new Uint8Array(saida)
-}
 
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes))
 const deB64 = (texto: string) => Uint8Array.from(atob(texto), (c) => c.charCodeAt(0))
@@ -42,9 +9,6 @@ const b64url = (bytes: Uint8Array) => b64(bytes).replace(/\+/g, '-').replace(/\/
 const deB64url = (texto: string) => deB64(texto.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (texto.length % 4)) % 4))
 
 export const aleatorio = (n: number) => crypto.getRandomValues(new Uint8Array(n))
-
-/** Token opaco para cookie (dispositivo confiável). */
-export const novoToken = () => b64url(aleatorio(32))
 
 /** Código numérico de 6 dígitos sem viés de módulo relevante (32 bits → 10^6). */
 export function novoCodigo(): string {
@@ -57,7 +21,7 @@ export async function sha256Hex(texto: string): Promise<string> {
   return [...h].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** Comparação em tempo constante para hashes hex do mesmo tamanho. */
+/** Comparação em tempo constante para textos do mesmo tamanho (hashes). */
 export function iguais(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let d = 0
@@ -65,35 +29,28 @@ export function iguais(a: string, b: string): boolean {
   return d === 0
 }
 
-// ---------- TOTP (HMAC-SHA1, 6 dígitos, passo de 30 s, como Microsoft/Google Authenticator) ----------
+// ---------- Senha: PBKDF2-SHA256, guardada como `pbkdf2$iteracoes$sal$hash` (base64url) ----------
 
-const PASSO_S = 30
+/** 100 mil é o máximo que o PBKDF2 do Workers aceita. */
+const ITERACOES = 100_000
+/** Hash de formato válido que nunca confere: gasta o mesmo tempo de uma senha real quando o e-mail não tem senha. */
+export const HASH_FALSO = `pbkdf2$${ITERACOES}$${'A'.repeat(22)}$${'A'.repeat(43)}`
 
-export async function totp(segredoBase32: string, contador: number): Promise<string> {
-  const chave = await crypto.subtle.importKey('raw', deBase32(segredoBase32), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
-  const msg = new DataView(new ArrayBuffer(8))
-  msg.setUint32(0, Math.floor(contador / 2 ** 32))
-  msg.setUint32(4, contador >>> 0)
-  const h = new Uint8Array(await crypto.subtle.sign('HMAC', chave, msg.buffer))
-  const off = h[h.length - 1] & 15
-  const bin = ((h[off] & 127) << 24) | (h[off + 1] << 16) | (h[off + 2] << 8) | h[off + 3]
-  return String(bin % 1_000_000).padStart(6, '0')
+async function derivar(senha: string, sal: Uint8Array<ArrayBuffer>, iteracoes: number): Promise<string> {
+  const chave = await crypto.subtle.importKey('raw', enc.encode(senha), 'PBKDF2', false, ['deriveBits'])
+  return b64url(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: sal, iterations: iteracoes }, chave, 256)))
 }
 
-/** Aceita o passo atual e um antes/depois (relógio do celular adiantado ou atrasado até 30 s). */
-export async function verificarTotp(segredoBase32: string, codigo: string, agoraMs: number, janela = 1): Promise<boolean> {
-  if (!/^\d{6}$/.test(codigo)) return false
-  const atual = Math.floor(agoraMs / 1000 / PASSO_S)
-  let ok = false
-  for (let d = -janela; d <= janela; d++) ok = iguais(await totp(segredoBase32, atual + d), codigo) || ok
-  return ok
+export async function hashSenha(senha: string): Promise<string> {
+  const sal = aleatorio(16)
+  return `pbkdf2$${ITERACOES}$${b64url(sal)}$${await derivar(senha, sal, ITERACOES)}`
 }
 
-export const novoSegredoTotp = () => base32(aleatorio(20))
-
-export function otpauthUrl(segredo: string, email: string, emissor = 'Betinhos'): string {
-  const rotulo = encodeURIComponent(`${emissor}:${email}`)
-  return `otpauth://totp/${rotulo}?secret=${segredo}&issuer=${encodeURIComponent(emissor)}&algorithm=SHA1&digits=6&period=${PASSO_S}`
+export async function conferirSenha(senha: string, guardado: string): Promise<boolean> {
+  const [tipo, iter, sal, hash] = guardado.split('$')
+  const n = Number(iter)
+  if (tipo !== 'pbkdf2' || !Number.isInteger(n) || n < 1 || n > ITERACOES || !sal || !hash) return false
+  return iguais(await derivar(senha, deB64url(sal), n), hash)
 }
 
 // ---------- AES-GCM (chave de 32 bytes em base64, vinda de secret) ----------
@@ -110,7 +67,7 @@ function chaveAes(chaveB64: string): Promise<CryptoKey> {
   return k
 }
 
-/** `iv.cifra` em base64url. `contexto` (AAD) amarra o texto ao uso: um cookie não decifra como segredo TOTP. */
+/** `iv.cifra` em base64url. `contexto` (AAD) amarra o texto ao uso: o cookie da etapa não decifra como sessão. */
 export async function cifrar(texto: string, chaveB64: string, contexto: string): Promise<string> {
   const iv = aleatorio(12)
   const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(contexto) }, await chaveAes(chaveB64), enc.encode(texto))

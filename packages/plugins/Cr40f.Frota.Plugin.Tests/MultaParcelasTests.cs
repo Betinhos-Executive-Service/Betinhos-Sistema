@@ -11,7 +11,8 @@ public class MultaParcelasTests
     [InlineData(0.05, 2, "0.02,0.03")]
     [InlineData(300.00, 3, "100.00,100.00,100.00")]
     [InlineData(130.16, 1, "130.16")]
-    [InlineData(1000.00, 12, "83.33,83.33,83.33,83.33,83.33,83.33,83.33,83.33,83.33,83.33,83.33,83.37")]
+    [InlineData(130.16, 3, "43.38,43.38,43.40")]
+    [InlineData(1000.00, 3, "333.33,333.33,333.34")]
     public void Divide_truncando_e_sobra_na_ultima(double valor, int n, string esperado)
     {
         var plano = MultaParcelas.Dividir((decimal)valor, n, "2026-12");
@@ -19,6 +20,19 @@ public class MultaParcelasTests
         Assert.Equal((decimal)valor, plano.Sum(p => p.Valor));
         Assert.All(plano, p => Assert.Equal(n, p.Total));
         Assert.Equal(Enumerable.Range(1, n), plano.Select(p => p.Numero));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(13)]
+    public void Recusa_fora_do_teto(int n) => Assert.Throws<System.ArgumentOutOfRangeException>(() => MultaParcelas.Dividir(100m, n, "2026-12"));
+
+    [Fact]
+    public void Termo_antigo_com_doze_parcelas_ainda_divide_com_resto_na_ultima()
+    {
+        var plano = MultaParcelas.Dividir(1000m, 12, "2026-12");
+        Assert.Equal(1000m, plano.Sum(p => p.Valor));
+        Assert.Equal(83.37m, plano[11].Valor);
     }
 
     [Fact]

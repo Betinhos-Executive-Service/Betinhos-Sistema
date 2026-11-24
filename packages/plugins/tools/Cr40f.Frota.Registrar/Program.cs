@@ -38,7 +38,7 @@ var apis = new[]
         new[]
         {
             new Param("MultaId", TipoGuid, "Id da multa (cr40f_multas)."),
-            new Param("Passo", TipoString, "DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer ou ResultadoRecurso."),
+            new Param("Passo", TipoString, "DefinirResponsavel, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer ou ResultadoRecurso."),
             new Param("DadosJson", TipoString, "Dados do passo (JSON, ver DadosPasso).", true),
         },
         new[] { new Param("MultaJson", TipoString, "{etapa, pendentes, proximoPasso, proximoPrazo, prazoVencido, aguardandoPenalidade} depois do passo.") }),

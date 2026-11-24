@@ -33,7 +33,6 @@ describe('MultaPassoAPasso', () => {
     const atual = screen.getByRole('list', { name: 'Etapas da multa' }).querySelector('[aria-current="step"]')
     expect(atual?.textContent).toContain('Identificar')
     expect(screen.getByRole('heading', { name: 'Definir o responsável' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Avisar o motorista' })).toBeNull()
   })
 
   it('o botão só libera com os obrigatórios e grava pela cr40f_PassoMulta', async () => {
@@ -120,17 +119,26 @@ describe('MultaPassoAPasso', () => {
     expect(screen.queryByRole('combobox', { name: 'Motorista indicado' })).toBeNull()
   })
 
+  it('sem aditivo: vai direto aos campos da indicação, com a mensagem do WhatsApp opcional e a data do aviso automático', async () => {
+    renderPasso(fonte(), { ...multa, status: MULTA.NOTIFICADO, motorista: ana, avisoAutomaticoEm: '2026-11-20' })
+    await act(async () => {})
+    expect(screen.getByRole('heading', { name: 'Indicar no órgão' })).toBeTruthy()
+    expect(screen.getByText(/O motorista recebeu o aviso pelo app em 20\/11\/2026/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Registrar indicação' })).toBeTruthy()
+  })
+
   it('Copiar mensagem: sem clipboard, deixa o texto selecionado para copiar à mão', async () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn(async () => { throw new Error('negado') }) } })
     const source = fonte()
     renderPasso(source, { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
     await act(async () => {})
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })) })
     expect(source.dossieMulta).toHaveBeenCalledWith('u1')
     const texto = screen.getByLabelText('Mensagem para o WhatsApp') as HTMLTextAreaElement
     expect(texto.value).toContain('Olá, Ana. Chegou uma notificação de multa do veículo TST1A11.')
     expect(screen.getByText('Não deu para copiar sozinho: o texto está selecionado. Use Ctrl+C.')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Avisei' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Registrar indicação' })).toBeTruthy()
   })
 
   it('Copiar mensagem: copiou, avisa e não mostra o campo de fallback', async () => {
@@ -138,7 +146,7 @@ describe('MultaPassoAPasso', () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
     renderPasso(fonte(), { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
     await act(async () => {})
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })) })
     expect(writeText).toHaveBeenCalledTimes(1)
     expect(screen.queryByText(/Não deu para copiar sozinho/)).toBeNull()
   })
@@ -148,7 +156,7 @@ describe('MultaPassoAPasso', () => {
     const source = fonte({ dossieMulta: vi.fn(async () => ({ ...dossie, infleet: { erro: 'Token da Infleet inválido (fictício)' } })) })
     renderPasso(source, { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
     await act(async () => {})
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })) })
     expect(screen.getByText(/Token da Infleet inválido \(fictício\)/)).toBeTruthy()
     const texto = screen.getByLabelText('Mensagem para o WhatsApp') as HTMLTextAreaElement
     expect(texto.value).toContain('Rastreador: indisponível no momento.')
@@ -158,7 +166,7 @@ describe('MultaPassoAPasso', () => {
   it('falha ao montar o dossiê mostra a mensagem do dossiê, sem o erro técnico', async () => {
     renderPasso(fonte({ dossieMulta: vi.fn(async () => { throw new Error('Failed to fetch') }) }), { ...multa, status: MULTA.NOTIFICADO, motorista: ana })
     await act(async () => {})
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })) })
     expect(await screen.findByText('Não foi possível montar o dossiê. Tente de novo.')).toBeTruthy()
     expect(screen.queryByText(/Failed to fetch/)).toBeNull()
   })
@@ -281,7 +289,7 @@ describe('opcoesMotoristas', () => {
 })
 
 describe('Acertar na folha com parcelas', () => {
-  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 100 }
+  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 60, valorGuia: 100 }
   const descontando: Multa = { ...acertar, competencia: '2026-10-01', acertoEm: '2026-11-10' }
   const parcela = (n: number, status: 'prevista' | 'descontada') => ({ id: `p${n}`, numero: n, total: 3, competencia: `2026-${String(9 + n).padStart(2, '0')}-01`, valor: 33.33, status, lancadoEm: status === 'descontada' ? '2026-11-10' : null, origem: 'multa' as const, colaborador: null, multa: null })
 
@@ -295,7 +303,7 @@ describe('Acertar na folha com parcelas', () => {
     expect(mes.max).toBe('2027-11')
     expect((screen.getByLabelText(/Parcelas/) as HTMLInputElement).value).toBe('1')
     fireEvent.change(screen.getByLabelText(/Parcelas/), { target: { value: '3' } })
-    expect(screen.getByText('3× R$ 33,33 · última R$ 33,34')).toBeTruthy()
+    expect(screen.getByText('Valor cheio R$ 100,00 · 3× R$ 33,33 · última R$ 33,34')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar acerto' })) })
     expect(source.passoMulta).toHaveBeenCalledWith('u1', 'RegistrarAcerto', { acerto: 'folha', competencia: '2026-11', parcelas: 3 })
   })
@@ -314,31 +322,39 @@ describe('Acertar na folha com parcelas', () => {
 const termoBase: TermoMulta = { id: 't1', status: 'pendente', forma: 'folha', parcelas: 3, valorTotal: 300, primeiraCompetencia: '2026-12-01', enviadoEm: '2026-11-17T13:00:00Z', assinadoEm: null, hashPdf: null, motivoContestacao: null, ultimoLembreteEm: null, criadoEm: '2026-11-17T13:00:00Z' }
 
 describe('Termo dentro do passo a passo', () => {
-  const avisar: Multa = { ...multa, status: MULTA.NOTIFICADO, motorista: ana, dataParaIndicar: '2026-12-10' }
+  const indicar: Multa = { ...multa, status: MULTA.NOTIFICADO, motorista: ana, dataParaIndicar: '2026-12-10' }
 
-  it('etapa 2 com aditivo e sem termo: oferece o termo pelo app e o WhatsApp', async () => {
-    renderPasso(fonte({ temAditivo: vi.fn(async () => true) }), avisar)
+  it('etapa 2 com aditivo e sem termo: oferece o termo pelo app e indicar sem o termo', async () => {
+    renderPasso(fonte({ temAditivo: vi.fn(async () => true) }), indicar)
     expect(await screen.findByRole('button', { name: 'Enviar termo pelo app' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Avisei' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Indicar sem o termo' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Registrar indicação' })).toBeNull()
   })
 
-  it('enquanto confere o aditivo: só o carregamento, sem WhatsApp e com Avisei desabilitado', () => {
-    renderPasso(fonte({ temAditivo: vi.fn(() => new Promise<boolean>(() => {})) }), avisar)
+  it('Indicar sem o termo revela os campos e o botão Registrar indicação', async () => {
+    renderPasso(fonte({ temAditivo: vi.fn(async () => true) }), indicar)
+    fireEvent.click(await screen.findByRole('button', { name: 'Indicar sem o termo' }))
+    expect(screen.getByRole('combobox', { name: 'Canal da indicação' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Registrar indicação' })).toBeTruthy()
+  })
+
+  it('enquanto confere o aditivo: só o carregamento, sem WhatsApp e com Registrar indicação desabilitado', () => {
+    renderPasso(fonte({ temAditivo: vi.fn(() => new Promise<boolean>(() => {})) }), indicar)
     expect(screen.getByText('Conferindo o aditivo…')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Copiar mensagem' })).toBeNull()
-    expect((screen.getByRole('button', { name: 'Avisei' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Copiar mensagem (opcional)' })).toBeNull()
+    expect((screen.getByRole('button', { name: 'Registrar indicação' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('termo pendente: mostra o andamento e deixa o Avisei desabilitado com o motivo', async () => {
-    const m: Multa = { ...avisar, termo: { status: 'pendente', enviadoEm: termoBase.enviadoEm }, termoVigente: { id: 't1', label: 'Termo' } }
+  it('termo pendente: mostra o andamento e deixa o Registrar indicação desabilitado com o motivo', async () => {
+    const m: Multa = { ...indicar, termo: { status: 'pendente', enviadoEm: termoBase.enviadoEm }, termoVigente: { id: 't1', label: 'Termo' } }
     renderPasso(fonte({ temAditivo: vi.fn(async () => true), listarTermos: vi.fn(async () => [termoBase]) }), m)
     expect(await screen.findByText('Aguardando o motorista assinar o termo')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Lembrar' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Cancelar termo' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' })).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'Avisei' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText('Cancele o termo antes de avisar pelo WhatsApp.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Indicar sem o termo' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Registrar indicação' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Aguarde a assinatura do termo ou cancele o termo.')).toBeTruthy()
   })
 
   it('etapa 1 com termo contestado mostra a contestação do motorista', async () => {

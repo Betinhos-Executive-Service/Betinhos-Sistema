@@ -20,6 +20,7 @@ import {
   parseChecklistItems,
   setChecklistOkNok,
   setChecklistValor,
+  solicitarVistoriaAgora,
   toggleChecklistProblema,
   validateChecklistDraft,
   type ChecklistDraft,
@@ -350,4 +351,46 @@ test("pedido de manutenção do checklist: só os Não OK, com km, problemas, ob
 test("pedido de manutenção do checklist: sem Não OK não pergunta", () => {
   const lista = [...itens, okNokItem()];
   assert.equal(checklistPedidoManutencao(checklist({ itens: lista }), draftWith({ valores: { pneus: "ok" } })), null);
+});
+
+test("vistoria agora no Dataverse chama a Custom API com new_ParaMim booleano e devolve o checklist", async () => {
+  const g = globalThis as any;
+  const original = g.fetch;
+  const calls: Array<{ url: string; init: any }> = [];
+  g.fetch = async (url: string, init: any) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ new_ChecklistId: "C0C0C0C0-0000-4000-8000-000000000009" }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    await withWindow({ location: { origin: "https://org.crm2.dynamics.com", hostname: "org.crm2.dynamics.com" } }, async () => {
+      const id = await solicitarVistoriaAgora({ id: "{AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA}", placa: "ABC1D23" }, driverId);
+      assert.equal(id, "c0c0c0c0-0000-4000-8000-000000000009");
+    });
+    assert.match(calls[0].url, /\/new_SolicitarChecklistVeiculo$/);
+    assert.deepEqual(JSON.parse(calls[0].init.body), { new_VeiculoId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", new_ParaMim: true });
+  } finally { g.fetch = original; }
+});
+
+test("vistoria agora recusa resposta sem id de checklist", async () => {
+  const g = globalThis as any;
+  const original = g.fetch;
+  g.fetch = async () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+  try {
+    await withWindow({ location: { origin: "https://org.crm2.dynamics.com", hostname: "org.crm2.dynamics.com" } }, async () => {
+      await assert.rejects(solicitarVistoriaAgora({ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", placa: "X" }, driverId), /não devolveu/);
+    });
+  } finally { g.fetch = original; }
+});
+
+test("vistoria agora no mock cria o pendente manual e devolve o mesmo aberto na segunda chamada", async () => {
+  await withWindow({ location: { origin: "http://localhost:5173", hostname: "localhost", search: "" }, setTimeout }, async () => {
+    const veiculo = { id: "mock-veiculo-rup", placa: "RUP6H17" };
+    const id = await solicitarVistoriaAgora(veiculo, "");
+    const repetido = await solicitarVistoriaAgora(veiculo, "");
+    assert.equal(repetido, id);
+    const criado = (await loadDriverChecklists("")).find((item) => item.id === id);
+    assert.equal(criado?.origem, CHECKLIST_ORIGEM.manual);
+    assert.equal(criado?.estado, CHECKLIST_ESTADO.pendente);
+    assert.equal(criado?.placa, "RUP6H17");
+  });
 });

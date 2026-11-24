@@ -6,41 +6,43 @@ export type FormaPagamento = 'guia' | 'folha'
 export type Acordo = { forma: FormaPagamento; parcelas: number; valorTotal: number; primeiraCompetencia: string /* 'YYYY-MM-01' */ }
 export type Parcela = { numero: number; competencia: string; valor: number }
 export type ContextoAcordo = { temAditivo: boolean; recursoPendente: boolean; temMotorista: boolean; termoPendente: boolean }
-/** `hoje` e `dataParaIndicar` são `yyyy-MM-dd`; `avisado` = motorista já avisado (a multa saiu da etapa 2). */
+/** `hoje` e `dataParaIndicar` são `yyyy-MM-dd`; `avisado` = DataAviso preenchida (só o termo assinado grava). */
 export type ContextoEnvio = ContextoAcordo & { hoje: string; dataParaIndicar: string | null; avisado: boolean }
 /** Margem, em dias, entre a expiração do termo e o prazo de indicação (igual a `TermoPrazos.MargemAntesDoPrazo`). */
 export const MARGEM_ANTES_DO_PRAZO = 3
-export const MAXIMO_PARCELAS_TERMO = 12
+/** Parcelas de termo novo. Termos antigos com 4 a 12 parcelas continuam legíveis (calcularParcelas aceita até 12). */
+export const MAXIMO_PARCELAS_TERMO = 3
+const MAXIMO_PARCELAS_HISTORICO = 12
 
 const COMPETENCIA = /^\d{4}-(0[1-9]|1[0-2])-01$/
 
 /** Reais em centavos inteiros; toFixed evita o erro de ponto flutuante (1,005 * 100 = 100.49999...). */
 export const emCentavos = (valor: number) => Math.round(Number((valor * 100).toFixed(2)))
-const parcelasValidas = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAXIMO_PARCELAS_TERMO
+const parcelasValidas = (n: number, teto = MAXIMO_PARCELAS_TERMO) => Number.isInteger(n) && n >= 1 && n <= teto
 
-/** Parcelas do desconto em folha, em centavos inteiros: a sobra vai para as primeiras e a soma fecha exata. Guia não parcela; acordo de folha inválido lança erro. */
+/** Parcelas do desconto em folha, em centavos inteiros: o resto de centavos vai para a última e a soma fecha exata. Guia não parcela; acordo de folha inválido lança erro. */
 export function calcularParcelas(a: Acordo): Parcela[] {
   if (a.forma !== 'folha') return []
-  if (!parcelasValidas(a.parcelas) || !COMPETENCIA.test(a.primeiraCompetencia)) throw new Error('Acordo de folha inválido.')
+  if (!parcelasValidas(a.parcelas, MAXIMO_PARCELAS_HISTORICO) || !COMPETENCIA.test(a.primeiraCompetencia)) throw new Error('Acordo de folha inválido.')
   const total = emCentavos(a.valorTotal)
   const base = Math.floor(total / a.parcelas)
   const sobra = total - base * a.parcelas
   return Array.from({ length: a.parcelas }, (_, i) => ({
     numero: i + 1,
     competencia: addMonths(a.primeiraCompetencia, i),
-    valor: (base + (i < sobra ? 1 : 0)) / 100,
+    valor: (base + (i === a.parcelas - 1 ? sobra : 0)) / 100,
   }))
 }
 
 /** Primeiro impedimento do envio, na mesma ordem de `ValidarAcordo` do plugin: etapa 2, prazo curto, motorista, aditivo, termo pendente, folha, parcelas, competência, janela e valor. */
 export function validarAcordo(a: Acordo, ctx: ContextoEnvio): string | null {
-  if (ctx.avisado) return 'O termo só é enviado na etapa 2, antes do aviso ao motorista.'
-  if (ctx.dataParaIndicar !== null && daysBetween(ctx.hoje, ctx.dataParaIndicar) < MARGEM_ANTES_DO_PRAZO) return 'Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.'
+  if (ctx.avisado) return 'O termo só é enviado na etapa 2, antes da indicação.'
+  if (ctx.dataParaIndicar !== null && daysBetween(ctx.hoje, ctx.dataParaIndicar) < MARGEM_ANTES_DO_PRAZO) return 'Faltam menos de 3 dias para o prazo de indicação; indique sem o termo.'
   if (!ctx.temMotorista) return 'A multa não tem motorista indicado.'
   if (!ctx.temAditivo) return 'O motorista ainda não tem o aditivo de assinatura eletrônica registrado.'
   if (ctx.termoPendente) return 'Já existe um termo pendente para esta multa.'
   if (a.forma !== 'folha') return 'O termo agora é só para desconto em folha.'
-  if (!parcelasValidas(a.parcelas)) return 'Escolha de 1 a 12 parcelas.'
+  if (!parcelasValidas(a.parcelas)) return 'Escolha de 1 a 3 parcelas.'
   if (!COMPETENCIA.test(a.primeiraCompetencia)) return 'Competência inválida.'
   const { de, ate } = janelaCompetencia(ctx.hoje)
   if (a.primeiraCompetencia < de || a.primeiraCompetencia > ate) return `Escolha um mês entre ${mesBr(de)} e ${mesBr(ate)}.`

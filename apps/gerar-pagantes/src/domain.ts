@@ -7,6 +7,7 @@ export const PAYMENT_METHODS = [
 ] as const
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]['value']
+export const isPurchaseOrder = (method: PaymentMethod) => method === 202410001
 
 export type LinkStatus = 'NotApplicable' | 'Generated' | 'Pending' | 'Failed' | 'Indeterminate'
 export type EmailStatus = 'NotApplicable' | 'Pending' | 'Sent' | 'Failed'
@@ -16,6 +17,8 @@ export interface Person {
   name: string
   email: string
   phone: string
+  /** Cliente da pessoa (lookup cr40f_cliente), usado no orçamento de Pedido de compra. */
+  client?: string
   role: 'Solicitante' | 'Passageiro' | 'Adicionado'
 }
 
@@ -60,6 +63,8 @@ export interface OperationData {
   statusLabel: string
   stateCode: number
   ownerId?: Guid
+  /** Cliente do primeiro serviço da OP que tem um; reserva quando a pessoa não tem cliente. */
+  clientName?: string
   people: Person[]
   directory: Person[]
   payers: Payer[]

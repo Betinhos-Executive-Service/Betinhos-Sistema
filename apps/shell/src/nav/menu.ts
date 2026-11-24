@@ -11,7 +11,7 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas' | 'acessos'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba; /** Rota válida (com guarda e título), mas sem link no menu: aberta por botão de outra tela. */ foraDoMenu?: true }
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -48,11 +48,10 @@ export const MENU: MenuGroup[] = [
     label: 'Financeiro',
     items: [
       { kind: 'page', id: 'composicao', label: 'Composição de Preço', page: 'composicao' },
-      wr('Composição de Preço (antiga)', 'new_TelaComposicaoPreco.html'),
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
-      { kind: 'page', id: 'validacao-cliente', label: 'Validação do cliente', page: 'validacao-cliente' },
+      { kind: 'page', id: 'validacao-cliente', label: 'Portal do cliente', page: 'validacao-cliente' },
       { kind: 'page', id: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores', page: 'pagamento-fornecedores' },
       { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
     ],
@@ -86,12 +85,8 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'treinamentos', label: 'Treinamentos', page: 'treinamentos' },
       { kind: 'page', id: 'cartoes', label: 'Cartões corporativos', page: 'cartoes' },
       { kind: 'page', id: 'app-motoristas', label: 'App Motoristas', page: 'app-motoristas' },
+      { kind: 'page', id: 'acessos', label: 'Acessos sem ficha', page: 'acessos', foraDoMenu: true },
     ],
-  },
-  {
-    id: 'rh',
-    label: 'RH',
-    items: [{ kind: 'page', id: 'rh-descontos', label: 'Descontos em folha', page: 'rh-descontos' }],
   },
   {
     id: 'back-end',
@@ -101,6 +96,8 @@ export const MENU: MenuGroup[] = [
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
       { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
+      { kind: 'page', id: 'rh-descontos', label: 'Descontos em folha', page: 'rh-descontos' },
+      wr('Composição de Preço (antiga)', 'new_TelaComposicaoPreco.html'),
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.

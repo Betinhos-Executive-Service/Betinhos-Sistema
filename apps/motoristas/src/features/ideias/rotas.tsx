@@ -1,10 +1,10 @@
-import type { Idea, IdeaDraft } from "./ideas";
+import type { IdeasGateway } from "./useIdeasGateway";
 import { IdeasScreen } from "./IdeasScreen";
 import type { Screen } from "../../types";
 import type { ReactNode } from "react";
 
 type Props = {
-  ideasGateway: { load: () => Promise<Idea[]>; create: (draft: IdeaDraft) => Promise<Idea>; };
+  ideasGateway: IdeasGateway;
   remoteMode: boolean;
   setScreen: React.Dispatch<React.SetStateAction<Screen>>;
 };
@@ -17,6 +17,7 @@ export function rotasIdeias(screen: Screen, { ideasGateway, remoteMode, setScree
         onBack={() => setScreen("inicio")}
         loadIdeas={ideasGateway.load}
         createIdea={ideasGateway.create}
+        uploadAttachment={ideasGateway.uploadAttachment}
         localNotice={remoteMode ? undefined : "Visualização local. Para enviar à equipe, abra o app publicado no Model-driven."}
       />
     );

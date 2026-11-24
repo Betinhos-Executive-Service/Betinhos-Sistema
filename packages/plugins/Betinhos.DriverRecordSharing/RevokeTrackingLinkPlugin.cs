@@ -8,7 +8,7 @@ namespace Betinhos.DriverRecordSharing
 {
     // Update de cr40f_status em cr40f_reservadeveculos (PostOperation, assíncrono): quando a reserva sai de
     // Concluído, encerra o link no Worker (POST /concluir, mantém os campos); Cancelado revoga (DELETE) e limpa os campos.
-    // Falha no Worker mantém os campos para nova tentativa e nunca bloqueia a mudança de status.
+    // Também revoga os cr40f_linkcadastro de serviço inteiro. Falha no Worker mantém os campos para nova tentativa e nunca bloqueia a mudança de status.
     public sealed class RevokeTrackingLinkPlugin : IPlugin
     {
         private const int TimeoutMs = 15000;
@@ -33,6 +33,9 @@ namespace Betinhos.DriverRecordSharing
             if (TrackingLinkRevocation.Decide(status.Value, "x") == TrackingLinkRevocation.LinkAction.None) return;
 
             var system = factory.CreateOrganizationService(null);
+            // Concluir ou cancelar fecha também a credencial de cadastro do portal; falha aqui não bloqueia nada.
+            try { TrackingLinkCadastro.RevokeWholeService(system, context.PrimaryEntityId); }
+            catch (Exception error) { tracing?.Trace("RevokeTrackingLink: link de cadastro não revogado serviceId={0}: {1}", context.PrimaryEntityId, error.GetType().Name); }
             var config = TrackingLinkWorkerConfig.Load(system, _secureConfig, tracing);
             if (!config.IsConfigured)
             {

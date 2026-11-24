@@ -20,13 +20,13 @@ function fake() {
   } as unknown as DataSource & Record<string, ReturnType<typeof vi.fn>>
 }
 
-async function montar(source: DataSource, opts: { item?: Multa; termoPendente?: TermoMulta | null; viaWhatsapp?: boolean } = {}) {
+async function montar(source: DataSource, opts: { item?: Multa; termoPendente?: TermoMulta | null; semTermo?: boolean } = {}) {
   const onChanged = vi.fn()
-  const onViaWhatsapp = vi.fn()
+  const onSemTermo = vi.fn()
   await act(async () => {
-    render(<ToastProvider><AvisoPorTermo source={source} multa={opts.item ?? multa} termoPendente={opts.termoPendente ?? null} valorCatalogo={195.23} hoje={HOJE} onChanged={onChanged} viaWhatsapp={opts.viaWhatsapp ?? false} onViaWhatsapp={onViaWhatsapp} whatsapp={<p>Conteúdo do WhatsApp</p>} /></ToastProvider>)
+    render(<ToastProvider><AvisoPorTermo source={source} multa={opts.item ?? multa} termoPendente={opts.termoPendente ?? null} valorCatalogo={195.23} hoje={HOJE} onChanged={onChanged} semTermo={opts.semTermo ?? false} onSemTermo={onSemTermo} indicacao={<p>Campos da indicação</p>} /></ToastProvider>)
   })
-  return { onChanged, onViaWhatsapp }
+  return { onChanged, onSemTermo }
 }
 
 afterEach(cleanup)
@@ -35,7 +35,7 @@ describe('AvisoPorTermo', () => {
   it('sem termo: mostra os dois caminhos e a prévia das parcelas', async () => {
     await montar(fake())
     expect(screen.getByRole('button', { name: 'Enviar termo pelo app' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Indicar sem o termo' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Parcelas'), { target: { value: '3' } })
     const previa = screen.getByRole('list', { name: 'Prévia das parcelas' })
     expect(previa.querySelectorAll('li')).toHaveLength(3)
@@ -54,21 +54,21 @@ describe('AvisoPorTermo', () => {
 
   it('prazo curto para indicar: mostra o motivo e bloqueia o envio', async () => {
     await montar(fake(), { item: { ...multa, dataParaIndicar: '2026-11-20' } })
-    expect(screen.getByText('Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.')).toBeTruthy()
+    expect(screen.getByText('Faltam menos de 3 dias para o prazo de indicação; indique sem o termo.')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Enviar termo pelo app' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('Avisar pelo WhatsApp sem termo pendente só troca o caminho', async () => {
-    const { onViaWhatsapp } = await montar(fake())
-    fireEvent.click(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' }))
-    expect(onViaWhatsapp).toHaveBeenCalledWith(true)
+  it('Indicar sem o termo, sem termo pendente só troca o caminho', async () => {
+    const { onSemTermo } = await montar(fake())
+    fireEvent.click(screen.getByRole('button', { name: 'Indicar sem o termo' }))
+    expect(onSemTermo).toHaveBeenCalledWith(true)
   })
 
-  it('no caminho do WhatsApp mostra o conteúdo e volta ao termo', async () => {
-    const { onViaWhatsapp } = await montar(fake(), { viaWhatsapp: true })
-    expect(screen.getByText('Conteúdo do WhatsApp')).toBeTruthy()
+  it('sem o termo mostra os campos da indicação e volta ao termo', async () => {
+    const { onSemTermo } = await montar(fake(), { semTermo: true })
+    expect(screen.getByText('Campos da indicação')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Voltar ao termo pelo app' }))
-    expect(onViaWhatsapp).toHaveBeenCalledWith(false)
+    expect(onSemTermo).toHaveBeenCalledWith(false)
   })
 
   it('termo pendente: mostra o estado, lembra e cancela com confirmação', async () => {
@@ -83,12 +83,12 @@ describe('AvisoPorTermo', () => {
     expect(source.cancelarTermoMulta).toHaveBeenCalledWith('t1')
   })
 
-  it('termo pendente: Avisar pelo WhatsApp cancela o termo e depois abre o WhatsApp', async () => {
+  it('termo pendente: Indicar sem o termo cancela o termo e depois abre os campos da indicação', async () => {
     const source = fake()
-    const { onViaWhatsapp } = await montar(source, { termoPendente: pendente })
-    fireEvent.click(screen.getByRole('button', { name: 'Avisar pelo WhatsApp' }))
+    const { onSemTermo } = await montar(source, { termoPendente: pendente })
+    fireEvent.click(screen.getByRole('button', { name: 'Indicar sem o termo' }))
     await act(async () => { fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar termo' })) })
     expect(source.cancelarTermoMulta).toHaveBeenCalledWith('t1')
-    expect(onViaWhatsapp).toHaveBeenCalledWith(true)
+    expect(onSemTermo).toHaveBeenCalledWith(true)
   })
 })

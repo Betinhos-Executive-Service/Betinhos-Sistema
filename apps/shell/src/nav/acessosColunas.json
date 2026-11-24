@@ -50,6 +50,9 @@
         "editar": ["cr40f_funcionarios.basico", "cr40f_funcionarios.cnh", "cr40f_funcionarios.rh"]
       },
       "gestor": { "ler": ["new_termomulta.prova"], "editar": ["cr40f_funcionarios.pessoal"] }
+    },
+    "acessos": {
+      "operador": { "ler": ["cr40f_funcionarios.basico", "cr40f_veiculos.basico"], "editar": [] }
     }
   }
 }

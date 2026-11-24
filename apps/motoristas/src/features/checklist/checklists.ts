@@ -2,6 +2,7 @@ import { DATAVERSE } from "../../data/dataverse/entidades.ts";
 import { isMockRuntime } from "../../shared/modoPreview.ts";
 import { canFetchOnDataverseHost, retrieveMultiple, retrieveOne } from "../../data/dataverse/cliente.ts";
 import { createFetchWebApi } from "../../data/dataverse/fetchWebApi.ts";
+import { executeCustomApi } from "../../data/dataverse/customApi.ts";
 
 // Checklist de vistoria de veículo. Contrato com o plugin ChecklistCommandPlugin
 // (plugins/DriverRecordSharing/ChecklistAnswers.cs): itens copiados do modelo e respostas em JSON.
@@ -414,6 +415,29 @@ export async function concluirChecklist(id: string, respostasJson: string) {
     return;
   }
   await executeChecklistAction("new_ConcluirChecklistVeiculo", { new_ChecklistId: cleanId, new_RespostasJson: respostasJson });
+}
+
+// "Fazer vistoria agora": abre (ou devolve o já aberto) o checklist do carro próprio para o chamador,
+// sem esperar a rotina quinzenal. O servidor (new_ParaMim) recusa terceiro e carro que não é próprio.
+export async function solicitarVistoriaAgora(veiculo: { id: string; placa: string }, motoristaId: string): Promise<string> {
+  if (isMockChecklists()) {
+    await delay(400);
+    if (mockChecklistFailure() === "registro") throw new Error("Sem conexão para abrir a vistoria.");
+    const lista = getLocalMock();
+    const aberto = lista.find((item) => item.estado === CHECKLIST_ESTADO.pendente && item.veiculoId === veiculo.id);
+    if (aberto) return aberto.id;
+    const id = `c0000000-0000-4000-8000-${String(Date.now()).slice(-12).padStart(12, "0")}`;
+    const agora = new Date().toISOString();
+    lista.unshift({
+      id, nome: `Checklist ${veiculo.placa} - manual`, motoristaId: motoristaId || MOCK_DRIVER_ID, veiculoId: veiculo.id, placa: veiculo.placa,
+      estado: CHECKLIST_ESTADO.pendente, origem: CHECKLIST_ORIGEM.manual, entreguePorNome: "", trocaDetectadaEm: null, solicitadoEm: agora, concluidoEm: null, odometro: null, itens: mockItens(), respostas: []
+    });
+    return id;
+  }
+  const resposta = await executeCustomApi("new_SolicitarChecklistVeiculo", { new_VeiculoId: cleanGuid(veiculo.id), new_ParaMim: true });
+  const id = cleanGuid(String(resposta.new_ChecklistId ?? ""));
+  if (!GUID_PATTERN.test(id)) throw new Error("O servidor não devolveu o checklist aberto.");
+  return id;
 }
 
 export async function uploadChecklistPhotoMock(fileName: string): Promise<ChecklistFotoEnviada> {

@@ -147,7 +147,8 @@ export interface QualityItem {
   assigneeProfiles?: Array<Employee | undefined>;
 }
 
-export interface LiveIdea { id: string; title: string; details: string; status: unknown; createdAt: string; author: string }
+export interface LiveIdeaAttachment { id: string; name: string; link: string; kind: "foto" | "video"; order: number }
+export interface LiveIdea { id: string; title: string; details: string; status: unknown; createdAt: string; author: string; attachments: LiveIdeaAttachment[] }
 export interface IdeaInput { title?: unknown; details?: unknown; status?: unknown }
 
 export interface PersonalTagAssignment { id: string; tagId: string; taskId: string; ownerUserId: string }
@@ -332,6 +333,7 @@ const EMAIL_DISPATCH_TABLE = "cr40f_plannerdisparo";
 const PERSONAL_TAG_TABLE = "cr40f_plannertagpessoal";
 const PERSONAL_TAG_TASK_TABLE = "cr40f_plannertagpessoaltarefa";
 const IDEA_TABLE = "cr40f_boasideias";
+const IDEA_ATTACHMENT_TABLE = "cr40f_boasideiaanexo";
 const ENVIRONMENT_VARIABLE_DEFINITION_TABLE = "environmentvariabledefinition";
 const ENVIRONMENT_VARIABLE_VALUE_TABLE = "environmentvariablevalue";
 const FLOW_URL_SCHEMA = "new_URLFlowsalvararquivosSharePoint";
@@ -389,6 +391,7 @@ const ENTITY_SETS: Readonly<Record<string, string>> = Object.freeze({
   [PERSONAL_TAG_TABLE]: "cr40f_plannertagpessoals",
   [PERSONAL_TAG_TASK_TABLE]: "cr40f_plannertagpessoaltarefas",
   [IDEA_TABLE]: "cr40f_boasideiases",
+  [IDEA_ATTACHMENT_TABLE]: "cr40f_boasideiaanexos",
   [ENVIRONMENT_VARIABLE_DEFINITION_TABLE]: "environmentvariabledefinitions",
   [ENVIRONMENT_VARIABLE_VALUE_TABLE]: "environmentvariablevalues",
   systemuser: "systemusers",
@@ -795,7 +798,7 @@ async function createLivePersonalTag(xrm: PlannerXrm, state: LiveState, input: {
   return loadLiveState(xrm);
 }
 
-function normalizeLiveIdea(row: Row): LiveIdea {
+function normalizeLiveIdea(row: Row, attachments: LiveIdeaAttachment[] = []): LiveIdea {
   return {
     id: s(row.cr40f_boasideiasid),
     title: s(row.cr40f_name),
@@ -803,12 +806,45 @@ function normalizeLiveIdea(row: Row): LiveIdea {
     status: row.cr40f_status ?? 100000000,
     createdAt: s(row.createdon),
     author: s(row["_createdby_value@OData.Community.Display.V1.FormattedValue"]),
+    attachments,
   };
 }
 
+// Anexos (fotos e vídeos) das ideias. Tabela ausente no ambiente (404, "does not exist") ou ilegível: ideias sem anexos.
+async function loadIdeaAttachments(xrm: PlannerXrm): Promise<Map<string, LiveIdeaAttachment[]>> {
+  const byIdea = new Map<string, LiveIdeaAttachment[]>();
+  let rows: Row[] = [];
+  try {
+    rows = await retrieveMany(xrm, IDEA_ATTACHMENT_TABLE, "?$select=cr40f_boasideiaanexoid,cr40f_name,cr40f_link,cr40f_nomearquivo,cr40f_tipomidia,cr40f_ordem,_cr40f_ideia_value&$filter=statecode eq 0&$orderby=cr40f_ordem asc");
+  } catch (error) {
+    console.warn("[Planner] anexos das ideias indisponíveis; ideias sem anexos", error);
+    return byIdea;
+  }
+  for (const row of rows) {
+    const ideaId = s(row._cr40f_ideia_value);
+    const link = s(row.cr40f_link);
+    // O motorista grava esse campo: só http(s) vira href.
+    if (!ideaId || !/^https?:\/\//i.test(link)) continue;
+    const list = byIdea.get(ideaId) || [];
+    list.push({
+      id: s(row.cr40f_boasideiaanexoid),
+      name: s(row.cr40f_nomearquivo) || s(row.cr40f_name) || "Anexo",
+      link,
+      kind: Number(row.cr40f_tipomidia) === 100000001 ? "video" : "foto",
+      order: Number(row.cr40f_ordem) || 0,
+    });
+    byIdea.set(ideaId, list);
+  }
+  for (const list of byIdea.values()) list.sort((a, b) => a.order - b.order);
+  return byIdea;
+}
+
 async function loadLiveIdeas(xrm: PlannerXrm) {
-  const rows = await retrieveMany(xrm, IDEA_TABLE, "?$select=cr40f_boasideiasid,cr40f_name,cr40f_detalhes,cr40f_status,createdon,_createdby_value&$filter=statecode eq 0&$orderby=createdon desc");
-  return rows.map(normalizeLiveIdea);
+  const [rows, attachments] = await Promise.all([
+    retrieveMany(xrm, IDEA_TABLE, "?$select=cr40f_boasideiasid,cr40f_name,cr40f_detalhes,cr40f_status,createdon,_createdby_value&$filter=statecode eq 0&$orderby=createdon desc"),
+    loadIdeaAttachments(xrm),
+  ]);
+  return rows.map((row) => normalizeLiveIdea(row, attachments.get(s(row.cr40f_boasideiasid)) || []));
 }
 
 async function createLiveIdea(xrm: PlannerXrm, input: IdeaInput = {}) {
@@ -3003,7 +3039,14 @@ function createMockDataStore(): PlannerDataStore {
   const withMode = (state: MockState): LiveState => ({ ...state, live: false } as unknown as LiveState);
   const withoutMode = ({ live: _live, ...state }: LiveState): MockState => asMock(asMock(state) as LiveState);
   const persist = (state: LiveState) => withMode(saveMockState(withoutMode(state)));
-  const mockIdeas: LiveIdea[] = [];
+  const mockIdeas: LiveIdea[] = [{
+    id: "mock-ideia-anexos", title: "Trocar o suporte de celular dos carros", details: "O suporte atual solta em estrada ruim; mandei fotos e um vídeo do problema.",
+    status: 100000000, createdAt: "2026-11-20T12:00:00.000Z", author: "Motorista · modo local",
+    attachments: [
+      { id: "mock-anexo-1", name: "suporte-solto.jpg", link: "https://example.com/anexos/suporte-solto.jpg", kind: "foto", order: 0 },
+      { id: "mock-anexo-2", name: "estrada.mp4", link: "https://example.com/anexos/estrada.mp4", kind: "video", order: 1 },
+    ],
+  }];
   const mockQuoteAttachments = new Map<string, LiveAttachment[]>();
 
   return {
@@ -3021,7 +3064,7 @@ function createMockDataStore(): PlannerDataStore {
     searchQuotes: async () => [],
     loadIdeas: async () => [...mockIdeas],
     createIdea: async (_state, input) => {
-      const idea: LiveIdea = { id: `mock-${Date.now()}-${mockIdeas.length}`, title: s(input.title), details: s(input.details), status: 100000000, createdAt: new Date().toISOString(), author: "Você · modo local" };
+      const idea: LiveIdea = { id: `mock-${Date.now()}-${mockIdeas.length}`, title: s(input.title), details: s(input.details), status: 100000000, createdAt: new Date().toISOString(), author: "Você · modo local", attachments: [] };
       mockIdeas.unshift(idea);
       return idea;
     },

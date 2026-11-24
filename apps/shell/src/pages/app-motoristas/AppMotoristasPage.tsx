@@ -39,7 +39,7 @@ function urlDoPreview(host: Host): string | null {
 }
 
 function AppMotoristas({ host }: { host: Host }) {
-  const acesso = useAcessoConfigApp(host)
+  const acesso = useAcessoConfigApp()
   useShellHeader({ title: 'App Motoristas' })
   if (!acesso) return <div className="page"><div className="am-vazio" role="status">Verificando acesso…</div></div>
   if (!acesso.gestor) {

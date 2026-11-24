@@ -20,6 +20,7 @@ function fakeClient(roles: string[] = []) {
       }
     }
     if (path.includes('systemuserroles_association')) return { value: roles.map((name) => ({ name })) }
+    if (path.includes('teammembership_association')) return { value: [] }
     throw new Error(`caminho inesperado ${path}`)
   })
   const client = { apiUrl: '', request, getAll: vi.fn(), create: vi.fn(async () => '{dddd0000-0000-0000-0000-000000000004}'), update: vi.fn(async () => undefined), remove: vi.fn(async () => undefined) }
@@ -64,6 +65,27 @@ describe('createDataverseViewStore', () => {
     expect(await createDataverseViewStore(fakeClient(['Acesso-Betinhos-MDA'])).canPublish()).toBe(false)
     expect(await createDataverseViewStore(fakeClient(['Gestor de visões'])).canPublish()).toBe(true)
     expect(await createDataverseViewStore(fakeClient(['System Administrator'])).canPublish()).toBe(true)
+  })
+
+  it('canPublish lê os papéis uma vez e tenta de novo depois de falhar', async () => {
+    const client = fakeClient(['Gestor de visões'])
+    const store = createDataverseViewStore(client)
+    await store.canPublish()
+    const antes = client.request.mock.calls.length
+    expect(await store.canPublish()).toBe(true)
+    expect(client.request.mock.calls.length).toBe(antes)
+
+    const falho = fakeClient(['Gestor de visões'])
+    let falhar = true
+    const original = falho.request.getMockImplementation()!
+    falho.request.mockImplementation(async (path: string) => {
+      if (falhar && path.includes('systemuserroles_association')) throw new Error('fora do ar')
+      return original(path)
+    })
+    const s2 = createDataverseViewStore(falho)
+    await expect(s2.canPublish()).rejects.toThrow()
+    falhar = false
+    expect(await s2.canPublish()).toBe(true)
   })
 })
 

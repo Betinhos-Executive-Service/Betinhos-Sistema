@@ -81,11 +81,19 @@ const NIVEIS = { operador: 'Operador', gestor: 'Gestor' }
 const LEITURA_DE_ACESSOS = { prvReadRole: 'Global', prvReadTeam: 'Global', prvReadUser: 'Global' }
 
 export function gerarPerfis(mapa, colunas) {
+  const doAdministrador = tabelasDoModulo(mapa.modulos.acessos, false)
+  juntar(doAdministrador, 'cr40f_acessohistorico', ['Read'])
   const papeis = {
     'Perfil - Base': { copiarDe: ['App Opener', 'Basic User'], app: 'cr40f_ModelDrivenBetinhos', tabelas: tabelasDaBase(mapa.base), privilegios: LEITURA_DE_ACESSOS },
-    'Perfil - Administrador de acessos': { copiarDe: [], app: null, tabelas: { cr40f_acessohistorico: { Read: 'Global' } }, privilegios: LEITURA_DE_ACESSOS },
+    'Perfil - Administrador de acessos': {
+      copiarDe: [],
+      app: null,
+      tabelas: ordenarTabelas(doAdministrador),
+      privilegios: LEITURA_DE_ACESSOS,
+    },
   }
-  const perfisDeColuna = {}
+  // Funcionarios tem seguranca de coluna: sem perfil de coluna o administrador de acessos ve o e-mail Microsoft vazio.
+  const perfisDeColuna = { 'Perfil - Administrador de acessos': permissoes(colunas, 'acessos', false) }
   for (const [area, rotuloArea] of Object.entries(AREAS))
     for (const [nivel, rotuloNivel] of Object.entries(NIVEIS)) {
       const nome = `Perfil - ${rotuloArea} - ${rotuloNivel}`

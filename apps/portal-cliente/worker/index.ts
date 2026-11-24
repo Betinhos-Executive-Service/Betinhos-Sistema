@@ -1,7 +1,7 @@
 // Worker do portal do cliente: /api/* (login, validação, pedidos) + build do app em ./dist (assets) + cron diário.
 // Cada rota exige o módulo do cliente na sessão (Tenaris valida; Latasa pede e acompanha).
 import type { Modulo } from '../src/domain/types'
-import { confirmarTotp, entrar, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
+import { confirmarCodigo, criarSenha, entrarComSenha, lerSessao, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
 import { aplicarTacita, enviarResumos } from './cron'
 import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
@@ -25,6 +25,13 @@ function comSeguranca(resp: Response): Response {
   return r
 }
 
+/** Rotas de login com e-mail no corpo: limite por e-mail além do por IP. */
+const AUTH_POR_EMAIL: Record<string, (req: Request, c: Ctx) => Promise<Response>> = {
+  'POST /auth/entrar': entrarComSenha,
+  'POST /auth/codigo': solicitarCodigo,
+  'POST /auth/codigo/confirmar': confirmarCodigo,
+}
+
 type ExecCtx = { waitUntil(p: Promise<unknown>): void }
 
 /** E-mail do corpo, sem consumir o stream original (para o limite por e-mail). */
@@ -46,12 +53,14 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   const c: Ctx = { env, dv: criarDv(env), agora: Date.now(), waitUntil: (p) => exec.waitUntil(p) }
   const rota = `${req.method} ${caminho}`
 
-  if (rota === 'POST /auth/codigo' || rota === 'POST /auth/entrar') {
+  const porEmail = AUTH_POR_EMAIL[rota]
+  if (porEmail) {
     const email = await emailDoCorpo(req)
     if (env.RL_EMAIL && email && !(await env.RL_EMAIL.limit({ key: `email:${await sha256Hex(email)}` })).success) return erro(429, 'bloqueado')
-    return rota === 'POST /auth/codigo' ? solicitarCodigo(req, c) : entrar(req, c)
+    return porEmail(req, c)
   }
-  if (rota === 'POST /auth/totp') return confirmarTotp(req, c)
+  if (rota === 'POST /auth/senha') return criarSenha(req, c)
+  if (rota === 'GET /auth/sessao') return lerSessao(req, c)
   if (rota === 'POST /auth/sair') return sair()
 
   const sessao = await sessaoAtual(req, c)

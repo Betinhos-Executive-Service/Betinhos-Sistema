@@ -3,7 +3,7 @@
     "leitura": ["cr40f_cidade", "new_localdebase", "cr40f_tipoequipamento", "cr40f_tipodocumento", "cr40f_categoriadespesaoperacional", "cr40f_formapagamentodespesa", "cr40f_comunicadohome", "cr40f_noticiaexterna"],
     "proprio": ["cr40f_visaodetabela"],
     "cria": ["cr40f_errodosistema", "new_appmotoristaslog"],
-    "donas": ["cr40f_plannertarefa", "cr40f_plannertarearesponsavel", "cr40f_plannertarearelacao", "cr40f_plannertarefaequipe", "cr40f_plannertarefaevento", "cr40f_plannerequipe", "cr40f_plannerequipemembro", "cr40f_plannernotificacao", "cr40f_plannertagpessoal", "cr40f_plannertagpessoaltarefa", "cr40f_plannerdisparo", "cr40f_boasideias"],
+    "donas": ["cr40f_plannertarefa", "cr40f_plannertarearesponsavel", "cr40f_plannertarearelacao", "cr40f_plannertarefaequipe", "cr40f_plannertarefaevento", "cr40f_plannerequipe", "cr40f_plannerequipemembro", "cr40f_plannernotificacao", "cr40f_plannertagpessoal", "cr40f_plannertagpessoaltarefa", "cr40f_plannerdisparo", "cr40f_boasideias", "cr40f_boasideiaanexo"],
     "sistema": {
       "annotation": { "Read": "Global", "Create": "Global", "Write": "Global", "Append": "Global", "AppendTo": "Global", "Delete": "Basic" }
     }
@@ -31,6 +31,9 @@
       "filhas": ["cr40f_treinamentoparticipacao"],
       "edita": ["cr40f_multas"],
       "leitura": ["cr40f_veiculos", "new_termomulta", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
+    },
+    "acessos": {
+      "leitura": ["cr40f_funcionarios", "cr40f_documento", "cr40f_multas", "cr40f_veiculos", "new_possedeveiculo"]
     }
   },
   "rotas": {
@@ -175,7 +178,7 @@
       "pastas": ["apps/shell/src/pages/clientes"]
     },
     "funcionarios": {
-      "perfis": ["rh"],
+      "perfis": ["rh", "acessos"],
       "pastas": ["apps/shell/src/pages/funcionarios"]
     },
     "documentos": {
@@ -212,7 +215,8 @@
     "cr40f_composicaodeprecos": {"perfis": ["financeiro"], "pastas": []},
     "new_marketing": {"perfis": ["operacional"], "pastas": []},
     "app-motoristas": {
-      "perfis": ["acessos"],
+      "perfis": ["operacional"],
+      "nivel": "gestor",
       "pastas": ["apps/shell/src/pages/app-motoristas"],
       "ignorar": [
         {"tabela": "cr40f_appconfigpessoa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
@@ -229,6 +233,10 @@
         {"tabela": "cr40f_projetoatualizacao", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_projetoetapa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"}
       ]
+    },
+    "acessos": {
+      "perfis": ["acessos"],
+      "pastas": ["apps/shell/src/pages/acessos"]
     }
   }
 }

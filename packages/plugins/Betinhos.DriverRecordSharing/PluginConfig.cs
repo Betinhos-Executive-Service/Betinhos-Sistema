@@ -75,6 +75,12 @@ namespace Betinhos.DriverRecordSharing
         public const string EnvSharePointList = "new_URLFlowListarArquivosSharePoint";
         public const string EnvSharePointQuery = "new_URLFlowConsultarArquivosSharePoint";
         public const string DevOrganizationName = "org23b93544";
+        // No plugin, context.OrganizationName traz o UniqueName do DEV (unq…), não o nome da URL (org23b93544).
+        public const string DevOrganizationUniqueName = "unq7e5f59f4efcef01189f6000d3ac0a";
+
+        public static bool IsDev(string organizationName) =>
+            string.Equals(organizationName, DevOrganizationName, System.StringComparison.OrdinalIgnoreCase)
+            || string.Equals(organizationName, DevOrganizationUniqueName, System.StringComparison.OrdinalIgnoreCase);
         public const string ServiceTrackingLink = "new_linkacompanhamento";
         public const string ServiceTrackingLinkExpiresAt = "new_linkacompanhamentoexpiraem";
         public const string ServiceCode = "cr40f_id";

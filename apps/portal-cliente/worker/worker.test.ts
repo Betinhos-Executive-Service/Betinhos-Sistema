@@ -1,18 +1,18 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { totp } from './cripto'
 import { bancoInicial, envFalso, fetchFalso, kvMemoria, LATASA, type Banco, type Email } from './fakeDataverse'
 import worker from './index'
 
 const ORIGEM = 'https://portal.test'
-let banco: Banco, emails: Email[], env: ReturnType<typeof envFalso>, pendentes: Promise<unknown>[]
+let banco: Banco, emails: Email[], kv: ReturnType<typeof kvMemoria>, env: ReturnType<typeof envFalso>, pendentes: Promise<unknown>[]
 const exec = { waitUntil: (p: Promise<unknown>) => void pendentes.push(p) }
 
 beforeEach(() => {
   banco = bancoInicial()
   emails = []
   pendentes = []
-  env = envFalso(kvMemoria())
+  kv = kvMemoria()
+  env = envFalso(kv)
   vi.stubGlobal('fetch', fetchFalso(banco, emails))
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -29,26 +29,57 @@ async function chamar(metodo: string, caminho: string, corpo?: unknown, cookie =
 /** Cookies `nome=valor` da resposta, para mandar na próxima chamada. */
 const cookies = (r: Response) => r.headers.getSetCookie().map((c) => c.split(';')[0]).filter((c) => !c.endsWith('=')).join('; ')
 
+/** Pede o código como se o intervalo de reenvio (60 s) já tivesse passado. */
 async function pedirCodigo(email: string) {
+  for (const k of kv.dados.keys()) if (k.startsWith('reenvio:')) kv.dados.delete(k)
   await chamar('POST', '/auth/codigo', { email })
   return String(emails.at(-1)?.dados.codigo ?? '')
 }
 
-/** Login completo com cadastro do autenticador; devolve o cookie de sessão. */
-async function logar(email = 'fiscal@tenaris.com') {
+const SENHA = 'senha-boa-123'
+
+/** Código do e-mail confirmado; devolve o cookie da etapa de criar a senha. */
+async function confirmar(email: string) {
   const codigo = await pedirCodigo(email)
-  const r = await chamar('POST', '/auth/entrar', { email, codigo })
-  const { segredo } = (await r.json()) as { segredo: string }
-  const t = await chamar('POST', '/auth/totp', { codigo: await totp(segredo, Math.floor(Date.now() / 30000)), lembrar: false }, cookies(r))
-  expect(t.status).toBe(200)
-  return cookies(t)
+  const r = await chamar('POST', '/auth/codigo/confirmar', { email, codigo })
+  expect(await r.json()).toEqual({ etapa: 'criar_senha' })
+  return cookies(r)
 }
 
+/** 1º acesso completo (código do e-mail + senha criada); devolve o cookie de sessão. */
+async function logar(email = 'fiscal@tenaris.com', senha = SENHA) {
+  const r = await chamar('POST', '/auth/senha', { senha }, await confirmar(email))
+  expect(r.status).toBe(200)
+  return cookies(r)
+}
+
+const entrar = (email: string, senha: string) => chamar('POST', '/auth/entrar', { email, senha })
+
 describe('login', () => {
-  it('e-mail não cadastrado: 204 e nada enviado', async () => {
+  it('e-mail não cadastrado: 403 sem_acesso e nada enviado', async () => {
     const r = await chamar('POST', '/auth/codigo', { email: 'ninguem@tenaris.com' })
-    expect(r.status).toBe(204)
+    expect(r.status).toBe(403)
+    expect(await r.json()).toEqual({ erro: 'sem_acesso' })
     expect(emails).toHaveLength(0)
+  })
+
+  it('10 respostas sem acesso do mesmo IP em 15 min: a 11ª vira 429', async () => {
+    for (let i = 0; i < 10; i++) expect((await chamar('POST', '/auth/codigo', { email: `n${i}@example.com` })).status).toBe(403)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n10@example.com' })).status).toBe(429)
+  })
+
+  it('pedido de e-mail liberado não conta para o limite de sem acesso do IP', async () => {
+    for (let i = 0; i < 9; i++) expect((await chamar('POST', '/auth/codigo', { email: `n${i}@example.com` })).status).toBe(403)
+    expect((await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })).status).toBe(204)
+    // Reenvio antes de 60 s: 429 aguarde, sem e-mail novo e sem contar para o IP.
+    for (let i = 0; i < 2; i++) {
+      const r = await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })
+      expect(r.status).toBe(429)
+      expect(await r.json()).toEqual({ erro: 'aguarde' })
+    }
+    expect(emails).toHaveLength(1)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n9@example.com' })).status).toBe(403)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n10@example.com' })).status).toBe(429)
   })
 
   it('e-mail cadastrado: 204, código no e-mail e só o hash no Dataverse', async () => {
@@ -60,40 +91,85 @@ describe('login', () => {
   it('5 códigos errados: 401 ×4 e depois 429, mesmo com o código certo', async () => {
     const certo = await pedirCodigo('fiscal@tenaris.com')
     const errado = certo === '000000' ? '111111' : '000000'
-    for (let i = 0; i < 4; i++) expect((await chamar('POST', '/auth/entrar', { email: 'fiscal@tenaris.com', codigo: errado })).status).toBe(401)
-    expect((await chamar('POST', '/auth/entrar', { email: 'fiscal@tenaris.com', codigo: errado })).status).toBe(429)
-    const r = await chamar('POST', '/auth/entrar', { email: 'fiscal@tenaris.com', codigo: certo })
+    const confirmarCom = (codigo: string) => chamar('POST', '/auth/codigo/confirmar', { email: 'fiscal@tenaris.com', codigo })
+    for (let i = 0; i < 4; i++) expect((await confirmarCom(errado)).status).toBe(401)
+    expect((await confirmarCom(errado)).status).toBe(429)
+    const r = await confirmarCom(certo)
     expect(r.status).toBe(429)
     expect(await r.json()).toEqual({ erro: 'bloqueado' })
   })
 
-  it('1º acesso: QR + TOTP errado 401; certo entra e grava o segredo cifrado', async () => {
-    const codigo = await pedirCodigo('fiscal@tenaris.com')
-    const r = await chamar('POST', '/auth/entrar', { email: 'fiscal@tenaris.com', codigo })
-    const corpo = (await r.json()) as { etapa: string; segredo: string; otpauthUrl: string }
-    expect(corpo.etapa).toBe('cadastrar_autenticador')
-    expect(corpo.otpauthUrl).toContain(`secret=${corpo.segredo}`)
-    const ruim = await chamar('POST', '/auth/totp', { codigo: '000000' }, cookies(r))
-    expect(ruim.status).toBe(401)
-    expect(await ruim.json()).toEqual({ erro: 'totp_invalido' })
-    const ok = await chamar('POST', '/auth/totp', { codigo: await totp(corpo.segredo, Math.floor(Date.now() / 30000)), lembrar: true }, cookies(r))
+  it('1º acesso: código certo, senha curta 400, senha boa grava só o hash e abre sessão de 30 dias', async () => {
+    const etapa = await confirmar('fiscal@tenaris.com')
+    const curta = await chamar('POST', '/auth/senha', { senha: 'curta' }, etapa)
+    expect(curta.status).toBe(400)
+    expect(await curta.json()).toMatchObject({ erro: 'senha_fraca' })
+    const ok = await chamar('POST', '/auth/senha', { senha: SENHA }, etapa)
     expect(await ok.json()).toEqual({ nome: 'Marcos', email: 'fiscal@tenaris.com', cliente: 'Tenaris', modulos: ['validar'] })
-    const setCookie = ok.headers.getSetCookie().join('\n')
-    expect(setCookie).toMatch(/__Host-portal_sessao=[^;]+; Path=\/; Max-Age=43200; HttpOnly; Secure; SameSite=Strict/)
-    const gravado = String(banco.validadorclientes[0].cr40f_segredototp)
-    expect(gravado).not.toContain(corpo.segredo)
-    expect(banco.validadorclientes[0].cr40f_totpcadastradoem).toBeTruthy()
-    expect(banco.dispositivoconfiavels).toHaveLength(1)
-
-    // Computador lembrado: próximo login só com o código do e-mail.
-    const dispositivo = cookies(ok).split('; ').find((c) => c.startsWith('__Host-portal_dispositivo='))!
-    const codigo2 = await pedirCodigo('fiscal@tenaris.com')
-    const r2 = await chamar('POST', '/auth/entrar', { email: 'fiscal@tenaris.com', codigo: codigo2 }, dispositivo)
-    expect(((await r2.json()) as { etapa: string }).etapa).toBe('ok')
+    expect(ok.headers.getSetCookie().join('\n')).toMatch(/__Host-portal_sessao=[^;]+; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict/)
+    const gravado = String(banco.validadorclientes[0].cr40f_senhahash)
+    expect(gravado).toMatch(/^pbkdf2\$100000\$/)
+    expect(gravado).not.toContain(SENHA)
+    expect(banco.validadorclientes[0].cr40f_senhadefinidaem).toBeTruthy()
+    // A sessão volta no recarregar.
+    expect(await (await chamar('GET', '/auth/sessao', undefined, cookies(ok))).json()).toMatchObject({ email: 'fiscal@tenaris.com' })
   })
 
-  it('TOTP sem passar pelo código do e-mail: 401', async () => {
-    expect((await chamar('POST', '/auth/totp', { codigo: '123456' })).status).toBe(401)
+  it('entrar com a senha; senha errada, sem senha criada e e-mail estranho dão o mesmo 401', async () => {
+    await logar()
+    const ok = await entrar('Fiscal@Tenaris.com ', SENHA)
+    expect(ok.status).toBe(200)
+    expect(await (await chamar('GET', '/servicos', undefined, cookies(ok))).json()).toHaveLength(banco.validacaoservicos.filter((v) => v.cr40f_status !== 100000005).length)
+    for (const [email, senha] of [['fiscal@tenaris.com', 'errada-000'], ['ninguem@tenaris.com', SENHA], ['paula.ribeiro@latasa.com.br', SENHA]]) {
+      const r = await entrar(email, senha)
+      expect(r.status).toBe(401)
+      expect(await r.json()).toEqual({ erro: 'senha_invalida' })
+    }
+  })
+
+  it('5 senhas erradas bloqueiam, até com a certa', async () => {
+    await logar()
+    for (let i = 0; i < 4; i++) expect((await entrar('fiscal@tenaris.com', 'errada-000')).status).toBe(401)
+    expect((await entrar('fiscal@tenaris.com', 'errada-000')).status).toBe(429)
+    expect((await entrar('fiscal@tenaris.com', SENHA)).status).toBe(429)
+  })
+
+  it('criar senha sem passar pelo código do e-mail: 401', async () => {
+    expect((await chamar('POST', '/auth/senha', { senha: SENHA })).status).toBe(401)
+  })
+
+  it('trocar a senha ("Esqueci a senha") derruba as sessões abertas com a antiga', async () => {
+    const antiga = await logar()
+    const nova = await logar('fiscal@tenaris.com', 'senha-nova-456')
+    expect((await chamar('GET', '/servicos', undefined, antiga)).status).toBe(401)
+    expect((await chamar('GET', '/servicos', undefined, nova)).status).toBe(200)
+    expect((await entrar('fiscal@tenaris.com', SENHA)).status).toBe(401)
+  })
+
+  it('"Zerar senha" do shell (só limpa a data): a senha antiga não entra e a sessão aberta cai', async () => {
+    const sessao = await logar()
+    banco.validadorclientes[0].cr40f_senhadefinidaem = null
+    expect((await chamar('GET', '/servicos', undefined, sessao)).status).toBe(401)
+    expect((await entrar('fiscal@tenaris.com', SENHA)).status).toBe(401)
+  })
+
+  it('desativar o usuário ou tirar o portal do cliente derruba a sessão na hora', async () => {
+    const sessao = await logar()
+    banco.validadorclientes[0].cr40f_ativo = false
+    expect((await chamar('GET', '/auth/sessao', undefined, sessao)).status).toBe(401)
+    expect((await chamar('GET', '/servicos', undefined, sessao)).status).toBe(401)
+  })
+
+  it('usuário trocado de cliente: a sessão antiga cai', async () => {
+    const sessao = await logar()
+    banco.validadorclientes[0]._cr40f_cliente_value = banco.validadorclientes[1]._cr40f_cliente_value
+    expect((await chamar('GET', '/servicos', undefined, sessao)).status).toBe(401)
+  })
+
+  it('usuário apagado no Dataverse: sessão cai com 401, não 500', async () => {
+    const sessao = await logar()
+    banco.validadorclientes.splice(0, 1)
+    expect((await chamar('GET', '/auth/sessao', undefined, sessao)).status).toBe(401)
   })
 })
 
@@ -103,10 +179,9 @@ describe('multi-cliente', () => {
     expect(codigo).toMatch(/^\d{6}$/)
     const criado = banco.validadorclientes.find((v) => v.cr40f_email === 'paula.ribeiro@latasa.com.br')!
     expect(criado).toMatchObject({ cr40f_name: 'Paula Ribeiro', cr40f_ativo: true, _cr40f_cliente_value: LATASA })
-    const r = await chamar('POST', '/auth/entrar', { email: 'paula.ribeiro@latasa.com.br', codigo })
-    const { segredo } = (await r.json()) as { segredo: string }
-    const t = await chamar('POST', '/auth/totp', { codigo: await totp(segredo, Math.floor(Date.now() / 30000)) }, cookies(r))
-    expect(await t.json()).toMatchObject({ cliente: 'Latasa', modulos: ['pedir', 'meus_servicos'] })
+    const r = await chamar('POST', '/auth/codigo/confirmar', { email: 'paula.ribeiro@latasa.com.br', codigo })
+    const s = await chamar('POST', '/auth/senha', { senha: SENHA }, cookies(r))
+    expect(await s.json()).toMatchObject({ cliente: 'Latasa', modulos: ['pedir', 'meus_servicos'] })
     // Segundo pedido de código reaproveita o cadastro.
     await pedirCodigo('paula.ribeiro@latasa.com.br')
     expect(banco.validadorclientes.filter((v) => v.cr40f_email === 'paula.ribeiro@latasa.com.br')).toHaveLength(1)
@@ -117,7 +192,7 @@ describe('multi-cliente', () => {
     banco.validadorclientes.find((v) => v.cr40f_email === 'paula.ribeiro@latasa.com.br')!.cr40f_ativo = false
     emails.length = 0
     const antes = banco.validadorclientes.length
-    expect((await chamar('POST', '/auth/codigo', { email: 'paula.ribeiro@latasa.com.br' })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email: 'paula.ribeiro@latasa.com.br' })).status).toBe(403)
     expect(emails).toHaveLength(0)
     expect(banco.validadorclientes).toHaveLength(antes)
   })
@@ -127,12 +202,12 @@ describe('multi-cliente', () => {
     ['subdomínio parecido', 'x@tasa.com'],
     ['dois clientes com o mesmo domínio', 'x@ambiguo.com'],
     ['cliente sem módulo', 'x@semmodulo.com'],
-  ])('%s: 204, sem e-mail e sem cadastro', async (_, email) => {
+  ])('%s: 403 sem_acesso, sem e-mail e sem cadastro', async (_, email) => {
     const antes = banco.validadorclientes.length
-    expect((await chamar('POST', '/auth/codigo', { email })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email })).status).toBe(403)
     expect(emails).toHaveLength(0)
     expect(banco.validadorclientes).toHaveLength(antes)
-    expect((await chamar('POST', '/auth/entrar', { email, codigo: '123456' })).status).toBe(401)
+    expect((await chamar('POST', '/auth/codigo/confirmar', { email, codigo: '123456' })).status).toBe(401)
   })
 
   it('cada módulo só na sessão do cliente certo: Tenaris não pede, Latasa não valida', async () => {
@@ -266,6 +341,19 @@ describe('cron', () => {
     const resumos = emails.filter((e) => e.tipo === 'resumo_diario')
     expect(resumos).toHaveLength(1)
     expect(resumos[0].para).toEqual(['fiscal@tenaris.com'])
+    // Contrato do flow (packages/deploy/flows/portal-cliente-emails.json): sem nome/cliente/linkPortal ele responde 400.
+    const d = resumos[0].dados as { liberadosHoje: unknown[]; vencendo: unknown[] }
+    expect(d).toMatchObject({ nome: expect.stringMatching(/\S/), cliente: expect.stringMatching(/\S/), linkPortal: 'https://cliente.exemplo/' })
+    for (const l of d.liberadosHoje) expect(l).toMatchObject({ numero: expect.any(String), data: expect.stringMatching(/^(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})?$/), trajeto: expect.stringContaining(' → '), valor: expect.any(Number) })
+    for (const v of d.vencendo) expect(v).toMatchObject({ numero: expect.any(String), prazo: expect.stringMatching(/^\d{2}\/\d{2}\/\d{4}$/) })
+    expect(d.liberadosHoje.length + d.vencendo.length).toBeGreaterThan(0)
+  })
+
+  it('código de acesso segue o contrato do flow (nome, codigo, validadeMinutos)', async () => {
+    emails.length = 0
+    await logar('fiscal@tenaris.com')
+    const c = emails.find((e) => e.tipo === 'codigo')
+    expect(c?.dados).toMatchObject({ nome: expect.stringMatching(/\S/), codigo: expect.stringMatching(/^\d{6}$/), validadeMinutos: 10 })
   })
 
   it('cliente sem o módulo Validar não recebe resumo, mesmo com validação liberada por engano', async () => {

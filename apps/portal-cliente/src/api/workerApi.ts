@@ -1,11 +1,11 @@
 import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
-import { ErroPortal, type CodigoErro, type PortalApi, type ResultadoEntrada } from './PortalApi'
+import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
 /**
  * PortalApi real: fala com o Worker na mesma origem (`/api/*`), sessão em cookie HttpOnly.
  * Usada por `main.tsx` fora do dev server local (porta 52463) e sem `?mock`.
  */
-const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'totp_invalido', 'bloqueado', 'nao_permitido', 'duplicado', 'falha']
+const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'senha_invalida', 'senha_fraca', 'bloqueado', 'aguarde', 'sem_acesso', 'nao_permitido', 'duplicado', 'falha']
 
 /** Corpo `{erro, mensagem?}` do Worker → ErroPortal; sem corpo, pelo status HTTP. */
 export async function erroDaResposta(r: Response): Promise<ErroPortal> {
@@ -37,9 +37,15 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     return (r.status === 204 ? undefined : await r.json()) as T
   }
   return {
+    sessao: () =>
+      chamar<Sessao>('GET', '/auth/sessao').catch((e: unknown) => {
+        if (e instanceof ErroPortal && e.codigo === 'nao_permitido') return null
+        throw e
+      }),
+    entrar: (email: string, senha: string) => chamar<Sessao>('POST', '/auth/entrar', { email, senha }),
     solicitarCodigo: (email: string) => chamar<void>('POST', '/auth/codigo', { email }),
-    entrar: (email: string, codigo: string) => chamar<ResultadoEntrada>('POST', '/auth/entrar', { email, codigo }),
-    confirmarAutenticador: (codigo: string, lembrar: boolean) => chamar<Sessao>('POST', '/auth/totp', { codigo, lembrar }),
+    confirmarCodigo: (email: string, codigo: string) => chamar<void>('POST', '/auth/codigo/confirmar', { email, codigo }).then(() => undefined),
+    criarSenha: (senha: string) => chamar<Sessao>('POST', '/auth/senha', { senha }),
     sair: () => chamar<void>('POST', '/auth/sair'),
     listar: () => chamar<Servico[]>('GET', '/servicos'),
     aprovar: (ids: string[]) => chamar<Servico[]>('POST', '/servicos/aprovar', { ids }),

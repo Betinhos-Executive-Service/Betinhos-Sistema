@@ -1,6 +1,6 @@
 {
   "name": "@betinhos/portal-cliente",
-  "version": "0.0.0",
+  "version": "0.0.6",
   "private": true,
   "type": "module",
   "description": "Portal do cliente, multi-cliente por módulos (Tenaris valida; Latasa pede e acompanha): React + Worker Cloudflare (/api, Dataverse S2S)",
@@ -9,16 +9,15 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build",
     "test": "vitest run",
-    "dev:worker": "vite build && wrangler dev"
+    "dev:worker": "vite build && wrangler dev",
+    "deploy:dev": "pnpm build && wrangler deploy --env dev && cd pages && wrangler pages deploy --branch main"
   },
   "dependencies": {
     "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.18.0",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.47.0",
-    "otpauth": "9.5.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "uqr": "0.1.3"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",

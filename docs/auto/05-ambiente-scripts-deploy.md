@@ -94,7 +94,7 @@ Ambientes citados no código:
 | Worker | Segredos/bindings (de `wrangler.jsonc` e do código) | Obrigatório? |
 |---|---|---|
 | `cadastro-passageiro` | secret `FLOW_URL` (URL do flow HTTP; sem ela, em localhost responde mock); secrets `CONTATO_WHATSAPP`, `CONTATO_EMAIL` (tela de link vencido; sem eles a tela só orienta pedir novo link); `MODO_LOCAL` (lido no código, fora do jsonc); bindings `ASSETS`, KV `CACHE`, rate limit `RATE_LIMITER` (60 req/60 s por IP) | `FLOW_URL` sim em produção; demais opcionais |
-| `portal-cliente` | secrets `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_TOTP`, `CHAVE_SESSAO`; bindings `ASSETS`, KV `KV` (no arquivo o id está como `TROCAR_PELO_ID_DO_KV`: placeholder a trocar), rate limits `RL_IP` (60/60 s) e `RL_EMAIL` (10/60 s); cron `0 11 * * 1-5` (8h de Brasília, aprovação tácita e resumo diário) | todos os secrets, sim |
+| `portal-cliente` | secrets `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_SESSAO`; bindings `ASSETS`, KV `KV` (no arquivo o id está como `TROCAR_PELO_ID_DO_KV`: placeholder a trocar), rate limits `RL_IP` (60/60 s) e `RL_EMAIL` (10/60 s); cron `0 11 * * 1-5` (8h de Brasília, aprovação tácita e resumo diário) | todos os secrets, sim |
 | `packages/planner/serverless/triage-worker.js` (legado) | `DEEPSEEK_API_KEY`, `TRIAGE_TOKEN` | não confirmado se ainda está em uso |
 
 Os dois `wrangler.jsonc` têm `account_id` Cloudflare e `workers_dev: true`, `compatibility_date` 2026-09-01. Segredos sobrevivem ao `wrangler deploy` e são definidos com `wrangler secret put <nome>`.
