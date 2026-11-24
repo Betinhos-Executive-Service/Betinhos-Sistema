@@ -1,6 +1,6 @@
 import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export class ErroPortal extends Error {
   constructor(public codigo: CodigoErro, message: string = codigo) {
@@ -9,19 +9,22 @@ export class ErroPortal extends Error {
   }
 }
 
-/** Próximo passo depois do código do e-mail: cadastrar o autenticador (1º acesso), digitar o código dele ou já entrar (computador lembrado). */
-export type ResultadoEntrada =
-  | { etapa: 'cadastrar_autenticador'; otpauthUrl: string; segredo: string }
-  | { etapa: 'autenticador' }
-  | { etapa: 'ok'; sessao: Sessao }
+/** Regra da senha, usada pela tela, pelo mock e pelo Worker. */
+export const SENHA_MIN = 8
+export const senhaFraca = (senha: string) => senha.length < SENHA_MIN || !senha.trim()
 
 /** Contrato das telas com o servidor. O protótipo usa o mock; o portal real, o Worker (`/api/*`). */
 export interface PortalApi {
-  /** Não revela se o e-mail está cadastrado: responde igual para qualquer e-mail válido. */
+  /** Sessão ainda válida (cookie de 30 dias) ou `null`: o portal abre já logado. */
+  sessao(): Promise<Sessao | null>
+  /** E-mail liberado + senha criada pela pessoa. Sem cadastro ou sem senha: `senha_invalida`, igual a senha errada. */
+  entrar(email: string, senha: string): Promise<Sessao>
+  /** 1º acesso e "Esqueci a senha". Não revela se o e-mail está liberado: responde igual para qualquer e-mail válido. */
   solicitarCodigo(email: string): Promise<void>
-  entrar(email: string, codigo: string): Promise<ResultadoEntrada>
-  /** Segunda etapa: código de 6 dígitos do app autenticador (TOTP). `lembrar` dispensa o TOTP neste computador por 30 dias. */
-  confirmarAutenticador(codigoTotp: string, lembrar: boolean): Promise<Sessao>
+  /** Código de 6 dígitos do e-mail; certo, libera `criarSenha` por 10 minutos. */
+  confirmarCodigo(email: string, codigo: string): Promise<void>
+  /** Grava a senha nova e já entra; as sessões abertas com a senha antiga caem. */
+  criarSenha(senha: string): Promise<Sessao>
   sair(): Promise<void>
   /** Serviços liberados do cliente da sessão. */
   listar(): Promise<Servico[]>

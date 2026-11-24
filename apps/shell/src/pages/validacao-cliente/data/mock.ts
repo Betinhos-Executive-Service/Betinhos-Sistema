@@ -83,8 +83,8 @@ export function createMockLinhas(mensagens: Mensagem[]): Linha[] {
 }
 
 export const createMockValidadores = (): Validador[] => [
-  { id: id('e1000000', 1), nome: 'Carla Menezes', email: 'carla.menezes@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: '2026-10-27T12:40:00Z', totpCadastradoEm: '2026-10-02T12:00:00Z' },
-  { id: id('e1000000', 2), nome: 'Roberto Lima', email: 'roberto.lima@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: null, totpCadastradoEm: null },
-  { id: id('e1000000', 3), nome: 'Ana Souza', email: 'ana.souza@tenaris.com', cliente: TENARIS, ativo: false, ultimoAcesso: '2026-09-15T12:00:00Z', totpCadastradoEm: '2026-09-01T12:00:00Z' },
-  { id: id('e1000000', 4), nome: 'Marcos Ternium', email: 'marcos@ternium.com', cliente: TERNIUM, ativo: true, ultimoAcesso: '2026-10-21T13:00:00Z', totpCadastradoEm: '2026-10-01T12:00:00Z' },
+  { id: id('e1000000', 1), nome: 'Carla Menezes', email: 'carla.menezes@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: '2026-10-27T12:40:00Z', senhaDefinidaEm: '2026-10-02T12:00:00Z' },
+  { id: id('e1000000', 2), nome: 'Roberto Lima', email: 'roberto.lima@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null },
+  { id: id('e1000000', 3), nome: 'Ana Souza', email: 'ana.souza@tenaris.com', cliente: TENARIS, ativo: false, ultimoAcesso: '2026-09-15T12:00:00Z', senhaDefinidaEm: '2026-09-01T12:00:00Z' },
+  { id: id('e1000000', 4), nome: 'Marcos Ternium', email: 'marcos@ternium.com', cliente: TERNIUM, ativo: true, ultimoAcesso: '2026-10-21T13:00:00Z', senhaDefinidaEm: '2026-10-01T12:00:00Z' },
 ]

@@ -12,14 +12,14 @@ type Erros = ReturnType<typeof validarValidador>
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 const VAZIO = { nome: '', email: '', clienteId: '' }
 
-/** Quem valida no portal: cadastrar, ativar/desativar e refazer o autenticador (zera o TOTP). */
+/** Quem usa o portal: cadastrar, ativar/desativar e zerar a senha. */
 export function ValidadoresDrawer({ open, onClose, validadores, clientes, source, mobile, onSaved }: Props) {
   const toast = useToast()
   const [form, setForm] = useState({ ...VAZIO, clienteId: clientes.length === 1 ? clientes[0].id : '' })
   const [erros, setErros] = useState<Erros>({})
   const [salvando, setSalvando] = useState(false)
   const [ocupado, setOcupado] = useState<string | null>(null)
-  const [refazer, setRefazer] = useState<Validador | null>(null)
+  const [zerar, setZerar] = useState<Validador | null>(null)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
   const sujo = !!(form.nome.trim() || form.email.trim())
 
@@ -37,8 +37,8 @@ export function ValidadoresDrawer({ open, onClose, validadores, clientes, source
     try {
       const id = await source.criarValidador(form)
       const cliente = clientes.find((c) => c.id === form.clienteId)!
-      onSaved({ id, nome: form.nome.trim(), email: form.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, totpCadastradoEm: null })
-      toast({ tone: 'success', message: `${form.nome.trim()} cadastrado. No primeiro acesso, o validador lê o QR code do autenticador.` })
+      onSaved({ id, nome: form.nome.trim(), email: form.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null })
+      toast({ tone: 'success', message: `${form.nome.trim()} cadastrado. No primeiro acesso, a pessoa cria a senha pelo código enviado ao e-mail.` })
       setForm((f) => ({ ...VAZIO, clienteId: f.clienteId }))
     } catch (reason) {
       toast({ tone: 'danger', message: `Não foi possível cadastrar. ${reasonText(reason)}` })
@@ -60,17 +60,17 @@ export function ValidadoresDrawer({ open, onClose, validadores, clientes, source
     }
   }
 
-  async function confirmarRefazer() {
-    if (!refazer) return
-    const v = refazer
+  async function confirmarZerar() {
+    if (!zerar) return
+    const v = zerar
     setOcupado(v.id)
     try {
-      await source.refazerAutenticador(v.id)
-      onSaved({ ...v, totpCadastradoEm: null })
-      setRefazer(null)
-      toast({ tone: 'success', message: `Autenticador de ${v.nome} zerado. Avise o validador: no próximo acesso, será preciso ler um QR code novo.` })
+      await source.zerarSenha(v.id)
+      onSaved({ ...v, senhaDefinidaEm: null })
+      setZerar(null)
+      toast({ tone: 'success', message: `Senha de ${v.nome} zerada. Avise a pessoa: para entrar, use "Primeiro acesso ou esqueci a senha" no portal.` })
     } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível refazer o autenticador. ${reasonText(reason)}` })
+      toast({ tone: 'danger', message: `Não foi possível zerar a senha. ${reasonText(reason)}` })
     } finally {
       setOcupado(null)
     }
@@ -97,13 +97,13 @@ export function ValidadoresDrawer({ open, onClose, validadores, clientes, source
                 <strong>{v.nome}</strong>
                 <span>{v.email} · {v.cliente.nome}</span>
                 <span className="vc-badges">
-                  {v.totpCadastradoEm ? <StatusBadge tone="success">Autenticador ativo</StatusBadge> : <StatusBadge tone="warning">Aguardando QR code</StatusBadge>}
+                  {v.senhaDefinidaEm ? <StatusBadge tone="success">Senha criada</StatusBadge> : <StatusBadge tone="warning">Aguardando 1º acesso</StatusBadge>}
                   <span className="vc-muted">{v.ultimoAcesso ? `Último acesso ${fmtData(v.ultimoAcesso)}` : 'Nunca acessou'}</span>
                 </span>
               </div>
               <div className="vc-val__acoes">
                 <Switch label={v.ativo ? 'Ativo' : 'Inativo'} checked={v.ativo} disabled={ocupado === v.id} onChange={() => void alternar(v)} />
-                <Button variant="secondary" size="compact" icon={<KeyRound size={14} />} disabled={ocupado === v.id || !v.totpCadastradoEm} title={v.totpCadastradoEm ? undefined : 'O validador ainda não cadastrou o autenticador.'} onClick={() => setRefazer(v)}>Refazer autenticador</Button>
+                <Button variant="secondary" size="compact" icon={<KeyRound size={14} />} disabled={ocupado === v.id || !v.senhaDefinidaEm} title={v.senhaDefinidaEm ? undefined : 'A pessoa ainda não criou a senha.'} onClick={() => setZerar(v)}>Zerar senha</Button>
               </div>
             </li>
           ))}
@@ -117,12 +117,12 @@ export function ValidadoresDrawer({ open, onClose, validadores, clientes, source
       {mobile
         ? <Sheet open={open} onClose={close} eyebrow="Validação do cliente" title="Validadores" footer={footer}>{body}</Sheet>
         : <Drawer open={open} onClose={close} eyebrow="Validação do cliente" title="Validadores" footer={footer}>{body}</Drawer>}
-      <Dialog open={refazer != null} onClose={() => { if (!ocupado) setRefazer(null) }} tone="danger" title="Refazer autenticador?"
+      <Dialog open={zerar != null} onClose={() => { if (!ocupado) setZerar(null) }} tone="danger" title="Zerar senha?"
         actions={<>
-          <Button variant="secondary" disabled={!!ocupado} onClick={() => setRefazer(null)}>Cancelar</Button>
-          <Button variant="danger" loading={!!ocupado} onClick={() => void confirmarRefazer()}>Refazer autenticador</Button>
+          <Button variant="secondary" disabled={!!ocupado} onClick={() => setZerar(null)}>Cancelar</Button>
+          <Button variant="danger" loading={!!ocupado} onClick={() => void confirmarZerar()}>Zerar senha</Button>
         </>}>
-        O código atual do app de {refazer?.nome} para de funcionar. No próximo acesso, o validador lê um QR code novo. O portal não avisa por e-mail: avise o validador.
+        A senha de {zerar?.nome} para de funcionar e as sessões abertas caem. Para voltar, a pessoa usa "Primeiro acesso ou esqueci a senha" e cria outra pelo código do e-mail. O portal não avisa: avise a pessoa.
       </Dialog>
       <Dialog open={confirmarSaida} onClose={() => setConfirmarSaida(false)} title="Descartar alterações?"
         actions={<>

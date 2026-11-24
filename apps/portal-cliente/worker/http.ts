@@ -4,18 +4,17 @@ import { cifrar, decifrar } from './cripto'
 import type { Env } from './env'
 
 /** Mesmos códigos do `ErroPortal` do app (contrato das duas etapas). */
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'totp_invalido' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export const json = (corpo: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } })
 
 export const erro = (status: number, codigo: CodigoErro, mensagem?: string) => json({ erro: codigo, ...(mensagem ? { mensagem } : {}) }, status)
 
-export const COOKIE = { sessao: '__Host-portal_sessao', etapa: '__Host-portal_etapa', dispositivo: '__Host-portal_dispositivo' } as const
+export const COOKIE = { sessao: '__Host-portal_sessao', etapa: '__Host-portal_etapa' } as const
 
-export const SESSAO_S = 12 * 60 * 60
+export const SESSAO_S = 30 * 24 * 60 * 60
 export const ETAPA_S = 10 * 60
-export const DISPOSITIVO_S = 30 * 24 * 60 * 60
 
 export const setCookie = (nome: string, valor: string, maxAge: number) =>
   `${nome}=${valor}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`
@@ -29,9 +28,10 @@ export function lerCookie(req: Request, nome: string): string | null {
   return null
 }
 
-export type Sessao = { vid: string; cid: string; nome: string; email: string; cliente: string; modulos: Modulo[]; exp: number }
-/** Entre o código do e-mail e o TOTP. `segredo` só no 1º acesso (ainda não gravado no Dataverse). */
-export type Etapa = { vid: string; email: string; exp: number; segredo?: string }
+/** `sv`: impressão da senha em uso; trocar a senha derruba as outras sessões. */
+export type Sessao = { vid: string; cid: string; nome: string; email: string; cliente: string; modulos: Modulo[]; sv: string; exp: number }
+/** Entre o código do e-mail e a senha nova (1º acesso ou "Esqueci a senha"). */
+export type Etapa = { vid: string; email: string; exp: number }
 
 export async function selar(env: Env, contexto: 'sessao' | 'etapa', dados: Sessao | Etapa): Promise<string> {
   return cifrar(JSON.stringify(dados), env.CHAVE_SESSAO, contexto)

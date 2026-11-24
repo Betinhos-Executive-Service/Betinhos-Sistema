@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { base32, cifrar, decifrar, deBase32, totp, verificarTotp } from './cripto'
+import { cifrar, conferirSenha, decifrar, hashSenha } from './cripto'
 import { mapearModulos, mapearPedido, mapearServico } from './mapear'
 import { NAV } from './schema'
 import { nomeDoEmail, normalizarPedido, validarPedido } from '../src/domain/pedidos'
@@ -8,36 +8,32 @@ import { listarServicos, servicosPorIds, tacitaVencida } from './odata'
 import { feriados, prazoTacito, venceu } from './prazo'
 
 const CHAVE = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)))
-// RFC 6238, apêndice B: segredo ASCII "12345678901234567890", SHA-1, 8 dígitos → os 6 finais.
-const RFC = base32(new TextEncoder().encode('12345678901234567890'))
 const TENARIS = '11111111-1111-1111-1111-111111111111'
 
-describe('TOTP', () => {
-  it('bate com os vetores da RFC 6238', async () => {
-    expect(await totp(RFC, Math.floor(59 / 30))).toBe('287082')
-    expect(await totp(RFC, Math.floor(1111111109 / 30))).toBe('081804')
+describe('senha (PBKDF2)', () => {
+  it('confere a certa, recusa a errada e usa sal novo a cada hash', async () => {
+    const h = await hashSenha('senha-boa-123')
+    expect(h).toMatch(/^pbkdf2\$100000\$[\w-]{22}\$[\w-]{43}$/)
+    expect(await conferirSenha('senha-boa-123', h)).toBe(true)
+    expect(await conferirSenha('senha-boa-124', h)).toBe(false)
+    expect(await hashSenha('senha-boa-123')).not.toBe(h)
   })
-  it('aceita ±1 passo e recusa 2 passos ou formato errado', async () => {
-    const t = 1111111109_000
-    const atual = await totp(RFC, Math.floor(t / 30000))
-    expect(await verificarTotp(RFC, atual, t + 30_000)).toBe(true)
-    expect(await verificarTotp(RFC, atual, t - 30_000)).toBe(true)
-    expect(await verificarTotp(RFC, atual, t + 61_000)).toBe(false)
-    expect(await verificarTotp(RFC, '12a456', t)).toBe(false)
-  })
-  it('base32 ida e volta', () => {
-    const b = new Uint8Array([0, 1, 2, 250, 255, 9, 8])
-    expect([...deBase32(base32(b))]).toEqual([...b])
+  it('recusa formato estranho e iterações acima do limite do Workers', async () => {
+    const [, , sal, hash] = (await hashSenha('x')).split('$')
+    expect(await conferirSenha('x', '')).toBe(false)
+    expect(await conferirSenha('x', `sha1$100000$${sal}$${hash}`)).toBe(false)
+    expect(await conferirSenha('x', `pbkdf2$100001$${sal}$${hash}`)).toBe(false)
+    expect(await conferirSenha('x', `pbkdf2$abc$${sal}$${hash}`)).toBe(false)
   })
 })
 
 describe('AES-GCM', () => {
   it('decifra no mesmo contexto e falha em outro, com outra chave ou adulterado', async () => {
-    const c = await cifrar('segredo', CHAVE, 'totp:a')
-    expect(await decifrar(c, CHAVE, 'totp:a')).toBe('segredo')
-    expect(await decifrar(c, CHAVE, 'totp:b')).toBeNull()
-    expect(await decifrar(c, btoa(String.fromCharCode(...new Uint8Array(32))), 'totp:a')).toBeNull()
-    expect(await decifrar(c.slice(0, -2) + 'AA', CHAVE, 'totp:a')).toBeNull()
+    const c = await cifrar('segredo', CHAVE, 'sessao')
+    expect(await decifrar(c, CHAVE, 'sessao')).toBe('segredo')
+    expect(await decifrar(c, CHAVE, 'etapa')).toBeNull()
+    expect(await decifrar(c, btoa(String.fromCharCode(...new Uint8Array(32))), 'sessao')).toBeNull()
+    expect(await decifrar(c.slice(0, -2) + 'AA', CHAVE, 'sessao')).toBeNull()
   })
 })
 

@@ -30,5 +30,5 @@
       ]
     }
   }
-  // Secrets (wrangler secret put): DV_TENANT, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, EMAIL_FLOW_URL, CHAVE_TOTP, CHAVE_SESSAO.
+  // Secrets (wrangler secret put): DV_TENANT, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, EMAIL_FLOW_URL, CHAVE_SESSAO.
 }
