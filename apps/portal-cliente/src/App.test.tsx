@@ -16,8 +16,8 @@ async function pedirCodigo(email = 'fiscal@tenaris.com', codigo = '123456') {
   fireEvent.click(await screen.findByRole('button', { name: 'Primeiro acesso ou esqueci a senha' }))
   fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: email } })
   fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+  // 6 números confirmam sozinhos, sem clicar em Continuar.
   fireEvent.change(await screen.findByLabelText(/Código do e-mail/), { target: { value: codigo } })
-  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
 }
 
 /** 1º acesso completo: código do e-mail e senha criada. */
@@ -72,6 +72,26 @@ describe('Portal do cliente', () => {
     expect(campo.getAttribute('autocomplete')).toBe('one-time-code')
     fireEvent.click(screen.getByRole('button', { name: 'Trocar e-mail' }))
     expect(screen.getByRole('button', { name: 'Enviar código' })).toBeTruthy()
+  })
+
+  it('código: reenviar só depois da contagem, com aviso de spam', async () => {
+    abrir()
+    fireEvent.click(await screen.findByRole('button', { name: 'Primeiro acesso ou esqueci a senha' }))
+    fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'fiscal@tenaris.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    const reenviar = await screen.findByRole('button', { name: /Reenviar código em 60 s/ })
+    expect((reenviar as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(/Confira a caixa de spam/)).toBeTruthy()
+  })
+
+  it('mostrar senha troca o campo para texto e volta', async () => {
+    abrir()
+    const campo = await screen.findByLabelText(/^Senha/)
+    expect(campo.getAttribute('type')).toBe('password')
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar senha' }))
+    expect(campo.getAttribute('type')).toBe('text')
+    fireEvent.click(screen.getByRole('button', { name: 'Ocultar senha' }))
+    expect(campo.getAttribute('type')).toBe('password')
   })
 
   it('criar senha confere tamanho e repetição antes de enviar', async () => {

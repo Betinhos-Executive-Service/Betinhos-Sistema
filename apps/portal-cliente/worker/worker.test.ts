@@ -4,14 +4,15 @@ import { bancoInicial, envFalso, fetchFalso, kvMemoria, LATASA, type Banco, type
 import worker from './index'
 
 const ORIGEM = 'https://portal.test'
-let banco: Banco, emails: Email[], env: ReturnType<typeof envFalso>, pendentes: Promise<unknown>[]
+let banco: Banco, emails: Email[], kv: ReturnType<typeof kvMemoria>, env: ReturnType<typeof envFalso>, pendentes: Promise<unknown>[]
 const exec = { waitUntil: (p: Promise<unknown>) => void pendentes.push(p) }
 
 beforeEach(() => {
   banco = bancoInicial()
   emails = []
   pendentes = []
-  env = envFalso(kvMemoria())
+  kv = kvMemoria()
+  env = envFalso(kv)
   vi.stubGlobal('fetch', fetchFalso(banco, emails))
 })
 afterEach(() => vi.unstubAllGlobals())
@@ -28,7 +29,9 @@ async function chamar(metodo: string, caminho: string, corpo?: unknown, cookie =
 /** Cookies `nome=valor` da resposta, para mandar na próxima chamada. */
 const cookies = (r: Response) => r.headers.getSetCookie().map((c) => c.split(';')[0]).filter((c) => !c.endsWith('=')).join('; ')
 
+/** Pede o código como se o intervalo de reenvio (60 s) já tivesse passado. */
 async function pedirCodigo(email: string) {
+  for (const k of kv.dados.keys()) if (k.startsWith('reenvio:')) kv.dados.delete(k)
   await chamar('POST', '/auth/codigo', { email })
   return String(emails.at(-1)?.dados.codigo ?? '')
 }
@@ -67,7 +70,14 @@ describe('login', () => {
 
   it('pedido de e-mail liberado não conta para o limite de sem acesso do IP', async () => {
     for (let i = 0; i < 9; i++) expect((await chamar('POST', '/auth/codigo', { email: `n${i}@example.com` })).status).toBe(403)
-    for (let i = 0; i < 3; i++) expect((await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })).status).toBe(204)
+    // Reenvio antes de 60 s: 429 aguarde, sem e-mail novo e sem contar para o IP.
+    for (let i = 0; i < 2; i++) {
+      const r = await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })
+      expect(r.status).toBe(429)
+      expect(await r.json()).toEqual({ erro: 'aguarde' })
+    }
+    expect(emails).toHaveLength(1)
     expect((await chamar('POST', '/auth/codigo', { email: 'n9@example.com' })).status).toBe(403)
     expect((await chamar('POST', '/auth/codigo', { email: 'n10@example.com' })).status).toBe(429)
   })

@@ -1,6 +1,6 @@
 import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
+export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
 export class ErroPortal extends Error {
   constructor(public codigo: CodigoErro, message: string = codigo) {
@@ -11,6 +11,8 @@ export class ErroPortal extends Error {
 
 /** Regra da senha, usada pela tela, pelo mock e pelo Worker. */
 export const SENHA_MIN = 8
+/** Intervalo mínimo entre dois códigos para o mesmo e-mail: o Worker recusa antes disso e a tela mostra a contagem. */
+export const REENVIO_S = 60
 export const senhaFraca = (senha: string) => senha.length < SENHA_MIN || !senha.trim()
 
 /** Contrato das telas com o servidor. O protótipo usa o mock; o portal real, o Worker (`/api/*`). */

@@ -1,10 +1,10 @@
 // Respostas, cookies e sessão. A sessão é um cookie cifrado (AES-GCM), sem tabela: some ao expirar ou ao sair.
+import type { CodigoErro } from '../src/api/PortalApi'
 import type { Modulo } from '../src/domain/types'
 import { cifrar, decifrar } from './cripto'
 import type { Env } from './env'
 
-/** Mesmos códigos do `ErroPortal` do app (contrato das duas etapas). */
-export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
+export type { CodigoErro }
 
 export const json = (corpo: unknown, status = 200, headers: HeadersInit = {}) =>
   new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } })
