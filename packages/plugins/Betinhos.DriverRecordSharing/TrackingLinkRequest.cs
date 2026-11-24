@@ -37,7 +37,7 @@ namespace Betinhos.DriverRecordSharing
             if (string.IsNullOrWhiteSpace(input.DepartureAddress)) return Fail("Serviço sem endereço de embarque.");
 
             var departure = input.DepartureUtc ?? nowUtc;
-            var hours = Math.Max(0.5, Math.Min(24.0, Math.Round((departure.AddHours(4) - nowUtc).TotalHours, 1)));
+            var hours = Math.Max(0.5, Math.Min(336.0, Math.Round((departure.AddHours(4) - nowUtc).TotalHours, 1)));
             var payload = new Dictionary<string, object>
             {
                 ["placa"] = ServiceVehicleResolver.NormalizePlate(input.VehiclePlate),
