@@ -18,5 +18,10 @@
     "migration": "20261123-1900-remover-passageiro1-4.ps1",
     "por": "20261123-2000-passageiro1-4-sem-quickfind.ps1",
     "motivo": "Falhou no DEV (Deploy 45241561927) no PATCH do fetchxml da quick find de cr40f_reservadeveculos (0x80040216); no DEV nenhuma quick find com campo de busca aceita gravacao. A 2000 limpa formulario, view A receber e views pessoais, sem quick find e sem apagar os lookups."
+  },
+  {
+    "migration": "20261124-1200-boas-ideias-anexos.ps1",
+    "por": "20261124-1205-boas-ideias-anexos-navegacao.ps1",
+    "motivo": "Falhou no DEV (Deploy 45401949365) no PUT parcial de RelationshipDefinitions para renomear a colecao (0x80060888, Nullable object must have a value). A 1205 tem o mesmo conteudo sem o PUT: o App usa so a navegacao cr40f_ideia, que ja nasce certa, e a migration confere."
   }
 ]
