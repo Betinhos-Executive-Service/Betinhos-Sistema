@@ -88,3 +88,13 @@
 .gv-v4__campo { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
 .gv-v4__campo svg { flex: 0 0 auto; opacity: .75; }
 .gv-v4__campo > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Hoje em destaque (cor de ação no separador); dias passados mais apagados até tocar ou selecionar. */
+.gv-dia[data-dia='hoje'] { border-bottom-color: var(--bt-color-action); }
+.gv-dia[data-dia='hoje'] span { color: var(--bt-color-action); }
+.gv-dia[data-dia='hoje'] span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: var(--bt-space-1-5); border-radius: var(--bt-radius-full); background: var(--bt-color-action); vertical-align: middle; }
+.gv-dia[data-dia='passado'] span { color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-semibold); }
+.gv-card.is-passado:not(.is-selected) { opacity: .6; transition: opacity .15s ease; }
+.gv-card.is-passado:not(.is-selected):focus-within { opacity: 1; }
+@media (hover: hover) { .gv-card.is-passado:not(.is-selected):hover { opacity: 1; } }
+

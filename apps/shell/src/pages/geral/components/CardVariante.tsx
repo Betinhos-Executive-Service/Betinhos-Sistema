@@ -39,20 +39,32 @@ const partes = (quando: string | null) => {
 const hojeSp = () => new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
 
 /** Rótulo do dia a partir de "dd/mm/aaaa": "Hoje · ter 24/11", "Amanhã · qua 25/11", "sáb 22/11". */
+/** Dias entre "dd/mm/aaaa" e hoje em São Paulo (negativo = passado); `null` se a data não for legível. */
+export function diasAteHoje(dia: string): number | null {
+  const [dd, mm, aaaa] = dia.split('/').map(Number)
+  if (!dd || !mm || !aaaa) return null
+  const [hd, hm, ha] = hojeSp().split('/').map(Number)
+  return Math.round((new Date(aaaa, mm - 1, dd).getTime() - new Date(ha, hm - 1, hd).getTime()) / 86_400_000)
+}
+
+const relacao = (dia: string | null) => {
+  const diff = dia ? diasAteHoje(dia) : null
+  return diff == null ? 'futuro' : diff === 0 ? 'hoje' : diff < 0 ? 'passado' : 'futuro'
+}
+
 export function rotuloDia(dia: string): string {
   const [dd, mm, aaaa] = dia.split('/').map(Number)
-  if (!dd || !mm || !aaaa) return dia
+  const diff = diasAteHoje(dia)
+  if (diff == null) return dia
   const data = new Date(aaaa, mm - 1, dd)
   const semana = data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
   const curto = `${semana} ${dia.slice(0, 5)}`
-  const [hd, hm, ha] = hojeSp().split('/').map(Number)
-  const diff = Math.round((data.getTime() - new Date(ha, hm - 1, hd).getTime()) / 86_400_000)
   return diff === 0 ? `Hoje · ${curto}` : diff === 1 ? `Amanhã · ${curto}` : diff === -1 ? `Ontem · ${curto}` : curto
 }
 
 /** Separador entre cards quando o dia muda. */
 export function SeparadorDia({ dia, total }: { dia: string; total: number }) {
-  return <li className="gv-dia"><span>{rotuloDia(dia)}</span><small>{total} {total === 1 ? 'item' : 'itens'}</small></li>
+  return <li className="gv-dia" data-dia={relacao(dia)}><span>{rotuloDia(dia)}</span><small>{total} {total === 1 ? 'item' : 'itens'}</small></li>
 }
 
 /** Até 2 primeiros nomes e o resto como contagem: "Diego, Helena +1". */
@@ -85,7 +97,8 @@ function Codigo({ d }: { d: DadosCard }) {
 
 /** Uma das 3 variações do card do serviço no celular (laboratório de design). */
 export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
-  const classe = `gv-card gv-card--${variante}${d.manutencao ? ' gv-card--manut' : ''}${selecionado ? ' is-selected' : ''}`
+  const passado = relacao(d.quando?.split(' ')[0] ?? null) === 'passado'
+  const classe = `gv-card gv-card--${variante}${d.manutencao ? ' gv-card--manut' : ''}${selecionado ? ' is-selected' : ''}${passado ? ' is-passado' : ''}`
   const alternar = (event: MouseEvent<HTMLLIElement>) => { if (!ignorarAlvo(event)) onToggle() }
   const { data, hora } = partes(d.quando)
 
