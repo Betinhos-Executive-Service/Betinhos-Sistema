@@ -7,17 +7,17 @@ import { ACTIVE_VEHICLE_FILTERS, VEHICLE_CATEGORY, bind } from "../../data/datav
 
 // Frota ativa (Próprio ou Aluguel) para o motorista escolher quando a Infleet não identifica o carro.
 // Carro de terceiro fica de fora: pertence a outro motorista.
-export function buildActiveFleetQuery() {
+export function buildActiveFleetQuery(categorias: number[] = [VEHICLE_CATEGORY.proprio, VEHICLE_CATEGORY.aluguel]) {
   return [
     "$select=cr40f_veiculosid,cr40f_placa,cr40f_modelo,cr40f_cor",
-    `$filter=statecode eq 0 and ${ACTIVE_VEHICLE_FILTERS.join(" and ")} and (new_categoriadoveiculo eq ${VEHICLE_CATEGORY.proprio} or new_categoriadoveiculo eq ${VEHICLE_CATEGORY.aluguel})`,
+    `$filter=statecode eq 0 and ${ACTIVE_VEHICLE_FILTERS.join(" and ")} and (${categorias.map((categoria) => `new_categoriadoveiculo eq ${categoria}`).join(" or ")})`,
     "$orderby=cr40f_modelo asc,cr40f_placa asc",
     "$top=300"
   ].join("&");
 }
 
-export async function loadActiveFleetRemote(): Promise<FleetVehicle[]> {
-  const result = await retrieveMultiple(DATAVERSE.veiculos, buildActiveFleetQuery());
+export async function loadActiveFleetRemote(categorias?: number[]): Promise<FleetVehicle[]> {
+  const result = await retrieveMultiple(DATAVERSE.veiculos, buildActiveFleetQuery(categorias));
   return result.entities
     .map((record) => ({
       id: cleanODataGuid(record.cr40f_veiculosid),
@@ -27,6 +27,9 @@ export async function loadActiveFleetRemote(): Promise<FleetVehicle[]> {
     }))
     .filter((vehicle) => vehicle.id && vehicle.placa);
 }
+
+// Só os carros próprios ativos: a vistoria na hora (servidor) recusa os outros.
+export const loadOwnFleetRemote = () => loadActiveFleetRemote([VEHICLE_CATEGORY.proprio]);
 
 // Carros de categoria "Carro de terceiro" vinculados ao motorista; ele escolhe qual está usando.
 export async function loadMyVehiclesRemote(driver: DriverContext): Promise<FleetVehicle[]> {
