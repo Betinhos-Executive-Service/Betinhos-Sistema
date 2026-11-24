@@ -20,6 +20,13 @@ describe('orçamento de pedido de compra', () => {
     expect(t).toContain('equipe de Ana & Cia nos dias 30/10/2026 a 31/10/2026')
     expect(t).toMatch(/valor total de R\$\s620,49/)
     expect(t).not.toMatch(/arame/i)
+    expect(t).toContain('ICD_1574138')
+  })
+
+  it('parágrafo do contrato só para Johnson&Johnson/Kenvue', () => {
+    expect(texto(blocosDoOrcamento({ ...dados, cliente: 'Johnson & Johnson do Brasil' }))).toContain('ICD_1574138')
+    expect(texto(blocosDoOrcamento({ ...dados, cliente: 'Tenaris' }))).not.toContain('ICD_1574138')
+    expect(texto(blocosDoOrcamento({ ...dados, cliente: '' }))).not.toContain('Johnson')
   })
 
   it('gera um PDF de uma página, inclusive com caractere fora do WinAnsi', async () => {
