@@ -49,7 +49,7 @@ export const resumoDoCliente = (clienteId: string, desdeIso: string, hoje: strin
       `(cr40f_liberadoem ge ${desdeIso} or cr40f_prazotacita eq ${hoje})`,
   )
 
-const VALIDADOR_SELECT = 'cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_senhahash,_cr40f_cliente_value,cr40f_ativo'
+const VALIDADOR_SELECT = 'cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_senhahash,cr40f_senhadefinidaem,_cr40f_cliente_value,cr40f_ativo'
 /** Os módulos do cliente vão na sessão: cliente sem módulo não entra. */
 const expandCliente = `$expand=${NAV.cliente}($select=cr40f_portalmodulos,cr40f_portalhabilitado)`
 

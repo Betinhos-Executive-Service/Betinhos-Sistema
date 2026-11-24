@@ -109,6 +109,11 @@ async function respostaSessao(c: Ctx, v: Registro, senhaHash: string): Promise<R
 
 const publica = (s: Sessao) => ({ nome: s.nome, email: s.email, cliente: s.cliente, modulos: s.modulos })
 
+/** O "Zerar senha" do shell limpa só a data (a coluna do hash tem segurança de coluna e só o Worker a grava). */
+function hashVigente(v: Registro): string {
+  return v.cr40f_senhahash && v.cr40f_senhadefinidaem ? String(v.cr40f_senhahash) : ''
+}
+
 export async function entrarComSenha(req: Request, c: Ctx): Promise<Response> {
   const corpo = await lerJson<{ email?: string; senha?: string }>(req)
   const email = normalizarEmail(corpo?.email)
@@ -116,7 +121,7 @@ export async function entrarComSenha(req: Request, c: Ctx): Promise<Response> {
   if (!EMAIL.test(email) || !senha || senha.length > SENHA_MAX) return erro(401, 'senha_invalida')
   if (await bloqueado(c.env, email)) return erro(429, 'bloqueado')
   const v = await buscarValidador(c.dv, email)
-  const hash = v?.cr40f_senhahash ? String(v.cr40f_senhahash) : ''
+  const hash = v ? hashVigente(v) : ''
   // Sem cadastro, sem senha criada ou barrado (cliente sem módulo): mesma resposta e mesmo custo de senha errada.
   if (!v || !hash || !liberado(v)) {
     await conferirSenha(senha, HASH_FALSO)
@@ -200,7 +205,8 @@ export async function sessaoAtual(req: Request, c: Ctx): Promise<Sessao | null> 
   const v = await validadorOuNada(c.dv, s.vid)
   // Trocado de cliente: a sessão antiga não lê os dados do cliente novo nem do antigo.
   if (!v || !liberado(v) || String(v._cr40f_cliente_value) !== s.cid) return null
-  if (!v.cr40f_senhahash || !iguais(await impressao(String(v.cr40f_senhahash)), s.sv)) return null
+  const hash = hashVigente(v)
+  if (!hash || !iguais(await impressao(hash), s.sv)) return null
   return { ...s, modulos: modulosDe(v) }
 }
 
