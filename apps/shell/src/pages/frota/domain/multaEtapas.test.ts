@@ -17,7 +17,7 @@ const f = JSON.parse(readFileSync(caminho, 'utf8')) as F
 
 describe('paridade de MultaEtapas com o plugin', () => {
   it('o fixture traz todos os casos', () => {
-    expect([f.avaliacoes.length, f.validacoes.length, f.aplicacoes.length]).toEqual([23, 71, 29])
+    expect([f.avaliacoes.length, f.validacoes.length, f.aplicacoes.length]).toEqual([23, 70, 27])
   })
 
   it.each(f.avaliacoes.map((c) => [c.nome, c] as const))('avalia: %s', (_nome, c) => {

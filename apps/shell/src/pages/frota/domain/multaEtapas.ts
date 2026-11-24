@@ -8,7 +8,7 @@ import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
  * O servidor é quem decide: a tela usa isto para mostrar o passo e travar o botão; a gravação passa pela cr40f_PassoMulta.
  */
 export type Etapa = 'identificar' | 'indicar' | 'pagar' | 'acertar' | 'encerrada' | 'recurso' | 'cancelada'
-export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto', 'TermoAssinado', 'TermoContestado'] as const
+export const PASSOS = ['DefinirResponsavel', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto', 'TermoAssinado', 'TermoContestado'] as const
 export type Passo = (typeof PASSOS)[number]
 
 export type MultaEstado = {
@@ -34,7 +34,6 @@ export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string;
 
 export const ROTULO_PASSO: Record<Passo, string> = {
   DefinirResponsavel: 'Definir o responsável',
-  AvisarMotorista: 'Avisar o motorista',
   RegistrarIndicacao: 'Indicar no órgão',
   RegistrarAceite: 'Conferir o aceite na CNH Digital',
   RegistrarPagamento: 'Pagar a guia',
@@ -55,7 +54,6 @@ export const ROTULO_ETAPA: Record<Etapa, string> = {
 }
 
 const ANTES: Partial<Record<Passo, string>> = {
-  AvisarMotorista: 'Avise o motorista antes de registrar a indicação.',
   RegistrarIndicacao: 'Registre a indicação antes do aceite.',
 }
 
@@ -94,7 +92,6 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
   if (vencido) pendentes.push('PrazoVencido')
   else if (etapa === 'identificar') pendentes.push('DefinirResponsavel')
   else if (etapa === 'indicar') {
-    if (m.dataAviso == null) pendentes.push('AvisarMotorista')
     if (m.dataIndicacao == null || m.canal == null) pendentes.push('RegistrarIndicacao')
     else if (m.canal === CANAL.SENATRAN && m.aceiteEm == null) pendentes.push('RegistrarAceite')
   } else if (etapa === 'pagar') {
@@ -223,15 +220,12 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
   }
   if (!s.pendentes.includes(passo as Passo)) return 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
   if (m.termoPendente === true && passo === 'RegistrarIndicacao') return 'Aguarde a assinatura do termo ou cancele o termo.'
-  if (m.termoPendente === true && passo === 'AvisarMotorista') return 'Cancele o termo antes de avisar pelo WhatsApp.'
   if (s.pendentes[0] !== passo) return ANTES[s.pendentes[0]] ?? 'Siga a ordem dos passos.'
   switch (passo as Passo) {
     case 'DefinirResponsavel':
       if (d.responsavel === 'empresa') return null
       if (d.responsavel !== 'motorista') return 'Escolha o responsável: motorista ou empresa.'
       return d.motoristaId?.trim() ? null : 'Escolha o motorista.'
-    case 'AvisarMotorista':
-      return d.data?.trim() ? dataRuim(d.data, hoje, '') : null
     case 'RegistrarIndicacao':
       return canalDe(d.canal) === null ? 'Escolha o canal da indicação.' : dataRuim(d.data, hoje, 'Informe a data da indicação.')
     case 'RegistrarAceite':
@@ -256,9 +250,6 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
       n.contestadaEm = null
       if (d.responsavel === 'empresa') Object.assign(n, { responsavel: RESPONSAVEL.EMPRESA, motivoEmpresa: MOTIVO_EMPRESA.CULPA_EMPRESA, status: MULTA.INDICADA })
       else Object.assign(n, { responsavel: RESPONSAVEL.MOTORISTA, motoristaId: d.motoristaId, status: MULTA.NOTIFICADO, avisoAutomaticoEm: hoje })
-      break
-    case 'AvisarMotorista':
-      n.dataAviso = d.data?.trim() ? d.data : hoje
       break
     case 'RegistrarIndicacao':
       Object.assign(n, { canal: canalDe(d.canal), dataIndicacao: d.data, indicado: true })

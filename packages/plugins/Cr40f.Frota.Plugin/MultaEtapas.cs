@@ -20,7 +20,6 @@ public static class MultaCodigos
 public static class Passos
 {
     public const string DefinirResponsavel = "DefinirResponsavel";
-    public const string AvisarMotorista = "AvisarMotorista";
     public const string RegistrarIndicacao = "RegistrarIndicacao";
     public const string RegistrarAceite = "RegistrarAceite";
     public const string RegistrarPagamento = "RegistrarPagamento";
@@ -35,7 +34,7 @@ public static class Passos
     /// <summary>Internos: só a API do termo chama (cr40f_PassoMulta confere o ParentContext). A tela nunca oferece.</summary>
     public const string TermoAssinado = "TermoAssinado";
     public const string TermoContestado = "TermoContestado";
-    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto, TermoAssinado, TermoContestado };
+    public static readonly string[] Todos = { DefinirResponsavel, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto, TermoAssinado, TermoContestado };
 }
 
 /// <summary>O que as regras leem e o passo muda. Datas em yyyy-MM-dd (dia de São Paulo). Espelho: MultaEstado de multaEtapas.ts.</summary>
@@ -126,7 +125,6 @@ public static class MultaEtapas
     public static readonly IReadOnlyDictionary<string, string> RotuloPasso = new Dictionary<string, string>
     {
         [Passos.DefinirResponsavel] = "Definir o responsável",
-        [Passos.AvisarMotorista] = "Avisar o motorista",
         [Passos.RegistrarIndicacao] = "Indicar no órgão",
         [Passos.RegistrarAceite] = "Conferir o aceite na CNH Digital",
         [Passos.RegistrarPagamento] = "Pagar a guia",
@@ -149,7 +147,6 @@ public static class MultaEtapas
 
     private static readonly IReadOnlyDictionary<string, string> Antes = new Dictionary<string, string>
     {
-        [Passos.AvisarMotorista] = "Avise o motorista antes de registrar a indicação.",
         [Passos.RegistrarIndicacao] = "Registre a indicação antes do aceite.",
     };
 
@@ -196,7 +193,6 @@ public static class MultaEtapas
         {
             case Identificar: s.Pendentes.Add(Passos.DefinirResponsavel); break;
             case Indicar:
-                if (m.DataAviso == null) s.Pendentes.Add(Passos.AvisarMotorista);
                 if (m.DataIndicacao == null || m.Canal == null) s.Pendentes.Add(Passos.RegistrarIndicacao);
                 else if (AceitePendente(m)) s.Pendentes.Add(Passos.RegistrarAceite);
                 break;
@@ -277,7 +273,6 @@ public static class MultaEtapas
                 : "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
         if (!s.Pendentes.Contains(passo)) return "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
         if (m.TermoPendente == true && passo == Passos.RegistrarIndicacao) return "Aguarde a assinatura do termo ou cancele o termo.";
-        if (m.TermoPendente == true && passo == Passos.AvisarMotorista) return "Cancele o termo antes de avisar pelo WhatsApp.";
         if (s.Pendentes[0] != passo) return Antes.TryGetValue(s.Pendentes[0], out var antes) ? antes : "Siga a ordem dos passos.";
         switch (passo)
         {
@@ -285,8 +280,6 @@ public static class MultaEtapas
                 if (d.Responsavel == "empresa") return null;
                 if (d.Responsavel != "motorista") return "Escolha o responsável: motorista ou empresa.";
                 return string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista." : null;
-            case Passos.AvisarMotorista:
-                return string.IsNullOrWhiteSpace(d.Data) ? null : DataRuim(d.Data, hoje, "");
             case Passos.RegistrarIndicacao:
                 return CanalDe(d.Canal) == null ? "Escolha o canal da indicação." : DataRuim(d.Data, hoje, "Informe a data da indicação.");
             case Passos.RegistrarAceite:
@@ -332,9 +325,6 @@ public static class MultaEtapas
                 n.ContestadaEm = null;
                 if (d.Responsavel == "empresa") { n.Responsavel = MultaCodigos.Empresa; n.MotivoEmpresa = MultaCodigos.CulpaDaEmpresa; n.Status = MultaCodigos.Pagar; }
                 else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; n.AvisoAutomaticoEm = hoje; }
-                break;
-            case Passos.AvisarMotorista:
-                n.DataAviso = string.IsNullOrWhiteSpace(d.Data) ? hoje : d.Data;
                 break;
             case Passos.RegistrarIndicacao:
                 n.Canal = CanalDe(d.Canal); n.DataIndicacao = d.Data; n.Indicado = true;

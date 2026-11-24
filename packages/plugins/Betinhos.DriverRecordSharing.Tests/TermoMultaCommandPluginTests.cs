@@ -109,11 +109,11 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void EnviarRecusaDepoisDoAviso()
+        public void EnviarRecusaDepoisDaAssinatura()
         {
             var s = Cenario();
             s.Multa["cr40f_datadeavisoaocondutor"] = new DateTime(2026, 10, 20);
-            Assert.Equal("O termo só é enviado na etapa 2, antes do aviso ao motorista.",
+            Assert.Equal("O termo só é enviado na etapa 2, antes da indicação.",
                 Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
         }
 
@@ -122,7 +122,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var s = Cenario();
             s.Multa["cr40f_status"] = new OptionSetValue(202410000);
-            Assert.Equal("O termo só é enviado na etapa 2, antes do aviso ao motorista.",
+            Assert.Equal("O termo só é enviado na etapa 2, antes da indicação.",
                 Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
         }
 
@@ -131,7 +131,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         {
             var s = Cenario();
             s.Multa["cr40f_dataparaindicar"] = new DateTime(2026, 10, 24);
-            Assert.Equal("Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.",
+            Assert.Equal("Faltam menos de 3 dias para o prazo de indicação; indique sem o termo.",
                 Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 2, 50m))).Message);
         }
 

@@ -229,7 +229,6 @@ public sealed class MultaTarefa
         var empresa = MultaEtapas.ResponsavelEfetivo(m) == MultaCodigos.Empresa;
         if (!empresa)
         {
-            itens.Add(Item(Passos.AvisarMotorista, m.DataAviso != null || depoisDe(MultaEtapas.Indicar)));
             itens.Add(Item(Passos.RegistrarIndicacao, (m.DataIndicacao != null && m.Canal != null) || depoisDe(MultaEtapas.Indicar)));
             if (m.Canal == MultaCodigos.Senatran) itens.Add(Item(Passos.RegistrarAceite, m.AceiteEm != null || depoisDe(MultaEtapas.Indicar)));
         }

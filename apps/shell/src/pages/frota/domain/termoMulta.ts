@@ -6,7 +6,7 @@ export type FormaPagamento = 'guia' | 'folha'
 export type Acordo = { forma: FormaPagamento; parcelas: number; valorTotal: number; primeiraCompetencia: string /* 'YYYY-MM-01' */ }
 export type Parcela = { numero: number; competencia: string; valor: number }
 export type ContextoAcordo = { temAditivo: boolean; recursoPendente: boolean; temMotorista: boolean; termoPendente: boolean }
-/** `hoje` e `dataParaIndicar` são `yyyy-MM-dd`; `avisado` = motorista já avisado (a multa saiu da etapa 2). */
+/** `hoje` e `dataParaIndicar` são `yyyy-MM-dd`; `avisado` = DataAviso preenchida (só o termo assinado grava). */
 export type ContextoEnvio = ContextoAcordo & { hoje: string; dataParaIndicar: string | null; avisado: boolean }
 /** Margem, em dias, entre a expiração do termo e o prazo de indicação (igual a `TermoPrazos.MargemAntesDoPrazo`). */
 export const MARGEM_ANTES_DO_PRAZO = 3
@@ -36,8 +36,8 @@ export function calcularParcelas(a: Acordo): Parcela[] {
 
 /** Primeiro impedimento do envio, na mesma ordem de `ValidarAcordo` do plugin: etapa 2, prazo curto, motorista, aditivo, termo pendente, folha, parcelas, competência, janela e valor. */
 export function validarAcordo(a: Acordo, ctx: ContextoEnvio): string | null {
-  if (ctx.avisado) return 'O termo só é enviado na etapa 2, antes do aviso ao motorista.'
-  if (ctx.dataParaIndicar !== null && daysBetween(ctx.hoje, ctx.dataParaIndicar) < MARGEM_ANTES_DO_PRAZO) return 'Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.'
+  if (ctx.avisado) return 'O termo só é enviado na etapa 2, antes da indicação.'
+  if (ctx.dataParaIndicar !== null && daysBetween(ctx.hoje, ctx.dataParaIndicar) < MARGEM_ANTES_DO_PRAZO) return 'Faltam menos de 3 dias para o prazo de indicação; indique sem o termo.'
   if (!ctx.temMotorista) return 'A multa não tem motorista indicado.'
   if (!ctx.temAditivo) return 'O motorista ainda não tem o aditivo de assinatura eletrônica registrado.'
   if (ctx.termoPendente) return 'Já existe um termo pendente para esta multa.'

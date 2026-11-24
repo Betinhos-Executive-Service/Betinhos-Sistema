@@ -214,8 +214,8 @@ namespace Betinhos.DriverRecordSharing
             var etapa2 = multa.GetAttributeValue<OptionSetValue>("cr40f_status")?.Value == StatusIndicar
                 && multa.GetAttributeValue<DateTime?>("cr40f_datadeavisoaocondutor") == null
                 && (prazo == null || prazo.Value.Date >= hoje);
-            if (!etapa2) throw new InvalidPluginExecutionException("O termo só é enviado na etapa 2, antes do aviso ao motorista.");
-            if (TermoPrazos.PrazoCurtoParaEnviar(prazo, hoje)) throw new InvalidPluginExecutionException("Faltam menos de 3 dias para o prazo de indicação; avise pelo WhatsApp.");
+            if (!etapa2) throw new InvalidPluginExecutionException("O termo só é enviado na etapa 2, antes da indicação.");
+            if (TermoPrazos.PrazoCurtoParaEnviar(prazo, hoje)) throw new InvalidPluginExecutionException("Faltam menos de 3 dias para o prazo de indicação; indique sem o termo.");
             var forma = InputInt(context, "new_FormaPagamento");
             var parcelas = InputInt(context, "new_Parcelas");
             var valorTotal = context.InputParameters.Contains("new_ValorTotal") ? Convert.ToDecimal(context.InputParameters["new_ValorTotal"], CultureInfo.InvariantCulture) : 0m;

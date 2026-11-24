@@ -29,12 +29,12 @@ public class PassoMultaTests
         var mundo = new FakeMundo();
         var multa = Multa(mundo, MultaCodigos.Indicar);
 
-        var json = PassoMultaPlugin.Executar(mundo, multa.Id, Passos.AvisarMotorista, "{}", Hoje);
+        var json = PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"canal\":\"senatran\",\"data\":\"2026-11-15\"}", Hoje);
 
         var gravado = mundo.Atualizados.Single();
-        Assert.Equal(new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc), gravado["cr40f_datadeavisoaocondutor"]);
-        Assert.Single(gravado.Attributes);
-        Assert.Contains("\"pendentes\":[\"RegistrarIndicacao\"]", json);
+        Assert.Equal(new DateTime(2026, 11, 15, 12, 0, 0, DateTimeKind.Utc), gravado["cr40f_datadeindicacao"]);
+        Assert.False(gravado.Contains("cr40f_datadeavisoaocondutor"));
+        Assert.Contains("\"pendentes\":[\"RegistrarAceite\"]", json);
         Assert.Contains("\"etapa\":\"indicar\"", json);
     }
 
@@ -45,9 +45,9 @@ public class PassoMultaTests
         var multa = Multa(mundo, MultaCodigos.Indicar);
 
         var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
-            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"canal\":\"dsv\",\"data\":\"2026-11-15\"}", Hoje));
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"data\":\"2026-11-15\"}", Hoje));
 
-        Assert.Equal("Avise o motorista antes de registrar a indicação.", erro.Message);
+        Assert.Equal("Escolha o canal da indicação.", erro.Message);
         Assert.Empty(mundo.Atualizados);
     }
 
@@ -102,7 +102,7 @@ public class PassoMultaTests
     {
         var mundo = new FakeMundo();
         var multa = Multa(mundo, MultaCodigos.Indicar);
-        var erro = Assert.Throws<InvalidPluginExecutionException>(() => PassoMultaPlugin.Executar(mundo, multa.Id, Passos.AvisarMotorista, "{nao e json", Hoje));
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() => PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{nao e json", Hoje));
         Assert.Equal("Dados do passo inválidos.", erro.Message);
     }
 
@@ -121,7 +121,7 @@ public class PassoMultaTests
     {
         var mundo = new FakeMundo();
         var inexistente = Guid.NewGuid();
-        var ctx = Contexto.Api(PassoMultaPlugin.Mensagem, new Dictionary<string, object> { ["MultaId"] = inexistente, ["Passo"] = Passos.AvisarMotorista, ["DadosJson"] = "{}" });
+        var ctx = Contexto.Api(PassoMultaPlugin.Mensagem, new Dictionary<string, object> { ["MultaId"] = inexistente, ["Passo"] = Passos.RegistrarIndicacao, ["DadosJson"] = "{}" });
 
         var erro = Assert.Throws<InvalidPluginExecutionException>(() => Contexto.Rodar(new PassoMultaPlugin(), ctx, mundo));
 
