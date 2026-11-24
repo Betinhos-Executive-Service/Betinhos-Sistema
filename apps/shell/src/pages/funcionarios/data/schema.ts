@@ -77,7 +77,7 @@ export const FIELDS: FieldDef[] = [
   { key: 'new_notificacoesoperacionais', label: 'Notificações operacionais', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesfinanceiras', label: 'Notificações financeiras', kind: 'bool', group: 'detalhes' },
   { key: 'new_notificacoesfrota', label: 'Notificações de frota', kind: 'bool', group: 'detalhes', hint: 'Recebe o resumo semanal de pendências da frota (quarta, 08:00).' },
-  { key: 'cr40f_recebeemailmultas', label: 'E-mail diário de multas', kind: 'bool', group: 'detalhes', hint: 'Recebe o e-mail "Multas de hoje" (dias úteis, 07:00).' },
+  { key: 'cr40f_recebeemailmultas', label: 'E-mail semanal de multas', kind: 'bool', group: 'detalhes', hint: 'Recebe o e-mail das multas toda quarta, às 08:00.' },
   { key: 'cr40f_gerarrecibopersonalizado', label: 'Gerar recibo personalizado', kind: 'bool', group: 'detalhes' },
   { key: 'cr40f_identificadordocolaborador', label: 'ID SharePoint', kind: 'text', group: 'detalhes', readonly: true },
   { key: 'new_aditivoassinaturaem', label: 'Aditivo assinado em', kind: 'date', group: 'assinatura', readonly: true },   // só a API do aditivo grava; o componente mostra a data
