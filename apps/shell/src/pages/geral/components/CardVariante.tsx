@@ -22,6 +22,8 @@ export type DadosCard = {
   motorista: string | null | undefined
   /** Grau · janela (manutenção). */
   meta: string | null
+  /** Primeiro nome de cada passageiro; `null` quando a visão não tem a coluna de passageiros. */
+  pax: string[] | null
   alertas: { texto: string; tom: 'perigo' | 'aviso' }[]
   acao: { rotulo: string; onClick: () => void }
   extra?: ReactNode
@@ -32,6 +34,25 @@ type Props = { variante: VarianteCard; d: DadosCard; selecionado: boolean; onTog
 const partes = (quando: string | null) => {
   const [data, hora] = (quando ?? '').split(' ')
   return { data: data || null, hora: hora || null }
+}
+
+const hojeSp = () => new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+
+/** Rótulo do dia a partir de "dd/mm/aaaa": "Hoje · ter 24/11", "Amanhã · qua 25/11", "sáb 22/11". */
+export function rotuloDia(dia: string): string {
+  const [dd, mm, aaaa] = dia.split('/').map(Number)
+  if (!dd || !mm || !aaaa) return dia
+  const data = new Date(aaaa, mm - 1, dd)
+  const semana = data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
+  const curto = `${semana} ${dia.slice(0, 5)}`
+  const [hd, hm, ha] = hojeSp().split('/').map(Number)
+  const diff = Math.round((data.getTime() - new Date(ha, hm - 1, hd).getTime()) / 86_400_000)
+  return diff === 0 ? `Hoje · ${curto}` : diff === 1 ? `Amanhã · ${curto}` : diff === -1 ? `Ontem · ${curto}` : curto
+}
+
+/** Separador entre cards quando o dia muda. */
+export function SeparadorDia({ dia, total }: { dia: string; total: number }) {
+  return <li className="gv-dia"><span>{rotuloDia(dia)}</span><small>{total} {total === 1 ? 'item' : 'itens'}</small></li>
 }
 
 const ignorarAlvo = (event: MouseEvent<HTMLElement>) => Boolean((event.target as HTMLElement).closest('button, input, a, label'))
@@ -109,17 +130,20 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
       <li className={`${classe} gv-card--v3`} data-tom={tom} onClick={alternar}>
         <div className="gv-v3__trilho gv-v4__trilho">
           {hora ? <span className="gv-v3__hora">{hora}</span> : null}
-          {data ? <span className="gv-v3__data">{data.slice(0, 5)}</span> : null}
           <Selecao d={d} selecionado={selecionado} onToggle={onToggle} />
         </div>
         <div className="gv-v4__conteudo">
           <div className="gv-v4__topo">
-            <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}{d.motorista ?? d.cliente ? <span className="gv-v2__quem">{d.motorista ?? d.cliente}</span> : null}</p>
+            <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}</p>
             {d.status}
           </div>
           <button type="button" className="gv-corpo" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
-            <span className="gv-v2__rota">{d.titulo ?? '—'}</span>
-            {d.cliente || d.meta ? <span className="gv-sec gv-v4__sec">{[d.cliente, d.meta].filter(Boolean).join(' · ')}</span> : null}
+            <span className="gv-v4__rota">{d.titulo ?? '—'}</span>
+            <span className="gv-v4__campos">
+              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo"><small>Pax</small><strong>{d.pax.join(', ')}</strong></span> : null}
+              {d.manutencao ? (d.meta ? <span className="gv-v4__campo"><small>Janela</small><strong>{d.meta}</strong></span> : null) : <span className="gv-v4__campo"><small>Cliente</small><strong>{d.cliente ?? '—'}</strong></span>}
+              {d.motorista ? <span className="gv-v4__campo"><small>Motorista</small><strong>{d.motorista}</strong></span> : null}
+            </span>
             <ChevronRight size={18} aria-hidden="true" />
           </button>
           {avisos.length > 0 ? <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span> : null}

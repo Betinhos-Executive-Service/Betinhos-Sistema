@@ -9,7 +9,8 @@ import type { LinhaManutencao } from '../domain/manutencao'
 import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { ManutencaoResumo, ManutencaoRotulo, rotuloAbrirManutencao } from './ManutencaoResumo'
-import { CardVariante, type DadosCard } from './CardVariante'
+import { CardVariante, SeparadorDia, type DadosCard } from './CardVariante'
+import { Fragment } from 'react'
 import type { VarianteCard } from '../../../nav/menu'
 
 type Props = {
@@ -36,25 +37,32 @@ type Props = {
   manutencao?: { ler: (row: Row) => LinhaManutencao | null; abrir: (m: LinhaManutencao) => void }
   /** Laboratório de design (`#/geral-card-v1..v3`): troca o card do celular por uma das variações. */
   variante?: VarianteCard
+  /** Primeiro nome dos passageiros de cada serviço (tabela serviços por passageiro); só nas variações. */
+  paxPorServico?: Map<string, string[]>
 }
 
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao, variante }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao, variante, paxPorServico }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
   }
   const valueOf = (row: Row, column: Column | undefined) => (column ? formatCell('readonly', row, rowKey(column, attributes?.get(column.key))) : '—')
 
+  const diaDaLinha = (row: Row) => {
+    const coluna = has.data ? rowKey(has.data, attributes?.get(has.data.key)) : DATA
+    return (formatCell('datetime', row, coluna) || '').split(' ')[0] || null
+  }
+
   if (loading && rows.length === 0) return <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" />
 
   return (
     <>
       <ul className={grid ? 'gr-cards gr-cards--grid' : 'gr-cards'} aria-label="Serviços">
-        {rows.map((row) => {
+        {rows.map((row, indice) => {
           const id = String(row[ID_ATTRIBUTE])
           const m = manutencao?.ler(row) ?? null
           if (variante) {
@@ -67,7 +75,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
                 motorista: row._cr40f_motorista_value == null ? null : formatCell('readonly', row, '_cr40f_motorista_value'),
                 meta: [m.grau, m.janelaRotulo].filter(Boolean).join(' · ') || null,
                 alertas: [...(m.atrasada ? [{ texto: 'Atrasada', tom: 'perigo' as const }] : []), ...(m.foraDaJanela ? [{ texto: 'Fora da janela', tom: 'aviso' as const }] : [])],
-                acao: { rotulo: /^program/i.test(m.statusRotulo) ? 'Reprogramar' : 'Programar', onClick: () => onEdit(id) },
+                acao: { rotulo: /^program/i.test(m.statusRotulo) ? 'Reprogramar' : 'Programar', onClick: () => onEdit(id) }, pax: null,
               }
               : {
                 id, manutencao: false, codigo: formatCell('readonly', row, 'cr40f_id'), abrirRotulo: `Abrir serviço ${formatCell('readonly', row, 'cr40f_id')} no Formulário Geral`, abrir: () => onOpen(id),
@@ -76,9 +84,19 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
                 titulo: has.trajeto ? valueOf(row, has.trajeto) : null, cliente: has.cliente ? valueOf(row, has.cliente) : null,
                 motorista: motoristaKey == null ? undefined : row[motoristaKey] == null ? null : formatCell('readonly', row, motoristaKey),
                 meta: null, alertas: [], acao: { rotulo: 'Editar', onClick: () => onEdit(id) },
+                pax: paxPorServico ? paxPorServico.get(id) ?? [] : null,
                 extra: besideId?.(id, formatCell('readonly', row, 'cr40f_id')),
               }
-            return <CardVariante key={id} variante={variante} d={d} selecionado={selected.has(id)} onToggle={() => onToggle(id)} />
+            // Separador quando o dia muda (a lista já vem ordenada pela visão).
+            const dia = d.quando?.split(' ')[0] ?? null
+            const anterior = indice > 0 ? diaDaLinha(rows[indice - 1]) : null
+            const total = dia ? rows.filter((r) => diaDaLinha(r) === dia).length : 0
+            return (
+              <Fragment key={id}>
+                {dia && dia !== anterior ? <SeparadorDia dia={dia} total={total} /> : null}
+                <CardVariante variante={variante} d={d} selecionado={selected.has(id)} onToggle={() => onToggle(id)} />
+              </Fragment>
+            )
           }
           if (m && manutencao) {
             return (

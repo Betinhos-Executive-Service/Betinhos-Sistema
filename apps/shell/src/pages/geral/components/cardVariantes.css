@@ -76,3 +76,16 @@
 .gv-card--v4 .gv-corpo > svg { grid-row: 1 / span 2; }
 .gv-card--v4 .gv-v3__hora { font-size: var(--bt-font-size-14); }
 .gv-card--v4 .gv-corpo { row-gap: 0; }
+
+/* Separador de dia entre os cards (todas as variações). */
+.gv-dia { display: flex; align-items: baseline; gap: var(--bt-space-2); margin-top: var(--bt-space-3); padding: 0 var(--bt-space-1) var(--bt-space-1); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); list-style: none; }
+.gv-dia:first-child { margin-top: 0; }
+.gv-dia span { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.gv-dia small { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+
+/* V4 · trajeto em destaque e os campos principais (pax, cliente, motorista) com rótulo pequeno. */
+.gv-v4__rota { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+.gv-v4__campos { display: grid; gap: 2px; min-width: 0; }
+.gv-v4__campo { display: flex; align-items: baseline; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-12); }
+.gv-v4__campo small { flex: 0 0 58px; font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); text-transform: uppercase; letter-spacing: .02em; }
+.gv-v4__campo strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }

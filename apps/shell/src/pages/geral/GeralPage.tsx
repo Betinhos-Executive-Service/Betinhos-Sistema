@@ -13,6 +13,7 @@ import { SearchHits } from '../../app/SearchHits'
 import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAberto'
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
+import { usePaxServicos } from './data/paxServicos'
 import type { EditValue } from './domain/edit'
 import { avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, SAIDA, type LinhaManutencao } from './domain/manutencao'
 import { ProtecaoContext } from './components/ProtecaoLock'
@@ -626,6 +627,9 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
   const editRow = editId == null ? undefined : rowOf(editId)
   const editManutencao = editRow ? lerManutencao(editRow) : null
 
+  // Variações do card (laboratório): primeiro nome dos passageiros pela tabela serviços por passageiro.
+  const idsDasLinhas = useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows])
+  const paxPorServico = usePaxServicos(host, idsDasLinhas, Boolean(variante) && mobile)
   const rowById = useMemo(() => new Map(rows.map((r) => [String(r[ID_ATTRIBUTE]), r])), [rows])
   const grouping = useMemo<Grouping | undefined>(() => {
     if (cardsLayout) return undefined
@@ -692,6 +696,7 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
               <GeralCards
                 grid={!mobile}
                 variante={mobile ? variante : undefined}
+                paxPorServico={paxPorServico}
                 rows={rows}
                 columns={dataColumns}
                 attributes={attributes}
