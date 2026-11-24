@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { useDados } from "../../app/DataProvider";
 import { createPortal } from "react-dom";
@@ -46,7 +46,8 @@ import { BrandLoader } from "../../shared/ui/BrandLoader";
 import { pedirArmazenamentoPersistente } from "../envio-pendente/armazenamentoPersistente";
 import { classificarErro } from "../envio-pendente/classificarErro";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
-import { describeVehicle, type FleetVehicle } from "../../lib/serviceVehicleInfleet";
+import { unavailableResolution, type DriverVehicleChoice, type FleetVehicle } from "../../lib/serviceVehicleInfleet";
+import { VehicleChoiceDialog } from "../detalhe/VehicleChoiceDialog";
 import { chaveDoChecklist, filaDeEnvio } from "../envio-pendente/fila";
 
 export type ChecklistsLoadStatus = "loading" | "ready" | "error";
@@ -121,6 +122,8 @@ const orderChecklistAnswers = (answers: ChecklistResposta[]) => [
 
 const newPhotoId = () => globalThis.crypto?.randomUUID?.() ?? `foto-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const itemDomId = (chave: string) => `checklist-item-${chave}`;
+// Sem candidatos da Infleet: o diálogo vai direto para a frota.
+const VISTORIA_SEM_CARRO = unavailableResolution("vistoria-sem-carro-atual");
 
 export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSelectedIdChange, onBack, onCloseDetail, onReload, onCriarManutencao, vistoriaAgora }: Props) {
   const dados = useDados();
@@ -138,9 +141,8 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
   const [retrying, setRetrying] = useState(false);
   // Checklist enviado com itens Não OK: pergunta se o motorista quer abrir a manutenção antes de voltar.
   const [pedidoManutencao, setPedidoManutencao] = useState<ChecklistPedidoManutencao | null>(null);
-  // Vistoria na hora: "starting" trava o botão durante a chamada; "choosing" mostra a frota quando não há carro atual.
-  const [vistoriaEstado, setVistoriaEstado] = useState<"idle" | "loadingFleet" | "choosing" | "starting">("idle");
-  const [frota, setFrota] = useState<FleetVehicle[]>([]);
+  // Vistoria na hora: "starting" trava o botão durante a chamada; "choosing" abre a escolha do carro quando não há carro atual.
+  const [vistoriaEstado, setVistoriaEstado] = useState<"idle" | "choosing" | "starting">("idle");
   const [vistoriaErro, setVistoriaErro] = useState("");
   const vistoriaRef = useRef(false);
   const saveTimerRef = useRef(0);
@@ -168,27 +170,25 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
       reportAppError(error, { severity: "warning", source: "checklists", action: "vistoriaAgora", screen: "Checklists", notifyUser: false });
       if (!aliveRef.current) return;
       setVistoriaErro(mensagemVistoria(error));
-      setVistoriaEstado(frota.length ? "choosing" : "idle");
+      setVistoriaEstado("idle");
     } finally {
       vistoriaRef.current = false;
     }
   };
 
   const iniciarVistoria = async () => {
-    if (!vistoriaAgora || vistoriaRef.current || vistoriaEstado === "loadingFleet") return;
+    if (!vistoriaAgora || vistoriaRef.current) return;
     setVistoriaErro("");
     if (vistoriaAgora.veiculoAtualId) { await abrirVistoria({ id: vistoriaAgora.veiculoAtualId, placa: "" }); return; }
-    setVistoriaEstado("loadingFleet");
-    try {
-      setFrota(await vistoriaAgora.carregarFrota());
-      if (aliveRef.current) setVistoriaEstado("choosing");
-    } catch (error) {
-      reportAppError(error, { severity: "warning", source: "checklists", action: "vistoriaAgoraFrota", screen: "Checklists", notifyUser: false });
-      if (!aliveRef.current) return;
-      setVistoriaErro(mensagemVistoria(error));
-      setVistoriaEstado("idle");
-    }
+    setVistoriaEstado("choosing");
   };
+
+  // O diálogo recarrega a frota quando estas funções mudam: ficam estáveis entre renderizações.
+  const carregarFrotaRef = useRef(vistoriaAgora?.carregarFrota);
+  carregarFrotaRef.current = vistoriaAgora?.carregarFrota;
+  const carregarFrota = useCallback((): Promise<FleetVehicle[]> => carregarFrotaRef.current?.() ?? Promise.resolve([]), []);
+  const cancelarEscolha = useCallback(() => setVistoriaEstado("idle"), []);
+  const escolherCarro = (choice: DriverVehicleChoice) => { if (choice.veiculoId) void abrirVistoria({ id: choice.veiculoId, placa: choice.placa }); };
   const sendView = send ? describeChecklistSend(send) : null;
   const formPanelRef = useRef<HTMLElement | null>(null);
   const focusSubmitRef = useRef(false);
@@ -654,34 +654,28 @@ export function ChecklistsScreen({ items, loadStatus = "ready", selectedId, onSe
               {vistoriaAgora ? (
                 <div className="checklist-agora">
                   {vistoriaEstado === "choosing" ? (
-                    <>
-                      <p className="checklist-agora-titulo">Qual carro você vai vistoriar?</p>
-                      {frota.length ? (
-                        <ul className="vehicle-choice-list">
-                          {frota.map((vehicle, index) => (
-                            <li key={vehicle.id} style={{ "--vehicle-choice-index": Math.min(index, 6) } as CSSProperties}>
-                              <button className="vehicle-choice-option" type="button" onClick={() => void abrirVistoria(vehicle)}>
-                                <span className="vehicle-choice-name">{describeVehicle(vehicle)}</span>
-                                <span className="vehicle-choice-plate">{vehicle.placa}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : <p className="comunicado-empty">Nenhum carro próprio ativo encontrado. Fale com a operação.</p>}
-                      <ActionButton variant="ghost" idleLabel="Cancelar" onClick={() => { setVistoriaEstado("idle"); setVistoriaErro(""); }} />
-                    </>
-                  ) : (
+                    <VehicleChoiceDialog
+                      resolution={VISTORIA_SEM_CARRO}
+                      loadFleet={carregarFrota}
+                      onChoose={escolherCarro}
+                      onCancel={cancelarEscolha}
+                      title="Qual carro você vai vistoriar?"
+                      fleetHint="Seu carro atual não foi identificado. Busque pela placa ou pelo modelo."
+                      allowNotApplicable={false}
+                    />
+                  ) : null}
+                  {vistoriaEstado !== "choosing" ? (
                     <ActionButton
                       variant="secondary"
                       className="checklist-agora-botao"
                       icon={<ClipboardCheck size={18} aria-hidden="true" />}
                       idleLabel="Fazer vistoria agora"
-                      loadingLabel={vistoriaEstado === "loadingFleet" ? "Carregando carros" : "Abrindo vistoria"}
-                      state={vistoriaEstado === "starting" || vistoriaEstado === "loadingFleet" ? "loading" : "idle"}
+                      loadingLabel="Abrindo vistoria"
+                      state={vistoriaEstado === "starting" ? "loading" : "idle"}
                       disabled={vistoriaEstado !== "idle"}
                       onClick={() => void iniciarVistoria()}
                     />
-                  )}
+                  ) : null}
                   {vistoriaErro ? <p className="comunicado-error" role="alert">{vistoriaErro}</p> : null}
                 </div>
               ) : null}
