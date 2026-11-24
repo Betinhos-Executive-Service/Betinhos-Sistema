@@ -18,13 +18,20 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 
 Segurança: 5 erros (código ou TOTP) no mesmo e-mail → 15 min de bloqueio; limite por IP e por e-mail (`ratelimits`); CSRF por `Origin`; segredo TOTP cifrado (AES-GCM, `CHAVE_TOTP`); código e token do dispositivo só como SHA-256; toda consulta filtra pelo cliente da sessão; rota de módulo que o cliente não tem → 403. O número da reserva (`cr40f_id`) é do autonumber do Dataverse; o Worker nunca o inventa.
 
-## Antes do 1º deploy (nada disso foi feito)
+## Publicação (cliente.betinhos.com.br)
 
-1. Schema no DEV: tabelas de `packages/deploy/provision-portal-cliente.ps1` e as de validador, mensagem, código e dispositivo. Confira os nomes marcados `CONFIRMAR` em `worker/schema.ts`.
-2. Usuário de aplicação (Entra ID + Dataverse) com papel mínimo: leitura de `cr40f_composicaodeprecos` e `cr40f_clientes1`; leitura e criação em `cr40f_reservadeveculos` (módulo Pedir grava só as colunas do pedido); leitura e escrita em `cr40f_validacaoservico`, `cr40f_validadorcliente`, `cr40f_mensagemvalidacao`, `cr40f_codigoacesso` e `cr40f_dispositivoconfiavel`. Sem acesso a contato/telefone de passageiro. Criar reserva dispara os plugins da tabela (AutoNumberGuard, preço, compartilhamento): confira no DEV antes do piloto.
-3. KV: `wrangler kv namespace create portal-cliente` e troque o id em `wrangler.jsonc`.
-4. Secrets (`pnpm exec wrangler secret put <NOME>`): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_TOTP`, `CHAVE_SESSAO`. As chaves: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma para cada. Trocar `CHAVE_TOTP` invalida todos os autenticadores cadastrados.
-5. `pnpm build && pnpm exec wrangler deploy` (da `main`).
+Dois Workers e um projeto Pages na conta Cloudflare do `cadastro-passageiro`:
+
+- `portal-cliente-dev` (`wrangler deploy --env dev`, Dataverse DEV): piloto. KV `portal-cliente-dev`.
+- `portal-cliente` (`wrangler deploy`, Dataverse PROD): só depois do piloto, a partir da `main`. KV `portal-cliente`.
+- Pages `portal-cliente` (`pages/`, `portal-cliente-5jp.pages.dev`): serve o `dist` e repassa `/api/*` ao Worker por service binding (`pages/functions/api/[[path]].ts`). Produção (branch `main` do Pages) liga no `portal-cliente`; preview (`--branch dev`, `dev.portal-cliente-5jp.pages.dev`) no `portal-cliente-dev`. O domínio `cliente.betinhos.com.br` é custom domain do Pages com CNAME na Locaweb para `portal-cliente-5jp.pages.dev` (a zona não está na Cloudflare, por isso Pages e não custom domain de Worker). Cron e ratelimit ficam no Worker.
+- `pnpm --dir apps/portal-cliente deploy:dev` faz build, Worker DEV e Pages preview.
+
+Por ambiente, uma vez:
+
+1. Papel `Portal do Cliente` (migration `20261124-1000-portal-cliente-papel.ps1`; PROD pelas soluções): o mínimo que o Worker usa. Criar reserva dispara os plugins da tabela (AutoNumberGuard, preço, compartilhamento): confira no DEV antes do piloto.
+2. App registration no Entra com client secret, usuário de aplicação no Dataverse com o papel `Portal do Cliente`.
+3. Secrets (`pnpm exec wrangler secret put <NOME> [--env dev]`, valor pelo stdin, nunca no comando): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_TOTP`, `CHAVE_SESSAO`. As chaves: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma para cada e por ambiente. Trocar `CHAVE_TOTP` invalida todos os autenticadores cadastrados.
 
 ## Local
 
