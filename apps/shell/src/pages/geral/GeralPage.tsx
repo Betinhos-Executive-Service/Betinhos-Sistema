@@ -13,6 +13,7 @@ import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAber
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
 import { usePaxServicos } from './data/paxServicos'
+import { BarraSelecaoAnimada } from './components/BarraSelecao'
 import type { EditValue } from './domain/edit'
 import { avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, SAIDA, type LinhaManutencao } from './domain/manutencao'
 import { ProtecaoContext } from './components/ProtecaoLock'
@@ -718,7 +719,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
-              {mobile ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
+              {/* Celular: barra de seleção própria (topo com ✕/contagem/Todos e 3 ações com rótulo) no lugar da barra do DS. */}
+              {mobile ? <BarraSelecaoAnimada ativo={selectedIds.length > 0} selection={selection} total={rows.length} onTodos={() => geral.setSelection(new Set(rows.map((r) => String(r[ID_ATTRIBUTE]))))} /> : null}
+              {mobile && selectedIds.length === 0 ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )
           : tabelaDs && !grouped ? (
@@ -807,7 +810,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
             {/* No celular, o "+" fixo no pé da tela substitui este. */}
             {mobile ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
           </>}
-          selection={selection}
+          selection={mobile ? undefined : selection}
         >
           {/* Depois da busca; continua visível com seleção (DS 1.26). Não encolhe: no celular empurraria "Criar serviço" para fora. */}
           {!mobile ? <span className="gr-manut-chave">{chaveManutencoes}</span> : null}

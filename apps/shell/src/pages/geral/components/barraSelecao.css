@@ -1,0 +1,28 @@
+/* Barra de seleção do celular (Geral). Só tokens do DS; candidata a substituir o SelectionBar do DS. */
+.gs-barra { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-2-5) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom, 0px)); border: var(--bt-border-width-default) solid var(--bt-color-border); border-bottom: 0; border-radius: var(--bt-radius-xl) var(--bt-radius-xl) 0 0; background: var(--bt-color-surface); box-shadow: var(--bt-shadow-drawer); animation: gs-sobe .22s cubic-bezier(.2, .8, .2, 1); }
+.gs-barra.is-saindo { animation: gs-desce .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
+
+/* Topo na mesma grade das 4 ações: ✕ no eixo da primeira, contagem no centro, "Todos" no eixo do "Mais". */
+.gs-topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); align-items: center; gap: var(--bt-space-1); }
+.gs-fechar { justify-self: center; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-secondary); cursor: pointer; }
+.gs-fechar:hover { background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); }
+.gs-selo { justify-self: center; display: inline-flex; align-items: center; gap: var(--bt-space-1-5); min-height: 28px; padding: 0 var(--bt-space-2-5); border-radius: var(--bt-radius-full); background: var(--bt-color-action-soft); color: var(--bt-color-action); font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); white-space: nowrap; }
+.gs-numero { display: inline-block; animation: gs-pulsa .2s ease-out; }
+.gs-todos { justify-self: center; min-height: 36px; padding: 0 var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
+
+/* Ações: colunas iguais; o "Mais" vem dentro do contêiner do Menu do DS e estica como as outras. */
+.gs-ferramentas { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--bt-space-1); }
+.gs-ferramentas > .bt-menu { display: grid; min-width: 0; }
+.gs-ferramentas > .bt-menu > .gs-ferramenta { width: 100%; }
+.gs-ferramenta { display: grid; justify-items: center; align-content: center; gap: var(--bt-space-1); min-width: 0; min-height: 56px; padding: var(--bt-space-1-5) var(--bt-space-0-5); border: 0; border-radius: var(--bt-radius-lg); background: transparent; color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); line-height: 1.2; text-align: center; cursor: pointer; transition: background-color .12s ease, transform .12s ease; }
+.gs-ferramenta svg { width: 20px; height: 20px; color: var(--bt-color-action); }
+.gs-ferramenta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-ferramenta:hover { background: var(--bt-color-surface-soft); }
+.gs-ferramenta:active { background: var(--bt-color-action-soft); transform: scale(.96); }
+.gs-ferramenta[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+.gs-fechar:focus-visible, .gs-todos:focus-visible, .gs-ferramenta:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+
+@keyframes gs-sobe { from { transform: translateY(100%); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes gs-desce { from { transform: none; opacity: 1; } to { transform: translateY(100%); opacity: .4; } }
+@keyframes gs-pulsa { from { transform: scale(.85); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .gs-barra, .gs-barra.is-saindo, .gs-numero { animation: none; } .gs-ferramenta:active { transform: none; } }

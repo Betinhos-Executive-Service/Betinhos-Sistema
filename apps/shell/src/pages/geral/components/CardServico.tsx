@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { Button, Checkbox } from '@betinhos/ui'
-import { Building2, CalendarClock, CalendarRange, UserPlus, UserRound, Users, Wrench } from 'lucide-react'
+import { Building2, CalendarClock, CalendarRange, Route, UserPlus, UserRound, Users, Wrench } from 'lucide-react'
 import './cardServico.css'
 
 /** O que o card do celular mostra, já lido da linha: serviço e manutenção no mesmo formato. */
@@ -89,13 +89,13 @@ export function CardServico({ d, selecionado, onToggle, onContextMenu }: Props) 
       <div className="gc-conteudo">
         <div className="gc-topo">
           <button type="button" className="gc-abrir" aria-label={d.abrirRotulo} onClick={d.abrir}>
-            {d.manutencao ? <Wrench size={14} aria-hidden="true" /> : null}
-            <span className="gc-rota">{d.titulo ?? '—'}</span>
+            {d.manutencao ? <><Wrench size={14} aria-hidden="true" /><span className="gc-titulo">{d.titulo ?? '—'}</span></>
+              : d.pax && d.pax.length > 0 ? <><Users size={15} aria-label="Passageiros" /><span className="gc-titulo" title={d.pax.join(', ')}>{resumoPax(d.pax)}</span></>
+              : <><Users size={15} aria-label="Passageiros" /><span className="gc-titulo gc-titulo--vazio">{d.pax ? 'Sem passageiro' : '…'}</span></>}
           </button>
           {d.status}
         </div>
-        {d.pax && d.pax.length > 0 ? <p className="gc-pax" title={d.pax.join(', ')}><Users size={15} aria-label="Passageiros" /><span>{resumoPax(d.pax)}</span></p>
-          : d.pax ? <p className="gc-pax gc-pax--vazio"><Users size={15} aria-label="Passageiros" /><span>Sem passageiro</span></p> : null}
+        {d.manutencao ? null : <p className="gc-rota" title="Trajeto"><Route size={14} aria-label="Trajeto" /><span>{d.titulo ?? '—'}</span></p>}
         <p className="gc-meta">
           {d.manutencao ? (d.meta ? <span title="Janela"><CalendarRange size={13} aria-label="Janela" />{d.meta}</span> : null) : <span title="Cliente"><Building2 size={13} aria-label="Cliente" />{d.cliente ?? '—'}</span>}
           {d.motorista ? <span title="Motorista"><UserRound size={13} aria-label="Motorista" />{d.motorista}</span> : null}
