@@ -15,15 +15,16 @@
 .gc-topo { display: flex; align-items: flex-start; gap: var(--bt-space-2); min-width: 0; }
 .gc-topo .bt-badge { flex: 0 0 auto; }
 .gc-abrir { display: flex; align-items: flex-start; gap: var(--bt-space-1); flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
-.gc-abrir svg { flex: 0 0 auto; margin-top: 3px; color: var(--bt-color-warning); }
+.gc-abrir svg { flex: 0 0 auto; margin-top: 3px; color: var(--bt-color-action); }
+.gc-card--manut .gc-abrir svg { color: var(--bt-color-warning); }
 .gc-abrir:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
-.gc-rota { font-size: 15px; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+.gc-titulo { font-size: 15px; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+.gc-titulo--vazio { font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-secondary); }
+/* Trajeto logo abaixo do passageiro: segundo na hierarquia. */
+.gc-rota { display: flex; align-items: flex-start; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-primary); line-height: 1.35; }
+.gc-rota svg { flex: 0 0 auto; margin-top: 2px; color: var(--bt-color-text-secondary); }
+.gc-rota span { min-width: 0; overflow-wrap: anywhere; }
 
-.gc-pax { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
-.gc-pax svg { flex: 0 0 auto; color: var(--bt-color-action); }
-.gc-pax span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gc-pax--vazio { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
-.gc-pax--vazio svg { color: var(--bt-color-text-secondary); }
 
 .gc-meta { display: flex; flex-wrap: wrap; gap: var(--bt-space-0-5) var(--bt-space-3); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
 .gc-meta span { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; }
