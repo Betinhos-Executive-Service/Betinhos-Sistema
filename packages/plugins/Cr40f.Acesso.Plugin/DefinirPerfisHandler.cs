@@ -34,7 +34,7 @@ public sealed class DefinirPerfisHandler
 
         var papeisDesejados = AcessoCatalogo.Papeis(pedido);
         papeisDesejados.Add(AcessoCatalogo.Base);
-        var colunasDesejadas = AcessoCatalogo.PerfisDeColuna(pedido);
+        var colunasDesejadas = AcessoCatalogo.Papeis(pedido);
         var faltam = papeisDesejados.Where(n => !papeis.ContainsKey(n)).Concat(colunasDesejadas.Where(n => !colunas.ContainsKey(n))).Distinct().ToList();
         if (faltam.Count > 0)
             throw new AcessoException("PERFIL_INDISPONIVEL", "Perfil ainda não publicado neste ambiente: " + string.Join("; ", faltam) + ".");
