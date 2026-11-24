@@ -5,8 +5,8 @@ import { situacaoDaMulta } from '../domain/multaEstado'
 
 // Cada caso da fase 3 do mock tem de cair no passo corrente que o nome promete.
 const CASOS: [string, string, string][] = [
-  ['A000000101', 'indicar', 'AvisarMotorista'],
-  ['A000000102', 'indicar', 'AvisarMotorista'],
+  ['A000000101', 'indicar', 'RegistrarIndicacao'],
+  ['A000000102', 'indicar', 'RegistrarIndicacao'],
   ['A000000103', 'identificar', 'DefinirResponsavel'],
   ['A000000104', 'indicar', 'RegistrarAceite'],
   ['A000000105', 'acertar', 'RegistrarAcerto'],

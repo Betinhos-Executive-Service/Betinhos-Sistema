@@ -19,13 +19,14 @@ public static class MultaMapper
         "cr40f_datadeavisoaocondutor", "cr40f_canalindicacao", "cr40f_datadeindicacao", "cr40f_indicado", "cr40f_aceiteem", "cr40f_vencimento",
         "cr40f_pagaem", "cr40f_valorpago", "cr40f_competenciadesconto", "cr40f_acertoem", "cr40f_encerradaem", "cr40f_canceladaem",
         "cr40f_motivocancelamento", "new_recursopendente", "cr40f_contestadaem", "cr40f_aceitedeclaradoem", "new_termovigente",
+        "new_valorguia", "cr40f_codigodainfracao",
     };
 
     /// <summary>Campo de MultaEstado (MultaEtapas.Mudancas) → coluna de cr40f_multas.</summary>
     public static readonly IReadOnlyDictionary<string, string> Coluna = new Dictionary<string, string>
     {
         ["status"] = "cr40f_status", ["responsavel"] = "cr40f_responsavel", ["motoristaId"] = "cr40f_motorista", ["motivoEmpresa"] = "cr40f_motivoempresa",
-        ["dataAviso"] = "cr40f_datadeavisoaocondutor", ["canal"] = "cr40f_canalindicacao", ["dataIndicacao"] = "cr40f_datadeindicacao",
+        ["dataAviso"] = "cr40f_datadeavisoaocondutor", ["avisoAutomaticoEm"] = "cr40f_avisoautomaticoem", ["canal"] = "cr40f_canalindicacao", ["dataIndicacao"] = "cr40f_datadeindicacao",
         ["indicado"] = "cr40f_indicado", ["aceiteEm"] = "cr40f_aceiteem", ["pagaEm"] = "cr40f_pagaem", ["valorPago"] = "cr40f_valorpago",
         ["competencia"] = "cr40f_competenciadesconto", ["acertoEm"] = "cr40f_acertoem", ["encerradaEm"] = "cr40f_encerradaem",
         ["canceladaEm"] = "cr40f_canceladaem", ["motivoCancelamento"] = "cr40f_motivocancelamento", ["recursoPendente"] = "new_recursopendente", ["contestadaEm"] = "cr40f_contestadaem",
@@ -46,6 +47,7 @@ public static class MultaMapper
         Vencimento = Mapper.Dia(e, "cr40f_vencimento"),
         PagaEm = Mapper.Dia(e, "cr40f_pagaem"),
         ValorPago = e.GetAttributeValue<Money>("cr40f_valorpago")?.Value,
+        ValorCheio = e.GetAttributeValue<Money>("new_valorguia")?.Value,
         Competencia = Mapper.Dia(e, "cr40f_competenciadesconto"),
         AcertoEm = Mapper.Dia(e, "cr40f_acertoem"),
         EncerradaEm = Mapper.Dia(e, "cr40f_encerradaem"),
@@ -77,6 +79,17 @@ public static class MultaMapper
 
     public const string Termo = "new_termomulta";
     public const int TermoPendente = 100000000, TermoAssinado = 100000001, TermoCancelado = 100000004, FormaFolha = 100000001;
+
+    /// <summary>Valor cheio da multa: new_valorguia; sem ele, cr40f_valordamulta da infração do catálogo (o mesmo que a tela mostra como "Valor").
+    /// Base das parcelas do acerto na folha. Falha de leitura do catálogo deixa o valor cheio ausente (o passo recusa com mensagem clara).</summary>
+    public static void CarregarValorCheio(IOrganizationService sistema, Entity linha, MultaEstado e, ITracingService? tracing = null)
+    {
+        if (e.ValorCheio > 0) return;
+        var infracao = linha.GetAttributeValue<EntityReference>("cr40f_codigodainfracao");
+        if (infracao == null) return;
+        try { e.ValorCheio = sistema.Retrieve(infracao.LogicalName, infracao.Id, new ColumnSet("cr40f_valordamulta")).GetAttributeValue<Money>("cr40f_valordamulta")?.Value; }
+        catch (Exception erro) { tracing?.Trace("Valor do catálogo da infração {0} ilegível: {1}", infracao.Id, erro.Message); }
+    }
 
     /// <summary>Lê o termo vigente da multa para as regras do termo. Devolve o id do termo vigente, ou null.</summary>
     public static Guid? CarregarTermo(IOrganizationService sistema, Entity linha, MultaEstado e, ITracingService? tracing = null)

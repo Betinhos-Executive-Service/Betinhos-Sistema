@@ -20,7 +20,6 @@ public static class MultaCodigos
 public static class Passos
 {
     public const string DefinirResponsavel = "DefinirResponsavel";
-    public const string AvisarMotorista = "AvisarMotorista";
     public const string RegistrarIndicacao = "RegistrarIndicacao";
     public const string RegistrarAceite = "RegistrarAceite";
     public const string RegistrarPagamento = "RegistrarPagamento";
@@ -35,7 +34,7 @@ public static class Passos
     /// <summary>Internos: só a API do termo chama (cr40f_PassoMulta confere o ParentContext). A tela nunca oferece.</summary>
     public const string TermoAssinado = "TermoAssinado";
     public const string TermoContestado = "TermoContestado";
-    public static readonly string[] Todos = { DefinirResponsavel, AvisarMotorista, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto, TermoAssinado, TermoContestado };
+    public static readonly string[] Todos = { DefinirResponsavel, RegistrarIndicacao, RegistrarAceite, RegistrarPagamento, RegistrarAcerto, PrazoVencido, Cancelar, Recorrer, ResultadoRecurso, ConcluirDesconto, ReabrirDesconto, TermoAssinado, TermoContestado };
 }
 
 /// <summary>O que as regras leem e o passo muda. Datas em yyyy-MM-dd (dia de São Paulo). Espelho: MultaEstado de multaEtapas.ts.</summary>
@@ -48,6 +47,8 @@ public sealed class MultaEstado
     [DataMember(Name = "motivoEmpresa")] public int? MotivoEmpresa { get; set; }
     [DataMember(Name = "dataParaIndicar")] public string? DataParaIndicar { get; set; }
     [DataMember(Name = "dataAviso")] public string? DataAviso { get; set; }
+    /// <summary>Dia em que o plugin pediu o aviso automático (push) ao motorista; só escrita, o flow "Multa | Aviso ao motorista" dispara por ela. Não faz parte do avanço de etapa.</summary>
+    [DataMember(Name = "avisoAutomaticoEm")] public string? AvisoAutomaticoEm { get; set; }
     [DataMember(Name = "canal")] public int? Canal { get; set; }
     [DataMember(Name = "dataIndicacao")] public string? DataIndicacao { get; set; }
     [DataMember(Name = "indicado")] public bool? Indicado { get; set; }
@@ -68,6 +69,8 @@ public sealed class MultaEstado
     [DataMember(Name = "termoParcelas")] public int? TermoParcelas { get; set; }
     [DataMember(Name = "termoPrimeiroMes")] public string? TermoPrimeiroMes { get; set; }
     [DataMember(Name = "termoValor")] public decimal? TermoValor { get; set; }
+    /// <summary>Valor cheio da multa (new_valorguia, ou cr40f_valordamulta do catálogo da infração): base das parcelas na folha. Carregado pelo passo.</summary>
+    [DataMember(Name = "valorCheio")] public decimal? ValorCheio { get; set; }
     /// <summary>Contagem de new_parcelamultafolha da multa, carregada pelo passo. Ausente = 0.</summary>
     [DataMember(Name = "parcelasPrevistas")] public int? ParcelasPrevistas { get; set; }
     [DataMember(Name = "parcelasDescontadas")] public int? ParcelasDescontadas { get; set; }
@@ -76,7 +79,7 @@ public sealed class MultaEstado
 }
 
 /// <summary>DadosJson da cr40f_PassoMulta. Textos fixos: responsavel motorista|empresa, motivo prazo-perdido|culpa-empresa,
-/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM, parcelas 1 a 12.</summary>
+/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM, parcelas 1 a 3.</summary>
 [DataContract]
 public sealed class DadosPasso
 {
@@ -122,7 +125,6 @@ public static class MultaEtapas
     public static readonly IReadOnlyDictionary<string, string> RotuloPasso = new Dictionary<string, string>
     {
         [Passos.DefinirResponsavel] = "Definir o responsável",
-        [Passos.AvisarMotorista] = "Avisar o motorista",
         [Passos.RegistrarIndicacao] = "Indicar no órgão",
         [Passos.RegistrarAceite] = "Conferir o aceite na CNH Digital",
         [Passos.RegistrarPagamento] = "Pagar a guia",
@@ -145,7 +147,6 @@ public static class MultaEtapas
 
     private static readonly IReadOnlyDictionary<string, string> Antes = new Dictionary<string, string>
     {
-        [Passos.AvisarMotorista] = "Avise o motorista antes de registrar a indicação.",
         [Passos.RegistrarIndicacao] = "Registre a indicação antes do aceite.",
     };
 
@@ -192,7 +193,6 @@ public static class MultaEtapas
         {
             case Identificar: s.Pendentes.Add(Passos.DefinirResponsavel); break;
             case Indicar:
-                if (m.DataAviso == null) s.Pendentes.Add(Passos.AvisarMotorista);
                 if (m.DataIndicacao == null || m.Canal == null) s.Pendentes.Add(Passos.RegistrarIndicacao);
                 else if (AceitePendente(m)) s.Pendentes.Add(Passos.RegistrarAceite);
                 break;
@@ -273,7 +273,6 @@ public static class MultaEtapas
                 : "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
         if (!s.Pendentes.Contains(passo)) return "Este passo não vale para a etapa atual da multa. Recarregue a tela.";
         if (m.TermoPendente == true && passo == Passos.RegistrarIndicacao) return "Aguarde a assinatura do termo ou cancele o termo.";
-        if (m.TermoPendente == true && passo == Passos.AvisarMotorista) return "Cancele o termo antes de avisar pelo WhatsApp.";
         if (s.Pendentes[0] != passo) return Antes.TryGetValue(s.Pendentes[0], out var antes) ? antes : "Siga a ordem dos passos.";
         switch (passo)
         {
@@ -281,8 +280,6 @@ public static class MultaEtapas
                 if (d.Responsavel == "empresa") return null;
                 if (d.Responsavel != "motorista") return "Escolha o responsável: motorista ou empresa.";
                 return string.IsNullOrWhiteSpace(d.MotoristaId) ? "Escolha o motorista." : null;
-            case Passos.AvisarMotorista:
-                return string.IsNullOrWhiteSpace(d.Data) ? null : DataRuim(d.Data, hoje, "");
             case Passos.RegistrarIndicacao:
                 return CanalDe(d.Canal) == null ? "Escolha o canal da indicação." : DataRuim(d.Data, hoje, "Informe a data da indicação.");
             case Passos.RegistrarAceite:
@@ -303,6 +300,7 @@ public static class MultaEtapas
     {
         if (d.Competencia == null || !MesIso.IsMatch(d.Competencia)) return "Informe o mês do desconto.";
         if (!(m.ValorPago > 0)) return "Registre o pagamento antes de lançar na folha.";
+        if (!(m.ValorCheio > 0)) return "A multa não tem o valor cheio; informe o valor da guia ou vincule a infração do catálogo.";
         if (string.IsNullOrWhiteSpace(m.MotoristaId)) return "A multa não tem motorista; defina o responsável antes.";
         if (m.TermoParcelas is int assinadas)
         {
@@ -315,7 +313,7 @@ public static class MultaEtapas
         var c = MultaParcelas.Competencia(d.Competencia);
         if (string.CompareOrdinal(c, de) < 0 || string.CompareOrdinal(c, ate) > 0) return $"Escolha um mês entre {MultaParcelas.MesBr(de)} e {MultaParcelas.MesBr(ate)}.";
         var n = d.Parcelas ?? 1;
-        return n < 1 || n > MultaParcelas.Maximo ? "Escolha de 1 a 12 parcelas." : null;
+        return n < 1 || n > MultaParcelas.MaximoParcelas ? "Escolha de 1 a 3 parcelas." : null;
     }
 
     public static MultaEstado Aplicar(MultaEstado m, string passo, DadosPasso d, string hoje)
@@ -326,10 +324,7 @@ public static class MultaEtapas
             case Passos.DefinirResponsavel:
                 n.ContestadaEm = null;
                 if (d.Responsavel == "empresa") { n.Responsavel = MultaCodigos.Empresa; n.MotivoEmpresa = MultaCodigos.CulpaDaEmpresa; n.Status = MultaCodigos.Pagar; }
-                else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; }
-                break;
-            case Passos.AvisarMotorista:
-                n.DataAviso = string.IsNullOrWhiteSpace(d.Data) ? hoje : d.Data;
+                else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; n.AvisoAutomaticoEm = hoje; }
                 break;
             case Passos.RegistrarIndicacao:
                 n.Canal = CanalDe(d.Canal); n.DataIndicacao = d.Data; n.Indicado = true;
@@ -388,7 +383,7 @@ public static class MultaEtapas
     private static readonly (string Campo, Func<MultaEstado, object?> Ler)[] Campos =
     {
         ("status", m => m.Status), ("responsavel", m => m.Responsavel), ("motoristaId", m => m.MotoristaId), ("motivoEmpresa", m => m.MotivoEmpresa),
-        ("dataAviso", m => m.DataAviso), ("canal", m => m.Canal), ("dataIndicacao", m => m.DataIndicacao), ("indicado", m => m.Indicado),
+        ("dataAviso", m => m.DataAviso), ("avisoAutomaticoEm", m => m.AvisoAutomaticoEm), ("canal", m => m.Canal), ("dataIndicacao", m => m.DataIndicacao), ("indicado", m => m.Indicado),
         ("aceiteEm", m => m.AceiteEm), ("pagaEm", m => m.PagaEm), ("valorPago", m => m.ValorPago), ("competencia", m => m.Competencia),
         ("acertoEm", m => m.AcertoEm), ("encerradaEm", m => m.EncerradaEm), ("canceladaEm", m => m.CanceladaEm),
         ("motivoCancelamento", m => m.MotivoCancelamento), ("recursoPendente", m => m.RecursoPendente),

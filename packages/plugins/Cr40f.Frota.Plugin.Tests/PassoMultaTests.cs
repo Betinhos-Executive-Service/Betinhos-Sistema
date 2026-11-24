@@ -29,12 +29,12 @@ public class PassoMultaTests
         var mundo = new FakeMundo();
         var multa = Multa(mundo, MultaCodigos.Indicar);
 
-        var json = PassoMultaPlugin.Executar(mundo, multa.Id, Passos.AvisarMotorista, "{}", Hoje);
+        var json = PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"canal\":\"senatran\",\"data\":\"2026-11-15\"}", Hoje);
 
         var gravado = mundo.Atualizados.Single();
-        Assert.Equal(new DateTime(2026, 11, 17, 12, 0, 0, DateTimeKind.Utc), gravado["cr40f_datadeavisoaocondutor"]);
-        Assert.Single(gravado.Attributes);
-        Assert.Contains("\"pendentes\":[\"RegistrarIndicacao\"]", json);
+        Assert.Equal(new DateTime(2026, 11, 15, 12, 0, 0, DateTimeKind.Utc), gravado["cr40f_datadeindicacao"]);
+        Assert.False(gravado.Contains("cr40f_datadeavisoaocondutor"));
+        Assert.Contains("\"pendentes\":[\"RegistrarAceite\"]", json);
         Assert.Contains("\"etapa\":\"indicar\"", json);
     }
 
@@ -45,9 +45,9 @@ public class PassoMultaTests
         var multa = Multa(mundo, MultaCodigos.Indicar);
 
         var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
-            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"canal\":\"dsv\",\"data\":\"2026-11-15\"}", Hoje));
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{\"data\":\"2026-11-15\"}", Hoje));
 
-        Assert.Equal("Avise o motorista antes de registrar a indicação.", erro.Message);
+        Assert.Equal("Escolha o canal da indicação.", erro.Message);
         Assert.Empty(mundo.Atualizados);
     }
 
@@ -102,7 +102,7 @@ public class PassoMultaTests
     {
         var mundo = new FakeMundo();
         var multa = Multa(mundo, MultaCodigos.Indicar);
-        var erro = Assert.Throws<InvalidPluginExecutionException>(() => PassoMultaPlugin.Executar(mundo, multa.Id, Passos.AvisarMotorista, "{nao e json", Hoje));
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() => PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarIndicacao, "{nao e json", Hoje));
         Assert.Equal("Dados do passo inválidos.", erro.Message);
     }
 
@@ -121,7 +121,7 @@ public class PassoMultaTests
     {
         var mundo = new FakeMundo();
         var inexistente = Guid.NewGuid();
-        var ctx = Contexto.Api(PassoMultaPlugin.Mensagem, new Dictionary<string, object> { ["MultaId"] = inexistente, ["Passo"] = Passos.AvisarMotorista, ["DadosJson"] = "{}" });
+        var ctx = Contexto.Api(PassoMultaPlugin.Mensagem, new Dictionary<string, object> { ["MultaId"] = inexistente, ["Passo"] = Passos.RegistrarIndicacao, ["DadosJson"] = "{}" });
 
         var erro = Assert.Throws<InvalidPluginExecutionException>(() => Contexto.Rodar(new PassoMultaPlugin(), ctx, mundo));
 
@@ -185,7 +185,8 @@ public class PassoMultaTests
 
     private static Entity MultaParaFolha(FakeMundo mundo, Guid motorista) => Multa(mundo, MultaCodigos.Acertar, m =>
     {
-        m["cr40f_valorpago"] = new Money(100m);
+        m["cr40f_valorpago"] = new Money(60m); // com desconto de 40%: a parcela sai do valor cheio, não do pago
+        m["new_valorguia"] = new Money(100m);
         m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", motorista);
         m["cr40f_pagaem"] = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
     });
@@ -230,10 +231,48 @@ public class PassoMultaTests
     }
 
     [Fact]
+    public void Folha_usa_o_valor_cheio_do_catalogo_quando_nao_ha_valor_da_guia()
+    {
+        var mundo = new FakeMundo();
+        var infracao = mundo.Add(new Entity("cr40f_infracaodetransito", Guid.NewGuid()) { ["cr40f_valordamulta"] = new Money(130.16m) });
+        var multa = Multa(mundo, MultaCodigos.Acertar, m =>
+        {
+            m["cr40f_valorpago"] = new Money(78.10m);
+            m["cr40f_codigodainfracao"] = new EntityReference("cr40f_infracaodetransito", infracao.Id);
+            m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid());
+        });
+        PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12\",\"parcelas\":3}", Hoje);
+        var valores = mundo.Linhas(PassoMultaPlugin.Parcelas).OrderBy(e => e.GetAttributeValue<int>("new_numero")).Select(p => p.GetAttributeValue<Money>("new_valor").Value);
+        Assert.Equal(new[] { 43.38m, 43.38m, 43.40m }, valores);
+    }
+
+    [Fact]
+    public void Folha_sem_valor_cheio_e_recusada()
+    {
+        var mundo = new FakeMundo();
+        var multa = Multa(mundo, MultaCodigos.Acertar, m => { m["cr40f_valorpago"] = new Money(60m); m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid()); });
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12\"}", Hoje));
+        Assert.Contains("valor cheio", erro.Message);
+        Assert.Empty(mundo.Criados);
+    }
+
+    [Fact]
+    public void Folha_recusa_mais_de_tres_parcelas()
+    {
+        var mundo = new FakeMundo();
+        var multa = MultaParaFolha(mundo, Guid.NewGuid());
+        var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
+            PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12\",\"parcelas\":4}", Hoje));
+        Assert.Equal("Escolha de 1 a 3 parcelas.", erro.Message);
+        Assert.Empty(mundo.Criados);
+    }
+
+    [Fact]
     public void Recusa_da_folha_nao_cria_parcela()
     {
         var mundo = new FakeMundo();
-        var multa = Multa(mundo, MultaCodigos.Acertar, m => m["cr40f_valorpago"] = new Money(100m));
+        var multa = Multa(mundo, MultaCodigos.Acertar, m => { m["cr40f_valorpago"] = new Money(100m); m["new_valorguia"] = new Money(100m); });
         var erro = Assert.Throws<InvalidPluginExecutionException>(() =>
             PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12\"}", Hoje));
         Assert.Equal("A multa não tem motorista; defina o responsável antes.", erro.Message);
@@ -339,7 +378,7 @@ public class PassoMultaTests
         var multa = MultaComTermo(mundo, MultaCodigos.Acertar, termo, m =>
         {
             m["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid());
-            m["cr40f_valorpago"] = new Money(120m); m["cr40f_pagaem"] = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
+            m["cr40f_valorpago"] = new Money(120m); m["new_valorguia"] = new Money(200m); m["cr40f_pagaem"] = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
         });
         PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, "{\"acerto\":\"folha\",\"competencia\":\"2026-12-01\",\"parcelas\":2}", Hoje);
         var parcelas = mundo.Linhas(PassoMultaPlugin.Parcelas);

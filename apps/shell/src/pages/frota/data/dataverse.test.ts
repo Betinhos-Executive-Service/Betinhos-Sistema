@@ -316,19 +316,19 @@ describe('passo a passo da multa (Custom APIs)', () => {
     const situacao = { etapa: 'indicar', pendentes: ['RegistrarIndicacao'], proximoPasso: 'Indicar no órgão', proximoPrazo: '2026-11-30', prazoVencido: false, aguardandoPenalidade: false }
     const fetchMock = resposta(true, 200, { MultaJson: JSON.stringify(situacao) })
     vi.stubGlobal('fetch', fetchMock)
-    expect(await createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).toEqual(situacao)
+    expect(await createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', {})).toEqual(situacao)
     expect(fetchMock.mock.calls[0][0]).toBe('https://org23b93544.crm2.dynamics.com/api/data/v9.2/cr40f_PassoMulta')
-    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ MultaId: 'aaaaaaaa-1111-2222-3333-444444444444', Passo: 'AvisarMotorista', DadosJson: '{}' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ MultaId: 'aaaaaaaa-1111-2222-3333-444444444444', Passo: 'RegistrarIndicacao', DadosJson: '{}' })
   })
 
   it('passoMulta repassa a recusa do servidor como está', async () => {
-    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Avise o motorista antes de registrar a indicação.' } }))
-    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', { canal: 'dsv', data: '2026-11-15' })).rejects.toThrow('Avise o motorista antes de registrar a indicação.')
+    vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Escolha o canal da indicação.' } }))
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', { canal: 'dsv', data: '2026-11-15' })).rejects.toThrow('Escolha o canal da indicação.')
   })
 
   it('a recusa do servidor chega com o status HTTP para a tela decidir o que mostrar', async () => {
     vi.stubGlobal('fetch', resposta(false, 400, { error: { message: 'Recusa de regra.' } }))
-    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'AvisarMotorista', {})).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Recusa de regra.' })
+    await expect(createXrmSource(host().xrm).passoMulta(MULTA_ID, 'RegistrarIndicacao', {})).rejects.toMatchObject({ name: 'ApiError', status: 400, message: 'Recusa de regra.' })
     vi.stubGlobal('fetch', resposta(false, 500, { error: { message: 'Unhandled exception' } }))
     await expect(createXrmSource(host().xrm).dossieMulta(MULTA_ID)).rejects.toMatchObject({ name: 'ApiError', status: 500 })
   })

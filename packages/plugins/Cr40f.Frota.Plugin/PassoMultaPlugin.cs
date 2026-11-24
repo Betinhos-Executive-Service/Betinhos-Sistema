@@ -54,6 +54,7 @@ public sealed class PassoMultaPlugin : IPlugin
         if ((passo == Passos.TermoAssinado || passo == Passos.TermoContestado) && !viaTermo)
             throw new InvalidPluginExecutionException("Este passo é registrado pelo termo do motorista.");
         var termoVigente = MultaMapper.CarregarTermo(sistema, linha, antes, tracing);
+        if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha") MultaMapper.CarregarValorCheio(sistema, linha, antes, tracing);
         if (passo == Passos.RegistrarAcerto && dados.Acerto == "folha" && antes.TermoParcelas != null && antes.TermoPrimeiroMes == null)
             throw new InvalidPluginExecutionException("O termo assinado não tem o primeiro mês; confira o termo antes de lançar na folha.");
         if (passo == Passos.Cancelar || passo == Passos.ConcluirDesconto || passo == Passos.ReabrirDesconto) ContarParcelas(sistema, multaId, antes); // só estes passos leem a contagem
@@ -85,7 +86,7 @@ public sealed class PassoMultaPlugin : IPlugin
 
     private static void CriarParcelas(IOrganizationService s, Guid multaId, string auto, MultaEstado m, DadosPasso d, Guid? dono, Guid? termoId)
     {
-        foreach (var p in MultaParcelas.Dividir(m.ValorPago!.Value, d.Parcelas ?? 1, d.Competencia!))
+        foreach (var p in MultaParcelas.Dividir(m.ValorCheio!.Value, d.Parcelas ?? 1, d.Competencia!))
         {
             var e = new Entity(Parcelas)
             {

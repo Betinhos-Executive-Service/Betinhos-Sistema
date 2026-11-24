@@ -1,0 +1,399 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "When_aviso_is_requested": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 3,
+          "subscriptionRequest/filterexpression": "cr40f_responsavel eq 100000000 and cr40f_avisoautomaticoem ne null",
+          "subscriptionRequest/entityname": "cr40f_multas",
+          "subscriptionRequest/filteringattributes": "cr40f_avisoautomaticoem",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "actions": {
+    "Init_web_push_entregue": {
+      "runAfter": {},
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Web_Push_Entregue",
+            "type": "boolean",
+            "value": false
+          }
+        ]
+      }
+    },
+    "Has_email": {
+      "actions": {
+        "Web_Push_Send_push": {
+          "actions": {
+            "List_func_Send_push": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "connectionName": "shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "cr40f_funcionarioses",
+                  "$top": 1,
+                  "$filter": "cr40f_emailmicrosoft eq '@{first(createArray(outputs('Get_driver')?['body/cr40f_emailmicrosoft']))}'",
+                  "$select": "cr40f_funcionariosid"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Has_func_Send_push": {
+              "actions": {
+                "List_subs_Send_push": {
+                  "runAfter": {},
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "connectionName": "shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "new_inscricaopushmotoristas",
+                      "$top": 50,
+                      "$filter": "_new_funcionario_value eq @{first(outputs('List_func_Send_push')?['body/value'])?['cr40f_funcionariosid']}",
+                      "$select": "new_inscricaopushmotoristaid,new_endpoint,new_chavep256dh,new_chaveauth"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Has_subs_Send_push": {
+                  "actions": {
+                    "Select_subs_Send_push": {
+                      "runAfter": {},
+                      "type": "Select",
+                      "inputs": {
+                        "from": "@outputs('List_subs_Send_push')?['body/value']",
+                        "select": {
+                          "endpoint": "@item()?['new_endpoint']",
+                          "p256dh": "@item()?['new_chavep256dh']",
+                          "auth": "@item()?['new_chaveauth']"
+                        }
+                      }
+                    },
+                    "Worker_Send_push": {
+                      "runAfter": {
+                        "Select_subs_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "operationId": "EnviarPush",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e",
+                          "connectionName": "shared_new-5fapp-20motoristas-20web-20push-5f30e351431b40001e"
+                        },
+                        "parameters": {
+                          "body/payload/tag": "multa-aviso-@{triggerOutputs()?['body/cr40f_multasid']}",
+                          "body/payload/body": "Toque para abrir.",
+                          "body/payload/title": "Você tem uma multa para ver no app",
+                          "body/subscriptions": "@body('Select_subs_Send_push')",
+                          "body/payload/url": "/WebResources/new_app-motoristas-v2"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Filter_ok_Send_push": {
+                      "runAfter": {
+                        "Worker_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Query",
+                      "inputs": {
+                        "where": "@and(greaterOrEquals(item()?['status'], 200), less(item()?['status'], 300))",
+                        "from": "@outputs('Worker_Send_push')?['body/results']"
+                      }
+                    },
+                    "Set_web_push_entregue": {
+                      "runAfter": {
+                        "Filter_ok_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "SetVariable",
+                      "inputs": {
+                        "name": "Web_Push_Entregue",
+                        "value": "@greater(length(body('Filter_ok_Send_push')), 0)"
+                      }
+                    },
+                    "Filter_gone_Send_push": {
+                      "runAfter": {
+                        "Worker_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Query",
+                      "inputs": {
+                        "where": "@equals(item()?['gone'], true)",
+                        "from": "@outputs('Worker_Send_push')?['body/results']"
+                      }
+                    },
+                    "Select_gone_Send_push": {
+                      "runAfter": {
+                        "Filter_gone_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Select",
+                      "inputs": {
+                        "select": "@item()?['endpoint']",
+                        "from": "@body('Filter_gone_Send_push')"
+                      }
+                    },
+                    "Filter_subs_Send_push": {
+                      "runAfter": {
+                        "Select_gone_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Query",
+                      "inputs": {
+                        "where": "@contains(body('Select_gone_Send_push'), item()?['new_endpoint'])",
+                        "from": "@outputs('List_subs_Send_push')?['body/value']"
+                      }
+                    },
+                    "Delete_each_Send_push": {
+                      "foreach": "@body('Filter_subs_Send_push')",
+                      "actions": {
+                        "Delete_row_Send_push": {
+                          "runAfter": {},
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "host": {
+                              "operationId": "DeleteRecord",
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                              "connectionName": "shared_commondataserviceforapps"
+                            },
+                            "parameters": {
+                              "recordId": "@items('Delete_each_Send_push')?['new_inscricaopushmotoristaid']",
+                              "entityName": "new_inscricaopushmotoristas"
+                            },
+                            "authentication": "@parameters('$authentication')"
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Filter_subs_Send_push": [
+                          "Succeeded"
+                        ]
+                      },
+                      "type": "Foreach"
+                    }
+                  },
+                  "runAfter": {
+                    "List_subs_Send_push": [
+                      "Succeeded"
+                    ]
+                  },
+                  "expression": {
+                    "greater": [
+                      "@length(outputs('List_subs_Send_push')?['body/value'])",
+                      0
+                    ]
+                  },
+                  "type": "If"
+                }
+              },
+              "runAfter": {
+                "List_func_Send_push": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "greater": [
+                  "@length(outputs('List_func_Send_push')?['body/value'])",
+                  0
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {},
+          "type": "Scope"
+        },
+        "Fallback_V2": {
+          "actions": {
+            "Send_push": {
+              "runAfter": {},
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "operationId": "SendPushNotificationV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_powerappsnotificationv2",
+                  "connectionName": "shared_powerappsnotificationv2-1"
+                },
+                "parameters": {
+                  "payload/dynamicParams/entityLogicalName": "cr40f_multas",
+                  "payload/message": "Você tem uma multa para ver no app\nToque para abrir.",
+                  "payload/playerType": "PowerApps",
+                  "payload/app": "{\"type\":\"AppModule\",\"displayName\":\"App Motoristas v2\",\"appIdentifier\":\"new_AppMotoristasv2\"}",
+                  "payload/dynamicParams/recordId": "@triggerOutputs()?['body/cr40f_multasid']",
+                  "payload/openApp": true,
+                  "payload/recipients": [
+                    "@outputs('Get_driver')?['body/cr40f_emailmicrosoft']"
+                  ]
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "runAfter": {
+            "Web_Push_Send_push": [
+              "Succeeded",
+              "Failed",
+              "TimedOut"
+            ]
+          },
+          "else": {
+            "actions": {}
+          },
+          "expression": {
+            "equals": [
+              "@variables('Web_Push_Entregue')",
+              false
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "runAfter": {
+        "Config_App": [
+          "Succeeded",
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "else": {
+        "actions": {}
+      },
+      "expression": {
+        "and": [
+          {
+            "not": {
+              "equals": [
+                "@empty(outputs('Get_driver')?['body/cr40f_emailmicrosoft'])",
+                true
+              ]
+            }
+          },
+          {
+            "equals": [
+              "@variables('Modulo_Desligado')",
+              false
+            ]
+          }
+        ]
+      },
+      "type": "If"
+    },
+    "Get_driver": {
+      "runAfter": {
+        "Init_modulo_desligado": [
+          "Succeeded"
+        ]
+      },
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "connectionName": "shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "cr40f_funcionarioses",
+          "$select": "cr40f_emailmicrosoft",
+          "recordId": "@triggerOutputs()?['body/_cr40f_motorista_value']"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Init_modulo_desligado": {
+      "runAfter": {
+        "Init_web_push_entregue": [
+          "Succeeded"
+        ]
+      },
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Modulo_Desligado",
+            "type": "boolean",
+            "value": false
+          }
+        ]
+      }
+    },
+    "Config_App": {
+      "runAfter": {
+        "Get_driver": [
+          "Succeeded"
+        ]
+      },
+      "type": "Scope",
+      "actions": {
+        "Config_efetiva": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "operationId": "PerformUnboundAction",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "connectionName": "shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "actionName": "cr40f_AppConfigEfetiva",
+              "item/Funcionario": "@triggerOutputs()?['body/_cr40f_motorista_value']"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Set_modulo_desligado": {
+          "runAfter": {
+            "Config_efetiva": [
+              "Succeeded"
+            ]
+          },
+          "type": "SetVariable",
+          "inputs": {
+            "name": "Modulo_Desligado",
+            "value": "@equals(json(coalesce(outputs('Config_efetiva')?['body/Resultado'], '{}'))?['chaves']?['multas'], false)"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

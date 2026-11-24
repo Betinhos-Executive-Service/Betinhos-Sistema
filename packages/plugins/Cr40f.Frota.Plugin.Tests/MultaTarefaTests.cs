@@ -93,9 +93,9 @@ public class MultaTarefaTests
         Tarefa(mundo).Sincronizar(multa.Id, false, MultaCodigos.Identificar);
 
         var t = UnicaTarefa(mundo);
-        Assert.Equal("Multa 1A2B3C · ABC1D23 · Avisar o motorista", t["cr40f_titulo"]);
+        Assert.Equal("Multa 1A2B3C · ABC1D23 · Indicar no órgão", t["cr40f_titulo"]);
         var checklist = Json.Ler<List<ItemChecklist>>((string)t["cr40f_checklistjson"]);
-        Assert.Equal(new[] { "multa-definir-responsavel:True", "multa-avisar-motorista:False", "multa-registrar-indicacao:False", "multa-registrar-pagamento:False", "multa-registrar-acerto:False" },
+        Assert.Equal(new[] { "multa-definir-responsavel:True", "multa-registrar-indicacao:False", "multa-registrar-pagamento:False", "multa-registrar-acerto:False" },
             checklist.Select(i => $"{i.Id}:{i.Done}"));
         Assert.Equal("Definir o responsável", checklist[0].Title);
         var etapa = Eventos(mundo).Single(e => (string)e["cr40f_campo"] == "multa:etapa");
