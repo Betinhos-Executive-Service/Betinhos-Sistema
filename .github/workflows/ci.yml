@@ -26,6 +26,7 @@ jobs:
     outputs:
       shell: ${{ steps.filtro.outputs.shell }}
       plugins: ${{ steps.filtro.outputs.plugins }}
+      acompanhar: ${{ steps.filtro.outputs.acompanhar }}
     steps:
       - id: filtro
         env:
@@ -33,13 +34,19 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; echo "plugins=todos" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; echo "plugins=todos" >> "$GITHUB_OUTPUT"; echo "acompanhar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
           # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso,driverrecordsharing,autonumberguard
           # (este último mora em apps/formulario-geral/power-platform/plugins; plannernotifications e quoteautonumberguard, em packages/planner/power-platform/plugins).
           plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar|Betinhos\.(DriverRecordSharing|ExpenseUpload)(\.Tests)?)/.*#\2\4\5#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p; s#^apps/formulario-geral/power-platform/plugins/(AutoNumberGuard)(\.Tests)?/.*#\1#p; s#^packages/planner/power-platform/plugins/(PlannerNotifications|QuoteAutoNumberGuard)(\.Tests)?/.*#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
           if echo "$arquivos" | grep -qE '^\.github/workflows/ci\.yml$'; then plugins=todos; fi
           echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
+          # Worker acompanhar-motorista: o próprio app, o bump-version compartilhado, o lock e este workflow.
+          if echo "$arquivos" | grep -qE '^(apps/acompanhar-motorista/|packages/deploy/bump-version\.mjs$|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
+            echo "acompanhar=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "acompanhar=false" >> "$GITHUB_OUTPUT"
+          fi
           if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
             echo "shell=true" >> "$GITHUB_OUTPUT"
           else
@@ -90,8 +97,9 @@ jobs:
       - name: Sintaxe dos Workers sem typecheck (cadastro-passageiro e backups)
         run: pnpm --filter @betinhos/cadastro-passageiro --filter @betinhos/backups check
       # Inclui @betinhos/formulario-geral (build do webresource + 19 testes do app).
-      - name: Testes (exceto shell)
-        run: pnpm -r --filter '!@betinhos/shell' test
+      # O acompanhar-motorista tem job próprio (só roda quando o PR o toca).
+      - name: Testes (exceto shell e acompanhar-motorista)
+        run: pnpm -r --filter '!@betinhos/shell' --filter '!@betinhos/acompanhar-motorista' test
       # O WebResource do App Motoristas é um HTML só; sem número de versão novo (quem sobe a versão é a publicação).
       - name: Build do App Motoristas
         run: pnpm --filter @betinhos/motoristas exec node scripts/build-react-singlefile.cjs --no-version
@@ -134,6 +142,29 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/3
+
+  # Worker acompanhar-motorista (apps/acompanhar-motorista): check (node --check + tsc), testes (node:test + vitest) e build do front.
+  # Só roda quando o PR toca o app. Nunca publica nem chama wrangler (a publicação é do deploy.yml e do producao.yml).
+  acompanhar-motorista:
+    needs: mudancas
+    if: needs.mudancas.outputs.acompanhar == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - run: pnpm install --frozen-lockfile --filter @betinhos/acompanhar-motorista...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm --filter @betinhos/acompanhar-motorista check
+      - run: pnpm --filter @betinhos/acompanhar-motorista test
+      - run: pnpm --filter @betinhos/acompanhar-motorista build
 
   # Testes dos plugins (net48, só Windows) e build dos registradores, só dos plugins que o PR toca. O workflow Deploy
   # publica sem repetir os testes. Sem assinatura aqui: a chave fica só no environment dev.
@@ -181,14 +212,15 @@ jobs:
   ok:
     name: CI ok
     if: always()
-    needs: [mudancas, checagens, schema, shell, plugins]
+    needs: [mudancas, checagens, schema, shell, plugins, acompanhar-motorista]
     runs-on: ubuntu-latest
     steps:
       # shell "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
       - run: |
-          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }}"
+          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }} | acompanhar-motorista: ${{ needs.acompanhar-motorista.result }} (${{ needs.mudancas.outputs.acompanhar }})"
           test "${{ needs.mudancas.result }}" = success
           test "${{ needs.checagens.result }}" = success
           if [ "${{ github.event_name }}" = pull_request ]; then test "${{ needs.schema.result }}" = success; fi
           if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
           if [ -n "${{ needs.mudancas.outputs.plugins }}" ]; then test "${{ needs.plugins.result }}" = success; fi
+          if [ "${{ needs.mudancas.outputs.acompanhar }}" = true ]; then test "${{ needs.acompanhar-motorista.result }}" = success; fi

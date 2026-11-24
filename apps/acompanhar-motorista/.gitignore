@@ -1,0 +1,4 @@
+web-dist/
+.wrangler/
+.dev.vars
+docs/verificacao/

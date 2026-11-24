@@ -142,3 +142,34 @@ test('hotfix-tela.mjs e o teste dele não mudam o PROD', () => {
   assert.equal(caminhoDoArquivo('packages/deploy/hotfix-tela.mjs'), 'nada')
   assert.equal(caminhoDoArquivo('packages/deploy/hotfix-tela.test.mjs'), 'nada')
 })
+
+test('Worker acompanhar-motorista: código vai pelo caminho worker; teste, docs, scripts e .md não mudam o PROD', () => {
+  for (const a of ['apps/acompanhar-motorista/src/worker.mjs', 'apps/acompanhar-motorista/web/src/App.tsx', 'apps/acompanhar-motorista/public/sw.js', 'apps/acompanhar-motorista/wrangler.jsonc', 'apps/acompanhar-motorista/package.json']) {
+    assert.equal(caminhoDoArquivo(a), 'worker', a)
+  }
+  for (const a of ['apps/acompanhar-motorista/tests/viagem.test.mjs', 'apps/acompanhar-motorista/docs/superpowers/specs/x.md', 'apps/acompanhar-motorista/scripts/mock-servicos.mjs', 'apps/acompanhar-motorista/web/src/testes/viagem.test.tsx', 'apps/acompanhar-motorista/README.md', 'apps/acompanhar-motorista/.dev.vars.exemplo']) {
+    assert.equal(caminhoDoArquivo(a), 'nada', a)
+  }
+  const r = caminhoDaPublicacao(['apps/acompanhar-motorista/src/worker.mjs', 'apps/acompanhar-motorista/tests/viagem.test.mjs', 'docs/x.md'])
+  assert.equal(r.caminho, 'worker')
+  assert.equal(r.worker, true)
+  assert.equal(caminhoDaPublicacao(['apps/acompanhar-motorista/tests/viagem.test.mjs']).caminho, 'nada')
+  assert.equal(caminhoDaPublicacao(['apps/acompanhar-motorista/tests/viagem.test.mjs']).worker, false)
+})
+
+test('Worker junto com tela, plugin ou soluções: o caminho dos outros vale e o Worker publica em paralelo', () => {
+  const tela = caminhoDaPublicacao(['apps/shell/src/App.tsx', 'apps/acompanhar-motorista/src/worker.mjs'])
+  assert.equal(tela.caminho, 'front')
+  assert.equal(tela.worker, true)
+  const plugin = caminhoDaPublicacao(['packages/plugins/Cr40f.Frota.Plugin/A.cs', 'apps/acompanhar-motorista/web/src/App.tsx'])
+  assert.equal(plugin.caminho, 'plugin')
+  assert.equal(plugin.worker, true)
+  const solucoes = caminhoDaPublicacao(['packages/deploy/provision-equipamentos.ps1', 'apps/acompanhar-motorista/src/worker.mjs'])
+  assert.equal(solucoes.caminho, 'solucoes')
+  assert.equal(solucoes.worker, true)
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx']).worker, false)
+})
+
+test('sem base conhecida: soluções e o Worker também publica', () => {
+  assert.equal(caminhoDaPublicacao(null).worker, true)
+})

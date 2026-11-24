@@ -1,0 +1,48 @@
+{
+  // PROD: este é o Worker `acompanhar-motorista` que já atende os links (mesmo nome, mesmo KV, mesmo Durable Object `Viagem`).
+  // `wrangler deploy` sem `--env` publica o PROD; só o workflow Produção faz isso. DEV: `env.dev` (Worker `acompanhar-motorista-dev`).
+  "name": "acompanhar-motorista",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-09-01",
+  "account_id": "a26e65df1496d9808e12a495bc47cd80",
+  "workers_dev": true,
+  // Build do app React (`pnpm build` gera web-dist/ com portal.html, JS, CSS e os arquivos de public/). O Worker segue
+  // dono de /r/*: devolve o portal.html com as metatags e o bootstrap do link e responde as APIs.
+  "assets": { "directory": "./web-dist", "binding": "ASSETS", "run_worker_first": ["/r/*"] },
+  // Contato da central exibido na página (mesmo número do site da Betinhos)
+  "vars": {
+    "CENTRAL_TELEFONE": "+5512997236961",
+    "CENTRAL_WHATSAPP": "5512997236961"
+  },
+  // Mesmo namespace KV do conector Infleet: ele cria `track:<id>`; este Worker grava só os marcos do serviço
+  "kv_namespaces": [{ "binding": "TRACK_KV", "id": "ff5ff0133e2741799e0c660dea0ddf80" }],
+  // Um Durable Object por link (src/viagem.mjs): uma leitura da Infleet por viagem, WebSocket ao vivo e avisos.
+  // Classe SQLite (plano gratuito); a migração é aditiva e os links ativos seguem respondendo durante o deploy.
+  "durable_objects": { "bindings": [{ "name": "VIAGEM", "class_name": "Viagem" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Viagem"] }],
+  // Envio de dados de passageiro (POST /r/<id>/passageiros/<guid>): 20 por minuto por IP + link. Sem o binding, não bloqueia.
+  // Segredos CADASTRO_FLOW_URL_DEV e CADASTRO_FLOW_URL_PROD (URL do flow, com assinatura): `wrangler secret put`, nunca no repositório.
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4202", "simple": { "limit": 20, "period": 60 } }],
+  // A cada 15 min: reenvia ao Flow do Dataverse as avaliações que ainda não chegaram (até 20 por execução)
+  "triggers": { "crons": ["*/15 * * * *"] },
+  // Logs do Worker guardados no painel (ex.: evento "rota_suspeita" para medir quantas rotas foram seguradas)
+  "observability": { "enabled": true },
+  // DEV: `wrangler deploy --env dev` publica o Worker `acompanhar-motorista-dev` (deploy.yml, push na develop).
+  // `vars`, KV, Durable Objects, migrations e ratelimits não herdam do topo; assets, cron, conta e observability herdam.
+  // Segredos próprios (`wrangler secret put --env dev`), os mesmos nomes do PROD (lista no README).
+  "env": {
+    "dev": {
+      "name": "acompanhar-motorista-dev",
+      "vars": {
+        "CENTRAL_TELEFONE": "+5512997236961",
+        "CENTRAL_WHATSAPP": "5512997236961"
+      },
+      // KV_DEV_ID_PENDENTE: id do namespace KV do DEV (`wrangler kv namespace create TRACK_KV_DEV`), a trocar antes do
+      // merge. É o único lugar: o workflow Deploy recusa publicar enquanto o texto abaixo estiver aqui.
+      "kv_namespaces": [{ "binding": "TRACK_KV", "id": "KV_DEV_ID_PENDENTE" }],
+      "durable_objects": { "bindings": [{ "name": "VIAGEM", "class_name": "Viagem" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Viagem"] }],
+      "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "4206", "simple": { "limit": 20, "period": 60 } }]
+    }
+  }
+}
