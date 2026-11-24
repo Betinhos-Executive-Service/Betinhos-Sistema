@@ -4,6 +4,7 @@ import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { SignaturePad } from "../../shared/ui/SignaturePad";
 import { SuccessCheck } from "./SuccessCheck";
 import { SelfieCapture } from "./SelfieCapture";
+import { AditivoPainel } from "./AditivoMotorista";
 import { ServicesMenu } from "../../shared/ui/navigation/ServicesMenu";
 import {
   abrirPdf,
@@ -168,16 +169,18 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
         return <button type="button" className="termo-primary" disabled={!canAdvance(flow) || busy} aria-busy={busy} onClick={() => void enviarContestacao()}>{spinner}{busy ? "Enviando" : flow.erro ? "Tentar de novo" : "Enviar"}</button>;
       case "sucesso":
         return <><button type="button" className="termo-primary" onClick={onDone}>Voltar para multas</button>{pdfBotao("termo-text-button termo-footer-secondary")}</>;
+      case "semAditivo":
+        return <button type="button" className="termo-text-button termo-footer-secondary" onClick={() => dispatch({ type: "go", step: "detalhe" })}>Voltar ao termo</button>;
       default:
         return <button type="button" className="termo-primary" onClick={onDone}>Voltar para multas</button>;
     }
   })();
 
-  const finalStep = flow.step === "detalhe" || flow.step === "sucesso" || flow.step === "contestado" || flow.step === "semAditivo" || flow.step === "encerrado";
+  const finalStep = flow.step === "detalhe" || flow.step === "sucesso" || flow.step === "contestado" || flow.step === "encerrado";
   const back = () => {
     if (flow.enviando) return;
     if (finalStep) { onDone(); return; }
-    if (flow.step === "contestar" || flow.step === "selfie") { dispatch({ type: "go", step: "detalhe" }); return; }
+    if (flow.step === "contestar" || flow.step === "selfie" || flow.step === "semAditivo") { dispatch({ type: "go", step: "detalhe" }); return; }
     dispatch({ type: "go", step: SIGN_STEPS[stepIndex - 1] });
   };
 
@@ -321,10 +324,7 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
           ) : null}
 
           {flow.step === "semAditivo" ? (
-            <section className="termo-result" role="alert">
-              <h2 ref={titleRef} tabIndex={-1}>Procure o escritório</h2>
-              <p>Para assinar pelo app, você precisa antes assinar no escritório o aditivo de assinatura eletrônica. Depois disso, volte aqui; o prazo continua até {prazo}.</p>
-            </section>
+            <AditivoPainel continuarLabel="Continuar" onConcluir={() => dispatch({ type: "go", step: "selfie" })} titleRef={titleRef} />
           ) : null}
 
           {flow.step === "encerrado" ? (

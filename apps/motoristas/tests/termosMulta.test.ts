@@ -7,9 +7,12 @@ import {
   createSingleFlight,
   descreverAcordo,
   descreverGpsErro,
+  gerarMeuAditivo,
   initialTermoFlow,
+  lerPdfAssinado,
   mapTermo,
   parseEvidencias,
+  registrarMeuAditivo,
   selfieDimensions,
   SEM_ADITIVO_MENSAGEM,
   termoFlowReducer,
@@ -169,4 +172,42 @@ test("erro rejeitado pelo Xrm mantém code, errorCode e message originais", asyn
   } finally {
     (globalThis as any).window = previousWindow;
   }
+});
+
+async function comXrm<T>(execute: (request: any) => Promise<unknown>, fn: () => Promise<T>) {
+  const previousWindow = (globalThis as any).window;
+  const windowMock: any = { location: { hostname: "app.exemplo.test", search: "" }, Xrm: { WebApi: { online: { execute } } } };
+  windowMock.parent = windowMock;
+  (globalThis as any).window = windowMock;
+  try { return await fn(); } finally { (globalThis as any).window = previousWindow; }
+}
+
+const resposta = (corpo: Record<string, unknown>) => ({ ok: true, status: 200, json: async () => corpo });
+
+test("gerarMeuAditivo chama a Custom API sem parâmetros e devolve o PDF do próprio motorista", async () => {
+  const chamadas: any[] = [];
+  const pdf = await comXrm(async (request) => { chamadas.push(request); return resposta({ new_PdfBase64: "JVBERg==", new_NomeArquivo: "aditivo.pdf" }); }, () => gerarMeuAditivo());
+  assert.deepEqual(pdf, { base64: "JVBERg==", nome: "aditivo.pdf" });
+  assert.equal(chamadas[0].getMetadata().operationName, "new_GerarMeuAditivo");
+  assert.deepEqual(Object.keys(chamadas[0]).filter((k) => k !== "getMetadata"), []);
+});
+
+test("registrarMeuAditivo envia só o PDF assinado, sem id de funcionário", async () => {
+  const chamadas: any[] = [];
+  await comXrm(async (request) => { chamadas.push(request); return { ok: true, status: 204 }; }, () => registrarMeuAditivo("JVBERg=="));
+  assert.equal(chamadas[0].getMetadata().operationName, "new_RegistrarMeuAditivo");
+  assert.deepEqual(Object.keys(chamadas[0]).filter((k) => k !== "getMetadata"), ["new_PdfBase64"]);
+  assert.equal(chamadas[0].new_PdfBase64, "JVBERg==");
+});
+
+test("registrarMeuAditivo repassa a mensagem clara do servidor", async () => {
+  await comXrm(async () => { throw { message: "O CPF de quem assinou não é o do seu cadastro. Assine com a sua própria conta gov.br." }; }, async () => {
+    await assert.rejects(registrarMeuAditivo("JVBERg=="), /O CPF de quem assinou/);
+  });
+});
+
+test("lerPdfAssinado devolve base64 puro, recusa tipo errado e arquivo acima de 5 MB", async () => {
+  assert.equal(await lerPdfAssinado(new File([new Uint8Array([37, 80, 68, 70])], "a.pdf", { type: "application/pdf" })), "JVBERg==");
+  await assert.rejects(lerPdfAssinado(new File(["x"], "foto.png", { type: "image/png" })), /PDF devolvido pelo gov\.br/);
+  await assert.rejects(lerPdfAssinado(new File([new Uint8Array(5 * 1024 * 1024 + 1)], "grande.pdf", { type: "application/pdf" })), /5 MB/);
 });

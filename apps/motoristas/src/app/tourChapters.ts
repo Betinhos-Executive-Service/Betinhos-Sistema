@@ -772,6 +772,16 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     ]
   },
   {
+    id: "aditivo",
+    title: "Aditivo de assinatura eletrônica",
+    steps: [
+      step("voltar", "Voltar", ["Volta para o início."], { target: SERVICE_HOME }),
+      step("baixar", "Baixar aditivo", ["Baixa o seu aditivo em PDF. Ele é gerado só para você."], { target: ".termo-primary" }),
+      step("enviar", "Enviar aditivo assinado", ["Assine o PDF no gov.br sem alterar o arquivo e envie aqui o PDF devolvido (até 5 MB). O app confere se a assinatura é sua e libera na hora."], { target: ".termo-text-button", optional: true }),
+      helpStep()
+    ]
+  },
+  {
     id: "postos-proximos",
     title: "Postos próximos",
     steps: [
@@ -868,6 +878,7 @@ const CHAPTER_IDS_BY_SCREEN: Readonly<Record<string, readonly string[]>> = {
   gastosCartao: ["gastos-cartao"],
   gastosRelatorio: ["gastos-relatorio"],
   postosProximos: ["postos-proximos"],
+  aditivo: ["aditivo"],
   solicitarManutencao: ["manutencao"],
   colisoesInicio: ["colisoes"],
   colisoes: ["colisao-registro"],
