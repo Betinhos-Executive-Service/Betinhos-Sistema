@@ -8,7 +8,7 @@ export function Parceria({ parceira, tamanho }: { parceira: Marca | null; tamanh
       <img className="pc-parceria__betinhos" src={logoBetinhos} alt="Betinhos Executive Service" />
       {parceira && (
         <>
-          <span className="pc-parceria__x" aria-hidden>×</span>
+          <span className="pc-parceria__divisor" aria-hidden />
           <img className="pc-parceria__cliente" src={parceira.logo} alt={parceira.nome} />
         </>
       )}
