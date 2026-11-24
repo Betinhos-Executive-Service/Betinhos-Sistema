@@ -7,7 +7,7 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 | Rota | O que faz |
 |---|---|
 | `POST /api/auth/entrar` | `{email, senha}` → sessão (cookie de 30 dias); sem cadastro, sem senha ou senha errada: 401 `senha_invalida` |
-| `POST /api/auth/codigo` | 1º acesso e "Esqueci a senha": sempre 204; se o e-mail é de usuário autorizado (cadastro ou domínio), manda o código (10 min) |
+| `POST /api/auth/codigo` | 1º acesso e "Esqueci a senha": e-mail autorizado (cadastro ou domínio) → 204 e o código (10 min); sem acesso → 403 `sem_acesso` (decisão do Renan, 24/11/2026); 10 negados do mesmo IP em 15 min → 429 |
 | `POST /api/auth/codigo/confirmar` | `{email, codigo}` → libera a criação da senha por 10 min (cookie da etapa) |
 | `POST /api/auth/senha` | `{senha}` (8 a 200 caracteres) → grava o hash, derruba as sessões antigas e abre a sessão |
 | `GET /api/auth/sessao` | Sessão atual ou 401 (o portal abre já logado) |

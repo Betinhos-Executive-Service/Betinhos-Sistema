@@ -53,10 +53,23 @@ async function logar(email = 'fiscal@tenaris.com', senha = SENHA) {
 const entrar = (email: string, senha: string) => chamar('POST', '/auth/entrar', { email, senha })
 
 describe('login', () => {
-  it('e-mail não cadastrado: 204 e nada enviado', async () => {
+  it('e-mail não cadastrado: 403 sem_acesso e nada enviado', async () => {
     const r = await chamar('POST', '/auth/codigo', { email: 'ninguem@tenaris.com' })
-    expect(r.status).toBe(204)
+    expect(r.status).toBe(403)
+    expect(await r.json()).toEqual({ erro: 'sem_acesso' })
     expect(emails).toHaveLength(0)
+  })
+
+  it('10 respostas sem acesso do mesmo IP em 15 min: a 11ª vira 429', async () => {
+    for (let i = 0; i < 10; i++) expect((await chamar('POST', '/auth/codigo', { email: `n${i}@example.com` })).status).toBe(403)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n10@example.com' })).status).toBe(429)
+  })
+
+  it('pedido de e-mail liberado não conta para o limite de sem acesso do IP', async () => {
+    for (let i = 0; i < 9; i++) expect((await chamar('POST', '/auth/codigo', { email: `n${i}@example.com` })).status).toBe(403)
+    for (let i = 0; i < 3; i++) expect((await chamar('POST', '/auth/codigo', { email: 'fiscal@tenaris.com' })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n9@example.com' })).status).toBe(403)
+    expect((await chamar('POST', '/auth/codigo', { email: 'n10@example.com' })).status).toBe(429)
   })
 
   it('e-mail cadastrado: 204, código no e-mail e só o hash no Dataverse', async () => {
@@ -162,7 +175,7 @@ describe('multi-cliente', () => {
     banco.validadorclientes.find((v) => v.cr40f_email === 'paula.ribeiro@latasa.com.br')!.cr40f_ativo = false
     emails.length = 0
     const antes = banco.validadorclientes.length
-    expect((await chamar('POST', '/auth/codigo', { email: 'paula.ribeiro@latasa.com.br' })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email: 'paula.ribeiro@latasa.com.br' })).status).toBe(403)
     expect(emails).toHaveLength(0)
     expect(banco.validadorclientes).toHaveLength(antes)
   })
@@ -172,9 +185,9 @@ describe('multi-cliente', () => {
     ['subdomínio parecido', 'x@tasa.com'],
     ['dois clientes com o mesmo domínio', 'x@ambiguo.com'],
     ['cliente sem módulo', 'x@semmodulo.com'],
-  ])('%s: 204, sem e-mail e sem cadastro', async (_, email) => {
+  ])('%s: 403 sem_acesso, sem e-mail e sem cadastro', async (_, email) => {
     const antes = banco.validadorclientes.length
-    expect((await chamar('POST', '/auth/codigo', { email })).status).toBe(204)
+    expect((await chamar('POST', '/auth/codigo', { email })).status).toBe(403)
     expect(emails).toHaveLength(0)
     expect(banco.validadorclientes).toHaveLength(antes)
     expect((await chamar('POST', '/auth/codigo/confirmar', { email, codigo: '123456' })).status).toBe(401)

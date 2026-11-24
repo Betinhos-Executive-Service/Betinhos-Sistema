@@ -16,6 +16,7 @@ const ERROS: Partial<Record<CodigoErro, string>> = {
   senha_fraca: SENHA_FRACA,
   codigo_invalido: 'Código incorreto. Confira o último e-mail recebido e digite os 6 números.',
   codigo_expirado: 'Este código expirou. Peça um novo código.',
+  sem_acesso: 'Este e-mail não tem acesso ao portal. Confira o endereço ou fale com a Betinhos.',
   bloqueado: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.',
 }
 
