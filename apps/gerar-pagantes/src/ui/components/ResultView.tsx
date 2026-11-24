@@ -1,5 +1,5 @@
 import { Alert, Button, Cluster, StatusBadge, Surface } from '@betinhos-executive-service/ui'
-import { Check, CircleAlert, Copy, Pencil, X } from 'lucide-react'
+import { Check, CircleAlert, Copy, FileDown, Pencil, X } from 'lucide-react'
 import { useState } from 'react'
 import { formatCurrency } from '../../money'
 
@@ -11,9 +11,10 @@ export interface ResultRow {
   linkLabel: string
   emailLabel: string
   error?: string
+  purchaseOrder?: boolean
 }
 
-export function ResultView({ title, rows }: { title: string; rows: ResultRow[] }) {
+export function ResultView({ title, rows, onBudget }: { title: string; rows: ResultRow[]; onBudget?: (name: string, amountCents: number) => void }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const failures = rows.filter((row) => row.error).length
 
@@ -34,6 +35,7 @@ export function ResultView({ title, rows }: { title: string; rows: ResultRow[] }
             <StatusBadge tone={row.error ? 'danger' : 'success'} icon={row.error ? <CircleAlert size={12} /> : <Check size={12} />}>{row.linkLabel}</StatusBadge>
             <span>{row.emailLabel}</span>
             {row.paymentUrl ? <Button variant="ghost" size="compact" icon={copiedKey === row.key ? <Check size={14} /> : <Copy size={14} />} onClick={() => void copy(row)}>{copiedKey === row.key ? 'Copiado' : 'Copiar link'}</Button> : null}
+            {row.purchaseOrder && onBudget ? <Button variant="ghost" size="compact" icon={<FileDown size={14} />} onClick={() => onBudget(row.name, row.amountCents)}>Baixar orçamento</Button> : null}
           </Cluster>
           {row.error ? <p className="result-view__error"><CircleAlert size={14} aria-hidden="true" />{row.error}</p> : null}
         </li>)}

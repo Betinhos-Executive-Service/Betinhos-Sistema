@@ -1,10 +1,11 @@
 import { Button, EmptyState, PageToolbar, Skeleton, Stack, Surface } from '@betinhos-executive-service/ui'
 import { Scale, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import type { Guid, OperationData, Person, SubmitResult } from '../domain'
+import { isPurchaseOrder, type Guid, type OperationData, type Person, type SubmitResult } from '../domain'
 import { getRecordIdFromLocation, loadOperation, searchDirectoryPeople, submitOperation, updatePersonEmail } from '../dataverse'
 import { logAppError } from '../errorLogger'
 import { formatCurrency } from '../money'
+import { baixarOrcamento } from '../orcamento/orcamento'
 import { activeDrafts, changeCount, diffDrafts, draftReducer, initialState, missingPayerEmails, toSubmitPayers, validate, type DraftAction, type DraftState, type MissingEmail, type PayerDraft } from '../payerDraft'
 import { AllocationSummary } from './components/AllocationSummary'
 import { DiscardDialog } from './components/DiscardDialog'
@@ -43,7 +44,8 @@ function toResultRows(drafts: PayerDraft[], result: SubmitResult): ResultRow[] {
       paymentUrl: item?.paymentUrl ?? draft.paymentUrl,
       linkLabel: linkResultLabel[item?.linkStatus ?? 'NotApplicable'],
       emailLabel: emailResultLabel[item?.emailStatus ?? 'NotApplicable'],
-      error: result.errors.find((error) => error.paganteId === draft.id)?.message
+      error: result.errors.find((error) => error.paganteId === draft.id)?.message,
+      purchaseOrder: isPurchaseOrder(draft.paymentMethod)
     }
   })
 }
@@ -148,6 +150,16 @@ export function App() {
     if (action === 'reload') void load()
   }
 
+  const serviceStart = operation?.serviceStartDate ?? null
+  const serviceEnd = operation?.serviceEndDate ?? null
+  const downloadBudget = useCallback((name: string, amountCents: number) => {
+    baixarOrcamento({ nome: name, valorCents: amountCents, inicio: serviceStart, fim: serviceEnd }).catch(async (error: unknown) => {
+      console.error('[GerarPagantes] Não foi possível gerar o orçamento.', error)
+      await logAppError(error, { source: 'React', action: 'download-budget', phase: 'generate-docx', component: 'App' })
+      setNotice({ tone: 'error', text: 'Não foi possível gerar o orçamento. Tente de novo.' })
+    })
+  }, [serviceStart, serviceEnd])
+
   const markAmountInvalid = useCallback((key: string, invalid: boolean) => {
     setInvalidAmounts((current) => {
       if (current.has(key) === invalid) return current
@@ -220,7 +232,7 @@ export function App() {
     <div className="popup-content">
       <OperationHeader editing={isEditMode} displayId={operation.displayId} serviceCount={operation.serviceCount} balanced={difference === 0} onRefresh={reload} onClose={isEmbedded ? requestClose : undefined} />
       {notice ? <FeedbackNotice {...notice} /> : null}
-      {result ? <ResultView title={result.title} rows={result.rows} /> : <>
+      {result ? <ResultView title={result.title} rows={result.rows} onBudget={downloadBudget} /> : <>
         <Surface flush className="payers-panel">
           <PageToolbar variant="filters" label="Pagantes" className="payers-panel__toolbar"
             start={<PersonSelect ariaLabel="Adicionar pagante" placeholder="Adicionar pagante" suggestions={suggestions} excludedIds={activeIds} onSearch={searchDirectoryPeople}
@@ -228,7 +240,7 @@ export function App() {
             end={<Button variant="secondary" size="compact" icon={<Scale size={15} />} disabled={active.filter((draft) => !draft.settled).length === 0} onClick={() => dispatch({ type: 'splitEvenly', totalCents })}>Dividir igualmente</Button>} />
           {drafts.length ? <div className="payers-panel__list">
             <div className="payers-panel__columns" aria-hidden="true"><span>Pagante</span><span>Forma</span><span>Valor</span><span>Envio</span></div>
-            {drafts.map((draft) => <PayerEditorRow key={draft.key} draft={draft} change={rowChange.get(draft.key)} errors={validation.rowErrors.get(draft.key) ?? []} totalCents={totalCents} people={suggestions} onSearch={searchDirectoryPeople} dispatch={dispatch} onAmountInvalid={markAmountInvalid} />)}
+            {drafts.map((draft) => <PayerEditorRow key={draft.key} draft={draft} change={rowChange.get(draft.key)} errors={validation.rowErrors.get(draft.key) ?? []} totalCents={totalCents} people={suggestions} onSearch={searchDirectoryPeople} dispatch={dispatch} onAmountInvalid={markAmountInvalid} onBudget={downloadBudget} />)}
           </div> : <EmptyState compact icon={<UsersRound size={32} />} title="Nenhum pagante ainda">Use a busca acima para adicionar quem vai pagar esta OP.</EmptyState>}
           <AllocationSummary totalCents={totalCents} allocatedCents={validation.allocatedCents} remainingCents={difference} />
         </Surface>
