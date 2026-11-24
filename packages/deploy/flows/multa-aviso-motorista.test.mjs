@@ -31,10 +31,10 @@ test('Web Push primeiro com o texto fixo, sem valor nem infração; o push do Po
   assert.equal(worker['body/payload/url'], '/WebResources/new_app-motoristas-v2')
 })
 
-test('o script nasce com BOM, é dry run por padrão e fica fora do flows-dev.mjs', () => {
+test('o script nasce com BOM, é dry run por padrão e o Deploy o publica pelo flows-dev.mjs', () => {
   const ps1 = readFileSync(new URL('../provision-flow-multa-aviso-motorista.ps1', import.meta.url), 'utf8')
   assert.equal(ps1.charCodeAt(0), 0xfeff)
   assert.ok(ps1.includes("Sync-FlowExistente $sessao 'Multa | Aviso ao motorista'"))
   assert.ok(ps1.includes("-FlowDeReferencias 'Termo de multa | Push ao motorista'"))
-  assert.doesNotMatch(readFileSync(new URL('../flows-dev.mjs', import.meta.url), 'utf8'), /multa-aviso-motorista/)
+  assert.match(readFileSync(new URL('../flows-dev.mjs', import.meta.url), 'utf8'), /provision-flow-multa-aviso-motorista\.ps1/)
 })
