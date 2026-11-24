@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getInitialParams } from "./app/bootstrap";
 import { isHashRoutingEnabled } from "./app/navigation";
 import type { MaintenanceRequestVehicleOption } from "./features/manutencao/remoto";
-import type { DriverContext } from "./data/dataverse/cliente";
+import { getDriverContext, getDriverCurrentVehicleId, type DriverContext } from "./data/dataverse/cliente";
 import { useDados } from "./app/DataProvider";
 import { AppShell } from "./app/AppShell";
 import { resetDadosLocais } from "./app/resetDadosLocais";
@@ -65,6 +65,9 @@ import { ButtonPreviewScreen } from "./app/ButtonPreviewScreen";
 import { InitialScreen } from "./features/servicos/InitialScreen";
 import { ReceiptPreviewScreen } from "./features/recibo/ReceiptScreen";
 import { isThirdPartyDriver } from "./features/meu-carro/myVehicle";
+import { loadOwnFleetRemote } from "./features/meu-carro/remoto";
+import { solicitarVistoriaAgora } from "./features/checklist/checklists";
+import { MOCK_FLEET } from "./lib/serviceVehicleInfleetMock";
 import type { DetailData, MaintenancePhotoKind, Screen } from "./types";
 import type { RemoteOperation } from "./shared/ui/FlowProgressOverlay";
 import { isMockRuntime, isPreviewMode } from "./shared/modoPreview";
@@ -617,7 +620,17 @@ function App() {
   const telaTreinamentos = rotasTreinamentos(screen, { ...treinamentosLista, driverContext, setScreen });
   if (telaTreinamentos) return show(telaTreinamentos);
 
-  const telaChecklist = rotasChecklist(screen, { ...checklistsLista, preencherManutencao: manutencao.preencherManutencaoDoChecklist, setScreen });
+  // "Fazer vistoria agora": só motorista não terceiro. A frota escolhida aqui nunca vira o carro atual.
+  const vistoriaAgora = isThirdPartyDriver(driverContext?.funcionario) ? undefined : {
+    veiculoAtualId: getDriverCurrentVehicleId(driverContext),
+    carregarFrota: async () => (remoteMode ? loadOwnFleetRemote() : MOCK_FLEET),
+    solicitar: async (veiculo: { id: string; placa: string }) => {
+      const motorista = driverContext ?? (remoteMode ? await getDriverContext() : null);
+      const placa = veiculo.placa || MOCK_FLEET.find((item) => item.id === veiculo.id)?.placa || "";
+      return solicitarVistoriaAgora({ id: veiculo.id, placa }, motorista?.id ?? "");
+    }
+  };
+  const telaChecklist = rotasChecklist(screen, { ...checklistsLista, preencherManutencao: manutencao.preencherManutencaoDoChecklist, setScreen, vistoriaAgora });
   if (telaChecklist) return show(telaChecklist);
 
   return show(

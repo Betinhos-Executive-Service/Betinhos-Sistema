@@ -152,6 +152,15 @@ test("consulta de veiculos para colisoes filtra apenas ativos sem restringir cat
   assert.equal(params.get("$top"), "200");
 });
 
+test("frota da vistoria agora traz so carros proprios ativos", () => {
+  const params = new URLSearchParams(buildActiveFleetQuery([100000000]));
+
+  assert.equal(
+    params.get("$filter"),
+    "statecode eq 0 and cr40f_statusdoveiculo eq 202410001 and (new_categoriadoveiculo eq 100000000)"
+  );
+});
+
 test("frota para o motorista escolher o carro traz so ativos Proprio ou Aluguel, sem terceiros", () => {
   const params = new URLSearchParams(buildActiveFleetQuery());
 

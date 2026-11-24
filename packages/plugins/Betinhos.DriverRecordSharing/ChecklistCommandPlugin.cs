@@ -91,6 +91,28 @@ namespace Betinhos.DriverRecordSharing
             var vehicle = system.Retrieve(VehicleTable, vehicleId, new ColumnSet(VehicleColumns()));
             if (vehicle.GetAttributeValue<OptionSetValue>("statecode")?.Value != 0)
                 throw new InvalidPluginExecutionException("Veículo inativo não pode receber checklist.");
+            // Chamada do App: o motorista abre a própria vistoria. Parâmetro opcional omitido chega como false.
+            var forCaller = context.InputParameters.Contains("new_ParaMim") && context.InputParameters["new_ParaMim"] is bool flag && flag;
+            Entity callerDriver = null;
+            if (forCaller)
+            {
+                callerDriver = CallerDriver(context, system);
+                if (!IsOwnActiveVehicle(vehicle))
+                    throw new InvalidPluginExecutionException("A vistoria na hora vale só para veículo próprio e ativo.");
+                var open = ChecklistQuery(new ColumnSet("new_estado", "new_motorista"), AguardandoMotorista, Pendente);
+                open.Criteria.AddCondition("new_veiculo", ConditionOperator.Equal, vehicleId);
+                var existing = AllRows(system, open).FirstOrDefault();
+                if (existing != null)
+                {
+                    var holder = existing.GetAttributeValue<EntityReference>("new_motorista");
+                    if (holder != null && holder.Id != callerDriver.Id)
+                        throw new InvalidPluginExecutionException("Já existe um checklist aberto para este veículo com outro motorista.");
+                    // Aberto sem motorista (ninguém identificado): passa para quem pediu.
+                    if (holder == null) AssignToCaller(system, existing.Id, callerDriver.Id);
+                    context.OutputParameters["new_ChecklistId"] = existing.Id;
+                    return;
+                }
+            }
             // Sem modelo informado: o modelo cujo filtro casa com o veículo; nada casou, o padrão.
             Entity template;
             if (modelId.HasValue) template = LoadTemplate(system, modelId.Value);
@@ -102,8 +124,36 @@ namespace Betinhos.DriverRecordSharing
             }
             var now = DateTime.UtcNow;
             var id = CreateChecklist(system, vehicle, template, Manual, now, context.InitiatingUserId, vehicleId.ToString("D") + ":M:" + Guid.NewGuid().ToString("N"));
-            AssignCurrentDriver(system, id);
+            if (forCaller) AssignToCaller(system, id, callerDriver.Id);
+            else AssignCurrentDriver(system, id);
             context.OutputParameters["new_ChecklistId"] = id;
+        }
+
+        // AssignDriver devolve false sem lançar (ex.: sem usuário Microsoft único); para o motorista isso é erro, não checklist invisível.
+        private static void AssignToCaller(IOrganizationService system, Guid checklistId, Guid driverId)
+        {
+            if (AssignDriver(system, checklistId, driverId)) return;
+            var row = system.Retrieve(ChecklistTable, checklistId, new ColumnSet("new_erroatribuicao"));
+            var reason = row.GetAttributeValue<string>("new_erroatribuicao");
+            throw new InvalidPluginExecutionException("Não foi possível abrir o checklist para você. " + (string.IsNullOrWhiteSpace(reason) ? "Contate a operação." : reason));
+        }
+
+        // Funcionário ativo do usuário chamador (e-mail Microsoft, mesmo filtro do Conclude); terceiro não abre vistoria por conta própria.
+        private static Entity CallerDriver(IPluginExecutionContext context, IOrganizationService system)
+        {
+            var user = system.Retrieve("systemuser", context.InitiatingUserId, new ColumnSet("internalemailaddress"));
+            var email = user.GetAttributeValue<string>("internalemailaddress");
+            if (string.IsNullOrWhiteSpace(email)) throw new InvalidPluginExecutionException("Usuário sem e-mail Microsoft.");
+            var query = new QueryExpression(DriverTable) { ColumnSet = new ColumnSet("cr40f_nomecompleto", "cr40f_tipodevinculo") };
+            query.Criteria.AddCondition("cr40f_emailmicrosoft", ConditionOperator.Equal, email);
+            query.Criteria.AddCondition("cr40f_status", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("statecode", ConditionOperator.Equal, 0);
+            query.Criteria.AddCondition("cr40f_tipodevinculo", ConditionOperator.In, new object[] { 0, 1 });
+            var matches = system.RetrieveMultiple(query).Entities;
+            if (matches.Count != 1) throw new InvalidPluginExecutionException("Usuário não está vinculado a um motorista ativo.");
+            if (Choice(matches[0], "cr40f_tipodevinculo") == 1)
+                throw new InvalidPluginExecutionException("Motorista terceiro não abre vistoria por aqui.");
+            return matches[0];
         }
 
         // ---------- Rotina diária ----------
