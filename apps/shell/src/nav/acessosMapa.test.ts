@@ -7,7 +7,8 @@ import { MENU } from './menu'
 
 type Classe = 'donas' | 'filhas' | 'cria' | 'edita' | 'leitura'
 type Modulo = Partial<Record<Classe, string[]>>
-type Rota = { perfis?: string[]; pastas: string[]; ignorar?: { tabela: string; motivo: string }[] }
+/** `ignorar[].perfis` limita a exceção a esses perfis da rota; sem ele vale para todos. */
+type Rota = { perfis?: string[]; pastas: string[]; ignorar?: { tabela: string; motivo: string; perfis?: string[] }[] }
 type Base = { leitura: string[]; proprio: string[]; cria: string[]; donas: string[]; sistema: Record<string, Record<string, string>> }
 type Mapa = { base: Base; modulos: Record<string, Modulo>; rotas: Record<string, Rota> }
 
@@ -83,11 +84,11 @@ describe('mapa de acessos', () => {
   it('cada perfil da rota alcança as tabelas que a tela usa', () => {
     const falhas: string[] = []
     for (const [id, rota] of Object.entries(mapa.rotas)) {
-      const ignoradas = new Set((rota.ignorar ?? []).map((i) => i.tabela))
-      const tabelas = tabelasDaRota(id, rota).filter((t) => !ignoradas.has(t) && !daBase.has(t))
+      const ignorada = (tabela: string, perfil: string | null) => (rota.ignorar ?? []).some((i) => i.tabela === tabela && (!i.perfis || (perfil != null && i.perfis.includes(perfil))))
+      const tabelas = tabelasDaRota(id, rota).filter((t) => !daBase.has(t))
       const perfis: (string | null)[] = rota.perfis?.length ? rota.perfis : [null]
       for (const perfil of perfis)
-        for (const tabela of tabelas) if (!perfil || !doModulo(perfil).has(tabela)) falhas.push(`${id}: ${tabela} (${perfil ?? 'base'})`)
+        for (const tabela of tabelas) if (!ignorada(tabela, perfil) && (!perfil || !doModulo(perfil).has(tabela))) falhas.push(`${id}: ${tabela} (${perfil ?? 'base'})`)
     }
     expect(falhas).toEqual([])
   })
@@ -119,6 +120,11 @@ describe('mapa de acessos', () => {
     ]
     const logicos = new Set(catalogo.map((t) => t.logico))
     expect([...new Set(doMapa)].filter((t) => !logicos.has(t)).sort()).toEqual([])
+  })
+
+  it('exceção por perfil só cita perfis da rota', () => {
+    const fora = Object.entries(mapa.rotas).flatMap(([id, r]) => (r.ignorar ?? []).flatMap((i) => (i.perfis ?? []).filter((p) => !r.perfis?.includes(p)).map((p) => `${id}: ${i.tabela} (${p})`)))
+    expect(fora).toEqual([])
   })
 
   it('toda exceção tem motivo', () => {

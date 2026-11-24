@@ -175,8 +175,15 @@
       "pastas": ["apps/shell/src/pages/clientes"]
     },
     "funcionarios": {
-      "perfis": ["rh"],
-      "pastas": ["apps/shell/src/pages/funcionarios"]
+      "perfis": ["rh", "acessos"],
+      "pastas": ["apps/shell/src/pages/funcionarios"],
+      "ignorar": [
+        {"tabela": "cr40f_documento", "perfis": ["acessos"], "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"},
+        {"tabela": "cr40f_funcionarios", "perfis": ["acessos"], "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"},
+        {"tabela": "cr40f_multas", "perfis": ["acessos"], "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"},
+        {"tabela": "cr40f_veiculos", "perfis": ["acessos"], "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"},
+        {"tabela": "new_possedeveiculo", "perfis": ["acessos"], "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"}
+      ]
     },
     "documentos": {
       "perfis": ["rh"],
@@ -212,7 +219,8 @@
     "cr40f_composicaodeprecos": {"perfis": ["financeiro"], "pastas": []},
     "new_marketing": {"perfis": ["operacional"], "pastas": []},
     "app-motoristas": {
-      "perfis": ["acessos"],
+      "perfis": ["operacional"],
+      "nivel": "gestor",
       "pastas": ["apps/shell/src/pages/app-motoristas"],
       "ignorar": [
         {"tabela": "cr40f_appconfigpessoa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
@@ -228,6 +236,13 @@
         {"tabela": "cr40f_projeto", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_projetoatualizacao", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},
         {"tabela": "cr40f_projetoetapa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"}
+      ]
+    },
+    "acessos": {
+      "perfis": ["acessos"],
+      "pastas": ["apps/shell/src/pages/acessos"],
+      "ignorar": [
+        {"tabela": "cr40f_funcionarios", "motivo": "Administrador de acessos abre Funcionarios por decisao do Renan (24/11/2026), mas o papel ainda nao le esta tabela: incluir a leitura antes do corte (plano 4)"}
       ]
     }
   }

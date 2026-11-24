@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { AcessosProvider, useAcessos } from './app/AcessosProvider'
+import { temAlgum } from './app/acessos'
 import { AppShell } from './app/AppShell'
 import { AuditoriaProvider } from './app/auditoria/AuditoriaProvider'
 import { GavetaRegistro } from './app/GavetaRegistro'
@@ -8,8 +10,9 @@ import { useDocumentosBadge } from './app/useDocumentosBadge'
 import { RouteLayout } from './app/RouteLayout'
 import { usePrefetchOnIntent } from './app/routes'
 import { iniciarCapturaDeErros } from './app/erros'
-import { createHost } from './host'
+import { createHost, type Host } from './host'
 import { DEFAULT_ITEM, ENTITY_NAMES, findItem, itemLabel, rotaAtualizada } from './nav/menu'
+import { perfisDoItem } from './nav/acessosMenu'
 import { hrefFor, parseHash, useHashQuery, useHashRoute } from './nav/useHashRoute'
 
 /** Itens do menu que só o gestor abre (constante: mantém o `ocultos` estável entre renders). */
@@ -19,10 +22,19 @@ type LabelsState = { labels: Map<string, string>; error: string | null }
 
 export function App() {
   const host = useMemo(createHost, [])
-  const docsUrgentes = useDocumentosBadge(host)
+  return (
+    <AcessosProvider host={host}>
+      <Sistema host={host} />
+    </AcessosProvider>
+  )
+}
+
+function Sistema({ host }: { host: Host }) {
+  const acesso = useAcessos()
+  const docsUrgentes = useDocumentosBadge(host, acesso.status === 'pronto' && temAlgum(acesso.acessos, perfisDoItem('documentos')))
   const badges = useMemo(() => (docsUrgentes ? { documentos: docsUrgentes } : undefined), [docsUrgentes])
   // Enquanto lê os papéis (acesso nulo) o item fica fora do menu: não pisca para quem não pode abrir.
-  const ocultos = useAcessoConfigApp(host)?.gestor ? undefined : SEM_GESTOR
+  const ocultos = useAcessoConfigApp()?.gestor ? undefined : SEM_GESTOR
   const route = useHashRoute()
   const query = useHashQuery()
   usePrefetchOnIntent()

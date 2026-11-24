@@ -1,9 +1,12 @@
 import { Suspense, useEffect, useState } from 'react'
-import { ExternalLink, MonitorOff, PlugZap, SearchX } from 'lucide-react'
+import { ExternalLink, Lock, MonitorOff, PlugZap, SearchX } from 'lucide-react'
 import type { Host } from '../host'
 import { DEFAULT_ITEM, type MenuGroup, type MenuItem } from '../nav/menu'
+import { nivelDoItem, perfisDoItem, podeAbrir } from '../nav/acessosMenu'
 import { hrefFor } from '../nav/useHashRoute'
-import { EmptyState, buttonClassName } from '@betinhos/ui'
+import { Button, EmptyState, buttonClassName } from '@betinhos/ui'
+import { useAcessos } from './AcessosProvider'
+import { PERFIL_LABEL } from './acessos'
 import { BrandLoader } from './BrandLoader'
 import { Frame } from './Frame'
 import { PageLayout } from './PageLayout'
@@ -29,6 +32,7 @@ function EntityFrame({ host, entity, title }: { host: Extract<Host, { mode: 'dat
 
 /** Escolhe o layout da rota: moldura para telas legadas, página do shell para os demais estados. */
 export function RouteLayout({ host, group, item, label }: Props) {
+  const acesso = useAcessos()
   if (!item) {
     return (
       <PageLayout title="Tela não encontrada">
@@ -37,6 +41,29 @@ export function RouteLayout({ host, group, item, label }: Props) {
         </EmptyState>
       </PageLayout>
     )
+  }
+
+  const perfis = perfisDoItem(item.id)
+  if (perfis) {
+    if (acesso.status === 'carregando') return <PageFallback title={label} />
+    if (acesso.status === 'erro') {
+      return (
+        <PageLayout eyebrow={group?.label} title={label}>
+          <EmptyState className="surface" align="start" icon={<PlugZap size={36} />} title="Não foi possível carregar seus acessos" action={<Button variant="primary" onClick={acesso.recarregar}>Tentar de novo</Button>}>
+            Sem essa leitura não dá para saber se você alcança esta tela.
+          </EmptyState>
+        </PageLayout>
+      )
+    }
+    if (!podeAbrir(acesso.acessos, item.id)) {
+      return (
+        <PageLayout eyebrow={group?.label} title={label}>
+          <EmptyState className="surface" align="start" icon={<Lock size={36} />} title="Sem acesso a este módulo" action={<a className={buttonClassName({ variant: 'primary' })} href={hrefFor(DEFAULT_ITEM.id)}>Ir para a Página Inicial</a>}>
+            Esta tela pede o perfil {perfis.map((p) => PERFIL_LABEL[p]).join(' ou ')}{nivelDoItem(item.id) === 'gestor' ? ', nível Gestor' : ''}. Peça o acesso a quem administra os acessos do sistema.
+          </EmptyState>
+        </PageLayout>
+      )
+    }
   }
 
   if (item.kind === 'unavailable') {
