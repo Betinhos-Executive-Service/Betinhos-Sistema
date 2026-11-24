@@ -1,7 +1,7 @@
 import { Avatar, Button, Checkbox, Cluster, Field, Input, Select, StatusBadge, Switch, Tooltip } from '@betinhos-executive-service/ui'
-import { Check, CircleAlert, Copy, Lock, LockOpen, Mail, RotateCcw, Send, Trash2, Undo2, UserRoundPen } from 'lucide-react'
+import { Check, CircleAlert, Copy, FileDown, Lock, LockOpen, Mail, RotateCcw, Send, Trash2, Undo2, UserRoundPen } from 'lucide-react'
 import { memo, useEffect, useState, type FormEvent } from 'react'
-import { EMAIL_MAX_LENGTH, emailValid, PAYMENT_METHODS, RECEIPT_EMAIL_MAX_LENGTH, type Person, type PersonSearch } from '../../domain'
+import { EMAIL_MAX_LENGTH, emailValid, isPurchaseOrder, PAYMENT_METHODS, RECEIPT_EMAIL_MAX_LENGTH, type Person, type PersonSearch } from '../../domain'
 import { formatCurrency, hasValidCurrencyPrecision, parseCurrency } from '../../money'
 import { isCard, needsRecipient, recipientIsOther, recipientLabel, type DraftAction, type PayerDraft } from '../../payerDraft'
 import { PersonSelect } from './PersonSelect'
@@ -13,7 +13,7 @@ const methodOptions = PAYMENT_METHODS.map((method) => ({ value: String(method.va
 const linkText = { Generated: 'Link gerado', Pending: 'Link em processamento', Failed: 'Falha ao gerar link', Indeterminate: 'Link indeterminado', NotApplicable: 'Sem link' } as const
 const emailText = { Sent: 'E-mail enviado', Pending: 'E-mail em processamento', Failed: 'Falha no envio do e-mail', NotApplicable: 'E-mail não enviado' } as const
 
-export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, errors, totalCents, people, onSearch, dispatch, onAmountInvalid }: {
+export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, errors, totalCents, people, onSearch, dispatch, onAmountInvalid, onBudget }: {
   draft: PayerDraft
   change?: RowChange
   errors: string[]
@@ -22,6 +22,7 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
   onSearch: PersonSearch
   dispatch: Dispatch
   onAmountInvalid: (key: string, invalid: boolean) => void
+  onBudget?: (name: string, amountCents: number) => void
 }) {
   const [amountInput, setAmountInput] = useState(() => formatCurrency(draft.amountCents))
   const [amountError, setAmountError] = useState('')
@@ -83,7 +84,9 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
             <Switch label="Link" checked={draft.generateLink} disabled={readOnly} onChange={(event) => dispatch({ type: 'setLink', key, generateLink: event.target.checked })} />
             <Switch label="E-mail" checked={draft.sendEmail} disabled={readOnly || !draft.generateLink} onChange={(event) => dispatch({ type: 'setEmail', key, sendEmail: event.target.checked })} />
             {choosesRecipient && !pickingRecipient ? <RecipientChip draft={draft} onPick={() => setPickingRecipient(true)} /> : null}
-          </> : <small>Sem link de pagamento</small>}
+          </> : isPurchaseOrder(draft.paymentMethod) && onBudget
+            ? <Button variant="ghost" size="compact" icon={<FileDown size={14} />} disabled={draft.amountCents <= 0} onClick={() => onBudget(draft.name, draft.amountCents)}>Orçamento</Button>
+            : <small>Sem link de pagamento</small>}
         </div>
       </div>
 
