@@ -5,7 +5,7 @@ import { isPurchaseOrder, type Guid, type OperationData, type Person, type Submi
 import { getRecordIdFromLocation, loadOperation, searchDirectoryPeople, submitOperation, updatePersonEmail } from '../dataverse'
 import { logAppError } from '../errorLogger'
 import { formatCurrency } from '../money'
-import { baixarOrcamento } from '../orcamento/orcamento'
+import { abrirOrcamento } from '../orcamento/orcamento'
 import { activeDrafts, changeCount, diffDrafts, draftReducer, initialState, missingPayerEmails, toSubmitPayers, validate, type DraftAction, type DraftState, type MissingEmail, type PayerDraft } from '../payerDraft'
 import { AllocationSummary } from './components/AllocationSummary'
 import { DiscardDialog } from './components/DiscardDialog'
@@ -155,7 +155,7 @@ export function App() {
   const serviceEnd = operation?.serviceEndDate ?? null
   const operationClient = operation?.clientName ?? ''
   const downloadBudget = useCallback((name: string, amountCents: number, client?: string) => {
-    baixarOrcamento({ nome: name, cliente: client || operationClient, valorCents: amountCents, inicio: serviceStart, fim: serviceEnd }).catch(async (error: unknown) => {
+    abrirOrcamento({ nome: name, cliente: client || operationClient, valorCents: amountCents, inicio: serviceStart, fim: serviceEnd }).catch(async (error: unknown) => {
       console.error('[GerarPagantes] Não foi possível gerar o orçamento.', error)
       await logAppError(error, { source: 'React', action: 'download-budget', phase: 'generate-docx', component: 'App' })
       setNotice({ tone: 'error', text: 'Não foi possível gerar o orçamento. Tente de novo.' })

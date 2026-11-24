@@ -1,37 +1,36 @@
 // @vitest-environment node
 
 import { readFileSync } from 'node:fs'
-import { strFromU8, unzipSync } from 'fflate'
+import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
-import { diasDoServico, nomeArquivoOrcamento, preencherOrcamento } from './orcamento'
+import { blocosDoOrcamento, diasDoServico, gerarPdfOrcamento, nomeArquivoOrcamento, type Bloco } from './orcamento'
 
-const modelo = new Uint8Array(readFileSync(new URL('./modelo-orcamento.docx', import.meta.url)))
-const texto = (docx: Uint8Array) => strFromU8(unzipSync(docx)['word/document.xml']).replace(/<[^>]+>/g, '')
+const timbrado = new Uint8Array(readFileSync(new URL('./timbrado.png', import.meta.url)))
 const hoje = new Date('2026-11-24T15:00:00Z')
+const dados = { nome: 'Ana & Cia', cliente: 'Kenvue', valorCents: 62049, inicio: '2026-10-30', fim: '2026-10-31', hoje }
+const texto = (blocos: Bloco[]) => blocos.map((b) => ('pontilhado' in b ? '----' : b.trechos.map((t) => t.t).join(''))).join('\n')
 
 describe('orçamento de pedido de compra', () => {
-  it('troca nome, valor, data e dias e mantém o resto do modelo', () => {
-    const docx = preencherOrcamento(modelo, { nome: 'Ana & Cia', cliente: 'Kenvue', valorCents: 62049, inicio: '2026-10-30', fim: '2026-10-31', hoje })
-    const t = texto(docx)
+  it('troca nome, cliente, valor, data e dias', () => {
+    const t = texto(blocosDoOrcamento(dados))
     expect(t).toContain('São José dos Campos, 24 de Novembro de 2026')
-    expect(t).toContain('Aos cuidados de: Ana &amp; Cia')
+    expect(t).toContain('Aos cuidados de: Ana & Cia')
     expect(t).toContain('Cliente: Kenvue')
-    expect(t).toMatch(/Assunto: Serviços prestados de transporte para equipe de Ana &amp; Cia(?!\s*\()/)
-    expect(t).toContain('para equipe de Ana &amp; Cia nos dias 30/10/2026 a 31/10/2026')
-    expect(t).not.toMatch(/arame/i)
+    expect(t).toContain('Assunto: Serviços prestados de transporte para equipe de Ana & Cia\n')
+    expect(t).toContain('equipe de Ana & Cia nos dias 30/10/2026 a 31/10/2026')
     expect(t).toMatch(/valor total de R\$\s620,49/)
-    expect(t).not.toMatch(/\{\{/)
-    expect(Object.keys(unzipSync(docx))).toEqual(Object.keys(unzipSync(modelo)))
+    expect(t).not.toMatch(/arame/i)
   })
 
-  it('modelo não carrega dados pessoais do documento original', () => {
-    const tudo = Object.entries(unzipSync(modelo)).filter(([nome]) => nome.endsWith('.xml') || nome.endsWith('.rels')).map(([, dados]) => strFromU8(dados)).join(' ')
-    expect(tudo).not.toMatch(/Regiane|Camila|@fornecedores|Juliana|Junior de Paula/i)
+  it('gera um PDF de uma página, inclusive com caractere fora do WinAnsi', async () => {
+    const pdf = await gerarPdfOrcamento(timbrado, { ...dados, nome: 'Łukasz Ğ 漢' })
+    expect(new TextDecoder().decode(pdf.slice(0, 5))).toBe('%PDF-')
+    expect((await PDFDocument.load(pdf)).getPageCount()).toBe(1)
   })
 
   it('formata dias e nome do arquivo', () => {
     expect(diasDoServico('2026-10-30', '2026-10-30')).toBe('30/10/2026')
     expect(diasDoServico(null, null)).toBe('')
-    expect(nomeArquivoOrcamento('Camila  Rangel', hoje)).toBe('ORÇAMENTO CAMILA RANGEL - 24-11.docx')
+    expect(nomeArquivoOrcamento('Camila  Rangel', hoje)).toBe('ORÇAMENTO CAMILA RANGEL - 24-11.pdf')
   })
 })
