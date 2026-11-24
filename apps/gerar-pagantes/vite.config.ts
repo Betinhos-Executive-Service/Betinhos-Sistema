@@ -5,8 +5,6 @@ import packageJson from './package.json'
 export default defineConfig({
   base: './',
   plugins: [react()],
-  // Modelo do orçamento (.docx) entra no bundle como data URL (?inline).
-  assetsInclude: ['**/*.docx'],
   // O design system usa o React da tela como peer: uma única cópia no bundle.
   resolve: { dedupe: ['react', 'react-dom'] },
   optimizeDeps: {
