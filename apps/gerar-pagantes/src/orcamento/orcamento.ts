@@ -38,6 +38,9 @@ export function nomeArquivoOrcamento(nome: string, hoje = new Date()): string {
   return `ORÇAMENTO ${limpo} - ${dia}-${String(mes).padStart(2, '0')}.pdf`
 }
 
+/** O parágrafo do contrato (ICD_1574138) só vale para Johnson&Johnson/Kenvue. */
+export const ehJohnson = (cliente: string) => /johnson|j\s*&\s*j|kenvue/i.test(cliente)
+
 export function blocosDoOrcamento(dados: DadosOrcamento): Bloco[] {
   const { dia, mes, ano } = hojeSp(dados.hoje ?? new Date())
   const nome = dados.nome.trim()
@@ -47,7 +50,7 @@ export function blocosDoOrcamento(dados: DadosOrcamento): Bloco[] {
     { trechos: [{ t: 'Cliente: ', b: true }, { t: dados.cliente.trim() }], espacoAntes: 8 },
     { trechos: [{ t: 'Assunto: ', b: true }, { t: `Serviços prestados de transporte para equipe de ${nome}` }], espacoAntes: 8 },
     { pontilhado: true },
-    { trechos: [{ t: 'Cfe reportado, o contrato entre Betinhos e Johnson&Johnson/Kenvue está vigente, renovado por mais um período qual possui o ICD_1574138, assim sendo, os pedidos podem seguir o fluxo via Ariba, uma vez que somos cadastrados e estamos com o contrato ativo.' }] },
+    ...(ehJohnson(dados.cliente) ? [{ trechos: [{ t: 'Cfe reportado, o contrato entre Betinhos e Johnson&Johnson/Kenvue está vigente, renovado por mais um período qual possui o ICD_1574138, assim sendo, os pedidos podem seguir o fluxo via Ariba, uma vez que somos cadastrados e estamos com o contrato ativo.' }] }] : []),
     { marcador: '1)', recuo: 18, espacoAntes: 14, trechos: [{ t: 'DOS SERVIÇOS', b: true }, { t: ': Serviços prestados de transporte para ' }, { t: `equipe de ${nome} nos dias ${diasDoServico(dados.inicio, dados.fim)}`, b: true }] },
     { marcador: '2)', recuo: 18, trechos: [{ t: 'DOS VALORES', b: true }, { t: ': Para o atendimento ao item 1 acima, formalizamos o valor total de ' }, { t: formatCurrency(dados.valorCents), b: true }] },
     { trechos: [{ t: 'sendo possível o pagamento via Ariba.' }] },
