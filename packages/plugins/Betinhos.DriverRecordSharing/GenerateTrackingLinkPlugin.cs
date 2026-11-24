@@ -166,7 +166,7 @@ namespace Betinhos.DriverRecordSharing
 
         public static Dictionary<string, object> CadastroPayload(string hash, string organizationName)
         {
-            var isDev = string.Equals(organizationName, PluginConfig.DevOrganizationName, StringComparison.OrdinalIgnoreCase);
+            var isDev = PluginConfig.IsDev(organizationName);
             return new Dictionary<string, object> { ["hash"] = hash, ["ambiente"] = isDev ? "dev" : "prod" };
         }
 
@@ -275,7 +275,7 @@ namespace Betinhos.DriverRecordSharing
             if (!vehicleId.HasValue) tracing?.Trace("Foto do veículo: motorista sem veículo atual");
             else
             {
-                var isDev = string.Equals(organizationName, PluginConfig.DevOrganizationName, StringComparison.OrdinalIgnoreCase);
+                var isDev = PluginConfig.IsDev(organizationName);
                 extras.VehiclePhoto = VehiclePhotoGateway.Load(system, vehicleId.Value, isDev, organizationName, tracing);
                 tracing?.Trace("GenerateTrackingLink: foto do veículo {0}", extras.VehiclePhoto == null ? "ausente" : extras.VehiclePhoto.Length + " bytes");
             }
