@@ -41,6 +41,8 @@ export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40
 export const PEDIDO_CAMPOS = [
   'cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',
   'cr40f_portalpedido', 'new_linkdovoucher', 'cr40f_tipodeveiculo', 'createdon',
+  // Lookups lidos pelo rótulo: nome primário do funcionário (cr40f_nomecompleto) e do veículo (cr40f_placa), metadata DEV 23/11/2026.
+  '_cr40f_motorista_value', '_cr40f_veiculo_value',
 ]
 
 /** Choice cr40f_status da validação (ordem do provision). */
