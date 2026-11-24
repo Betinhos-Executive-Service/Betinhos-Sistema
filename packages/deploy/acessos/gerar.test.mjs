@@ -11,9 +11,9 @@ const AREAS = { operacional: 'Operacional', financeiro: 'Financeiro', frota: 'Fr
 const comDelete = (papel) => Object.keys(papel.tabelas).filter((t) => papel.tabelas[t].Delete).sort()
 const coluna = (perfil, tabela, nome) => gerado.colunas[perfil].find((p) => p.tabela === tabela && p.coluna === nome)
 
-test('gera 10 papeis e 8 perfis de coluna', () => {
+test('gera 10 papeis e 9 perfis de coluna', () => {
   assert.equal(Object.keys(gerado.papeis).length, 10)
-  assert.equal(Object.keys(gerado.colunas).length, 8)
+  assert.equal(Object.keys(gerado.colunas).length, 9)
   assert.ok(gerado.papeis['Perfil - Base'])
   assert.ok(gerado.papeis['Perfil - Administrador de acessos'])
   assert.equal(gerado.colunas['Perfil - Base'], undefined)
@@ -46,9 +46,21 @@ test('Base: visao propria, registro de erro so cria, sem tabela de area', () => 
   for (const tabela of ['cr40f_financeiro', 'cr40f_funcionarios', 'cr40f_veiculos', 'cr40f_reservadeveculos']) assert.equal(base.tabelas[tabela], undefined, tabela)
 })
 
-test('Administrador de acessos le o historico e nao recebe papel de atribuir', () => {
+test('Administrador de acessos le o historico e Funcionarios, so leitura, e nao recebe papel de atribuir', () => {
   const adm = gerado.papeis['Perfil - Administrador de acessos']
-  assert.deepEqual(adm.tabelas, { cr40f_acessohistorico: { Read: 'Global' } })
+  const leitura = { AppendTo: 'Global', Read: 'Global' }
+  assert.deepEqual(adm.tabelas, {
+    cr40f_acessohistorico: { Read: 'Global' },
+    cr40f_documento: leitura,
+    cr40f_funcionarios: leitura,
+    cr40f_multas: leitura,
+    cr40f_veiculos: leitura,
+    new_possedeveiculo: leitura,
+  })
+  const colunas = gerado.colunas['Perfil - Administrador de acessos']
+  assert.ok(colunas.some((c) => c.tabela === 'cr40f_funcionarios' && c.coluna === 'cr40f_emailmicrosoft' && c.ler && !c.editar))
+  assert.ok(colunas.every((c) => !c.editar))
+  assert.ok(!colunas.some((c) => c.coluna === 'cr40f_numerodocpf'))
   assert.deepEqual(Object.keys(adm.privilegios).sort(), ['prvReadRole', 'prvReadTeam', 'prvReadUser'])
 })
 

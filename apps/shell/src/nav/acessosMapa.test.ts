@@ -32,6 +32,7 @@ const FILHAS: Record<string, string[]> = {
   financeiro: ['cr40f_cotacaoopcao', 'cr40f_cotacaoopcaoitem', 'cr40f_itempagamentoaterceiro'],
   frota: ['cr40f_fotoequipamento'],
   rh: ['cr40f_treinamentoparticipacao'],
+  acessos: [],
 }
 
 function arquivos(pasta: string): string[] {
@@ -78,7 +79,7 @@ describe('mapa de acessos', () => {
   it('só usa perfis conhecidos', () => {
     const usados = Object.values(mapa.rotas).flatMap((r) => r.perfis ?? [])
     expect([...new Set(usados)].filter((p) => !PERFIS.includes(p))).toEqual([])
-    expect(Object.keys(mapa.modulos).sort()).toEqual(['financeiro', 'frota', 'operacional', 'rh'])
+    expect(Object.keys(mapa.modulos).sort()).toEqual(['acessos', 'financeiro', 'frota', 'operacional', 'rh'])
   })
 
   it('cada perfil da rota alcança as tabelas que a tela usa', () => {
