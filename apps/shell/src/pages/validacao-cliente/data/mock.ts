@@ -7,12 +7,13 @@ export const TENARIS: Cliente = { id: 'c1000000-0000-4000-8000-000000000001', no
 export const TERNIUM: Cliente = { id: 'c1000000-0000-4000-8000-000000000002', nome: 'Ternium' }
 export const MOCK_CLIENTES = [TENARIS, TERNIUM]
 export const EMBRAER: Cliente = { id: 'c1000000-0000-4000-8000-000000000003', nome: 'Embraer' }
-/** Clientes do cadastro que ainda não têm portal, para o "+ Cliente" do pnpm dev. */
-export const MOCK_CADASTRO: Cliente[] = [...MOCK_CLIENTES, EMBRAER, { id: 'c1000000-0000-4000-8000-000000000004', nome: 'Latasa' }, { id: 'c1000000-0000-4000-8000-000000000005', nome: 'Kenvue' }]
+/** Clientes cadastrados que ainda não têm nada do portal configurado. */
+const SEM_PORTAL: Cliente[] = ['Latasa', 'Kenvue', 'Embraco', 'Whirlpool', 'Johnson & Johnson', 'Petrobras', 'Vale', 'Votorantim'].map((nome, i) => ({ id: `c1000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`, nome }))
 export const createMockConfigs = (): PortalConfig[] => [
   { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [] },
   { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'] },
   { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [] },
+  ...SEM_PORTAL.map((cliente): PortalConfig => ({ cliente, ligado: false, modulos: [], dominios: [] })),
 ]
 
 const composicao = (hora: number, espera = 0, pedagio = 0, estacionamento = 0): ItemComposicao[] =>

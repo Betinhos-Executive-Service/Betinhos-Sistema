@@ -75,8 +75,8 @@ function composicaoDe(row: Row | undefined): ItemComposicao[] {
 
 const CLIENTE_SELECT = 'cr40f_clientes1id,cr40f_nomedocliente'
 const CONFIG_SELECT = `${CLIENTE_SELECT},cr40f_portalhabilitado,cr40f_portalmodulos,cr40f_portaldominios`
-/** Clientes que já têm algo do portal configurado, ligado ou não. */
-const FILTRO_CONFIG = encodeURIComponent('cr40f_portalhabilitado eq true or cr40f_portalmodulos ne null or cr40f_portaldominios ne null')
+/** Todos os clientes ativos: a aba Configurações lista os que têm portal e os que ainda não têm. */
+const FILTRO_CONFIG = encodeURIComponent('statecode eq 0')
 
 export const clienteDe = (r: Row): Cliente => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: str(r.cr40f_nomedocliente) || 'Cliente' })
 
@@ -84,18 +84,14 @@ export function mapConfig(r: Row): PortalConfig {
   return { cliente: clienteDe(r), ligado: r.cr40f_portalhabilitado === true, modulos: lerModulos(r.cr40f_portalmodulos), dominios: normalizarDominios(str(r.cr40f_portaldominios)).dominios }
 }
 
-export const buscarClientesPath = (set: string, texto: string) =>
-  `${set}?$select=${CLIENTE_SELECT}&$filter=${encodeURIComponent(`contains(cr40f_nomedocliente,'${texto.trim().replace(/'/g, "''")}')`)}&$orderby=cr40f_nomedocliente asc&$top=20`
-
-/** Configurações do portal, validações, reservas, composições e mensagens; só os clientes com portal ligado entram nas linhas. */
+/** Configurações de todos os clientes ativos, validações, reservas, composições e mensagens; só os clientes com portal ligado entram nas linhas. */
 export async function loadAll(client: DataverseClient, s: EntitySets) {
-  const configs = (await client.getAll(`${s.cliente}?$select=${CONFIG_SELECT}&$filter=${FILTRO_CONFIG}`)).map(mapConfig)
+  const configs = (await client.getAll(`${s.cliente}?$select=${CONFIG_SELECT}&$filter=${FILTRO_CONFIG}&$orderby=cr40f_nomedocliente asc`)).map(mapConfig)
   const clientes = configs.filter((c) => c.ligado).map((c) => c.cliente)
   const porCliente = new Map(configs.map((c) => [c.cliente.id, c.cliente]))
-  if (!configs.length) return { linhas: [] as Linha[], clientes, validadores: [] as Validador[], configs }
-  const validadoresDe = (ids: string[]) => `${s.validador}?$select=${VALIDADOR_SELECT.join(',')}&$filter=${encodeURIComponent(ids.map((id) => `_cr40f_cliente_value eq ${id}`).join(' or '))}`
+  const validadoresPath = `${s.validador}?$select=${VALIDADOR_SELECT.join(',')}`
   if (!clientes.length) {
-    const rows = await client.getAll(validadoresDe(configs.map((c) => c.cliente.id)))
+    const rows = await client.getAll(validadoresPath)
     return { linhas: [] as Linha[], clientes, validadores: rows.map((r) => mapValidador(r, porCliente)), configs }
   }
 
@@ -103,7 +99,7 @@ export async function loadAll(client: DataverseClient, s: EntitySets) {
   const doCliente = encodeURIComponent(clientes.map((c) => `_cr40f_cliente_value eq ${c.id}`).join(' or '))
   const [validacoes, validadoresRows, candidatas] = await Promise.all([
     client.getAll(`${s.validacao}?$select=${VALIDACAO_SELECT.join(',')}&$filter=${doCliente}`),
-    client.getAll(validadoresDe(configs.map((c) => c.cliente.id))),
+    client.getAll(validadoresPath),
     // Candidatas a liberar: do cliente, com composição e saída nos últimos 90 dias; as já liberadas saem abaixo.
     client.getAll(`${s.reserva}?$select=${RESERVA_SELECT.join(',')}&$filter=(${doCliente}) and _new_composicaodepreco_value ne null and cr40f_dataehorriodesada ge ${desde}`),
   ])

@@ -66,7 +66,7 @@ function Portal({ host, source }: { host: Host; source: Source }) {
   else if (data.error && !data.loaded) conteudo = <Alert tone="danger" title="Não foi possível carregar o portal do cliente" action={<Button variant="secondary" onClick={() => void data.reload()}>Tentar de novo</Button>}>{data.error}</Alert>
   else if (!data.loaded) conteudo = <p className="vc-muted" role="status">Carregando...</p>
   else if (aba === 'usuarios') conteudo = <UsuariosTab validadores={data.validadores} clientes={data.clientes} source={source} onSaved={data.upsertValidador} />
-  else conteudo = <ConfiguracoesTab configs={data.configs} validadores={data.validadores} source={source} mobile={mobile} onSaved={salvouConfig} />
+  else conteudo = <ConfiguracoesTab configs={data.configs} validadores={data.validadores} source={source} mobile={mobile} onSaved={salvouConfig} onValidadorSaved={data.upsertValidador} />
 
   return (
     <div className="page vc-page">
@@ -191,7 +191,7 @@ function Conteudo({ host, source, data, mobile }: { host: Host; source: Source; 
   } else if (!data.loaded) {
     body = <ValidacaoTable list={[]} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={() => undefined} loading />
   } else if (!data.clientes.length) {
-    body = <EmptyState className="surface" align="start" icon={<ShieldCheck size={36} />} title="Nenhum cliente com portal ligado.">Ligue o portal do cliente na aba Configurações para os serviços dele aparecerem aqui.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<ShieldCheck size={36} />} title="Nenhum cliente com portal liberado.">Ligue o portal do cliente na aba Configurações para os serviços dele aparecerem aqui.</EmptyState>
   } else {
     const footer = <span className="vc-num">{visible.length} de {data.linhas.length}{visiveisSel.length ? ` · ${visiveisSel.length} selecionado(s)` : ''}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum registro com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />

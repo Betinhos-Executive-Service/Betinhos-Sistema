@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Button, Dialog, Field, Input, Select, StatusBadge, Switch, useToast } from '@betinhos/ui'
-import { KeyRound, UserPlus } from 'lucide-react'
+import { Button, Field, Input, Select, useToast } from '@betinhos/ui'
+import { UserPlus } from 'lucide-react'
 import type { Source } from '../data/source'
 import { validarValidador } from '../domain/regras'
 import type { Cliente, Validador } from '../domain/types'
-import { fmtData } from './ValidacaoList'
+import { UsuarioItem, useAcoesUsuario } from './UsuarioItem'
 
 type Props = { validadores: Validador[]; clientes: Cliente[]; source: Source; onSaved: (v: Validador) => void }
 type Erros = ReturnType<typeof validarValidador>
@@ -18,8 +18,7 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
   const [form, setForm] = useState({ ...VAZIO, clienteId: clientes.length === 1 ? clientes[0].id : '' })
   const [erros, setErros] = useState<Erros>({})
   const [salvando, setSalvando] = useState(false)
-  const [ocupado, setOcupado] = useState<string | null>(null)
-  const [zerar, setZerar] = useState<Validador | null>(null)
+  const { ocupado, alternar, pedirZerar, dialogo } = useAcoesUsuario(source, onSaved)
 
   const set = (patch: Partial<typeof VAZIO>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -41,35 +40,6 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
     }
   }
 
-  async function alternar(v: Validador) {
-    setOcupado(v.id)
-    try {
-      await source.setValidadorAtivo(v.id, !v.ativo)
-      onSaved({ ...v, ativo: !v.ativo })
-      toast({ tone: 'success', message: v.ativo ? `${v.nome} não acessa mais o portal.` : `${v.nome} voltou a acessar o portal.` })
-    } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível alterar. ${reasonText(reason)}` })
-    } finally {
-      setOcupado(null)
-    }
-  }
-
-  async function confirmarZerar() {
-    if (!zerar) return
-    const v = zerar
-    setOcupado(v.id)
-    try {
-      await source.zerarSenha(v.id)
-      onSaved({ ...v, senhaDefinidaEm: null })
-      setZerar(null)
-      toast({ tone: 'success', message: `Senha de ${v.nome} zerada. Avise a pessoa: para entrar, use "Primeiro acesso ou esqueci a senha" no portal.` })
-    } catch (reason) {
-      toast({ tone: 'danger', message: `Não foi possível zerar a senha. ${reasonText(reason)}` })
-    } finally {
-      setOcupado(null)
-    }
-  }
-
   const lista = [...validadores].sort((a, b) => a.cliente.nome.localeCompare(b.cliente.nome, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'))
   return (
     <>
@@ -86,32 +56,11 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
         <section className="vc-secao" aria-labelledby="vc-val-lista">
           <h3 id="vc-val-lista" className="vc-secao__titulo">Usuários ({lista.length})</h3>
           <ul className="vc-val-lista">
-            {lista.map((v) => (
-              <li key={v.id} className="vc-val">
-                <div className="vc-val__info">
-                  <strong>{v.nome}</strong>
-                  <span>{v.email} · {v.cliente.nome}</span>
-                  <span className="vc-badges">
-                    {v.senhaDefinidaEm ? <StatusBadge tone="success">Senha criada</StatusBadge> : <StatusBadge tone="warning">Aguardando 1º acesso</StatusBadge>}
-                    <span className="vc-muted">{v.ultimoAcesso ? `Último acesso ${fmtData(v.ultimoAcesso)}` : 'Nunca acessou'}</span>
-                  </span>
-                </div>
-                <div className="vc-val__acoes">
-                  <Switch label={v.ativo ? 'Ativo' : 'Inativo'} checked={v.ativo} disabled={ocupado === v.id} onChange={() => void alternar(v)} />
-                  <Button variant="secondary" size="compact" icon={<KeyRound size={14} />} disabled={ocupado === v.id || !v.senhaDefinidaEm} title={v.senhaDefinidaEm ? undefined : 'A pessoa ainda não criou a senha.'} onClick={() => setZerar(v)}>Zerar senha</Button>
-                </div>
-              </li>
-            ))}
+            {lista.map((v) => <UsuarioItem key={v.id} v={v} mostrarCliente ocupado={ocupado === v.id} onAlternar={(x) => void alternar(x)} onZerar={pedirZerar} />)}
           </ul>
         </section>
       </div>
-      <Dialog open={zerar != null} onClose={() => { if (!ocupado) setZerar(null) }} tone="danger" title="Zerar senha?"
-        actions={<>
-          <Button variant="secondary" disabled={!!ocupado} onClick={() => setZerar(null)}>Cancelar</Button>
-          <Button variant="danger" loading={!!ocupado} onClick={() => void confirmarZerar()}>Zerar senha</Button>
-        </>}>
-        A senha de {zerar?.nome} para de funcionar e as sessões abertas caem. Para voltar, a pessoa usa "Primeiro acesso ou esqueci a senha" e cria outra pelo código do e-mail. O portal não avisa: avise a pessoa.
-      </Dialog>
+      {dialogo}
     </>
   )
 }

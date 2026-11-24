@@ -22,7 +22,7 @@ description: "Verifica a tela #/validacao-cliente do shell, "Portal do cliente" 
 - Em dúvida: 48204 (motivo Espera), 48213 (Ternium). Respondido: 48205.
 - Aprovado: 48206, 48208 ("Próximo mês"), 48211 (set/2026, "Entra"), 48214. Aprovado automaticamente: 48207. Retirado: 48209 (conversa guardada).
 - Validadores: Carla (senha criada), Roberto (aguardando 1º acesso), Ana (inativa), Marcos (Ternium).
-- Configurações: Tenaris (ligado, 3 módulos, só cadastrados), Ternium (ligado, Validar e Meus serviços, `@ternium.com`), Embraer (desligado, Pedir). Cadastro para "+ Cliente": Tenaris, Ternium, Embraer, Latasa, Kenvue.
+- Configurações: Tenaris (ligado, 3 módulos, só cadastrados), Ternium (ligado, Validar e Meus serviços, `@ternium.com`), Embraer (desligado, Pedir). Mais 8 clientes sem portal (Latasa, Kenvue, Embraco, Whirlpool, Johnson & Johnson, Petrobras, Vale, Votorantim), no total 11 na aba Configurações.
 
 ## Roteiro no navegador (mock)
 Subir o shell em porta própria para não derrubar o dev server de outra sessão: `cd apps/shell && npx vite --port 36593 --strictPort --host 127.0.0.1` e abrir `http://127.0.0.1:36593/#/validacao-cliente` (a primeira carga do Vite pode recarregar uma vez ao otimizar dependências; os `ERR_NETWORK_CHANGED` dessa hora são do servidor subindo).
@@ -32,13 +32,14 @@ Subir o shell em porta própria para não derrubar o dev server de outra sessão
 3. "Retirar do portal" → confirmação explica que o cliente deixa de ver, não entra no fechamento e a conversa fica; confirmar → Retirado, conversa visível, linha sai da Visão padrão (contagem cai).
 4. Marcar a caixa de 48212 → "Incluir no fechamento" → coluna Fechamento "Entra". "Exportar Excel do mês" → Tenaris/outubro: contagem e total; exportar baixa `fechamento-tenaris-2026-10.xls`.
 5. Aba Usuários (`#/validacao-cliente?aba=usuarios`; o menu "⋮ Validadores" não existe mais) → cadastrar vazio mostra os 3 erros; cadastrar Paula Rocha/Tenaris → entra na lista "Aguardando 1º acesso"; Switch Ativo/Inativo; "Zerar senha" da Carla com confirmação → "Aguardando 1º acesso" (no Dataverse limpa `cr40f_senhahash` e `cr40f_senhadefinidaem`).
-5b. Aba Configurações (`?aba=configuracoes`): lista com nome, Ligado/Desligado, módulos, "Quem entra" e usuários ativos (Tenaris: 2; Ternium: 1; Embraer desligado).
-   - Ligar/desligar: abrir Embraer → Portal ligado + escolher módulo → Salvar → linha "Ligado" e Embraer passa a existir no filtro de cliente da aba Validação. Desligar a Tenaris → some da aba Validação.
+5b. Aba Configurações (`?aba=configuracoes`): lista de TODOS os clientes ativos (DEV: `statecode eq 0`, 47; mock: 11), liberados primeiro e depois os demais por nome; cada linha com nome, Liberado/Não liberado, módulos, "Quem entra" e usuários ativos (Tenaris: 2; Ternium: 1). Busca por nome (sem acento) e chips Todos / Liberados / Não liberados com contagem (mock: 11 / 2 / 9; Embraer e os 8 sem portal são não liberados).
+   - Ligar/desligar: abrir Embraer → Portal liberado + escolher módulo → Salvar → linha "Ligado" e Embraer passa a existir no filtro de cliente da aba Validação. Desligar a Tenaris (Portal liberado off) → some da aba Validação.
    - Módulos: ligado sem módulo → "Escolha ao menos um módulo; sem módulo ninguém entra." e nada grava.
-   - Quem entra: "Só e-mails cadastrados" grava domínios vazios; "Também e-mails destes domínios" mostra o campo; `@Tenaris.com; https://www.b.com.br` vira `tenaris.com`, `b.com.br`; sem ponto → "Domínio inválido".
+   - Domínios liberados: "Só e-mails cadastrados" grava domínios vazios; "Também e-mails destes domínios" mostra o campo; `@Tenaris.com; https://www.b.com.br` vira `tenaris.com`, `b.com.br`; sem ponto → "Domínio inválido".
    - Domínio repetido: na Tenaris digitar `ternium.com` → "@ternium.com já é do cliente Ternium." (não grava); domínio de cliente desligado não bloqueia.
    - Aviso: `gmail.com` mostra o alerta "Domínio público" e salva normalmente.
-   - "+ Cliente": digitar "lat" → Latasa → abre o mesmo drawer; cliente que já tem configuração abre com os dados dela.
+   - Cliente sem portal: buscar "lat" → Latasa → abrir → Portal liberado + módulo → Salvar → vai para o topo da lista como Liberado e entra no filtro da aba Validação.
+   - E-mails liberados (no drawer, entre Módulos e Domínios liberados): lista os usuários do cliente (nome, e-mail, Ativo, Zerar senha); "Nome + E-mail + Liberar e-mail" cadastra na hora (toast próprio, sem Salvar, e-mail repetido recusado); Ativo e Zerar senha também gravam na hora. O contador "Usuários ativos" da linha acompanha. Sem fechar o drawer, conferir na aba Usuários que o e-mail novo aparece.
    - Fechar: X, Esc e clique fora fecham; com alteração aparece "Descartar alterações?" (Continuar editando / Descartar); durante o salvamento não fecha. Erro ao gravar → toast danger e drawer aberto com os dados.
    - No Dataverse (DEV): PATCH em `cr40f_clientes1` (`cr40f_portalhabilitado`, `cr40f_portalmodulos` como `'100000000,100000002'` ou null, `cr40f_portaldominios` como `a.com; b.com` ou null); conferir pela tabela e pedir código no portal com e-mail do domínio (regra no Worker `apps/portal-cliente/worker/auth.ts`, não muda).
 6. 375 px: cards, detalhe em Sheet com "Enviar resposta", drawer de configuração em Sheet, sem rolagem horizontal.

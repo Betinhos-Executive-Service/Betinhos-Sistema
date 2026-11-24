@@ -3,8 +3,8 @@ import type { Host } from '../../../host'
 import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarLiberacao, aplicarResposta } from '../domain/regras'
 import { dominiosDoForm, gravarModulos, type ConfigForm } from '../domain/config'
 import type { Cliente, Fechamento, Linha, Mensagem, NovoValidador, PortalConfig, Validador } from '../domain/types'
-import { MOCK_CADASTRO, createMockConfigs, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
-import { ENTITIES, buscarClientesPath, clienteDe, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
+import { createMockConfigs, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
+import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
 import { latenciaMock } from '../../../app/latenciaMock'
 
 export type Carga = { linhas: Linha[]; clientes: Cliente[]; validadores: Validador[]; configs: PortalConfig[] }
@@ -31,8 +31,6 @@ export type Source = {
   setValidadorAtivo: (id: string, ativo: boolean) => Promise<void>
   /** Apaga a senha do portal (e derruba as sessões abertas): a pessoa cria outra pelo código do e-mail. Não avisa o cliente. */
   zerarSenha: (id: string) => Promise<void>
-  /** Cadastro de clientes pelo nome (até 20), para ligar o portal de um cliente que ainda não aparece na lista. */
-  buscarClientes: (texto: string) => Promise<Cliente[]>
   /** Grava portal ligado, módulos e domínios no cadastro do cliente; devolve a configuração gravada. */
   salvarConfig: (cliente: Cliente, form: ConfigForm) => Promise<PortalConfig>
 }
@@ -89,11 +87,6 @@ function createMockSource(): Source {
     async criarValidador() { await wait(300); const id = nextId('e1000000'); validadores.add(id); return id },
     async setValidadorAtivo(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
     async zerarSenha(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
-    async buscarClientes(texto) {
-      await wait(200)
-      const q = texto.trim().toLowerCase()
-      return MOCK_CADASTRO.filter((c) => c.nome.toLowerCase().includes(q)).slice(0, 20)
-    },
     async salvarConfig(cliente, form) {
       await wait(350)
       const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form) }
@@ -200,10 +193,6 @@ export function createSource(host: Host): Source {
     },
     setValidadorAtivo: async (id, ativo) => host.client.update((await entitySets()).validador, id, { cr40f_ativo: ativo }),
     zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhahash: null, cr40f_senhadefinidaem: null }),
-    async buscarClientes(texto) {
-      const rows = await host.client.getAll(buscarClientesPath((await entitySets()).cliente, texto))
-      return rows.map(clienteDe)
-    },
     async salvarConfig(cliente, form) {
       const dominios = dominiosDoForm(form)
       await host.client.update((await entitySets()).cliente, cliente.id, {
