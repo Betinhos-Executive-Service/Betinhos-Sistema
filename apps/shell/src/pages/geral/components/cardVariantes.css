@@ -98,3 +98,6 @@
 .gv-card.is-passado:not(.is-selected):focus-within { opacity: 1; }
 @media (hover: hover) { .gv-card.is-passado:not(.is-selected):hover { opacity: 1; } }
 
+/* V4 · alertas à esquerda e a ação rápida (Atribuir) à direita, como no Resumo Operacional. */
+.gv-v4__pe { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); margin-top: var(--bt-space-1); }
+.gv-v4__pe .bt-button { flex: 0 0 auto; }

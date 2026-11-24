@@ -56,6 +56,9 @@ import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import { useGeralViewState } from './useGeralViewState'
 import './geral.css'
 
+/** Só a coluna Motorista (sheet do "Atribuir"); sem ela na visão, todas. */
+const colunasDoMotorista = (columns: Column[]) => { const so = columns.filter((c) => !c.alias && c.attribute === 'cr40f_motorista'); return so.length > 0 ? so : columns }
+
 export function GeralPage({ host, variante }: { host: Host; variante?: VarianteCard }) {
   // Trocar a chave recria a tela inteira: é o "Tentar de novo" quando as visões não carregam.
   const [attempt, setAttempt] = useState(0)
@@ -92,6 +95,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
   const cardsLayout = mobile || mode === 'cards'
   const changeMode = useCallback((next: ViewMode) => { setModeState(next); setEditId(null); saveViewMode(source.kv, next) }, [source.kv])
   const [editId, setEditId] = useState<string | null>(null)
+  /** Sheet aberta pelo "Atribuir" do card: só o campo Motorista. */
+  const [soMotorista, setSoMotorista] = useState(false)
   // Falha numa linha cuja sheet não está aberta (celular) não tem onde aparecer: vira aviso.
   const editIdRef = useRef(editId)
   editIdRef.current = editId
@@ -706,7 +711,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
                 onOpen={(id) => { void openForm('edit', id) }}
                 besideId={besideId}
                 manutencao={manutencao}
-                onEdit={setEditId}
+                onEdit={(id) => { setSoMotorista(false); setEditId(id) }}
+                onAtribuir={(id) => { setSoMotorista(true); setEditId(id) }}
                 onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
               />
@@ -811,7 +817,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}
-            columns={editManutencao ? colunasDaManutencao(dataColumns) : dataColumns}
+            columns={editManutencao ? colunasDaManutencao(dataColumns) : soMotorista ? colunasDoMotorista(dataColumns) : dataColumns}
+            eyebrow={soMotorista && !editManutencao ? 'Atribuir motorista' : undefined}
             manutencao={editManutencao ? { titulo: `Manutenção · ${editManutencao.veiculo}` } : undefined}
             attributes={attributes}
             cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}

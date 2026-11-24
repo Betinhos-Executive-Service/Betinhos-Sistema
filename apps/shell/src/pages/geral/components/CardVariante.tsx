@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { Button, Checkbox, StatusBadge } from '@betinhos/ui'
-import { Building2, CalendarRange, ChevronRight, Pencil, UserRound, Users, Wrench } from 'lucide-react'
+import { Building2, CalendarRange, ChevronRight, Pencil, UserPlus, UserRound, Users, Wrench } from 'lucide-react'
 import type { VarianteCard } from '../../../nav/menu'
 import './cardVariantes.css'
 
@@ -27,6 +27,8 @@ export type DadosCard = {
   alertas: { texto: string; tom: 'perigo' | 'aviso' }[]
   acao: { rotulo: string; onClick: () => void }
   extra?: ReactNode
+  /** Ação rápida quando falta motorista (abre a escolha do motorista). */
+  atribuir?: () => void
 }
 
 type Props = { variante: VarianteCard; d: DadosCard; selecionado: boolean; onToggle: () => void }
@@ -162,7 +164,12 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
             </span>
             <ChevronRight size={18} aria-hidden="true" />
           </button>
-          {avisos.length > 0 ? <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span> : null}
+          {avisos.length > 0 || d.atribuir ? (
+            <div className="gv-v4__pe">
+              <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span>
+              {d.atribuir ? <Button variant="action" size="compact" icon={<UserPlus size={14} aria-hidden="true" />} aria-label={`Atribuir motorista: ${d.codigo}`} onClick={d.atribuir}>Atribuir</Button> : null}
+            </div>
+          ) : null}
         </div>
       </li>
     )

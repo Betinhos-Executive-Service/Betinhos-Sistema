@@ -39,13 +39,15 @@ type Props = {
   variante?: VarianteCard
   /** Primeiro nome dos passageiros de cada serviço (tabela serviços por passageiro); só nas variações. */
   paxPorServico?: Map<string, string[]>
+  /** Ação rápida do card sem motorista: abre só a escolha do motorista. */
+  onAtribuir?: (id: string) => void
 }
 
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
-export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao, variante, paxPorServico }: Props) {
+export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao, variante, paxPorServico, onAtribuir }: Props) {
   const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
   const has = {
     status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto'),
@@ -91,6 +93,7 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
             const dia = d.quando?.split(' ')[0] ?? null
             const anterior = indice > 0 ? diaDaLinha(rows[indice - 1]) : null
             const total = dia ? rows.filter((r) => diaDaLinha(r) === dia).length : 0
+            if (d.motorista === null) d.atribuir = d.manutencao ? d.acao.onClick : onAtribuir ? () => onAtribuir(id) : undefined
             return (
               <Fragment key={id}>
                 {dia && dia !== anterior ? <SeparadorDia dia={dia} total={total} /> : null}
