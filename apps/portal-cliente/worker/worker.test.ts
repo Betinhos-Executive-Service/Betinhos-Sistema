@@ -136,6 +136,13 @@ describe('login', () => {
     expect((await entrar('fiscal@tenaris.com', SENHA)).status).toBe(401)
   })
 
+  it('"Zerar senha" do shell (só limpa a data): a senha antiga não entra e a sessão aberta cai', async () => {
+    const sessao = await logar()
+    banco.validadorclientes[0].cr40f_senhadefinidaem = null
+    expect((await chamar('GET', '/servicos', undefined, sessao)).status).toBe(401)
+    expect((await entrar('fiscal@tenaris.com', SENHA)).status).toBe(401)
+  })
+
   it('desativar o usuário ou tirar o portal do cliente derruba a sessão na hora', async () => {
     const sessao = await logar()
     banco.validadorclientes[0].cr40f_ativo = false

@@ -192,7 +192,7 @@ export function createSource(host: Host): Source {
       }))
     },
     setValidadorAtivo: async (id, ativo) => host.client.update((await entitySets()).validador, id, { cr40f_ativo: ativo }),
-    zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhahash: null, cr40f_senhadefinidaem: null }),
+    zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhadefinidaem: null }),
     async salvarConfig(cliente, form) {
       const dominios = dominiosDoForm(form)
       await host.client.update((await entitySets()).cliente, cliente.id, {
