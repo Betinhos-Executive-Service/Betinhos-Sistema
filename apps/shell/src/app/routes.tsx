@@ -2,7 +2,7 @@ import { Component, lazy, useEffect, type ComponentType, type LazyExoticComponen
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button, EmptyState, PageHeader, Skeleton, Stack } from '@betinhos/ui'
 import type { Host } from '../host'
-import { findItem, type MenuItem } from '../nav/menu'
+import { findItem, type MenuItem, type VarianteCard } from '../nav/menu'
 import { logAppError } from '@betinhos/ui/error-logger'
 import { isChunkLoadError, reportarErro } from './erros'
 import { BrandLoader } from './BrandLoader'
@@ -10,7 +10,7 @@ import { BrandLoader } from './BrandLoader'
 type PageId = Extract<MenuItem, { kind: 'page' }>['page']
 type Agente = NonNullable<Extract<MenuItem, { kind: 'page' }>['agente']>
 type FrotaAba = NonNullable<Extract<MenuItem, { kind: 'page' }>['aba']>
-type PageProps = { host: Host; agente?: Agente; aba?: FrotaAba }
+type PageProps = { host: Host; agente?: Agente; aba?: FrotaAba; variante?: VarianteCard }
 
 /**
  * Um chunk por tela: só a rota aberta é baixada e avaliada na carga (Recharts fica no chunk do Dashboard).
@@ -155,9 +155,9 @@ const lazyFor = (page: PageId) => {
   return component
 }
 
-export function LazyPage({ page, host, agente, aba }: { page: PageId; host: Host; agente?: Agente; aba?: FrotaAba }) {
+export function LazyPage({ page, host, agente, aba, variante }: { page: PageId; host: Host; agente?: Agente; aba?: FrotaAba; variante?: VarianteCard }) {
   const Page = lazyFor(page)
-  return <Page host={host} agente={agente} aba={aba} />
+  return <Page host={host} agente={agente} aba={aba} variante={variante} />
 }
 
 /**

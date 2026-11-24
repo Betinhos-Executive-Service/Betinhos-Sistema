@@ -3,6 +3,7 @@ import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, Switch, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction, type TableFilters } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
+import type { VarianteCard } from '../../nav/menu'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
@@ -54,10 +55,10 @@ import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import { useGeralViewState } from './useGeralViewState'
 import './geral.css'
 
-export function GeralPage({ host }: { host: Host }) {
+export function GeralPage({ host, variante }: { host: Host; variante?: VarianteCard }) {
   // Trocar a chave recria a tela inteira: é o "Tentar de novo" quando as visões não carregam.
   const [attempt, setAttempt] = useState(0)
-  return <ToastProvider><Geral key={attempt} host={host} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
+  return <ToastProvider><Geral key={attempt} host={host} variante={variante} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
@@ -66,7 +67,7 @@ const VIRTUAL_KEYS: ReadonlySet<string> = new Set(VIRTUAL_COLUMNS.map((c) => c.k
 /** Substantivo do primário do painel Filtros ("Mostrar 16 serviços"), como o rodapé da lista. */
 const SERVICOS = { one: 'serviço', other: 'serviços' }
 
-function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
+function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCard; onRetry: () => void }) {
   // `manutencoes` só vale no mock (pnpm dev): as linhas OS-9001 a OS-9004 do plano 3. No Dataverse vêm da própria consulta.
   const source = useMemo(() => createSource(host, { manutencoes: true }), [host])
   // Histórico do campo protegido sob demanda, uma consulta por OS enquanto a tela está aberta; falha não fica no cache.
@@ -104,7 +105,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // `?tabela=ds`: a grade no `Table` do Design System (migração em partes); fica na URL enquanto a tela regrava o estado.
   const tabelaDs = initial.tabela === 'ds'
   const onStateChange = useCallback((state: UrlState) => {
-    const next = hrefFor('geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
+    const next = hrefFor(variante ? `geral-card-${variante}` : 'geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
     if (next !== window.location.hash) window.history.replaceState(null, '', next)
   }, [initial.tabela])
   const geral = useGeral(source, { onSaveFail, initial, onStateChange })
@@ -690,6 +691,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
               <GeralCards
                 grid={!mobile}
+                variante={mobile ? variante : undefined}
                 rows={rows}
                 columns={dataColumns}
                 attributes={attributes}

@@ -11,7 +11,10 @@ export type MenuItem =
   /** Item do sitemap que o shell ainda não consegue abrir. */
   | { kind: 'unavailable'; id: string; label: string; reason: string }
   /** Tela React do próprio shell. */
-  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba }
+  | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba; variante?: VarianteCard }
+
+/** Variações do card do serviço da Geral no celular (laboratório de design, fora do menu). */
+export type VarianteCard = 'v1' | 'v2' | 'v3'
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -151,8 +154,19 @@ export function rotaAtualizada(id: string, query: URLSearchParams): { id: string
   return findItem(`frota-${aba}`) ? { id: `frota-${aba}`, query: rest } : { id: 'frota', query: rest }
 }
 
+/** Rotas de laboratório: abrem por URL (`#/geral-card-v1`), não aparecem no menu. */
+const LABORATORIO: MenuGroup = {
+  id: 'laboratorio',
+  label: 'Laboratório',
+  items: [
+    { kind: 'page', id: 'geral-card-v1', label: 'Geral · card V1 (ajuste fino)', page: 'geral', variante: 'v1' },
+    { kind: 'page', id: 'geral-card-v2', label: 'Geral · card V2 (reorganizado)', page: 'geral', variante: 'v2' },
+    { kind: 'page', id: 'geral-card-v3', label: 'Geral · card V3 (agenda)', page: 'geral', variante: 'v3' },
+  ],
+}
+
 export function findItem(id: string) {
-  for (const group of MENU) {
+  for (const group of [...MENU, LABORATORIO]) {
     const item = group.items.find((candidate) => candidate.id === id)
     if (item) return { group, item }
   }

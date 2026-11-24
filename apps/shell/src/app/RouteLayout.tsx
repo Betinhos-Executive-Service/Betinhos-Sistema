@@ -53,7 +53,7 @@ export function RouteLayout({ host, group, item, label }: Props) {
       // As visões da Frota compartilham a montagem: trocar de item no menu não recarrega as tabelas.
       <RouteErrorBoundary key={item.aba ? item.page : item.id} title={label}>
         <Suspense fallback={<PageFallback title={label} />}>
-          <LazyPage page={item.page} host={host} agente={item.agente} aba={item.aba} />
+          <LazyPage page={item.page} host={host} agente={item.agente} aba={item.aba} variante={item.variante} />
         </Suspense>
       </RouteErrorBoundary>
     )

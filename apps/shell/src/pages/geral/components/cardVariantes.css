@@ -1,0 +1,65 @@
+/* Laboratório: 3 variações do card do serviço da Geral no celular (#/geral-card-v1..v3). Só tokens do DS. */
+.gv-card { position: relative; min-width: 0; list-style: none; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.gv-card.is-selected { background-color: var(--bt-color-action-soft); border-color: var(--bt-color-action); }
+.gv-card p { margin: 0; }
+.gv-card .bt-choice { align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
+.gv-card .bt-choice__control { margin-top: 0; }
+.gv-id { display: inline-flex; align-items: center; gap: var(--bt-space-1); padding: 0; border: 0; background: transparent; color: var(--bt-color-brand); font: inherit; font-weight: var(--bt-font-weight-extrabold); cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gv-id svg { color: var(--bt-color-warning); }
+.gv-id:focus-visible, .gv-acao:focus-visible, .gv-corpo:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gv-alertas { display: flex; flex-wrap: wrap; gap: var(--bt-space-1); }
+.gv-alerta { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); }
+.gv-alerta::before { content: ''; width: 6px; height: 6px; border-radius: var(--bt-radius-full); background: currentColor; }
+.gv-alerta--perigo { color: var(--bt-color-danger); }
+.gv-alerta--aviso { color: var(--bt-color-warning); }
+.gv-sec { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); overflow-wrap: anywhere; }
+.gv-sec strong { color: var(--bt-color-text-primary); font-weight: var(--bt-font-weight-semibold); }
+
+/* V1 · ajuste fino: mesma estrutura, uma borda só, data e cliente juntos, selos numa linha, ação mais leve. */
+.gv-card--v1 { display: grid; gap: var(--bt-space-1-5); padding: var(--bt-space-2) var(--bt-space-3) var(--bt-space-3); }
+.gv-card--v1.gv-card--manut { border-left: 3px solid var(--bt-color-warning); }
+.gv-v1__head { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; margin-left: calc(var(--bt-space-2) * -1); }
+.gv-v1__head .bt-badge { margin-left: auto; }
+.gv-v1__quando { font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.gv-v1__quando strong { color: var(--bt-color-text-primary); }
+.gv-v1__titulo { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+.gv-v1__pe { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); margin-top: var(--bt-space-1); }
+
+
+/* V3 · agenda: trilho da hora à esquerda com a cor do estado, o card inteiro abre a edição. */
+.gv-card--v3 { display: grid; grid-template-columns: 64px 1fr; overflow: hidden; border-radius: var(--bt-radius-lg); }
+.gv-v3__trilho { display: flex; flex-direction: column; align-items: center; gap: var(--bt-space-0-5); padding: var(--bt-space-3) var(--bt-space-1); border-right: 3px solid var(--gv-tom, var(--bt-color-brand)); background-color: color-mix(in srgb, var(--gv-tom, var(--bt-color-brand)) 10%, var(--bt-color-surface)); }
+.gv-card--v3[data-tom='perigo'] { --gv-tom: var(--bt-color-danger); }
+.gv-card--v3[data-tom='aviso'] { --gv-tom: var(--bt-color-warning); }
+.gv-card--v3[data-tom='ok'] { --gv-tom: var(--bt-color-success); }
+.gv-v3__hora { font-size: var(--bt-font-size-17); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
+.gv-v3__data { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.gv-v3__trilho .bt-choice { margin-top: auto; }
+.gv-v3__conteudo { display: grid; gap: var(--bt-space-1); min-width: 0; padding: var(--bt-space-2-5) var(--bt-space-3) var(--bt-space-3); }
+.gv-v3__topo { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; font-size: var(--bt-font-size-12); }
+.gv-v3__topo .bt-badge { margin-left: auto; }
+.gv-corpo { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--bt-space-0-5) var(--bt-space-2); padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-sm); }
+.gv-corpo > svg { grid-column: 2; grid-row: 1 / span 3; color: var(--bt-color-text-secondary); }
+.gv-v3__titulo { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+
+/* V2 · linha compacta no estilo do Resumo Operacional: hora, quem, trajeto, pílula de status, faixa e alerta coloridos. */
+.gv-card--v2 { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--bt-space-2-5); padding: var(--bt-space-2) var(--bt-space-2) var(--bt-space-2) var(--bt-space-3); border-left: 3px solid transparent; }
+.gv-card--v2[data-tom='perigo'] { border-left-color: var(--bt-color-danger); }
+.gv-card--v2[data-tom='aviso'] { border-left-color: var(--bt-color-warning); }
+.gv-v2__hora { display: grid; justify-items: center; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
+.gv-v2__hora small { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-medium); color: var(--bt-color-text-secondary); }
+.gv-v2__corpo { display: grid; gap: var(--bt-space-0-5); min-width: 0; }
+.gv-v2__titulo { display: flex; align-items: center; gap: var(--bt-space-1); min-width: 0; font-size: var(--bt-font-size-13); }
+.gv-v2__titulo .gv-id { flex: 0 0 auto; }
+.gv-v2__quem { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.gv-v2__quem::before { content: '· '; color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-regular); }
+.gv-v2__linha { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gv-v2__linha:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gv-v2__linha .gv-sec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gv-v2__rota { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--bt-font-size-13); color: var(--bt-color-text-secondary); }
+.gv-v2__avisos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
+.gv-v2__aviso { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); }
+.gv-v2__aviso--perigo { color: var(--bt-color-danger); }
+.gv-v2__aviso--aviso { color: var(--bt-color-warning); }
+.gv-v2__lado { display: grid; justify-items: end; gap: var(--bt-space-0-5); }
+.gv-v2__lado .bt-choice { min-height: var(--bt-control-height-compact); }
