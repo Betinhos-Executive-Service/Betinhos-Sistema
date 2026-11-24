@@ -4,7 +4,7 @@
 // libera a etapa "criar senha". 5 erros (senha ou código) no mesmo e-mail bloqueiam por 15 min.
 // A sessão (cookie de 30 dias) é conferida no Dataverse a cada chamada: desativar o usuário, tirar o portal ou trocar a
 // senha derruba as sessões abertas.
-import { SENHA_MIN, senhaFraca } from '../src/api/PortalApi'
+import { REENVIO_S, SENHA_MIN, senhaFraca } from '../src/api/PortalApi'
 import { dominioDe, nomeDoEmail } from '../src/domain/pedidos'
 import { conferirSenha, HASH_FALSO, hashSenha, iguais, novoCodigo, sha256Hex } from './cripto'
 import { enviarEmail, ErroDataverse, type Dv } from './dataverse'
@@ -144,6 +144,8 @@ export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
     await c.env.KV.put(chaveIp, String(negados + 1), { expirationTtl: BLOQUEIO_S })
     return erro(403, 'sem_acesso')
   }
+  const chaveReenvio = `reenvio:${await sha256Hex(email)}`
+  if (await c.env.KV.get(chaveReenvio)) return erro(429, 'aguarde')
   const vid = String(v.cr40f_validadorclienteid)
   const codigo = novoCodigo()
   // Sem waitUntil: se gravar ou enviar falhar, a tela mostra o erro em vez de "enviado".
@@ -156,6 +158,7 @@ export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
     cr40f_usado: false,
   })
   await enviarEmail(c.env, 'codigo', [email], { nome: String(v.cr40f_name || nomeDoEmail(email)), codigo, validadeMinutos: 10 })
+  await c.env.KV.put(chaveReenvio, '1', { expirationTtl: REENVIO_S })
   return new Response(null, { status: 204 })
 }
 

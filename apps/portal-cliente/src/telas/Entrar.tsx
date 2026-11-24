@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Alert, Button, Field, Input } from '@betinhos/ui'
-import { ArrowLeft, LogIn, Mail } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, LogIn, Mail, RotateCw } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
-import { ErroPortal, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
+import { ErroPortal, REENVIO_S, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
 import { marcaParceira } from '../domain/marcas'
 import type { Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
@@ -18,6 +18,7 @@ const ERROS: Partial<Record<CodigoErro, string>> = {
   codigo_expirado: 'Este código expirou. Peça um novo código.',
   sem_acesso: 'Este e-mail não tem acesso ao portal. Confira o endereço ou fale com a Betinhos.',
   bloqueado: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.',
+  aguarde: 'Acabamos de enviar um código. Aguarde um minuto para pedir outro.',
 }
 
 /** senha: login normal. pedir/codigo/nova: 1º acesso ou "Esqueci a senha" (código por e-mail e senha nova). */
@@ -33,9 +34,21 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
   const [erroCampo, setErroCampo] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [verSenha, setVerSenha] = useState(false)
+  /** Segundos até liberar o "Reenviar código". */
+  const [reenviarEm, setReenviarEm] = useState(0)
+  const [reenviado, setReenviado] = useState(false)
+  const formCodigoRef = useRef<HTMLFormElement>(null)
+  /** Trava síncrona: Enter no mesmo frame do auto-envio ou clique duplo não mandam duas vezes. */
+  const ocupado = useRef(false)
   const focoRef = useRef<HTMLInputElement>(null)
   const senhaRef = useRef<HTMLInputElement>(null)
   const [erroSenha, setErroSenha] = useState<string | null>(null)
+  useEffect(() => {
+    if (reenviarEm <= 0) return
+    const t = setTimeout(() => setReenviarEm((s) => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [reenviarEm])
   const chaveLink = useMemo(() => new URLSearchParams(window.location.search).get('c'), [])
   const parceira = marcaParceira({ chave: chaveLink, email: EMAIL_VALIDO.test(email.trim()) ? email : undefined })
 
@@ -50,13 +63,16 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
     setErro(null)
     setErroCampo(null)
     setErroSenha(null)
+    setReenviado(false)
+    setVerSenha(false)
     limparCampos()
     requestAnimationFrame(() => focoRef.current?.focus())
   }
 
   /** Valida, mostra o carregando e traduz o erro do servidor. `invalido` preenchido = mensagem no campo (o principal ou o da senha), e não envia. */
-  async function enviar(e: FormEvent, invalido: string | null, rodar: () => Promise<void>, noCampoSenha = false) {
-    e.preventDefault()
+  async function enviar(e: FormEvent | null, invalido: string | null, rodar: () => Promise<void>, noCampoSenha = false) {
+    e?.preventDefault()
+    if (ocupado.current) return
     setErroCampo(noCampoSenha ? null : invalido)
     setErroSenha(noCampoSenha ? invalido : null)
     if (invalido) {
@@ -64,6 +80,8 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
       return
     }
     setErro(null)
+    setReenviado(false)
+    ocupado.current = true
     setEnviando(true)
     try {
       await rodar()
@@ -79,6 +97,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
       limparCampos()
       ;(etapa === 'senha' ? senhaRef : focoRef).current?.focus()
     } finally {
+      ocupado.current = false
       setEnviando(false)
     }
   }
@@ -92,8 +111,23 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
 
   const pedirCodigo = (e: FormEvent) =>
     enviar(e, emailInvalido(), async () => {
-      await api.solicitarCodigo(email.trim())
+      try {
+        await api.solicitarCodigo(email.trim())
+      } catch (err) {
+        // Código pedido há menos de 1 min (voltou ou recarregou): o anterior ainda vale, segue para digitá-lo.
+        if (!(err instanceof ErroPortal && err.codigo === 'aguarde')) throw err
+      }
       irPara('codigo')
+      setReenviarEm(REENVIO_S)
+    })
+
+  const reenviarCodigo = () =>
+    enviar(null, null, async () => {
+      await api.solicitarCodigo(email.trim())
+      setCodigo('')
+      setReenviado(true)
+      setReenviarEm(REENVIO_S)
+      focoRef.current?.focus()
     })
 
   const confirmarCodigo = (e: FormEvent) =>
@@ -122,6 +156,12 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
     <Button type="button" variant="ghost" size="touch" fullWidth onClick={() => irPara(para)} icon={<ArrowLeft size={18} aria-hidden />}>{rotulo}</Button>
   )
   const alerta = erro && <Alert tone="danger">{erro}</Alert>
+  const olho = (
+    <button type="button" className="pc-entrar__olho" onMouseDown={(e) => e.preventDefault()} onClick={() => setVerSenha((v) => !v)} aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={verSenha}>
+      {verSenha ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
+    </button>
+  )
+  const tipoSenha = verSenha ? 'text' : 'password'
 
   return (
     <main className="pc-entrar">
@@ -133,7 +173,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
             <p className="pc-entrar__texto">Entre com o e-mail da sua empresa e a sua senha.</p>
             {campoEmail}
             <Field label="Senha" error={erroSenha} required>
-              <Input ref={senhaRef} type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" />
+              <Input ref={senhaRef} type={tipoSenha} autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" suffix={olho} />
             </Field>
             {alerta}
             <Button type="submit" size="touch" fullWidth loading={enviando} icon={<LogIn size={18} aria-hidden />}>Entrar</Button>
@@ -148,8 +188,9 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
             {voltar('Voltar para o login', 'senha')}
           </form>
         ) : etapa === 'codigo' ? (
-          <form key="codigo" className="pc-entrar__form pc-entrar__form--entra" onSubmit={confirmarCodigo} noValidate>
+          <form key="codigo" ref={formCodigoRef} className="pc-entrar__form pc-entrar__form--entra" onSubmit={confirmarCodigo} noValidate>
             <p className="pc-entrar__texto">Se o e-mail <strong>{email.trim()}</strong> estiver liberado, você vai receber um código de 6 dígitos. Ele vale por 10 minutos.</p>
+            <p className="pc-entrar__dica">Não chegou? Confira a caixa de spam ou lixo eletrônico.</p>
             <Field label="Código do e-mail" error={erroCampo} hint={dicaCodigo} required>
               <Input
                 ref={focoRef}
@@ -157,13 +198,22 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
                 autoComplete="one-time-code"
                 maxLength={6}
                 value={codigo}
-                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) => {
+                  const digitos = e.target.value.replace(/\D/g, '').slice(0, 6)
+                  setCodigo(digitos)
+                  // Digitou ou colou os 6 números: confirma sozinho.
+                  if (digitos.length === 6 && !enviando) requestAnimationFrame(() => formCodigoRef.current?.requestSubmit())
+                }}
                 className="pc-entrar__codigo"
                 size="touch"
               />
             </Field>
             {alerta}
+            {reenviado && <Alert tone="success">Enviamos um novo código. Use o do último e-mail.</Alert>}
             <Button type="submit" size="touch" fullWidth loading={enviando}>Continuar</Button>
+            <Button type="button" variant="ghost" size="touch" fullWidth disabled={reenviarEm > 0 || enviando} onClick={reenviarCodigo} icon={<RotateCw size={18} aria-hidden />}>
+              {reenviarEm > 0 ? `Reenviar código em ${reenviarEm} s` : 'Reenviar código'}
+            </Button>
             {voltar('Trocar e-mail', 'pedir')}
           </form>
         ) : (
@@ -172,10 +222,10 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
             {/* Campo oculto: o gerenciador de senhas do navegador associa a senha nova ao e-mail. */}
             <input type="email" autoComplete="username" value={email.trim()} readOnly hidden />
             <Field label="Nova senha" hint={`Pelo menos ${SENHA_MIN} caracteres.`} error={erroCampo} required>
-              <Input ref={focoRef} type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" />
+              <Input ref={focoRef} type={tipoSenha} autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" suffix={olho} />
             </Field>
             <Field label="Repita a senha" error={erroSenha} required>
-              <Input ref={senhaRef} type="password" autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} size="touch" />
+              <Input ref={senhaRef} type={tipoSenha} autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} size="touch" />
             </Field>
             {alerta}
             <Button type="submit" size="touch" fullWidth loading={enviando}>Salvar senha e entrar</Button>

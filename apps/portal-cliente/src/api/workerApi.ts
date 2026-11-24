@@ -5,7 +5,7 @@ import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
  * PortalApi real: fala com o Worker na mesma origem (`/api/*`), sessão em cookie HttpOnly.
  * Usada por `main.tsx` fora do dev server local (porta 52463) e sem `?mock`.
  */
-const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'senha_invalida', 'senha_fraca', 'bloqueado', 'sem_acesso', 'nao_permitido', 'duplicado', 'falha']
+const CODIGOS: string[] = ['codigo_invalido', 'codigo_expirado', 'senha_invalida', 'senha_fraca', 'bloqueado', 'aguarde', 'sem_acesso', 'nao_permitido', 'duplicado', 'falha']
 
 /** Corpo `{erro, mensagem?}` do Worker → ErroPortal; sem corpo, pelo status HTTP. */
 export async function erroDaResposta(r: Response): Promise<ErroPortal> {

@@ -31,6 +31,29 @@
   color: var(--bt-color-text-secondary);
 }
 
+.pc-entrar__dica {
+  margin: calc(-1 * var(--bt-space-2)) 0 0;
+  font-size: var(--bt-font-size-13);
+  color: var(--bt-color-text-tertiary);
+}
+
+/* Botão de mostrar/ocultar dentro do campo: área de toque de 40 px sem aumentar o campo. */
+.pc-entrar__olho {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-inline-end: calc(-1 * var(--bt-space-2));
+  padding: 0;
+  border: 0;
+  border-radius: var(--bt-radius-sm);
+  background: none;
+  color: var(--bt-color-text-secondary);
+  cursor: pointer;
+}
+.pc-entrar__olho:hover { color: var(--bt-color-text-primary); }
+.pc-entrar__olho:focus-visible { box-shadow: var(--bt-focus-ring); outline: none; }
+
 .pc-entrar__form { display: flex; flex-direction: column; gap: var(--bt-space-4); }
 
 /* Etapa do código entra deslizando de leve: mostra que o fluxo avançou sem trocar de tela. */
