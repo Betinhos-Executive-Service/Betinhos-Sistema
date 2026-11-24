@@ -3,7 +3,6 @@ import type { Row } from '@betinhos/dataverse'
 import { Alert, Button, ContextMenu, EmptyState, SearchBox, Stack, StatusBadge, Switch, ToastProvider, ViewBar, readFilters, selectionMenuActions, useShellHeader, useToast, wantsNativeMenu, type FilterGroup, type FilterOption, type MenuAction, type SelectionAction, type TableFilters } from '@betinhos/ui'
 import { Archive, ArchiveRestore, Bug, CalendarDays, ClipboardList, Copy, FilePlus2, LayoutGrid, Link2, ListChecks, Pencil, Plus, RefreshCw, SearchX, Send, Share2, ShieldCheck, Table2, Ticket, UserPlus } from 'lucide-react'
 import type { Host } from '../../host'
-import type { VarianteCard } from '../../nav/menu'
 import { useMedia } from '../operacional/useMedia'
 import { hrefFor, patchHashQuery, queryFromHash, readHashQuery } from '../../nav/useHashRoute'
 import { createDataverseExtraSource, createMockExtraSource, extraCatalog, resolveLinkColumns } from '../../app/extraColumns'
@@ -59,10 +58,10 @@ import './geral.css'
 /** Só a coluna Motorista (sheet do "Atribuir"); sem ela na visão, todas. */
 const colunasDoMotorista = (columns: Column[]) => { const so = columns.filter((c) => !c.alias && c.attribute === 'cr40f_motorista'); return so.length > 0 ? so : columns }
 
-export function GeralPage({ host, variante }: { host: Host; variante?: VarianteCard }) {
+export function GeralPage({ host }: { host: Host }) {
   // Trocar a chave recria a tela inteira: é o "Tentar de novo" quando as visões não carregam.
   const [attempt, setAttempt] = useState(0)
-  return <ToastProvider><Geral key={attempt} host={host} variante={variante} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
+  return <ToastProvider><Geral key={attempt} host={host} onRetry={() => setAttempt((n) => n + 1)} /></ToastProvider>
 }
 
 const IDLE: CellStatus = { kind: 'idle' }
@@ -71,7 +70,7 @@ const VIRTUAL_KEYS: ReadonlySet<string> = new Set(VIRTUAL_COLUMNS.map((c) => c.k
 /** Substantivo do primário do painel Filtros ("Mostrar 16 serviços"), como o rodapé da lista. */
 const SERVICOS = { one: 'serviço', other: 'serviços' }
 
-function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCard; onRetry: () => void }) {
+function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // `manutencoes` só vale no mock (pnpm dev): as linhas OS-9001 a OS-9004 do plano 3. No Dataverse vêm da própria consulta.
   const source = useMemo(() => createSource(host, { manutencoes: true }), [host])
   // Histórico do campo protegido sob demanda, uma consulta por OS enquanto a tela está aberta; falha não fica no cache.
@@ -111,7 +110,7 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
   // `?tabela=ds`: a grade no `Table` do Design System (migração em partes); fica na URL enquanto a tela regrava o estado.
   const tabelaDs = initial.tabela === 'ds'
   const onStateChange = useCallback((state: UrlState) => {
-    const next = hrefFor(variante ? `geral-card-${variante}` : 'geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
+    const next = hrefFor('geral', new URLSearchParams(writeUrlState({ ...state, tabela: initial.tabela })))
     if (next !== window.location.hash) window.history.replaceState(null, '', next)
   }, [initial.tabela])
   const geral = useGeral(source, { onSaveFail, initial, onStateChange })
@@ -530,6 +529,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
   // lugares: "Editar" só entra com um serviço marcado.
   const selectionActions: SelectionAction[] = [
     { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: mobile ? one : true, onSelect: () => abrirLinha(selectedIds[0]) },
+    // Celular: o card abre o Formulário Geral; a edição rápida campo a campo (sheet) fica aqui, com um serviço marcado.
+    ...(mobile ? [{ id: 'editar-campos', label: 'Editar campos', icon: <ListChecks size={16} />, single: true, onSelect: () => { setSoMotorista(false); setEditId(selectedIds[0]) } } satisfies SelectionAction] : []),
     { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
     selectedState === 1
       ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, inline: true, onSelect: () => askState(true) }
@@ -632,9 +633,9 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
   const editRow = editId == null ? undefined : rowOf(editId)
   const editManutencao = editRow ? lerManutencao(editRow) : null
 
-  // Variações do card (laboratório): primeiro nome dos passageiros pela tabela serviços por passageiro.
+  // Cards do celular: primeiro nome dos passageiros pela tabela serviços por passageiro.
   const idsDasLinhas = useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows])
-  const paxPorServico = usePaxServicos(host, idsDasLinhas, Boolean(variante) && mobile)
+  const paxPorServico = usePaxServicos(host, idsDasLinhas, mobile)
   const rowById = useMemo(() => new Map(rows.map((r) => [String(r[ID_ATTRIBUTE]), r])), [rows])
   const grouping = useMemo<Grouping | undefined>(() => {
     if (cardsLayout) return undefined
@@ -700,7 +701,6 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
               <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
               <GeralCards
                 grid={!mobile}
-                variante={mobile ? variante : undefined}
                 paxPorServico={paxPorServico}
                 rows={rows}
                 columns={dataColumns}
@@ -718,7 +718,7 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
-              {mobile && variante ? <button type="button" className="gv-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
+              {mobile ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )
           : tabelaDs && !grouped ? (
@@ -804,8 +804,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-            {/* Variações no celular: o "+" fixo no pé da tela substitui este. */}
-            {mobile && variante ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
+            {/* No celular, o "+" fixo no pé da tela substitui este. */}
+            {mobile ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
           </>}
           selection={selection}
         >

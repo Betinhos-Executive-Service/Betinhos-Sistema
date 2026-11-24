@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuditoriaProvider } from '../../app/auditoria/AuditoriaProvider'
 import { GeralPage } from './GeralPage'
-import { acao, cellOf, columnMenu, dataRows, findDataRows, hooks, PAGE1, pickView, usarAmbienteGeral } from './testUtils'
+import { acao, editarCamposDoCard, cellOf, columnMenu, dataRows, findDataRows, hooks, PAGE1, pickView, usarAmbienteGeral } from './testUtils'
 
 vi.mock('./data/source', async (importOriginal) => (await import('./testUtils')).mockSource(await importOriginal<typeof import('./data/source')>()))
 usarAmbienteGeral()
@@ -157,9 +157,10 @@ describe('Geral: correções finais', () => {
     })
     const openSheet = async (name?: string) => {
       render(<GeralPage host={{ mode: 'mock' }} />)
-      const cards = await screen.findAllByRole('listitem')
+      await screen.findAllByRole('listitem')
+      const cards = Array.from(document.querySelectorAll<HTMLElement>('.gr-cards > li.gc-card'))
       const card = name ? cards.find((c) => c.textContent?.includes(name)) : cards[0]
-      fireEvent.click(within(card as HTMLElement).getByRole('button', { name: 'Editar campos' }))
+      await editarCamposDoCard(card as HTMLElement)
       return screen.findByRole('dialog', { name: /Serviço OS-/ })
     }
 
