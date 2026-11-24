@@ -723,7 +723,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
-              {mobile && varianteBarra && selectedIds.length > 0 ? <BarraSelecao variante={varianteBarra} selection={selection} /> : null}
+              {mobile && varianteBarra && selectedIds.length > 0 ? <BarraSelecao variante={varianteBarra} selection={selection} total={rows.length} onTodos={() => geral.setSelection(new Set(rows.map((r) => String(r[ID_ATTRIBUTE]))))} /> : null}
               {mobile && selectedIds.length === 0 ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )

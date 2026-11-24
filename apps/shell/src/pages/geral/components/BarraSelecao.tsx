@@ -13,9 +13,11 @@ export const lerVarianteBarra = (hash: string): VarianteBarra | null => {
 
 /** Ações que ganham botão próprio no celular, nesta ordem; "Editar" fica no menu (tocar no card já abre o formulário). */
 const PRINCIPAIS = ['editar-campos', 'copiar', 'disparar']
+/** Barra B: o que se faz com um serviço é diferente do que se faz com vários (Editar campos só vale para um). */
+const PRINCIPAIS_B = { um: ['copiar', 'disparar', 'editar-campos'], varios: ['copiar', 'disparar', 'voucher'] }
 
 /** Rótulo curto na barra B (o nome completo fica no `aria-label` e no menu). */
-const CURTO: Record<string, string> = { copiar: 'Copiar', 'editar-campos': 'Editar campos', disparar: 'Disparar' }
+const CURTO: Record<string, string> = { copiar: 'Copiar', 'editar-campos': 'Editar campos', disparar: 'Disparar', voucher: 'Voucher' }
 
 const contagem = (n: number) => (n === 1 ? '1 selecionado' : `${n} selecionados`)
 
@@ -45,10 +47,11 @@ function useAlturaPublicada() {
 }
 
 /** Barra de seleção do celular em 3 variações; recebe a mesma `selection` que o `ViewBar` do DS. */
-export function BarraSelecao({ variante, selection }: { variante: VarianteBarra; selection: ViewBarSelection }) {
+export function BarraSelecao({ variante, selection, total, onTodos }: { variante: VarianteBarra; selection: ViewBarSelection; total?: number; onTodos?: () => void }) {
   const ref = useAlturaPublicada()
   const [folha, setFolha] = useState(false)
-  const principais = PRINCIPAIS.map((id) => selection.actions.find((a) => a.id === id)).filter((a): a is SelectionAction => a != null)
+  const ids = variante === 'b' ? (selection.count === 1 ? PRINCIPAIS_B.um : PRINCIPAIS_B.varios) : PRINCIPAIS
+  const principais = ids.map((id) => selection.actions.find((a) => a.id === id)).filter((a): a is SelectionAction => a != null)
   const resto = selectionMenuActions({ count: selection.count, actions: selection.actions.filter((a) => !principais.includes(a)) })
   const mais = (rotulo: boolean) => (
     <Menu
@@ -76,8 +79,11 @@ export function BarraSelecao({ variante, selection }: { variante: VarianteBarra;
     return (
       <div ref={ref} className="gs-barra gs-barra--b" role="group" aria-label="Comandos da seleção">
         <div className="gs-b__topo">
-          <span role="status" className="gs-b__selo"><CheckCheck size={14} aria-hidden="true" />{contagem(selection.count)}</span>
-          <button type="button" className="gs-b__limpar" onClick={selection.onClear}>Desmarcar</button>
+          <button type="button" className="gs-icone gs-b__fechar" aria-label="Desmarcar tudo" title="Desmarcar tudo" onClick={selection.onClear}><X size={20} aria-hidden="true" /></button>
+          <span role="status" className="gs-b__selo"><CheckCheck size={14} aria-hidden="true" /><span key={selection.count} className="gs-b__numero">{contagem(selection.count)}</span></span>
+          {onTodos && total != null && selection.count < total
+            ? <button type="button" className="gs-b__todos" aria-label={`Selecionar todos (${total})`} onClick={onTodos}>Todos</button>
+            : <span className="gs-b__todos" aria-hidden="true" />}
         </div>
         <div className="gs-b__ferramentas">
           {principais.map((a) => <Acao key={a.id} action={a} count={selection.count} classe="gs-ferramenta" comRotulo />)}
