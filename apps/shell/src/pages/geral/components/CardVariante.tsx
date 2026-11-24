@@ -55,6 +55,9 @@ export function SeparadorDia({ dia, total }: { dia: string; total: number }) {
   return <li className="gv-dia"><span>{rotuloDia(dia)}</span><small>{total} {total === 1 ? 'item' : 'itens'}</small></li>
 }
 
+/** Até 2 primeiros nomes e o resto como contagem: "Diego, Helena +1". */
+export const resumoPax = (pax: string[]) => (pax.length > 2 ? `${pax.slice(0, 2).join(', ')} +${pax.length - 2}` : pax.join(', '))
+
 const ignorarAlvo = (event: MouseEvent<HTMLElement>) => Boolean((event.target as HTMLElement).closest('button, input, a, label'))
 
 function Alertas({ d }: { d: DadosCard }) {
@@ -140,7 +143,7 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
           <button type="button" className="gv-corpo" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
             <span className="gv-v4__rota">{d.titulo ?? '—'}</span>
             <span className="gv-v4__campos">
-              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo" title="Passageiros"><Users size={13} aria-label="Passageiros" /><span>{d.pax.join(', ')}</span></span> : null}
+              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo" title={d.pax.join(', ')}><Users size={13} aria-label="Passageiros" /><span>{resumoPax(d.pax)}</span></span> : null}
               {d.manutencao ? (d.meta ? <span className="gv-v4__campo" title="Janela"><CalendarRange size={13} aria-label="Janela" /><span>{d.meta}</span></span> : null) : <span className="gv-v4__campo" title="Cliente"><Building2 size={13} aria-label="Cliente" /><span>{d.cliente ?? '—'}</span></span>}
               {d.motorista ? <span className="gv-v4__campo" title="Motorista"><UserRound size={13} aria-label="Motorista" /><span>{d.motorista}</span></span> : null}
             </span>
