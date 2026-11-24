@@ -81,5 +81,3 @@
 
 /* Fazer vistoria agora: botão e escolha do carro acima da lista. */
 .checklist-agora { display: grid; gap: 10px; margin: 0 0 14px; }
-.checklist-agora-titulo { margin: 0; font-size: 14px; font-weight: 700; }
-.checklist-agora .vehicle-choice-list { margin: 0; }
