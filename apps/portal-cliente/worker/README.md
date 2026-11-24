@@ -24,10 +24,10 @@ Segurança: 5 erros (senha ou código) no mesmo e-mail → 15 min de bloqueio; l
 
 Dois Workers e um projeto Pages na conta Cloudflare do `cadastro-passageiro`:
 
-- `portal-cliente-dev` (`wrangler deploy --env dev`, Dataverse DEV): piloto. KV `portal-cliente-dev`.
+- `portal-cliente-dev` (`wrangler deploy --env dev`, Dataverse DEV): piloto. KV `portal-cliente-dev`. **Durante o piloto** (desde 24/11/2026) `cliente.betinhos.com.br` abre este Worker: a produção do Pages aponta para ele e o `PORTAL_URL` dele é o domínio. Quando o PROD estiver pronto, volte o service binding de produção em `pages/wrangler.jsonc` para `portal-cliente`, o `PORTAL_URL` do `env.dev` para o endereço de preview e o `deploy:dev` para `--branch dev`.
 - `portal-cliente` (`wrangler deploy`, Dataverse PROD): só depois do piloto, a partir da `main`. KV `portal-cliente`.
 - Pages `portal-cliente` (`pages/`, `portal-cliente-5jp.pages.dev`): serve o `dist` e repassa `/api/*` ao Worker por service binding (`pages/functions/api/[[path]].ts`). Produção (branch `main` do Pages) liga no `portal-cliente`; preview (`--branch dev`, `dev.portal-cliente-5jp.pages.dev`) no `portal-cliente-dev`. O domínio `cliente.betinhos.com.br` é custom domain do Pages com CNAME na Locaweb para `portal-cliente-5jp.pages.dev` (a zona não está na Cloudflare, por isso Pages e não custom domain de Worker). Cron e ratelimit ficam no Worker.
-- `pnpm --dir apps/portal-cliente deploy:dev` faz build, Worker DEV e Pages preview.
+- `pnpm --dir apps/portal-cliente deploy:dev` faz build, Worker DEV e Pages produção (`--branch main`, o domínio, durante o piloto).
 
 Por ambiente, uma vez:
 
