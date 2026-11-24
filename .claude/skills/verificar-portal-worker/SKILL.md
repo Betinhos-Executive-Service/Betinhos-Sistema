@@ -23,4 +23,4 @@ description: "Verifica o Worker Cloudflare do portal de validação do cliente (
 - Saída dos testes e do typecheck; respostas do `curl` no `wrangler dev`.
 
 ## Fora do alcance
-- Deploy (`wrangler deploy`), secrets reais e usuário de aplicação: só com OK do Renan, a partir da `main`. Plugins disparados pela criação da reserva (AutoNumberGuard, preço, compartilhamento) só se veem no DEV.
+- Deploy do PROD (`wrangler deploy`, Pages produção), secrets reais e usuário de aplicação: só com OK do Renan, a partir da `main`. Piloto: `deploy:dev` (Worker `portal-cliente-dev` + Pages preview `dev.portal-cliente-5jp.pages.dev`); prova = login e lista pelo endereço do Pages (o proxy `/api/*` mantém Origin e cookies), `POST /api/auth/codigo` com `Origin` do Pages → 204. Plugins disparados pela criação da reserva (AutoNumberGuard, preço, compartilhamento) só se veem no DEV.

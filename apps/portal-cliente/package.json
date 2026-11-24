@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "build": "node ../../packages/deploy/bump-version.mjs . && tsc --noEmit && vite build",
     "test": "vitest run",
-    "dev:worker": "vite build && wrangler dev"
+    "dev:worker": "vite build && wrangler dev",
+    "deploy:dev": "pnpm build && wrangler deploy --env dev && cd pages && wrangler pages deploy --branch dev"
   },
   "dependencies": {
     "@betinhos/ui": "npm:@betinhos-executive-service/ui@^1.18.0",

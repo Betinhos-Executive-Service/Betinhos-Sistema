@@ -7,13 +7,25 @@
   "workers_dev": true,
   // /api/* passa pelo Worker; o resto é o build do app (pnpm build → ./dist), SPA com fallback para index.html.
   "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
-  // Token do Dataverse e contadores de falha/bloqueio do login. Criar com `wrangler kv namespace create portal-cliente` e trocar o id.
-  "kv_namespaces": [{ "binding": "KV", "id": "TROCAR_PELO_ID_DO_KV" }],
+  // Token do Dataverse e contadores de falha/bloqueio do login.
+  "kv_namespaces": [{ "binding": "KV", "id": "42c4e91b814c41a89aa61cae44ddcc57" }],
   "ratelimits": [
     { "name": "RL_IP", "namespace_id": "4202", "simple": { "limit": 60, "period": 60 } },
     { "name": "RL_EMAIL", "namespace_id": "4203", "simple": { "limit": 10, "period": 60 } }
   ],
   // 11:00 UTC = 8h em America/Sao_Paulo, seg–sex: aprovação tácita + resumo diário.
-  "triggers": { "crons": ["0 11 * * 1-5"] }
+  "triggers": { "crons": ["0 11 * * 1-5"] },
+  // DEV (piloto, Dataverse DEV): `wrangler deploy --env dev` publica o Worker portal-cliente-dev.
+  // KV e ratelimits não herdam do topo; cron herda. Secrets próprios (`wrangler secret put --env dev`).
+  "env": {
+    "dev": {
+      "name": "portal-cliente-dev",
+      "kv_namespaces": [{ "binding": "KV", "id": "1f4cfbe2ec2f42f190f7016db632cabc" }],
+      "ratelimits": [
+        { "name": "RL_IP", "namespace_id": "4204", "simple": { "limit": 60, "period": 60 } },
+        { "name": "RL_EMAIL", "namespace_id": "4205", "simple": { "limit": 10, "period": 60 } }
+      ]
+    }
+  }
   // Secrets (wrangler secret put): DV_TENANT, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, EMAIL_FLOW_URL, CHAVE_TOTP, CHAVE_SESSAO.
 }
