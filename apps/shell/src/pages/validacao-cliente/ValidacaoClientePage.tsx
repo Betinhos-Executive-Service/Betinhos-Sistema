@@ -47,9 +47,9 @@ function ValidacaoCliente({ host }: { host: Host }) {
 
 type Aba = 'validacao' | 'usuarios' | 'configuracoes'
 const ABAS = [
-  { value: 'validacao' as const, label: 'Validação', icon: <ShieldCheck size={16} /> },
   { value: 'usuarios' as const, label: 'Usuários', icon: <Users size={16} /> },
   { value: 'configuracoes' as const, label: 'Configurações', icon: <Settings2 size={16} /> },
+  { value: 'validacao' as const, label: 'Validação', icon: <ShieldCheck size={16} /> },
 ]
 const abaDe = (valor: string): Aba => (valor === 'usuarios' || valor === 'configuracoes' ? valor : 'validacao')
 

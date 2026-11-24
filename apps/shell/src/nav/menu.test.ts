@@ -135,7 +135,8 @@ it('Back-End não lista mais as tabelas de apoio tiradas em 18/11/2026', () => {
   }
 })
 
-it('Portal do cliente, Descontos em folha e Composição antiga ficam no Back-End', () => {
-  for (const id of ['validacao-cliente', 'rh-descontos', 'new_telacomposicaopreco']) expect(findItem(id)?.group.id).toBe('back-end')
+it('Descontos em folha e Composição antiga ficam no Back-End; Portal do cliente segue no Financeiro', () => {
+  expect(findItem('validacao-cliente')?.group.id).toBe('financeiro')
+  for (const id of ['rh-descontos', 'new_telacomposicaopreco']) expect(findItem(id)?.group.id).toBe('back-end')
   expect(MENU.some((group) => group.id === 'rh')).toBe(false)
 })
