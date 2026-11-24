@@ -1,6 +1,6 @@
 // Porte de Tela Planner/src/IdeasView.jsx (sem mudança de comportamento).
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Archive, Check, Columns3, Lightbulb, List, Plus, RefreshCw, Search, X } from "lucide-react";
+import { Archive, Check, Columns3, Image, Lightbulb, List, Plus, RefreshCw, Search, Video, X } from "lucide-react";
 import PageHeader from '../components/PageHeader';
 import SearchableSelect from '../components/SearchableSelect';
 import { BrandLoader } from '../../../app/BrandLoader';
@@ -30,6 +30,19 @@ function formatDate(value: any) {
 
 function statusLabel(status: any) {
   return IDEA_STATUSES.find((item) => item.value === status)?.label || "Status indefinido";
+}
+
+function AttachmentSummary({ idea }: any) {
+  const list: any[] = idea?.attachments || [];
+  const videos = list.filter((item) => item.kind === "video").length;
+  const photos = list.length - videos;
+  if (!photos && !videos) return null;
+  return (
+    <small className="idea-attachment-summary">
+      {photos > 0 && <span><Image size={12} aria-hidden="true" /> {photos} {photos === 1 ? "foto" : "fotos"}</span>}
+      {videos > 0 && <span><Video size={12} aria-hidden="true" /> {videos} {videos === 1 ? "vídeo" : "vídeos"}</span>}
+    </small>
+  );
 }
 
 function readStoredView() {
@@ -119,6 +132,19 @@ function IdeaDrawer({ idea, onClose, onSave, onArchive }: any) {
             <small>{draft.details.length}/2000</small>
           </label>
           {!isNew && <label className="idea-status-field"><span>Status</span><SearchableSelect value={draft.status} onChange={(value: any) => setDraft((current: any) => ({ ...current, status: Number(value) }))} options={IDEA_STATUSES} clearable={false} disabled={saving} aria-label="Status da ideia" /></label>}
+          {!isNew && idea.attachments?.length > 0 && <section className="idea-attachments" aria-label="Anexos da ideia">
+            <span className="idea-attachments-title">Anexos <AttachmentSummary idea={idea} /></span>
+            <ul>
+              {idea.attachments.map((item: any) => (
+                <li key={item.id}>
+                  <a href={item.link} target="_blank" rel="noopener noreferrer">
+                    {item.kind === "video" ? <Video size={14} aria-hidden="true" /> : <Image size={14} aria-hidden="true" />}
+                    <span>{item.name}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>}
           {error && <p className="ideas-feedback ideas-feedback-error" role="alert">{error}</p>}
         </form>
         <footer className="drawer-footer">
@@ -281,6 +307,7 @@ export default function IdeasView({ store }: any) {
             <button className="idea-card-copy idea-open" type="button" onClick={() => setDrawer({ idea })} aria-label={`Abrir ideia ${idea.title}`}>
               <span className="idea-title-line"><span className="idea-title">{idea.title}</span><span className={`idea-status-badge idea-status-${idea.status}`}>{statusLabel(idea.status)}</span></span>
               {idea.details && <span className="idea-details">{idea.details}</span>}
+              <AttachmentSummary idea={idea} />
               <small>{metaLine(idea)}</small>
             </button>
             <div className="idea-card-action">
@@ -315,6 +342,7 @@ export default function IdeasView({ store }: any) {
                     <button className="idea-open" type="button" onClick={() => setDrawer({ idea })} aria-label={`Abrir ideia ${idea.title}`}>
                       <span className="idea-title">{idea.title}</span>
                       {idea.details && <span className="idea-details">{idea.details}</span>}
+                      <AttachmentSummary idea={idea} />
                       <small>{metaLine(idea)}</small>
                     </button>
                     <div className="idea-move"><SearchableSelect value={idea.status} onChange={(value: any) => handleStatusChange(idea, Number(value))} options={IDEA_STATUSES.map((item) => ({ value: item.value, label: item.value === idea.status ? item.label : `Mover para ${item.label}` }))} clearable={false} disabled={Boolean(updatingId)} aria-label={`Mover ${idea.title} para`} /></div>
