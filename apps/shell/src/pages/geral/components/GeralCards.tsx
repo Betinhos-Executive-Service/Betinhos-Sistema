@@ -10,7 +10,7 @@ import { ID_ATTRIBUTE, type AttributeMap, type Column } from '../domain/types'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { ManutencaoResumo, ManutencaoRotulo, rotuloAbrirManutencao } from './ManutencaoResumo'
 import { CardServico, SeparadorDia, type DadosCard } from './CardServico'
-import { Fragment } from 'react'
+import { Fragment, memo, useMemo, useRef, type MutableRefObject } from 'react'
 
 type Props = {
   rows: Row[]
@@ -42,6 +42,52 @@ type Props = {
 
 const STATUS = 'cr40f_status'
 const DATA = 'cr40f_dataehorriodesada'
+const SEM_PAX: string[] = []
+
+type Acoes = Pick<Props, 'onOpen' | 'onEdit' | 'onAtribuir' | 'onToggle' | 'onCardContextMenu'>
+
+type PropsLinha = {
+  row: Row
+  id: string
+  selecionado: boolean
+  /** `null`: passageiros ainda não carregados. */
+  pax: string[] | null
+  columns: Column[]
+  attributes: AttributeMap | null
+  besideId?: Props['besideId']
+  manutencao?: Props['manutencao']
+  acoes: MutableRefObject<Acoes>
+}
+
+/** Um card do celular: lê a linha e monta o `CardServico`. Memorizado; só redesenha quando a linha ou a marcação muda. */
+const CardDaLinha = memo(function CardDaLinha({ row, id, selecionado, pax, columns, attributes, besideId, manutencao, acoes }: PropsLinha) {
+  const find = (attribute: string) => columns.find((c) => !c.alias && c.attribute === attribute)
+  const has = { status: find(STATUS), data: find(DATA), cliente: find('cr40f_cliente'), motorista: find('cr40f_motorista'), trajeto: find('cr40f_trajeto') }
+  const valueOf = (column: Column | undefined) => (column ? formatCell('readonly', row, rowKey(column, attributes?.get(column.key))) : '—')
+  const m = manutencao?.ler(row) ?? null
+  const motoristaKey = has.motorista && attributes ? rowKey(has.motorista, attributes.get(has.motorista.key)) : null
+  const d: DadosCard = m && manutencao
+    ? {
+      id, manutencao: true, codigo: m.veiculo, abrirRotulo: rotuloAbrirManutencao(m), abrir: () => manutencao.abrir(m),
+      status: <StatusBadge tone={m.statusTom}>{m.statusRotulo}</StatusBadge>,
+      quando: formatCell('datetime', row, DATA) || null, titulo: m.descricao, cliente: null,
+      motorista: row._cr40f_motorista_value == null ? null : formatCell('readonly', row, '_cr40f_motorista_value'),
+      meta: [m.grau, m.janelaRotulo].filter(Boolean).join(' · ') || null,
+      alertas: [...(m.atrasada ? [{ texto: 'Atrasada', tom: 'perigo' as const }] : []), ...(m.foraDaJanela ? [{ texto: 'Fora da janela', tom: 'aviso' as const }] : [])],
+      programar: { rotulo: /^program/i.test(m.statusRotulo) ? 'Reprogramar' : 'Programar', onClick: () => acoes.current.onEdit(id) }, pax: null,
+    }
+    : {
+      id, manutencao: false, codigo: formatCell('readonly', row, 'cr40f_id'), abrirRotulo: `Abrir serviço ${formatCell('readonly', row, 'cr40f_id')} no Formulário Geral`, abrir: () => acoes.current.onOpen(id),
+      status: has.status && typeof row[STATUS] === 'number' ? <ChoiceBadge column={has.status} info={attributes?.get(has.status.key)} raw={row[STATUS] as number} text={formatCell('readonly', row, STATUS)} /> : null,
+      quando: has.data ? formatCell('datetime', row, rowKey(has.data, attributes?.get(has.data.key))) || null : null,
+      titulo: has.trajeto ? valueOf(has.trajeto) : null, cliente: has.cliente ? valueOf(has.cliente) : null,
+      motorista: motoristaKey == null ? undefined : row[motoristaKey] == null ? null : formatCell('readonly', row, motoristaKey),
+      meta: null, alertas: [], pax,
+      extra: besideId?.(id, formatCell('readonly', row, 'cr40f_id')),
+    }
+  if (d.motorista === null && !d.manutencao && acoes.current.onAtribuir) d.atribuir = () => acoes.current.onAtribuir?.(id)
+  return <CardServico d={d} selecionado={selecionado} onToggle={() => acoes.current.onToggle(id)} onContextMenu={acoes.current.onCardContextMenu ? (event) => acoes.current.onCardContextMenu?.(id, event) : undefined} />
+})
 
 /** Lista de serviços no celular: um card por linha com o essencial e o botão que abre a edição por campo. */
 export function GeralCards({ rows, columns, attributes, loading, selected, onToggle, onOpen, besideId, onEdit, onCardContextMenu, footer, grid = false, manutencao, paxPorServico, onAtribuir }: Props) {
@@ -56,6 +102,18 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
     return (formatCell('datetime', row, coluna) || '').split(' ')[0] || null
   }
 
+  // Callbacks lidos na hora do toque: os cards memorizados não precisam redesenhar quando eles mudam de identidade.
+  const acoes = useRef<Acoes>({ onOpen, onEdit, onAtribuir, onToggle, onCardContextMenu })
+  acoes.current = { onOpen, onEdit, onAtribuir, onToggle, onCardContextMenu }
+  // Dia de cada linha e quantos itens por dia, uma vez por lista (antes era uma varredura da lista por card).
+  const dias = useMemo(() => {
+    const lista = rows.map(diaDaLinha)
+    const total = new Map<string, number>()
+    for (const dia of lista) if (dia) total.set(dia, (total.get(dia) ?? 0) + 1)
+    return { lista, total }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- diaDaLinha só depende de columns e attributes
+  }, [rows, columns, attributes])
+
   if (loading && rows.length === 0) return <BrandLoader variant="inline" label="Carregando serviços" text="Carregando serviços…" />
 
   return (
@@ -64,38 +122,15 @@ export function GeralCards({ rows, columns, attributes, loading, selected, onTog
         {rows.map((row, indice) => {
           const id = String(row[ID_ATTRIBUTE])
           const m = manutencao?.ler(row) ?? null
-          // Celular: card com trilho da hora, trajeto e passageiros em destaque e separador por dia.
+          // Celular: card com trilho da hora, passageiro e trajeto em destaque e separador por dia. Cada card é memorizado:
+          // marcar um não redesenha os outros.
           if (!grid) {
-            const motoristaKey = has.motorista && attributes ? rowKey(has.motorista, attributes.get(has.motorista.key)) : null
-            const d: DadosCard = m && manutencao
-              ? {
-                id, manutencao: true, codigo: m.veiculo, abrirRotulo: rotuloAbrirManutencao(m), abrir: () => manutencao.abrir(m),
-                status: <StatusBadge tone={m.statusTom}>{m.statusRotulo}</StatusBadge>,
-                quando: formatCell('datetime', row, DATA) || null, titulo: m.descricao, cliente: null,
-                motorista: row._cr40f_motorista_value == null ? null : formatCell('readonly', row, '_cr40f_motorista_value'),
-                meta: [m.grau, m.janelaRotulo].filter(Boolean).join(' · ') || null,
-                alertas: [...(m.atrasada ? [{ texto: 'Atrasada', tom: 'perigo' as const }] : []), ...(m.foraDaJanela ? [{ texto: 'Fora da janela', tom: 'aviso' as const }] : [])],
-                programar: { rotulo: /^program/i.test(m.statusRotulo) ? 'Reprogramar' : 'Programar', onClick: () => onEdit(id) }, pax: null,
-              }
-              : {
-                id, manutencao: false, codigo: formatCell('readonly', row, 'cr40f_id'), abrirRotulo: `Abrir serviço ${formatCell('readonly', row, 'cr40f_id')} no Formulário Geral`, abrir: () => onOpen(id),
-                status: has.status && typeof row[STATUS] === 'number' ? <ChoiceBadge column={has.status} info={attributes?.get(has.status.key)} raw={row[STATUS] as number} text={formatCell('readonly', row, STATUS)} /> : null,
-                quando: has.data ? formatCell('datetime', row, rowKey(has.data, attributes?.get(has.data.key))) || null : null,
-                titulo: has.trajeto ? valueOf(row, has.trajeto) : null, cliente: has.cliente ? valueOf(row, has.cliente) : null,
-                motorista: motoristaKey == null ? undefined : row[motoristaKey] == null ? null : formatCell('readonly', row, motoristaKey),
-                meta: null, alertas: [],
-                pax: paxPorServico ? paxPorServico.get(id) ?? [] : null,
-                extra: besideId?.(id, formatCell('readonly', row, 'cr40f_id')),
-              }
-            // Separador quando o dia muda (a lista já vem ordenada pela visão).
-            const dia = d.quando?.split(' ')[0] ?? null
-            const anterior = indice > 0 ? diaDaLinha(rows[indice - 1]) : null
-            const total = dia ? rows.filter((r) => diaDaLinha(r) === dia).length : 0
-            if (d.motorista === null && !d.manutencao && onAtribuir) d.atribuir = () => onAtribuir(id)
+            const dia = dias.lista[indice]
+            const anterior = indice > 0 ? dias.lista[indice - 1] : null
             return (
               <Fragment key={id}>
-                {dia && dia !== anterior ? <SeparadorDia dia={dia} total={total} /> : null}
-                <CardServico d={d} selecionado={selected.has(id)} onToggle={() => onToggle(id)} onContextMenu={onCardContextMenu ? (event) => onCardContextMenu(id, event) : undefined} />
+                {dia && dia !== anterior ? <SeparadorDia dia={dia} total={dias.total.get(dia) ?? 0} /> : null}
+                <CardDaLinha row={row} id={id} selecionado={selected.has(id)} pax={paxPorServico ? paxPorServico.get(id) ?? SEM_PAX : null} columns={columns} attributes={attributes} besideId={besideId} manutencao={manutencao} acoes={acoes} />
               </Fragment>
             )
           }
