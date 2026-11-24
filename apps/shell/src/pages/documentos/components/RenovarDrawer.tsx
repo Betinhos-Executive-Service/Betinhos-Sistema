@@ -1,8 +1,8 @@
 import { useEffect, useId, useState } from 'react'
 import { Alert, Button, Dialog, Drawer, Field, Input, Textarea, Upload, type UploadFile } from '@betinhos/ui'
-import { DOC_MAX_BYTES } from '../../funcionarios/data/sharepoint'
 import type { DocsSource } from '../data/source'
 import type { SalvarDocResult } from '../data/salvar'
+import { maxBytesDoTipo, mbDoTipo } from '../domain/tamanho'
 import { validadeSugerida } from '../domain/vencimento'
 import type { DocEmitido, Dono, TipoDoc } from '../domain/types'
 import '../documentos.css'
@@ -89,9 +89,9 @@ export function RenovarDrawer({ alvo, source, onClose, onSaved }: Props) {
           <Field label="Observação"><Textarea rows={2} value={form.observacao} disabled={saving} onChange={(e) => set({ observacao: e.target.value })} /></Field>
           <Upload
             label="Arquivos"
-            hint="PDF, JPG ou PNG, até 10 MB cada."
+            hint={`PDF, JPG ou PNG, até ${mbDoTipo(tipo)} MB cada.`}
             accept={ACCEPT}
-            maxSize={DOC_MAX_BYTES}
+            maxSize={maxBytesDoTipo(tipo)}
             files={uploadFiles}
             disabled={saving}
             onChange={(files, added) => set({ arquivos: [...form.arquivos.filter((_, i) => files.includes(uploadFiles[i])), ...added] })}

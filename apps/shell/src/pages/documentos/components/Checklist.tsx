@@ -3,12 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { acceptFiles, Alert, Button, Dialog, Spinner, useToast } from '@betinhos/ui'
 import { File as FileIcon, FileImage, FileText, History, Paperclip, Plus, Trash2, Upload as UploadIcon } from 'lucide-react'
 import { formatBR, todaySP } from '../../funcionarios/data/dates'
-import { DOC_MAX_BYTES } from '../../funcionarios/data/sharepoint'
 import type { DocsSource } from '../data/source'
 import { avisoFalhas, type SalvarDocResult } from '../data/salvar'
 import { criarLimite, type Limite } from '../domain/limite'
 import { elipseMeio, nomeAmigavel } from '../domain/nomes'
 import { montarChecklist } from '../domain/pendencias'
+import { maxBytesDoTipo } from '../domain/tamanho'
 import type { Arquivo, DocEmitido, ItemChecklist } from '../domain/types'
 import { useDocumentos } from '../useDocumentos'
 import { ACCEPT, RenovarDrawer, type AlvoRenovar } from './RenovarDrawer'
@@ -54,10 +54,10 @@ export function Checklist({ source, donoId, titulo = 'Documentos controlados' }:
 const TIPOS_ACEITOS = /\.(pdf|jpe?g|png)$/i
 const MIME_ACEITOS = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 
-/** Mesmas regras do drawer: PDF, JPG ou PNG, até DOC_MAX_BYTES. Devolve a mensagem de erro ou null. */
-function validarArquivo(file: File) {
+/** Mesmas regras do drawer: PDF, JPG ou PNG, até o limite do tipo. Devolve a mensagem de erro ou null. */
+function validarArquivo(file: File, maxSize: number) {
   if (!TIPOS_ACEITOS.test(file.name) && !MIME_ACEITOS.has(file.type)) return `${file.name} não é PDF, JPG ou PNG.`
-  return acceptFiles([file], 0, { maxSize: DOC_MAX_BYTES }).error
+  return acceptFiles([file], 0, { maxSize }).error
 }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -101,7 +101,7 @@ function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; s
   /** Anexa (ou reenvia) um arquivo ao vigente: serve para upload que falhou e para documento migrado sem arquivo. */
   const enviar = async (doc: DocEmitido, file: File) => {
     setErroArq(null)
-    const invalido = validarArquivo(file)
+    const invalido = validarArquivo(file, maxBytesDoTipo(item.tipo))
     if (invalido) { setFalhaEnvio(null); setErroArq(invalido); return }
     setEnviando(true)
     try {
