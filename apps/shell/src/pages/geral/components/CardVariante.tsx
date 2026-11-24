@@ -142,34 +142,34 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
   }
 
   if (variante === 'v4') {
-    // V3 (trilho da hora com a cor do estado) com a leitura do Resumo Operacional: "#ID · quem", trajeto, pílula e alerta em texto.
+    // Passageiro e trajeto em primeiro plano; a OS fica discreta. Tocar no card abre o Formulário Geral (o mesmo do "+").
     const avisos = [...d.alertas, ...(d.motorista === null ? [{ texto: 'Sem motorista', tom: 'aviso' as const }] : [])]
+    const abrirCard = (event: MouseEvent<HTMLLIElement>) => { if (!ignorarAlvo(event)) d.abrir() }
     return (
-      <li className={`${classe} gv-card--v3`} data-tom={tom} onClick={alternar}>
+      <li className={`${classe} gv-card--v3`} data-tom={tom} onClick={abrirCard}>
         <div className="gv-v3__trilho gv-v4__trilho">
           {hora ? <span className="gv-v3__hora">{hora}</span> : null}
           <Selecao d={d} selecionado={selecionado} onToggle={onToggle} />
         </div>
         <div className="gv-v4__conteudo">
           <div className="gv-v4__topo">
-            <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}</p>
+            <button type="button" className="gv-v4__abrir" aria-label={d.abrirRotulo} onClick={d.abrir}>
+              {d.manutencao ? <Wrench size={14} aria-hidden="true" /> : null}
+              <span className="gv-v4__rota">{d.titulo ?? '—'}</span>
+            </button>
             {d.status}
           </div>
-          <button type="button" className="gv-corpo" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
-            <span className="gv-v4__rota">{d.titulo ?? '—'}</span>
-            <span className="gv-v4__campos">
-              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo" title={d.pax.join(', ')}><Users size={13} aria-label="Passageiros" /><span>{resumoPax(d.pax)}</span></span> : null}
-              {d.manutencao ? (d.meta ? <span className="gv-v4__campo" title="Janela"><CalendarRange size={13} aria-label="Janela" /><span>{d.meta}</span></span> : null) : <span className="gv-v4__campo" title="Cliente"><Building2 size={13} aria-label="Cliente" /><span>{d.cliente ?? '—'}</span></span>}
-              {d.motorista ? <span className="gv-v4__campo" title="Motorista"><UserRound size={13} aria-label="Motorista" /><span>{d.motorista}</span></span> : null}
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-          {avisos.length > 0 || d.atribuir ? (
-            <div className="gv-v4__pe">
-              <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span>
-              {d.atribuir ? <Button variant="action" size="compact" icon={<UserPlus size={14} aria-hidden="true" />} aria-label={`Atribuir motorista: ${d.codigo}`} onClick={d.atribuir}>Atribuir</Button> : null}
-            </div>
-          ) : null}
+          {d.pax && d.pax.length > 0 ? <p className="gv-v4__pax" title={d.pax.join(', ')}><Users size={15} aria-label="Passageiros" /><span>{resumoPax(d.pax)}</span></p>
+            : d.pax ? <p className="gv-v4__pax gv-v4__pax--vazio"><Users size={15} aria-label="Passageiros" /><span>Sem passageiro</span></p> : null}
+          <p className="gv-v4__meta">
+            {d.manutencao ? (d.meta ? <span title="Janela"><CalendarRange size={13} aria-label="Janela" />{d.meta}</span> : null) : <span title="Cliente"><Building2 size={13} aria-label="Cliente" />{d.cliente ?? '—'}</span>}
+            {d.motorista ? <span title="Motorista"><UserRound size={13} aria-label="Motorista" />{d.motorista}</span> : null}
+          </p>
+          <div className="gv-v4__pe">
+            <span className="gv-v4__os">{d.manutencao ? d.codigo : d.codigo}{d.extra}</span>
+            <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span>
+            {d.atribuir ? <Button variant="action" size="compact" icon={<UserPlus size={14} aria-hidden="true" />} aria-label={`Atribuir motorista: ${d.codigo}`} onClick={d.atribuir}>Atribuir</Button> : null}
+          </div>
         </div>
       </li>
     )

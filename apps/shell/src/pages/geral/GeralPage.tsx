@@ -718,6 +718,7 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
+              {mobile && variante ? <button type="button" className="gv-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )
           : tabelaDs && !grouped ? (
@@ -803,7 +804,8 @@ function Geral({ host, variante, onRetry }: { host: Host; variante?: VarianteCar
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-            <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>
+            {/* Variações no celular: o "+" fixo no pé da tela substitui este. */}
+            {mobile && variante ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
           </>}
           selection={selection}
         >

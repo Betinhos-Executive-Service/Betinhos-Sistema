@@ -101,3 +101,32 @@
 /* V4 · alertas à esquerda e a ação rápida (Atribuir) à direita, como no Resumo Operacional. */
 .gv-v4__pe { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); margin-top: var(--bt-space-1); }
 .gv-v4__pe .bt-button { flex: 0 0 auto; }
+
+/* V4 · passageiro e trajeto em primeiro plano, OS discreta no pé; o card inteiro abre o Formulário Geral. */
+.gv-card--v4 { cursor: pointer; }
+.gv-v4__abrir { display: flex; align-items: flex-start; gap: var(--bt-space-1); flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gv-v4__abrir svg { flex: 0 0 auto; margin-top: 3px; color: var(--bt-color-warning); }
+.gv-v4__abrir:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gv-v4__topo { align-items: flex-start; }
+.gv-card--v4 .gv-v4__rota { font-size: var(--bt-font-size-15, 15px); }
+.gv-v4__pax { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; margin: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+.gv-v4__pax svg { flex: 0 0 auto; color: var(--bt-color-action); }
+.gv-v4__pax span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gv-v4__pax--vazio { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
+.gv-v4__pax--vazio svg { color: var(--bt-color-text-secondary); }
+.gv-v4__meta { display: flex; flex-wrap: wrap; gap: var(--bt-space-0-5) var(--bt-space-3); margin: 0; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gv-v4__meta span { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; }
+.gv-v4__meta svg { flex: 0 0 auto; opacity: .75; }
+.gv-v4__os { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.gv-card--v4 .gv-v4__pe { justify-content: flex-start; }
+.gv-card--v4 .gv-v4__pe .bt-button { margin-left: auto; }
+
+/* Botão "+" fixo no pé da tela (laboratório, só no celular). */
+.gv-fab { position: fixed; right: var(--bt-space-4); bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom, 0px) + var(--bt-selectionbar-height, 0px)); z-index: 20; display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: var(--bt-radius-full); background: var(--bt-color-action); color: var(--bt-color-on-solid); box-shadow: var(--bt-shadow-popover); cursor: pointer; }
+.gv-fab:active { transform: scale(.96); }
+.gv-fab:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--bt-focus-border), var(--bt-focus-ring); }
+
+.gv-v4__os, .gv-card--v4 .gv-v2__aviso { white-space: nowrap; }
+.gv-card--v4 .gv-v4__pe { flex-wrap: wrap; row-gap: var(--bt-space-1); }
+/* Espaço no fim da lista para o "+" fixo não cobrir o último card. */
+.gr-cards:has(.gv-card) { padding-bottom: calc(56px + var(--bt-space-6)); }
