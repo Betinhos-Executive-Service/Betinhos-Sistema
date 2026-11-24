@@ -5,7 +5,7 @@ import { finalizeServiceRemote, saveServiceObservationRemote } from "../../featu
 import { loadRemoteDetailByParams, loadRemoteStore, markDetailViewedRemote } from "../../features/servicos/agendaRemota.ts";
 import { saveVoucherDraftRemote, saveVoucherRemote } from "../../features/voucher/remoto.ts";
 import { uploadChecklistPhotoRemote } from "../../features/checklist/remoto.ts";
-import { createIdeaRemote, loadMyIdeasRemote } from "../../features/ideias/remoto.ts";
+import { createIdeaRemote, loadMyIdeasRemote, uploadIdeaAttachmentRemote } from "../../features/ideias/remoto.ts";
 import { conferirProvaMidiaRemote, emitirProvaMidiaRemote, registrarProvaMidiaRemote } from "../../features/fotos/provaRemota.ts";
 import type { PortaDados } from "../porta.ts";
 
@@ -32,6 +32,7 @@ export const adaptadorDataverse: PortaDados = {
   acaoComunicado: executeComunicadoAction,
   carregarIdeias: loadMyIdeasRemote,
   criarIdeia: createIdeaRemote,
+  enviarAnexoIdeia: uploadIdeaAttachmentRemote,
   emitirProvaMidia: emitirProvaMidiaRemote,
   registrarProvaMidia: registrarProvaMidiaRemote,
   conferirProvaMidia: conferirProvaMidiaRemote
