@@ -12,6 +12,7 @@ import { SearchHits } from '../../app/SearchHits'
 import { abrirGavetaRegistro, useRegistroAlterado } from '../../app/registroAberto'
 import { todaySP } from '../frota/data/dates'
 import { createSource } from './data/source'
+import { usePaxServicos } from './data/paxServicos'
 import type { EditValue } from './domain/edit'
 import { avisoForaDaJanela, colunasDaManutencao, ehLinhaDeManutencao, gravarManutencoesNaVisao, lerLinhaManutencao, SAIDA, type LinhaManutencao } from './domain/manutencao'
 import { ProtecaoContext } from './components/ProtecaoLock'
@@ -54,6 +55,9 @@ import { cellKey, useGeral, type SaveFailure } from './useGeral'
 import { useGeralViewState } from './useGeralViewState'
 import './geral.css'
 
+/** Só a coluna Motorista (sheet do "Atribuir"); sem ela na visão, todas. */
+const colunasDoMotorista = (columns: Column[]) => { const so = columns.filter((c) => !c.alias && c.attribute === 'cr40f_motorista'); return so.length > 0 ? so : columns }
+
 export function GeralPage({ host }: { host: Host }) {
   // Trocar a chave recria a tela inteira: é o "Tentar de novo" quando as visões não carregam.
   const [attempt, setAttempt] = useState(0)
@@ -90,6 +94,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const cardsLayout = mobile || mode === 'cards'
   const changeMode = useCallback((next: ViewMode) => { setModeState(next); setEditId(null); saveViewMode(source.kv, next) }, [source.kv])
   const [editId, setEditId] = useState<string | null>(null)
+  /** Sheet aberta pelo "Atribuir" do card: só o campo Motorista. */
+  const [soMotorista, setSoMotorista] = useState(false)
   // Falha numa linha cuja sheet não está aberta (celular) não tem onde aparecer: vira aviso.
   const editIdRef = useRef(editId)
   editIdRef.current = editId
@@ -523,6 +529,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   // lugares: "Editar" só entra com um serviço marcado.
   const selectionActions: SelectionAction[] = [
     { id: 'editar', label: 'Editar', icon: <Pencil size={16} />, single: true, inline: mobile ? one : true, onSelect: () => abrirLinha(selectedIds[0]) },
+    // Celular: o card abre o Formulário Geral; a edição rápida campo a campo (sheet) fica aqui, com um serviço marcado.
+    ...(mobile ? [{ id: 'editar-campos', label: 'Editar campos', icon: <ListChecks size={16} />, single: true, onSelect: () => { setSoMotorista(false); setEditId(selectedIds[0]) } } satisfies SelectionAction] : []),
     { id: 'copiar', label: 'Copiar Serviços', icon: <Copy size={16} />, inline: true, onSelect: () => { void copySelected() } },
     selectedState === 1
       ? { id: 'ativar', label: 'Ativar', icon: <ArchiveRestore size={16} />, inline: true, onSelect: () => askState(true) }
@@ -625,6 +633,9 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
   const editRow = editId == null ? undefined : rowOf(editId)
   const editManutencao = editRow ? lerManutencao(editRow) : null
 
+  // Cards do celular: primeiro nome dos passageiros pela tabela serviços por passageiro.
+  const idsDasLinhas = useMemo(() => rows.map((r) => String(r[ID_ATTRIBUTE])), [rows])
+  const paxPorServico = usePaxServicos(host, idsDasLinhas, mobile)
   const rowById = useMemo(() => new Map(rows.map((r) => [String(r[ID_ATTRIBUTE]), r])), [rows])
   const grouping = useMemo<Grouping | undefined>(() => {
     if (cardsLayout) return undefined
@@ -690,6 +701,7 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
               <div ref={mobile ? undefined : cardsScrollRef} className={mobile ? undefined : 'gr-cardsview__scroll'}>
               <GeralCards
                 grid={!mobile}
+                paxPorServico={paxPorServico}
                 rows={rows}
                 columns={dataColumns}
                 attributes={attributes}
@@ -699,12 +711,14 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
                 onOpen={(id) => { void openForm('edit', id) }}
                 besideId={besideId}
                 manutencao={manutencao}
-                onEdit={setEditId}
+                onEdit={(id) => { setSoMotorista(false); setEditId(id) }}
+                onAtribuir={(id) => { setSoMotorista(true); setEditId(id) }}
                 onCardContextMenu={mobile ? undefined : openContext}
                 footer={rows.length > 0 || loadError ? <LoadMore root={mobile ? null : cardsScrollRef} {...loadMoreProps} /> : null}
               />
               </div>
               {!loading && rows.length === 0 && !geral.pageError ? <div className="gr-empty">{empty}</div> : null}
+              {mobile ? <button type="button" className="gc-fab" aria-label="Criar serviço" title="Criar serviço" onClick={() => { void openForm('create') }}><Plus size={24} aria-hidden="true" /></button> : null}
             </div>
           )
           : tabelaDs && !grouped ? (
@@ -790,7 +804,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
           // "Atualizar" fica junto da primária: o que está em `primary` nunca sai da linha (DS §10.9.1).
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title={status ?? 'Atualizar'} loading={loading && rows.length > 0} onClick={reload} />
-            <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>
+            {/* No celular, o "+" fixo no pé da tela substitui este. */}
+            {mobile ? null : <Button size={size} icon={<Plus size={16} />} title="Criar serviço" onClick={() => { void openForm('create') }}>Criar serviço</Button>}
           </>}
           selection={selection}
         >
@@ -804,7 +819,8 @@ function Geral({ host, onRetry }: { host: Host; onRetry: () => void }) {
         {cardsLayout && editRow ? (
           <GeralSheet
             row={editRow}
-            columns={editManutencao ? colunasDaManutencao(dataColumns) : dataColumns}
+            columns={editManutencao ? colunasDaManutencao(dataColumns) : soMotorista ? colunasDoMotorista(dataColumns) : dataColumns}
+            eyebrow={soMotorista && !editManutencao ? 'Atribuir motorista' : undefined}
             manutencao={editManutencao ? { titulo: `Manutenção · ${editManutencao.veiculo}` } : undefined}
             attributes={attributes}
             cellStatus={(attribute) => cells.get(cellKey(String(editRow[ID_ATTRIBUTE]), attribute)) ?? IDLE}

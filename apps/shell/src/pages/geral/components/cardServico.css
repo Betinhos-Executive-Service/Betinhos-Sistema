@@ -1,0 +1,58 @@
+/* Card do serviço no celular (Geral). Só tokens do DS. */
+.gc-card { display: grid; grid-template-columns: 56px 1fr; min-width: 0; overflow: hidden; list-style: none; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); cursor: pointer; }
+.gc-card.is-selected { background-color: var(--bt-color-action-soft); border-color: var(--bt-color-action); }
+.gc-card[data-tom='perigo'] { --gc-tom: var(--bt-color-danger); }
+.gc-card[data-tom='aviso'] { --gc-tom: var(--bt-color-warning); }
+.gc-card p { margin: 0; }
+
+/* Trilho da hora: a borda leva a cor do estado (atraso, falta de motorista). */
+.gc-trilho { display: flex; flex-direction: column; align-items: center; gap: var(--bt-space-0-5); padding: var(--bt-space-2) var(--bt-space-1); border-right: 3px solid var(--gc-tom, var(--bt-color-brand)); background-color: color-mix(in srgb, var(--gc-tom, var(--bt-color-brand)) 10%, var(--bt-color-surface)); }
+.gc-hora { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
+.gc-trilho .bt-choice { margin-top: auto; align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
+.gc-trilho .bt-choice__control { margin-top: 0; }
+
+.gc-conteudo { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: var(--bt-space-2) var(--bt-space-2) var(--bt-space-2) var(--bt-space-2-5); }
+.gc-topo { display: flex; align-items: flex-start; gap: var(--bt-space-2); min-width: 0; }
+.gc-topo .bt-badge { flex: 0 0 auto; }
+.gc-abrir { display: flex; align-items: flex-start; gap: var(--bt-space-1); flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--bt-radius-xs); }
+.gc-abrir svg { flex: 0 0 auto; margin-top: 3px; color: var(--bt-color-warning); }
+.gc-abrir:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gc-rota { font-size: 15px; font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); line-height: 1.3; overflow-wrap: anywhere; }
+
+.gc-pax { display: flex; align-items: center; gap: var(--bt-space-1-5); min-width: 0; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-primary); }
+.gc-pax svg { flex: 0 0 auto; color: var(--bt-color-action); }
+.gc-pax span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-pax--vazio { font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
+.gc-pax--vazio svg { color: var(--bt-color-text-secondary); }
+
+.gc-meta { display: flex; flex-wrap: wrap; gap: var(--bt-space-0-5) var(--bt-space-3); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.gc-meta span { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-width: 0; }
+.gc-meta svg { flex: 0 0 auto; opacity: .75; }
+
+.gc-pe { display: flex; flex-wrap: wrap; align-items: center; gap: var(--bt-space-1) var(--bt-space-2); margin-top: var(--bt-space-1); }
+.gc-pe .bt-button { flex: 0 0 auto; margin-left: auto; }
+.gc-pe .bt-button + .bt-button { margin-left: 0; }
+.gc-os { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gc-avisos { display: flex; flex-wrap: wrap; gap: var(--bt-space-2); }
+.gc-aviso { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-bold); white-space: nowrap; }
+.gc-aviso--perigo { color: var(--bt-color-danger); }
+.gc-aviso--aviso { color: var(--bt-color-warning); }
+
+/* Separador de dia: hoje em destaque, dias passados apagados. */
+.gc-dia { display: flex; align-items: baseline; gap: var(--bt-space-2); margin-top: var(--bt-space-3); padding: 0 var(--bt-space-1) var(--bt-space-1); border-bottom: var(--bt-border-width-default) solid var(--bt-color-border); list-style: none; }
+.gc-dia:first-child { margin-top: 0; }
+.gc-dia span { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); }
+.gc-dia small { font-size: var(--bt-font-size-11); color: var(--bt-color-text-secondary); }
+.gc-dia[data-dia='hoje'] { border-bottom-color: var(--bt-color-action); }
+.gc-dia[data-dia='hoje'] span { color: var(--bt-color-action); }
+.gc-dia[data-dia='hoje'] span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: var(--bt-space-1-5); border-radius: var(--bt-radius-full); background: var(--bt-color-action); vertical-align: middle; }
+.gc-dia[data-dia='passado'] span { color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-semibold); }
+.gc-card.is-passado:not(.is-selected) { opacity: .6; transition: opacity .15s ease; }
+.gc-card.is-passado:not(.is-selected):focus-within { opacity: 1; }
+@media (hover: hover) { .gc-card.is-passado:not(.is-selected):hover { opacity: 1; } }
+
+/* "+" fixo no pé da tela (Criar serviço), acima da barra de seleção; a lista deixa espaço para ele. */
+.gc-fab { position: fixed; right: var(--bt-space-4); bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom, 0px) + var(--bt-selectionbar-height, 0px)); z-index: 20; display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: var(--bt-radius-full); background: var(--bt-color-action); color: var(--bt-color-on-solid); box-shadow: var(--bt-shadow-popover); cursor: pointer; }
+.gc-fab:active { transform: scale(.96); }
+.gc-fab:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--bt-focus-border), var(--bt-focus-ring); }
+.gr-cards:has(.gc-card) { padding-bottom: calc(56px + var(--bt-space-6)); }

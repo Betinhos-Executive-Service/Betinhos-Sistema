@@ -136,14 +136,14 @@ describe('Geral: espaço e densidade', () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
     await screen.findAllByText(PAGE1)
-    expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(100)
+    expect(document.querySelectorAll('.gr-cards > li.gc-card')).toHaveLength(100)
     expect(screen.queryByText(/Carregar mais$/)).toBeNull()
     // O efeito que cria o observador roda depois da pintura: espera ele existir.
     await waitFor(() => expect(FakeObserver.instances.filter((o) => !o.closed).length).toBe(1))
     expect(FakeObserver.instances.filter((o) => !o.closed)[0].options?.root === null).toBe(true)
     await act(async () => { FakeObserver.trigger([{ isIntersecting: true }]) })
     await screen.findAllByText(`200 de ${MOCK_ROW_COUNT} serviços`)
-    expect(document.querySelectorAll('.gr-cards > li')).toHaveLength(200)
+    expect(document.querySelectorAll('.gr-cards > li.gc-card')).toHaveLength(200)
   }, 90_000)
 
   it('no desktop todos os comandos da lista têm o tamanho padrão do DS (40 px), igual a Colunas e Filtros', async () => {
@@ -171,11 +171,14 @@ describe('Geral: espaço e densidade', () => {
     const search = within(toolbar).getByRole('searchbox', { name: 'Buscar serviços' }).closest('.bt-control')
     expect(search?.classList.contains('bt-control--compact')).toBe(false)
     expect(search?.classList.contains('bt-control--touch')).toBe(true)
-    for (const name of ['Criar serviço', 'Mais ações', 'Colunas', 'Filtros']) {
+    for (const name of ['Mais ações', 'Colunas', 'Filtros']) {
       const button = within(toolbar).getByRole('button', { name })
       expect(button.classList.contains('bt-button--compact')).toBe(false)
       expect(button.classList.contains('bt-button--touch')).toBe(true)
     }
+    // "Criar serviço" vira o botão redondo fixo (FAB): a barra não o repete.
+    expect(within(toolbar).queryByRole('button', { name: 'Criar serviço' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Criar serviço' }).classList.contains('gc-fab')).toBe(true)
     // No celular não há linha de filtro rápido: os filtros ficam no painel.
     expect(within(toolbar).queryByRole('button', { name: 'Filtro rápido' })).toBeNull()
   })

@@ -382,15 +382,17 @@ describe('Geral: seleção pela linha', () => {
     expect(selectedRows()[0]).toBe(row)
   })
 
-  it('no celular, tocar no corpo do card alterna a seleção', async () => {
+  it('no celular, tocar no corpo do card abre o serviço sem selecionar; a seleção é pela caixa', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const card = (await screen.findAllByRole('listitem'))[0]
-    fireEvent.click(card.querySelector('.gr-card__line') as HTMLElement)
-    expect(card.className).toContain('is-selected')
-    fireEvent.click(card.querySelector('.gr-card__line') as HTMLElement)
+    await screen.findAllByRole('listitem')
+    const card = document.querySelector('.gr-cards > li.gc-card') as HTMLElement
+    fireEvent.click(card.querySelector('.gc-conteudo') as HTMLElement)
+    expect(await screen.findByRole('dialog', { name: 'Formulário Geral abre no Dataverse' })).toBeTruthy()
     expect(card.className).not.toContain('is-selected')
-    fireEvent.click(within(card).getByRole('button', { name: /Abrir serviço/ }))
+    fireEvent.click(within(card).getByRole('checkbox', { name: /Selecionar serviço/ }))
+    expect(card.className).toContain('is-selected')
+    fireEvent.click(within(card).getByRole('checkbox', { name: /Selecionar serviço/ }))
     expect(card.className).not.toContain('is-selected')
   })
 
@@ -429,7 +431,7 @@ describe('Geral: seleção pela linha', () => {
     it('no celular o alternador não aparece', async () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
       render(<GeralPage host={{ mode: 'mock' }} />)
-      await waitFor(() => expect(document.querySelectorAll('.gr-card').length).toBeGreaterThan(0))
+      await waitFor(() => expect(document.querySelectorAll('.gc-card').length).toBeGreaterThan(0))
       fireEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
       await screen.findByRole('menuitem', { name: 'Compartilhar link', hidden: true })
       expect(screen.queryByRole('menuitemradio', { name: 'Ver como cards', hidden: true })).toBeNull()

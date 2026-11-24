@@ -198,13 +198,13 @@ describe('Geral › linhas de manutenção', () => {
       vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     })
 
-    it('o card da manutenção tem o selo e "Programar" abre a edição só com motorista e saída', async () => {
+    it('o card da manutenção tem o selo e "Reprogramar" (já programada) abre a edição só com motorista e saída', async () => {
       render(<GeralPage host={host} />)
       await screen.findByLabelText('Mostrar manutenções')
-      const card = (await screen.findAllByRole('listitem')).find((c) => c.textContent?.includes('TST1A11')) as HTMLElement
-      expect(card.className).toContain('gr-card--manutencao')
+      const card = (await screen.findAllByRole('listitem')).filter((c) => c.classList.contains('gc-card')).find((c) => c.textContent?.includes('TST1A11')) as HTMLElement
+      expect(card.className).toContain('gc-card--manut')
       expect(within(card).getByText('Atrasada')).toBeTruthy()
-      fireEvent.click(within(card).getByRole('button', { name: 'Programar' }))
+      fireEvent.click(within(card).getByRole('button', { name: 'Reprogramar' }))
       const sheet = await screen.findByRole('dialog', { name: 'Manutenção · TST1A11' })
       expect(within(sheet).getByText('Programar manutenção')).toBeTruthy()
       expect(within(sheet).getByText('Motorista')).toBeTruthy()
@@ -218,7 +218,7 @@ describe('Geral › linhas de manutenção', () => {
       await screen.findByLabelText('Mostrar manutenções')
       await pickView('Sem motorista')
       const card = await waitFor(() => {
-        const achado = screen.getAllByRole('listitem').find((c) => c.className.includes('gr-card--manutencao') && c.textContent?.includes('TST2B22'))
+        const achado = screen.getAllByRole('listitem').find((c) => c.className.includes('gc-card--manut') && c.textContent?.includes('TST2B22'))
         if (!achado) throw new Error('Sem o card da manutenção sem motorista')
         return achado
       })
