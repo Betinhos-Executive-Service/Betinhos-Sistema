@@ -202,14 +202,12 @@ O GitHub é o único caminho de publicação (decisão do Renan, 05/11/2026; ver
 - Links ativos não caem: o deploy troca só o código; KV e segredos ficam como estão, e a página aberta recarrega sozinha uma vez quando vê a versão nova. Os workflows nunca rodam `wrangler kv`, `wrangler secret` nem `wrangler delete`.
 - Precisa do secret `CLOUDFLARE_API_TOKEN` nos environments `dev` e `prod-front` (Cloudflare > My Profile > API Tokens > template "Edit Cloudflare Workers", conta Betinhos).
 
-### Pendente à mão para o Worker DEV (uma vez)
+### Worker DEV (feito à mão uma vez)
 
-O `env.dev` do `wrangler.jsonc` usa o id `KV_DEV_ID_PENDENTE` no KV (único lugar). Enquanto ele estiver lá, o job `worker` do `deploy.yml` não publica (só avisa). Para liberar:
+O KV do DEV (`acompanhar-motorista-dev`) foi criado em 24/11/2026 e o id está em `env.dev.kv_namespaces` do `wrangler.jsonc`. Se o id voltar a ser `KV_DEV_ID_PENDENTE`, o job `worker` do `deploy.yml` não publica (só avisa).
 
-1. Crie o KV do DEV: `pnpm exec wrangler kv namespace create TRACK_KV_DEV` (em `apps/acompanhar-motorista`, com login do Cloudflare).
-2. Troque `KV_DEV_ID_PENDENTE` pelo id devolvido, em `env.dev.kv_namespaces` do `wrangler.jsonc`, e abra o PR.
-3. Grave os segredos do Worker DEV (abaixo) com `pnpm exec wrangler secret put <NOME> --env dev`.
-4. O primeiro `wrangler deploy --env dev` cria o Worker e o Durable Object `Viagem` (migration `v1` própria); o Deploy da `develop` faz isso sozinho depois do passo 2.
+1. Os segredos do Worker DEV (abaixo) se gravam com `pnpm exec wrangler secret put <NOME> --env dev`.
+2. O primeiro `wrangler deploy --env dev` cria o Worker e o Durable Object `Viagem` (migration `v1` própria); o Deploy da `develop` faz isso sozinho.
 
 ## Configuração
 
