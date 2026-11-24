@@ -48,7 +48,6 @@ export const MENU: MenuGroup[] = [
     label: 'Financeiro',
     items: [
       { kind: 'page', id: 'composicao', label: 'Composição de Preço', page: 'composicao' },
-      wr('Composição de Preço (antiga)', 'new_TelaComposicaoPreco.html'),
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
@@ -89,11 +88,6 @@ export const MENU: MenuGroup[] = [
     ],
   },
   {
-    id: 'rh',
-    label: 'RH',
-    items: [{ kind: 'page', id: 'rh-descontos', label: 'Descontos em folha', page: 'rh-descontos' }],
-  },
-  {
     id: 'back-end',
     label: 'Back-End',
     items: [
@@ -101,6 +95,8 @@ export const MENU: MenuGroup[] = [
       wr('Dashboard antigo (TV)', 'new_dashboard'),
       { kind: 'page', id: 'logs-apps', label: 'Logs dos apps', page: 'logs' },
       { kind: 'page', id: 'projetos', label: 'Projetos', page: 'projetos' },
+      { kind: 'page', id: 'rh-descontos', label: 'Descontos em folha', page: 'rh-descontos' },
+      wr('Composição de Preço (antiga)', 'new_TelaComposicaoPreco.html'),
       table('cr40f_categoriadespesaoperacional'),
       table('cr40f_formapagamentodespesa'),
       // Substituído por #/comunicados (Operacional); fica aqui enquanto houver uso.
