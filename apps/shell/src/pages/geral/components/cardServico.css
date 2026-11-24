@@ -1,4 +1,8 @@
 /* Card do serviço no celular (Geral). Só tokens do DS. */
+/* Claro (padrão dos tokens): trilho neutro e card com sombra leve sobre o fundo cinza. Escuro: trilho na cor da marca, sem sombra. */
+.gc-card { --gc-trilho-borda: var(--bt-color-border-strong); --gc-trilho-fundo: var(--bt-color-surface-soft); box-shadow: var(--bt-shadow-card); }
+:root[data-theme='dark'] .gc-card { --gc-trilho-borda: var(--bt-color-brand); --gc-trilho-fundo: color-mix(in srgb, var(--bt-color-brand) 10%, var(--bt-color-surface)); box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root[data-theme='auto'] .gc-card { --gc-trilho-borda: var(--bt-color-brand); --gc-trilho-fundo: color-mix(in srgb, var(--bt-color-brand) 10%, var(--bt-color-surface)); box-shadow: none; } }
 .gc-card { display: grid; grid-template-columns: 56px 1fr; min-width: 0; overflow: hidden; list-style: none; border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-lg); background-color: var(--bt-color-surface); cursor: pointer; }
 .gc-card.is-selected { background-color: var(--bt-color-action-soft); border-color: var(--bt-color-action); }
 .gc-card[data-tom='perigo'] { --gc-tom: var(--bt-color-danger); }
@@ -6,7 +10,8 @@
 .gc-card p { margin: 0; }
 
 /* Trilho da hora: a borda leva a cor do estado (atraso, falta de motorista). */
-.gc-trilho { display: flex; flex-direction: column; align-items: center; gap: var(--bt-space-0-5); padding: var(--bt-space-2) var(--bt-space-1); border-right: 3px solid var(--gc-tom, var(--bt-color-brand)); background-color: color-mix(in srgb, var(--gc-tom, var(--bt-color-brand)) 10%, var(--bt-color-surface)); }
+.gc-trilho { display: flex; flex-direction: column; align-items: center; gap: var(--bt-space-0-5); padding: var(--bt-space-2) var(--bt-space-1); border-right: 3px solid var(--gc-tom, var(--gc-trilho-borda)); background-color: var(--gc-tom-fundo, var(--gc-trilho-fundo)); }
+.gc-card[data-tom='perigo'], .gc-card[data-tom='aviso'] { --gc-tom-fundo: color-mix(in srgb, var(--gc-tom) 10%, var(--bt-color-surface)); }
 .gc-hora { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary); font-variant-numeric: tabular-nums; }
 .gc-trilho .bt-choice { margin-top: auto; align-items: center; justify-content: center; min-width: var(--bt-control-height-touch); min-height: var(--bt-control-height-touch); }
 .gc-trilho .bt-choice__control { margin-top: 0; }
