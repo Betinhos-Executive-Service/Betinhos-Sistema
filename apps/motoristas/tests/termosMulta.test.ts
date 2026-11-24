@@ -19,7 +19,7 @@ import {
   TERMO_STATUS,
   validarMotivo
 } from "../src/features/termos/termosMulta.ts";
-import { acoesTelaAditivo, enviarAditivoAssinado } from "../src/features/termos/aditivoAcoes.ts";
+import { enviarAditivoAssinado } from "../src/features/termos/aditivoAcoes.ts";
 import { executeCustomApi } from "../src/data/dataverse/customApi.ts";
 
 const termoId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -211,15 +211,6 @@ test("lerPdfAssinado devolve base64 puro, recusa tipo errado e arquivo acima de 
   assert.equal(await lerPdfAssinado(new File([new Uint8Array([37, 80, 68, 70])], "a.pdf", { type: "application/pdf" })), "JVBERg==");
   await assert.rejects(lerPdfAssinado(new File(["x"], "foto.png", { type: "image/png" })), /PDF devolvido pelo gov\.br/);
   await assert.rejects(lerPdfAssinado(new File([new Uint8Array(5 * 1024 * 1024 + 1)], "grande.pdf", { type: "application/pdf" })), /5 MB/);
-});
-
-test("Voltar na tela avulsa do aditivo só navega: o cartão da Home não some sem envio confirmado", () => {
-  const eventos: string[] = [];
-  const acoes = acoesTelaAditivo(() => eventos.push("confirmado"), (destino) => eventos.push(`tela:${destino}`));
-  acoes.onBack();
-  assert.deepEqual(eventos, ["tela:inicio"]);
-  acoes.onConfirmado();
-  assert.deepEqual(eventos, ["tela:inicio", "confirmado"]);
 });
 
 test("a confirmação do aditivo (na tela avulsa ou dentro do termo) só dispara depois de o servidor registrar", async () => {

@@ -59,6 +59,7 @@ export function useTermosMulta(driverIdRef: MutableRefObject<string>, driverId: 
     reloadTermosMulta().catch((error) => reportAppError(error, { severity: "warning", source: "app", action: "listarMinhasMultas", notifyUser: false }));
   }, [driverId]);
 
+  const aditivoConfirmado = useCallback(() => setSemAditivo(false), []);
   const precisaDeVoce = agruparMinhasMultas(minhasMultas).precisa.length;
-  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce, semAditivo, aditivoConfirmado: () => setSemAditivo(false) };
+  return { termosMulta, termosStatus, reloadTermosMulta, minhasMultas, minhasMultasOfflineEm, minhasMultasLidoEm, precisaDeVoce, semAditivo, aditivoConfirmado };
 }

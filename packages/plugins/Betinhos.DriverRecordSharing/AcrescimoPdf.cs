@@ -19,7 +19,7 @@ namespace Betinhos.DriverRecordSharing
         public const string Erro = "O aditivo foi alterado depois de gerado. Baixe o aditivo no App, assine no gov.br e envie o arquivo devolvido, sem mexer nele.";
         public const int LimiteBytes = 512 * 1024;
 
-        private sealed class Entrada { public long Off; public int Gen; public string Flag; }
+        private sealed class Entrada { public long Off; public string Flag; }
 
         /// <summary>Devolve null quando a parte acrescentada é só a assinatura; senão a mensagem de recusa.</summary>
         public static string Conferir(byte[] assinado, byte[] original)
@@ -65,8 +65,8 @@ namespace Betinhos.DriverRecordSharing
                 var n = par.Key; var e = par.Value;
                 if (e.Flag == "f") { if (n == 0) continue; return false; }
                 if (e.Flag != "n" || e.Off < L || e.Off >= offXref) return false;
-                int fim; int numero;
-                var dict = LerObjeto(t, (int)e.Off, out numero, out fim);
+                int numero;
+                var dict = LerObjeto(t, (int)e.Off, out numero);
                 if (numero != n) return false;
                 string tipo; if (dict == null || !dict.TryGetValue("Type", out tipo)) tipo = null;
                 if (tipo == "/Pages" || tipo == "/ObjStm" || tipo == "/XRef") return false;
@@ -74,8 +74,8 @@ namespace Betinhos.DriverRecordSharing
                 if (xrefOrig.TryGetValue(n, out orig) && orig.Flag == "n")
                 {
                     if (dict == null) return false;
-                    int numOrig, fimOrig;
-                    var antes = LerObjeto(t, (int)orig.Off, out numOrig, out fimOrig);
+                    int numOrig;
+                    var antes = LerObjeto(t, (int)orig.Off, out numOrig);
                     if (antes == null || numOrig != n) return false;
                     if (tipo == "/Catalog")
                     {
@@ -112,10 +112,10 @@ namespace Betinhos.DriverRecordSharing
                 if (qtd < 0 || qtd > 10000) throw new FormatException();
                 for (var i = 0; i < qtd; i++)
                 {
-                    var off = Inteiro(t, ref p); var gen = (int)Inteiro(t, ref p); var flag = Token(t, ref p);
+                    var off = Inteiro(t, ref p); Inteiro(t, ref p); var flag = Token(t, ref p);
                     var n = (int)(inicio + i);
                     if (mapa.ContainsKey(n)) throw new FormatException();
-                    mapa[n] = new Entrada { Off = off, Gen = gen, Flag = flag };
+                    mapa[n] = new Entrada { Off = off, Flag = flag };
                 }
             }
             int fim;
@@ -124,13 +124,13 @@ namespace Betinhos.DriverRecordSharing
             return mapa;
         }
 
-        private static Dictionary<string, string> LerObjeto(string t, int p, out int numero, out int fim)
+        private static Dictionary<string, string> LerObjeto(string t, int p, out int numero)
         {
             numero = (int)Inteiro(t, ref p);
             Inteiro(t, ref p);
             if (Token(t, ref p) != "obj") throw new FormatException();
             p = Ws(t, p);
-            fim = p;
+            int fim;
             if (p + 1 < t.Length && t[p] == '<' && t[p + 1] == '<') return Dicionario(t, p, out fim);
             return null;
         }
@@ -179,7 +179,6 @@ namespace Betinhos.DriverRecordSharing
             while (q < t.Length && !Delim(t[q])) q++;
             if (q == p) throw new FormatException();
             // referência indireta "n g R"
-            var guarda = q;
             var a = Ws(t, q);
             var b = a; while (b < t.Length && char.IsDigit(t[b])) b++;
             if (b > a && IsDigits(t, p, q))
@@ -187,7 +186,7 @@ namespace Betinhos.DriverRecordSharing
                 var c2 = Ws(t, b);
                 if (c2 < t.Length && t[c2] == 'R' && (c2 + 1 >= t.Length || Delim(t[c2 + 1]))) return c2 + 1;
             }
-            return guarda;
+            return q;
         }
 
         private static bool IsDigits(string t, int a, int b)

@@ -67,8 +67,7 @@ namespace Betinhos.DriverRecordSharing
             "zrSqo1iq2JbeqnMRRmyg+yUI30ZVP2XQAKIZXRRCHrfcp5cMwr6L7vGCi8vjxO0mBRxXJY2SN23S" +
             "a9Ehkdc7WGLkXSSzPGLx/YnEXyE2do7LM7lPqHkm2QfBZfc3HiJ9SKHkcTcp3Em3UBScjdvYZMbg" +
             "r6pfuWLYo7MB7TfvvqcLnhwwHtaEUBJxvowKZh3JesSfmmKpzdpm0oKB1aEsfGwLAB5uj/oRhYYI" +
-            "EjUPRiyP36PU9nU8OgIvbQf8NiK4YrorQrsS" +
-            "";
+            "EjUPRiyP36PU9nU8OgIvbQf8NiK4YrorQrsS";
 
         private const string OidSha256 = "2.16.840.1.101.3.4.2.1";
         private const string OidRsa = "1.2.840.113549.1.1.1";

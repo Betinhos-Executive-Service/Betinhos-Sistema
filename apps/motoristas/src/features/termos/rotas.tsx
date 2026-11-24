@@ -1,7 +1,6 @@
 import type { MinhaMulta, CargaStatus } from "./minhasMultas";
 import { declararAceite } from "./minhasMultas";
 import { AditivoScreen } from "./AditivoMotorista";
-import { acoesTelaAditivo } from "./aditivoAcoes";
 import { MinhasMultasScreen } from "./MinhasMultasScreen";
 import type { TermoMulta } from "./termosMulta";
 import type { Screen } from "../../types";
@@ -37,8 +36,8 @@ export function rotasTermos(screen: Screen, {
     );
   }
   if (screen === "aditivo") {
-    const acoes = acoesTelaAditivo(onAditivoConfirmado, setScreen);
-    return <AditivoScreen onBack={acoes.onBack} onConfirmado={acoes.onConfirmado} />;
+    // "Voltar" só navega: o cartão da Home sai apenas quando o servidor confirma o aditivo.
+    return <AditivoScreen onBack={() => setScreen("inicio")} onConfirmado={onAditivoConfirmado} />;
   }
   return null;
 }

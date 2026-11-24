@@ -471,7 +471,7 @@ export function InitialScreen(props: InitialScreenProps) {
     .filter((type) => type.count > 0 && ligado(type.id === "gastosCartao" ? "expenses" : type.id))
     .map((type) => ({ id: type.id, text: type.text(type.count) }));
 
-  const cartaoAditivo = props.semAditivo === true && ligado("multas") && typeof props.onOpenAditivo === "function";
+  const cartaoAditivo = props.semAditivo === true && ligado("multas") && !!props.onOpenAditivo;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
