@@ -219,7 +219,8 @@
     "cr40f_composicaodeprecos": {"perfis": ["financeiro"], "pastas": []},
     "new_marketing": {"perfis": ["operacional"], "pastas": []},
     "app-motoristas": {
-      "perfis": ["acessos"],
+      "perfis": ["operacional"],
+      "nivel": "gestor",
       "pastas": ["apps/shell/src/pages/app-motoristas"],
       "ignorar": [
         {"tabela": "cr40f_appconfigpessoa", "motivo": "acesso de gravacao ainda sem dono: decisao do Renan (grava nesta tabela)"},

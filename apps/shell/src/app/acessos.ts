@@ -46,7 +46,7 @@ export function temPerfil(a: Acessos, perfil: Perfil, nivel: Nivel = 'operador')
   return tem != null && (nivel === 'operador' || tem === 'gestor')
 }
 
-export const temAlgum = (a: Acessos, perfis: readonly Perfil[] | undefined) => !perfis || perfis.some((p) => temPerfil(a, p))
+export const temAlgum = (a: Acessos, perfis: readonly Perfil[] | undefined, nivel?: Nivel) => !perfis || perfis.some((p) => temPerfil(a, p, nivel))
 export const semModulos = (a: Acessos) => !a.admin && !a.acessos && AREAS.every((area) => !a.areas[area])
 
 type Linhas<T> = { value: T[] }

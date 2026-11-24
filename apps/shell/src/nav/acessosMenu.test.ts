@@ -41,4 +41,11 @@ describe('menuVisivel', () => {
     expect(ver(lerPapeis(['Perfil - RH - Operador']))).toContain('funcionarios')
     expect(ver({ admin: false, areas: { financeiro: 'gestor' }, acessos: false })).not.toContain('funcionarios')
   })
+
+  it('Configuração do App Motoristas pede Operacional no nível Gestor, como a página e o servidor', () => {
+    const ver = (a: Acessos) => ids(menuVisivel(a))
+    expect(ver(lerPapeis(['Perfil - Operacional - Gestor']))).toContain('app-motoristas')
+    expect(ver(lerPapeis(['Perfil - Operacional - Operador']))).not.toContain('app-motoristas')
+    expect(ver({ admin: false, areas: {}, acessos: true })).not.toContain('app-motoristas')
+  })
 })
