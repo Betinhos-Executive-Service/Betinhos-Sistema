@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { armazenamentoEmMemoria, createMockApi, CODIGO_MOCK, refazerAutenticadorMock, totpDo, usuarioMock } from './mockApi'
+import { apagarSenhasMock, armazenamentoEmMemoria, createMockApi, CODIGO_MOCK, usuarioMock } from './mockApi'
 import { ErroPortal } from './PortalApi'
 
 const EMAIL = 'fiscal@tenaris.com'
+const SENHA = 'senha-boa-123'
 const T0 = new Date('2026-10-28T13:00:00Z').getTime()
-const agora = () => new Date(T0)
 
 /** Mock com relógio controlável e armazenamento isolado por teste. */
 function montar(armazenamento = armazenamentoEmMemoria()) {
@@ -13,19 +13,16 @@ function montar(armazenamento = armazenamentoEmMemoria()) {
   return { api, relogio, armazenamento }
 }
 
-/** Código do app autenticador naquele instante, gerado pela mesma biblioteca. */
-const totp = (segredo: string, t: number) => totpDo(EMAIL, segredo).generate({ timestamp: t })
-
-async function cadastrar(m = montar()) {
-  const r = await m.api.entrar(EMAIL, CODIGO_MOCK)
-  if (r.etapa !== 'cadastrar_autenticador') throw new Error(`esperava cadastro, veio ${r.etapa}`)
-  return { ...m, segredo: r.segredo, otpauthUrl: r.otpauthUrl }
+/** 1º acesso completo: código do e-mail e senha criada. */
+async function primeiroAcesso(m = montar(), email = EMAIL) {
+  await m.api.solicitarCodigo(email)
+  await m.api.confirmarCodigo(email, CODIGO_MOCK)
+  await m.api.criarSenha(SENHA)
+  return m
 }
 
 async function logado() {
-  const m = await cadastrar()
-  await m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t), false)
-  return m.api
+  return (await primeiroAcesso()).api
 }
 
 describe('mockApi', () => {
@@ -67,90 +64,75 @@ describe('mockApi', () => {
     expect(s.mensagens).toHaveLength(alvo.mensagens.length + 1)
   })
 
-  it('1º acesso devolve QR (otpauth SHA-1, 30 s, 6 dígitos) e o segredo; o 2º pede só o código', async () => {
-    const m = await cadastrar()
-    expect(m.otpauthUrl).toMatch(/^otpauth:\/\/totp\/Betinhos:fiscal%40tenaris\.com\?/)
-    expect(m.otpauthUrl).toContain(`secret=${m.segredo}`)
-    expect(m.otpauthUrl).toMatch(/algorithm=SHA1.*digits=6.*period=30/)
-    await m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t), false)
+  it('1º acesso: código do e-mail, cria a senha e entra; depois entra só com a senha', async () => {
+    const m = montar()
+    await expect(m.api.entrar(EMAIL, SENHA)).rejects.toMatchObject({ codigo: 'senha_invalida' })
+    await primeiroAcesso(m)
+    await expect(m.api.listar()).resolves.toHaveLength(30)
     await m.api.sair()
-    // Novo carregamento da página, mesmo armazenamento.
-    const outra = montar(m.armazenamento)
-    await expect(outra.api.entrar(EMAIL, CODIGO_MOCK)).resolves.toEqual({ etapa: 'autenticador' })
-    await expect(outra.api.confirmarAutenticador(totp(m.segredo, outra.relogio.t), false)).resolves.toMatchObject({ nome: 'Marcos Albuquerque' })
+    await expect(montar(m.armazenamento).api.entrar(EMAIL, SENHA)).resolves.toMatchObject({ nome: 'Marcos Albuquerque', cliente: 'Tenaris' })
   })
 
-  it('TOTP errado não entra e não grava o autenticador', async () => {
-    const m = await cadastrar()
-    await expect(m.api.confirmarAutenticador('000000', false)).rejects.toMatchObject({ codigo: 'totp_invalido' })
-    await expect(m.api.listar()).rejects.toMatchObject({ codigo: 'nao_permitido' })
-    // Sem confirmar, o próximo login ainda é cadastro.
-    const outra = montar(m.armazenamento)
-    await expect(outra.api.entrar(EMAIL, CODIGO_MOCK)).resolves.toMatchObject({ etapa: 'cadastrar_autenticador' })
+  it('senha errada e e-mail não liberado respondem igual', async () => {
+    const m = await primeiroAcesso()
+    await expect(m.api.entrar(EMAIL, 'outra-senha')).rejects.toMatchObject({ codigo: 'senha_invalida' })
+    await expect(m.api.entrar('alguem@example.com', SENHA)).rejects.toMatchObject({ codigo: 'senha_invalida' })
   })
 
-  it('aceita o código de 30 s atrás (janela ±1) e recusa o de 60 s atrás', async () => {
-    const m = await cadastrar()
-    await expect(m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t - 60_000), false)).rejects.toMatchObject({ codigo: 'totp_invalido' })
-    await expect(m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t - 30_000), false)).resolves.toMatchObject({ cliente: 'Tenaris' })
+  it('criar senha exige o código confirmado e o mínimo de caracteres', async () => {
+    const m = montar()
+    await expect(m.api.criarSenha(SENHA)).rejects.toMatchObject({ codigo: 'nao_permitido' })
+    await expect(m.api.confirmarCodigo(EMAIL, '000000')).rejects.toMatchObject({ codigo: 'codigo_invalido' })
+    await expect(m.api.criarSenha(SENHA)).rejects.toMatchObject({ codigo: 'nao_permitido' })
+    await m.api.confirmarCodigo(EMAIL, CODIGO_MOCK)
+    await expect(m.api.criarSenha('curta')).rejects.toMatchObject({ codigo: 'senha_fraca' })
+    await expect(m.api.criarSenha('        ')).rejects.toMatchObject({ codigo: 'senha_fraca' })
+    await expect(m.api.criarSenha(SENHA)).resolves.toMatchObject({ email: EMAIL })
   })
 
-  it('confirmar sem passar pelo código do e-mail é recusado', async () => {
-    await expect(montar().api.confirmarAutenticador('123456', false)).rejects.toMatchObject({ codigo: 'nao_permitido' })
+  it('esqueci a senha troca a senha antiga', async () => {
+    const m = await primeiroAcesso()
+    await m.api.confirmarCodigo(EMAIL, CODIGO_MOCK)
+    await m.api.criarSenha('senha-nova-456')
+    await expect(m.api.entrar(EMAIL, SENHA)).rejects.toMatchObject({ codigo: 'senha_invalida' })
+    await expect(m.api.entrar(EMAIL, 'senha-nova-456')).resolves.toMatchObject({ email: EMAIL })
   })
 
-  it('lembrar dispensa o TOTP por 30 dias, só para o mesmo e-mail', async () => {
-    const m = await cadastrar()
-    await m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t), true)
+  it('a sessão volta no recarregar por 30 dias; sair ou apagar as senhas encerra', async () => {
+    const m = await primeiroAcesso()
     const outra = montar(m.armazenamento)
     outra.relogio.t += 29 * 24 * 3600_000
-    await expect(outra.api.entrar(EMAIL, CODIGO_MOCK)).resolves.toMatchObject({ etapa: 'ok', sessao: { nome: 'Marcos Albuquerque' } })
-    await expect(outra.api.entrar('financeiro@tenaris.com', CODIGO_MOCK)).resolves.toMatchObject({ etapa: 'cadastrar_autenticador' })
+    await expect(outra.api.sessao()).resolves.toMatchObject({ email: EMAIL })
     outra.relogio.t += 2 * 24 * 3600_000
-    await expect(outra.api.entrar(EMAIL, CODIGO_MOCK)).resolves.toEqual({ etapa: 'autenticador' })
+    await expect(outra.api.sessao()).resolves.toBeNull()
+
+    const m2 = await primeiroAcesso()
+    await m2.api.sair()
+    await expect(montar(m2.armazenamento).api.sessao()).resolves.toBeNull()
+
+    const m3 = await primeiroAcesso()
+    apagarSenhasMock(m3.armazenamento)
+    await expect(montar(m3.armazenamento).api.sessao()).resolves.toBeNull()
   })
 
-  it('refazer autenticador volta ao cadastro com segredo novo', async () => {
-    const m = await cadastrar()
-    await m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t), true)
-    refazerAutenticadorMock(m.armazenamento)
-    const r = await montar(m.armazenamento).api.entrar(EMAIL, CODIGO_MOCK)
-    if (r.etapa !== 'cadastrar_autenticador') throw new Error(r.etapa)
-    expect(r.segredo).not.toBe(m.segredo)
-  })
-
-  it('5 TOTP errados bloqueiam por 15 minutos', async () => {
-    const m = await cadastrar()
-    for (let i = 0; i < 4; i++) await expect(m.api.confirmarAutenticador('000000', false)).rejects.toMatchObject({ codigo: 'totp_invalido' })
-    await expect(m.api.confirmarAutenticador('000000', false)).rejects.toMatchObject({ codigo: 'bloqueado' })
-    await expect(m.api.confirmarAutenticador(totp(m.segredo, m.relogio.t), false)).rejects.toMatchObject({ codigo: 'bloqueado' })
+  it('5 erros bloqueiam por 15 minutos, até com a senha certa', async () => {
+    const m = await primeiroAcesso()
+    for (let i = 0; i < 4; i++) await expect(m.api.entrar(EMAIL, 'errada-000')).rejects.toMatchObject({ codigo: 'senha_invalida' })
+    await expect(m.api.entrar(EMAIL, 'errada-000')).rejects.toMatchObject({ codigo: 'bloqueado' })
+    await expect(m.api.entrar(EMAIL, SENHA)).rejects.toMatchObject({ codigo: 'bloqueado' })
+    await expect(m.api.confirmarCodigo(EMAIL, CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'bloqueado' })
     m.relogio.t += 14 * 60_000
-    await expect(m.api.entrar(EMAIL, CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'bloqueado' })
+    await expect(m.api.entrar(EMAIL, SENHA)).rejects.toMatchObject({ codigo: 'bloqueado' })
     m.relogio.t += 2 * 60_000
-    await expect(m.api.entrar(EMAIL, CODIGO_MOCK)).resolves.toMatchObject({ etapa: 'cadastrar_autenticador' })
+    await expect(m.api.entrar(EMAIL, SENHA)).resolves.toMatchObject({ email: EMAIL })
   })
 
-  it('bloqueia na quinta tentativa errada', async () => {
-    const api = createMockApi({ agora, armazenamento: armazenamentoEmMemoria() })
-    for (let i = 0; i < 4; i++) await expect(api.entrar('fiscal@tenaris.com', '000000')).rejects.toMatchObject({ codigo: 'codigo_invalido' })
-    await expect(api.entrar('fiscal@tenaris.com', '000000')).rejects.toMatchObject({ codigo: 'bloqueado' })
-    await expect(api.entrar('fiscal@tenaris.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'bloqueado' })
-  })
-
-  it('o bloqueio dura 15 minutos', async () => {
-    let t = new Date('2026-10-28T13:00:00Z').getTime()
-    const api = createMockApi({ agora: () => new Date(t), armazenamento: armazenamentoEmMemoria() })
-    for (let i = 0; i < 5; i++) await api.entrar('fiscal@tenaris.com', '000000').catch(() => undefined)
-    t += 14 * 60_000
-    await expect(api.entrar('fiscal@tenaris.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'bloqueado' })
-    t += 2 * 60_000
-    await expect(api.entrar('fiscal@tenaris.com', CODIGO_MOCK)).resolves.toMatchObject({ etapa: 'cadastrar_autenticador' })
-  })
-
-  it('e-mail não cadastrado falha igual a código errado', async () => {
-    const api = createMockApi({ agora, armazenamento: armazenamentoEmMemoria() })
-    await api.solicitarCodigo('alguem@outra.com')
-    await expect(api.entrar('alguem@outra.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'codigo_invalido' })
+  it('código errado conta para o bloqueio; e-mail não liberado falha igual a código errado', async () => {
+    const m = montar()
+    await m.api.solicitarCodigo('alguem@outra.com')
+    await expect(m.api.confirmarCodigo('alguem@outra.com', CODIGO_MOCK)).rejects.toMatchObject({ codigo: 'codigo_invalido' })
+    for (let i = 0; i < 3; i++) await expect(m.api.confirmarCodigo(EMAIL, '000000')).rejects.toMatchObject({ codigo: 'codigo_invalido' })
+    await expect(m.api.confirmarCodigo(EMAIL, '000000')).rejects.toMatchObject({ codigo: 'bloqueado' })
   })
 })
 
@@ -162,13 +144,7 @@ describe('mockApi multi-cliente', () => {
     expect(usuarioMock('x@semmodulo.com.br')).toBeNull()
   })
 
-  async function latasa(email = 'compras@latasa.com.br') {
-    const m = montar()
-    const r = await m.api.entrar(email, CODIGO_MOCK)
-    if (r.etapa !== 'cadastrar_autenticador') throw new Error(r.etapa)
-    await m.api.confirmarAutenticador(totpDo(email, r.segredo).generate({ timestamp: m.relogio.t }), false)
-    return m
-  }
+  const latasa = (email = 'compras@latasa.com.br') => primeiroAcesso(montar(), email)
 
   it('Latasa não lista validações; Tenaris não pede', async () => {
     const { api } = await latasa()

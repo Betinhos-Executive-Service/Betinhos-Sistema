@@ -1,7 +1,7 @@
 import type { StatusPedido } from '../src/domain/types'
 
 // Nomes lógicos no Dataverse. `cr40f_validacaoservico` e `cr40f_clientes1.cr40f_portalhabilitado` seguem
-// packages/deploy/provision-portal-cliente.ps1, assim como validador, mensagem, código e dispositivo (conferidos na
+// packages/deploy/provision-portal-cliente.ps1, assim como validador, mensagem e código (conferidos na
 // metadata do DEV em 28/10/2026).
 
 export const SET = {
@@ -9,7 +9,6 @@ export const SET = {
   validador: 'cr40f_validadorclientes',
   mensagem: 'cr40f_mensagemvalidacaos',
   codigo: 'cr40f_codigoacessos',
-  dispositivo: 'cr40f_dispositivoconfiavels',
   cliente: 'cr40f_clientes1s',
   reserva: 'cr40f_reservadeveculoses',
 } as const

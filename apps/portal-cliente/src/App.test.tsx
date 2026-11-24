@@ -1,82 +1,96 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from './App'
-import { armazenamentoEmMemoria, createMockApi, totpDo, type Armazenamento } from './api/mockApi'
+import { armazenamentoEmMemoria, createMockApi, type Armazenamento } from './api/mockApi'
 
 const T0 = new Date('2026-10-28T13:00:00Z').getTime()
 const agora = () => new Date(T0)
+const SENHA = 'senha-boa-123'
 
 function abrir(armazenamento: Armazenamento = armazenamentoEmMemoria()) {
   return render(<App api={createMockApi({ agora, armazenamento })} dicaCodigo="Protótipo: use o código 123456." />)
 }
 
-/** Lê o segredo mostrado no cadastro, como faria quem digita à mão no app autenticador. */
-function segredoNaTela() {
-  return document.querySelector('.pc-entrar__segredo')!.textContent!.replace(/\s/g, '')
-}
-
-const totpAgora = (segredo: string, email = 'fiscal@tenaris.com') => totpDo(email, segredo).generate({ timestamp: T0 })
-
-async function confirmarTotp(codigo: string, lembrar = false) {
-  const campo = await screen.findByLabelText(/Código do autenticador/)
-  if (lembrar) fireEvent.click(screen.getByLabelText('Lembrar este computador por 30 dias'))
-  fireEvent.change(campo, { target: { value: codigo } })
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
-}
-
-/** Login completo no 1º acesso: código do e-mail, QR e TOTP gerado com a mesma biblioteca. */
-async function entrarCompleto(email = 'fiscal@tenaris.com') {
-  await entrar('123456', email)
-  await screen.findByRole('img', { name: /QR code/ })
-  await confirmarTotp(totpAgora(segredoNaTela(), email))
-}
-
-async function entrar(codigo = '123456', email = 'fiscal@tenaris.com') {
+/** "Primeiro acesso ou esqueci a senha": e-mail, código do e-mail e Continuar. */
+async function pedirCodigo(email = 'fiscal@tenaris.com', codigo = '123456') {
+  fireEvent.click(await screen.findByRole('button', { name: 'Primeiro acesso ou esqueci a senha' }))
   fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: email } })
   fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
-  const campo = await screen.findByLabelText(/Código de acesso/)
-  fireEvent.change(campo, { target: { value: codigo } })
+  fireEvent.change(await screen.findByLabelText(/Código do e-mail/), { target: { value: codigo } })
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+}
+
+/** 1º acesso completo: código do e-mail e senha criada. */
+async function entrarCompleto(email = 'fiscal@tenaris.com') {
+  await pedirCodigo(email)
+  fireEvent.change(await screen.findByLabelText(/Nova senha/), { target: { value: SENHA } })
+  fireEvent.change(screen.getByLabelText(/Repita a senha/), { target: { value: SENHA } })
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar senha e entrar' }))
+}
+
+async function entrarComSenha(senha = SENHA, email = 'fiscal@tenaris.com') {
+  fireEvent.change(await screen.findByLabelText(/E-mail/), { target: { value: email } })
+  fireEvent.change(screen.getByLabelText(/^Senha/), { target: { value: senha } })
   fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 }
 
 describe('Portal do cliente', () => {
-  it('mostra a versão do build já na tela de entrada', () => {
+  it('mostra a versão do build já na tela de entrada', async () => {
     abrir()
-    expect(screen.getByRole('heading', { name: 'Portal do cliente' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Portal do cliente' })).toBeTruthy()
     expect(document.querySelector('.bt-build-badge')?.textContent).toMatch(/^v\d+\.\d+\.\d+ · /)
   })
 
-  it('e-mail incompleto não avança', () => {
+  it('e-mail incompleto não avança', async () => {
     abrir()
-    fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'fiscal@' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar código' }))
+    fireEvent.change(await screen.findByLabelText(/E-mail/), { target: { value: 'fiscal@' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
     expect(screen.getByText(/Digite um e-mail completo/)).toBeTruthy()
+  })
+
+  it('sem senha digitada, o aviso fica no campo Senha', async () => {
+    abrir()
+    await entrarComSenha('')
+    const campo = screen.getByLabelText(/^Senha/)
+    expect(campo.getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByText('Digite sua senha.')).toBeTruthy()
+  })
+
+  it('sem senha criada, o login avisa como senha incorreta e aponta o 1º acesso', async () => {
+    abrir()
+    await entrarComSenha()
+    expect(await screen.findByText(/E-mail ou senha incorretos/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Primeiro acesso ou esqueci a senha' })).toBeTruthy()
   })
 
   it('código errado avisa e permite trocar o e-mail', async () => {
     abrir()
-    await entrar('000000')
+    await pedirCodigo('fiscal@tenaris.com', '000000')
     expect(await screen.findByText(/Código incorreto/)).toBeTruthy()
+    const campo = screen.getByLabelText(/Código do e-mail/)
+    expect(campo.getAttribute('inputmode')).toBe('numeric')
+    expect(campo.getAttribute('autocomplete')).toBe('one-time-code')
     fireEvent.click(screen.getByRole('button', { name: 'Trocar e-mail' }))
     expect(screen.getByRole('button', { name: 'Enviar código' })).toBeTruthy()
   })
 
-  it('1º acesso mostra QR e segredo; TOTP errado avisa; o certo entra', async () => {
+  it('criar senha confere tamanho e repetição antes de enviar', async () => {
     abrir()
-    await entrar()
-    expect(await screen.findByRole('img', { name: /QR code/ })).toBeTruthy()
-    expect(screen.getByText(/Microsoft ou Google Authenticator/)).toBeTruthy()
-    expect((screen.getByLabelText('Lembrar este computador por 30 dias') as HTMLInputElement).checked).toBe(false)
-    const campo = screen.getByLabelText(/Código do autenticador/)
-    expect(campo.getAttribute('inputmode')).toBe('numeric')
-    expect(campo.getAttribute('autocomplete')).toBe('one-time-code')
-    await confirmarTotp('000000')
-    expect(await screen.findByText(/Código do autenticador incorreto/)).toBeTruthy()
-    await confirmarTotp(totpAgora(segredoNaTela()))
-    expect(await screen.findByText(/Serviços de outubro de 2026/)).toBeTruthy()
+    await pedirCodigo()
+    const nova = await screen.findByLabelText(/Nova senha/)
+    expect(nova.getAttribute('autocomplete')).toBe('new-password')
+    fireEvent.change(nova, { target: { value: 'curta' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar senha e entrar' }))
+    expect(screen.getByText(/pelo menos 8 caracteres/)).toBeTruthy()
+    fireEvent.change(nova, { target: { value: SENHA } })
+    fireEvent.change(screen.getByLabelText(/Repita a senha/), { target: { value: 'outra-senha' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar senha e entrar' }))
+    expect(screen.getByText('As duas senhas não são iguais.')).toBeTruthy()
+    expect(screen.getByLabelText(/Repita a senha/).getAttribute('aria-invalid')).toBe('true')
+    expect(nova.getAttribute('aria-invalid')).not.toBe('true')
   })
 
-  it('2º acesso pede só o código; com "lembrar", o seguinte pula o autenticador', async () => {
+  it('1º acesso cria a senha e entra; ao recarregar já abre logado; depois de sair entra com a senha', async () => {
     const armazenamento = armazenamentoEmMemoria()
     const primeiro = abrir(armazenamento)
     await entrarCompleto()
@@ -84,19 +98,15 @@ describe('Portal do cliente', () => {
     primeiro.unmount()
 
     const segundo = abrir(armazenamento)
-    await entrar()
-    await screen.findByLabelText(/Código do autenticador/)
-    expect(screen.queryByRole('img', { name: /QR code/ })).toBeNull()
-    expect(document.querySelector('.pc-entrar__segredo')).toBeNull()
-    const segredo = JSON.parse(armazenamento.getItem('pc-mock-autenticadores')!)['fiscal@tenaris.com']
-    await confirmarTotp(totpAgora(segredo), true)
-    await screen.findByText(/Serviços de outubro de 2026/)
+    expect(await screen.findByText(/Serviços de outubro de 2026/)).toBeTruthy()
     segundo.unmount()
 
+    armazenamento.removeItem('pc-mock-sessao')
     abrir(armazenamento)
-    await entrar()
+    await entrarComSenha('errada-000')
+    expect(await screen.findByText(/E-mail ou senha incorretos/)).toBeTruthy()
+    await entrarComSenha()
     expect(await screen.findByText(/Serviços de outubro de 2026/)).toBeTruthy()
-    expect(screen.queryByLabelText(/Código do autenticador/)).toBeNull()
   })
 
   it('Tenaris vê só a validação, sem troca de módulo', async () => {
@@ -181,7 +191,7 @@ describe('Portal do cliente', () => {
 
     it('e-mail de domínio não autorizado recebe a mesma mensagem de código incorreto', async () => {
       abrir()
-      await entrar('123456', 'alguem@example.com')
+      await pedirCodigo('alguem@example.com')
       expect(await screen.findByText(/Código incorreto/)).toBeTruthy()
     })
 

@@ -2,6 +2,12 @@
 import type { Env } from './env'
 import type { Registro } from './mapear'
 
+export class ErroDataverse extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+  }
+}
+
 export type Dv = {
   get(caminho: string): Promise<Registro>
   lista(caminho: string): Promise<Registro[]>
@@ -47,7 +53,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
       body: corpo ? JSON.stringify(corpo) : undefined,
     })
     if (r.status === 401) await env.KV.delete(CHAVE_TOKEN)
-    if (!r.ok) throw new Error(`Dataverse ${metodo} ${caminho.split('?')[0]}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`)
+    if (!r.ok) throw new ErroDataverse(r.status, `Dataverse ${metodo} ${caminho.split('?')[0]}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`)
     return r
   }
   return {

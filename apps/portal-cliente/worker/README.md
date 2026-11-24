@@ -2,13 +2,15 @@
 
 Backend do `apps/portal-cliente` no Cloudflare Workers (mesma conta do `cadastro-passageiro`). Serve o build (`./dist`) e as rotas `/api/*`; o cron (8h, seg–sex) aplica a aprovação tácita e manda o resumo diário.
 
-Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `cr40f_portalmodulos` (Validar / Pedir / Meus serviços) e `cr40f_portaldominios`. Entra quem é validador cadastrado ativo ou tem e-mail de um domínio autorizado de um único cliente com módulo (o cadastro em `cr40f_validadorcliente` é criado no primeiro pedido de código). Os módulos vão na sessão (cookie de 12 h) e cada rota exige o seu: Tenaris = Validar; Latasa = Pedir + Meus serviços.
+Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `cr40f_portalmodulos` (Validar / Pedir / Meus serviços) e `cr40f_portaldominios`. Entra quem é validador cadastrado ativo ou tem e-mail de um domínio autorizado de um único cliente com módulo (o cadastro em `cr40f_validadorcliente` é criado no primeiro pedido de código). Cada pessoa cria a própria senha no 1º acesso (código por e-mail); "Esqueci a senha" segue o mesmo caminho. A sessão dura 30 dias e é conferida no Dataverse a cada chamada (ativo, portal habilitado, módulos e senha atual), e cada rota exige o seu módulo: Tenaris = Validar; Latasa = Pedir + Meus serviços.
 
 | Rota | O que faz |
 |---|---|
-| `POST /api/auth/codigo` | Sempre 204; se o e-mail é de usuário autorizado (cadastro ou domínio), manda o código (10 min) |
-| `POST /api/auth/entrar` | Código do e-mail → `cadastrar_autenticador` (QR), `autenticador` ou `ok` (dispositivo lembrado) |
-| `POST /api/auth/totp` | Código do autenticador (`lembrar` = 30 dias) → sessão (cookie 12 h) |
+| `POST /api/auth/entrar` | `{email, senha}` → sessão (cookie de 30 dias); sem cadastro, sem senha ou senha errada: 401 `senha_invalida` |
+| `POST /api/auth/codigo` | 1º acesso e "Esqueci a senha": sempre 204; se o e-mail é de usuário autorizado (cadastro ou domínio), manda o código (10 min) |
+| `POST /api/auth/codigo/confirmar` | `{email, codigo}` → libera a criação da senha por 10 min (cookie da etapa) |
+| `POST /api/auth/senha` | `{senha}` (8 a 200 caracteres) → grava o hash, derruba as sessões antigas e abre a sessão |
+| `GET /api/auth/sessao` | Sessão atual ou 401 (o portal abre já logado) |
 | `POST /api/auth/sair` | Apaga a sessão |
 | `GET /api/servicos` | Serviços do cliente da sessão (sem Retirado) |
 | `POST /api/servicos/aprovar` | `{ids}` em lote |
@@ -16,7 +18,7 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 | `POST /api/pedidos` | Módulo Pedir: `{passageiros[], origem, destino, saida, observacao?}` → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
 | `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com status, veículo e voucher quando programadas |
 
-Segurança: 5 erros (código ou TOTP) no mesmo e-mail → 15 min de bloqueio; limite por IP e por e-mail (`ratelimits`); CSRF por `Origin`; segredo TOTP cifrado (AES-GCM, `CHAVE_TOTP`); código e token do dispositivo só como SHA-256; toda consulta filtra pelo cliente da sessão; rota de módulo que o cliente não tem → 403. O número da reserva (`cr40f_id`) é do autonumber do Dataverse; o Worker nunca o inventa.
+Segurança: 5 erros (senha ou código) no mesmo e-mail → 15 min de bloqueio; limite por IP e por e-mail (`ratelimits`); CSRF por `Origin`; senha só como PBKDF2-SHA256 (100 mil iterações, sal próprio, `cr40f_senhahash`); código só como SHA-256; cookies cifrados (AES-GCM, `CHAVE_SESSAO`); toda consulta filtra pelo cliente da sessão; rota de módulo que o cliente não tem → 403. O número da reserva (`cr40f_id`) é do autonumber do Dataverse; o Worker nunca o inventa.
 
 ## Publicação (cliente.betinhos.com.br)
 
@@ -31,10 +33,10 @@ Por ambiente, uma vez:
 
 1. Papel `Portal do Cliente` (migration `20261124-1000-portal-cliente-papel.ps1`; PROD pelas soluções): o mínimo que o Worker usa. Criar reserva dispara os plugins da tabela (AutoNumberGuard, preço, compartilhamento): confira no DEV antes do piloto.
 2. App registration no Entra com client secret, usuário de aplicação no Dataverse com o papel `Portal do Cliente`.
-3. Secrets (`pnpm exec wrangler secret put <NOME> [--env dev]`, valor pelo stdin, nunca no comando): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_TOTP`, `CHAVE_SESSAO`. As chaves: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma para cada e por ambiente. Trocar `CHAVE_TOTP` invalida todos os autenticadores cadastrados.
+3. Secrets (`pnpm exec wrangler secret put <NOME> [--env dev]`, valor pelo stdin, nunca no comando): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_SESSAO`. A chave: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma por ambiente. Trocar `CHAVE_SESSAO` derruba todas as sessões (as senhas continuam).
 
 ## Local
 
 - `pnpm test` (lógica pura + rotas contra o Dataverse falso de `worker/fakeDataverse.ts`) e `pnpm typecheck`.
 - `pnpm build && pnpm exec wrangler dev` sobe Worker + assets; sem secrets, as rotas que tocam o Dataverse respondem 500 (`falha`).
-- Qual API o app usa (`src/main.tsx`): mock só no dev server local (`pnpm dev`, porta 52463, em `localhost`/`127.0.0.1`) ou com `?mock` na URL; em qualquer outro endereço (workers.dev, `wrangler dev`) usa `createWorkerApi()`. A dica do código e o `?refazer-autenticador` só existem no mock.
+- Qual API o app usa (`src/main.tsx`): mock só no dev server local (`pnpm dev`, porta 52463, em `localhost`/`127.0.0.1`) ou com `?mock` na URL; em qualquer outro endereço (workers.dev, `wrangler dev`) usa `createWorkerApi()`. A dica do código e o `?apagar-senhas` só existem no mock.

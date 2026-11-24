@@ -17,7 +17,7 @@ export type EntitySets = Record<keyof typeof ENTITIES, string>
 const VALIDACAO_SELECT = ['cr40f_validacaoservicoid', 'cr40f_status', 'cr40f_liberadoem', 'cr40f_observacao', 'cr40f_valorliberado', 'cr40f_valoranterior', 'cr40f_prazotacita', 'cr40f_aprovadoem', 'cr40f_aprovadopor', 'cr40f_incluirfechamento', '_cr40f_reserva_value', '_cr40f_cliente_value']
 const RESERVA_SELECT = ['cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_dataehorriodesada', 'cr40f_trajeto', 'cr40f_cr', 'cr40f_idtenaris', '_cr40f_cliente_value', '_new_composicaodepreco_value']
 const MENSAGEM_SELECT = ['cr40f_mensagemvalidacaoid', '_cr40f_validacao_value', 'cr40f_lado', 'cr40f_autor', 'cr40f_motivo', 'cr40f_texto', 'createdon']
-const VALIDADOR_SELECT = ['cr40f_validadorclienteid', 'cr40f_name', 'cr40f_email', '_cr40f_cliente_value', 'cr40f_ativo', 'cr40f_ultimoacesso', 'cr40f_totpcadastradoem']
+const VALIDADOR_SELECT = ['cr40f_validadorclienteid', 'cr40f_name', 'cr40f_email', '_cr40f_cliente_value', 'cr40f_ativo', 'cr40f_ultimoacesso', 'cr40f_senhadefinidaem']
 /** `new_status` da composição de preços: 100000001 Concluído (metadata do DEV, 28/10/2026). */
 const COMPOSICAO_CONCLUIDA = 100000001
 /** Itens de cr40f_composicaodeprecos (metadata do DEV, 28/10/2026) exibidos no detalhe; vazios ou zerados ficam fora. O repasse a terceiro é custo e não aparece. */
@@ -63,7 +63,7 @@ export function mapValidador(row: Row, clientes: Map<string, Cliente>): Validado
     cliente: clientes.get(clienteId) ?? { id: clienteId, nome: formatted(row, '_cr40f_cliente_value') },
     ativo: row.cr40f_ativo !== false,
     ultimoAcesso: str(row.cr40f_ultimoacesso) || null,
-    totpCadastradoEm: str(row.cr40f_totpcadastradoem) || null,
+    senhaDefinidaEm: str(row.cr40f_senhadefinidaem) || null,
   }
 }
 

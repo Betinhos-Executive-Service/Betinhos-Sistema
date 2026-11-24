@@ -30,7 +30,7 @@ function source(over: Partial<Source> = {}): Source {
     setFechamento: async () => undefined,
     criarValidador: async () => 'x',
     setValidadorAtivo: async () => undefined,
-    refazerAutenticador: async () => undefined,
+    zerarSenha: async () => undefined,
     ...over,
   }
 }

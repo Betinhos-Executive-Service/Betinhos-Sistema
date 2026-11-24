@@ -8,9 +8,15 @@ const resposta = (status: number, corpo?: unknown) => async () =>
 describe('workerApi', () => {
   it('manda credentials include e JSON', async () => {
     let init: RequestInit | undefined
-    const api = createWorkerApi('/api', async (_u, i) => ((init = i), new Response(JSON.stringify({ etapa: 'autenticador' }), { status: 200 })))
-    expect(await api.entrar('a@b.com', '123456')).toEqual({ etapa: 'autenticador' })
-    expect(init).toMatchObject({ method: 'POST', credentials: 'include', body: '{"email":"a@b.com","codigo":"123456"}' })
+    const sessao = { nome: 'A', email: 'a@b.com', cliente: 'Latasa', modulos: ['pedir'] }
+    const api = createWorkerApi('/api', async (_u, i) => ((init = i), new Response(JSON.stringify(sessao), { status: 200 })))
+    expect(await api.entrar('a@b.com', 'senha-boa')).toEqual(sessao)
+    expect(init).toMatchObject({ method: 'POST', credentials: 'include', body: '{"email":"a@b.com","senha":"senha-boa"}' })
+  })
+
+  it('sessão: 401 nao_permitido vira null (sem login), outro erro sobe', async () => {
+    expect(await createWorkerApi('/api', resposta(401, { erro: 'nao_permitido' })).sessao()).toBeNull()
+    await expect(createWorkerApi('/api', resposta(500)).sessao()).rejects.toMatchObject({ codigo: 'falha' })
   })
 
   it('204 vira undefined', async () => {
@@ -18,7 +24,7 @@ describe('workerApi', () => {
   })
 
   it.each([
-    [401, { erro: 'totp_invalido' }, 'totp_invalido'],
+    [401, { erro: 'senha_invalida' }, 'senha_invalida'],
     [429, undefined, 'bloqueado'],
     [404, { erro: 'nao_permitido' }, 'nao_permitido'],
     [500, { erro: 'qualquer' }, 'falha'],

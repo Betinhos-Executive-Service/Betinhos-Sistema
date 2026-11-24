@@ -28,8 +28,8 @@ export type Source = {
   setFechamento: (validacaoIds: string[], valor: Fechamento) => Promise<void>
   criarValidador: (v: NovoValidador) => Promise<string>
   setValidadorAtivo: (id: string, ativo: boolean) => Promise<void>
-  /** Zera o segredo TOTP: no próximo acesso o validador lê um QR code novo. Não avisa o cliente. */
-  refazerAutenticador: (id: string) => Promise<void>
+  /** Apaga a senha do portal (e derruba as sessões abertas): a pessoa cria outra pelo código do e-mail. Não avisa o cliente. */
+  zerarSenha: (id: string) => Promise<void>
 }
 
 /** Papéis que abrem a tela; administradores também. Sem papel de financeiro dedicado no DEV, a checagem é por nome. */
@@ -82,7 +82,7 @@ function createMockSource(): Source {
     async setFechamento() { await wait(300) },
     async criarValidador() { await wait(300); const id = nextId('e1000000'); validadores.add(id); return id },
     async setValidadorAtivo(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
-    async refazerAutenticador(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
+    async zerarSenha(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
   }
 }
 
@@ -182,6 +182,6 @@ export function createSource(host: Host): Source {
       }))
     },
     setValidadorAtivo: async (id, ativo) => host.client.update((await entitySets()).validador, id, { cr40f_ativo: ativo }),
-    refazerAutenticador: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_segredototp: null, cr40f_totpcadastradoem: null }),
+    zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhahash: null, cr40f_senhadefinidaem: null }),
   }
 }
