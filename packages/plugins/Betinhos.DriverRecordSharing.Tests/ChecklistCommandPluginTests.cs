@@ -121,6 +121,134 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
+        public void ParaMimCriaEAtribuiAoChamadorENaoAoMotoristaAtualDoCarro()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            service.Driver("Outro", "outro@empresa.test", vehicle, DateTime.UtcNow.AddDays(-1));
+            service.User("outro@empresa.test");
+            var caller = service.Driver("Eu", "eu@empresa.test", null, null);
+            var callerUser = service.User("eu@empresa.test");
+            var context = Context(callerUser.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true));
+
+            Invoke("Request", context, service, service);
+
+            var checklist = service.Rows("new_checklistveiculo").Single();
+            Assert.Equal(checklist.Id, (Guid)context.OutputParameters["new_ChecklistId"]);
+            Assert.Equal(100000001, Choice(checklist, "new_origem"));
+            Assert.Equal(Pendente, Choice(checklist, "new_estado"));
+            Assert.Equal(caller.Id, checklist.GetAttributeValue<EntityReference>("new_motorista").Id);
+            Assert.Equal(callerUser.Id, checklist.GetAttributeValue<EntityReference>("ownerid").Id);
+        }
+
+        [Fact]
+        public void ParaMimFalsoMantemAtribuicaoAoMotoristaAtual()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var current = service.Driver("Atual", "atual@empresa.test", vehicle, DateTime.UtcNow.AddDays(-1));
+            service.User("atual@empresa.test");
+            var caller = service.User("gestao@empresa.test");
+
+            Invoke("Request", Context(caller.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", false)), service, service);
+
+            Assert.Equal(current.Id, service.Rows("new_checklistveiculo").Single().GetAttributeValue<EntityReference>("new_motorista").Id);
+        }
+
+        [Fact]
+        public void ParaMimDevolveChecklistAbertoDoChamadorSemCriarOutro()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var caller = service.Driver("Eu", "eu@empresa.test", vehicle, DateTime.UtcNow);
+            var callerUser = service.User("eu@empresa.test");
+            var open = service.Checklist(vehicle, Pendente, caller, callerUser);
+            var context = Context(callerUser.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true));
+
+            Invoke("Request", context, service, service);
+
+            Assert.Equal(open.Id, (Guid)context.OutputParameters["new_ChecklistId"]);
+            Assert.Single(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
+        public void ParaMimComAbertoSemMotoristaAtribuiAoChamador()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var caller = service.Driver("Eu", "eu@empresa.test", null, null);
+            var callerUser = service.User("eu@empresa.test");
+            var open = service.Checklist(vehicle, AguardandoMotorista);
+            var context = Context(callerUser.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true));
+
+            Invoke("Request", context, service, service);
+
+            Assert.Equal(open.Id, (Guid)context.OutputParameters["new_ChecklistId"]);
+            Assert.Single(service.Rows("new_checklistveiculo"));
+            Assert.Equal(caller.Id, open.GetAttributeValue<EntityReference>("new_motorista").Id);
+            Assert.Equal(Pendente, Choice(open, "new_estado"));
+        }
+
+        [Fact]
+        public void ParaMimRecusaAbertoDeOutroMotorista()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var other = service.Driver("Outro", "outro@empresa.test", vehicle, DateTime.UtcNow);
+            var otherUser = service.User("outro@empresa.test");
+            service.Checklist(vehicle, Pendente, other, otherUser);
+            service.Driver("Eu", "eu@empresa.test", null, null);
+            var callerUser = service.User("eu@empresa.test");
+
+            AssertPluginError(() => Invoke("Request", Context(callerUser.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true)), service, service));
+            Assert.Single(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
+        public void ParaMimRecusaMotoristaTerceiro()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var driver = service.Driver("Terceiro", "t@empresa.test", null, null);
+            driver["cr40f_tipodevinculo"] = new OptionSetValue(1);
+            var user = service.User("t@empresa.test");
+
+            AssertPluginError(() => Invoke("Request", Context(user.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true)), service, service));
+            Assert.Empty(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
+        public void ParaMimRecusaVeiculoQueNaoEProprio()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23", proprio: false);
+            service.Template(padrao: true);
+            service.Driver("Eu", "eu@empresa.test", null, null);
+            var user = service.User("eu@empresa.test");
+
+            AssertPluginError(() => Invoke("Request", Context(user.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true)), service, service));
+            Assert.Empty(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
+        public void ParaMimRecusaUsuarioSemMotorista()
+        {
+            var service = new FakeService();
+            var vehicle = service.Vehicle("ABC1D23");
+            service.Template(padrao: true);
+            var user = service.User("ninguem@empresa.test");
+
+            AssertPluginError(() => Invoke("Request", Context(user.Id, P("new_VeiculoId", vehicle.Id), P("new_ParaMim", true)), service, service));
+            Assert.Empty(service.Rows("new_checklistveiculo"));
+        }
+
+        [Fact]
         public void AtribuicaoEscolheQuemPegouOVeiculoPorUltimo()
         {
             var service = new FakeService();

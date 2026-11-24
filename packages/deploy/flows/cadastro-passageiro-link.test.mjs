@@ -66,10 +66,28 @@ test('link vencido ou revogado responde 410 e marca Expirado (3)', () => {
 
 test('escopo: passageiro do link, filhos por _cr40f_geral_value, sem lookups passageiro1..4', () => {
   assert.match(todas.get('Listar_filhos').inputs.parameters.$filter, /^_cr40f_geral_value eq /)
-  assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value')
+  assert.equal(todas.get('Listar_filhos').inputs.parameters.$select, '_cr40f_bancodedados_value,cr40f_ordemdeselecao')
   assert.doesNotMatch(raw, /passageiro[1-4]/i, 'a reserva não lê mais os lookups passageiro1..4')
   assert.ok(!todas.has('Filtrar_lookups'))
   assert.match(todas.get('Escopo').inputs, /_cr40f_passageiro_value/)
+})
+
+test('ler: cada passageiro leva ordem = cr40f_ordemdeselecao do filho (nula quando o filho não tem), sem json() de chaves montadas', () => {
+  const filhos = todas.get('Listar_filhos')
+  assert.match(filhos.inputs.parameters.$filter, /^_cr40f_geral_value eq /)
+  assert.match(filhos.inputs.parameters.$select, /(^|,)cr40f_ordemdeselecao(,|$)/)
+  // lista {id, ordem} fora do loop (o loop só enxerga ancestrais) e busca por id dentro dele: passageiro repetido na reserva
+  // não gera chave repetida num json() (que derrubaria o flow inteiro com 500)
+  assert.deepEqual(todas.get('Ordens_filhos').runAfter, { Listar_filhos: ['Succeeded'] })
+  assert.deepEqual(todas.get('Escopo').runAfter.Ordens_filhos, ['Succeeded'])
+  assert.ok(!todas.has('Ordens'))
+  assert.doesNotMatch(raw, /@json\(/)
+  assert.deepEqual(Object.keys(todas.get('Ordens_filhos').inputs.select).sort(), ['id', 'ordem'])
+  assert.deepEqual(todas.get('Ordem_do_passageiro').runAfter, {})
+  assert.equal(todas.get('Ordem_do_passageiro').inputs.from, "@body('Ordens_filhos')")
+  assert.match(todas.get('Ordem_do_passageiro').inputs.where, /items\('Por_passageiro'\)/)
+  assert.deepEqual(todas.get('Incluir_passageiro').runAfter.Ordem_do_passageiro, ['Succeeded'])
+  assert.equal(todas.get('Incluir_passageiro').inputs.value.ordem, "@first(body('Ordem_do_passageiro'))?['ordem']")
 })
 
 test('salvar: passageiro fora do escopo 404, limite de 30 envios 429', () => {
@@ -95,7 +113,7 @@ test('ler: passageiros em paralelo e sem foto (a foto vem da op foto)', () => {
   assert.ok(loop.runtimeConfiguration.concurrency.repetitions >= 10, 'loop paralelo')
   assert.ok(!('Ler_foto' in loop.actions) && !('Tem_foto_lida' in loop.actions), 'o ler não baixa fotos')
   const incluir = todas.get('Incluir_passageiro')
-  assert.deepEqual(incluir.runAfter, { Obter_passageiro: ['Succeeded'] })
+  assert.deepEqual(incluir.runAfter, { Obter_passageiro: ['Succeeded'], Ordem_do_passageiro: ['Succeeded'] })
   assert.match(incluir.inputs.value.temFoto, /new_linkdafoto/)
   assert.equal(incluir.inputs.value.foto, null)
 })

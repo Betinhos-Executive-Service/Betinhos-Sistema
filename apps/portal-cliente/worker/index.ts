@@ -1,13 +1,13 @@
 // Worker do portal do cliente: /api/* (login, validação, pedidos) + build do app em ./dist (assets) + cron diário.
 // Cada rota exige o módulo do cliente na sessão (Tenaris valida; Latasa pede e acompanha).
 import type { Modulo } from '../src/domain/types'
-import { confirmarTotp, entrar, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
+import { confirmarCodigo, criarSenha, entrarComSenha, lerSessao, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
 import { aplicarTacita, enviarResumos } from './cron'
 import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
 import type { Env } from './env'
 import { erro } from './http'
-import { criarPedido, listarPedidos } from './pedidos'
+import { cancelarPedido, criarPedido, listarPedidos } from './pedidos'
 import { abrirDuvida, aprovar, listar, responder } from './servicos'
 
 const SEGURANCA: Record<string, string> = {
@@ -23,6 +23,13 @@ function comSeguranca(resp: Response): Response {
   const r = new Response(resp.body, resp)
   for (const [k, v] of Object.entries(SEGURANCA)) r.headers.set(k, v)
   return r
+}
+
+/** Rotas de login com e-mail no corpo: limite por e-mail além do por IP. */
+const AUTH_POR_EMAIL: Record<string, (req: Request, c: Ctx) => Promise<Response>> = {
+  'POST /auth/entrar': entrarComSenha,
+  'POST /auth/codigo': solicitarCodigo,
+  'POST /auth/codigo/confirmar': confirmarCodigo,
 }
 
 type ExecCtx = { waitUntil(p: Promise<unknown>): void }
@@ -46,12 +53,14 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   const c: Ctx = { env, dv: criarDv(env), agora: Date.now(), waitUntil: (p) => exec.waitUntil(p) }
   const rota = `${req.method} ${caminho}`
 
-  if (rota === 'POST /auth/codigo' || rota === 'POST /auth/entrar') {
+  const porEmail = AUTH_POR_EMAIL[rota]
+  if (porEmail) {
     const email = await emailDoCorpo(req)
     if (env.RL_EMAIL && email && !(await env.RL_EMAIL.limit({ key: `email:${await sha256Hex(email)}` })).success) return erro(429, 'bloqueado')
-    return rota === 'POST /auth/codigo' ? solicitarCodigo(req, c) : entrar(req, c)
+    return porEmail(req, c)
   }
-  if (rota === 'POST /auth/totp') return confirmarTotp(req, c)
+  if (rota === 'POST /auth/senha') return criarSenha(req, c)
+  if (rota === 'GET /auth/sessao') return lerSessao(req, c)
   if (rota === 'POST /auth/sair') return sair()
 
   const sessao = await sessaoAtual(req, c)
@@ -59,6 +68,8 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   const com = (modulo: Modulo, rodar: () => Promise<Response>) => (sessao.modulos.includes(modulo) ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
   if (rota === 'POST /pedidos') return com('pedir', () => criarPedido(req, c, sessao))
   if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
+  const cancelar = /^POST \/pedidos\/([^/]+)\/cancelar$/.exec(rota)
+  if (cancelar) return com('meus_servicos', () => cancelarPedido(c, sessao, cancelar[1]))
   if (rota === 'GET /servicos') return com('validar', () => listar(c, sessao))
   if (rota === 'POST /servicos/aprovar') return com('validar', () => aprovar(req, c, sessao))
   const m = /^POST \/servicos\/([^/]+)\/(duvida|responder)$/.exec(rota)

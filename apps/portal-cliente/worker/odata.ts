@@ -49,9 +49,9 @@ export const resumoDoCliente = (clienteId: string, desdeIso: string, hoje: strin
       `(cr40f_liberadoem ge ${desdeIso} or cr40f_prazotacita eq ${hoje})`,
   )
 
-const VALIDADOR_SELECT = 'cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_segredototp,_cr40f_cliente_value,cr40f_ativo'
+const VALIDADOR_SELECT = 'cr40f_validadorclienteid,cr40f_name,cr40f_email,cr40f_senhahash,cr40f_senhadefinidaem,_cr40f_cliente_value,cr40f_ativo'
 /** Os módulos do cliente vão na sessão: cliente sem módulo não entra. */
-const expandCliente = `$expand=${NAV.cliente}($select=cr40f_portalmodulos)`
+const expandCliente = `$expand=${NAV.cliente}($select=cr40f_portalmodulos,cr40f_portalhabilitado)`
 
 /** Usuário ativo de um cliente com portal e módulos; `$top=2` para recusar e-mail duplicado. */
 export const validadorPorEmail = (email: string) =>
@@ -66,7 +66,7 @@ export const validadorQualquerPorEmail = (email: string) =>
 
 /** Validadores ativos de clientes com portal, com os módulos do cliente (o resumo diário é só de quem valida). */
 export const validadoresAtivos = () =>
-  `${SET.validador}?$select=cr40f_email,_cr40f_cliente_value&${expandCliente}&$filter=${encodeURIComponent(`cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
+  `${SET.validador}?$select=cr40f_name,cr40f_email,_cr40f_cliente_value&${expandCliente}&$filter=${encodeURIComponent(`cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
 
 /** Clientes com portal cujo campo de domínios contém o domínio; a igualdade exata é conferida no código. */
 export const clientesPorDominio = (dominio: string) =>
@@ -75,6 +75,10 @@ export const clientesPorDominio = (dominio: string) =>
 /** Reservas pedidas pelo portal por este usuário (e do cliente da sessão, por garantia). */
 export const pedidosDe = (validadorId: string, clienteId: string) =>
   `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
+
+/** Um pedido do usuário (e do cliente da sessão), com a observação interna para o cancelamento acrescentar a nota. */
+export const pedidoDe = (id: string, validadorId: string, clienteId: string) =>
+  `${SET.reserva}?$select=${[...PEDIDO_CAMPOS, 'cr40f_observaointerna'].join(',')}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)} and cr40f_reservadeveculosid eq ${guid(id)}`)}`
 
 /** Caminho do POST da reserva: o `$select` define o que volta no `return=representation`. */
 export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}`

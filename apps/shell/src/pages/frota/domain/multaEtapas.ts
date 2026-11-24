@@ -8,13 +8,13 @@ import { CANAL, MOTIVO_EMPRESA, MULTA, RESPONSAVEL } from '../data/schema'
  * O servidor é quem decide: a tela usa isto para mostrar o passo e travar o botão; a gravação passa pela cr40f_PassoMulta.
  */
 export type Etapa = 'identificar' | 'indicar' | 'pagar' | 'acertar' | 'encerrada' | 'recurso' | 'cancelada'
-export const PASSOS = ['DefinirResponsavel', 'AvisarMotorista', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto', 'TermoAssinado', 'TermoContestado'] as const
+export const PASSOS = ['DefinirResponsavel', 'RegistrarIndicacao', 'RegistrarAceite', 'RegistrarPagamento', 'RegistrarAcerto', 'PrazoVencido', 'Cancelar', 'Recorrer', 'ResultadoRecurso', 'ConcluirDesconto', 'ReabrirDesconto', 'TermoAssinado', 'TermoContestado'] as const
 export type Passo = (typeof PASSOS)[number]
 
 export type MultaEstado = {
   status?: number | null; responsavel?: number | null; motoristaId?: string | null; motivoEmpresa?: number | null
-  dataParaIndicar?: string | null; dataAviso?: string | null; canal?: number | null; dataIndicacao?: string | null; indicado?: boolean | null
-  aceiteEm?: string | null; vencimento?: string | null; pagaEm?: string | null; valorPago?: number | null; competencia?: string | null
+  dataParaIndicar?: string | null; dataAviso?: string | null; /** Só escrita: dispara o aviso por push. */ avisoAutomaticoEm?: string | null; canal?: number | null; dataIndicacao?: string | null; indicado?: boolean | null
+  aceiteEm?: string | null; vencimento?: string | null; pagaEm?: string | null; valorPago?: number | null; valorCheio?: number | null; competencia?: string | null
   acertoEm?: string | null; encerradaEm?: string | null; canceladaEm?: string | null; motivoCancelamento?: string | null; recursoPendente?: boolean | null
   /** Contagem de parcelas da multa, carregada pelo passo. Ausente = 0. */
   parcelasPrevistas?: number | null; parcelasDescontadas?: number | null
@@ -34,7 +34,6 @@ export type Situacao = { etapa: Etapa; pendentes: Passo[]; proximoPasso: string;
 
 export const ROTULO_PASSO: Record<Passo, string> = {
   DefinirResponsavel: 'Definir o responsável',
-  AvisarMotorista: 'Avisar o motorista',
   RegistrarIndicacao: 'Indicar no órgão',
   RegistrarAceite: 'Conferir o aceite na CNH Digital',
   RegistrarPagamento: 'Pagar a guia',
@@ -55,7 +54,6 @@ export const ROTULO_ETAPA: Record<Etapa, string> = {
 }
 
 const ANTES: Partial<Record<Passo, string>> = {
-  AvisarMotorista: 'Avise o motorista antes de registrar a indicação.',
   RegistrarIndicacao: 'Registre a indicação antes do aceite.',
 }
 
@@ -94,7 +92,6 @@ export function avaliar(m: MultaEstado, hoje: string): Situacao {
   if (vencido) pendentes.push('PrazoVencido')
   else if (etapa === 'identificar') pendentes.push('DefinirResponsavel')
   else if (etapa === 'indicar') {
-    if (m.dataAviso == null) pendentes.push('AvisarMotorista')
     if (m.dataIndicacao == null || m.canal == null) pendentes.push('RegistrarIndicacao')
     else if (m.canal === CANAL.SENATRAN && m.aceiteEm == null) pendentes.push('RegistrarAceite')
   } else if (etapa === 'pagar') {
@@ -117,13 +114,15 @@ function rotuloPendente(m: MultaEstado, passo: Passo): string {
   return ROTULO_PASSO[passo]
 }
 
-const MAXIMO_PARCELAS = 12
+/** Parcelas de entrada nova (termo e acerto na folha). Registros antigos com 4 a 12 continuam legíveis. */
+export const MAXIMO_PARCELAS = 3
+const JANELA_MESES = 12
 const PASSO_FORA = 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
 export const competenciaDe = (mes: string) => `${mes.slice(0, 7)}-01`
 export const mesBr = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 export function janelaCompetencia(hoje: string) {
   const mes = competenciaDe(hoje)
-  return { de: addMonths(mes, -1), ate: addMonths(mes, MAXIMO_PARCELAS) }
+  return { de: addMonths(mes, -1), ate: addMonths(mes, JANELA_MESES) }
 }
 /** Primeiro mês do Acertar -> folha com termo assinado: o do termo, ou o mês de hoje se ele saiu da janela do RH. */
 export function mesDoTermo(m: MultaEstado, hoje: string): string | null {
@@ -165,6 +164,7 @@ function dataRuim(data: string | undefined, hoje: string, vazio: string): string
 function validarFolha(m: MultaEstado, d: DadosPasso, hoje: string): string | null {
   if (!d.competencia || !/^\d{4}-(0[1-9]|1[0-2])(-01)?$/.test(d.competencia)) return 'Informe o mês do desconto.'
   if (!((m.valorPago ?? 0) > 0)) return 'Registre o pagamento antes de lançar na folha.'
+  if (!((m.valorCheio ?? 0) > 0)) return 'A multa não tem o valor cheio; informe o valor da guia ou vincule a infração do catálogo.'
   if (!m.motoristaId?.trim()) return 'A multa não tem motorista; defina o responsável antes.'
   if (m.termoParcelas != null) {
     if (m.termoValor != null && (m.valorPago ?? 0) > m.termoValor) return 'O valor pago passou do valor do termo; envie um termo novo ou registre como empresa assume.'
@@ -176,7 +176,7 @@ function validarFolha(m: MultaEstado, d: DadosPasso, hoje: string): string | nul
   const c = competenciaDe(d.competencia)
   if (c < de || c > ate) return `Escolha um mês entre ${mesBr(de)} e ${mesBr(ate)}.`
   const n = d.parcelas ?? 1
-  return n < 1 || n > MAXIMO_PARCELAS ? 'Escolha de 1 a 12 parcelas.' : null
+  return n < 1 || n > MAXIMO_PARCELAS ? 'Escolha de 1 a 3 parcelas.' : null
 }
 
 export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje: string): string | null {
@@ -220,15 +220,12 @@ export function validarPasso(m: MultaEstado, passo: string, d: DadosPasso, hoje:
   }
   if (!s.pendentes.includes(passo as Passo)) return 'Este passo não vale para a etapa atual da multa. Recarregue a tela.'
   if (m.termoPendente === true && passo === 'RegistrarIndicacao') return 'Aguarde a assinatura do termo ou cancele o termo.'
-  if (m.termoPendente === true && passo === 'AvisarMotorista') return 'Cancele o termo antes de avisar pelo WhatsApp.'
   if (s.pendentes[0] !== passo) return ANTES[s.pendentes[0]] ?? 'Siga a ordem dos passos.'
   switch (passo as Passo) {
     case 'DefinirResponsavel':
       if (d.responsavel === 'empresa') return null
       if (d.responsavel !== 'motorista') return 'Escolha o responsável: motorista ou empresa.'
       return d.motoristaId?.trim() ? null : 'Escolha o motorista.'
-    case 'AvisarMotorista':
-      return d.data?.trim() ? dataRuim(d.data, hoje, '') : null
     case 'RegistrarIndicacao':
       return canalDe(d.canal) === null ? 'Escolha o canal da indicação.' : dataRuim(d.data, hoje, 'Informe a data da indicação.')
     case 'RegistrarAceite':
@@ -252,10 +249,7 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
     case 'DefinirResponsavel':
       n.contestadaEm = null
       if (d.responsavel === 'empresa') Object.assign(n, { responsavel: RESPONSAVEL.EMPRESA, motivoEmpresa: MOTIVO_EMPRESA.CULPA_EMPRESA, status: MULTA.INDICADA })
-      else Object.assign(n, { responsavel: RESPONSAVEL.MOTORISTA, motoristaId: d.motoristaId, status: MULTA.NOTIFICADO })
-      break
-    case 'AvisarMotorista':
-      n.dataAviso = d.data?.trim() ? d.data : hoje
+      else Object.assign(n, { responsavel: RESPONSAVEL.MOTORISTA, motoristaId: d.motoristaId, status: MULTA.NOTIFICADO, avisoAutomaticoEm: hoje })
       break
     case 'RegistrarIndicacao':
       Object.assign(n, { canal: canalDe(d.canal), dataIndicacao: d.data, indicado: true })
@@ -309,7 +303,7 @@ export function aplicarPasso(m: MultaEstado, passo: Passo, d: DadosPasso, hoje: 
   return n
 }
 
-const CAMPOS = ['status', 'responsavel', 'motoristaId', 'motivoEmpresa', 'dataAviso', 'canal', 'dataIndicacao', 'indicado', 'aceiteEm', 'pagaEm', 'valorPago', 'competencia', 'acertoEm', 'encerradaEm', 'canceladaEm', 'motivoCancelamento', 'recursoPendente', 'contestadaEm'] as const
+const CAMPOS = ['status', 'responsavel', 'motoristaId', 'motivoEmpresa', 'dataAviso', 'avisoAutomaticoEm', 'canal', 'dataIndicacao', 'indicado', 'aceiteEm', 'pagaEm', 'valorPago', 'competencia', 'acertoEm', 'encerradaEm', 'canceladaEm', 'motivoCancelamento', 'recursoPendente', 'contestadaEm'] as const
 
 /** Campos que mudaram, no formato `campo=valor` (o mesmo de MultaEtapas.Formatar). */
 export function mudancas(antes: MultaEstado, depois: MultaEstado): string[] {

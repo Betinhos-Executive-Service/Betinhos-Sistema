@@ -24,8 +24,8 @@ export interface Env {
   DV_URL: string
   /** URL SAS do flow "Portal cliente – e-mails". */
   EMAIL_FLOW_URL: string
-  /** 32 bytes em base64: cifra o segredo TOTP gravado no Dataverse. */
-  CHAVE_TOTP: string
-  /** 32 bytes em base64: cifra os cookies de sessão e da etapa do autenticador. */
+  /** 32 bytes em base64: cifra os cookies de sessão e da etapa de criar a senha. */
   CHAVE_SESSAO: string
+  /** Link do portal nos e-mails (var do wrangler.jsonc). */
+  PORTAL_URL: string
 }

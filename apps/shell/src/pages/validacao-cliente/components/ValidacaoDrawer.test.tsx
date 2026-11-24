@@ -17,7 +17,7 @@ function source(over: Partial<Source> = {}): Source {
   return {
     mock: true,
     podeAcessar: async () => true,
-    load: async () => ({ linhas, clientes: [], validadores: [] }),
+    load: async () => ({ linhas, clientes: [], validadores: [], configs: [] }),
     mensagens: async (id) => mensagens.filter((m) => m.validacaoId === id),
     responder: vi.fn(async (l: Linha, texto: string) => ({
       mensagem: { id: 'm-novo', validacaoId: l.validacaoId!, lado: 'betinhos' as const, autor: 'Juliana', motivo: null, texto, criadaEm: '2026-10-28T15:00:00Z' },
@@ -30,7 +30,8 @@ function source(over: Partial<Source> = {}): Source {
     setFechamento: async () => undefined,
     criarValidador: async () => 'x',
     setValidadorAtivo: async () => undefined,
-    refazerAutenticador: async () => undefined,
+    zerarSenha: async () => undefined,
+    salvarConfig: async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }),
     ...over,
   }
 }

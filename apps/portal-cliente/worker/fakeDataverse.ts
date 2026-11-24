@@ -20,9 +20,9 @@ export function kvMemoria(): KV & { dados: Map<string, string> } {
   return { dados, get: async (k) => dados.get(k) ?? null, put: async (k, v) => void dados.set(k, v), delete: async (k) => void dados.delete(k) }
 }
 
-export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'dispositivoconfiavels' | 'validacaoservicos' | 'mensagemvalidacaos' | 'clientes1s' | 'reservadeveculoses', Registro[]>
+export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'validacaoservicos' | 'mensagemvalidacaos' | 'clientes1s' | 'reservadeveculoses', Registro[]>
 const CHAVE_ID: Record<keyof Banco, string> = {
-  validadorclientes: 'cr40f_validadorclienteid', codigoacessos: 'cr40f_codigoacessoid', dispositivoconfiavels: 'cr40f_dispositivoconfiavelid',
+  validadorclientes: 'cr40f_validadorclienteid', codigoacessos: 'cr40f_codigoacessoid',
   validacaoservicos: 'cr40f_validacaoservicoid', mensagemvalidacaos: 'cr40f_mensagemvalidacaoid', clientes1s: 'cr40f_clientes1id', reservadeveculoses: 'cr40f_reservadeveculosid',
 }
 export type Email = { tipo: string; para: string[]; dados: Record<string, unknown> }
@@ -32,7 +32,7 @@ let seq = 0
 const novoId = () => `aaaaaaaa-0000-0000-0000-${String(++seq).padStart(12, '0')}`
 
 export function bancoInicial(): Banco {
-  const reserva = (n: string) => ({ cr40f_id: n, cr40f_idtenaris: `PO-${n}`, cr40f_cr: 'CR1', [NAV.passageiros]: [{ _cr40f_bancodedados_value: 'p1', [`_cr40f_bancodedados_value${FV}`]: 'Ana', cr40f_ordemdeselecao: 1 }], new_composicaodepreco: { new_valortotal: 500, cr40f_valorhoramotorista: 500 } })
+  const reserva = (n: string) => ({ cr40f_id: n, cr40f_idtenaris: `PO-${n}`, cr40f_cr: 'CR1', [NAV.passageiros]: [{ _cr40f_bancodedados_value: 'p1', [`_cr40f_bancodedados_value${FV}`]: 'Ana', cr40f_ordemdeselecao: 1 }], [NAV.composicao]: { new_valortotal: 500, cr40f_valorhoramotorista: 500 } })
   const validacao = (id: string, cliente: string, status: number, prazo: string, n: string) => ({
     cr40f_validacaoservicoid: id, _cr40f_cliente_value: cliente, cr40f_status: status, cr40f_prazotacita: prazo, cr40f_liberadoem: '2026-10-28T11:00:00Z', cr40f_Reserva: reserva(n),
   })
@@ -42,7 +42,6 @@ export function bancoInicial(): Banco {
       { cr40f_validadorclienteid: '44444444-4444-4444-4444-444444444444', cr40f_name: 'Olga', cr40f_email: 'olga@outro.com', cr40f_ativo: true, _cr40f_cliente_value: OUTRO, [`_cr40f_cliente_value${FV}`]: 'Outro' },
     ],
     codigoacessos: [],
-    dispositivoconfiavels: [],
     validacaoservicos: [
       validacao('22222222-2222-2222-2222-222222222221', TENARIS, 100000000, '2026-10-27', '10801'), // liberado, venceu
       validacao('22222222-2222-2222-2222-222222222222', TENARIS, 100000000, '2026-11-04', '10802'), // liberado, no prazo
@@ -83,14 +82,10 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[
     return linhas.filter((c) => c.cr40f_portalhabilitado && String(c.cr40f_portaldominios ?? '').includes(dominio))
   }
   if (tabela === 'reservadeveculoses') {
-    const [usuario, cliente] = guids(filtro)
-    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente)
+    const [usuario, cliente, id] = guids(filtro)
+    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
   if (tabela === 'codigoacessos') return linhas.filter((c) => c._cr40f_validador_value === guids(filtro)[0] && !c.cr40f_usado).slice(-1)
-  if (tabela === 'dispositivoconfiavels') {
-    const hash = /cr40f_hashtoken eq '([0-9a-f]+)'/.exec(filtro)?.[1]
-    return linhas.filter((d) => d.cr40f_hashtoken === hash && Date.parse(String(d.cr40f_expiraem)) > Date.now())
-  }
   if (tabela === 'mensagemvalidacaos') return linhas.filter((m) => guids(filtro).includes(String(m._cr40f_validacao_value)))
   // validacaoservicos
   const prazoLt = /cr40f_prazotacita lt (\d{4}-\d\d-\d\d)/.exec(filtro)?.[1]
@@ -133,6 +128,5 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
 }
 
 export function envFalso(kv: KV = kvMemoria()): Env {
-  const chave = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)))
-  return { KV: kv, DV_TENANT: 't', DV_CLIENT_ID: 'c', DV_CLIENT_SECRET: 's', DV_URL, EMAIL_FLOW_URL: FLOW_URL, CHAVE_TOTP: chave, CHAVE_SESSAO: btoa(String.fromCharCode(...new Uint8Array(32).fill(4))) }
+  return { KV: kv, DV_TENANT: 't', DV_CLIENT_ID: 'c', DV_CLIENT_SECRET: 's', DV_URL, EMAIL_FLOW_URL: FLOW_URL, CHAVE_SESSAO: btoa(String.fromCharCode(...new Uint8Array(32).fill(4))), PORTAL_URL: 'https://cliente.exemplo/' }
 }

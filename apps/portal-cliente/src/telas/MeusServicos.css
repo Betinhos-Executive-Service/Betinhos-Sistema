@@ -1,5 +1,45 @@
-/* Sem clique: a linha não abre detalhe. */
-.pc-meus__servico { cursor: default; }
-.pc-meus__servico:active { transform: none; }
 .pc-meus__veiculo { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
-.pc-meus__voucher { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-action); }
+.pc-meus__voucher { display: inline-flex; align-items: center; gap: var(--bt-space-1); font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+/* Um bloco por dia; só o primeiro mostra o cabeçalho das colunas (as tabelas têm as mesmas colunas e ficam alinhadas). */
+.pc-ped__dias { display: flex; flex-direction: column; gap: var(--bt-space-5); }
+.pc-ped__dia { display: flex; flex-direction: column; gap: var(--bt-space-2); }
+.pc-ped__dia + .pc-ped__dia .bt-table__head { display: none; }
+.pc-ped__titulo-dia {
+  display: flex; align-items: baseline; gap: var(--bt-space-2); margin: 0;
+  font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); color: var(--bt-color-text-primary);
+}
+.pc-ped__contagem { font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-semibold); color: var(--bt-color-text-secondary); }
+
+.pc-ped__quando { display: flex; flex-direction: column; gap: var(--bt-space-0-5); min-width: 0; }
+.pc-ped__hora { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-extrabold); font-variant-numeric: tabular-nums; color: var(--bt-color-text-primary); }
+.pc-ped__codigo { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); font-variant-numeric: tabular-nums; }
+.pc-ped__trajeto-mobile { display: none; margin-top: var(--bt-space-1); font-size: var(--bt-font-size-12); color: var(--bt-color-text-primary); overflow-wrap: anywhere; }
+
+.pc-ped__trajeto { display: flex; flex-direction: column; gap: var(--bt-space-1); min-width: 0; }
+.pc-ped__ponto { display: flex; align-items: baseline; gap: var(--bt-space-2); min-width: 0; font-size: var(--bt-font-size-13); }
+.pc-ped__local { overflow-wrap: anywhere; }
+.pc-ped__pino { flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--bt-color-text-secondary); transform: translateY(-1px); }
+.pc-ped__ponto--destino .pc-ped__pino { background-color: var(--bt-color-text-secondary); }
+.pc-ped__ponto--destino { color: var(--bt-color-text-secondary); }
+
+/* Painel */
+.pc-ped__situacao .pc-det__nota { margin-top: var(--bt-space-2); }
+.pc-ped__trilha { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pc-ped__passo { position: relative; display: flex; gap: var(--bt-space-3); padding-bottom: var(--bt-space-3); }
+.pc-ped__passo:last-child { padding-bottom: 0; }
+.pc-ped__passo:not(:last-child)::before {
+  content: ''; position: absolute; left: 5px; top: 14px; bottom: 0; width: 2px; background-color: var(--bt-color-border);
+}
+.pc-ped__marca { flex-shrink: 0; width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--bt-color-border); background-color: var(--bt-color-surface); }
+.pc-ped__passo--feito .pc-ped__marca { border-color: var(--bt-color-success); background-color: var(--bt-color-success); }
+.pc-ped__passo--atual .pc-ped__marca { border-color: var(--bt-color-action); }
+.pc-ped__passo--cancelado .pc-ped__marca { border-color: var(--bt-color-danger); background-color: var(--bt-color-danger); }
+.pc-ped__texto { display: flex; flex-direction: column; gap: var(--bt-space-0-5); }
+.pc-ped__titulo { font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); }
+.pc-ped__passo--pendente .pc-ped__titulo { color: var(--bt-color-text-secondary); font-weight: var(--bt-font-weight-regular); }
+.pc-ped__detalhe { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+
+@media (max-width: 820px) {
+  .pc-ped__trajeto-mobile { display: block; }
+}

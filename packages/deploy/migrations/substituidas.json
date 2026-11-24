@@ -18,5 +18,15 @@
     "migration": "20261123-1900-remover-passageiro1-4.ps1",
     "por": "20261123-2000-passageiro1-4-sem-quickfind.ps1",
     "motivo": "Falhou no DEV (Deploy 45241561927) no PATCH do fetchxml da quick find de cr40f_reservadeveculos (0x80040216); no DEV nenhuma quick find com campo de busca aceita gravacao. A 2000 limpa formulario, view A receber e views pessoais, sem quick find e sem apagar os lookups."
+  },
+  {
+    "migration": "20261124-1200-boas-ideias-anexos.ps1",
+    "por": "20261124-1205-boas-ideias-anexos-navegacao.ps1",
+    "motivo": "Falhou no DEV (Deploy 45401949365) no PUT parcial de RelationshipDefinitions para renomear a colecao (0x80060888, Nullable object must have a value). A 1205 tem o mesmo conteudo sem o PUT: o App usa so a navegacao cr40f_ideia, que ja nasce certa, e a migration confere."
+  },
+  {
+    "migration": "20261124-1700-portal-senhahash-segura.ps1",
+    "por": "20261124-1830-portal-senhahash-segura-ordem.ps1",
+    "motivo": "Falhou no DEV (Deploy 45457471435) ao criar a fieldpermission antes de proteger cr40f_senhahash (0x8004f508: coluna nao secured). A 1830 tem o mesmo conteudo e protege a coluna primeiro."
   }
 ]

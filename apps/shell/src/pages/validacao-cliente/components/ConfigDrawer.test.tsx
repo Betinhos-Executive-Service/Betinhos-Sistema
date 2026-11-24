@@ -1,0 +1,103 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { ToastProvider } from '@betinhos/ui'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { EMBRAER, TENARIS, createMockConfigs, createMockValidadores } from '../data/mock'
+import type { Source } from '../data/source'
+import type { PortalConfig } from '../domain/types'
+import { ConfigDrawer } from './ConfigDrawer'
+
+afterEach(cleanup)
+
+const configs = createMockConfigs()
+const validadores = createMockValidadores()
+const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }))
+
+function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}) {
+  const source = { salvarConfig: salvarConfig(), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
+  const props = { onClose: vi.fn(), onSaved: vi.fn(), onValidadorSaved: vi.fn() }
+  render(<ToastProvider><ConfigDrawer cliente={cliente} config={config} outros={configs} validadores={validadores} source={source} mobile={false} {...props} /></ToastProvider>)
+  return { source, ...props }
+}
+const drawer = () => screen.getAllByRole('dialog', { hidden: true }).find((d) => d.classList.contains('bt-drawer'))!
+const salvar = () => fireEvent.click(within(drawer()).getByRole('button', { name: 'Salvar' }))
+
+describe('ConfigDrawer', () => {
+  it('liga o portal sem módulo: erro e nada gravado', () => {
+    const { source, onSaved } = abrir(EMBRAER, { ...configs[2], modulos: [] })
+    fireEvent.click(within(drawer()).getByRole('switch', { name: /Portal liberado/ }))
+    salvar()
+    expect(within(drawer()).getByText(/Escolha ao menos um módulo/)).toBeTruthy()
+    expect(source.salvarConfig).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  it('domínio já usado por outro cliente ligado bloqueia', () => {
+    const { source } = abrir(TENARIS)
+    fireEvent.click(within(drawer()).getByRole('radio', { name: /Também e-mails destes domínios/ }))
+    fireEvent.change(within(drawer()).getByLabelText('Domínios'), { target: { value: '@Ternium.com' } })
+    salvar()
+    expect(within(drawer()).getByText('@ternium.com já é do cliente Ternium.')).toBeTruthy()
+    expect(source.salvarConfig).not.toHaveBeenCalled()
+  })
+
+  it('domínio público só avisa e deixa salvar', async () => {
+    const { source, onSaved, onClose } = abrir(TENARIS)
+    fireEvent.click(within(drawer()).getByRole('radio', { name: /Também e-mails destes domínios/ }))
+    fireEvent.change(within(drawer()).getByLabelText('Domínios'), { target: { value: 'gmail.com' } })
+    expect(within(drawer()).getByText(/@gmail\.com é um e-mail público/)).toBeTruthy()
+    salvar()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(source.salvarConfig).toHaveBeenCalledWith(TENARIS, expect.objectContaining({ restringir: true, dominiosTexto: 'gmail.com' }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('erro ao gravar: drawer continua aberto e nada é aplicado', async () => {
+    const { onSaved, onClose } = abrir(TENARIS, configs[0], { salvarConfig: vi.fn(async () => { throw new Error('HTTP 500') }) })
+    fireEvent.click(within(drawer()).getByRole('checkbox', { name: /Pedir/ }))
+    salvar()
+    expect(await screen.findByText(/Não foi possível salvar. HTTP 500/)).toBeTruthy()
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('lista os e-mails do cliente e libera um novo na hora, sem o Salvar', async () => {
+    const { source, onSaved, onValidadorSaved } = abrir(TENARIS, configs[0])
+    expect(within(drawer()).getByText('carla.menezes@tenaris.com')).toBeTruthy()
+    expect(within(drawer()).queryByText('marcos@ternium.com')).toBeNull()
+    fireEvent.change(within(drawer()).getByLabelText('Nome'), { target: { value: 'Paulo Reis' } })
+    fireEvent.change(within(drawer()).getByLabelText('E-mail'), { target: { value: 'Paulo@Tenaris.com' } })
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Liberar e-mail' }))
+    await waitFor(() => expect(onValidadorSaved).toHaveBeenCalledWith(expect.objectContaining({ nome: 'Paulo Reis', email: 'paulo@tenaris.com', cliente: TENARIS, ativo: true })))
+    expect(source.criarValidador).toHaveBeenCalledWith({ nome: 'Paulo Reis', email: 'Paulo@Tenaris.com', clienteId: TENARIS.id })
+    expect(source.salvarConfig).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  it('e-mail já liberado é recusado', () => {
+    const { source } = abrir(TENARIS, configs[0])
+    fireEvent.change(within(drawer()).getByLabelText('Nome'), { target: { value: 'Carla' } })
+    fireEvent.change(within(drawer()).getByLabelText('E-mail'), { target: { value: 'carla.menezes@tenaris.com' } })
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Liberar e-mail' }))
+    expect(within(drawer()).getByText('Este e-mail já é validador.')).toBeTruthy()
+    expect(source.criarValidador).not.toHaveBeenCalled()
+  })
+
+  it('desativa um e-mail liberado na hora', async () => {
+    const { onValidadorSaved } = abrir(TENARIS, configs[0], { setValidadorAtivo: vi.fn(async () => undefined) })
+    fireEvent.click(within(drawer()).getAllByRole('switch', { name: 'Ativo' })[0])
+    await waitFor(() => expect(onValidadorSaved).toHaveBeenCalledWith(expect.objectContaining({ ativo: false })))
+  })
+
+  it('Esc com alteração pede "Descartar alterações?"; sem alteração fecha direto', () => {
+    const sujo = abrir(TENARIS, configs[0])
+    fireEvent.click(within(drawer()).getByRole('checkbox', { name: /Pedir/ }))
+    fireEvent(drawer(), new Event('cancel', { cancelable: true }))
+    expect(sujo.onClose).not.toHaveBeenCalled()
+    expect(screen.getByText('Descartar alterações?')).toBeTruthy()
+    cleanup()
+    const limpo = abrir(TENARIS, configs[0])
+    fireEvent(drawer(), new Event('cancel', { cancelable: true }))
+    expect(limpo.onClose).toHaveBeenCalled()
+  })
+})

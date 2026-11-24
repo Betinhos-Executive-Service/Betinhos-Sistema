@@ -18,6 +18,12 @@ type VehicleChoiceDialogProps = {
   loadAllVehicles?: () => Promise<FleetVehicle[]>;
   onChoose: (choice: DriverVehicleChoice) => void;
   onCancel: () => void;
+  /** Padrão: "Qual carro você usou?" (serviço). */
+  title?: string;
+  /** Texto abaixo do título quando a lista é a frota; padrão é o do serviço sem carro na Infleet. */
+  fleetHint?: string;
+  /** "Não se aplica" só faz sentido no serviço; a vistoria esconde. */
+  allowNotApplicable?: boolean;
 };
 
 type VehicleOption = { id: string; placa: string; modelo: string; cor: string };
@@ -31,7 +37,7 @@ function normalizeSearch(value: string) {
 
 // Pergunta qual carro o motorista usou: entre os carros da janela do serviço ou, se a Infleet
 // não identificou nenhum carro cadastrado, entre todos os carros ativos.
-export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, onChoose, onCancel }: VehicleChoiceDialogProps) {
+export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, onChoose, onCancel, title = "Qual carro você usou?", fleetHint = "A Infleet não identificou o carro deste serviço.", allowNotApplicable = true }: VehicleChoiceDialogProps) {
   // candidatos: carros vistos pela Infleet; lista: carros oferecidos pelo chamador; todos: frota ativa completa.
   const [mode, setMode] = useState<"candidatos" | "lista" | "todos">(() => (needsFleetChoice(resolution) ? "lista" : "candidatos"));
   const fleetMode = mode !== "candidatos";
@@ -113,9 +119,9 @@ export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, on
       onClick={selectedId ? undefined : onCancel}
     >
       <div className="contact-choice-dialog vehicle-choice-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="contact-choice-title" id="vehicle-choice-title">Qual carro você usou?</div>
+        <div className="contact-choice-title" id="vehicle-choice-title">{title}</div>
         {mode === "lista" ? (
-          <div className="contact-choice-phone vehicle-choice-hint">A Infleet não identificou o carro deste serviço.</div>
+          <div className="contact-choice-phone vehicle-choice-hint">{fleetHint}</div>
         ) : null}
         {mode === "todos" ? (
           <div className="contact-choice-phone vehicle-choice-hint">Escolha na frota o carro que você usou.</div>
@@ -191,7 +197,7 @@ export function VehicleChoiceDialog({ resolution, loadFleet, loadAllVehicles, on
           </button>
         ) : null}
 
-        {fleetState !== "loading" ? (
+        {allowNotApplicable && fleetState !== "loading" ? (
           <button
             className="contact-choice-cancel"
             type="button"

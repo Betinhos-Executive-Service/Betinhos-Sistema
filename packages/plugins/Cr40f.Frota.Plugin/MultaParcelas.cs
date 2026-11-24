@@ -14,14 +14,19 @@ public sealed class ParcelaPlano
 }
 
 /// <summary>Parcelas do Acertar -> folha (spec RH §3). Espelho: dividirParcelas/janelaCompetencia de multaEtapas.ts; paridade em
-/// Fixtures/multa-etapas.json (seção "divisoes"). O termo de multa tem divisão própria (sobra nas primeiras) e não usa esta classe.</summary>
+/// Fixtures/multa-etapas.json (seção "divisoes"). O termo de multa tem divisão própria (TermoMultaCommandPlugin.CalcularParcelas), com a mesma regra: resto na última.</summary>
 public static class MultaParcelas
 {
-    public const int Maximo = 12;
+    /// <summary>Máximo de parcelas de uma entrada nova (decisão da Frota, 24/11/2026): 1x, 2x ou 3x, iguais, em meses seguidos.</summary>
+    public const int MaximoParcelas = 3;
+    /// <summary>Teto de Dividir: termos assinados antes de 24/11/2026 podem ter de 4 a 12 parcelas e o acerto delas continua valendo.</summary>
+    public const int MaximoHistorico = 12;
+    /// <summary>Meses à frente em que o primeiro desconto pode cair (janela de competência; não é o limite de parcelas).</summary>
+    public const int JanelaMeses = 12;
 
     public static List<ParcelaPlano> Dividir(decimal valor, int n, string primeira)
     {
-        if (n < 1 || n > Maximo) throw new ArgumentOutOfRangeException(nameof(n));
+        if (n < 1 || n > MaximoHistorico) throw new ArgumentOutOfRangeException(nameof(n));
         var centavos = (long)decimal.Round(valor * 100m, 0, MidpointRounding.AwayFromZero);
         var parcela = centavos / n;
         var inicio = Mes(Competencia(primeira));
@@ -42,7 +47,7 @@ public static class MultaParcelas
     public static (string De, string Ate) Janela(string hoje)
     {
         var mes = Mes(Competencia(hoje.Substring(0, 7)));
-        return (mes.AddMonths(-1).ToString("yyyy-MM-01", CultureInfo.InvariantCulture), mes.AddMonths(Maximo).ToString("yyyy-MM-01", CultureInfo.InvariantCulture));
+        return (mes.AddMonths(-1).ToString("yyyy-MM-01", CultureInfo.InvariantCulture), mes.AddMonths(JanelaMeses).ToString("yyyy-MM-01", CultureInfo.InvariantCulture));
     }
 
     public static string MesBr(string iso) => iso.Substring(5, 2) + "/" + iso.Substring(0, 4);

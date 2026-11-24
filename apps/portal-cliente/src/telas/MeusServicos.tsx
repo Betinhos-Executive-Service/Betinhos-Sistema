@@ -1,37 +1,54 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, EmptyState, PageHeader, SegmentedControl, StatusBadge, Table, type TableColumn } from '@betinhos/ui'
-import { CarFront, FileText, Plus, RefreshCw } from 'lucide-react'
+import {
+  Alert, Button, Dialog, EmptyState, PageHeader, PageToolbar, SearchBox, SegmentedControl, Select, StatusBadge, Table, useToast, type TableColumn,
+} from '@betinhos/ui'
+import { CarFront, Download, FileText, Plus, RefreshCw } from 'lucide-react'
+import { ErroPortal } from '../api/PortalApi'
 import { useApi } from '../api/ApiContext'
+import { exportarPedidos } from '../excel/exportar'
 import { statusPedidoInfo } from '../domain/pedidos'
 import type { Pedido } from '../domain/types'
-import { colunasTrajeto, ResumoServico } from './colunas'
+import { agruparPorDia, daAbaPedidos, filtrarPedidos, SITUACOES, type AbaPedidos, type Situacao } from './meusFiltros'
+import { PedidoDetalhe } from './PedidoDetalhe'
 import './MeusServicos.css'
 
-type Aba = 'proximos' | 'todos'
-const ENCERRADO = new Set(['concluido', 'cancelado'])
+const fmtHora = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
 
-/** Próximos: saída daqui para a frente e ainda não encerrado, do mais perto para o mais longe; Todos: do mais recente para o mais antigo. */
-export function daAbaPedidos(pedidos: Pedido[], aba: Aba, agoraMs: number): Pedido[] {
-  const lista = aba === 'todos' ? pedidos : pedidos.filter((p) => Date.parse(p.saida) >= agoraMs && !ENCERRADO.has(p.status))
-  const ms = (p: Pedido) => Date.parse(p.saida) || 0
-  return [...lista].sort((a, b) => (aba === 'todos' ? ms(b) - ms(a) : ms(a) - ms(b)))
-}
-
-const colunas: TableColumn<Pedido>[] = [
+/**
+ * A linha inteira abre o detalhe (é um botão), então nada clicável dentro dela: voucher e cancelar ficam no painel.
+ * No mobile a coluna Trajeto some e o trajeto aparece embaixo do horário.
+ */
+const COLUNAS: TableColumn<Pedido>[] = [
   {
-    key: 'servico', header: 'Serviço', width: 'minmax(190px, 1.1fr)',
-    cell: (p) => <span className="pc-servico pc-meus__servico"><ResumoServico numero={p.numero || 'Aguardando número'} saida={p.saida} origem={p.origem} destino={p.destino} /></span>,
+    key: 'saida', header: 'Saída', width: 'minmax(104px, 0.6fr)',
+    cell: (p) => (
+      <span className="pc-ped__quando">
+        <span className="pc-ped__hora">{p.saida ? fmtHora.format(new Date(p.saida)) : '—'}</span>
+        <span className="pc-ped__codigo">{p.numero || 'Sem código'}</span>
+        <span className="pc-ped__trajeto-mobile">{p.origem} → {p.destino}</span>
+      </span>
+    ),
   },
-  ...colunasTrajeto<Pedido>(),
   {
-    key: 'status', header: 'Situação', width: 'minmax(200px, 1.2fr)',
+    key: 'trajeto', header: 'Trajeto', width: 'minmax(240px, 1.8fr)', hideBelow: 'mobile',
+    cell: (p) => (
+      <span className="pc-ped__trajeto">
+        <span className="pc-ped__ponto"><span className="pc-ped__pino" aria-hidden /> <span className="pc-ped__local">{p.origem}</span></span>
+        <span className="pc-ped__ponto pc-ped__ponto--destino"><span className="pc-ped__pino" aria-hidden /> <span className="pc-ped__local">{p.destino}</span></span>
+      </span>
+    ),
+  },
+  { key: 'passageiros', header: 'Passageiros', width: 'minmax(140px, 1fr)', hideBelow: 'compact', cell: (p) => p.passageiros.join(', ') },
+  {
+    key: 'status', header: 'Situação', width: 'minmax(170px, 1fr)',
     cell: (p) => {
       const info = statusPedidoInfo(p.status)
+      const quem = [p.motorista, p.placa].filter(Boolean).join(' · ') || p.veiculo
       return (
         <span className="pc-situacao">
           <StatusBadge tone={info.tom} dot>{info.rotulo}</StatusBadge>
-          {p.veiculo && <span className="pc-meus__veiculo"><CarFront size={12} aria-hidden /> {p.veiculo}</span>}
-          {p.voucherUrl && <a className="pc-meus__voucher" href={p.voucherUrl} target="_blank" rel="noopener noreferrer"><FileText size={12} aria-hidden /> Voucher</a>}
+          {quem && <span className="pc-meus__veiculo"><CarFront size={12} aria-hidden /> {quem}</span>}
+          {p.voucherUrl && <span className="pc-meus__voucher"><FileText size={12} aria-hidden /> Voucher disponível</span>}
         </span>
       )
     },
@@ -42,7 +59,14 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
   const api = useApi()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [carga, setCarga] = useState<'carregando' | 'erro' | 'ok'>('carregando')
-  const [aba, setAba] = useState<Aba>('proximos')
+  const [aba, setAba] = useState<AbaPedidos>('proximos')
+  const [busca, setBusca] = useState('')
+  const [situacao, setSituacao] = useState<Situacao | null>(null)
+  const [abertoId, setAbertoId] = useState<string | null>(null)
+  const [cancelando, setCancelando] = useState<Pedido | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [exportando, setExportando] = useState(false)
+  const toast = useToast()
 
   const carregar = useCallback(async () => {
     setCarga('carregando')
@@ -56,10 +80,51 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
 
   useEffect(() => { void carregar() }, [carregar])
 
+  async function confirmarCancelamento() {
+    if (!cancelando) return
+    setEnviando(true)
+    try {
+      const atualizado = await api.cancelarPedido(cancelando.id)
+      setPedidos((lista) => lista.map((p) => (p.id === atualizado.id ? atualizado : p)))
+      toast({ tone: 'success', message: atualizado.numero ? `Pedido ${atualizado.numero} cancelado.` : 'Pedido cancelado.' })
+    } catch (e) {
+      toast({ tone: 'danger', message: e instanceof ErroPortal && e.message !== e.codigo ? e.message : 'Não foi possível cancelar agora. Tente de novo.' })
+      void carregar()
+    } finally {
+      setEnviando(false)
+      setCancelando(null)
+    }
+  }
+
   const agoraMs = Date.now()
   const proximos = daAbaPedidos(pedidos, 'proximos', agoraMs)
-  const linhas = aba === 'proximos' ? proximos : daAbaPedidos(pedidos, 'todos', agoraMs)
+  const daAba = aba === 'proximos' ? proximos : daAbaPedidos(pedidos, 'todos', agoraMs)
+  const linhas = filtrarPedidos(daAba, { busca, situacao })
+  const dias = agruparPorDia(linhas, agoraMs)
+  const filtrando = busca.trim() !== '' || situacao !== null
+  const aberto = pedidos.find((p) => p.id === abertoId) ?? null
   const pedirBotao = onPedir && <Button onClick={onPedir} icon={<Plus size={16} aria-hidden />}>Pedir serviço</Button>
+
+  async function exportar() {
+    setExportando(true)
+    try {
+      await exportarPedidos(linhas, `meus-servicos-${aba}.xlsx`)
+    } catch {
+      toast({ tone: 'danger', message: 'Não foi possível gerar o Excel. Tente de novo.' })
+    } finally {
+      setExportando(false)
+    }
+  }
+
+  const vazio = filtrando ? (
+    <EmptyState icon={<CarFront size={36} aria-hidden />} title="Nenhum pedido com esses filtros." action={<Button variant="secondary" onClick={() => { setBusca(''); setSituacao(null) }}>Limpar filtros</Button>}>
+      Mude a busca ou a situação para ver outros pedidos.
+    </EmptyState>
+  ) : (
+    <EmptyState icon={<CarFront size={36} aria-hidden />} title={pedidos.length && aba === 'proximos' ? 'Nenhum serviço pela frente.' : 'Nenhum pedido ainda.'} action={pedirBotao}>
+      Os pedidos que você fizer por aqui aparecem nesta lista.
+    </EmptyState>
+  )
 
   return (
     <main className="pc-conteudo">
@@ -72,7 +137,7 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
         </>}
       />
 
-      <SegmentedControl<Aba>
+      <SegmentedControl<AbaPedidos>
         className="pc-abas"
         value={aba}
         onChange={setAba}
@@ -80,24 +145,48 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
         aria-label="Quais pedidos mostrar"
       />
 
+      <PageToolbar
+        variant="filters"
+        label="Filtros"
+        start={<>
+          <SearchBox value={busca} onChange={setBusca} placeholder="Buscar passageiro, local ou código" aria-label="Buscar pedidos" className="pc-busca" />
+          <Select value={situacao} onChange={(v) => setSituacao(v as Situacao | null)} options={SITUACOES} placeholder="Todas as situações" clearable aria-label="Situação" className="pc-filtro" />
+        </>}
+        end={<Button variant="secondary" onClick={() => void exportar()} loading={exportando} disabled={!linhas.length} icon={<Download size={16} aria-hidden />}>Exportar Excel</Button>}
+      />
+
       {carga === 'erro' ? (
         <Alert tone="danger" action={<Button variant="secondary" size="compact" onClick={() => void carregar()}>Tentar de novo</Button>}>
           Não foi possível carregar seus pedidos. Verifique a conexão e tente de novo.
         </Alert>
+      ) : carga === 'carregando' || !dias.length ? (
+        <Table columns={COLUNAS} rows={[]} rowKey={(p) => p.id} loading={carga === 'carregando'} empty={vazio} />
       ) : (
-        <Table
-          columns={colunas}
-          rows={linhas}
-          rowKey={(p) => p.id}
-          loading={carga === 'carregando'}
-          empty={
-            <EmptyState icon={<CarFront size={36} aria-hidden />} title={pedidos.length && aba === 'proximos' ? 'Nenhum serviço pela frente.' : 'Nenhum pedido ainda.'} action={pedirBotao}>
-              Os pedidos que você fizer por aqui aparecem nesta lista.
-            </EmptyState>
-          }
-          footer={<span className="pc-rodape">Pedidos: {linhas.length}</span>}
-        />
+        <div className="pc-ped__dias">
+          {dias.map((g) => (
+            <section key={g.dia} className="pc-ped__dia" aria-labelledby={`pc-dia-${g.dia}`}>
+              <h2 id={`pc-dia-${g.dia}`} className="pc-ped__titulo-dia">
+                {g.titulo} <span className="pc-ped__contagem">{g.pedidos.length === 1 ? '1 serviço' : `${g.pedidos.length} serviços`}</span>
+              </h2>
+              <Table columns={COLUNAS} rows={g.pedidos} rowKey={(p) => p.id} onRowClick={(p) => setAbertoId(p.id)} aria-label={`Serviços de ${g.titulo}`} />
+            </section>
+          ))}
+        </div>
       )}
+
+      {aberto && <PedidoDetalhe key={aberto.id} pedido={aberto} onFechar={() => setAbertoId(null)} onCancelar={setCancelando} />}
+
+      <Dialog
+        open={cancelando !== null}
+        onClose={() => { if (!enviando) setCancelando(null) }}
+        title={cancelando?.numero ? `Cancelar o pedido ${cancelando.numero}?` : 'Cancelar este pedido?'}
+        actions={<>
+          <Button variant="secondary" onClick={() => setCancelando(null)} disabled={enviando}>Manter pedido</Button>
+          <Button variant="danger" onClick={() => void confirmarCancelamento()} loading={enviando}>Cancelar pedido</Button>
+        </>}
+      >
+        A Betinhos não vai programar este serviço. Para pedir de novo, faça um novo pedido.
+      </Dialog>
     </main>
   )
 }

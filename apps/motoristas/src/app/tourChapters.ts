@@ -726,9 +726,10 @@ export const TOUR_CHAPTERS: readonly TourChapter[] = [
     steps: [
       backStep(),
       step("atualizar", "Atualizar ideias", ["O botão da direita recarrega a lista das suas ideias enviadas."], { target: '.form-menu-button[aria-label="Atualizar ideias"]', optional: true }),
-      step("titulo", "Título", ["Resuma a ideia em uma frase, como \"água gelada nos carros executivos\". É obrigatório."], field("t[ií]tulo")),
-      step("como", "Como funcionaria?", ["Conte o problema e como a ideia ajudaria. É opcional."], field("como funcionaria")),
-      step("enviar", "Enviar ideia", ["Envia para a equipe, que vai avaliar. Você acompanha o status em \"Suas ideias\", logo abaixo."], { ...button("ENVIAR IDEIA") }),
+      step("nova", "Nova ideia", ["Toque aqui para contar uma ideia. Você escreve o que viu, como resolveria e, se quiser, anexa até 5 fotos ou vídeos."], { ...button("NOVA IDEIA") }),
+      step("titulo", "O que você viu?", ["Resuma a ideia em uma frase, como \"água gelada nos carros executivos\". É obrigatório."], { ...field("1\\. O que você viu", { optional: true }) }),
+      step("como", "Como resolveria?", ["Conte o problema e como a ideia ajudaria. É opcional."], { ...field("2\\. Como resolveria", { optional: true }) }),
+      step("enviar", "Enviar ideia", ["Envia para a equipe, que vai avaliar. Você acompanha o status em \"Suas ideias\"."], { ...button("ENVIAR IDEIA", { optional: true }) }),
       step("lista", "Suas ideias", ["O histórico das ideias que você já enviou."], { target: "h2", match: "suas ideias", optional: true }),
       helpStep()
     ]

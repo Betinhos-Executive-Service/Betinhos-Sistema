@@ -2994,6 +2994,16 @@
 :where(.planner-page, .planner-portal) .idea-move select { width: 100%; min-height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--neutral); color: var(--control); font: inherit; font-size: 11px; }
 :where(.planner-page, .planner-portal) .idea-drawer .drawer-header .ideas-section-heading { margin: 0; }
 :where(.planner-page, .planner-portal) .idea-drawer .ideas-form { align-content: start; }
+:where(.planner-page, .planner-portal) small.idea-attachment-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 600; }
+:where(.planner-page, .planner-portal) .idea-attachment-summary span { display: inline-flex; align-items: center; gap: 4px; }
+:where(.planner-page, .planner-portal) .idea-attachments { display: grid; gap: 8px; }
+:where(.planner-page, .planner-portal) .idea-attachments-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--control); font-size: 12px; font-weight: 700; }
+:where(.planner-page, .planner-portal) .idea-attachments-title small { margin: 0; }
+:where(.planner-page, .planner-portal) .idea-attachments ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+:where(.planner-page, .planner-portal) .idea-attachments a { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--blue); font-size: 12px; font-weight: 600; text-decoration: none; }
+:where(.planner-page, .planner-portal) .idea-attachments a:hover { background: var(--surface-soft); }
+:where(.planner-page, .planner-portal) .idea-attachments a span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 :where(.planner-page, .planner-portal) .idea-drawer .ideas-archive { margin-right: auto; }
 @media (max-width: 780px) { :where(.planner-page, .planner-portal) .ideas-board { grid-template-columns: repeat(4, minmax(78vw, 1fr)); } }
 :where(.planner-page, .planner-portal) .more-action-icon-ideas { background: var(--amber-soft); color: var(--amber); }

@@ -1,177 +1,184 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
-import { Alert, Button, Checkbox, Field, Input } from '@betinhos/ui'
-import { ArrowLeft, Mail } from 'lucide-react'
-import { renderSVG } from 'uqr'
+import { Alert, Button, Field, Input } from '@betinhos/ui'
+import { ArrowLeft, LogIn, Mail } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
-import { ErroPortal, type CodigoErro } from '../api/PortalApi'
+import { ErroPortal, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
+import { marcaParceira } from '../domain/marcas'
 import type { Sessao } from '../domain/types'
+import { Parceria } from './Parceria'
 import './Entrar.css'
 
+const SENHA_FRACA = `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.`
 const EMAIL_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const ERROS: Partial<Record<CodigoErro, string>> = {
+  senha_invalida: 'E-mail ou senha incorretos. No primeiro acesso, crie sua senha pelo link abaixo.',
+  senha_fraca: SENHA_FRACA,
   codigo_invalido: 'Código incorreto. Confira o último e-mail recebido e digite os 6 números.',
   codigo_expirado: 'Este código expirou. Peça um novo código.',
-  totp_invalido: 'Código do autenticador incorreto. Digite os 6 números que aparecem agora no app.',
-  bloqueado: 'Muitas tentativas. Aguarde 15 minutos e peça um novo código.',
+  sem_acesso: 'Este e-mail não tem acesso ao portal. Confira o endereço ou fale com a Betinhos.',
+  bloqueado: 'Muitas tentativas. Aguarde 15 minutos e tente de novo.',
 }
 
-type Cadastro = { otpauthUrl: string; segredo: string }
-
-/** QR em SVG gerado no navegador: o segredo não passa por nenhum serviço externo. */
-function QrAutenticador({ otpauthUrl }: { otpauthUrl: string }) {
-  const src = useMemo(
-    () => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(renderSVG(otpauthUrl, { border: 2, blackColor: '#001A3D', whiteColor: '#FFFFFF' }))}`,
-    [otpauthUrl],
-  )
-  return <img className="pc-entrar__qr" src={src} width={176} height={176} alt="QR code para cadastrar o portal no app autenticador" />
-}
+/** senha: login normal. pedir/codigo/nova: 1º acesso ou "Esqueci a senha" (código por e-mail e senha nova). */
+type Etapa = 'senha' | 'pedir' | 'codigo' | 'nova'
 
 export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void; dicaCodigo?: string }) {
   const api = useApi()
-  const [etapa, setEtapa] = useState<'email' | 'codigo' | 'autenticador'>('email')
-  const [cadastro, setCadastro] = useState<Cadastro | null>(null)
-  const [lembrar, setLembrar] = useState(false)
+  const [etapa, setEtapa] = useState<Etapa>('senha')
   const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const [repetir, setRepetir] = useState('')
   const [codigo, setCodigo] = useState('')
   const [erroCampo, setErroCampo] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
-  const codigoRef = useRef<HTMLInputElement>(null)
+  const focoRef = useRef<HTMLInputElement>(null)
+  const senhaRef = useRef<HTMLInputElement>(null)
+  const [erroSenha, setErroSenha] = useState<string | null>(null)
+  const chaveLink = useMemo(() => new URLSearchParams(window.location.search).get('c'), [])
+  const parceira = marcaParceira({ chave: chaveLink, email: EMAIL_VALIDO.test(email.trim()) ? email : undefined })
 
-  async function enviarCodigo(e: FormEvent) {
-    e.preventDefault()
-    if (!EMAIL_VALIDO.test(email.trim())) {
-      setErroCampo('Digite um e-mail completo, como nome@empresa.com.')
-      return
-    }
-    setErroCampo(null)
-    setErro(null)
-    setEnviando(true)
-    try {
-      await api.solicitarCodigo(email.trim())
-      setEtapa('codigo')
-      requestAnimationFrame(() => codigoRef.current?.focus())
-    } catch {
-      setErro('Não foi possível enviar o código agora. Tente de novo em instantes.')
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  async function entrar(e: FormEvent) {
-    e.preventDefault()
-    if (!/^\d{6}$/.test(codigo)) {
-      setErroCampo('O código tem 6 números.')
-      return
-    }
-    setErroCampo(null)
-    setErro(null)
-    setEnviando(true)
-    try {
-      const r = await api.entrar(email.trim(), codigo)
-      if (r.etapa === 'ok') return onEntrar(r.sessao)
-      setCadastro(r.etapa === 'cadastrar_autenticador' ? r : null)
-      setCodigo('')
-      setEtapa('autenticador')
-      requestAnimationFrame(() => codigoRef.current?.focus())
-    } catch (err) {
-      falhou(err)
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  async function confirmar(e: FormEvent) {
-    e.preventDefault()
-    if (!/^\d{6}$/.test(codigo)) {
-      setErroCampo('O código tem 6 números.')
-      return
-    }
-    setErroCampo(null)
-    setErro(null)
-    setEnviando(true)
-    try {
-      onEntrar(await api.confirmarAutenticador(codigo, lembrar))
-    } catch (err) {
-      // Bloqueado: a etapa do autenticador acabou; o validador recomeça pelo e-mail depois dos 15 minutos.
-      if (err instanceof ErroPortal && err.codigo === 'bloqueado') setEtapa('codigo')
-      falhou(err)
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  function falhou(err: unknown) {
-    setErro((err instanceof ErroPortal && ERROS[err.codigo]) || 'Não foi possível entrar agora. Tente de novo em instantes.')
+  function limparCampos() {
     setCodigo('')
-    codigoRef.current?.focus()
+    setSenha('')
+    setRepetir('')
   }
 
-  const campoCodigo = (label: string, hint?: string) => (
-    <Field label={label} error={erroCampo} hint={hint} required>
-      <Input
-        ref={codigoRef}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        value={codigo}
-        onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
-        className="pc-entrar__codigo"
-        size="touch"
-      />
+  function irPara(proxima: Etapa) {
+    setEtapa(proxima)
+    setErro(null)
+    setErroCampo(null)
+    setErroSenha(null)
+    limparCampos()
+    requestAnimationFrame(() => focoRef.current?.focus())
+  }
+
+  /** Valida, mostra o carregando e traduz o erro do servidor. `invalido` preenchido = mensagem no campo (o principal ou o da senha), e não envia. */
+  async function enviar(e: FormEvent, invalido: string | null, rodar: () => Promise<void>, noCampoSenha = false) {
+    e.preventDefault()
+    setErroCampo(noCampoSenha ? null : invalido)
+    setErroSenha(noCampoSenha ? invalido : null)
+    if (invalido) {
+      if (noCampoSenha) senhaRef.current?.focus()
+      return
+    }
+    setErro(null)
+    setEnviando(true)
+    try {
+      await rodar()
+    } catch (err) {
+      const codigoErro = err instanceof ErroPortal ? err.codigo : 'falha'
+      // A etapa de criar a senha expirou (10 min): recomeça pelo pedido do código.
+      if (etapa === 'nova' && codigoErro === 'nao_permitido') {
+        irPara('pedir')
+        setErro('O tempo para criar a senha acabou. Peça um novo código.')
+        return
+      }
+      setErro(ERROS[codigoErro] ?? 'Não foi possível continuar agora. Tente de novo em instantes.')
+      limparCampos()
+      ;(etapa === 'senha' ? senhaRef : focoRef).current?.focus()
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const emailInvalido = () => (EMAIL_VALIDO.test(email.trim()) ? null : 'Digite um e-mail completo, como nome@empresa.com.')
+
+  const entrar = (e: FormEvent) => {
+    const erroEmail = emailInvalido()
+    return enviar(e, erroEmail ?? (senha ? null : 'Digite sua senha.'), async () => onEntrar(await api.entrar(email.trim(), senha)), !erroEmail)
+  }
+
+  const pedirCodigo = (e: FormEvent) =>
+    enviar(e, emailInvalido(), async () => {
+      await api.solicitarCodigo(email.trim())
+      irPara('codigo')
+    })
+
+  const confirmarCodigo = (e: FormEvent) =>
+    enviar(e, /^\d{6}$/.test(codigo) ? null : 'O código tem 6 números.', async () => {
+      await api.confirmarCodigo(email.trim(), codigo)
+      irPara('nova')
+    })
+
+  // Senha fraca aparece na "Nova senha"; senhas diferentes, na "Repita a senha".
+  const salvarSenha = (e: FormEvent) => {
+    const fraca = senhaFraca(senha)
+    return enviar(
+      e,
+      fraca ? SENHA_FRACA : senha !== repetir ? 'As duas senhas não são iguais.' : null,
+      async () => onEntrar(await api.criarSenha(senha)),
+      !fraca,
+    )
+  }
+
+  const campoEmail = (
+    <Field label="E-mail" error={erroCampo} required>
+      <Input ref={focoRef} type="email" autoComplete="username" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com" size="touch" autoFocus />
     </Field>
   )
-
-  function trocarEmail() {
-    setEtapa('email')
-    setCadastro(null)
-    setCodigo('')
-    setErro(null)
-    setErroCampo(null)
-  }
+  const voltar = (rotulo: string, para: Etapa) => (
+    <Button type="button" variant="ghost" size="touch" fullWidth onClick={() => irPara(para)} icon={<ArrowLeft size={18} aria-hidden />}>{rotulo}</Button>
+  )
+  const alerta = erro && <Alert tone="danger">{erro}</Alert>
 
   return (
     <main className="pc-entrar">
       <section className="pc-entrar__card" aria-labelledby="pc-entrar-titulo">
-        <p className="pc-marca">Betinhos Executive Service</p>
+        <Parceria parceira={parceira} tamanho="entrar" />
         <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Portal do cliente</h1>
-        {etapa === 'email' ? (
-          <form className="pc-entrar__form" onSubmit={enviarCodigo} noValidate>
-            <p className="pc-entrar__texto">Entre com o e-mail da sua empresa. Enviaremos um código de acesso, sem senha.</p>
-            <Field label="E-mail" error={erroCampo} required>
-              <Input type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nome@empresa.com" size="touch" autoFocus />
+        {etapa === 'senha' ? (
+          <form key="senha" className="pc-entrar__form" onSubmit={entrar} noValidate>
+            <p className="pc-entrar__texto">Entre com o e-mail da sua empresa e a sua senha.</p>
+            {campoEmail}
+            <Field label="Senha" error={erroSenha} required>
+              <Input ref={senhaRef} type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" />
             </Field>
-            {erro && <Alert tone="danger">{erro}</Alert>}
+            {alerta}
+            <Button type="submit" size="touch" fullWidth loading={enviando} icon={<LogIn size={18} aria-hidden />}>Entrar</Button>
+            <Button type="button" variant="ghost" size="touch" fullWidth onClick={() => irPara('pedir')}>Primeiro acesso ou esqueci a senha</Button>
+          </form>
+        ) : etapa === 'pedir' ? (
+          <form key="pedir" className="pc-entrar__form pc-entrar__form--entra" onSubmit={pedirCodigo} noValidate>
+            <p className="pc-entrar__texto">Enviaremos um código para o seu e-mail. Com ele, você cria a sua senha.</p>
+            {campoEmail}
+            {alerta}
             <Button type="submit" size="touch" fullWidth loading={enviando} icon={<Mail size={18} aria-hidden />}>Enviar código</Button>
+            {voltar('Voltar para o login', 'senha')}
           </form>
         ) : etapa === 'codigo' ? (
-          <form key="codigo" className="pc-entrar__form pc-entrar__form--entra" onSubmit={entrar} noValidate>
-            <p className="pc-entrar__texto">Enviamos um código de 6 dígitos para <strong>{email.trim()}</strong>. Ele vale por 10 minutos.</p>
-            {campoCodigo('Código de acesso', dicaCodigo)}
-            {erro && <Alert tone="danger">{erro}</Alert>}
-            <Button type="submit" size="touch" fullWidth loading={enviando}>Entrar</Button>
-            <Button type="button" variant="ghost" size="touch" fullWidth onClick={trocarEmail} icon={<ArrowLeft size={18} aria-hidden />}>Trocar e-mail</Button>
+          <form key="codigo" className="pc-entrar__form pc-entrar__form--entra" onSubmit={confirmarCodigo} noValidate>
+            <p className="pc-entrar__texto">Se o e-mail <strong>{email.trim()}</strong> estiver liberado, você vai receber um código de 6 dígitos. Ele vale por 10 minutos.</p>
+            <Field label="Código do e-mail" error={erroCampo} hint={dicaCodigo} required>
+              <Input
+                ref={focoRef}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="pc-entrar__codigo"
+                size="touch"
+              />
+            </Field>
+            {alerta}
+            <Button type="submit" size="touch" fullWidth loading={enviando}>Continuar</Button>
+            {voltar('Trocar e-mail', 'pedir')}
           </form>
         ) : (
-          <form key="autenticador" className="pc-entrar__form pc-entrar__form--entra" onSubmit={confirmar} noValidate>
-            {cadastro ? (
-              <>
-                <p className="pc-entrar__texto">Primeiro acesso: abra o Microsoft ou Google Authenticator e leia o código abaixo.</p>
-                <QrAutenticador otpauthUrl={cadastro.otpauthUrl} />
-                <p className="pc-entrar__texto">
-                  Sem câmera? Adicione a conta à mão com a chave{' '}
-                  <code className="pc-entrar__segredo">{cadastro.segredo.match(/.{1,4}/g)?.join(' ')}</code>
-                </p>
-              </>
-            ) : (
-              <p className="pc-entrar__texto">Abra o app autenticador e digite o código de 6 dígitos do portal Betinhos.</p>
-            )}
-            {campoCodigo('Código do autenticador')}
-            <Checkbox label="Lembrar este computador por 30 dias" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} />
-            {erro && <Alert tone="danger">{erro}</Alert>}
-            <Button type="submit" size="touch" fullWidth loading={enviando}>Confirmar</Button>
-            <Button type="button" variant="ghost" size="touch" fullWidth onClick={trocarEmail} icon={<ArrowLeft size={18} aria-hidden />}>Trocar e-mail</Button>
+          <form key="nova" className="pc-entrar__form pc-entrar__form--entra" onSubmit={salvarSenha} noValidate>
+            <p className="pc-entrar__texto">Crie a sua senha do portal para <strong>{email.trim()}</strong>.</p>
+            {/* Campo oculto: o gerenciador de senhas do navegador associa a senha nova ao e-mail. */}
+            <input type="email" autoComplete="username" value={email.trim()} readOnly hidden />
+            <Field label="Nova senha" hint={`Pelo menos ${SENHA_MIN} caracteres.`} error={erroCampo} required>
+              <Input ref={focoRef} type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} size="touch" />
+            </Field>
+            <Field label="Repita a senha" error={erroSenha} required>
+              <Input ref={senhaRef} type="password" autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} size="touch" />
+            </Field>
+            {alerta}
+            <Button type="submit" size="touch" fullWidth loading={enviando}>Salvar senha e entrar</Button>
           </form>
         )}
       </section>

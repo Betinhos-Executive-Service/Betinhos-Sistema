@@ -10,7 +10,7 @@ Sumário: 1. Portal do cliente · 2. Cadastro do passageiro · 3. Escala FDS · 
 
 **Finalidade.** Portal multi-cliente por módulos. A Tenaris **valida** os serviços liberados pela Betinhos (aprovar, abrir dúvida, aprovação tácita em 5 dias úteis); a Latasa **pede** serviços e **acompanha** os pedidos. Referências: `apps/portal-cliente/worker/README.md`, `apps/portal-cliente/package.json`.
 
-**Stack.** React 19 + Vite 7 + TypeScript, `@betinhos/ui`, `exceljs` (exportação), `otpauth` e `uqr` (QR do autenticador); Worker Cloudflare em `worker/` (Web Crypto, KV, rate limiting, cron) falando com o Dataverse por usuário de aplicação (OAuth client credentials). Testes com Vitest + jsdom. Sem `@cloudflare/workers-types`: tipos mínimos à mão em `worker/env.ts`.
+**Stack.** React 19 + Vite 7 + TypeScript, `@betinhos/ui`, `exceljs` (exportação); Worker Cloudflare em `worker/` (Web Crypto, KV, rate limiting, cron) falando com o Dataverse por usuário de aplicação (OAuth client credentials). Testes com Vitest + jsdom. Sem `@cloudflare/workers-types`: tipos mínimos à mão em `worker/env.ts`.
 
 ### Arquitetura
 
@@ -18,7 +18,7 @@ Sumário: 1. Portal do cliente · 2. Cadastro do passageiro · 3. Escala FDS · 
 flowchart LR
   B[Navegador<br/>SPA React] -->|"/api/* cookie HttpOnly"| W[Worker Cloudflare<br/>worker/index.ts]
   B -->|demais rotas| A[ASSETS ./dist<br/>fallback SPA]
-  W --> KV[(KV<br/>token DV, falhas, replay TOTP,<br/>antiduplicidade de pedido)]
+  W --> KV[(KV<br/>token DV, falhas,<br/>antiduplicidade de pedido)]
   W --> RL[Rate limit<br/>RL_IP / RL_EMAIL]
   W -->|OAuth S2S + Web API v9.2| DV[(Dataverse)]
   W -->|POST tipo,para,dados| FL[Flow HTTP<br/>Portal cliente – e-mails]
@@ -27,18 +27,20 @@ flowchart LR
 ```
 
 - `src/main.tsx` escolhe a API: **mock** só no dev server local (`localhost`/`127.0.0.1` na porta `52463`) ou com `?mock` na URL; em qualquer outro endereço usa `createWorkerApi()` (`src/api/workerApi.ts`). O contrato das telas é `src/api/PortalApi.ts`.
-- Telas em `src/telas/`: `Entrar` (código + autenticador), `Servicos` e `Detalhe` (módulo Validar), `Pedir`, `MeusServicos`, `Conversa`, `Portal`, `Topo`. Regras puras em `src/domain/` (`regras.ts`, `pedidos.ts`), exportação Excel em `src/excel/exportar.ts`.
+- Telas em `src/telas/`: `Entrar` (e-mail + senha; 1º acesso e "Esqueci a senha" pelo código do e-mail), `Servicos` e `Detalhe` (módulo Validar), `Pedir`, `MeusServicos`, `Conversa`, `Portal`, `Topo`. Regras puras em `src/domain/` (`regras.ts`, `pedidos.ts`), exportação Excel em `src/excel/exportar.ts`.
 - Worker: `index.ts` (roteamento, CSRF, CSP, rate limit), `auth.ts` (login), `servicos.ts` (validação), `pedidos.ts` (Pedir/Meus serviços), `cron.ts`, `prazo.ts`, `cripto.ts`, `dataverse.ts`, `odata.ts` (montagem das consultas), `mapear.ts`, `schema.ts` (nomes lógicos e choices), `fakeDataverse.ts` (testes).
 
 ### Rotas `/api` (todas respondem `Cache-Control: no-store` e levam CSP, HSTS, `nosniff`, `Referrer-Policy: no-referrer`)
 
-Regras comuns (`worker/index.ts`): escrita (não-GET) exige `Origin` igual à origem do Worker, senão `403 nao_permitido`; limite por IP (`RL_IP`, 60/60 s) → `429 bloqueado`; rotas fora de `/auth` exigem sessão (`401 nao_permitido`) e o módulo do cliente (`403 nao_permitido`). Erro tem o formato `{ "erro": "<codigo>", "mensagem"?: "..." }`; códigos: `codigo_invalido`, `codigo_expirado`, `totp_invalido`, `bloqueado`, `nao_permitido`, `duplicado`, `falha`.
+Regras comuns (`worker/index.ts`): escrita (não-GET) exige `Origin` igual à origem do Worker, senão `403 nao_permitido`; limite por IP (`RL_IP`, 60/60 s) → `429 bloqueado`; rotas fora de `/auth` exigem sessão (`401 nao_permitido`) e o módulo do cliente (`403 nao_permitido`). Erro tem o formato `{ "erro": "<codigo>", "mensagem"?: "..." }`; códigos: `codigo_invalido`, `codigo_expirado`, `senha_invalida`, `senha_fraca`, `bloqueado`, `nao_permitido`, `duplicado`, `falha`.
 
 | Rota | Módulo | Corpo → resposta |
 |---|---|---|
 | `POST /api/auth/codigo` | público | `{email}` → sempre `204`. Em segundo plano (`waitUntil`): acha/cria o validador, grava `cr40f_codigoacesso` e pede ao flow o e-mail `tipo:"codigo"` com `{nome, codigo, validoMinutos:10}`. Limite por e-mail (`RL_EMAIL`, 10/60 s, chave = SHA-256 do e-mail) |
-| `POST /api/auth/entrar` | público | `{email, codigo}` (6 dígitos) → `{etapa:"cadastrar_autenticador", otpauthUrl, segredo}` (1º acesso), `{etapa:"autenticador"}` ou `{etapa:"ok", sessao}` (dispositivo lembrado). Grava cookie de etapa (10 min). Erros: `401 codigo_invalido/codigo_expirado`, `429 bloqueado` |
-| `POST /api/auth/totp` | cookie de etapa | `{codigo, lembrar?}` → `{nome, email, cliente, modulos[]}` + cookie de sessão (12 h); com `lembrar:true`, cookie de dispositivo (30 dias). `401 totp_invalido` / `nao_permitido` |
+| `POST /api/auth/codigo/confirmar` | público | `{email, codigo}` (6 dígitos) → `{etapa:"criar_senha"}` + cookie de etapa (10 min). Erros: `401 codigo_invalido/codigo_expirado`, `429 bloqueado` |
+| `POST /api/auth/senha` | cookie de etapa | `{senha}` (8 a 200 caracteres) → grava o hash PBKDF2 em `cr40f_senhahash`, derruba as sessões antigas e devolve `{nome, email, cliente, modulos[]}` + cookie de sessão (30 dias). `400 senha_fraca`, `401 nao_permitido` |
+| `POST /api/auth/entrar` | público | `{email, senha}` → `{nome, email, cliente, modulos[]}` + cookie de sessão (30 dias). Sem cadastro, sem senha criada ou senha errada: o mesmo `401 senha_invalida`; `429 bloqueado` |
+| `GET /api/auth/sessao` | sessão | sessão atual (o portal abre já logado) ou `401 nao_permitido` |
 | `POST /api/auth/sair` | sessão | `204`, apaga cookie de sessão |
 | `GET /api/servicos` | `validar` | lista de `Servico` do cliente da sessão (sem status Retirado), com mensagens |
 | `POST /api/servicos/aprovar` | `validar` | `{ids[]}` (GUIDs, 1 a 500) → serviços aprovados (só `liberado`, `em_duvida`, `respondido`); status vira Aprovado, grava `cr40f_aprovadoem` e `cr40f_aprovadopor` (e-mail) |
@@ -48,9 +50,9 @@ Regras comuns (`worker/index.ts`): escrita (não-GET) exige `Origin` igual à or
 | `GET /api/pedidos` | `meus_servicos` | pedidos do usuário da sessão, com status, veículo e voucher |
 
 Detalhes confirmados no código:
-- **Login em duas etapas**: código de 6 dígitos por e-mail (10 min, guardado só como SHA-256 de `vid:codigo`) + TOTP (RFC 6238: HMAC-SHA1, 6 dígitos, passo de 30 s, janela de ±1 passo). Mesmo TOTP não vale duas vezes (chave `totp:<vid>:<codigo>` no KV, 120 s). Quem entra: validador ativo cadastrado, ou, sem cadastro, e-mail de domínio autorizado de **um único** cliente com portal habilitado e algum módulo (o cadastro é criado no primeiro pedido de código). E-mail já cadastrado mas barrado não ganha cadastro novo; e-mail duplicado no cadastro = ninguém entra.
-- **Bloqueio**: 5 erros (código ou TOTP) no mesmo e-mail → 15 min (contador `falhas:<sha256(email)>` no KV).
-- **Cifra** (`worker/cripto.ts`): AES-GCM com chave de 32 bytes em base64 e o "contexto" como dado autenticado adicional (um cookie não decifra como segredo TOTP). O segredo TOTP fica cifrado em `cr40f_validadorcliente.cr40f_segredototp` com `CHAVE_TOTP` (contexto `totp:<vid>`); os cookies `__Host-portal_sessao` e `__Host-portal_etapa` são cifrados com `CHAVE_SESSAO`; o cookie `__Host-portal_dispositivo` é um token opaco cujo SHA-256 vai a `cr40f_dispositivoconfiavel`. Cookies: `HttpOnly; Secure; SameSite=Strict`.
+- **Login com senha** (desde 24/11/2026, sem autenticador): e-mail liberado + senha da própria pessoa (PBKDF2-SHA256, 100 mil iterações, sal de 16 bytes, formato `pbkdf2$iter$sal$hash`). 1º acesso e "Esqueci a senha": código de 6 dígitos por e-mail (10 min, guardado só como SHA-256 de `vid:codigo`) e depois a senha nova. Sessão de 30 dias, revalidada no Dataverse a cada chamada: desativar, tirar o portal do cliente, trocar de cliente ou trocar/zerar a senha derruba na hora. Quem entra: validador ativo cadastrado, ou, sem cadastro, e-mail de domínio autorizado de **um único** cliente com portal habilitado e algum módulo (o cadastro é criado no primeiro pedido de código). E-mail já cadastrado mas barrado não ganha cadastro novo; e-mail duplicado no cadastro = ninguém entra.
+- **Bloqueio**: 5 erros (senha ou código) no mesmo e-mail → 15 min (contador `falhas:<sha256(email)>` no KV).
+- **Cifra** (`worker/cripto.ts`): AES-GCM com chave de 32 bytes em base64 e o "contexto" como dado autenticado adicional (um cookie de etapa não decifra como sessão). Os cookies `__Host-portal_sessao` e `__Host-portal_etapa` são cifrados com `CHAVE_SESSAO`. Cookies: `HttpOnly; Secure; SameSite=Strict`.
 - **Isolamento**: toda consulta de serviço leva o cliente da sessão no `$filter` (`odata.ts`); id de outro cliente retorna 404. O custo de repasse a terceiro não é exposto (`COMPOSICAO_LINHAS` em `schema.ts`).
 - **Prazo tácito** (`worker/prazo.ts`): 5 dias úteis (seg–sex), America/Sao_Paulo fixo em UTC-3, sem feriados nacionais (fixos + Sexta-feira Santa; Carnaval e Corpus Christi não contam como feriado). O prazo gravado (`cr40f_prazotacita`) vem da liberação no shell; o Worker só o aplica.
 - **Cron** (`wrangler.jsonc`: `0 11 * * 1-5` = 8h São Paulo, seg–sex), `worker/cron.ts`: (1) `aplicarTacita`: validações vencidas viram Aprovado tácito (`cr40f_status` 100000004) com `cr40f_aprovadoem`; (2) `enviarResumos`: em dia útil, e-mail `tipo:"resumo_diario"` com `{cliente, data, liberados[], vencendoHoje[]}` aos validadores ativos de clientes com módulo Validar; sem itens, não envia.
@@ -61,23 +63,22 @@ Detalhes confirmados no código:
 | Tabela (entity set) | Uso | Colunas lidas/gravadas |
 |---|---|---|
 | `cr40f_clientes1` (`cr40f_clientes1s`) | cliente/habilitação | `cr40f_portalhabilitado`, `cr40f_portalmodulos` (choice múltipla: Validar 100000000, Pedir 100000001, Meus serviços 100000002), `cr40f_portaldominios`, `cr40f_nomedocliente` |
-| `cr40f_validadorcliente` | usuário do portal | `cr40f_email`, `cr40f_ativo`, `cr40f_segredototp`, `cr40f_totpcadastradoem`, `cr40f_ultimoacesso`, lookup `cr40f_Cliente` |
+| `cr40f_validadorcliente` | usuário do portal | `cr40f_email`, `cr40f_ativo`, `cr40f_senhahash`, `cr40f_senhadefinidaem`, `cr40f_ultimoacesso`, lookup `cr40f_Cliente` |
 | `cr40f_codigoacesso` | código de e-mail | `cr40f_hashcodigo`, `cr40f_expiraem`, `cr40f_tentativas`, `cr40f_usado`, lookup `cr40f_Validador` |
-| `cr40f_dispositivoconfiavel` | "lembrar este computador" | `cr40f_hashtoken`, `cr40f_expiraem`, lookup `cr40f_Validador` |
 | `cr40f_validacaoservico` | validação de cada serviço | `cr40f_status` (Liberado 100000000, Em dúvida …01, Respondido …02, Aprovado …03, Aprovado tácito …04, Retirado …05), `cr40f_liberadoem`, `cr40f_prazotacita`, `cr40f_aprovadoem`, `cr40f_aprovadopor`, `cr40f_valorliberado`, `cr40f_valoranterior`, `cr40f_observacao`, lookups `cr40f_Reserva`, `cr40f_Cliente` |
 | `cr40f_mensagemvalidacao` | conversa da dúvida | `cr40f_lado` (cliente 100000000, Betinhos …01), `cr40f_autor`, `cr40f_texto`, `cr40f_motivo`, lookup `cr40f_Validacao` |
-| `cr40f_reservadeveculos` | reserva (leitura; criação no módulo Pedir) | leitura: `cr40f_id`, `cr40f_idtenaris`, `cr40f_cr`, `cr40f_dataehorriodesada`, `cr40f_endereodesada`, `cr40f_destino`, `new_linkdovoucher`, `new_categoriadoveiculo`, passageiros e solicitante; criação: `cr40f_status`, saída, origem, destino, `cr40f_portalpedido` (JSON), `cr40f_passageirosetelefonedecontato`, `cr40f_observaointerna`, lookups `cr40f_Cliente` e `cr40f_PortalUsuario` |
-| `cr40f_composicaodeprecos` | preço exibido ao cliente | `new_valortotal` e linhas de composição (via `$expand` na reserva) |
+| `cr40f_reservadeveculos` | reserva (leitura; criação no módulo Pedir) | leitura: `cr40f_id`, `cr40f_idtenaris`, `cr40f_cr`, `cr40f_dataehorriodesada`, `cr40f_endereodesada`, `cr40f_destino`, `new_linkdovoucher`, `cr40f_tipodeveiculo` (choice, rótulo pela anotação), passageiros e solicitante; criação: `cr40f_status`, saída, origem, destino, `cr40f_portalpedido` (JSON), `cr40f_passageirosetelefonedecontato`, `cr40f_observaointerna`, lookups `cr40f_Cliente` e `cr40f_PortalUsuario` |
+| `cr40f_composicaodeprecos` | preço exibido ao cliente | `new_valortotal` e linhas de composição (via `$expand=new_ComposicaodePreco` na reserva) |
 
 ### Variáveis, bindings e secrets (só nomes; `wrangler.jsonc`, `worker/env.ts`)
 
 - **Bindings**: `KV` (KV namespace; o `id` no arquivo é o texto `TROCAR_PELO_ID_DO_KV`, ou seja, **ainda não criado/preenchido**), `ASSETS` (build `./dist`, `run_worker_first: ["/api/*"]`, fallback de SPA), `RL_IP` (60/60 s) e `RL_EMAIL` (10/60 s), `triggers.crons`.
-- **Secrets** (`wrangler secret put`): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_TOTP`, `CHAVE_SESSAO`. Trocar `CHAVE_TOTP` invalida todos os autenticadores cadastrados.
+- **Secrets** (`wrangler secret put`): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_SESSAO`. Trocar `CHAVE_SESSAO` derruba todas as sessões abertas.
 - Sem `vars` no `wrangler.jsonc`. Conta Cloudflare: o mesmo `account_id` do `cadastro-passageiro` (identificador de conta, não segredo).
 
 ### Como rodar, testar e publicar
 
-- `pnpm dev` (porta 52463, wrapper `packages/deploy/dev-restart.mjs`), modo mock: aceita o código fixo exibido na tela (`CODIGO_MOCK`); `?refazer-autenticador` só existe no mock.
+- `pnpm dev` (porta 52463, wrapper `packages/deploy/dev-restart.mjs`), modo mock: aceita o código fixo exibido na tela (`CODIGO_MOCK`); `?apagar-senhas` só existe no mock.
 - `pnpm test` (Vitest: lógica pura, `mockApi`, `workerApi`, Excel e rotas do Worker contra o Dataverse falso `worker/fakeDataverse.ts`) e `pnpm typecheck` (`tsc` no app e em `worker/`).
 - `pnpm dev:worker` = `vite build && wrangler dev`; sem secrets, rotas que tocam o Dataverse respondem 500 `falha`.
 - Publicar: `pnpm build && pnpm exec wrangler deploy`, da `main`. Pré-requisitos do README do Worker (schema no DEV via `provision-portal-cliente.ps1`, usuário de aplicação com papel mínimo, KV, secrets) **constam como não feitos**: "Antes do 1º deploy (nada disso foi feito)". Estado atual do deploy: **não confirmado**.

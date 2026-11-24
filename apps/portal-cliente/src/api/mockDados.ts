@@ -17,6 +17,7 @@ const PASSAGEIROS = [
 ]
 const SOLICITANTES = ['Paula Ribeiro', 'Eduardo Nogueira', 'Sônia Matos']
 const VEICULOS = ['Sedan executivo', 'SUV executiva', 'Van executiva']
+const MOTORISTAS: [nome: string, placa: string][] = [['Carlos Souza', 'RTA2E41'], ['Marcos Lima', 'SFB7C19'], ['Paulo Henrique Alves', 'QXZ4H08']]
 
 const PLANO: Status[] = [
   ...Array<Status>(14).fill('liberado'),
@@ -108,9 +109,9 @@ const ROTAS_LATASA: [string, string][] = [
   ['Latasa Reciclagem, Pindamonhangaba', 'Hotel Mercure, São José dos Campos'],
   ['Av. Faria Lima, 3000, São Paulo', 'Latasa Reciclagem, Pindamonhangaba'],
 ]
-/** Do mais recente para o mais antigo: 2 futuros (um já programado) e 4 passados. */
+/** Do mais recente para o mais antigo: 3 futuros (dois já programados, no mesmo dia) e 4 passados. */
 const PLANO_PEDIDOS: { status: StatusPedido; dias: number }[] = [
-  { status: 'solicitado', dias: 3 }, { status: 'programado', dias: 1 }, { status: 'concluido', dias: -2 },
+  { status: 'solicitado', dias: 3 }, { status: 'programado', dias: 1 }, { status: 'programado', dias: 1 }, { status: 'concluido', dias: -2 },
   { status: 'cancelado', dias: -5 }, { status: 'concluido', dias: -9 }, { status: 'concluido', dias: -16 },
 ]
 
@@ -128,7 +129,7 @@ export function gerarPedidos(agora: Date): PedidoMock[] {
       passageiros: [PASSAGEIROS[(i + 3) % PASSAGEIROS.length]],
       criadoEm: new Date(saida.getTime() - 2 * DIA_MS).toISOString(),
       ...(i === 0 ? { observacao: 'Voo LA3421, chega às 14h10.' } : {}),
-      ...(status === 'programado' || status === 'concluido' ? { veiculo: VEICULOS[i % VEICULOS.length], voucherUrl: `https://exemplo.betinhos.com.br/voucher/${numero}.pdf` } : {}),
+      ...(status === 'programado' || status === 'concluido' ? { veiculo: VEICULOS[i % VEICULOS.length], motorista: MOTORISTAS[i % MOTORISTAS.length][0], placa: MOTORISTAS[i % MOTORISTAS.length][1], voucherUrl: `https://exemplo.betinhos.com.br/voucher/${numero}.pdf` } : {}),
     }
   })
 }

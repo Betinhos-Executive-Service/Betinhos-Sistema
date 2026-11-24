@@ -15,6 +15,7 @@ describe('dataverseEntitySets', () => {
     expect(entitySetName('cr40f_plannerequipemembro')).toBe('cr40f_plannerequipemembros')
     expect(entitySetName('cr40f_plannertagpessoal')).toBe('cr40f_plannertagpessoals')
     expect(entitySetName('cr40f_plannertagpessoaltarefa')).toBe('cr40f_plannertagpessoaltarefas')
+    expect(entitySetName('cr40f_boasideiaanexo')).toBe('cr40f_boasideiaanexos')
     expect(entitySetName('systemuser')).toBe('systemusers')
     expect(entitySetName('team')).toBe('teams')
   })

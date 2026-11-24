@@ -1,7 +1,7 @@
 import type { StatusPedido } from '../src/domain/types'
 
 // Nomes lógicos no Dataverse. `cr40f_validacaoservico` e `cr40f_clientes1.cr40f_portalhabilitado` seguem
-// packages/deploy/provision-portal-cliente.ps1, assim como validador, mensagem, código e dispositivo (conferidos na
+// packages/deploy/provision-portal-cliente.ps1, assim como validador, mensagem e código (conferidos na
 // metadata do DEV em 28/10/2026).
 
 export const SET = {
@@ -9,7 +9,6 @@ export const SET = {
   validador: 'cr40f_validadorclientes',
   mensagem: 'cr40f_mensagemvalidacaos',
   codigo: 'cr40f_codigoacessos',
-  dispositivo: 'cr40f_dispositivoconfiavels',
   cliente: 'cr40f_clientes1s',
   reserva: 'cr40f_reservadeveculoses',
 } as const
@@ -19,6 +18,7 @@ export const MODULO_DV = { validar: 100000000, pedir: 100000001, meus_servicos: 
 
 /** cr40f_status da reserva (metadata DEV 08/10/2026) → situação vista pelo solicitante. */
 export const RESERVA_SOLICITADO = 202410004
+export const RESERVA_CANCELADO = 202410002
 export const PEDIDO_STATUS: Record<number, StatusPedido> = {
   [RESERVA_SOLICITADO]: 'solicitado',
   202410000: 'em_analise', // Pré-reserva
@@ -39,7 +39,9 @@ export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40
  */
 export const PEDIDO_CAMPOS = [
   'cr40f_reservadeveculosid', 'cr40f_id', 'cr40f_status', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',
-  'cr40f_portalpedido', 'new_linkdovoucher', 'new_categoriadoveiculo', 'createdon',
+  'cr40f_portalpedido', 'new_linkdovoucher', 'cr40f_tipodeveiculo', 'createdon',
+  // Lookups lidos pelo rótulo: nome primário do funcionário (cr40f_nomecompleto) e do veículo (cr40f_placa), metadata DEV 23/11/2026.
+  '_cr40f_motorista_value', '_cr40f_veiculo_value',
 ]
 
 /** Choice cr40f_status da validação (ordem do provision). */
@@ -56,12 +58,12 @@ export const LADO_DV = { cliente: 100000000, betinhos: 100000001 } as const
 
 export const MOTIVO_DV = { espera: 100000000, km_rota: 100000001, valor: 100000002, passageiro: 100000003, outro: 100000004 } as const
 
-/** Navigation property do lookup cr40f_Reserva (schema name) e do lookup legado da composição na reserva. */
-export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_composicaodepreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario' }
+/** Navigation property do lookup cr40f_Reserva (schema name) e do lookup new_composicaodepreco da composição na reserva (navegação new_ComposicaodePreco, metadata DEV/PROD 23/11/2026). */
+export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_ComposicaodePreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario' }
 
 export const RESERVA_CAMPOS = [
   'cr40f_id', 'cr40f_idtenaris', 'cr40f_cr', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',
-  'new_linkdovoucher', 'new_categoriadoveiculo',
+  'new_linkdovoucher', 'cr40f_tipodeveiculo',
   '_cr40f_solicitante_value',
 ]
 

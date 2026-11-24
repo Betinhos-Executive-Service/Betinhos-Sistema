@@ -18,7 +18,8 @@ public class LancarDescontoFolhaTests
         {
             ["cr40f_novacoluna"] = "TST0001",
             ["cr40f_status"] = new OptionSetValue(MultaCodigos.Acertar),
-            ["cr40f_valorpago"] = new Money(100m),
+            ["cr40f_valorpago"] = new Money(60m),
+            ["new_valorguia"] = new Money(100m),
             ["cr40f_motorista"] = new EntityReference("cr40f_funcionarios", Guid.NewGuid()),
         });
         PassoMultaPlugin.Executar(mundo, multa.Id, Passos.RegistrarAcerto, $"{{\"acerto\":\"folha\",\"competencia\":\"2026-11\",\"parcelas\":{n}}}", Hoje);

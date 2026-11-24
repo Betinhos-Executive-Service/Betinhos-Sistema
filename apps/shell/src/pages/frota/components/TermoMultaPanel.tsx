@@ -56,15 +56,15 @@ type Props = {
   hoje: string
   /** Chamado depois de enviar, lembrar ou cancelar: o pai relê a multa e os termos. */
   onChanged: () => void
-  /** O gestor escolheu avisar pelo WhatsApp (estado do pai, que também decide o botão "Avisei"). */
-  viaWhatsapp: boolean
-  onViaWhatsapp: (valor: boolean) => void
-  /** Conteúdo do aviso pelo WhatsApp (o passo de antes), mostrado quando o gestor escolhe esse caminho. */
-  whatsapp: ReactNode
+  /** O gestor escolheu indicar sem o termo (estado do pai, que também decide o botão "Registrar indicação"). */
+  semTermo: boolean
+  onSemTermo: (valor: boolean) => void
+  /** Campos da indicação (canal e data), mostrados quando o gestor escolhe indicar sem o termo. */
+  indicacao: ReactNode
 }
 
-/** Conteúdo do passo "Avisar o motorista" quando ele tem o aditivo: termo pelo app ou, se preferir, WhatsApp. */
-export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoje, onChanged, viaWhatsapp, onViaWhatsapp, whatsapp }: Props) {
+/** Conteúdo do passo "Indicar no órgão" quando o motorista tem o aditivo: termo pelo app ou, se preferir, indicar sem o termo. */
+export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoje, onChanged, semTermo, onSemTermo, indicacao }: Props) {
   const notify = useNotify()
   const ids = useId()
   const [parcelas, setParcelas] = useState(1)
@@ -74,7 +74,7 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
   const [valorSalvo, setValorSalvo] = useState(multa.valorGuia)
   const [ocupado, setOcupado] = useState(false)
   const [confirmarEnvio, setConfirmarEnvio] = useState(false)
-  const [confirmarCancelamento, setConfirmarCancelamento] = useState<'cancelar' | 'whatsapp' | null>(null)
+  const [confirmarCancelamento, setConfirmarCancelamento] = useState<'cancelar' | 'sem-termo' | null>(null)
 
   const nomeMotorista = multa.motorista?.label ?? ''
   // Em centavos, com a mesma regra da prévia: o total enviado fecha com a soma das parcelas.
@@ -113,6 +113,7 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
 
   const enviar = () => executar(async () => {
     if (impedimento) return
+    await salvarValor() // o servidor divide o valor gravado na multa, então o digitado precisa estar salvo antes
     await source.enviarTermoMulta(multa.id, acordo)
     setConfirmarEnvio(false)
     notify('success', 'Termo enviado ao motorista.')
@@ -125,11 +126,11 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
     onChanged()
   })
 
-  const cancelar = (termoId: string, depois: 'cancelar' | 'whatsapp') => executar(async () => {
+  const cancelar = (termoId: string, depois: 'cancelar' | 'sem-termo') => executar(async () => {
     setConfirmarCancelamento(null)
     await source.cancelarTermoMulta(termoId)
     notify('success', 'Termo cancelado.')
-    if (depois === 'whatsapp') onViaWhatsapp(true)
+    if (depois === 'sem-termo') onSemTermo(true)
     onChanged()
   })
 
@@ -146,20 +147,20 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
           <div className="frota-termo__linha">
             <Button variant="secondary" size="compact" icon={<BellRing size={16} />} disabled={ocupado || lembreteBloqueado} aria-describedby={lembreteBloqueado ? `${ids}-lembrete` : undefined} onClick={() => void lembrar(termoPendente.id)}>Lembrar</Button>
             <Button variant="ghost" size="compact" disabled={ocupado} onClick={() => setConfirmarCancelamento('cancelar')}>Cancelar termo</Button>
-            <Button variant="secondary" size="compact" disabled={ocupado} onClick={() => setConfirmarCancelamento('whatsapp')}>Avisar pelo WhatsApp</Button>
+            <Button variant="secondary" size="compact" disabled={ocupado} onClick={() => setConfirmarCancelamento('sem-termo')}>Indicar sem o termo</Button>
           </div>
           {lembreteBloqueado && proximoLembrete !== null && <span id={`${ids}-lembrete`} className="frota-muted">Próximo lembrete a partir de {dataHora(new Date(proximoLembrete).toISOString())}.</span>}
         </div>
-      ) : viaWhatsapp ? (
+      ) : semTermo ? (
         <>
-          {whatsapp}
-          <div><Button variant="ghost" size="compact" onClick={() => onViaWhatsapp(false)}>Voltar ao termo pelo app</Button></div>
+          {indicacao}
+          <div><Button variant="ghost" size="compact" onClick={() => onSemTermo(false)}>Voltar ao termo pelo app</Button></div>
         </>
       ) : (
         <div className="frota-termo__form">
-          <p className="frota-muted">O motorista recebe o termo no app e assina ou contesta em até {PRAZO_TERMO_DIAS} dias. Se preferir, avise pelo WhatsApp.</p>
+          <p className="frota-muted">O motorista recebe o termo no app e assina ou contesta em até {PRAZO_TERMO_DIAS} dias. Se preferir, indique sem o termo.</p>
           <div className="frota-fields">
-            <Field label="Valor da guia (R$)" hint={multa.valorGuia === null && valorCatalogo !== null ? 'Pré-preenchido com o valor do catálogo de infrações.' : undefined}>
+            <Field label="Valor cheio da multa (R$)" hint="Valor da guia sem o desconto de 40% (pré-preenchido pelo catálogo). As parcelas dividem este valor.">
               <Input type="number" inputMode="decimal" min="0" step="0.01" prefix="R$" value={valorGuia} onChange={(e) => setValorGuia(e.target.value)} onBlur={() => void salvarValor()} />
             </Field>
             <Field label="Parcelas">
@@ -177,7 +178,7 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
           {impedimento && <Alert tone="warning">{impedimento}</Alert>}
           <div className="frota-termo__linha">
             <Button icon={<Send size={16} />} disabled={!!impedimento || ocupado} onClick={() => setConfirmarEnvio(true)}>Enviar termo pelo app</Button>
-            <Button variant="secondary" disabled={ocupado} onClick={() => onViaWhatsapp(true)}>Avisar pelo WhatsApp</Button>
+            <Button variant="secondary" disabled={ocupado} onClick={() => onSemTermo(true)}>Indicar sem o termo</Button>
           </div>
         </div>
       )}

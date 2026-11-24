@@ -14,6 +14,8 @@ import { ComprovantesRecebimento } from '../../recebimentos/ComprovantesRecebime
 import type { RecebimentosSource } from '../../recebimentos/source'
 
 type Props = {
+  /** Rótulo acima do título (ex.: "Atribuir motorista" na ação rápida do card). */
+  eyebrow?: string
   row: Row
   /** Colunas visíveis da visão: a sheet edita só o que a visão mostra. */
   columns: Column[]
@@ -146,7 +148,7 @@ function SheetField({ row, column, info, status, onSave, onReset, search, onInva
 }
 
 /** Edição dos campos do serviço no celular: um campo por coluna editável da visão, gravado campo a campo. */
-export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search, recebimentos, manutencao }: Props) {
+export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose, onSave, onReset, search, recebimentos, manutencao, eyebrow }: Props) {
   const name = formatCell('readonly', row, 'cr40f_id')
   const [confirming, setConfirming] = useState(false)
   const invalid = useRef(new Set<string>())
@@ -169,7 +171,7 @@ export function GeralSheet({ row, columns, attributes, cellStatus, open, onClose
 
   return (
     <>
-      <Sheet open={open} onClose={requestClose} eyebrow={manutencao ? 'Programar manutenção' : 'Editar campos'} expandLabel="Ver todos os campos" title={manutencao ? manutencao.titulo : `Serviço ${name}`}>
+      <Sheet open={open} onClose={requestClose} eyebrow={eyebrow ?? (manutencao ? 'Programar manutenção' : 'Editar campos')} expandLabel="Ver todos os campos" title={manutencao ? manutencao.titulo : `Serviço ${name}`}>
         <div className="gr-sheet">
           {columns.map((column) => {
             if (!column.alias && column.attribute === 'cr40f_id') return null

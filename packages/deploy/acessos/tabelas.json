@@ -130,6 +130,7 @@
   {"logico":"cr40f_avisodestinatario","conjunto":"cr40f_avisodestinatarios","organizacao":false},
   {"logico":"cr40f_bancodedados","conjunto":"cr40f_bancodedadoses","organizacao":false},
   {"logico":"cr40f_baselinepreventiva","conjunto":"cr40f_baselinepreventivas","organizacao":true},
+  {"logico":"cr40f_boasideiaanexo","conjunto":"cr40f_boasideiaanexos","organizacao":false},
   {"logico":"cr40f_boasideias","conjunto":"cr40f_boasideiases","organizacao":false},
   {"logico":"cr40f_cartaocorporativo","conjunto":"cr40f_cartaocorporativos","organizacao":false},
   {"logico":"cr40f_categoriadespesaoperacional","conjunto":"cr40f_categoriadespesaoperacionals","organizacao":false},

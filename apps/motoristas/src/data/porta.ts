@@ -35,6 +35,7 @@ export type PortaDados = {
   acaoComunicado: typeof comunicados.executeComunicadoAction;
   carregarIdeias: typeof ideias.loadMyIdeasRemote;
   criarIdeia: typeof ideias.createIdeaRemote;
+  enviarAnexoIdeia: typeof ideias.uploadIdeaAttachmentRemote;
   emitirProvaMidia: typeof prova.emitirProvaMidiaRemote;
   registrarProvaMidia: typeof prova.registrarProvaMidiaRemote;
   conferirProvaMidia: typeof prova.conferirProvaMidiaRemote;

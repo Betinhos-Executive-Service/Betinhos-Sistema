@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { GeralPage } from './GeralPage'
-import { acao, cellOf, columnMenu, dataRows, findDataRows, PAGE1, pickView, usarAmbienteGeral, viewTrigger } from './testUtils'
+import { acao, editarCamposDoCard, cellOf, columnMenu, dataRows, findDataRows, PAGE1, pickView, usarAmbienteGeral, viewTrigger } from './testUtils'
 
 vi.mock('./data/source', async (importOriginal) => (await import('./testUtils')).mockSource(await importOriginal<typeof import('./data/source')>()))
 usarAmbienteGeral()
@@ -351,8 +351,8 @@ describe('Geral', () => {
   it('no celular mostra cards e edita pela sheet', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const card = (await screen.findAllByRole('listitem'))[0]
-    fireEvent.click(within(card).getByRole('button', { name: 'Editar campos' }))
+    await screen.findAllByRole('listitem')
+    await editarCamposDoCard(document.querySelector('.gr-cards > li.gc-card') as HTMLElement)
     const sheet = await screen.findByRole('dialog', { name: /Serviço OS-/ })
     const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
     fireEvent.change(trajeto, { target: { value: 'Rota pelo celular' } })
@@ -362,14 +362,14 @@ describe('Geral', () => {
   it('no celular, fechar a sheet com o campo em edição grava o que foi digitado', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener: () => undefined, removeEventListener: () => undefined }))
     render(<GeralPage host={{ mode: 'mock' }} />)
-    const card = (await screen.findAllByRole('listitem'))[0]
-    fireEvent.click(within(card).getByRole('button', { name: 'Editar campos' }))
+    await screen.findAllByRole('listitem')
+    await editarCamposDoCard(document.querySelector('.gr-cards > li.gc-card') as HTMLElement)
     const sheet = await screen.findByRole('dialog', { name: /Serviço OS-/ })
     const trajeto = within(sheet).getByLabelText('Trajeto') as HTMLInputElement
     trajeto.focus()
     fireEvent.change(trajeto, { target: { value: 'Rota sem blur' } })
     fireEvent.click(within(sheet).getByRole('button', { name: 'Fechar' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Serviço OS-/ })).toBeNull())
-    expect(await within((await screen.findAllByRole('listitem'))[0]).findByText('Rota sem blur')).toBeTruthy()
+    expect(await within(document.querySelector('.gr-cards > li.gc-card') as HTMLElement).findByText('Rota sem blur')).toBeTruthy()
   })
 })

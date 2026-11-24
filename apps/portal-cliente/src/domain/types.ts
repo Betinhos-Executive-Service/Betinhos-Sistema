@@ -66,6 +66,10 @@ export type Pedido = NovoPedido & {
   numero: string
   status: StatusPedido
   criadoEm: string
+  /** Tipo de veículo (choice da reserva). */
   veiculo?: string
+  /** Nome do motorista programado. */
+  motorista?: string
+  placa?: string
   voucherUrl?: string
 }

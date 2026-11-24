@@ -63,8 +63,20 @@ export type Validador = {
   cliente: Cliente
   ativo: boolean
   ultimoAcesso: string | null
-  /** Vazio = ainda não leu o QR code (ou o autenticador foi refeito). */
-  totpCadastradoEm: string | null
+  /** Vazio = ainda não criou a senha no portal (ou a senha foi zerada). */
+  senhaDefinidaEm: string | null
 }
 
 export type NovoValidador = { nome: string; email: string; clienteId: string }
+
+/** Módulos do portal do cliente (`cr40f_portalmodulos`; valores em `config.ts`). */
+export type ModuloPortal = 'validar' | 'pedir' | 'meus_servicos'
+
+/** Configuração do portal de um cliente (`cr40f_clientes1`). */
+export type PortalConfig = {
+  cliente: Cliente
+  ligado: boolean
+  modulos: ModuloPortal[]
+  /** Vazio = só e-mails cadastrados. */
+  dominios: string[]
+}

@@ -2,6 +2,12 @@
 import type { Env } from './env'
 import type { Registro } from './mapear'
 
+export class ErroDataverse extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+  }
+}
+
 export type Dv = {
   get(caminho: string): Promise<Registro>
   lista(caminho: string): Promise<Registro[]>
@@ -47,7 +53,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
       body: corpo ? JSON.stringify(corpo) : undefined,
     })
     if (r.status === 401) await env.KV.delete(CHAVE_TOKEN)
-    if (!r.ok) throw new Error(`Dataverse ${metodo} ${caminho.split('?')[0]}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`)
+    if (!r.ok) throw new ErroDataverse(r.status, `Dataverse ${metodo} ${caminho.split('?')[0]}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`)
     return r
   }
   return {
@@ -62,6 +68,9 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
 export type TipoEmail = 'codigo' | 'resumo_diario' | 'resposta_betinhos'
 
 export async function enviarEmail(env: Env, tipo: TipoEmail, para: string[], dados: Registro, f: typeof fetch = fetch): Promise<void> {
-  const r = await f(env.EMAIL_FLOW_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, para, dados }) })
+  // Logo servida pelo próprio portal (public/email).
+  // Sem PORTAL_URL o flow usa a logo padrão; o e-mail (ex.: código de acesso) não deixa de sair.
+  const logoUrl = URL.canParse(env.PORTAL_URL ?? '') ? new URL('email/logo-betinhos.png', env.PORTAL_URL).href : undefined
+  const r = await f(env.EMAIL_FLOW_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo, para, dados: { ...dados, logoUrl } }) })
   if (!r.ok) throw new Error(`flow de e-mail (${tipo}): HTTP ${r.status}`)
 }

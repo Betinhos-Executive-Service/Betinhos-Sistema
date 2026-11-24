@@ -8,7 +8,7 @@ const FV = '@OData.Community.Display.V1.FormattedValue'
 const str = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'string' ? (r[campo] as string) : '')
 const num = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'number' ? (r[campo] as number) : undefined)
 const rotulo = (r: Registro | undefined, lookup: string) => str(r, `${lookup}${FV}`)
-const veiculoDe = (r: Registro | undefined) => rotulo(r, 'new_categoriadoveiculo') || str(r, 'new_categoriadoveiculo')
+const veiculoDe = (r: Registro | undefined) => rotulo(r, 'cr40f_tipodeveiculo')
 
 const inverter = <K extends string>(mapa: Record<K, number>) =>
   new Map(Object.entries(mapa).map(([k, v]) => [v as number, k as K]))
@@ -83,7 +83,7 @@ export type PedidoPortal = { passageiros: string[]; observacao?: string }
 
 const PROGRAMADO = new Set<StatusPedido>(['programado', 'em_execucao', 'concluido'])
 
-/** Reserva → pedido do solicitante. Voucher e veículo só depois de programado. */
+/** Reserva → pedido do solicitante. Voucher, veículo, motorista e placa só depois de programado. */
 export function mapearPedido(r: Registro): Pedido {
   const status = PEDIDO_STATUS[num(r, 'cr40f_status') ?? -1] ?? 'em_analise'
   let portal: PedidoPortal = { passageiros: [] }
@@ -91,6 +91,9 @@ export function mapearPedido(r: Registro): Pedido {
     portal = { ...portal, ...(JSON.parse(str(r, 'cr40f_portalpedido') || '{}') as PedidoPortal) }
   } catch { /* coluna editada à mão: mostra sem passageiros */ }
   const veiculo = veiculoDe(r)
+  const programado = PROGRAMADO.has(status)
+  const motorista = rotulo(r, '_cr40f_motorista_value')
+  const placa = rotulo(r, '_cr40f_veiculo_value')
   return {
     id: str(r, 'cr40f_reservadeveculosid'),
     numero: str(r, 'cr40f_id'),
@@ -101,7 +104,9 @@ export function mapearPedido(r: Registro): Pedido {
     passageiros: portal.passageiros,
     criadoEm: str(r, 'createdon'),
     ...(portal.observacao ? { observacao: portal.observacao } : {}),
-    ...(PROGRAMADO.has(status) && veiculo ? { veiculo } : {}),
-    ...(PROGRAMADO.has(status) && str(r, 'new_linkdovoucher') ? { voucherUrl: str(r, 'new_linkdovoucher') } : {}),
+    ...(programado && veiculo ? { veiculo } : {}),
+    ...(programado && motorista ? { motorista } : {}),
+    ...(programado && placa ? { placa } : {}),
+    ...(programado && str(r, 'new_linkdovoucher') ? { voucherUrl: str(r, 'new_linkdovoucher') } : {}),
   }
 }

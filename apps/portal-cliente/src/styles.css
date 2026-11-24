@@ -1,10 +1,11 @@
 /* Estilos globais do portal. Tokens e componentes vêm do @betinhos/ui. */
 
-.pc-marca {
-  margin: 0;
-  font-size: var(--bt-font-size-12);
-  font-weight: var(--bt-font-weight-extrabold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bt-color-brand);
-}
+.pc-parceria { display: flex; align-items: center; gap: var(--bt-space-3); flex-shrink: 0; }
+.pc-parceria img { display: block; width: auto; }
+/* Divisória fina entre as marcas; o wordmark do cliente é horizontal e fica mais baixo para equilibrar o peso. */
+.pc-parceria__divisor { align-self: stretch; width: 1px; margin-block: 2px; background-color: var(--bt-color-border); }
+.pc-parceria--topo .pc-parceria__betinhos { height: 32px; }
+.pc-parceria--topo .pc-parceria__cliente { height: 22px; }
+.pc-parceria--entrar { justify-content: center; gap: var(--bt-space-4); margin-bottom: var(--bt-space-5); }
+.pc-parceria--entrar .pc-parceria__betinhos { height: 44px; }
+.pc-parceria--entrar .pc-parceria__cliente { height: 30px; }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   AlertTriangle, Banknote, BookUser, Calculator, Calendar, Camera, Car, CarFront, ClipboardCheck, ClipboardList, Clock, Coins, Contact, CreditCard, Database, Download,
   FileText, Fingerprint, FolderCheck, FolderCog, FolderKanban, Gauge, GraduationCap, HandCoins, History, Home, Hourglass, IdCard, KeyRound, Landmark, Laptop, LayoutDashboard, List, Mail, Megaphone, MapPin, Monitor, Moon, Paperclip, ReceiptText, Route,
-  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Smartphone, Sun, Tag, TrendingUp, UserCog, Users, Wallet, Wrench,
+  Scale, ScrollText, Shield, ShieldCheck, Shuffle, Smartphone, Sun, Tag, TrendingUp, Users, Wallet, Wrench,
 } from 'lucide-react'
 import { Alert, AppShell as Shell, Button, formatBuild, type NavGroup } from '@betinhos/ui'
 import { menuVisivel } from '../nav/acessosMenu'
@@ -58,7 +58,6 @@ export const GROUP_ICONS: Record<string, ReactNode> = {
   financeiro: <Wallet />,
   frota: <Car />,
   cadastros: <Database />,
-  rh: <UserCog />,
   'back-end': <FolderCog />,
 }
 

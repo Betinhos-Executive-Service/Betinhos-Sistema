@@ -31,6 +31,14 @@
           "Read": "Global",
           "Write": "Global"
         },
+        "cr40f_boasideiaanexo": {
+          "Append": "Global",
+          "AppendTo": "Global",
+          "Create": "Global",
+          "Delete": "Global",
+          "Read": "Global",
+          "Write": "Global"
+        },
         "cr40f_boasideias": {
           "Append": "Global",
           "AppendTo": "Global",

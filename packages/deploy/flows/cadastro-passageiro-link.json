@@ -289,7 +289,7 @@
                           },
                           "parameters": {
                             "entityName": "__SET_SERVICOS__",
-                            "$select": "_cr40f_bancodedados_value",
+                            "$select": "_cr40f_bancodedados_value,cr40f_ordemdeselecao",
                             "$filter": "_cr40f_geral_value eq @{outputs('Link')?['_cr40f_reserva_value']}",
                             "$top": 20
                           },
@@ -306,6 +306,21 @@
                         "inputs": {
                           "from": "@body('Listar_filhos')?['value']",
                           "select": "@toLower(coalesce(item()?['_cr40f_bancodedados_value'], ''))"
+                        }
+                      },
+                      "Ordens_filhos": {
+                        "type": "Select",
+                        "runAfter": {
+                          "Listar_filhos": [
+                            "Succeeded"
+                          ]
+                        },
+                        "inputs": {
+                          "from": "@body('Listar_filhos')?['value']",
+                          "select": {
+                            "id": "@toLower(coalesce(item()?['_cr40f_bancodedados_value'], ''))",
+                            "ordem": "@item()?['cr40f_ordemdeselecao']"
+                          }
                         }
                       },
                       "Filtrar_filhos": {
@@ -344,6 +359,9 @@
                             "Succeeded"
                           ],
                           "Obter_reserva": [
+                            "Succeeded"
+                          ],
+                          "Ordens_filhos": [
                             "Succeeded"
                           ]
                         },
@@ -393,6 +411,9 @@
                                     "runAfter": {
                                       "Obter_passageiro": [
                                         "Succeeded"
+                                      ],
+                                      "Ordem_do_passageiro": [
+                                        "Succeeded"
                                       ]
                                     },
                                     "inputs": {
@@ -400,6 +421,7 @@
                                       "value": {
                                         "id": "@{items('Por_passageiro')}",
                                         "primeiroNome": "@first(split(trim(coalesce(body('Obter_passageiro')?['cr40f_nomedopassageiro'], '')), ' '))",
+                                        "ordem": "@first(body('Ordem_do_passageiro'))?['ordem']",
                                         "temFoto": "@not(empty(body('Obter_passageiro')?['new_linkdafoto']))",
                                         "foto": null,
                                         "temTelefone": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_telefone'], ''))))",
@@ -407,6 +429,14 @@
                                         "temEmail": "@not(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], ''))))",
                                         "emailMascarado": "@if(less(indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'), 1), if(empty(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], ''))), '', '•••'), concat(substring(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), 0, min(2, indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'))), '•••', substring(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), indexOf(trim(coalesce(body('Obter_passageiro')?['cr40f_email'], '')), '@'))))"
                                       }
+                                    }
+                                  },
+                                  "Ordem_do_passageiro": {
+                                    "type": "Query",
+                                    "runAfter": {},
+                                    "inputs": {
+                                      "from": "@body('Ordens_filhos')",
+                                      "where": "@equals(item()?['id'], items('Por_passageiro'))"
                                     }
                                   }
                                 }
