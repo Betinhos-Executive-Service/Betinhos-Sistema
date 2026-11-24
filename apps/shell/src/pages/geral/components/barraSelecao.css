@@ -1,0 +1,32 @@
+/* Laboratório: barra de seleção do celular (#/geral?barra=a|b|c). Só tokens do DS; vai para o DS depois de escolhida. */
+.gs-barra { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: var(--bt-space-2) var(--bt-space-3) calc(var(--bt-space-2) + env(safe-area-inset-bottom, 0px)); border-top: var(--bt-border-width-default) solid var(--bt-color-border); background: var(--bt-color-surface); box-shadow: var(--bt-shadow-drawer); }
+.gs-icone { display: inline-grid; place-items: center; flex: 0 0 auto; width: var(--bt-control-height-touch); height: var(--bt-control-height-touch); padding: 0; border: 0; border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-primary); cursor: pointer; }
+.gs-icone:hover { background: var(--bt-color-surface-soft); }
+.gs-icone:focus-visible, .gs-ferramenta:focus-visible, .gs-pilula button:focus-visible, .gs-folha__item:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bt-focus-border), var(--bt-focus-ring); }
+.gs-icone[aria-disabled='true'], .gs-ferramenta[aria-disabled='true'], .gs-folha__item[aria-disabled='true'] { opacity: .45; cursor: not-allowed; }
+.gs-contagem { font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-primary); white-space: nowrap; }
+
+/* A · uma linha: ✕, contagem e as ações principais só com ícone; o resto no ⋮. */
+.gs-barra--a { display: flex; align-items: center; gap: var(--bt-space-1); }
+.gs-barra--a .gs-contagem { flex: 1; min-width: 0; }
+
+/* B · barra de ferramentas: contagem em cima; embaixo ícone com rótulo, como a barra de abas do celular. */
+.gs-barra--b { display: grid; gap: var(--bt-space-1); padding-top: var(--bt-space-1-5); }
+.gs-b__topo { display: flex; align-items: center; justify-content: space-between; gap: var(--bt-space-2); }
+.gs-b__limpar { padding: var(--bt-space-1) var(--bt-space-2); border: 0; border-radius: var(--bt-radius-sm); background: transparent; color: var(--bt-color-action); font: inherit; font-size: var(--bt-font-size-13); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
+.gs-b__ferramentas { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--bt-space-1); }
+.gs-ferramenta { display: grid; justify-items: center; gap: 2px; min-height: 52px; padding: var(--bt-space-1) 0; border: 0; border-radius: var(--bt-radius-md); background: transparent; color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-semibold); cursor: pointer; }
+.gs-ferramenta svg { width: 20px; height: 20px; }
+.gs-ferramenta:hover { background: var(--bt-color-surface-soft); }
+
+/* C · pílula flutuante: contagem, "Ações" (abre a folha com tudo, com rótulo) e ✕; ocupa o mínimo da tela. */
+.gs-pilula { position: fixed; left: 50%; bottom: calc(var(--bt-space-4) + env(safe-area-inset-bottom, 0px)); z-index: 30; display: flex; align-items: center; gap: var(--bt-space-1); padding: var(--bt-space-1) var(--bt-space-1) var(--bt-space-1) var(--bt-space-4); border-radius: var(--bt-radius-full); background: var(--bt-color-text-primary); color: var(--bt-color-surface); box-shadow: var(--bt-shadow-popover); transform: translateX(-50%); white-space: nowrap; }
+.gs-pilula .gs-contagem { color: inherit; }
+.gs-pilula__acoes { display: inline-flex; align-items: center; gap: var(--bt-space-1); min-height: 40px; padding: 0 var(--bt-space-3); border: 0; border-radius: var(--bt-radius-full); background: var(--bt-color-action); color: var(--bt-color-on-solid); font: inherit; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-bold); cursor: pointer; }
+.gs-pilula__fechar { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--bt-radius-full); background: transparent; color: inherit; cursor: pointer; }
+.gs-folha { display: grid; gap: var(--bt-space-1); margin: 0; padding: 0; list-style: none; }
+.gs-folha__grupo { margin: var(--bt-space-3) 0 var(--bt-space-1); font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); letter-spacing: .04em; text-transform: uppercase; color: var(--bt-color-text-secondary); }
+.gs-folha__grupo:first-child { margin-top: 0; }
+.gs-folha__item { display: flex; align-items: center; gap: var(--bt-space-3); width: 100%; min-height: var(--bt-control-height-touch); padding: var(--bt-space-2) var(--bt-space-3); border: 0; border-radius: var(--bt-radius-md); background: var(--bt-color-surface-soft); color: var(--bt-color-text-primary); font: inherit; font-size: var(--bt-font-size-14); font-weight: var(--bt-font-weight-semibold); text-align: left; cursor: pointer; }
+.gs-folha__item--perigo { color: var(--bt-color-danger); }
+.gs-folha__item small { display: block; font-size: var(--bt-font-size-12); font-weight: var(--bt-font-weight-regular); color: var(--bt-color-text-secondary); }
