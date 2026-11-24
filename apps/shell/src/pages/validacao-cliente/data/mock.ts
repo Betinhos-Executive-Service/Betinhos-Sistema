@@ -1,11 +1,19 @@
 import { prazoTacita } from '../domain/regras'
-import type { Cliente, ItemComposicao, Linha, Mensagem, Situacao, Validador } from '../domain/types'
+import type { Cliente, ItemComposicao, Linha, Mensagem, PortalConfig, Situacao, Validador } from '../domain/types'
 
 // Dados fictícios para o pnpm dev: dois clientes com portal e todas as situações.
 
 export const TENARIS: Cliente = { id: 'c1000000-0000-4000-8000-000000000001', nome: 'Tenaris' }
 export const TERNIUM: Cliente = { id: 'c1000000-0000-4000-8000-000000000002', nome: 'Ternium' }
 export const MOCK_CLIENTES = [TENARIS, TERNIUM]
+export const EMBRAER: Cliente = { id: 'c1000000-0000-4000-8000-000000000003', nome: 'Embraer' }
+/** Clientes do cadastro que ainda não têm portal, para o "+ Cliente" do pnpm dev. */
+export const MOCK_CADASTRO: Cliente[] = [...MOCK_CLIENTES, EMBRAER, { id: 'c1000000-0000-4000-8000-000000000004', nome: 'Latasa' }, { id: 'c1000000-0000-4000-8000-000000000005', nome: 'Kenvue' }]
+export const createMockConfigs = (): PortalConfig[] => [
+  { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [] },
+  { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'] },
+  { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [] },
+]
 
 const composicao = (hora: number, espera = 0, pedagio = 0, estacionamento = 0): ItemComposicao[] =>
   [

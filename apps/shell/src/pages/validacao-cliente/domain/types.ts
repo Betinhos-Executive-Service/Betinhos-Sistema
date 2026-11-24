@@ -68,3 +68,15 @@ export type Validador = {
 }
 
 export type NovoValidador = { nome: string; email: string; clienteId: string }
+
+/** Módulos do portal do cliente (`cr40f_portalmodulos`; valores em `config.ts`). */
+export type ModuloPortal = 'validar' | 'pedir' | 'meus_servicos'
+
+/** Configuração do portal de um cliente (`cr40f_clientes1`). */
+export type PortalConfig = {
+  cliente: Cliente
+  ligado: boolean
+  modulos: ModuloPortal[]
+  /** Vazio = só e-mails cadastrados. */
+  dominios: string[]
+}

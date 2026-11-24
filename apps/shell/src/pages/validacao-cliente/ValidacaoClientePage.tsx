@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Alert, Button, Dialog, EmptyState, Field, SearchBox, Textarea, Select, StatusBadge, ToastProvider, ViewBar, matchesFilters, todaySaoPaulo, useShellHeader, useToast, type MenuAction } from '@betinhos/ui'
-import { CalendarClock, CheckCheck, Download, Lock, MessageCircleQuestion, RefreshCw, SearchX, ShieldCheck, Undo2, Users } from 'lucide-react'
+import { Alert, Button, Dialog, EmptyState, Field, SearchBox, Textarea, Select, StatusBadge, Tabs, ToastProvider, ViewBar, tabId, matchesFilters, todaySaoPaulo, useShellHeader, useToast } from '@betinhos/ui'
+import { CalendarClock, CheckCheck, Download, Lock, MessageCircleQuestion, RefreshCw, SearchX, Settings2, ShieldCheck, Undo2, Users } from 'lucide-react'
 import type { Host } from '../../host'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
@@ -9,16 +9,16 @@ import { SearchHits } from '../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText } from '../../app/search'
 import { useQueryTexto } from '../../nav/queryState'
 import { useMedia } from '../operacional/useMedia'
-import { createSource } from './data/source'
+import { createSource, type Lote, type Source } from './data/source'
 import { baixarPlanilha, nomeArquivo, planilhaFechamento } from './domain/excel'
 import { TELA, VALIDACAO_COLUMNS, VALIDACAO_DEFAULT_FILTERS, VALIDACAO_SORT, builtinViews, linhaKeywordText, readLinha, sortLinhas, validacaoFields } from './domain/lista'
 import { aplicarLiberacao, linhasDoFechamento, mesDe, mesLabel, podeLiberar, podeMarcarFechamento, podeRetirar, valorFechamento } from './domain/regras'
-import type { Fechamento, Linha } from './domain/types'
-import type { Lote } from './data/source'
+import type { Fechamento, Linha, PortalConfig } from './domain/types'
 import { useValidacoes } from './useValidacoes'
 import { ValidacaoCards, ValidacaoTable, money } from './components/ValidacaoList'
 import { ValidacaoDrawer } from './components/ValidacaoDrawer'
-import { ValidadoresDrawer } from './components/ValidadoresDrawer'
+import { ConfiguracoesTab } from './components/ConfiguracoesTab'
+import { UsuariosTab } from './components/UsuariosTab'
 import './validacao-cliente.css'
 import { useAuditoria } from '../../app/auditoria/AuditoriaProvider'
 
@@ -37,19 +37,48 @@ function ValidacaoCliente({ host }: { host: Host }) {
     source.podeAcessar().then((ok) => { if (live) setAcesso(ok ? 'sim' : 'nao') }).catch(() => { if (live) setAcesso('nao') })
     return () => { live = false }
   }, [source])
-  useShellHeader({ title: 'Validação do cliente' })
+  useShellHeader({ title: 'Portal do cliente' })
   if (acesso === 'nao') {
     return <div className="page vc-page"><EmptyState className="surface" align="start" icon={<Lock size={36} />} title="Acesso restrito ao financeiro">Peça ao administrador o papel de financeiro para acompanhar a validação dos clientes.</EmptyState></div>
   }
   if (acesso === 'checando') return <div className="page vc-page"><ValidacaoTable list={[]} hoje="" selecionados={new Set()} onToggle={() => undefined} onOpen={() => undefined} loading /></div>
-  return <Conteudo host={host} source={source} />
+  return <Portal host={host} source={source} />
 }
 
-function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof createSource> }) {
-  const auditoria = useAuditoria()
-  const toast = useToast()
+type Aba = 'validacao' | 'usuarios' | 'configuracoes'
+const ABAS = [
+  { value: 'validacao' as const, label: 'Validação', icon: <ShieldCheck size={16} /> },
+  { value: 'usuarios' as const, label: 'Usuários', icon: <Users size={16} /> },
+  { value: 'configuracoes' as const, label: 'Configurações', icon: <Settings2 size={16} /> },
+]
+const abaDe = (valor: string): Aba => (valor === 'usuarios' || valor === 'configuracoes' ? valor : 'validacao')
+
+/** Portal do cliente: validação dos serviços, usuários do portal e configuração por cliente; a aba ativa fica na URL (`aba`). */
+function Portal({ host, source }: { host: Host; source: Source }) {
   const mobile = useMedia('(max-width: 820px)')
   const data = useValidacoes(source)
+  const [abaTexto, setAba] = useQueryTexto('aba', 'validacao')
+  const aba = abaDe(abaTexto)
+  const salvouConfig = useCallback((config: PortalConfig) => { data.upsertConfig(config); void data.reload() }, [data.upsertConfig, data.reload])
+
+  let conteudo: ReactNode
+  if (aba === 'validacao') conteudo = <Conteudo host={host} source={source} data={data} mobile={mobile} />
+  else if (data.error && !data.loaded) conteudo = <Alert tone="danger" title="Não foi possível carregar o portal do cliente" action={<Button variant="secondary" onClick={() => void data.reload()}>Tentar de novo</Button>}>{data.error}</Alert>
+  else if (!data.loaded) conteudo = <p className="vc-muted" role="status">Carregando...</p>
+  else if (aba === 'usuarios') conteudo = <UsuariosTab validadores={data.validadores} clientes={data.clientes} source={source} onSaved={data.upsertValidador} />
+  else conteudo = <ConfiguracoesTab configs={data.configs} validadores={data.validadores} source={source} mobile={mobile} onSaved={salvouConfig} />
+
+  return (
+    <div className="page vc-page">
+      <Tabs tabs={ABAS} value={aba} onChange={setAba} aria-label="Portal do cliente" panelId="vc-aba" />
+      <div id="vc-aba" role="tabpanel" aria-labelledby={tabId('vc-aba', aba)} className="vc-aba">{conteudo}</div>
+    </div>
+  )
+}
+
+function Conteudo({ host, source, data, mobile }: { host: Host; source: Source; data: ReturnType<typeof useValidacoes>; mobile: boolean }) {
+  const auditoria = useAuditoria()
+  const toast = useToast()
   const hoje = todaySaoPaulo()
   const fields = useMemo(() => validacaoFields(data.linhas, data.clientes), [data.linhas, data.clientes])
 
@@ -67,7 +96,6 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   const [query, setQuery] = useQueryTexto('q')
   const [aberto, setAberto] = useQueryTexto('ver')
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
-  const [validadoresOpen, setValidadoresOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [marcando, setMarcando] = useState(false)
 
@@ -155,13 +183,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
 
   const refresh = useCallback(() => { void data.reload() }, [data.reload])
   // "Atualizar" fica na linha de comando em todas as larguras; o cabeçalho do celular não repete.
-  useShellHeader({ title: 'Validação do cliente' })
   const size = mobile ? 'touch' : 'default'
-  // "⋮" (Mais ações): o que é raro e não depende da seleção.
-  const moreActions: MenuAction[] = [
-    { id: 'validadores', label: 'Validadores', icon: <Users size={16} />, disabled: !data.loaded, onSelect: () => setValidadoresOpen(true) },
-  ]
-
   const linhaAberta = aberto ? data.linhas.find((l) => l.id === aberto) ?? null : null
   let body
   if (data.error && !data.loaded) {
@@ -169,7 +191,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   } else if (!data.loaded) {
     body = <ValidacaoTable list={[]} hoje={hoje} selecionados={selecionados} onToggle={toggle} onOpen={() => undefined} loading />
   } else if (!data.clientes.length) {
-    body = <EmptyState className="surface" align="start" icon={<ShieldCheck size={36} />} title="Nenhum cliente com portal habilitado.">Marque "Portal habilitado" no cadastro do cliente para os serviços dele aparecerem aqui.</EmptyState>
+    body = <EmptyState className="surface" align="start" icon={<ShieldCheck size={36} />} title="Nenhum cliente com portal ligado.">Ligue o portal do cliente na aba Configurações para os serviços dele aparecerem aqui.</EmptyState>
   } else {
     const footer = <span className="vc-num">{visible.length} de {data.linhas.length}{visiveisSel.length ? ` · ${visiveisSel.length} selecionado(s)` : ''}</span>
     const empty = <EmptyState align="start" icon={<SearchX size={36} />} title="Nenhum registro com estes filtros" action={<Button variant="secondary" onClick={clearAll}>Limpar filtros</Button>} />
@@ -188,11 +210,10 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
   }
 
   return (
-    <div className="page vc-page">
+    <>
       <div role="toolbar" aria-label="Comandos da validação do cliente">
         <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_validacaoservico', onOpenRecord: setAberto })} view={view} columns={VALIDACAO_COLUMNS} filters={{ fields: allFields }}
           search={<SearchBox size={size} value={query} onChange={setQuery} placeholder="Buscar por serviço, pedido, cliente, trajeto, situação, data, valor ou mensagem" aria-label="Buscar serviços" />}
-          more={moreActions}
           primary={<>
             <Button variant="secondary" size={size} icon={<RefreshCw size={16} />} aria-label="Atualizar" title="Atualizar" loading={data.loading && data.loaded} onClick={refresh} />
             <Button size={size} icon={<Download size={16} />} disabled={!data.loaded || !data.clientes.length} onClick={() => setExportOpen(true)}>Exportar Excel do mês</Button>
@@ -221,7 +242,6 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
           onPatch={(l, patch) => data.patchLinhas([l.id], patch)}
           onRetirada={(l) => { data.patchLinhas([l.id], { situacao: 'retirado' }); setSelecionados((s) => { const n = new Set(s); n.delete(l.id); return n }) }} />
       ) : null}
-      {data.loaded ? <ValidadoresDrawer open={validadoresOpen} onClose={() => setValidadoresOpen(false)} validadores={data.validadores} clientes={data.clientes} source={source} mobile={mobile} onSaved={data.upsertValidador} /> : null}
       <Dialog open={loteLiberar} onClose={() => { if (!marcando) setLoteLiberar(false) }} title={`Liberar ${paraLiberar.length} serviço(s) para o portal?`}
         actions={<>
           <Button variant="secondary" disabled={marcando} onClick={() => setLoteLiberar(false)}>Cancelar</Button>
@@ -240,7 +260,7 @@ function Conteudo({ host, source }: { host: Host; source: ReturnType<typeof crea
         O cliente deixa de ver {paraRetirar.map((l) => l.codigo).join(', ')} e eles não entram no fechamento. As conversas ficam guardadas aqui.
       </Dialog>
       {data.loaded ? <ExportarDialog open={exportOpen} onClose={() => setExportOpen(false)} linhas={data.linhas} clientes={data.clientes} hoje={hoje} /> : null}
-    </div>
+    </>
   )
 }
 
