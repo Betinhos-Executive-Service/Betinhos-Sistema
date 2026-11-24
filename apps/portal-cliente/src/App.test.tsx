@@ -212,9 +212,10 @@ describe('Portal do cliente', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Enviar pedido' }))
       expect(await screen.findByText(/Pedido RV-\d+ enviado/)).toBeTruthy()
       expect(await screen.findByRole('heading', { name: 'Meus serviços' })).toBeTruthy()
-      const linha = (await screen.findByText('Latasa, Pindamonhangaba → Aeroporto de Guarulhos', { selector: '.pc-trajeto' })).closest<HTMLElement>('tr, [role=row]')!
+      const linha = (await screen.findByText('Hiroshi Tanaka, Juliana Prado')).closest<HTMLElement>('[role=row], tr')!
       expect(within(linha).getByText('Solicitado')).toBeTruthy()
-      expect(within(linha).getByText('Hiroshi Tanaka, Juliana Prado')).toBeTruthy()
+      expect(within(linha).getByText('Latasa, Pindamonhangaba', { selector: '.pc-ped__local' })).toBeTruthy()
+      expect(within(linha).getByText('Aeroporto de Guarulhos', { selector: '.pc-ped__local' })).toBeTruthy()
     })
 
     it('Meus serviços mostra o programado com voucher e separa próximos de todos', async () => {
@@ -222,11 +223,16 @@ describe('Portal do cliente', () => {
       await entrarCompleto(LATASA)
       fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
       await screen.findByRole('heading', { name: 'Meus serviços' })
-      expect(await screen.findByText('Programado')).toBeTruthy()
-      expect(screen.getByRole('link', { name: /Voucher/ }).getAttribute('href')).toMatch(/\.pdf$/)
+      expect((await screen.findAllByText('Programado')).length).toBe(2)
+      expect(screen.getAllByText('Voucher disponível').length).toBe(2)
+      expect(screen.queryByRole('link', { name: /Voucher/ })).toBeNull()
       expect(screen.queryByText('Concluído')).toBeNull()
-      fireEvent.click(screen.getByRole('radio', { name: /Todos · 6/ }))
-      expect((await screen.findAllByText('Concluído')).length).toBe(3)
+      // A linha abre o painel com o voucher.
+      fireEvent.click(screen.getAllByText('Programado')[0].closest<HTMLElement>('[role=row], tr, button')!)
+      expect((await screen.findByRole('link', { name: /Ver voucher/ })).getAttribute('href')).toMatch(/\.pdf$/)
+      expect(screen.getByText('Motorista programado')).toBeTruthy()
+      fireEvent.click(screen.getByRole('radio', { name: /Todos · 7/ }))
+      expect((await screen.findAllByText('Concluído')).length).toBeGreaterThan(0)
     })
   })
 })
