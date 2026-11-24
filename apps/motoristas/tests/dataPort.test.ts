@@ -35,6 +35,7 @@ test("adaptador Dataverse delega cada operacao para a funcao atual, sem embrulho
     acaoComunicado: comunicados.executeComunicadoAction,
     carregarIdeias: ideias.loadMyIdeasRemote,
     criarIdeia: ideias.createIdeaRemote,
+    enviarAnexoIdeia: ideias.uploadIdeaAttachmentRemote,
     emitirProvaMidia: prova.emitirProvaMidiaRemote,
     registrarProvaMidia: prova.registrarProvaMidiaRemote,
     conferirProvaMidia: prova.conferirProvaMidiaRemote
