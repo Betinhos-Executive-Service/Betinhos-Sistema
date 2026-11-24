@@ -1,7 +1,7 @@
 {
   "name": "@betinhos/gerar-pagantes",
   "private": true,
-  "version": "0.2.155",
+  "version": "0.2.156",
   "type": "module",
   "scripts": {
     "dev": "node ../../packages/deploy/dev-restart.mjs 36491 .",
