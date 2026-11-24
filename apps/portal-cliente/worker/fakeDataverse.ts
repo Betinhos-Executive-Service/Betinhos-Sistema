@@ -134,5 +134,5 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
 
 export function envFalso(kv: KV = kvMemoria()): Env {
   const chave = btoa(String.fromCharCode(...new Uint8Array(32).fill(3)))
-  return { KV: kv, DV_TENANT: 't', DV_CLIENT_ID: 'c', DV_CLIENT_SECRET: 's', DV_URL, EMAIL_FLOW_URL: FLOW_URL, CHAVE_TOTP: chave, CHAVE_SESSAO: btoa(String.fromCharCode(...new Uint8Array(32).fill(4))) }
+  return { KV: kv, DV_TENANT: 't', DV_CLIENT_ID: 'c', DV_CLIENT_SECRET: 's', DV_URL, EMAIL_FLOW_URL: FLOW_URL, CHAVE_TOTP: chave, CHAVE_SESSAO: btoa(String.fromCharCode(...new Uint8Array(32).fill(4))), PORTAL_URL: 'https://cliente.exemplo/' }
 }

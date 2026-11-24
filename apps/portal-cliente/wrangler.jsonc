@@ -15,11 +15,14 @@
   ],
   // 11:00 UTC = 8h em America/Sao_Paulo, seg–sex: aprovação tácita + resumo diário.
   "triggers": { "crons": ["0 11 * * 1-5"] },
+  // Link do portal nos e-mails (vars não herdam no env).
+  "vars": { "PORTAL_URL": "https://cliente.betinhos.com.br/" },
   // DEV (piloto, Dataverse DEV): `wrangler deploy --env dev` publica o Worker portal-cliente-dev.
   // KV e ratelimits não herdam do topo; cron herda. Secrets próprios (`wrangler secret put --env dev`).
   "env": {
     "dev": {
       "name": "portal-cliente-dev",
+      "vars": { "PORTAL_URL": "https://dev.portal-cliente-5jp.pages.dev/" },
       "kv_namespaces": [{ "binding": "KV", "id": "1f4cfbe2ec2f42f190f7016db632cabc" }],
       "ratelimits": [
         { "name": "RL_IP", "namespace_id": "4204", "simple": { "limit": 60, "period": 60 } },

@@ -66,7 +66,7 @@ export const validadorQualquerPorEmail = (email: string) =>
 
 /** Validadores ativos de clientes com portal, com os módulos do cliente (o resumo diário é só de quem valida). */
 export const validadoresAtivos = () =>
-  `${SET.validador}?$select=cr40f_email,_cr40f_cliente_value&${expandCliente}&$filter=${encodeURIComponent(`cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
+  `${SET.validador}?$select=cr40f_name,cr40f_email,_cr40f_cliente_value&${expandCliente}&$filter=${encodeURIComponent(`cr40f_ativo eq true and ${NAV.cliente}/cr40f_portalhabilitado eq true`)}`
 
 /** Clientes com portal cujo campo de domínios contém o domínio; a igualdade exata é conferida no código. */
 export const clientesPorDominio = (dominio: string) =>
