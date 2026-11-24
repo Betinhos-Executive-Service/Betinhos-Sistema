@@ -52,7 +52,7 @@ export const MENU: MenuGroup[] = [
       { kind: 'page', id: 'ops', label: 'Ordens de Pagamento', page: 'ops' },
       { kind: 'page', id: 'pagantes', label: 'Pagantes', page: 'pagantes' },
       { kind: 'page', id: 'pendencias', label: 'Pendências', page: 'pendencias' },
-      { kind: 'page', id: 'validacao-cliente', label: 'Validação do cliente', page: 'validacao-cliente' },
+      { kind: 'page', id: 'validacao-cliente', label: 'Portal do cliente', page: 'validacao-cliente' },
       { kind: 'page', id: 'pagamento-fornecedores', label: 'Pagamento de Fornecedores', page: 'pagamento-fornecedores' },
       { kind: 'page', id: 'despesas-operacionais', label: 'Despesas (App Motoristas)', page: 'despesas' },
     ],

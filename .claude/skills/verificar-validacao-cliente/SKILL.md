@@ -1,16 +1,16 @@
 ---
 name: verificar-validacao-cliente
-description: "Verifica a tela #/validacao-cliente do shell (financeiro acompanha a validação dos serviços pelo cliente no portal: dúvidas, retirada, fechamento do mês, Excel e validadores). Use após mudar apps/shell/src/pages/validacao-cliente/** ou o item do menu/rota dela."
+description: "Verifica a tela #/validacao-cliente do shell, "Portal do cliente" (abas Validação, Usuários e Configurações: financeiro acompanha a validação dos serviços pelo cliente no portal, dúvidas, retirada, fechamento do mês, Excel, usuários do portal e configuração por cliente). Use após mudar apps/shell/src/pages/validacao-cliente/** ou o item do menu/rota dela."
 ---
-# Verificar Validação do cliente
+# Verificar Portal do cliente (rota `validacao-cliente`)
 
 ## Cobre
-- `apps/shell/src/pages/validacao-cliente/**`: regras puras em `domain/regras.ts` (status, prazo da tácita em dias úteis sem feriados nacionais, sugestão de fechamento, linhas do Excel, validação do validador), lista no padrão DS §10.9.1/§10.9.2 em `domain/lista.ts` (visões prontas A liberar, Liberados, Em dúvida, Aprovados, Retirados; Visão padrão "Validação do cliente" sem os retirados), Excel provisório em `domain/excel.ts` (SpreadsheetML `.xls`), dados em `data/{mock,queries,source}.ts`, `components/{ValidacaoList,ValidacaoDrawer,ValidadoresDrawer}.tsx`.
-- Registro: `nav/menu.ts` (Financeiro › Validação do cliente), `app/routes.tsx`, ícone `ShieldCheck` em `app/AppShell.tsx`.
+- `apps/shell/src/pages/validacao-cliente/**`: regras puras em `domain/regras.ts` (status, prazo da tácita em dias úteis sem feriados nacionais, sugestão de fechamento, linhas do Excel, validação do validador), lista no padrão DS §10.9.1/§10.9.2 em `domain/lista.ts` (visões prontas A liberar, Liberados, Em dúvida, Aprovados, Retirados; Visão padrão "Validação do cliente" sem os retirados), Excel provisório em `domain/excel.ts` (SpreadsheetML `.xls`), dados em `data/{mock,queries,source}.ts`, `components/{ValidacaoList,ValidacaoDrawer,UsuariosTab,ConfiguracoesTab,ConfigDrawer}.tsx`. Abas (`Tabs` do DS, `?aba=usuarios|configuracoes`; vazio = Validação) em `ValidacaoClientePage.tsx`; regras da aba Configurações em `domain/config.ts` (módulos, domínios, domínios públicos, validação).
+- Registro: `nav/menu.ts` (Financeiro › Portal do cliente; id e rota seguem `validacao-cliente`), `app/routes.tsx`, ícone `ShieldCheck` em `app/AppShell.tsx`.
 - Spec: `docs/superpowers/specs/2026-10-28-portal-validacao-cliente-design.md`.
 
 ## Testes e tipos
-1. `cd apps/shell && pnpm exec vitest run src/pages/validacao-cliente` → 23 testes (15 de regras em `domain/regras.test.ts`, 8 do drawer em `components/ValidacaoDrawer.test.tsx`) em 28/10/2026.
+1. `cd apps/shell && pnpm exec vitest run --maxWorkers=2 src/pages/validacao-cliente` → testes de regras (`domain/regras.test.ts`, `domain/lista.test.ts`), das regras de configuração (`domain/config.test.ts`) e dos drawers (`ValidacaoDrawer.test.tsx`, `ConfigDrawer.test.tsx`).
    - Prazo: terça 27/10/2026 → 04/11 (pula Finados); sexta 30/10 com feriado na segunda → 09/11.
    - Excel de out/2026 da Tenaris no mock = 48207 (tácito) e 48206 (aprovado); 48208 marcado "Próximo mês" fica fora.
 2. `pnpm typecheck` sem erros; suíte completa do shell antes do PR.
@@ -22,6 +22,7 @@ description: "Verifica a tela #/validacao-cliente do shell (financeiro acompanha
 - Em dúvida: 48204 (motivo Espera), 48213 (Ternium). Respondido: 48205.
 - Aprovado: 48206, 48208 ("Próximo mês"), 48211 (set/2026, "Entra"), 48214. Aprovado automaticamente: 48207. Retirado: 48209 (conversa guardada).
 - Validadores: Carla (senha criada), Roberto (aguardando 1º acesso), Ana (inativa), Marcos (Ternium).
+- Configurações: Tenaris (ligado, 3 módulos, só cadastrados), Ternium (ligado, Validar e Meus serviços, `@ternium.com`), Embraer (desligado, Pedir). Mais 8 clientes sem portal (Latasa, Kenvue, Embraco, Whirlpool, Johnson & Johnson, Petrobras, Vale, Votorantim), no total 11 na aba Configurações.
 
 ## Roteiro no navegador (mock)
 Subir o shell em porta própria para não derrubar o dev server de outra sessão: `cd apps/shell && npx vite --port 36593 --strictPort --host 127.0.0.1` e abrir `http://127.0.0.1:36593/#/validacao-cliente` (a primeira carga do Vite pode recarregar uma vez ao otimizar dependências; os `ERR_NETWORK_CHANGED` dessa hora são do servidor subindo).
@@ -30,8 +31,18 @@ Subir o shell em porta própria para não derrubar o dev server de outra sessão
 2. Abrir 48204 → drawer "Serviço 48204" com composição, conversa e campo "Responder". Digitar, Esc → "Descartar alterações?" (Continuar editando mantém o texto). "Enviar resposta" → situação Respondido, mensagem na conversa, toast "Resposta enviada. O cliente tem até dd/mm/aaaa…". Vazio → "Escreva a resposta antes de enviar."
 3. "Retirar do portal" → confirmação explica que o cliente deixa de ver, não entra no fechamento e a conversa fica; confirmar → Retirado, conversa visível, linha sai da Visão padrão (contagem cai).
 4. Marcar a caixa de 48212 → "Incluir no fechamento" → coluna Fechamento "Entra". "Exportar Excel do mês" → Tenaris/outubro: contagem e total; exportar baixa `fechamento-tenaris-2026-10.xls`.
-5. "Validadores" → cadastrar vazio mostra os 3 erros; cadastrar Paula Rocha/Tenaris → entra na lista "Aguardando 1º acesso"; "Zerar senha" da Carla com confirmação → "Aguardando 1º acesso" (no Dataverse limpa `cr40f_senhahash` e `cr40f_senhadefinidaem`).
-6. 375 px: cards, detalhe em Sheet com "Enviar resposta", Validadores em Sheet, sem rolagem horizontal.
+5. Aba Usuários (`#/validacao-cliente?aba=usuarios`; o menu "⋮ Validadores" não existe mais) → cadastrar vazio mostra os 3 erros; cadastrar Paula Rocha/Tenaris → entra na lista "Aguardando 1º acesso"; Switch Ativo/Inativo; "Zerar senha" da Carla com confirmação → "Aguardando 1º acesso" (no Dataverse limpa `cr40f_senhahash` e `cr40f_senhadefinidaem`).
+5b. Aba Configurações (`?aba=configuracoes`): lista de TODOS os clientes ativos (DEV: `statecode eq 0`, 47; mock: 11), liberados primeiro e depois os demais por nome; cada linha com nome, Liberado/Não liberado, módulos, "Quem entra" e usuários ativos (Tenaris: 2; Ternium: 1). Busca por nome (sem acento) e chips Todos / Liberados / Não liberados com contagem (mock: 11 / 2 / 9; Embraer e os 8 sem portal são não liberados).
+   - Ligar/desligar: abrir Embraer → Portal liberado + escolher módulo → Salvar → linha "Ligado" e Embraer passa a existir no filtro de cliente da aba Validação. Desligar a Tenaris (Portal liberado off) → some da aba Validação.
+   - Módulos: ligado sem módulo → "Escolha ao menos um módulo; sem módulo ninguém entra." e nada grava.
+   - Domínios liberados: "Só e-mails cadastrados" grava domínios vazios; "Também e-mails destes domínios" mostra o campo; `@Tenaris.com; https://www.b.com.br` vira `tenaris.com`, `b.com.br`; sem ponto → "Domínio inválido".
+   - Domínio repetido: na Tenaris digitar `ternium.com` → "@ternium.com já é do cliente Ternium." (não grava); domínio de cliente desligado não bloqueia.
+   - Aviso: `gmail.com` mostra o alerta "Domínio público" e salva normalmente.
+   - Cliente sem portal: buscar "lat" → Latasa → abrir → Portal liberado + módulo → Salvar → vai para o topo da lista como Liberado e entra no filtro da aba Validação.
+   - E-mails liberados (no drawer, entre Módulos e Domínios liberados): lista os usuários do cliente (nome, e-mail, Ativo, Zerar senha); "Nome + E-mail + Liberar e-mail" cadastra na hora (toast próprio, sem Salvar, e-mail repetido recusado); Ativo e Zerar senha também gravam na hora. O contador "Usuários ativos" da linha acompanha. Sem fechar o drawer, conferir na aba Usuários que o e-mail novo aparece.
+   - Fechar: X, Esc e clique fora fecham; com alteração aparece "Descartar alterações?" (Continuar editando / Descartar); durante o salvamento não fecha. Erro ao gravar → toast danger e drawer aberto com os dados.
+   - No Dataverse (DEV): PATCH em `cr40f_clientes1` (`cr40f_portalhabilitado`, `cr40f_portalmodulos` como `'100000000,100000002'` ou null, `cr40f_portaldominios` como `a.com; b.com` ou null); conferir pela tabela e pedir código no portal com e-mail do domínio (regra no Worker `apps/portal-cliente/worker/auth.ts`, não muda).
+6. 375 px: cards, detalhe em Sheet com "Enviar resposta", drawer de configuração em Sheet, sem rolagem horizontal.
 7. Console sem erros depois da carga.
 Se o screenshot do navegador interno falhar (janela atrás), dirija pelo DOM (`dialog[open]`, `.vc-open`, `.vc-check input`) e leia o resultado no texto.
 
