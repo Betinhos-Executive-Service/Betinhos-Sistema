@@ -74,7 +74,7 @@ export function AditivoPainel({ continuarLabel, onConcluir, onConfirmado, titleR
     <section className="termo-result" aria-label="Aditivo de assinatura eletrônica">
       <h2 ref={titleRef} tabIndex={-1}>Assine o aditivo de assinatura eletrônica</h2>
       <p>Para assinar pelo app, você precisa antes assinar este aditivo no gov.br. Leva poucos minutos.</p>
-      <ol className="termo-help">
+      <ol className="termo-help" style={{ textAlign: "left", paddingLeft: 20 }}>
         <li>Baixe o aditivo.</li>
         <li>Abra o <a href={ADITIVO_ASSINADOR_URL} target="_blank" rel="noopener noreferrer">assinador do gov.br</a> e assine sem alterar o arquivo.</li>
         <li>Envie aqui o PDF que o gov.br devolver (até 5 MB).</li>

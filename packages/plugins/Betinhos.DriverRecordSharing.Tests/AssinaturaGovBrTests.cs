@@ -200,6 +200,12 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(11, r.Cpf.Length);
             var esperado = AssinaturaGovBr.Digitos(Environment.GetEnvironmentVariable("ADITIVO_REAL_CPF"));
             if (esperado.Length == 11) Assert.Equal(esperado, r.Cpf);
+            // A revisão que o gov.br acrescenta tem de passar na regra de integridade do texto.
+            var fim = System.Text.Encoding.ASCII.GetString(pdf).IndexOf("%%EOF", StringComparison.Ordinal) + 5;
+            while (fim < pdf.Length && (pdf[fim] == '\r' || pdf[fim] == '\n')) fim++;
+            var original = new byte[fim];
+            Array.Copy(pdf, original, fim);
+            Assert.Null(AcrescimoPdf.Conferir(pdf, original));
         }
     }
 }
