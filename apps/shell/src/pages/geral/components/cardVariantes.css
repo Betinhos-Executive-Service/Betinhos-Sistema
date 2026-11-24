@@ -63,3 +63,16 @@
 .gv-v2__aviso--aviso { color: var(--bt-color-warning); }
 .gv-v2__lado { display: grid; justify-items: end; gap: var(--bt-space-0-5); }
 .gv-v2__lado .bt-choice { min-height: var(--bt-control-height-compact); }
+
+/* V4 · V3 + Resumo Operacional: trilho mais estreito, pílula de status à direita do título, alertas em texto. */
+.gv-card--v4 { grid-template-columns: 56px 1fr; }
+.gv-v4__trilho { padding-block: var(--bt-space-2); }
+.gv-v4__conteudo { display: grid; gap: var(--bt-space-0-5); min-width: 0; padding: var(--bt-space-2) var(--bt-space-2) var(--bt-space-2) var(--bt-space-2-5); }
+.gv-v4__topo { display: flex; align-items: center; gap: var(--bt-space-2); min-width: 0; }
+.gv-v4__topo .gv-v2__titulo { flex: 1; }
+.gv-v4__topo .bt-badge { flex: 0 0 auto; }
+.gv-v4__sec { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gv-card--v4 .gv-corpo { grid-template-columns: minmax(0, 1fr) auto; }
+.gv-card--v4 .gv-corpo > svg { grid-row: 1 / span 2; }
+.gv-card--v4 .gv-v3__hora { font-size: var(--bt-font-size-14); }
+.gv-card--v4 .gv-corpo { row-gap: 0; }

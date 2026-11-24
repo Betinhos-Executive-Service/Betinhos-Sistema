@@ -90,7 +90,7 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
       <li className={classe} data-tom={tom} onClick={alternar}>
         <span className="gv-v2__hora">{hora}{data ? <small>{data.slice(0, 5)}</small> : null}</span>
         <div className="gv-v2__corpo">
-          <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}<span className="gv-v2__quem">{d.motorista ?? d.cliente ?? d.titulo ?? ''}</span></p>
+          <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}{d.motorista ?? d.cliente ? <span className="gv-v2__quem">{d.motorista ?? d.cliente}</span> : null}</p>
           <button type="button" className="gv-v2__linha" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
             <span className="gv-v2__rota">{d.titulo ?? '—'}</span>
             {d.cliente || d.meta ? <span className="gv-sec">{[d.cliente, d.meta].filter(Boolean).join(' · ')}</span> : null}
@@ -98,6 +98,32 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
           {avisos.length > 0 ? <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span> : null}
         </div>
         <div className="gv-v2__lado">{d.status}<Selecao d={d} selecionado={selecionado} onToggle={onToggle} /></div>
+      </li>
+    )
+  }
+
+  if (variante === 'v4') {
+    // V3 (trilho da hora com a cor do estado) com a leitura do Resumo Operacional: "#ID · quem", trajeto, pílula e alerta em texto.
+    const avisos = [...d.alertas, ...(d.motorista === null ? [{ texto: 'Sem motorista', tom: 'aviso' as const }] : [])]
+    return (
+      <li className={`${classe} gv-card--v3`} data-tom={tom} onClick={alternar}>
+        <div className="gv-v3__trilho gv-v4__trilho">
+          {hora ? <span className="gv-v3__hora">{hora}</span> : null}
+          {data ? <span className="gv-v3__data">{data.slice(0, 5)}</span> : null}
+          <Selecao d={d} selecionado={selecionado} onToggle={onToggle} />
+        </div>
+        <div className="gv-v4__conteudo">
+          <div className="gv-v4__topo">
+            <p className="gv-v2__titulo"><Codigo d={d} />{d.extra}{d.motorista ?? d.cliente ? <span className="gv-v2__quem">{d.motorista ?? d.cliente}</span> : null}</p>
+            {d.status}
+          </div>
+          <button type="button" className="gv-corpo" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
+            <span className="gv-v2__rota">{d.titulo ?? '—'}</span>
+            {d.cliente || d.meta ? <span className="gv-sec gv-v4__sec">{[d.cliente, d.meta].filter(Boolean).join(' · ')}</span> : null}
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+          {avisos.length > 0 ? <span className="gv-v2__avisos">{avisos.map((a) => <span key={a.texto} className={`gv-v2__aviso gv-v2__aviso--${a.tom}`}>{a.texto}</span>)}</span> : null}
+        </div>
       </li>
     )
   }

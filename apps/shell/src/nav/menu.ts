@@ -14,7 +14,7 @@ export type MenuItem =
   | { kind: 'page'; id: string; label: string; page: 'operacional' | 'frota' | 'funcionarios' | 'curriculos' | 'pagantes' | 'pessoas' | 'dashboard' | 'infracoes' | 'ops' | 'despesas' | 'geral' | 'documentos' | 'pendencias' | 'agentes' | 'comunicados' | 'equipamentos' | 'clientes' | 'planner' | 'validacao-cliente' | 'logs' | 'qualidade' | 'pagamento-fornecedores' | 'funcoes-operacionais' | 'inicio' | 'treinamentos' | 'cartoes' | 'composicao' | 'rh-descontos' | 'projetos' | 'app-motoristas'; agente?: 'financeiro' | 'logistica' | 'pessoas' | 'frota'; aba?: FrotaAba; variante?: VarianteCard }
 
 /** Variações do card do serviço da Geral no celular (laboratório de design, fora do menu). */
-export type VarianteCard = 'v1' | 'v2' | 'v3'
+export type VarianteCard = 'v1' | 'v2' | 'v3' | 'v4'
 
 /** Visões da Frota: cada uma é um item do menu, todas na mesma tela (`page: 'frota'`). */
 export type FrotaAba = 'pendencias' | 'veiculos' | 'manutencoes' | 'multas' | 'colisoes' | 'indicadores' | 'plano' | 'checklists'
@@ -162,6 +162,7 @@ const LABORATORIO: MenuGroup = {
     { kind: 'page', id: 'geral-card-v1', label: 'Geral · card V1 (ajuste fino)', page: 'geral', variante: 'v1' },
     { kind: 'page', id: 'geral-card-v2', label: 'Geral · card V2 (reorganizado)', page: 'geral', variante: 'v2' },
     { kind: 'page', id: 'geral-card-v3', label: 'Geral · card V3 (agenda)', page: 'geral', variante: 'v3' },
+    { kind: 'page', id: 'geral-card-v4', label: 'Geral · card V4 (agenda + Resumo)', page: 'geral', variante: 'v4' },
   ],
 }
 
