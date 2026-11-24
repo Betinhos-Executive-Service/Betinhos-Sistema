@@ -256,7 +256,7 @@ describe('Equipamentos', () => {
     window.location.hash = '#/equipamentos?ver=00000000-0000-0000-0000-000000000000'
     render(<EquipamentosPage host={{ mode: 'mock' }} />)
     expect(await screen.findByText('Equipamento não encontrado')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Voltar à lista' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Voltar à lista' }))
     await waitFor(() => expect(screen.queryByText('Equipamento não encontrado')).toBeNull())
     expect(window.location.hash).not.toContain('ver=')
     await openButton('Notebook do Financeiro')
