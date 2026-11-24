@@ -97,6 +97,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         [Theory]
         [InlineData("org23b93544", "dev")]
         [InlineData("ORG23B93544", "dev")]
+        [InlineData("unq7e5f59f4efcef01189f6000d3ac0a", "dev")]
         [InlineData("outraorg", "prod")]
         [InlineData(null, "prod")]
         public void CadastroPayload_ChoosesEnvironmentByOrganization(string organization, string ambiente)
