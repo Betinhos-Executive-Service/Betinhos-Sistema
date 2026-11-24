@@ -2,6 +2,7 @@ import { EmptyState } from '@betinhos/ui'
 import { History } from 'lucide-react'
 import { oQueMuda } from '../domain/perfis'
 import type { Historico } from '../domain/types'
+import '../acessos.css'
 
 const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 export const fmtQuando = (d: Date | null) => (d ? fmt.format(d) : '—')

@@ -15,6 +15,8 @@ export type Pessoa = {
   /** Administrador do Sistema (direto ou por equipe): vale como todos os perfis e a tela não edita. */
   admin: boolean
   alteradoEm: Date | null
+  /** Há funcionário ativo com este e-mail Microsoft; a tela Acessos lista só quem não tem. */
+  temFicha: boolean
 }
 
 export type Historico = { id: string; usuarioId: string; usuario: string; alteradoPor: string; antes: PerfisPessoa; depois: PerfisPessoa; quando: Date | null }

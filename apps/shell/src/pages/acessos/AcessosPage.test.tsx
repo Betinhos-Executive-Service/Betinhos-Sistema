@@ -35,8 +35,15 @@ describe('AcessosPage', () => {
   it('lista as pessoas com os perfis de cada uma', async () => {
     tela()
     expect((await row('Bruno Modelo')).textContent).toContain('Financeiro · Operador')
-    expect((await row('Ana Exemplo')).textContent).toContain('Administrador do Sistema')
+    expect((await row('Carla Amostra')).textContent).toContain('Operacional · Gestor')
     expect((await row('Diego Teste')).textContent).toContain('Só o Base')
+  })
+
+  it('mostra só quem não tem ficha de funcionário', async () => {
+    tela()
+    await row('Bruno Modelo')
+    expect(screen.queryAllByText('Ana Exemplo')).toHaveLength(0)
+    expect(screen.getAllByText('Diego Teste').length).toBeGreaterThan(0)
   })
 
   it('a busca filtra por perfil', async () => {

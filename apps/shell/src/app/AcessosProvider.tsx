@@ -14,10 +14,12 @@ export function AcessosProvider({ host, children }: { host: Host; children: Reac
 
   useEffect(() => {
     let vivo = true
-    setEstado({ status: 'carregando' })
+    // Quem já tem os acessos lidos (releitura do aviso de leitura parcial) segue com eles: voltar a "carregando"
+    // desmontaria a tela aberta, com o que estivesse digitado nela.
+    setEstado((atual) => (atual.status === 'pronto' ? atual : { status: 'carregando' }))
     carregarAcessos(host).then(
       ({ acessos, parcial }) => { if (vivo) setEstado({ status: 'pronto', acessos, parcial }) },
-      () => { if (vivo) setEstado({ status: 'erro' }) },
+      () => { if (vivo) setEstado((atual) => (atual.status === 'pronto' ? { ...atual, parcial: true } : { status: 'erro' })) },
     )
     return () => { vivo = false }
   }, [host, tentativa])

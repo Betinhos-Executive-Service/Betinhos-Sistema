@@ -1,4 +1,4 @@
-import { Alert, Button, buttonClassName, Dialog, Tabs } from '@betinhos/ui'
+import { Alert, Button, buttonClassName, Dialog, Tabs, useToast } from '@betinhos/ui'
 import { Car, ChevronLeft, ExternalLink, FileText, FolderOpen, KeyRound, Megaphone, Package, Save, StickyNote, TriangleAlert, Undo2, UserRound, X, type LucideIcon } from 'lucide-react'
 import { useQueryTexto } from '../../../nav/queryState'
 import { useIsMobile } from '../lib/useMediaQuery'
@@ -19,6 +19,8 @@ import { AnotacoesTab } from './Anotacoes'
 import { ComunicadosTab } from './ComunicadosTab'
 import type { Source as ComunicadosSource } from '../../comunicados/data/source'
 import { AcessoApp, type EstadoAcesso, SeloApp, useContaApp } from './AcessoApp'
+import { AcessoSistema, PERFIS_LIVRES, type EstadoPerfis } from './AcessoSistema'
+import type { Source as AcessosSource } from '../../acessos/data/source'
 import type { AcessoInicial, AcessoSource } from '../data/acesso'
 import { DocumentosArquivos } from './DocumentosArquivos'
 import { Checklist } from '../../documentos/components/Checklist'
@@ -55,13 +57,15 @@ type Props = {
   acesso?: AcessoSource | null
   /** Fonte dos comunicados; sem ela a aba Comunicados some. */
   comunicados?: ComunicadosSource | null
+  /** Fonte dos acessos; sem ela (ou sem o perfil de acessos) o bloco "Acesso ao sistema" não aparece. */
+  acessosSistema?: AcessosSource | null
   onCadastrarAcesso?: (inicial: AcessoInicial) => void
   /** E-mail criado pelo cadastro cuja liberação no Dataverse ficou pendente (ainda não gravado na ficha). */
   emailPendente?: string
   onLiberacaoConcluida?: (id: string) => void
 }
 
-export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, comunicados, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
+export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, comunicados, acessosSistema, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
   const notify = useNotify()
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
@@ -75,6 +79,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
   const tab: Tab = !id ? 'dados' : tabs.find((item) => item.key === secao)?.key ?? 'dados'
   const idAnterior = useRef(id)
   const [discarding, setDiscarding] = useState(false)
+  const [perfis, setPerfis] = useState<EstadoPerfis>(PERFIS_LIVRES)
   const panel = useRef<HTMLElement>(null)
   const mobile = useIsMobile()
 
@@ -143,10 +148,17 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
     aniversario: original.values.cr40f_datadeaniversario as string | null,
   }, todaySP()) : []
 
+  const toast = useToast()
+  // O bloco de perfis é desmontado ao sair da aba: com rascunho pendente a troca não acontece, para não perdê-lo sem aviso.
+  function trocarAba(next: string) {
+    if (perfis.alterado || perfis.salvando) { toast({ tone: 'warning', message: 'Salve ou descarte os perfis antes de trocar de aba.' }); return }
+    setTab(next)
+  }
+
   // Com alteração não salva, pergunta antes de fechar; durante o salvamento, não fecha.
   function requestClose() {
-    if (saving) return
-    if (touched) { setDiscarding(true); return }
+    if (saving || perfis.salvando) return
+    if (touched || perfis.alterado) { setDiscarding(true); return }
     onClose()
   }
 
@@ -246,7 +258,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
         </header>
 
         <div className="drawer-tabs">
-          <Tabs aria-label="Seções da ficha" value={tab} onChange={(next) => setTab(next)} tabs={tabs.map((item) => ({
+          <Tabs aria-label="Seções da ficha" value={tab} onChange={trocarAba} tabs={tabs.map((item) => ({
               value: item.key,
               icon: <item.icon aria-hidden />,
               // Só a aba aberta mostra o nome; nas outras ele vira dica no hover (no celular, só para leitor de tela) e segue como nome acessível.
@@ -318,6 +330,7 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                   onCadastrar={() => onCadastrarAcesso?.({ funcionarioId: original.id, nomeCompleto: String(original.values.cr40f_nomecompleto ?? ''), celular: String(original.values.cr40f_telefonecorporativo ?? '') })}
                 />
               )}
+              <AcessoSistema email={emailFicha} source={acessosSistema} onEstado={setPerfis} />
               <section className="group">
                 <SecretText html={original.loginsesenhas} onSave={async (html) => { await source.saveLogins(original.id, html); setOriginal(await source.get(original.id)) }} />
               </section>

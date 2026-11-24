@@ -6,8 +6,8 @@ import { MENU } from './menu'
 const ids = (grupos: { items: { id: string }[] }[]) => grupos.flatMap((g) => g.items.map((i) => i.id))
 
 describe('menuVisivel', () => {
-  it('quem tem todos os perfis vê o menu inteiro', () => {
-    expect(ids(menuVisivel(TODOS))).toEqual(ids(MENU))
+  it('quem tem todos os perfis vê o menu inteiro, menos as rotas fora do menu', () => {
+    expect(ids(menuVisivel(TODOS))).toEqual(ids(MENU).filter((id) => id !== 'acessos'))
   })
 
   it('quem só tem o Base vê só as rotas livres, e grupo vazio some', () => {
@@ -29,10 +29,16 @@ describe('menuVisivel', () => {
     expect(perfisDoItem('geral')).toEqual(['operacional'])
   })
 
-  it('Acessos aparece só para Administrador de acessos e para o Administrador do Sistema', () => {
+  it('Acessos sem ficha não tem item no menu, mas a rota segue com a guarda do perfil', () => {
+    for (const a of [TODOS, { admin: false, areas: {}, acessos: true }, NENHUM]) expect(ids(menuVisivel(a))).not.toContain('acessos')
+    expect(perfisDoItem('acessos')).toEqual(['acessos'])
+    expect(MENU.flatMap((g) => g.items).some((i) => i.id === 'acessos')).toBe(true)
+  })
+
+  it('Funcionários abre para RH e para o Administrador de acessos', () => {
     const ver = (a: Acessos) => ids(menuVisivel(a))
-    expect(ver({ admin: false, areas: { financeiro: 'gestor' }, acessos: false })).not.toContain('acessos')
-    expect(ver({ admin: false, areas: {}, acessos: true })).toContain('acessos')
-    expect(ver(TODOS)).toContain('acessos')
+    expect(ver({ admin: false, areas: {}, acessos: true })).toContain('funcionarios')
+    expect(ver(lerPapeis(['Perfil - RH - Operador']))).toContain('funcionarios')
+    expect(ver({ admin: false, areas: { financeiro: 'gestor' }, acessos: false })).not.toContain('funcionarios')
   })
 })

@@ -26,6 +26,13 @@ describe('fonte real', () => {
     }],
   }
 
+  it('temFicha cruza o e-mail sem diferenciar maiúsculas e, sem ler as fichas, ninguém some', async () => {
+    const com = await createSource(real({ ...respostas, cr40f_funcionarioses: [{ cr40f_emailmicrosoft: ' ANA@exemplo.test ' }] })).load()
+    expect(com.pessoas.map((x) => [x.nome, x.temFicha])).toEqual([['Ana Exemplo', true], ['Bruno Modelo', false]])
+    const sem = await createSource(real(respostas)).load()
+    expect(sem.pessoas.every((x) => !x.temFicha)).toBe(true)
+  })
+
   it('monta pessoas (admin por equipe), histórico com nomes e a última alteração', async () => {
     const dados = await createSource(real(respostas)).load()
     expect(dados.euId).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')

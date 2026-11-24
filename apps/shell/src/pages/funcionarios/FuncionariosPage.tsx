@@ -1,8 +1,10 @@
 import { Alert, Button, EmptyState, SearchBox, ToastProvider, ViewBar, type MenuAction } from '@betinhos/ui'
-import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, Stethoscope } from 'lucide-react'
+import { Cake, CloudOff, IdCard, KeyRound, Plus, RefreshCw, SearchX, ShieldCheck, Stethoscope } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
+import { temAlgum } from '../../app/acessos'
+import { acessosDe, useAcessos } from '../../app/AcessosProvider'
 import { SearchHits } from '../../app/SearchHits'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
@@ -12,7 +14,7 @@ import { filterRows } from '../../app/filterRows'
 import { useListView } from '../../app/useListView'
 import { useProgressiveData } from '../../app/useProgressiveData'
 import { useQueryFilters, useQueryId, useQueryTexto } from '../../nav/queryState'
-import { useHashQuery } from '../../nav/useHashRoute'
+import { hrefFor, useHashQuery } from '../../nav/useHashRoute'
 import { destinoDeVolta } from './lib/voltar'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
@@ -21,6 +23,7 @@ import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, F
 import { type AcessoInicial, createAcessoSource } from './data/acesso'
 import { createFuncionariosSource } from './data/hostSource'
 import { createSource as createComunicadosSource } from '../comunicados/data/source'
+import { createSource as createAcessosSource } from '../acessos/data/source'
 import { funcionariosQuery } from './data/query'
 import type { DataSource } from './data/source'
 import type { Funcionario, FuncionarioView } from './data/types'
@@ -150,6 +153,9 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
   const comunicados = useMemo(() => createComunicadosSource(host), [host])
+  const verAcessosSemFicha = temAlgum(acessosDe(useAcessos()), ['acessos'])
+  const irParaAcessos = useCallback(() => { location.hash = hrefFor('acessos') }, [])
+  const acessosSistema = useMemo(() => createAcessosSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
     setAcessoAberto(null)
     setLiberacoesPendentes(({ [id]: _, ...resto }) => (emailPendente ? { ...resto, [id]: emailPendente } : resto))
@@ -160,7 +166,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
 
   const ativos = views.filter((row) => row.values.cr40f_status === 0).length
   const ficha = selection.mode !== 'closed' && (
-    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} comunicados={comunicados} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })}
+    <Ficha source={source} docs={docs} id={selection.mode === 'open' ? selection.id : null} onClose={() => { if (voltar) location.hash = voltar; else setSelection({ mode: 'closed' }) }} onSaved={onSaved} onAditivoSalvo={voltar ? () => { location.hash = voltar } : undefined} versao={fichaVersao} acesso={acesso} comunicados={comunicados} acessosSistema={acessosSistema} onCadastrarAcesso={(inicial) => setAcessoAberto({ inicial })}
       emailPendente={selection.mode === 'open' ? liberacoesPendentes[selection.id] : undefined}
       onLiberacaoConcluida={(id) => { setLiberacoesPendentes(({ [id]: _, ...resto }) => resto); void onSaved(id, false) }} />
   )
@@ -188,6 +194,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           onReload={() => void reload()}
           onOpen={(id) => setSelection({ mode: 'open', id })}
           onNew={() => setSelection({ mode: 'new' })}
+          onAcessosSemFicha={verAcessosSemFicha ? irParaAcessos : undefined}
         />
         {ficha}
         {acessoDrawer}
@@ -223,6 +230,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           more={moreActions}
           primary={<>
             <Button variant="secondary" icon={<RefreshCw size={16} />} aria-label="Recarregar lista" title="Atualizar" loading={loading} onClick={() => void reload()} />
+            {verAcessosSemFicha ? <Button variant="secondary" icon={<ShieldCheck size={16} />} onClick={irParaAcessos}>Acessos sem ficha</Button> : null}
             <Button icon={<Plus size={16} />} onClick={() => setSelection({ mode: 'new' })}>Novo</Button>
           </>}>
           <EnvBadge env={source.envLabel} />
