@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { Button, Checkbox, StatusBadge } from '@betinhos/ui'
-import { ChevronRight, Pencil, Wrench } from 'lucide-react'
+import { Building2, CalendarRange, ChevronRight, Pencil, UserRound, Users, Wrench } from 'lucide-react'
 import type { VarianteCard } from '../../../nav/menu'
 import './cardVariantes.css'
 
@@ -140,9 +140,9 @@ export function CardVariante({ variante, d, selecionado, onToggle }: Props) {
           <button type="button" className="gv-corpo" aria-label={`${d.acao.rotulo}: ${d.codigo}`} onClick={d.acao.onClick}>
             <span className="gv-v4__rota">{d.titulo ?? '—'}</span>
             <span className="gv-v4__campos">
-              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo"><small>Pax</small><strong>{d.pax.join(', ')}</strong></span> : null}
-              {d.manutencao ? (d.meta ? <span className="gv-v4__campo"><small>Janela</small><strong>{d.meta}</strong></span> : null) : <span className="gv-v4__campo"><small>Cliente</small><strong>{d.cliente ?? '—'}</strong></span>}
-              {d.motorista ? <span className="gv-v4__campo"><small>Motorista</small><strong>{d.motorista}</strong></span> : null}
+              {d.pax && d.pax.length > 0 ? <span className="gv-v4__campo" title="Passageiros"><Users size={13} aria-label="Passageiros" /><span>{d.pax.join(', ')}</span></span> : null}
+              {d.manutencao ? (d.meta ? <span className="gv-v4__campo" title="Janela"><CalendarRange size={13} aria-label="Janela" /><span>{d.meta}</span></span> : null) : <span className="gv-v4__campo" title="Cliente"><Building2 size={13} aria-label="Cliente" /><span>{d.cliente ?? '—'}</span></span>}
+              {d.motorista ? <span className="gv-v4__campo" title="Motorista"><UserRound size={13} aria-label="Motorista" /><span>{d.motorista}</span></span> : null}
             </span>
             <ChevronRight size={18} aria-hidden="true" />
           </button>
