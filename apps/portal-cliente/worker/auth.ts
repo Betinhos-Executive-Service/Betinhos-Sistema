@@ -90,7 +90,7 @@ export async function solicitarCodigo(req: Request, c: Ctx): Promise<Response> {
         cr40f_tentativas: 0,
         cr40f_usado: false,
       })
-      await enviarEmail(c.env, 'codigo', [email], { nome: v.cr40f_name, codigo, validoMinutos: 10 })
+      await enviarEmail(c.env, 'codigo', [email], { nome: String(v.cr40f_name || nomeDoEmail(email)), codigo, validadeMinutos: 10 })
     })().catch((e) => console.error('auth/codigo', String(e))),
   )
   return new Response(null, { status: 204 })

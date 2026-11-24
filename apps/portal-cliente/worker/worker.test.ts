@@ -266,6 +266,19 @@ describe('cron', () => {
     const resumos = emails.filter((e) => e.tipo === 'resumo_diario')
     expect(resumos).toHaveLength(1)
     expect(resumos[0].para).toEqual(['fiscal@tenaris.com'])
+    // Contrato do flow (packages/deploy/flows/portal-cliente-emails.json): sem nome/cliente/linkPortal ele responde 400.
+    const d = resumos[0].dados as { liberadosHoje: unknown[]; vencendo: unknown[] }
+    expect(d).toMatchObject({ nome: expect.stringMatching(/\S/), cliente: expect.stringMatching(/\S/), linkPortal: 'https://cliente.exemplo/' })
+    for (const l of d.liberadosHoje) expect(l).toMatchObject({ numero: expect.any(String), data: expect.stringMatching(/^(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})?$/), trajeto: expect.stringContaining(' → '), valor: expect.any(Number) })
+    for (const v of d.vencendo) expect(v).toMatchObject({ numero: expect.any(String), prazo: expect.stringMatching(/^\d{2}\/\d{2}\/\d{4}$/) })
+    expect(d.liberadosHoje.length + d.vencendo.length).toBeGreaterThan(0)
+  })
+
+  it('código de acesso segue o contrato do flow (nome, codigo, validadeMinutos)', async () => {
+    emails.length = 0
+    await logar('fiscal@tenaris.com')
+    const c = emails.find((e) => e.tipo === 'codigo')
+    expect(c?.dados).toMatchObject({ nome: expect.stringMatching(/\S/), codigo: expect.stringMatching(/^\d{6}$/), validadeMinutos: 10 })
   })
 
   it('cliente sem o módulo Validar não recebe resumo, mesmo com validação liberada por engano', async () => {

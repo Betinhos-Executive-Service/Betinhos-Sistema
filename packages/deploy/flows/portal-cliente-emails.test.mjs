@@ -213,15 +213,17 @@ test('escape de HTML: nome com <script> não vira tag, nem em campos da tabela',
     if (c.dados.liberadosHoje) c.dados.liberadosHoje[0].trajeto = '<img src=x onerror=alert(1)>'
     if (c.dados.trecho) c.dados.trecho = '"><a href="https://mal">x</a>'
     const html = executar(c).email.Body
-    assert.doesNotMatch(html, /<script|<img|href="https:\/\/mal/i, ex.tipo)
+    assert.doesNotMatch(html, /<script|<img(?! src="https:\/\/)|href="https:\/\/mal/i, ex.tipo)
     assert.ok(html.includes('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; O&#39;Neil &#123;&#123;codigo}}'), ex.tipo)
   }
 })
 
-test('modelos no padrão do e-mail (§14.5): 640 px, fundo #F0F0F0, CTA navy 44 px, sem imagem nem gradiente', () => {
+test('modelos no padrão do e-mail (§14.5): 640 px, fundo #F0F0F0, CTA navy 44 px, só a logo como imagem, sem gradiente', () => {
   for (const arq of Object.values(modelos)) {
     const h = ler(`./portal-cliente-emails/${arq}`)
-    assert.doesNotMatch(h, /<img|gradient|<style|@\{|url\(/i, arq)
+    assert.doesNotMatch(h, /gradient|<style|@\{|url\(|border-left/i, arq)
+    // Única imagem: a logo, com alt e tamanho fixo (cliente que bloqueia imagem mostra o texto).
+    assert.deepEqual(h.match(/<img[^>]*>/g) ?? [], /resumo-linha/.test(arq) ? [] : [h.match(/<img src="\{\{logoUrl\}\}" width="143" height="80" alt="Betinhos Executive Service"[^>]*>/)?.[0]], arq)
     assert.ok(!h.startsWith('@'))
   }
   for (const arq of ['codigo.html', 'resumo-diario.html', 'resposta-betinhos.html']) {
@@ -232,6 +234,12 @@ test('modelos no padrão do e-mail (§14.5): 640 px, fundo #F0F0F0, CTA navy 44 
   for (const arq of ['resumo-diario.html', 'resposta-betinhos.html']) {
     assert.match(ler(`./portal-cliente-emails/${arq}`), /bgcolor="#001A3D"[^>]*>.*height:44px;[^>]*color:#FFFFFF;[^>]*>Abrir o portal/s)
   }
+})
+
+test('logo: usa a logoUrl enviada e, sem ela, a do portal de produção', () => {
+  const comLogo = structuredClone(exemplos.codigo); comLogo.dados.logoUrl = 'https://dev.exemplo/email/logo-betinhos.png'
+  assert.match(executar(comLogo).email.Body, /<img src="https:\/\/dev\.exemplo\/email\/logo-betinhos\.png"/)
+  for (const ex of Object.values(exemplos)) assert.match(executar(ex).email.Body, /<img src="https:\/\/cliente\.betinhos\.com\.br\/email\/logo-betinhos\.png"/, ex.tipo)
 })
 
 test('toda ação citada em expressões existe, nomes únicos e nenhum dado de ambiente no repo', () => {

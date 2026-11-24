@@ -28,4 +28,6 @@ export interface Env {
   CHAVE_TOTP: string
   /** 32 bytes em base64: cifra os cookies de sessão e da etapa do autenticador. */
   CHAVE_SESSAO: string
+  /** Link do portal nos e-mails (var do wrangler.jsonc). */
+  PORTAL_URL: string
 }
