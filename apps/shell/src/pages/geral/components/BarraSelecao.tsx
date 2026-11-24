@@ -47,7 +47,29 @@ function useAlturaPublicada() {
 }
 
 /** Barra de seleção do celular em 3 variações; recebe a mesma `selection` que o `ViewBar` do DS. */
-export function BarraSelecao({ variante, selection, total, onTodos }: { variante: VarianteBarra; selection: ViewBarSelection; total?: number; onTodos?: () => void }) {
+type PropsBarra = { variante: VarianteBarra; selection: ViewBarSelection; total?: number; onTodos?: () => void }
+
+const SAIDA_MS = 180
+
+/**
+ * Monta a barra enquanto há seleção e a mantém por `SAIDA_MS` depois de desmarcar, com a última contagem, para ela
+ * descer em vez de sumir. Com `prefers-reduced-motion` some na hora.
+ */
+export function BarraSelecaoAnimada({ ativo, ...props }: PropsBarra & { ativo: boolean }) {
+  const [montado, setMontado] = useState(ativo)
+  const ultima = useRef(props.selection)
+  if (ativo) ultima.current = props.selection
+  useEffect(() => {
+    if (ativo) { setMontado(true); return }
+    const reduz = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const t = window.setTimeout(() => setMontado(false), reduz ? 0 : SAIDA_MS)
+    return () => window.clearTimeout(t)
+  }, [ativo])
+  if (!ativo && !montado) return null
+  return <BarraSelecao {...props} selection={ativo ? props.selection : ultima.current} saindo={!ativo} />
+}
+
+export function BarraSelecao({ variante, selection, total, onTodos, saindo = false }: PropsBarra & { saindo?: boolean }) {
   const ref = useAlturaPublicada()
   const [folha, setFolha] = useState(false)
   const ids = variante === 'b' ? (selection.count === 1 ? PRINCIPAIS_B.um : PRINCIPAIS_B.varios) : PRINCIPAIS
@@ -77,7 +99,7 @@ export function BarraSelecao({ variante, selection, total, onTodos }: { variante
 
   if (variante === 'b') {
     return (
-      <div ref={ref} className="gs-barra gs-barra--b" role="group" aria-label="Comandos da seleção">
+      <div ref={ref} className={saindo ? 'gs-barra gs-barra--b is-saindo' : 'gs-barra gs-barra--b'} role="group" aria-label="Comandos da seleção" aria-hidden={saindo || undefined}>
         <div className="gs-b__topo">
           <button type="button" className="gs-icone gs-b__fechar" aria-label="Desmarcar tudo" title="Desmarcar tudo" onClick={selection.onClear}><X size={20} aria-hidden="true" /></button>
           <span role="status" className="gs-b__selo"><CheckCheck size={14} aria-hidden="true" /><span key={selection.count} className="gs-b__numero">{contagem(selection.count)}</span></span>

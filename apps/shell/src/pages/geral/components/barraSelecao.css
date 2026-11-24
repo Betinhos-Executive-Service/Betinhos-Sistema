@@ -56,3 +56,8 @@
 .gs-barra--b .gs-b__topo { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); gap: var(--bt-space-1); }
 .gs-barra--b .gs-b__fechar { justify-self: center; }
 .gs-barra--b .gs-b__todos { justify-self: center; }
+
+/* B · saída: desce e esmaece; inerte enquanto sai. */
+.gs-barra--b.is-saindo { animation: gs-desce .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
+@keyframes gs-desce { from { transform: none; opacity: 1; } to { transform: translateY(100%); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .gs-barra--b.is-saindo { animation: none; } }
