@@ -113,6 +113,7 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
 
   const enviar = () => executar(async () => {
     if (impedimento) return
+    await salvarValor() // o servidor divide o valor gravado na multa, então o digitado precisa estar salvo antes
     await source.enviarTermoMulta(multa.id, acordo)
     setConfirmarEnvio(false)
     notify('success', 'Termo enviado ao motorista.')
@@ -159,7 +160,7 @@ export function AvisoPorTermo({ source, multa, termoPendente, valorCatalogo, hoj
         <div className="frota-termo__form">
           <p className="frota-muted">O motorista recebe o termo no app e assina ou contesta em até {PRAZO_TERMO_DIAS} dias. Se preferir, avise pelo WhatsApp.</p>
           <div className="frota-fields">
-            <Field label="Valor da guia (R$)" hint={multa.valorGuia === null && valorCatalogo !== null ? 'Pré-preenchido com o valor do catálogo de infrações.' : undefined}>
+            <Field label="Valor cheio da multa (R$)" hint="Valor da guia sem o desconto de 40% (pré-preenchido pelo catálogo). As parcelas dividem este valor.">
               <Input type="number" inputMode="decimal" min="0" step="0.01" prefix="R$" value={valorGuia} onChange={(e) => setValorGuia(e.target.value)} onBlur={() => void salvarValor()} />
             </Field>
             <Field label="Parcelas">

@@ -48,6 +48,8 @@ public sealed class MultaEstado
     [DataMember(Name = "motivoEmpresa")] public int? MotivoEmpresa { get; set; }
     [DataMember(Name = "dataParaIndicar")] public string? DataParaIndicar { get; set; }
     [DataMember(Name = "dataAviso")] public string? DataAviso { get; set; }
+    /// <summary>Dia em que o plugin pediu o aviso automático (push) ao motorista; só escrita, o flow "Multa | Aviso ao motorista" dispara por ela. Não faz parte do avanço de etapa.</summary>
+    [DataMember(Name = "avisoAutomaticoEm")] public string? AvisoAutomaticoEm { get; set; }
     [DataMember(Name = "canal")] public int? Canal { get; set; }
     [DataMember(Name = "dataIndicacao")] public string? DataIndicacao { get; set; }
     [DataMember(Name = "indicado")] public bool? Indicado { get; set; }
@@ -68,6 +70,8 @@ public sealed class MultaEstado
     [DataMember(Name = "termoParcelas")] public int? TermoParcelas { get; set; }
     [DataMember(Name = "termoPrimeiroMes")] public string? TermoPrimeiroMes { get; set; }
     [DataMember(Name = "termoValor")] public decimal? TermoValor { get; set; }
+    /// <summary>Valor cheio da multa (new_valorguia, ou cr40f_valordamulta do catálogo da infração): base das parcelas na folha. Carregado pelo passo.</summary>
+    [DataMember(Name = "valorCheio")] public decimal? ValorCheio { get; set; }
     /// <summary>Contagem de new_parcelamultafolha da multa, carregada pelo passo. Ausente = 0.</summary>
     [DataMember(Name = "parcelasPrevistas")] public int? ParcelasPrevistas { get; set; }
     [DataMember(Name = "parcelasDescontadas")] public int? ParcelasDescontadas { get; set; }
@@ -76,7 +80,7 @@ public sealed class MultaEstado
 }
 
 /// <summary>DadosJson da cr40f_PassoMulta. Textos fixos: responsavel motorista|empresa, motivo prazo-perdido|culpa-empresa,
-/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM, parcelas 1 a 12.</summary>
+/// canal senatran|dsv|prefeitura, acerto folha|empresa, resultado deferido|indeferido, competencia yyyy-MM, parcelas 1 a 3.</summary>
 [DataContract]
 public sealed class DadosPasso
 {
@@ -303,6 +307,7 @@ public static class MultaEtapas
     {
         if (d.Competencia == null || !MesIso.IsMatch(d.Competencia)) return "Informe o mês do desconto.";
         if (!(m.ValorPago > 0)) return "Registre o pagamento antes de lançar na folha.";
+        if (!(m.ValorCheio > 0)) return "A multa não tem o valor cheio; informe o valor da guia ou vincule a infração do catálogo.";
         if (string.IsNullOrWhiteSpace(m.MotoristaId)) return "A multa não tem motorista; defina o responsável antes.";
         if (m.TermoParcelas is int assinadas)
         {
@@ -315,7 +320,7 @@ public static class MultaEtapas
         var c = MultaParcelas.Competencia(d.Competencia);
         if (string.CompareOrdinal(c, de) < 0 || string.CompareOrdinal(c, ate) > 0) return $"Escolha um mês entre {MultaParcelas.MesBr(de)} e {MultaParcelas.MesBr(ate)}.";
         var n = d.Parcelas ?? 1;
-        return n < 1 || n > MultaParcelas.Maximo ? "Escolha de 1 a 12 parcelas." : null;
+        return n < 1 || n > MultaParcelas.MaximoParcelas ? "Escolha de 1 a 3 parcelas." : null;
     }
 
     public static MultaEstado Aplicar(MultaEstado m, string passo, DadosPasso d, string hoje)
@@ -326,7 +331,7 @@ public static class MultaEtapas
             case Passos.DefinirResponsavel:
                 n.ContestadaEm = null;
                 if (d.Responsavel == "empresa") { n.Responsavel = MultaCodigos.Empresa; n.MotivoEmpresa = MultaCodigos.CulpaDaEmpresa; n.Status = MultaCodigos.Pagar; }
-                else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; }
+                else { n.Responsavel = MultaCodigos.Motorista; n.MotoristaId = d.MotoristaId; n.Status = MultaCodigos.Indicar; n.AvisoAutomaticoEm = hoje; }
                 break;
             case Passos.AvisarMotorista:
                 n.DataAviso = string.IsNullOrWhiteSpace(d.Data) ? hoje : d.Data;
@@ -388,7 +393,7 @@ public static class MultaEtapas
     private static readonly (string Campo, Func<MultaEstado, object?> Ler)[] Campos =
     {
         ("status", m => m.Status), ("responsavel", m => m.Responsavel), ("motoristaId", m => m.MotoristaId), ("motivoEmpresa", m => m.MotivoEmpresa),
-        ("dataAviso", m => m.DataAviso), ("canal", m => m.Canal), ("dataIndicacao", m => m.DataIndicacao), ("indicado", m => m.Indicado),
+        ("dataAviso", m => m.DataAviso), ("avisoAutomaticoEm", m => m.AvisoAutomaticoEm), ("canal", m => m.Canal), ("dataIndicacao", m => m.DataIndicacao), ("indicado", m => m.Indicado),
         ("aceiteEm", m => m.AceiteEm), ("pagaEm", m => m.PagaEm), ("valorPago", m => m.ValorPago), ("competencia", m => m.Competencia),
         ("acertoEm", m => m.AcertoEm), ("encerradaEm", m => m.EncerradaEm), ("canceladaEm", m => m.CanceladaEm),
         ("motivoCancelamento", m => m.MotivoCancelamento), ("recursoPendente", m => m.RecursoPendente),

@@ -63,7 +63,7 @@ namespace Betinhos.DriverRecordSharing
         private const int TextoTipoAditivo = 100000001;
         private const string ColunaAditivo = "new_aditivoassinatura";
         private const string PassoMulta = "cr40f_PassoMulta";
-        private const int MaxParcelas = 12;
+        private const int MaxParcelas = 3; // decisão da Frota, 24/11/2026: 1x a 3x; termos antigos com 4 a 12 seguem válidos
         private const string VersaoProvisoria = "v0-placeholder";
         private const string MultaMudouDeEtapa = "Esta multa mudou de etapa e o termo não pode mais ser assinado. Procure o escritório.";
         private const int StatusIndicar = 202410004;
@@ -227,6 +227,12 @@ namespace Betinhos.DriverRecordSharing
             pendenteQuery.Criteria.AddCondition("new_multa", ConditionOperator.Equal, multaId);
             pendenteQuery.Criteria.AddCondition("new_status", ConditionOperator.Equal, Pendente);
 
+            // A base é o valor cheio da multa (guia ou catálogo da infração), não o que o gestor digitou: o servidor é a fonte.
+            var infracao = multa.GetAttributeValue<EntityReference>("cr40f_codigodainfracao");
+            var catalogo = infracao == null ? null : system.Retrieve(infracao.LogicalName, infracao.Id, new ColumnSet("cr40f_codigodainfracao", "cr40f_descricaodainfracao", "cr40f_valordamulta"));
+            var valorCheio = multa.GetAttributeValue<Money>("new_valorguia")?.Value ?? catalogo?.GetAttributeValue<Money>("cr40f_valordamulta")?.Value;
+            if (valorCheio > 0) valorTotal = valorCheio.Value;
+
             var erro = ValidarAcordo(forma, parcelas, valorTotal, competencia, hoje,
                 temMotorista: motorista != null,
                 temAditivo: motorista != null && TemAditivo(motorista),
@@ -238,8 +244,6 @@ namespace Betinhos.DriverRecordSharing
             var texto = TextoVigente(system);
             if (texto.GetAttributeValue<string>("new_versao") == VersaoProvisoria) throw new InvalidPluginExecutionException("O texto do termo ainda é provisório.");
             var placa = Placa(system, multa);
-            var infracao = multa.GetAttributeValue<EntityReference>("cr40f_codigodainfracao");
-            var catalogo = infracao == null ? null : system.Retrieve(infracao.LogicalName, infracao.Id, new ColumnSet("cr40f_codigodainfracao", "cr40f_descricaodainfracao", "cr40f_valordamulta"));
             var infracaoTexto = catalogo == null ? (infracao?.Name ?? "não informada")
                 : (catalogo.GetAttributeValue<string>("cr40f_codigodainfracao") + " - " + catalogo.GetAttributeValue<string>("cr40f_descricaodainfracao")).Trim(' ', '-');
             var formaTexto = forma == Folha ? "Desconto em folha" : "Paga a guia";
@@ -327,7 +331,7 @@ namespace Betinhos.DriverRecordSharing
             if (!temAditivo) return SemAditivo;
             if (termoPendente()) return "Já existe um termo pendente para esta multa.";
             if (forma != Folha) return "O termo agora é só para desconto em folha.";
-            if (parcelas < 1 || parcelas > MaxParcelas) return "Escolha de 1 a 12 parcelas.";
+            if (parcelas < 1 || parcelas > MaxParcelas) return "Escolha de 1 a 3 parcelas.";
             if (!competencia.HasValue || DateOnly(competencia.Value).Day != 1 || competencia.Value.TimeOfDay != TimeSpan.Zero) return "Competência inválida.";
             var de = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(-1);
             var ate = new DateTime(hoje.Year, hoje.Month, 1).AddMonths(12);
@@ -344,7 +348,7 @@ namespace Betinhos.DriverRecordSharing
             public decimal Valor;
         }
 
-        /// Espelha calcularParcelas: centavos inteiros, sobra nas primeiras, soma exata.
+        /// Espelha calcularParcelas: centavos inteiros, a sobra vai para a última parcela, soma exata.
         public static List<Parcela> CalcularParcelas(decimal valorTotal, int parcelas, DateTime primeiraCompetencia)
         {
             var total = EmCentavos(valorTotal);
@@ -354,7 +358,7 @@ namespace Betinhos.DriverRecordSharing
             {
                 Numero = i + 1,
                 Competencia = primeiraCompetencia.Date.AddMonths(i),
-                Valor = (baseCentavos + (i < sobra ? 1 : 0)) / 100m,
+                Valor = (baseCentavos + (i == parcelas - 1 ? sobra : 0)) / 100m,
             }).ToList();
         }
 

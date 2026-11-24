@@ -8,7 +8,7 @@ import type { DataSource } from '../data/source'
 import type { FrotaData, Multa, ParcelaFolha, Ref, TermoMulta } from '../data/types'
 import { mensagemDaAcao } from '../data/xrm'
 import { estadoDaMulta, responsavelDaMulta, urgenciaDoPrazo } from '../domain/multaEstado'
-import { aberta, avaliar, dataAceiteInicial, janelaCompetencia, mesBr, mesDoTermo, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
+import { aberta, avaliar, dataAceiteInicial, janelaCompetencia, MAXIMO_PARCELAS, mesBr, mesDoTermo, previaParcelas, responsavelEfetivo, ROTULO_PASSO, validarPasso, type DadosPasso, type Etapa, type MultaEstado, type Passo } from '../domain/multaEtapas'
 import { mensagemWhatsApp } from '../domain/multaMensagem'
 import { AvisoPorTermo } from './TermoMultaPanel'
 import { useNotify } from './Toasts'
@@ -83,7 +83,8 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   }, [source, multa.id, temTermo, multa.termo?.status, multa.termo?.enviadoEm, multa.termoVigente?.id, versaoTermos])
   const ultimoTermo = termos[0] ?? null
   const termoPendente = termos.find((t) => t.status === 'pendente') ?? null
-  const estado = useMemo(() => estadoDaMulta(multa, ultimoTermo), [multa, ultimoTermo])
+  const valorCatalogo = data.infracoes.find((i) => i.id === multa.infracaoId)?.valor ?? null
+  const estado = useMemo(() => estadoDaMulta(multa, ultimoTermo, valorCatalogo), [multa, ultimoTermo, valorCatalogo])
   const situacao = useMemo(() => avaliar(estado, hoje), [estado, hoje])
   const responsavel = responsavelDaMulta(multa)
   const motoristaId = multa.motorista?.id ?? null
@@ -248,10 +249,12 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
   const caminhoTermo = ultimoTermo?.status !== 'contestado' && (termoPendente !== null || temAditivo !== false)
   const termoDoAcerto = estado.termoParcelas != null
   const mesPassado = termoDoAcerto && estado.termoPrimeiroMes != null && mesDoTermo(estado, hoje) !== `${estado.termoPrimeiroMes.slice(0, 7)}-01`
-  const valorCatalogo = data.infracoes.find((i) => i.id === multa.infracaoId)?.valor ?? null
+  const avisoApp = multa.avisoAutomaticoEm
   const avisoWhatsapp = <>
-      <p className="frota-muted">Mande pelo WhatsApp a mensagem com o serviço do dia e o rastreador. Depois confirme em "Avisei".</p>
-      <div className="frota-cluster"><Button variant="secondary" loading={montando} onClick={() => void copiar()}>Copiar mensagem</Button></div>
+      {avisoApp
+        ? <p className="frota-muted">O motorista já recebeu o aviso pelo app em {formatBR(avisoApp)}. A mensagem do WhatsApp com o serviço do dia e o rastreador é opcional; confirme em "Avisei" para seguir.</p>
+        : <p className="frota-muted">Mande pelo WhatsApp a mensagem com o serviço do dia e o rastreador. Depois confirme em "Avisei".</p>}
+      <div className="frota-cluster"><Button variant={avisoApp ? 'ghost' : 'secondary'} loading={montando} onClick={() => void copiar()}>Copiar mensagem{avisoApp ? ' (opcional)' : ''}</Button></div>
       {mensagem !== null && <textarea ref={textoRef} className="multa-mensagem" aria-label="Mensagem para o WhatsApp" rows={9} readOnly value={mensagem} />}
       {copiaFalhou && <p className="frota-muted" role="status">Não deu para copiar sozinho: o texto está selecionado. Use Ctrl+C.</p>}
       {erroRastreador && <Alert tone="warning">Rastreador (InFleet) indisponível. Este detalhe fica só aqui, fora da mensagem: {erroRastreador}</Alert>}
@@ -316,11 +319,15 @@ export function MultaPassoAPasso({ source, multa, data, onChanged, hoje = todayS
                 <Field label="Parcelas">
                   {estado.termoParcelas != null
                     ? <p className="frota-muted">{estado.termoParcelas} {estado.termoParcelas === 1 ? 'parcela' : 'parcelas'}, como assinado</p>
-                    : <Input type="number" min={1} max={12} step={1} disabled={salvando} value={String(dados.parcelas ?? 1)} onChange={(e: { target: { value: string } }) => set({ parcelas: Math.max(1, Math.min(12, Math.trunc(Number(e.target.value)) || 1)) })} />}
+                    : <Input type="number" min={1} max={MAXIMO_PARCELAS} step={1} disabled={salvando} value={String(dados.parcelas ?? 1)} onChange={(e: { target: { value: string } }) => set({ parcelas: Math.max(1, Math.min(MAXIMO_PARCELAS, Math.trunc(Number(e.target.value)) || 1)) })} />}
                 </Field>
               </div>
               {mesPassado && <Alert tone="warning">O primeiro mês do termo ({mesBr(estado.termoPrimeiroMes!)}) já passou; as parcelas começam em {mesBr(mesDoTermo(estado, hoje)!)}.</Alert>}
-              {estado.valorPago ? <p className="frota-muted">{previaParcelas(estado.valorPago, dados.parcelas ?? 1)}</p> : <p className="frota-muted">Registre o pagamento antes de lançar na folha.</p>}
+              {!estado.valorPago
+                ? <p className="frota-muted">Registre o pagamento antes de lançar na folha.</p>
+                : estado.valorCheio
+                  ? <p className="frota-muted">Valor cheio {brl(estado.valorCheio)} · {previaParcelas(estado.valorCheio, dados.parcelas ?? 1)}</p>
+                  : <Alert tone="warning">A multa não tem o valor cheio; informe o valor da guia ou vincule a infração do catálogo.</Alert>}
             </>
           )}
           {dados.acerto === 'empresa' && (

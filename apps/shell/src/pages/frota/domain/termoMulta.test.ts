@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calcularParcelas, expiraEm, validarAcordo, type Acordo } from './termoMulta'
+import { calcularParcelas, emCentavos, expiraEm, validarAcordo, type Acordo } from './termoMulta'
 
 const folha: Acordo = { forma: 'folha', parcelas: 3, valorTotal: 195.23, primeiraCompetencia: '2026-11-01' }
 const ctxOk = { temAditivo: true, recursoPendente: false, temMotorista: true, termoPendente: false, hoje: '2026-11-18', dataParaIndicar: '2026-12-10', avisado: false }
@@ -9,7 +9,7 @@ const MSG = {
   motorista: 'A multa não tem motorista indicado.',
   aditivo: 'O motorista ainda não tem o aditivo de assinatura eletrônica registrado.',
   termo: 'Já existe um termo pendente para esta multa.',
-  parcelas: 'Escolha de 1 a 12 parcelas.',
+  parcelas: 'Escolha de 1 a 3 parcelas.',
   soFolha: 'O termo agora é só para desconto em folha.',
   janela: 'Escolha um mês entre 10/2026 e 11/2027.',
   etapa2: 'O termo só é enviado na etapa 2, antes do aviso ao motorista.',
@@ -20,9 +20,9 @@ const MSG = {
 }
 
 describe('calcularParcelas', () => {
-  it('divide em centavos, com a sobra nas primeiras parcelas e soma exata', () => {
+  it('divide em centavos, com o resto na última parcela e soma exata', () => {
     const parcelas = calcularParcelas(folha)
-    expect(parcelas.map((p) => p.valor)).toEqual([65.08, 65.08, 65.07])
+    expect(parcelas.map((p) => p.valor)).toEqual([65.07, 65.07, 65.09])
     expect(parcelas.map((p) => p.competencia)).toEqual(['2026-11-01', '2026-12-01', '2027-01-01'])
     expect(parcelas.map((p) => p.numero)).toEqual([1, 2, 3])
   })
@@ -35,8 +35,14 @@ describe('calcularParcelas', () => {
   it('90,00 em 3x é exato', () => {
     expect(calcularParcelas({ ...folha, valorTotal: 90 }).map((p) => p.valor)).toEqual([30, 30, 30])
   })
-  it('2x com sobra de um centavo na primeira', () => {
-    expect(calcularParcelas({ ...folha, parcelas: 2, valorTotal: 100.01 }).map((p) => p.valor)).toEqual([50.01, 50])
+  it('2x com sobra de um centavo na última', () => {
+    expect(calcularParcelas({ ...folha, parcelas: 2, valorTotal: 100.01 }).map((p) => p.valor)).toEqual([50, 50.01])
+  })
+  it('termo antigo com 12 parcelas continua calculável, com o resto na última', () => {
+    const p = calcularParcelas({ ...folha, parcelas: 12, valorTotal: 1000 })
+    expect(p).toHaveLength(12)
+    expect(p[11].valor).toBe(83.37)
+    expect(p.reduce((s, x) => s + emCentavos(x.valor), 0)).toBe(100000)
   })
   it('1,005 vira 1,01 centavo-a-centavo sem erro de ponto flutuante', () => {
     expect(calcularParcelas({ ...folha, parcelas: 1, valorTotal: 1.005 }).map((p) => p.valor)).toEqual([1.01])
@@ -55,7 +61,7 @@ const folhaF: Acordo = { ...folha, primeiraCompetencia: '2026-12-01' }
 describe('validarAcordo (fase 3)', () => {
   it('acordo válido retorna null', () => {
     expect(validarAcordo(folhaF, ctxOk)).toBeNull()
-    expect(validarAcordo({ ...folhaF, parcelas: 12, primeiraCompetencia: '2027-11-01' }, ctxOk)).toBeNull()
+    expect(validarAcordo({ ...folhaF, parcelas: 3, primeiraCompetencia: '2027-11-01' }, ctxOk)).toBeNull()
   })
   it('mensagens exatas de cada regra', () => {
     expect(validarAcordo(folhaF, { ...ctxOk, temMotorista: false })).toBe(MSG.motorista)
@@ -68,9 +74,9 @@ describe('validarAcordo (fase 3)', () => {
     expect(validarAcordo(folhaF, { ...ctxOk, dataParaIndicar: '2026-11-20' })).toBe(MSG.prazoCurto)
     expect(validarAcordo(folhaF, { ...ctxOk, dataParaIndicar: '2026-11-21' })).toBeNull()
   })
-  it('parcelas fora de 1 a 12 ou não inteiras', () => {
+  it('parcelas fora de 1 a 3 ou não inteiras', () => {
     expect(validarAcordo({ ...folhaF, parcelas: 0 }, ctxOk)).toBe(MSG.parcelas)
-    expect(validarAcordo({ ...folhaF, parcelas: 13 }, ctxOk)).toBe(MSG.parcelas)
+    expect(validarAcordo({ ...folhaF, parcelas: 4 }, ctxOk)).toBe(MSG.parcelas)
     expect(validarAcordo({ ...folhaF, parcelas: 1.5 }, ctxOk)).toBe(MSG.parcelas)
   })
   it('competência fora do formato e fora da janela do RH', () => {

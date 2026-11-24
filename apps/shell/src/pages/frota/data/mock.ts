@@ -141,7 +141,7 @@ const MULTI_TO_PROP: Record<string, string> = { [CAMPO.servicos]: 'servicos', [C
 /** Leva o estado novo do passo para a multa do mock; o motorista escolhido vira Ref pelas pessoas fictícias. */
 function aplicarNaMulta(m: Multa, e: MultaEstado, pessoas: Ref[]) {
   Object.assign(m, {
-    status: e.status ?? null, responsavel: e.responsavel ?? null, motivoEmpresa: e.motivoEmpresa ?? null, dataAviso: e.dataAviso || null,
+    status: e.status ?? null, responsavel: e.responsavel ?? null, motivoEmpresa: e.motivoEmpresa ?? null, dataAviso: e.dataAviso || null, avisoAutomaticoEm: e.avisoAutomaticoEm || m.avisoAutomaticoEm || null,
     canal: e.canal ?? null, dataIndicacao: e.dataIndicacao || null, indicado: e.indicado ?? false, aceiteEm: e.aceiteEm || null,
     pagaEm: e.pagaEm || null, valorPago: e.valorPago ?? null, competencia: e.competencia || null, acertoEm: e.acertoEm || null,
     encerradaEm: e.encerradaEm || null, canceladaEm: e.canceladaEm || null, motivoCancelamento: e.motivoCancelamento || null, recursoPendente: e.recursoPendente ?? false,
@@ -231,7 +231,7 @@ export function createMockSource(): DataSource {
       return find(kind, id)?.status ?? null
     },
     async dateBehaviors() {
-      return { cr40f_agendarpara: 'DateOnly', cr40f_datadeavisoaocondutor: 'DateOnly', cr40f_datadeindicacao: 'DateOnly', cr40f_dataparaindicar: 'DateOnly' }
+      return { cr40f_agendarpara: 'DateOnly', cr40f_datadeavisoaocondutor: 'DateOnly', cr40f_avisoautomaticoem: 'DateOnly', cr40f_datadeindicacao: 'DateOnly', cr40f_dataparaindicar: 'DateOnly' }
     },
     async update(kind, id, patch) {
       await delay()
@@ -473,7 +473,7 @@ export function createMockSource(): DataSource {
       const item = data.multas.find((row) => row.id === multaId)
       if (!item) throw new Error('Registro não encontrado no mock.')
       const hoje = todaySP()
-      const antes = estadoDaMulta(item)
+      const antes = estadoDaMulta(item, null, data.infracoes.find((row) => row.id === item.infracaoId)?.valor ?? null)
       const erro = validarPasso(antes, passo, dados, hoje)
       if (erro) throw new ApiError(erro, 400)
       const depois = aplicarPasso(antes, passo, dados, hoje)

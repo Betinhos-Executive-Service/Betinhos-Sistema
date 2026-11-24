@@ -120,6 +120,14 @@ describe('MultaPassoAPasso', () => {
     expect(screen.queryByRole('combobox', { name: 'Motorista indicado' })).toBeNull()
   })
 
+  it('aviso automático já enviado: mostra a data e deixa a mensagem do WhatsApp opcional', async () => {
+    renderPasso(fonte(), { ...multa, status: MULTA.NOTIFICADO, motorista: ana, avisoAutomaticoEm: '2026-11-20' })
+    await act(async () => {})
+    expect(screen.getByText(/O motorista já recebeu o aviso pelo app em 20\/11\/2026/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Copiar mensagem (opcional)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Avisei' })).toBeTruthy()
+  })
+
   it('Copiar mensagem: sem clipboard, deixa o texto selecionado para copiar à mão', async () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn(async () => { throw new Error('negado') }) } })
     const source = fonte()
@@ -281,7 +289,7 @@ describe('opcoesMotoristas', () => {
 })
 
 describe('Acertar na folha com parcelas', () => {
-  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 100 }
+  const acertar: Multa = { ...multa, status: MULTA.PAGO, responsavel: 100000000, motorista: ana, dataAviso: '2026-10-01', dataIndicacao: '2026-10-02', indicado: true, canal: 100000001, dataParaIndicar: '2026-10-20', vencimento: '2026-11-01', pagaEm: '2026-11-05', valorPago: 60, valorGuia: 100 }
   const descontando: Multa = { ...acertar, competencia: '2026-10-01', acertoEm: '2026-11-10' }
   const parcela = (n: number, status: 'prevista' | 'descontada') => ({ id: `p${n}`, numero: n, total: 3, competencia: `2026-${String(9 + n).padStart(2, '0')}-01`, valor: 33.33, status, lancadoEm: status === 'descontada' ? '2026-11-10' : null, origem: 'multa' as const, colaborador: null, multa: null })
 
@@ -295,7 +303,7 @@ describe('Acertar na folha com parcelas', () => {
     expect(mes.max).toBe('2027-11')
     expect((screen.getByLabelText(/Parcelas/) as HTMLInputElement).value).toBe('1')
     fireEvent.change(screen.getByLabelText(/Parcelas/), { target: { value: '3' } })
-    expect(screen.getByText('3× R$ 33,33 · última R$ 33,34')).toBeTruthy()
+    expect(screen.getByText('Valor cheio R$ 100,00 · 3× R$ 33,33 · última R$ 33,34')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Registrar acerto' })) })
     expect(source.passoMulta).toHaveBeenCalledWith('u1', 'RegistrarAcerto', { acerto: 'folha', competencia: '2026-11', parcelas: 3 })
   })

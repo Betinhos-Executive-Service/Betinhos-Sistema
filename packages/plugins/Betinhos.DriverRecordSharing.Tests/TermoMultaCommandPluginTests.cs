@@ -45,13 +45,14 @@ namespace Betinhos.DriverRecordSharing.Tests
             Assert.Equal(Pendente, termo.GetAttributeValue<OptionSetValue>("new_status").Value);
             Assert.Equal(Relogio, termo.GetAttributeValue<DateTime>("new_enviadoem"));
             Assert.Equal(3, termo.GetAttributeValue<int>("new_parcelas"));
-            Assert.Equal(100.00m, termo.GetAttributeValue<Money>("new_valortotal").Value);
-            Assert.Equal(33.34m, termo.GetAttributeValue<Money>("new_valorparcela").Value);
+            // O gestor mandou 100,00, mas a base é o valor cheio da multa (new_valorguia 293,47); a sobra do centavo vai na última parcela.
+            Assert.Equal(293.47m, termo.GetAttributeValue<Money>("new_valortotal").Value);
+            Assert.Equal(97.82m, termo.GetAttributeValue<Money>("new_valorparcela").Value);
             Assert.Equal("v1", termo.GetAttributeValue<string>("new_versaotexto"));
             var texto = termo.GetAttributeValue<string>("new_textotermo");
             Assert.Contains("Eu, João Motorista, CPF 123.456.789-00", texto);
             Assert.Contains("ABC1D23", texto);
-            Assert.Contains("R$ 100,00", texto);
+            Assert.Contains("R$ 293,47", texto);
             Assert.Contains("Desconto em folha (3", texto);
             Assert.DoesNotContain("{", texto);
             var evid = termo.GetAttributeValue<string>("new_evidenciasjson");
@@ -81,7 +82,7 @@ namespace Betinhos.DriverRecordSharing.Tests
         [InlineData("semAditivoArquivo", "O motorista ainda não tem o aditivo de assinatura eletrônica registrado.")]
         [InlineData("termoPendente", "Já existe um termo pendente para esta multa.")]
         [InlineData("guia", "O termo agora é só para desconto em folha.")]
-        [InlineData("parcelas", "Escolha de 1 a 12 parcelas.")]
+        [InlineData("parcelas", "Escolha de 1 a 3 parcelas.")]
         [InlineData("competencia", "Competência inválida.")]
         [InlineData("janela", "Escolha um mês entre 09/2026 e 10/2027.")]
         [InlineData("valor", "Informe um valor maior que zero.")]
@@ -96,10 +97,10 @@ namespace Betinhos.DriverRecordSharing.Tests
                 case "semAditivoArquivo": s.Motorista.Attributes.Remove("new_aditivoassinatura"); break;
                 case "termoPendente": s.Add(new Entity("new_termomulta") { ["new_multa"] = s.Multa.ToEntityReference(), ["new_status"] = new OptionSetValue(Pendente) }); break;
                 case "guia": p["new_FormaPagamento"] = Guia; break;
-                case "parcelas": p["new_Parcelas"] = 13; break;
+                case "parcelas": p["new_Parcelas"] = 4; break;
                 case "janela": p["new_PrimeiraCompetencia"] = new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc); break;
                 case "competencia": p["new_PrimeiraCompetencia"] = new DateTime(2026, 11, 2, 0, 0, 0, DateTimeKind.Utc); break;
-                case "valor": p["new_ValorTotal"] = 0.01m; break;
+                case "valor": s.Multa.Attributes.Remove("new_valorguia"); s.Rows("cr40f_infracaodetransito").Single().Attributes.Remove("cr40f_valordamulta"); p["new_ValorTotal"] = 0.01m; break; // sem valor cheio, vale o informado
             }
 
             var error = Assert.Throws<InvalidPluginExecutionException>(() => Run(s, "new_EnviarTermoMulta", s.Gestor, p));
@@ -149,7 +150,7 @@ namespace Betinhos.DriverRecordSharing.Tests
             var s = Cenario();
             s.Rows("new_textotermomulta").First(r => r.GetAttributeValue<string>("new_versao") == "v1")["new_texto"] = "{motorista}|{placa}|{datahora}|{local}|{auto}|{valor}|{parcelas}|{primeiromes}";
             Run(s, "new_EnviarTermoMulta", s.Gestor, Acordo(s, Folha, 3, 195.23m));
-            Assert.Equal("João Motorista|ABC1D23|10/10/2026 10:00|Av. Paulista, 1000|Multa teste|R$ 195,23|3|11/2026",
+            Assert.Equal("João Motorista|ABC1D23|10/10/2026 10:00|Av. Paulista, 1000|Multa teste|R$ 293,47|3|11/2026",
                 s.Rows("new_termomulta").Single().GetAttributeValue<string>("new_textotermo"));
         }
 
@@ -165,10 +166,10 @@ namespace Betinhos.DriverRecordSharing.Tests
         public void ParcelasDistribuemCentavosComoNoSistema()
         {
             var parcelas = TermoMultaCommandPlugin.CalcularParcelas(100.00m, 3, new DateTime(2026, 11, 1));
-            Assert.Equal(new[] { 33.34m, 33.33m, 33.33m }, parcelas.Select(p => p.Valor));
+            Assert.Equal(new[] { 33.33m, 33.33m, 33.34m }, parcelas.Select(p => p.Valor));
             Assert.Equal(new[] { new DateTime(2026, 11, 1), new DateTime(2026, 12, 1), new DateTime(2027, 1, 1) }, parcelas.Select(p => p.Competencia));
-            Assert.Equal(new[] { 0.34m, 0.33m, 0.33m }, TermoMultaCommandPlugin.CalcularParcelas(1.00m, 3, new DateTime(2026, 1, 1)).Select(p => p.Valor));
-            Assert.Equal(new[] { 0.51m, 0.50m }, TermoMultaCommandPlugin.CalcularParcelas(1.005m, 2, new DateTime(2026, 1, 1)).Select(p => p.Valor));
+            Assert.Equal(new[] { 0.33m, 0.33m, 0.34m }, TermoMultaCommandPlugin.CalcularParcelas(1.00m, 3, new DateTime(2026, 1, 1)).Select(p => p.Valor));
+            Assert.Equal(new[] { 0.50m, 0.51m }, TermoMultaCommandPlugin.CalcularParcelas(1.005m, 2, new DateTime(2026, 1, 1)).Select(p => p.Valor));
         }
 
         // ---------- Assinar ----------
