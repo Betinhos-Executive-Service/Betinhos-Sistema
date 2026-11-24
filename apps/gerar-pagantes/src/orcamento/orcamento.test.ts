@@ -11,10 +11,11 @@ const hoje = new Date('2026-11-24T15:00:00Z')
 
 describe('orçamento de pedido de compra', () => {
   it('troca nome, valor, data e dias e mantém o resto do modelo', () => {
-    const docx = preencherOrcamento(modelo, { nome: 'Ana & Cia', valorCents: 62049, inicio: '2026-10-30', fim: '2026-10-31', hoje })
+    const docx = preencherOrcamento(modelo, { nome: 'Ana & Cia', cliente: 'Kenvue', valorCents: 62049, inicio: '2026-10-30', fim: '2026-10-31', hoje })
     const t = texto(docx)
     expect(t).toContain('São José dos Campos, 24 de Novembro de 2026')
     expect(t).toContain('Aos cuidados de: Ana &amp; Cia')
+    expect(t).toContain('Cliente: Kenvue')
     expect(t).toMatch(/Assunto: Serviços prestados de transporte para equipe de Ana &amp; Cia(?!\s*\()/)
     expect(t).toContain('para equipe de Ana &amp; Cia nos dias 30/10/2026 a 31/10/2026')
     expect(t).not.toMatch(/arame/i)

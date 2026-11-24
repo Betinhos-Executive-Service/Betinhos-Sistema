@@ -45,7 +45,8 @@ function toResultRows(drafts: PayerDraft[], result: SubmitResult): ResultRow[] {
       linkLabel: linkResultLabel[item?.linkStatus ?? 'NotApplicable'],
       emailLabel: emailResultLabel[item?.emailStatus ?? 'NotApplicable'],
       error: result.errors.find((error) => error.paganteId === draft.id)?.message,
-      purchaseOrder: isPurchaseOrder(draft.paymentMethod)
+      purchaseOrder: isPurchaseOrder(draft.paymentMethod),
+      client: draft.client
     }
   })
 }
@@ -152,13 +153,14 @@ export function App() {
 
   const serviceStart = operation?.serviceStartDate ?? null
   const serviceEnd = operation?.serviceEndDate ?? null
-  const downloadBudget = useCallback((name: string, amountCents: number) => {
-    baixarOrcamento({ nome: name, valorCents: amountCents, inicio: serviceStart, fim: serviceEnd }).catch(async (error: unknown) => {
+  const operationClient = operation?.clientName ?? ''
+  const downloadBudget = useCallback((name: string, amountCents: number, client?: string) => {
+    baixarOrcamento({ nome: name, cliente: client || operationClient, valorCents: amountCents, inicio: serviceStart, fim: serviceEnd }).catch(async (error: unknown) => {
       console.error('[GerarPagantes] Não foi possível gerar o orçamento.', error)
       await logAppError(error, { source: 'React', action: 'download-budget', phase: 'generate-docx', component: 'App' })
       setNotice({ tone: 'error', text: 'Não foi possível gerar o orçamento. Tente de novo.' })
     })
-  }, [serviceStart, serviceEnd])
+  }, [serviceStart, serviceEnd, operationClient])
 
   const markAmountInvalid = useCallback((key: string, invalid: boolean) => {
     setInvalidAmounts((current) => {

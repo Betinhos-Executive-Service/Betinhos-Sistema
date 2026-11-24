@@ -97,6 +97,7 @@ function toPerson(row: Record<string, unknown>, role: Person['role']): Person {
     name: text(row, 'cr40f_nomedopassageiro'),
     email: text(row, 'cr40f_email'),
     phone: text(row, 'cr40f_telefone'),
+    client: text(row, '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue') || undefined,
     role
   }
 }
@@ -116,7 +117,7 @@ export async function searchDirectoryPeople(query: string, nextLink?: string): P
   }
   const escaped = encodeURIComponent(normalized.replace(/'/g, "''")).replace(/'/g, '%27')
   const filter = `(contains(cr40f_nomedopassageiro,'${escaped}') or contains(cr40f_email,'${escaped}'))`
-  const options = nextLink ?? `?$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_email,cr40f_telefone&$filter=${filter}&$orderby=cr40f_nomedopassageiro asc&$top=20`
+  const options = nextLink ?? `?$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_email,cr40f_telefone,_cr40f_cliente_value&$filter=${filter}&$orderby=cr40f_nomedopassageiro asc&$top=20`
   const page = await api.retrieveMultipleRecords('cr40f_bancodedados', options)
   return { people: page.entities.map((row) => toPerson(row, 'Adicionado')), nextLink: page.nextLink }
 }
@@ -172,7 +173,7 @@ export async function loadOperation(recordId: Guid): Promise<OperationData> {
   const api = xrm.WebApi
   const [finance, services] = await Promise.all([
     api.retrieveRecord('cr40f_financeiro', recordId, '?$select=cr40f_idfinanceiro,versionnumber,statecode,statuscode,_ownerid_value'),
-    fetchAll('cr40f_reservadeveculos', `?$select=cr40f_reservadeveculosid,cr40f_dataehorriodesada,_cr40f_solicitante_value&$filter=_cr40f_financeiro_value eq ${recordId}`)
+    fetchAll('cr40f_reservadeveculos', `?$select=cr40f_reservadeveculosid,cr40f_dataehorriodesada,_cr40f_solicitante_value,_cr40f_cliente_value&$filter=_cr40f_financeiro_value eq ${recordId}`)
   ])
   assertOperationEditable(finance)
   const serviceIds = services.map((service) => text(service, 'cr40f_reservadeveculosid')).filter(Boolean)
@@ -193,7 +194,7 @@ export async function loadOperation(recordId: Guid): Promise<OperationData> {
   const requiredPersonIds = [...new Set([...involvedIds, ...payerIds])]
   const personFilter = requiredPersonIds.map((id) => `cr40f_bancodedadosid eq ${id}`).join(' or ')
   const directoryRows = requiredPersonIds.length
-    ? await fetchAll('cr40f_bancodedados', `?$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_email,cr40f_telefone&$filter=statecode eq 0 and (${personFilter})&$orderby=cr40f_nomedopassageiro asc`)
+    ? await fetchAll('cr40f_bancodedados', `?$select=cr40f_bancodedadosid,cr40f_nomedopassageiro,cr40f_email,cr40f_telefone,_cr40f_cliente_value&$filter=statecode eq 0 and (${personFilter})&$orderby=cr40f_nomedopassageiro asc`)
     : []
   const requesterSet = new Set(requesterIds)
   const directory = directoryRows.map((row) => toPerson(row, requesterSet.has(text(row, 'cr40f_bancodedadosid')) ? 'Solicitante' : involvedIds.has(text(row, 'cr40f_bancodedadosid')) ? 'Passageiro' : 'Adicionado'))
@@ -211,6 +212,7 @@ export async function loadOperation(recordId: Guid): Promise<OperationData> {
     statusLabel: text(finance, 'statuscode@OData.Community.Display.V1.FormattedValue'),
     stateCode: Number(finance.statecode ?? 0),
     ownerId: lookup(finance, '_ownerid_value'),
+    clientName: services.map((service) => text(service, '_cr40f_cliente_value@OData.Community.Display.V1.FormattedValue')).find(Boolean) || undefined,
     people,
     directory,
     payers

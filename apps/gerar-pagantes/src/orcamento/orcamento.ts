@@ -3,9 +3,10 @@ import { formatCurrency } from '../money'
 import modeloUrl from './modelo-orcamento.docx?inline'
 
 // Modelo do orçamento de Pedido de compra (Johnson&Johnson/Kenvue, via Ariba). O .docx traz os marcadores
-// {{DATA}}, {{NOME}}, {{DIAS}} e {{VALOR}} no word/document.xml; o resto do papel timbrado fica como está.
+// {{DATA}}, {{NOME}}, {{CLIENTE}}, {{DIAS}} e {{VALOR}} no word/document.xml; o resto do papel timbrado fica como está.
 export interface DadosOrcamento {
   nome: string
+  cliente: string
   valorCents: number
   inicio: string | null
   fim: string | null
@@ -39,11 +40,12 @@ export function preencherOrcamento(modelo: Uint8Array, dados: DadosOrcamento): U
   const valores: Record<string, string> = {
     DATA: `${dia} de ${MESES[mes - 1]} de ${ano}`,
     NOME: dados.nome.trim(),
+    CLIENTE: dados.cliente.trim(),
     DIAS: diasDoServico(dados.inicio, dados.fim),
     VALOR: formatCurrency(dados.valorCents)
   }
   const documento = strFromU8(arquivos['word/document.xml'])
-  arquivos['word/document.xml'] = strToU8(documento.replace(/\{\{(DATA|NOME|DIAS|VALOR)\}\}/g, (_, chave: string) => escXml(valores[chave])))
+  arquivos['word/document.xml'] = strToU8(documento.replace(/\{\{(DATA|NOME|CLIENTE|DIAS|VALOR)\}\}/g, (_, chave: string) => escXml(valores[chave])))
   return zipSync(arquivos)
 }
 

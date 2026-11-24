@@ -22,7 +22,7 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
   onSearch: PersonSearch
   dispatch: Dispatch
   onAmountInvalid: (key: string, invalid: boolean) => void
-  onBudget?: (name: string, amountCents: number) => void
+  onBudget?: (name: string, amountCents: number, client?: string) => void
 }) {
   const [amountInput, setAmountInput] = useState(() => formatCurrency(draft.amountCents))
   const [amountError, setAmountError] = useState('')
@@ -85,7 +85,7 @@ export const PayerEditorRow = memo(function PayerEditorRow({ draft, change, erro
             <Switch label="E-mail" checked={draft.sendEmail} disabled={readOnly || !draft.generateLink} onChange={(event) => dispatch({ type: 'setEmail', key, sendEmail: event.target.checked })} />
             {choosesRecipient && !pickingRecipient ? <RecipientChip draft={draft} onPick={() => setPickingRecipient(true)} /> : null}
           </> : isPurchaseOrder(draft.paymentMethod) && onBudget
-            ? <Button variant="ghost" size="compact" icon={<FileDown size={14} />} disabled={draft.amountCents <= 0} onClick={() => onBudget(draft.name, draft.amountCents)}>Orçamento</Button>
+            ? <Button variant="ghost" size="compact" icon={<FileDown size={14} />} disabled={draft.amountCents <= 0} onClick={() => onBudget(draft.name, draft.amountCents, draft.client)}>Orçamento</Button>
             : <small>Sem link de pagamento</small>}
         </div>
       </div>
