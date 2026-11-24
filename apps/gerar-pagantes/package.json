@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@betinhos-executive-service/ui": "1.11.0",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.47.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

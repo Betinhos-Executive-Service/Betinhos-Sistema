@@ -7,6 +7,7 @@ export const PAYMENT_METHODS = [
 ] as const
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number]['value']
+export const isPurchaseOrder = (method: PaymentMethod) => method === 202410001
 
 export type LinkStatus = 'NotApplicable' | 'Generated' | 'Pending' | 'Failed' | 'Indeterminate'
 export type EmailStatus = 'NotApplicable' | 'Pending' | 'Sent' | 'Failed'
