@@ -31,7 +31,7 @@ import {
   type TermoStep
 } from "./termosMulta";
 
-type Props = { termo: TermoMulta; onDone: () => void; onRefresh: () => void | Promise<void> };
+type Props = { termo: TermoMulta; onDone: () => void; onRefresh: () => void | Promise<void>; onAditivoConfirmado?: () => void };
 
 const STEP_TITLE: Partial<Record<TermoStep, string>> = {
   selfie: "Tire uma selfie",
@@ -52,7 +52,7 @@ function NeutralMark() {
   );
 }
 
-export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
+export function TermoMultaDetalheScreen({ termo, onDone, onRefresh, onAditivoConfirmado }: Props) {
   const [flow, dispatch] = useReducer(termoFlowReducer, undefined, initialTermoFlow);
   const [checandoAditivo, setChecandoAditivo] = useState(false);
   const [pdfState, setPdfState] = useState<{ busy: boolean; erro: string }>({ busy: false, erro: "" });
@@ -324,7 +324,7 @@ export function TermoMultaDetalheScreen({ termo, onDone, onRefresh }: Props) {
           ) : null}
 
           {flow.step === "semAditivo" ? (
-            <AditivoPainel continuarLabel="Continuar" onConcluir={() => dispatch({ type: "go", step: "selfie" })} titleRef={titleRef} />
+            <AditivoPainel continuarLabel="Continuar" onConcluir={() => dispatch({ type: "go", step: "selfie" })} onConfirmado={onAditivoConfirmado} titleRef={titleRef} />
           ) : null}
 
           {flow.step === "encerrado" ? (

@@ -204,11 +204,45 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Fact]
-        public void CadastroSemCpfRecusaSemAssinaturaAindaSerAceita()
+        public void CadastroSemCpfRecusaJaAoGerarEAoRegistrar()
         {
             var m = new Mundo();
+            var gerado = m.Gerar();
             m.S.Motorista.Attributes.Remove("cr40f_numerodocpf");
-            Assert.Equal("Seu cadastro está sem CPF válido. Procure o escritório.", m.Recusa(m.Assinado(m.Gerar())));
+            const string msg = "Seu cadastro está sem CPF válido. Procure o escritório.";
+            Assert.Equal(msg, Assert.Throws<InvalidPluginExecutionException>(() => m.Gerar()).Message);
+            Assert.Equal(msg, m.Recusa(m.Assinado(gerado)));
+        }
+
+        [Fact]
+        public void RevisaoNoFormatoDoAssinadorPassaPelaConferenciaDoAcrescimo()
+        {
+            var m = new Mundo();
+            var gerado = m.Gerar();
+            Assert.Null(AcrescimoPdf.Conferir(m.Assinado(gerado), gerado));
+        }
+
+        [Theory]
+        [InlineData((int)GovBrFalso.Defeito.ConteudoTrocado)]
+        [InlineData((int)GovBrFalso.Defeito.RecursosTrocados)]
+        [InlineData((int)GovBrFalso.Defeito.PagesReescrito)]
+        [InlineData((int)GovBrFalso.Defeito.FonteReescrita)]
+        [InlineData((int)GovBrFalso.Defeito.ObjStm)]
+        [InlineData((int)GovBrFalso.Defeito.XRefStream)]
+        [InlineData((int)GovBrFalso.Defeito.Grande)]
+        [InlineData((int)GovBrFalso.Defeito.RootDiferente)]
+        [InlineData((int)GovBrFalso.Defeito.EntradaLivre)]
+        [InlineData((int)GovBrFalso.Defeito.SemPrev)]
+        [InlineData((int)GovBrFalso.Defeito.PrevErrado)]
+        [InlineData((int)GovBrFalso.Defeito.CatalogoOutroPages)]
+        [InlineData((int)GovBrFalso.Defeito.XRefStm)]
+        public void RevisaoQueMexeNoTextoOuForaDoFormatoRecusa(int defeitoNumero)
+        {
+            var m = new Mundo();
+            var gerado = m.Gerar();
+            var assinado = m.Assinado(gerado, new GovBrFalso.Opcoes { Defeito = (GovBrFalso.Defeito)defeitoNumero });
+            Assert.Equal(AcrescimoPdf.Erro, m.Recusa(assinado)); // assinatura e CPF são válidos: só a integridade recusa
+            Assert.Null(m.S.UploadedPdf);
         }
 
         [Fact]

@@ -1,6 +1,7 @@
 import type { MinhaMulta, CargaStatus } from "./minhasMultas";
 import { declararAceite } from "./minhasMultas";
 import { AditivoScreen } from "./AditivoMotorista";
+import { acoesTelaAditivo } from "./aditivoAcoes";
 import { MinhasMultasScreen } from "./MinhasMultasScreen";
 import type { TermoMulta } from "./termosMulta";
 import type { Screen } from "../../types";
@@ -32,11 +33,12 @@ export function rotasTermos(screen: Screen, {
 }: Props): ReactNode | null {
   if (screen === "multas") {
     return (
-      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} lidoEm={minhasMultasLidoEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} />
+      <MinhasMultasScreen items={minhasMultas} termos={termosMulta} loadStatus={termosStatus} offlineEm={minhasMultasOfflineEm} lidoEm={minhasMultasLidoEm} onBack={() => setScreen("inicio")} onReload={reloadTermosMulta} onDeclarar={declararAceite} onSelectedChange={setTourTermoId} onAditivoConfirmado={onAditivoConfirmado} />
     );
   }
   if (screen === "aditivo") {
-    return <AditivoScreen onBack={() => { onAditivoConfirmado(); setScreen("inicio"); }} />;
+    const acoes = acoesTelaAditivo(onAditivoConfirmado, setScreen);
+    return <AditivoScreen onBack={acoes.onBack} onConfirmado={acoes.onConfirmado} />;
   }
   return null;
 }

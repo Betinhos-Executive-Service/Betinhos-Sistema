@@ -932,6 +932,7 @@ namespace Betinhos.DriverRecordSharing
         private void GerarMeuAditivo(IPluginExecutionContext context, IOrganizationService system, ITracingService tracing)
         {
             var aditivo = GerarDoFuncionario(system, MotoristaChamador(context, system, tracing));
+            ExigirCpfValido(aditivo.Funcionario); // recusa já aqui: não adianta assinar um aditivo que o servidor não vai aceitar
             context.OutputParameters["new_PdfBase64"] = Convert.ToBase64String(aditivo.Pdf);
             context.OutputParameters["new_NomeArquivo"] = NomeArquivoAditivo(aditivo);
         }
@@ -949,15 +950,23 @@ namespace Betinhos.DriverRecordSharing
             if (erro != null)
                 throw new InvalidPluginExecutionException(erro.StartsWith("Este PDF não é o aditivo", StringComparison.Ordinal)
                     ? "Este PDF não é o seu aditivo. Baixe o aditivo no App, assine no gov.br e envie o arquivo devolvido." : erro);
+            var alterado = AcrescimoPdf.Conferir(assinado, aditivo.Pdf);
+            if (alterado != null) throw new InvalidPluginExecutionException(alterado);
             var agora = clock();
-            var conferida = AssinaturaGovBr.Verificar(assinado, aditivo.Pdf.Length, acsConfiaveis, agora);
+            var conferida = AssinaturaGovBr.Verificar(assinado, aditivo.Pdf.Length, acsConfiaveis, agora, tracing);
             if (conferida.Erro != null) throw new InvalidPluginExecutionException(conferida.Erro);
-            var cpfCadastro = AssinaturaGovBr.Digitos(aditivo.Funcionario.GetAttributeValue<string>("cr40f_numerodocpf"));
-            if (cpfCadastro.Length != 11) throw new InvalidPluginExecutionException("Seu cadastro está sem CPF válido. Procure o escritório.");
+            var cpfCadastro = ExigirCpfValido(aditivo.Funcionario);
             if (conferida.Cpf != cpfCadastro) throw new InvalidPluginExecutionException("O CPF de quem assinou não é o do seu cadastro. Assine com a sua própria conta gov.br.");
             var dia = TimeZoneInfo.ConvertTimeFromUtc(agora, SaoPaulo()).Date;
             UploadPdf(system, aditivo.Funcionario.ToEntityReference(), NomeArquivoAditivo(aditivo), assinado, ColunaAditivo);
             system.Update(new Entity(Funcionario, id) { ["new_aditivoassinaturaem"] = DateTime.SpecifyKind(dia.AddHours(12), DateTimeKind.Utc) });
+        }
+
+        private static string ExigirCpfValido(Entity funcionario)
+        {
+            var cpf = AssinaturaGovBr.Digitos(funcionario.GetAttributeValue<string>("cr40f_numerodocpf"));
+            if (cpf.Length != 11) throw new InvalidPluginExecutionException("Seu cadastro está sem CPF válido. Procure o escritório.");
+            return cpf;
         }
 
         private static string NomeArquivoAditivo(AditivoGerado aditivo)

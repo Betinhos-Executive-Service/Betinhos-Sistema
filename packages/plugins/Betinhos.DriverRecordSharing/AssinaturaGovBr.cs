@@ -18,7 +18,9 @@ namespace Betinhos.DriverRecordSharing
     /// Confere a assinatura PAdES/adbe.pkcs7.detached que o assinador do ITI (gov.br) acrescenta ao PDF: ByteRange cobre o arquivo,
     /// messageDigest bate, a assinatura RSA do signatário vale e o certificado foi emitido pela AC Final do Governo Federal do Brasil v1.
     /// Leitor BER/DER próprio (aceita comprimento indefinido) e só mscorlib: sem SignedCms/System.Security.dll, por causa do sandbox do Dataverse.
-    /// Não consulta revogação (CRL/OCSP): o CPF e a cadeia é que amarram o aditivo ao motorista.
+    /// A validade do certificado é conferida contra o relógio do servidor (o signingTime é informado por quem assina: só serve para recusar data futura).
+    /// Sem CRL/OCSP: não consulta revogação; o CPF e a cadeia é que amarram o aditivo ao motorista.
+    /// A integridade do texto (nada reescrito na parte acrescentada) é conferida por <see cref="AcrescimoPdf"/>.
     /// </summary>
     public static class AssinaturaGovBr
     {
@@ -26,7 +28,7 @@ namespace Betinhos.DriverRecordSharing
         public const string ErroAlterado = "O arquivo foi alterado depois de assinado ou a assinatura não é válida. Assine de novo no gov.br e envie o arquivo sem mexer nele.";
         public const string ErroNaoGovBr = "Esta assinatura não é do gov.br. Assine em assinador.iti.br com a sua conta gov.br e envie o arquivo devolvido.";
         public const string ErroIlegivel = "Não foi possível ler a assinatura deste PDF. Assine de novo no gov.br e envie o arquivo que ele devolveu.";
-        public const string ErroValidade = "O certificado de quem assinou não estava válido na data da assinatura. Assine de novo no gov.br.";
+        public const string ErroValidade = "O certificado de quem assinou não está dentro da validade. Assine de novo no gov.br.";
         public const string ErroSemCpf = "A assinatura não traz o CPF de quem assinou. Assine de novo com a sua conta gov.br.";
         public const string ErroFuturo = "A data da assinatura está no futuro. Confira o relógio do aparelho e assine de novo.";
 
@@ -87,10 +89,15 @@ namespace Betinhos.DriverRecordSharing
         }
 
         /// <param name="inicio">Onde começa a parte acrescentada (tamanho do PDF gerado); 0 para olhar o arquivo todo.</param>
-        public static AssinaturaConferida Verificar(byte[] pdf, int inicio, IList<byte[]> acsConfiaveis, DateTime agoraUtc)
+        /// <param name="tracing">Opcional. No catch genérico só o tipo da exceção vai para o trace (nunca mensagem nem dado do PDF).</param>
+        public static AssinaturaConferida Verificar(byte[] pdf, int inicio, IList<byte[]> acsConfiaveis, DateTime agoraUtc, Microsoft.Xrm.Sdk.ITracingService tracing = null)
         {
             try { return Conferir(pdf, inicio, acsConfiaveis, agoraUtc); }
-            catch (Exception) { return new AssinaturaConferida { Erro = ErroIlegivel }; } // estrutura malformada: nunca vaza detalhe
+            catch (Exception ex)
+            {
+                try { tracing?.Trace("AssinaturaGovBr: estrutura ilegível (" + ex.GetType().Name + ")."); } catch (Exception) { }
+                return new AssinaturaConferida { Erro = ErroIlegivel }; // estrutura malformada: nunca vaza detalhe
+            }
         }
 
         private static AssinaturaConferida Falha(string erro) => new AssinaturaConferida { Erro = erro };
@@ -167,12 +174,7 @@ namespace Betinhos.DriverRecordSharing
             else if (certs.Count == 1) signer = certs[0];
             if (signer == null) return Falha(ErroIlegivel);
 
-            var attrsDer = attrsNode.Bruto();
-            attrsDer[0] = 0x31; // a assinatura é sobre o SET, não sobre o [0] IMPLICIT
-            if (!RsaOk(signer.Modulo, signer.Expoente, attrsDer, assinatura, hash)) return Falha(ErroAlterado);
-
-            var quando = signingTime ?? agora;
-            if (signingTime.HasValue && signingTime.Value > agora.AddMinutes(10)) return Falha(ErroFuturo);
+            // Cadeia primeiro: só o certificado emitido pela AC fixada chega à conta RSA dos atributos assinados (sem custo para quem manda lixo).
             Cert ac = null;
             foreach (var der in acs ?? new List<byte[]>())
             {
@@ -181,7 +183,13 @@ namespace Betinhos.DriverRecordSharing
                 if (h != null && Igual(cand.AssuntoBruto, signer.EmissorBruto) && RsaOk(cand.Modulo, cand.Expoente, signer.TbsBruto, signer.Assinatura, h)) { ac = cand; break; }
             }
             if (ac == null) return Falha(ErroNaoGovBr);
-            if (quando < signer.NaoAntes || quando > signer.NaoDepois || quando < ac.NaoAntes || quando > ac.NaoDepois) return Falha(ErroValidade);
+
+            var attrsDer = attrsNode.Bruto();
+            attrsDer[0] = 0x31; // a assinatura é sobre o SET, não sobre o [0] IMPLICIT
+            if (!RsaOk(signer.Modulo, signer.Expoente, attrsDer, assinatura, hash)) return Falha(ErroAlterado);
+
+            if (signingTime.HasValue && signingTime.Value > agora.AddMinutes(10)) return Falha(ErroFuturo);
+            if (agora < signer.NaoAntes || agora > signer.NaoDepois || agora < ac.NaoAntes || agora > ac.NaoDepois) return Falha(ErroValidade);
             if (signer.Cpf == null) return Falha(ErroSemCpf);
             return new AssinaturaConferida { Cpf = signer.Cpf, AssinadoEmUtc = signingTime };
         }
@@ -370,6 +378,7 @@ namespace Betinhos.DriverRecordSharing
                 var par = Node.Ler(chave, 0, chave.Length, 0);
                 c.Modulo = SemZeros(par.Kids[0].Conteudo());
                 c.Expoente = SemZeros(par.Kids[1].Conteudo());
+                if (c.Modulo.Length > 512 || c.Expoente.Length > 4) throw new FormatException(); // chave acima de 4096 bits ou expoente acima de 32 bits: conta cara, nunca é do gov.br
                 for (var j = i + 6; j < k.Count; j++)
                 {
                     if (k[j].Tag != 0xA3) continue;

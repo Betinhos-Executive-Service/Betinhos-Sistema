@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { enviarAditivoAssinado } from "./aditivoAcoes";
 import { reportAppError } from "../../shared/appErrorLogger";
 import { customApiErrorMessage } from "../../data/dataverse/customApi";
 import { SuccessCheck } from "./SuccessCheck";
@@ -8,20 +9,20 @@ import {
   ADITIVO_ASSINADOR_URL,
   gerarMeuAditivo,
   isMockTermos,
-  lerPdfAssinado,
-  navegadorPdfEnv,
-  registrarMeuAditivo
+  navegadorPdfEnv
 } from "./termosMulta";
 
 type PainelProps = {
   /** Texto do botão depois de confirmado ("Continuar" no termo, "Voltar ao início" na tela avulsa). */
   continuarLabel: string;
   onConcluir: () => void;
+  /** Chamado quando o servidor registrou o aditivo (antes de o motorista tocar no botão final). */
+  onConfirmado?: () => void;
   titleRef?: React.Ref<HTMLHeadingElement>;
 };
 
 /** O motorista baixa o próprio aditivo, assina no gov.br e devolve o PDF; o servidor confere e libera na hora. */
-export function AditivoPainel({ continuarLabel, onConcluir, titleRef }: PainelProps) {
+export function AditivoPainel({ continuarLabel, onConcluir, onConfirmado, titleRef }: PainelProps) {
   const [baixando, setBaixando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
@@ -47,7 +48,7 @@ export function AditivoPainel({ continuarLabel, onConcluir, titleRef }: PainelPr
     setEnviando(true);
     setErro("");
     try {
-      await registrarMeuAditivo(await lerPdfAssinado(file));
+      await enviarAditivoAssinado(file, onConfirmado);
       setConfirmado(true);
     } catch (error) {
       reportAppError(error, { source: "aditivo", action: "registrarMeuAditivo", screen: "Aditivo", notifyUser: false });
@@ -98,14 +99,14 @@ export function AditivoPainel({ continuarLabel, onConcluir, titleRef }: PainelPr
 }
 
 /** Tela avulsa aberta pelo cartão da tela inicial. */
-export function AditivoScreen({ onBack }: { onBack: () => void }) {
+export function AditivoScreen({ onBack, onConfirmado }: { onBack: () => void; onConfirmado: () => void }) {
   return (
     <>
       <ServicesMenu title="Aditivo" eyebrow={isMockTermos() ? "Operação · Mock local" : "Operação"} homeLabel="Voltar" homeIcon="arrowLeft" onHome={onBack} />
       <div className="termo-flow">
         <div className="termo-flow-scroll" tabIndex={0} aria-label="Aditivo de assinatura eletrônica">
           <div className="termo-step">
-            <AditivoPainel continuarLabel="Voltar ao início" onConcluir={onBack} />
+            <AditivoPainel continuarLabel="Voltar ao início" onConcluir={onBack} onConfirmado={onConfirmado} />
           </div>
         </div>
       </div>

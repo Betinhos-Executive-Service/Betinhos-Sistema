@@ -1,8 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Xrm.Sdk;
 using Xunit;
 
 namespace Betinhos.DriverRecordSharing.Tests
@@ -103,6 +105,71 @@ namespace Betinhos.DriverRecordSharing.Tests
             var m = new Mundo();
             var pdf = m.Pdf(new GovBrFalso.Opcoes { SigningTime = Agora.AddHours(2) });
             Assert.Equal(AssinaturaGovBr.ErroFuturo, AssinaturaGovBr.Verificar(pdf, Gerado.Length, m.Acs, Agora).Erro);
+        }
+
+        [Fact]
+        public void ValidadeVaiContraORelogioDoServidorENaoContraOSigningTime()
+        {
+            // signingTime anterior ao início do certificado: antes recusava; agora só o relógio do servidor conta
+            var m = new Mundo();
+            var antigo = m.Pdf(new GovBrFalso.Opcoes { SigningTime = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc) });
+            Assert.Null(AssinaturaGovBr.Verificar(antigo, Gerado.Length, m.Acs, Agora).Erro);
+            // certificado vencido hoje, mesmo com signingTime dentro da validade
+            var vencido = new Mundo(de: new DateTime(2026, 1, 1), ate: new DateTime(2026, 10, 1));
+            var pdf = vencido.Pdf(new GovBrFalso.Opcoes { SigningTime = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc) });
+            Assert.Equal(AssinaturaGovBr.ErroValidade, AssinaturaGovBr.Verificar(pdf, Gerado.Length, vencido.Acs, Agora).Erro);
+        }
+
+        [Fact]
+        public void CadeiaEConferidaAntesDaContaRsaDosAtributos()
+        {
+            var m = new Mundo();
+            var outraAc = GovBrFalso.NovaAc("OUTRA AC", new DateTime(2020, 6, 17), new DateTime(2033, 6, 9));
+            var estranho = GovBrFalso.NovoSignatario(outraAc, GovBrFalso.CpfFicticio, new DateTime(2026, 1, 1), new DateTime(2027, 1, 1));
+            var pdf = GovBrFalso.AssinarPdf(Gerado, outraAc, estranho, new GovBrFalso.Opcoes { ChaveDosAtributos = GovBrFalso.NovaChave() });
+            // fora da AC fixada recusa pela cadeia, sem chegar à assinatura dos atributos (que está errada)
+            Assert.Equal(AssinaturaGovBr.ErroNaoGovBr, AssinaturaGovBr.Verificar(pdf, Gerado.Length, m.Acs, Agora).Erro);
+            // na cadeia certa, a assinatura errada dos atributos continua sendo "alterado"
+            var certo = m.Pdf(new GovBrFalso.Opcoes { ChaveDosAtributos = GovBrFalso.NovaChave() });
+            Assert.Equal(AssinaturaGovBr.ErroAlterado, AssinaturaGovBr.Verificar(certo, Gerado.Length, m.Acs, Agora).Erro);
+        }
+
+        [Fact]
+        public void ModuloAcimaDe4096BitsOuExpoenteAcimaDe32BitsRecusa()
+        {
+            var m = new Mundo();
+            var grande = new byte[513]; grande[0] = 0x80; grande[512] = 1;
+            var modulo = GovBrFalso.NovoSignatario(m.Ac, GovBrFalso.CpfFicticio, new DateTime(2026, 1, 1), new DateTime(2027, 1, 1), 78,
+                new RSAParameters { Modulus = grande, Exponent = new byte[] { 1, 0, 1 } });
+            Assert.Equal(AssinaturaGovBr.ErroIlegivel, AssinaturaGovBr.Verificar(GovBrFalso.AssinarPdf(Gerado, m.Ac, modulo), Gerado.Length, m.Acs, Agora).Erro);
+
+            var normal = new byte[256]; normal[0] = 0x80; normal[255] = 1;
+            var expoente = GovBrFalso.NovoSignatario(m.Ac, GovBrFalso.CpfFicticio, new DateTime(2026, 1, 1), new DateTime(2027, 1, 1), 79,
+                new RSAParameters { Modulus = normal, Exponent = new byte[] { 1, 0, 0, 0, 1 } });
+            Assert.Equal(AssinaturaGovBr.ErroIlegivel, AssinaturaGovBr.Verificar(GovBrFalso.AssinarPdf(Gerado, m.Ac, expoente), Gerado.Length, m.Acs, Agora).Erro);
+        }
+
+        private sealed class Rastro : ITracingService
+        {
+            public readonly List<string> Linhas = new List<string>();
+            public void Trace(string format, params object[] args) => Linhas.Add(args == null || args.Length == 0 ? format : string.Format(format, args));
+        }
+
+        [Fact]
+        public void NoCatchGenericoOTraceLevaSoOTipoDaExcecao()
+        {
+            var m = new Mundo();
+            var pdf = m.Pdf();
+            var texto = Encoding.ASCII.GetString(pdf);
+            var ini = texto.IndexOf("/Contents <", StringComparison.Ordinal) + "/Contents <".Length;
+            for (var i = 0; i < 40; i++) pdf[ini + i * 3] = (byte)'f';
+            var rastro = new Rastro();
+            var r = AssinaturaGovBr.Verificar(pdf, Gerado.Length, m.Acs, Agora, rastro);
+            Assert.Equal(AssinaturaGovBr.ErroIlegivel, r.Erro);
+            var linha = Assert.Single(rastro.Linhas);
+            Assert.Contains("Exception", linha);
+            Assert.DoesNotContain(GovBrFalso.CpfFicticio, linha);
+            Assert.DoesNotContain(new string('f', 6), linha);
         }
 
         [Fact]
