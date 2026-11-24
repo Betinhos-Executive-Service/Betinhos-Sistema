@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Menu, Sheet, selectionBlock, selectionMenuActions, type SelectionAction, type ViewBarSelection } from '@betinhos/ui'
-import { ChevronUp, MoreVertical, X } from 'lucide-react'
+import { CheckCheck, ChevronUp, MoreVertical, X } from 'lucide-react'
 import './barraSelecao.css'
 
 /** Variações da barra de seleção do celular (laboratório, `#/geral?barra=a|b|c`). */
@@ -14,13 +14,16 @@ export const lerVarianteBarra = (hash: string): VarianteBarra | null => {
 /** Ações que ganham botão próprio no celular, nesta ordem; "Editar" fica no menu (tocar no card já abre o formulário). */
 const PRINCIPAIS = ['editar-campos', 'copiar', 'disparar']
 
+/** Rótulo curto na barra B (o nome completo fica no `aria-label` e no menu). */
+const CURTO: Record<string, string> = { copiar: 'Copiar', 'editar-campos': 'Editar campos', disparar: 'Disparar' }
+
 const contagem = (n: number) => (n === 1 ? '1 selecionado' : `${n} selecionados`)
 
 function Acao({ action, count, classe, comRotulo }: { action: SelectionAction; count: number; classe: string; comRotulo: boolean }) {
   const motivo = selectionBlock(action, count)
   return (
     <button type="button" className={classe} aria-label={action.label} title={motivo ?? action.label} aria-disabled={motivo ? 'true' : undefined} onClick={motivo ? undefined : action.onSelect}>
-      {action.icon}{comRotulo ? <span>{action.label}</span> : null}
+      {action.icon}{comRotulo ? <span>{CURTO[action.id] ?? action.label}</span> : null}
     </button>
   )
 }
@@ -73,7 +76,7 @@ export function BarraSelecao({ variante, selection }: { variante: VarianteBarra;
     return (
       <div ref={ref} className="gs-barra gs-barra--b" role="group" aria-label="Comandos da seleção">
         <div className="gs-b__topo">
-          <span role="status" className="gs-contagem">{contagem(selection.count)}</span>
+          <span role="status" className="gs-b__selo"><CheckCheck size={14} aria-hidden="true" />{contagem(selection.count)}</span>
           <button type="button" className="gs-b__limpar" onClick={selection.onClear}>Desmarcar</button>
         </div>
         <div className="gs-b__ferramentas">
