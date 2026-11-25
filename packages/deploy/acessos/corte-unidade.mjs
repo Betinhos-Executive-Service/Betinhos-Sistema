@@ -39,9 +39,11 @@ export async function lerUnidade(dv) {
   const raizes = bus.filter((b) => !b._parentbusinessunitid_value)
   if (raizes.length !== 1) throw new Error(`Unidade raiz não encontrada (${raizes.length}).`)
   const raiz = raizes[0].businessunitid
-  const frotas = bus.filter((b) => b._parentbusinessunitid_value === raiz && !b.isdisabled && b.name?.toLowerCase() === UNIDADE.toLowerCase())
-  if (frotas.length > 1) throw new Error('Há mais de uma unidade Frota ativa; corrija antes do corte.')
+  const frotas = bus.filter((b) => b._parentbusinessunitid_value === raiz && b.name?.toLowerCase() === UNIDADE.toLowerCase())
+  // Conta também a desativada: sobra de um desfazer cujo DELETE falhou; o corte a reativa em vez de criar outra.
+  if (frotas.length > 1) throw new Error('Há mais de uma unidade Frota (ativa ou desativada) abaixo da raiz; corrija antes do corte.')
   const frota = frotas[0]?.businessunitid ?? null
+  const frotaDesativada = Boolean(frotas[0]?.isdisabled)
   const roles = await dv.todos(`roles?$select=roleid,name,_businessunitid_value,_parentrootroleid_value&$filter=${filtroNomes}`)
   const raizPorNome = {}, copiaPorRaiz = {}
   for (const r of roles) {
@@ -56,7 +58,7 @@ export async function lerUnidade(dv) {
   const documentos = (await dv.todos(`cr40f_documentos?$select=cr40f_documentoid,_owningbusinessunit_value&$filter=${encodeURIComponent('_cr40f_veiculo_value ne null and _cr40f_funcionario_value eq null')}`))
     .map((d) => ({ id: d.cr40f_documentoid, unidade: d._owningbusinessunit_value }))
   return {
-    org: { id: org.organizationid, xml: org.orgdborgsettings }, recurso, raiz, frota,
+    org: { id: org.organizationid, xml: org.orgdborgsettings }, recurso, raiz, frota, frotaDesativada,
     raizPorNome, copiaPorRaiz, atribuicoes, documentos,
     // Com o recurso já ligado a varredura não importa (a trava só vale antes de ligar).
     datasNulas: recurso ? [] : await lerDatasNulas(dv),
@@ -67,7 +69,7 @@ export function planoDaUnidade(u) {
   const raizes = new Set(Object.values(u.raizPorNome))
   return {
     ligarRecurso: !u.recurso,
-    criarUnidade: !u.frota,
+    criarUnidade: !u.frota || Boolean(u.frotaDesativada),
     documentos: u.documentos.filter((d) => !u.frota || d.unidade !== u.frota).map((d) => d.id).sort(),
     trocas: u.atribuicoes.filter((a) => raizes.has(a.papel)).sort((a, b) => a.usuario.localeCompare(b.usuario) || a.papel.localeCompare(b.papel)),
     travas: u.recurso ? [] : [...u.datasNulas],
@@ -88,24 +90,29 @@ async function esperarCopias(dv, frota, raizes, esperar) {
 
 const ref = (dv, set, id) => ({ '@odata.id': `${typeof dv.api === 'string' ? `${dv.api}/` : ''}${set}(${id})` })
 
+// Idempotente: lê os papéis do usuário e só associa o que falta e só desassocia o que ainda existe.
+async function trocarPapel(dv, usuario, de, para) {
+  const atuais = new Set((await dv.todos(`systemusers(${usuario})/systemuserroles_association?$select=roleid`)).map((r) => r.roleid))
+  if (!atuais.has(para)) await dv.chamar('POST', `systemusers(${usuario})/systemuserroles_association/$ref`, ref(dv, 'roles', para))
+  if (atuais.has(de)) await dv.chamar('DELETE', `systemusers(${usuario})/systemuserroles_association(${de})/$ref`)
+}
+
 export async function aplicarUnidade(dv, plano, u, { esperar = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   if (plano.travas.length) throw new Error(`Colunas DateTime sem DateTimeBehavior: ${plano.travas.join(', ')}`)
   if (plano.ligarRecurso) await dv.chamar('PATCH', `organizations(${u.org.id})`, { orgdborgsettings: xmlComRecurso(u.org.xml, true) })
   let frota = u.frota
-  if (plano.criarUnidade) {
+  if (plano.criarUnidade && u.frota) await dv.chamar('PATCH', `businessunits(${u.frota})`, { isdisabled: false })
+  else if (plano.criarUnidade) {
     const criada = await dv.chamar('POST', 'businessunits', { name: UNIDADE, 'parentbusinessunitid@odata.bind': `/businessunits(${u.raiz})` }, { Prefer: 'return=representation' })
     frota = criada?.businessunitid ?? (await lerUnidade(dv)).frota
   }
   const copias = await esperarCopias(dv, frota, Object.values(u.raizPorNome), esperar)
   for (const id of plano.documentos) await dv.chamar('PATCH', `cr40f_documentos(${id})`, { 'owningbusinessunit@odata.bind': `/businessunits(${frota})` })
-  for (const t of plano.trocas) {
-    await dv.chamar('POST', `systemusers(${t.usuario})/systemuserroles_association/$ref`, ref(dv, 'roles', copias[t.papel]))
-    await dv.chamar('DELETE', `systemusers(${t.usuario})/systemuserroles_association(${t.papel})/$ref`)
-  }
+  for (const t of plano.trocas) await trocarPapel(dv, t.usuario, t.papel, copias[t.papel])
 }
 
 export function fotoDaUnidade(u, plano) {
-  return { existia: Boolean(u.frota), recursoAntes: u.recurso, documentos: plano.documentos, trocas: plano.trocas }
+  return { existia: Boolean(u.frota) && !u.frotaDesativada, recursoAntes: u.recurso, documentos: plano.documentos, trocas: plano.trocas }
 }
 
 export function planoDesfazerUnidade(fotos, u) {
@@ -122,10 +129,7 @@ export function planoDesfazerUnidade(fotos, u) {
 }
 
 export async function aplicarDesfazerUnidade(dv, plano, u) {
-  for (const t of plano.trocas) {
-    await dv.chamar('POST', `systemusers(${t.usuario})/systemuserroles_association/$ref`, ref(dv, 'roles', t.para))
-    await dv.chamar('DELETE', `systemusers(${t.usuario})/systemuserroles_association(${t.de})/$ref`)
-  }
+  for (const t of plano.trocas) await trocarPapel(dv, t.usuario, t.de, t.para)
   for (const id of plano.documentos) await dv.chamar('PATCH', `cr40f_documentos(${id})`, { 'owningbusinessunit@odata.bind': `/businessunits(${u.raiz})` })
   if (plano.apagarUnidade) {
     await dv.chamar('PATCH', `businessunits(${plano.apagarUnidade})`, { isdisabled: true })

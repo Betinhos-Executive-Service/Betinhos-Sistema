@@ -94,6 +94,7 @@ test('aplicarUnidade segue a ordem: recurso, unidade, copias, documentos, trocas
   const dv = falso({ 'roles': { value: [{ roleid: C_OP, name: PAPEIS_FROTA[0], _businessunitid_value: FROTA, _parentrootroleid_value: R_OP },
     { roleid: C_GE, name: PAPEIS_FROTA[1], _businessunitid_value: FROTA, _parentrootroleid_value: R_GE }] } })
   const u = estado({ atribuicoes: [{ usuario: ID(30), papel: R_GE }], documentos: [{ id: ID(40), unidade: RAIZ }] })
+  dv.todos = async (c) => (c.startsWith('systemusers(') ? [{ roleid: R_GE }] : [{ roleid: C_OP, name: PAPEIS_FROTA[0], _businessunitid_value: FROTA, _parentrootroleid_value: R_OP }, { roleid: C_GE, name: PAPEIS_FROTA[1], _businessunitid_value: FROTA, _parentrootroleid_value: R_GE }])
   await aplicarUnidade(dv, planoDaUnidade(u), u, { esperar: async () => {} })
   assert.deepEqual(dv.chamadas.map(([m, c]) => `${m} ${c}`), [
     `PATCH organizations(${ORG})`,
@@ -149,4 +150,33 @@ test('trava de datas nulas só vale com o recurso desligado (e a varredura nem r
   const ligado = planoDaUnidade(await lerUnidade(montar(true)))
   assert.deepEqual(ligado.travas, [])
   assert.equal(planoDaUnidade({ ...estado({ recurso: true }), datasNulas: ['cr40f_x.cr40f_data'] }).travas.length, 0)
+})
+
+test('trocas de papel sao idempotentes: associacao existente nao repete e delete de ausente nao falha', async () => {
+  const dv = falso({})
+  dv.todos = async (c) => (c.startsWith('systemusers(') ? [{ roleid: C_GE }] : [{ roleid: C_OP, name: PAPEIS_FROTA[0], _businessunitid_value: FROTA, _parentrootroleid_value: R_OP }, { roleid: C_GE, name: PAPEIS_FROTA[1], _businessunitid_value: FROTA, _parentrootroleid_value: R_GE }])
+  const u = estado({ recurso: true, frota: FROTA, atribuicoes: [{ usuario: ID(30), papel: R_GE }] })
+  await aplicarUnidade(dv, planoDaUnidade(u), u, { esperar: async () => {} })
+  assert.deepEqual(dv.chamadas, [])
+})
+
+test('unidade Frota desativada que sobrou e achada e reativada, sem criar outra', async () => {
+  const montar = (bus) => falso({
+    'organizations': { value: [{ organizationid: ORG, orgdborgsettings: XML(true) }] },
+    'businessunits': { value: bus },
+    'roles': { value: [{ roleid: R_OP, name: PAPEIS_FROTA[0], _businessunitid_value: RAIZ, _parentrootroleid_value: null },
+      { roleid: R_GE, name: PAPEIS_FROTA[1], _businessunitid_value: RAIZ, _parentrootroleid_value: null }] },
+  })
+  const raiz = { businessunitid: RAIZ, name: 'org', _parentbusinessunitid_value: null, isdisabled: false }
+  const dv = montar([raiz, { businessunitid: FROTA, name: 'Frota', _parentbusinessunitid_value: RAIZ, isdisabled: true }])
+  const u = await lerUnidade(dv)
+  assert.equal(u.frota, FROTA)
+  assert.equal(u.frotaDesativada, true)
+  const plano = planoDaUnidade(u)
+  assert.equal(plano.criarUnidade, true)
+  dv.todos = async (c) => (c.startsWith('roles') ? [{ roleid: C_OP, name: PAPEIS_FROTA[0], _businessunitid_value: FROTA, _parentrootroleid_value: R_OP }, { roleid: C_GE, name: PAPEIS_FROTA[1], _businessunitid_value: FROTA, _parentrootroleid_value: R_GE }] : [])
+  await aplicarUnidade(dv, plano, u, { esperar: async () => {} })
+  assert.deepEqual(dv.chamadas.map(([m, c, b]) => `${m} ${c} ${JSON.stringify(b ?? null)}`), [`PATCH businessunits(${FROTA}) {"isdisabled":false}`])
+  const dois = montar([raiz, { businessunitid: FROTA, name: 'Frota', _parentbusinessunitid_value: RAIZ, isdisabled: true }, { businessunitid: ID(9), name: 'frota', _parentbusinessunitid_value: RAIZ, isdisabled: false }])
+  await assert.rejects(() => lerUnidade(dois), /mais de uma unidade Frota/)
 })

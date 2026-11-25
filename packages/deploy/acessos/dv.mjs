@@ -44,7 +44,8 @@ export function criarCliente({ url, token, fetch = globalThis.fetch, espera = do
     if (corpo !== undefined) headers['Content-Type'] = 'application/json'
     for (let tentativa = 1; ; tentativa++) {
       const r = await fetch(alvo, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) })
-      if ((r.status === 429 || r.status >= 500) && tentativa < 4) {
+      // POST não se repete em 5xx: a criação pode ter passado e a repetição duplicaria o registro.
+      if ((r.status === 429 || (r.status >= 500 && metodo !== 'POST')) && tentativa < 4) {
         const depois = Number(r.headers?.get?.('Retry-After'))
         await espera(depois > 0 ? depois * 1000 : 2000 * tentativa)
         continue

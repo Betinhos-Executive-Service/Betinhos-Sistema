@@ -37,6 +37,13 @@ test('chamar repete 429 e 5xx e depois devolve o JSON', async () => {
   assert.deepEqual(esperas, [1000, 4000])
 })
 
+test('chamar não repete POST em 5xx, para não duplicar a criação', async () => {
+  const { fetch, chamadas } = falso([resposta(503, 'fora'), resposta(200, { ok: 1 })])
+  const dv = criarCliente({ url: URL_DEV, token: 't', fetch, espera: async () => {} })
+  await assert.rejects(dv.chamar('POST', 'businessunits', { a: 1 }), /503/)
+  assert.equal(chamadas.length, 1)
+})
+
 test('erro sai sem GUID e 204 vira null', async () => {
   const id = '00000000-0000-0000-0000-000000000001'
   const { fetch } = falso([resposta(400, `papel ${id} recusado`), resposta(204)])

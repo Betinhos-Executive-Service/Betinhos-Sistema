@@ -204,6 +204,8 @@ test('corte dos acessos não muda o caminho do PROD (roda no job acessos)', () =
     'packages/deploy/acessos/corte-regras.mjs',
     'packages/deploy/acessos/corte-regras.test.mjs',
     'packages/deploy/acessos/corte-estado.mjs',
+    'packages/deploy/acessos/corte-unidade.mjs',
+    'packages/deploy/acessos/corte-unidade.test.mjs',
     'packages/deploy/acessos/corte-ci.mjs',
     'packages/deploy/acessos/relatorio-corte.mjs',
     'packages/deploy/acessos/dv.mjs',

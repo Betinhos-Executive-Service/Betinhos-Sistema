@@ -112,8 +112,10 @@ jobs:
             echo "ha=nao" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Só vale foto de execução da branch do ambiente: artefato de outra branch não pode alimentar o desfazer.
+          if [ "$AMB" = "prod" ]; then RAMO=main; else RAMO=develop; fi
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=acessos-foto-$AMB&per_page=100" \
-            --jq '.artifacts[] | select(.expired == false) | .id' > "$RUNNER_TEMP/ids.txt"
+            --jq ".artifacts[] | select(.expired == false and .workflow_run.head_branch == \"$RAMO\") | .id" > "$RUNNER_TEMP/ids.txt"
           if [ ! -s "$RUNNER_TEMP/ids.txt" ]; then
             echo "::error::Nenhuma foto do corte nos últimos 90 dias; o desfazer automático não tem o que devolver."
             exit 1
