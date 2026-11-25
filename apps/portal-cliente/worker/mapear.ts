@@ -95,8 +95,8 @@ export function pessoasDoPedido(r: Registro): PassageiroPedido[] {
   })
 }
 
-/** Reserva → pedido do solicitante. Voucher, veículo, motorista e placa só depois de programado. */
-export function mapearPedido(r: Registro): Pedido {
+/** Reserva → pedido visto por `usuarioId`. Voucher, veículo, motorista e placa só depois de programado. */
+export function mapearPedido(r: Registro, usuarioId: string): Pedido {
   const status = PEDIDO_STATUS[num(r, 'cr40f_status') ?? -1] ?? 'em_analise'
   let portal: PedidoPortal = { passageiros: [] }
   try {
@@ -119,6 +119,7 @@ export function mapearPedido(r: Registro): Pedido {
     passageiros: pessoas.length ? pessoas.map((p) => p.nome) : portal.passageiros,
     pessoas: pessoas.length ? pessoas : portal.passageiros.map((nome) => ({ nome })),
     criadoEm: str(r, 'createdon'),
+    ...(str(r, '_cr40f_portalusuario_value').toLowerCase() !== usuarioId.toLowerCase() ? { comoPassageiro: true } : {}),
     ...(tipoVeiculo !== undefined ? { tipoVeiculo } : {}),
     ...(portal.observacao ? { observacao: portal.observacao } : {}),
     ...(programado && veiculo ? { veiculo } : {}),

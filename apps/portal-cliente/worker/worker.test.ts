@@ -270,6 +270,17 @@ describe('pedidos', () => {
     expect(meu).toMatchObject({ status: 'programado', voucherUrl: 'https://v/RV-48500.pdf', veiculo: 'Sedan executivo', motorista: 'Carlos Souza', placa: 'ABC1D23' })
   })
 
+  it('Meus serviços também lista, só para leitura, o pedido em que o e-mail do usuário é passageiro', async () => {
+    const paula = await logar('paula@latasa.com.br')
+    const compras = await logar('compras@latasa.com.br')
+    const comCompras = { ...pedido(), passageiros: [{ nome: 'Equipe Compras', telefone: '(12) 99999-0002', email: 'Compras@Latasa.com.br' }] }
+    const criado = (await (await chamar('POST', '/pedidos', comCompras, paula)).json()) as { id: string; comoPassageiro?: boolean }
+    expect(criado.comoPassageiro).toBeUndefined()
+    const lista = (await (await chamar('GET', '/pedidos', undefined, compras)).json()) as Array<Record<string, unknown>>
+    expect(lista).toEqual([expect.objectContaining({ id: criado.id, comoPassageiro: true })])
+    expect((await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, compras)).status).toBe(404)
+  })
+
   it('cancelar: só o dono e só em Solicitado; nota na observação interna', async () => {
     const paula = await logar('paula@latasa.com.br')
     const compras = await logar('compras@latasa.com.br')

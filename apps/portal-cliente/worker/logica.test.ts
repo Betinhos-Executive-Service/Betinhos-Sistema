@@ -130,13 +130,15 @@ describe('pedidos', () => {
   it('mapeia a reserva pela coluna do portal (JSON); voucher só depois de programado', () => {
     const r = {
       cr40f_reservadeveculosid: 'id1', cr40f_id: 'RV-1', cr40f_status: 202410004, cr40f_dataehorriodesada: '2026-11-03T10:00:00Z', cr40f_endereodesada: 'A', cr40f_destino: 'B',
-      cr40f_portalpedido: '{"passageiros":["Ana","Bia"],"observacao":"Voo LA1"}', new_linkdovoucher: 'https://v/1.pdf', createdon: '2026-11-01T12:00:00Z',
+      cr40f_portalpedido: '{"passageiros":["Ana","Bia"],"observacao":"Voo LA1"}', new_linkdovoucher: 'https://v/1.pdf', createdon: '2026-11-01T12:00:00Z', _cr40f_portalusuario_value: 'U1',
     }
-    expect(mapearPedido(r)).toEqual({ id: 'id1', numero: 'RV-1', status: 'solicitado', saida: '2026-11-03T10:00:00Z', origem: 'A', destino: 'B', passageiros: ['Ana', 'Bia'], pessoas: [{ nome: 'Ana' }, { nome: 'Bia' }], criadoEm: '2026-11-01T12:00:00Z', observacao: 'Voo LA1' })
-    expect(mapearPedido({ ...r, cr40f_status: 202410005 })).toMatchObject({ status: 'programado', voucherUrl: 'https://v/1.pdf' })
-    expect(mapearPedido({ ...r, cr40f_status: 202410010 }).status).toBe('cancelado')
+    expect(mapearPedido(r, 'u1')).toEqual({ id: 'id1', numero: 'RV-1', status: 'solicitado', saida: '2026-11-03T10:00:00Z', origem: 'A', destino: 'B', passageiros: ['Ana', 'Bia'], pessoas: [{ nome: 'Ana' }, { nome: 'Bia' }], criadoEm: '2026-11-01T12:00:00Z', observacao: 'Voo LA1' })
+    // Quem não pediu (só é passageiro) recebe o pedido marcado como só leitura.
+    expect(mapearPedido(r, 'u2').comoPassageiro).toBe(true)
+    expect(mapearPedido({ ...r, cr40f_status: 202410005 }, 'u1')).toMatchObject({ status: 'programado', voucherUrl: 'https://v/1.pdf' })
+    expect(mapearPedido({ ...r, cr40f_status: 202410010 }, 'u1').status).toBe('cancelado')
     // Coluna editada à mão: não quebra, só fica sem passageiros.
-    expect(mapearPedido({ ...r, cr40f_portalpedido: 'x' }).passageiros).toEqual([])
+    expect(mapearPedido({ ...r, cr40f_portalpedido: 'x' }, 'u1').passageiros).toEqual([])
   })
   it('passageiros e contato vêm de Serviços por Passageiro, em ordem; o tipo de veículo pedido sai como número', () => {
     const vinculo = (id: string, ordem: number, nome: string, extra = {}) => ({ _cr40f_bancodedados_value: id, cr40f_ordemdeselecao: ordem, [NAV.vinculoPessoa]: { cr40f_nomedopassageiro: nome, ...extra } })
@@ -145,6 +147,6 @@ describe('pedidos', () => {
       cr40f_portalpedido: '{"passageiros":["Antigo"]}', cr40f_tipodeveiculo: 202410003,
       [NAV.passageiros]: [vinculo('p2', 2, 'Bia', { cr40f_email: 'bia@exemplo.com' }), vinculo('p1', 1, 'Ana', { cr40f_telefone: '12999990001' })],
     }
-    expect(mapearPedido(r)).toMatchObject({ passageiros: ['Ana', 'Bia'], tipoVeiculo: 202410003, pessoas: [{ id: 'p1', nome: 'Ana', telefone: '12999990001' }, { id: 'p2', nome: 'Bia', email: 'bia@exemplo.com' }] })
+    expect(mapearPedido(r, 'u1')).toMatchObject({ passageiros: ['Ana', 'Bia'], tipoVeiculo: 202410003, pessoas: [{ id: 'p1', nome: 'Ana', telefone: '12999990001' }, { id: 'p2', nome: 'Bia', email: 'bia@exemplo.com' }] })
   })
 })

@@ -86,7 +86,10 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
   }
   if (tabela === 'reservadeveculoses') {
     const [usuario, cliente, id] = guids(filtro)
-    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
+    const passageiro = /\/any\(.*cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
+    const ehPassageiro = (r: Registro) => passageiro !== undefined && banco.servicosporpassageiros.some((v) => v._cr40f_geral_value === r.cr40f_reservadeveculosid
+      && String(banco.bancodedadoses.find((p) => p.cr40f_bancodedadosid === v._cr40f_bancodedados_value)?.cr40f_email ?? '').toLowerCase() === passageiro.toLowerCase())
+    return linhas.filter((r) => (r._cr40f_portalusuario_value === usuario || ehPassageiro(r)) && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
   if (tabela === 'bancodedadoses') {
     const [cliente, id] = guids(filtro)

@@ -37,10 +37,11 @@ export function PedidoDetalhe({ pedido: p, onFechar, onCancelar, onRepetir }: Pr
   const mobile = useMediaQuery('(max-width: 820px)')
   const info = statusPedidoInfo(p.status)
   const Painel = mobile ? Sheet : Drawer
-  const rodape = (p.voucherUrl || podeCancelar(p.status) || onRepetir) && (
+  const cancelavel = podeCancelar(p.status) && !p.comoPassageiro
+  const rodape = (p.voucherUrl || cancelavel || onRepetir) && (
     <div className="pc-det__acoes">
       {onRepetir && <Button variant="secondary" onClick={() => onRepetir(p)} icon={<Repeat size={16} aria-hidden />}>Repetir pedido</Button>}
-      {podeCancelar(p.status) && <Button variant="secondary" onClick={() => onCancelar(p)} icon={<X size={16} aria-hidden />}>Cancelar pedido</Button>}
+      {cancelavel && <Button variant="secondary" onClick={() => onCancelar(p)} icon={<X size={16} aria-hidden />}>Cancelar pedido</Button>}
       {p.voucherUrl && (
         <a className={buttonClassName({ variant: 'primary' })} href={p.voucherUrl} target="_blank" rel="noopener noreferrer">
           <FileText size={16} aria-hidden /> Ver voucher (PDF)

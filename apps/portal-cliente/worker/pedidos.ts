@@ -123,7 +123,7 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
   }
   // Marca só depois de criar tudo: uma falha no Dataverse não bloqueia a nova tentativa por 1 minuto.
   c.waitUntil(c.env.KV.put(chave, '1', { expirationTtl: JANELA_DUPLICADO_MS / 1000 }))
-  return json({ ...mapearPedido(criado), passageiros: pessoas.map((p) => p.nome), pessoas, ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }, 201)
+  return json({ ...mapearPedido(criado, sessao.vid), passageiros: pessoas.map((p) => p.nome), pessoas, ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }, 201)
 }
 
 /** Reserva sem passageiros não pode ficar na fila da operação: apaga; se o papel não deixar, cancela com nota. */
@@ -140,7 +140,7 @@ async function desfazerReserva(c: Ctx, reservaId: string, sessao: Sessao): Promi
 }
 
 export async function listarPedidos(c: Ctx, sessao: Sessao): Promise<Response> {
-  return json((await c.dv.lista(pedidosDe(sessao.vid, sessao.cid))).map(mapearPedido))
+  return json((await c.dv.lista(pedidosDe(sessao.vid, sessao.cid, sessao.email))).map((r) => mapearPedido(r, sessao.vid)))
 }
 
 const dataHoraSp = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
@@ -153,5 +153,5 @@ export async function cancelarPedido(c: Ctx, sessao: Sessao, id: string): Promis
   const nota = `Cancelado pelo cliente no portal por ${sessao.nome} (${sessao.email}) em ${dataHoraSp.format(c.agora)}`
   const antes = typeof reg.cr40f_observaointerna === 'string' ? reg.cr40f_observaointerna : ''
   await c.dv.patch(`${SET.reserva}(${guid(id)})`, { cr40f_status: RESERVA_CANCELADO, cr40f_observaointerna: antes ? `${antes}\n${nota}` : nota })
-  return json(mapearPedido({ ...reg, cr40f_status: RESERVA_CANCELADO }))
+  return json(mapearPedido({ ...reg, cr40f_status: RESERVA_CANCELADO }, sessao.vid))
 }
