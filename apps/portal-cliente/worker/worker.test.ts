@@ -384,6 +384,14 @@ describe('passageiros do pedido', () => {
     expect(await r.json()).toEqual([])
   })
 
+  it('rota: exige sessão e módulo Pedir; sem TOMTOM_KEY responde null sem erro', async () => {
+    expect((await chamar('GET', '/rota?o=paulista&d=guarulhos')).status).toBe(401)
+    expect((await chamar('GET', '/rota?o=paulista&d=guarulhos', undefined, await logar())).status).toBe(403)
+    const r = await chamar('GET', '/rota?o=avenida paulista&d=aeroporto guarulhos', undefined, await logar('compras@latasa.com.br'))
+    expect(r.status).toBe(200)
+    expect(await r.json()).toBeNull()
+  })
+
   it('passageiro novo vira pessoa do cliente e vínculo com ordem; a leitura volta por Serviços por Passageiro', async () => {
     const sessao = await logar('compras@latasa.com.br')
     const r = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana Souza', telefone: '(12) 99999-0001' }, { nome: 'Bia Lima', email: 'bia@exemplo.com' }], { tipoVeiculo: 202410003 }), sessao)

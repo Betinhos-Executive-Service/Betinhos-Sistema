@@ -1,5 +1,5 @@
 import type { Marca } from '../domain/marca'
-import type { DecisaoAprovacao, EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, PedidoParaAprovar, Servico, Sessao } from '../domain/types'
+import type { DecisaoAprovacao, EnderecoSugerido, EstimativaRota, Motivo, NovoPedido, PassageiroPedido, Pedido, PedidoParaAprovar, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
 /**
@@ -60,6 +60,7 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     responder: (id: string, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/responder`, { texto }),
     buscarPassageiros: (q: string) => chamar<PassageiroPedido[]>('GET', `/passageiros?q=${encodeURIComponent(q)}`),
     buscarEnderecos: (q: string, sinal?: AbortSignal) => chamar<EnderecoSugerido[]>('GET', `/enderecos?q=${encodeURIComponent(q)}`, undefined, sinal),
+    estimarRota: (o: string, d: string, sinal?: AbortSignal) => chamar<EstimativaRota | null>('GET', `/rota?o=${encodeURIComponent(o)}&d=${encodeURIComponent(d)}`, undefined, sinal),
     pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
     meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
     cancelarPedido: (id: string) => chamar<Pedido>('POST', `/pedidos/${encodeURIComponent(id)}/cancelar`),

@@ -17,6 +17,7 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 | `POST /api/servicos/:id/duvida` · `/responder` | `{motivo, texto}` · `{texto}` |
 | `GET /api/passageiros?q=` | Módulo Pedir: até 20 passageiros ativos do cliente da sessão (`cr40f_bancodedados`), filtrados por nome |
 | `GET /api/enderecos?q=` | Módulo Pedir: até 6 sugestões `[{rotulo, endereco}]` da TomTom Search (`typeahead`, BR, pt-BR; POI, endereço e rua). Mínimo 3 caracteres, `q` até 100. Sem `TOMTOM_KEY` ou com a TomTom falhando responde `[]` (o campo continua texto livre) |
+| `GET /api/rota?o=&d=` | Módulo Pedir: prévia do trajeto `{distanciaKm, minutos}` (TomTom Geocoding + Routing com trânsito, no servidor). Mesmos limites de `q`; sem `TOMTOM_KEY`, endereço não achado ou TomTom falhando responde `null` (a prévia só não aparece) |
 | `POST /api/pedidos` | Módulo Pedir: `{passageiros[{id?, nome, telefone?, email?}], origem, destino, saida, tipoVeiculo?, observacao?}` (celular ou e-mail por passageiro; vínculos em `cr40f_servicosporpassageiro`) → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
 | `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com passageiros (`pessoas`), `tipoVeiculo`, status, veículo e voucher quando programadas |
 

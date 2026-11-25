@@ -9,6 +9,7 @@ import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
 import type { Env } from './env'
 import { sugerirEnderecos } from './enderecos'
+import { responderRota } from './rota'
 import { erro } from './http'
 import { baixarLogo, consultarMarca } from './marca'
 import { cancelarPedido, criarPedido, listarPassageiros, listarPedidos } from './pedidos'
@@ -80,6 +81,7 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   if (rota === 'POST /pedidos') return com('pedir', () => criarPedido(req, c, sessao))
   if (rota === 'GET /passageiros') return com('pedir', () => listarPassageiros(c, sessao, url.searchParams.get('q') ?? ''))
   if (rota === 'GET /enderecos') return com('pedir', () => sugerirEnderecos(env, url.searchParams.get('q') ?? ''))
+  if (rota === 'GET /rota') return com('pedir', () => responderRota(env, url.searchParams.get('o') ?? '', url.searchParams.get('d') ?? ''))
   if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
   // Aprovação: quem aprova pode não pedir, então basta ter Pedir ou Meus serviços; o papel de aprovador é conferido na rota.
   const comPedidos = (rodar: () => Promise<Response>) => (sessao.modulos.includes('pedir') || sessao.modulos.includes('meus_servicos') ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
