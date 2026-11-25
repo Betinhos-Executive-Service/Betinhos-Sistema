@@ -215,16 +215,17 @@ export function resumoPublico(rel, { ambiente, sal }) {
   ].join('\n')
 }
 
-export function fotoDoCorte(estado, plano, { ambiente, host, quando, commit }) {
+export function fotoDoCorte(estado, plano, { ambiente, host, quando, commit }, unidade) {
   const porPessoa = new Map()
   for (const { usuario, papel } of plano.pessoasRemover) porPessoa.set(usuario, [...(porPessoa.get(usuario) ?? []), papel])
   const ids = [...plano.equipeRemover, ...plano.pessoasRemover.map((p) => p.papel)]
   return {
-    versao: 1, ambiente, host, quando, commit,
+    versao: 2, ambiente, host, quando, commit,
     equipe: estado.equipe ? { id: estado.equipe.id, papeis: [...plano.equipeRemover] } : null,
     base: estado.base,
     pessoas: [...porPessoa].map(([id, papeis]) => ({ id, papeis })),
     nomes: Object.fromEntries(ids.map((id) => [id, estado.papeis.get(id)?.nome ?? ''])),
+    unidade,
   }
 }
 
@@ -236,9 +237,15 @@ export function lerFoto(texto) {
     f = null
   }
   const ids = (lista) => Array.isArray(lista) && lista.every((x) => GUID.test(x))
-  const ok = f?.versao === 1 && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' &&
+  const ok = (f?.versao === 1 || f?.versao === 2) && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' &&
     (f.equipe === null || (GUID.test(f.equipe?.id ?? '') && ids(f.equipe.papeis))) && Array.isArray(f.pessoas) && f.pessoas.every((p) => GUID.test(p?.id ?? '') && ids(p.papeis))
   if (!ok) throw new Error('foto do corte em formato desconhecido; nada feito')
+  if (f.versao === 2) {
+    const u = f.unidade
+    const unidadeOk = u && typeof u.existia === 'boolean' && typeof u.recursoAntes === 'boolean' && ids(u.documentos) &&
+      Array.isArray(u.trocas) && u.trocas.every((t) => GUID.test(t?.usuario ?? '') && GUID.test(t?.papel ?? ''))
+    if (!unidadeOk) throw new Error('foto do corte versao 2 sem unidade valida; nada feito')
+  }
   return f
 }
 

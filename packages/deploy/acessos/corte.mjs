@@ -4,8 +4,9 @@
 //   modo       imprime o modo do ambiente em corte.json; não chama o Dataverse;
 //   automacao  garante os membros do perfil de coluna "Passageiros - automação" (conta que roda + ACESSOS_AUTOMACAO_MEMBROS);
 //   avaliar    relatório (sai 1 se travar), foto do que sai e estado.txt = nada | aplicar | travado;
-//   aplicar    reavalia, confere com a foto e aplica: Base na equipe, tira os papéis da equipe e os diretos; confere;
-//   desfazer   devolve o que as fotos guardaram (equipe e pessoas ativas) e confere.
+//   aplicar    reavalia, confere com a foto e aplica: unidade Frota (recurso, BU, documentos de veículo, cópias dos papéis Frota),
+//              depois Base na equipe, tira os papéis da equipe e os diretos; confere;
+//   desfazer   devolve o que as fotos guardaram (equipe e pessoas ativas) e a unidade Frota (olha o estado, não a foto) e confere.
 // Saída pública: contagens e ids curtos com hash. Ids reais só em <pasta>, que o workflow cifra.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -15,6 +16,9 @@ import {
   PERFIL_AUTOMACAO, fotoDoCorte, lerCorte, lerFoto, lerIds, mesmoPlano, planoDesfazer, planoDoCorte, planoVazio, resumoPublico,
 } from './corte-regras.mjs'
 import { lerEstado } from './corte-estado.mjs'
+import {
+  aplicarDesfazerUnidade, aplicarUnidade, fotoDaUnidade, lerUnidade, mesmaUnidade, planoDaUnidade, planoDesfazerUnidade, resumoUnidade, unidadeVazia,
+} from './corte-unidade.mjs'
 import { avaliar, detalhe, foraDoRepo } from './relatorio-corte.mjs'
 
 const { values: a } = parseArgs({
@@ -72,17 +76,21 @@ async function principal() {
     const { estado, relatorio } = await avaliar(dv, { manter })
     escrever(join(pasta, 'relatorio', 'relatorio.json'), detalhe(relatorio, estado))
     console.log(resumoPublico(relatorio, { ambiente: a.ambiente, sal }))
-    if (!relatorio.zero) {
+    const u = await lerUnidade(dv)
+    const pu = planoDaUnidade(u)
+    console.log(resumoUnidade(pu))
+    if (pu.travas.length) console.log(`Trava: colunas DateTime sem DateTimeBehavior (${pu.travas.length}): ${pu.travas.join(', ')}`)
+    if (!relatorio.zero || pu.travas.length) {
       escrever(join(pasta, 'estado.txt'), 'travado')
       return 1
     }
-    if (planoVazio(relatorio.plano)) {
+    if (planoVazio(relatorio.plano) && unidadeVazia(pu)) {
       escrever(join(pasta, 'estado.txt'), 'nada')
       console.log('Nada a cortar: o ambiente já está no estado do corte.')
       return 0
     }
     const meta = { ambiente: a.ambiente, host: sal, quando: new Date().toISOString(), commit: process.env.GITHUB_SHA ?? 'local' }
-    escrever(join(pasta, 'foto', 'foto.json'), fotoDoCorte(estado, relatorio.plano, meta))
+    escrever(join(pasta, 'foto', 'foto.json'), fotoDoCorte(estado, relatorio.plano, meta, fotoDaUnidade(u, pu)))
     escrever(join(pasta, 'estado.txt'), 'aplicar')
     return 0
   }
@@ -97,7 +105,9 @@ async function principal() {
       console.log(resumoPublico(relatorio, { ambiente: a.ambiente, sal }))
       return 1
     }
-    if (!mesmoPlano(foto, relatorio.plano)) {
+    const u = await lerUnidade(dv)
+    const pu = planoDaUnidade(u)
+    if (!mesmoPlano(foto, relatorio.plano) || !mesmaUnidade(foto, pu)) {
       console.error('O ambiente mudou entre a foto e a aplicação; nada aplicado. Rode o workflow de novo.')
       return 1
     }
@@ -105,12 +115,13 @@ async function principal() {
       console.log('Dry-run: o plano bate com a foto; nada aplicado.')
       return 0
     }
+    await aplicarUnidade(dv, pu, u)
     const { equipeAdicionar, equipeRemover, pessoasRemover } = relatorio.plano
     for (const r of equipeAdicionar) await dv.chamar('POST', `teams(${estado.equipe?.id})/teamroles_association/$ref`, ref('roles', r))
     for (const r of equipeRemover) await dv.chamar('DELETE', `teams(${estado.equipe?.id})/teamroles_association(${r})/$ref`)
     for (const { usuario, papel } of pessoasRemover) await dv.chamar('DELETE', `systemusers(${usuario})/systemuserroles_association(${papel})/$ref`)
-    if (!planoVazio(planoDoCorte(await lerEstado(dv), { manter }))) {
-      console.error('Conferência: ainda há papéis a tirar; veja o relatório cifrado e rode de novo.')
+    if (!planoVazio(planoDoCorte(await lerEstado(dv), { manter })) || !unidadeVazia(planoDaUnidade(await lerUnidade(dv)))) {
+      console.error('Conferência: ainda há papéis a tirar ou a unidade Frota está incompleta; veja o relatório cifrado e rode de novo.')
       return 1
     }
     console.log(`Corte aplicado: equipe -${equipeRemover.length} +${equipeAdicionar.length}; ${pessoasRemover.length} papel(is) direto(s) retirados.`)
@@ -127,11 +138,17 @@ async function principal() {
     const estado = await lerEstado(dv)
     const plano = planoDesfazer(fotos, estado)
     console.log(`Desfazer (${a.ambiente}): ${fotos.length} foto(s); equipe +${plano.equipeAdicionar.length}; ${plano.pessoasAdicionar.length} papel(is) direto(s) de volta; ${plano.ignorados.length} item(ns) ignorado(s) (pessoa inativa ou papel ausente).`)
+    const comUnidade = fotos.some((f) => f.unidade)
+    const uAntes = comUnidade ? await lerUnidade(dv) : null
+    const pdu = uAntes ? planoDesfazerUnidade(fotos, uAntes) : null
+    if (pdu) console.log(`Desfazer da unidade: ${pdu.trocas.length} troca(s) de volta; ${pdu.documentos.length} documento(s) à raiz; unidade ${pdu.apagarUnidade ? 'apagada' : 'mantida'}; recurso ${pdu.desligarRecurso ? 'desligado' : 'mantido'}.`)
     if (!a.aplicar) return 0
     for (const r of plano.equipeAdicionar) await dv.chamar('POST', `teams(${estado.equipe?.id})/teamroles_association/$ref`, ref('roles', r))
     for (const { usuario, papel } of plano.pessoasAdicionar) await dv.chamar('POST', `systemusers(${usuario})/systemuserroles_association/$ref`, ref('roles', papel))
+    if (pdu) await aplicarDesfazerUnidade(dv, pdu, uAntes)
     const resto = planoDesfazer(fotos, await lerEstado(dv))
-    if (resto.equipeAdicionar.length || resto.pessoasAdicionar.length) {
+    const restoUnidade = pdu ? planoDesfazerUnidade(fotos, await lerUnidade(dv)) : null
+    if (resto.equipeAdicionar.length || resto.pessoasAdicionar.length || restoUnidade?.trocas.length || restoUnidade?.documentos.length) {
       console.error('Conferência: ainda falta devolver papéis; rode de novo.')
       return 1
     }

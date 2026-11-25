@@ -6,6 +6,7 @@ import {
 } from './corte-regras.mjs'
 
 const ID = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
+const UNI = { existia: true, recursoAntes: true, documentos: [], trocas: [] }
 const P = { antigo: ID(1), dev: ID(2), admin: ID(3), base: ID(4), op: ID(5) }
 const EQ = ID(100), SERV = ID(200), MANTIDO = ID(201), ANA = ID(202), BIA = ID(203)
 const priv = (tabela, tipo, nivel = 8) => ({ tabela, tipo, nivel })
@@ -204,7 +205,7 @@ function devolver(e, pd) {
 test('foto: guarda o que sai, relê e confere com o plano', () => {
   const e = estado()
   const plano = planoDoCorte(e, { manter: MANTER })
-  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META, UNI)))
   assert.deepEqual(foto.equipe, { id: EQ, papeis: [P.antigo, P.dev] })
   assert.deepEqual(foto.pessoas, [{ id: BIA, papeis: [P.antigo, P.admin] }])
   assert.equal(foto.nomes[P.dev], 'DEV - Usuário')
@@ -213,15 +214,27 @@ test('foto: guarda o que sai, relê e confere com o plano', () => {
 })
 
 test('foto: formato desconhecido é recusado', () => {
-  assert.throws(() => lerFoto('{"versao":2}'), /formato desconhecido/)
-  assert.throws(() => lerFoto(JSON.stringify({ ...fotoDoCorte(estado(), planoDoCorte(estado(), { manter: MANTER }), META), pessoas: [{ id: 'fulano', papeis: [] }] })), /formato desconhecido/)
+  assert.throws(() => lerFoto('{"versao":3}'), /formato desconhecido/)
+  assert.throws(() => lerFoto(JSON.stringify({ ...fotoDoCorte(estado(), planoDoCorte(estado(), { manter: MANTER }), META, UNI), pessoas: [{ id: 'fulano', papeis: [] }] })), /formato desconhecido/)
+})
+
+test('foto v2 exige unidade valida', () => {
+  const e = estado()
+  const base = JSON.parse(JSON.stringify(fotoDoCorte(e, planoDoCorte(e, { manter: MANTER }), META, UNI)))
+  assert.throws(() => lerFoto(JSON.stringify({ ...base, unidade: undefined })), /unidade/)
+  assert.throws(() => lerFoto(JSON.stringify({ ...base, unidade: { ...UNI, documentos: ['x'] } })), /unidade/)
+  const ok = { ...base, unidade: { existia: false, recursoAntes: false, documentos: [ID(40)], trocas: [{ usuario: ID(30), papel: ID(11) }] } }
+  assert.equal(lerFoto(JSON.stringify(ok)).unidade.existia, false)
+  const v1 = { ...base, versao: 1 }
+  delete v1.unidade
+  assert.equal(lerFoto(JSON.stringify(v1)).versao, 1)
 })
 
 test('desfazer devolve à equipe e às pessoas e depois não tem nada a fazer', () => {
   const e = estado()
   const plano = planoDoCorte(e, { manter: MANTER })
   const cortado = aplicarPlano(e, plano)
-  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META, UNI)))
   const pd = planoDesfazer([foto], cortado)
   assert.deepEqual(pd.equipeAdicionar, [P.antigo, P.dev])
   assert.deepEqual(pd.pessoasAdicionar, [{ usuario: BIA, papel: P.antigo }, { usuario: BIA, papel: P.admin }])
@@ -233,7 +246,7 @@ test('desfazer devolve à equipe e às pessoas e depois não tem nada a fazer', 
 test('desfazer ignora pessoa inativa e papel que não existe mais; recusa outra equipe', () => {
   const e = estado()
   const plano = planoDoCorte(e, { manter: MANTER })
-  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META, UNI)))
   const cortado = aplicarPlano(e, plano)
   const semBia = { ...cortado, pessoas: cortado.pessoas.filter((p) => p.id !== BIA), papeis: new Map([...cortado.papeis].filter(([id]) => id !== P.dev)) }
   const pd = planoDesfazer([foto], semBia)
@@ -249,7 +262,7 @@ test('sem a equipe: só os papéis diretos saem, a foto guarda equipe nula e o d
   assert.deepEqual([plano.equipeRemover, plano.equipeAdicionar], [[], []])
   assert.deepEqual(plano.pessoasRemover, [{ usuario: BIA, papel: P.antigo }, { usuario: BIA, papel: P.admin }])
   const cortado = aplicarPlano(e, plano)
-  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META, UNI)))
   assert.equal(foto.equipe, null)
   assert.equal(mesmoPlano(foto, plano), true)
   const pd = planoDesfazer([foto], cortado)
