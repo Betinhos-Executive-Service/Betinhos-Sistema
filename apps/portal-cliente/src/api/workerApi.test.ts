@@ -14,6 +14,13 @@ describe('workerApi', () => {
     expect(init).toMatchObject({ method: 'POST', credentials: 'include', body: '{"email":"a@b.com","senha":"senha-boa"}' })
   })
 
+  it('buscarPassageiros chama GET /passageiros com a busca codificada', async () => {
+    let url = ''
+    const api = createWorkerApi('/api', async (u) => ((url = String(u)), new Response(JSON.stringify([{ id: 'p1', nome: 'Ana' }]), { status: 200 })))
+    expect(await api.buscarPassageiros('ana s')).toEqual([{ id: 'p1', nome: 'Ana' }])
+    expect(url).toBe('/api/passageiros?q=ana%20s')
+  })
+
   it('sessão: 401 nao_permitido vira null (sem login), outro erro sobe', async () => {
     expect(await createWorkerApi('/api', resposta(401, { erro: 'nao_permitido' })).sessao()).toBeNull()
     await expect(createWorkerApi('/api', resposta(500)).sessao()).rejects.toMatchObject({ codigo: 'falha' })

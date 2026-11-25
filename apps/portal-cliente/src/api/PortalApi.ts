@@ -1,4 +1,4 @@
-import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 
 export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
@@ -34,6 +34,8 @@ export interface PortalApi {
   aprovar(ids: string[]): Promise<Servico[]>
   abrirDuvida(id: string, motivo: Motivo, texto: string): Promise<Servico>
   responder(id: string, texto: string): Promise<Servico>
+  /** Módulo Pedir: passageiros já cadastrados do cliente da sessão (nome contém `q`; até 20, por nome). */
+  buscarPassageiros(q: string): Promise<PassageiroPedido[]>
   /** Módulo Pedir: cria a reserva em Solicitado. `duplicado` = mesmo pedido há menos de 1 minuto. */
   pedir(novo: NovoPedido): Promise<Pedido>
   /** Módulo Meus serviços: pedidos feitos pelo e-mail da sessão, do mais recente para o mais antigo. */

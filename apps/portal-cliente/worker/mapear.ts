@@ -1,5 +1,5 @@
 // Registro do Dataverse (validação + reserva + composição + mensagens) → Servico do portal.
-import type { Mensagem, Modulo, Motivo, Pedido, Servico, Status, StatusPedido } from '../src/domain/types'
+import type { Mensagem, Modulo, Motivo, PassageiroPedido, Pedido, Servico, Status, StatusPedido } from '../src/domain/types'
 import { COMPOSICAO_LINHAS, LADO_DV, MODULO_DV, MOTIVO_DV, NAV, PEDIDO_STATUS, STATUS_DV } from './schema'
 
 export type Registro = Record<string, unknown>
@@ -79,9 +79,21 @@ export function mapearModulos(valor: unknown): Modulo[] {
 export const modulosDe = (v: Registro): Modulo[] => mapearModulos((v[NAV.cliente] as Registro | undefined)?.cr40f_portalmodulos)
 
 /** O que o cliente digitou, guardado em `cr40f_portalpedido` como JSON. */
-export type PedidoPortal = { passageiros: string[]; observacao?: string }
+export type PedidoPortal = { passageiros: string[]; observacao?: string; tipoVeiculo?: number }
 
 const PROGRAMADO = new Set<StatusPedido>(['programado', 'em_execucao', 'concluido'])
+
+/** Passageiros do pedido pelos vínculos (Serviços por Passageiro) expandidos, na ordem de seleção; vazio se a reserva não os trouxe. */
+export function pessoasDoPedido(r: Registro): PassageiroPedido[] {
+  const filhos = ((r[NAV.passageiros] ?? []) as Registro[]).slice().sort((a, b) => (num(a, 'cr40f_ordemdeselecao') ?? 1e9) - (num(b, 'cr40f_ordemdeselecao') ?? 1e9))
+  return filhos.flatMap((f) => {
+    const p = (f[NAV.vinculoPessoa] ?? undefined) as Registro | undefined
+    const id = str(f, '_cr40f_bancodedados_value')
+    const nome = str(p, 'cr40f_nomedopassageiro') || rotulo(f, '_cr40f_bancodedados_value')
+    if (!id || !nome) return []
+    return [{ id, nome, ...(str(p, 'cr40f_telefone') ? { telefone: str(p, 'cr40f_telefone') } : {}), ...(str(p, 'cr40f_email') ? { email: str(p, 'cr40f_email') } : {}) }]
+  })
+}
 
 /** Reserva → pedido do solicitante. Voucher, veículo, motorista e placa só depois de programado. */
 export function mapearPedido(r: Registro): Pedido {
@@ -91,6 +103,8 @@ export function mapearPedido(r: Registro): Pedido {
     portal = { ...portal, ...(JSON.parse(str(r, 'cr40f_portalpedido') || '{}') as PedidoPortal) }
   } catch { /* coluna editada à mão: mostra sem passageiros */ }
   const veiculo = veiculoDe(r)
+  const pessoas = pessoasDoPedido(r)
+  const tipoVeiculo = num(r, 'cr40f_tipodeveiculo')
   const programado = PROGRAMADO.has(status)
   const motorista = rotulo(r, '_cr40f_motorista_value')
   const placa = rotulo(r, '_cr40f_veiculo_value')
@@ -101,8 +115,11 @@ export function mapearPedido(r: Registro): Pedido {
     saida: str(r, 'cr40f_dataehorriodesada'),
     origem: str(r, 'cr40f_endereodesada'),
     destino: str(r, 'cr40f_destino'),
-    passageiros: portal.passageiros,
+    // Nome e contato vêm do vínculo; pedido antigo (sem vínculo) cai nos nomes guardados em `cr40f_portalpedido`.
+    passageiros: pessoas.length ? pessoas.map((p) => p.nome) : portal.passageiros,
+    pessoas: pessoas.length ? pessoas : portal.passageiros.map((nome) => ({ nome })),
     criadoEm: str(r, 'createdon'),
+    ...(tipoVeiculo !== undefined ? { tipoVeiculo } : {}),
     ...(portal.observacao ? { observacao: portal.observacao } : {}),
     ...(programado && veiculo ? { veiculo } : {}),
     ...(programado && motorista ? { motorista } : {}),

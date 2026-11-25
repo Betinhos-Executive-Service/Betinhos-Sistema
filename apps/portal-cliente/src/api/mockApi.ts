@@ -1,7 +1,7 @@
-import { chaveDuplicado, dominioDe, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido } from '../domain/pedidos'
+import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido, soDigitos } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
-import type { Modulo, Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
-import { gerarPedidos, gerarServicos, type PedidoMock } from './mockDados'
+import type { Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import { gerarPedidos, gerarServicos, PESSOAS_LATASA, type PedidoMock } from './mockDados'
 import { ErroPortal, senhaFraca, type PortalApi } from './PortalApi'
 
 export const CODIGO_MOCK = '123456'
@@ -66,6 +66,9 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
   const espera = () => new Promise<void>((r) => setTimeout(r, opts.atrasoMs ?? 0))
   let servicos = gerarServicos(agora())
   let pedidos = gerarPedidos(agora())
+  /** Pessoas por cliente (nome da sessão): no real, `cr40f_bancodedados` filtrado pelo cliente. */
+  const pessoas: Record<string, Required<PassageiroPedido>[]> = { Latasa: structuredClone(PESSOAS_LATASA) }
+  let seqPessoa = PESSOAS_LATASA.length
   let sessao: Sessao | null = null
   let tentativasErradas = 0
   let bloqueadoAte = 0
@@ -191,16 +194,53 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       if (!texto.trim()) throw new ErroPortal('nao_permitido', 'Escreva a resposta.')
       return atualizar(id, (s) => ({ ...s, status: 'em_duvida', mensagens: [...s.mensagens, mensagem(s, nome, texto.trim())] }))
     },
+    async buscarPassageiros(q) {
+      await espera()
+      const { cliente } = exigirSessao('pedir')
+      const busca = chaveNome(q)
+      return (pessoas[cliente] ?? [])
+        .filter((p) => chaveNome(p.nome).includes(busca))
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .slice(0, 20)
+        .map((p) => ({ ...p }))
+    },
     async pedir(novo) {
       await espera()
-      const { email } = exigirSessao('pedir')
+      const { email, cliente } = exigirSessao('pedir')
       const pedido = normalizarPedido(novo)
       const primeiro = primeiroErroPedido(pedido, agora().getTime())
       if (primeiro) throw new ErroPortal('nao_permitido', primeiro)
       const chave = chaveDuplicado(email, pedido)
       const repetido = pedidos.some((p) => chaveDuplicado(p.solicitante, p) === chave && agora().getTime() - Date.parse(p.criadoEm) < JANELA_DUPLICADO_MS)
       if (repetido) throw new ErroPortal('duplicado', 'Este pedido acabou de ser enviado.')
-      const criado: PedidoMock = { ...pedido, id: `ped-${pedidos.length + 1}`, numero: `RV-${48400 + pedidos.length}`, status: 'solicitado', criadoEm: agora().toISOString(), solicitante: email }
+      // Como o Worker: id tem de ser de pessoa do cliente; sem id, reaproveita mesmo nome + mesmo celular ou e-mail; contato mudado corrige a pessoa.
+      const base = (pessoas[cliente] ??= [])
+      const resolvidas = pedido.passageiros.map((p): Required<PassageiroPedido> => {
+        const contato = { telefone: p.telefone ?? '', email: p.email ?? '' }
+        if (p.id) {
+          const atual = base.find((x) => x.id === p.id)
+          if (!atual) throw new ErroPortal('nao_permitido', 'Passageiro não encontrado.')
+          return { ...atual, ...contato }
+        }
+        const igual = base.find((x) => chaveNome(x.nome) === chaveNome(p.nome)
+          && ((!!x.telefone && !!contato.telefone && soDigitos(x.telefone) === soDigitos(contato.telefone)) || (!!x.email && !!contato.email && x.email.toLowerCase() === contato.email.toLowerCase())))
+        return igual ? { ...igual, telefone: igual.telefone || contato.telefone, email: igual.email || contato.email } : { id: '', nome: p.nome, ...contato }
+      })
+      const ids = resolvidas.map((p) => p.id).filter(Boolean)
+      if (new Set(ids).size < ids.length) throw new ErroPortal('nao_permitido', 'Este passageiro já está no pedido.')
+      const gravadas = resolvidas.map((p) => {
+        if (p.id) {
+          base.splice(base.findIndex((x) => x.id === p.id), 1, p)
+          return p
+        }
+        const nova = { ...p, id: `pes-${++seqPessoa}` }
+        base.push(nova)
+        return nova
+      })
+      const criado: PedidoMock = {
+        ...pedido, passageiros: gravadas.map((p) => p.nome), pessoas: gravadas.map((p) => ({ ...p })),
+        id: `ped-${pedidos.length + 1}`, numero: `RV-${48400 + pedidos.length}`, status: 'solicitado', criadoEm: agora().toISOString(), solicitante: email,
+      }
       pedidos = [criado, ...pedidos]
       return semSolicitante(criado)
     },

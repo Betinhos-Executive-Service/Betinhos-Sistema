@@ -1,5 +1,5 @@
 import { DIA_MS, DIAS_TACITA, somarDiasUteis } from '../domain/regras'
-import type { LinhaPreco, Mensagem, Pedido, Servico, Status, StatusPedido } from '../domain/types'
+import type { LinhaPreco, Mensagem, PassageiroPedido, Pedido, Servico, Status, StatusPedido } from '../domain/types'
 
 // Dados fictícios para o protótipo: nomes, pedidos e valores não vêm do Dataverse.
 const CRS = ['501019604 · Manutenção', '501019611 · Engenharia', '501019720 · Comercial']
@@ -102,6 +102,13 @@ export function gerarServicos(agora: Date): Servico[] {
   })
 }
 
+/** Pessoas fictícias da Latasa (contatos inventados) para a busca do Pedir; no real vêm de `cr40f_bancodedados`. */
+export const PESSOAS_LATASA: Required<PassageiroPedido>[] = [
+  { id: 'pes-1', nome: 'Carla Menezes', telefone: '(12) 99100-0001', email: 'carla.menezes@exemplo.com.br' },
+  { id: 'pes-2', nome: 'Rafael Duarte', telefone: '(12) 99100-0002', email: '' },
+  { id: 'pes-3', nome: 'Hiroshi Tanaka', telefone: '', email: 'hiroshi.tanaka@exemplo.com.br' },
+  { id: 'pes-4', nome: 'Juliana Prado', telefone: '(11) 99100-0004', email: 'juliana.prado@exemplo.com.br' },
+]
 export const SOLICITANTE_LATASA = 'compras@latasa.com.br'
 const ROTAS_LATASA: [string, string][] = [
   ['Latasa Reciclagem, Pindamonhangaba', 'Aeroporto de Guarulhos (GRU)'],
@@ -126,7 +133,9 @@ export function gerarPedidos(agora: Date): PedidoMock[] {
     const [origem, destino] = ROTAS_LATASA[i % ROTAS_LATASA.length]
     return {
       id: `ped-seed-${i}`, numero, origem, destino, saida: saida.toISOString(), status, solicitante: SOLICITANTE_LATASA,
-      passageiros: [PASSAGEIROS[(i + 3) % PASSAGEIROS.length]],
+      passageiros: [PESSOAS_LATASA[i % PESSOAS_LATASA.length].nome],
+      pessoas: [PESSOAS_LATASA[i % PESSOAS_LATASA.length]],
+      ...(i % 2 === 0 ? { tipoVeiculo: 202410001 } : {}),
       criadoEm: new Date(saida.getTime() - 2 * DIA_MS).toISOString(),
       ...(i === 0 ? { observacao: 'Voo LA3421, chega às 14h10.' } : {}),
       ...(status === 'programado' || status === 'concluido' ? { veiculo: VEICULOS[i % VEICULOS.length], motorista: MOTORISTAS[i % MOTORISTAS.length][0], placa: MOTORISTAS[i % MOTORISTAS.length][1], voucherUrl: `https://exemplo.betinhos.com.br/voucher/${numero}.pdf` } : {}),

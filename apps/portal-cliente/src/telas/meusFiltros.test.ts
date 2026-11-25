@@ -4,7 +4,7 @@ import { agruparPorDia, daAbaPedidos, filtrarPedidos, tituloDia } from './meusFi
 
 const AGORA = Date.parse('2026-11-23T15:00:00Z')
 const p = (id: string, saida: string, extra: Partial<Pedido> = {}): Pedido => ({
-  id, numero: `RV-${id}`, status: 'solicitado', saida, origem: 'Latasa, Pindamonhangaba', destino: 'Aeroporto de Guarulhos', passageiros: ['Ana Lúcia'], criadoEm: saida, ...extra,
+  id, numero: `RV-${id}`, status: 'solicitado', saida, origem: 'Latasa, Pindamonhangaba', destino: 'Aeroporto de Guarulhos', passageiros: ['Ana Lúcia'], pessoas: [], criadoEm: saida, ...extra,
 })
 
 describe('Meus serviços: filtros e grupos', () => {

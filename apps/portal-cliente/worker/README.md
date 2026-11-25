@@ -15,8 +15,9 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 | `GET /api/servicos` | Serviços do cliente da sessão (sem Retirado) |
 | `POST /api/servicos/aprovar` | `{ids}` em lote |
 | `POST /api/servicos/:id/duvida` · `/responder` | `{motivo, texto}` · `{texto}` |
-| `POST /api/pedidos` | Módulo Pedir: `{passageiros[], origem, destino, saida, observacao?}` → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
-| `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com status, veículo e voucher quando programadas |
+| `GET /api/passageiros?q=` | Módulo Pedir: até 20 passageiros ativos do cliente da sessão (`cr40f_bancodedados`), filtrados por nome |
+| `POST /api/pedidos` | Módulo Pedir: `{passageiros[{id?, nome, telefone?, email?}], origem, destino, saida, tipoVeiculo?, observacao?}` (celular ou e-mail por passageiro; vínculos em `cr40f_servicosporpassageiro`) → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
+| `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com passageiros (`pessoas`), `tipoVeiculo`, status, veículo e voucher quando programadas |
 
 Segurança: 5 erros (senha ou código) no mesmo e-mail → 15 min de bloqueio; limite por IP e por e-mail (`ratelimits`); CSRF por `Origin`; senha só como PBKDF2-SHA256 (100 mil iterações, sal próprio, `cr40f_senhahash` com segurança de coluna e sem auditoria: só o perfil "Portal do cliente - senha", com o usuário de aplicação do Worker, e o Administrador do Sistema leem; migration 20261124-1700); senha vale só com `cr40f_senhadefinidaem` preenchida (o "Zerar senha" do shell limpa só a data); código só como SHA-256; cookies cifrados (AES-GCM, `CHAVE_SESSAO`); toda consulta filtra pelo cliente da sessão; rota de módulo que o cliente não tem → 403. O número da reserva (`cr40f_id`) é do autonumber do Dataverse; o Worker nunca o inventa.
 

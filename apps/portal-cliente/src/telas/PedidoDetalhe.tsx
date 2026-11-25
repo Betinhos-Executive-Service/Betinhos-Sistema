@@ -1,5 +1,5 @@
 import { Button, Drawer, Sheet, Stack, StatusBadge, buttonClassName, useMediaQuery } from '@betinhos/ui'
-import { FileText, X } from 'lucide-react'
+import { FileText, X, Repeat } from 'lucide-react'
 import { dataHora } from '../domain/formato'
 import { podeCancelar, statusPedidoInfo } from '../domain/pedidos'
 import type { Pedido, StatusPedido } from '../domain/types'
@@ -30,15 +30,16 @@ const AVISO: Partial<Record<StatusPedido, string>> = {
   confirmado: 'Pedido confirmado. O motorista aparece aqui quando for programado.',
 }
 
-type Props = { pedido: Pedido; onFechar: () => void; onCancelar: (p: Pedido) => void }
+type Props = { pedido: Pedido; onFechar: () => void; onCancelar: (p: Pedido) => void; onRepetir?: (p: Pedido) => void }
 
 /** Detalhe do pedido: painel lateral no desktop, sheet no mobile. Só leitura; a única ação é cancelar em Solicitado. */
-export function PedidoDetalhe({ pedido: p, onFechar, onCancelar }: Props) {
+export function PedidoDetalhe({ pedido: p, onFechar, onCancelar, onRepetir }: Props) {
   const mobile = useMediaQuery('(max-width: 820px)')
   const info = statusPedidoInfo(p.status)
   const Painel = mobile ? Sheet : Drawer
-  const rodape = (p.voucherUrl || podeCancelar(p.status)) && (
+  const rodape = (p.voucherUrl || podeCancelar(p.status) || onRepetir) && (
     <div className="pc-det__acoes">
+      {onRepetir && <Button variant="secondary" onClick={() => onRepetir(p)} icon={<Repeat size={16} aria-hidden />}>Repetir pedido</Button>}
       {podeCancelar(p.status) && <Button variant="secondary" onClick={() => onCancelar(p)} icon={<X size={16} aria-hidden />}>Cancelar pedido</Button>}
       {p.voucherUrl && (
         <a className={buttonClassName({ variant: 'primary' })} href={p.voucherUrl} target="_blank" rel="noopener noreferrer">

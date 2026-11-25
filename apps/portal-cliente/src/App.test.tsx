@@ -198,15 +198,21 @@ describe('Portal do cliente', () => {
       expect(screen.getByText('Compras · Latasa')).toBeTruthy()
     })
 
+    /** Abre a busca de passageiros e escolhe o cadastrado pelo nome. */
+    async function escolherPassageiro(nome: string) {
+      fireEvent.click(screen.getByRole('combobox', { name: /Buscar passageiro cadastrado/ }))
+      fireEvent.click(await screen.findByRole('option', { name: new RegExp(nome), hidden: true }))
+    }
+
     it('trocar de área no meio do pedido não perde o que foi digitado', async () => {
       abrir()
       await entrarCompleto(LATASA)
       await screen.findByRole('heading', { name: 'Pedir serviço' })
-      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
+      fireEvent.change(screen.getByLabelText(/Saída de/), { target: { value: 'Latasa, Pindamonhangaba' } })
       fireEvent.click(screen.getByRole('radio', { name: 'Meus serviços' }))
       await screen.findByRole('heading', { name: 'Meus serviços' })
       fireEvent.click(screen.getByRole('radio', { name: 'Pedir serviço' }))
-      expect((screen.getByLabelText(/^Passageiro/) as HTMLInputElement).value).toBe('Hiroshi Tanaka')
+      expect((screen.getByLabelText(/Saída de/) as HTMLInputElement).value).toBe('Latasa, Pindamonhangaba')
     })
 
     it('e-mail sem acesso ouve isso na hora e não vai para a etapa do código', async () => {
@@ -218,37 +224,62 @@ describe('Portal do cliente', () => {
       expect(screen.queryByLabelText(/Código/)).toBeNull()
     })
 
-    it('erros por campo: sem origem e data no passado', async () => {
+    it('erros por campo: passageiro novo sem contato, sem origem e data no passado', async () => {
       abrir()
       await entrarCompleto(LATASA)
       await screen.findByRole('heading', { name: 'Pedir serviço' })
-      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Cadastrar novo passageiro' }))
+      fireEvent.change(screen.getByLabelText(/Nome do novo passageiro/), { target: { value: 'Pessoa Nova' } })
       fireEvent.change(screen.getByLabelText(/Destino/), { target: { value: 'GRU' } })
-      fireEvent.change(screen.getByLabelText(/Data e hora da saída/), { target: { value: '2020-01-01T10:00' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar pedido' }))
-      expect(await screen.findByText('Informe o endereço de saída.')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(/^Data/), { target: { value: '2020-01-01' } })
+      fireEvent.change(screen.getByLabelText(/^Hora/), { target: { value: '10:00' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+      expect(await screen.findByText('Informe celular ou e-mail.')).toBeTruthy()
+      expect(screen.getByText('Informe o endereço de saída.')).toBeTruthy()
       expect(screen.getByText('A saída precisa ser daqui para a frente.')).toBeTruthy()
-      expect(screen.queryByText(/Pedido RV-/)).toBeNull()
+      expect(screen.queryByRole('heading', { name: 'Revisar pedido' })).toBeNull()
     })
 
-    it('pedido completo aparece em Meus serviços como Solicitado', async () => {
+    it('pedido com passageiro cadastrado e novo: revisa, volta, envia e aparece como Solicitado', async () => {
       abrir()
       await entrarCompleto(LATASA)
       await screen.findByRole('heading', { name: 'Pedir serviço' })
-      fireEvent.change(screen.getByLabelText(/^Passageiro/), { target: { value: 'Hiroshi Tanaka' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Adicionar passageiro' }))
-      fireEvent.change(screen.getByLabelText('Passageiro 2'), { target: { value: 'Juliana Prado' } })
+      await escolherPassageiro('Hiroshi Tanaka')
+      fireEvent.click(screen.getByRole('button', { name: 'Cadastrar novo passageiro' }))
+      fireEvent.change(screen.getByLabelText(/Nome do novo passageiro/), { target: { value: 'Pessoa Nova' } })
+      const celulares = screen.getAllByLabelText(/^Celular/)
+      fireEvent.change(celulares[1], { target: { value: '(12) 98888-7777' } })
       fireEvent.change(screen.getByLabelText(/Saída de/), { target: { value: 'Latasa, Pindamonhangaba' } })
       fireEvent.change(screen.getByLabelText(/Destino/), { target: { value: 'Aeroporto de Guarulhos' } })
-      fireEvent.change(screen.getByLabelText(/Data e hora da saída/), { target: { value: amanha() } })
+      fireEvent.change(screen.getByLabelText(/^Data/), { target: { value: amanha().slice(0, 10) } })
+      fireEvent.change(screen.getByLabelText(/^Hora/), { target: { value: '09:00' } })
       fireEvent.change(screen.getByLabelText(/Observação/), { target: { value: 'Voo LA3421' } })
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar pedido' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+      expect(await screen.findByRole('heading', { name: 'Revisar pedido' })).toBeTruthy()
+      expect(screen.getByText('Pessoa Nova')).toBeTruthy()
+      expect(screen.getByText('A Betinhos escolhe')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Voltar e editar' }))
+      expect((screen.getByLabelText(/Destino/) as HTMLInputElement).value).toBe('Aeroporto de Guarulhos')
+      fireEvent.click(screen.getByRole('button', { name: 'Revisar pedido' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Enviar pedido' }))
       expect(await screen.findByText(/Pedido RV-\d+ enviado/)).toBeTruthy()
       expect(await screen.findByRole('heading', { name: 'Meus serviços' })).toBeTruthy()
-      const linha = (await screen.findByText('Hiroshi Tanaka, Juliana Prado')).closest<HTMLElement>('[role=row], tr')!
+      const linha = (await screen.findByText('Hiroshi Tanaka, Pessoa Nova')).closest<HTMLElement>('[role=row], tr')!
       expect(within(linha).getByText('Solicitado')).toBeTruthy()
-      expect(within(linha).getByText('Latasa, Pindamonhangaba', { selector: '.pc-ped__local' })).toBeTruthy()
-      expect(within(linha).getByText('Aeroporto de Guarulhos', { selector: '.pc-ped__local' })).toBeTruthy()
+    })
+
+    it('Repetir pedido abre o Pedir preenchido, sem data e hora', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
+      await screen.findByRole('heading', { name: 'Meus serviços' })
+      fireEvent.click((await screen.findAllByText('Programado'))[0].closest<HTMLElement>('[role=row], tr, button')!)
+      fireEvent.click(await screen.findByRole('button', { name: 'Repetir pedido' }))
+      expect(await screen.findByRole('heading', { name: 'Pedir serviço' })).toBeTruthy()
+      expect((screen.getByLabelText(/Saída de/) as HTMLInputElement).value).toMatch(/\S/)
+      expect(screen.getAllByRole('group', { name: /Passageiro 1/ }).length).toBe(1)
+      expect((screen.getByLabelText(/^Data/) as HTMLInputElement).value).toBe('')
+      expect((screen.getByLabelText(/^Hora/) as HTMLInputElement).value).toBe('')
     })
 
     it('Meus serviços mostra o programado com voucher e separa próximos de todos', async () => {

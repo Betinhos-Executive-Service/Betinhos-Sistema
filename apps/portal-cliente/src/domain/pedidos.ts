@@ -1,5 +1,5 @@
 import type { StatusTone } from '@betinhos/ui'
-import type { Modulo, NovoPedido, StatusPedido } from './types'
+import type { Modulo, NovoPedido, PassageiroPedido, StatusPedido } from './types'
 
 export const MODULO_LABEL: Record<Modulo, string> = { validar: 'Validar', pedir: 'Pedir serviço', meus_servicos: 'Meus serviços' }
 
@@ -13,16 +13,72 @@ export const MAX_TEXTO = 2000
 export const JANELA_DUPLICADO_MS = 60 * 1000
 const UM_ANO_MS = 366 * 24 * 60 * 60 * 1000
 
-export type ErrosPedido = Partial<Record<'passageiros' | 'origem' | 'destino' | 'saida' | 'observacao', string>>
+export type ErrosPedido = Partial<Record<'passageiros' | 'origem' | 'destino' | 'saida' | 'tipoVeiculo' | 'observacao', string>>
 
-/** Pedido com espaços aparados e passageiros vazios removidos. */
+/** Tipos de veículo que o portal aceita (choice `cr40f_tipodeveiculo`); qualquer outro valor o Dataverse recusa. */
+export const TIPOS_VEICULO: { valor: number; rotulo: string }[] = [
+  { valor: 202410001, rotulo: 'Executivo' },
+  { valor: 202410002, rotulo: 'Blindado' },
+  { valor: 100000002, rotulo: 'Minivan' },
+  { valor: 202410003, rotulo: 'Van' },
+  { valor: 202410004, rotulo: 'Van Blindado' },
+]
+export const rotuloVeiculo = (valor?: number) => TIPOS_VEICULO.find((t) => t.valor === valor)?.rotulo
+
+export const MAX_EMAIL = 120
+export const MAX_TELEFONE = 30
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export const soDigitos = (t: string) => t.replace(/\D/g, '')
+/** Celular com DDD (10 ou 11 dígitos), aceitando +55 na frente. */
+export function celularValido(t: string): boolean {
+  let d = soDigitos(t)
+  if (d.startsWith('55') && d.length > 11) d = d.slice(2)
+  return d.length === 10 || d.length === 11
+}
+export const emailValido = (t: string) => EMAIL_OK.test(t)
+/** Nome sem acento, caixa ou espaço repetido: "João  Silva" = "joao silva". */
+export const chaveNome = (n: string) => n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+
+/** Erro de um passageiro (nome e contato), ou `undefined`. */
+export function erroPassageiro(p: PassageiroPedido): string | undefined {
+  if (!p.nome) return 'Informe o nome do passageiro.'
+  if (p.nome.length > MAX_NOME) return `O nome tem no máximo ${MAX_NOME} caracteres.`
+  if (!p.telefone && !p.email) return 'Informe celular ou e-mail.'
+  if (p.telefone && (p.telefone.length > MAX_TELEFONE || !celularValido(p.telefone))) return 'Celular inválido. Use DDD e número.'
+  if (p.email && (p.email.length > MAX_EMAIL || !emailValido(p.email))) return 'E-mail inválido.'
+  return undefined
+}
+
+/** Um erro (ou `undefined`) por passageiro, na ordem; repetido (mesmo id ou mesmo nome) também é erro. */
+export function errosPassageiros(lista: PassageiroPedido[]): (string | undefined)[] {
+  const vistos = new Set<string>()
+  return lista.map((p) => {
+    const proprio = erroPassageiro(p)
+    const chaves = [chaveNome(p.nome), ...(p.id ? [`id:${p.id}`] : [])]
+    const repetido = chaves.some((c) => vistos.has(c))
+    chaves.forEach((c) => vistos.add(c))
+    return proprio ?? (repetido ? 'Este passageiro já está no pedido.' : undefined)
+  })
+}
+
+/** Pedido com espaços aparados, passageiros vazios removidos e contato só quando preenchido. */
 export function normalizarPedido(p: NovoPedido): NovoPedido {
   const observacao = (p.observacao ?? '').trim()
+  const passageiros = p.passageiros
+    .map((x): PassageiroPedido => {
+      const telefone = (x.telefone ?? '').trim()
+      const email = (x.email ?? '').trim()
+      return { ...(x.id ? { id: x.id } : {}), nome: x.nome.trim(), ...(telefone ? { telefone } : {}), ...(email ? { email } : {}) }
+    })
+    .filter((x) => x.nome || x.id)
+    .slice(0, MAX_PASSAGEIROS)
   return {
-    passageiros: p.passageiros.map((n) => n.trim()).filter(Boolean).slice(0, MAX_PASSAGEIROS),
+    passageiros,
     origem: p.origem.trim(),
     destino: p.destino.trim(),
     saida: p.saida,
+    ...(p.tipoVeiculo !== undefined && p.tipoVeiculo !== null ? { tipoVeiculo: p.tipoVeiculo } : {}),
     ...(observacao ? { observacao } : {}),
   }
 }
@@ -31,7 +87,11 @@ export function normalizarPedido(p: NovoPedido): NovoPedido {
 export function validarPedido(p: NovoPedido, agoraMs: number): ErrosPedido {
   const e: ErrosPedido = {}
   if (!p.passageiros.length) e.passageiros = 'Informe pelo menos um passageiro.'
-  else if (p.passageiros.some((n) => n.length > MAX_NOME)) e.passageiros = `Cada nome tem no máximo ${MAX_NOME} caracteres.`
+  else if (p.passageiros.length > MAX_PASSAGEIROS) e.passageiros = `Até ${MAX_PASSAGEIROS} passageiros por pedido.`
+  else {
+    const primeiro = errosPassageiros(p.passageiros).find(Boolean)
+    if (primeiro) e.passageiros = primeiro
+  }
   if (!p.origem) e.origem = 'Informe o endereço de saída.'
   else if (p.origem.length > MAX_ENDERECO) e.origem = `O endereço de saída tem no máximo ${MAX_ENDERECO} caracteres.`
   if (!p.destino) e.destino = 'Informe o destino.'
@@ -40,14 +100,19 @@ export function validarPedido(p: NovoPedido, agoraMs: number): ErrosPedido {
   if (Number.isNaN(saida)) e.saida = 'Informe a data e a hora da saída.'
   else if (saida < agoraMs) e.saida = 'A saída precisa ser daqui para a frente.'
   else if (saida > agoraMs + UM_ANO_MS) e.saida = 'A saída não pode passar de um ano.'
+  if (p.tipoVeiculo !== undefined && !TIPOS_VEICULO.some((t) => t.valor === p.tipoVeiculo)) e.tipoVeiculo = 'Tipo de veículo inválido.'
   if ((p.observacao ?? '').length > MAX_TEXTO) e.observacao = `A observação tem no máximo ${MAX_TEXTO} caracteres.`
   return e
 }
 
 export const primeiroErroPedido = (p: NovoPedido, agoraMs: number) => Object.values(validarPedido(p, agoraMs))[0]
 
+/** "Nome – contato; Nome – contato": cortesia gravada em `cr40f_passageirosetelefonedecontato` (só escrita; a leitura é por Serviços por Passageiro). */
+export const textoCortesia = (ps: PassageiroPedido[]) =>
+  ps.map((p) => [p.nome, p.telefone || p.email].filter(Boolean).join(' – ')).join('; ')
+
 /** O que identifica um pedido repetido dentro da janela. */
-export const chaveDuplicado = (email: string, p: NovoPedido) => [email, p.saida, p.origem, p.destino].join('|').toLowerCase()
+export const chaveDuplicado = (email: string, p: Pick<NovoPedido, 'saida' | 'origem' | 'destino'>) => [email, p.saida, p.origem, p.destino].join('|').toLowerCase()
 
 const STATUS: Record<StatusPedido, { rotulo: string; tom: StatusTone }> = {
   solicitado: { rotulo: 'Solicitado', tom: 'warning' },

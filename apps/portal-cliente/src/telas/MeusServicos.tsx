@@ -55,7 +55,7 @@ const COLUNAS: TableColumn<Pedido>[] = [
   },
 ]
 
-export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
+export function MeusServicos({ onPedir, onRepetir }: { onPedir?: () => void; onRepetir?: (p: Pedido) => void }) {
   const api = useApi()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [carga, setCarga] = useState<'carregando' | 'erro' | 'ok'>('carregando')
@@ -174,7 +174,7 @@ export function MeusServicos({ onPedir }: { onPedir?: () => void }) {
         </div>
       )}
 
-      {aberto && <PedidoDetalhe key={aberto.id} pedido={aberto} onFechar={() => setAbertoId(null)} onCancelar={setCancelando} />}
+      {aberto && <PedidoDetalhe key={aberto.id} pedido={aberto} onFechar={() => setAbertoId(null)} onCancelar={setCancelando} onRepetir={onRepetir} />}
 
       <Dialog
         open={cancelando !== null}

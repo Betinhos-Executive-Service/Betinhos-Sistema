@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { apagarSenhasMock, armazenamentoEmMemoria, createMockApi, CODIGO_MOCK, usuarioMock } from './mockApi'
 import { ErroPortal } from './PortalApi'
+import type { PassageiroPedido } from '../domain/types'
 
 const EMAIL = 'fiscal@tenaris.com'
 const SENHA = 'senha-boa-123'
@@ -155,7 +156,7 @@ describe('mockApi multi-cliente', () => {
   it('pedido entra como Solicitado em Meus serviços; o mesmo pedido em 1 minuto é duplicado; depois passa', async () => {
     const { api, relogio } = await latasa()
     const antes = (await api.meusServicos()).length
-    const novo = { passageiros: ['Hiroshi Tanaka'], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 86400_000).toISOString() }
+    const novo = { passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 86400_000).toISOString() }
     const criado = await api.pedir(novo)
     expect(criado).toMatchObject({ status: 'solicitado', numero: /^RV-/ })
     expect((await api.meusServicos())[0]).toEqual(criado)
@@ -166,6 +167,33 @@ describe('mockApi multi-cliente', () => {
     await expect(api.pedir({ ...novo, origem: '' })).rejects.toMatchObject({ message: 'Informe o endereço de saída.' })
     await expect(api.cancelarPedido(criado.id)).resolves.toMatchObject({ id: criado.id, status: 'cancelado' })
     await expect(api.cancelarPedido(criado.id)).rejects.toMatchObject({ message: expect.stringContaining('fale com a Betinhos') })
+  })
+
+  it('busca de passageiros: só pessoas do cliente, por parte do nome, sem acento nem caixa', async () => {
+    const { api } = await latasa()
+    expect((await api.buscarPassageiros('')).map((p) => p.nome)).toEqual(['Carla Menezes', 'Hiroshi Tanaka', 'Juliana Prado', 'Rafael Duarte'])
+    expect(await api.buscarPassageiros('TANAKA')).toEqual([expect.objectContaining({ id: 'pes-3', nome: 'Hiroshi Tanaka', email: 'hiroshi.tanaka@exemplo.com.br' })])
+    expect(await api.buscarPassageiros('zzz')).toEqual([])
+    await expect((await logado()).buscarPassageiros('a')).rejects.toMatchObject({ codigo: 'nao_permitido' })
+  })
+
+  it('pedido com pessoa nova cadastra; repetir nome e contato reaproveita; id existente corrige o contato; id alheio é recusado', async () => {
+    const { api, relogio } = await latasa()
+    const saida = new Date(T0 + 86400_000).toISOString()
+    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida })
+    const criado = await api.pedir(pedido([{ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' }]))
+    expect(criado.pessoas).toEqual([expect.objectContaining({ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' })])
+    const idNilza = criado.pessoas[0].id!
+    expect(await api.buscarPassageiros('nilza')).toHaveLength(1)
+    relogio.t += 61_000
+    const de_novo = await api.pedir(pedido([{ nome: 'nilza prado', email: 'NILZA@exemplo.com.br' }], 'Outro'))
+    expect(de_novo.pessoas[0].id).toBe(idNilza)
+    expect(await api.buscarPassageiros('nilza')).toHaveLength(1)
+    relogio.t += 61_000
+    await api.pedir(pedido([{ id: 'pes-2', nome: 'Rafael Duarte', telefone: '(12) 98888-7777' }], 'Terceiro'))
+    expect((await api.buscarPassageiros('rafael'))[0].telefone).toBe('(12) 98888-7777')
+    await expect(api.pedir(pedido([{ id: 'pes-999', nome: 'X', email: 'x@y.co' }], 'Quarto'))).rejects.toMatchObject({ message: 'Passageiro não encontrado.' })
+    await expect(api.pedir(pedido([{ nome: 'Sem contato' }], 'Quinto'))).rejects.toMatchObject({ message: 'Informe celular ou e-mail.' })
   })
 
   it('outro e-mail do mesmo domínio começa sem pedidos', async () => {

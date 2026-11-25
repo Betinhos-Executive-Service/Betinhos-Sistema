@@ -1,4 +1,4 @@
-import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
 /**
@@ -51,6 +51,7 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     aprovar: (ids: string[]) => chamar<Servico[]>('POST', '/servicos/aprovar', { ids }),
     abrirDuvida: (id: string, motivo: Motivo, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/duvida`, { motivo, texto }),
     responder: (id: string, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/responder`, { texto }),
+    buscarPassageiros: (q: string) => chamar<PassageiroPedido[]>('GET', `/passageiros?q=${encodeURIComponent(q)}`),
     pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
     meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
     cancelarPedido: (id: string) => chamar<Pedido>('POST', `/pedidos/${encodeURIComponent(id)}/cancelar`),

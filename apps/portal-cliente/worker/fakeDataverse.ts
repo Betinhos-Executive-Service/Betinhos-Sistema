@@ -20,10 +20,11 @@ export function kvMemoria(): KV & { dados: Map<string, string> } {
   return { dados, get: async (k) => dados.get(k) ?? null, put: async (k, v) => void dados.set(k, v), delete: async (k) => void dados.delete(k) }
 }
 
-export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'validacaoservicos' | 'mensagemvalidacaos' | 'clientes1s' | 'reservadeveculoses', Registro[]>
+export type Banco = Record<'validadorclientes' | 'codigoacessos' | 'validacaoservicos' | 'mensagemvalidacaos' | 'clientes1s' | 'reservadeveculoses' | 'bancodedadoses' | 'servicosporpassageiros', Registro[]>
 const CHAVE_ID: Record<keyof Banco, string> = {
   validadorclientes: 'cr40f_validadorclienteid', codigoacessos: 'cr40f_codigoacessoid',
   validacaoservicos: 'cr40f_validacaoservicoid', mensagemvalidacaos: 'cr40f_mensagemvalidacaoid', clientes1s: 'cr40f_clientes1id', reservadeveculoses: 'cr40f_reservadeveculosid',
+  bancodedadoses: 'cr40f_bancodedadosid', servicosporpassageiros: 'cr40f_servicosporpassageiroid',
 }
 export type Email = { tipo: string; para: string[]; dados: Record<string, unknown> }
 
@@ -58,6 +59,8 @@ export function bancoInicial(): Banco {
       { cr40f_clientes1id: SEM_MODULO, cr40f_nomedocliente: 'Sem módulo', cr40f_portalhabilitado: true, cr40f_portalmodulos: null, cr40f_portaldominios: 'semmodulo.com' },
     ],
     reservadeveculoses: [],
+    bancodedadoses: [],
+    servicosporpassageiros: [],
   }
 }
 
@@ -65,7 +68,7 @@ const clienteDe = (banco: Banco, id: unknown) => banco.clientes1s.find((c) => c.
 
 const guids = (texto: string) => [...texto.matchAll(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g)].map((m) => m[0])
 
-function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[] {
+function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = ''): Registro[] {
   const linhas = banco[tabela]
   if (tabela === 'validadorclientes') {
     const email = /cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
@@ -85,6 +88,20 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[
     const [usuario, cliente, id] = guids(filtro)
     return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
+  if (tabela === 'bancodedadoses') {
+    const [cliente, id] = guids(filtro)
+    const top = Number(/\$top=(\d+)/.exec(topo)?.[1] ?? 1e9)
+    const aspas = (t: string) => t.replace(/''/g, "'")
+    const contem = /contains\(cr40f_nomedopassageiro,'((?:[^']|'')*)'\)/.exec(filtro)?.[1]
+    const igual = /cr40f_nomedopassageiro eq '((?:[^']|'')*)'/.exec(filtro)?.[1]
+    const nome = (r: Registro) => String(r.cr40f_nomedopassageiro ?? '').toLowerCase()
+    return linhas
+      .filter((r) => r._cr40f_cliente_value === cliente && r.statecode !== 1 && (!id || r.cr40f_bancodedadosid === id))
+      .filter((r) => contem === undefined || nome(r).includes(aspas(contem).toLowerCase()))
+      .filter((r) => igual === undefined || nome(r) === aspas(igual).toLowerCase())
+      .sort((a, b) => nome(a).localeCompare(nome(b)))
+      .slice(0, top)
+  }
   if (tabela === 'codigoacessos') return linhas.filter((c) => c._cr40f_validador_value === guids(filtro)[0] && !c.cr40f_usado).slice(-1)
   if (tabela === 'mensagemvalidacaos') return linhas.filter((m) => guids(filtro).includes(String(m._cr40f_validacao_value)))
   // validacaoservicos
@@ -95,7 +112,10 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string): Registro[
 }
 
 /** `fetch` falso. `emails` recebe o que iria para o flow. */
-export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
+/** `falhas.vinculo` e `falhas.apagar` simulam o Dataverse recusando o vínculo da pessoa e o DELETE da reserva. */
+export type Falhas = { vinculo?: boolean; apagar?: boolean }
+
+export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): typeof fetch {
   return async (entrada, init) => {
     const url = String(entrada)
     const metodo = init?.method ?? 'GET'
@@ -108,6 +128,7 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
     if (!banco[tabela]) return new Response('tabela desconhecida', { status: 404 })
     const chaveId = CHAVE_ID[tabela]
     if (metodo === 'POST') {
+      if (tabela === 'servicosporpassageiros' && falhas.vinculo) return new Response('sem privilégio', { status: 403 })
       const novo: Registro = { [chaveId]: novoId(), createdon: new Date().toISOString(), ...corpo }
       for (const k of Object.keys(corpo).filter((k) => k.endsWith('@odata.bind'))) novo[`_${k.split('@')[0].toLowerCase()}_value`] = guids(String(corpo[k]))[0]
       if (novo._cr40f_cliente_value) novo[`_cr40f_cliente_value${FV}`] = clienteDe(banco, novo._cr40f_cliente_value)?.cr40f_nomedocliente
@@ -115,7 +136,22 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
       banco[tabela].push(novo)
       return init?.headers && String((init.headers as Record<string, string>).Prefer).includes('return=representation') ? Response.json(novo, { status: 201 }) : new Response(null, { status: 204 })
     }
-    const expandir = (reg: Registro) => (caminho.includes('$expand=cr40f_Cliente') ? { ...reg, cr40f_Cliente: clienteDe(banco, reg._cr40f_cliente_value) ?? null } : reg)
+    const expandir = (reg: Registro): Registro => {
+      if (caminho.includes('$expand=cr40f_Cliente')) return { ...reg, cr40f_Cliente: clienteDe(banco, reg._cr40f_cliente_value) ?? null }
+      if (tabela === 'reservadeveculoses' && caminho.includes(NAV.passageiros)) {
+        const filhos = banco.servicosporpassageiros.filter((v) => v._cr40f_geral_value === reg.cr40f_reservadeveculosid)
+          .map((v) => ({ ...v, [NAV.vinculoPessoa]: banco.bancodedadoses.find((p) => p.cr40f_bancodedadosid === v._cr40f_bancodedados_value) ?? null }))
+        return { ...reg, [NAV.passageiros]: filhos }
+      }
+      return reg
+    }
+    if (metodo === 'DELETE') {
+      if (falhas.apagar) return new Response('sem privilégio', { status: 403 })
+      const i = banco[tabela].findIndex((r) => r[chaveId] === id)
+      if (i < 0) return new Response('não achou', { status: 404 })
+      banco[tabela].splice(i, 1)
+      return new Response(null, { status: 204 })
+    }
     if (id) {
       const reg = banco[tabela].find((r) => r[chaveId] === id)
       if (!reg) return new Response('não achou', { status: 404 })
@@ -123,7 +159,7 @@ export function fetchFalso(banco: Banco, emails: Email[]): typeof fetch {
       return Response.json(expandir(reg))
     }
     const filtro = /\$filter=([^&]*)/.exec(caminho)?.[1] ?? ''
-    return Response.json({ value: consultar(banco, tabela, filtro).map(expandir) })
+    return Response.json({ value: consultar(banco, tabela, filtro, caminho).map(expandir) })
   }
 }
 

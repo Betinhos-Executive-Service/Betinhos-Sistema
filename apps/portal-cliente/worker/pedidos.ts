@@ -1,21 +1,61 @@
 // Módulos Pedir e Meus serviços: o pedido vira uma Reserva de Veículos em Solicitado, ligada ao usuário do portal;
 // a operação precifica e programa no shell e o solicitante acompanha o status aqui.
-import { chaveDuplicado, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, normalizarPedido, primeiroErroPedido } from '../src/domain/pedidos'
-import type { NovoPedido } from '../src/domain/types'
+import { chaveDuplicado, chaveNome, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, normalizarPedido, primeiroErroPedido, soDigitos, textoCortesia } from '../src/domain/pedidos'
+import type { NovoPedido, PassageiroPedido } from '../src/domain/types'
 import type { Ctx } from './auth'
 import { sha256Hex } from './cripto'
 import { erro, json, lerJson, type Sessao } from './http'
-import { mapearPedido, type PedidoPortal } from './mapear'
-import { criarPedido as caminhoCriar, guid, pedidoDe, pedidosDe } from './odata'
-import { NAV, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
+import { mapearPedido, type PedidoPortal, type Registro } from './mapear'
+import { criarPedido as caminhoCriar, criarPessoa, ehGuid, guid, pedidoDe, pedidosDe, pessoaDoCliente, pessoasComNome, pessoasDoCliente } from './odata'
+import { NAV, PESSOA_ATIVA, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
 
-const lista = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
 const textoOu = (v: unknown) => (typeof v === 'string' ? v : '')
+
+/** Passageiros do corpo: só objetos com os campos conhecidos; qualquer outra coisa vira nome vazio (recusado pela validação). */
+function passageirosDoCorpo(v: unknown): PassageiroPedido[] {
+  if (!Array.isArray(v)) return []
+  return v.map((x) => {
+    const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
+    return { ...(typeof o.id === 'string' && o.id ? { id: o.id } : {}), nome: textoOu(o.nome), telefone: textoOu(o.telefone), email: textoOu(o.email) }
+  })
+}
+
+const str = (r: Registro, campo: string) => (typeof r[campo] === 'string' ? (r[campo] as string) : '')
+const contatoDe = (r: Registro): PassageiroPedido => ({ id: str(r, 'cr40f_bancodedadosid'), nome: str(r, 'cr40f_nomedopassageiro'), telefone: str(r, 'cr40f_telefone'), email: str(r, 'cr40f_email') })
+const mesmoContato = (a: PassageiroPedido, b: PassageiroPedido) =>
+  (!!a.telefone && !!b.telefone && soDigitos(a.telefone) === soDigitos(b.telefone)) || (!!a.email && !!b.email && a.email.toLowerCase() === b.email.toLowerCase())
+
+/** Passageiros do cliente da sessão para o Pedir escolher: nome, celular e e-mail, no máximo 20. */
+export async function listarPassageiros(c: Ctx, sessao: Sessao, busca: string): Promise<Response> {
+  const pessoas = await c.dv.lista(pessoasDoCliente(sessao.cid, busca.trim().slice(0, 100)))
+  return json(pessoas.map(contatoDe))
+}
+
+/** Pessoa do cliente da sessão (por id, ou criada/reaproveitada pelo nome e contato) já com o contato corrigido. */
+type Resolvida = { pessoa: PassageiroPedido; atualizar?: Registro }
+
+/** Só leitura: devolve o que gravar, ou a mensagem de erro (id de outra pessoa/cliente). */
+async function resolver(c: Ctx, sessao: Sessao, p: PassageiroPedido): Promise<Resolvida | string> {
+  if (p.id) {
+    if (!ehGuid(p.id)) return 'Passageiro não encontrado.'
+    const [reg] = await c.dv.lista(pessoaDoCliente(p.id, sessao.cid))
+    if (!reg) return 'Passageiro não encontrado.'
+    const atual = contatoDe(reg)
+    const mudou: Registro = {}
+    if ((p.telefone ?? '') !== atual.telefone) mudou.cr40f_telefone = p.telefone || null
+    if ((p.email ?? '') !== atual.email) mudou.cr40f_email = p.email || null
+    return { pessoa: { ...atual, telefone: p.telefone ?? '', email: p.email ?? '' }, ...(Object.keys(mudou).length ? { atualizar: mudou } : {}) }
+  }
+  const candidatas = (await c.dv.lista(pessoasComNome(sessao.cid, p.nome))).map(contatoDe)
+  const igual = candidatas.find((x) => chaveNome(x.nome) === chaveNome(p.nome) && mesmoContato(x, p))
+  return igual ? { pessoa: { ...igual, telefone: igual.telefone || p.telefone, email: igual.email || p.email } } : { pessoa: { nome: p.nome, telefone: p.telefone, email: p.email } }
+}
 
 export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise<Response> {
   const corpo = await lerJson<Partial<Record<keyof NovoPedido, unknown>>>(req)
   const pedido = normalizarPedido({
-    passageiros: lista(corpo?.passageiros), origem: textoOu(corpo?.origem), destino: textoOu(corpo?.destino), saida: textoOu(corpo?.saida), observacao: textoOu(corpo?.observacao),
+    passageiros: passageirosDoCorpo(corpo?.passageiros), origem: textoOu(corpo?.origem), destino: textoOu(corpo?.destino), saida: textoOu(corpo?.saida), observacao: textoOu(corpo?.observacao),
+    ...(typeof corpo?.tipoVeiculo === 'number' ? { tipoVeiculo: corpo.tipoVeiculo } : corpo?.tipoVeiculo != null ? { tipoVeiculo: Number.NaN } : {}),
   })
   const primeiroErro = primeiroErroPedido(pedido, c.agora)
   if (primeiroErro) return erro(400, 'nao_permitido', primeiroErro)
@@ -24,22 +64,79 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
   const chave = `pedido:${await sha256Hex(`${sessao.vid}|${chaveDuplicado(sessao.email, pedido)}`)}`
   if (await c.env.KV.get(chave)) return erro(409, 'duplicado', 'Este pedido acabou de ser enviado.')
 
-  const portal: PedidoPortal = { passageiros: pedido.passageiros, ...(pedido.observacao ? { observacao: pedido.observacao } : {}) }
+  // 1) Só leitura: confere que cada passageiro com id é do cliente da sessão, antes de gravar qualquer coisa.
+  const resolvidas: Resolvida[] = []
+  for (const p of pedido.passageiros) {
+    const r = await resolver(c, sessao, p)
+    if (typeof r === 'string') return erro(400, 'nao_permitido', r)
+    resolvidas.push(r)
+  }
+  const ids = resolvidas.map((r) => r.pessoa.id).filter(Boolean)
+  if (new Set(ids).size < ids.length) return erro(400, 'nao_permitido', 'Este passageiro já está no pedido.')
+
+  // 2) Corrige o contato de quem já existe e cadastra quem é novo.
+  const pessoas: PassageiroPedido[] = []
+  for (const r of resolvidas) {
+    if (r.pessoa.id) {
+      if (r.atualizar) await c.dv.patch(`${SET.pessoa}(${guid(r.pessoa.id)})`, r.atualizar)
+      pessoas.push(r.pessoa)
+      continue
+    }
+    const nova = await c.dv.criar(criarPessoa(), {
+      cr40f_nomedopassageiro: r.pessoa.nome,
+      ...(r.pessoa.telefone ? { cr40f_telefone: r.pessoa.telefone } : {}),
+      ...(r.pessoa.email ? { cr40f_email: r.pessoa.email } : {}),
+      cr40f_status: PESSOA_ATIVA,
+      [`${NAV.pessoaCliente}@odata.bind`]: `/${SET.cliente}(${sessao.cid})`,
+    })
+    pessoas.push({ ...r.pessoa, id: str(nova, 'cr40f_bancodedadosid') })
+  }
+
+  // 3) Reserva e, por último, o vínculo de cada pessoa (Serviços por Passageiro, ordem 1..N).
+  const portal: PedidoPortal = { passageiros: pessoas.map((p) => p.nome), ...(pedido.observacao ? { observacao: pedido.observacao } : {}), ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }
   const criado = await c.dv.criar(caminhoCriar(), {
     cr40f_status: RESERVA_SOLICITADO,
     cr40f_dataehorriodesada: new Date(Date.parse(pedido.saida)).toISOString(),
     cr40f_endereodesada: pedido.origem,
     cr40f_destino: pedido.destino,
+    ...(pedido.tipoVeiculo !== undefined ? { cr40f_tipodeveiculo: pedido.tipoVeiculo } : {}),
     cr40f_portalpedido: JSON.stringify(portal),
-    // Cortesia para a operação (só escrita): os plugins e o shell são donos destas colunas depois.
-    cr40f_passageirosetelefonedecontato: pedido.passageiros.join('; '),
+    // Cortesia para a operação (só escrita, "Nome – contato"): quem lê passageiros usa Serviços por Passageiro.
+    cr40f_passageirosetelefonedecontato: textoCortesia(pessoas),
     cr40f_observaointerna: `Pedido pelo portal por ${sessao.nome} (${sessao.email})${pedido.observacao ? `: ${pedido.observacao}` : ''}`,
     [`${NAV.cliente}@odata.bind`]: `/${SET.cliente}(${sessao.cid})`,
     [`${NAV.portalUsuario}@odata.bind`]: `/${SET.validador}(${sessao.vid})`,
   })
-  // Marca só depois de criar: uma falha no Dataverse não bloqueia a nova tentativa por 1 minuto.
+  const reservaId = str(criado, 'cr40f_reservadeveculosid')
+  try {
+    for (const [i, p] of pessoas.entries()) {
+      await c.dv.post(SET.vinculo, {
+        [`${NAV.vinculoGeral}@odata.bind`]: `/${SET.reserva}(${guid(reservaId)})`,
+        [`${NAV.vinculoPessoa}@odata.bind`]: `/${SET.pessoa}(${guid(p.id ?? '')})`,
+        cr40f_ordemdeselecao: i + 1,
+      })
+    }
+  } catch (e) {
+    console.error('vínculo de passageiro falhou', e instanceof Error ? e.message : e)
+    await desfazerReserva(c, reservaId, sessao)
+    return erro(502, 'falha', 'Não foi possível registrar os passageiros do pedido. Tente de novo.')
+  }
+  // Marca só depois de criar tudo: uma falha no Dataverse não bloqueia a nova tentativa por 1 minuto.
   c.waitUntil(c.env.KV.put(chave, '1', { expirationTtl: JANELA_DUPLICADO_MS / 1000 }))
-  return json(mapearPedido(criado), 201)
+  return json({ ...mapearPedido(criado), passageiros: pessoas.map((p) => p.nome), pessoas, ...(pedido.tipoVeiculo !== undefined ? { tipoVeiculo: pedido.tipoVeiculo } : {}) }, 201)
+}
+
+/** Reserva sem passageiros não pode ficar na fila da operação: apaga; se o papel não deixar, cancela com nota. */
+async function desfazerReserva(c: Ctx, reservaId: string, sessao: Sessao): Promise<void> {
+  try {
+    await c.dv.apagar(`${SET.reserva}(${guid(reservaId)})`)
+  } catch {
+    try {
+      await c.dv.patch(`${SET.reserva}(${guid(reservaId)})`, { cr40f_status: RESERVA_CANCELADO, cr40f_observaointerna: `Pedido pelo portal por ${sessao.nome} (${sessao.email}) cancelado: falha ao registrar os passageiros.` })
+    } catch (e) {
+      console.error('não foi possível desfazer a reserva', reservaId, e instanceof Error ? e.message : e)
+    }
+  }
 }
 
 export async function listarPedidos(c: Ctx, sessao: Sessao): Promise<Response> {

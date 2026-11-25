@@ -11,6 +11,9 @@ export const SET = {
   codigo: 'cr40f_codigoacessos',
   cliente: 'cr40f_clientes1s',
   reserva: 'cr40f_reservadeveculoses',
+  /** Pessoa (cr40f_bancodedados) e o vínculo pessoa-reserva (Serviços por Passageiro). */
+  pessoa: 'cr40f_bancodedadoses',
+  vinculo: 'cr40f_servicosporpassageiros',
 } as const
 
 /** Choice múltipla cr40f_clientes1.cr40f_portalmodulos (provision-portal-cliente.ps1). */
@@ -30,6 +33,10 @@ export const PEDIDO_STATUS: Record<number, StatusPedido> = {
   202410002: 'cancelado',
   202410010: 'cancelado', // Cancelado com Ressalvas
 }
+
+/** cr40f_status da pessoa (cr40f_bancodedados): Ativo. */
+export const PESSOA_ATIVA = 202410000
+export const PESSOA_CAMPOS = ['cr40f_bancodedadosid', 'cr40f_nomedopassageiro', 'cr40f_telefone', 'cr40f_email']
 
 export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portaldominios']
 
@@ -59,7 +66,7 @@ export const LADO_DV = { cliente: 100000000, betinhos: 100000001 } as const
 export const MOTIVO_DV = { espera: 100000000, km_rota: 100000001, valor: 100000002, passageiro: 100000003, outro: 100000004 } as const
 
 /** Navigation property do lookup cr40f_Reserva (schema name) e do lookup new_composicaodepreco da composição na reserva (navegação new_ComposicaodePreco, metadata DEV/PROD 23/11/2026). */
-export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_ComposicaodePreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario' }
+export const NAV = { passageiros: 'cr40f_servicosporpassageiro_Geral_cr40f_reservadeveculos', reserva: 'cr40f_Reserva', composicao: 'new_ComposicaodePreco', validacao: 'cr40f_Validacao', validador: 'cr40f_Validador', cliente: 'cr40f_Cliente', portalUsuario: 'cr40f_PortalUsuario', pessoaCliente: 'cr40f_Cliente', vinculoGeral: 'cr40f_Geral', vinculoPessoa: 'cr40f_BancodeDados' }
 
 export const RESERVA_CAMPOS = [
   'cr40f_id', 'cr40f_idtenaris', 'cr40f_cr', 'cr40f_dataehorriodesada', 'cr40f_endereodesada', 'cr40f_destino',
