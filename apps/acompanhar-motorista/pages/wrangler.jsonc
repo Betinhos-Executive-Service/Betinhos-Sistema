@@ -1,0 +1,20 @@
+{
+  // Projeto Pages do link de acompanhamento. O DNS do betinhos.com.br fica na Locaweb (CNAMEs → acompanhe.pages.dev), então o
+  // Worker não aceita domínio próprio direto. Só repassa ao Worker por service binding (functions/[[path]].ts), com a mesma URL:
+  // o Worker monta os links novos com o domínio de quem o chamou.
+  // Decisão do Renan, 25/11/2026: acompanhe.betinhos.com.br → acompanhar-motorista (PROD); acompanhe.dev.betinhos.com.br e
+  // qualquer outro endereço (pages.dev, previews) → acompanhar-motorista-dev.
+  // Publicação à mão: `cd pages && npx wrangler pages deploy --branch main`.
+  "name": "acompanhe",
+  "pages_build_output_dir": "estatico",
+  "compatibility_date": "2026-09-01",
+  "services": [
+    { "binding": "PROD", "service": "acompanhar-motorista" },
+    { "binding": "DEV", "service": "acompanhar-motorista-dev" }
+  ],
+  "env": {
+    "preview": {
+      "services": [{ "binding": "DEV", "service": "acompanhar-motorista-dev" }]
+    }
+  }
+}

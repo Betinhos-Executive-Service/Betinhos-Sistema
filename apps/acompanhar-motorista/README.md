@@ -209,6 +209,10 @@ O KV do DEV (`acompanhar-motorista-dev`) foi criado em 24/11/2026 e o id está e
 1. Os segredos do Worker DEV (abaixo) se gravam com `pnpm exec wrangler secret put <NOME> --env dev`.
 2. O primeiro `wrangler deploy --env dev` cria o Worker e o Durable Object `Viagem` (migration `v1` própria); o Deploy da `develop` faz isso sozinho.
 
+### Domínios `acompanhe.betinhos.com.br` (PROD) e `acompanhe.dev.betinhos.com.br` (DEV)
+
+O DNS do `betinhos.com.br` fica na Locaweb, então o Worker não aceita domínio próprio direto. O projeto Pages `acompanhe` (`pages/`) repassa tudo ao Worker por service binding, com a mesma URL; o Worker monta os links novos com o domínio de quem chamou `/api/links`. Na Locaweb, os CNAMEs `acompanhe` e `acompanhe.dev` apontam para `acompanhe.pages.dev`. A function escolhe o Worker pelo domínio (decisão do Renan, 25/11/2026): `acompanhe.betinhos.com.br` → `acompanhar-motorista` (PROD); o resto (`acompanhe.dev`, `pages.dev`, previews) → `acompanhar-motorista-dev`. Publicação do Pages à mão: `cd pages && npx wrangler pages deploy --branch main`. Os links já enviados no `workers.dev` continuam valendo.
+
 ## Configuração
 
 - Variáveis (`wrangler.jsonc`): `CENTRAL_TELEFONE`, `CENTRAL_WHATSAPP`. Opcionais, só para apontar a serviços de teste: `INFLEET_URL`, `TOMTOM_URL`, `OSRM_URL`.
