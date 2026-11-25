@@ -28,6 +28,7 @@ import { nextEditableCell } from './data/grid-navigation'
 import { CompositionSaveQueue } from './data/composition-save-queue'
 import { keywordTokens } from '../../app/keywordSearch'
 import { SearchHighlight, SearchTokensContext } from '../../app/SearchHighlight'
+import { usePodeExcluir } from '../../app/useNivel'
 import { preloadSearchChoices } from './data/composition-search'
 import { matchesCompositionFilters, sumSelectedCompositions } from './data/composition-totals'
 import { applyMockView, deleteMockView, loadMockViews, mockColumnCatalog, saveMockView } from './data/mock-views'
@@ -225,6 +226,7 @@ function provisionalField(id: string): CatalogField {
 function ComposicaoContent({ host }: { host: Host }) {
   const toast = useToast()
   const mobile = useMediaQuery('(max-width: 820px)')
+  const podeExcluir = usePodeExcluir('cr40f_composicaodeprecos')
   const hostRef = useRef(host)
   hostRef.current = host
   const [rows, setRows] = useState<Composition[]>([])
@@ -1654,7 +1656,7 @@ function ComposicaoContent({ host }: { host: Host }) {
       <CompositionCommandLine
         view={viewBar} actions={commandLineActions} onSearch={setSearch} ready=
 {viewReady} mock={usingMockData} mobile={mobile} search={search}
-        commandPhase={commandPhase} commandLocked={commandLocked} commandBlock={commandBlock} exporting={exporting} selectedCount={selectedCount}
+        commandPhase={commandPhase} commandLocked={commandLocked} commandBlock={commandBlock} exporting={exporting} selectedCount={selectedCount} podeExcluir={podeExcluir}
         exportBlocked={!dataSource || Boolean(queryError) || (dataSource === 'dataverse' && !catalog.length)}
         countText={nextLink
           ? totalCount !== null ? `${visibleRows.length} de ${totalCount.toLocaleString('pt-BR')} registros` : `${visibleRows.length}+ registros`
