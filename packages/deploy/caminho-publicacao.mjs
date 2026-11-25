@@ -77,6 +77,9 @@ export const NEUTRO = [
   /^packages\/deploy\/backup\//,
   // Registro "Publicado no PROD" do módulo Projetos (job projetos do producao.yml): só grava dados, não muda o que é publicado.
   /^packages\/deploy\/projetos\//,
+  // Corte dos acessos (plano 4): roda no job acessos (acessos-corte.yml) do Deploy e da Produção, depois da publicação;
+  // quem-le e prova são só leitura/DEV. O motor e os perfis (aplicar-perfis.ps1, perfis.gerado.json) seguem pelas soluções.
+  /^packages\/deploy\/acessos\/(corte\.json|(corte|corte-regras|corte-estado|corte-unidade|corte-ci|relatorio-corte|dv|quem-le|prova)(\.test)?\.mjs)$/,
   /^packages\/deploy\/(push-dev|push-webresources-dev|push-formulario-dev|push-front-prod|push-plugins-dev|push-plugins-prod|exportar-plugins-dev|pendentes-dev|push-flows-dev|chunk-cleanup)\.ps1$/,
   /^packages\/plugins\/(Cr40f\.[A-Za-z]+\.Plugin|Betinhos\.(DriverRecordSharing|ExpenseUpload))\.Tests\//,
   // Betinhos.ExpenseUpload: congelado, não é publicado por nenhum caminho.

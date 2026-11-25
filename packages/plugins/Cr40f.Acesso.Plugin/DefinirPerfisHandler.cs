@@ -27,8 +27,10 @@ public sealed class DefinirPerfisHandler
         var alvo = Alvo(usuario) ?? throw new AcessoException("USUARIO_INVALIDO", "Usuário não encontrado, desativado ou de aplicação.");
         var papeis = Catalogo("role", alvo.GetAttributeValue<EntityReference>("businessunitid")!.Id);
         var colunas = Catalogo("fieldsecurityprofile", null);
+        var copias = CopiasNaFrota(alvo.GetAttributeValue<EntityReference>("businessunitid")!.Id, out var temFrota);
+        var conhecidos = papeis.Concat(copias).ToList();
         var papeisAtuais = PapeisDoUsuario.IdsDiretos(_sistema, usuario);
-        var antes = AcessoCatalogo.DosPapeis(papeis.Where(p => papeisAtuais.Contains(p.Value)).Select(p => p.Key));
+        var antes = AcessoCatalogo.DosPapeis(conhecidos.Where(p => papeisAtuais.Contains(p.Value)).Select(p => p.Key).Distinct());
         if (antes.Acessos != pedido.Acessos && !admin)
             throw new AcessoException("SEM_PERMISSAO", "Só o Administrador do Sistema concede ou retira o perfil Administrador de acessos.");
 
@@ -39,9 +41,15 @@ public sealed class DefinirPerfisHandler
         if (faltam.Count > 0)
             throw new AcessoException("PERFIL_INDISPONIVEL", "Perfil ainda não publicado neste ambiente: " + string.Join("; ", faltam) + ".");
 
-        Ajustar(usuario, "systemuserroles_association", "role", papeis, papeisAtuais, papeisDesejados);
-        Ajustar(usuario, "systemuserprofiles_association", "fieldsecurityprofile", colunas,
-            PapeisDoUsuario.Ids(_sistema, "systemuserprofiles", "systemuserid", usuario, "fieldsecurityprofileid"), colunasDesejadas);
+        // Com a unidade Frota, Frota Operador/Gestor vão pela cópia do papel nela; sem a cópia, recusa em vez de cair no papel raiz.
+        var faltamCopias = temFrota ? papeisDesejados.Where(n => NomesFrota.Contains(n) && !copias.ContainsKey(n)).ToList() : new List<string>();
+        if (faltamCopias.Count > 0)
+            throw new AcessoException("PERFIL_INDISPONIVEL", "Perfil ainda não copiado para a unidade Frota: " + string.Join("; ", faltamCopias) + ".");
+        var querer = papeisDesejados.Select(n => copias.TryGetValue(n, out var c) ? c : papeis[n]).ToList();
+
+        Ajustar(usuario, "systemuserroles_association", "role", conhecidos.Select(p => p.Value), papeisAtuais, querer);
+        Ajustar(usuario, "systemuserprofiles_association", "fieldsecurityprofile", colunas.Values,
+            PapeisDoUsuario.Ids(_sistema, "systemuserprofiles", "systemuserid", usuario, "fieldsecurityprofileid"), colunasDesejadas.Select(n => colunas[n]).ToList());
 
         var jsonAntes = AcessoCatalogo.Json(antes);
         var jsonDepois = AcessoCatalogo.Json(pedido);
@@ -88,12 +96,28 @@ public sealed class DefinirPerfisHandler
         return mapa;
     }
 
-    /// <summary>Inclui o que falta e retira o que sobra, só entre os registros do catálogo.</summary>
-    private void Ajustar(Guid usuario, string relacao, string tabela, Dictionary<string, Guid> catalogo, List<Guid> atuais, List<string> desejados)
+    private static readonly HashSet<string> NomesFrota = new(new[] { "operador", "gestor" }.Select(n => AcessoCatalogo.NomeDoPapel("frota", n)), StringComparer.Ordinal);
+
+    /// <summary>Cópias dos papéis Frota na unidade "Frota" filha da unidade do alvo; vazio quando a unidade não existe.</summary>
+    private Dictionary<string, Guid> CopiasNaFrota(Guid buAlvo, out bool temUnidade)
     {
-        var querer = desejados.Select(n => catalogo[n]).ToList();
-        var incluir = querer.Where(id => !atuais.Contains(id)).Select(id => new EntityReference(tabela, id)).ToList();
-        var retirar = catalogo.Values.Where(id => atuais.Contains(id) && !querer.Contains(id)).Select(id => new EntityReference(tabela, id)).ToList();
+        var q = new QueryExpression("businessunit") { ColumnSet = new ColumnSet("name", "isdisabled") };
+        q.Criteria.AddCondition("parentbusinessunitid", ConditionOperator.Equal, buAlvo);
+        var frotas = _sistema.RetrieveMultiple(q).Entities
+            .Where(b => !b.GetAttributeValue<bool>("isdisabled") && string.Equals(b.GetAttributeValue<string>("name"), "Frota", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (frotas.Count > 1) throw new AcessoException("PERFIL_INDISPONIVEL", "Há mais de uma unidade Frota ativa neste ambiente.");
+        temUnidade = frotas.Count == 1;
+        if (!temUnidade) return new Dictionary<string, Guid>(StringComparer.Ordinal);
+        return Catalogo("role", frotas[0].Id).Where(p => NomesFrota.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>Inclui o que falta e retira o que sobra, só entre os registros conhecidos (<paramref name="universo"/>).</summary>
+    private void Ajustar(Guid usuario, string relacao, string tabela, IEnumerable<Guid> universo, List<Guid> atuais, List<Guid> querer)
+    {
+        var conhecidos = new HashSet<Guid>(universo);
+        var incluir = querer.Where(id => !atuais.Contains(id)).Distinct().Select(id => new EntityReference(tabela, id)).ToList();
+        var retirar = atuais.Where(id => conhecidos.Contains(id) && !querer.Contains(id)).Select(id => new EntityReference(tabela, id)).ToList();
         if (incluir.Count > 0) _sistema.Associate("systemuser", usuario, new Relationship(relacao), new EntityReferenceCollection(incluir));
         if (retirar.Count > 0) _sistema.Disassociate("systemuser", usuario, new Relationship(relacao), new EntityReferenceCollection(retirar));
     }

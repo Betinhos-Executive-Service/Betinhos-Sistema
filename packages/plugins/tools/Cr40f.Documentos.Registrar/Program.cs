@@ -18,6 +18,8 @@ if (dllPath.Length > 0 && !File.Exists(dllPath)) throw new FileNotFoundException
 const string PluginTypeName = "Cr40f.Documentos.Plugin.DocumentosResumoPlugin";
 const string CustomApiName = "cr40f_DocumentosResumoSemanal";
 const int PluginAssemblyComponentType = 91;
+const int StepComponentType = 92;
+const string UnidadeTypeName = "Cr40f.Documentos.Plugin.DocumentoUnidadePlugin";
 
 Log("autenticando no Dataverse");
 var tokenCacheDirectory = Path.Combine(Path.GetTempPath(), "Betinhos", "Dataverse");
@@ -48,9 +50,13 @@ if (testar)
 var assemblyInfo = AssemblyInfo.Read(dllPath);
 if (assemblyInfo.PublicKeyToken.Length == 0) throw new InvalidOperationException("DLL sem assinatura forte.");
 var assemblyId = UpsertAssembly(service, assemblyInfo, Convert.ToBase64String(File.ReadAllBytes(dllPath)));
-var pluginTypeId = UpsertPluginType(service, assemblyId);
+var pluginTypeId = UpsertPluginType(service, assemblyId, PluginTypeName);
 EnsureSolutionComponent(service, assemblyId, solutionUniqueName, PluginAssemblyComponentType);
 EnsureCustomApi(service, pluginTypeId, solutionUniqueName);
+var unidadeTypeId = UpsertPluginType(service, assemblyId, UnidadeTypeName);
+EnsureStep(service, unidadeTypeId, "Create", "cr40f_documento", "Documentos | Unidade do documento (Create)", solutionUniqueName, null, null);
+EnsureStep(service, unidadeTypeId, "Update", "cr40f_documento", "Documentos | Unidade do documento (Update)", solutionUniqueName,
+    "cr40f_veiculo,cr40f_funcionario,ownerid", "cr40f_veiculo,cr40f_funcionario,owningbusinessunit");
 
 if (publish)
 {
@@ -85,22 +91,79 @@ static Guid UpsertAssembly(ServiceClient service, AssemblyInfo info, string cont
     });
 }
 
-static Guid UpsertPluginType(ServiceClient service, Guid assemblyId)
+static Guid UpsertPluginType(ServiceClient service, Guid assemblyId, string typeName)
 {
-    var existing = FindSingleOrNone(service, "plugintype", ("typename", PluginTypeName), ("pluginassemblyid", assemblyId));
+    var existing = FindSingleOrNone(service, "plugintype", ("typename", typeName), ("pluginassemblyid", assemblyId));
     if (existing is not null)
     {
-        Log($"reutilizando tipo {PluginTypeName}");
+        Log($"reutilizando tipo {typeName}");
         return existing.Id;
     }
-    Log($"criando tipo {PluginTypeName}");
+    Log($"criando tipo {typeName}");
+    var curto = typeName.Substring(typeName.LastIndexOf('.') + 1);
     return service.Create(new Entity("plugintype")
     {
-        ["name"] = "DocumentosResumoPlugin",
-        ["friendlyname"] = "DocumentosResumoPlugin",
-        ["typename"] = PluginTypeName,
+        ["name"] = curto,
+        ["friendlyname"] = curto,
+        ["typename"] = typeName,
         ["pluginassemblyid"] = Ref("pluginassembly", assemblyId),
     });
+}
+
+static void EnsureStep(ServiceClient service, Guid pluginTypeId, string messageName, string entity, string name,
+    string solutionUniqueName, string? filteringAttributes, string? preImageAttributes)
+{
+    const int Stage = 10; // PreValidation: antes da checagem de privilégio e do cálculo da unidade pelo dono
+    var existente = FindSingleOrNone(service, "sdkmessageprocessingstep", ("name", name));
+    Guid stepId;
+    if (existente != null)
+    {
+        stepId = existente.Id;
+        var upd = new Entity("sdkmessageprocessingstep", stepId)
+        {
+            ["filteringattributes"] = filteringAttributes,
+            ["stage"] = new OptionSetValue(Stage),
+            ["mode"] = new OptionSetValue(0),
+            ["rank"] = 1,
+            ["eventhandler"] = Ref("plugintype", pluginTypeId),
+        };
+        service.Update(upd);
+        Log($"step atualizado: {name}");
+    }
+    else
+    {
+        var message = FindSingleOrNone(service, "sdkmessage", ("name", messageName)) ?? throw new InvalidOperationException($"sdkmessage {messageName} não encontrada");
+        var filter = FindSingleOrNone(service, "sdkmessagefilter", ("sdkmessageid", message.Id), ("primaryobjecttypecode", entity))
+            ?? throw new InvalidOperationException($"sdkmessagefilter {messageName}/{entity} não encontrado");
+        stepId = service.Create(new Entity("sdkmessageprocessingstep")
+        {
+            ["name"] = name,
+            ["mode"] = new OptionSetValue(0),
+            ["stage"] = new OptionSetValue(Stage),
+            ["rank"] = 1,
+            ["supporteddeployment"] = new OptionSetValue(0),
+            ["sdkmessageid"] = Ref("sdkmessage", message.Id),
+            ["sdkmessagefilterid"] = Ref("sdkmessagefilter", filter.Id),
+            ["eventhandler"] = Ref("plugintype", pluginTypeId),
+            ["filteringattributes"] = filteringAttributes,
+            ["asyncautodelete"] = false,
+        });
+        Log($"step criado: {name}");
+    }
+    EnsureSolutionComponent(service, stepId, solutionUniqueName, StepComponentType);
+    if (preImageAttributes == null) return;
+    var imagem = FindSingleOrNone(service, "sdkmessageprocessingstepimage", ("sdkmessageprocessingstepid", stepId), ("entityalias", "pre"));
+    var dados = new Entity("sdkmessageprocessingstepimage")
+    {
+        ["name"] = "pre",
+        ["entityalias"] = "pre",
+        ["imagetype"] = new OptionSetValue(0),
+        ["messagepropertyname"] = "Target",
+        ["attributes"] = preImageAttributes,
+        ["sdkmessageprocessingstepid"] = Ref("sdkmessageprocessingstep", stepId),
+    };
+    if (imagem == null) service.Create(dados);
+    else { dados.Id = imagem.Id; service.Update(dados); }
 }
 
 static void EnsureCustomApi(ServiceClient service, Guid pluginTypeId, string solution)

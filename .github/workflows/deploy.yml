@@ -77,6 +77,13 @@ on:
       - 'packages/plugins/Betinhos.DriverRecordSharing/**'
       - 'packages/plugins/tools/**'
       - 'packages/plugins/scripts/**'
+      # Corte dos acessos (plano 4): job acessos, depois do dev.
+      - 'packages/deploy/acessos/corte.json'
+      - 'packages/deploy/acessos/corte*.mjs'
+      - 'packages/deploy/acessos/relatorio-corte.mjs'
+      - 'packages/deploy/acessos/dv.mjs'
+      - '!packages/deploy/acessos/*.test.mjs'
+      - '.github/workflows/acessos-corte.yml'
   workflow_dispatch:
     inputs:
       forcar_tela:
@@ -542,3 +549,16 @@ jobs:
           fi
           git tag -f schema-dev-publicado "$GITHUB_SHA"
           git push -f origin refs/tags/schema-dev-publicado
+
+  # Corte dos acessos no DEV (plano 4): modo em packages/deploy/acessos/corte.json; só na develop e depois do dev verde.
+  acessos:
+    needs: dev
+    if: needs.dev.result == 'success' && github.ref == 'refs/heads/develop'
+    uses: ./.github/workflows/acessos-corte.yml
+    with:
+      ambiente: dev
+      environment: dev
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: read

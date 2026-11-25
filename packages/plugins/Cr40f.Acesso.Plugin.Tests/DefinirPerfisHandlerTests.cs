@@ -53,7 +53,8 @@ public sealed class DefinirPerfisHandlerTests
         return u.Id;
     }
 
-    private void Vincular(Guid usuario, string papel) => _svc.Com(new Entity("systemuserroles", Guid.NewGuid()) { ["systemuserid"] = usuario, ["roleid"] = _papeis[papel] });
+    private void Vincular(Guid usuario, string papel) => Vincular(usuario, _papeis[papel]);
+    private void Vincular(Guid usuario, Guid papel) => _svc.Com(new Entity("systemuserroles", Guid.NewGuid()) { ["systemuserid"] = usuario, ["roleid"] = papel });
     private string Executar(Guid chamador, Guid usuario, string? perfis) => new DefinirPerfisHandler(_svc).Executar(chamador, usuario, perfis);
     private bool Tem(Guid usuario, string papel) => PapeisDoUsuario.IdsDiretos(_svc, usuario).Contains(_papeis[papel]);
     private bool TemColuna(Guid usuario, string perfil) => PapeisDoUsuario.Ids(_svc, "systemuserprofiles", "systemuserid", usuario, "fieldsecurityprofileid").Contains(_colunas[perfil]);
@@ -318,5 +319,87 @@ public sealed class DefinirPerfisHandlerTests
 
         Assert.True(Tem(alvo, papelAdmin));
         Assert.DoesNotContain(_svc.Desassociados, d => d.Alvo == _papeis[papelAdmin]);
+    }
+
+    private const string FrotaGestor = "[{\"perfil\":\"frota\",\"nivel\":\"gestor\"}]";
+    private const string FrotaOperador = "[{\"perfil\":\"frota\",\"nivel\":\"operador\"}]";
+    private const string RhGestor = "[{\"perfil\":\"rh\",\"nivel\":\"gestor\"}]";
+    private readonly Dictionary<string, Guid> _copias = new();
+
+    private void UnidadeFrota(bool comCopias = true)
+    {
+        var frota = new Guid("00000000-0000-0000-0000-000000000090");
+        _svc.Com(new Entity("businessunit", frota)
+        {
+            ["name"] = "Frota",
+            ["parentbusinessunitid"] = new EntityReference("businessunit", _bu),
+            ["isdisabled"] = false,
+        });
+        if (!comCopias) return;
+        var n = 0x91;
+        foreach (var nivel in new[] { "operador", "gestor" })
+        {
+            var nome = AcessoCatalogo.NomeDoPapel("frota", nivel);
+            var copia = new Entity("role", new Guid($"00000000-0000-0000-0000-0000000000{n++:x2}"))
+            {
+                ["name"] = nome,
+                ["businessunitid"] = new EntityReference("businessunit", frota),
+                ["parentrootroleid"] = new EntityReference("role", _papeis[nome]),
+            };
+            _svc.Com(copia);
+            _copias[nome] = copia.Id;
+        }
+    }
+
+    [Fact]
+    public void Com_unidade_Frota_atribui_a_copia_e_nao_o_raiz()
+    {
+        UnidadeFrota();
+        var admin = Usuario(Admin); var alvo = Usuario();
+        Executar(admin, alvo, FrotaGestor);
+        var nome = AcessoCatalogo.NomeDoPapel("frota", "gestor");
+        Assert.Contains(_svc.Associados, a => a.Alvo == _copias[nome]);
+        Assert.DoesNotContain(_svc.Associados, a => a.Alvo == _papeis[nome]);
+    }
+
+    [Fact]
+    public void Com_unidade_Frota_o_papel_raiz_de_Frota_sai()
+    {
+        UnidadeFrota();
+        var nome = AcessoCatalogo.NomeDoPapel("frota", "gestor");
+        var admin = Usuario(Admin); var alvo = Usuario(nome);
+        Executar(admin, alvo, FrotaGestor);
+        Assert.Contains(_svc.Desassociados, d => d.Alvo == _papeis[nome]);
+        Assert.Contains(_svc.Associados, a => a.Alvo == _copias[nome]);
+    }
+
+    [Fact]
+    public void Retirar_Frota_tira_a_copia_e_o_historico_a_reconhece()
+    {
+        UnidadeFrota();
+        var nome = AcessoCatalogo.NomeDoPapel("frota", "operador");
+        var admin = Usuario(Admin); var alvo = Usuario();
+        Vincular(alvo, _copias[nome]);
+        Executar(admin, alvo, RhGestor);
+        Assert.Contains(_svc.Desassociados, d => d.Alvo == _copias[nome]);
+        Assert.Contains("frota", Historico().Single().GetAttributeValue<string>("cr40f_perfisantes"));
+    }
+
+    [Fact]
+    public void Copia_ausente_recusa_sem_associar_nada()
+    {
+        UnidadeFrota(comCopias: false);
+        var admin = Usuario(Admin); var alvo = Usuario();
+        Assert.Equal("PERFIL_INDISPONIVEL", Codigo(() => Executar(admin, alvo, FrotaOperador)));
+        Assert.Empty(_svc.Associados);
+    }
+
+    [Fact]
+    public void Com_unidade_Frota_outras_areas_seguem_no_raiz()
+    {
+        UnidadeFrota();
+        var admin = Usuario(Admin); var alvo = Usuario();
+        Executar(admin, alvo, RhGestor);
+        Assert.Contains(_svc.Associados, a => a.Alvo == _papeis[AcessoCatalogo.NomeDoPapel("rh", "gestor")]);
     }
 }
