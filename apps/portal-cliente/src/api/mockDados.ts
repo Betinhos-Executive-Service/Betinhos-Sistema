@@ -124,6 +124,25 @@ const PLANO_PEDIDOS: { status: StatusPedido; dias: number }[] = [
 
 export type PedidoMock = Pedido & { solicitante: string }
 
+export const SOLICITANTE_PENDENTE = 'carlos.mendes@latasa.com.br'
+/** Aprovador de mentira da Latasa (no real, `cr40f_validadorcliente.cr40f_aprovador`). */
+export const APROVADORES_MOCK = ['gestor@latasa.com.br']
+
+/** Pedidos de `SOLICITANTE_PENDENTE`: dois esperando o aprovador e um já recusado (cancelado com o motivo). */
+export function gerarPedidosPendentes(agora: Date): PedidoMock[] {
+  const em = (dias: number, hora: number) => {
+    const d = new Date(agora.getTime() + dias * DIA_MS)
+    d.setUTCHours(hora, 0, 0, 0)
+    return d.toISOString()
+  }
+  const base = { solicitante: SOLICITANTE_PENDENTE, criadoEm: new Date(agora.getTime() - 3600_000).toISOString() }
+  return [
+    { ...base, id: 'ped-apr-1', numero: 'RV-48350', origem: 'Latasa Reciclagem, Pindamonhangaba', destino: 'Aeroporto de Guarulhos (GRU)', saida: em(2, 11), status: 'solicitado', aprovacao: 'pendente', passageiros: ['Carla Menezes'], pessoas: [PESSOAS_LATASA[0]], tipoVeiculo: 202410001, observacao: 'Voo LA3421, chega às 14h10.' },
+    { ...base, id: 'ped-apr-2', numero: 'RV-48351', origem: 'Av. Faria Lima, 3000, São Paulo', destino: 'Latasa Reciclagem, Pindamonhangaba', saida: em(4, 12), status: 'solicitado', aprovacao: 'pendente', passageiros: ['Rafael Duarte', 'Juliana Prado'], pessoas: [PESSOAS_LATASA[1], PESSOAS_LATASA[3]] },
+    { ...base, id: 'ped-apr-3', numero: 'RV-48352', origem: 'Latasa Reciclagem, Pindamonhangaba', destino: 'Hotel Mercure, São José dos Campos', saida: em(1, 15), status: 'cancelado', aprovacao: 'recusado', motivoRecusa: 'Reunião adiada; peça de novo quando a data estiver definida.', passageiros: ['Hiroshi Tanaka'], pessoas: [PESSOAS_LATASA[2]] },
+  ]
+}
+
 /** Pedidos da Latasa feitos por `SOLICITANTE_LATASA` (outro e-mail do domínio começa sem pedidos). */
 export function gerarPedidos(agora: Date): PedidoMock[] {
   return PLANO_PEDIDOS.map(({ status, dias }, i) => {

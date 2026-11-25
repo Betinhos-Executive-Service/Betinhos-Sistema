@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Checkbox, Dialog, Drawer, Field, Input, Radio, Sheet, Switch, Textarea, useToast } from '@betinhos/ui'
 import { ImagePlus, Trash2, UserPlus } from 'lucide-react'
 import type { Source } from '../data/source'
-import { MODULOS, configIgual, formDaConfig, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
+import { MODULOS, configIgual, formDaConfig, semAprovador, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
 import { validarValidador } from '../domain/regras'
 import type { Cliente, ModuloPortal, PortalConfig, Validador } from '../domain/types'
 import { PrevisaoMarca } from './PrevisaoMarca'
@@ -16,7 +16,7 @@ type Props = {
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
-const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', logo: null, logoMudou: false }
+const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', exigeAprovacao: false, logo: null, logoMudou: false }
 const inicial = (config: PortalConfig | null, logo: string | null = null) => (config ? formDaConfig(config, logo) : { ...NOVA, logo })
 const lerArquivo = (arquivo: File) => new Promise<string>((ok, falha) => {
   const leitor = new FileReader()
@@ -101,7 +101,7 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
     setLiberando(true)
     try {
       const id = await source.criarValidador({ ...novo, clienteId: cliente.id })
-      onValidadorSaved({ id, nome: novo.nome.trim(), email: novo.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null })
+      onValidadorSaved({ id, nome: novo.nome.trim(), email: novo.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null, aprovador: false })
       toast({ tone: 'success', message: `${novo.email.trim().toLowerCase()} liberado. No primeiro acesso, a pessoa cria a senha pelo código enviado ao e-mail.` })
       setNovo({ nome: '', email: '' })
     } catch (reason) {
@@ -123,6 +123,10 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
         <ChoiceGroup label="Módulos" error={mostrarErros ? erros.modulos : undefined}>
           {MODULOS.map((m) => <Checkbox key={m.value} label={m.label} description={m.description} checked={form.modulos.includes(m.value)} disabled={salvando} onChange={() => toggleModulo(m.value)} />)}
         </ChoiceGroup>
+      </section>
+      <section className="vc-secao">
+        <Switch label="Pedidos precisam de aprovação" description="O pedido só chega à Betinhos depois que um aprovador do cliente aprova no portal. Marque os aprovadores em E-mails liberados." checked={form.exigeAprovacao} disabled={salvando} onChange={(e) => set({ exigeAprovacao: e.target.checked })} />
+        {semAprovador(form, doCliente) ? <Alert tone="warning" title="Nenhum aprovador ativo">Sem aprovador, os pedidos entram direto, sem aprovação. Marque ao menos um usuário como Aprovador em E-mails liberados.</Alert> : null}
       </section>
       <section className="vc-secao" aria-labelledby="vc-identidade-titulo">
         <h3 id="vc-identidade-titulo" className="vc-secao__titulo">Identidade no portal</h3>
@@ -149,7 +153,7 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
         <p className="vc-muted">Estas ações salvam na hora, sem precisar do Salvar.</p>
         {doCliente.length ? (
           <ul className="vc-val-lista">
-            {doCliente.map((v) => <UsuarioItem key={v.id} v={v} mostrarCliente={false} ocupado={acoes.ocupado === v.id} onAlternar={(x) => void acoes.alternar(x)} onZerar={acoes.pedirZerar} />)}
+            {doCliente.map((v) => <UsuarioItem key={v.id} v={v} mostrarCliente={false} ocupado={acoes.ocupado === v.id} onAlternar={(x) => void acoes.alternar(x)} onAprovador={(x) => void acoes.alternarAprovador(x)} onZerar={acoes.pedirZerar} />)}
           </ul>
         ) : <p className="vc-muted">Nenhum e-mail liberado para este cliente.</p>}
         <Field label="Nome" error={errosNovo.nome}><Input name="novo-nome" value={novo.nome} disabled={liberando} onChange={(e) => setNovo((n) => ({ ...n, nome: e.target.value }))} /></Field>

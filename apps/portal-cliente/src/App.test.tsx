@@ -232,6 +232,30 @@ describe('Portal do cliente', () => {
     /** `datetime-local` de amanhã às 09:00 (sem fuso). */
     const amanha = () => `${new Date(T0 + 86400_000).toISOString().slice(0, 10)}T09:00`
 
+    it('aprovador vê a aba Para aprovar, recusa com motivo e o pedido sai da lista', async () => {
+      abrir()
+      await entrarCompleto('gestor@latasa.com.br')
+      fireEvent.click(await screen.findByRole('radio', { name: 'Para aprovar' }))
+      fireEvent.click(await screen.findByText('RV-48350'))
+      fireEvent.click(await screen.findByRole('button', { name: 'Recusar' }))
+      const motivo = await screen.findByRole('textbox', { name: 'Motivo da recusa' })
+      const botao = screen.getByRole('button', { name: 'Recusar pedido' }) as HTMLButtonElement
+      expect(botao.disabled).toBe(true)
+      fireEvent.change(motivo, { target: { value: 'Fora da política de viagens.' } })
+      await waitFor(() => expect(botao.disabled).toBe(false))
+      fireEvent.click(botao)
+      await waitFor(() => expect(screen.queryByText('RV-48350')).toBeNull())
+      expect(screen.getByText('RV-48351')).toBeTruthy()
+    })
+
+    it('quem pede e depende de aprovação vê Aguardando aprovação em Meus serviços', async () => {
+      abrir()
+      await entrarCompleto('carlos.mendes@latasa.com.br')
+      fireEvent.click(await screen.findByRole('radio', { name: 'Meus serviços' }))
+      expect((await screen.findAllByText('Aguardando aprovação')).length).toBeGreaterThan(0)
+      expect(screen.queryByRole('radio', { name: 'Para aprovar' })).toBeNull()
+    })
+
     it('entra pelo domínio e vê só Pedir e Meus serviços', async () => {
       abrir()
       await entrarCompleto(LATASA)

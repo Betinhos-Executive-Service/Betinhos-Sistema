@@ -47,7 +47,7 @@ export type Servico = {
 /** Módulos do portal habilitados por cliente (`cr40f_clientes1.cr40f_portalmodulos`). */
 export type Modulo = 'validar' | 'pedir' | 'meus_servicos'
 
-export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[]; marca?: Marca }
+export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[]; marca?: Marca; /** Aprova os pedidos do cliente (aba "Para aprovar"). */ aprovador?: boolean }
 
 /** `cr40f_status` da reserva visto pelo solicitante. */
 export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'
@@ -88,4 +88,15 @@ export type Pedido = Omit<NovoPedido, 'passageiros'> & {
   motorista?: string
   placa?: string
   voucherUrl?: string
+  /** Aprovação do cliente: só nos clientes que exigem. Pendente = ainda não chegou à operação. */
+  aprovacao?: AprovacaoPedido
+  /** Motivo informado por quem recusou (pedido recusado vira cancelado). */
+  motivoRecusa?: string
 }
+
+export type AprovacaoPedido = 'pendente' | 'aprovado' | 'recusado'
+
+/** Pedido de outro usuário esperando a decisão do aprovador (aba "Para aprovar"). */
+export type PedidoParaAprovar = Pick<Pedido, 'id' | 'numero' | 'saida' | 'origem' | 'destino' | 'passageiros' | 'criadoEm' | 'observacao' | 'tipoVeiculo'> & { solicitante: string }
+
+export type DecisaoAprovacao = { decisao: 'aprovar' | 'recusar'; motivo?: string }

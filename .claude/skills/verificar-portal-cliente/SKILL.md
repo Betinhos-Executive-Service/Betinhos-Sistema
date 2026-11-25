@@ -49,3 +49,9 @@ description: "Verifica o portal do cliente (apps/portal-cliente, React multi-cli
 
 ## Fora do alcance
 - Worker (`verificar-portal-worker`), tabelas (`provision-portal-cliente.ps1`), flow de e-mails e a tela `#/validacao-cliente` do shell têm skills próprias. A criação real da reserva pelo pedido só é verificável no DEV, depois do merge e do provision.
+
+## Avisos e aprovação (25/11/2026)
+- Sessão com `aprovador` mostra a aba "Para aprovar" (`telas/ParaAprovar.tsx`, `AbaPortal` em `domain/pedidos.ts`); `GET /aprovacoes` e `POST /aprovacoes/:id` (`{decisao, motivo?}`). Recusar exige motivo de 5 a 500 caracteres; com motivo digitado, fechar o diálogo pergunta "Descartar alterações?"; durante o envio nada fecha.
+- Pedido com `aprovacao: 'pendente'` e Solicitado aparece como "Aguardando aprovação" (`situacaoDoPedido`) na lista e no detalhe, com a etapa na linha do tempo; pode cancelar. Recusado vira Cancelado e mostra o motivo no detalhe.
+- Mock: `gestor@latasa.com.br` é aprovador; `carlos.mendes@latasa.com.br` tem 2 pedidos pendentes e 1 recusado (seed) e cada pedido novo dele nasce pendente. Os outros e-mails da Latasa não mudam.
+- Teste: `cd apps/portal-cliente && pnpm exec vitest run --maxWorkers=2 src` e `pnpm exec tsc --noEmit`.

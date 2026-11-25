@@ -1,7 +1,15 @@
 import type { StatusTone } from '@betinhos/ui'
-import type { EnderecoSugerido, Modulo, NovoPedido, PassageiroPedido, StatusPedido } from './types'
+import type { EnderecoSugerido, Modulo, NovoPedido, Pedido, PassageiroPedido, StatusPedido } from './types'
 
 export const MODULO_LABEL: Record<Modulo, string> = { validar: 'Validar', pedir: 'Pedir serviço', meus_servicos: 'Meus serviços' }
+
+/** Abas do cabeçalho: os módulos do cliente mais "Para aprovar", que só o aprovador vê. */
+export type AbaPortal = Modulo | 'aprovar'
+export const ABA_LABEL: Record<AbaPortal, string> = { ...MODULO_LABEL, aprovar: 'Para aprovar' }
+
+/** Motivo mínimo de uma recusa (o Worker confere o mesmo limite). */
+export const MOTIVO_RECUSA_MIN = 5
+export const MOTIVO_RECUSA_MAX = 500
 
 export const MAX_PASSAGEIROS = 4
 /** Nome de passageiro e endereço: cabem em `cr40f_portalpedido` (memo de 4000) junto com a observação. */
@@ -127,6 +135,12 @@ const STATUS: Record<StatusPedido, { rotulo: string; tom: StatusTone }> = {
   cancelado: { rotulo: 'Cancelado', tom: 'danger' },
 }
 export const statusPedidoInfo = (s: StatusPedido) => STATUS[s]
+
+/** Pedido esperando o aprovador do cliente: ainda não chegou à operação. */
+export const aguardandoAprovacao = (p: Pick<Pedido, 'status' | 'aprovacao'>) => p.status === 'solicitado' && p.aprovacao === 'pendente'
+/** Situação mostrada ao solicitante: "Aguardando aprovação" no lugar de Solicitado enquanto o aprovador não decide. */
+export const situacaoDoPedido = (p: Pick<Pedido, 'status' | 'aprovacao'>): { rotulo: string; tom: StatusTone } =>
+  aguardandoAprovacao(p) ? { rotulo: 'Aguardando aprovação', tom: 'warning' } : STATUS[p.status]
 
 /** `paula.ribeiro@latasa.com.br` → `Paula Ribeiro`: nome de quem entra pelo domínio, sem cadastro prévio. */
 export function nomeDoEmail(email: string): string {

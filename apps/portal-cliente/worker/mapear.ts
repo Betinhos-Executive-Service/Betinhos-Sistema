@@ -1,11 +1,11 @@
 // Registro do Dataverse (validação + reserva + composição + mensagens) → Servico do portal.
 import type { Mensagem, Modulo, Motivo, PassageiroPedido, Pedido, Servico, Status, StatusPedido } from '../src/domain/types'
-import { COMPOSICAO_LINHAS, LADO_DV, MODULO_DV, MOTIVO_DV, NAV, PEDIDO_STATUS, STATUS_DV } from './schema'
+import { APROVACAO, COMPOSICAO_LINHAS, LADO_DV, MODULO_DV, MOTIVO_DV, NAV, PEDIDO_STATUS, STATUS_DV } from './schema'
 
 export type Registro = Record<string, unknown>
 
 const FV = '@OData.Community.Display.V1.FormattedValue'
-const str = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'string' ? (r[campo] as string) : '')
+export const str = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'string' ? (r[campo] as string) : '')
 const num = (r: Registro | undefined, campo: string) => (typeof r?.[campo] === 'number' ? (r[campo] as number) : undefined)
 const rotulo = (r: Registro | undefined, lookup: string) => str(r, `${lookup}${FV}`)
 const veiculoDe = (r: Registro | undefined) => rotulo(r, 'cr40f_tipodeveiculo')
@@ -95,6 +95,14 @@ export function pessoasDoPedido(r: Registro): PassageiroPedido[] {
   })
 }
 
+/** Situação da aprovação do cliente e, na recusa, o motivo. Pedido sem aprovação (cliente sem o recurso) não leva nada. */
+function aprovacaoDe(r: Registro): Pick<Pedido, 'aprovacao' | 'motivoRecusa'> {
+  const v = num(r, 'cr40f_portalaprovacao')
+  const aprovacao = v === APROVACAO.pendente ? 'pendente' : v === APROVACAO.aprovado ? 'aprovado' : v === APROVACAO.recusado ? 'recusado' : undefined
+  const motivo = str(r, 'cr40f_portalmotivorecusa')
+  return { ...(aprovacao ? { aprovacao } : {}), ...(aprovacao === 'recusado' && motivo ? { motivoRecusa: motivo } : {}) }
+}
+
 /** Reserva → pedido visto por `usuarioId`. Voucher, veículo, motorista e placa só depois de programado. */
 export function mapearPedido(r: Registro, usuarioId: string): Pedido {
   const status = PEDIDO_STATUS[num(r, 'cr40f_status') ?? -1] ?? 'em_analise'
@@ -122,6 +130,7 @@ export function mapearPedido(r: Registro, usuarioId: string): Pedido {
     ...(str(r, '_cr40f_portalusuario_value').toLowerCase() !== usuarioId.toLowerCase() ? { comoPassageiro: true } : {}),
     ...(tipoVeiculo !== undefined ? { tipoVeiculo } : {}),
     ...(portal.observacao ? { observacao: portal.observacao } : {}),
+    ...aprovacaoDe(r),
     ...(programado && veiculo ? { veiculo } : {}),
     ...(programado && motorista ? { motorista } : {}),
     ...(programado && placa ? { placa } : {}),

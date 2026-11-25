@@ -1,5 +1,5 @@
 import type { Marca } from '../domain/marca'
-import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { DecisaoAprovacao, EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, PedidoParaAprovar, Servico, Sessao } from '../domain/types'
 
 export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
@@ -9,6 +9,9 @@ export class ErroPortal extends Error {
     this.name = 'ErroPortal'
   }
 }
+
+/** Texto do erro para o usuário: a mensagem do Worker quando ela diz algo, senão o padrão da tela. */
+export const mensagemDoErro = (e: unknown, padrao: string) => (e instanceof ErroPortal && e.message !== e.codigo ? e.message : padrao)
 
 /** Regra da senha, usada pela tela, pelo mock e pelo Worker. */
 export const SENHA_MIN = 8
@@ -50,4 +53,8 @@ export interface PortalApi {
   meusServicos(): Promise<Pedido[]>
   /** Cancela um pedido do próprio usuário ainda em Solicitado; senão `nao_permitido` com a mensagem para a tela. */
   cancelarPedido(id: string): Promise<Pedido>
+  /** Aprovador: pedidos do cliente esperando decisão, exceto os próprios. Quem não é aprovador recebe `nao_permitido`. */
+  aprovacoes(): Promise<PedidoParaAprovar[]>
+  /** Aprovador: aprova (o pedido segue para a Betinhos) ou recusa com motivo (o pedido é cancelado). `nao_permitido` traz a mensagem para a tela. */
+  decidirAprovacao(id: string, decisao: DecisaoAprovacao): Promise<void>
 }

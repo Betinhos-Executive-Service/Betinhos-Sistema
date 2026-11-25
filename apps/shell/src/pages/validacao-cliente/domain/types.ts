@@ -65,6 +65,8 @@ export type Validador = {
   ultimoAcesso: string | null
   /** Vazio = ainda não criou a senha no portal (ou a senha foi zerada). */
   senhaDefinidaEm: string | null
+  /** `cr40f_aprovador`: aprova os pedidos dos colegas quando o cliente exige aprovação. */
+  aprovador: boolean
 }
 
 export type NovoValidador = { nome: string; email: string; clienteId: string }
@@ -79,5 +81,7 @@ export type PortalConfig = {
   modulos: ModuloPortal[]
   /** Vazio = só e-mails cadastrados. */
   dominios: string[]
+  /** `cr40f_portalexigeaprovacao`: o pedido só chega à Betinhos depois que um aprovador do cliente aprova. */
+  exigeAprovacao: boolean
   /** O logo do cliente no portal (`cr40f_portallogo`) é lido à parte. */
 }

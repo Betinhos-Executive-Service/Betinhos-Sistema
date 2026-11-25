@@ -19,3 +19,7 @@ description: "Verifica o flow HTTP 'Portal cliente – e-mails' (código de aces
 
 ## Evidência
 - Saída do `node --test` (pass/fail), screenshots 700/375 px dos três e-mails, saída do dry run.
+
+## Tipos de aviso e aprovação (25/11/2026)
+- Cinco casos novos no Switch: `Confirmado`, `AprovacaoPendente`, `AprovacaoLembrete`, `AprovacaoResultado` e `AvisoOperacao`, com modelos HTML em `packages/deploy/flows/portal-cliente-emails/`. `AvisoOperacao` vai com `para: []` e o flow envia à caixa compartilhada (`__CAIXA_COMPARTILHADA__`); para inválido ainda responde 400.
+- Teste: `node --test packages/deploy/flows/portal-cliente-emails.test.mjs` (19 testes); com `PORTAL_EMAILS_EXEMPLOS=<pasta>` grava o HTML de exemplo de cada modelo. O flow existente publica pelo Deploy; o e-mail real não foi enviado.

@@ -211,4 +211,34 @@ describe('mockApi multi-cliente', () => {
     const { api } = await latasa('paula.ribeiro@latasa.com.br')
     expect(await api.meusServicos()).toEqual([])
   })
+
+  describe('aprovação', () => {
+    const SOLICITANTE = 'carlos.mendes@latasa.com.br'
+    const APROVADOR = 'gestor@latasa.com.br'
+    const novo = { passageiros: [{ nome: 'Ana Lima', email: 'ana@exemplo.com.br' }], origem: 'A', destino: 'B', saida: '2026-10-30T10:00:00Z' }
+
+    it('só o aprovador tem a sessão marcada e vê a lista, sem os próprios pedidos', async () => {
+      expect((await (await latasa(APROVADOR)).api.sessao())?.aprovador).toBe(true)
+      expect((await (await latasa(SOLICITANTE)).api.sessao())?.aprovador).toBeUndefined()
+      const lista = await (await latasa(APROVADOR)).api.aprovacoes()
+      expect(lista.map((p) => p.numero)).toEqual(['RV-48350', 'RV-48351'])
+      await expect((await latasa(SOLICITANTE)).api.aprovacoes()).rejects.toBeInstanceOf(ErroPortal)
+    })
+
+    it('pedido de quem precisa de aprovação nasce pendente; o do aprovador não', async () => {
+      const { api } = await latasa(SOLICITANTE)
+      expect((await api.pedir(novo)).aprovacao).toBe('pendente')
+      const outro = await latasa(APROVADOR)
+      expect((await outro.api.pedir(novo)).aprovacao).toBeUndefined()
+    })
+
+    it('aprovar tira da lista; recusar exige motivo e cancela com ele', async () => {
+      const { api } = await latasa(APROVADOR)
+      await api.decidirAprovacao('ped-apr-1', { decisao: 'aprovar' })
+      await expect(api.decidirAprovacao('ped-apr-2', { decisao: 'recusar', motivo: 'não' })).rejects.toBeInstanceOf(ErroPortal)
+      await api.decidirAprovacao('ped-apr-2', { decisao: 'recusar', motivo: 'Fora da política de viagens.' })
+      expect(await api.aprovacoes()).toEqual([])
+      await expect(api.decidirAprovacao('ped-apr-1', { decisao: 'aprovar' })).rejects.toBeInstanceOf(ErroPortal)
+    })
+  })
 })

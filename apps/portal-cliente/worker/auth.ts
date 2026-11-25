@@ -4,6 +4,7 @@
 // libera a etapa "criar senha". 5 erros (senha ou código) no mesmo e-mail bloqueiam por 15 min.
 // A sessão (cookie de 30 dias) é conferida no Dataverse a cada chamada: desativar o usuário, tirar o portal ou trocar a
 // senha derruba as sessões abertas.
+import { usuarioEhAprovador } from './aprovacao'
 import { REENVIO_S, SENHA_MIN, senhaFraca } from '../src/api/PortalApi'
 import { dominioDe, nomeDoEmail } from '../src/domain/pedidos'
 import { conferirSenha, HASH_FALSO, hashSenha, iguais, novoCodigo, sha256Hex } from './cripto'
@@ -106,10 +107,10 @@ async function respostaSessao(c: Ctx, v: Registro, senhaHash: string): Promise<R
   const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
   headers.append('Set-Cookie', setCookie(COOKIE.sessao, await selar(c.env, 'sessao', sessao), SESSAO_S))
   headers.append('Set-Cookie', apagarCookie(COOKIE.etapa))
-  return new Response(JSON.stringify(publica(sessao, await marcaDaSessao(c.dv, sessao.cid))), { status: 200, headers })
+  return new Response(JSON.stringify(publica(sessao, await marcaDaSessao(c.dv, sessao.cid), await usuarioEhAprovador(c.dv, sessao.vid))), { status: 200, headers })
 }
 
-const publica = (s: Sessao, marca: Marca | null) => ({ nome: s.nome, email: s.email, cliente: s.cliente, modulos: s.modulos, ...(marca ? { marca } : {}) })
+const publica = (s: Sessao, marca: Marca | null, aprovador = false) => ({ nome: s.nome, email: s.email, cliente: s.cliente, modulos: s.modulos, ...(marca ? { marca } : {}), ...(aprovador ? { aprovador } : {}) })
 
 /** O "Zerar senha" do shell limpa só a data (a coluna do hash tem segurança de coluna e só o Worker a grava). */
 function hashVigente(v: Registro): string {
@@ -218,7 +219,7 @@ export async function sessaoAtual(req: Request, c: Ctx): Promise<Sessao | null> 
 /** `GET /auth/sessao`: o app abre já logado enquanto o cookie valer. */
 export async function lerSessao(req: Request, c: Ctx): Promise<Response> {
   const s = await sessaoAtual(req, c)
-  return s ? json(publica(s, await marcaDaSessao(c.dv, s.cid))) : erro(401, 'nao_permitido')
+  return s ? json(publica(s, await marcaDaSessao(c.dv, s.cid), await usuarioEhAprovador(c.dv, s.vid))) : erro(401, 'nao_permitido')
 }
 
 export type { Ctx }

@@ -1,4 +1,4 @@
-import type { ModuloPortal, PortalConfig } from './types'
+import type { ModuloPortal, PortalConfig, Validador } from './types'
 
 /** Valores da choice múltipla `cr40f_portalmodulos` (mesmos de `apps/portal-cliente/worker/schema.ts`). */
 export const MODULO_VALOR: Record<ModuloPortal, number> = { validar: 100000000, pedir: 100000001, meus_servicos: 100000002 }
@@ -52,14 +52,14 @@ export function validarLogo(arquivo: { type: string; size: number }): string | n
 }
 
 export type ConfigForm = {
-  ligado: boolean; modulos: ModuloPortal[]; restringir: boolean; dominiosTexto: string
+  ligado: boolean; modulos: ModuloPortal[]; restringir: boolean; dominiosTexto: string; exigeAprovacao: boolean
   /** Logo escolhido, como data URL; `null` = sem logo. Só vai ao Dataverse quando `logoMudou`. */
   logo: string | null; logoMudou: boolean
 }
 export type ConfigErros = Partial<Record<'modulos' | 'dominios', string>>
 
 export const formDaConfig = (c: PortalConfig, logo: string | null = null): ConfigForm => ({
-  ligado: c.ligado, modulos: c.modulos, restringir: c.dominios.length > 0, dominiosTexto: c.dominios.join('; '),
+  ligado: c.ligado, modulos: c.modulos, restringir: c.dominios.length > 0, dominiosTexto: c.dominios.join('; '), exigeAprovacao: c.exigeAprovacao,
   logo, logoMudou: false,
 })
 
@@ -88,9 +88,13 @@ export function validarConfig(f: ConfigForm, clienteId: string, outros: PortalCo
   return { erros, avisos }
 }
 
+/** Aprovação ligada num portal que pede serviço e nenhum aprovador ativo: o pedido entra direto, sem aprovação. */
+export const semAprovador = (f: Pick<ConfigForm, 'ligado' | 'exigeAprovacao' | 'modulos'>, validadores: Pick<Validador, 'ativo' | 'aprovador'>[]) =>
+  f.ligado && f.exigeAprovacao && f.modulos.includes('pedir') && !validadores.some((v) => v.ativo && v.aprovador)
+
 export const quemEntra = (dominios: string[]) => (dominios.length ? `Cadastrados + ${dominios.map((d) => `@${d}`).join(', ')}` : 'Só cadastrados')
 
 export const configIgual = (a: ConfigForm, b: ConfigForm) =>
-  a.ligado === b.ligado && a.restringir === b.restringir && a.dominiosTexto.trim() === b.dominiosTexto.trim()
+  a.ligado === b.ligado && a.exigeAprovacao === b.exigeAprovacao && a.restringir === b.restringir && a.dominiosTexto.trim() === b.dominiosTexto.trim()
   && a.logo === b.logo
   && MODULOS.every((m) => a.modulos.includes(m.value) === b.modulos.includes(m.value))

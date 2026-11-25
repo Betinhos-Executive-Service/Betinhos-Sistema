@@ -14,7 +14,9 @@
     { "name": "RL_EMAIL", "namespace_id": "4203", "simple": { "limit": 10, "period": 60 } }
   ],
   // 11:00 UTC = 8h em America/Sao_Paulo, seg–sex: aprovação tácita + resumo diário.
-  "triggers": { "crons": ["0 11 * * 1-5"] },
+  "triggers": { "crons": ["0 11 * * 1-5", "*/10 * * * *"] },
+  // Logs e traces do Workers: o cron de avisos e as rotas de aprovação só se auditam por aqui.
+  "observability": { "enabled": true, "traces": { "enabled": true } },
   // Link do portal nos e-mails (vars não herdam no env).
   "vars": { "PORTAL_URL": "https://cliente.betinhos.com.br/" },
   // DEV (piloto, Dataverse DEV): `wrangler deploy --env dev` publica o Worker portal-cliente-dev.

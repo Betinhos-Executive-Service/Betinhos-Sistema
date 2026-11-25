@@ -1,6 +1,6 @@
 // Montagem das consultas OData. Toda consulta de serviço leva o cliente da sessão no $filter:
 // o isolamento entre clientes é aqui, não na tela.
-import { CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
+import { APROVACAO, RESERVA_CONFIRMADO, RESERVA_SOLICITADO, CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -117,3 +117,33 @@ export const criarPessoa = () => `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(','
 
 /** Caminho do POST da reserva: o `$select` define o que volta no `return=representation`. */
 export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}`
+
+// Aprovação e avisos (migration 20261125-1800-portal-avisos-aprovacao.ps1). Leituras isoladas das de login e Meus serviços.
+
+/** O cliente exige aprovação? Lido à parte: se a coluna ainda não existir, o chamador trata como "não". */
+export const clienteExigeAprovacao = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=cr40f_portalexigeaprovacao`
+
+/** O usuário é aprovador? Idem. */
+export const usuarioAprovador = (validadorId: string) => `${SET.validador}(${guid(validadorId)})?$select=cr40f_aprovador`
+
+/** Aprovadores ativos do cliente. */
+export const aprovadoresDoCliente = (clienteId: string) =>
+  `${SET.validador}?$select=cr40f_validadorclienteid,cr40f_name,cr40f_email&$filter=${encodeURIComponent(`${doCliente(clienteId)} and cr40f_ativo eq true and cr40f_aprovador eq true`)}`
+
+const expandSolicitante = `${NAV.portalUsuario}($select=cr40f_name,cr40f_email)`
+const camposAprovacao = [...PEDIDO_CAMPOS, 'cr40f_observaointerna', '_cr40f_cliente_value'].join(',')
+const comPassageiros = `$expand=${expandPassageiros},${expandSolicitante}`
+
+/** Pedidos pendentes de um cliente (aba "Para aprovar") ou, sem cliente, de todos (cron de lembrete e aviso à operação). */
+export const pendentesDeAprovacao = (clienteId?: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$orderby=cr40f_dataehorriodesada asc&$top=200` +
+  `&$filter=${encodeURIComponent(`cr40f_portalaprovacao eq ${APROVACAO.pendente} and cr40f_status eq ${RESERVA_SOLICITADO}${clienteId ? ` and ${doCliente(clienteId)}` : ''}`)}`
+
+/** Um pedido com aprovação, do cliente da sessão, para decidir (o chamador confere pendência e autoria). */
+export const pedidoParaDecidir = (id: string, clienteId: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$filter=${encodeURIComponent(`cr40f_reservadeveculosid eq ${guid(id)} and ${doCliente(clienteId)} and cr40f_portalaprovacao ne null`)}`
+
+/** Pedidos do portal confirmados pela operação desde `desdeIso` (o cron avisa uma vez por pedido). */
+export const confirmadosDesde = (desdeIso: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$top=200` +
+  `&$filter=${encodeURIComponent(`cr40f_status eq ${RESERVA_CONFIRMADO} and _cr40f_portalusuario_value ne null and modifiedon ge ${desdeIso}`)}`

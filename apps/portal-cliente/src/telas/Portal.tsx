@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Modulo, Pedido, Sessao } from '../domain/types'
+import type { AbaPortal } from '../domain/pedidos'
 import { MeusServicos } from './MeusServicos'
+import { ParaAprovar } from './ParaAprovar'
 import { Pedir } from './Pedir'
 import { Servicos } from './Servicos'
 import { Topo } from './Topo'
@@ -12,7 +14,8 @@ import { Topo } from './Topo'
  */
 export function Portal({ sessao, onSair }: { sessao: Sessao; onSair: () => void }) {
   const { modulos } = sessao
-  const [ativo, setAtivo] = useState<Modulo>(modulos[0])
+  const abas: AbaPortal[] = sessao.aprovador ? [...modulos, 'aprovar'] : modulos
+  const [ativo, setAtivo] = useState<AbaPortal>(modulos[0])
   const [versao, setVersao] = useState(0)
   const [modelo, setModelo] = useState<Pedido | null>(null)
   const [repeticoes, setRepeticoes] = useState(0)
@@ -29,7 +32,8 @@ export function Portal({ sessao, onSair }: { sessao: Sessao; onSair: () => void 
   }
   return (
     <div className="pc-pagina">
-      <Topo sessao={sessao} onSair={onSair} ativo={ativo} onModulo={setAtivo} />
+      <Topo sessao={sessao} onSair={onSair} abas={abas} ativo={ativo} onAba={setAtivo} />
+      {sessao.aprovador && <div hidden={ativo !== 'aprovar'}><ParaAprovar /></div>}
       {tem('validar') && <div hidden={ativo !== 'validar'}><Servicos sessao={sessao} /></div>}
       {tem('pedir') && <div key={`pedir-${versao}-${repeticoes}`} hidden={ativo !== 'pedir'}><Pedir onPedido={pedido} modelo={modelo} onRepetirAnterior={tem('meus_servicos') ? () => setAtivo('meus_servicos') : undefined} /></div>}
       {tem('meus_servicos') && <div key={`meus-${versao}`} hidden={ativo !== 'meus_servicos'}><MeusServicos onPedir={tem('pedir') ? () => setAtivo('pedir') : undefined} onRepetir={tem('pedir') ? repetir : undefined} /></div>}

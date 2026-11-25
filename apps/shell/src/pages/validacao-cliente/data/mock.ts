@@ -10,10 +10,10 @@ export const EMBRAER: Cliente = { id: 'c1000000-0000-4000-8000-000000000003', no
 /** Clientes cadastrados que ainda não têm nada do portal configurado. */
 const SEM_PORTAL: Cliente[] = ['Latasa', 'Kenvue', 'Embraco', 'Whirlpool', 'Johnson & Johnson', 'Petrobras', 'Vale', 'Votorantim'].map((nome, i) => ({ id: `c1000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`, nome }))
 export const createMockConfigs = (): PortalConfig[] => [
-  { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [] },
-  { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'] },
-  { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [] },
-  ...SEM_PORTAL.map((cliente): PortalConfig => ({ cliente, ligado: false, modulos: [], dominios: [] })),
+  { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [], exigeAprovacao: true },
+  { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'], exigeAprovacao: false },
+  { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [], exigeAprovacao: false },
+  ...SEM_PORTAL.map((cliente): PortalConfig => ({ cliente, ligado: false, modulos: [], dominios: [], exigeAprovacao: false })),
 ]
 
 const composicao = (hora: number, espera = 0, pedagio = 0, estacionamento = 0): ItemComposicao[] =>
@@ -92,8 +92,8 @@ export function createMockLinhas(mensagens: Mensagem[]): Linha[] {
 }
 
 export const createMockValidadores = (): Validador[] => [
-  { id: id('e1000000', 1), nome: 'Carla Menezes', email: 'carla.menezes@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: '2026-10-27T12:40:00Z', senhaDefinidaEm: '2026-10-02T12:00:00Z' },
-  { id: id('e1000000', 2), nome: 'Roberto Lima', email: 'roberto.lima@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null },
-  { id: id('e1000000', 3), nome: 'Ana Souza', email: 'ana.souza@tenaris.com', cliente: TENARIS, ativo: false, ultimoAcesso: '2026-09-15T12:00:00Z', senhaDefinidaEm: '2026-09-01T12:00:00Z' },
-  { id: id('e1000000', 4), nome: 'Marcos Ternium', email: 'marcos@ternium.com', cliente: TERNIUM, ativo: true, ultimoAcesso: '2026-10-21T13:00:00Z', senhaDefinidaEm: '2026-10-01T12:00:00Z' },
+  { id: id('e1000000', 1), nome: 'Carla Menezes', email: 'carla.menezes@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: '2026-10-27T12:40:00Z', senhaDefinidaEm: '2026-10-02T12:00:00Z', aprovador: true },
+  { id: id('e1000000', 2), nome: 'Roberto Lima', email: 'roberto.lima@tenaris.com', cliente: TENARIS, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null, aprovador: false },
+  { id: id('e1000000', 3), nome: 'Ana Souza', email: 'ana.souza@tenaris.com', cliente: TENARIS, ativo: false, ultimoAcesso: '2026-09-15T12:00:00Z', senhaDefinidaEm: '2026-09-01T12:00:00Z', aprovador: false },
+  { id: id('e1000000', 4), nome: 'Marcos Ternium', email: 'marcos@ternium.com', cliente: TERNIUM, ativo: true, ultimoAcesso: '2026-10-21T13:00:00Z', senhaDefinidaEm: '2026-10-01T12:00:00Z', aprovador: false },
 ]

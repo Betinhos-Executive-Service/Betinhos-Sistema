@@ -11,7 +11,7 @@ afterEach(cleanup)
 
 const configs = createMockConfigs()
 const validadores = createMockValidadores()
-const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }))
+const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], exigeAprovacao: form.exigeAprovacao }))
 
 function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}, editarIdentidade = true) {
   const source = { salvarConfig: salvarConfig(), logoDoCliente: vi.fn(async () => null), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
@@ -138,5 +138,24 @@ describe('ConfigDrawer', () => {
     expect(within(drawer()).getByText(/Só o administrador do ambiente/)).toBeTruthy()
     expect(within(drawer()).queryByLabelText('Arquivo do logo')).toBeNull()
     expect(within(drawer()).queryByRole('button', { name: /Enviar logo/ })).toBeNull()
+  })
+
+  it('aprovação ligada sem aprovador mostra o aviso e grava o interruptor', async () => {
+    const { source } = abrir(EMBRAER, { ...configs[2], ligado: true })
+    expect(within(drawer()).queryByText('Nenhum aprovador ativo')).toBeNull()
+    fireEvent.click(within(drawer()).getByRole('switch', { name: /Pedidos precisam de aprovação/ }))
+    expect(within(drawer()).getByText('Nenhum aprovador ativo')).toBeTruthy()
+    salvar()
+    await waitFor(() => expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ exigeAprovacao: true })))
+  })
+
+  it('cliente com aprovador ativo não mostra o aviso e a marca Aprovador salva na hora', async () => {
+    const setValidadorAprovador = vi.fn(async () => undefined)
+    const { onValidadorSaved } = abrir(TENARIS, configs[0], { setValidadorAprovador })
+    expect(within(drawer()).queryByText('Nenhum aprovador ativo')).toBeNull()
+    const marcas = within(drawer()).getAllByRole('switch', { name: 'Aprovador' })
+    fireEvent.click(marcas[1])
+    await waitFor(() => expect(setValidadorAprovador).toHaveBeenCalled())
+    expect(onValidadorSaved).toHaveBeenCalledWith(expect.objectContaining({ aprovador: expect.any(Boolean) }))
   })
 })
