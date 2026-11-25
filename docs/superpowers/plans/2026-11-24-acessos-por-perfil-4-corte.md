@@ -20,6 +20,7 @@
 4. Flows ligados: trava se o dono perde privilégio numa tabela do flow; se as tabelas do flow não forem conhecidas com segurança, trava em todo flow ligado cujo dono não seja a conta de serviço nem admin mantido. Referências de conexão de quem perde acesso: informativo.
 5. Passageiro: `cr40f_telefone`, `cr40f_email`, `cr40f_datadenascimento` (DateTime) e `cr40f_enderecodesaida` protegidas por migration, coluna antes da permissão; Operacional edita, Financeiro lê, `Motoristas` lê telefone e endereço de saída, perfil novo `Passageiros - automação` para conta de serviço e donos de flow.
 6. Motor `aplicar-perfis.ps1` não muda; código novo em Node; `dv.mjs` extraído com testes.
+7. Documentos segmentados (decisão de 25/11/2026): a Frota lê, cria e edita só os documentos de veículo (`cr40f_documento` com `cr40f_veiculo` preenchido); o Gestor da Frota também os exclui. O RH continua vendo e mantendo todos. Separação pelo dono do registro (Tarefa 15), sem tabela nova e sem compartilhamento por registro.
 
 ## Restrições globais
 
@@ -2145,6 +2146,20 @@ EOF
 Esperado: `teste (Base)` com as 4 `vazio`; `alvo (Operacional)` com `cr40f_telefone=cheio` e `cr40f_enderecodesaida=cheio` (e-mail e nascimento `cheio` quando o registro tiver). Nenhum valor é impresso.
 
 ---
+
+### Tarefa 15: documentos de veículo só para a Frota (dono = equipe)
+
+Detalhar em passos com código antes de executar; esta seção fixa o desenho decidido em 25/11/2026.
+
+**Fatos conferidos (25/11/2026, leitura no DEV e no PROD):** não existe equipe do Dataverse para a Frota (a "Frota" das multas é equipe do Planner, `cr40f_plannerequipe`); `cr40f_documento` tem os lookups `cr40f_funcionario` e `cr40f_veiculo`, e o shell decide a categoria por eles (`pages/documentos/data/queries.ts`); o DEV tem 1 documento de veículo.
+
+**Desenho.**
+- Migration nova cria a equipe proprietária `Documentos de veículo` (teamtype 0, unidade raiz, sem papel) e reatribui a ela os documentos de veículo existentes. Idempotente.
+- `nav/acessosMapa.json` e `gerar.mjs`: o perfil Frota recebe `cr40f_documento` com profundidade Basic (Read, Create, Write, Append, AppendTo; Delete Basic só no Gestor) e leitura Global em `cr40f_tipodocumento`. RH segue Global. Precisa de campo novo no mapa para profundidade por tabela (ex.: `"basico": ["cr40f_documento"]`), com teste no `acessosMapa.test.ts`.
+- Plugin (pre-operation, Create e Update de `cr40f_veiculo`/`cr40f_funcionario` em `cr40f_documento`): com veículo, dono = equipe `Documentos de veículo`; com funcionário, dono volta a ser quem criou ou a conta de serviço. Provar no DEV que o usuário Frota com Create Basic consegue criar com o dono trocado no pre-operation.
+- `Cr40f.Acesso.Plugin` (`cr40f_AcessoDefinirPerfis`): ao dar ou tirar o perfil Frota (qualquer nível), põe ou tira a pessoa da equipe `Documentos de veículo`; o histórico registra. O corte (Tarefa 8) sincroniza os membros uma vez.
+- Shell: sem mudança de tela; a lixeira da ficha do veículo passa a usar a decisão do Gestor da Frota (rever o revert dac1c56b do plano 3: `Checklist` recebe a tabela/área da ficha).
+- Verificação: Frota Operador vê só documentos de veículo, cria e edita, sem lixeira; Frota Gestor exclui; RH vê todos; quem só tem Frota não vê documento de funcionário em `#/documentos` nem pela Web API.
 
 ### Tarefa 14: documentação e skill de verificação
 
