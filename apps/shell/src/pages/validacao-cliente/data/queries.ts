@@ -1,6 +1,7 @@
 import { chunk, cleanId, formatted, type DataverseClient, type Row } from '@betinhos/dataverse'
 import { diaLocal, fechamentoDoValor, motivoDoValor, statusDoValor, LADO_VALOR } from '../domain/regras'
 import { lerModulos, normalizarDominios } from '../domain/config'
+import { horasDaColuna } from '../domain/prazos'
 import type { Cliente, ItemComposicao, Linha, Mensagem, PortalConfig, Validador } from '../domain/types'
 
 // Nomes lógicos das tabelas do portal (packages/deploy/provision-portal-cliente.ps1, sessão "Liberar para o portal").
@@ -75,14 +76,15 @@ function composicaoDe(row: Row | undefined): ItemComposicao[] {
 }
 
 const CLIENTE_SELECT = 'cr40f_clientes1id,cr40f_nomedocliente'
-const CONFIG_SELECT = `${CLIENTE_SELECT},cr40f_portalhabilitado,cr40f_portalmodulos,cr40f_portaldominios,cr40f_portalexigeaprovacao`
+const CONFIG_SELECT = `${CLIENTE_SELECT},cr40f_portalhabilitado,cr40f_portalmodulos,cr40f_portaldominios,cr40f_portalexigeaprovacao,cr40f_portalantecedenciapedido,cr40f_portalprazocancelar,cr40f_portalcontato`
 /** Todos os clientes ativos: a aba Configurações lista os que têm portal e os que ainda não têm. */
 const FILTRO_CONFIG = encodeURIComponent('statecode eq 0')
 
 export const clienteDe = (r: Row): Cliente => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: str(r.cr40f_nomedocliente) || 'Cliente' })
 
 export function mapConfig(r: Row): PortalConfig {
-  return { cliente: clienteDe(r), ligado: r.cr40f_portalhabilitado === true, modulos: lerModulos(r.cr40f_portalmodulos), dominios: normalizarDominios(str(r.cr40f_portaldominios)).dominios, exigeAprovacao: r.cr40f_portalexigeaprovacao === true }
+  return { cliente: clienteDe(r), ligado: r.cr40f_portalhabilitado === true, modulos: lerModulos(r.cr40f_portalmodulos), dominios: normalizarDominios(str(r.cr40f_portaldominios)).dominios, exigeAprovacao: r.cr40f_portalexigeaprovacao === true,
+    antecedenciaPedidoH: horasDaColuna(r.cr40f_portalantecedenciapedido), prazoCancelarH: horasDaColuna(r.cr40f_portalprazocancelar), contato: str(r.cr40f_portalcontato).trim() }
 }
 
 /** Configurações de todos os clientes ativos, validações, reservas, composições e mensagens; só os clientes com portal ligado entram nas linhas. */

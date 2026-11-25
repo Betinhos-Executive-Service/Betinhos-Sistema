@@ -61,3 +61,7 @@ Várias palavras (E, sem acento) em código, pedido, data, situação, trajeto, 
 - ConfigDrawer: interruptor "Pedidos precisam de aprovação" (`cr40f_clientes1.cr40f_portalexigeaprovacao`) e, em cada e-mail liberado (drawer e aba Usuários), o interruptor "Aprovador" (`cr40f_validadorcliente.cr40f_aprovador`, salva na hora). Aviso "Nenhum aprovador ativo" quando portal ligado, aprovação exigida, módulo Pedir e nenhum aprovador ativo (`semAprovador` em `domain/config.ts`): nesse caso o worker deixa o pedido entrar direto.
 - Mock: Tenaris exige aprovação e Carla Menezes é aprovadora; Embraer serve para ver o aviso (ligue o portal e o interruptor).
 - Teste: `pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 src/pages/validacao-cliente` e `tsc --noEmit`. No DEV, só vale depois da migration `20261125-1800-portal-avisos-aprovacao.ps1`.
+
+## Prazos do portal (25/11/2026)
+- Seção "Prazos do portal" no drawer de configuração (abaixo da aprovação): antecedência para pedir, prazo para cancelar (horas, vazio = padrão 24 h e 12 h, 0 = sem limite, máximo 720) e contato da operação (100 caracteres). A prévia "O cliente vai ler:" (`data-testid="previa-prazos"`) usa as frases do portal, espelhadas em `domain/prazos.ts`; vazio grava `null`.
+- Colunas `cr40f_portalantecedenciapedido`, `cr40f_portalprazocancelar`, `cr40f_portalcontato` (migration `20261125-1900-portal-prazos-cliente.ps1`; no DEV só depois do Deploy). Teste: `pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 src/pages/validacao-cliente`.

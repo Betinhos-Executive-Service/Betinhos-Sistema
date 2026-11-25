@@ -5,13 +5,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EMBRAER, TENARIS, createMockConfigs, createMockValidadores } from '../data/mock'
 import type { Source } from '../data/source'
 import type { PortalConfig } from '../domain/types'
+import { prazosDoForm } from '../domain/config'
 import { ConfigDrawer } from './ConfigDrawer'
 
 afterEach(cleanup)
 
 const configs = createMockConfigs()
 const validadores = createMockValidadores()
-const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], exigeAprovacao: form.exigeAprovacao }))
+const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], exigeAprovacao: form.exigeAprovacao, ...prazosDoForm(form) }))
 
 function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}, editarIdentidade = true) {
   const source = { salvarConfig: salvarConfig(), logoDoCliente: vi.fn(async () => null), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
@@ -50,6 +51,34 @@ describe('ConfigDrawer', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
     expect(source.salvarConfig).toHaveBeenCalledWith(TENARIS, expect.objectContaining({ restringir: true, dominiosTexto: 'gmail.com' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('prazos: placeholders do padrão, prévia ao vivo e gravação das horas e do contato', async () => {
+    const { source } = abrir(EMBRAER)
+    const ant = within(drawer()).getByLabelText(/Antecedência mínima/) as HTMLInputElement
+    expect(ant.placeholder).toBe('24 h (padrão)')
+    expect((within(drawer()).getByLabelText(/Prazo para cancelar/) as HTMLInputElement).placeholder).toBe('12 h (padrão)')
+    const previa = () => within(drawer()).getByTestId('previa-prazos').textContent ?? ''
+    expect(previa()).toContain('Pedidos com pelo menos 24 h de antecedência.')
+    expect(previa()).toContain('Você cancela até 12 h antes da saída.')
+    expect(previa()).toContain('Fale com a Betinhos.')
+    fireEvent.change(ant, { target: { value: '48' } })
+    fireEvent.change(within(drawer()).getByLabelText(/Prazo para cancelar/), { target: { value: '0' } })
+    fireEvent.change(within(drawer()).getByLabelText('Contato da operação'), { target: { value: '(12) 99999-0000' } })
+    expect(previa()).toContain('Pedidos com pelo menos 48 h de antecedência.')
+    expect(previa()).toContain('Você cancela até a hora da saída.')
+    expect(previa()).toContain('Fale com a Betinhos: (12) 99999-0000.')
+    salvar()
+    await waitFor(() => expect(source.salvarConfig).toHaveBeenCalled())
+    expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ antecedenciaTexto: '48', prazoCancelarTexto: '0', contato: '(12) 99999-0000' }))
+  })
+
+  it('prazo inválido bloqueia o Salvar', () => {
+    const { source } = abrir(EMBRAER)
+    fireEvent.change(within(drawer()).getByLabelText(/Antecedência mínima/), { target: { value: '800' } })
+    salvar()
+    expect(within(drawer()).getByText(/número inteiro de 0 a 720/)).toBeTruthy()
+    expect(source.salvarConfig).not.toHaveBeenCalled()
   })
 
   it('erro ao gravar: drawer continua aberto e nada é aplicado', async () => {

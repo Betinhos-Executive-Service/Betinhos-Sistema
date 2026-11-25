@@ -70,7 +70,7 @@ $modelos = [ordered]@{
   __TPL_CODIGO__ = 'codigo.html'; __TPL_RESUMO__ = 'resumo-diario.html'; __TPL_LINHA_LIBERADO__ = 'resumo-linha-liberado.html'
   __TPL_LINHA_VENCENDO__ = 'resumo-linha-vencendo.html'; __TPL_RESPOSTA__ = 'resposta-betinhos.html'
   __TPL_CONFIRMADO__ = 'pedido-confirmado.html'; __TPL_APROV_PENDENTE__ = 'aprovacao-pendente.html'; __TPL_APROV_LEMBRETE__ = 'aprovacao-lembrete.html'
-  __TPL_APROV_RESULTADO__ = 'aprovacao-resultado.html'; __TPL_AVISO_OPERACAO__ = 'aviso-operacao.html'
+  __TPL_APROV_RESULTADO__ = 'aprovacao-resultado.html'; __TPL_AVISO_OPERACAO__ = 'aviso-operacao.html'; __TPL_CANCELAMENTO_OPERACAO__ = 'cancelamento-operacao.html'
 }
 foreach ($tok in $modelos.Keys) {
   $html = [IO.File]::ReadAllText((Join-Path $pasta "portal-cliente-emails\$($modelos[$tok])"), [Text.Encoding]::UTF8)

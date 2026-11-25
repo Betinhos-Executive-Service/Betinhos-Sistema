@@ -14,6 +14,7 @@ const modelos = {
   __TPL_APROV_LEMBRETE__: 'aprovacao-lembrete.html',
   __TPL_APROV_RESULTADO__: 'aprovacao-resultado.html',
   __TPL_AVISO_OPERACAO__: 'aviso-operacao.html',
+  __TPL_CANCELAMENTO_OPERACAO__: 'cancelamento-operacao.html',
 }
 const ler = (f) => readFileSync(new URL(f, import.meta.url), 'utf8')
 const raw = ler('./portal-cliente-emails.json')
@@ -114,9 +115,11 @@ const exemplos = {
     nome: 'Paula', resultado: 'recusado', aprovador: 'Aline', numero: 'RV-10301', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', motivo: 'Fora do orçamento do mês.', linkPortal: 'https://cliente.betinhos.com.br/' } },
   aviso_operacao: { tipo: 'aviso_operacao', para: [], dados: {
     numero: 'RV-10301', solicitante: 'Paula Lima', cliente: 'Latasa', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka' } },
+  cancelamento_operacao: { tipo: 'cancelamento_operacao', para: [], dados: {
+    numero: 'RV-10301', solicitante: 'Paula Lima', cliente: 'Latasa', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka', situacao: 'Confirmado' } },
 }
 
-const TIPOS = ['codigo', 'resumo_diario', 'resposta_betinhos', 'pedido_confirmado', 'aprovacao_pendente', 'aprovacao_lembrete', 'aprovacao_resultado', 'aviso_operacao']
+const TIPOS = ['codigo', 'resumo_diario', 'resposta_betinhos', 'pedido_confirmado', 'aprovacao_pendente', 'aprovacao_lembrete', 'aprovacao_resultado', 'aviso_operacao', 'cancelamento_operacao']
 
 test('gatilho HTTP POST com schema de tipo, para e dados', () => {
   const g = flow.triggers.manual
@@ -126,7 +129,7 @@ test('gatilho HTTP POST com schema de tipo, para e dados', () => {
   assert.equal(g.inputs.schema.properties.para.type, 'array')
 })
 
-test('Switch por tipo com os oito casos e default 400', () => {
+test('Switch por tipo com os nove casos e default 400', () => {
   const sw = todas.get('Por_tipo')
   assert.equal(sw.type, 'Switch')
   assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), [...TIPOS].sort())
@@ -135,7 +138,7 @@ test('Switch por tipo com os oito casos e default 400', () => {
 
 test('envio com remetente fixo (De), um por caso, com os assuntos combinados', () => {
   const envios = porTipo('OpenApiConnection')
-  assert.equal(envios.length, 8)
+  assert.equal(envios.length, 9)
   for (const e of envios) {
     assert.equal(e.inputs.host.operationId, 'SendEmailV2')
     assert.equal(e.inputs.host.connectionName, 'shared_office365')
@@ -149,6 +152,7 @@ test('envio com remetente fixo (De), um por caso, com os assuntos combinados', (
   assert.equal(executar(exemplos.aprovacao_lembrete).email.Subject, 'Lembrete: pedido RV-10301 aguarda aprovação')
   assert.equal(executar(exemplos.aprovacao_resultado).email.Subject, 'Pedido RV-10301 recusado')
   assert.equal(executar(exemplos.aviso_operacao).email.Subject, 'Pedido do portal sai em até 12 h: RV-10301')
+  assert.equal(executar(exemplos.cancelamento_operacao).email.Subject, 'Pedido do portal cancelado pelo cliente: RV-10301')
 })
 
 test('respostas só 202, 400 e 502, com corpo genérico que nunca ecoa dados', () => {
@@ -167,14 +171,14 @@ test('exemplos válidos respondem 202 e enviam para todos os destinatários', ()
     const r = executar(ex)
     assert.equal(r.status, 202, ex.tipo)
     assert.deepEqual(r.corpo, { ok: true })
-    assert.equal(r.email.To, ex.tipo === 'aviso_operacao' ? 'caixa@exemplo.com' : ex.para.join(';'))
+    assert.equal(r.email.To, ex.para.length === 0 ? 'caixa@exemplo.com' : ex.para.join(';'))
   }
 })
 
 test('campos obrigatórios por tipo: faltou um, 400 sem envio', () => {
   const obrig = { codigo: ['nome', 'codigo', 'validadeMinutos'], resumo_diario: ['nome', 'cliente', 'linkPortal'], resposta_betinhos: ['nome', 'numero', 'trecho', 'linkPortal'],
     pedido_confirmado: ['numero', 'data'], aprovacao_pendente: ['nome', 'solicitante', 'numero', 'linkPortal'], aprovacao_lembrete: ['nome', 'solicitante', 'numero', 'linkPortal'],
-    aprovacao_resultado: ['nome', 'numero', 'aprovador', 'linkPortal'], aviso_operacao: ['numero', 'solicitante', 'cliente', 'data'] }
+    aprovacao_resultado: ['nome', 'numero', 'aprovador', 'linkPortal'], aviso_operacao: ['numero', 'solicitante', 'cliente', 'data'], cancelamento_operacao: ['numero', 'solicitante', 'cliente', 'data'] }
   for (const [tipo, campos] of Object.entries(obrig)) {
     for (const c of campos) {
       for (const valor of [undefined, '   ']) {
@@ -309,6 +313,20 @@ test('aviso à operação: ignora destinatários do corpo e vai só à caixa com
     for (const t of ['RV-10301', 'Paula Lima', 'Latasa', '02/12/2026 08:00']) assert.ok(r.email.Body.includes(t), t)
   }
   const ruim = structuredClone(exemplos.aviso_operacao); ruim.para = ['sem-arroba']
+  assert.equal(executar(ruim).status, 400)
+})
+
+test('cancelamento à operação: vai só à caixa compartilhada, com a situação que o pedido tinha e o texto escapado', () => {
+  const com = structuredClone(exemplos.cancelamento_operacao); com.para = ['intruso@exemplo.com']
+  for (const ex of [exemplos.cancelamento_operacao, com]) {
+    const r = executar(ex)
+    assert.equal(r.status, 202); assert.equal(r.email.To, 'caixa@exemplo.com')
+    for (const t of ['RV-10301', 'Paula Lima', 'Latasa', '02/12/2026 08:00', 'Confirmado']) assert.ok(r.email.Body.includes(t), t)
+    assert.doesNotMatch(r.email.Body, /\{\{\w+\}\}/)
+  }
+  const mal = structuredClone(exemplos.cancelamento_operacao); mal.dados.situacao = '<b>x</b>'
+  assert.match(executar(mal).email.Body, /&lt;b&gt;x&lt;\/b&gt;/)
+  const ruim = structuredClone(exemplos.cancelamento_operacao); ruim.para = ['sem-arroba']
   assert.equal(executar(ruim).status, 400)
 })
 

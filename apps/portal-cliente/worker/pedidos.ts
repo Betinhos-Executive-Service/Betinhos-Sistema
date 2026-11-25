@@ -1,13 +1,16 @@
 // Módulos Pedir e Meus serviços: o pedido vira uma Reserva de Veículos em Solicitado, ligada ao usuário do portal;
 // a operação precifica e programa no shell e o solicitante acompanha o status aqui.
-import { chaveDuplicado, chaveNome, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, normalizarPedido, primeiroErroPedido, soDigitos, textoCortesia } from '../src/domain/pedidos'
+import { chaveDuplicado, chaveNome, JANELA_DUPLICADO_MS, normalizarPedido, primeiroErroPedido, soDigitos, statusPedidoInfo, textoCortesia } from '../src/domain/pedidos'
+import { motivoNaoCancela } from '../src/domain/prazos'
 import type { NovoPedido, PassageiroPedido } from '../src/domain/types'
 import type { Ctx } from './auth'
 import { sha256Hex } from './cripto'
 import { erro, json, lerJson, type Sessao } from './http'
 import { mapearPedido, type PedidoPortal, type Registro } from './mapear'
 import { criarPedido as caminhoCriar, criarPessoa, ehGuid, guid, pedidoDe, pedidosDe, pessoaDoCliente, pessoasComNome, pessoasDoCliente } from './odata'
-import { alterarPendente, anexarNota, aprovadoresDoPedido, avisarAprovadores, dataHoraSp, ESTADO } from './aprovacao'
+import { alterarPendente, anexarNota, aprovadoresDoPedido, avisarAprovadores, dataHoraSp, ESTADO, quandoETrajeto } from './aprovacao'
+import { enviarEmail } from './dataverse'
+import { prazosDoCliente } from './prazos'
 import { APROVACAO, NAV, PESSOA_ATIVA, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
 
 const textoOu = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -58,7 +61,7 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
     passageiros: passageirosDoCorpo(corpo?.passageiros), origem: textoOu(corpo?.origem), destino: textoOu(corpo?.destino), saida: textoOu(corpo?.saida), observacao: textoOu(corpo?.observacao),
     ...(typeof corpo?.tipoVeiculo === 'number' ? { tipoVeiculo: corpo.tipoVeiculo } : corpo?.tipoVeiculo != null ? { tipoVeiculo: Number.NaN } : {}),
   })
-  const primeiroErro = primeiroErroPedido(pedido, c.agora)
+  const primeiroErro = primeiroErroPedido(pedido, c.agora, await prazosDoCliente(c.dv, sessao.cid))
   if (primeiroErro) return erro(400, 'nao_permitido', primeiroErro)
 
   // Clique duplo ou reenvio: mesmo pedido do mesmo usuário em 1 minuto não cria outra reserva.
@@ -160,14 +163,20 @@ export async function listarPedidos(c: Ctx, sessao: Sessao): Promise<Response> {
 
 /** Cancela um pedido ainda em Solicitado; depois disso é com a operação. A nota fica na observação interna da reserva. */
 export async function cancelarPedido(c: Ctx, sessao: Sessao, id: string): Promise<Response> {
-  const [reg] = await c.dv.lista(pedidoDe(id, sessao.vid, sessao.cid))
+  const [[reg], prazos] = await Promise.all([c.dv.lista(pedidoDe(id, sessao.vid, sessao.cid)), prazosDoCliente(c.dv, sessao.cid)])
   if (!reg) return erro(404, 'nao_permitido', 'Pedido não encontrado.')
-  if (reg.cr40f_status !== RESERVA_SOLICITADO) return erro(409, 'nao_permitido', MSG_NAO_CANCELA)
+  const atual = mapearPedido(reg, sessao.vid)
+  const motivo = motivoNaoCancela(atual, c.agora, prazos)
+  if (motivo) return erro(409, 'nao_permitido', motivo)
   const nota = `Cancelado pelo cliente no portal por ${sessao.nome} (${sessao.email}) em ${dataHoraSp.format(c.agora)}`
   const antes = typeof reg.cr40f_observaointerna === 'string' ? reg.cr40f_observaointerna : ''
   const corpo = { cr40f_status: RESERVA_CANCELADO, cr40f_observaointerna: anexarNota(antes, nota) }
   // Pendente de aprovação está inativo: grava reativando e volta a inativar (nunca chegou à operação).
   if (reg.cr40f_portalaprovacao === APROVACAO.pendente) await alterarPendente(c.dv, `${SET.reserva}(${guid(id)})`, corpo, true)
   else await c.dv.patch(`${SET.reserva}(${guid(id)})`, corpo)
+  // Já na fila da operação (Confirmado ou Programado): avisa a caixa da operação; `para` vazio = a caixa compartilhada.
+  if (atual.status !== 'solicitado') {
+    c.waitUntil(enviarEmail(c.env, 'cancelamento_operacao', [], { numero: atual.numero, solicitante: sessao.nome, cliente: sessao.cliente, situacao: statusPedidoInfo(atual.status).rotulo, ...quandoETrajeto(atual), passageiros: atual.passageiros.join(', ') }).catch((e) => console.error('cancelamento/aviso', id, String(e))))
+  }
   return json(mapearPedido({ ...reg, cr40f_status: RESERVA_CANCELADO }, sessao.vid))
 }

@@ -1,3 +1,4 @@
+import { MAX_CONTATO, MAX_PRAZO_H, lerHoras } from './prazos'
 import type { ModuloPortal, PortalConfig, Validador } from './types'
 
 /** Valores da choice múltipla `cr40f_portalmodulos` (mesmos de `apps/portal-cliente/worker/schema.ts`). */
@@ -53,13 +54,16 @@ export function validarLogo(arquivo: { type: string; size: number }): string | n
 
 export type ConfigForm = {
   ligado: boolean; modulos: ModuloPortal[]; restringir: boolean; dominiosTexto: string; exigeAprovacao: boolean
+  /** Horas como digitadas (vazio = padrão). */
+  antecedenciaTexto: string; prazoCancelarTexto: string; contato: string
   /** Logo escolhido, como data URL; `null` = sem logo. Só vai ao Dataverse quando `logoMudou`. */
   logo: string | null; logoMudou: boolean
 }
-export type ConfigErros = Partial<Record<'modulos' | 'dominios', string>>
+export type ConfigErros = Partial<Record<'modulos' | 'dominios' | 'antecedencia' | 'prazoCancelar' | 'contato', string>>
 
 export const formDaConfig = (c: PortalConfig, logo: string | null = null): ConfigForm => ({
   ligado: c.ligado, modulos: c.modulos, restringir: c.dominios.length > 0, dominiosTexto: c.dominios.join('; '), exigeAprovacao: c.exigeAprovacao,
+  antecedenciaTexto: c.antecedenciaPedidoH == null ? '' : String(c.antecedenciaPedidoH), prazoCancelarTexto: c.prazoCancelarH == null ? '' : String(c.prazoCancelarH), contato: c.contato,
   logo, logoMudou: false,
 })
 
@@ -71,6 +75,10 @@ export function validarConfig(f: ConfigForm, clienteId: string, outros: PortalCo
   const erros: ConfigErros = {}
   const avisos: string[] = []
   if (f.ligado && !f.modulos.length) erros.modulos = 'Escolha ao menos um módulo; sem módulo ninguém entra.'
+  const msgHoras = `Informe um número inteiro de 0 a ${MAX_PRAZO_H}, ou deixe vazio para o padrão.`
+  if (lerHoras(f.antecedenciaTexto) === undefined) erros.antecedencia = msgHoras
+  if (lerHoras(f.prazoCancelarTexto) === undefined) erros.prazoCancelar = msgHoras
+  if (f.contato.trim().length > MAX_CONTATO) erros.contato = `No máximo ${MAX_CONTATO} caracteres.`
   if (f.restringir) {
     const { dominios, invalidos } = normalizarDominios(f.dominiosTexto)
     if (invalidos.length) erros.dominios = `Domínio inválido: ${invalidos.join(', ')}. Use o formato empresa.com.br.`
@@ -96,5 +104,11 @@ export const quemEntra = (dominios: string[]) => (dominios.length ? `Cadastrados
 
 export const configIgual = (a: ConfigForm, b: ConfigForm) =>
   a.ligado === b.ligado && a.exigeAprovacao === b.exigeAprovacao && a.restringir === b.restringir && a.dominiosTexto.trim() === b.dominiosTexto.trim()
+  && a.antecedenciaTexto.trim() === b.antecedenciaTexto.trim() && a.prazoCancelarTexto.trim() === b.prazoCancelarTexto.trim() && a.contato.trim() === b.contato.trim()
   && a.logo === b.logo
   && MODULOS.every((m) => a.modulos.includes(m.value) === b.modulos.includes(m.value))
+
+/** Prazos do formulário já validados: vazio vira `null` (padrão). */
+export const prazosDoForm = (f: ConfigForm): Pick<PortalConfig, 'antecedenciaPedidoH' | 'prazoCancelarH' | 'contato'> => ({
+  antecedenciaPedidoH: lerHoras(f.antecedenciaTexto) ?? null, prazoCancelarH: lerHoras(f.prazoCancelarTexto) ?? null, contato: f.contato.trim(),
+})

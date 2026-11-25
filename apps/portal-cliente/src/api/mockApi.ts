@@ -1,7 +1,8 @@
 import { chaveDaMarca, DOMINIOS_PUBLICOS_MARCA, type Marca } from '../domain/marca'
-import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MOTIVO_RECUSA_MAX, MOTIVO_RECUSA_MIN, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido, soDigitos } from '../domain/pedidos'
+import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MOTIVO_RECUSA_MAX, MOTIVO_RECUSA_MIN, nomeDoEmail, normalizarPedido, primeiroErroPedido, soDigitos } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
 import type { EnderecoSugerido, Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import { motivoNaoCancela, PRAZOS_PADRAO, type Prazos } from '../domain/prazos'
 import { APROVADORES_MOCK, SOLICITANTE_PENDENTE, gerarPedidos, gerarPedidosPendentes, gerarServicos, PESSOAS_LATASA, type PedidoMock } from './mockDados'
 import { ErroPortal, senhaFraca, type PortalApi } from './PortalApi'
 
@@ -20,6 +21,10 @@ const logoMock = (cor: string, sigla: string) =>
 /** Identidade cadastrada por cliente (no real, colunas de `cr40f_clientes1`). Latasa tem logo; o resto fica só com a Betinhos. */
 const MARCAS: Record<string, Marca> = {
   Latasa: { nome: 'Latasa', logoUrl: logoMock('#0a7d4a', 'ReciclaBR') },
+}
+/** Prazos por cliente (no real, colunas de `cr40f_clientes1`); sem entrada vale o padrão de 24 h e 12 h. */
+const PRAZOS_MOCK: Record<string, Prazos> = {
+  Latasa: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '(12) 99999-0000 (WhatsApp)' },
 }
 /** Validadores cadastrados pela Betinhos (Tenaris). Quem entra pelo domínio não precisa de cadastro. */
 const VALIDADORES: Record<string, Usuario> = {
@@ -113,7 +118,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     bloqueadoAte = agora().getTime() + BLOQUEIO_MS
     throw new ErroPortal('bloqueado')
   }
-  const paraSessao = (u: Usuario, email: string): Sessao => ({ nome: u.nome, email, cliente: u.cliente, modulos: u.modulos, ...(MARCAS[u.cliente] ? { marca: MARCAS[u.cliente] } : {}), ...(u.cliente === 'Latasa' && APROVADORES_MOCK.includes(email) ? { aprovador: true } : {}) })
+  const paraSessao = (u: Usuario, email: string): Sessao => ({ prazos: PRAZOS_MOCK[u.cliente] ?? PRAZOS_PADRAO, nome: u.nome, email, cliente: u.cliente, modulos: u.modulos, ...(MARCAS[u.cliente] ? { marca: MARCAS[u.cliente] } : {}), ...(u.cliente === 'Latasa' && APROVADORES_MOCK.includes(email) ? { aprovador: true } : {}) })
   const abrirSessao = (u: Usuario, email: string): Sessao => {
     tentativasErradas = 0
     pendente = null
@@ -122,6 +127,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     return { ...sessao }
   }
 
+  const prazosDe = (cliente: string) => PRAZOS_MOCK[cliente] ?? PRAZOS_PADRAO
   const copia = (s: Servico): Servico => structuredClone(s)
   const semSolicitante = ({ solicitante: _, ...p }: PedidoMock): Pedido => structuredClone(p)
   const exigirSessao = (modulo: Modulo) => {
@@ -247,7 +253,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       await espera()
       const { email, cliente } = exigirSessao('pedir')
       const pedido = normalizarPedido(novo)
-      const primeiro = primeiroErroPedido(pedido, agora().getTime())
+      const primeiro = primeiroErroPedido(pedido, agora().getTime(), prazosDe(cliente))
       if (primeiro) throw new ErroPortal('nao_permitido', primeiro)
       const chave = chaveDuplicado(email, pedido)
       const repetido = pedidos.some((p) => chaveDuplicado(p.solicitante, p) === chave && agora().getTime() - Date.parse(p.criadoEm) < JANELA_DUPLICADO_MS)
@@ -291,10 +297,11 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     },
     async cancelarPedido(id) {
       await espera()
-      const { email } = exigirSessao('meus_servicos')
+      const { email, cliente } = exigirSessao('meus_servicos')
       const atual = pedidos.find((p) => p.id === id && p.solicitante === email)
       if (!atual) throw new ErroPortal('nao_permitido', 'Pedido não encontrado.')
-      if (!podeCancelar(atual.status)) throw new ErroPortal('nao_permitido', MSG_NAO_CANCELA)
+      const motivo = motivoNaoCancela(atual, agora().getTime(), prazosDe(cliente))
+      if (motivo) throw new ErroPortal('nao_permitido', motivo)
       const cancelado: PedidoMock = { ...atual, status: 'cancelado' }
       pedidos = pedidos.map((p) => (p.id === id ? cancelado : p))
       return semSolicitante(cancelado)

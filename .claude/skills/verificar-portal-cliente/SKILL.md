@@ -55,3 +55,8 @@ description: "Verifica o portal do cliente (apps/portal-cliente, React multi-cli
 - Pedido com `aprovacao: 'pendente'` e Solicitado aparece como "Aguardando aprovação" (`situacaoDoPedido`) na lista e no detalhe, com a etapa na linha do tempo; pode cancelar. Recusado vira Cancelado e mostra o motivo no detalhe.
 - Mock: `gestor@latasa.com.br` é aprovador; `carlos.mendes@latasa.com.br` tem 2 pedidos pendentes e 1 recusado (seed) e cada pedido novo dele nasce pendente. Os outros e-mails da Latasa não mudam.
 - Teste: `cd apps/portal-cliente && pnpm exec vitest run --maxWorkers=2 src` e `pnpm exec tsc --noEmit`.
+
+## Prazos por cliente (25/11/2026)
+- Regra pura em `src/domain/prazos.ts` (Worker, front e mock): 24 h para pedir e 12 h para cancelar quando a coluna está vazia, 0 = sem antecedência (pedir) ou até a hora da saída (cancelar; saída já passada não cancela), contato de até 100 caracteres. A sessão traz `prazos`; sem ele vale o padrão.
+- Pedir mostra "Pedidos com pelo menos N h de antecedência." no passo Quando e, fora do prazo, o erro com o contato ("Fale com a Betinhos: ..."). Painel do pedido (`data-testid="regra-cancelar"`) mostra a regra; fora do prazo, em execução, concluído ou cancelado não há botão Cancelar e a nota dá o motivo e o contato. Cancelam-se Solicitado (inclui aguardando aprovação), Confirmado e Programado.
+- Mock: Latasa com 24 h, 12 h e contato `(12) 99999-0000 (WhatsApp)`; pedido RV-48299 (confirmado, sai em 5 h) nunca tem Cancelar. Datas de teste a partir de +48 h (o mínimo é 24 h).

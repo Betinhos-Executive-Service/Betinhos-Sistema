@@ -35,3 +35,8 @@ description: "Verifica o Worker Cloudflare do portal de validação do cliente (
 - `worker/aprovacao.ts` (rotas `/aprovacoes`) e `worker/avisos.ts` (cron): `aprovacao.test.ts` cobre pedido pendente (reserva inativa, `statecode 1`/`statuscode 2`, até a decisão), 403 (não aprovador, pedido de outro cliente, o próprio pedido), 409, aprovar e recusar, cancelar antes da aprovação, "Confirmado" uma vez por pedido (KV), lembrete após 2 h uma vez e aviso à operação 12 h antes da saída uma vez; saída passada não avisa.
 - Cliente sem aprovador ativo: o pedido entra direto. Depende da migration aplicada antes do deploy do worker.
 - Teste: `cd apps/portal-cliente && pnpm exec vitest run --maxWorkers=2 worker` e `pnpm exec tsc --noEmit -p worker`. Não verificado: Dataverse real (gravar em registro inativo; plugins e flows de Create ainda disparam).
+
+## Prazos por cliente (25/11/2026)
+- `worker/prazos.ts`: `prazosDoCliente` lê `cr40f_portalantecedenciapedido`, `cr40f_portalprazocancelar` e `cr40f_portalcontato` com `tolerante` (só 400 = coluna ausente vira padrão; outro erro propaga e o pedido/cancelamento falha em vez de liberar). `prazosDaSessao` nunca falha: cai no padrão. A sessão pública leva `prazos`.
+- `POST /pedidos` responde 400 fora da antecedência; `POST /pedidos/:id/cancelar` responde 409 fora do prazo ou fora de Solicitado/Confirmado/Programado. Cancelar Confirmado ou Programado dispara `cancelamento_operacao` (`para: []`, `waitUntil`, falha só registra). Solicitado não envia e-mail.
+- Testes: `worker/worker.test.ts` (prazos na sessão, 400, 409, e-mail, coluna ausente 400 vs 503). Datas de pedido nos testes: +48 h.

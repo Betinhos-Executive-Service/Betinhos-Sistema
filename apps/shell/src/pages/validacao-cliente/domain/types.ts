@@ -83,5 +83,10 @@ export type PortalConfig = {
   dominios: string[]
   /** `cr40f_portalexigeaprovacao`: o pedido só chega à Betinhos depois que um aprovador do cliente aprova. */
   exigeAprovacao: boolean
+  /** `cr40f_portalantecedenciapedido` e `cr40f_portalprazocancelar` em horas: `null` = padrão (24 h e 12 h), 0 = sem limite. */
+  antecedenciaPedidoH: number | null
+  prazoCancelarH: number | null
+  /** `cr40f_portalcontato`: como falar com a operação; vazio = só "Fale com a Betinhos.". */
+  contato: string
   /** O logo do cliente no portal (`cr40f_portallogo`) é lido à parte. */
 }

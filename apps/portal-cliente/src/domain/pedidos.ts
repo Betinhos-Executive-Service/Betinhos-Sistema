@@ -1,4 +1,5 @@
 import type { StatusTone } from '@betinhos/ui'
+import { erroAntecedencia, type Prazos } from './prazos'
 import type { EnderecoSugerido, Modulo, NovoPedido, Pedido, PassageiroPedido, StatusPedido } from './types'
 
 export const MODULO_LABEL: Record<Modulo, string> = { validar: 'Validar', pedir: 'Pedir serviço', meus_servicos: 'Meus serviços' }
@@ -95,7 +96,7 @@ export function normalizarPedido(p: NovoPedido): NovoPedido {
 }
 
 /** Erros por campo de um pedido já normalizado; objeto vazio = pode enviar. */
-export function validarPedido(p: NovoPedido, agoraMs: number): ErrosPedido {
+export function validarPedido(p: NovoPedido, agoraMs: number, prazos?: Prazos): ErrosPedido {
   const e: ErrosPedido = {}
   if (!p.passageiros.length) e.passageiros = 'Informe pelo menos um passageiro.'
   else if (p.passageiros.length > MAX_PASSAGEIROS) e.passageiros = `Até ${MAX_PASSAGEIROS} passageiros por pedido.`
@@ -111,12 +112,16 @@ export function validarPedido(p: NovoPedido, agoraMs: number): ErrosPedido {
   if (Number.isNaN(saida)) e.saida = 'Informe a data e a hora da saída.'
   else if (saida < agoraMs) e.saida = 'A saída precisa ser daqui para a frente.'
   else if (saida > agoraMs + UM_ANO_MS) e.saida = 'A saída não pode passar de um ano.'
+  else if (prazos) {
+    const antecedencia = erroAntecedencia(saida, agoraMs, prazos)
+    if (antecedencia) e.saida = antecedencia
+  }
   if (p.tipoVeiculo !== undefined && !TIPOS_VEICULO.some((t) => t.valor === p.tipoVeiculo)) e.tipoVeiculo = 'Tipo de veículo inválido.'
   if ((p.observacao ?? '').length > MAX_TEXTO) e.observacao = `A observação tem no máximo ${MAX_TEXTO} caracteres.`
   return e
 }
 
-export const primeiroErroPedido = (p: NovoPedido, agoraMs: number) => Object.values(validarPedido(p, agoraMs))[0]
+export const primeiroErroPedido = (p: NovoPedido, agoraMs: number, prazos?: Prazos) => Object.values(validarPedido(p, agoraMs, prazos))[0]
 
 /** "Nome – contato; Nome – contato": cortesia gravada em `cr40f_passageirosetelefonedecontato` (só escrita; a leitura é por Serviços por Passageiro). */
 export const textoCortesia = (ps: PassageiroPedido[]) =>
@@ -148,10 +153,6 @@ export function nomeDoEmail(email: string): string {
 }
 
 export const dominioDe = (email: string) => email.split('@')[1] ?? ''
-
-/** Só pedido ainda em Solicitado (antes de a operação mexer) pode ser cancelado pelo portal. */
-export const podeCancelar = (status: StatusPedido) => status === 'solicitado'
-export const MSG_NAO_CANCELA = 'Este pedido já está com a operação. Para cancelar, fale com a Betinhos.'
 
 /** Texto que vai para o campo ao escolher uma sugestão: "rótulo, endereço", sem repetir o rótulo quando o endereço já o traz. */
 export function textoDoEndereco({ rotulo, endereco }: EnderecoSugerido): string {

@@ -36,7 +36,8 @@
                 "aprovacao_pendente",
                 "aprovacao_lembrete",
                 "aprovacao_resultado",
-                "aviso_operacao"
+                "aviso_operacao",
+                "cancelamento_operacao"
               ]
             },
             "para": {
@@ -132,6 +133,9 @@
                 "motivo": {
                   "type": "string"
                 },
+                "situacao": {
+                  "type": "string"
+                },
                 "logoUrl": {
                   "type": "string"
                 }
@@ -162,7 +166,7 @@
               "Succeeded"
             ]
           },
-          "inputs": "@and(lessOrEquals(length(triggerBody()?['para']),10),empty(body('Destinatarios_invalidos')),or(equals(coalesce(triggerBody()?['tipo'],''),'aviso_operacao'),greater(length(triggerBody()?['para']),0)))"
+          "inputs": "@and(lessOrEquals(length(triggerBody()?['para']),10),empty(body('Destinatarios_invalidos')),or(or(equals(coalesce(triggerBody()?['tipo'],''),'aviso_operacao'),equals(coalesce(triggerBody()?['tipo'],''),'cancelamento_operacao')),greater(length(triggerBody()?['para']),0)))"
         }
       }
     },
@@ -918,6 +922,92 @@
                   "else": {
                     "actions": {
                       "Responder_400_aviso_op": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "CancelamentoOperacao": {
+              "case": "cancelamento_operacao",
+              "actions": {
+                "Valido_cancel_op": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['solicitante'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['cliente'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['data'],''))))))",
+                  "actions": {
+                    "Modelo_cancel_op": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_CANCELAMENTO_OPERACAO__"
+                    },
+                    "Html_cancel_op": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_cancel_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(outputs('Modelo_cancel_op'),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{solicitante}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['solicitante'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{cliente}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['cliente'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{passageiros}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['passageiros'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{situacao}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['situacao'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_cancel_op": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_cancel_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/Subject": "@concat('Pedido do portal cancelado pelo cliente: ',trim(string(triggerBody()?['dados']?['numero'])))",
+                          "emailMessage/Body": "@outputs('Html_cancel_op')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_cancel_op": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_cancel_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_cancel_op": {
                         "type": "Response",
                         "kind": "Http",
                         "runAfter": {},

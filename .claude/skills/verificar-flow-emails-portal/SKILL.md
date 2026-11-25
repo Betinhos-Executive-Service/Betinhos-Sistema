@@ -23,3 +23,6 @@ description: "Verifica o flow HTTP 'Portal cliente – e-mails' (código de aces
 ## Tipos de aviso e aprovação (25/11/2026)
 - Cinco casos novos no Switch: `Confirmado`, `AprovacaoPendente`, `AprovacaoLembrete`, `AprovacaoResultado` e `AvisoOperacao`, com modelos HTML em `packages/deploy/flows/portal-cliente-emails/`. `AvisoOperacao` vai com `para: []` e o flow envia à caixa compartilhada (`__CAIXA_COMPARTILHADA__`); para inválido ainda responde 400.
 - Teste: `node --test packages/deploy/flows/portal-cliente-emails.test.mjs` (19 testes); com `PORTAL_EMAILS_EXEMPLOS=<pasta>` grava o HTML de exemplo de cada modelo. O flow existente publica pelo Deploy; o e-mail real não foi enviado.
+
+## Cancelamento pelo cliente (25/11/2026)
+- Caso `CancelamentoOperacao` (`tipo: cancelamento_operacao`, modelo `cancelamento-operacao.html`, assunto "Pedido do portal cancelado pelo cliente: <numero>"). `Para_ok` aceita `para` vazio para `aviso_operacao` e `cancelamento_operacao`; o campo opcional `situacao` (Confirmado/Programado) entra no gatilho. Teste: 20 testes em `portal-cliente-emails.test.mjs`. E-mail real não enviado.
