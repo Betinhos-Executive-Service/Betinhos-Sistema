@@ -192,7 +192,7 @@ O GitHub é o único caminho de publicação (decisão do Renan, 05/11/2026; ver
 
 | Worker | Nome | Quando publica | Como |
 |---|---|---|---|
-| DEV | `acompanhar-motorista-dev` (`env.dev` do `wrangler.jsonc`) | push na `develop` que mude o app | job `worker` do `deploy.yml` (environment `dev`): `wrangler deploy --env dev` |
+| DEV | `acompanhar-motorista-dev` (`env.dev` do `wrangler.jsonc`) | push na `develop` que mude o app | job `worker` do `deploy-cloudflare.yml` (environment `dev`): `wrangler deploy --env dev` |
 | PROD | `acompanhar-motorista` (nível raiz do `wrangler.jsonc`) | push na `main` (PR `develop → main`) | caminho "worker" do `producao.yml` (`packages/deploy/caminho-publicacao.mjs`, environment `prod-front`): `wrangler deploy`, sem soluções nem Dataverse |
 
 - PR: o job `acompanhar-motorista` do `ci.yml` roda `pnpm check`, `pnpm test` e `pnpm build` só quando o PR toca o app.
@@ -204,7 +204,7 @@ O GitHub é o único caminho de publicação (decisão do Renan, 05/11/2026; ver
 
 ### Worker DEV (feito à mão uma vez)
 
-O KV do DEV (`acompanhar-motorista-dev`) foi criado em 24/11/2026 e o id está em `env.dev.kv_namespaces` do `wrangler.jsonc`. Se o id voltar a ser `KV_DEV_ID_PENDENTE`, o job `worker` do `deploy.yml` não publica (só avisa).
+O KV do DEV (`acompanhar-motorista-dev`) foi criado em 24/11/2026 e o id está em `env.dev.kv_namespaces` do `wrangler.jsonc`. Se o id voltar a ser `KV_DEV_ID_PENDENTE`, o job `worker` do `deploy-cloudflare.yml` não publica (só avisa).
 
 1. Os segredos do Worker DEV (abaixo) se gravam com `pnpm exec wrangler secret put <NOME> --env dev`.
 2. O primeiro `wrangler deploy --env dev` cria o Worker e o Durable Object `Viagem` (migration `v1` própria); o Deploy da `develop` faz isso sozinho.

@@ -1,0 +1,260 @@
+name: Deploy Cloudflare
+
+# Só DEV: push na branch develop publica o que roda na Cloudflare e não passa pelo Dataverse: o Worker acompanhar-motorista
+# (apps/acompanhar-motorista → Worker `acompanhar-motorista-dev`) e o portal do cliente (apps/portal-cliente → Worker e Pages
+# `portal-cliente-dev`, cliente.dev.betinhos.com.br). O PROD é do workflow Produção (producao.yml, jobs worker e portal).
+# Saiu do deploy.yml em 25/11/2026: lá o grupo dataverse-dev vale para o workflow inteiro, então um push só de portal ou de Worker
+# esperava na fila atrás de outro Deploy (~80 s) e ainda subia o job dev (Windows, ~54 s consultando o DEV) sem publicar nada.
+# Cada job decide por arquivos (caminho-publicacao.mjs, campos worker e portal) desde a sua tag (worker-dev-publicado,
+# portal-dev-publicado; tag ausente = publica), então uma execução cancelada na fila nunca deixa mudança para trás: a seguinte
+# publica tudo o que mudou desde a tag. Só `wrangler deploy` e `wrangler pages deploy`: nunca `wrangler kv`, `wrangler secret`
+# nem `wrangler delete` (KV e secrets são criados à mão, README de cada app).
+on:
+  push:
+    branches: [develop]
+    paths:
+      # caminho-publicacao.mjs decide o que muda de fato: teste, documentação e scripts locais não publicam.
+      - 'apps/acompanhar-motorista/**'
+      - '!apps/acompanhar-motorista/tests/**'
+      - '!apps/acompanhar-motorista/docs/**'
+      - '!apps/acompanhar-motorista/**/*.md'
+      - 'apps/portal-cliente/**'
+      - '!apps/portal-cliente/**/*.test.*'
+      - '!apps/portal-cliente/**/*.md'
+      - 'packages/deploy/caminho-publicacao.mjs'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+    inputs:
+      forcar_worker:
+        description: 'Publicar o Worker acompanhar-motorista-dev mesmo sem mudança'
+        type: boolean
+        default: false
+      forcar_portal:
+        description: 'Publicar o portal do cliente (Worker e Pages portal-cliente-dev) mesmo sem mudança'
+        type: boolean
+        default: false
+
+# Uma publicação de cada vez na Cloudflare do DEV; a mais nova na fila substitui a anterior e publica tudo desde as tags.
+concurrency:
+  group: cloudflare-dev
+  cancel-in-progress: false
+
+jobs:
+  # Worker acompanhar-motorista no DEV (wrangler deploy --env dev). Decide por arquivos (caminho-publicacao.mjs, campo worker) desde
+  # a tag worker-dev-publicado, para uma execução cancelada na fila nunca deixar mudança para trás. Só `wrangler deploy`: nunca
+  # `wrangler kv`, `wrangler secret` nem `wrangler delete` (KV e secrets são criados à mão, README do app).
+  worker:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: dev
+    outputs:
+      publicou: ${{ steps.pendente.outputs.publicar }}
+    env:
+      APP: apps/acompanhar-motorista
+      URL_DEV: https://acompanhar-motorista-dev.betinhosexecutiveservice.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: O Worker mudou desde a última publicação?
+        id: pendente
+        env:
+          FORCAR: ${{ inputs.forcar_worker }}
+        run: |
+          publicar=false
+          if [ "$FORCAR" = "true" ]; then
+            publicar=true; motivo="forçado à mão"
+          elif base=$(git rev-parse -q --verify 'refs/tags/worker-dev-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
+            if [ "$(git diff --name-only "$base" HEAD | node packages/deploy/caminho-publicacao.mjs | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).worker")" = "true" ]; then
+              publicar=true; motivo="mudou desde a tag worker-dev-publicado"
+            else
+              motivo="sem mudança no Worker desde a tag worker-dev-publicado"
+            fi
+          else
+            publicar=true; motivo="sem publicação anterior registrada (tag worker-dev-publicado)"
+          fi
+          if [ "$publicar" = "true" ] && grep -q 'KV_DEV_ID_PENDENTE' "$APP/wrangler.jsonc"; then
+            echo "::warning::Worker DEV não publicado: o id do KV ainda é KV_DEV_ID_PENDENTE em $APP/wrangler.jsonc. Crie o KV à mão (README do app), troque o id e faça novo push."
+            echo "## Worker acompanhar-motorista-dev: NÃO publicado (KV_DEV_ID_PENDENTE em $APP/wrangler.jsonc)" >> "$GITHUB_STEP_SUMMARY"
+            publicar=false
+          else
+            echo "## Worker acompanhar-motorista-dev: publicar=$publicar ($motivo)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
+      - name: Conferir o token da Cloudflare
+        if: steps.pendente.outputs.publicar == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta o secret CLOUDFLARE_API_TOKEN no environment dev (template 'Edit Cloudflare Workers')."
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.pendente.outputs.publicar == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.pendente.outputs.publicar == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - name: Instalar só o Worker
+        if: steps.pendente.outputs.publicar == 'true'
+        run: pnpm install --frozen-lockfile --filter @betinhos/acompanhar-motorista...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Sem commit (a main é protegida): package.json e src/version.mjs mudam só neste runner. A base é a maior entre a versão do repo
+      # e a que o Worker DEV mostra no ar, então a versão nunca retrocede.
+      - name: Versão nova
+        id: versao
+        if: steps.pendente.outputs.publicar == 'true'
+        run: |
+          node "$APP/scripts/bump-version.mjs" --publicada "$URL_DEV"
+          echo "versao=$(node -p "require('./$APP/package.json').version" )" >> "$GITHUB_OUTPUT"
+      - name: Build do front (Static Assets)
+        if: steps.pendente.outputs.publicar == 'true'
+        run: pnpm --filter @betinhos/acompanhar-motorista build
+      - name: Publicar no Cloudflare (Worker DEV)
+        if: steps.pendente.outputs.publicar == 'true'
+        working-directory: apps/acompanhar-motorista
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler deploy --env dev
+      - name: Conferir no ar
+        if: steps.pendente.outputs.publicar == 'true'
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: |
+          bash "$APP/scripts/conferir-no-ar.sh" "$URL_DEV" "$VERSAO"
+          echo "### acompanhar-motorista-dev v$VERSAO publicado" >> "$GITHUB_STEP_SUMMARY"
+
+  # A tag só anda quando o Worker foi publicado e conferido. Job à parte para que `contents: write` não fique no job do token.
+  tag-worker:
+    needs: worker
+    if: needs.worker.result == 'success' && needs.worker.outputs.publicou == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mover a tag worker-dev-publicado
+        run: |
+          if base=$(git rev-parse -q --verify 'refs/tags/worker-dev-publicado^{commit}') && ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
+            echo "A tag está à frente deste commit; não anda para trás."
+            exit 0
+          fi
+          git tag -f worker-dev-publicado "$GITHUB_SHA"
+          git push -f origin refs/tags/worker-dev-publicado
+
+  # Portal do cliente no DEV: Worker portal-cliente-dev (Dataverse DEV) e Pages portal-cliente-dev (cliente.dev.betinhos.com.br).
+  # Mesma lógica do job worker: decide por arquivos (caminho-publicacao.mjs, campo portal) desde a tag portal-dev-publicado.
+  # Só `wrangler deploy` e `wrangler pages deploy`: nunca `wrangler kv`, `wrangler secret` nem `wrangler delete` (KV e secrets são à mão).
+  portal:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: dev
+    outputs:
+      publicou: ${{ steps.pendente.outputs.publicar }}
+    env:
+      APP: apps/portal-cliente
+      URL_DEV: https://portal-cliente-dev-67b.pages.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: O portal mudou desde a última publicação?
+        id: pendente
+        env:
+          FORCAR: ${{ inputs.forcar_portal }}
+        run: |
+          publicar=false
+          if [ "$FORCAR" = "true" ]; then
+            publicar=true; motivo="forçado à mão"
+          elif base=$(git rev-parse -q --verify 'refs/tags/portal-dev-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
+            if [ "$(git diff --name-only "$base" HEAD | node packages/deploy/caminho-publicacao.mjs | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).portal")" = "true" ]; then
+              publicar=true; motivo="mudou desde a tag portal-dev-publicado"
+            else
+              motivo="sem mudança no portal desde a tag portal-dev-publicado"
+            fi
+          else
+            publicar=true; motivo="sem publicação anterior registrada (tag portal-dev-publicado)"
+          fi
+          echo "## Portal do cliente DEV: publicar=$publicar ($motivo)" >> "$GITHUB_STEP_SUMMARY"
+          echo "publicar=$publicar" >> "$GITHUB_OUTPUT"
+      - name: Conferir o token da Cloudflare
+        if: steps.pendente.outputs.publicar == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta o secret CLOUDFLARE_API_TOKEN no environment dev (template 'Edit Cloudflare Workers', com Cloudflare Pages: Edit)."
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.pendente.outputs.publicar == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.pendente.outputs.publicar == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - name: Instalar só o portal
+        if: steps.pendente.outputs.publicar == 'true'
+        run: pnpm install --frozen-lockfile --filter @betinhos/portal-cliente...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Sem commit (a main é protegida): o package.json muda só neste runner. A base é a maior entre a versão do repo e a que o Pages
+      # DEV mostra no ar (PUBLISHED_VERSION, lida por bump-version.mjs dentro do build), então a versão nunca retrocede.
+      - name: Build (versão nova)
+        id: versao
+        if: steps.pendente.outputs.publicar == 'true'
+        run: |
+          PUBLISHED_VERSION="$(node "$APP/scripts/versao-publicada.mjs" "$URL_DEV")" pnpm --filter @betinhos/portal-cliente build
+          echo "versao=$(node -p "require('./$APP/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publicar o Worker (portal-cliente-dev)
+        if: steps.pendente.outputs.publicar == 'true'
+        working-directory: apps/portal-cliente
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler deploy --env dev
+      - name: Publicar o Pages (portal-cliente-dev, API → portal-cliente-dev)
+        if: steps.pendente.outputs.publicar == 'true'
+        working-directory: apps/portal-cliente
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/publicar-pages.mjs --projeto portal-cliente-dev --servico portal-cliente-dev
+      - name: Conferir no ar
+        if: steps.pendente.outputs.publicar == 'true'
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: |
+          bash "$APP/scripts/conferir-no-ar.sh" "$URL_DEV" "$VERSAO"
+          echo "### portal-cliente-dev v$VERSAO publicado (cliente.dev.betinhos.com.br)" >> "$GITHUB_STEP_SUMMARY"
+
+  # A tag só anda quando o portal foi publicado e conferido. Job à parte para que `contents: write` não fique no job do token.
+  tag-portal:
+    needs: portal
+    if: needs.portal.result == 'success' && needs.portal.outputs.publicou == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mover a tag portal-dev-publicado
+        run: |
+          if base=$(git rev-parse -q --verify 'refs/tags/portal-dev-publicado^{commit}') && ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
+            echo "A tag está à frente deste commit; não anda para trás."
+            exit 0
+          fi
+          git tag -f portal-dev-publicado "$GITHUB_SHA"
+          git push -f origin refs/tags/portal-dev-publicado
