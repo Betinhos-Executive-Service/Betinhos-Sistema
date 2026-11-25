@@ -21,7 +21,8 @@
       "leitura": ["cr40f_funcionarios", "cr40f_veiculos", "cr40f_servicosporpassageiro", "cr40f_manutencoes", "cr40f_agenteproposta", "cr40f_agenteexecucao"]
     },
     "frota": {
-      "donas": ["cr40f_veiculos", "cr40f_manutencoes", "cr40f_multas", "cr40f_infracaodetransito", "cr40f_colisao_v2", "cr40f_baselinepreventiva", "cr40f_itemplanopreventivo", "new_checklistmodelo", "new_checklistmodeloitem", "new_checklistveiculo", "new_checklistveiculofoto", "new_fotomanutencao", "new_parcelamultafolha", "new_termomulta", "new_possedeveiculo", "cr40f_equipamento", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional"],
+      "donas": ["cr40f_veiculos", "cr40f_manutencoes", "cr40f_multas", "cr40f_infracaodetransito", "cr40f_colisao_v2", "cr40f_baselinepreventiva", "cr40f_itemplanopreventivo", "new_checklistmodelo", "new_checklistmodeloitem", "new_checklistveiculo", "new_checklistveiculofoto", "new_fotomanutencao", "new_parcelamultafolha", "new_termomulta", "new_possedeveiculo", "cr40f_equipamento", "cr40f_despesaoperacional", "cr40f_anexodespesaoperacional", "cr40f_documento"],
+      "local": ["cr40f_documento"],
       "filhas": ["cr40f_fotoequipamento"],
       "cria": ["cr40f_reservadeveculos"],
       "leitura": ["cr40f_funcionarios", "new_telemetriadiariainfleet", "new_eventoinfleet", "new_viageminfleet", "cr40f_agenteproposta", "cr40f_agenteexecucao"]

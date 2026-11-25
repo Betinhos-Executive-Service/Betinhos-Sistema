@@ -137,3 +137,18 @@ test('o hash do perfis.gerado.json esta numa migration', () => {
     'Regenerou os perfis? Crie uma migration nova chamando Invoke-PerfisDeAcesso com o hash novo (node packages/deploy/acessos/gerar.mjs --hash).',
   )
 })
+
+test('Frota tem cr40f_documento em Local; RH segue Global', () => {
+  const { papeis } = gerado
+  const local = { Append: 'Local', AppendTo: 'Local', Create: 'Local', Read: 'Local', Write: 'Local' }
+  assert.deepEqual(papeis['Perfil - Frota - Operador'].tabelas.cr40f_documento, local)
+  assert.deepEqual(papeis['Perfil - Frota - Gestor'].tabelas.cr40f_documento, { ...local, Delete: 'Local' })
+  assert.equal(papeis['Perfil - RH - Operador'].tabelas.cr40f_documento.Read, 'Global')
+  assert.equal(papeis['Perfil - RH - Gestor'].tabelas.cr40f_documento.Delete, 'Global')
+})
+
+test('local com tabela fora do modulo e recusado', () => {
+  const outro = JSON.parse(readFileSync(CAMINHO_MAPA, 'utf8'))
+  outro.modulos.frota.local = ['cr40f_avisodestinatario']
+  assert.throws(() => gerarPerfis(outro, colunas), /local/)
+})
