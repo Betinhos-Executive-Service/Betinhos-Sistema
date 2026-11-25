@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BT } from "./bt";
-import { Cabecalho } from "./componentes/Cabecalho";
+import { Avaliacao } from "./componentes/Avaliacao";
+import { CardCompartilhar } from "./componentes/CardCompartilhar";
 import { CardMapa } from "./componentes/CardMapa";
 import { CardMotorista, type Tela } from "./componentes/CardMotorista";
-import { CardStatus } from "./componentes/CardStatus";
-import { CardTrajeto } from "./componentes/CardTrajeto";
+import { Contato } from "./componentes/Contato";
+import { Faixa } from "./componentes/Faixa";
 import { FolhaDetalhes } from "./componentes/FolhaDetalhes";
+import { LinhaDoTempo } from "./componentes/LinhaDoTempo";
 import { useAgora } from "./hooks/useAgora";
 import { useEta } from "./hooks/useEta";
 import { useViagem } from "./hooks/useViagem";
 import { useIdioma } from "./i18n";
 import { CardPassageiros } from "./passageiros/CardPassageiros";
 import { FolhaPassageiro } from "./passageiros/FolhaPassageiro";
-import { usePassageiros, type Passageiro } from "./passageiros/usePassageiros";
-import { estadoVivo, idadePosicao } from "./status";
+import { faltasDe, usePassageiros, type Passageiro } from "./passageiros/usePassageiros";
+import { estadoViagem } from "./portal";
+import { estadoVivo, esperaMin, idadePosicao } from "./status";
 
 export function App() {
   const { t, setTitulo } = useIdioma();
@@ -25,18 +28,17 @@ export function App() {
   const [editando, setEditando] = useState<Passageiro | null>(null);
   const origemPax = useRef<HTMLElement | null>(null);
   const pax = usePassageiros(!!editando);
-  const [fimCard, setFimCard] = useState(false);
-  const [mapaPronto, setMapaPronto] = useState(false);
   const [diag, setDiag] = useState("");
   const avisouChegada = useRef(false);
 
   const concluido = dados?.fase === "concluido";
   const noLocal = dados?.fase === "no_local" && !!dados.posicao;
-  const semMapa = dados?.rastreio === false;
+  const estado = dados ? estadoViagem(dados) : null;
+  const comMapa = estado === "a_caminho" || estado === "no_local" || estado === "em_viagem";
   const idade = idadePosicao(dados, desvio, agora);
   const vivo = estadoVivo(dados, t, idade, falhandoDesde, agora);
   const os = String(dados?.titulo ?? "").match(/OS[-\s]*(\d+)/i);
-  const titulo = dados?.titulo ? dados.titulo.replace(/\s*\bOS[-\s]*\d+/i, "").trim() || dados.titulo : null;
+  const espera = dados ? esperaMin(dados, desvio, agora) : 0;
   const reserva = os ? t("reserva", { n: "OS-" + os[1] }) : null;
 
   useEffect(() => {
@@ -50,14 +52,6 @@ export function App() {
     }
   }, [concluido, noLocal, setTitulo]);
 
-  // Sem mapa (biblioteca lenta ou ausente), o card final não fica escondido: aparece em 600 ms.
-  useEffect(() => {
-    if (!concluido || mapaPronto || fimCard) return;
-    const id = setTimeout(() => setFimCard(true), semMapa ? 0 : 600);
-    return () => clearTimeout(id);
-  }, [concluido, mapaPronto, fimCard, semMapa]);
-
-  const mostrarCard = useCallback(() => setFimCard(true), []);
   const abrirTela = useCallback((q: Exclude<Tela, null>) => { origemTela.current = document.activeElement; setTela(q); }, []);
   const fecharTela = useCallback(() => {
     setTela(null);
@@ -73,23 +67,27 @@ export function App() {
     if (o && o.isConnected) o.focus();
   }, []);
 
+  const faltam = pax.aberto && !concluido ? pax.lista.filter((p) => faltasDe(p).length > 0) : [];
   return (
     <>
-      <div id="app" className={(concluido ? "fim" : "") + (fimCard ? " fim-card" : "")}>
-        <Cabecalho reserva={reserva} />
+      <div id="app" className={concluido ? "fim" : undefined}>
+        <Faixa dados={dados} eta={eta} reserva={reserva} espera={espera} />
         <div className="diag" id="diag" hidden={!diag}>{diag}</div>
-        <main className={"portal" + (semMapa ? " sem-mapa" : "")}>
-          <div className="col-a">
-            <CardStatus dados={dados} cfg={BT.cfg} eta={eta} idade={idade} desvio={desvio} agora={agora} titulo={titulo} />
-            <CardMotorista dados={dados} cfg={BT.cfg} oculto={concluido} abrirTela={abrirTela} />
-            <CardTrajeto dados={dados} chegada={eta.chegada} oculto={concluido} />
-            <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />
-          </div>
-          {semMapa ? null : (
-            <div className="col-b">
-              <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />
+        <main className="corpo">
+          {concluido ? <Avaliacao visivel avaliado={!!dados?.avaliado} /> : null}
+          {faltam.length ? (
+            <div className="faixa-pax" id="faixa-pax" role="status">
+              <span>{t("pax.faixa", { n: faltam.length })}</span>
+              <button type="button" className="btn btn-secundario btn-leve" onClick={(e) => editar(faltam[0], e.currentTarget)}>{t("pax.completar")}</button>
             </div>
-          )}
+          ) : null}
+          {comMapa ? <CardMapa dados={dados} retomada={retomada} vivo={vivo} eta={eta} aoDiagnostico={setDiag} /> : null}
+          <CardMotorista dados={dados} cfg={BT.cfg} abrirTela={abrirTela} />
+          <LinhaDoTempo dados={dados} cfg={BT.cfg} chegada={eta.chegada} abrirTela={abrirTela} />
+          {concluido ? null : <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />}
+          {concluido ? null : <CardCompartilhar />}
+          <Contato cfg={BT.cfg} />
+          <footer className="rodape">Betinhos Executive Service</footer>
         </main>
         <span className="versao" aria-hidden="true">{BT.versao}</span>
       </div>

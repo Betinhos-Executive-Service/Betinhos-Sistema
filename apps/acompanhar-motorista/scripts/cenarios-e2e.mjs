@@ -37,7 +37,7 @@ async function abrir(id, { largura } = {}) {
 }
 const texto = (page, id) => page.locator(`#${id}`).innerText().catch(() => "");
 const foto = (page, nome) => page.screenshot({ path: `${SAIDA}/${nome}.png` });
-async function esperarStatus(page, re, ms = 20000) { await page.waitForFunction((s) => new RegExp(s).test(document.getElementById("status")?.innerText || ""), re.source, { timeout: ms }); }
+async function esperarStatus(page, re, ms = 20000) { await page.waitForFunction((s) => new RegExp(s, "i").test(document.getElementById("status")?.innerText || ""), re.source, { timeout: ms }); }
 async function esperarMapa(page) { await page.waitForFunction(() => document.querySelector(".maplibregl-canvas") && document.querySelector(".carro"), null, { timeout: 20000 }); await dormir(2500); }
 
 // 1. A caminho longe: ETA, rota, carro desliza
@@ -51,7 +51,7 @@ if (!SO) {
   await esperarMapa(page);
   await foto(page, "1-a-caminho");
   const eta = await texto(page, "eta");
-  registrar("1. A caminho com ETA e rota", /A caminho/.test(await texto(page, "status")) && /\d+ min/.test(eta) && !(await page.locator("#eta").isHidden()), `status em ${tStatus} ms · ETA: ${eta.replace(/\s+/g, " ")}`);
+  registrar("1. A caminho com ETA e rota", /a caminho/i.test(await texto(page, "status")) && /\d+ min/.test(eta) && !(await page.locator("#eta").isHidden()), `status em ${tStatus} ms · ETA: ${eta.replace(/\s+/g, " ")}`);
   // deslizamento: observa cada mudança do transform do marcador (MutationObserver) após nova posição 300 m adiante
   await page.evaluate(() => { window.__mov = []; let last = null; const el = document.querySelector(".carro"); new MutationObserver(() => { if (el.style.transform !== last) { last = el.style.transform; window.__mov.push(performance.now()); } }).observe(el, { attributes: true, attributeFilter: ["style"] }); });
   await cenario({ lat: aoNorte(saida, 5700).lat, lon: aoNorte(saida, 5700).lon });
@@ -72,7 +72,7 @@ if (!SO) {
   await esperarStatus(page, /A caminho/); await esperarMapa(page);
   await dormir(12500);
   await cenario({ lat: aoNorte(saida, 900).lat, lon: aoNorte(saida, 900).lon, speed: 30 });
-  await esperarStatus(page, /^Chegando$/, 25000);
+  await esperarStatus(page, /chegando/, 25000);
   await dormir(1500);
   await foto(page, "2-chegando");
   const passo = await page.locator('.passo[data-passo="a_caminho"]').innerText();
@@ -80,7 +80,7 @@ if (!SO) {
   await cenario({ lat: aoNorte(saida, 1400).lat, lon: aoNorte(saida, 1400).lon, speed: 30 });
   await dormir(17000);
   const ainda = await texto(page, "status");
-  registrar("2. Chegando a < 1 km, sem oscilar ao voltar para 1,4 km", passo.includes("Chegando") && /Chegando/.test(ainda), `barra: "${passo}" · após oscilar: "${ainda}"`);
+  registrar("2. Chegando a < 1 km, sem oscilar ao voltar para 1,4 km", passo.includes("Chegando") && /chegando/i.test(ainda), `barra: "${passo}" · após oscilar: "${ainda}"`);
   await page.close();
 }
 // 3. No local → Em viagem → Concluído (permanência de 60 s simulada pelo fixTime)
@@ -92,14 +92,14 @@ if (!SO) {
   await esperarMapa(page);
   await dormir(12500);
   await cenario({ ...saida, speed: 0, fixTime: new Date(agora + 1000).toISOString() });
-  await esperarStatus(page, /Motorista no local/, 25000);
+  await esperarStatus(page, /chegou/, 25000);
   await dormir(800);
   await foto(page, "3a-no-local");
   const aviso = await texto(page, "aviso");
   registrar("3a. Parado no embarque > 60 s → No local, aviso com carro e placa", /chegou/i.test(aviso) && /MOCK123/.test(aviso), aviso.replace(/\s+/g, " "));
   await dormir(12500);
   await cenario({ ...aoNorte(saida, -1500), speed: 50, fixTime: new Date(agora + 60000).toISOString() });
-  await esperarStatus(page, /Em viagem/, 25000);
+  await esperarStatus(page, /viagem em andamento/, 25000);
   await dormir(2500);
   await foto(page, "3b-em-viagem");
   const etaV = await texto(page, "eta");
@@ -293,7 +293,7 @@ if (!SO) {
 {
   await cenario({ ...aoNorte(saida, 3000), speed: 45, foto: false });
   const ps = await abrir("DevSimples01"); await esperarMapa(ps); await foto(ps, "8a-modo-simples");
-  registrar("B1. Modo simples: só carro e cartão, sem etapas/ETA", (await ps.locator("#passos").isHidden()) && (await ps.locator("#eta").isHidden()) && !(await ps.locator("#cartao").isHidden()));
+  registrar("B1. Modo simples: só carro e cartão, linha curta e sem ETA", (await ps.locator("#paradas li").count()) === 4 && (await ps.locator("#eta").count()) === 0 && !(await ps.locator("#cartao").isHidden()));
   await ps.close();
   const pn = await abrir("DevSemNome01"); await esperarStatus(pn, /A caminho/);
   registrar("B2. Sem foto do motorista → inicial", (await pn.locator("#m-avatar").innerText()).trim() === "C", await pn.locator("#m-avatar").innerText());
@@ -309,7 +309,7 @@ if (!SO) {
   await cenario({ foto: false });
   await cenario({ ...aoNorte(saida, 6000), speed: 45 });
   const pp = await abrir("DevParadas01"); await esperarStatus(pp, /A caminho/); await esperarMapa(pp); await foto(pp, "8b-multiplas-etapas");
-  registrar("B3. Múltiplas etapas listadas e numeradas no mapa", (await pp.locator("#paradas li").count()) === 3 && (await pp.locator(".mk-etapa").count()) === 3);
+  registrar("B3. Múltiplas etapas listadas e numeradas no mapa", (await pp.locator("#paradas li[data-passo=parada]").count()) === 1 && (await pp.locator(".mk-etapa").count()) === 3);
   const etaTxt = await texto(pp, "eta");
   const horaSP = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date());
   const horaNY = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -323,10 +323,10 @@ if (!SO) {
   await pp.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, get: () => false }); document.dispatchEvent(new Event("visibilitychange")); });
   const col = setInterval(() => pp.evaluate(() => { const el = document.querySelector(".carro"); if (el) window.__amostras.push(el.style.transform); }).catch(() => {}), 300);
   // Com o WebSocket aberto, a posição nova pode vir no quadro seguinte do Viagem (até 15 s), não na reconsulta.
-  for (let i = 0; i < 40 && !/Chegando/.test(await texto(pp, "status")); i++) await dormir(500);
+  for (let i = 0; i < 40 && !/chegando/i.test(await texto(pp, "status")); i++) await dormir(500);
   await dormir(1500); clearInterval(col);
   const am = await pp.evaluate(() => Array.from(new Set(window.__amostras)));
-  registrar("B5. Volta do segundo plano: reconsulta e salta (≤ 4 posições distintas, sem animar 2 km)", am.length <= 4 && /Chegando/.test(await texto(pp, "status")), `${am.length} posições · status: ${await texto(pp, "status")}`);
+  registrar("B5. Volta do segundo plano: reconsulta e salta (≤ 4 posições distintas, sem animar 2 km)", am.length <= 4 && /chegando/i.test(await texto(pp, "status")), `${am.length} posições · status: ${await texto(pp, "status")}`);
   await pp.close();
 }
 await browser.close();

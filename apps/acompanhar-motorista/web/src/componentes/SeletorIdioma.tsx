@@ -5,7 +5,7 @@ import { LISTA_IDIOMAS, useIdioma } from "../i18n";
 const Bandeira = ({ id }: { id: string }) => <span className="bandeira" dangerouslySetInnerHTML={{ __html: (BANDEIRAS as Record<string, string>)[id] }} />;
 
 // Seletor de idioma: botão com a bandeira atual e menu com as três. Fecha no clique fora e no Esc.
-export function SeletorIdioma({ className = "idioma" }: { className?: string }) {
+export function SeletorIdioma({ className = "idioma", segmentado = false }: { className?: string; segmentado?: boolean }) {
   const { id, t, mudar } = useIdioma();
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null), botao = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null);
@@ -17,6 +17,16 @@ export function SeletorIdioma({ className = "idioma" }: { className?: string }) 
     document.addEventListener("click", fora); document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("click", fora); document.removeEventListener("keydown", esc); };
   }, [aberto]);
+  // Variante segmentada (faixa do topo): PT | EN | ES sempre à vista, sem menu.
+  if (segmentado) return (
+    <div className="idioma-seg" id="idioma" role="group" aria-label={t("idioma")}>
+      {LISTA_IDIOMAS.map((l) => (
+        <button key={l.id} type="button" className="idioma-op" data-idioma={l.id} lang={l.local} aria-pressed={l.id === id} onClick={() => mudar(l.id)}>
+          {l.id.toUpperCase()}<span className="sr">{l.nome}</span>
+        </button>
+      ))}
+    </div>
+  );
   return (
     <div className={className} id="idioma" ref={caixa}>
       <button type="button" className="qd idioma-botao" id="idioma-botao" ref={botao} aria-haspopup="true" aria-expanded={aberto} aria-controls="idioma-menu" aria-label={t("idioma")} onClick={() => setAberto((a) => !a)}>

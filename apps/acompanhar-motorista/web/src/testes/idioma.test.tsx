@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { IDIOMAS, TEXTOS } from "../../../src/idiomas.mjs";
-import { Cabecalho } from "../componentes/Cabecalho";
+import { CardCompartilhar } from "../componentes/CardCompartilhar";
+import { SeletorIdioma } from "../componentes/SeletorIdioma";
 import { LinkInvalido } from "../componentes/LinkInvalido";
 import { renderiza } from "./ajuda";
 
@@ -11,8 +12,8 @@ const arquivos = (dir: string): string[] => readdirSync(dir).flatMap((n) => { co
 
 describe("idioma", () => {
   it("seletor com as três bandeiras; trocar muda o texto e o <html lang> do menu", () => {
-    const { container } = renderiza(<Cabecalho reserva="Reserva OS-12" />);
-    expect(container.querySelector("#idioma-botao")).not.toBeNull();
+    const { container } = renderiza(<><SeletorIdioma segmentado /><CardCompartilhar /></>);
+    expect(container.querySelector("#idioma")).not.toBeNull();
     for (const l of IDIOMAS) expect(container.querySelector(`[data-idioma="${l.id}"]`)).not.toBeNull();
     expect(screen.getByLabelText("Compartilhar este link")).toBeInTheDocument();
     fireEvent.click(container.querySelector('[data-idioma="en"]')!);

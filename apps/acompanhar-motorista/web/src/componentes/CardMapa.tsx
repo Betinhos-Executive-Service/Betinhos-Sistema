@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BT, DEBUG, reduzMovimento } from "../bt";
 import { useIdioma } from "../i18n";
-import { Ampliar, Centro, Fechar } from "../icones";
+import { km } from "../formato";
+import type { EtaMostrado } from "../hooks/useEta";
+import { Ampliar, Aviso, Centro, Fechar } from "../icones";
 import { MapaViagem } from "../mapa/MapaViagem";
 import type { Vivo } from "../status";
 import type { Dados } from "../tipos";
@@ -14,15 +16,13 @@ interface Props {
   dados: Dados | null;
   retomada: number;
   vivo: Vivo;
-  oculto?: boolean;
-  aoMostrarCard: () => void;
-  aoMapaPronto: (pronto: boolean) => void;
+  eta: EtaMostrado;
   aoDiagnostico: (texto: string) => void;
 }
 
 // Mapa único: a miniatura e a tela cheia são o mesmo MapLibre (resize), e a morfose card -> tela cheia é um layout animation do motion.
-export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, aoDiagnostico }: Props) {
-  const { t } = useIdioma();
+export function CardMapa({ dados, retomada, vivo, eta, aoDiagnostico }: Props) {
+  const { t, id } = useIdioma();
   const caixa = useRef<HTMLDivElement>(null);
   const alvo = useRef<HTMLDivElement>(null);
   const cartao = useRef<HTMLElement>(null);
@@ -31,8 +31,8 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
   const ctrl = useRef<MapaViagem | null>(null);
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
-  const cb = useRef({ aoMostrarCard, aoDiagnostico });
-  cb.current = { aoMostrarCard, aoDiagnostico };
+  const cb = useRef({ aoDiagnostico });
+  cb.current = { aoDiagnostico };
   const textos = useRef({ t });
   textos.current = { t };
   const [seguindo, setSeguindo] = useState(true);
@@ -49,15 +49,14 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
       corRota: getComputedStyle(document.documentElement).getPropertyValue("--bt-color-action").trim(),
       rotuloVeiculo: textos.current.t("veiculo"), rotuloEtapa: (n) => textos.current.t("etapa", { n }),
       aoMexer: () => setSeguindo(false), aoSeguir: setSeguindo,
-      aoMostrarCard: () => cb.current.aoMostrarCard(), aoDiagnostico: (x) => cb.current.aoDiagnostico(x),
+      aoMostrarCard() {}, aoDiagnostico: (x) => cb.current.aoDiagnostico(x),
     }, dadosRef.current).then((m) => {
       if (!vivoEfeito) { m.destruir(); return; }
       ctrl.current = m;
       // Os dados que chegaram enquanto a biblioteca baixava (o efeito de [dados] ainda não tinha mapa) entram agora.
       if (dadosRef.current) m.atualizar(dadosRef.current);
-      aoMapaPronto(true);
     }).catch(() => { /* sem biblioteca: o painel segue funcionando e o card final aparece pelo plano B */ });
-    return () => { vivoEfeito = false; ctrl.current?.destruir(); ctrl.current = null; aoMapaPronto(false); };
+    return () => { vivoEfeito = false; ctrl.current?.destruir(); ctrl.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (dados) ctrl.current?.atualizar(dados); }, [dados]);
@@ -108,11 +107,12 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
   const dialogo = ampliado ? { role: "dialog", "aria-modal": true, "aria-label": t("mapa") } : {};
   return (
     <section className="card c-mapa" id="c-mapa" aria-labelledby="mapa-titulo" ref={cartao}>
-      <h2 id="mapa-titulo">{t("card.mapa")}</h2>
+      <h2 id="mapa-titulo" className="sr">{t("card.mapa")}</h2>
       <div className="mapa-moldura">
         <motion.div layout className={"mapa-caixa" + (ampliado ? " ampliado" : "")} id="mapa-caixa" ref={caixa} style={{ borderRadius: raio }} transition={transicao}
           onLayoutAnimationComplete={() => ctrl.current?.redimensionar()} {...dialogo}>
           <div id="mapa" ref={alvo} role="region" aria-label={t("mapa")} />
+          <span className={"selo-mapa" + (vivo.velha ? " velho" : "")} id="selo-mapa" hidden={vivo.oculto}>{vivo.velha ? <><Aviso /><span>{vivo.texto || t("conexao.reconectando")}</span></> : <><i aria-hidden="true" /><span>{t("mapa.aoVivo")}</span></>}</span>
           <button type="button" ref={centrarRef} className="qd btn-centro" id="centrar" aria-label={t("centrar")} data-oculto={seguindo ? "1" : "0"}
             onClick={() => { ctrl.current?.centrar(); setSeguindo(true); }}><Centro /></button>
           <button type="button" className="btn btn-secundario mapa-btn" id="ampliar" hidden={ampliado} onClick={() => ampliar(true)}><Ampliar /><span>{t("mapa.ampliar")}</span></button>
@@ -123,12 +123,15 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
         {ampliado ? <motion.div key="fundo" className="mapa-fundo" id="mapa-fundo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={reduzMovimento() ? { duration: 0 } : { duration: ampliado ? 0.35 : 0.25, ease: EASE }} onClick={() => ampliar(false)} /> : null}
       </AnimatePresence>
-      <p key={pulsos.current.n} className={"vivo pulso" + (vivo.velha ? " velha" : "")} id="vivo" hidden={vivo.oculto}>
-        <span id="atualizado">{vivo.texto}</span>
-        <span className={"conexao" + (vivo.conexao === "off" ? " off" : "")} id="conexao" role="status" hidden={vivo.conexao === ""}>
-          {vivo.conexao === "off" ? t("conexao.off") : vivo.conexao === "rastreador" ? t("conexao.rastreador") : vivo.conexao === "reconectando" ? t("conexao.reconectando") : ""}
-        </span>
-      </p>
+      <div className="mapa-pe">
+        <span id="mapa-km">{eta.eta && typeof eta.eta.km === "number" ? t(dados?.fase === "em_viagem" ? "mapa.kmDestino" : "mapa.km", { km: km(id, eta.eta.km) }) : t("mapa.semPrevisao")}</span>
+        <p key={pulsos.current.n} className={"vivo pulso" + (vivo.velha ? " velha" : "")} id="vivo" hidden={vivo.oculto}>
+          <span id="atualizado">{vivo.texto}</span>
+          <span className={"conexao" + (vivo.conexao === "off" ? " off" : "")} id="conexao" role="status" hidden={vivo.conexao === ""}>
+            {vivo.conexao === "off" ? t("conexao.off") : vivo.conexao === "rastreador" ? t("conexao.rastreador") : vivo.conexao === "reconectando" ? t("conexao.reconectando") : ""}
+          </span>
+        </p>
+      </div>
     </section>
   );
 }

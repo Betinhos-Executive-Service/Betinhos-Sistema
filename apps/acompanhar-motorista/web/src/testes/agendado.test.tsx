@@ -1,25 +1,9 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CardTrajeto } from "../componentes/CardTrajeto";
 import { MapaViagem } from "../mapa/MapaViagem";
 import { renderiza } from "./ajuda";
 
 const agendado = { fase: "agendado", horarioAgendado: "2026-12-01T13:00:00Z", embarque: { lat: -18.9, lon: -48.27, label: "Av. Rondon Pacheco, 100 - Uberlândia" }, posicao: null, rota: null };
-
-describe("Card do trajeto antes da saída", () => {
-  it("sem etapas e com embarque: mostra a Saída com o endereço e o horário agendado", () => {
-    const { container } = renderiza(<CardTrajeto dados={agendado} chegada={null} oculto={false} />);
-    expect(container.querySelector("#c-trajeto")).not.toHaveAttribute("hidden");
-    expect(screen.getByText("Saída")).toBeInTheDocument();
-    expect(screen.getByText(/Rondon Pacheco/)).toBeInTheDocument();
-    expect(container.querySelector(".p-h b")).toBeTruthy();
-    expect(screen.getByText("Agendado")).toBeInTheDocument();
-  });
-  it("sem etapas e sem embarque: continua oculto", () => {
-    const { container } = renderiza(<CardTrajeto dados={{ fase: "agendado" }} chegada={null} oculto={false} />);
-    expect(container.querySelector("#c-trajeto")).toHaveAttribute("hidden");
-  });
-});
 
 // MapLibre falso: guarda as chamadas de enquadramento para provar que o centro não depende do tamanho da tela.
 const chamadas: any[] = [];
