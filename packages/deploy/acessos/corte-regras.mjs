@@ -122,3 +122,93 @@ export function conferirManter(estado, manter) {
   }
   return erros
 }
+
+export function travasDePessoas(lista, { uso, incertas = new Set() }) {
+  const travas = [], informativo = []
+  for (const p of lista) {
+    const usadas = p.escrita.filter((t) => incertas.has(t) || uso.get(t)?.has(p.id))
+    const semUso = [...p.leitura, ...p.escrita.filter((t) => !usadas.includes(t))]
+    if (usadas.length) travas.push({ id: p.id, tabelas: usadas })
+    if (semUso.length) informativo.push({ id: p.id, tabelas: semUso })
+  }
+  return { travas, informativo }
+}
+
+const DATAVERSE = /commondataserviceforapps/i
+
+// Tabelas que o flow toca pelo conector do Dataverse. Qualquer operação do conector sem tabela conhecida
+// (expressão, ação sem entityName, nome fora do catálogo) deixa o flow incerto.
+export function tabelasDoFlow(clientdata, catalogo) {
+  let definicao
+  try {
+    definicao = JSON.parse(clientdata)?.properties?.definition
+  } catch {
+    return { tabelas: [], incerto: true }
+  }
+  if (!definicao) return { tabelas: [], incerto: true }
+  const tabelas = new Set()
+  let incerto = false
+  const visitar = (no) => {
+    const host = no?.inputs?.host
+    if (host && DATAVERSE.test(JSON.stringify(host))) {
+      const p = no.inputs.parameters ?? {}
+      const bruto = p.entityName ?? p['subscriptionRequest/entityname']
+      const logico = typeof bruto === 'string' && !bruto.includes('@') ? catalogo.get(bruto.toLowerCase()) : undefined
+      if (logico) tabelas.add(logico)
+      else incerto = true
+    }
+    for (const v of Object.values(no ?? {})) if (v && typeof v === 'object') visitar(v)
+  }
+  visitar(definicao)
+  return { tabelas: [...tabelas].sort(), incerto }
+}
+
+export function travasDeFlows(flows, { perdasPorUsuario, servico, manter, equipeCorte }) {
+  const travas = []
+  for (const f of flows) {
+    if (f.dono.tipo === 'equipe') {
+      if (f.dono.id === equipeCorte) travas.push({ id: f.id, motivo: 'dono é a equipe do corte' })
+      continue
+    }
+    if (f.dono.id === servico || manter.has(f.dono.id)) continue
+    if (f.incerto) {
+      travas.push({ id: f.id, motivo: 'tabelas do flow incertas: mover o flow para a conta de serviço' })
+      continue
+    }
+    const p = perdasPorUsuario.get(f.dono.id)
+    const perdidas = f.tabelas.filter((t) => p && (p.escrita.includes(t) || p.leitura.includes(t)))
+    if (perdidas.length) travas.push({ id: f.id, motivo: 'dono perde acesso a tabela do flow', tabelas: perdidas })
+  }
+  return travas
+}
+
+export function montarRelatorio({ estado, manter, uso, incertas, flows, referencias = [] }) {
+  const erros = conferirManter(estado, manter)
+  const plano = planoDoCorte(estado, { manter })
+  const lista = perdasPorPessoa(estado, plano)
+  const { travas, informativo } = travasDePessoas(lista, { uso, incertas })
+  const perdasPorUsuario = new Map(lista.map((p) => [p.id, p]))
+  const travasFlows = travasDeFlows(flows, { perdasPorUsuario, servico: estado.servico, manter, equipeCorte: estado.equipe.id })
+  const perdem = new Set(lista.filter((p) => p.escrita.length || p.leitura.length).map((p) => p.id))
+  return {
+    zero: !erros.length && !travas.length && !travasFlows.length,
+    erros, plano, travas, travasFlows, informativo,
+    referencias: referencias.filter((r) => perdem.has(r.dono)),
+    incertas: [...incertas].sort(),
+  }
+}
+
+// Log público do Actions: só contagens, nomes de tabela e ids curtos com hash.
+export function resumoPublico(rel, { ambiente, sal }) {
+  const h = (id) => hashCurto(id, sal)
+  const pessoas = new Set(rel.plano.pessoasRemover.map((p) => p.usuario)).size
+  const lista = (itens, f) => (itens.length ? ` (${itens.map(f).join('; ')})` : '')
+  return [
+    `Corte dos acessos (${ambiente}): ${rel.zero ? 'ZERO, pode aplicar' : 'TRAVADO, nada aplicado'}`,
+    `Plano: equipe perde ${rel.plano.equipeRemover.length} papel(is) e ganha ${rel.plano.equipeAdicionar.length}; ${rel.plano.pessoasRemover.length} papel(is) direto(s) saem de ${pessoas} pessoa(s)`,
+    `Travas de pessoas: ${rel.travas.length}${lista(rel.travas, (t) => `${h(t.id)}: ${t.tabelas.join(', ')}`)}`,
+    `Travas de flows: ${rel.travasFlows.length}${lista(rel.travasFlows, (t) => `${h(t.id)}: ${t.motivo}`)}`,
+    ...rel.erros.map((e) => `Erro: ${e.id ? `${h(e.id)}: ` : ''}${e.motivo}`),
+    `Informativo: ${rel.informativo.length} pessoa(s) perdem acesso sem uso nos últimos ${DIAS} dias; ${rel.referencias.length} referência(s) de conexão de quem perde acesso; tabelas sem medida de uso: ${rel.incertas.join(', ') || 'nenhuma'}`,
+  ].join('\n')
+}

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  aplicarPlano, conferirManter, desde, efetivos, lerCorte, lerIds, perdasPorPessoa, planoDoCorte, planoVazio,
+  aplicarPlano, conferirManter, desde, efetivos, lerCorte, lerIds, montarRelatorio, perdasPorPessoa, planoDoCorte,
+  planoVazio, resumoPublico, tabelasDoFlow, travasDeFlows, travasDePessoas,
 } from './corte-regras.mjs'
 
 const ID = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -110,4 +111,84 @@ test('admins a manter: vazio, inexistente e sem admin direto travam', () => {
   assert.deepEqual(conferirManter(estado(), new Set([ANA])), [{ id: ANA, motivo: 'admin a manter não tem Administrador do Sistema direto' }])
   assert.deepEqual(conferirManter(estado(), new Set([ID(999)])), [{ id: ID(999), motivo: 'admin a manter não é pessoa ativa' }])
   assert.deepEqual(conferirManter(estado(), new Set([SERV])), [{ id: SERV, motivo: 'admin a manter não é pessoa ativa' }])
+})
+
+const plano0 = () => planoDoCorte(estado(), { manter: MANTER })
+
+test('trava só perda de escrita em tabela usada nos 90 dias; o resto é informativo', () => {
+  const lista = perdasPorPessoa(estado(), plano0())
+  const uso = new Map([['cr40f_financeiro', new Set([ANA])], ['cr40f_reservadeveculos', new Set([ANA])]])
+  const r = travasDePessoas(lista, { uso })
+  assert.deepEqual(r.travas, [{ id: ANA, tabelas: ['cr40f_financeiro'] }])
+  assert.deepEqual(r.informativo, [
+    { id: ANA, tabelas: ['cr40f_funcionarios', 'cr40f_veiculos'] },
+    { id: BIA, tabelas: ['cr40f_financeiro', 'cr40f_funcionarios', 'cr40f_reservadeveculos', 'cr40f_veiculos'] },
+  ])
+})
+
+test('tabela sem medida de uso trava quem perde escrita nela', () => {
+  const lista = perdasPorPessoa(estado(), plano0())
+  const r = travasDePessoas(lista, { uso: new Map(), incertas: new Set(['cr40f_veiculos']) })
+  assert.deepEqual(r.travas, [{ id: ANA, tabelas: ['cr40f_veiculos'] }, { id: BIA, tabelas: ['cr40f_veiculos'] }])
+})
+
+const host = { apiId: '/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps', connectionName: 'shared_commondataserviceforapps' }
+const catalogo = new Map([
+  ['cr40f_financeiro', 'cr40f_financeiro'], ['cr40f_financeiros', 'cr40f_financeiro'],
+  ['cr40f_reservadeveculos', 'cr40f_reservadeveculos'], ['cr40f_reservadeveculoses', 'cr40f_reservadeveculos'],
+])
+const fluxo = (acoes) => JSON.stringify({ properties: { definition: {
+  triggers: { quando: { type: 'OpenApiConnectionWebhook', inputs: { host, parameters: { 'subscriptionRequest/entityname': 'cr40f_financeiro' } } } },
+  actions: acoes,
+} } })
+
+test('tabelas do flow: gatilho e ações do Dataverse, inclusive aninhadas', () => {
+  const texto = fluxo({
+    listar: { type: 'OpenApiConnection', inputs: { host, parameters: { entityName: 'cr40f_reservadeveculoses' } } },
+    se: { type: 'If', actions: { email: { type: 'OpenApiConnection', inputs: { host: { connectionName: 'shared_office365' }, parameters: {} } } } },
+  })
+  assert.deepEqual(tabelasDoFlow(texto, catalogo), { tabelas: ['cr40f_financeiro', 'cr40f_reservadeveculos'], incerto: false })
+})
+
+test('tabelas do flow: expressão, tabela desconhecida, ação sem tabela e JSON ruim ficam incertos', () => {
+  const op = (parameters) => fluxo({ a: { type: 'OpenApiConnection', inputs: { host, parameters } } })
+  assert.equal(tabelasDoFlow(op({ entityName: "@variables('t')" }), catalogo).incerto, true)
+  assert.equal(tabelasDoFlow(op({ entityName: 'cr40f_naoexiste' }), catalogo).incerto, true)
+  assert.equal(tabelasDoFlow(op({ actionName: 'cr40f_AcessoDefinirPerfis' }), catalogo).incerto, true)
+  assert.equal(tabelasDoFlow('{', catalogo).incerto, true)
+  assert.equal(tabelasDoFlow('', catalogo).incerto, true)
+})
+
+test('flows: trava dono que perde tabela do flow, incerto de pessoa comum e equipe do corte', () => {
+  const lista = perdasPorPessoa(estado(), plano0())
+  const flows = [
+    { id: 'f1', dono: { tipo: 'usuario', id: ANA }, tabelas: ['cr40f_financeiro'], incerto: false },
+    { id: 'f2', dono: { tipo: 'usuario', id: SERV }, tabelas: [], incerto: true },
+    { id: 'f3', dono: { tipo: 'usuario', id: BIA }, tabelas: [], incerto: true },
+    { id: 'f4', dono: { tipo: 'equipe', id: EQ }, tabelas: ['cr40f_reservadeveculos'], incerto: false },
+    { id: 'f5', dono: { tipo: 'usuario', id: MANTIDO }, tabelas: [], incerto: true },
+    { id: 'f6', dono: { tipo: 'usuario', id: ANA }, tabelas: ['cr40f_reservadeveculos'], incerto: false },
+  ]
+  const travas = travasDeFlows(flows, { perdasPorUsuario: new Map(lista.map((p) => [p.id, p])), servico: SERV, manter: MANTER, equipeCorte: EQ })
+  assert.deepEqual(travas.map((t) => t.id), ['f1', 'f3', 'f4'])
+  assert.deepEqual(travas[0].tabelas, ['cr40f_financeiro'])
+})
+
+test('relatório: zero só sem trava; resumo público sem GUID', () => {
+  const e = estado()
+  const limpo = montarRelatorio({ estado: e, manter: MANTER, uso: new Map(), incertas: new Set(), flows: [], referencias: [] })
+  assert.equal(limpo.zero, true)
+  const travado = montarRelatorio({
+    estado: e, manter: MANTER, uso: new Map([['cr40f_financeiro', new Set([ANA])]]), incertas: new Set(),
+    flows: [{ id: ID(700), dono: { tipo: 'usuario', id: BIA }, tabelas: [], incerto: true }],
+    referencias: [{ id: ID(800), dono: BIA }, { id: ID(801), dono: SERV }],
+  })
+  assert.equal(travado.zero, false)
+  assert.equal(travado.referencias.length, 1)
+  const texto = resumoPublico(travado, { ambiente: 'dev', sal: 'host' })
+  assert.match(texto, /TRAVADO/)
+  assert.match(texto, /Travas de pessoas: 1/)
+  assert.match(texto, /Travas de flows: 1/)
+  assert.doesNotMatch(texto, /[0-9a-f]{8}-[0-9a-f]{4}-/)
+  assert.match(resumoPublico(montarRelatorio({ estado: e, manter: new Set(), uso: new Map(), incertas: new Set(), flows: [] }), { ambiente: 'dev', sal: 'h' }), /Erro: ACESSOS_ADMINS_MANTER vazia/)
 })
