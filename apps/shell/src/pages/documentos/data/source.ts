@@ -167,7 +167,7 @@ export function createDocsSource(host: Host): DocsSource {
 
   let sets: Promise<EntitySets> | null = null
   // Quem só tem Frota não lê a tabela de RH dos destinatários de aviso: lista vazia, a ficha do veículo abre.
-  const semPermissao = <T,>(p: Promise<T[]>) => p.catch((e: unknown) => { if (e instanceof DataverseError && e.status === 403) return [] as T[]; throw e })
+  const semPermissao = <T,>(p: Promise<T[]>) => p.catch((e: unknown): T[] => { if (e instanceof DataverseError && e.status === 403) return []; throw e })
 
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => {
     const get = (name: string) => {
