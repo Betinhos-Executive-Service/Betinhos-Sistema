@@ -43,6 +43,8 @@ const rotas = () => [
     { LogicalName: 'cr40f_financeiro', EntitySetName: 'cr40f_financeiros', IsCustomEntity: true, TableType: 'Standard', Privileges: [{ PrivilegeId: ID(600), PrivilegeType: 'Write' }] },
     { LogicalName: 'systemuser', EntitySetName: 'systemusers', IsCustomEntity: false, TableType: 'Standard', Privileges: [] },
     { LogicalName: 'cr40f_virtual', EntitySetName: 'cr40f_virtuais', IsCustomEntity: true, TableType: 'Virtual', Privileges: [] },
+    { LogicalName: 'msdyn_aimodel', EntitySetName: 'msdyn_aimodels', IsCustomEntity: true, TableType: 'Standard', Privileges: [] },
+    { LogicalName: 'cr40f_a_cr40f_b', EntitySetName: 'cr40f_a_cr40f_bset', IsIntersect: true, TableType: 'Standard', Privileges: [] },
   ] }],
   [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.antigo}`, { RolePrivileges: [{ PrivilegeId: ID(600), Depth: 'Global' }, { PrivilegeId: ID(999), Depth: 'Global' }] }],
   [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.base}`, { RolePrivileges: [] }],
@@ -74,9 +76,15 @@ test('lerEstado recusa profundidade desconhecida', async () => {
   await assert.rejects(lerEstado(falso(r)), /profundidade desconhecida/)
 })
 
-test('lerEstado recusa equipe ausente ou Base fora da unidade da equipe', async () => {
-  const semEquipe = rotas().map(([k, v]) => (k === 'teams?' ? [k, []] : [k, v]))
-  await assert.rejects(lerEstado(falso(semEquipe)), /0 encontradas/)
+test('lerEstado sem a equipe usa a Base da unidade raiz; recusa equipe repetida ou Base fora da unidade', async () => {
+  const semEquipe = [['businessunits?', [{ businessunitid: BU }]], ...rotas().map(([k, v]) => (k === 'teams?' ? [k, []] : [k, v]))]
+  const e = await lerEstado(falso(semEquipe))
+  assert.equal(e.equipe, null)
+  assert.equal(e.base, P.base)
+  const outraRaiz = semEquipe.map(([k, v]) => (k === 'businessunits?' ? [k, [{ businessunitid: ID(901) }]] : [k, v]))
+  await assert.rejects(lerEstado(falso(outraRaiz)), /Perfil - Base não existe na unidade raiz/)
+  const duas = rotas().map(([k, v]) => (k === 'teams?' ? [k, [...v, { ...v[0], teamid: ID(101) }]] : [k, v]))
+  await assert.rejects(lerEstado(falso(duas)), /2 encontradas/)
   const semBase = rotas().map(([k, v]) => (k === 'roles?' ? [k, v.filter((r) => r.name !== 'Perfil - Base')] : [k, v]))
   await assert.rejects(lerEstado(falso(semBase)), /Perfil - Base não existe/)
 })

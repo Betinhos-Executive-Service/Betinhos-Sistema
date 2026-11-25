@@ -242,3 +242,17 @@ test('desfazer ignora pessoa inativa e papel que não existe mais; recusa outra 
   assert.deepEqual(pd.ignorados.sort(), [P.dev, BIA].sort())
   assert.throws(() => planoDesfazer([{ ...foto, equipe: { id: ID(101), papeis: [] } }], cortado), /outra equipe/)
 })
+
+test('sem a equipe: só os papéis diretos saem, a foto guarda equipe nula e o desfazer devolve às pessoas', () => {
+  const e = { ...estado(), equipe: null }
+  const plano = planoDoCorte(e, { manter: MANTER })
+  assert.deepEqual([plano.equipeRemover, plano.equipeAdicionar], [[], []])
+  assert.deepEqual(plano.pessoasRemover, [{ usuario: BIA, papel: P.antigo }, { usuario: BIA, papel: P.admin }])
+  const cortado = aplicarPlano(e, plano)
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  assert.equal(foto.equipe, null)
+  assert.equal(mesmoPlano(foto, plano), true)
+  const pd = planoDesfazer([foto], cortado)
+  assert.deepEqual([pd.equipeAdicionar, pd.pessoasAdicionar.length], [[], 2])
+  assert.throws(() => planoDesfazer([foto], estado()), /outra equipe/)
+})

@@ -2,6 +2,7 @@
 import { ADMIN, EQUIPE, NIVEL, PAPEL_BASE, tabelasDoFlow } from './corte-regras.mjs'
 
 // Tabelas padrão medidas além das customizadas (as que a operação cria e altera no dia a dia).
+const PREFIXOS = /^(cr40f|new)_/
 export const PADRAO_MEDIDAS = ['account', 'annotation', 'appointment', 'contact', 'email', 'phonecall', 'task']
 
 function agrupar(linhas, chave, valor) {
@@ -11,7 +12,7 @@ function agrupar(linhas, chave, valor) {
 }
 
 export async function lerCatalogo(dv) {
-  const linhas = (await dv.um('EntityDefinitions?$select=LogicalName,EntitySetName,IsCustomEntity,TableType,Privileges')).value
+  const linhas = (await dv.um('EntityDefinitions?$select=LogicalName,EntitySetName,IsIntersect,TableType,Privileges')).value
   const indice = new Map(), catalogo = new Map(), conjuntoDe = new Map(), tabelas = []
   for (const e of linhas) {
     catalogo.set(e.LogicalName.toLowerCase(), e.LogicalName)
@@ -20,7 +21,8 @@ export async function lerCatalogo(dv) {
       conjuntoDe.set(e.LogicalName, e.EntitySetName)
     }
     for (const p of e.Privileges ?? []) indice.set(p.PrivilegeId, { tabela: e.LogicalName, tipo: p.PrivilegeType })
-    if (e.TableType !== 'Virtual' && e.TableType !== 'Elastic' && (e.IsCustomEntity || PADRAO_MEDIDAS.includes(e.LogicalName))) tabelas.push(e.LogicalName)
+    // Só as tabelas da Betinhos (cr40f_/new_) e as padrão medidas; as de soluções da Microsoft e as de ligação ficam fora.
+    if (e.TableType !== 'Virtual' && e.TableType !== 'Elastic' && !e.IsIntersect && (PREFIXOS.test(e.LogicalName) || PADRAO_MEDIDAS.includes(e.LogicalName))) tabelas.push(e.LogicalName)
   }
   return { indice, catalogo, conjuntoDe, tabelas: tabelas.sort() }
 }
@@ -28,11 +30,13 @@ export async function lerCatalogo(dv) {
 export async function lerEstado(dv) {
   const { UserId } = await dv.um('WhoAmI')
   const equipes = await dv.todos(`teams?$select=teamid,name,_businessunitid_value&$filter=name eq '${EQUIPE}'`)
-  if (equipes.length !== 1) throw new Error(`equipe ${EQUIPE}: ${equipes.length} encontradas (esperado 1)`)
-  const equipe = { id: equipes[0].teamid, bu: equipes[0]._businessunitid_value }
+  if (equipes.length > 1) throw new Error(`equipe ${EQUIPE}: ${equipes.length} encontradas (esperado 1)`)
+  // Sem a equipe (o DEV não tem), o corte só mexe nos papéis diretos e a Base é a da unidade raiz.
+  const equipe = equipes.length ? { id: equipes[0].teamid, bu: equipes[0]._businessunitid_value } : null
+  const unidade = equipe?.bu ?? (await dv.todos('businessunits?$select=businessunitid&$filter=_parentbusinessunitid_value eq null'))[0]?.businessunitid
   const linhasPapeis = await dv.todos('roles?$select=roleid,name,_businessunitid_value')
-  const base = linhasPapeis.find((r) => r.name === PAPEL_BASE && r._businessunitid_value === equipe.bu)
-  if (!base) throw new Error(`${PAPEL_BASE} não existe na unidade da equipe`)
+  const base = linhasPapeis.find((r) => r.name === PAPEL_BASE && r._businessunitid_value === unidade)
+  if (!base) throw new Error(`${PAPEL_BASE} não existe na unidade ${equipe ? 'da equipe' : 'raiz'}`)
   const teamroles = await dv.ligacao('teamroles', 'teamid,roleid')
   const membros = await dv.ligacao('teammembership', 'teamid,systemuserid')
   const userroles = await dv.ligacao('systemuserroles', 'systemuserid,roleid')
@@ -46,7 +50,7 @@ export async function lerEstado(dv) {
     .map((u) => ({ id: u.systemuserid, app: u.applicationid != null, equipes: equipesDe.get(u.systemuserid) ?? [], diretos: diretosDe.get(u.systemuserid) ?? [] }))
   const usados = new Set([
     base.roleid,
-    ...(equipesPapeis.get(equipe.id) ?? []),
+    ...(equipe ? equipesPapeis.get(equipe.id) ?? [] : []),
     ...pessoas.flatMap((p) => [...p.diretos, ...p.equipes.flatMap((t) => equipesPapeis.get(t) ?? [])]),
   ])
   const { indice, catalogo, conjuntoDe, tabelas } = await lerCatalogo(dv)

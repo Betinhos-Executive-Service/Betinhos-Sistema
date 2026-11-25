@@ -74,7 +74,7 @@ export function perdas(antes, depois, universo) {
 // Usuário de aplicação e a conta que roda nunca perdem papel direto.
 export function planoDoCorte(estado, { manter }) {
   const nome = (id) => estado.papeis.get(id)?.nome ?? ''
-  const daEquipe = estado.equipes.get(estado.equipe.id) ?? []
+  const daEquipe = estado.equipe ? estado.equipes.get(estado.equipe.id) ?? [] : null
   const pessoasRemover = []
   for (const p of estado.pessoas) {
     if (p.app || p.id === estado.servico) continue
@@ -83,8 +83,8 @@ export function planoDoCorte(estado, { manter }) {
     }
   }
   return {
-    equipeRemover: daEquipe.filter((r) => r !== estado.base),
-    equipeAdicionar: daEquipe.includes(estado.base) ? [] : [estado.base],
+    equipeRemover: daEquipe ? daEquipe.filter((r) => r !== estado.base) : [],
+    equipeAdicionar: !daEquipe || daEquipe.includes(estado.base) ? [] : [estado.base],
     pessoasRemover,
   }
 }
@@ -93,10 +93,12 @@ export const planoVazio = (p) => !p.equipeRemover.length && !p.equipeAdicionar.l
 
 export function aplicarPlano(estado, plano) {
   const equipes = new Map(estado.equipes)
-  const atuais = new Set(equipes.get(estado.equipe.id) ?? [])
-  for (const r of plano.equipeRemover) atuais.delete(r)
-  for (const r of plano.equipeAdicionar) atuais.add(r)
-  equipes.set(estado.equipe.id, [...atuais])
+  if (estado.equipe) {
+    const atuais = new Set(equipes.get(estado.equipe.id) ?? [])
+    for (const r of plano.equipeRemover) atuais.delete(r)
+    for (const r of plano.equipeAdicionar) atuais.add(r)
+    equipes.set(estado.equipe.id, [...atuais])
+  }
   const tirar = new Map()
   for (const { usuario, papel } of plano.pessoasRemover) tirar.set(usuario, new Set([...(tirar.get(usuario) ?? []), papel]))
   const pessoas = estado.pessoas.map((p) => ({ ...p, diretos: p.diretos.filter((r) => !tirar.get(p.id)?.has(r)) }))
@@ -188,7 +190,7 @@ export function montarRelatorio({ estado, manter, uso, incertas, flows, referenc
   const lista = perdasPorPessoa(estado, plano)
   const { travas, informativo } = travasDePessoas(lista, { uso, incertas })
   const perdasPorUsuario = new Map(lista.map((p) => [p.id, p]))
-  const travasFlows = travasDeFlows(flows, { perdasPorUsuario, servico: estado.servico, manter, equipeCorte: estado.equipe.id })
+  const travasFlows = travasDeFlows(flows, { perdasPorUsuario, servico: estado.servico, manter, equipeCorte: estado.equipe?.id })
   const perdem = new Set(lista.filter((p) => p.escrita.length || p.leitura.length).map((p) => p.id))
   return {
     zero: !erros.length && !travas.length && !travasFlows.length,
@@ -219,7 +221,7 @@ export function fotoDoCorte(estado, plano, { ambiente, host, quando, commit }) {
   const ids = [...plano.equipeRemover, ...plano.pessoasRemover.map((p) => p.papel)]
   return {
     versao: 1, ambiente, host, quando, commit,
-    equipe: { id: estado.equipe.id, papeis: [...plano.equipeRemover] },
+    equipe: estado.equipe ? { id: estado.equipe.id, papeis: [...plano.equipeRemover] } : null,
     base: estado.base,
     pessoas: [...porPessoa].map(([id, papeis]) => ({ id, papeis })),
     nomes: Object.fromEntries(ids.map((id) => [id, estado.papeis.get(id)?.nome ?? ''])),
@@ -234,26 +236,26 @@ export function lerFoto(texto) {
     f = null
   }
   const ids = (lista) => Array.isArray(lista) && lista.every((x) => GUID.test(x))
-  const ok = f?.versao === 1 && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' && GUID.test(f.equipe?.id ?? '') &&
-    ids(f.equipe.papeis) && Array.isArray(f.pessoas) && f.pessoas.every((p) => GUID.test(p?.id ?? '') && ids(p.papeis))
+  const ok = f?.versao === 1 && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' &&
+    (f.equipe === null || (GUID.test(f.equipe?.id ?? '') && ids(f.equipe.papeis))) && Array.isArray(f.pessoas) && f.pessoas.every((p) => GUID.test(p?.id ?? '') && ids(p.papeis))
   if (!ok) throw new Error('foto do corte em formato desconhecido; nada feito')
   return f
 }
 
 export function mesmoPlano(foto, plano) {
   const chave = (lista) => JSON.stringify([...lista].sort())
-  return chave(foto.equipe.papeis) === chave(plano.equipeRemover) &&
+  return chave(foto.equipe?.papeis ?? []) === chave(plano.equipeRemover) &&
     chave(foto.pessoas.flatMap((p) => p.papeis.map((r) => `${p.id}|${r}`))) === chave(plano.pessoasRemover.map((p) => `${p.usuario}|${p.papel}`))
 }
 
 // União de todas as fotos: um corte em mais de uma execução continua desfazível. Perfil - Base fica na equipe.
 export function planoDesfazer(fotos, estado) {
-  const daEquipe = new Set(estado.equipes.get(estado.equipe.id) ?? [])
+  const daEquipe = new Set(estado.equipe ? estado.equipes.get(estado.equipe.id) ?? [] : [])
   const pessoas = new Map(estado.pessoas.filter((p) => !p.app).map((p) => [p.id, p]))
   const equipe = new Set(), diretos = new Map(), ignorados = new Set()
   for (const f of fotos) {
-    if (f.equipe.id !== estado.equipe.id) throw new Error('foto de outra equipe; nada feito')
-    for (const r of f.equipe.papeis) {
+    if ((f.equipe?.id ?? null) !== (estado.equipe?.id ?? null)) throw new Error('foto de outra equipe; nada feito')
+    for (const r of f.equipe?.papeis ?? []) {
       if (!estado.papeis.has(r)) ignorados.add(r)
       else if (!daEquipe.has(r)) equipe.add(r)
     }
