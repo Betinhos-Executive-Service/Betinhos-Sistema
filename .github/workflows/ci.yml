@@ -124,7 +124,7 @@ jobs:
         run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.parte }}
 
   # Worker acompanhar-motorista (apps/acompanhar-motorista): check (node --check + tsc), testes (node:test + vitest) e build do front.
-  # Só roda quando o PR toca o app. Nunca publica nem chama wrangler (a publicação é do deploy.yml e do producao.yml).
+  # Só roda quando o PR toca o app. Nunca publica nem chama wrangler (a publicação é do deploy-cloudflare.yml e do producao.yml).
   acompanhar-motorista:
     needs: mudancas
     if: needs.mudancas.outputs.acompanhar == 'true'
