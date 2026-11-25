@@ -49,6 +49,8 @@ export const PEDIDO_CAMPOS = [
   'cr40f_portalpedido', 'new_linkdovoucher', 'cr40f_tipodeveiculo', 'createdon',
   // Lookups lidos pelo rótulo: nome primário do funcionário (cr40f_nomecompleto) e do veículo (cr40f_placa), metadata DEV 23/11/2026.
   '_cr40f_motorista_value', '_cr40f_veiculo_value',
+  // Quem pediu: quem não pediu (só é passageiro) vê o pedido sem poder cancelar.
+  '_cr40f_portalusuario_value',
 ]
 
 /** Choice cr40f_status da validação (ordem do provision). */

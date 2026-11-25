@@ -76,6 +76,8 @@ export type Pedido = Omit<NovoPedido, 'passageiros'> & {
   criadoEm: string
   /** Só os nomes, para lista, busca e Excel. */
   passageiros: string[]
+  /** Pedido feito por outra pessoa em que o usuário é passageiro: só leitura (não cancela). */
+  comoPassageiro?: boolean
   /** Passageiros com id e contato (de Serviços por Passageiro), para repetir o pedido. */
   pessoas: PassageiroPedido[]
   /** Veículo programado pela operação (nome). */

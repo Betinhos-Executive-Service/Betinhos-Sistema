@@ -77,9 +77,9 @@ export const clientesPorDominio = (dominio: string) =>
 /** Passageiros do pedido: vínculo (ordem) mais a pessoa com o contato. Lido pelo vínculo, nunca por `cr40f_passageirosetelefonedecontato`. */
 const expandPassageiros = `${NAV.passageiros}($select=_cr40f_bancodedados_value,cr40f_ordemdeselecao;$expand=${NAV.vinculoPessoa}($select=${PESSOA_CAMPOS.join(',')}))`
 
-/** Reservas pedidas pelo portal por este usuário (e do cliente da sessão, por garantia). */
-export const pedidosDe = (validadorId: string, clienteId: string) =>
-  `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$expand=${expandPassageiros}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
+/** Reservas do cliente da sessão pedidas por este usuário ou em que o e-mail dele está entre os passageiros. */
+export const pedidosDe = (validadorId: string, clienteId: string, email: string) =>
+  `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$expand=${expandPassageiros}&$filter=${encodeURIComponent(`(_cr40f_portalusuario_value eq ${guid(validadorId)} or ${NAV.passageiros}/any(v:v/${NAV.vinculoPessoa}/cr40f_email eq ${texto(email)})) and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
 
 /** Um pedido do usuário (e do cliente da sessão), com a observação interna para o cancelamento acrescentar a nota. */
 export const pedidoDe = (id: string, validadorId: string, clienteId: string) =>
