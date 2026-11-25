@@ -310,6 +310,14 @@ describe('Portal do cliente', () => {
       fireEvent.keyDown(destino, { key: 'Escape' })
       expect(destino.getAttribute('aria-expanded')).toBe('false')
       expect((destino as HTMLInputElement).value).toBe('Fábrica Latasa, portão 3')
+      // Tab aceita a opção destacada e fecha a lista (o foco segue sozinho).
+      fireEvent.change(destino, { target: { value: 'aeroporto' } })
+      await waitFor(() => expect(destino.getAttribute('aria-expanded')).toBe('true'))
+      fireEvent.keyDown(destino, { key: 'ArrowDown' })
+      const destacada = screen.getAllByRole('option')[0].textContent
+      fireEvent.keyDown(destino, { key: 'Tab' })
+      expect((destino as HTMLInputElement).value).toBe(destacada)
+      expect(destino.getAttribute('aria-expanded')).toBe('false')
     })
 
     it('veículo em cards de rádio com capacidade e aviso quando não cabe', async () => {
@@ -322,8 +330,8 @@ describe('Portal do cliente', () => {
       continuar()
       await screen.findByText('Passo 2 de 3 · Trajeto e horário')
       const grupo = screen.getByRole('group', { name: /Veículo/ })
-      expect(within(grupo).getAllByRole('radio').length).toBe(6)
-      expect((within(grupo).getByRole('radio', { name: /A Betinhos escolhe/ }) as HTMLInputElement).checked).toBe(true)
+      expect(within(grupo).getAllByRole('radio').length).toBe(5)
+      expect((within(grupo).getByRole('radio', { name: /Minivan/ }) as HTMLInputElement).checked).toBe(true)
       expect(within(grupo).getByText('até 14 pax')).toBeTruthy()
       expect(within(grupo).getAllByText('Não cabe 4 pessoas').length).toBe(2)
       // Aviso não bloqueia: escolher o Executivo e seguir.
@@ -347,7 +355,7 @@ describe('Portal do cliente', () => {
       continuar()
       expect(await screen.findByText('Passo 3 de 3 · Conferir e enviar')).toBeTruthy()
       expect(screen.getByText('Pessoa Nova')).toBeTruthy()
-      expect(screen.getByText('A Betinhos escolhe')).toBeTruthy()
+      expect(screen.getByText('Executivo')).toBeTruthy()
       expect(screen.getByText('Voo LA3421')).toBeTruthy()
       expect(screen.getByText(/-feira, \d\d\/\d\d\/\d{4} às 09:00|sábado, |domingo, /)).toBeTruthy()
       // Alterar leva ao passo certo e mantém tudo.

@@ -20,7 +20,7 @@ if (mock && url.searchParams.has('apagar-senhas')) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App
-      api={mock ? createMockApi({ atrasoMs: 350 }) : createWorkerApi()}
+      api={mock ? createMockApi({ atrasoMs: 350, enderecosReais: import.meta.env.DEV }) : createWorkerApi()}
       dicaCodigo={mock ? `Protótipo: use o código ${CODIGO_MOCK}.` : undefined}
     />
   </StrictMode>,

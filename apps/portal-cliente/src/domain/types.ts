@@ -52,7 +52,10 @@ export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'program
 
 /** Pessoa do pedido (`cr40f_bancodedados`). Sem `id` = cadastro novo. */
 /** Sugestão de endereço (TomTom): `rotulo` é o nome do lugar ou da rua; `endereco` o endereço formatado. */
-export type EnderecoSugerido = { rotulo: string; endereco: string }
+/** Local conhecido que a lista destaca com ícone próprio; sem tipo, o ícone sai da heurística (rua ou local). */
+export type TipoLocal = 'aeroporto' | 'hotel' | 'rodoviaria' | 'estacao'
+
+export type EnderecoSugerido = { rotulo: string; endereco: string; tipo?: TipoLocal }
 
 export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string }
 
@@ -62,7 +65,7 @@ export type NovoPedido = {
   destino: string
   /** ISO da saída. */
   saida: string
-  /** Preferência de veículo (valor da choice `cr40f_tipodeveiculo`); sem valor, a Betinhos escolhe. */
+  /** Preferência de veículo (valor da choice `cr40f_tipodeveiculo`); sem valor, fica sem preferência. */
   tipoVeiculo?: number
   observacao?: string
 }

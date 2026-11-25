@@ -22,12 +22,14 @@ const VALIDADORES: Record<string, Usuario> = {
 /** Cadastro por e-mail ou, sem cadastro, pelo domínio do cliente; cliente sem módulo não autoriza. */
 /** Locais públicos fictícios para o dev server sugerir endereço sem TomTom. */
 const ENDERECOS_MOCK: EnderecoSugerido[] = [
-  { rotulo: 'Aeroporto Internacional de Guarulhos', endereco: 'Rodovia Hélio Smidt, s/n, Guarulhos - SP' },
-  { rotulo: 'Aeroporto de Congonhas', endereco: 'Avenida Washington Luís, Vila Congonhas, São Paulo - SP' },
-  { rotulo: 'Aeroporto de Viracopos', endereco: 'Rodovia Santos Dumont, Campinas - SP' },
+  { rotulo: 'Aeroporto Internacional de Guarulhos', endereco: 'Rodovia Hélio Smidt, s/n, Guarulhos - SP', tipo: 'aeroporto' },
+  { rotulo: 'Aeroporto de Congonhas', endereco: 'Avenida Washington Luís, Vila Congonhas, São Paulo - SP', tipo: 'aeroporto' },
+  { rotulo: 'Aeroporto de Viracopos', endereco: 'Rodovia Santos Dumont, Campinas - SP', tipo: 'aeroporto' },
   { rotulo: 'Avenida Paulista, 1000', endereco: 'Avenida Paulista, 1000, Bela Vista, São Paulo - SP' },
   { rotulo: 'Avenida Brigadeiro Faria Lima, 3477', endereco: 'Avenida Brigadeiro Faria Lima, 3477, Itaim Bibi, São Paulo - SP' },
-  { rotulo: 'Rodoviária do Tietê', endereco: 'Avenida Cruzeiro do Sul, 1800, Santana, São Paulo - SP' },
+  { rotulo: 'Rodoviária do Tietê', endereco: 'Avenida Cruzeiro do Sul, 1800, Santana, São Paulo - SP', tipo: 'rodoviaria' },
+  { rotulo: 'Hotel Unique', endereco: 'Avenida Brigadeiro Luís Antônio, 4700, Jardim Paulista, São Paulo - SP', tipo: 'hotel' },
+  { rotulo: 'Estação da Luz', endereco: 'Praça da Luz, 1, Luz, São Paulo - SP', tipo: 'estacao' },
   { rotulo: 'Praça da Sé', endereco: 'Praça da Sé, Sé, São Paulo - SP' },
 ]
 
@@ -71,7 +73,10 @@ export function apagarSenhasMock(armazenamento: Armazenamento = armazenamentoPad
 }
 
 /** PortalApi em memória para o protótipo: nada sai do navegador. Senhas e sessão ficam em `armazenamento` (no real, hash no Dataverse e cookie do Worker). */
-export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; armazenamento?: Armazenamento } = {}): PortalApi {
+/** Rota do dev server (vite.config.ts) que consulta a TomTom com a chave local; 204 = sem chave. */
+export const ROTA_ENDERECOS_DEV = '/__dev/enderecos'
+
+export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; armazenamento?: Armazenamento; enderecosReais?: boolean } = {}): PortalApi {
   const agora = opts.agora ?? (() => new Date())
   const armazenamento = opts.armazenamento ?? armazenamentoPadrao()
   const espera = () => new Promise<void>((r) => setTimeout(r, opts.atrasoMs ?? 0))
@@ -205,11 +210,16 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       if (!texto.trim()) throw new ErroPortal('nao_permitido', 'Escreva a resposta.')
       return atualizar(id, (s) => ({ ...s, status: 'em_duvida', mensagens: [...s.mensagens, mensagem(s, nome, texto.trim())] }))
     },
-    async buscarEnderecos(q) {
-      await espera()
+    async buscarEnderecos(q, sinal) {
       exigirSessao('pedir')
       const busca = chaveNome(q.trim())
       if (busca.length < 3) return []
+      // No dev server com TOMTOM_KEY no .env.local: sugestões reais; sem chave (204) ou falha, as fictícias.
+      if (opts.enderecosReais) {
+        const r = await fetch(`${ROTA_ENDERECOS_DEV}?q=${encodeURIComponent(q)}`, { signal: sinal }).catch(() => null)
+        if (r?.status === 200) return (await r.json()) as EnderecoSugerido[]
+      }
+      await espera()
       return ENDERECOS_MOCK.filter((e) => chaveNome(`${e.rotulo} ${e.endereco}`).includes(busca)).slice(0, 6)
     },
     async buscarPassageiros(q) {

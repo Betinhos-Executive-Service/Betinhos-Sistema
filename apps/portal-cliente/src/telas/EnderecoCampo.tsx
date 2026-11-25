@@ -1,15 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Building2, History, MapPin } from 'lucide-react'
+import { BedDouble, Building2, Bus, History, MapPin, Plane, TrainFront } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { MAX_ENDERECO, textoDoEndereco } from '../domain/pedidos'
-import type { EnderecoSugerido } from '../domain/types'
+import type { EnderecoSugerido, TipoLocal } from '../domain/types'
 
 const ESPERA_MS = 250
 const MIN_BUSCA = 3
 const MAX_RECENTES = 4
 const MAX_OPCOES = 6
 
-type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' }
+type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' | TipoLocal }
+
+const ICONES = { recente: History, poi: Building2, rua: MapPin, aeroporto: Plane, hotel: BedDouble, rodoviaria: Bus, estacao: TrainFront }
 
 type Props = {
   id: string
@@ -36,17 +38,20 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
   const [aberto, setAberto] = useState(false)
   const [ativo, setAtivo] = useState(-1)
   const [sugestoes, setSugestoes] = useState<EnderecoSugerido[]>([])
+  const [buscando, setBuscando] = useState(false)
 
   // Sugestões remotas: só com o campo aberto e 3+ letras; cada tecla cancela a busca anterior.
   const consulta = value.trim()
   useEffect(() => {
-    if (!aberto || consulta.length < MIN_BUSCA) { setSugestoes([]); return }
+    if (!aberto || consulta.length < MIN_BUSCA) { setSugestoes([]); setBuscando(false); return }
+    // O carregando começa já na tecla (cobre a espera), para o campo nunca parecer parado.
+    setBuscando(true)
     const controle = new AbortController()
     const t = setTimeout(() => {
       api.buscarEnderecos(consulta, controle.signal).then(
         (r) => { if (!controle.signal.aborted) setSugestoes(r) },
         () => { if (!controle.signal.aborted) setSugestoes([]) },
-      )
+      ).finally(() => { if (!controle.signal.aborted) setBuscando(false) })
     }, ESPERA_MS)
     return () => { clearTimeout(t); controle.abort() }
   }, [api, aberto, consulta])
@@ -61,13 +66,17 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
       .map<Opcao>((s) => ({
         chave: `s:${s.rotulo}|${s.endereco}`,
         texto: textoDoEndereco(s),
-        tipo: s.endereco.toLowerCase().includes(s.rotulo.toLowerCase()) ? 'rua' : 'poi',
+        tipo: s.tipo ?? (s.endereco.toLowerCase().includes(s.rotulo.toLowerCase()) ? 'rua' : 'poi'),
       }))
       .filter((o) => !doHistorico.some((h) => h.texto.toLowerCase() === o.texto.toLowerCase()))
     return [...doHistorico, ...remotas].slice(0, MAX_OPCOES)
   }, [consulta, recentes, sugestoes])
 
-  const mostrando = aberto && opcoes.length > 0
+  const mostrando = aberto && (opcoes.length > 0 || buscando)
+  // Ao fechar, a lista mantém as últimas opções enquanto some, para a saída não piscar vazia.
+  const ultimas = useRef<Opcao[]>([])
+  if (mostrando) ultimas.current = opcoes
+  const exibidas = mostrando ? opcoes : ultimas.current
   const refAtivo = useRef<HTMLLIElement>(null)
   useEffect(() => { refAtivo.current?.scrollIntoView?.({ block: 'nearest' }) }, [ativo])
 
@@ -87,15 +96,17 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
     } else if (e.key === 'Escape') {
       if (aberto) { e.preventDefault(); e.stopPropagation(); setAberto(false); setAtivo(-1) }
     } else if (e.key === 'Tab') {
-      setAberto(false)
+      // Tab (ou Shift+Tab) aceita a opção destacada e deixa o foco seguir para o próximo campo.
+      if (mostrando && ativo >= 0 && opcoes[ativo]) escolher(opcoes[ativo])
+      else { setAberto(false); setAtivo(-1) }
     }
   }
 
-  const recentesVisiveis = opcoes.filter((o) => o.tipo === 'recente')
-  const remotasVisiveis = opcoes.filter((o) => o.tipo !== 'recente')
+  const recentesVisiveis = exibidas.filter((o) => o.tipo === 'recente')
+  const remotasVisiveis = exibidas.filter((o) => o.tipo !== 'recente')
   const linha = (o: Opcao) => {
-    const i = opcoes.indexOf(o)
-    const Icone = o.tipo === 'recente' ? History : o.tipo === 'poi' ? Building2 : MapPin
+    const i = exibidas.indexOf(o)
+    const Icone = ICONES[o.tipo]
     return (
       <li
         key={o.chave}
@@ -103,12 +114,13 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         ref={i === ativo ? refAtivo : undefined}
         role="option"
         aria-selected={i === ativo}
-        className={`pc-pp__opcao${i === ativo ? ' pc-pp__opcao--ativa' : ''}`}
+        className={`pc-pp__opcao${o.tipo === 'recente' ? '' : ' pc-pp__opcao--remota'}${i === ativo ? ' pc-pp__opcao--ativa' : ''}`}
+        style={{ '--i': i } as React.CSSProperties}
         // mouseDown (e não click) com preventDefault: o campo não perde o foco antes da escolha.
         onMouseDown={(ev) => { ev.preventDefault(); escolher(o) }}
         onMouseMove={() => { if (ativo !== i) setAtivo(i) }}
       >
-        <Icone size={16} aria-hidden className="pc-pp__opcao-icone" />
+        <span className="pc-pp__opcao-icone" data-tipo={o.tipo} aria-hidden><Icone size={15} /></span>
         <span className="pc-pp__opcao-texto">{comDestaque(o.texto, consulta)}</span>
       </li>
     )
@@ -126,6 +138,7 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         aria-required
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
+        aria-busy={buscando || undefined}
         value={value}
         placeholder={placeholder}
         maxLength={MAX_ENDERECO}
@@ -135,11 +148,29 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         onBlur={() => { setAberto(false); setAtivo(-1) }}
         onKeyDown={teclar}
       />
-      <ul id={idLista} role="listbox" aria-label="Sugestões de endereço" className="pc-pp__lista" hidden={!mostrando}>
+      <span role="status" className="pc-pp__sr">{mostrando && buscando ? 'Buscando endereços…' : ''}</span>
+      <ul
+        id={idLista}
+        role="listbox"
+        aria-label="Sugestões de endereço"
+        aria-hidden={mostrando ? undefined : true}
+        className={`pc-pp__lista${mostrando ? ' pc-pp__lista--aberta' : ''}${buscando ? ' pc-pp__lista--buscando' : ''}`}
+      >
         {recentesVisiveis.length > 0 && <li role="presentation" className="pc-pp__grupo">Recentes</li>}
         {recentesVisiveis.map(linha)}
-        {remotasVisiveis.length > 0 && <li role="presentation" className="pc-pp__grupo">Sugestões</li>}
+        {(remotasVisiveis.length > 0 || buscando) && (
+          <li role="presentation" className="pc-pp__grupo">
+            Sugestões
+            {buscando && <span className="pc-pp__grupo-status" aria-hidden><span className="pc-pp__giro" />Buscando</span>}
+          </li>
+        )}
         {remotasVisiveis.map(linha)}
+        {/* Sem sugestões ainda: linhas fantasma no lugar delas, no mesmo tamanho, para a lista não pular. */}
+        {buscando && remotasVisiveis.length === 0 && [72, 52, 64].map((w, i) => (
+          <li key={`esq-${i}`} role="presentation" aria-hidden className="pc-pp__esqueleto" style={{ '--w': `${w}%`, '--i': i } as React.CSSProperties}>
+            <span className="pc-pp__esqueleto-icone" /><span className="pc-pp__esqueleto-barra" />
+          </li>
+        ))}
       </ul>
     </div>
   )

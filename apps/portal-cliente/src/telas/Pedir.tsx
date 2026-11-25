@@ -1,6 +1,6 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Alert, Button, Field, Input, PageHeader, Select, Textarea, useToast } from '@betinhos/ui'
-import { ArrowDownUp, ArrowLeft, ArrowRight, Bus, CalendarDays, Car, Check, ClipboardCheck, FileText, Flag, Info, MapPin, Pencil, Route, RotateCcw, Send, ShieldCheck, Sparkles, TriangleAlert, UserPlus, Users, Van, X, type LucideIcon } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, ArrowRight, Bus, CalendarDays, Car, Check, ClipboardCheck, FileText, Flag, Info, MapPin, Pencil, Route, RotateCcw, Send, ShieldCheck, TriangleAlert, UserPlus, Users, Van, X, type LucideIcon } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal } from '../api/PortalApi'
 import {
@@ -22,14 +22,13 @@ function mensagemDoErro(err: unknown): string {
   return err.codigo === 'nao_permitido' && err.message !== err.codigo ? err.message : GENERICO
 }
 
-const SEM_PREFERENCIA = 'auto'
 type Passo = 1 | 2 | 3
 const PASSOS: { n: Passo; nome: string; icone: LucideIcon }[] = [
   { n: 1, nome: 'Quem viaja', icone: Users },
   { n: 2, nome: 'Trajeto e horário', icone: Route },
   { n: 3, nome: 'Conferir e enviar', icone: ClipboardCheck },
 ]
-const ICONE_VEICULO: Record<string, LucideIcon> = { auto: Sparkles, 202410001: Car, 202410002: ShieldCheck, 100000002: Bus, 202410003: Van, 202410004: ShieldCheck }
+const ICONE_VEICULO: Record<string, LucideIcon> = { 202410001: Car, 202410002: ShieldCheck, 100000002: Bus, 202410003: Van, 202410004: ShieldCheck }
 
 /** Cartão em edição: `indice` null = passageiro novo; `id` guarda o cadastrado cujo contato está sendo completado. */
 type Rascunho = { indice: number | null; id?: string; nome: string; telefone: string; email: string }
@@ -52,7 +51,9 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   const [destino, setDestino] = useState(modelo?.destino ?? '')
   const [data, setData] = useState('')
   const [hora, setHora] = useState('')
-  const [veiculo, setVeiculo] = useState<string>(modelo?.tipoVeiculo ? String(modelo.tipoVeiculo) : SEM_PREFERENCIA)
+  // Até o cliente escolher, o veículo acompanha o nº de passageiros: o primeiro tipo em que todos cabem.
+  const [veiculoEscolhido, setVeiculo] = useState<string | undefined>(modelo?.tipoVeiculo ? String(modelo.tipoVeiculo) : undefined)
+  const veiculo = veiculoEscolhido ?? String((TIPOS_VEICULO.find((t) => (capacidadeVeiculo(t.valor) ?? 0) >= passageiros.length) ?? TIPOS_VEICULO[0]).valor)
   const [observacao, setObservacao] = useState(modelo?.observacao ?? '')
   const [erros, setErros] = useState<ErrosPedido>({})
   const [errosPas, setErrosPas] = useState<(string | undefined)[]>([])
@@ -66,6 +67,14 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   const nomeNovo = useRef<HTMLInputElement>(null)
   const celularNovo = useRef<HTMLInputElement>(null)
   const idRota = useId()
+  // Cada inversão gira o botão meia volta e anima a troca dos endereços.
+  const [giros, setGiros] = useState(0)
+  const [trocando, setTrocando] = useState(false)
+  useEffect(() => {
+    if (!trocando) return
+    const t = window.setTimeout(() => setTrocando(false), 400)
+    return () => window.clearTimeout(t)
+  }, [trocando, giros])
 
   // Troca de passo: topo da tela e foco no título (menos na primeira exibição, inclusive no duplo efeito do StrictMode).
   useEffect(() => {
@@ -174,8 +183,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   }
 
   function montar(): NovoPedido {
-    const preferencia = veiculo === SEM_PREFERENCIA ? undefined : Number(veiculo)
-    return normalizarPedido({ passageiros, origem, destino, saida: data && hora ? deLocalSaoPaulo(`${data}T${hora}`) : '', tipoVeiculo: preferencia, observacao })
+    return normalizarPedido({ passageiros, origem, destino, saida: data && hora ? deLocalSaoPaulo(`${data}T${hora}`) : '', tipoVeiculo: Number(veiculo), observacao })
   }
 
   /** Foca o primeiro campo inválido (ou o aviso, se o erro não tem campo) depois de pintar os erros. */
@@ -272,18 +280,53 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
         </div>
 
         <div ref={corpo} className="pc-pp__card">
-          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo">{atual.nome}</h2>
+          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo">{passo === 1 ? 'Quem vai viajar?' : atual.nome}</h2>
 
           {passo === 1 && (
             <div className="pc-pp__corpo">
-              {onRepetirAnterior && (
-                <button type="button" className="pc-pp__link" onClick={onRepetirAnterior}><RotateCcw size={14} aria-hidden /> Repetir um pedido anterior</button>
-              )}
+              <p className="pc-pp__apoio">Escolha quem já viajou com a Betinhos ou cadastre alguém novo.</p>
               {erros.passageiros && !errosPas.some(Boolean) && <Alert tone="danger"><span className="pc-pp__erro-foco" tabIndex={-1}>{erros.passageiros}</span></Alert>}
 
-              <Bloco icone={Users} titulo="Passageiros" dica={`${passageiros.length} de ${MAX_PASSAGEIROS} passageiros`}>
-                {passageiros.length === 0 && <p className="pc-pp__dica">Ninguém ainda. Adicione abaixo.</p>}
-                {passageiros.length > 0 && (
+              {rascunho ? (
+                <div className="pc-pp__novo" role="group" aria-label={rascunho.indice === null ? 'Novo passageiro' : 'Corrigir passageiro'}>
+                  <div className="pc-pp__novo-campos">
+                    <Field label="Nome">
+                      <Input ref={nomeNovo} value={rascunho.nome} onChange={(e) => mudarRascunho('nome', e.target.value)} autoComplete="off" placeholder="Nome completo" size="touch" maxLength={MAX_NOME} readOnly={nomeTravado} invalid={erroNoNome} />
+                    </Field>
+                    <Field label="Celular">
+                      <Input ref={celularNovo} type="tel" inputMode="tel" value={rascunho.telefone} onChange={(e) => mudarRascunho('telefone', e.target.value)} autoComplete="off" placeholder="(11) 90000-0000" size="touch" maxLength={MAX_TELEFONE} invalid={erroNoContato} />
+                    </Field>
+                    <Field label="E-mail">
+                      <Input type="email" value={rascunho.email} onChange={(e) => mudarRascunho('email', e.target.value)} autoComplete="off" placeholder="nome@empresa.com" size="touch" maxLength={MAX_EMAIL} invalid={erroNoContato} />
+                    </Field>
+                  </div>
+                  <p className="pc-pp__dica">Informe celular ou e-mail. Se o contato mudou, corrija aqui.</p>
+                  {erroRascunho && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erroRascunho}</p>}
+                  <div className="pc-pp__novo-acoes">
+                    <Button type="button" variant="secondary" size="compact" onClick={() => { setRascunho(null); setErroRascunho(undefined) }}>Cancelar</Button>
+                    <Button type="button" size="compact" onClick={salvarRascunho}>{rascunho.indice === null ? 'Adicionar passageiro' : 'Salvar contato'}</Button>
+                  </div>
+                </div>
+              ) : passageiros.length < MAX_PASSAGEIROS ? (
+                <div className="pc-pp__achar">
+                  <div className="pc-pp__busca">
+                    <Field label="Buscar passageiro cadastrado">
+                      <Select value={null} onChange={escolher} options={opcoes} loading={buscando} onSearchChange={buscar} placeholder="Digite o nome" searchPlaceholder="Buscar por nome" emptyText="Ninguém com esse nome" onCreate={(nome) => abrirNovo(nome)} />
+                    </Field>
+                    <span className="pc-pp__ou" aria-hidden>ou</span>
+                    <Button type="button" variant="secondary" size="touch" onClick={() => abrirNovo()} icon={<UserPlus size={16} aria-hidden />}>Cadastrar novo</Button>
+                </div>
+                </div>
+              ) : (
+                <p className="pc-pp__dica">Máximo de {MAX_PASSAGEIROS} passageiros por pedido. Para mais gente, faça outro pedido.</p>
+              )}
+
+              {passageiros.length > 0 && (
+              <section aria-labelledby="pc-pp-lista-titulo">
+                <div className="pc-pp__lista-cab">
+                  <h3 id="pc-pp-lista-titulo" className="pc-pp__lista-titulo">Neste pedido</h3>
+                  <span className="pc-pp__contador">{passageiros.length} de {MAX_PASSAGEIROS}</span>
+                </div>
                   <ul className="pc-pp__chips" aria-label="Passageiros do pedido">
                     {passageiros.map((p, i) => (
                       <li key={p.id ?? `novo-${i}`} className="pc-pp__chip-item">
@@ -300,41 +343,16 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                       </li>
                     ))}
                   </ul>
-                )}
-              </Bloco>
-              <Bloco icone={UserPlus} titulo="Adicionar passageiro">
+              </section>
+              )}
 
-                {rascunho ? (
-                  <div className="pc-pp__novo" role="group" aria-label={rascunho.indice === null ? 'Novo passageiro' : 'Corrigir passageiro'}>
-                    <div className="pc-pp__novo-campos">
-                      <Field label="Nome">
-                        <Input ref={nomeNovo} value={rascunho.nome} onChange={(e) => mudarRascunho('nome', e.target.value)} autoComplete="off" placeholder="Nome completo" size="touch" maxLength={MAX_NOME} readOnly={nomeTravado} invalid={erroNoNome} />
-                      </Field>
-                      <Field label="Celular">
-                        <Input ref={celularNovo} type="tel" inputMode="tel" value={rascunho.telefone} onChange={(e) => mudarRascunho('telefone', e.target.value)} autoComplete="off" placeholder="(11) 90000-0000" size="touch" maxLength={MAX_TELEFONE} invalid={erroNoContato} />
-                      </Field>
-                      <Field label="E-mail">
-                        <Input type="email" value={rascunho.email} onChange={(e) => mudarRascunho('email', e.target.value)} autoComplete="off" placeholder="nome@empresa.com" size="touch" maxLength={MAX_EMAIL} invalid={erroNoContato} />
-                      </Field>
-                    </div>
-                    <p className="pc-pp__dica">Informe celular ou e-mail. Se o contato mudou, corrija aqui.</p>
-                    {erroRascunho && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erroRascunho}</p>}
-                    <div className="pc-pp__novo-acoes">
-                      <Button type="button" variant="secondary" size="compact" onClick={() => { setRascunho(null); setErroRascunho(undefined) }}>Cancelar</Button>
-                      <Button type="button" size="compact" onClick={salvarRascunho}>{rascunho.indice === null ? 'Adicionar passageiro' : 'Salvar contato'}</Button>
-                    </div>
-                  </div>
-                ) : passageiros.length < MAX_PASSAGEIROS ? (
-                  <div className="pc-pp__busca">
-                    <Field label="Buscar passageiro cadastrado">
-                      <Select value={null} onChange={escolher} options={opcoes} loading={buscando} onSearchChange={buscar} placeholder="Escolher da lista" searchPlaceholder="Buscar por nome" emptyText="Ninguém com esse nome" onCreate={(nome) => abrirNovo(nome)} />
-                    </Field>
-                    <Button type="button" variant="secondary" size="touch" onClick={() => abrirNovo()} icon={<UserPlus size={16} aria-hidden />}>Cadastrar novo</Button>
-                  </div>
-                ) : (
-                  <p className="pc-pp__dica">Máximo de {MAX_PASSAGEIROS} passageiros por pedido. Para mais gente, faça outro pedido.</p>
-                )}
-              </Bloco>
+              {onRepetirAnterior && !rascunho && (
+                <button type="button" className="pc-pp__repetir" onClick={onRepetirAnterior}>
+                  <span className="pc-pp__repetir-icone" aria-hidden><RotateCcw size={16} /></span>
+                  <span className="pc-pp__repetir-texto"><strong>Repetir um pedido anterior</strong>Mesmos passageiros e trajeto de um pedido antigo.</span>
+                  <ArrowRight size={16} aria-hidden />
+                </button>
+              )}
             </div>
           )}
 
@@ -346,7 +364,10 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
               </p>
 
               <Bloco icone={Route} titulo="Trajeto">
-                <div className="pc-pp__rota">
+                <div
+                  className={['pc-pp__rota', origem.trim() && 'pc-pp__rota--origem', destino.trim() && 'pc-pp__rota--destino', trocando && 'pc-pp__rota--trocando'].filter(Boolean).join(' ')}
+                  style={{ '--giro': giros } as CSSProperties}
+                >
                   <div className="pc-pp__trilho" aria-hidden><span className="pc-pp__ponto" /><span className="pc-pp__linha" /><span className="pc-pp__quadrado" /></div>
                   <div className="pc-pp__rota-campos">
                     <div className="pc-pp__rota-linha">
@@ -360,23 +381,26 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                       {erros.destino && <p className="pc-pp__erro" id={`${idRota}-de`} role="alert">{erros.destino}</p>}
                     </div>
                   </div>
-                  <button type="button" className="pc-pp__inverter" aria-label="Inverter saída e destino" onClick={() => { setOrigem(destino); setDestino(origem); limpar('origem'); limpar('destino') }}><ArrowDownUp size={16} aria-hidden /></button>
+                  <button type="button" className="pc-pp__inverter" aria-label="Inverter saída e destino" onClick={() => { setOrigem(destino); setDestino(origem); limpar('origem'); limpar('destino'); setGiros((g) => g + 1); setTrocando(true) }}><ArrowDownUp size={16} aria-hidden /></button>
                 </div>
               </Bloco>
 
-              <Bloco icone={CalendarDays} titulo="Quando" dica="Horário de Brasília">
-                <div className="pc-pp__quando">
-                  <div className="pc-pp__data">
-                    <Field label="Data">
-                      <Input type="date" value={data} min={hoje} onChange={(e) => { setData(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
-                    </Field>
-                    <div className="pc-pp__atalhos" role="group" aria-label="Atalhos de data">
-                      {atalhosDeData(hoje).map((a) => (
-                        <button key={a.valor} type="button" className="pc-pp__atalho" aria-pressed={data === a.valor} onClick={() => { setData(a.valor); limpar('saida') }}>{a.rotulo}</button>
-                      ))}
-                    </div>
+              <Bloco
+                icone={CalendarDays}
+                titulo="Quando"
+                acao={
+                  <div className="pc-pp__atalhos" role="group" aria-label="Atalhos de data">
+                    {atalhosDeData(hoje).map((a) => (
+                      <button key={a.valor} type="button" className="pc-pp__atalho" aria-pressed={data === a.valor} onClick={() => { setData(a.valor); limpar('saida') }}>{a.rotulo}</button>
+                    ))}
                   </div>
-                  <Field label="Hora">
+                }
+              >
+                <div className="pc-pp__quando">
+                  <Field label="Data">
+                    <Input type="date" value={data} min={hoje} onChange={(e) => { setData(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
+                  </Field>
+                  <Field label="Hora (Brasília)">
                     <Input type="time" value={hora} onChange={(e) => { setHora(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
                   </Field>
                 </div>
@@ -387,7 +411,6 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                 <fieldset className="pc-pp__veiculos">
                   <legend className="pc-pp__sr">Veículo</legend>
                   <div className="pc-pp__grade">
-                    <OpcaoVeiculo valor={SEM_PREFERENCIA} nome="A Betinhos escolhe" detalhe="Pelo nº de passageiros" marcado={veiculo === SEM_PREFERENCIA} onEscolher={escolherVeiculo} />
                     {TIPOS_VEICULO.map((t) => {
                       const cap = capacidadeVeiculo(t.valor)
                       const naoCabe = cap !== undefined && passageiros.length > cap
@@ -421,7 +444,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                   <span className="pc-pp__linha-resumo">{diaSemanaDataHora(pedido.saida)} <small>· Brasília</small></span>
                 </Secao>
                 <Secao icone={Car} nome="Veículo" onAlterar={() => ir(2)}>
-                  <span className="pc-pp__linha-resumo">{rotuloVeiculo(pedido.tipoVeiculo) ?? 'A Betinhos escolhe'}</span>
+                  <span className="pc-pp__linha-resumo">{rotuloVeiculo(pedido.tipoVeiculo)}</span>
                 </Secao>
                 <Secao icone={FileText} nome="Observação" onAlterar={() => ir(2)}>
                   <span className="pc-pp__linha-resumo">{pedido.observacao ?? <small>Sem observação</small>}</span>
@@ -433,9 +456,10 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
           )}
 
           <div className="pc-pp__rodape">
+            {passo === 1 && passageiros.length === 0 && <span className="pc-pp__rodape-dica">Escolha ao menos 1 passageiro para continuar.</span>}
             {passo > 1 && <Button type="button" variant="secondary" size="touch" className="pc-pp__voltar" onClick={() => ir((passo - 1) as Passo)} icon={<ArrowLeft size={18} aria-hidden />}>Voltar</Button>}
             {passo < 3
-              ? <Button type="button" size="touch" className="pc-pp__prox" onClick={continuar}>Continuar <ArrowRight size={18} aria-hidden /></Button>
+              ? <Button type="button" size="touch" className={`pc-pp__prox${passo === 1 && passageiros.length === 0 ? ' pc-pp__prox--espera' : ''}`} onClick={continuar}>{passo === 1 ? 'Continuar para o trajeto' : 'Continuar para conferir'} <ArrowRight className="pc-pp__prox-seta" size={18} aria-hidden /></Button>
               : <Button type="button" size="touch" className="pc-pp__prox" loading={enviando} onClick={enviar} icon={<Send size={18} aria-hidden />}>Enviar pedido</Button>}
           </div>
         </div>
@@ -452,7 +476,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
               <ItemPedido icone={MapPin} nome="Saída" valor={resumoEnd(origem)} />
               <ItemPedido icone={Flag} nome="Destino" valor={resumoEnd(destino)} destaque />
               <ItemPedido icone={CalendarDays} nome="Quando" valor={quando} />
-              <ItemPedido icone={Car} nome="Veículo" valor={veiculo === SEM_PREFERENCIA ? 'A Betinhos escolhe' : rotuloVeiculo(Number(veiculo)) ?? ''} />
+              <ItemPedido icone={Car} nome="Veículo" valor={rotuloVeiculo(Number(veiculo)) ?? ''} />
               <ItemPedido icone={FileText} nome="Observação" valor={observacao.trim()} />
             </dl>
             <p className="pc-pp__aviso"><Info size={16} aria-hidden /> Confirmamos por e-mail e o voucher aparece em Meus serviços.</p>
@@ -476,13 +500,14 @@ function ItemPedido({ icone: Icone, nome, valor, destaque }: { icone: LucideIcon
 }
 
 /** Bloco de formulário: mesmo cabeçalho (ícone, título, dica) em todos os passos. Sem aria-labelledby, para não duplicar rótulos dos campos. */
-function Bloco({ icone: Icone, titulo, dica, children }: { icone: LucideIcon; titulo: string; dica?: string; children: ReactNode }) {
+function Bloco({ icone: Icone, titulo, dica, acao, children }: { icone: LucideIcon; titulo: string; dica?: string; acao?: ReactNode; children: ReactNode }) {
   return (
     <section className="pc-pp__bloco">
       <div className="pc-pp__bloco-cab">
         <span className="pc-pp__bloco-icone" aria-hidden><Icone size={16} /></span>
         <h3 className="pc-pp__bloco-titulo">{titulo}</h3>
         {dica && <span className="pc-pp__bloco-dica">{dica}</span>}
+        {acao && <div className="pc-pp__bloco-acao">{acao}</div>}
       </div>
       {children}
     </section>
