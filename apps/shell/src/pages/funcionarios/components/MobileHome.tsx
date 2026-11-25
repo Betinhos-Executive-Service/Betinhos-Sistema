@@ -20,6 +20,8 @@ type Props = {
   /** Fim da lista (sentinela da rolagem infinita). */
   footer?: ReactNode
   counts: Record<AlertKind, number>
+  /** Chips de alerta que o perfil lê (sem a prop, todos). */
+  alertas?: readonly AlertKind[]
   filters: Filters
   update: (patch: Partial<Filters>) => void
   reset: () => void
@@ -54,7 +56,7 @@ function filtrosExtras(filters: Filters) {
 }
 
 export function MobileHome(props: Props) {
-  const { views, visible, shown = visible, footer, words, counts, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
+  const { views, visible, shown = visible, footer, words, counts, alertas, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
   // A folha de filtros aberta vive na URL (`filtros=1`).
   const [sheet, setSheet] = useQueryBandeira('filtros')
   const extras = filtrosExtras(filters)
@@ -83,7 +85,7 @@ export function MobileHome(props: Props) {
             </button>
           ))}
           <span className="m-chips-sep" aria-hidden />
-          {ALERTAS.map(({ kind, label, icon: Icon }) => (
+          {ALERTAS.filter(({ kind }) => !alertas || alertas.includes(kind)).map(({ kind, label, icon: Icon }) => (
             <button key={kind} type="button" className={`m-chip m-chip--alert m-chip--${kind}${filters.alerta === kind ? ' m-chip--on' : ''}`} aria-pressed={filters.alerta === kind} disabled={!counts[kind] && filters.alerta !== kind} onClick={() => update({ alerta: filters.alerta === kind ? null : kind })}>
               <Icon size={14} aria-hidden />{label}<strong>{counts[kind]}</strong>
             </button>
