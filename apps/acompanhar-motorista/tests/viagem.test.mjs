@@ -374,6 +374,18 @@ test("avisos: inscrição com motorista já definido não avisa o mesmo motorist
   assert.equal(ctx.m.get("s").motorista, "Carlos");
 });
 
+test("avisos: nome que some numa leitura (fora de em definição) e volta não avisa de novo", async () => {
+  const { v, ctx, mudar } = await viagemComAvisos({ fase: "agendado", emDefinicao: false, motorista: { nome: "Carlos" } });
+  await pedirAviso(v, "POST", await inscricaoReal(7));
+  const push = pushFalso();
+  await comFetch(push, async () => {
+    mudar({ fase: "a_caminho", emDefinicao: false, motorista: { nome: null } }); await v.alarm();
+    mudar({ fase: "a_caminho", emDefinicao: false, motorista: { nome: "Carlos" } }); await v.alarm();
+  });
+  assert.equal(push.envios.length, 0);
+  assert.equal(ctx.m.get("s").motorista, "Carlos");
+});
+
 test("avisos: 410 remove a inscrição; 500 tenta no alarm seguinte, até 3 vezes", async () => {
   const { v, ctx, mudar } = await viagemComAvisos({ fase: "a_caminho", chegando: false });
   const [a, b] = [await inscricaoReal(1), await inscricaoReal(2)];

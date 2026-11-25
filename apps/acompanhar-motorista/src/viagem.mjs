@@ -257,7 +257,7 @@ export class Viagem {
       if (!falhou) {
         for (const e of eventosNovos(dados, s.enviados)) s.enviados[e] = true;
         s.motorista = dados.motorista?.nome ?? null;
-      }
+      } else delete s.motorista; // sem leitura de agora, a próxima vira a base (não avisa o que a pessoa já vê)
     }
     s.inscricoes = guardarInscricao(s.inscricoes, inscricao);
     await this.salvar();
@@ -280,9 +280,12 @@ export class Viagem {
     if (!dados || !vapid || !s?.inscricoes?.length) return;
     const nome = dados.motorista?.nome ?? null; // em definição não há nome
     const saiu = s.enviados.viagem_iniciada || eventosNovos(dados).some((e) => e === "viagem_iniciada" || e === "concluido");
-    // undefined = Viagem de antes deste aviso: o motorista de agora vira a base, sem aviso.
-    if (s.motorista === undefined || !nome || saiu) s.motorista = nome;
-    else if (nome !== s.motorista && await this.enviar(MOTORISTA_DEFINIDO, dados, vapid)) s.motorista = nome;
+    // Sem nome fora de "em definição" (ex.: motorista da Infleet sumiu numa leitura): mantém a base, senão a volta
+    // do mesmo nome avisaria de novo. undefined = Viagem de antes deste aviso: o motorista de agora vira a base.
+    const nomeSumiu = !nome && !dados.emDefinicao && !saiu && s.motorista !== undefined;
+    if (s.motorista === undefined || !nome || saiu) {
+      if (!nomeSumiu) { s.motorista = nome; delete s.falhas[MOTORISTA_DEFINIDO]; }
+    } else if (nome !== s.motorista && await this.enviar(MOTORISTA_DEFINIDO, dados, vapid)) s.motorista = nome;
     const evento = eventosNovos(dados, s.enviados).at(-1);
     if (evento && await this.enviar(evento, dados, vapid)) for (const e of EVENTOS.slice(0, EVENTOS.indexOf(evento) + 1)) s.enviados[e] = true;
     await this.salvar();
