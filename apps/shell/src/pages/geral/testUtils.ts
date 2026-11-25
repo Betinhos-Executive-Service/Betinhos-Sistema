@@ -12,6 +12,8 @@ type SourceModule = typeof import('./data/source')
 
 // Ganchos para simular o que o mock não faz: falha parcial de estado, linha inativa e cópia lenta.
 export const hooks = {
+  /** Tamanho da página só neste teste (arquivo de página cheia: testes que não dependem de 100 linhas). */
+  pageSize: null as null | number,
   setState: null as null | Source['setState'],
   copyRows: null as null | Source['copyRows'],
   update: null as null | Source['update'],
@@ -25,7 +27,8 @@ export const hooks = {
 /**
  * Linhas por página nos testes de tela. A tela real pede 100; aqui bastam 20, porque renderizar e consultar por papel
  * 100 linhas no jsdom era a maior parte do custo destes arquivos. Quem testa a página cheia ou a rolagem
- * (GeralPage.densidade) passa `{ pageSize: 100 }` ao `mockSource`.
+ * (GeralPage.densidade) passa `{ pageSize: 100 }` ao `mockSource` e volta a 20 com `hooks.pageSize` nos testes que não
+ * dependem do número de linhas.
  */
 export const TEST_PAGE_SIZE = 20
 
@@ -35,7 +38,7 @@ export function mockSource(actual: SourceModule, { pageSize = TEST_PAGE_SIZE, ma
     ...actual,
     createSource: (host: Parameters<SourceModule['createSource']>[0]): Source => {
       // Sem a latência simulada do pnpm dev: os testes não esperam timers artificiais.
-      const source = actual.createSource(host, { latency: 0, pageSize, manutencoes })
+      const source = actual.createSource(host, { latency: 0, pageSize: hooks.pageSize ?? pageSize, manutencoes })
       return {
         ...source,
         setState: (ids, active) => (hooks.setState ? hooks.setState(ids, active) : source.setState(ids, active)),
@@ -77,6 +80,7 @@ export function usarAmbienteGeral() {
     hooks.attributes = null
     hooks.mixedState = false
     hooks.paginas = 0
+    hooks.pageSize = null
   })
 }
 
