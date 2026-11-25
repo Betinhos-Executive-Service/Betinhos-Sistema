@@ -45,6 +45,8 @@ export const TEXTOS = {
   "m.rotulo": ["Quem é seu motorista", "Who is your driver", "Quién es tu conductor"],
   "m.papel": ["Seu motorista", "Your driver", "Tu conductor"],
   "m.motorista": ["Motorista", "Driver", "Conductor"],
+  "m.emDefinicao": ["Motorista em definição", "Driver to be assigned", "Conductor por definir"],
+  "m.emDefinicaoAviso": ["Assim que a escala for confirmada, o motorista e o carro aparecem aqui.", "As soon as the schedule is confirmed, your driver and car will appear here.", "En cuanto se confirme la escala, el conductor y el coche aparecerán aquí."],
   "m.abrir": ["Ver motorista em tela cheia", "View driver in full screen", "Ver conductor en pantalla completa"],
   "m.abrirCarro": ["Ver carro em tela cheia", "View car in full screen", "Ver auto en pantalla completa"],
   "m.ligar": ["Ligar", "Call", "Llamar"],

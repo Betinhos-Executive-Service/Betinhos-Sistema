@@ -28,8 +28,11 @@ export function autorizado(request, segredo) {
 }
 
 export function validarPedido(body) {
-  const placa = norm(body?.placa);
-  if (!placa) return { erro: "placa obrigatória" };
+  // Sem placa (motorista em definição ou sem carro atual) ou com `rastreio: false` (terceiro, carro sem Infleet),
+  // o link nasce sem veículo da Infleet: sem mapa nem ETA. Plugin antigo não manda `rastreio` e sempre tem placa.
+  const placa = norm(body?.placa) || null;
+  if (body?.rastreio === true && !placa) return { erro: "placa obrigatória para rastreio" };
+  const rastreio = body?.rastreio !== false;
   const embarque = String(body?.embarque ?? "").trim();
   if (!embarque) return { erro: "embarque obrigatório" };
   let horarioAgendado = null;
@@ -60,7 +63,7 @@ export function validarPedido(body) {
   const veiculo = { foto: foto(body.veiculo?.fotoBase64) };
   if (fotos.some((f) => !f)) return { erro: "foto inválida" };
   if (fotos.some((f) => f.bytes.length > FOTO_MAX)) return { erro: "foto acima de 400 KB" };
-  return { dados: { placa, embarque, destinoFinal: texto(body.destinoFinal), paradas, observacoes: texto(body.observacoes), trajeto: texto(body.trajeto), motorista, veiculo, horarioAgendado, titulo: texto(body.titulo), tipoServico: texto(body.tipoServico), corVeiculo: texto(body.corVeiculo), modeloVeiculo: texto(body.modeloVeiculo), marcaVeiculo: texto(body.marcaVeiculo), validadeHoras, cadastro } };
+  return { dados: { placa, rastreio, embarque, destinoFinal: texto(body.destinoFinal), paradas, observacoes: texto(body.observacoes), trajeto: texto(body.trajeto), motorista, veiculo, horarioAgendado, titulo: texto(body.titulo), tipoServico: texto(body.tipoServico), corVeiculo: texto(body.corVeiculo), modeloVeiculo: texto(body.modeloVeiculo), marcaVeiculo: texto(body.marcaVeiculo), validadeHoras, cadastro } };
 }
 
 export { candidatosEndereco, cidadeDoTexto, lugaresConhecidos } from "./geocodificar.mjs";
@@ -180,10 +183,13 @@ function camposDoPedido(veiculo, dados, calculo, fotos) {
   };
 }
 
+const comRastreio = (dados) => Boolean(dados.placa) && dados.rastreio !== false;
+const veiculoDoPedido = (dados, deps) => (comRastreio(dados) ? deps.acharVeiculo(dados.placa) : { id: null, plate: dados.placa ?? null });
+
 const camposCadastro = (dados) => (dados.cadastro ? { cadastroHash: dados.cadastro.hash, cadastroAmbiente: dados.cadastro.ambiente } : {});
 
 export async function criarLink(env, origem, dados, deps) {
-  const veiculo = await deps.acharVeiculo(dados.placa);
+  const veiculo = await veiculoDoPedido(dados, deps);
   const calculo = await etapasDoPedido(dados, deps);
   const id = deps.novoId();
   const expiraEm = new Date(deps.agora().getTime() + dados.validadeHoras * 3600e3).toISOString();
@@ -210,7 +216,7 @@ export async function atualizarLink(env, id, dados, deps) {
   if (t.concluidoPor === "dataverse" || await env.TRACK_KV.get(`concluido:${id}`)) return { concluido: true };
   const restoS = Math.round((new Date(t.expiraEm).getTime() - deps.agora().getTime()) / 1000);
   if (!(restoS >= 60)) return null;
-  const veiculo = t.vehicleId && norm(dados.placa) === norm(t.placa) ? { id: t.vehicleId, plate: t.placa } : await deps.acharVeiculo(dados.placa);
+  const veiculo = comRastreio(dados) && t.vehicleId && norm(dados.placa) === norm(t.placa) ? { id: t.vehicleId, plate: t.placa } : await veiculoDoPedido(dados, deps);
   const calculo = await etapasDoPedido(dados, deps);
   const antigas = Array.isArray(t.etapas) ? t.etapas : [];
   calculo.etapas = calculo.etapas.map((e, i) => {
@@ -228,7 +234,7 @@ export async function atualizarLink(env, id, dados, deps) {
     if (mesmoMotorista) novo.motorista.temFoto = true; else await env.TRACK_KV.delete(`foto:${id}:motorista`);
   }
   if (!fotos.veiculo && t.veiculoTemFoto) {
-    if (novo.vehicleId === t.vehicleId) novo.veiculoTemFoto = true; else await env.TRACK_KV.delete(`foto:${id}:veiculo`);
+    if (novo.vehicleId === t.vehicleId && norm(novo.placa) === norm(t.placa)) novo.veiculoTemFoto = true; else await env.TRACK_KV.delete(`foto:${id}:veiculo`);
   }
   const mesmaSaida = perto(t.destino, novo.destino);
   // Credencial de cadastro trocada: a lista guardada (inclusive "encerrado") é da credencial antiga; a próxima leitura vai ao flow.

@@ -32,6 +32,7 @@ export function App() {
 
   const concluido = dados?.fase === "concluido";
   const noLocal = dados?.fase === "no_local" && !!dados.posicao;
+  const semMapa = dados?.rastreio === false;
   const idade = idadePosicao(dados, desvio, agora);
   const vivo = estadoVivo(dados, t, idade, falhandoDesde, agora);
   const os = String(dados?.titulo ?? "").match(/OS[-\s]*(\d+)/i);
@@ -77,15 +78,15 @@ export function App() {
       <div id="app" className={(concluido ? "fim" : "") + (fimCard ? " fim-card" : "")}>
         <Cabecalho reserva={reserva} />
         <div className="diag" id="diag" hidden={!diag}>{diag}</div>
-        <main className="portal">
+        <main className={"portal" + (semMapa ? " sem-mapa" : "")}>
           <div className="col-a">
             <CardStatus dados={dados} cfg={BT.cfg} eta={eta} idade={idade} desvio={desvio} agora={agora} titulo={titulo} />
             <CardMotorista dados={dados} cfg={BT.cfg} oculto={concluido} abrirTela={abrirTela} />
             <CardTrajeto dados={dados} chegada={eta.chegada} oculto={concluido} />
             <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />
           </div>
-          <div className="col-b">
-            <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />
+          <div className="col-b" hidden={semMapa}>
+            {semMapa ? null : <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />}
           </div>
         </main>
         <span className="versao" aria-hidden="true">{BT.versao}</span>

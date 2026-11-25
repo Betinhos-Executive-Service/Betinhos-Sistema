@@ -39,6 +39,7 @@ html.sem-rolagem{overflow:hidden}
   .portal{display:grid;grid-template-columns:minmax(0,1fr) 420px;align-items:start;gap:16px;padding-top:20px}
   .col-a{display:flex;flex-direction:column;gap:12px;min-width:0}
   .col-b{display:block;position:sticky;top:16px;z-index:5}
+  .portal.sem-mapa{grid-template-columns:minmax(0,640px);justify-content:center}
   .c-status,.c-mapa,.c-motorista,.c-trajeto,.pax{order:0}
 }
 #mapa{position:absolute;inset:0;background:#eef1f5}

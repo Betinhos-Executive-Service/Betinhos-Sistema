@@ -46,6 +46,15 @@ export function CardMotorista({ dados, cfg, oculto, abrirTela }: Props) {
   const nome = m.nome || t("m.motorista");
   const c = contatoMotorista(dados, cfg);
   const semContato = !c.ligar && !c.whats;
+  if (dados?.emDefinicao) return (
+    <section className="card c-motorista motorista" id="cartao" aria-labelledby="m-rotulo" hidden={oculto}>
+      <h2 id="m-rotulo">{t("card.motorista")}</h2>
+      <div className="m-topo">
+        <Avatar className="avatar" id="m-avatar" inicial="?" />
+        <span className="m-info"><b id="m-nome">{t("m.emDefinicao")}</b><small className="m-papel">{t("m.emDefinicaoAviso")}</small></span>
+      </div>
+    </section>
+  );
   return (
     <section className="card c-motorista motorista" id="cartao" aria-labelledby="m-rotulo" hidden={oculto}>
       <h2 id="m-rotulo">{t("card.motorista")}</h2>
