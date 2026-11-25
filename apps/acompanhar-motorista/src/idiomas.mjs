@@ -56,9 +56,11 @@ export const TEXTOS = {
   "m.whatsCentral": ["WhatsApp da central Betinhos", "Betinhos dispatch WhatsApp", "WhatsApp de la central Betinhos"],
   "m.nota": ["Contato pela central Betinhos", "Contact through Betinhos dispatch", "Contacto a través de la central Betinhos"],
   "sino.ativar": ["Avisar quando estiver chegando", "Notify me when arriving", "Avisarme cuando esté llegando"],
+  "sino.ativarEmDefinicao": ["Avisar quando o motorista for definido", "Notify me when the driver is assigned", "Avisarme cuando se defina el conductor"],
   "sino.ativo": ["Aviso ligado", "Alert on", "Aviso activado"],
   "sino.ligado": ["Vamos avisar quando {motorista} estiver chegando", "We'll let you know when {motorista} is arriving", "Te avisaremos cuando {motorista} esté llegando"],
   "sino.ligadoSemNome": ["Vamos avisar quando o motorista estiver chegando", "We'll let you know when the driver is arriving", "Te avisaremos cuando el conductor esté llegando"],
+  "sino.ligadoEmDefinicao": ["Vamos avisar quando o motorista for definido e quando estiver chegando", "We'll let you know when the driver is assigned and when they're arriving", "Te avisaremos cuando se defina el conductor y cuando esté llegando"],
   "sino.desligado": ["Aviso desligado", "Alert off", "Aviso desactivado"],
   "sino.erro": ["Não foi possível ligar o aviso. Tente de novo.", "Couldn't turn on the alert. Please try again.", "No fue posible activar el aviso. Inténtalo de nuevo."],
   "sino.negadoTitulo": ["Notificações bloqueadas", "Notifications blocked", "Notificaciones bloqueadas"],
@@ -163,6 +165,8 @@ export const CORES = {
 // Avisos por web push (montados no servidor, no idioma da inscrição; não vão para a página). Nunca levam
 // endereço nem nome do passageiro; {motorista} é o primeiro nome do motorista.
 export const AVISOS = {
+  "motorista_definido.titulo": ["Seu motorista é {motorista}", "Your driver is {motorista}", "Tu conductor es {motorista}"],
+  "motorista_definido.semCarro": ["Toque para ver os detalhes", "Tap to see the details", "Toca para ver los detalles"],
   "chegando_embarque.titulo": ["{motorista} está chegando", "{motorista} is arriving", "{motorista} está llegando"],
   "chegando_embarque.semNome": ["Seu motorista está chegando", "Your driver is arriving", "Tu conductor está llegando"],
   "chegando_embarque.corpo": ["{veiculo} {placa}", "{veiculo} {placa}", "{veiculo} {placa}"],

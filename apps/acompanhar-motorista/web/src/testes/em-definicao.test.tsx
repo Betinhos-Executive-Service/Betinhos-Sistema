@@ -20,4 +20,12 @@ describe("Card do motorista sem escala", () => {
     expect(screen.getByText("TER1A23")).toBeInTheDocument();
     expect(screen.queryByText("Motorista em definição")).toBeNull();
   });
+  it("sino: em definição avisa quando o motorista for definido; com motorista, quando estiver chegando", () => {
+    const comSino = { ...cfg, vapid: "BAAA" };
+    const { container, unmount } = renderiza(<CardMotorista dados={{ fase: "agendado", rastreio: false, emDefinicao: true }} cfg={comSino} oculto={false} abrirTela={abrir} />);
+    expect(container.querySelector("#sino-txt")?.textContent).toBe("Avisar quando o motorista for definido");
+    unmount();
+    const outro = renderiza(<CardMotorista dados={{ fase: "agendado", rastreio: false, emDefinicao: false, motorista: { nome: "Ana" }, veiculo: { placa: "TER1A23" } }} cfg={comSino} oculto={false} abrirTela={abrir} />);
+    expect(outro.container.querySelector("#sino-txt")?.textContent).toBe("Avisar quando estiver chegando");
+  });
 });
