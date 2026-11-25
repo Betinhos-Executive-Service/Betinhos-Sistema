@@ -234,9 +234,10 @@ function Get-AllPages([string] $Url) {
   return $all
 }
 
+# Fora do if: a validacao pos-publicacao usa Get-WebResourcesByName mesmo sem chunks.
+. (Join-Path $PSScriptRoot "chunk-cleanup.ps1")
 $previousChunks = @()
 if ($chunkNames.Count) {
-  . (Join-Path $PSScriptRoot "chunk-cleanup.ps1")
   $previousChunks = @(Get-PublishedChunkNames $apiBaseUrl $headers $ResourceName $chunkPrefix)
   Write-Step "build publicado antes deste push: $($previousChunks.Count) chunks"
 }
@@ -255,9 +256,11 @@ Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/PublishXml" -Headers $headers -
 # Quem esta na solucao vem numa consulta so (era uma por recurso).
 $inSolution = @{}
 foreach ($c in Get-AllPages "$apiBaseUrl/solutioncomponents?`$select=objectid&`$filter=_solutionid_value eq $solutionId and componenttype eq 61") { $inSolution[[string] $c.objectid] = $true }
+# O que ficou gravado vem em poucas consultas (era um GET por recurso).
+$gravados = Get-WebResourcesByName $apiBaseUrl $headers @($resources | ForEach-Object { $_.Name })
 foreach ($r in $resources) {
-  $published = Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset($($r.Id))?`$select=name,content,webresourcetype" -Headers $headers
-  if ($published.name -ne $r.Name -or $published.webresourcetype -ne $r.Type -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
+  $published = $gravados[$r.Name]
+  if ($null -eq $published -or [string] $published.webresourceid -ne [string] $r.Id -or $published.webresourcetype -ne $r.Type -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
   if (-not $inSolution.ContainsKey([string] $r.Id)) { throw "$($r.Name) nao esta na solucao $solutionUniqueName apos a publicacao." }
 }
 

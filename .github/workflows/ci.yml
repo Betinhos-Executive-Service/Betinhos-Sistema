@@ -70,6 +70,10 @@ jobs:
           }
           Write-Host "$($arquivos.Count) arquivos, $falhas erro(s)"
           if ($falhas) { exit 1 }
+      # Leitura em lote e limpeza de chunks do push da tela (DEV e PROD), com respostas simuladas: sem Dataverse.
+      - name: Chunks do push da tela
+        shell: pwsh
+        run: ./packages/deploy/testa-chunk-cleanup.ps1 -Script ./packages/deploy/chunk-cleanup.ps1
       # Schema por migration (packages/deploy/migrations/README.md): migration publicada é imutável e schema novo não entra por provision-*.
       - name: Migrations
         if: github.event_name == 'pull_request'

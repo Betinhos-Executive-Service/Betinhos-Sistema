@@ -51,6 +51,7 @@ on:
       - 'packages/dataverse/**'
       - 'pnpm-lock.yaml'
       - 'packages/deploy/push-dev.ps1'
+      - 'packages/deploy/chunk-cleanup.ps1'
       - 'packages/deploy/push-plugins-dev.ps1'
       - 'packages/deploy/pendentes-dev.ps1'
       - 'packages/deploy/push-flows-dev.ps1'

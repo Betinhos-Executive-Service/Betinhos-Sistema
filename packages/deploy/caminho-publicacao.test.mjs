@@ -106,6 +106,8 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'packages/deploy/solucoes/conferir.mjs',
     'packages/deploy/push-front-prod.ps1',
     'packages/deploy/push-flows-dev.ps1',
+    'packages/deploy/chunk-cleanup.ps1',
+    'packages/deploy/testa-chunk-cleanup.ps1',
     'packages/deploy/flows-dev.mjs',
     'packages/deploy/flows-dev.test.mjs',
     'packages/deploy/backup/exportar-dataverse.mjs',
