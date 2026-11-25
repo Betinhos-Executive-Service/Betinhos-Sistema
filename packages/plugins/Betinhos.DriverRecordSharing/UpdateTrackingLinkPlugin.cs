@@ -56,9 +56,12 @@ namespace Betinhos.DriverRecordSharing
                 var built = GenerateTrackingLinkPlugin.LoadPayload(system, system, serviceId, context.OrganizationName, tracing);
                 if (built.Error != null)
                 {
-                    // Motorista sem rastreio (terceiro, sem carro, removido): revoga para o cliente não ver o motorista anterior.
+                    // Só status sem link (Solicitado) ou reserva sem embarque. Motorista removido, terceiro ou sem Infleet não chega aqui: o PUT troca o link para "em definição" ou sem mapa.
                     tracing?.Trace("UpdateTrackingLink: revogando link serviceId={0}: {1}", serviceId, built.Error);
                     if (!Send(config, "DELETE", url, null, tracing)) return;
+                    // Link revogado: a credencial de cadastro do portal sai junto (mesma regra do RevokeTrackingLinkPlugin).
+                    try { TrackingLinkCadastro.RevokeWholeService(system, serviceId); }
+                    catch (Exception cadastroError) { tracing?.Trace("UpdateTrackingLink: link de cadastro não revogado serviceId={0}: {1}", serviceId, cadastroError.GetType().Name); }
                     var update = new Entity(PluginConfig.ServiceTable, serviceId);
                     update[PluginConfig.ServiceTrackingLink] = null;
                     update[PluginConfig.ServiceTrackingLinkExpiresAt] = null;
