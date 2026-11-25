@@ -13,6 +13,7 @@ const VALID_VIEWS = new Set([
   'more',
   'quality',
   'settings',
+  'projects',
 ])
 
 export interface PlannerUrlState {

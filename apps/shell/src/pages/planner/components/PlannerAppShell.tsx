@@ -65,7 +65,7 @@ export function AppShell({
       : ["board", "list", "calendar"].includes(active)
         ? "board"
         : active;
-  const mobileNavActive = ["ideas", "quality", "settings"].includes(active)
+  const mobileNavActive = ["ideas", "quality", "settings", "projects"].includes(active)
     ? "more"
     : desktopNavActive;
   const activeLabel: any =

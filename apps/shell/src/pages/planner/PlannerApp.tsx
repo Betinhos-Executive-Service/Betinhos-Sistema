@@ -21,6 +21,7 @@ import { CalendarView } from './views/CalendarView'
 import CentralView from './views/CentralView'
 import ContactsView from './views/ContactsView'
 import IdeasView from './views/IdeasView'
+import ProjectsView from './views/ProjectsView'
 import { ListView } from './views/ListView'
 import ManagementView from './views/ManagementView'
 import { MoreView } from './views/MoreView'
@@ -224,6 +225,7 @@ export function PlannerApp() {
     if (active === "management")
       return <ManagementView state={viewState} currentEmployee={currentEmployee} onOpenTask={openTask} onCollect={collectTask} onRegisterWaitingReturn={openWaitingReturn} />;
     if (active === "ideas") return <IdeasView store={store} />;
+    if (active === "projects") return <ProjectsView currentUserName={currentEmployee?.name} />;
     if (active === "contacts")
       return (
         <ContactsView

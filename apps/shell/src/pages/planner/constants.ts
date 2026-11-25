@@ -1,6 +1,6 @@
 // Porte de Tela Planner/src/App.jsx (sem mudança de comportamento).
 import { PRIORITIES, STATUSES } from './domain/domain'
-import { CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, LayoutDashboard, Lightbulb, ListFilter, Menu, Play, Settings, Target, Users } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ClipboardList, Clock3, FileText, FolderKanban, LayoutDashboard, Lightbulb, ListFilter, Menu, Play, Settings, Target } from 'lucide-react'
 
 
 // No Sistema Betinhos a barra do shell já navega: a do Planner começa recolhida, com a preferência
@@ -12,17 +12,15 @@ export const QUOTE_WORKSPACE_V2_ENABLED = import.meta.env.VITE_QUOTES_WORKSPACE_
 export const QUOTE_HYBRID_V3_ENABLED = import.meta.env.VITE_QUOTES_HYBRID_V3 !== "false";
 
 export const CENTRAL_NAV_ITEMS = [
-  ["dashboard", "Início", LayoutDashboard],
   ["board", "Tarefas", ClipboardList],
   ["management", "Gestão", Target],
   ["ideas", "Boas ideias", Lightbulb],
-  ["contacts", "Contatos", Users],
   ["quotes", "Cotações", FileText],
   ["settings", "Configurações", Settings],
+  ["projects", "Projetos", FolderKanban],
 ];
 
 export const MOBILE_NAV_ITEMS = [
-  ["dashboard", "Hoje", LayoutDashboard],
   ["board", "Tarefas", ClipboardList],
   ["quotes", "Cotações", FileText],
   ["more", "Mais", Menu],
