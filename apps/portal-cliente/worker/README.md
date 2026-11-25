@@ -15,8 +15,10 @@ Multi-cliente: cada cliente (`cr40f_clientes1`) tem `cr40f_portalhabilitado`, `c
 | `GET /api/servicos` | Serviços do cliente da sessão (sem Retirado) |
 | `POST /api/servicos/aprovar` | `{ids}` em lote |
 | `POST /api/servicos/:id/duvida` · `/responder` | `{motivo, texto}` · `{texto}` |
-| `POST /api/pedidos` | Módulo Pedir: `{passageiros[], origem, destino, saida, observacao?}` → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
-| `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com status, veículo e voucher quando programadas |
+| `GET /api/passageiros?q=` | Módulo Pedir: até 20 passageiros ativos do cliente da sessão (`cr40f_bancodedados`), filtrados por nome |
+| `GET /api/enderecos?q=` | Módulo Pedir: até 6 sugestões `[{rotulo, endereco}]` da TomTom Search (`typeahead`, BR, pt-BR; POI, endereço e rua). Mínimo 3 caracteres, `q` até 100. Sem `TOMTOM_KEY` ou com a TomTom falhando responde `[]` (o campo continua texto livre) |
+| `POST /api/pedidos` | Módulo Pedir: `{passageiros[{id?, nome, telefone?, email?}], origem, destino, saida, tipoVeiculo?, observacao?}` (celular ou e-mail por passageiro; vínculos em `cr40f_servicosporpassageiro`) → reserva em **Solicitado** (`cr40f_status` 202410004) ligada ao cliente e ao usuário (`cr40f_portalusuario`), com o pedido do cliente em `cr40f_portalpedido` (JSON); 400 com a mensagem do campo; 409 `duplicado` para o mesmo pedido em 1 min |
+| `GET /api/pedidos` | Módulo Meus serviços: reservas pedidas pelo usuário da sessão, com passageiros (`pessoas`), `tipoVeiculo`, status, veículo e voucher quando programadas |
 
 Segurança: 5 erros (senha ou código) no mesmo e-mail → 15 min de bloqueio; limite por IP e por e-mail (`ratelimits`); CSRF por `Origin`; senha só como PBKDF2-SHA256 (100 mil iterações, sal próprio, `cr40f_senhahash` com segurança de coluna e sem auditoria: só o perfil "Portal do cliente - senha", com o usuário de aplicação do Worker, e o Administrador do Sistema leem; migration 20261124-1700); senha vale só com `cr40f_senhadefinidaem` preenchida (o "Zerar senha" do shell limpa só a data); código só como SHA-256; cookies cifrados (AES-GCM, `CHAVE_SESSAO`); toda consulta filtra pelo cliente da sessão; rota de módulo que o cliente não tem → 403. O número da reserva (`cr40f_id`) é do autonumber do Dataverse; o Worker nunca o inventa.
 
@@ -33,7 +35,7 @@ Por ambiente, uma vez:
 
 1. Papel `Portal do Cliente` (migration `20261124-1000-portal-cliente-papel.ps1`; PROD pelas soluções): o mínimo que o Worker usa. Criar reserva dispara os plugins da tabela (AutoNumberGuard, preço, compartilhamento): confira no DEV antes do piloto.
 2. App registration no Entra com client secret, usuário de aplicação no Dataverse com o papel `Portal do Cliente`.
-3. Secrets (`pnpm exec wrangler secret put <NOME> [--env dev]`, valor pelo stdin, nunca no comando): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_SESSAO`. A chave: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma por ambiente. Trocar `CHAVE_SESSAO` derruba todas as sessões (as senhas continuam).
+3. Secrets (`pnpm exec wrangler secret put <NOME> [--env dev]`, valor pelo stdin, nunca no comando): `DV_TENANT`, `DV_CLIENT_ID`, `DV_CLIENT_SECRET`, `DV_URL`, `EMAIL_FLOW_URL`, `CHAVE_SESSAO`; opcional `TOMTOM_KEY` (chave da TomTom Search, a mesma conta do acompanhar-motorista; sem ela o Pedir só não sugere endereço). A chave: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`, uma por ambiente. Trocar `CHAVE_SESSAO` derruba todas as sessões (as senhas continuam).
 
 ## Local
 

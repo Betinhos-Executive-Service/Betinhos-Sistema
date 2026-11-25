@@ -106,9 +106,11 @@ describe('mapearServico', () => {
 
 describe('pedidos', () => {
   const T0 = Date.parse('2026-11-01T12:00:00Z')
-  const base = normalizarPedido({ passageiros: [' Ana ', '', 'Bia'], origem: ' Pinda ', destino: 'GRU', saida: '2026-11-03T10:00:00Z', observacao: ' ' })
+  const ana = { nome: ' Ana ', telefone: '(12) 99999-0001' }
+  const bia = { nome: 'Bia', email: 'bia@exemplo.com' }
+  const base = normalizarPedido({ passageiros: [ana, { nome: '' }, bia], origem: ' Pinda ', destino: 'GRU', saida: '2026-11-03T10:00:00Z', observacao: ' ' })
   it('normaliza e valida campo a campo', () => {
-    expect(base).toEqual({ passageiros: ['Ana', 'Bia'], origem: 'Pinda', destino: 'GRU', saida: '2026-11-03T10:00:00Z' })
+    expect(base).toEqual({ passageiros: [{ nome: 'Ana', telefone: '(12) 99999-0001' }, bia], origem: 'Pinda', destino: 'GRU', saida: '2026-11-03T10:00:00Z' })
     expect(validarPedido(base, T0)).toEqual({})
     expect(validarPedido({ ...base, passageiros: [], origem: '', destino: '' }, T0)).toEqual({
       passageiros: 'Informe pelo menos um passageiro.', origem: 'Informe o endereço de saída.', destino: 'Informe o destino.',
@@ -116,7 +118,7 @@ describe('pedidos', () => {
     expect(validarPedido({ ...base, saida: '2026-11-01T11:59:00Z' }, T0).saida).toMatch(/daqui para a frente/)
     expect(validarPedido({ ...base, saida: 'ontem' }, T0).saida).toMatch(/data e a hora/)
     expect(validarPedido({ ...base, saida: '2028-01-01T10:00:00Z' }, T0).saida).toMatch(/um ano/)
-    expect(validarPedido({ ...base, passageiros: ['x'.repeat(101)], origem: 'y'.repeat(301) }, T0)).toMatchObject({ passageiros: /100 caracteres/, origem: /300 caracteres/ })
+    expect(validarPedido({ ...base, passageiros: [{ nome: 'x'.repeat(101), email: 'a@b.co' }], origem: 'y'.repeat(301) }, T0)).toMatchObject({ passageiros: /100 caracteres/, origem: /300 caracteres/ })
   })
   it('nome a partir do e-mail e módulos da choice múltipla', () => {
     expect(nomeDoEmail('paula.ribeiro@latasa.com.br')).toBe('Paula Ribeiro')
@@ -130,10 +132,19 @@ describe('pedidos', () => {
       cr40f_reservadeveculosid: 'id1', cr40f_id: 'RV-1', cr40f_status: 202410004, cr40f_dataehorriodesada: '2026-11-03T10:00:00Z', cr40f_endereodesada: 'A', cr40f_destino: 'B',
       cr40f_portalpedido: '{"passageiros":["Ana","Bia"],"observacao":"Voo LA1"}', new_linkdovoucher: 'https://v/1.pdf', createdon: '2026-11-01T12:00:00Z',
     }
-    expect(mapearPedido(r)).toEqual({ id: 'id1', numero: 'RV-1', status: 'solicitado', saida: '2026-11-03T10:00:00Z', origem: 'A', destino: 'B', passageiros: ['Ana', 'Bia'], criadoEm: '2026-11-01T12:00:00Z', observacao: 'Voo LA1' })
+    expect(mapearPedido(r)).toEqual({ id: 'id1', numero: 'RV-1', status: 'solicitado', saida: '2026-11-03T10:00:00Z', origem: 'A', destino: 'B', passageiros: ['Ana', 'Bia'], pessoas: [{ nome: 'Ana' }, { nome: 'Bia' }], criadoEm: '2026-11-01T12:00:00Z', observacao: 'Voo LA1' })
     expect(mapearPedido({ ...r, cr40f_status: 202410005 })).toMatchObject({ status: 'programado', voucherUrl: 'https://v/1.pdf' })
     expect(mapearPedido({ ...r, cr40f_status: 202410010 }).status).toBe('cancelado')
     // Coluna editada à mão: não quebra, só fica sem passageiros.
     expect(mapearPedido({ ...r, cr40f_portalpedido: 'x' }).passageiros).toEqual([])
+  })
+  it('passageiros e contato vêm de Serviços por Passageiro, em ordem; o tipo de veículo pedido sai como número', () => {
+    const vinculo = (id: string, ordem: number, nome: string, extra = {}) => ({ _cr40f_bancodedados_value: id, cr40f_ordemdeselecao: ordem, [NAV.vinculoPessoa]: { cr40f_nomedopassageiro: nome, ...extra } })
+    const r = {
+      cr40f_reservadeveculosid: 'id1', cr40f_id: 'RV-1', cr40f_status: 202410004, cr40f_dataehorriodesada: '2026-11-03T10:00:00Z', cr40f_endereodesada: 'A', cr40f_destino: 'B', createdon: '2026-11-01T12:00:00Z',
+      cr40f_portalpedido: '{"passageiros":["Antigo"]}', cr40f_tipodeveiculo: 202410003,
+      [NAV.passageiros]: [vinculo('p2', 2, 'Bia', { cr40f_email: 'bia@exemplo.com' }), vinculo('p1', 1, 'Ana', { cr40f_telefone: '12999990001' })],
+    }
+    expect(mapearPedido(r)).toMatchObject({ passageiros: ['Ana', 'Bia'], tipoVeiculo: 202410003, pessoas: [{ id: 'p1', nome: 'Ana', telefone: '12999990001' }, { id: 'p2', nome: 'Bia', email: 'bia@exemplo.com' }] })
   })
 })

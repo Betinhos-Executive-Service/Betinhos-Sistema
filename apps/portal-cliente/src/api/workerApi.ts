@@ -1,4 +1,4 @@
-import type { Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
 /**
@@ -21,7 +21,7 @@ export async function erroDaResposta(r: Response): Promise<ErroPortal> {
 }
 
 export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch(...a)): PortalApi {
-  async function chamar<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown): Promise<T> {
+  async function chamar<T>(metodo: 'GET' | 'POST', caminho: string, corpo?: unknown, signal?: AbortSignal): Promise<T> {
     let r: Response
     try {
       r = await f(base + caminho, {
@@ -29,6 +29,7 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
         credentials: 'include',
         headers: corpo === undefined ? undefined : { 'Content-Type': 'application/json' },
         body: corpo === undefined ? undefined : JSON.stringify(corpo),
+        signal,
       })
     } catch {
       throw new ErroPortal('falha', 'Sem conexão com o servidor.')
@@ -51,6 +52,8 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     aprovar: (ids: string[]) => chamar<Servico[]>('POST', '/servicos/aprovar', { ids }),
     abrirDuvida: (id: string, motivo: Motivo, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/duvida`, { motivo, texto }),
     responder: (id: string, texto: string) => chamar<Servico>('POST', `/servicos/${encodeURIComponent(id)}/responder`, { texto }),
+    buscarPassageiros: (q: string) => chamar<PassageiroPedido[]>('GET', `/passageiros?q=${encodeURIComponent(q)}`),
+    buscarEnderecos: (q: string, sinal?: AbortSignal) => chamar<EnderecoSugerido[]>('GET', `/enderecos?q=${encodeURIComponent(q)}`, undefined, sinal),
     pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
     meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
     cancelarPedido: (id: string) => chamar<Pedido>('POST', `/pedidos/${encodeURIComponent(id)}/cancelar`),

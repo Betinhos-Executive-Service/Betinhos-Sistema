@@ -50,23 +50,35 @@ export type Sessao = { nome: string; email: string; cliente: string; modulos: Mo
 /** `cr40f_status` da reserva visto pelo solicitante. */
 export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'
 
+/** Pessoa do pedido (`cr40f_bancodedados`). Sem `id` = cadastro novo. */
+/** Sugestão de endereço (TomTom): `rotulo` é o nome do lugar ou da rua; `endereco` o endereço formatado. */
+export type EnderecoSugerido = { rotulo: string; endereco: string }
+
+export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string }
+
 export type NovoPedido = {
-  passageiros: string[]
+  passageiros: PassageiroPedido[]
   origem: string
   destino: string
   /** ISO da saída. */
   saida: string
+  /** Preferência de veículo (valor da choice `cr40f_tipodeveiculo`); sem valor, a Betinhos escolhe. */
+  tipoVeiculo?: number
   observacao?: string
 }
 
 /** Reserva pedida pelo portal (módulos Pedir e Meus serviços). */
-export type Pedido = NovoPedido & {
+export type Pedido = Omit<NovoPedido, 'passageiros'> & {
   id: string
   /** Código da reserva (`cr40f_id`); vazio até o Dataverse numerar. */
   numero: string
   status: StatusPedido
   criadoEm: string
-  /** Tipo de veículo (choice da reserva). */
+  /** Só os nomes, para lista, busca e Excel. */
+  passageiros: string[]
+  /** Passageiros com id e contato (de Serviços por Passageiro), para repetir o pedido. */
+  pessoas: PassageiroPedido[]
+  /** Veículo programado pela operação (nome). */
   veiculo?: string
   /** Nome do motorista programado. */
   motorista?: string

@@ -15,6 +15,8 @@ export type Dv = {
   post(caminho: string, corpo: Registro): Promise<void>
   /** POST que devolve o registro criado (`Prefer: return=representation`), com as colunas do `$select` do caminho. */
   criar(caminho: string, corpo: Registro): Promise<Registro>
+  /** DELETE de um registro (ex.: `cr40f_reservadeveculoses(<id>)`). */
+  apagar(caminho: string): Promise<void>
 }
 
 const CHAVE_TOKEN = 'dv:token'
@@ -61,6 +63,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
     lista: async (c) => ((await (await chamar('GET', c)).json()) as { value: Registro[] }).value,
     patch: async (c, corpo) => void (await chamar('PATCH', c, corpo)),
     post: async (c, corpo) => void (await chamar('POST', c, corpo)),
+    apagar: async (c) => void (await chamar('DELETE', c)),
     criar: async (c, corpo) => (await (await chamar('POST', c, corpo, ',return=representation')).json()) as Registro,
   }
 }
