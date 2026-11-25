@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { BedDouble, Building2, Bus, History, MapPin, Plane, TrainFront } from 'lucide-react'
+import { BedDouble, Building2, Bus, History, MapPin, Plane, TrainFront, X } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { MAX_ENDERECO, textoDoEndereco } from '../domain/pedidos'
 import type { EnderecoSugerido, TipoLocal } from '../domain/types'
@@ -9,9 +9,18 @@ const MIN_BUSCA = 3
 const MAX_RECENTES = 4
 const MAX_OPCOES = 6
 
-type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' | TipoLocal }
+type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' | TipoLocal; rotulo?: string }
 
 const ICONES = { recente: History, poi: Building2, rua: MapPin, aeroporto: Plane, hotel: BedDouble, rodoviaria: Bus, estacao: TrainFront }
+
+type Escolha = { texto: string; titulo: string; resto: string; tipo: Opcao['tipo'] }
+
+/** Divide o endereço em nome (rua e número, ou o local) e o resto (bairro, cidade). */
+export function partesDoEndereco(texto: string): { titulo: string; resto: string } {
+  const p = texto.split(',').map((t) => t.trim()).filter(Boolean)
+  const n = p.length > 1 && /^\d/.test(p[1]) ? 2 : 1
+  return { titulo: p.slice(0, n).join(', ') || texto.trim(), resto: p.slice(n).join(', ') }
+}
 
 type Props = {
   id: string
@@ -39,6 +48,9 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
   const [ativo, setAtivo] = useState(-1)
   const [sugestoes, setSugestoes] = useState<EnderecoSugerido[]>([])
   const [buscando, setBuscando] = useState(false)
+  const [focado, setFocado] = useState(false)
+  const [escolha, setEscolha] = useState<Escolha | null>(null)
+  const refInput = useRef<HTMLInputElement>(null)
 
   // Sugestões remotas: só com o campo aberto e 3+ letras; cada tecla cancela a busca anterior.
   const consulta = value.trim()
@@ -66,6 +78,7 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
       .map<Opcao>((s) => ({
         chave: `s:${s.rotulo}|${s.endereco}`,
         texto: textoDoEndereco(s),
+        rotulo: s.rotulo,
         tipo: s.tipo ?? (s.endereco.toLowerCase().includes(s.rotulo.toLowerCase()) ? 'rua' : 'poi'),
       }))
       .filter((o) => !doHistorico.some((h) => h.texto.toLowerCase() === o.texto.toLowerCase()))
@@ -80,7 +93,19 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
   const refAtivo = useRef<HTMLLIElement>(null)
   useEffect(() => { refAtivo.current?.scrollIntoView?.({ block: 'nearest' }) }, [ativo])
 
-  const escolher = (o: Opcao) => { onChange(o.texto.slice(0, MAX_ENDERECO)); setAberto(false); setAtivo(-1) }
+  const escolher = (o: Opcao) => {
+    const texto = o.texto.slice(0, MAX_ENDERECO)
+    // Local com nome (hotel, aeroporto, empresa): o nome vem da sugestão e o resto é o endereço dele.
+    const partes = o.rotulo && o.tipo !== 'rua' && texto.startsWith(o.rotulo)
+      ? { titulo: o.rotulo, resto: texto.slice(o.rotulo.length).replace(/^,\s*/, '') }
+      : partesDoEndereco(texto)
+    setEscolha({ texto, ...partes, tipo: o.tipo === 'recente' ? 'rua' : o.tipo })
+    onChange(texto); setAberto(false); setAtivo(-1)
+  }
+  // Fora de foco e preenchido: o campo mostra o local em duas linhas (nome e resto); tocar volta ao texto.
+  const exibir = !focado && value.trim() !== ''
+  const vista: Escolha = escolha?.texto === value ? escolha : { texto: value, ...partesDoEndereco(value), tipo: 'rua' }
+  const IconeVista = ICONES[vista.tipo]
   const idOpcao = (i: number) => `${idLista}-${i}`
 
   function teclar(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -127,8 +152,23 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
   }
 
   return (
-    <div className="pc-pp__combo">
+    <div className={`pc-pp__combo${exibir ? ' pc-pp__combo--exibindo' : ''}`}>
+      {exibir && (
+        <div className="pc-pp__vista" aria-hidden>
+          <span className="pc-pp__opcao-icone" data-tipo={vista.tipo}><IconeVista size={15} /></span>
+          <span className="pc-pp__vista-texto">
+            <span className="pc-pp__vista-titulo">{vista.titulo}</span>
+            {vista.resto && <span className="pc-pp__vista-resto">{vista.resto}</span>}
+          </span>
+        </div>
+      )}
+      {exibir && (
+        <button type="button" className="pc-pp__limpar" aria-label="Limpar endereço" onClick={() => { onChange(''); setEscolha(null); refInput.current?.focus() }}>
+          <X size={14} aria-hidden />
+        </button>
+      )}
       <input
+        ref={refInput}
         id={id}
         role="combobox"
         aria-expanded={mostrando}
@@ -144,8 +184,8 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         maxLength={MAX_ENDERECO}
         autoComplete="off"
         onChange={(e) => { onChange(e.target.value); setAberto(true); setAtivo(-1) }}
-        onFocus={() => setAberto(true)}
-        onBlur={() => { setAberto(false); setAtivo(-1) }}
+        onFocus={() => { setFocado(true); setAberto(true) }}
+        onBlur={() => { setFocado(false); setAberto(false); setAtivo(-1) }}
         onKeyDown={teclar}
       />
       <span role="status" className="pc-pp__sr">{mostrando && buscando ? 'Buscando endereços…' : ''}</span>

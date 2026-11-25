@@ -118,6 +118,16 @@ button.pc-pp__passo-botao:focus-visible { outline: 2px solid var(--ped-navy); ou
 
 /* Combobox de endereço */
 .pc-pp__combo { position: relative; min-width: 0; }
+/* Endereço escolhido, fora de foco: nome em destaque e o resto menor; o input fica por cima, invisível, e o toque volta ao texto. */
+.pc-pp__vista { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 10px; min-width: 0; padding: 4px 30px 4px 0; pointer-events: none; }
+.pc-pp__vista-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pc-pp__vista-titulo, .pc-pp__vista-resto { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pc-pp__vista-titulo { font-weight: 600; font-size: 1rem; }
+.pc-pp__vista-resto { font-size: 0.8125rem; color: #6b7280; }
+.pc-pp__rota-linha .pc-pp__combo--exibindo > input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; opacity: 0; cursor: text; }
+.pc-pp__limpar { position: absolute; top: 50%; right: 0; z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; color: #6b7280; cursor: pointer; transform: translateY(-50%); transition: background 100ms ease, color 100ms ease; }
+.pc-pp__limpar:hover { background: #f2f4f8; color: var(--ped-navy); }
+.pc-pp__limpar:focus-visible { outline: 2px solid var(--ped-navy); outline-offset: 1px; }
 .pc-pp__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pc-pp__grupo-status { float: right; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--ped-navy); animation: pc-pp-surge 160ms ease both; }
 .pc-pp__giro { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(11, 31, 58, 0.16); border-top-color: var(--ped-navy); animation: pc-pp-gira 650ms linear infinite; }
