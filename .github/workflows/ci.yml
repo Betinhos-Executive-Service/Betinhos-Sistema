@@ -11,66 +11,41 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Os testes do shell são quase todo o tempo do CI (~95%): rodam divididos em fatias paralelas (vitest --shard),
-# equilibradas pelo tempo de cada arquivo (apps/shell/tempos-testes.json), e só quando o PR mexe em algo que o shell usa.
-# O resto (typecheck de todos os pacotes, testes dos outros pacotes, dados pessoais e segredos) roda num job ao lado.
-# O job "CI ok" junta tudo num resultado só.
+# Tudo roda em paralelo e o job "CI ok" junta num resultado só. O que manda no tempo do CI é o job mais lento:
+# - shell: testes em fatias paralelas (vitest --shard), equilibradas pelo tempo de cada arquivo
+#   (apps/shell/tempos-testes.json), mais o typecheck do shell numa parte própria. Só quando o PR mexe em algo que o
+#   shell usa; cada parte decide sozinha (.github/scripts/ci-mudancas.sh) para não esperar outro job antes de começar.
+# - checagens: typecheck e testes dos outros pacotes, dados pessoais, segredos e sintaxe dos .ps1.
+# - plugins (Windows) e acompanhar-motorista: só quando o PR os toca (job "mudancas").
 jobs:
-  # PR que não toca o shell nem o que os testes dele leem (dataverse, fixtures dos plugins, dependências) pula as fatias.
   # Fora de PR (manual ou workflow_call) roda tudo.
   mudancas:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       shell: ${{ steps.filtro.outputs.shell }}
       plugins: ${{ steps.filtro.outputs.plugins }}
       acompanhar: ${{ steps.filtro.outputs.acompanhar }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
       - id: filtro
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: |
-          if [ -z "$PR" ]; then echo "shell=true" >> "$GITHUB_OUTPUT"; echo "plugins=todos" >> "$GITHUB_OUTPUT"; echo "acompanhar=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          arquivos=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
-          # Plugins tocados (código, testes, registrador ou script de publicação), em minúsculas: frota,acesso,driverrecordsharing,autonumberguard
-          # (este último mora em apps/formulario-geral/power-platform/plugins; plannernotifications e quoteautonumberguard, em packages/planner/power-platform/plugins).
-          plugins=$(echo "$arquivos" | sed -nE 's#^packages/plugins/(Cr40f\.([A-Za-z]+)\.Plugin(\.Tests)?|tools/Cr40f\.([A-Za-z]+)\.Registrar|Betinhos\.(DriverRecordSharing|ExpenseUpload)(\.Tests)?)/.*#\2\4\5#p; s#^packages/plugins/scripts/push-([a-z]+)-plugin\.ps1$#\1#p; s#^apps/formulario-geral/power-platform/plugins/(AutoNumberGuard)(\.Tests)?/.*#\1#p; s#^packages/planner/power-platform/plugins/(PlannerNotifications|QuoteAutoNumberGuard)(\.Tests)?/.*#\1#p' | tr 'A-Z' 'a-z' | sort -u | paste -sd, -)
-          if echo "$arquivos" | grep -qE '^\.github/workflows/ci\.yml$'; then plugins=todos; fi
-          echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
-          # Worker acompanhar-motorista: o próprio app, o bump-version compartilhado, o lock e este workflow.
-          if echo "$arquivos" | grep -qE '^(apps/acompanhar-motorista/|packages/deploy/bump-version\.mjs$|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
-            echo "acompanhar=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "acompanhar=false" >> "$GITHUB_OUTPUT"
-          fi
-          if echo "$arquivos" | grep -qE '^(apps/shell/|packages/dataverse/|packages/plugins/[^/]+/Fixtures/|\.github/workflows/ci\.yml$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig\.base\.json$|\.npmrc$)'; then
-            echo "shell=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "shell=false" >> "$GITHUB_OUTPUT"
-            echo "PR sem mudança que afete o shell: fatias do shell puladas." >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: bash .github/scripts/ci-mudancas.sh
 
   checagens:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
-          # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
-          registry-url: https://npm.pkg.github.com
-          scope: '@betinhos-executive-service'
-      - run: pnpm install --frozen-lockfile
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/preparar-pnpm
       # Sem dado pessoal real (CPF válido, e-mail de pessoa, backup de flow) no repositório.
       - run: node --test scripts/dados-pessoais.test.mjs && node scripts/dados-pessoais.mjs
       # Os .ps1 de publicação só rodam no Deploy e no Produção: erro de sintaxe apareceria tarde, no meio de uma publicação.
@@ -91,9 +66,11 @@ jobs:
           if ($falhas) { exit 1 }
       - name: Varredura de segredos na solução
         run: node packages/deploy/scan-secrets.mjs solution
-      # Todo pacote com script typecheck (shell, escala-fds, portal-cliente e worker, agentes-ia, despesas-ia).
-      - name: Typecheck
-        run: pnpm -r --if-present typecheck
+      # Todo pacote com script typecheck, menos o shell (escala-fds, gerar-pagantes, motoristas, portal-cliente e worker,
+      # agentes-ia, app-config, despesas-ia). O do shell é o mais lento (~30 s) e roda no job "shell (tipos)", só quando
+      # o PR mexe no shell.
+      - name: Typecheck (exceto shell)
+        run: pnpm -r --if-present --filter '!@betinhos/shell' typecheck
       - name: Sintaxe dos Workers sem typecheck (cadastro-passageiro e backups)
         run: pnpm --filter @betinhos/cadastro-passageiro --filter @betinhos/backups check
       # Inclui @betinhos/formulario-geral (build do webresource + 19 testes do app).
@@ -118,30 +95,37 @@ jobs:
           BASE: ${{ github.base_ref }}
         run: git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/migrations-ci.mjs
 
+  # PR que não toca o shell nem o que ele lê (dataverse, app-config, fixtures dos plugins, catálogo de acessos,
+  # dependências) termina no filtro, sem instalar nada.
   shell:
-    needs: mudancas
-    if: needs.mudancas.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: read
     strategy:
       fail-fast: false
       matrix:
-        fatia: [1, 2, 3]
-    name: shell (${{ matrix.fatia }}/3)
+        parte: [tipos, 1/4, 2/4, 3/4, 4/4]
+    name: shell (${{ matrix.parte }})
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@betinhos-executive-service'
-      # Só o shell e o que ele usa do workspace (@betinhos/dataverse).
-      - run: pnpm install --frozen-lockfile --filter @betinhos/shell...
+      - id: filtro
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.fatia }}/3
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: bash .github/scripts/ci-mudancas.sh
+      # Só o shell e o que ele usa do workspace (@betinhos/dataverse e @betinhos/app-config).
+      - if: steps.filtro.outputs.shell == 'true'
+        uses: ./.github/actions/preparar-pnpm
+        with:
+          filtro: --filter @betinhos/shell...
+      - if: steps.filtro.outputs.shell == 'true' && matrix.parte == 'tipos'
+        run: pnpm --filter @betinhos/shell typecheck
+      - if: steps.filtro.outputs.shell == 'true' && matrix.parte != 'tipos'
+        run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.parte }}
 
   # Worker acompanhar-motorista (apps/acompanhar-motorista): check (node --check + tsc), testes (node:test + vitest) e build do front.
   # Só roda quando o PR toca o app. Nunca publica nem chama wrangler (a publicação é do deploy.yml e do producao.yml).
@@ -152,16 +136,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/preparar-pnpm
         with:
-          node-version: 24
-          cache: pnpm
-          registry-url: https://npm.pkg.github.com
-          scope: '@betinhos-executive-service'
-      - run: pnpm install --frozen-lockfile --filter @betinhos/acompanhar-motorista...
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          filtro: --filter @betinhos/acompanhar-motorista...
       - run: pnpm --filter @betinhos/acompanhar-motorista check
       - run: pnpm --filter @betinhos/acompanhar-motorista test
       - run: pnpm --filter @betinhos/acompanhar-motorista build
@@ -215,12 +192,13 @@ jobs:
     needs: [mudancas, checagens, schema, shell, plugins, acompanhar-motorista]
     runs-on: ubuntu-latest
     steps:
-      # shell "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
+      # O shell sempre roda (quando o PR não o toca, cada parte termina no próprio filtro), então tem de dar success.
+      # plugins e acompanhar-motorista "skipped" só valem quando o filtro decidiu pular; se o filtro falhou, o CI falha.
       - run: |
           echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }} | acompanhar-motorista: ${{ needs.acompanhar-motorista.result }} (${{ needs.mudancas.outputs.acompanhar }})"
           test "${{ needs.mudancas.result }}" = success
           test "${{ needs.checagens.result }}" = success
+          test "${{ needs.shell.result }}" = success
           if [ "${{ github.event_name }}" = pull_request ]; then test "${{ needs.schema.result }}" = success; fi
-          if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
           if [ -n "${{ needs.mudancas.outputs.plugins }}" ]; then test "${{ needs.plugins.result }}" = success; fi
           if [ "${{ needs.mudancas.outputs.acompanhar }}" = true ]; then test "${{ needs.acompanhar-motorista.result }}" = success; fi
