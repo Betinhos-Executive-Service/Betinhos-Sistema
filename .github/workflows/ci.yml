@@ -146,6 +146,11 @@ jobs:
     if: needs.mudancas.outputs.plugins != ''
     runs-on: windows-latest
     timeout-minutes: 20
+    # "todos" (PR que mexe no CI ou em arquivo compartilhado) divide os plugins em 2 runners; plugin tocado sozinho usa 1.
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: ${{ fromJSON(needs.mudancas.outputs.plugins == 'todos' && '[1,2]' || '[1]') }}
     env:
       DOTNET_NOLOGO: 'true'
       DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
@@ -160,6 +165,7 @@ jobs:
       - name: Testes e registradores
         env:
           PLUGINS: ${{ needs.mudancas.outputs.plugins }}
+          PARTE: ${{ matrix.parte }}
         run: |
           # nome curto -> pasta do código (Cr40f.<Nome>.Plugin, Betinhos.DriverRecordSharing e Betinhos.ExpenseUpload, este só compila e testa;
           # AutoNumberGuard mora no app do Formulário Geral e também só compila e testa)
@@ -169,6 +175,8 @@ jobs:
           # Planner: PlannerNotifications (sininho) e QuoteAutoNumberGuard, também só compilam e testam
           foreach ($n in 'PlannerNotifications', 'QuoteAutoNumberGuard') { $pastas[$n.ToLowerInvariant()] = "packages/planner/power-platform/plugins/$n" }
           $pedidos = if ($env:PLUGINS -eq 'todos') { @($pastas.Keys | Sort-Object) } else { @($env:PLUGINS.Split(',') | Where-Object { $_ -and $pastas.ContainsKey($_) }) }
+          # com "todos", cada runner fica com os plugins de posição par ou ímpar da lista ordenada
+          if ($env:PLUGINS -eq 'todos') { $pedidos = @(for ($i = [int]$env:PARTE - 1; $i -lt $pedidos.Count; $i += 2) { $pedidos[$i] }) }
           foreach ($nome in $pedidos) {
             $dir = $pastas[$nome]
             $p = Split-Path -Leaf $dir
