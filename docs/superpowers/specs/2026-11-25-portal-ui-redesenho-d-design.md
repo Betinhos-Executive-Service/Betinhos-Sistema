@@ -10,7 +10,7 @@ Trocar o layout da página pública `/r/<id>` (`apps/acompanhar-motorista/web`) 
 - Corpo em coluna única (592 px), cards sobrepondo a faixa, gap de 16 px e padding de 20 px (ajuste do Renan: mais espaço e menos ruído, como a V1). Sem emojis, pílulas só para estado, botões secundários em contorno leve; Compartilhar e Central como linhas leves.
 - Ordem: passageiros sem cadastro, mapa, Seu motorista, Sua viagem, Passageiros, Compartilhar, Central 24h, rodapé.
 - Linha do tempo: confirmada, motorista definido, aguardando a saída (agendado), a caminho, no local, em viagem (com paradas), chegada; cada etapa com endereço e horário; atual em dourado, feitas em verde, futuras em cinza. O sino fica na etapa atual (em definição, no card do motorista).
-- Aeroporto (embarque casa com aeroporto, siglas ou terminal): kicker "Seja bem-vindo · Welcome to Brazil"; em no local, "<nome> espera você no desembarque". Sem prometer placa com nome.
+- Aeroporto (embarque casa com aeroporto, siglas ou terminal): saudação em destaque no topo da faixa (dourado, 22 px, peso 800; "Seja bem-vindo", "Welcome" ou "Bienvenido" conforme o idioma, sem linha secundária e sem citar o país), em todas as fases antes do concluído; em no local, "<nome> espera você no desembarque". Sem prometer placa com nome.
 - i18n em PT/EN/ES para todo texto novo (`src/idiomas.mjs`).
 
 ## Estados

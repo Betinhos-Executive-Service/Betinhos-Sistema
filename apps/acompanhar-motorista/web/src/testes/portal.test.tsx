@@ -72,6 +72,13 @@ describe("linha do tempo", () => {
 });
 
 describe("Faixa e LinhaDoTempo renderizadas", () => {
+  it("faixa: saudação traduzida pelo idioma; concluído não mostra", () => {
+    const d: Dados = { fase: "agendado", motorista: { nome: "Ana" }, embarque: { lat: 0, lon: 0, label: "Aeroporto de Guarulhos" } };
+    const { container } = renderiza(<Faixa dados={d} eta={vazio} reserva={null} espera={0} />, "en");
+    expect(container.querySelector("#boasvindas")).toHaveTextContent("Welcome");
+    const fim = renderiza(<Faixa dados={{ ...d, fase: "concluido" }} eta={vazio} reserva={null} espera={0} />);
+    expect(fim.container.querySelector("#boasvindas")).toBeNull();
+  });
   it("faixa: título, 5 segmentos e selo com minutos só a caminho", () => {
     const d: Dados = { fase: "a_caminho", horarioAgendado: ag };
     const { container } = renderiza(<Faixa dados={d} eta={{ eta: { minutos: 7 } as never, chegada: Date.now() + 7 * 60000 }} reserva="Reserva OS-12" espera={0} />);
@@ -85,7 +92,7 @@ describe("Faixa e LinhaDoTempo renderizadas", () => {
   it("faixa: aeroporto mostra o boas-vindas e agendado não tem selo", () => {
     const d: Dados = { fase: "agendado", motorista: { nome: "Ana" }, embarque: { lat: 0, lon: 0, label: "Aeroporto de Guarulhos" } };
     const { container } = renderiza(<Faixa dados={d} eta={vazio} reserva={null} espera={0} />);
-    expect(container.querySelector("#boasvindas")).toBeInTheDocument();
+    expect(container.querySelector("#boasvindas")).toHaveTextContent("Seja bem-vindo");
     expect(container.querySelector("#eta")).toBeNull();
   });
   it("linha do tempo: etapa atual marcada, sem sino sem VAPID", () => {

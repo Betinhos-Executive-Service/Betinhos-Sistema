@@ -104,7 +104,7 @@ export const TEXTOS = {
   "resumo.distancia": ["Distância", "Distance", "Distancia"],
   "agendado.titulo": ["Aguardando a saída", "Waiting for departure", "Esperando la salida"],
   "agendado.texto": ["Viagem agendada para {dia} às {h}", "Ride scheduled for {dia} at {h}", "Viaje programado para el {dia} a las {h}"],
-  "boasvindas": ["Seja bem-vindo · Welcome to Brazil", "Welcome to Brazil", "Bienvenido a Brasil · Welcome to Brazil"],
+  "boasvindas": ["Seja bem-vindo", "Welcome", "Bienvenido"],
   "faixa.saida": ["Saída {h}", "Pickup {h}", "Salida {h}"],
   "h.confirmada": ["Reserva confirmada", "Booking confirmed", "Reserva confirmada"],
   "h.definido": ["Motorista definido", "Driver assigned", "Conductor asignado"],

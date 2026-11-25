@@ -26,7 +26,7 @@ export function Faixa({ dados, eta, reserva, espera }: Props) {
         <SeletorIdioma segmentado />
       </div>
       <div className="faixa-heroi">
-        {dados && aeroportoNoEmbarque(dados) && e !== "concluido" ? <p className="kicker" id="boasvindas">{t("boasvindas")}</p> : null}
+        {dados && aeroportoNoEmbarque(dados) && e !== "concluido" ? <p className="boasvindas" id="boasvindas">{t("boasvindas")}</p> : null}
         <p className="reserva" id="reserva" hidden={!linha}>{linha}</p>
         <div className="titulo-linha">
           <h1 id="status" aria-live="polite" className={dados ? undefined : "esqueleto"}>{dados ? tituloFase(dados, t) : t("status.localizando")}</h1>
