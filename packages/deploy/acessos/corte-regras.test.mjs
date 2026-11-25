@@ -158,6 +158,9 @@ test('tabelas do flow: expressão, tabela desconhecida, ação sem tabela e JSON
   assert.equal(tabelasDoFlow(op({ actionName: 'cr40f_AcessoDefinirPerfis' }), catalogo).incerto, true)
   assert.equal(tabelasDoFlow('{', catalogo).incerto, true)
   assert.equal(tabelasDoFlow('', catalogo).incerto, true)
+  const antigo = { apiId: '/providers/Microsoft.PowerApps/apis/shared_commondataservice', connectionName: 'shared_commondataservice' }
+  const legado = fluxo({ a: { type: 'OpenApiConnection', inputs: { host: antigo, parameters: { dataset: 'default.cds', table: 'cr40f_financeiros' } } } })
+  assert.equal(tabelasDoFlow(legado, catalogo).incerto, true)
 })
 
 test('flows: trava dono que perde tabela do flow, incerto de pessoa comum e equipe do corte', () => {

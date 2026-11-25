@@ -51,6 +51,8 @@ export function criarCliente({ url, token, fetch = globalThis.fetch, espera = do
         continue
       }
       const texto = await r.text()
+      // DELETE repetido depois de 5xx: o primeiro pode ter passado; 404 aqui é o alvo já removido.
+      if (metodo === 'DELETE' && tentativa > 1 && r.status === 404) return null
       if (!r.ok) throw new Error(`${metodo} ${limpo(caminho.replace(api + '/', '').split('?')[0])} falhou: ${r.status} ${limpo(texto.slice(0, 300))}`)
       return texto ? JSON.parse(texto) : null
     }

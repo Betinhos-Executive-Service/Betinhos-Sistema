@@ -44,6 +44,15 @@ test('chamar não repete POST em 5xx, para não duplicar a criação', async () 
   assert.equal(chamadas.length, 1)
 })
 
+test('DELETE repetido depois de 5xx aceita 404 (o primeiro passou)', async () => {
+  const { fetch, chamadas } = falso([resposta(503, 'fora'), resposta(404, 'nao existe')])
+  const dv = criarCliente({ url: URL_DEV, token: 't', fetch, espera: async () => {} })
+  assert.equal(await dv.chamar('DELETE', 'teams(x)/teamroles_association(y)/$ref'), null)
+  assert.equal(chamadas.length, 2)
+  const so404 = criarCliente({ url: URL_DEV, token: 't', fetch: falso([resposta(404, 'nao existe')]).fetch, espera: async () => {} })
+  await assert.rejects(so404.chamar('DELETE', 'teams(x)'), /404/)
+})
+
 test('erro sai sem GUID e 204 vira null', async () => {
   const id = '00000000-0000-0000-0000-000000000001'
   const { fetch } = falso([resposta(400, `papel ${id} recusado`), resposta(204)])

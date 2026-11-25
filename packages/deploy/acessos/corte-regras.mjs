@@ -136,7 +136,8 @@ export function travasDePessoas(lista, { uso, incertas = new Set() }) {
   return { travas, informativo }
 }
 
-const DATAVERSE = /commondataserviceforapps/i
+// Pega também o conector antigo (shared_commondataservice): sem entityName, o flow que o usa fica incerto.
+const DATAVERSE = /commondataservice/i
 
 // Tabelas que o flow toca pelo conector do Dataverse. Qualquer operação do conector sem tabela conhecida
 // (expressão, ação sem entityName, nome fora do catálogo) deixa o flow incerto.
