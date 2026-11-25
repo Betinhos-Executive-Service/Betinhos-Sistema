@@ -738,14 +738,6 @@
           "Read": "Global",
           "Write": "Global"
         },
-        "cr40f_documento": {
-          "Append": "Local",
-          "AppendTo": "Local",
-          "Create": "Local",
-          "Delete": "Local",
-          "Read": "Local",
-          "Write": "Local"
-        },
         "cr40f_equipamento": {
           "Append": "Global",
           "AppendTo": "Global",
@@ -931,13 +923,6 @@
           "Create": "Global",
           "Read": "Global",
           "Write": "Global"
-        },
-        "cr40f_documento": {
-          "Append": "Local",
-          "AppendTo": "Local",
-          "Create": "Local",
-          "Read": "Local",
-          "Write": "Local"
         },
         "cr40f_equipamento": {
           "Append": "Global",
