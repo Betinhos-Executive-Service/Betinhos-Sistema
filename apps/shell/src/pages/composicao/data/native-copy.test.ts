@@ -78,14 +78,14 @@ describe('cópia de visão nativa com filtros do usuário', () => {
     expect(lockedNativeCopy(source, true)).toBe(false)
   })
 
-  it('(d) com divergência na cópia antiga, continua travada como antes', async () => {
+  it('(d) com divergência na cópia antiga, os filtros aninhados ficam editáveis', async () => {
     const { rows } = await saveCopy()
     const edited = String(rows.personal[0].fetchxml).replace('value="900"', 'value="950"').replace('value="2"', 'value="7"')
     for (const fetchxml of [edited, String(rows.personal[0].fetchxml).replace('<condition attribute="new_status" operator="eq" value="2"', '<condition attribute="new_status" operator="eq" value="7"')]) {
       const [copy] = buildViews({ ...rows, personal: [{ ...rows.personal[0], fetchxml }] }, catalog)
       expect(copy).toMatchObject({ nativeOnly: true, managed: false })
       expect(conditions(copy.sourceFetchXml!)).toContain('new_status eq 7')
-      expect(copy.definition.filters).toEqual([])
+      expect(copy.nativeFiltersEditable).toBe(true)
     }
   })
 
