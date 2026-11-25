@@ -31,7 +31,7 @@ export function Portal({ sessao, onSair }: { sessao: Sessao; onSair: () => void 
     <div className="pc-pagina">
       <Topo sessao={sessao} onSair={onSair} ativo={ativo} onModulo={setAtivo} />
       {tem('validar') && <div hidden={ativo !== 'validar'}><Servicos sessao={sessao} /></div>}
-      {tem('pedir') && <div key={`pedir-${versao}-${repeticoes}`} hidden={ativo !== 'pedir'}><Pedir onPedido={pedido} modelo={modelo} /></div>}
+      {tem('pedir') && <div key={`pedir-${versao}-${repeticoes}`} hidden={ativo !== 'pedir'}><Pedir onPedido={pedido} modelo={modelo} onRepetirAnterior={tem('meus_servicos') ? () => setAtivo('meus_servicos') : undefined} /></div>}
       {tem('meus_servicos') && <div key={`meus-${versao}`} hidden={ativo !== 'meus_servicos'}><MeusServicos onPedir={tem('pedir') ? () => setAtivo('pedir') : undefined} onRepetir={tem('pedir') ? repetir : undefined} /></div>}
     </div>
   )

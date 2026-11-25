@@ -23,6 +23,9 @@ export const TIPOS_VEICULO: { valor: number; rotulo: string }[] = [
   { valor: 202410003, rotulo: 'Van' },
   { valor: 202410004, rotulo: 'Van Blindado' },
 ]
+/** Assumi estas capacidades (passageiros); só orientam o aviso na tela, nada é bloqueado nem gravado. Confirmar com a operação. */
+export const CAPACIDADE_VEICULO: Record<number, number> = { 202410001: 3, 202410002: 3, 100000002: 6, 202410003: 14, 202410004: 10 }
+export const capacidadeVeiculo = (valor?: number) => (valor === undefined ? undefined : CAPACIDADE_VEICULO[valor])
 export const rotuloVeiculo = (valor?: number) => TIPOS_VEICULO.find((t) => t.valor === valor)?.rotulo
 
 export const MAX_EMAIL = 120

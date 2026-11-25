@@ -21,3 +21,10 @@ export function diaBr(dia: string): string {
   const [a, m, d] = dia.split('-')
   return `${d}/${m}/${a}`
 }
+
+const fmtDiaSemana = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' })
+/** `quinta-feira, 26/11/2026 às 09:00` (Brasília). */
+export function diaSemanaDataHora(iso: string): string {
+  const d = new Date(iso)
+  return `${fmtDiaSemana.format(d)}, ${fmtData.format(d)} às ${fmtHora.format(d)}`
+}
