@@ -27,7 +27,7 @@ if ($papeis.Count -ne 1) { throw "Papel '$nomePapel' nao encontrado (ou duplicad
 $roleId = [string] $papeis[0].roleid
 
 $temAgora = { @(Get-Rows "roleprivilegescollection" "privilegeid" "roleid eq $roleId and privilegeid eq $privId").Count -gt 0 }
-if (& $temAgora) { Write-Step "$nomePapel ja tem $nomePriv: nada a conceder" }
+if (& $temAgora) { Write-Step "$nomePapel ja tem ${nomePriv}: nada a conceder" }
 elseif (-not $Apply) { Write-Step "DRY RUN concederia: $nomePriv=Basic" }
 else {
   $concessao = [ordered]@{ "@odata.type" = "Microsoft.Dynamics.CRM.RolePrivilege"; PrivilegeId = $privId; Depth = "Basic"; BusinessUnitId = $bu; PrivilegeName = $nomePriv }
