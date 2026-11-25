@@ -41,6 +41,11 @@ export const PEDIDO_STATUS: Record<number, StatusPedido> = {
 /** cr40f_status da pessoa (cr40f_bancodedados): Ativo. */
 export const PESSOA_ATIVA = 202410000
 export const PESSOA_CAMPOS = ['cr40f_bancodedadosid', 'cr40f_nomedopassageiro', 'cr40f_telefone', 'cr40f_email']
+/**
+ * Endereço padrão da pessoa (saída e destino). Fica fora de PESSOA_CAMPOS de propósito: aquele select também alimenta o $expand
+ * dos pedidos, e a coluna de destino só existe depois da migration 20261125-2000. Só a busca do Pedir e a correção de contato leem estes.
+ */
+export const PESSOA_CAMPOS_ENDERECO = [...PESSOA_CAMPOS, 'cr40f_enderecodesaida', 'cr40f_enderecodedestino']
 
 export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portaldominios']
 

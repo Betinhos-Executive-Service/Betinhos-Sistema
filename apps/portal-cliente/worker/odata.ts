@@ -1,6 +1,6 @@
 // Montagem das consultas OData. Toda consulta de serviço leva o cliente da sessão no $filter:
 // o isolamento entre clientes é aqui, não na tela.
-import { APROVACAO, RESERVA_CONFIRMADO, RESERVA_SOLICITADO, CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
+import { APROVACAO, RESERVA_CONFIRMADO, RESERVA_SOLICITADO, CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, PESSOA_CAMPOS_ENDERECO, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -100,17 +100,17 @@ export const pedidoDe = (id: string, validadorId: string, clienteId: string) =>
   `${SET.reserva}?$select=${[...PEDIDO_CAMPOS, 'cr40f_observaointerna'].join(',')}&$expand=${expandPassageiros}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)} and cr40f_reservadeveculosid eq ${guid(id)}`)}`
 
 /** Pessoas ativas do cliente da sessão, por nome (busca do Pedir): 20 no máximo, em ordem alfabética. */
-export const pessoasDoCliente = (clienteId: string, busca: string) =>
-  `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(',')}&$top=20&$orderby=cr40f_nomedopassageiro asc` +
+export const pessoasDoCliente = (clienteId: string, busca: string, campos = PESSOA_CAMPOS_ENDERECO) =>
+  `${SET.pessoa}?$select=${campos.join(',')}&$top=20&$orderby=cr40f_nomedopassageiro asc` +
   `&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0${busca ? ` and contains(cr40f_nomedopassageiro,${texto(busca)})` : ''}`)}`
 
 /** Uma pessoa por id, só se for do cliente da sessão (de outro cliente → lista vazia). */
-export const pessoaDoCliente = (id: string, clienteId: string) =>
-  `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(',')}&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_bancodedadosid eq ${guid(id)}`)}`
+export const pessoaDoCliente = (id: string, clienteId: string, campos = PESSOA_CAMPOS_ENDERECO) =>
+  `${SET.pessoa}?$select=${campos.join(',')}&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_bancodedadosid eq ${guid(id)}`)}`
 
 /** Pessoas do cliente com este nome (o Dataverse compara sem diferenciar caixa); a igualdade fina é conferida no código. */
-export const pessoasComNome = (clienteId: string, nome: string) =>
-  `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(',')}&$top=20&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_nomedopassageiro eq ${texto(nome)}`)}`
+export const pessoasComNome = (clienteId: string, nome: string, campos = PESSOA_CAMPOS_ENDERECO) =>
+  `${SET.pessoa}?$select=${campos.join(',')}&$top=20&$filter=${encodeURIComponent(`${doCliente(clienteId)} and statecode eq 0 and cr40f_nomedopassageiro eq ${texto(nome)}`)}`
 
 /** POST da pessoa: o `$select` define o que volta no `return=representation`. */
 export const criarPessoa = () => `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(',')}`

@@ -128,8 +128,8 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
 }
 
 /** `fetch` falso. `emails` recebe o que iria para o flow. */
-/** `falhas.vinculo` e `falhas.apagar` simulam o Dataverse recusando o vínculo da pessoa e o DELETE da reserva; `exigeAprovacao`, a leitura dessa coluna do cliente com 503; `email`, o flow de e-mails fora do ar. */
-export type Falhas = { vinculo?: boolean; apagar?: boolean; exigeAprovacao?: boolean; email?: boolean }
+/** `falhas.vinculo` e `falhas.apagar` simulam o Dataverse recusando o vínculo da pessoa e o DELETE da reserva; `exigeAprovacao`, a leitura dessa coluna do cliente com 503; `semEnderecoDestino`, o Dataverse sem a coluna de destino (migration ainda não aplicada: select dela dá 400); `email`, o flow de e-mails fora do ar. */
+export type Falhas = { vinculo?: boolean; apagar?: boolean; exigeAprovacao?: boolean; email?: boolean; semEnderecoDestino?: boolean }
 
 export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): typeof fetch {
   return async (entrada, init) => {
@@ -149,6 +149,7 @@ export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): 
     if (!banco[tabela]) return new Response('tabela desconhecida', { status: 404 })
     const chaveId = CHAVE_ID[tabela]
     if (falhas.exigeAprovacao && caminho.includes('cr40f_portalexigeaprovacao')) return new Response('indisponível', { status: 503 })
+    if (falhas.semEnderecoDestino && caminho.includes('cr40f_enderecodedestino')) return new Response('propriedade inexistente', { status: 400 })
     if (metodo === 'POST') {
       if (tabela === 'servicosporpassageiros' && falhas.vinculo) return new Response('sem privilégio', { status: 403 })
       const novo: Registro = { [chaveId]: novoId(), createdon: new Date().toISOString(), ...corpo }
@@ -184,7 +185,9 @@ export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): 
       return Response.json(expandir(reg))
     }
     const filtro = /\$filter=([^&]*)/.exec(caminho)?.[1] ?? ''
-    return Response.json({ value: consultar(banco, tabela, filtro, caminho).map(expandir) })
+    // sem a coluna, o Dataverse também não devolve o que o select não pediu: aqui, nenhum dos dois endereços
+    const semColuna = (r: Registro): Registro => { if (!falhas.semEnderecoDestino) return r; const { cr40f_enderecodesaida: _s, cr40f_enderecodedestino: _d, ...resto } = r; return resto }
+    return Response.json({ value: consultar(banco, tabela, filtro, caminho).map(expandir).map(semColuna) })
   }
 }
 

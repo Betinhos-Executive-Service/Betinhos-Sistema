@@ -1,9 +1,9 @@
 import { chaveDaMarca, DOMINIOS_PUBLICOS_MARCA, type Marca } from '../domain/marca'
 import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MOTIVO_RECUSA_MAX, MOTIVO_RECUSA_MIN, nomeDoEmail, normalizarPedido, primeiroErroPedido, soDigitos } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
-import type { EnderecoSugerido, Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { EnderecoSugerido, Modulo, Motivo, NovoPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { motivoNaoCancela, PRAZOS_PADRAO, type Prazos } from '../domain/prazos'
-import { APROVADORES_MOCK, SOLICITANTE_PENDENTE, gerarPedidos, gerarPedidosPendentes, gerarServicos, PESSOAS_LATASA, type PedidoMock } from './mockDados'
+import { APROVADORES_MOCK, SOLICITANTE_PENDENTE, gerarPedidos, gerarPedidosPendentes, gerarServicos, PESSOAS_LATASA, type PedidoMock, type PessoaMock } from './mockDados'
 import { ErroPortal, senhaFraca, type PortalApi } from './PortalApi'
 
 export const CODIGO_MOCK = '123456'
@@ -96,7 +96,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
   let servicos = gerarServicos(agora())
   let pedidos = [...gerarPedidos(agora()), ...gerarPedidosPendentes(agora())]
   /** Pessoas por cliente (nome da sessão): no real, `cr40f_bancodedados` filtrado pelo cliente. */
-  const pessoas: Record<string, Required<PassageiroPedido>[]> = { Latasa: structuredClone(PESSOAS_LATASA) }
+  const pessoas: Record<string, PessoaMock[]> = { Latasa: structuredClone(PESSOAS_LATASA) }
   let seqPessoa = PESSOAS_LATASA.length
   let sessao: Sessao | null = null
   let tentativasErradas = 0
@@ -281,8 +281,9 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       if (repetido) throw new ErroPortal('duplicado', 'Este pedido acabou de ser enviado.')
       // Como o Worker: id tem de ser de pessoa do cliente; sem id, reaproveita mesmo nome + mesmo celular ou e-mail; contato mudado corrige a pessoa.
       const base = (pessoas[cliente] ??= [])
-      const resolvidas = pedido.passageiros.map((p): Required<PassageiroPedido> => {
-        const contato = { telefone: p.telefone ?? '', email: p.email ?? '' }
+      const resolvidas = pedido.passageiros.map((p): PessoaMock => {
+        // Padrão só muda se o cadastro mandou (ausente = não mexe; "" = limpa); o endereço do pedido nunca entra aqui.
+        const contato = { telefone: p.telefone ?? '', email: p.email ?? '', ...(p.saidaPadrao !== undefined ? { saidaPadrao: p.saidaPadrao } : {}), ...(p.destinoPadrao !== undefined ? { destinoPadrao: p.destinoPadrao } : {}) }
         if (p.id) {
           const atual = base.find((x) => x.id === p.id)
           if (!atual) throw new ErroPortal('nao_permitido', 'Passageiro não encontrado.')
@@ -290,7 +291,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
         }
         const igual = base.find((x) => chaveNome(x.nome) === chaveNome(p.nome)
           && ((!!x.telefone && !!contato.telefone && soDigitos(x.telefone) === soDigitos(contato.telefone)) || (!!x.email && !!contato.email && x.email.toLowerCase() === contato.email.toLowerCase())))
-        return igual ? { ...igual, telefone: igual.telefone || contato.telefone, email: igual.email || contato.email } : { id: '', nome: p.nome, ...contato }
+        return igual ? { ...igual, ...contato, telefone: igual.telefone || contato.telefone, email: igual.email || contato.email } : { id: '', nome: p.nome, ...contato }
       })
       const ids = resolvidas.map((p) => p.id).filter(Boolean)
       if (new Set(ids).size < ids.length) throw new ErroPortal('nao_permitido', 'Este passageiro já está no pedido.')

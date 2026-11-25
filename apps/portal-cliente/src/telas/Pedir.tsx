@@ -31,9 +31,19 @@ const PASSOS: { n: Passo; nome: string; icone: LucideIcon }[] = [
 ]
 const ICONE_VEICULO: Record<string, LucideIcon> = { 202410001: Car, 202410002: ShieldCheck, 100000002: Bus, 202410003: Van, 202410004: ShieldCheck }
 
-/** Cartão em edição: `indice` null = passageiro novo; `id` guarda o cadastrado cujo contato está sendo completado. */
-type Rascunho = { indice: number | null; id?: string; nome: string; telefone: string; email: string }
+type CampoPadrao = 'saidaPadrao' | 'destinoPadrao'
+/** Cartão em edição: `indice` null = passageiro novo; `id` guarda o cadastrado cujo contato está sendo completado; `antes`, o passageiro como veio. */
+type Rascunho = { indice: number | null; id?: string; nome: string; telefone: string; email: string; saidaPadrao: string; destinoPadrao: string; antes: PassageiroPedido }
+const rascunhoDe = (indice: number | null, p: PassageiroPedido): Rascunho => ({
+  indice, id: p.id, nome: p.nome, telefone: p.telefone ?? '', email: p.email ?? '', saidaPadrao: p.saidaPadrao ?? '', destinoPadrao: p.destinoPadrao ?? '', antes: p,
+})
 
+/** Primeiro endereço padrão (na ordem dos passageiros) que existe, para preencher o campo vazio do trajeto. */
+const primeiroPadrao = (ps: PassageiroPedido[], campo: CampoPadrao) => ps.find((p) => p[campo])?.[campo] ?? ''
+/** Padrões dos passageiros, sem repetir: aparecem no topo das sugestões. */
+const padroesDe = (ps: PassageiroPedido[], campo: CampoPadrao) => [...new Set(ps.map((p) => p[campo]).filter((e): e is string => !!e))]
+/** Sem os padrões: o Worker só grava o que veio (ausente = não mexe). */
+const semPadroes = ({ saidaPadrao: _s, destinoPadrao: _d, ...p }: PassageiroPedido): PassageiroPedido => p
 const contatoDe = (p: PassageiroPedido) => [p.telefone, p.email].filter(Boolean).join(' · ')
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean)
@@ -60,6 +70,8 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
   const [erros, setErros] = useState<ErrosPedido>({})
   const [errosPas, setErrosPas] = useState<(string | undefined)[]>([])
   const [rascunho, setRascunho] = useState<Rascunho | null>(null)
+  /** Ids dos cadastrados cujo padrão o cliente mudou no cartão. */
+  const padroesEditados = useRef(new Set<string>())
   const [erroRascunho, setErroRascunho] = useState<string | undefined>()
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -133,13 +145,9 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
   const limpar = (campo: keyof ErrosPedido) => setErros((e) => (e[campo] ? { ...e, [campo]: undefined } : e))
 
   // ---- passageiros ----
-  const abrirNovo = (nome = '') => { setErroRascunho(undefined); setRascunho({ indice: null, nome, telefone: '', email: '' }) }
-  const abrirEdicao = (i: number) => {
-    const p = passageiros[i]
-    setErroRascunho(undefined)
-    setRascunho({ indice: i, id: p.id, nome: p.nome, telefone: p.telefone ?? '', email: p.email ?? '' })
-  }
-  const mudarRascunho = (campo: 'nome' | 'telefone' | 'email', valor: string) => setRascunho((r) => (r ? { ...r, [campo]: valor } : r))
+  const abrirNovo = (nome = '') => { setErroRascunho(undefined); setRascunho(rascunhoDe(null, { nome })) }
+  const abrirEdicao = (i: number) => { setErroRascunho(undefined); setRascunho(rascunhoDe(i, passageiros[i])) }
+  const mudarRascunho = (campo: 'nome' | 'telefone' | 'email' | CampoPadrao, valor: string) => setRascunho((r) => (r ? { ...r, [campo]: valor } : r))
   const removerPassageiro = (i: number) => {
     setPassageiros((xs) => xs.filter((_, j) => j !== i))
     setErrosPas([])
@@ -155,19 +163,32 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
     // Sem contato válido: o cliente completa no cartão.
     if (erroPassageiro(novo)) {
       setErroRascunho(undefined)
-      setRascunho({ indice: null, id: a.id, nome: a.nome, telefone: a.telefone ?? '', email: a.email ?? '' })
+      setRascunho(rascunhoDe(null, a))
       return
     }
     setPassageiros((xs) => [...xs, novo])
+    preencherPadroes([...passageiros, novo])
     limpar('passageiros')
+  }
+  /** Saída e Destino vazios recebem o padrão do primeiro passageiro que tiver; o que o cliente digitou nunca é trocado, e remover o passageiro não desfaz. */
+  function preencherPadroes(lista: PassageiroPedido[]) {
+    setOrigem((o) => o || primeiroPadrao(lista, 'saidaPadrao'))
+    setDestino((d) => d || primeiroPadrao(lista, 'destinoPadrao'))
   }
   function salvarRascunho() {
     if (!rascunho) return
+    // Padrão que o cliente não mexeu fica como veio (inclusive ausente, ex.: Repetir pedido); mudado vai para o cadastro ("" limpa).
+    const mudou = (campo: CampoPadrao) => rascunho[campo].trim() !== (rascunho.antes[campo] ?? '')
+    const padrao = (campo: CampoPadrao) => (mudou(campo) ? rascunho[campo].trim() : rascunho.antes[campo])
+    const saidaPadrao = padrao('saidaPadrao')
+    const destinoPadrao = padrao('destinoPadrao')
     const novo: PassageiroPedido = {
       ...(rascunho.id ? { id: rascunho.id } : {}),
       nome: rascunho.nome.trim(),
       telefone: rascunho.telefone.trim() || undefined,
       email: rascunho.email.trim() || undefined,
+      ...(saidaPadrao !== undefined ? { saidaPadrao } : {}),
+      ...(destinoPadrao !== undefined ? { destinoPadrao } : {}),
     }
     const lista = rascunho.indice === null ? [...passageiros, novo] : passageiros.map((p, i) => (i === rascunho.indice ? novo : p))
     const alvo = rascunho.indice === null ? lista.length - 1 : rascunho.indice
@@ -177,7 +198,9 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
       setTimeout(() => corpo.current?.querySelector<HTMLElement>('.pc-pp__novo [aria-invalid="true"], .pc-pp__novo [role=alert]')?.focus())
       return
     }
+    if (rascunho.id && (mudou('saidaPadrao') || mudou('destinoPadrao'))) padroesEditados.current.add(rascunho.id)
     setPassageiros(lista)
+    preencherPadroes(lista)
     setRascunho(null)
     setErroRascunho(undefined)
     setErrosPas([])
@@ -185,7 +208,9 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
   }
 
   function montar(): NovoPedido {
-    return normalizarPedido({ passageiros, origem, destino, saida: data && hora ? deLocalSaoPaulo(`${data}T${hora}`) : '', tipoVeiculo: Number(veiculo), observacao })
+    // Cadastrado só leva o padrão que o cliente mudou no cartão: o que veio da busca não regrava a ficha (nem desfaz edição da operação).
+    const envio = passageiros.map((p) => (p.id && !padroesEditados.current.has(p.id) ? semPadroes(p) : p))
+    return normalizarPedido({ passageiros: envio, origem, destino, saida: data && hora ? deLocalSaoPaulo(`${data}T${hora}`) : '', tipoVeiculo: Number(veiculo), observacao })
   }
 
   /** Foca o primeiro campo inválido (ou o aviso, se o erro não tem campo) depois de pintar os erros. */
@@ -202,7 +227,7 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
     setErro(null)
     if (n === 1) {
       if (rascunho) {
-        const vazio = !rascunho.nome.trim() && !rascunho.telefone.trim() && !rascunho.email.trim()
+        const vazio = [rascunho.nome, rascunho.telefone, rascunho.email, rascunho.saidaPadrao, rascunho.destinoPadrao].every((v) => !v.trim())
         if (!vazio) { setErroRascunho('Adicione o passageiro ou cancele o cadastro.'); focarErro(); return false }
         setRascunho(null)
       }
@@ -302,7 +327,15 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
                       <Input type="email" value={rascunho.email} onChange={(e) => mudarRascunho('email', e.target.value)} autoComplete="off" placeholder="nome@empresa.com" size="touch" maxLength={MAX_EMAIL} invalid={erroNoContato} />
                     </Field>
                   </div>
-                  <p className="pc-pp__dica">Informe celular ou e-mail. Se o contato mudou, corrija aqui.</p>
+                  <div className="pc-pp__novo-campos">
+                    <Field label="Saída padrão (opcional)">
+                      <Input value={rascunho.saidaPadrao} onChange={(e) => mudarRascunho('saidaPadrao', e.target.value)} autoComplete="off" placeholder="Onde costuma embarcar" size="touch" maxLength={MAX_ENDERECO} />
+                    </Field>
+                    <Field label="Destino padrão (opcional)">
+                      <Input value={rascunho.destinoPadrao} onChange={(e) => mudarRascunho('destinoPadrao', e.target.value)} autoComplete="off" placeholder="Para onde costuma ir" size="touch" maxLength={MAX_ENDERECO} />
+                    </Field>
+                  </div>
+                  <p className="pc-pp__dica">Informe celular ou e-mail. Os endereços padrão preenchem o trajeto deste passageiro nos próximos pedidos; no pedido você pode trocá-los.</p>
                   {erroRascunho && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erroRascunho}</p>}
                   <div className="pc-pp__novo-acoes">
                     <Button type="button" variant="secondary" size="compact" onClick={() => { setRascunho(null); setErroRascunho(undefined) }}>Cancelar</Button>
@@ -374,12 +407,12 @@ export function Pedir({ prazos, onPedido, modelo, onRepetirAnterior }: Props) {
                   <div className="pc-pp__rota-campos">
                     <div className="pc-pp__rota-linha">
                       <label htmlFor={`${idRota}-o`}>Saída</label>
-                      <EnderecoCampo id={`${idRota}-o`} value={origem} onChange={(v) => { setOrigem(v); limpar('origem') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.origem} describedBy={erros.origem ? `${idRota}-oe` : undefined} />
+                      <EnderecoCampo id={`${idRota}-o`} value={origem} onChange={(v) => { setOrigem(v); limpar('origem') }} padroes={padroesDe(passageiros, 'saidaPadrao')} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.origem} describedBy={erros.origem ? `${idRota}-oe` : undefined} />
                       {erros.origem && <p className="pc-pp__erro" id={`${idRota}-oe`} role="alert">{erros.origem}</p>}
                     </div>
                     <div className="pc-pp__rota-linha">
                       <label htmlFor={`${idRota}-d`}>Destino</label>
-                      <EnderecoCampo id={`${idRota}-d`} value={destino} onChange={(v) => { setDestino(v); limpar('destino') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.destino} describedBy={erros.destino ? `${idRota}-de` : undefined} />
+                      <EnderecoCampo id={`${idRota}-d`} value={destino} onChange={(v) => { setDestino(v); limpar('destino') }} padroes={padroesDe(passageiros, 'destinoPadrao')} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.destino} describedBy={erros.destino ? `${idRota}-de` : undefined} />
                       {erros.destino && <p className="pc-pp__erro" id={`${idRota}-de`} role="alert">{erros.destino}</p>}
                     </div>
                   </div>

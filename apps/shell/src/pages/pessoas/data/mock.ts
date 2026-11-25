@@ -15,7 +15,7 @@ function pessoa(n: number, nome: string, cliente: number | null, extra: Partial<
   return {
     id: id(n), nome, clienteId: c?.id ?? '', cliente: c?.nome ?? '', telefone: '', email: '',
     cargo: null, classificacao: CLASSIFICACAO.frequente, idioma: IDIOMA.portugues, status: STATUS.ativo, sexo: null, tipoVeiculo: null,
-    departamento: '', cr: '', endereco: '', preferencias: '', nascimento: '', cadastro: '2026-01-10', ultimoServico: '', foto: '', criadoEm: new Date('2026-01-10T12:00:00Z'),
+    departamento: '', cr: '', endereco: '', enderecoDestino: '', preferencias: '', nascimento: '', cadastro: '2026-01-10', ultimoServico: '', foto: '', criadoEm: new Date('2026-01-10T12:00:00Z'),
     ...extra,
   }
 }

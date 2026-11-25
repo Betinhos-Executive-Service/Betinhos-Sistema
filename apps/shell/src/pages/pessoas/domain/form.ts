@@ -7,7 +7,7 @@ import type { ChoiceKey, Pessoa } from './types'
 export type PessoaForm = {
   nome: string; clienteId: string; clienteNome: string; telefone: string; email: string
   cargo: string; classificacao: string; idioma: string; status: string; sexo: string; tipoVeiculo: string
-  departamento: string; cr: string; endereco: string; preferencias: string; nascimento: string
+  departamento: string; cr: string; endereco: string; enderecoDestino: string; preferencias: string; nascimento: string
 }
 export type FormKey = keyof PessoaForm
 export type FormErrors = Partial<Record<FormKey, string>>
@@ -15,13 +15,13 @@ export type FormErrors = Partial<Record<FormKey, string>>
 /** Colunas de texto/data e choices; o cliente (lookup) é tratado à parte. */
 export const TEXT_FIELDS = {
   nome: 'cr40f_nomedopassageiro', telefone: 'cr40f_telefone', email: 'cr40f_email', departamento: 'cr40f_departamento',
-  cr: 'cr40f_cr', endereco: 'cr40f_enderecodesaida', preferencias: 'cr40f_preferenciasdopassageiro', nascimento: 'cr40f_datadenascimento',
+  cr: 'cr40f_cr', endereco: 'cr40f_enderecodesaida', enderecoDestino: 'cr40f_enderecodedestino', preferencias: 'cr40f_preferenciasdopassageiro', nascimento: 'cr40f_datadenascimento',
 } as const
 export const CHOICE_FIELDS: Record<ChoiceKey, string> = {
   cargo: 'cr40f_cargo', classificacao: 'cr40f_classificacao', idioma: 'cr40f_idioma', status: 'cr40f_status', sexo: 'cr40f_sexo', tipoVeiculo: 'new_tipodoveiculo',
 }
 export const MAX_LENGTH: Partial<Record<FormKey, number>> = {
-  nome: 850, telefone: 250, email: 1000, departamento: 1000, cr: 200, endereco: 4000, preferencias: 1000,
+  nome: 850, telefone: 250, email: 1000, departamento: 1000, cr: 200, endereco: 4000, enderecoDestino: 4000, preferencias: 1000,
 }
 
 const s = (v: number | null) => (v == null ? '' : String(v))
@@ -29,7 +29,7 @@ const s = (v: number | null) => (v == null ? '' : String(v))
 export function emptyForm(): PessoaForm {
   return {
     nome: '', clienteId: '', clienteNome: '', telefone: '', email: '', cargo: '', classificacao: '', idioma: String(IDIOMA.portugues),
-    status: String(STATUS.ativo), sexo: '', tipoVeiculo: '', departamento: '', cr: '', endereco: '', preferencias: '', nascimento: '',
+    status: String(STATUS.ativo), sexo: '', tipoVeiculo: '', departamento: '', cr: '', endereco: '', enderecoDestino: '', preferencias: '', nascimento: '',
   }
 }
 
@@ -37,7 +37,7 @@ export function toForm(p: Pessoa): PessoaForm {
   return {
     nome: p.nome, clienteId: p.clienteId, clienteNome: p.cliente, telefone: p.telefone, email: p.email,
     cargo: s(p.cargo), classificacao: s(p.classificacao), idioma: s(p.idioma), status: s(p.status), sexo: s(p.sexo), tipoVeiculo: s(p.tipoVeiculo),
-    departamento: p.departamento, cr: p.cr, endereco: p.endereco, preferencias: p.preferencias, nascimento: p.nascimento,
+    departamento: p.departamento, cr: p.cr, endereco: p.endereco, enderecoDestino: p.enderecoDestino, preferencias: p.preferencias, nascimento: p.nascimento,
   }
 }
 
@@ -111,6 +111,6 @@ export function applyForm(p: Pessoa, f: PessoaForm): Pessoa {
   return {
     ...p, nome: f.nome.trim(), clienteId: f.clienteId, cliente: f.clienteId ? f.clienteNome : '', telefone: f.telefone.trim(), email: f.email.trim().toLowerCase(),
     cargo: num(f.cargo), classificacao: num(f.classificacao), idioma: num(f.idioma), status: num(f.status), sexo: num(f.sexo), tipoVeiculo: num(f.tipoVeiculo),
-    departamento: f.departamento.trim(), cr: f.cr.trim(), endereco: f.endereco.trim(), preferencias: f.preferencias.trim(), nascimento: f.nascimento,
+    departamento: f.departamento.trim(), cr: f.cr.trim(), endereco: f.endereco.trim(), enderecoDestino: f.enderecoDestino.trim(), preferencias: f.preferencias.trim(), nascimento: f.nascimento,
   }
 }

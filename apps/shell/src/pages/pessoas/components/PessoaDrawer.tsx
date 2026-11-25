@@ -91,6 +91,7 @@ function Ficha({ p, choices, dups, source, onOpen }: { p: Pessoa; choices: Choic
         </dl>
         {p.preferencias ? <p className="ps-ficha__text"><strong>Preferências:</strong> {p.preferencias}</p> : null}
         {p.endereco ? <p className="ps-ficha__text"><strong>Endereço de saída:</strong> {p.endereco}</p> : null}
+        {p.enderecoDestino ? <p className="ps-ficha__text"><strong>Endereço de destino:</strong> {p.enderecoDestino}</p> : null}
       </Section>
 
       <Section title="Serviços" aside={r ? <span className="ps-muted ps-num">{limitado ? `Mais de ${r.total}` : r.total} no total · {r.ultimos90} nos últimos 90 dias</span> : null}>
@@ -241,6 +242,6 @@ export function hojeSaoPaulo(now = new Date()) {
 function emptyPessoa(): Pessoa {
   return {
     id: '', nome: '', clienteId: '', cliente: '', telefone: '', email: '', cargo: null, classificacao: null, idioma: null, status: null, sexo: null, tipoVeiculo: null,
-    departamento: '', cr: '', endereco: '', preferencias: '', nascimento: '', cadastro: '', ultimoServico: '', foto: '', criadoEm: null,
+    departamento: '', cr: '', endereco: '', enderecoDestino: '', preferencias: '', nascimento: '', cadastro: '', ultimoServico: '', foto: '', criadoEm: null,
   }
 }
