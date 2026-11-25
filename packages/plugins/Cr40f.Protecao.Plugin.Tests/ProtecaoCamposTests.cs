@@ -41,10 +41,46 @@ public class ProtecaoCamposTests
     }
 
     [Fact]
-    public void Status_cancelado_da_tenaris_tambem_e_barrado()
+    public void Cancelado_da_tenaris_passa_por_cima_do_status_protegido_e_libera_o_status()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo["cr40f_cr"] = "999"; alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_cr,cr40f_status"));
+        Assert.Equal(202410002, alvo.GetAttributeValue<OptionSetValue>("cr40f_status").Value);
+        Assert.Equal(new[] { "cr40f_cr" }, r.Barrados);
+        Assert.False(alvo.Contains("cr40f_cr"));
+        Assert.Equal("cr40f_cr", alvo[ProtecaoCampos.Lista]);
+    }
+
+    [Fact]
+    public void Cancelado_da_tenaris_com_so_o_status_protegido_esvazia_a_lista()
     {
         var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
-        ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_status"));
+        var r = ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_status"));
+        Assert.Empty(r.Barrados);
+        Assert.True(alvo.Contains("cr40f_status"));
+        Assert.True(alvo.Contains(ProtecaoCampos.Lista));
+        Assert.Null(alvo[ProtecaoCampos.Lista]);
+    }
+
+    [Theory]
+    [InlineData(202410002)] // já Cancelado
+    [InlineData(202410010)] // Cancelado com Ressalvas, dado pela equipe
+    public void Cancelado_da_tenaris_em_reserva_ja_cancelada_mantem_o_status_da_equipe(int atual)
+    {
+        var anterior = Anterior("cr40f_status"); anterior["cr40f_status"] = new OptionSetValue(atual);
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410002); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, anterior);
+        Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
+        Assert.False(alvo.Contains("cr40f_status"));
+        Assert.False(alvo.Contains(ProtecaoCampos.Lista));
+    }
+
+    [Fact]
+    public void Outro_status_da_tenaris_continua_barrado()
+    {
+        var alvo = Alvo(); alvo["cr40f_status"] = new OptionSetValue(202410008); alvo[ProtecaoCampos.Snapshot] = Planilha;
+        var r = ProtecaoCampos.Aplicar(alvo, Anterior("cr40f_status"));
+        Assert.Equal(new[] { "cr40f_status" }, r.Barrados);
         Assert.False(alvo.Contains("cr40f_status"));
     }
 

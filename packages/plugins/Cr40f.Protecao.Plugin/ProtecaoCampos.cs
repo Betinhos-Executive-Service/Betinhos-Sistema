@@ -25,6 +25,11 @@ public static class ProtecaoCampos
 {
     public const string Lista = "new_camposprotegidos";
     public const string Snapshot = "new_snapshotsharepoint";
+    public const string Status = "cr40f_status";
+    /// <summary>Cancelado em cr40f_reservadeveculos.cr40f_status, o valor que a Tenaris manda.</summary>
+    public const int Cancelado = 202410002;
+    /// <summary>Cancelado e Cancelado com Ressalvas.</summary>
+    static readonly int[] JaCancelados = { Cancelado, 202410010 };
     public static readonly string[] Monitorados =
     {
         "cr40f_destino", "cr40f_endereodesada", "cr40f_dataehorriodesada", "cr40f_obsdeoperao", "cr40f_horrioprevistoderetorno",
@@ -37,6 +42,11 @@ public static class ProtecaoCampos
         var protegidos = LerLista(alvo.Contains(Lista) ? alvo.GetAttributeValue<string>(Lista) : anterior?.GetAttributeValue<string>(Lista));
         if (alvo.Contains(Snapshot))
         {
+            if (CancelamentoDaTenaris(alvo, anterior, protegidos))
+            {
+                protegidos.Remove(Status);
+                alvo[Lista] = protegidos.Count > 0 ? string.Join(",", protegidos) : null;
+            }
             var barrados = protegidos.Where(alvo.Contains).ToList();
             foreach (var campo in barrados) alvo.Attributes.Remove(campo);
             return new Resultado(Array.Empty<string>(), barrados);
@@ -51,6 +61,15 @@ public static class ProtecaoCampos
         if (adicionados.Count > 0) alvo[Lista] = string.Join(",", protegidos.Concat(adicionados));
         return new Resultado(adicionados, Array.Empty<string>());
     }
+
+    /// <summary>
+    /// Exceção à trava (pedido do Renan, 25/11/2026): Cancelado vindo da Tenaris passa por cima do status editado pela equipe
+    /// e o status sai da lista. Se a reserva já está cancelada (Cancelado ou Cancelado com Ressalvas), o status da equipe fica.
+    /// </summary>
+    static bool CancelamentoDaTenaris(Entity alvo, Entity? anterior, List<string> protegidos) =>
+        protegidos.Contains(Status)
+        && alvo.GetAttributeValue<OptionSetValue>(Status)?.Value == Cancelado
+        && !JaCancelados.Contains(anterior?.GetAttributeValue<OptionSetValue>(Status)?.Value ?? 0);
 
     static List<string> LerLista(string? texto) =>
         (texto ?? "").Split(',', ';').Select(nome => nome.Trim().ToLowerInvariant()).Where(nome => nome.Length > 0).Distinct().ToList();
