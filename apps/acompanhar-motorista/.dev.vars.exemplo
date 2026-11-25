@@ -1,0 +1,15 @@
+# Copie para .dev.vars (não versionado) para rodar `pnpm dev:local` contra o mock (`pnpm mock`). Nenhum valor aqui é segredo real.
+INFLEET_TOKEN=mock
+INFLEET_URL=http://127.0.0.1:36490/v1/graphql
+OSRM_URL=http://127.0.0.1:36490
+TOMTOM_URL=http://127.0.0.1:36490
+TOMTOM_KEY=mock
+LINK_API_SECRET=dev-local
+# Flow falso do cadastro de passageiros (parte do mock; valor sem segredo).
+CADASTRO_FLOW_URL_DEV=http://127.0.0.1:36490/flow
+
+# Avisos (sino) no teste local: gere um par só de teste com `node scripts/gerar-vapid.mjs` e cole as três linhas
+# abaixo em .dev.vars. Nunca reaproveite o par de produção nem versione a chave privada.
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_JWK=
+# VAPID_SUBJECT=mailto:teste-local@example.com
