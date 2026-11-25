@@ -111,6 +111,34 @@
 .termo-footer-secondary { justify-self:center; }
 .termo-spinner { width:16px; height:16px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:termo-spin 800ms linear infinite; }
 
+/* Aditivo pelo motorista: cabeçalho à esquerda e passo a passo em cartões; o passo atual ganha fundo branco, sombra e número escuro. */
+.aditivo { display:grid; gap:18px; padding:8px 12px 4px; }
+.aditivo-topo { display:grid; gap:6px; justify-items:start; }
+.aditivo-topo .termo-badge { gap:4px; }
+.aditivo-topo h2 { margin:4px 0 0; color:#001a3d; font-size:1.3rem; font-weight:800; line-height:1.25; }
+.aditivo-topo h2:focus { outline:0; }
+.aditivo-topo p { margin:0; color:#475569; font-size:.95rem; line-height:1.5; }
+.aditivo-passos { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.aditivo-passo { display:grid; grid-template-columns:32px minmax(0,1fr); gap:12px; padding:14px; border:1px solid #e2e8f0; border-radius:12px; background:#fcfcfb; transition:background-color 160ms ease, box-shadow 160ms ease; }
+.aditivo-passo[data-estado="atual"] { background:#fff; border-color:#c7d2e2; box-shadow:0 8px 24px rgba(0,26,61,.06); }
+.aditivo-passo-marca { display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:#f1f5f9; color:#475569; font-size:.9rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.aditivo-passo[data-estado="atual"] .aditivo-passo-marca { background:#001a3d; color:#fff; }
+.aditivo-passo[data-estado="feito"] .aditivo-passo-marca { background:#eaf8f1; color:#147a4b; }
+.aditivo-passo-corpo { display:grid; gap:8px; min-width:0; padding-top:4px; }
+.aditivo-passo-corpo h3 { margin:0; color:#001a3d; font-size:1rem; font-weight:800; line-height:1.3; }
+.aditivo-passo[data-estado="feito"] h3 { color:#334155; }
+.aditivo-passo-corpo > p:not(.termo-alert) { margin:0; color:#475569; font-size:.88rem; line-height:1.45; }
+.aditivo-passo .termo-primary { min-height:46px; margin-top:2px; font-size:.95rem; text-decoration:none; }
+.aditivo-acao-secundaria { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:44px; margin-top:2px; padding:0 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#0b2d5a; font:inherit; font-size:.92rem; font-weight:800; text-decoration:none; cursor:pointer; transition:transform 160ms cubic-bezier(.23,1,.32,1), border-color 160ms ease; }
+.aditivo-acao-secundaria:disabled { opacity:.55; cursor:not-allowed; }
+.aditivo-acao-secundaria:focus-visible,.aditivo-passo a.termo-primary:focus-visible { outline:0; border-color:#6c91e8; box-shadow:0 0 0 3px rgba(33,89,210,.18); }
+.aditivo-acao-secundaria .termo-spinner { border-color:rgba(11,45,90,.25); border-top-color:#0b2d5a; }
+@media (hover:hover) and (pointer:fine) { .aditivo-acao-secundaria:not(:disabled):hover { border-color:#c7d2e2; } }
+.aditivo-acao-secundaria:not(:disabled):active { transform:scale(.97); }
+.aditivo-sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+.aditivo-ok p { max-width:32ch; }
+@media (prefers-reduced-motion:reduce) { .aditivo-passo,.aditivo-acao-secundaria { transition:none; } .aditivo-acao-secundaria:not(:disabled):active { transform:none; } }
+
 .termo-row:active,.termo-primary:not(:disabled):active,.termo-capture:not(:disabled):active { transform:scale(.97); }
 
 @keyframes termo-spin { to { transform:rotate(360deg); } }
