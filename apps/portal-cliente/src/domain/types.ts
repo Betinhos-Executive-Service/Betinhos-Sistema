@@ -1,3 +1,5 @@
+import type { Marca } from './marca'
+
 export type Status = 'liberado' | 'em_duvida' | 'respondido' | 'aprovado' | 'aprovado_tacito'
 
 export type Motivo = 'espera' | 'km_rota' | 'valor' | 'passageiro' | 'outro'
@@ -45,7 +47,7 @@ export type Servico = {
 /** Módulos do portal habilitados por cliente (`cr40f_clientes1.cr40f_portalmodulos`). */
 export type Modulo = 'validar' | 'pedir' | 'meus_servicos'
 
-export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[] }
+export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[]; marca?: Marca }
 
 /** `cr40f_status` da reserva visto pelo solicitante. */
 export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'
@@ -76,6 +78,8 @@ export type Pedido = Omit<NovoPedido, 'passageiros'> & {
   criadoEm: string
   /** Só os nomes, para lista, busca e Excel. */
   passageiros: string[]
+  /** Pedido feito por outra pessoa em que o usuário é passageiro: só leitura (não cancela). */
+  comoPassageiro?: boolean
   /** Passageiros com id e contato (de Serviços por Passageiro), para repetir o pedido. */
   pessoas: PassageiroPedido[]
   /** Veículo programado pela operação (nome). */

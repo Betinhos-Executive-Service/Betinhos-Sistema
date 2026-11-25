@@ -86,7 +86,10 @@ function consultar(banco: Banco, tabela: keyof Banco, filtro: string, topo = '')
   }
   if (tabela === 'reservadeveculoses') {
     const [usuario, cliente, id] = guids(filtro)
-    return linhas.filter((r) => r._cr40f_portalusuario_value === usuario && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
+    const passageiro = /\/any\(.*cr40f_email eq '([^']*)'/.exec(filtro)?.[1]
+    const ehPassageiro = (r: Registro) => passageiro !== undefined && banco.servicosporpassageiros.some((v) => v._cr40f_geral_value === r.cr40f_reservadeveculosid
+      && String(banco.bancodedadoses.find((p) => p.cr40f_bancodedadosid === v._cr40f_bancodedados_value)?.cr40f_email ?? '').toLowerCase() === passageiro.toLowerCase())
+    return linhas.filter((r) => (r._cr40f_portalusuario_value === usuario || ehPassageiro(r)) && r._cr40f_cliente_value === cliente && (!id || r.cr40f_reservadeveculosid === id))
   }
   if (tabela === 'bancodedadoses') {
     const [cliente, id] = guids(filtro)
@@ -123,6 +126,11 @@ export function fetchFalso(banco: Banco, emails: Email[], falhas: Falhas = {}): 
     if (url.startsWith('https://login.microsoftonline.com/')) return Response.json({ access_token: 'tk', expires_in: 3600 })
     if (url === FLOW_URL) return emails.push(corpo), new Response(null, { status: 202 })
     const caminho = decodeURIComponent(url.slice(`${DV_URL}/api/data/v9.2/`.length))
+    const logo = /^cr40f_clientes1s\((.+?)\)\/cr40f_portallogo\/\$value/.exec(caminho)
+    if (logo) {
+      const bytes = banco.clientes1s.find((c) => c.cr40f_clientes1id === logo[1])?.logoBytes
+      return bytes instanceof Uint8Array ? new Response(bytes as Uint8Array<ArrayBuffer>, { headers: { 'Content-Type': 'application/octet-stream' } }) : new Response('sem imagem', { status: 404 })
+    }
     const [, tabelaCr, id] = /^cr40f_(\w+?)(?:\((.+?)\))?(?:\?|$)/.exec(caminho) ?? []
     const tabela = tabelaCr as keyof Banco
     if (!banco[tabela]) return new Response('tabela desconhecida', { status: 404 })

@@ -41,6 +41,50 @@ describe('Portal do cliente', () => {
     expect(document.querySelector('.bt-build-badge')?.textContent).toMatch(/^v\d+\.\d+\.\d+ · /)
   })
 
+  describe('identidade do cliente', () => {
+    const logo = () => document.querySelector<HTMLImageElement>('.pc-parceria__cliente')
+    const comLink = (c: string) => window.history.replaceState(null, '', `/?c=${c}`)
+    afterEach(() => window.history.replaceState(null, '', '/'))
+
+    it('?c=latasa mostra o logo do cliente já na entrada', async () => {
+      comLink('latasa')
+      abrir()
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'))
+    })
+
+    it('chave desconhecida fica só com a Betinhos', async () => {
+      comLink('nao-existe')
+      abrir()
+      await screen.findByRole('heading', { name: 'Portal do cliente' })
+      await new Promise((r) => setTimeout(r, 50))
+      expect(logo()).toBeNull()
+    })
+
+    it('digitar e-mail do domínio do cliente mostra o logo; domínio público não mostra nada', async () => {
+      abrir()
+      const campo = await screen.findByLabelText(/E-mail/)
+      fireEvent.change(campo, { target: { value: 'x@gmail.com' } })
+      await new Promise((r) => setTimeout(r, 700))
+      expect(logo()).toBeNull()
+      fireEvent.change(campo, { target: { value: 'x@reciclabr.com.br' } })
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'), { timeout: 3000 })
+    })
+
+    it('depois do login o topo mostra o logo e o nome do cliente', async () => {
+      abrir()
+      await entrarCompleto('compras@latasa.com.br')
+      expect(await screen.findByText('Compras · Latasa')).toBeTruthy()
+      expect(logo()?.alt).toBe('Latasa')
+    })
+
+    it('cliente sem logo (Tenaris): topo só com a Betinhos', async () => {
+      abrir()
+      await entrarCompleto()
+      await screen.findByText(/Marcos Albuquerque · Tenaris/)
+      expect(logo()).toBeNull()
+    })
+  })
+
   it('e-mail incompleto não avança', async () => {
     abrir()
     fireEvent.change(await screen.findByLabelText(/E-mail/), { target: { value: 'fiscal@' } })

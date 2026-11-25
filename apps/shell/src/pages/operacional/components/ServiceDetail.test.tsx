@@ -32,11 +32,9 @@ describe('ServiceDetail: carro e link', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('*Seu motorista:* Carlos\n• *Carro:* Corolla Prata\n• *Placa:* RUH7G45'))
   })
 
-  it('motorista terceiro desativa "Gerar link" com o motivo', () => {
+  it('motorista terceiro também gera link (página sem mapa)', () => {
     setup(motorista({ terceiro: true }))
-    const botao = screen.getByRole('button', { name: /Gerar link/ }) as HTMLButtonElement
-    expect(botao.disabled).toBe(true)
-    expect(botao.title).toBe('Motorista terceiro sem rastreador')
+    expect((screen.getByRole('button', { name: /Gerar link/ }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('gera o link e mostra o erro no próprio detalhe quando falha', async () => {

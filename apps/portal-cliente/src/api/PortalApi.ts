@@ -1,3 +1,4 @@
+import type { Marca } from '../domain/marca'
 import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 
 export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
@@ -17,6 +18,11 @@ export const senhaFraca = (senha: string) => senha.length < SENHA_MIN || !senha.
 
 /** Contrato das telas com o servidor. O protótipo usa o mock; o portal real, o Worker (`/api/*`). */
 export interface PortalApi {
+  /**
+   * Identidade do cliente na tela de entrada: pelo link (`chave` de `?c=`) ou pelo domínio do e-mail digitado.
+   * `null` quando não há marca (domínio público, cliente sem logo ou sem acesso): a tela fica só com a Betinhos.
+   */
+  marca(consulta: { chave?: string; email?: string }, sinal?: AbortSignal): Promise<Marca | null>
   /** Sessão ainda válida (cookie de 30 dias) ou `null`: o portal abre já logado. */
   sessao(): Promise<Sessao | null>
   /** E-mail liberado + senha criada pela pessoa. Sem cadastro ou sem senha: `senha_invalida`, igual a senha errada. */

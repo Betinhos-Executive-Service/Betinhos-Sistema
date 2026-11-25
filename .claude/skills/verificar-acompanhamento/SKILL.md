@@ -4,7 +4,7 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 ---
 # Verificar acompanhamento
 
-> Worker no monorepo: `apps/acompanhar-motorista`. Todos os comandos abaixo (`pnpm check`, `pnpm mock`, `pnpm dev:local`, `pnpm semear`, `pnpm e2e`, `cp .dev.vars.exemplo`, `scripts/...`, `.wrangler/...`) rodam **dentro dessa pasta** (`cd apps/acompanhar-motorista`) ou com `pnpm --filter @betinhos/acompanhar-motorista <script>`. Caminhos `src/`, `web/`, `public/`, `scripts/` e `docs/` são relativos a ela. Os prints e vídeos de referência de `docs/verificacao/` e os anexos do T3 citados abaixo não vieram para o repositório público; a pasta `docs/verificacao/` é gitignorada e o e2e a recria. Publicação: o GitHub (deploy.yml no DEV, producao.yml no PROD); nunca à mão.
+> Worker no monorepo: `apps/acompanhar-motorista`. Todos os comandos abaixo (`pnpm check`, `pnpm mock`, `pnpm dev:local`, `pnpm semear`, `pnpm e2e`, `cp .dev.vars.exemplo`, `scripts/...`, `.wrangler/...`) rodam **dentro dessa pasta** (`cd apps/acompanhar-motorista`) ou com `pnpm --filter @betinhos/acompanhar-motorista <script>`. Caminhos `src/`, `web/`, `public/`, `scripts/` e `docs/` são relativos a ela. Os prints e vídeos de referência de `docs/verificacao/` e os anexos do T3 citados abaixo não vieram para o repositório público; a pasta `docs/verificacao/` é gitignorada e o e2e a recria. Publicação: o GitHub (deploy-cloudflare.yml no DEV, producao.yml no PROD); nunca à mão.
 
 ## Cobre
 - Código: `src/worker.mjs`, `src/pagina.mjs` (injeta metatags e bootstrap no HTML do build), `web/` (app React + Vite: `web/src`, entrada `web/portal.html`, build em `web-dist/`), `src/etapas.mjs`, `src/movimento.mjs`, `src/infleet.mjs`, `src/local.mjs`, `src/confianca.mjs`, `src/dados.mjs`, `src/ritmo.mjs`, `src/viagem.mjs` (Durable Object), `src/webpush.mjs`, `src/avisos.mjs`, `public/sw.js`, `scripts/mock-servicos.mjs`, `scripts/semear-local.mjs`, `scripts/cenarios-e2e.mjs`, `scripts/kv-local.mjs` (`gravarTrackLocal`: grava `track:<id>` no KV local via `wrangler kv key put --local`; semear e e2e usam).
@@ -66,6 +66,14 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 - Erros de console esperados: só avisos do WebGL do mapa. `__name is not defined` indica função interna embutida sem o shim (ver `PASSAGEIROS_SCRIPT`).
 - Prints de referência: `docs/verificacao/2026-11-23-portal-passageiros/`. Flow real não é chamado: declare "não verificado com o flow real".
 
+## Sem motorista e sem rastreio (fase 2, 25/11/2026)
+- `POST/PUT /api/links` aceita pedido sem `placa` e com `rastreio: false`; `rastreio: true` sem placa → 400 "placa obrigatória para rastreio". Sem rastreio o link nasce com `vehicleId` nulo e `acharVeiculo` não é chamado; um PUT com placa da Infleet passa a rastrear, um PUT sem motorista volta a "em definição" sem revogar. Foto do carro só segue com a mesma placa.
+- `/dados` publica `rastreio` (há `vehicleId`) e `emDefinicao` (sem motorista, sem veículo e sem placa); sem `vehicleId` a Infleet nunca é chamada e a fase fica "agendado" até o Dataverse concluir (limite conhecido).
+- Página: `emDefinicao` → card "Motorista em definição" com o contato da central e o Sino; `rastreio === false` → sem `.col-b`/mapa e, no desktop, `.portal.sem-mapa` em coluna única centralizada. Links antigos (sem os campos) continuam com mapa.
+- Testes: `tests/api-links.test.mjs` ("link sem rastreio…"), `tests/dados.test.mjs` (Infleet não chamada), `web/src/testes/em-definicao.test.tsx`. Cenários locais `DevDefinica1` e `DevSemRastr1` (`scripts/semear-local.mjs`): print a 390 e 1280 px.
+- Plugin (`Betinhos.DriverRecordSharing`): `TrackingLinkRequest.Build` só recusa Solicitado (202410004), Cancelado (202410002), Cancelado com Ressalvas (202410010) e reserva sem embarque; sem motorista, sem carro, terceiro ou carro sem `InfleetId` manda `rastreio: false` (placa nula sem carro). `GenerateTrackingLinkPlugin` gera sem motorista e, com a reserva em Concluído (202410008), chama `/concluir` logo depois de gravar o link. `UpdateTrackingLinkPlugin` só faz DELETE quando o `Build` recusa; tirar o motorista vira PUT ("em definição"). Testes: `TrackingLinkRequestTests` (sem rastreio, status, embarque).
+- Prova no DEV (depois do Deploy e com o Worker DEV publicado): gerar link numa reserva Confirmada sem motorista → página "Motorista em definição"; pôr motorista com Infleet → mapa; trocar por terceiro → sem mapa com placa; tirar o motorista → volta a "em definição" e o trace do Update mostra PUT, nunca DELETE.
+
 ## Casos de borda
 - Infleet fora com o Durable Object recém-acordado (sem leitura em memória): a página recebe `{"tipo":"fonte_fora"}` e mostra "Aguardando o rastreador"; o log mostra `Leitura do alarm falhou`.
 - Prévia do WhatsApp: `curl -s http://127.0.0.1:36489/r/DevCompleto1 | rg 'og:'` → título, descrição com horário e carro, `og:image` absoluto; revogado/expirado só com metatags genéricas.
@@ -79,6 +87,10 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 ## Evidência obrigatória
 - `resultado.json` com todos `ok: true`, PNGs dos 7 cenários + bordas, `# fail 0` do `pnpm test`, console sem erros (o próprio e2e checa).
 - Lighthouse: versione só um `lighthouse.md` com as métricas; `lighthouse.report.json/html` ficam fora do commit (grandes). PNGs: reduza antes de commitar (ex.: `quantize(128)` no Pillow).
+
+## Botão "Gerar link" no shell (fase 2)
+- Regra igual à `TrackingLinkRequest.StatusAllowsLink` do plugin: bloqueia só Solicitado (202410004), Cancelado (202410002) e Cancelado com Ressalvas (202410010); sem exigência de motorista (`apps/shell/src/pages/geral/domain/link.ts`). No Operacional o botão vale também para motorista terceiro (página sem mapa).
+- Provar: `pnpm exec vitest run src/pages/geral/domain/link.test.ts src/pages/geral/GeralPage.correcoes.test.tsx src/pages/operacional` em `apps/shell`; no mock, `#/operacional` → serviço da Rita Fernandes (terceiro) mostra "Gerar link" ativo.
 
 ## Limites
 - Infleet, TomTom e OSRM reais não são chamados: declare "não verificado com Infleet real". Push real (FCM/Mozilla/Apple) não é enviado no local: a entrega no Android se testa depois do deploy com os segredos VAPID (passo no README). Publicação (`wrangler deploy`) e segredos são do Renan.

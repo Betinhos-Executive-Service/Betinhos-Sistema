@@ -12,7 +12,8 @@ test("autoriza só o segredo exato", () => {
 });
 
 test("valida campos obrigatórios", () => {
-  assert.equal(validarPedido({ embarque: "Av. Paulista" }).erro, "placa obrigatória");
+  assert.equal(validarPedido({ embarque: "Av. Paulista", rastreio: true }).erro, "placa obrigatória para rastreio");
+  assert.equal(validarPedido({ embarque: "Av. Paulista" }).dados.placa, null, "sem placa: motorista em definição ou sem carro");
   assert.equal(validarPedido({ placa: "ABC1D23" }).erro, "embarque obrigatório");
   assert.equal(validarPedido({ placa: "ABC1D23", embarque: "Av. Paulista", horarioAgendado: "ontem" }).erro, "horarioAgendado inválido");
   assert.equal(validarPedido({ placa: "ruh-7g45", embarque: "Av. Paulista", validadeHoras: 999 }).dados.validadeHoras, 336);
@@ -452,4 +453,28 @@ test("cadastro: criar grava cadastroHash/cadastroAmbiente; PUT sem cadastro pres
     const texto = await (await worker.fetch(new Request(`https://w/r/${"c".repeat(12)}${sufixo}`), envW)).text();
     assert.doesNotMatch(texto, new RegExp(`${outro}|cadastroHash|cadastroAmbiente`), sufixo || "html");
   }
+});
+
+test("link sem rastreio: sem placa ou com rastreio false não consulta a Infleet; PUT troca de modo", async () => {
+  const env = { TRACK_KV: kv(), LINK_API_SECRET: "s" };
+  const buscas = [];
+  const deps = { acharVeiculo: async (p) => { buscas.push(p); return { id: "v1", plate: p }; }, geocode: async () => ({ lat: -23.5, lon: -46.6 }),
+    agora: () => new Date("2026-11-25T12:00:00Z"), novoId: () => "s".repeat(12), normalizar: async () => null };
+  const pedido = (extra) => validarPedido({ embarque: "Rua Alfa, 10", validadeHoras: 48, ...extra }).dados;
+  const id = "s".repeat(12), ler = () => JSON.parse(env.TRACK_KV.m.get(`track:${id}`).v);
+  const { atualizarLink } = await import("../src/api-links.mjs");
+
+  await criarLink(env, "https://w", pedido({}), deps);
+  assert.deepEqual([ler().vehicleId, ler().placa, ler().motorista, buscas.length], [null, null, null, 0]);
+
+  // Terceiro sem rastreador: placa vem, Infleet não.
+  await atualizarLink(env, id, pedido({ placa: "ter-1a23", rastreio: false, motorista: { nome: "Ana" } }), deps);
+  assert.deepEqual([ler().vehicleId, ler().placa, ler().motorista.nome, buscas.length], [null, "TER1A23", "Ana", 0]);
+
+  // Escala com carro Infleet: busca o veículo; tirar o motorista volta a sem veículo, sem revogar.
+  await atualizarLink(env, id, pedido({ placa: "ABC1D23", motorista: { nome: "Bia" } }), deps);
+  assert.deepEqual([ler().vehicleId, buscas], ["v1", ["ABC1D23"]]);
+  const r = await atualizarLink(env, id, pedido({}), deps);
+  assert.equal(r.atualizado, true);
+  assert.deepEqual([ler().vehicleId, ler().placa, ler().motorista], [null, null, null]);
 });

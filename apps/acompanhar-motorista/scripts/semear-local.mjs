@@ -26,6 +26,9 @@ const links = {
   DevRevogar01: { ...base, modo: "completo", titulo: "Embarque OS-10005", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
   DevConcluir1: { ...base, modo: "completo", titulo: "Embarque OS-10006", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
   DevFluxo0001: { ...base, modo: "completo", titulo: "Embarque OS-10007", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
+  // Fase 2: sem motorista (em definição) e terceiro sem rastreador (sem mapa).
+  DevDefinica1: { ...base, ...cadastro, vehicleId: null, placa: null, corVeiculo: null, modeloVeiculo: null, motorista: null, modo: "completo", titulo: "Embarque OS-10011", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
+  DevSemRastr1: { ...base, ...cadastro, vehicleId: null, placa: "TER1A23", modo: "completo", titulo: "Embarque OS-10012", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
   ["a".repeat(64)]: { vehicleId: "veic-mock", placa: "MOCK123", titulo: "Link antigo", destino: { ...saida, label: "13:40 - FULANO - Av. Paulista, 1000 - Bela Vista" }, destinoFinal: destino, destinoTentadoEm: "x", horarioAgendado, expiraEm },
 };
 for (const [id, t] of Object.entries(links)) { gravarTrackLocal(id, t); console.log(`track:${id}`); }

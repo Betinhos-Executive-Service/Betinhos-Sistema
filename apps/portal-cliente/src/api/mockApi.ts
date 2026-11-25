@@ -1,3 +1,4 @@
+import { chaveDaMarca, DOMINIOS_PUBLICOS_MARCA, type Marca } from '../domain/marca'
 import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido, soDigitos } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
 import type { EnderecoSugerido, Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
@@ -9,9 +10,16 @@ type Usuario = { nome: string; cliente: string; modulos: Modulo[] }
 /** Mesma configuração que `cr40f_clientes1` terá: módulos e domínios por cliente. */
 const CLIENTES: Record<string, { modulos: Modulo[]; dominios: string[] }> = {
   Tenaris: { modulos: ['validar'], dominios: [] },
-  Latasa: { modulos: ['pedir', 'meus_servicos'], dominios: ['latasa.com.br'] },
+  Latasa: { modulos: ['pedir', 'meus_servicos'], dominios: ['latasa.com.br', 'reciclabr.com.br'] },
   // Portal habilitado sem módulo nenhum: ninguém entra.
   'Sem Módulo': { modulos: [], dominios: ['semmodulo.com.br'] },
+}
+/** Logo de mentira (SVG embutido): o repositório é público e não leva logo de cliente. */
+const logoMock = (cor: string, sigla: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60"><rect width="260" height="60" rx="12" fill="${cor}"/><text x="130" y="39" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#fff" text-anchor="middle">${sigla}</text></svg>`)}`
+/** Identidade cadastrada por cliente (no real, colunas de `cr40f_clientes1`). Latasa tem logo; o resto fica só com a Betinhos. */
+const MARCAS: Record<string, Marca> = {
+  Latasa: { nome: 'Latasa', logoUrl: logoMock('#0a7d4a', 'ReciclaBR') },
 }
 /** Validadores cadastrados pela Betinhos (Tenaris). Quem entra pelo domínio não precisa de cadastro. */
 const VALIDADORES: Record<string, Usuario> = {
@@ -105,7 +113,7 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
     bloqueadoAte = agora().getTime() + BLOQUEIO_MS
     throw new ErroPortal('bloqueado')
   }
-  const paraSessao = (u: Usuario, email: string): Sessao => ({ nome: u.nome, email, cliente: u.cliente, modulos: u.modulos })
+  const paraSessao = (u: Usuario, email: string): Sessao => ({ nome: u.nome, email, cliente: u.cliente, modulos: u.modulos, ...(MARCAS[u.cliente] ? { marca: MARCAS[u.cliente] } : {}) })
   const abrirSessao = (u: Usuario, email: string): Sessao => {
     tentativasErradas = 0
     pendente = null
@@ -132,6 +140,15 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
   })
 
   return {
+    async marca({ chave, email }) {
+      await espera()
+      const cliente = chave
+        ? Object.keys(CLIENTES).find((n) => chaveDaMarca(n) === chaveDaMarca(chave))
+        : email && !DOMINIOS_PUBLICOS_MARCA.includes(dominioDe(email.trim().toLowerCase()))
+          ? usuarioMock(email.trim().toLowerCase())?.cliente
+          : undefined
+      return (cliente && CLIENTES[cliente].modulos.length && MARCAS[cliente]) || null
+    },
     async sessao() {
       await espera()
       const salva = lerJson<{ email: string; expiraEm: number }>(CHAVE_SESSAO)
