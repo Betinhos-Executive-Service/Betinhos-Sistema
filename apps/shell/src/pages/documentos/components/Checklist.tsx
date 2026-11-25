@@ -14,6 +14,7 @@ import { useDocumentos } from '../useDocumentos'
 import { ACCEPT, RenovarDrawer, type AlvoRenovar } from './RenovarDrawer'
 import { StatusDoc } from './StatusDoc'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { usePodeExcluir } from '../../../app/useNivel'
 import '../documentos.css'
 
 type Props = { source: DocsSource; donoId: string; titulo?: string }
@@ -69,6 +70,7 @@ const iconeArquivo = (arq: Arquivo) => {
 }
 
 function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; source: DocsSource; limite: Limite; onRenovar: () => void }) {
+  const podeExcluir = usePodeExcluir('cr40f_documento')
   const toast = useToast()
   const [verHistorico, setVerHistorico] = useState(false)
   const [arquivos, setArquivos] = useState<Arquivo[] | null>(null)
@@ -174,7 +176,7 @@ function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; s
                   <button type="button" className="doc-arq__abrir" title={a.nome} aria-label={`Abrir ${nome}`} onClick={() => void abrir(a)}>
                     {iconeArquivo(a)}<span className="doc-arq__nome">{elipseMeio(nome)}</span>
                   </button>
-                  <Button size="compact" variant="ghost" className="doc-arq__excluir" icon={<Trash2 size={14} />} aria-label={`Excluir ${nome}`} title={`Excluir ${nome}`} onClick={() => setConfirmar(a)} />
+                  {podeExcluir ? <Button size="compact" variant="ghost" className="doc-arq__excluir" icon={<Trash2 size={14} />} aria-label={`Excluir ${nome}`} title={`Excluir ${nome}`} onClick={() => setConfirmar(a)} /> : null}
                 </li>
               )
             })}

@@ -5,6 +5,7 @@ import { reportAppError, setErrorScreen } from "./appErrorLogger";
 import { applyChoiceDefinitions, calculateStats, defaultChoiceDefinitions, filterErrors, sortErrors } from "./domain";
 import { ActionForm, Drawer, ErrorDetails, ErrorForm } from "./forms";
 import { SettingsView } from "./settings";
+import { useAcessosProntos } from "../../app/useNivel";
 import { AgendaView, AppShell, Dashboard, OccurrencesView, ReportsView } from "./views";
 import "./qualidade.css";
 
@@ -112,7 +113,9 @@ export default function App({ embedded = false }) {
   const [evidences, setEvidences] = useState([]);
   const [errorEditor, setErrorEditor] = useState(null);
   const [actionEditor, setActionEditor] = useState(null);
-  const access = useMemo(() => dataverse.getAccessProfile(), []);
+  const acessos = useAcessosProntos();
+  // Opções de choice são metadata (Insert/Update/DeleteOptionValue): nenhum perfil tem personalização, só o Administrador do Sistema.
+  const access = useMemo(() => ({ ...dataverse.getAccessProfile(), canConfigure: acessos.admin }), [acessos.admin]);
 
   const loadData = async () => {
     setLoading(true); setErrorMessage("");

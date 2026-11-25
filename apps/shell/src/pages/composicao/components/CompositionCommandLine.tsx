@@ -29,6 +29,8 @@ type Props = {
   exporting: boolean
   exportBlocked: boolean
   selectedCount: number
+  /** Excluir composição é do Gestor do Financeiro (tabela dona); sem ele a ação não aparece. */
+  podeExcluir: boolean
   countText: string
   countLabel?: string
 }
@@ -46,7 +48,7 @@ function CompositionCommandLine(p: Props) {
   const run = (name: keyof CommandLineActions) => () => p.actions.current[name]()
   const selectionActions: SelectionAction[] = [
     { id: 'op', label: p.commandPhase === 'inspect-op' ? 'Verificando…' : p.commandPhase === 'send-op' ? 'Enviando…' : 'Gerar OP', icon: <FilePlus2 size={16} />, inline: true, blocked: p.commandBlock, onSelect: run('generateOp') },
-    { id: 'excluir', label: p.commandPhase === 'delete' ? 'Excluindo…' : 'Excluir', icon: <Trash2 size={16} />, tone: 'danger', inline: true, blocked: p.commandBlock, onSelect: run('exclude') },
+    ...(p.podeExcluir ? [{ id: 'excluir', label: p.commandPhase === 'delete' ? 'Excluindo…' : 'Excluir', icon: <Trash2 size={16} />, tone: 'danger' as const, inline: true, blocked: p.commandBlock, onSelect: run('exclude') }] : []),
   ]
   const more: MenuAction[] = [{
     id: 'excel', label: p.exporting ? 'Extraindo…' : p.selectedCount ? `Extrair ${p.selectedCount} para Excel` : 'Extrair para Excel', icon: <Download size={16} />,

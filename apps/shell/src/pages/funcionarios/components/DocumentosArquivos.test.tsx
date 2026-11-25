@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createMockSource } from '../data/mock'
 import { DocumentosArquivos, formatBytes } from './DocumentosArquivos'
 import { ToastProvider } from '@betinhos/ui'
+import { ComAcessos } from '../../../app/ComAcessos'
 
 afterEach(cleanup)
 
@@ -25,6 +26,12 @@ describe('DocumentosArquivos', () => {
     expect(screen.getByText('Excluir do SharePoint?')).toBeTruthy()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Excluir arquivo/ })) })
     await waitFor(() => expect(screen.queryByText('Comprovante de residência.jpg')).toBeNull())
+  })
+
+  it('RH Operador lista e envia, mas não vê Excluir', async () => {
+    render(<ComAcessos perfis="rh:operador"><ToastProvider><DocumentosArquivos source={createMockSource()} id="m1" /></ToastProvider></ComAcessos>)
+    await screen.findByText('Comprovante de residência.jpg', undefined, { timeout: 4000 })
+    expect(screen.queryByRole('button', { name: 'Excluir Comprovante de residência.jpg' })).toBeNull()
   })
 
   it('mantém o erro de envio na fila com opção de tentar de novo', async () => {
