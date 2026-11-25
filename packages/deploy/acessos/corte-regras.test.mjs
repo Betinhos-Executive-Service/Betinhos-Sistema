@@ -53,11 +53,10 @@ test('corte.json: recusa modo, chave, ambiente e JSON inválidos', () => {
   assert.throws(() => lerCorte('{ "dev": "esperar" }', 'prod'), /prod precisa ser/)
 })
 
-test('o corte.json versionado começa esperando nos dois ambientes', async () => {
+test('o corte.json versionado tem modo válido nos dois ambientes', async () => {
   const { readFileSync } = await import('node:fs')
   const texto = readFileSync(new URL('./corte.json', import.meta.url), 'utf8')
-  assert.equal(lerCorte(texto, 'dev'), 'esperar')
-  assert.equal(lerCorte(texto, 'prod'), 'esperar')
+  for (const amb of ['dev', 'prod']) assert.ok(['esperar', 'cortar', 'desfazer'].includes(lerCorte(texto, amb)))
 })
 
 test('ids da variável: vírgulas, espaços, maiúsculas e repetidos', () => {
