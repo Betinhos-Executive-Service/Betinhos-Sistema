@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  aplicarPlano, conferirManter, desde, efetivos, lerCorte, lerIds, montarRelatorio, perdasPorPessoa, planoDoCorte,
-  planoVazio, resumoPublico, tabelasDoFlow, travasDeFlows, travasDePessoas,
+  aplicarPlano, conferirManter, desde, efetivos, fotoDoCorte, lerCorte, lerFoto, lerIds, mesmoPlano, montarRelatorio,
+  perdasPorPessoa, planoDesfazer, planoDoCorte, planoVazio, resumoPublico, tabelasDoFlow, travasDeFlows, travasDePessoas,
 } from './corte-regras.mjs'
 
 const ID = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -191,4 +191,54 @@ test('relatório: zero só sem trava; resumo público sem GUID', () => {
   assert.match(texto, /Travas de flows: 1/)
   assert.doesNotMatch(texto, /[0-9a-f]{8}-[0-9a-f]{4}-/)
   assert.match(resumoPublico(montarRelatorio({ estado: e, manter: new Set(), uso: new Map(), incertas: new Set(), flows: [] }), { ambiente: 'dev', sal: 'h' }), /Erro: ACESSOS_ADMINS_MANTER vazia/)
+})
+
+const META = { ambiente: 'dev', host: 'h', quando: '2026-11-25T12:00:00.000Z', commit: 'abc' }
+function devolver(e, pd) {
+  const equipes = new Map(e.equipes)
+  equipes.set(e.equipe.id, [...(equipes.get(e.equipe.id) ?? []), ...pd.equipeAdicionar])
+  const pessoas = e.pessoas.map((p) => ({ ...p, diretos: [...p.diretos, ...pd.pessoasAdicionar.filter((x) => x.usuario === p.id).map((x) => x.papel)] }))
+  return { ...e, equipes, pessoas }
+}
+
+test('foto: guarda o que sai, relê e confere com o plano', () => {
+  const e = estado()
+  const plano = planoDoCorte(e, { manter: MANTER })
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  assert.deepEqual(foto.equipe, { id: EQ, papeis: [P.antigo, P.dev] })
+  assert.deepEqual(foto.pessoas, [{ id: BIA, papeis: [P.antigo, P.admin] }])
+  assert.equal(foto.nomes[P.dev], 'DEV - Usuário')
+  assert.equal(mesmoPlano(foto, plano), true)
+  assert.equal(mesmoPlano(foto, { ...plano, pessoasRemover: [] }), false)
+})
+
+test('foto: formato desconhecido é recusado', () => {
+  assert.throws(() => lerFoto('{"versao":2}'), /formato desconhecido/)
+  assert.throws(() => lerFoto(JSON.stringify({ ...fotoDoCorte(estado(), planoDoCorte(estado(), { manter: MANTER }), META), pessoas: [{ id: 'fulano', papeis: [] }] })), /formato desconhecido/)
+})
+
+test('desfazer devolve à equipe e às pessoas e depois não tem nada a fazer', () => {
+  const e = estado()
+  const plano = planoDoCorte(e, { manter: MANTER })
+  const cortado = aplicarPlano(e, plano)
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const pd = planoDesfazer([foto], cortado)
+  assert.deepEqual(pd.equipeAdicionar, [P.antigo, P.dev])
+  assert.deepEqual(pd.pessoasAdicionar, [{ usuario: BIA, papel: P.antigo }, { usuario: BIA, papel: P.admin }])
+  assert.deepEqual(pd.ignorados, [])
+  const resto = planoDesfazer([foto, foto], devolver(cortado, pd))
+  assert.deepEqual([resto.equipeAdicionar, resto.pessoasAdicionar], [[], []])
+})
+
+test('desfazer ignora pessoa inativa e papel que não existe mais; recusa outra equipe', () => {
+  const e = estado()
+  const plano = planoDoCorte(e, { manter: MANTER })
+  const foto = lerFoto(JSON.stringify(fotoDoCorte(e, plano, META)))
+  const cortado = aplicarPlano(e, plano)
+  const semBia = { ...cortado, pessoas: cortado.pessoas.filter((p) => p.id !== BIA), papeis: new Map([...cortado.papeis].filter(([id]) => id !== P.dev)) }
+  const pd = planoDesfazer([foto], semBia)
+  assert.deepEqual(pd.equipeAdicionar, [P.antigo])
+  assert.deepEqual(pd.pessoasAdicionar, [])
+  assert.deepEqual(pd.ignorados.sort(), [P.dev, BIA].sort())
+  assert.throws(() => planoDesfazer([{ ...foto, equipe: { id: ID(101), papeis: [] } }], cortado), /outra equipe/)
 })

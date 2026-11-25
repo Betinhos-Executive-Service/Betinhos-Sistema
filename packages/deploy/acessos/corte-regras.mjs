@@ -212,3 +212,59 @@ export function resumoPublico(rel, { ambiente, sal }) {
     `Informativo: ${rel.informativo.length} pessoa(s) perdem acesso sem uso nos últimos ${DIAS} dias; ${rel.referencias.length} referência(s) de conexão de quem perde acesso; tabelas sem medida de uso: ${rel.incertas.join(', ') || 'nenhuma'}`,
   ].join('\n')
 }
+
+export function fotoDoCorte(estado, plano, { ambiente, host, quando, commit }) {
+  const porPessoa = new Map()
+  for (const { usuario, papel } of plano.pessoasRemover) porPessoa.set(usuario, [...(porPessoa.get(usuario) ?? []), papel])
+  const ids = [...plano.equipeRemover, ...plano.pessoasRemover.map((p) => p.papel)]
+  return {
+    versao: 1, ambiente, host, quando, commit,
+    equipe: { id: estado.equipe.id, papeis: [...plano.equipeRemover] },
+    base: estado.base,
+    pessoas: [...porPessoa].map(([id, papeis]) => ({ id, papeis })),
+    nomes: Object.fromEntries(ids.map((id) => [id, estado.papeis.get(id)?.nome ?? ''])),
+  }
+}
+
+export function lerFoto(texto) {
+  let f
+  try {
+    f = JSON.parse(String(texto).replace(/^﻿/, ''))
+  } catch {
+    f = null
+  }
+  const ids = (lista) => Array.isArray(lista) && lista.every((x) => GUID.test(x))
+  const ok = f?.versao === 1 && AMBIENTES.includes(f.ambiente) && typeof f.host === 'string' && GUID.test(f.equipe?.id ?? '') &&
+    ids(f.equipe.papeis) && Array.isArray(f.pessoas) && f.pessoas.every((p) => GUID.test(p?.id ?? '') && ids(p.papeis))
+  if (!ok) throw new Error('foto do corte em formato desconhecido; nada feito')
+  return f
+}
+
+export function mesmoPlano(foto, plano) {
+  const chave = (lista) => JSON.stringify([...lista].sort())
+  return chave(foto.equipe.papeis) === chave(plano.equipeRemover) &&
+    chave(foto.pessoas.flatMap((p) => p.papeis.map((r) => `${p.id}|${r}`))) === chave(plano.pessoasRemover.map((p) => `${p.usuario}|${p.papel}`))
+}
+
+// União de todas as fotos: um corte em mais de uma execução continua desfazível. Perfil - Base fica na equipe.
+export function planoDesfazer(fotos, estado) {
+  const daEquipe = new Set(estado.equipes.get(estado.equipe.id) ?? [])
+  const pessoas = new Map(estado.pessoas.filter((p) => !p.app).map((p) => [p.id, p]))
+  const equipe = new Set(), diretos = new Map(), ignorados = new Set()
+  for (const f of fotos) {
+    if (f.equipe.id !== estado.equipe.id) throw new Error('foto de outra equipe; nada feito')
+    for (const r of f.equipe.papeis) {
+      if (!estado.papeis.has(r)) ignorados.add(r)
+      else if (!daEquipe.has(r)) equipe.add(r)
+    }
+    for (const p of f.pessoas) {
+      const atual = pessoas.get(p.id)
+      if (!atual) { ignorados.add(p.id); continue }
+      for (const r of p.papeis) {
+        if (!estado.papeis.has(r)) ignorados.add(r)
+        else if (!atual.diretos.includes(r)) diretos.set(`${p.id}|${r}`, { usuario: p.id, papel: r })
+      }
+    }
+  }
+  return { equipeAdicionar: [...equipe], pessoasAdicionar: [...diretos.values()], ignorados: [...ignorados] }
+}
