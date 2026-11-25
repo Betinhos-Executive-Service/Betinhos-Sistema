@@ -1,6 +1,6 @@
 {
   "name": "@betinhos/acompanhar-motorista",
-  "version": "0.0.51",
+  "version": "0.0.52",
   "private": true,
   "type": "module",
   "description": "Link público de acompanhamento ao vivo do motorista Betinhos (Cloudflare Worker + Infleet)",

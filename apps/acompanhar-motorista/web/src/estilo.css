@@ -256,12 +256,12 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .frase{margin:20px 0 0;font-size:15px;line-height:22px;font-weight:500;color:#dbe5f5}
 .frase:empty{display:none}
 .corpo{position:relative;z-index:1;display:flex;flex-direction:column;gap:16px;max-width:592px;margin:-36px auto 0;padding:0 16px calc(24px + env(safe-area-inset-bottom))}
-/* Celular: as colunas do desktop somem e o order devolve a sequência de uma coluna (topo, mapa, motorista, viagem, resto). */
+/* Celular: as colunas do desktop somem e o order monta a sequência de uma coluna (topo, motorista, mapa, viagem, resto): quem vem buscar importa mais que o mapa. */
 .corpo:not(.duas)>.col{display:contents}
 .corpo:not(.duas) .col>*{order:4}
 .corpo:not(.duas) .col>:is(.avaliacao,.faixa-pax){order:0}
-.corpo:not(.duas) .c-mapa{order:1}
-.corpo:not(.duas) .c-motorista{order:2}
+.corpo:not(.duas) .c-motorista{order:1}
+.corpo:not(.duas) .c-mapa{order:2}
 .corpo:not(.duas) .c-viagem{order:3}
 .corpo:not(.duas)>.rodape{order:5}
 .col>.card,.col>.avaliacao{animation:entra 320ms var(--bt-ease-quint) backwards}
