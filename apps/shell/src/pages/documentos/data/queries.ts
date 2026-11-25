@@ -77,14 +77,15 @@ export type NovoDoc = {
 
 const vazioNulo = (v: string) => (v.trim() ? v.trim() : null)
 
-export function docPayload(input: NovoDoc, sets: Pick<EntitySets, 'tipo' | 'funcionario' | 'veiculo'>): Row {
+export function docPayload(input: NovoDoc, sets: Pick<EntitySets, 'tipo' | 'funcionario' | 'veiculo'>, unidadeFrota?: string): Row {
   const dono = input.categoria === 'pessoas'
     ? { [`${NAV.funcionario}@odata.bind`]: `/${sets.funcionario}(${input.donoId})` }
     : { [`${NAV.veiculo}@odata.bind`]: `/${sets.veiculo}(${input.donoId})` }
+  const unidade = input.categoria === 'frota' && unidadeFrota ? { 'owningbusinessunit@odata.bind': `/businessunits(${unidadeFrota})` } : {}
   return {
     cr40f_name: input.nome, cr40f_numero: vazioNulo(input.numero), cr40f_emissao: input.emissao, cr40f_validade: input.validade,
     cr40f_situacao: SITUACAO_CODE.vigente, cr40f_pasta: input.pasta, cr40f_observacao: vazioNulo(input.observacao),
-    [`${NAV.tipo}@odata.bind`]: `/${sets.tipo}(${input.tipoId})`, ...dono,
+    [`${NAV.tipo}@odata.bind`]: `/${sets.tipo}(${input.tipoId})`, ...dono, ...unidade,
   }
 }
 

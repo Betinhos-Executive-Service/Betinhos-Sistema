@@ -70,7 +70,10 @@ const iconeArquivo = (arq: Arquivo) => {
 }
 
 function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; source: DocsSource; limite: Limite; onRenovar: () => void }) {
-  const podeExcluir = usePodeExcluir('cr40f_documento')
+  // A lixeira apaga o arquivo no SharePoint, não o registro: segue a tabela do dono (veículo ou funcionário).
+  const excluirPessoas = usePodeExcluir('cr40f_funcionarios')
+  const excluirFrota = usePodeExcluir('cr40f_veiculos')
+  const podeExcluir = (item.vigente?.categoria ?? item.tipo.categoria) === 'frota' ? excluirFrota : excluirPessoas
   const toast = useToast()
   const [verHistorico, setVerHistorico] = useState(false)
   const [arquivos, setArquivos] = useState<Arquivo[] | null>(null)

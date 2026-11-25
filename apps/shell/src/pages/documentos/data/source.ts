@@ -1,5 +1,5 @@
 // data/source.ts
-import { cleanId, getHostXrm, type Row } from '@betinhos/dataverse'
+import { cleanId, DataverseError, getHostXrm, type Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import { getDataverseEnvironmentLabel } from '../../funcionarios/data/dataverse'
 import { toDataverseDate, todaySP } from '../../funcionarios/data/dates'
@@ -166,6 +166,15 @@ export function createDocsSource(host: Host): DocsSource {
   let cache: DocsData | null = null
 
   let sets: Promise<EntitySets> | null = null
+  // Unidade Frota (existe depois do corte): o documento de veículo já nasce nela; sem unidade ou sem leitura, o plugin cobre.
+  let unidadeFrota: Promise<string> | null = null
+  const lerUnidadeFrota = () => (unidadeFrota ??= host.client
+    .getAll("businessunits?$select=businessunitid,_parentbusinessunitid_value&$filter=name eq 'Frota' and isdisabled eq false")
+    .then((linhas) => String(linhas.find((l) => l._parentbusinessunitid_value)?.businessunitid ?? ''))
+    .catch(() => ''))
+  // Quem só tem Frota não lê a tabela de RH dos destinatários de aviso: lista vazia, a ficha do veículo abre.
+  const semPermissao = <T,>(p: Promise<T[]>) => p.catch((e: unknown) => { if (e instanceof DataverseError && e.status === 403) return [] as T[]; throw e })
+
   const entitySets = () => (sets ??= host.metadata.entities(Object.values(ENTITIES)).then((info) => {
     const get = (name: string) => {
       const value = info.get(name)?.entitySetName
@@ -193,7 +202,7 @@ export function createDocsSource(host: Host): DocsSource {
     async carregar() {
       const s = await entitySets()
       const [tipos, docs, destinatarios, funcionarios, veiculos] = await Promise.all([
-        host.client.getAll(tiposPath(s.tipo)), host.client.getAll(documentosPath(s.documento)), host.client.getAll(destinatariosPath(s.destinatario)),
+        host.client.getAll(tiposPath(s.tipo)), host.client.getAll(documentosPath(s.documento)), semPermissao(host.client.getAll(destinatariosPath(s.destinatario))),
         host.client.getAll(funcionariosPath(s.funcionario)), host.client.getAll(veiculosPath(s.veiculo)),
       ])
       cache = {
@@ -208,7 +217,7 @@ export function createDocsSource(host: Host): DocsSource {
       const s = await entitySets()
       return comAviso(salvarDocumento({
         envLabel,
-        criar: async (novo) => cleanId(await host.client.create(s.documento, docPayload(novo, s))),
+        criar: async (novo) => cleanId(await host.client.create(s.documento, docPayload(novo, s, novo.categoria === 'frota' ? await lerUnidadeFrota() : undefined))),
         enviar,
         substituir: (id) => host.client.update(s.documento, id, { cr40f_situacao: SITUACAO_CODE.substituido } as Row),
         dualWrite,

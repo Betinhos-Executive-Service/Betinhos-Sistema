@@ -1,4 +1,6 @@
+import { DataverseError } from '@betinhos/dataverse'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Row } from '@betinhos/dataverse'
 import type { Host } from '../../../host'
 import type { DocEmitido, Dono, TipoDoc } from '../domain/types'
 import { ENTITIES } from './queries'
@@ -84,7 +86,7 @@ function hostFalso(behaviors: Record<string, string>, arquivos: { nomeArquivo: s
     }
     throw new Error(`request inesperado: ${path}`)
   })
-  const client = { apiUrl: 'https://org23b93544.crm2.dynamics.com/api/data/v9.2', request, getAll: vi.fn(async () => []), create: vi.fn(async () => '{D-NOVO}'), update, remove: vi.fn() }
+  const client = { apiUrl: 'https://org23b93544.crm2.dynamics.com/api/data/v9.2', request, getAll: vi.fn(async (_: string) => [] as Row[]), create: vi.fn(async (_: string, __: Row) => '{D-NOVO}'), update, remove: vi.fn() }
   const sets = new Map(Object.values(ENTITIES).map((n) => [n, { logicalName: n, entitySetName: `${n}s`, label: n }]))
   const host = { mode: 'dataverse', clientUrl: 'https://org23b93544.crm2.dynamics.com', client, metadata: { entities: async () => sets }, insideModelDriven: false, appId: async () => undefined } as unknown as Host
   const dispatchEvent = vi.fn((_: Event) => true)
@@ -95,7 +97,7 @@ function hostFalso(behaviors: Record<string, string>, arquivos: { nomeArquivo: s
   }
   vi.stubGlobal('window', { Xrm: { WebApi: webApi }, dispatchEvent })
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ sucesso: true, arquivos }) })))
-  return { host, update, request, dispatchEvent }
+  return { host, update, request, dispatchEvent, getAll: client.getAll, create: client.create }
 }
 
 const TIPO = (codigo: string, extra: Partial<TipoDoc> = {}): TipoDoc => ({ id: `t-${codigo}`, codigo, nome: codigo, categoria: 'pessoas', temValidade: true, validadePadraoMeses: null, obrigatorioPara: [], ordem: 1, ativo: true, ...extra })
@@ -134,6 +136,31 @@ describe('createDocsSource (Dataverse)', () => {
     const rg = { pasta: 'Funcionarios/DEV/m1/Documentos/RG', tipoId: 't-RG', validade: null }
     expect((await source.arquivos(DOC({ ...rg, emissao: '2020-01-02' }))).map((a) => a.nome)).toEqual(['RG_2020-01-02_rg.pdf'])
     expect((await source.arquivos(DOC({ ...rg, emissao: null }))).map((a) => a.nome)).toEqual(['RG_sem-data_rg.pdf'])
+  })
+
+  it('carregar tolera 403 só nos destinatários de aviso (quem só tem Frota abre a ficha do veículo)', async () => {
+    const { host, getAll } = hostFalso({})
+    getAll.mockImplementation(async (path: string) => {
+      if (path.startsWith('cr40f_avisodestinatarios')) throw new DataverseError('sem permissão', 403)
+      return []
+    })
+    expect((await createDocsSource(host).carregar()).destinatarios).toEqual([])
+    getAll.mockImplementation(async (path: string) => {
+      if (path.startsWith('cr40f_avisodestinatarios')) throw new DataverseError('falhou', 500)
+      return []
+    })
+    await expect(createDocsSource(host).carregar()).rejects.toThrow('falhou')
+  })
+
+  it('documento de veículo nasce na unidade Frota quando ela existe; sem leitura da unidade, sem vínculo', async () => {
+    const { host, getAll, create } = hostFalso({})
+    const salvar = () => createDocsSource(host).salvarDocumento({ tipo: TIPO('CRLV', { categoria: 'frota' }), dono: { ...ANA, id: 'v1', categoria: 'frota' }, anterior: null, numero: '', emissao: null, validade: null, observacao: '', arquivos: [] })
+    getAll.mockImplementation(async (path: string) => (path.startsWith('businessunits') ? [{ businessunitid: 'fro-1', _parentbusinessunitid_value: 'raiz' }] : []))
+    await salvar()
+    expect(create.mock.calls.at(-1)?.[1]).toMatchObject({ 'owningbusinessunit@odata.bind': '/businessunits(fro-1)' })
+    getAll.mockImplementation(async (path: string) => { if (path.startsWith('businessunits')) throw new DataverseError('negado', 403); return [] })
+    await salvar()
+    expect(create.mock.calls.at(-1)?.[1]).not.toHaveProperty('owningbusinessunit@odata.bind')
   })
 
   it('avisa o menu (documentos:alterados) depois de salvar documento e tipo', async () => {
