@@ -331,6 +331,14 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .col{display:flex;flex-direction:column;gap:16px;min-width:0}
 .corpo.duas>.rodape{grid-column:1/-1;text-align:left}
 .corpo.duas .mapa-moldura{height:300px}
+/* Motorista em destaque: primeiro card da coluna esquerda, foto, nome e placa maiores. */
+.corpo.duas .c-motorista{order:-1}
+.corpo.duas .motorista .avatar{width:80px;height:80px;font-size:28px}
+.corpo.duas .motorista .m-topo{gap:18px}
+.corpo.duas .motorista .m-info b{font-size:24px;line-height:30px}
+.corpo.duas .motorista #m-carro{font-size:15px;line-height:20px}
+.corpo.duas .motorista .placa{font-size:16px;line-height:20px;padding:0 9px 2px}
+.corpo.duas .motorista .placa::before{margin:0 -9px 2px;font-size:6px;line-height:8px}
 .heroi-card .boasvindas{margin:0 0 4px;font-size:18px;line-height:24px;color:var(--bt-color-brand)}
 .heroi-card h1{margin:0;font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.01em;color:var(--bt-color-brand);overflow-wrap:anywhere}
 .heroi-card .esqueleto{width:60%;min-height:32px}

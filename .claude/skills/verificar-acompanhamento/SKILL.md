@@ -87,7 +87,7 @@ Vale por cima das descrições de layout acima (cards `.painel`, `.passos`, `#c-
 
 O celular continua igual ao "D". No desktop (`useDesktop`, `(min-width: 1024px)`, troca ao redimensionar):
 - Faixa fina como no PROD (`.faixa.fina`): marca à esquerda; à direita `#reserva` "Reserva OS-N", bandeira `#idioma-botao` com menu e `#compartilhar` (copia o link, `#copiado` "Link copiado"). Sem seletor segmentado e sem o card de compartilhar no corpo.
-- `main.corpo.duas` com duas `.col`. Esquerda: herói em card (`.heroi-card`: `#boasvindas`, `#status`, `#eta`, `#passos`, `#frase`), avaliação, `#faixa-pax`, motorista, passageiros, Central 24h. Direita: mapa (300 px; 190 px com altura ≤780) e `#viagem`.
+- `main.corpo.duas` com duas `.col`. Esquerda (desde a v0.0.53): motorista em destaque primeiro (`order:-1`, avatar 80 px, nome 24 px, placa maior), depois herói em card (`.heroi-card`: `#boasvindas`, `#status`, `#eta`, `#passos`, `#frase`), avaliação, `#faixa-pax`, motorista, passageiros, Central 24h. Direita: mapa (300 px; 190 px com altura ≤780) e `#viagem`.
 - Mesma árvore nos dois modos: no celular as `.col` ficam `display:contents` e o `order` devolve a sequência faixa-pax, motorista, mapa, viagem (motorista antes do mapa desde a v0.0.52), passageiros, compartilhar, Central 24h e rodapé. Prova: marcar `#c-mapa` (`dataset`) a 1440, redimensionar para 800 e conferir que a marca continua (o mapa não é recriado) e a ordem pelo `getBoundingClientRect().top`.
 - Prints 1440x900 e 1280x720 sem fullPage de `DevCompleto1` (rolagem 0 nos dois) e `DevAgendado1`. Rolagem só aparece com a lista de passageiros (`DevAgendado1`, `DevAeroport1`), aceita.
 
