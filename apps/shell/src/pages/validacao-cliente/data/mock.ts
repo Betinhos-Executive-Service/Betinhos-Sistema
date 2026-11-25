@@ -10,10 +10,10 @@ export const EMBRAER: Cliente = { id: 'c1000000-0000-4000-8000-000000000003', no
 /** Clientes cadastrados que ainda não têm nada do portal configurado. */
 const SEM_PORTAL: Cliente[] = ['Latasa', 'Kenvue', 'Embraco', 'Whirlpool', 'Johnson & Johnson', 'Petrobras', 'Vale', 'Votorantim'].map((nome, i) => ({ id: `c1000000-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`, nome }))
 export const createMockConfigs = (): PortalConfig[] => [
-  { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [] },
-  { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'] },
-  { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [] },
-  ...SEM_PORTAL.map((cliente): PortalConfig => ({ cliente, ligado: false, modulos: [], dominios: [] })),
+  { cliente: TENARIS, ligado: true, modulos: ['validar', 'pedir', 'meus_servicos'], dominios: [], nomeExibicao: '', cor: '' },
+  { cliente: TERNIUM, ligado: true, modulos: ['validar', 'meus_servicos'], dominios: ['ternium.com'], nomeExibicao: '', cor: '' },
+  { cliente: EMBRAER, ligado: false, modulos: ['pedir'], dominios: [], nomeExibicao: '', cor: '' },
+  ...SEM_PORTAL.map((cliente): PortalConfig => ({ cliente, ligado: false, modulos: [], dominios: [], nomeExibicao: '', cor: '' })),
 ]
 
 const composicao = (hora: number, espera = 0, pedagio = 0, estacionamento = 0): ItemComposicao[] =>

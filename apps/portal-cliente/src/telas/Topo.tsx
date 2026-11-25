@@ -1,6 +1,5 @@
 import { Button, SegmentedControl } from '@betinhos/ui'
 import { LogOut } from 'lucide-react'
-import { marcaParceira } from '../domain/marcas'
 import { MODULO_LABEL } from '../domain/pedidos'
 import type { Modulo, Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
@@ -12,7 +11,7 @@ export function Topo({ sessao, onSair, ativo, onModulo }: Props) {
   return (
     <header className="pc-topo">
       <div className="pc-topo__inicio">
-        <Parceria parceira={marcaParceira({ cliente: sessao.cliente, email: sessao.email })} tamanho="topo" />
+        <Parceria parceira={sessao.marca ?? null} tamanho="topo" />
         {sessao.modulos.length > 1 && (
           <SegmentedControl<Modulo>
             className="pc-topo__modulos"
@@ -24,7 +23,7 @@ export function Topo({ sessao, onSair, ativo, onModulo }: Props) {
         )}
       </div>
       <div className="pc-topo__usuario">
-        <span className="pc-topo__nome">{sessao.nome} · {sessao.cliente}</span>
+        <span className="pc-topo__nome">{sessao.nome} · {sessao.marca?.nome ?? sessao.cliente}</span>
         <Button variant="ghost" size="compact" onClick={onSair} icon={<LogOut size={16} aria-hidden />}>Sair</Button>
       </div>
     </header>

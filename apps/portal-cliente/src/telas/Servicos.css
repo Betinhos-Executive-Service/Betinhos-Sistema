@@ -11,6 +11,7 @@
   min-height: 56px;
   padding: var(--bt-space-2) var(--bt-space-6);
   background-color: var(--bt-color-surface);
+  border-top: 3px solid var(--pc-marca, transparent);
   border-bottom: 1px solid var(--bt-color-border);
 }
 .pc-topo__inicio { display: flex; align-items: center; gap: var(--bt-space-5); min-width: 0; }

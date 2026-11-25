@@ -1,40 +1,74 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Checkbox, Dialog, Drawer, Field, Input, Radio, Sheet, Switch, Textarea, useToast } from '@betinhos/ui'
-import { UserPlus } from 'lucide-react'
+import { ImagePlus, Trash2, UserPlus } from 'lucide-react'
 import type { Source } from '../data/source'
-import { MODULOS, configIgual, formDaConfig, validarConfig, type ConfigForm } from '../domain/config'
+import { MODULOS, NOME_EXIBICAO_MAX, configIgual, ehCor, formDaConfig, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
 import { validarValidador } from '../domain/regras'
 import type { Cliente, ModuloPortal, PortalConfig, Validador } from '../domain/types'
+import { PrevisaoMarca } from './PrevisaoMarca'
 import { UsuarioItem, useAcoesUsuario } from './UsuarioItem'
 
 type Props = {
   cliente: Cliente | null; config: PortalConfig | null; outros: PortalConfig[]; validadores: Validador[]; source: Source; mobile: boolean
+  /** Só o Renan edita logo, cor e nome; os outros veem a identidade em leitura. */
+  editarIdentidade?: boolean
   onClose: () => void; onSaved: (c: PortalConfig) => void; onValidadorSaved: (v: Validador) => void
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
-const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '' }
-const inicial = (config: PortalConfig | null) => (config ? formDaConfig(config) : NOVA)
+const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', nomeExibicao: '', cor: '', logo: null, logoMudou: false }
+const inicial = (config: PortalConfig | null, logo: string | null = null) => (config ? formDaConfig(config, logo) : { ...NOVA, logo })
+const lerArquivo = (arquivo: File) => new Promise<string>((ok, falha) => {
+  const leitor = new FileReader()
+  leitor.onload = () => ok(String(leitor.result))
+  leitor.onerror = () => falha(new Error('Não foi possível ler o arquivo.'))
+  leitor.readAsDataURL(arquivo)
+})
 
 /** Edição do portal de um cliente: liberado, módulos, e-mails e domínios. Fecha por X, Esc ou fundo; com alteração pergunta antes. */
-export function ConfigDrawer({ cliente, config, outros, validadores, source, mobile, onClose, onSaved, onValidadorSaved }: Props) {
+export function ConfigDrawer({ cliente, config, outros, validadores, source, mobile, editarIdentidade = false, onClose, onSaved, onValidadorSaved }: Props) {
   const toast = useToast()
   const [form, setForm] = useState<ConfigForm>(inicial(config))
   const [mostrarErros, setMostrarErros] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [confirmarSaida, setConfirmarSaida] = useState(false)
-  const base = inicial(config)
+  const [logoBase, setLogoBase] = useState<string | null>(null)
+  const [erroLogo, setErroLogo] = useState<string | null>(null)
+  const arquivoRef = useRef<HTMLInputElement>(null)
+  const base = inicial(config, logoBase)
   const acoes = useAcoesUsuario(source, onValidadorSaved)
   const [novo, setNovo] = useState({ nome: '', email: '' })
   const [errosNovo, setErrosNovo] = useState<ReturnType<typeof validarValidador>>({})
   const [liberando, setLiberando] = useState(false)
   const idCliente = cliente?.id
   const [idAnterior, setIdAnterior] = useState(idCliente)
-  if (idAnterior !== idCliente) { setIdAnterior(idCliente); setForm(base); setMostrarErros(false); setNovo({ nome: '', email: '' }); setErrosNovo({}) }
+  if (idAnterior !== idCliente) { setIdAnterior(idCliente); setForm(inicial(config)); setLogoBase(null); setErroLogo(null); setMostrarErros(false); setNovo({ nome: '', email: '' }); setErrosNovo({}) }
+  useEffect(() => {
+    if (!idCliente) return
+    let vivo = true
+    source.logoDoCliente(idCliente).then((logo) => {
+      if (!vivo) return
+      setLogoBase(logo)
+      setForm((f) => (f.logoMudou ? f : { ...f, logo }))
+    }).catch(() => { if (vivo) toast({ tone: 'warning', message: 'Não foi possível ler o logo atual.' }) })
+    return () => { vivo = false }
+  }, [idCliente, source, toast])
   const doCliente = validadores.filter((v) => v.cliente.id === idCliente).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const set = (patch: Partial<ConfigForm>) => setForm((f) => ({ ...f, ...patch }))
   const sujo = !configIgual(form, base)
   const { erros, avisos } = useMemo(() => (cliente ? validarConfig(form, cliente.id, outros) : { erros: {}, avisos: [] }), [form, cliente, outros])
+
+  async function escolherLogo(arquivo: File | undefined) {
+    if (!arquivo) return
+    const motivo = validarLogo(arquivo)
+    if (motivo) { setErroLogo(motivo); return }
+    try {
+      setErroLogo(null)
+      set({ logo: await lerArquivo(arquivo), logoMudou: true })
+    } catch (reason) {
+      setErroLogo(reasonText(reason))
+    }
+  }
 
   function close() {
     if (salvando) return
@@ -90,6 +124,35 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
           {MODULOS.map((m) => <Checkbox key={m.value} label={m.label} description={m.description} checked={form.modulos.includes(m.value)} disabled={salvando} onChange={() => toggleModulo(m.value)} />)}
         </ChoiceGroup>
       </section>
+      <section className="vc-secao" aria-labelledby="vc-identidade-titulo">
+        <h3 id="vc-identidade-titulo" className="vc-secao__titulo">Identidade no portal</h3>
+        {editarIdentidade ? null : <p className="vc-muted">Só o administrador do ambiente altera logo, cor e nome.</p>}
+        <div className="vc-identidade">
+          <Field label="Nome de exibição" hint="Aparece no topo do portal. Vazio usa o nome do cadastro." error={erros.nomeExibicao}>
+            <Input name="nome-exibicao" value={form.nomeExibicao} maxLength={NOME_EXIBICAO_MAX + 20} disabled={salvando || !editarIdentidade} onChange={(e) => set({ nomeExibicao: e.target.value })} />
+          </Field>
+          <Field label="Cor" hint="Faixa do topo e botão principal. Formato #RRGGBB." error={erros.cor}>
+            <div className="vc-identidade__cor">
+              <input type="color" aria-label="Escolher cor" value={ehCor(form.cor.trim()) ? form.cor.trim() : '#000000'} disabled={salvando || !editarIdentidade} onChange={(e) => set({ cor: e.target.value })} />
+              <Input name="cor" value={form.cor} placeholder="#0a7d4a" disabled={salvando || !editarIdentidade} onChange={(e) => set({ cor: e.target.value })} />
+            </div>
+          </Field>
+          <Field label="Logo" hint="PNG ou JPG, até 1 MB." error={erroLogo ?? undefined}>
+            <div className="vc-identidade__logo">
+              {form.logo ? <img src={form.logo} alt={`Logo de ${cliente?.nome ?? 'cliente'}`} /> : <span className="vc-muted">Sem logo: o portal mostra só a marca Betinhos.</span>}
+              {editarIdentidade ? (
+                <>
+                  <input ref={arquivoRef} className="vc-identidade__arquivo" type="file" name="logo" aria-label="Arquivo do logo" accept="image/png,image/jpeg"
+                    onChange={(e) => { void escolherLogo(e.target.files?.[0]); e.target.value = '' }} />
+                  <Button type="button" variant="secondary" icon={<ImagePlus size={16} />} disabled={salvando} onClick={() => arquivoRef.current?.click()}>{form.logo ? 'Trocar logo' : 'Enviar logo'}</Button>
+                  {form.logo ? <Button type="button" variant="secondary" icon={<Trash2 size={16} />} disabled={salvando} onClick={() => { setErroLogo(null); set({ logo: null, logoMudou: true }) }}>Remover</Button> : null}
+                </>
+              ) : null}
+            </div>
+          </Field>
+          <PrevisaoMarca nome={form.nomeExibicao || cliente?.nome || ''} cor={form.cor} logo={form.logo} />
+        </div>
+      </section>
       <section className="vc-secao" aria-labelledby="vc-emails-titulo">
         <h3 id="vc-emails-titulo" className="vc-secao__titulo">E-mails liberados ({doCliente.length})</h3>
         <p className="vc-muted">Estas ações salvam na hora, sem precisar do Salvar.</p>
@@ -112,8 +175,8 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
             <Textarea rows={2} name="dominios" value={form.dominiosTexto} disabled={salvando} onChange={(e) => set({ dominiosTexto: e.target.value })} />
           </Field>
         ) : null}
-        {avisos.map((a) => <Alert key={a} tone="warning" title="Domínio público">{a}</Alert>)}
       </section>
+      {avisos.map((a) => <Alert key={a} tone="warning" title="Atenção">{a}</Alert>)}
     </form>
   )
   const footer = (

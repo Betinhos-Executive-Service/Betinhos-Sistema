@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Alert, Button, Field, Input } from '@betinhos/ui'
 import { ArrowLeft, Eye, EyeOff, LogIn, Mail, RotateCw } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal, REENVIO_S, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
-import { marcaParceira } from '../domain/marcas'
+import { estiloDaMarca } from '../domain/marca'
 import type { Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
+import { useMarcaEntrada } from './useMarcaEntrada'
 import './Entrar.css'
 
 const SENHA_FRACA = `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.`
@@ -50,7 +51,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
     return () => clearTimeout(t)
   }, [reenviarEm])
   const chaveLink = useMemo(() => new URLSearchParams(window.location.search).get('c'), [])
-  const parceira = marcaParceira({ chave: chaveLink, email: EMAIL_VALIDO.test(email.trim()) ? email : undefined })
+  const parceira = useMarcaEntrada(chaveLink, email)
 
   function limparCampos() {
     setCodigo('')
@@ -164,7 +165,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
   const tipoSenha = verSenha ? 'text' : 'password'
 
   return (
-    <main className="pc-entrar">
+    <main className="pc-entrar" style={estiloDaMarca(parceira?.cor) as CSSProperties}>
       <section className="pc-entrar__card" aria-labelledby="pc-entrar-titulo">
         <Parceria parceira={parceira} tamanho="entrar" />
         <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Portal do cliente</h1>

@@ -79,4 +79,7 @@ export type PortalConfig = {
   modulos: ModuloPortal[]
   /** Vazio = só e-mails cadastrados. */
   dominios: string[]
+  /** Identidade no portal (`cr40f_portalnomeexibicao`, `cr40f_portalcor`); vazio = usa o nome do cadastro e a cor padrão. O logo é lido à parte. */
+  nomeExibicao: string
+  cor: string
 }

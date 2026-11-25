@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, validarConfig, type ConfigForm } from './config'
+import { LOGO_MAX_BYTES, corLegivel, dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, validarConfig, validarLogo, type ConfigForm } from './config'
 import type { PortalConfig } from './types'
 
 const cliente = (id: string, nome: string) => ({ id, nome })
-const config = (id: string, nome: string, over: Partial<PortalConfig> = {}): PortalConfig => ({ cliente: cliente(id, nome), ligado: true, modulos: ['validar'], dominios: [], ...over })
-const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', ...over })
+const config = (id: string, nome: string, over: Partial<PortalConfig> = {}): PortalConfig => ({ cliente: cliente(id, nome), ligado: true, modulos: ['validar'], dominios: [], nomeExibicao: '', cor: '', ...over })
+const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', nomeExibicao: '', cor: '', logo: null, logoMudou: false, ...over })
 
 describe('normalizarDominio', () => {
   it('tira @, protocolo, www, caminho e caixa', () => {
@@ -66,5 +66,33 @@ describe('gravação', () => {
   it('descreve quem entra', () => {
     expect(quemEntra([])).toBe('Só cadastrados')
     expect(quemEntra(['a.com', 'b.com'])).toBe('Cadastrados + @a.com, @b.com')
+  })
+})
+
+describe('identidade', () => {
+  it('cor inválida bloqueia; vazia e válida passam', () => {
+    expect(validarConfig(form({ cor: 'verde' }), 'a', []).erros.cor).toMatch(/#RRGGBB/)
+    expect(validarConfig(form({ cor: '#12345' }), 'a', []).erros.cor).toBeTruthy()
+    expect(validarConfig(form({ cor: '' }), 'a', []).erros.cor).toBeUndefined()
+    expect(validarConfig(form({ cor: '#0a7d4a' }), 'a', [])).toEqual({ erros: {}, avisos: [] })
+  })
+  it('cor com pouco contraste só avisa e cai na padrão', () => {
+    const r = validarConfig(form({ cor: '#ffff00' }), 'a', [])
+    expect(r.erros.cor).toBeUndefined()
+    expect(r.avisos[0]).toMatch(/cor padrão da Betinhos/)
+    expect(corLegivel('#ffff00')).toBeUndefined()
+    expect(corLegivel('#0A7D4A')).toBe('#0a7d4a')
+  })
+  it('nome de exibição acima de 100 caracteres bloqueia', () => {
+    expect(validarConfig(form({ nomeExibicao: 'a'.repeat(101) }), 'a', []).erros.nomeExibicao).toBeTruthy()
+    expect(validarConfig(form({ nomeExibicao: 'a'.repeat(100) }), 'a', []).erros.nomeExibicao).toBeUndefined()
+  })
+  it('logo: aceita só PNG e JPG até 1 MB; recusa o resto', () => {
+    for (const type of ['image/png', 'image/jpeg']) expect(validarLogo({ type, size: 1000 })).toBeNull()
+    expect(validarLogo({ type: 'image/png', size: LOGO_MAX_BYTES })).toBeNull()
+    expect(validarLogo({ type: 'image/png', size: LOGO_MAX_BYTES + 1 })).toMatch(/limite é 1 MB/)
+    expect(validarLogo({ type: 'application/pdf', size: 10 })).toMatch(/Formato não aceito/)
+    expect(validarLogo({ type: 'image/gif', size: 10 })).toMatch(/Formato não aceito/)
+    for (const type of ['image/webp', 'image/svg+xml']) expect(validarLogo({ type, size: 10 })).toMatch(/PNG ou JPG/)
   })
 })

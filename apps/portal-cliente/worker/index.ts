@@ -8,6 +8,7 @@ import { criarDv } from './dataverse'
 import type { Env } from './env'
 import { sugerirEnderecos } from './enderecos'
 import { erro } from './http'
+import { baixarLogo, consultarMarca } from './marca'
 import { cancelarPedido, criarPedido, listarPassageiros, listarPedidos } from './pedidos'
 import { abrirDuvida, aprovar, listar, responder } from './servicos'
 
@@ -22,7 +23,8 @@ const SEGURANCA: Record<string, string> = {
 
 function comSeguranca(resp: Response): Response {
   const r = new Response(resp.body, resp)
-  for (const [k, v] of Object.entries(SEGURANCA)) r.headers.set(k, v)
+  // Resposta que já traz a própria CSP (o logo, `default-src 'none'`) a mantém.
+  for (const [k, v] of Object.entries(SEGURANCA)) if (k !== 'Content-Security-Policy' || !r.headers.has(k)) r.headers.set(k, v)
   return r
 }
 
@@ -63,6 +65,9 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   if (rota === 'POST /auth/senha') return criarSenha(req, c)
   if (rota === 'GET /auth/sessao') return lerSessao(req, c)
   if (rota === 'POST /auth/sair') return sair()
+  if (rota === 'GET /marca') return consultarMarca(c.dv, url)
+  const logo = /^GET \/marca\/logo\/([^/]+)$/.exec(rota)
+  if (logo) return baixarLogo(c.dv, logo[1])
 
   const sessao = await sessaoAtual(req, c)
   if (!sessao) return erro(401, 'nao_permitido')

@@ -31,7 +31,9 @@ function source(over: Partial<Source> = {}): Source {
     criarValidador: async () => 'x',
     setValidadorAtivo: async () => undefined,
     zerarSenha: async () => undefined,
-    salvarConfig: async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }),
+    salvarConfig: async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], nomeExibicao: form.nomeExibicao, cor: form.cor }),
+    podeEditarIdentidade: async () => true,
+    logoDoCliente: async () => null,
     ...over,
   }
 }
