@@ -1918,7 +1918,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 - [ ] **Passo 4: rodar e ver passar.** `node --test packages/deploy/acessos/corte-ci.test.mjs` → `fail 0`. E a CLI: `printf 'A\tpackages/deploy/migrations/20261201-0900-acessos-passageiro.ps1\n' | node packages/deploy/acessos/corte-ci.mjs --tag-prod 0; echo $?` → `::error::...` e `1`.
 
-- [ ] **Passo 5: passo no CI.** Em `.github/workflows/ci.yml`, no job `schema`, depois do passo `Migrations`:
+- [ ] **Passo 5: passo no CI.** Em `.github/workflows/ci.yml`, no job `basico` (o antigo job `schema` virou o passo `Migrations` dele, PR #731), depois do passo `Migrations`:
 
 ```yaml
       - name: Proteção do passageiro só depois do corte do PROD
