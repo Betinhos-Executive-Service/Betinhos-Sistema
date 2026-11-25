@@ -44,7 +44,7 @@ Cada correção segue a skill `entrega-autonoma`, com o erro real como "antes":
 - **Erro que depende de dados do Dataverse ou de flow**: worktree local (precisa do `az login` no DEV). Reproduza no DEV com dados equivalentes; nunca reproduza escrevendo no PROD.
   - Flow: o JSON de cada flow fica em `packages/deploy/flows/` e o provisionamento em `packages/deploy/provision-flow-*.ps1`. Corrija ali, aplique no DEV, rode o flow no DEV e prove o sucesso (run com status Succeeded). Faça backup do JSON atual antes (padrão `flows/backup/`).
 - Trava de recurso compartilhado (Dataverse DEV): `~/.claude/locks/dataverse-dev.lock`, como na `agentes-paralelos`.
-- PR com: chave do plantão, ocorrências, antes/depois, como foi verificado e "não verificado na nuvem" quando for o caso. Revisão Sonnet + Fable. Merge só com `.claude/entrega-autonoma.json` `{"autoMerge": true}`; sem isso, PR pronto e aguardando o Renan.
+- PR com: chave do plantão, ocorrências, antes/depois, como foi verificado e "não verificado na nuvem" quando for o caso. Dois revisores com modelo pela criticidade (regra da `entrega-autonoma`, nunca Fable). Merge só com `.claude/entrega-autonoma.json` `{"autoMerge": true}`; sem isso, PR pronto e aguardando o Renan.
 - Erros do app no DEV: depois do PR, atualize `cr40f_situacao` do grupo para 100000001 (Em correção) e `cr40f_pr` com o link. No PROD nada é escrito.
 
 ## 4. Registrar e pedir validação
