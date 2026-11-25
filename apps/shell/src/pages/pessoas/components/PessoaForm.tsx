@@ -113,6 +113,7 @@ export function PessoaForm({ formId, form, errors, onChange, onSubmit, choices, 
           {choice('tipoVeiculo', 'Veículo preferido', toOptions(choices.tipoVeiculo))}
           {area('preferencias', 'Preferências do passageiro')}
           {area('endereco', 'Endereço de saída')}
+          {area('enderecoDestino', 'Endereço de destino')}
         </div>
       </fieldset>
     </form>

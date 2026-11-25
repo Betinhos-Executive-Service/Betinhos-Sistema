@@ -126,6 +126,17 @@ describe('formulário', () => {
     expect(isDirty(base, { ...base, clienteNome: 'outro rótulo' })).toBe(false)
     expect(applyForm(p, { ...base, email: ' NOVO@X.COM ' }).email).toBe('novo@x.com')
   })
+
+  it('endereço de saída e de destino padrão: gravam nas colunas certas, só quando mudam, e limpam com vazio', () => {
+    const base = toForm(byName('Mariana Albuquerque'))
+    expect(base.enderecoDestino).toBe('')
+    const novo = { ...base, endereco: ' Hotel Mercure ', enderecoDestino: ' Aeroporto de Guarulhos (GRU) ' }
+    expect(buildPayload(base, novo, bind)).toEqual({ cr40f_enderecodesaida: 'Hotel Mercure', cr40f_enderecodedestino: 'Aeroporto de Guarulhos (GRU)' })
+    expect(applyForm(byName('Mariana Albuquerque'), novo)).toMatchObject({ endereco: 'Hotel Mercure', enderecoDestino: 'Aeroporto de Guarulhos (GRU)' })
+    const gravado = toForm({ ...byName('Mariana Albuquerque'), endereco: 'A', enderecoDestino: 'B' })
+    expect(buildPayload(gravado, { ...gravado, enderecoDestino: '' }, bind)).toEqual({ cr40f_enderecodedestino: null })
+    expect(Object.keys(validateForm({ ...base, enderecoDestino: 'x'.repeat(4001) }, new Date(), base))).toContain('enderecoDestino')
+  })
 })
 
 describe('histórico', () => {

@@ -5,6 +5,20 @@ const T0 = Date.parse('2026-11-01T12:00:00Z')
 const pedido = (passageiros: Parameters<typeof normalizarPedido>[0]['passageiros']) =>
   normalizarPedido({ passageiros, origem: 'A', destino: 'B', saida: '2026-11-03T10:00:00Z' })
 
+describe('endereço padrão do passageiro', () => {
+  it('normalizarPedido apara e limita; ausente continua ausente; vazio continua vazio (limpar)', () => {
+    const [a, b, c] = pedido([
+      { nome: 'A', email: 'a@b.co', saidaPadrao: '  Rua A  ', destinoPadrao: 'x'.repeat(400) },
+      { nome: 'B', email: 'b@b.co' },
+      { nome: 'C', email: 'c@b.co', saidaPadrao: '   ' },
+    ]).passageiros
+    expect(a.saidaPadrao).toBe('Rua A')
+    expect(a.destinoPadrao).toHaveLength(300)
+    expect('saidaPadrao' in b || 'destinoPadrao' in b).toBe(false)
+    expect(c.saidaPadrao).toBe('')
+  })
+})
+
 describe('contato do passageiro', () => {
   it('celular com 10 ou 11 dígitos, aceitando máscara e +55', () => {
     expect(celularValido('(12) 99999-0001')).toBe(true)

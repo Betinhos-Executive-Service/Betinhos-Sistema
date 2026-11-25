@@ -81,7 +81,13 @@ export function normalizarPedido(p: NovoPedido): NovoPedido {
     .map((x): PassageiroPedido => {
       const telefone = (x.telefone ?? '').trim()
       const email = (x.email ?? '').trim()
-      return { ...(x.id ? { id: x.id } : {}), nome: x.nome.trim(), ...(telefone ? { telefone } : {}), ...(email ? { email } : {}) }
+      const padrao = (v?: string) => (v === undefined ? undefined : v.trim().slice(0, MAX_ENDERECO))
+      const saidaPadrao = padrao(x.saidaPadrao)
+      const destinoPadrao = padrao(x.destinoPadrao)
+      return {
+        ...(x.id ? { id: x.id } : {}), nome: x.nome.trim(), ...(telefone ? { telefone } : {}), ...(email ? { email } : {}),
+        ...(saidaPadrao !== undefined ? { saidaPadrao } : {}), ...(destinoPadrao !== undefined ? { destinoPadrao } : {}),
+      }
     })
     .filter((x) => x.nome || x.id)
     .slice(0, MAX_PASSAGEIROS)

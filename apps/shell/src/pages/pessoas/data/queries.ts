@@ -17,7 +17,7 @@ export function guid(value: string) {
 
 const SELECT = [
   'cr40f_bancodedadosid', 'cr40f_nomedopassageiro', '_cr40f_cliente_value', 'cr40f_telefone', 'cr40f_email', 'cr40f_cargo', 'cr40f_classificacao',
-  'cr40f_idioma', 'cr40f_status', 'cr40f_sexo', 'new_tipodoveiculo', 'cr40f_departamento', 'cr40f_cr', 'cr40f_enderecodesaida',
+  'cr40f_idioma', 'cr40f_status', 'cr40f_sexo', 'new_tipodoveiculo', 'cr40f_departamento', 'cr40f_cr', 'cr40f_enderecodesaida', 'cr40f_enderecodedestino',
   'cr40f_preferenciasdopassageiro', 'cr40f_datadenascimento', 'cr40f_datadecadastro', 'cr40f_datadoultimoservico', 'new_linkdafoto', 'createdon',
 ]
 
@@ -45,7 +45,7 @@ export function mapPessoa(row: Row): Pessoa {
     telefone: text(row.cr40f_telefone), email: text(row.cr40f_email),
     cargo: num(row.cr40f_cargo), classificacao: num(row.cr40f_classificacao), idioma: num(row.cr40f_idioma), status: num(row.cr40f_status),
     sexo: num(row.cr40f_sexo), tipoVeiculo: num(row.new_tipodoveiculo),
-    departamento: text(row.cr40f_departamento), cr: text(row.cr40f_cr), endereco: text(row.cr40f_enderecodesaida), preferencias: text(row.cr40f_preferenciasdopassageiro),
+    departamento: text(row.cr40f_departamento), cr: text(row.cr40f_cr), endereco: text(row.cr40f_enderecodesaida), enderecoDestino: text(row.cr40f_enderecodedestino), preferencias: text(row.cr40f_preferenciasdopassageiro),
     nascimento: dateOnly(row.cr40f_datadenascimento), cadastro: dateOnly(row.cr40f_datadecadastro), ultimoServico: dateOnly(row.cr40f_datadoultimoservico),
     foto: text(row.new_linkdafoto), criadoEm: date(row.createdon),
   }

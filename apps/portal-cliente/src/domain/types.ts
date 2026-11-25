@@ -65,7 +65,11 @@ export type EnderecoSugerido = { rotulo: string; endereco: string; tipo?: TipoLo
 /** Prévia do trajeto no Pedir: distância e tempo de carro, com trânsito quando a fonte tem. */
 export type EstimativaRota = { distanciaKm: number; minutos: number }
 
-export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string }
+/**
+ * `saidaPadrao`/`destinoPadrao`: endereços padrão do cadastro (um por linha). Ausente = o cliente não mexeu (o Worker não grava);
+ * "" = limpar. O endereço digitado no pedido NUNCA vira padrão: só o cadastro do passageiro grava.
+ */
+export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string; saidaPadrao?: string; destinoPadrao?: string }
 
 export type NovoPedido = {
   passageiros: PassageiroPedido[]

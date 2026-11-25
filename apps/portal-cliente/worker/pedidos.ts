@@ -1,6 +1,6 @@
 // Módulos Pedir e Meus serviços: o pedido vira uma Reserva de Veículos em Solicitado, ligada ao usuário do portal;
 // a operação precifica e programa no shell e o solicitante acompanha o status aqui.
-import { chaveDuplicado, chaveNome, JANELA_DUPLICADO_MS, normalizarPedido, primeiroErroPedido, soDigitos, statusPedidoInfo, textoCortesia } from '../src/domain/pedidos'
+import { chaveDuplicado, chaveNome, JANELA_DUPLICADO_MS, MAX_ENDERECO, normalizarPedido, primeiroErroPedido, soDigitos, statusPedidoInfo, textoCortesia } from '../src/domain/pedidos'
 import { motivoNaoCancela } from '../src/domain/prazos'
 import type { NovoPedido, PassageiroPedido } from '../src/domain/types'
 import type { Ctx } from './auth'
@@ -9,9 +9,9 @@ import { erro, json, lerJson, type Sessao } from './http'
 import { mapearPedido, type PedidoPortal, type Registro } from './mapear'
 import { criarPedido as caminhoCriar, criarPessoa, ehGuid, guid, pedidoDe, pedidosDe, pessoaDoCliente, pessoasComNome, pessoasDoCliente } from './odata'
 import { alterarPendente, anexarNota, aprovadoresDoPedido, avisarAprovadores, dataHoraSp, ESTADO, quandoETrajeto } from './aprovacao'
-import { enviarEmail } from './dataverse'
+import { enviarEmail, ErroDataverse } from './dataverse'
 import { prazosDoCliente } from './prazos'
-import { APROVACAO, NAV, PESSOA_ATIVA, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
+import { APROVACAO, NAV, PESSOA_ATIVA, PESSOA_CAMPOS, PESSOA_CAMPOS_ENDERECO, RESERVA_CANCELADO, RESERVA_SOLICITADO, SET } from './schema'
 
 const textoOu = (v: unknown) => (typeof v === 'string' ? v : '')
 
@@ -20,19 +20,55 @@ function passageirosDoCorpo(v: unknown): PassageiroPedido[] {
   if (!Array.isArray(v)) return []
   return v.map((x) => {
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>
-    return { ...(typeof o.id === 'string' && o.id ? { id: o.id } : {}), nome: textoOu(o.nome), telefone: textoOu(o.telefone), email: textoOu(o.email) }
+    return {
+      ...(typeof o.id === 'string' && o.id ? { id: o.id } : {}), nome: textoOu(o.nome), telefone: textoOu(o.telefone), email: textoOu(o.email),
+      // Só quando o cliente mandou: ausente = não mexe no padrão; "" = limpa.
+      ...(typeof o.saidaPadrao === 'string' ? { saidaPadrao: o.saidaPadrao } : {}),
+      ...(typeof o.destinoPadrao === 'string' ? { destinoPadrao: o.destinoPadrao } : {}),
+    }
   })
 }
 
 const str = (r: Registro, campo: string) => (typeof r[campo] === 'string' ? (r[campo] as string) : '')
-const contatoDe = (r: Registro): PassageiroPedido => ({ id: str(r, 'cr40f_bancodedadosid'), nome: str(r, 'cr40f_nomedopassageiro'), telefone: str(r, 'cr40f_telefone'), email: str(r, 'cr40f_email') })
+/** Endereço padrão em uma linha só (o memo da ficha pode ter quebras) e no tamanho do campo do pedido. */
+const umaLinha = (t: string) => t.replace(/\s*[\r\n]+\s*/g, ', ').trim().slice(0, MAX_ENDERECO)
+/** Chave do portal, coluna da pessoa (cr40f_bancodedados). */
+const PADROES = [['saidaPadrao', 'cr40f_enderecodesaida'], ['destinoPadrao', 'cr40f_enderecodedestino']] as const
+/** Padrões enviados pelo cliente, já em uma linha (o que vale depois da gravação). */
+const padroesDe = (p: PassageiroPedido): Pick<PassageiroPedido, 'saidaPadrao' | 'destinoPadrao'> =>
+  Object.fromEntries(PADROES.flatMap(([k]) => { const v = p[k]; return v === undefined ? [] : [[k, umaLinha(v)]] }))
+/** Contato e endereços padrão; as chaves de endereço só vêm quando a leitura trouxe a coluna (antes da migration não trazem). */
+const contatoDe = (r: Registro): PassageiroPedido => ({
+  id: str(r, 'cr40f_bancodedadosid'), nome: str(r, 'cr40f_nomedopassageiro'), telefone: str(r, 'cr40f_telefone'), email: str(r, 'cr40f_email'),
+  ...Object.fromEntries(PADROES.filter(([, coluna]) => coluna in r).map(([chave, coluna]) => [chave, umaLinha(str(r, coluna))])),
+})
+/**
+ * Colunas a gravar na pessoa: só os padrões que o cliente mandou e que diferem do cadastro ("" limpa).
+ * Coluna que a leitura não trouxe (antes da migration) não entra: o PATCH dela daria 400 e derrubaria o pedido.
+ */
+const mudancaPadroes = (atual: PassageiroPedido, p: PassageiroPedido): Registro => {
+  const novos = padroesDe(p)
+  return Object.fromEntries(PADROES.flatMap(([chave, coluna]) => {
+    const novo = novos[chave]
+    return novo !== undefined && chave in atual && novo !== atual[chave] ? [[coluna, novo || null]] : []
+  }))
+}
 const mesmoContato = (a: PassageiroPedido, b: PassageiroPedido) =>
   (!!a.telefone && !!b.telefone && soDigitos(a.telefone) === soDigitos(b.telefone)) || (!!a.email && !!b.email && a.email.toLowerCase() === b.email.toLowerCase())
 
 /** Passageiros do cliente da sessão para o Pedir escolher: nome, celular e e-mail, no máximo 20. */
 export async function listarPassageiros(c: Ctx, sessao: Sessao, busca: string): Promise<Response> {
-  const pessoas = await c.dv.lista(pessoasDoCliente(sessao.cid, busca.trim().slice(0, 100)))
+  const pessoas = await listaPessoas(c, (campos) => pessoasDoCliente(sessao.cid, busca.trim().slice(0, 100), campos))
   return json(pessoas.map(contatoDe))
+}
+
+/** Lê com os endereços padrão; se o Dataverse responder 400 (coluna de destino ainda sem a migration), repete só com o contato. */
+async function listaPessoas(c: Ctx, caminho: (campos: string[]) => string): Promise<Registro[]> {
+  try { return await c.dv.lista(caminho(PESSOA_CAMPOS_ENDERECO)) } catch (e) {
+    if (!(e instanceof ErroDataverse) || e.status !== 400) throw e // só 400 = coluna ausente; 503 e afins propagam
+    console.warn('pessoas sem endereço padrão', e.message)
+    return c.dv.lista(caminho(PESSOA_CAMPOS))
+  }
 }
 
 /** Pessoa do cliente da sessão (por id, ou criada/reaproveitada pelo nome e contato) já com o contato corrigido. */
@@ -42,17 +78,19 @@ type Resolvida = { pessoa: PassageiroPedido; atualizar?: Registro }
 async function resolver(c: Ctx, sessao: Sessao, p: PassageiroPedido): Promise<Resolvida | string> {
   if (p.id) {
     if (!ehGuid(p.id)) return 'Passageiro não encontrado.'
-    const [reg] = await c.dv.lista(pessoaDoCliente(p.id, sessao.cid))
+    const [reg] = await listaPessoas(c, (campos) => pessoaDoCliente(p.id!, sessao.cid, campos))
     if (!reg) return 'Passageiro não encontrado.'
     const atual = contatoDe(reg)
-    const mudou: Registro = {}
+    const mudou: Registro = mudancaPadroes(atual, p)
     if ((p.telefone ?? '') !== atual.telefone) mudou.cr40f_telefone = p.telefone || null
     if ((p.email ?? '') !== atual.email) mudou.cr40f_email = p.email || null
-    return { pessoa: { ...atual, telefone: p.telefone ?? '', email: p.email ?? '' }, ...(Object.keys(mudou).length ? { atualizar: mudou } : {}) }
+    return { pessoa: { ...atual, telefone: p.telefone ?? '', email: p.email ?? '', ...padroesDe(p) }, ...(Object.keys(mudou).length ? { atualizar: mudou } : {}) }
   }
-  const candidatas = (await c.dv.lista(pessoasComNome(sessao.cid, p.nome))).map(contatoDe)
+  const candidatas = (await listaPessoas(c, (campos) => pessoasComNome(sessao.cid, p.nome, campos))).map(contatoDe)
   const igual = candidatas.find((x) => chaveNome(x.nome) === chaveNome(p.nome) && mesmoContato(x, p))
-  return igual ? { pessoa: { ...igual, telefone: igual.telefone || p.telefone, email: igual.email || p.email } } : { pessoa: { nome: p.nome, telefone: p.telefone, email: p.email } }
+  if (!igual) return { pessoa: { nome: p.nome, telefone: p.telefone, email: p.email, ...padroesDe(p) } }
+  const atualizar = mudancaPadroes(igual, p)
+  return { pessoa: { ...igual, telefone: igual.telefone || p.telefone, email: igual.email || p.email, ...padroesDe(p) }, ...(Object.keys(atualizar).length ? { atualizar } : {}) }
 }
 
 export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise<Response> {
@@ -90,6 +128,7 @@ export async function criarPedido(req: Request, c: Ctx, sessao: Sessao): Promise
       cr40f_nomedopassageiro: r.pessoa.nome,
       ...(r.pessoa.telefone ? { cr40f_telefone: r.pessoa.telefone } : {}),
       ...(r.pessoa.email ? { cr40f_email: r.pessoa.email } : {}),
+      ...Object.fromEntries(PADROES.filter(([k]) => r.pessoa[k]).map(([k, coluna]) => [coluna, r.pessoa[k]])),
       cr40f_status: PESSOA_ATIVA,
       [`${NAV.pessoaCliente}@odata.bind`]: `/${SET.cliente}(${sessao.cid})`,
     })

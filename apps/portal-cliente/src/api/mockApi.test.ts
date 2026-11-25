@@ -228,6 +228,23 @@ describe('mockApi multi-cliente', () => {
     await expect(api.pedir(pedido([{ nome: 'Sem contato' }], 'Quinto'))).rejects.toMatchObject({ message: 'Informe celular ou e-mail.' })
   })
 
+  it('endereço padrão: vem na busca; pedido novo e correção gravam; ausente não mexe; "" limpa; o digitado no pedido não vira padrão', async () => {
+    const { api, relogio } = await latasa()
+    const saida = new Date(T0 + 2 * 86400_000).toISOString()
+    const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida })
+    const [carla] = await api.buscarPassageiros('carla')
+    expect(carla).toMatchObject({ saidaPadrao: expect.stringContaining('Latasa'), destinoPadrao: expect.stringContaining('GRU') })
+    const nova = await api.pedir(pedido([{ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br', saidaPadrao: 'Rua A, 10', destinoPadrao: 'Hotel B' }]))
+    expect(nova.pessoas[0]).toMatchObject({ saidaPadrao: 'Rua A, 10', destinoPadrao: 'Hotel B' })
+    const id = nova.pessoas[0].id!
+    relogio.t += 61_000
+    await api.pedir(pedido([{ id, nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' }], 'Outro lugar'))
+    expect((await api.buscarPassageiros('nilza'))[0]).toMatchObject({ saidaPadrao: 'Rua A, 10', destinoPadrao: 'Hotel B' })
+    relogio.t += 61_000
+    await api.pedir(pedido([{ id, nome: 'Nilza Prado', email: 'nilza@exemplo.com.br', destinoPadrao: '' }], 'Terceiro'))
+    expect((await api.buscarPassageiros('nilza'))[0]).toMatchObject({ saidaPadrao: 'Rua A, 10', destinoPadrao: '' })
+  })
+
   it('outro e-mail do mesmo domínio começa sem pedidos', async () => {
     const { api } = await latasa('paula.ribeiro@latasa.com.br')
     expect(await api.meusServicos()).toEqual([])

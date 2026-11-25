@@ -287,6 +287,76 @@ describe('Portal do cliente', () => {
       fireEvent.change(screen.getByLabelText(/^Hora/), { target: { value: hora } })
     }
 
+    it('endereço padrão: escolher o passageiro preenche Saída e Destino; o 1º com padrão vence; o digitado nunca é sobrescrito', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      await escolherPassageiro('Rafael Duarte') // sem padrão
+      await escolherPassageiro('Hiroshi Tanaka')
+      await escolherPassageiro('Carla Menezes')
+      continuar()
+      const saida = (await screen.findByLabelText(/^Saída/)) as HTMLInputElement
+      expect(saida.value).toBe('Hotel Mercure, São José dos Campos')
+      expect((screen.getByLabelText(/Destino/) as HTMLInputElement).value).toBe('Latasa Reciclagem, Pindamonhangaba')
+      // O padrão da Carla aparece como sugestão, sem trocar o que já está no campo.
+      fireEvent.focus(saida)
+      fireEvent.mouseDown(await screen.findByRole('option', { name: /Latasa Reciclagem, Pindamonhangaba/, hidden: true }))
+      expect(saida.value).toBe('Latasa Reciclagem, Pindamonhangaba')
+      // Editado à mão e de volta ao passo 1: acrescentar outro passageiro não sobrescreve.
+      fireEvent.change(saida, { target: { value: 'Meu endereço' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
+      await screen.findByText('Passo 1 de 3 · Quem viaja')
+      await escolherPassageiro('Juliana Prado')
+      continuar()
+      expect(((await screen.findByLabelText(/^Saída/)) as HTMLInputElement).value).toBe('Meu endereço')
+    })
+
+    it('só o padrão mudado no cartão vai para o cadastro; o que veio da busca ou não foi mexido não é enviado', async () => {
+      const api = createMockApi({ agora, armazenamento: armazenamentoEmMemoria() })
+      const pedir = vi.spyOn(api, 'pedir')
+      render(<App api={api} dicaCodigo="Protótipo: use o código 123456." />)
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      await escolherPassageiro('Carla Menezes')
+      await escolherPassageiro('Hiroshi Tanaka')
+      await escolherPassageiro('Rafael Duarte')
+      // Rafael (sem padrão): corrige só o celular; os campos de padrão ficam vazios e não viram "limpar".
+      fireEvent.click(screen.getByRole('button', { name: 'Corrigir contato de Rafael Duarte' }))
+      fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '(12) 99100-0099' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+      // Carla: troca só o destino padrão.
+      fireEvent.click(screen.getByRole('button', { name: 'Corrigir contato de Carla Menezes' }))
+      fireEvent.change(screen.getByLabelText(/Destino padrão/), { target: { value: 'Aeroporto de Viracopos (VCP)' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Salvar contato' }))
+      continuar()
+      await screen.findByText('Passo 2 de 3 · Trajeto e horário')
+      preencherTrajeto()
+      continuar()
+      fireEvent.click(await screen.findByRole('button', { name: 'Enviar pedido' }))
+      await waitFor(() => expect(pedir).toHaveBeenCalled())
+      const [carla, hiroshi, rafael] = pedir.mock.calls[0][0].passageiros
+      expect(carla).toMatchObject({ destinoPadrao: 'Aeroporto de Viracopos (VCP)' })
+      expect(hiroshi).not.toHaveProperty('saidaPadrao')
+      expect(hiroshi).not.toHaveProperty('destinoPadrao')
+      expect(rafael).not.toHaveProperty('saidaPadrao')
+      expect(rafael).not.toHaveProperty('destinoPadrao')
+    })
+
+    it('cartão do passageiro novo tem Saída e Destino padrão (opcionais) e o pedido segue', async () => {
+      abrir()
+      await entrarCompleto(LATASA)
+      await screen.findByRole('heading', { name: 'Pedir serviço' })
+      fireEvent.click(screen.getByRole('button', { name: 'Cadastrar novo' }))
+      fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Pessoa Nova' } })
+      fireEvent.change(screen.getByLabelText('Celular'), { target: { value: '(12) 98888-7777' } })
+      fireEvent.change(screen.getByLabelText(/Saída padrão/), { target: { value: 'Rua das Flores, 100' } })
+      fireEvent.change(screen.getByLabelText(/Destino padrão/), { target: { value: 'Aeroporto de Guarulhos' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar passageiro' }))
+      continuar()
+      expect(((await screen.findByLabelText(/^Saída/)) as HTMLInputElement).value).toBe('Rua das Flores, 100')
+      expect((screen.getByLabelText(/Destino/) as HTMLInputElement).value).toBe('Aeroporto de Guarulhos')
+    })
+
     it('trocar de área no meio do pedido não perde o que foi digitado nem o passo', async () => {
       abrir()
       await entrarCompleto(LATASA)

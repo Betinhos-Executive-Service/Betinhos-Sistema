@@ -419,6 +419,69 @@ describe('passageiros do pedido', () => {
     expect(banco.servicosporpassageiros).toHaveLength(1)
   })
 
+  describe('endereço padrão', () => {
+    const ENDERECOS = { cr40f_enderecodesaida: 'Latasa, Pindamonhangaba', cr40f_enderecodedestino: 'Aeroporto de Guarulhos (GRU)' }
+
+    it('busca devolve saidaPadrao e destinoPadrao em uma linha; pessoa sem padrão volta sem os campos', async () => {
+      const sessao = await logar('compras@latasa.com.br')
+      pessoa('Carla Menezes', LATASA, { cr40f_enderecodesaida: 'Rua A\r\n10', cr40f_enderecodedestino: 'GRU' }); pessoa('Rafael')
+      const lista = (await (await chamar('GET', '/passageiros', undefined, sessao)).json()) as Array<Record<string, unknown>>
+      expect(lista.find((p) => p.nome === 'Carla Menezes')).toMatchObject({ saidaPadrao: 'Rua A, 10', destinoPadrao: 'GRU' })
+      expect(lista.find((p) => p.nome === 'Rafael')).not.toHaveProperty('saidaPadrao')
+    })
+
+    it('passageiro novo grava os padrões na criação (aparados e no limite)', async () => {
+      const sessao = await logar('compras@latasa.com.br')
+      const r = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana Souza', telefone: '12999990001', saidaPadrao: '  Latasa  ', destinoPadrao: 'x'.repeat(400) }]), sessao)
+      expect(r.status).toBe(201)
+      expect(banco.bancodedadoses[0]).toMatchObject({ cr40f_enderecodesaida: 'Latasa' })
+      expect(String(banco.bancodedadoses[0].cr40f_enderecodedestino)).toHaveLength(300)
+    })
+
+    it('pessoa existente: só muda o que difere; ausente não mexe; "" limpa', async () => {
+      const sessao = await logar('compras@latasa.com.br')
+      const ana = pessoa('Ana Souza', LATASA, ENDERECOS)
+      const id = ana.cr40f_bancodedadosid
+      await chamar('POST', '/pedidos', pedido([{ id, nome: 'Ana Souza', telefone: '12999990001' }]), sessao)
+      expect(ana).toMatchObject(ENDERECOS)
+      await chamar('POST', '/pedidos', pedido([{ id, nome: 'Ana Souza', telefone: '12999990001', saidaPadrao: 'Hotel Mercure', destinoPadrao: 'Aeroporto de Guarulhos (GRU)' }]), sessao)
+      expect(ana).toMatchObject({ cr40f_enderecodesaida: 'Hotel Mercure', cr40f_enderecodedestino: 'Aeroporto de Guarulhos (GRU)' })
+      await chamar('POST', '/pedidos', pedido([{ id, nome: 'Ana Souza', telefone: '12999990001', destinoPadrao: '' }]), sessao)
+      expect(ana).toMatchObject({ cr40f_enderecodesaida: 'Hotel Mercure', cr40f_enderecodedestino: null })
+    })
+
+    it('o endereço digitado no pedido não vira padrão', async () => {
+      const sessao = await logar('compras@latasa.com.br')
+      const ana = pessoa('Ana Souza')
+      expect((await chamar('POST', '/pedidos', pedido([{ id: ana.cr40f_bancodedadosid, nome: 'Ana Souza', telefone: '12999990001' }], { origem: 'Outro lugar', destino: 'Outro destino' }), sessao)).status).toBe(201)
+      expect(ana).not.toHaveProperty('cr40f_enderecodesaida')
+      expect(ana).not.toHaveProperty('cr40f_enderecodedestino')
+    })
+
+    it('id de outro cliente com padrão: 400 e a pessoa não é alterada', async () => {
+      const sessao = await logar('compras@latasa.com.br')
+      const alheia = pessoa('Olga Tenaris', TENARIS, ENDERECOS)
+      const r = await chamar('POST', '/pedidos', pedido([{ id: alheia.cr40f_bancodedadosid, nome: 'Olga Tenaris', telefone: '12999990001', saidaPadrao: 'Invasão' }]), sessao)
+      expect(r.status).toBe(400)
+      expect(alheia).toMatchObject(ENDERECOS)
+    })
+
+    it('sem a coluna de destino no Dataverse (migration pendente): a lista e o pedido seguem sem os padrões (leitura tolerante)', async () => {
+      vi.stubGlobal('fetch', fetchFalso(banco, emails, { semEnderecoDestino: true }))
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const sessao = await logar('compras@latasa.com.br')
+      const ana = pessoa('Ana Souza', LATASA, ENDERECOS)
+      const lista = (await (await chamar('GET', '/passageiros', undefined, sessao)).json()) as Array<Record<string, unknown>>
+      expect(lista).toHaveLength(1)
+      expect(lista[0]).toMatchObject({ nome: 'Ana Souza', telefone: '12999990001' })
+      expect(lista[0]).not.toHaveProperty('saidaPadrao')
+      expect((await chamar('POST', '/pedidos', pedido([{ id: ana.cr40f_bancodedadosid, nome: 'Ana Souza', telefone: '12999990001' }]), sessao)).status).toBe(201)
+      // Padrão mandado pelo cartão nessa janela: não vira PATCH da coluna que não existe (daria 400 e derrubaria o pedido).
+      expect((await chamar('POST', '/pedidos', pedido([{ id: ana.cr40f_bancodedadosid, nome: 'Ana Souza', telefone: '12999990001', destinoPadrao: 'GRU' }]), sessao)).status).toBe(201)
+      expect(ana).toMatchObject(ENDERECOS)
+    })
+  })
+
   it('pessoa com id de outro cliente: 400 e nada criado nem alterado', async () => {
     const sessao = await logar('compras@latasa.com.br')
     const alheia = pessoa('Olga Tenaris', TENARIS)

@@ -102,11 +102,13 @@ export function gerarServicos(agora: Date): Servico[] {
   })
 }
 
-/** Pessoas fictícias da Latasa (contatos inventados) para a busca do Pedir; no real vêm de `cr40f_bancodedados`. */
-export const PESSOAS_LATASA: Required<PassageiroPedido>[] = [
-  { id: 'pes-1', nome: 'Carla Menezes', telefone: '(12) 99100-0001', email: 'carla.menezes@exemplo.com.br' },
+/** Pessoa do cadastro fictício: contato sempre presente, endereço padrão opcional. */
+export type PessoaMock = Required<Pick<PassageiroPedido, 'id' | 'nome' | 'telefone' | 'email'>> & Pick<PassageiroPedido, 'saidaPadrao' | 'destinoPadrao'>
+/** Pessoas fictícias da Latasa (contatos inventados) para a busca do Pedir; no real vêm de `cr40f_bancodedados`. Carla e Hiroshi têm endereço padrão. */
+export const PESSOAS_LATASA: PessoaMock[] = [
+  { id: 'pes-1', nome: 'Carla Menezes', telefone: '(12) 99100-0001', email: 'carla.menezes@exemplo.com.br', saidaPadrao: 'Latasa Reciclagem, Pindamonhangaba', destinoPadrao: 'Aeroporto de Guarulhos (GRU)' },
   { id: 'pes-2', nome: 'Rafael Duarte', telefone: '(12) 99100-0002', email: '' },
-  { id: 'pes-3', nome: 'Hiroshi Tanaka', telefone: '', email: 'hiroshi.tanaka@exemplo.com.br' },
+  { id: 'pes-3', nome: 'Hiroshi Tanaka', telefone: '', email: 'hiroshi.tanaka@exemplo.com.br', saidaPadrao: 'Hotel Mercure, São José dos Campos', destinoPadrao: 'Latasa Reciclagem, Pindamonhangaba' },
   { id: 'pes-4', nome: 'Juliana Prado', telefone: '(11) 99100-0004', email: 'juliana.prado@exemplo.com.br' },
 ]
 export const SOLICITANTE_LATASA = 'compras@latasa.com.br'

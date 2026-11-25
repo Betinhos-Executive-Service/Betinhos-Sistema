@@ -17,6 +17,7 @@ export type Pessoa = {
   departamento: string
   cr: string
   endereco: string
+  enderecoDestino: string
   preferencias: string
   nascimento: string
   cadastro: string
