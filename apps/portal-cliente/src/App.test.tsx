@@ -308,7 +308,7 @@ describe('Portal do cliente', () => {
       await cadastrarNovo('Pessoa Nova')
       continuar()
       await screen.findByText('Passo 2 de 3 · Trajeto e horário')
-      expect(screen.getByText(/Hiroshi Tanaka, Pessoa Nova/)).toBeTruthy()
+      expect(within(screen.getByRole('complementary', { name: 'Seu pedido' })).getByText(/Hiroshi Tanaka, Pessoa Nova/)).toBeTruthy()
       preencherTrajeto()
       fireEvent.change(screen.getByLabelText(/Observação/), { target: { value: 'Voo LA3421' } })
       continuar()

@@ -1,5 +1,9 @@
-/* Pedir serviço em 3 passos (variante B). Coluna única, cartão branco; sem borda lateral colorida. */
-.pc-pp { --ped-navy: #0b1f3a; --ped-borda: #e2e2e2; --ped-cinza: #5f6672; width: 100%; max-width: 620px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--bt-space-4); min-width: 0; }
+/* Pedir serviço em 3 passos (variante B). Abaixo de 960px: coluna única. Desktop: cartão + resumo "Seu pedido" ao lado. */
+.pc-pp { --ped-navy: #0b1f3a; --ped-borda: #e2e2e2; --ped-cinza: #5f6672; width: 100%; max-width: 620px; margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'cab' 'passos' 'card'; gap: var(--bt-space-4); min-width: 0; }
+.pc-pp__cab { grid-area: cab; min-width: 0; }
+.pc-pp__passos { grid-area: passos; }
+.pc-pp__card { grid-area: card; }
+.pc-pp__lateral { display: none; }
 
 /* Progresso: 3 segmentos com rótulo; atual e feitos em navy. */
 .pc-pp__passos ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -96,4 +100,27 @@ button.pc-pp__passo-botao:focus-visible { outline: 2px solid var(--ped-navy); ou
   .pc-pp__novo-campos, .pc-pp__quando { grid-template-columns: minmax(0, 1fr); }
   .pc-pp__grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pc-pp__rotulo { font-size: 0.75rem; }
+}
+
+/* Resumo lateral e grade larga (desktop) */
+.pc-pp__lateral { grid-area: lateral; align-self: start; padding: var(--bt-space-4, 16px); background: #fff; border: 1px solid var(--ped-borda); border-radius: 14px; }
+.pc-pp__lateral h2 { margin: 0 0 var(--bt-space-3); font-size: 0.9375rem; font-weight: 600; color: var(--ped-navy); }
+.pc-pp__lateral dl { margin: 0; display: flex; flex-direction: column; gap: var(--bt-space-3); }
+.pc-pp__item dt { font-size: 0.75rem; font-weight: 600; color: var(--ped-cinza); }
+.pc-pp__item dd { margin: 2px 0 0; overflow-wrap: anywhere; font-size: 0.9375rem; }
+.pc-pp__item dd.pc-pp__item--vazio { color: #9aa1ad; }
+
+@media (min-width: 960px) {
+  .pc-pp { max-width: 1080px; grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: 'cab cab' 'passos passos' 'card lateral'; column-gap: var(--bt-space-5, 24px); }
+  .pc-pp--conferir { grid-template-areas: 'cab cab' 'passos passos' 'card .'; }
+  .pc-pp--conferir .pc-pp__card { max-width: 720px; }
+  .pc-pp__lateral { display: block; position: sticky; top: 16px; }
+  .pc-pp__recap { display: none; }
+  .pc-pp__busca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--bt-space-3); }
+  .pc-pp__busca > :first-child { align-self: auto; }
+  .pc-pp__corpo--trajeto { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); grid-template-areas: 'rota quando'; align-items: start; }
+  .pc-pp__corpo--trajeto > :is(.pc-pp__erro, .pc-pp__veiculos, .pc-pp__largo) { grid-column: 1 / -1; }
+  .pc-pp__rota { grid-area: rota; }
+  .pc-pp__quando { grid-area: quando; grid-template-columns: minmax(0, 1fr); }
+  .pc-pp__grade { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

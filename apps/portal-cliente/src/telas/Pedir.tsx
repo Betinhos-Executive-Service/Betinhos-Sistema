@@ -241,11 +241,12 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   const atual = PASSOS[passo - 1]
   const pedido = passo === 3 ? montar() : null
   const nomes = passageiros.map((p) => p.nome.trim()).filter(Boolean)
+  const quando = data && hora ? diaSemanaDataHora(deLocalSaoPaulo(`${data}T${hora}`)) : ''
 
   return (
     <main className="pc-conteudo">
-      <div className="pc-pp">
-        <PageHeader title="Pedir serviço" description={`Passo ${passo} de 3 · ${atual.nome}`} />
+      <div className={`pc-pp${passo === 3 ? ' pc-pp--conferir' : ''}`}>
+        <div className="pc-pp__cab"><PageHeader title="Pedir serviço" description={`Passo ${passo} de 3 · ${atual.nome}`} /></div>
 
         <nav className="pc-pp__passos" aria-label="Etapas do pedido">
           <ol>
@@ -327,7 +328,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
           )}
 
           {passo === 2 && (
-            <div className="pc-pp__corpo">
+            <div className="pc-pp__corpo pc-pp__corpo--trajeto">
               <p className="pc-pp__recap">
                 <span><b>Passageiros:</b> {nomes.join(', ') || 'nenhum'}</span>
                 <button type="button" className="pc-pp__link" onClick={() => ir(1)} aria-label="Alterar passageiros">Alterar</button>
@@ -375,9 +376,11 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                 <p className="pc-pp__dica">É uma preferência; a Betinhos confirma o veículo.</p>
               </fieldset>
 
-              <Field label={<>Observação <span className="pc-pp__opcional">opcional</span></>} hint="Voo, bagagem, parada, centro de custo" error={erros.observacao}>
-                <Textarea rows={3} value={observacao} onChange={(e) => { setObservacao(e.target.value); limpar('observacao') }} maxLength={MAX_TEXTO} invalid={!!erros.observacao} />
-              </Field>
+              <div className="pc-pp__largo">
+                <Field label={<>Observação <span className="pc-pp__opcional">opcional</span></>} hint="Voo, bagagem, parada, centro de custo" error={erros.observacao}>
+                  <Textarea rows={3} value={observacao} onChange={(e) => { setObservacao(e.target.value); limpar('observacao') }} maxLength={MAX_TEXTO} invalid={!!erros.observacao} />
+                </Field>
+              </div>
             </div>
           )}
 
@@ -415,8 +418,31 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
               : <Button type="button" size="touch" className="pc-pp__prox" loading={enviando} onClick={enviar} icon={<Send size={18} aria-hidden />}>Enviar pedido</Button>}
           </div>
         </div>
+
+        {passo < 3 && (
+          <aside className="pc-pp__lateral" aria-label="Seu pedido">
+            <h2>Seu pedido</h2>
+            <dl>
+              <ItemPedido nome="Passageiros" valor={nomes.join(', ')} />
+              <ItemPedido nome="Saída de" valor={origem.trim()} />
+              <ItemPedido nome="Destino" valor={destino.trim()} />
+              <ItemPedido nome="Quando" valor={quando} />
+              <ItemPedido nome="Veículo" valor={veiculo === SEM_PREFERENCIA ? 'A Betinhos escolhe' : rotuloVeiculo(Number(veiculo)) ?? ''} />
+              <ItemPedido nome="Observação" valor={observacao.trim()} />
+            </dl>
+          </aside>
+        )}
       </div>
     </main>
+  )
+}
+
+function ItemPedido({ nome, valor }: { nome: string; valor: string }) {
+  return (
+    <div className="pc-pp__item">
+      <dt>{nome}</dt>
+      <dd className={valor ? undefined : 'pc-pp__item--vazio'}>{valor || '—'}</dd>
+    </div>
   )
 }
 
