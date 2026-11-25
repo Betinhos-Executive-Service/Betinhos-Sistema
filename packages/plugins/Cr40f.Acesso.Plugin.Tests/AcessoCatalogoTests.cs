@@ -53,7 +53,6 @@ public sealed class AcessoCatalogoTests
         Assert.Equal("gestor", perfis.Areas["rh"]);
         Assert.Equal(2, perfis.Areas.Count);
         Assert.True(perfis.Acessos);
-        Assert.Equal(new[] { "Perfil - Financeiro - Operador", "Perfil - RH - Gestor" }, AcessoCatalogo.PerfisDeColuna(perfis));
         Assert.Equal(new[] { "Perfil - Financeiro - Operador", "Perfil - RH - Gestor", "Perfil - Administrador de acessos" }, AcessoCatalogo.Papeis(perfis));
     }
 

@@ -12,6 +12,9 @@ name: Produção
 #    minutos antes do plugin que ela chama (o plugin-dev espera o Deploy da develop na fila dataverse-dev);
 #  - solucoes: qualquer outra coisa (schema, flows, registrador, outros WebResources, arquivo desconhecido) → publicar.yml
 #    com test-e-prod: export do DEV, ensaio no TEST e PROD com os mesmos pacotes, backup e aprovação do Renan;
+#  - worker: o Worker Cloudflare acompanhar-motorista (apps/acompanhar-motorista) → `wrangler deploy` direto no Worker PROD (job
+#    worker, environment prod-front, sem soluções nem Dataverse). Roda em paralelo ao caminho da tela/plugin/soluções quando o
+#    mesmo push mexe nos dois; a tag só anda com todos verdes. Nunca roda wrangler kv, secret nem delete;
 #  - nada: só documentação, CI, skills → só move a tag.
 # A tag só anda quando a publicação passa: o que falhou ou foi recusado volta a contar no próximo push.
 on:
@@ -20,10 +23,10 @@ on:
   workflow_dispatch:
     inputs:
       caminho:
-        description: 'auto = pelos arquivos; front ou solucoes força o caminho'
+        description: 'auto = pelos arquivos; front, solucoes ou worker força o caminho'
         type: choice
         default: auto
-        options: [auto, front, solucoes]
+        options: [auto, front, solucoes, worker]
 
 # Uma publicação de cada vez, na ordem dos merges. Só uma fica na fila (a mais nova); como o caminho é calculado desde a
 # última publicação que passou, a mais nova já inclui o que a cancelada levaria.
@@ -41,6 +44,7 @@ jobs:
     outputs:
       caminho: ${{ steps.decidir.outputs.caminho }}
       plugins: ${{ steps.decidir.outputs.plugins }}
+      worker: ${{ steps.decidir.outputs.worker }}
       base: ${{ steps.base.outputs.base }}
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +61,7 @@ jobs:
           FORCADO: ${{ inputs.caminho }}
         run: |
           if [ -n "$FORCADO" ] && [ "$FORCADO" != "auto" ]; then
-            resultado="{\"caminho\":\"$FORCADO\",\"motivo\":\"forçado à mão\"}"
+            resultado="{\"caminho\":\"$FORCADO\",\"motivo\":\"forçado à mão\",\"worker\":$([ "$FORCADO" = worker ] && echo true || echo false)}"
           elif base=$(git rev-parse -q --verify 'refs/tags/prod-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
             resultado=$(git diff --name-only "$base" HEAD | node packages/deploy/caminho-publicacao.mjs)
           else
@@ -65,6 +69,7 @@ jobs:
           fi
           caminho=$(node -p "JSON.parse(process.argv[1]).caminho" "$resultado")
           echo "caminho=$caminho" >> "$GITHUB_OUTPUT"
+          echo "worker=$(node -p "JSON.parse(process.argv[1]).worker === true" "$resultado")" >> "$GITHUB_OUTPUT"
           echo "plugins=$(node -p "(JSON.parse(process.argv[1]).plugins ?? []).join(',')" "$resultado")" >> "$GITHUB_OUTPUT"
           echo "## Caminho: $caminho" >> "$GITHUB_STEP_SUMMARY"
           node -p "JSON.parse(process.argv[1]).motivo" "$resultado" >> "$GITHUB_STEP_SUMMARY"
@@ -177,6 +182,60 @@ jobs:
             echo "Tela publicada logo depois dos plugins - v$(node -p "require('./apps/shell/package.json').version")" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Worker acompanhar-motorista no PROD (o Worker de nome acompanhar-motorista, KV e Durable Object já existentes; secrets intactos).
+  # Independe do Dataverse e das soluções. Só `wrangler deploy`: nunca `wrangler kv`, `wrangler secret` nem `wrangler delete`.
+  worker:
+    needs: caminho
+    if: needs.caminho.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Environment sem revisor (a aprovação é o merge na main), com regra de branch: só a main. Guarda o secret CLOUDFLARE_API_TOKEN.
+    environment: prod-front
+    env:
+      APP: apps/acompanhar-motorista
+      URL_PROD: https://acompanhar-motorista.betinhosexecutiveservice.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir o token da Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta o secret CLOUDFLARE_API_TOKEN no environment prod-front (template 'Edit Cloudflare Workers')."
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - name: Instalar só o Worker
+        run: pnpm install --frozen-lockfile --filter @betinhos/acompanhar-motorista...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Sem commit (a main é protegida): package.json e src/version.mjs mudam só neste runner. A base é a maior entre a versão do repo
+      # e a que o Worker PROD mostra no ar (sequência própria, independente da do DEV), então a versão nunca retrocede.
+      - name: Versão nova
+        id: versao
+        run: |
+          node "$APP/scripts/bump-version.mjs" --publicada "$URL_PROD"
+          echo "versao=$(node -p "require('./$APP/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Build do front (Static Assets)
+        run: pnpm --filter @betinhos/acompanhar-motorista build
+      - name: Publicar no Cloudflare (Worker PROD)
+        working-directory: apps/acompanhar-motorista
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler deploy
+      - name: Conferir no ar
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: |
+          bash "$APP/scripts/conferir-no-ar.sh" "$URL_PROD" "$VERSAO"
+          echo "Publicado no PROD (Worker acompanhar-motorista) - v$VERSAO" >> "$GITHUB_STEP_SUMMARY"
+
   solucoes:
     needs: caminho
     if: needs.caminho.outputs.caminho == 'solucoes'
@@ -186,11 +245,13 @@ jobs:
     secrets: inherit
 
   marcar:
-    needs: [caminho, front, plugin, solucoes]
-    # Tela e plugin juntos vão no job plugin: a tag só anda com os dois verdes (a tela é o último passo dele).
+    needs: [caminho, front, plugin, worker, solucoes]
+    # Tela e plugin juntos vão no job plugin: a tag só anda com os dois verdes (a tela é o último passo dele). O Worker, quando o push
+    # o inclui (output worker), também precisa estar verde, seja qual for o caminho principal.
     if: >-
       !cancelled() && needs.caminho.result == 'success' &&
-      (needs.caminho.outputs.caminho == 'nada' || needs.solucoes.result == 'success' ||
+      (needs.caminho.outputs.worker != 'true' || needs.worker.result == 'success') &&
+      (needs.caminho.outputs.caminho == 'nada' || needs.caminho.outputs.caminho == 'worker' || needs.solucoes.result == 'success' ||
        (needs.caminho.outputs.caminho == 'front' && needs.front.result == 'success') ||
        ((needs.caminho.outputs.caminho == 'plugin' || needs.caminho.outputs.caminho == 'front-plugin') && needs.plugin.result == 'success'))
     runs-on: ubuntu-latest

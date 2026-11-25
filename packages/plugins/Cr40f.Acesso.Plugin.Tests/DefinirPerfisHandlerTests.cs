@@ -22,6 +22,7 @@ public sealed class DefinirPerfisHandlerTests
     public DefinirPerfisHandlerTests()
     {
         foreach (var nome in new[] { Admin, Antigo, AcessoCatalogo.Base, AcessoCatalogo.AdminAcessos }) Papel(nome);
+        PerfilDeColuna(AcessoCatalogo.AdminAcessos);
         foreach (var area in new[] { "operacional", "financeiro", "frota", "rh" })
             foreach (var nivel in new[] { "operador", "gestor" })
             {
@@ -193,8 +194,10 @@ public sealed class DefinirPerfisHandlerTests
         var admin = Usuario(Admin); var alvo = Usuario();
         Executar(admin, alvo, "[{\"perfil\":\"acessos\"}]");
         Assert.True(Tem(alvo, AcessoCatalogo.AdminAcessos));
+        Assert.True(TemColuna(alvo, AcessoCatalogo.AdminAcessos));
         Executar(admin, alvo, "[]");
         Assert.False(Tem(alvo, AcessoCatalogo.AdminAcessos));
+        Assert.False(TemColuna(alvo, AcessoCatalogo.AdminAcessos));
         Assert.True(Tem(alvo, AcessoCatalogo.Base));
     }
 

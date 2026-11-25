@@ -28,13 +28,11 @@ public static class AcessoCatalogo
     public static bool EhDoCatalogo(string nome) => Lista.Contains(nome);
     public static bool EhAdminDoSistema(IEnumerable<string> papeis) => papeis.Any(p => AdminDoSistema.Contains(p));
 
-    /// <summary>Perfis de coluna da pessoa: um por área, com o mesmo nome do papel.</summary>
-    public static List<string> PerfisDeColuna(PerfisDoUsuario p) => p.Areas.Select(a => NomeDoPapel(a.Key, a.Value)).ToList();
-
-    /// <summary>Papéis da pessoa, sem o Base (que o handler sempre acrescenta).</summary>
+    /// <summary>Papéis da pessoa, sem o Base (que o handler sempre acrescenta). Cada um tem um perfil de coluna
+    /// com o mesmo nome, inclusive o Administrador de acessos (lê o e-mail Microsoft dos funcionários).</summary>
     public static List<string> Papeis(PerfisDoUsuario p)
     {
-        var nomes = PerfisDeColuna(p);
+        var nomes = p.Areas.Select(a => NomeDoPapel(a.Key, a.Value)).ToList();
         if (p.Acessos) nomes.Add(AdminAcessos);
         return nomes;
     }
