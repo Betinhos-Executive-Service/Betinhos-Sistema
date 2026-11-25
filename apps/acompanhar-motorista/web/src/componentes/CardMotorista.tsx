@@ -57,7 +57,7 @@ export function CardMotorista({ dados, cfg, oculto, abrirTela }: Props) {
           <a className="btn btn-primario btn-icone" id="m-whats" href={c.whats} hidden={!c.whats} target="_blank" rel="noopener" aria-label={t("m.whatsCentral")}><Mensagem /><span className="sr">WhatsApp</span></a>
         </div>
       </div>
-      {cfg.vapid ? <Sino vapid={cfg.vapid} abrirTela={abrirTela} /> : null}
+      {cfg.vapid ? <Sino vapid={cfg.vapid} emDefinicao abrirTela={abrirTela} /> : null}
     </section>
   );
   return (

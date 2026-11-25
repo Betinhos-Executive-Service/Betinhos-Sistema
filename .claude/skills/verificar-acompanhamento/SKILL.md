@@ -92,5 +92,13 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 - Regra igual à `TrackingLinkRequest.StatusAllowsLink` do plugin: bloqueia só Solicitado (202410004), Cancelado (202410002) e Cancelado com Ressalvas (202410010); sem exigência de motorista (`apps/shell/src/pages/geral/domain/link.ts`). No Operacional o botão vale também para motorista terceiro (página sem mapa).
 - Provar: `pnpm exec vitest run src/pages/geral/domain/link.test.ts src/pages/geral/GeralPage.correcoes.test.tsx src/pages/operacional` em `apps/shell`; no mock, `#/operacional` → serviço da Rita Fernandes (terceiro) mostra "Gerar link" ativo.
 
+## Aviso "Seu motorista é X" (fase 3, 25/11/2026)
+
+- Regra (`src/viagem.mjs` `avisar`, `src/avisos.mjs` `MOTORISTA_DEFINIDO`): avisa quem ligou o sino quando a escala define o motorista (em definição → nome) ou troca (A → B), antes da viagem começar. Tirar o motorista, o mesmo motorista de novo, viagem iniciada ou concluída: só atualiza `s.motorista`, sem push. Na inscrição, o motorista de agora vira a base (não avisa o que a pessoa já vê); Viagem antigo sem `s.motorista` faz o mesmo na primeira leitura.
+- Texto: título "Seu motorista é <primeiro nome>", corpo "<modelo cor> · <placa>" (o que houver) ou "Toque para ver os detalhes"; pt/en/es em `AVISOS`; tag `<id>:motorista_definido` (troca substitui a notificação anterior). Falha de entrega repete no alarm seguinte, até 3 vezes (`falhas.motorista_definido`).
+- Sino em definição: "Avisar quando o motorista for definido", toast "Vamos avisar quando o motorista for definido e quando estiver chegando" (mesma inscrição liga os avisos de chegada).
+- Testes: `node --test tests/avisos.test.mjs tests/viagem.test.mjs` ("avisos: motorista definido ou trocado…", "…inscrição com motorista já definido…") e `npx vitest run web/src/testes/em-definicao.test.tsx`.
+- Prova no DEV (precisa do Deploy da develop e de um celular com o sino ligado): link sem motorista, ligar o sino, vincular motorista na reserva (`cr40f_Motorista@odata.bind`) → push em até ~1 min (o PUT do plugin chama `/recarregar`, que antecipa o alarm). Trocar o motorista → segundo push; tirar → nenhum.
+
 ## Limites
 - Infleet, TomTom e OSRM reais não são chamados: declare "não verificado com Infleet real". Push real (FCM/Mozilla/Apple) não é enviado no local: a entrega no Android se testa depois do deploy com os segredos VAPID (passo no README). Publicação (`wrangler deploy`) e segredos são do Renan.
