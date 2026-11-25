@@ -1,4 +1,4 @@
 {
-  "dev": "cortar",
+  "dev": "desfazer",
   "prod": "esperar"
 }
