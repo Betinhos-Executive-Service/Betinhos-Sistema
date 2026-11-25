@@ -35,6 +35,10 @@ function Get-Dv([string] $Path) { @((Invoke-RestMethod -Uri "$base/api/data/v9.2
 
 $ate = (git -C $root rev-parse "$Ate^{commit}").Trim()
 if ($LASTEXITCODE -ne 0) { throw "Commit desconhecido: $Ate" }
+# --depth=1 so em checkout raso (o do Deploy): num clone completo ele tornaria o repositorio raso
+# e o proximo pull acusaria historicos divergentes.
+$profundidade = @()
+if ((git -C $root rev-parse --is-shallow-repository) -eq 'true') { $profundidade = @('--depth=1') }
 
 # Arquivos mudados entre um commit registrado e $ate; $null quando o commit nao existe (nem buscando no origin).
 $cacheDiff = @{}
@@ -44,7 +48,7 @@ function Get-Mudancas([string] $Sha) {
   $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   try {
     git -C $root cat-file -e "$Sha^{commit}" 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { git -C $root fetch --quiet --no-tags --depth=1 origin $Sha 2>&1 | Out-Null }
+    if ($LASTEXITCODE -ne 0) { git -C $root fetch --quiet --no-tags @profundidade origin $Sha 2>&1 | Out-Null }
     git -C $root cat-file -e "$Sha^{commit}" 2>&1 | Out-Null
     $existe = ($LASTEXITCODE -eq 0)
   }
@@ -61,11 +65,32 @@ function Get-Mudancas([string] $Sha) {
 
 $motivos = New-Object System.Collections.Generic.List[string]
 
+# O que o DEV registra vem em duas consultas (web resources e assemblies), antes de qualquer comparacao.
+$nomesWr = 'cr40f_SistemaBetinhos.html', 'Tela_GerarPagantes/index.html', 'new_formulario_geral.html', 'new_app-motoristas-v2', 'new_app-motoristas-v2-sw',
+  'new_appmotoristas_push_redirect.js', 'new_exchange_lifecycle_commands.js', 'new_exchange_lifecycle_dialog.html'
+$descricoes = @{}
+foreach ($r in Get-Dv ("webresourceset?`$select=name,description&`$filter=" + (($nomesWr | ForEach-Object { "name eq '$_'" }) -join ' or '))) { $descricoes[$r.name] = "$($r.description)" }
+$assemblies = @{}
+foreach ($a in Get-Dv "pluginassemblies?`$select=name,description&`$filter=startswith(name,'Cr40f.') or name eq 'Betinhos.DriverRecordSharing'") { $assemblies[$a.name] = "$($a.description)" }
+
+# Os commits registrados que o checkout nao tem (o do Deploy e raso) chegam num fetch so; era um por commit.
+# Se algum nao existir no origin o fetch inteiro falha, e Get-Mudancas busca de novo, um a um.
+$registrados = @(@($descricoes.Values) + @($assemblies.Values) | ForEach-Object { [regex]::Matches($_, '(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])') } | ForEach-Object { $_.Value } | Sort-Object -Unique)
+$eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+try {
+  $ausentes = @($registrados | Where-Object { git -C $root cat-file -e "$_^{commit}" 2>&1 | Out-Null; $LASTEXITCODE -ne 0 })
+  if ($ausentes.Count -gt 1) {
+    git -C $root fetch --quiet --no-tags @profundidade origin @ausentes 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine('[pendentes] fetch em lote falhou; commits buscados um a um') }
+  }
+}
+finally { $ErrorActionPreference = $eap }
+
 # $Nome guarda "vX.Y.Z <sha>" na descricao; $Peca e o campo de mudancas-dev.mjs.
 # $Padrao captura o commit no grupo 1 (padrao: "vX.Y.Z <sha>").
 function Test-WebResourcePendente([string] $Nome, [string] $Peca, [string] $Padrao = '^v\d+\.\d+\.\d+ ([0-9a-f]{40})') {
-  $rows = @(Get-Dv "webresourceset?`$select=description&`$filter=name eq '$Nome'")
-  if ($rows.Count -ne 1 -or "$($rows[0].description)" -notmatch $Padrao) { $motivos.Add("${Peca}: sem commit registrado no DEV ($Nome)"); return $true }
+  if ($nomesWr -notcontains $Nome) { throw "$Nome fora de `$nomesWr: a consulta unica nao o traz." }
+  if (-not $descricoes.ContainsKey($Nome) -or $descricoes[$Nome] -notmatch $Padrao) { $motivos.Add("${Peca}: sem commit registrado no DEV ($Nome)"); return $true }
   $sha = $Matches[1]
   $m = Get-Mudancas $sha
   if ($null -eq $m) { $motivos.Add("${Peca}: commit $($sha.Substring(0,7)) do DEV fora do repositorio"); return $true }
@@ -85,8 +110,6 @@ foreach ($n in 'new_appmotoristas_push_redirect.js', 'new_exchange_lifecycle_com
 }
 
 $plugins = New-Object System.Collections.Generic.List[string]
-$assemblies = @{}
-foreach ($a in Get-Dv "pluginassemblies?`$select=name,description&`$filter=startswith(name,'Cr40f.') or name eq 'Betinhos.DriverRecordSharing'") { $assemblies[$a.name] = "$($a.description)" }
 foreach ($d in Get-ChildItem (Join-Path $root 'packages\plugins') -Directory | Sort-Object Name) {
   if ($d.Name -notmatch '^(?:Cr40f\.(?<n>[A-Za-z]+)\.Plugin|Betinhos\.(?<n>DriverRecordSharing))$') { continue }
   $nome = $Matches['n'].ToLowerInvariant()
