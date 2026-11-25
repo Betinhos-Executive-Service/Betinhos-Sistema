@@ -13,6 +13,7 @@ import { Conteudo } from './Conteudo'
 import { EditorTexto } from './EditorTexto'
 import { NavTopo } from '../../../app/NavTopo'
 import { QuizEditor } from './QuizEditor'
+import { usePodeExcluir } from '../../../app/useNivel'
 
 type Props = {
   initial: Treinamento
@@ -33,6 +34,7 @@ const sameDraft = (a: Treinamento, b: Treinamento) => JSON.stringify(semAnexos(a
 
 export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSaved, onAnexos, onDeleted }: Props) {
   const toast = useToast()
+  const podeExcluir = usePodeExcluir('cr40f_treinamento')
   const [draft, setDraft] = useState(initial)
   const [busy, setBusy] = useState<'save' | 'publish' | 'delete' | null>(null)
   const [confirm, setConfirm] = useState<Confirm>(null)
@@ -189,7 +191,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
               </Field>
               <div>
                 <span className="tr-label">Fotos e arquivos</span>
-                <AnexosSecao treinamentoId={draft.id || null} anexos={draft.anexos} source={source} disabled={lock} garantirId={garantirId} aposCriar={aposCriar} onChange={(anexos, id) => void anexosAlterados(anexos, id)} />
+                <AnexosSecao treinamentoId={draft.id || null} anexos={draft.anexos} source={source} disabled={lock} garantirId={garantirId} aposCriar={aposCriar} podeExcluir={podeExcluir} onChange={(anexos, id) => void anexosAlterados(anexos, id)} />
               </div>
             </div>
           </Surface>
@@ -262,7 +264,7 @@ export function TreinamentoEditor({ initial, funcionarios, source, onBack, onSav
       {erro ? <p className="tr-error" role="alert"><AlertTriangle size={16} aria-hidden="true" />{erro}</p> : null}
       <div className="tr-form__actions">
         {publicado ? <Button icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvarPublicado()}>Salvar alterações</Button> : <>
-          {draft.id ? <Button variant="danger" className="tr-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
+          {draft.id && podeExcluir ? <Button variant="danger" className="tr-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
           <Button variant="secondary" icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvar()}>Salvar rascunho</Button>
           <Button icon={<Send size={16} />} disabled={lock} loading={busy === 'publish'} onClick={pedirPublicacao}>Publicar treinamento</Button>
         </>}
