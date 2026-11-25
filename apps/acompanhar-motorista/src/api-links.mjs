@@ -184,7 +184,7 @@ function camposDoPedido(veiculo, dados, calculo, fotos) {
 }
 
 const comRastreio = (dados) => Boolean(dados.placa) && dados.rastreio !== false;
-const veiculoDoPedido = (dados, deps) => (comRastreio(dados) ? deps.acharVeiculo(dados.placa) : { id: null, plate: dados.placa ?? null });
+const veiculoDoPedido = (dados, deps) => (comRastreio(dados) ? deps.acharVeiculo(dados.placa) : { id: null, plate: dados.placa });
 
 const camposCadastro = (dados) => (dados.cadastro ? { cadastroHash: dados.cadastro.hash, cadastroAmbiente: dados.cadastro.ambiente } : {});
 
@@ -228,13 +228,13 @@ export async function atualizarLink(env, id, dados, deps) {
   const fotos = fotosDoPedido(dados);
   await gravarFotos(env, id, fotos, ttl);
   const novo = camposDoPedido(veiculo, dados, calculo, fotos);
-  // Foto não reenviada continua valendo para o mesmo motorista/veículo; trocou e veio sem foto, a antiga sai.
+  // Foto não reenviada continua valendo para o mesmo motorista/placa (com ou sem rastreio); trocou e veio sem foto, a antiga sai.
   const mesmoMotorista = Boolean(novo.motorista && t.motorista && novo.motorista.nome === t.motorista.nome);
   if (!fotos.motorista && t.motorista?.temFoto) {
     if (mesmoMotorista) novo.motorista.temFoto = true; else await env.TRACK_KV.delete(`foto:${id}:motorista`);
   }
   if (!fotos.veiculo && t.veiculoTemFoto) {
-    if (novo.vehicleId === t.vehicleId && norm(novo.placa) === norm(t.placa)) novo.veiculoTemFoto = true; else await env.TRACK_KV.delete(`foto:${id}:veiculo`);
+    if (norm(novo.placa) === norm(t.placa)) novo.veiculoTemFoto = true; else await env.TRACK_KV.delete(`foto:${id}:veiculo`);
   }
   const mesmaSaida = perto(t.destino, novo.destino);
   // Credencial de cadastro trocada: a lista guardada (inclusive "encerrado") é da credencial antiga; a próxima leitura vai ao flow.

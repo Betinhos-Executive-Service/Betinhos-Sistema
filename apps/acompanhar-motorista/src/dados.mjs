@@ -193,8 +193,8 @@ function resposta(id, t, v, { fase, chegando = false, etapas = null, eta = null,
   const fim = fase === "concluido", simples = t.modo === "simples", l = v?.location;
   return {
     titulo: t.titulo ?? null, modo: simples ? "simples" : "completo",
-    // Sem veículo da Infleet a página não monta mapa; sem motorista também, mostra "Motorista em definição".
-    rastreio: Boolean(t.vehicleId), emDefinicao: !t.motorista && !t.vehicleId,
+    // Sem veículo da Infleet a página não monta mapa; sem motorista nem placa, mostra "Motorista em definição".
+    rastreio: Boolean(t.vehicleId), emDefinicao: !t.motorista && !t.vehicleId && !t.placa,
     ...cartoes(id, t, v, fim), comSinal: v ? Boolean(v.hasSignal) : true,
     posicao: !fim && l ? { lat: l.latitude, lon: l.longitude, endereco: l.address ?? null, velocidadeKmh: Math.round(l.speed ?? 0), atualizadoEm: l.fixTime ?? null } : null,
     sinalAtrasadoMin,

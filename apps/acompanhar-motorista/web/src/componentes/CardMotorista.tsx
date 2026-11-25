@@ -52,7 +52,12 @@ export function CardMotorista({ dados, cfg, oculto, abrirTela }: Props) {
       <div className="m-topo">
         <Avatar className="avatar" id="m-avatar" inicial="?" />
         <span className="m-info"><b id="m-nome">{t("m.emDefinicao")}</b><small className="m-papel">{t("m.emDefinicaoAviso")}</small></span>
+        <div className="m-acoes" id="m-contato" hidden={semContato}>
+          <a className="btn btn-secundario btn-icone" id="m-ligar" href={c.ligar} hidden={!c.ligar} aria-label={t("m.ligarCentral")}><Telefone /><span className="sr">{t("m.ligar")}</span></a>
+          <a className="btn btn-primario btn-icone" id="m-whats" href={c.whats} hidden={!c.whats} target="_blank" rel="noopener" aria-label={t("m.whatsCentral")}><Mensagem /><span className="sr">WhatsApp</span></a>
+        </div>
       </div>
+      {cfg.vapid ? <Sino vapid={cfg.vapid} abrirTela={abrirTela} /> : null}
     </section>
   );
   return (

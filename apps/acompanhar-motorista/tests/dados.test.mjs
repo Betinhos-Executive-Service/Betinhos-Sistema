@@ -32,6 +32,8 @@ test("calcularDados: sem veículo da Infleet não consulta a Infleet e marca em 
     assert.deepEqual([d.fase, d.rastreio, d.emDefinicao, d.posicao], ["agendado", false, true, null]);
     const sem = await calcularDados("z".repeat(12), { ...t, motorista: { nome: "Ana" } }, {}, {}, { gravar: () => {} });
     assert.deepEqual([sem.rastreio, sem.emDefinicao, sem.motorista.nome], [false, false, "Ana"]);
+    const soPlaca = await calcularDados("z".repeat(12), { ...t, placa: "TER1A23" }, {}, {}, { gravar: () => {} });
+    assert.deepEqual([soPlaca.emDefinicao, soPlaca.veiculo.placa], [false, "TER1A23"], "placa conhecida não vira em definição");
   } finally { globalThis.fetch = original; }
 });
 

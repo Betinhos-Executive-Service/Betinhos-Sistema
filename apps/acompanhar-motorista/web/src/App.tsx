@@ -53,9 +53,9 @@ export function App() {
   // Sem mapa (biblioteca lenta ou ausente), o card final não fica escondido: aparece em 600 ms.
   useEffect(() => {
     if (!concluido || mapaPronto || fimCard) return;
-    const id = setTimeout(() => setFimCard(true), 600);
+    const id = setTimeout(() => setFimCard(true), semMapa ? 0 : 600);
     return () => clearTimeout(id);
-  }, [concluido, mapaPronto, fimCard]);
+  }, [concluido, mapaPronto, fimCard, semMapa]);
 
   const mostrarCard = useCallback(() => setFimCard(true), []);
   const abrirTela = useCallback((q: Exclude<Tela, null>) => { origemTela.current = document.activeElement; setTela(q); }, []);
@@ -85,9 +85,11 @@ export function App() {
             <CardTrajeto dados={dados} chegada={eta.chegada} oculto={concluido} />
             <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />
           </div>
-          <div className="col-b" hidden={semMapa}>
-            {semMapa ? null : <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />}
-          </div>
+          {semMapa ? null : (
+            <div className="col-b">
+              <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />
+            </div>
+          )}
         </main>
         <span className="versao" aria-hidden="true">{BT.versao}</span>
       </div>
