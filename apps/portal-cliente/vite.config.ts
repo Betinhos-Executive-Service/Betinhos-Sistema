@@ -5,7 +5,11 @@ import { readFileSync } from 'node:fs'
 const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Versão em texto na página: o CI lê o que está no ar (scripts/versao-publicada.mjs) e confere o deploy.
+    { name: 'portal-versao', transformIndexHtml: (html: string) => html.replace('</head>', `    <meta name="portal-versao" content="${packageJson.version}" />\n  </head>`) },
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
