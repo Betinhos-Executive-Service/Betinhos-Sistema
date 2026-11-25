@@ -15,6 +15,9 @@ name: Produção
 #  - worker: o Worker Cloudflare acompanhar-motorista (apps/acompanhar-motorista) → `wrangler deploy` direto no Worker PROD (job
 #    worker, environment prod-front, sem soluções nem Dataverse). Roda em paralelo ao caminho da tela/plugin/soluções quando o
 #    mesmo push mexe nos dois; a tag só anda com todos verdes. Nunca roda wrangler kv, secret nem delete;
+#  - portal: o portal do cliente (apps/portal-cliente) → Worker `portal-cliente` (wrangler deploy sem env) + Pages `portal-cliente`
+#    (cliente.betinhos.com.br), job portal, environment prod-front. Como o worker, roda em paralelo e a tag só anda com ele verde.
+#    Piloto: o binding API do Pages aponta para portal-cliente-dev até a variável do repositório PORTAL_API_SERVICE valer `portal-cliente`;
 #  - nada: só documentação, CI, skills → só move a tag.
 # A tag só anda quando a publicação passa: o que falhou ou foi recusado volta a contar no próximo push.
 on:
@@ -23,10 +26,10 @@ on:
   workflow_dispatch:
     inputs:
       caminho:
-        description: 'auto = pelos arquivos; front, solucoes ou worker força o caminho'
+        description: 'auto = pelos arquivos; front, solucoes, worker ou portal força o caminho'
         type: choice
         default: auto
-        options: [auto, front, solucoes, worker]
+        options: [auto, front, solucoes, worker, portal]
 
 # Uma publicação de cada vez, na ordem dos merges. Só uma fica na fila (a mais nova); como o caminho é calculado desde a
 # última publicação que passou, a mais nova já inclui o que a cancelada levaria.
@@ -45,6 +48,7 @@ jobs:
       caminho: ${{ steps.decidir.outputs.caminho }}
       plugins: ${{ steps.decidir.outputs.plugins }}
       worker: ${{ steps.decidir.outputs.worker }}
+      portal: ${{ steps.decidir.outputs.portal }}
       base: ${{ steps.base.outputs.base }}
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +65,7 @@ jobs:
           FORCADO: ${{ inputs.caminho }}
         run: |
           if [ -n "$FORCADO" ] && [ "$FORCADO" != "auto" ]; then
-            resultado="{\"caminho\":\"$FORCADO\",\"motivo\":\"forçado à mão\",\"worker\":$([ "$FORCADO" = worker ] && echo true || echo false)}"
+            resultado="{\"caminho\":\"$FORCADO\",\"motivo\":\"forçado à mão\",\"worker\":$([ "$FORCADO" = worker ] && echo true || echo false),\"portal\":$([ "$FORCADO" = portal ] && echo true || echo false)}"
           elif base=$(git rev-parse -q --verify 'refs/tags/prod-publicado^{commit}') && git merge-base --is-ancestor "$base" HEAD; then
             resultado=$(git diff --name-only "$base" HEAD | node packages/deploy/caminho-publicacao.mjs)
           else
@@ -70,6 +74,7 @@ jobs:
           caminho=$(node -p "JSON.parse(process.argv[1]).caminho" "$resultado")
           echo "caminho=$caminho" >> "$GITHUB_OUTPUT"
           echo "worker=$(node -p "JSON.parse(process.argv[1]).worker === true" "$resultado")" >> "$GITHUB_OUTPUT"
+          echo "portal=$(node -p "JSON.parse(process.argv[1]).portal === true" "$resultado")" >> "$GITHUB_OUTPUT"
           echo "plugins=$(node -p "(JSON.parse(process.argv[1]).plugins ?? []).join(',')" "$resultado")" >> "$GITHUB_OUTPUT"
           echo "## Caminho: $caminho" >> "$GITHUB_STEP_SUMMARY"
           node -p "JSON.parse(process.argv[1]).motivo" "$resultado" >> "$GITHUB_STEP_SUMMARY"
@@ -236,6 +241,66 @@ jobs:
           bash "$APP/scripts/conferir-no-ar.sh" "$URL_PROD" "$VERSAO"
           echo "Publicado no PROD (Worker acompanhar-motorista) - v$VERSAO" >> "$GITHUB_STEP_SUMMARY"
 
+  # Portal do cliente no PROD: Worker `portal-cliente` (KV, ratelimits e secrets próprios, criados à mão) e Pages `portal-cliente`
+  # (cliente.betinhos.com.br). Independe do Dataverse e das soluções. Só `wrangler deploy` e `wrangler pages deploy`: nunca
+  # `wrangler kv`, `wrangler secret` nem `wrangler delete`.
+  # Piloto (decisão do Renan, 24/11/2026): o binding API do Pages aponta para o Worker da variável do repositório PORTAL_API_SERVICE;
+  # vazia = portal-cliente-dev (Dataverse DEV). Ao ligar o PROD, a variável passa a valer `portal-cliente` (sem PR; vale no próximo deploy).
+  portal:
+    needs: caminho
+    if: needs.caminho.outputs.portal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: prod-front
+    env:
+      APP: apps/portal-cliente
+      URL_PROD: https://cliente.betinhos.com.br
+      PORTAL_API_SERVICE: ${{ vars.PORTAL_API_SERVICE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir o token da Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta o secret CLOUDFLARE_API_TOKEN no environment prod-front (template 'Edit Cloudflare Workers', com Cloudflare Pages: Edit)."
+            exit 1
+          fi
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://npm.pkg.github.com
+          scope: '@betinhos-executive-service'
+      - name: Instalar só o portal
+        run: pnpm install --frozen-lockfile --filter @betinhos/portal-cliente...
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Sem commit (a main é protegida): o package.json muda só neste runner. A base é a maior entre a versão do repo e a que o PROD
+      # mostra no ar (sequência própria, independente da do DEV), então a versão nunca retrocede.
+      - name: Build (versão nova)
+        id: versao
+        run: |
+          PUBLISHED_VERSION="$(node "$APP/scripts/versao-publicada.mjs" "$URL_PROD")" pnpm --filter @betinhos/portal-cliente build
+          echo "versao=$(node -p "require('./$APP/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publicar o Worker (portal-cliente)
+        working-directory: apps/portal-cliente
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler deploy
+      - name: Publicar o Pages (portal-cliente)
+        working-directory: apps/portal-cliente
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/publicar-pages.mjs --projeto portal-cliente --servico "${PORTAL_API_SERVICE:-portal-cliente-dev}"
+      - name: Conferir no ar
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: |
+          bash "$APP/scripts/conferir-no-ar.sh" "$URL_PROD" "$VERSAO"
+          echo "Publicado no PROD (portal do cliente) - v$VERSAO; API → ${PORTAL_API_SERVICE:-portal-cliente-dev}" >> "$GITHUB_STEP_SUMMARY"
+
   solucoes:
     needs: caminho
     if: needs.caminho.outputs.caminho == 'solucoes'
@@ -245,13 +310,14 @@ jobs:
     secrets: inherit
 
   marcar:
-    needs: [caminho, front, plugin, worker, solucoes]
+    needs: [caminho, front, plugin, worker, portal, solucoes]
     # Tela e plugin juntos vão no job plugin: a tag só anda com os dois verdes (a tela é o último passo dele). O Worker, quando o push
     # o inclui (output worker), também precisa estar verde, seja qual for o caminho principal.
     if: >-
       !cancelled() && needs.caminho.result == 'success' &&
       (needs.caminho.outputs.worker != 'true' || needs.worker.result == 'success') &&
-      (needs.caminho.outputs.caminho == 'nada' || needs.caminho.outputs.caminho == 'worker' || needs.solucoes.result == 'success' ||
+      (needs.caminho.outputs.portal != 'true' || needs.portal.result == 'success') &&
+      (needs.caminho.outputs.caminho == 'nada' || needs.caminho.outputs.caminho == 'worker' || needs.caminho.outputs.caminho == 'portal' || needs.solucoes.result == 'success' ||
        (needs.caminho.outputs.caminho == 'front' && needs.front.result == 'success') ||
        ((needs.caminho.outputs.caminho == 'plugin' || needs.caminho.outputs.caminho == 'front-plugin') && needs.plugin.result == 'success'))
     runs-on: ubuntu-latest

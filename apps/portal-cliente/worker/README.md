@@ -24,12 +24,12 @@ Segurança: 5 erros (senha ou código) no mesmo e-mail → 15 min de bloqueio; l
 
 ## Publicação (cliente.betinhos.com.br)
 
-Dois Workers e um projeto Pages na conta Cloudflare do `cadastro-passageiro`:
+Dois Workers e dois projetos Pages na conta Cloudflare do `cadastro-passageiro`. **Publicação é só pelo GitHub** (push na `develop` → DEV, push na `main` → PROD); `pnpm deploy:dev` fica para emergência local.
 
-- `portal-cliente-dev` (`wrangler deploy --env dev`, Dataverse DEV): piloto. KV `portal-cliente-dev`. **Durante o piloto** (desde 24/11/2026) `cliente.betinhos.com.br` abre este Worker: a produção do Pages aponta para ele e o `PORTAL_URL` dele é o domínio. Quando o PROD estiver pronto, volte o service binding de produção em `pages/wrangler.jsonc` para `portal-cliente`, o `PORTAL_URL` do `env.dev` para o endereço de preview e o `deploy:dev` para `--branch dev`.
-- `portal-cliente` (`wrangler deploy`, Dataverse PROD): só depois do piloto, a partir da `main`. KV `portal-cliente`.
-- Pages `portal-cliente` (`pages/`, `portal-cliente-5jp.pages.dev`): serve o `dist` e repassa `/api/*` ao Worker por service binding (`pages/functions/api/[[path]].ts`). Produção (branch `main` do Pages) liga no `portal-cliente`; preview (`--branch dev`, `dev.portal-cliente-5jp.pages.dev`) no `portal-cliente-dev`. O domínio `cliente.betinhos.com.br` é custom domain do Pages com CNAME na Locaweb para `portal-cliente-5jp.pages.dev` (a zona não está na Cloudflare, por isso Pages e não custom domain de Worker). Cron e ratelimit ficam no Worker.
-- `pnpm --dir apps/portal-cliente deploy:dev` faz build, Worker DEV e Pages produção (`--branch main`, o domínio, durante o piloto).
+- `portal-cliente-dev` (`wrangler deploy --env dev`, Dataverse DEV): job `portal` do `deploy.yml` a cada push na `develop` (tag `portal-dev-publicado`). KV `portal-cliente-dev`; `PORTAL_URL` = `https://cliente.dev.betinhos.com.br/`.
+- `portal-cliente` (`wrangler deploy`, Dataverse PROD): job `portal` do `producao.yml` a cada push na `main`, environment `prod-front`. KV `portal-cliente`.
+- Pages (só `pages/functions/api/[[path]].ts`, que repassa `/api/*` ao Worker por service binding `API`; o `wrangler.jsonc` nasce em `scripts/publicar-pages.mjs`, numa pasta temporária). `portal-cliente-dev` (`portal-cliente-dev-67b.pages.dev`, domínio `cliente.dev.betinhos.com.br`) → Worker `portal-cliente-dev`. `portal-cliente` (`portal-cliente-5jp.pages.dev`, domínio `cliente.betinhos.com.br`) → Worker da variável do repositório **`PORTAL_API_SERVICE`** (vazia = `portal-cliente-dev`, o piloto). **Para ligar o PROD: defina `PORTAL_API_SERVICE=portal-cliente` em Settings → Variables → Actions e rode "Produção" (`workflow_dispatch`, caminho `portal`) ou espere o próximo push na `main`; sem PR.** Os domínios têm CNAME na Locaweb (a zona não está na Cloudflare, por isso Pages): `cliente` → `portal-cliente-5jp.pages.dev`, `cliente.dev` → `portal-cliente-dev-67b.pages.dev`. Cron e ratelimit ficam no Worker. A versão (`vX.Y.Z`) sobe a cada deploy sobre a maior entre o repo e a do ar (`<meta name="portal-versao">`); resumo do job e `conferir-no-ar.sh` mostram a versão.
+- `pnpm --dir apps/portal-cliente deploy:dev` (emergência, wrangler logado): build, Worker DEV e Pages `portal-cliente-dev`. Nunca publique o PROD à mão.
 
 Por ambiente, uma vez:
 

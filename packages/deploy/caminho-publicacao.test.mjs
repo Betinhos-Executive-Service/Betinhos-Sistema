@@ -110,7 +110,8 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'packages/deploy/flows-dev.test.mjs',
     'packages/deploy/backup/exportar-dataverse.mjs',
     '.github/workflows/backup-prod.yml',
-    'apps/portal-cliente/src/x.ts',
+    'apps/portal-cliente/src/x.test.ts',
+    'apps/portal-cliente/README.md',
     'apps/backups/src/worker.mjs',
     '',
   ])
@@ -172,4 +173,26 @@ test('Worker junto com tela, plugin ou soluções: o caminho dos outros vale e o
 
 test('sem base conhecida: soluções e o Worker também publica', () => {
   assert.equal(caminhoDaPublicacao(null).worker, true)
+})
+
+test('Portal do cliente: código vai pelo caminho portal; teste e .md não mudam o PROD', () => {
+  for (const a of ['apps/portal-cliente/src/App.tsx', 'apps/portal-cliente/worker/index.ts', 'apps/portal-cliente/wrangler.jsonc', 'apps/portal-cliente/pages/functions/api/[[path]].ts', 'apps/portal-cliente/scripts/publicar-pages.mjs', 'apps/portal-cliente/package.json']) {
+    assert.equal(caminhoDoArquivo(a), 'portal', a)
+  }
+  for (const a of ['apps/portal-cliente/src/App.test.tsx', 'apps/portal-cliente/worker/index.test.ts', 'apps/portal-cliente/worker/fakeDataverse.ts', 'apps/portal-cliente/scripts/versao-publicada.test.mjs', 'apps/portal-cliente/README.md']) {
+    assert.equal(caminhoDoArquivo(a), 'nada', a)
+  }
+})
+
+test('Portal sozinho: caminho portal, sem soluções; misturado, o portal publica em paralelo', () => {
+  const r = caminhoDaPublicacao(['apps/portal-cliente/src/App.tsx', 'apps/portal-cliente/src/App.test.tsx', 'docs/x.md'])
+  assert.equal(r.caminho, 'portal')
+  assert.equal(r.portal, true)
+  assert.equal(r.worker, false)
+  assert.equal(caminhoDaPublicacao(['apps/portal-cliente/src/App.test.tsx']).portal, false)
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'apps/portal-cliente/worker/index.ts']).caminho, 'front')
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx', 'apps/portal-cliente/worker/index.ts']).portal, true)
+  assert.equal(caminhoDaPublicacao(['packages/deploy/provision-equipamentos.ps1', 'apps/portal-cliente/worker/index.ts']).portal, true)
+  assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx']).portal, false)
+  assert.equal(caminhoDaPublicacao(null).portal, true)
 })

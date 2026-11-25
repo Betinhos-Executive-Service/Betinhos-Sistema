@@ -13,6 +13,8 @@ import { pathToFileURL } from 'node:url'
 //    `wrangler deploy` direto (environment prod-front, job worker do producao.yml). Publicar a versão anterior resolve em minutos.
 //    Misturado com tela ou plugin mantém o caminho deles e o Worker publica em paralelo (campo `worker`); misturado com o que vai pelas
 //    soluções, o Worker também publica (é independente), mas o caminho segue sendo "solucoes".
+//  - "portal": só o portal do cliente (apps/portal-cliente): Worker `portal-cliente` + Pages `portal-cliente` (cliente.betinhos.com.br), `wrangler deploy`
+//    direto (job portal do producao.yml). Mesma regra do Worker: misturado com outro caminho, o portal publica em paralelo (campo `portal`).
 //  - "nada": só documentação, CI, skills e scripts de publicação; o PROD não muda.
 // Arquivo que não está em nenhuma lista vai pelas soluções: na dúvida, o caminho mais seguro.
 
@@ -43,14 +45,22 @@ export const WORKER_NEUTRO = [
   /\.md$/,
 ]
 
-// Não mudam nada no PROD. Os apps portal-cliente, cadastro-passageiro e backups são Workers da Cloudflare (wrangler), fora do Dataverse.
+// Portal do cliente (apps/portal-cliente): Worker + front em Pages, fora do Dataverse. Teste, scripts de teste, documentação e
+// config de teste não mudam o que roda: o resto (src, worker, pages, public, wrangler.jsonc, package.json, scripts de publicação) publica.
+export const PORTAL = /^apps\/portal-cliente\//
+export const PORTAL_NEUTRO = [
+  /\.test\.[^/]+$/,
+  /^apps\/portal-cliente\/(src\/test-setup\.ts|worker\/fakeDataverse\.ts|tsconfig[^/]*\.json)$/,
+  /\.md$/,
+]
+
+// Não mudam nada no PROD. Os apps cadastro-passageiro e backups são Workers da Cloudflare (wrangler), fora do Dataverse.
 export const NEUTRO = [
   /^docs\//,
   /^legacy\//,
   /^\.claude\//,
   /^\.github\//,
   /^scripts\//,
-  /^apps\/portal-cliente\//,
   /^apps\/cadastro-passageiro\//,
   /^apps\/backups\//,
   // App Motoristas: teste, documentação, skills e scripts de QA não mudam o PROD. O resto do app (build e service worker) vai pelas
@@ -80,6 +90,7 @@ export const NEUTRO = [
 ]
 
 export function caminhoDoArquivo(arquivo) {
+  if (PORTAL.test(arquivo)) return PORTAL_NEUTRO.some((r) => r.test(arquivo)) ? 'nada' : 'portal'
   if (WORKER.test(arquivo)) return WORKER_NEUTRO.some((r) => r.test(arquivo)) ? 'nada' : 'worker'
   if (FRONT.some((r) => r.test(arquivo))) return 'front'
   if (PLUGIN.test(arquivo)) return 'plugin'
@@ -89,24 +100,26 @@ export function caminhoDoArquivo(arquivo) {
 
 // arquivos: lista do git diff --name-only (com os nomes antigos de renomeações). null = sem base conhecida → soluções.
 export function caminhoDaPublicacao(arquivos) {
-  if (arquivos == null) return { caminho: 'solucoes', motivo: 'sem publicação anterior registrada (tag prod-publicado)', plugins: [], worker: true }
-  const porCaminho = { front: [], plugin: [], worker: [], solucoes: [] }
+  if (arquivos == null) return { caminho: 'solucoes', motivo: 'sem publicação anterior registrada (tag prod-publicado)', plugins: [], worker: true, portal: true }
+  const porCaminho = { front: [], plugin: [], worker: [], portal: [], solucoes: [] }
   for (const arquivo of arquivos.map((a) => a.trim()).filter(Boolean)) {
     const c = caminhoDoArquivo(arquivo)
     if (c !== 'nada') porCaminho[c].push(arquivo)
   }
   const worker = porCaminho.worker.length > 0
+  const portal = porCaminho.portal.length > 0
   if (porCaminho.solucoes.length) {
     const lista = porCaminho.solucoes
-    return { caminho: 'solucoes', motivo: `fora da tela e do código de plugin: ${lista.slice(0, 10).join(', ')}${lista.length > 10 ? ` (+${lista.length - 10})` : ''}`, plugins: [], worker }
+    return { caminho: 'solucoes', motivo: `fora da tela e do código de plugin: ${lista.slice(0, 10).join(', ')}${lista.length > 10 ? ` (+${lista.length - 10})` : ''}`, plugins: [], worker, portal }
   }
   const plugins = [...new Set(porCaminho.plugin.map((a) => nomePlugin(PLUGIN.exec(a))))].sort()
   const front = porCaminho.front.length
-  if (front && plugins.length) return { caminho: 'front-plugin', motivo: `tela (${front} arquivo(s)) e plugins: ${plugins.join(', ')}`, plugins, worker }
-  if (plugins.length) return { caminho: 'plugin', motivo: `só código de plugin: ${plugins.join(', ')}`, plugins, worker }
-  if (front) return { caminho: 'front', motivo: `só a tela: ${front} arquivo(s)`, plugins, worker }
-  if (worker) return { caminho: 'worker', motivo: `só o Worker acompanhar-motorista: ${porCaminho.worker.length} arquivo(s)`, plugins, worker }
-  return { caminho: 'nada', motivo: 'nenhum arquivo que mude o PROD', plugins, worker }
+  if (front && plugins.length) return { caminho: 'front-plugin', motivo: `tela (${front} arquivo(s)) e plugins: ${plugins.join(', ')}`, plugins, worker, portal }
+  if (plugins.length) return { caminho: 'plugin', motivo: `só código de plugin: ${plugins.join(', ')}`, plugins, worker, portal }
+  if (front) return { caminho: 'front', motivo: `só a tela: ${front} arquivo(s)`, plugins, worker, portal }
+  if (worker) return { caminho: 'worker', motivo: `só o Worker acompanhar-motorista: ${porCaminho.worker.length} arquivo(s)`, plugins, worker, portal }
+  if (portal) return { caminho: 'portal', motivo: `só o portal do cliente: ${porCaminho.portal.length} arquivo(s)`, plugins, worker, portal }
+  return { caminho: 'nada', motivo: 'nenhum arquivo que mude o PROD', plugins, worker, portal }
 }
 
 // Uso: git diff --name-only A B | node caminho-publicacao.mjs          → imprime JSON {caminho, motivo}
