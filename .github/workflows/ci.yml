@@ -117,6 +117,12 @@ jobs:
         env:
           BASE: ${{ github.base_ref }}
         run: git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/migrations-ci.mjs
+      - name: Proteção do passageiro só depois do corte do PROD
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          tag=$(git ls-remote --tags origin refs/tags/acessos-corte-prod | wc -l)
+          git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/acessos/corte-ci.mjs --tag-prod "$tag"
 
   shell:
     needs: mudancas
