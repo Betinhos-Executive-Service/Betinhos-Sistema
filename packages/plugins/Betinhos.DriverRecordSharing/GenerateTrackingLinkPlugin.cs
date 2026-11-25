@@ -59,7 +59,9 @@ namespace Betinhos.DriverRecordSharing
                 }
 
                 // Credencial de cadastro do portal: falha aqui só tira a seção Passageiros, o link sai igual.
-                var cadastro = TryCreateCadastro(system, serviceId, built.Payload, context.OrganizationName, tracing);
+                // Serviço já concluído não abre cadastro (o RevokeTrackingLinkPlugin já fechou os do serviço na conclusão).
+                var completed = built.Status == PluginConfig.ServiceStatusCompleted;
+                var cadastro = completed ? null : TryCreateCadastro(system, serviceId, built.Payload, context.OrganizationName, tracing);
                 var link = RequestLink(config, built.Payload, tracing);
                 if (link == null)
                 {
@@ -73,6 +75,12 @@ namespace Betinhos.DriverRecordSharing
                 update[PluginConfig.ServiceTrackingLink] = link.Item1;
                 if (link.Item2.HasValue) update[PluginConfig.ServiceTrackingLinkExpiresAt] = link.Item2.Value;
                 system.Update(update);
+                // Serviço já concluído: o link nasce encerrado (cliente vê "Serviço concluído"); falha só vai para o trace.
+                if (completed)
+                {
+                    var conclude = TrackingLinkRevocation.BuildConcludeUrl(config.Url, TrackingLinkRevocation.ExtractId(link.Item1));
+                    if (conclude != null) RevokeTrackingLinkPlugin.Send(config, "POST", conclude, true, tracing);
+                }
 
                 var ok = new Dictionary<string, object>
                 {
@@ -105,20 +113,21 @@ namespace Betinhos.DriverRecordSharing
                     PluginConfig.ServiceStartDate,
                     PluginConfig.ServiceDriverLookup,
                     PluginConfig.ServiceCustomDeparture,
-                    PluginConfig.ServiceReturnDeparture));
+                    PluginConfig.ServiceReturnDeparture,
+                    PluginConfig.ServiceStatus));
             var input = new TrackingLinkRequest.Input
             {
                 ServiceCode = service.GetAttributeValue<string>(PluginConfig.ServiceCode),
                 DepartureAddress = service.GetAttributeValue<string>(PluginConfig.ServiceDepartureAddress),
                 DestinationAddress = service.GetAttributeValue<string>(PluginConfig.ServiceDestinationAddress),
                 Route = service.GetAttributeValue<string>(PluginConfig.ServiceRoute),
-                DepartureUtc = service.GetAttributeValue<DateTime?>(PluginConfig.ServiceStartDate)
+                DepartureUtc = service.GetAttributeValue<DateTime?>(PluginConfig.ServiceStartDate),
+                Status = service.GetAttributeValue<OptionSetValue>(PluginConfig.ServiceStatus)?.Value
             };
 
+            // Sem motorista o link sai "em definição" (sem motorista, carro nem mapa); a escala depois atualiza pelo UpdateTrackingLinkPlugin.
             var driver = service.GetAttributeValue<EntityReference>(PluginConfig.ServiceDriverLookup);
-            if (driver == null) return new TrackingLinkRequest.Result("Serviço sem motorista.", null);
-
-            var vehicleId = LoadDriverAndVehicle(system, driver.Id, input);
+            var vehicleId = driver == null ? null : LoadDriverAndVehicle(system, driver.Id, input);
             var stops = TrackingLinkStops.Plan(new TrackingLinkStops.Input
             {
                 CustomAddress = service.GetAttributeValue<string>(PluginConfig.ServiceCustomDeparture),
@@ -132,10 +141,10 @@ namespace Betinhos.DriverRecordSharing
             var built = TrackingLinkRequest.Build(input, DateTime.UtcNow);
             if (built.Error != null) return built;
 
-            var extras = LoadExtras(system, driver.Id, vehicleId, stops.Stops, organizationName, tracing);
+            var extras = LoadExtras(system, driver?.Id, vehicleId, stops.Stops, organizationName, tracing);
             var enriched = TrackingLinkPayload.Build(built.Payload, extras);
             foreach (var warning in enriched.Warnings) tracing?.Trace("GenerateTrackingLink: {0}.", warning);
-            return new TrackingLinkRequest.Result(null, enriched.Payload);
+            return new TrackingLinkRequest.Result(null, enriched.Payload) { Status = input.Status };
         }
 
         // Cria o link de cadastro e acrescenta "cadastro" ao payload; sem validade ou em falha devolve null e o payload fica como está.
@@ -242,12 +251,25 @@ namespace Betinhos.DriverRecordSharing
         }
 
         // Dados do cartão (paradas, telefone corporativo, fotos). Qualquer falha aqui só tira o dado: o link sai igual.
-        private static TrackingLinkPayload.Extras LoadExtras(IOrganizationService system, Guid driverId, Guid? vehicleId, string[] stops, string organizationName, ITracingService tracing)
+        private static TrackingLinkPayload.Extras LoadExtras(IOrganizationService system, Guid? driverId, Guid? vehicleId, string[] stops, string organizationName, ITracingService tracing)
         {
             var extras = new TrackingLinkPayload.Extras
             {
                 Stops = stops
             };
+            if (driverId.HasValue) LoadDriverCard(system, driverId.Value, extras, tracing);
+            if (!vehicleId.HasValue) tracing?.Trace("Foto do veículo: motorista sem veículo atual");
+            else
+            {
+                var isDev = PluginConfig.IsDev(organizationName);
+                extras.VehiclePhoto = VehiclePhotoGateway.Load(system, vehicleId.Value, isDev, organizationName, tracing);
+                tracing?.Trace("GenerateTrackingLink: foto do veículo {0}", extras.VehiclePhoto == null ? "ausente" : extras.VehiclePhoto.Length + " bytes");
+            }
+            return extras;
+        }
+
+        private static void LoadDriverCard(IOrganizationService system, Guid driverId, TrackingLinkPayload.Extras extras, ITracingService tracing)
+        {
             try
             {
                 var employee = system.Retrieve(
@@ -272,14 +294,6 @@ namespace Betinhos.DriverRecordSharing
             {
                 tracing?.Trace("GenerateTrackingLink: foto do motorista indisponível: {0}", error.GetType().Name);
             }
-            if (!vehicleId.HasValue) tracing?.Trace("Foto do veículo: motorista sem veículo atual");
-            else
-            {
-                var isDev = PluginConfig.IsDev(organizationName);
-                extras.VehiclePhoto = VehiclePhotoGateway.Load(system, vehicleId.Value, isDev, organizationName, tracing);
-                tracing?.Trace("GenerateTrackingLink: foto do veículo {0}", extras.VehiclePhoto == null ? "ausente" : extras.VehiclePhoto.Length + " bytes");
-            }
-            return extras;
         }
 
         private static Guid? LoadDriverAndVehicle(IOrganizationService system, Guid driverId, TrackingLinkRequest.Input input)
