@@ -508,3 +508,85 @@ describe('cron', () => {
     expect(emails.filter((e) => e.tipo === 'resumo_diario').flatMap((e) => e.para)).toEqual(['fiscal@tenaris.com'])
   })
 })
+
+describe('identidade do cliente', () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
+  const latasa = () => banco.clientes1s.find((c) => c.cr40f_clientes1id === LATASA)!
+  const comMarca = () => Object.assign(latasa(), { cr40f_portallogo_timestamp: '639000', logoBytes: PNG })
+
+  it('?c=<nome normalizado> devolve nome do cadastro e endereço do logo; nada além disso', async () => {
+    comMarca()
+    const r = await chamar('GET', '/marca?c=Latasa')
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual({ nome: 'Latasa', logoUrl: `/api/marca/logo/${LATASA}?v=639000` })
+  })
+
+  it('e-mail de domínio cadastrado devolve a marca, sem exigir sessão', async () => {
+    comMarca()
+    const r = await chamar('GET', '/marca?email=x%40LATASA.com.br')
+    expect(r.status).toBe(200)
+    expect(await r.json()).toMatchObject({ nome: 'Latasa' })
+  })
+
+  it.each([
+    ['domínio público', 'x@gmail.com'],
+    ['domínio sem cliente', 'x@example.com'],
+    ['subdomínio parecido', 'x@tasa.com'],
+    ['e-mail incompleto', 'x@'],
+  ])('%s: 404, sem revelar nada', async (_, email) => {
+    comMarca()
+    banco.clientes1s.push({ ...latasa(), cr40f_clientes1id: '88888888-8888-8888-8888-888888888888', cr40f_portaldominios: 'gmail.com' })
+    expect((await chamar('GET', `/marca?email=${encodeURIComponent(email)}`)).status).toBe(404)
+  })
+
+  it('cliente sem logo, sem módulo, desabilitado ou chave desconhecida: 404 igual', async () => {
+    expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
+    comMarca()
+    latasa().cr40f_portalhabilitado = false
+    expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
+    expect((await chamar('GET', '/marca?email=x@latasa.com.br')).status).toBe(404)
+    latasa().cr40f_portalhabilitado = true
+    latasa().cr40f_portalmodulos = null
+    expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
+    expect((await chamar('GET', '/marca?c=nao-existe')).status).toBe(404)
+    expect((await chamar('GET', '/marca')).status).toBe(404)
+  })
+
+  it('logo: baixa a imagem com o tipo pelo conteúdo e cache; recusa conteúdo desconhecido, id inválido e cliente barrado', async () => {
+    comMarca()
+    const r = await chamar('GET', `/marca/logo/${LATASA}`)
+    expect(r.status).toBe(200)
+    expect(r.headers.get('Content-Type')).toBe('image/png')
+    expect(r.headers.get('Cache-Control')).toBe('public, max-age=300')
+    expect(new Uint8Array(await r.arrayBuffer())).toEqual(PNG)
+    latasa().logoBytes = new TextEncoder().encode('<html>não é imagem</html>')
+    expect((await chamar('GET', `/marca/logo/${LATASA}`)).status).toBe(404)
+    expect((await chamar('GET', '/marca/logo/nao-e-guid')).status).toBe(404)
+    comMarca()
+    latasa().cr40f_portalhabilitado = false
+    expect((await chamar('GET', `/marca/logo/${LATASA}`)).status).toBe(404)
+  })
+
+  it('SVG e WebP não são servidos: 404', async () => {
+    for (const bytes of [new TextEncoder().encode('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>'), new TextEncoder().encode('RIFF\0\0\0\0WEBPVP8 ')]) {
+      comMarca().logoBytes = bytes
+      expect((await chamar('GET', `/marca/logo/${LATASA}`)).status).toBe(404)
+    }
+  })
+
+  it('o logo PNG sai com nosniff e CSP que bloqueia tudo', async () => {
+    comMarca()
+    const r = await chamar('GET', `/marca/logo/${LATASA}`)
+    expect(r.headers.get('Content-Type')).toBe('image/png')
+    expect(r.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(r.headers.get('Content-Security-Policy')).toBe("default-src 'none'")
+  })
+
+  it('a sessão leva a marca do cliente; sem logo cadastrado, vem sem marca', async () => {
+    const semMarca = await logar('compras@latasa.com.br')
+    expect(await (await chamar('GET', '/auth/sessao', undefined, semMarca)).json()).not.toHaveProperty('marca')
+    comMarca()
+    const r = await chamar('GET', '/auth/sessao', undefined, semMarca)
+    expect(await r.json()).toMatchObject({ marca: { nome: 'Latasa' } })
+  })
+})

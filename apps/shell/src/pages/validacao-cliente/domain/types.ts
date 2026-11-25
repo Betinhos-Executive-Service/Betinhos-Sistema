@@ -79,4 +79,5 @@ export type PortalConfig = {
   modulos: ModuloPortal[]
   /** Vazio = só e-mails cadastrados. */
   dominios: string[]
+  /** O logo do cliente no portal (`cr40f_portallogo`) é lido à parte. */
 }

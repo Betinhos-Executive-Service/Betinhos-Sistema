@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EmptyState, SearchBox, StatusBadge } from '@betinhos/ui'
 import { Settings2 } from 'lucide-react'
 import type { Source } from '../data/source'
@@ -25,6 +25,12 @@ export function ConfiguracoesTab({ configs, validadores, source, mobile, onSaved
   const [alvo, setAlvo] = useState<Cliente | null>(null)
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [editarIdentidade, setEditarIdentidade] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    source.podeEditarIdentidade().then((ok) => { if (vivo) setEditarIdentidade(ok) }).catch(() => { if (vivo) setEditarIdentidade(false) })
+    return () => { vivo = false }
+  }, [source])
   const configAlvo = alvo ? configs.find((c) => c.cliente.id === alvo.id) ?? null : null
   const usuarios = (id: string) => validadores.filter((v) => v.ativo && v.cliente.id === id).length
 
@@ -68,7 +74,7 @@ export function ConfiguracoesTab({ configs, validadores, source, mobile, onSaved
           {configs.length ? 'Limpe a busca ou troque o filtro.' : 'Cadastre o cliente para liberar o portal dele.'}
         </EmptyState>
       )}
-      <ConfigDrawer cliente={alvo} config={configAlvo} outros={configs} validadores={validadores} source={source} mobile={mobile} onClose={() => setAlvo(null)} onSaved={onSaved} onValidadorSaved={onValidadorSaved} />
+      <ConfigDrawer cliente={alvo} config={configAlvo} outros={configs} validadores={validadores} source={source} mobile={mobile} editarIdentidade={editarIdentidade} onClose={() => setAlvo(null)} onSaved={onSaved} onValidadorSaved={onValidadorSaved} />
     </div>
   )
 }

@@ -3,9 +3,9 @@ import { Alert, Button, Field, Input } from '@betinhos/ui'
 import { ArrowLeft, Eye, EyeOff, LogIn, Mail, RotateCw } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal, REENVIO_S, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
-import { marcaParceira } from '../domain/marcas'
 import type { Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
+import { useMarcaEntrada } from './useMarcaEntrada'
 import './Entrar.css'
 
 const SENHA_FRACA = `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.`
@@ -50,7 +50,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
     return () => clearTimeout(t)
   }, [reenviarEm])
   const chaveLink = useMemo(() => new URLSearchParams(window.location.search).get('c'), [])
-  const parceira = marcaParceira({ chave: chaveLink, email: EMAIL_VALIDO.test(email.trim()) ? email : undefined })
+  const parceira = useMarcaEntrada(chaveLink, email)
 
   function limparCampos() {
     setCodigo('')

@@ -9,3 +9,8 @@
 .pc-parceria--entrar { justify-content: center; gap: var(--bt-space-4); margin-bottom: var(--bt-space-5); }
 .pc-parceria--entrar .pc-parceria__betinhos { height: 44px; }
 .pc-parceria--entrar .pc-parceria__cliente { height: 30px; }
+/* Logo do cliente entra devagar ao lado da Betinhos (ao abrir o link ou ao reconhecer o domínio do e-mail). */
+.pc-parceria__cliente, .pc-parceria__divisor { animation: pc-marca-entra 420ms var(--bt-ease-out, ease-out) both; }
+.pc-parceria__cliente { max-width: 180px; object-fit: contain; }
+@keyframes pc-marca-entra { from { opacity: 0; transform: translateX(-10px) scale(0.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pc-parceria__cliente, .pc-parceria__divisor { animation: none; } }

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, validarConfig, type ConfigForm } from './config'
+import { LOGO_MAX_BYTES, dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, validarConfig, validarLogo, type ConfigForm } from './config'
 import type { PortalConfig } from './types'
 
 const cliente = (id: string, nome: string) => ({ id, nome })
 const config = (id: string, nome: string, over: Partial<PortalConfig> = {}): PortalConfig => ({ cliente: cliente(id, nome), ligado: true, modulos: ['validar'], dominios: [], ...over })
-const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', ...over })
+const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', logo: null, logoMudou: false, ...over })
 
 describe('normalizarDominio', () => {
   it('tira @, protocolo, www, caminho e caixa', () => {
@@ -66,5 +66,16 @@ describe('gravação', () => {
   it('descreve quem entra', () => {
     expect(quemEntra([])).toBe('Só cadastrados')
     expect(quemEntra(['a.com', 'b.com'])).toBe('Cadastrados + @a.com, @b.com')
+  })
+})
+
+describe('identidade', () => {
+  it('logo: aceita só PNG e JPG até 1 MB; recusa o resto', () => {
+    for (const type of ['image/png', 'image/jpeg']) expect(validarLogo({ type, size: 1000 })).toBeNull()
+    expect(validarLogo({ type: 'image/png', size: LOGO_MAX_BYTES })).toBeNull()
+    expect(validarLogo({ type: 'image/png', size: LOGO_MAX_BYTES + 1 })).toMatch(/limite é 1 MB/)
+    expect(validarLogo({ type: 'application/pdf', size: 10 })).toMatch(/Formato não aceito/)
+    expect(validarLogo({ type: 'image/gif', size: 10 })).toMatch(/Formato não aceito/)
+    for (const type of ['image/webp', 'image/svg+xml']) expect(validarLogo({ type, size: 10 })).toMatch(/PNG ou JPG/)
   })
 })

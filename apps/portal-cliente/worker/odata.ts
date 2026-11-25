@@ -1,6 +1,6 @@
 // Montagem das consultas OData. Toda consulta de serviço leva o cliente da sessão no $filter:
 // o isolamento entre clientes é aqui, não na tela.
-import { CLIENTE_CAMPOS, COMPOSICAO_LINHAS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
+import { CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -73,6 +73,20 @@ export const validadoresAtivos = () =>
 /** Clientes com portal cujo campo de domínios contém o domínio; a igualdade exata é conferida no código. */
 export const clientesPorDominio = (dominio: string) =>
   `${SET.cliente}?$select=${CLIENTE_CAMPOS.join(',')}&$filter=${encodeURIComponent(`cr40f_portalhabilitado eq true and contains(cr40f_portaldominios,${texto(dominio)})`)}`
+
+/** Identidade de um cliente (nunca no login: coluna ausente não pode derrubar a entrada). */
+export const marcaDoCliente = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=${MARCA_CAMPOS.join(',')}`
+
+/** Clientes com portal, para achar o da chave `?c=` (poucos; a chave é o nome normalizado, conferido no código). */
+export const clientesComPortal = () =>
+  `${SET.cliente}?$select=${MARCA_CAMPOS.join(',')}&$filter=${encodeURIComponent('cr40f_portalhabilitado eq true')}`
+
+/** Clientes com portal e domínio parecido, com os campos da identidade. */
+export const marcasPorDominio = (dominio: string) =>
+  `${SET.cliente}?$select=${MARCA_CAMPOS.join(',')},cr40f_portaldominios&$filter=${encodeURIComponent(`cr40f_portalhabilitado eq true and contains(cr40f_portaldominios,${texto(dominio)})`)}`
+
+/** Logo em tamanho cheio (`$value`). */
+export const logoDoCliente = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})/cr40f_portallogo/$value?size=full`
 
 /** Passageiros do pedido: vínculo (ordem) mais a pessoa com o contato. Lido pelo vínculo, nunca por `cr40f_passageirosetelefonedecontato`. */
 const expandPassageiros = `${NAV.passageiros}($select=_cr40f_bancodedados_value,cr40f_ordemdeselecao;$expand=${NAV.vinculoPessoa}($select=${PESSOA_CAMPOS.join(',')}))`

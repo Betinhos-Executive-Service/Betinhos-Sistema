@@ -13,10 +13,10 @@ const configs = createMockConfigs()
 const validadores = createMockValidadores()
 const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }))
 
-function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}) {
-  const source = { salvarConfig: salvarConfig(), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
+function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}, editarIdentidade = true) {
+  const source = { salvarConfig: salvarConfig(), logoDoCliente: vi.fn(async () => null), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
   const props = { onClose: vi.fn(), onSaved: vi.fn(), onValidadorSaved: vi.fn() }
-  render(<ToastProvider><ConfigDrawer cliente={cliente} config={config} outros={configs} validadores={validadores} source={source} mobile={false} {...props} /></ToastProvider>)
+  render(<ToastProvider><ConfigDrawer cliente={cliente} config={config} outros={configs} validadores={validadores} source={source} mobile={false} editarIdentidade={editarIdentidade} {...props} /></ToastProvider>)
   return { source, ...props }
 }
 const drawer = () => screen.getAllByRole('dialog', { hidden: true }).find((d) => d.classList.contains('bt-drawer'))!
@@ -99,5 +99,44 @@ describe('ConfigDrawer', () => {
     const limpo = abrir(TENARIS, configs[0])
     fireEvent(drawer(), new Event('cancel', { cancelable: true }))
     expect(limpo.onClose).toHaveBeenCalled()
+  })
+
+  const png = (tamanho = 100, type = 'image/png') => new File([new Uint8Array(tamanho)], 'logo.png', { type })
+  const enviar = (arquivo: File) => fireEvent.change(within(drawer()).getByLabelText('Arquivo do logo'), { target: { files: [arquivo] } })
+
+  it('envia o logo: a prévia mostra antes de salvar e o Salvar leva a imagem', async () => {
+    const { source, onSaved } = abrir(EMBRAER)
+    enviar(png())
+    expect((await within(drawer()).findAllByAltText('Logo de Embraer')).length).toBeGreaterThan(0)
+    expect(within(drawer()).getByLabelText('Prévia da identidade no portal')).toBeTruthy()
+    expect(within(drawer()).getAllByText('Embraer').length).toBeGreaterThan(0)
+    salvar()
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+    expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ logoMudou: true, logo: expect.stringMatching(/^data:image\/png;base64,/) }))
+  })
+
+  it('arquivo grande ou de tipo inválido é recusado com mensagem clara', async () => {
+    abrir(EMBRAER)
+    enviar(png(1024 * 1024 + 1))
+    expect(await within(drawer()).findByText(/O limite é 1 MB/)).toBeTruthy()
+    enviar(png(10, 'application/pdf'))
+    expect(await within(drawer()).findByText(/Formato não aceito/)).toBeTruthy()
+    expect(within(drawer()).queryByAltText(/Logo de/)).toBeNull()
+  })
+
+  it('mostra o logo atual do cliente e remove sem trocar', async () => {
+    const atual = 'data:image/png;base64,AAAA'
+    const { source } = abrir(EMBRAER, undefined, { logoDoCliente: vi.fn(async () => atual) })
+    expect((await within(drawer()).findAllByAltText('Logo de Embraer')).length).toBeGreaterThan(0)
+    fireEvent.click(within(drawer()).getByRole('button', { name: 'Remover' }))
+    salvar()
+    await waitFor(() => expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ logo: null, logoMudou: true })))
+  })
+
+  it('sem ser o Renan a identidade é só leitura', () => {
+    abrir(EMBRAER, undefined, {}, false)
+    expect(within(drawer()).getByText(/Só o administrador do ambiente/)).toBeTruthy()
+    expect(within(drawer()).queryByLabelText('Arquivo do logo')).toBeNull()
+    expect(within(drawer()).queryByRole('button', { name: /Enviar logo/ })).toBeNull()
   })
 })

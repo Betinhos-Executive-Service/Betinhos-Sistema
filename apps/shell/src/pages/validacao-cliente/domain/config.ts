@@ -40,10 +40,28 @@ export function normalizarDominios(texto: string): { dominios: string[]; invalid
   return { dominios, invalidos }
 }
 
-export type ConfigForm = { ligado: boolean; modulos: ModuloPortal[]; restringir: boolean; dominiosTexto: string }
+/** Logo: tipos aceitos e limite da coluna `cr40f_portallogo` (1 MB). */
+const LOGO_TIPOS = ['image/png', 'image/jpeg']
+export const LOGO_MAX_BYTES = 1024 * 1024
+
+/** Motivo da recusa do arquivo de logo, ou `null` quando serve. */
+export function validarLogo(arquivo: { type: string; size: number }): string | null {
+  if (!LOGO_TIPOS.includes(arquivo.type)) return 'Formato não aceito. Envie PNG ou JPG.'
+  if (arquivo.size > LOGO_MAX_BYTES) return `Arquivo com ${(arquivo.size / 1024 / 1024).toFixed(1).replace('.', ',')} MB. O limite é 1 MB.`
+  return null
+}
+
+export type ConfigForm = {
+  ligado: boolean; modulos: ModuloPortal[]; restringir: boolean; dominiosTexto: string
+  /** Logo escolhido, como data URL; `null` = sem logo. Só vai ao Dataverse quando `logoMudou`. */
+  logo: string | null; logoMudou: boolean
+}
 export type ConfigErros = Partial<Record<'modulos' | 'dominios', string>>
 
-export const formDaConfig = (c: PortalConfig): ConfigForm => ({ ligado: c.ligado, modulos: c.modulos, restringir: c.dominios.length > 0, dominiosTexto: c.dominios.join('; ') })
+export const formDaConfig = (c: PortalConfig, logo: string | null = null): ConfigForm => ({
+  ligado: c.ligado, modulos: c.modulos, restringir: c.dominios.length > 0, dominiosTexto: c.dominios.join('; '),
+  logo, logoMudou: false,
+})
 
 /** Domínios que vão para o Dataverse: "só cadastrados" não leva nenhum. */
 export const dominiosDoForm = (f: ConfigForm): string[] => (f.restringir ? normalizarDominios(f.dominiosTexto).dominios : [])
@@ -74,4 +92,5 @@ export const quemEntra = (dominios: string[]) => (dominios.length ? `Cadastrados
 
 export const configIgual = (a: ConfigForm, b: ConfigForm) =>
   a.ligado === b.ligado && a.restringir === b.restringir && a.dominiosTexto.trim() === b.dominiosTexto.trim()
+  && a.logo === b.logo
   && MODULOS.every((m) => a.modulos.includes(m.value) === b.modulos.includes(m.value))

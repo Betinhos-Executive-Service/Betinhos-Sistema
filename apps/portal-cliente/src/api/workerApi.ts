@@ -1,3 +1,4 @@
+import type { Marca } from '../domain/marca'
 import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
@@ -38,6 +39,11 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     return (r.status === 204 ? undefined : await r.json()) as T
   }
   return {
+    marca: ({ chave, email }, sinal) =>
+      chamar<Marca>('GET', `/marca?${chave ? `c=${encodeURIComponent(chave)}` : `email=${encodeURIComponent(email ?? '')}`}`, undefined, sinal).catch((e: unknown) => {
+        if (e instanceof ErroPortal && e.codigo === 'nao_permitido') return null
+        throw e
+      }),
     sessao: () =>
       chamar<Sessao>('GET', '/auth/sessao').catch((e: unknown) => {
         if (e instanceof ErroPortal && e.codigo === 'nao_permitido') return null
