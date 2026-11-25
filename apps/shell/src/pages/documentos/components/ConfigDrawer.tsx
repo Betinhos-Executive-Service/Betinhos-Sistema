@@ -5,8 +5,8 @@ import type { DocsSource } from '../data/source'
 import type { TipoInput } from '../data/queries'
 import { OBRIG_DA_CATEGORIA, OBRIG_LABEL } from '../domain/codes'
 import type { Categoria, DocsData, TipoDoc } from '../domain/types'
-import '../documentos.css'
 import { usePodeExcluir } from '../../../app/useNivel'
+import '../documentos.css'
 
 type Props = { source: DocsSource; data: DocsData; onClose: () => void; onChanged: () => void }
 type Aba = 'tipos' | 'destinatarios'

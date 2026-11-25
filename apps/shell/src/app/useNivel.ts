@@ -11,7 +11,7 @@ export function useAcessosProntos(): Acessos {
 
 export function usePodeExcluir(tabela: string): boolean {
   const acessos = useAcessosProntos()
-  return useMemo(() => podeExcluir(acessos, tabela), [acessos, tabela])
+  return podeExcluir(acessos, tabela)
 }
 
 export function useAcessoColunas(tabela: string): (coluna: string) => AcessoColuna {

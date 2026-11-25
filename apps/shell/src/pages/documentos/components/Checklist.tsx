@@ -14,8 +14,8 @@ import { useDocumentos } from '../useDocumentos'
 import { ACCEPT, RenovarDrawer, type AlvoRenovar } from './RenovarDrawer'
 import { StatusDoc } from './StatusDoc'
 import { BrandLoader } from '../../../app/BrandLoader'
-import '../documentos.css'
 import { usePodeExcluir } from '../../../app/useNivel'
+import '../documentos.css'
 
 type Props = { source: DocsSource; donoId: string; titulo?: string }
 

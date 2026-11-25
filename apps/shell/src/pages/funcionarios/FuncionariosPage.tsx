@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { temAlgum } from '../../app/acessos'
-import { acessosDe, useAcessos } from '../../app/AcessosProvider'
 import { useAcessosProntos } from '../../app/useNivel'
 import { SearchHits } from '../../app/SearchHits'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
@@ -99,7 +98,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // A busca filtra 200 ms depois da última tecla (celular e desktop); o texto de cada colaborador já vem normalizado.
   const buscaCelular = useDebouncedText(filters.search)
   const palavrasCelular = useMemo(() => searchWords(buscaCelular), [buscaCelular])
-  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular }), [filters, buscaCelular])
+  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular, alerta: filters.alerta && alertasPermitidos.includes(filters.alerta) ? filters.alerta : null }), [filters, buscaCelular, alertasPermitidos])
   const views = useMemo(() => withAlertas(rows, today), [rows, today])
   const base = useMemo(() => applyBaseFilters(views, filtrosCelular), [views, filtrosCelular])
   const visible = useMemo(() => applyFilters(views, filtrosCelular), [views, filtrosCelular])
@@ -159,7 +158,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
   const comunicados = useMemo(() => createComunicadosSource(host), [host])
-  const verAcessosSemFicha = temAlgum(acessosDe(useAcessos()), ['acessos'])
+  const verAcessosSemFicha = temAlgum(acessos, ['acessos'])
   const irParaAcessos = useCallback(() => { location.hash = hrefFor('acessos') }, [])
   const acessosSistema = useMemo(() => createAcessosSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
