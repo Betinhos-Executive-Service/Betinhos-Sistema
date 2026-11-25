@@ -77,7 +77,7 @@ export function criarDv(env: Env, f: typeof fetch = fetch): Dv {
   }
 }
 
-export type TipoEmail = 'codigo' | 'resumo_diario' | 'resposta_betinhos'
+export type TipoEmail = 'codigo' | 'resumo_diario' | 'resposta_betinhos' | 'pedido_confirmado' | 'aprovacao_pendente' | 'aprovacao_lembrete' | 'aprovacao_resultado' | 'aviso_operacao'
 
 export async function enviarEmail(env: Env, tipo: TipoEmail, para: string[], dados: Registro, f: typeof fetch = fetch): Promise<void> {
   // Logo servida pelo próprio portal (public/email).

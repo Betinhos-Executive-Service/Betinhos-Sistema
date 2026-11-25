@@ -66,4 +66,14 @@ describe('workerApi.marca', () => {
     expect(await createWorkerApi('/api', resposta(404, { erro: 'nao_permitido' })).marca({ chave: 'x' })).toBeNull()
     await expect(createWorkerApi('/api', resposta(500)).marca({ chave: 'x' })).rejects.toMatchObject({ codigo: 'falha' })
   })
+
+  it('aprovacoes e decidirAprovacao chamam GET /aprovacoes e POST /aprovacoes/:id', async () => {
+    const chamadas: { url: string; init?: RequestInit }[] = []
+    const api = createWorkerApi('/api', async (u, i) => (chamadas.push({ url: String(u), init: i }), new Response(JSON.stringify(chamadas.length === 1 ? [] : { id: 'p 1', decisao: 'recusar' }), { status: 200 })))
+    expect(await api.aprovacoes()).toEqual([])
+    await api.decidirAprovacao('p 1', { decisao: 'recusar', motivo: 'Fora da política.' })
+    expect(chamadas[0].url).toBe('/api/aprovacoes')
+    expect(chamadas[1].url).toBe('/api/aprovacoes/p%201')
+    expect(chamadas[1].init).toMatchObject({ method: 'POST', body: '{"decisao":"recusar","motivo":"Fora da política."}' })
+  })
 })

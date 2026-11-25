@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { LOGO_MAX_BYTES, dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, validarConfig, validarLogo, type ConfigForm } from './config'
+import { LOGO_MAX_BYTES, dominiosDoForm, gravarModulos, lerModulos, normalizarDominio, normalizarDominios, quemEntra, semAprovador, validarConfig, validarLogo, type ConfigForm } from './config'
 import type { PortalConfig } from './types'
 
 const cliente = (id: string, nome: string) => ({ id, nome })
-const config = (id: string, nome: string, over: Partial<PortalConfig> = {}): PortalConfig => ({ cliente: cliente(id, nome), ligado: true, modulos: ['validar'], dominios: [], ...over })
-const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', logo: null, logoMudou: false, ...over })
+const config = (id: string, nome: string, over: Partial<PortalConfig> = {}): PortalConfig => ({ cliente: cliente(id, nome), ligado: true, modulos: ['validar'], dominios: [], exigeAprovacao: false, ...over })
+const form = (over: Partial<ConfigForm> = {}): ConfigForm => ({ ligado: true, modulos: ['validar'], restringir: false, dominiosTexto: '', exigeAprovacao: false, logo: null, logoMudou: false, ...over })
 
 describe('normalizarDominio', () => {
   it('tira @, protocolo, www, caminho e caixa', () => {
@@ -77,5 +77,18 @@ describe('identidade', () => {
     expect(validarLogo({ type: 'application/pdf', size: 10 })).toMatch(/Formato não aceito/)
     expect(validarLogo({ type: 'image/gif', size: 10 })).toMatch(/Formato não aceito/)
     for (const type of ['image/webp', 'image/svg+xml']) expect(validarLogo({ type, size: 10 })).toMatch(/PNG ou JPG/)
+  })
+})
+
+describe('aprovação de pedidos', () => {
+  const aprov = (ativo: boolean, aprovador: boolean) => ({ ativo, aprovador })
+  it('avisa só com portal ligado, aprovação exigida, Pedir ativo e nenhum aprovador ativo', () => {
+    const f = form({ exigeAprovacao: true, modulos: ['pedir'] })
+    expect(semAprovador(f, [])).toBe(true)
+    expect(semAprovador(f, [aprov(false, true), aprov(true, false)])).toBe(true)
+    expect(semAprovador(f, [aprov(true, true)])).toBe(false)
+    expect(semAprovador({ ...f, exigeAprovacao: false }, [])).toBe(false)
+    expect(semAprovador({ ...f, ligado: false }, [])).toBe(false)
+    expect(semAprovador({ ...f, modulos: ['validar'] }, [])).toBe(false)
   })
 })

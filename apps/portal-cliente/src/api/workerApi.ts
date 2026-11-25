@@ -1,5 +1,5 @@
 import type { Marca } from '../domain/marca'
-import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { DecisaoAprovacao, EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, PedidoParaAprovar, Servico, Sessao } from '../domain/types'
 import { ErroPortal, type CodigoErro, type PortalApi } from './PortalApi'
 
 /**
@@ -63,5 +63,7 @@ export function createWorkerApi(base = '/api', f: typeof fetch = (...a) => fetch
     pedir: (novo: NovoPedido) => chamar<Pedido>('POST', '/pedidos', novo),
     meusServicos: () => chamar<Pedido[]>('GET', '/pedidos'),
     cancelarPedido: (id: string) => chamar<Pedido>('POST', `/pedidos/${encodeURIComponent(id)}/cancelar`),
+    aprovacoes: () => chamar<PedidoParaAprovar[]>('GET', '/aprovacoes'),
+    decidirAprovacao: (id: string, decisao: DecisaoAprovacao) => chamar<unknown>('POST', `/aprovacoes/${encodeURIComponent(id)}`, decisao).then(() => undefined),
   }
 }

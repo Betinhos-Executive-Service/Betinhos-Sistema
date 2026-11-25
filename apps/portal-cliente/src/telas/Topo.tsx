@@ -1,23 +1,23 @@
 import { Button, SegmentedControl } from '@betinhos/ui'
 import { LogOut } from 'lucide-react'
-import { MODULO_LABEL } from '../domain/pedidos'
-import type { Modulo, Sessao } from '../domain/types'
+import { ABA_LABEL, type AbaPortal } from '../domain/pedidos'
+import type { Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
 
-type Props = { sessao: Sessao; onSair: () => void; ativo: Modulo; onModulo: (m: Modulo) => void }
+type Props = { sessao: Sessao; onSair: () => void; abas: AbaPortal[]; ativo: AbaPortal; onAba: (a: AbaPortal) => void }
 
 /** Cabeçalho fixo: marca, troca de módulo (só quando o cliente tem mais de um) e saída. */
-export function Topo({ sessao, onSair, ativo, onModulo }: Props) {
+export function Topo({ sessao, onSair, abas, ativo, onAba }: Props) {
   return (
     <header className="pc-topo">
       <div className="pc-topo__inicio">
         <Parceria parceira={sessao.marca ?? null} tamanho="topo" />
-        {sessao.modulos.length > 1 && (
-          <SegmentedControl<Modulo>
+        {abas.length > 1 && (
+          <SegmentedControl<AbaPortal>
             className="pc-topo__modulos"
             value={ativo}
-            onChange={onModulo}
-            options={sessao.modulos.map((m) => ({ value: m, label: MODULO_LABEL[m] }))}
+            onChange={onAba}
+            options={abas.map((a) => ({ value: a, label: ABA_LABEL[a] }))}
             aria-label="Área do portal"
           />
         )}

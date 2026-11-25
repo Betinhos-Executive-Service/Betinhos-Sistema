@@ -3,10 +3,10 @@ import {
   Alert, Button, Dialog, EmptyState, PageHeader, PageToolbar, SearchBox, SegmentedControl, Select, StatusBadge, Table, useToast, type TableColumn,
 } from '@betinhos/ui'
 import { CarFront, Download, FileText, Plus, RefreshCw } from 'lucide-react'
-import { ErroPortal } from '../api/PortalApi'
+import { mensagemDoErro } from '../api/PortalApi'
 import { useApi } from '../api/ApiContext'
 import { exportarPedidos } from '../excel/exportar'
-import { statusPedidoInfo } from '../domain/pedidos'
+import { situacaoDoPedido } from '../domain/pedidos'
 import type { Pedido } from '../domain/types'
 import { agruparPorDia, daAbaPedidos, filtrarPedidos, SITUACOES, type AbaPedidos, type Situacao } from './meusFiltros'
 import { PedidoDetalhe } from './PedidoDetalhe'
@@ -42,7 +42,7 @@ const COLUNAS: TableColumn<Pedido>[] = [
   {
     key: 'status', header: 'Situação', width: 'minmax(170px, 1fr)',
     cell: (p) => {
-      const info = statusPedidoInfo(p.status)
+      const info = situacaoDoPedido(p)
       const quem = [p.motorista, p.placa].filter(Boolean).join(' · ') || p.veiculo
       return (
         <span className="pc-situacao">
@@ -88,7 +88,7 @@ export function MeusServicos({ onPedir, onRepetir }: { onPedir?: () => void; onR
       setPedidos((lista) => lista.map((p) => (p.id === atualizado.id ? atualizado : p)))
       toast({ tone: 'success', message: atualizado.numero ? `Pedido ${atualizado.numero} cancelado.` : 'Pedido cancelado.' })
     } catch (e) {
-      toast({ tone: 'danger', message: e instanceof ErroPortal && e.message !== e.codigo ? e.message : 'Não foi possível cancelar agora. Tente de novo.' })
+      toast({ tone: 'danger', message: mensagemDoErro(e, 'Não foi possível cancelar agora. Tente de novo.') })
       void carregar()
     } finally {
       setEnviando(false)

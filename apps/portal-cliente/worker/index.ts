@@ -2,6 +2,8 @@
 // Cada rota exige o módulo do cliente na sessão (Tenaris valida; Latasa pede e acompanha).
 import type { Modulo } from '../src/domain/types'
 import { confirmarCodigo, criarSenha, entrarComSenha, lerSessao, normalizarEmail, sair, sessaoAtual, solicitarCodigo, type Ctx } from './auth'
+import { decidirAprovacao, listarAprovacoes } from './aprovacao'
+import { rodarAvisos } from './avisos'
 import { aplicarTacita, enviarResumos } from './cron'
 import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
@@ -34,6 +36,9 @@ const AUTH_POR_EMAIL: Record<string, (req: Request, c: Ctx) => Promise<Response>
   'POST /auth/codigo': solicitarCodigo,
   'POST /auth/codigo/confirmar': confirmarCodigo,
 }
+
+/** Cron de 10 em 10 minutos (wrangler.jsonc); o diário cuida da aprovação tácita e do resumo. */
+export const CRON_AVISOS = '*/10 * * * *'
 
 type ExecCtx = { waitUntil(p: Promise<unknown>): void }
 
@@ -76,6 +81,11 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   if (rota === 'GET /passageiros') return com('pedir', () => listarPassageiros(c, sessao, url.searchParams.get('q') ?? ''))
   if (rota === 'GET /enderecos') return com('pedir', () => sugerirEnderecos(env, url.searchParams.get('q') ?? ''))
   if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
+  // Aprovação: quem aprova pode não pedir, então basta ter Pedir ou Meus serviços; o papel de aprovador é conferido na rota.
+  const comPedidos = (rodar: () => Promise<Response>) => (sessao.modulos.includes('pedir') || sessao.modulos.includes('meus_servicos') ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
+  if (rota === 'GET /aprovacoes') return comPedidos(() => listarAprovacoes(c, sessao))
+  const decidir = /^POST \/aprovacoes\/([^/]+)$/.exec(rota)
+  if (decidir) return comPedidos(() => decidirAprovacao(req, c, sessao, decidir[1]))
   const cancelar = /^POST \/pedidos\/([^/]+)\/cancelar$/.exec(rota)
   if (cancelar) return com('meus_servicos', () => cancelarPedido(c, sessao, cancelar[1]))
   if (rota === 'GET /servicos') return com('validar', () => listar(c, sessao))
@@ -100,8 +110,12 @@ export default {
     return comSeguranca(asset)
   },
 
-  async scheduled(controller: { scheduledTime: number }, env: Env, exec: ExecCtx): Promise<void> {
+  async scheduled(controller: { scheduledTime: number; cron?: string }, env: Env, exec: ExecCtx): Promise<void> {
     const dv = criarDv(env)
+    if (controller.cron === CRON_AVISOS) {
+      exec.waitUntil(rodarAvisos(env, dv, controller.scheduledTime).then((r) => console.log(`cron/avisos: ${r.confirmados} confirmado(s), ${r.lembretes} lembrete(s), ${r.operacao} aviso(s) à operação`)))
+      return
+    }
     exec.waitUntil(
       (async () => {
         const tacitas = await aplicarTacita(dv, controller.scheduledTime)

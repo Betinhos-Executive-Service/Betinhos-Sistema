@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { celularValido, chaveNome, emailValido, errosPassageiros, normalizarPedido, textoCortesia, textoDoEndereco, validarPedido } from './pedidos'
+import { aguardandoAprovacao, situacaoDoPedido, celularValido, chaveNome, emailValido, errosPassageiros, normalizarPedido, textoCortesia, textoDoEndereco, validarPedido } from './pedidos'
 
 const T0 = Date.parse('2026-11-01T12:00:00Z')
 const pedido = (passageiros: Parameters<typeof normalizarPedido>[0]['passageiros']) =>
@@ -70,5 +70,16 @@ describe('texto do endereço sugerido', () => {
     expect(textoDoEndereco({ rotulo: 'Aeroporto de Congonhas', endereco: 'Av. Washington Luís, São Paulo' })).toBe('Aeroporto de Congonhas, Av. Washington Luís, São Paulo')
     expect(textoDoEndereco({ rotulo: 'Avenida Paulista, 1000', endereco: 'Avenida Paulista, 1000, São Paulo' })).toBe('Avenida Paulista, 1000, São Paulo')
     expect(textoDoEndereco({ rotulo: 'x', endereco: 'y'.repeat(500) }).length).toBe(300)
+  })
+})
+
+describe('aprovação do pedido', () => {
+  it('só Solicitado com aprovação pendente aguarda; recusado mostra Cancelado', () => {
+    expect(aguardandoAprovacao({ status: 'solicitado', aprovacao: 'pendente' })).toBe(true)
+    expect(aguardandoAprovacao({ status: 'solicitado', aprovacao: 'aprovado' })).toBe(false)
+    expect(aguardandoAprovacao({ status: 'cancelado', aprovacao: 'pendente' })).toBe(false)
+    expect(situacaoDoPedido({ status: 'solicitado', aprovacao: 'pendente' }).rotulo).toBe('Aguardando aprovação')
+    expect(situacaoDoPedido({ status: 'cancelado', aprovacao: 'recusado' }).rotulo).toBe('Cancelado')
+    expect(situacaoDoPedido({ status: 'solicitado' }).rotulo).toBe('Solicitado')
   })
 })

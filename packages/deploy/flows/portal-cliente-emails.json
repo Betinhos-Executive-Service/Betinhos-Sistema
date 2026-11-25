@@ -31,12 +31,17 @@
               "enum": [
                 "codigo",
                 "resumo_diario",
-                "resposta_betinhos"
+                "resposta_betinhos",
+                "pedido_confirmado",
+                "aprovacao_pendente",
+                "aprovacao_lembrete",
+                "aprovacao_resultado",
+                "aviso_operacao"
               ]
             },
             "para": {
               "type": "array",
-              "minItems": 1,
+              "minItems": 0,
               "maxItems": 10,
               "items": {
                 "type": "string"
@@ -99,6 +104,36 @@
                 },
                 "linkPortal": {
                   "type": "string"
+                },
+                "solicitante": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "string"
+                },
+                "trajeto": {
+                  "type": "string"
+                },
+                "passageiros": {
+                  "type": "string"
+                },
+                "origem": {
+                  "type": "string"
+                },
+                "destino": {
+                  "type": "string"
+                },
+                "resultado": {
+                  "type": "string"
+                },
+                "aprovador": {
+                  "type": "string"
+                },
+                "motivo": {
+                  "type": "string"
+                },
+                "logoUrl": {
+                  "type": "string"
                 }
               }
             }
@@ -127,7 +162,7 @@
               "Succeeded"
             ]
           },
-          "inputs": "@and(greater(length(triggerBody()?['para']),0),lessOrEquals(length(triggerBody()?['para']),10),empty(body('Destinatarios_invalidos')))"
+          "inputs": "@and(lessOrEquals(length(triggerBody()?['para']),10),empty(body('Destinatarios_invalidos')),or(equals(coalesce(triggerBody()?['tipo'],''),'aviso_operacao'),greater(length(triggerBody()?['para']),0)))"
         }
       }
     },
@@ -453,6 +488,436 @@
                   "else": {
                     "actions": {
                       "Responder_400_resposta": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "Confirmado": {
+              "case": "pedido_confirmado",
+              "actions": {
+                "Valido_confirmado": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['data'],''))))))",
+                  "actions": {
+                    "Modelo_confirmado": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_CONFIRMADO__"
+                    },
+                    "Html_confirmado": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_confirmado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(outputs('Modelo_confirmado'),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{origem}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['origem'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{destino}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['destino'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{passageiros}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['passageiros'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_confirmado": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_confirmado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('Serviço confirmado: ',trim(string(triggerBody()?['dados']?['numero'])))",
+                          "emailMessage/Body": "@outputs('Html_confirmado')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_confirmado": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_confirmado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_confirmado": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "AprovacaoPendente": {
+              "case": "aprovacao_pendente",
+              "actions": {
+                "Valido_aprov_pendente": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['solicitante'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),startsWith(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'https://'))",
+                  "actions": {
+                    "Modelo_aprov_pendente": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_APROV_PENDENTE__"
+                    },
+                    "Html_aprov_pendente": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_aprov_pendente": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(outputs('Modelo_aprov_pendente'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{solicitante}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['solicitante'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{passageiros}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['passageiros'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linkPortal}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_aprov_pendente": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_aprov_pendente": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('Aprovação pendente: pedido ',trim(string(triggerBody()?['dados']?['numero'])))",
+                          "emailMessage/Body": "@outputs('Html_aprov_pendente')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_aprov_pendente": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_aprov_pendente": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_aprov_pendente": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "AprovacaoLembrete": {
+              "case": "aprovacao_lembrete",
+              "actions": {
+                "Valido_aprov_lembrete": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['solicitante'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),startsWith(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'https://'))",
+                  "actions": {
+                    "Modelo_aprov_lembrete": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_APROV_LEMBRETE__"
+                    },
+                    "Html_aprov_lembrete": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_aprov_lembrete": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(outputs('Modelo_aprov_lembrete'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{solicitante}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['solicitante'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{passageiros}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['passageiros'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linkPortal}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_aprov_lembrete": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_aprov_lembrete": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('Lembrete: pedido ',trim(string(triggerBody()?['dados']?['numero'])),' aguarda aprovação')",
+                          "emailMessage/Body": "@outputs('Html_aprov_lembrete')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_aprov_lembrete": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_aprov_lembrete": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_aprov_lembrete": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "AprovacaoResultado": {
+              "case": "aprovacao_resultado",
+              "actions": {
+                "Valido_aprov_resultado": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['nome'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['aprovador'],''))))),startsWith(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'https://'))",
+                  "actions": {
+                    "Modelo_aprov_resultado": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_APROV_RESULTADO__"
+                    },
+                    "Html_aprov_resultado": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_aprov_resultado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(replace(outputs('Modelo_aprov_resultado'),'{{nome}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['nome'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{linkPortal}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['linkPortal'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{tituloResultado}}',if(equals(triggerBody()?['dados']?['resultado'],'aprovado'),'Seu pedido foi aprovado','Seu pedido foi recusado')),'{{textoResultado}}',if(equals(triggerBody()?['dados']?['resultado'],'aprovado'),concat(replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['aprovador'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'),' aprovou o seu pedido e ele já seguiu para a Betinhos.'),concat(replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['aprovador'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'),' recusou o seu pedido. Ele foi cancelado e não será atendido.'))),'{{blocoMotivo}}',if(empty(trim(string(coalesce(triggerBody()?['dados']?['motivo'],'')))),'',concat('<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin:0 0 20px;\"><tr><td style=\"padding:16px 18px;background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:24px;color:#0F172A;white-space:pre-line;\"><strong>Motivo:</strong> ',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['motivo'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'),'</td></tr></table>')))"
+                    },
+                    "Enviar_aprov_resultado": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_aprov_resultado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "@join(triggerBody()?['para'],';')",
+                          "emailMessage/Subject": "@concat('Pedido ',trim(string(triggerBody()?['dados']?['numero'])),if(equals(triggerBody()?['dados']?['resultado'],'aprovado'),' aprovado',' recusado'))",
+                          "emailMessage/Body": "@outputs('Html_aprov_resultado')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_aprov_resultado": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_aprov_resultado": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_aprov_resultado": {
+                        "type": "Response",
+                        "kind": "Http",
+                        "runAfter": {},
+                        "inputs": {
+                          "statusCode": 400,
+                          "headers": {
+                            "Content-Type": "application/json"
+                          },
+                          "body": {
+                            "ok": false,
+                            "codigo": "entrada_invalida"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "AvisoOperacao": {
+              "case": "aviso_operacao",
+              "actions": {
+                "Valido_aviso_op": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": "@and(outputs('Para_ok'),not(empty(trim(string(coalesce(triggerBody()?['dados']?['numero'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['solicitante'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['cliente'],''))))),not(empty(trim(string(coalesce(triggerBody()?['dados']?['data'],''))))))",
+                  "actions": {
+                    "Modelo_aviso_op": {
+                      "type": "Compose",
+                      "runAfter": {},
+                      "inputs": "__TPL_AVISO_OPERACAO__"
+                    },
+                    "Html_aviso_op": {
+                      "type": "Compose",
+                      "runAfter": {
+                        "Modelo_aviso_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": "@replace(replace(replace(replace(replace(replace(replace(outputs('Modelo_aviso_op'),'{{numero}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['numero'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{solicitante}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['solicitante'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{cliente}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['cliente'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{data}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['data'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{trajeto}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['trajeto'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{passageiros}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['passageiros'],'')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;')),'{{logoUrl}}',replace(replace(replace(replace(replace(replace(string(coalesce(triggerBody()?['dados']?['logoUrl'],'https://cliente.betinhos.com.br/email/logo-betinhos.png')),'&','&amp;'),'<','&lt;'),'>','&gt;'),'\"','&quot;'),'''','&#39;'),'{','&#123;'))"
+                    },
+                    "Enviar_aviso_op": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {
+                        "Html_aviso_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                          "connectionName": "shared_office365",
+                          "operationId": "SendEmailV2"
+                        },
+                        "parameters": {
+                          "emailMessage/From": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/To": "__CAIXA_COMPARTILHADA__",
+                          "emailMessage/Subject": "@concat('Pedido do portal sai em até 12 h: ',trim(string(triggerBody()?['dados']?['numero'])))",
+                          "emailMessage/Body": "@outputs('Html_aviso_op')",
+                          "emailMessage/Importance": "Normal"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      }
+                    },
+                    "Responder_202_aviso_op": {
+                      "type": "Response",
+                      "kind": "Http",
+                      "runAfter": {
+                        "Enviar_aviso_op": [
+                          "Succeeded"
+                        ]
+                      },
+                      "inputs": {
+                        "statusCode": 202,
+                        "headers": {
+                          "Content-Type": "application/json"
+                        },
+                        "body": {
+                          "ok": true
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Responder_400_aviso_op": {
                         "type": "Response",
                         "kind": "Http",
                         "runAfter": {},
