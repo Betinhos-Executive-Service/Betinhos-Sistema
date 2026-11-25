@@ -1,7 +1,7 @@
 name: Sincronizar solução do DEV
 
 # Traz schema, flows, plugins e WebResources editados no DEV para o repo (pasta solution/),
-# em uma branch sync/* com PR para develop. Só leitura no DEV.
+# em uma branch sync/* com PR para develop. Só leitura no DEV. Só roda à mão (workflow_dispatch).
 on:
   workflow_dispatch:
 
