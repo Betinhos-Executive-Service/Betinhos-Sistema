@@ -6,6 +6,7 @@ import type { TipoInput } from '../data/queries'
 import { OBRIG_DA_CATEGORIA, OBRIG_LABEL } from '../domain/codes'
 import type { Categoria, DocsData, TipoDoc } from '../domain/types'
 import '../documentos.css'
+import { usePodeExcluir } from '../../../app/useNivel'
 
 type Props = { source: DocsSource; data: DocsData; onClose: () => void; onChanged: () => void }
 type Aba = 'tipos' | 'destinatarios'
@@ -64,6 +65,7 @@ type TiposProps = {
 }
 
 function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, onVoltar }: TiposProps) {
+  const podeExcluir = usePodeExcluir('cr40f_tipodocumento')
   const toast = useToast()
   const formId = useId()
   const [erro, setErro] = useState<string | null>(null)
@@ -162,9 +164,11 @@ function Tipos({ source, data, onChanged, edicao, setEdicao, saving, setSaving, 
                         {t.ativo
                           ? <Button size="compact" variant="ghost" icon={<Power size={14} />} disabled={saving} onClick={() => setAcao({ tipo: t, tipoAcao: 'inativar' })}>Inativar</Button>
                           : <Button size="compact" variant="ghost" icon={<RotateCcw size={14} />} disabled={saving} onClick={() => void reativar(t)}>Reativar</Button>}
-                        <Button size="compact" variant="ghost" icon={<Trash2 size={14} />} disabled={saving || qtd > 0}
-                          title={qtd > 0 ? 'Tem documento emitido: use Inativar' : undefined} aria-label={`Excluir ${t.nome}`}
-                          onClick={() => setAcao({ tipo: t, tipoAcao: 'excluir' })} />
+                        {podeExcluir ? (
+                          <Button size="compact" variant="ghost" icon={<Trash2 size={14} />} disabled={saving || qtd > 0}
+                            title={qtd > 0 ? 'Tem documento emitido: use Inativar' : undefined} aria-label={`Excluir ${t.nome}`}
+                            onClick={() => setAcao({ tipo: t, tipoAcao: 'excluir' })} />
+                        ) : null}
                       </span>
                     </div>
                     <p className="doc-muted">
