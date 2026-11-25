@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Faixa } from "../componentes/Faixa";
+import { Faixa, Heroi } from "../componentes/Faixa";
 import { LinhaDoTempo } from "../componentes/LinhaDoTempo";
 import { fazTraduz } from "../i18n";
 import { ehAeroporto, estadoViagem, fraseFase, linhaDoTempo, segmentosAcesos, sinoNoPasso, tituloFase } from "../portal";
@@ -96,6 +96,19 @@ describe("Faixa e LinhaDoTempo renderizadas", () => {
     const { container } = renderiza(<Faixa dados={d} eta={vazio} reserva={null} espera={0} />);
     expect(container.querySelector("#boasvindas")).toHaveTextContent("Seja bem-vindo");
     expect(container.querySelector("#eta")).toBeNull();
+  });
+  it("desktop: faixa fina com reserva, bandeira e compartilhar; herói vira card sem repetir a reserva", () => {
+    const d: Dados = { fase: "a_caminho", horarioAgendado: ag };
+    const eta = { eta: { minutos: 7 } as never, chegada: Date.now() + 7 * 60000 };
+    const topo = renderiza(<Faixa desktop dados={d} eta={eta} reserva="Reserva OS-12" espera={0} />).container;
+    expect(topo.querySelector(".faixa.fina #reserva")).toHaveTextContent("Reserva OS-12");
+    expect(topo.querySelector("#idioma-botao")).not.toBeNull();
+    expect(topo.querySelector("#compartilhar")).not.toBeNull();
+    expect(topo.querySelector("#status")).toBeNull();
+    const card = renderiza(<Heroi desktop dados={d} eta={eta} reserva="Reserva OS-12" espera={0} />).container;
+    expect(card.querySelector(".heroi-card #status")).toHaveTextContent("Seu motorista está a caminho");
+    expect(card.querySelector("#eta")).toHaveTextContent("7");
+    expect(card.querySelector("#agenda")).not.toHaveTextContent("OS-12");
   });
   it("linha do tempo: etapa atual marcada, sem sino sem VAPID", () => {
     const { container } = renderiza(<LinhaDoTempo dados={{ fase: "a_caminho" }} cfg={{ tomtom: false, telefone: null, whatsapp: null, aoVivo: false, vapid: null, completo: false }} chegada={null} abrirTela={() => {}} />);

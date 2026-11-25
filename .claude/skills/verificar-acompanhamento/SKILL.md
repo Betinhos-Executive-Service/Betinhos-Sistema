@@ -83,6 +83,14 @@ Vale por cima das descrições de layout acima (cards `.painel`, `.passos`, `#c-
 - Prints a 390x844 @2x fullPage dos estados definição, agendado, a caminho, sem rastreio, passageiros, concluído, paradas e aeroporto; comparar com a densidade da V1 (`link-passageiro-v1.png`): gap de 16 px entre cards, padding 20 px, sem emojis, pílulas só para estado. O único 404 de console esperado é `/passageiros` em link sem cadastro.
 - Testes: `web/src/testes/portal.test.tsx` (aeroporto, título/barra, frases, linha do tempo por estado, sino) e `layout-css.test.ts`. Não verificado: comportamento com Infleet/Dataverse reais (ex.: OS-1993 no DEV) e Web Push real.
 
+## Desktop (≥1024 px, 25/11/2026, v0.0.50)
+
+O celular continua igual ao "D". No desktop (`useDesktop`, `(min-width: 1024px)`, troca ao redimensionar):
+- Faixa fina como no PROD (`.faixa.fina`): marca à esquerda; à direita `#reserva` "Reserva OS-N", bandeira `#idioma-botao` com menu e `#compartilhar` (copia o link, `#copiado` "Link copiado"). Sem seletor segmentado e sem o card de compartilhar no corpo.
+- `main.corpo.duas` com duas `.col`. Esquerda: herói em card (`.heroi-card`: `#boasvindas`, `#agenda` data · saída sem a reserva, `#status`, `#eta`, `#passos`, `#frase`), avaliação, `#faixa-pax`, motorista, passageiros, Central 24h. Direita: mapa (300 px; 190 px com altura ≤780) e `#viagem`.
+- Mesma árvore nos dois modos: no celular as `.col` ficam `display:contents` e o `order` devolve a sequência faixa-pax, mapa, motorista, viagem, passageiros, compartilhar, Central 24h e rodapé. Prova: marcar `#c-mapa` (`dataset`) a 1440, redimensionar para 800 e conferir que a marca continua (o mapa não é recriado) e a ordem pelo `getBoundingClientRect().top`.
+- Prints 1440x900 e 1280x720 sem fullPage de `DevCompleto1` (rolagem 0 nos dois) e `DevAgendado1`. Rolagem só aparece com a lista de passageiros (`DevAgendado1`, `DevAeroport1`), aceita.
+
 ## Casos de borda
 - Infleet fora com o Durable Object recém-acordado (sem leitura em memória): a página recebe `{"tipo":"fonte_fora"}` e mostra "Aguardando o rastreador"; o log mostra `Leitura do alarm falhou`.
 - Prévia do WhatsApp: `curl -s http://127.0.0.1:36489/r/DevCompleto1 | rg 'og:'` → título, descrição com horário e carro, `og:image` absoluto; revogado/expirado só com metatags genéricas.

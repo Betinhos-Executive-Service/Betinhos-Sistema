@@ -5,10 +5,11 @@ import { CardCompartilhar } from "./componentes/CardCompartilhar";
 import { CardMapa } from "./componentes/CardMapa";
 import { CardMotorista, type Tela } from "./componentes/CardMotorista";
 import { Contato } from "./componentes/Contato";
-import { Faixa } from "./componentes/Faixa";
+import { Faixa, Heroi } from "./componentes/Faixa";
 import { FolhaDetalhes } from "./componentes/FolhaDetalhes";
 import { LinhaDoTempo } from "./componentes/LinhaDoTempo";
 import { useAgora } from "./hooks/useAgora";
+import { useDesktop } from "./hooks/useDesktop";
 import { useEta } from "./hooks/useEta";
 import { useViagem } from "./hooks/useViagem";
 import { useIdioma } from "./i18n";
@@ -30,6 +31,7 @@ export function App() {
   const pax = usePassageiros(!!editando);
   const [diag, setDiag] = useState("");
   const avisouChegada = useRef(false);
+  const desktop = useDesktop();
 
   const concluido = dados?.fase === "concluido";
   const noLocal = dados?.fase === "no_local" && !!dados.posicao;
@@ -68,26 +70,32 @@ export function App() {
   }, []);
 
   const faltam = pax.aberto && !concluido ? pax.lista.filter((p) => faltasDe(p).length > 0) : [];
+  const faixaProps = { dados, eta, reserva, espera };
+  const topo = <>
+    {desktop ? <Heroi {...faixaProps} desktop /> : null}
+    {concluido ? <Avaliacao visivel avaliado={!!dados?.avaliado} /> : null}
+    {faltam.length ? (
+      <div className="faixa-pax" id="faixa-pax" role="status">
+        <span>{t("pax.faixa", { n: faltam.length })}</span>
+        <button type="button" className="btn btn-secundario btn-leve" onClick={(e) => editar(faltam[0], e.currentTarget)}>{t("pax.completar")}</button>
+      </div>
+    ) : null}
+  </>;
+  const mapa = comMapa ? <CardMapa dados={dados} retomada={retomada} vivo={vivo} eta={eta} aoDiagnostico={setDiag} /> : null;
+  const motorista = <CardMotorista dados={dados} cfg={BT.cfg} abrirTela={abrirTela} />;
+  const linhaDoTempo = <LinhaDoTempo dados={dados} cfg={BT.cfg} chegada={eta.chegada} abrirTela={abrirTela} />;
+  const passageiros = concluido ? null : <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />;
+  const rodape = <footer className="rodape">Betinhos Executive Service</footer>;
   return (
     <>
       <div id="app" className={concluido ? "fim" : undefined}>
-        <Faixa dados={dados} eta={eta} reserva={reserva} espera={espera} />
+        <Faixa {...faixaProps} desktop={desktop} />
         <div className="diag" id="diag" hidden={!diag}>{diag}</div>
-        <main className="corpo">
-          {concluido ? <Avaliacao visivel avaliado={!!dados?.avaliado} /> : null}
-          {faltam.length ? (
-            <div className="faixa-pax" id="faixa-pax" role="status">
-              <span>{t("pax.faixa", { n: faltam.length })}</span>
-              <button type="button" className="btn btn-secundario btn-leve" onClick={(e) => editar(faltam[0], e.currentTarget)}>{t("pax.completar")}</button>
-            </div>
-          ) : null}
-          {comMapa ? <CardMapa dados={dados} retomada={retomada} vivo={vivo} eta={eta} aoDiagnostico={setDiag} /> : null}
-          <CardMotorista dados={dados} cfg={BT.cfg} abrirTela={abrirTela} />
-          <LinhaDoTempo dados={dados} cfg={BT.cfg} chegada={eta.chegada} abrirTela={abrirTela} />
-          {concluido ? null : <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />}
-          {concluido ? null : <CardCompartilhar />}
-          <Contato cfg={BT.cfg} />
-          <footer className="rodape">Betinhos Executive Service</footer>
+        {/* Mesma árvore nos dois modos: cruzar 1024 px não recria mapa, avaliação nem formulários. */}
+        <main className={desktop ? "corpo duas" : "corpo"}>
+          <div className="col">{topo}{motorista}{passageiros}{desktop || concluido ? null : <CardCompartilhar />}<Contato cfg={BT.cfg} /></div>
+          <div className="col">{mapa}{linhaDoTempo}</div>
+          {rodape}
         </main>
         <span className="versao" aria-hidden="true">{BT.versao}</span>
       </div>
