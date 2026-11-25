@@ -7,6 +7,7 @@ import type { EnderecoSugerido } from '../domain/types'
 const ESPERA_MS = 250
 const MIN_BUSCA = 3
 const MAX_RECENTES = 4
+const MAX_OPCOES = 6
 
 type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' }
 
@@ -19,6 +20,13 @@ type Props = {
   placeholder?: string
   invalid?: boolean
   describedBy?: string
+}
+
+/** Destaca em negrito a parte digitada; o texto continua o mesmo para quem lê a opção. */
+function comDestaque(texto: string, consulta: string) {
+  const i = consulta ? texto.toLowerCase().indexOf(consulta.toLowerCase()) : -1
+  if (i < 0) return texto
+  return <>{texto.slice(0, i)}<b>{texto.slice(i, i + consulta.length)}</b>{texto.slice(i + consulta.length)}</>
 }
 
 /** Campo de endereço com sugestões (combobox ARIA 1.2): texto livre sempre vale; escolher uma sugestão só preenche o mesmo campo. */
@@ -56,7 +64,7 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         tipo: s.endereco.toLowerCase().includes(s.rotulo.toLowerCase()) ? 'rua' : 'poi',
       }))
       .filter((o) => !doHistorico.some((h) => h.texto.toLowerCase() === o.texto.toLowerCase()))
-    return [...doHistorico, ...remotas]
+    return [...doHistorico, ...remotas].slice(0, MAX_OPCOES)
   }, [consulta, recentes, sugestoes])
 
   const mostrando = aberto && opcoes.length > 0
@@ -101,7 +109,7 @@ export function EnderecoCampo({ id, value, onChange, recentes, placeholder, inva
         onMouseMove={() => { if (ativo !== i) setAtivo(i) }}
       >
         <Icone size={16} aria-hidden className="pc-pp__opcao-icone" />
-        <span className="pc-pp__opcao-texto">{o.texto}</span>
+        <span className="pc-pp__opcao-texto">{comDestaque(o.texto, consulta)}</span>
       </li>
     )
   }

@@ -213,7 +213,7 @@ describe('Portal do cliente', () => {
     }
     const continuar = () => fireEvent.click(screen.getByRole('button', { name: /^Continuar/ }))
     const preencherTrajeto = (destino = 'Aeroporto de Guarulhos', hora = '09:00') => {
-      fireEvent.change(screen.getByLabelText(/Saída de/), { target: { value: 'Latasa, Pindamonhangaba' } })
+      fireEvent.change(screen.getByLabelText(/^Saída/), { target: { value: 'Latasa, Pindamonhangaba' } })
       fireEvent.change(screen.getByLabelText(/Destino/), { target: { value: destino } })
       fireEvent.change(screen.getByLabelText(/^Data/), { target: { value: amanha().slice(0, 10) } })
       fireEvent.change(screen.getByLabelText(/^Hora/), { target: { value: hora } })
@@ -225,11 +225,11 @@ describe('Portal do cliente', () => {
       await screen.findByRole('heading', { name: 'Pedir serviço' })
       await escolherPassageiro('Hiroshi Tanaka')
       continuar()
-      fireEvent.change(await screen.findByLabelText(/Saída de/), { target: { value: 'Latasa, Pindamonhangaba' } })
+      fireEvent.change(await screen.findByLabelText(/^Saída/), { target: { value: 'Latasa, Pindamonhangaba' } })
       fireEvent.click(screen.getByRole('radio', { name: 'Meus serviços' }))
       await screen.findByRole('heading', { name: 'Meus serviços' })
       fireEvent.click(screen.getByRole('radio', { name: 'Pedir serviço' }))
-      expect((screen.getByLabelText(/Saída de/) as HTMLInputElement).value).toBe('Latasa, Pindamonhangaba')
+      expect((screen.getByLabelText(/^Saída/) as HTMLInputElement).value).toBe('Latasa, Pindamonhangaba')
     })
 
     it('e-mail sem acesso ouve isso na hora e não vai para a etapa do código', async () => {
@@ -275,7 +275,7 @@ describe('Portal do cliente', () => {
       continuar()
       expect(await screen.findByText('Informe o endereço de saída.')).toBeTruthy()
       expect(screen.getByText('A saída precisa ser daqui para a frente.')).toBeTruthy()
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/Saída de/)))
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/^Saída/)))
       expect(screen.getByText('Passo 2 de 3 · Trajeto e horário')).toBeTruthy()
     })
 
@@ -400,7 +400,7 @@ describe('Portal do cliente', () => {
       expect(screen.getByText('Passo 1 de 3 · Quem viaja')).toBeTruthy()
       expect(screen.getAllByRole('listitem').filter((li) => li.className.includes('pc-pp__chip-item')).length).toBe(1)
       continuar()
-      expect((await screen.findByLabelText(/Saída de/) as HTMLInputElement).value).toMatch(/\S/)
+      expect((await screen.findByLabelText(/^Saída/) as HTMLInputElement).value).toMatch(/\S/)
       expect((screen.getByLabelText(/^Data/) as HTMLInputElement).value).toBe('')
       expect((screen.getByLabelText(/^Hora/) as HTMLInputElement).value).toBe('')
     })

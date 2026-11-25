@@ -243,14 +243,16 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   const atual = PASSOS[passo - 1]
   const pedido = passo === 3 ? montar() : null
   const nomes = passageiros.map((p) => p.nome.trim()).filter(Boolean)
-  const preenchidos = [nomes.length > 0, !!origem.trim(), !!destino.trim(), !!(data && hora)].filter(Boolean).length
+  // Endereço só entra no resumo depois de 3 letras (o texto ainda vale para o pedido).
+  const resumoEnd = (v: string) => (v.trim().length >= 3 ? v.trim() : '')
   const quando = data && hora ? diaSemanaDataHora(deLocalSaoPaulo(`${data}T${hora}`)) : ''
 
   return (
     <main className="pc-conteudo pc-pp-pagina">
       <div className={`pc-pp${passo === 3 ? ' pc-pp--conferir' : ''}`}>
         <div className="pc-pp__cab">
-          <PageHeader title="Pedir serviço" description="Leva menos de um minuto. A gente cuida do resto." />
+          <PageHeader title="Pedir serviço" />
+          <p className="pc-pp__sub">Leva menos de um minuto. A gente cuida do resto.</p>
           <p className="pc-pp__sr">Passo {passo} de 3 · {atual.nome}</p>
           <nav className="pc-pp__passos" aria-label="Etapas do pedido">
             <ol>
@@ -270,7 +272,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
         </div>
 
         <div ref={corpo} className="pc-pp__card">
-          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo"><span className="pc-pp__titulo-icone" aria-hidden><atual.icone size={18} /></span>{atual.nome}</h2>
+          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo">{atual.nome}</h2>
 
           {passo === 1 && (
             <div className="pc-pp__corpo">
@@ -279,56 +281,60 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
               )}
               {erros.passageiros && !errosPas.some(Boolean) && <Alert tone="danger"><span className="pc-pp__erro-foco" tabIndex={-1}>{erros.passageiros}</span></Alert>}
 
-              {passageiros.length > 0 && (
-                <ul className="pc-pp__chips" aria-label="Passageiros do pedido">
-                  {passageiros.map((p, i) => (
-                    <li key={p.id ?? `novo-${i}`} className="pc-pp__chip-item">
-                      <div className={`pc-pp__chip${errosPas[i] ? ' pc-pp__chip--erro' : ''}`}>
-                        <span className="pc-pp__avatar" aria-hidden>{iniciais(p.nome)}</span>
-                        <span className="pc-pp__chip-texto">
-                          <span className="pc-pp__chip-nome">{p.nome || 'Sem nome'}</span>
-                          <span className="pc-pp__chip-contato">{contatoDe(p) || 'Sem contato'}</span>
-                        </span>
-                        <button type="button" className="pc-pp__icone" aria-label={`Corrigir contato de ${p.nome || `passageiro ${i + 1}`}`} onClick={() => abrirEdicao(i)} disabled={cartaoAberto}><Pencil size={14} aria-hidden /></button>
-                        <button type="button" className="pc-pp__icone" aria-label={`Remover ${p.nome || `passageiro ${i + 1}`}`} onClick={() => removerPassageiro(i)}><X size={16} aria-hidden /></button>
-                      </div>
-                      {errosPas[i] && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{errosPas[i]}</p>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="pc-pp__contagem">{passageiros.length} de {MAX_PASSAGEIROS} passageiros</p>
+              <Bloco icone={Users} titulo="Passageiros" dica={`${passageiros.length} de ${MAX_PASSAGEIROS} passageiros`}>
+                {passageiros.length === 0 && <p className="pc-pp__dica">Ninguém ainda. Adicione abaixo.</p>}
+                {passageiros.length > 0 && (
+                  <ul className="pc-pp__chips" aria-label="Passageiros do pedido">
+                    {passageiros.map((p, i) => (
+                      <li key={p.id ?? `novo-${i}`} className="pc-pp__chip-item">
+                        <div className={`pc-pp__chip${errosPas[i] ? ' pc-pp__chip--erro' : ''}`}>
+                          <span className="pc-pp__avatar" aria-hidden>{iniciais(p.nome)}</span>
+                          <span className="pc-pp__chip-texto">
+                            <span className="pc-pp__chip-nome">{p.nome || 'Sem nome'}</span>
+                            <span className="pc-pp__chip-contato">{contatoDe(p) || 'Sem contato'}</span>
+                          </span>
+                          <button type="button" className="pc-pp__icone" aria-label={`Corrigir contato de ${p.nome || `passageiro ${i + 1}`}`} onClick={() => abrirEdicao(i)} disabled={cartaoAberto}><Pencil size={14} aria-hidden /></button>
+                          <button type="button" className="pc-pp__icone" aria-label={`Remover ${p.nome || `passageiro ${i + 1}`}`} onClick={() => removerPassageiro(i)}><X size={16} aria-hidden /></button>
+                        </div>
+                        {errosPas[i] && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{errosPas[i]}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Bloco>
+              <Bloco icone={UserPlus} titulo="Adicionar passageiro">
 
-              {rascunho ? (
-                <div className="pc-pp__novo" role="group" aria-label={rascunho.indice === null ? 'Novo passageiro' : 'Corrigir passageiro'}>
-                  <div className="pc-pp__novo-campos">
-                    <Field label="Nome">
-                      <Input ref={nomeNovo} value={rascunho.nome} onChange={(e) => mudarRascunho('nome', e.target.value)} autoComplete="off" placeholder="Nome completo" size="touch" maxLength={MAX_NOME} readOnly={nomeTravado} invalid={erroNoNome} />
-                    </Field>
-                    <Field label="Celular">
-                      <Input ref={celularNovo} type="tel" inputMode="tel" value={rascunho.telefone} onChange={(e) => mudarRascunho('telefone', e.target.value)} autoComplete="off" placeholder="(11) 90000-0000" size="touch" maxLength={MAX_TELEFONE} invalid={erroNoContato} />
-                    </Field>
-                    <Field label="E-mail">
-                      <Input type="email" value={rascunho.email} onChange={(e) => mudarRascunho('email', e.target.value)} autoComplete="off" placeholder="nome@empresa.com" size="touch" maxLength={MAX_EMAIL} invalid={erroNoContato} />
-                    </Field>
+                {rascunho ? (
+                  <div className="pc-pp__novo" role="group" aria-label={rascunho.indice === null ? 'Novo passageiro' : 'Corrigir passageiro'}>
+                    <div className="pc-pp__novo-campos">
+                      <Field label="Nome">
+                        <Input ref={nomeNovo} value={rascunho.nome} onChange={(e) => mudarRascunho('nome', e.target.value)} autoComplete="off" placeholder="Nome completo" size="touch" maxLength={MAX_NOME} readOnly={nomeTravado} invalid={erroNoNome} />
+                      </Field>
+                      <Field label="Celular">
+                        <Input ref={celularNovo} type="tel" inputMode="tel" value={rascunho.telefone} onChange={(e) => mudarRascunho('telefone', e.target.value)} autoComplete="off" placeholder="(11) 90000-0000" size="touch" maxLength={MAX_TELEFONE} invalid={erroNoContato} />
+                      </Field>
+                      <Field label="E-mail">
+                        <Input type="email" value={rascunho.email} onChange={(e) => mudarRascunho('email', e.target.value)} autoComplete="off" placeholder="nome@empresa.com" size="touch" maxLength={MAX_EMAIL} invalid={erroNoContato} />
+                      </Field>
+                    </div>
+                    <p className="pc-pp__dica">Informe celular ou e-mail. Se o contato mudou, corrija aqui.</p>
+                    {erroRascunho && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erroRascunho}</p>}
+                    <div className="pc-pp__novo-acoes">
+                      <Button type="button" variant="secondary" size="compact" onClick={() => { setRascunho(null); setErroRascunho(undefined) }}>Cancelar</Button>
+                      <Button type="button" size="compact" onClick={salvarRascunho}>{rascunho.indice === null ? 'Adicionar passageiro' : 'Salvar contato'}</Button>
+                    </div>
                   </div>
-                  <p className="pc-pp__dica">Informe celular ou e-mail. Se o contato mudou, corrija aqui.</p>
-                  {erroRascunho && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erroRascunho}</p>}
-                  <div className="pc-pp__novo-acoes">
-                    <Button type="button" variant="secondary" size="compact" onClick={() => { setRascunho(null); setErroRascunho(undefined) }}>Cancelar</Button>
-                    <Button type="button" size="compact" onClick={salvarRascunho}>{rascunho.indice === null ? 'Adicionar passageiro' : 'Salvar contato'}</Button>
+                ) : passageiros.length < MAX_PASSAGEIROS ? (
+                  <div className="pc-pp__busca">
+                    <Field label="Buscar passageiro cadastrado">
+                      <Select value={null} onChange={escolher} options={opcoes} loading={buscando} onSearchChange={buscar} placeholder="Escolher da lista" searchPlaceholder="Buscar por nome" emptyText="Ninguém com esse nome" onCreate={(nome) => abrirNovo(nome)} />
+                    </Field>
+                    <Button type="button" variant="secondary" size="touch" onClick={() => abrirNovo()} icon={<UserPlus size={16} aria-hidden />}>Cadastrar novo</Button>
                   </div>
-                </div>
-              ) : passageiros.length < MAX_PASSAGEIROS ? (
-                <div className="pc-pp__busca">
-                  <Field label="Buscar passageiro cadastrado">
-                    <Select value={null} onChange={escolher} options={opcoes} loading={buscando} onSearchChange={buscar} placeholder="Escolher da lista" searchPlaceholder="Buscar por nome" emptyText="Ninguém com esse nome" onCreate={(nome) => abrirNovo(nome)} />
-                  </Field>
-                  <Button type="button" variant="secondary" size="touch" onClick={() => abrirNovo()} icon={<UserPlus size={16} aria-hidden />}>Cadastrar novo</Button>
-                </div>
-              ) : (
-                <p className="pc-pp__dica">Máximo de {MAX_PASSAGEIROS} passageiros por pedido. Para mais gente, faça outro pedido.</p>
-              )}
+                ) : (
+                  <p className="pc-pp__dica">Máximo de {MAX_PASSAGEIROS} passageiros por pedido. Para mais gente, faça outro pedido.</p>
+                )}
+              </Bloco>
             </div>
           )}
 
@@ -339,79 +345,85 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                 <button type="button" className="pc-pp__link" onClick={() => ir(1)} aria-label="Alterar passageiros">Alterar</button>
               </p>
 
-              <div className="pc-pp__rota">
-                <div className="pc-pp__trilho" aria-hidden><span className="pc-pp__ponto" /><span className="pc-pp__linha" /><span className="pc-pp__quadrado" /></div>
-                <div className="pc-pp__rota-campos">
-                  <div className="pc-pp__rota-linha">
-                    <label htmlFor={`${idRota}-o`}>Saída de</label>
-                    <EnderecoCampo id={`${idRota}-o`} value={origem} onChange={(v) => { setOrigem(v); limpar('origem') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.origem} describedBy={erros.origem ? `${idRota}-oe` : undefined} />
-                    {erros.origem && <p className="pc-pp__erro" id={`${idRota}-oe`} role="alert">{erros.origem}</p>}
+              <Bloco icone={Route} titulo="Trajeto">
+                <div className="pc-pp__rota">
+                  <div className="pc-pp__trilho" aria-hidden><span className="pc-pp__ponto" /><span className="pc-pp__linha" /><span className="pc-pp__quadrado" /></div>
+                  <div className="pc-pp__rota-campos">
+                    <div className="pc-pp__rota-linha">
+                      <label htmlFor={`${idRota}-o`}>Saída</label>
+                      <EnderecoCampo id={`${idRota}-o`} value={origem} onChange={(v) => { setOrigem(v); limpar('origem') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.origem} describedBy={erros.origem ? `${idRota}-oe` : undefined} />
+                      {erros.origem && <p className="pc-pp__erro" id={`${idRota}-oe`} role="alert">{erros.origem}</p>}
+                    </div>
+                    <div className="pc-pp__rota-linha">
+                      <label htmlFor={`${idRota}-d`}>Destino</label>
+                      <EnderecoCampo id={`${idRota}-d`} value={destino} onChange={(v) => { setDestino(v); limpar('destino') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.destino} describedBy={erros.destino ? `${idRota}-de` : undefined} />
+                      {erros.destino && <p className="pc-pp__erro" id={`${idRota}-de`} role="alert">{erros.destino}</p>}
+                    </div>
                   </div>
-                  <div className="pc-pp__rota-linha">
-                    <label htmlFor={`${idRota}-d`}>Destino</label>
-                    <EnderecoCampo id={`${idRota}-d`} value={destino} onChange={(v) => { setDestino(v); limpar('destino') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.destino} describedBy={erros.destino ? `${idRota}-de` : undefined} />
-                    {erros.destino && <p className="pc-pp__erro" id={`${idRota}-de`} role="alert">{erros.destino}</p>}
+                  <button type="button" className="pc-pp__inverter" aria-label="Inverter saída e destino" onClick={() => { setOrigem(destino); setDestino(origem); limpar('origem'); limpar('destino') }}><ArrowDownUp size={16} aria-hidden /></button>
+                </div>
+              </Bloco>
+
+              <Bloco icone={CalendarDays} titulo="Quando" dica="Horário de Brasília">
+                <div className="pc-pp__quando">
+                  <div className="pc-pp__data">
+                    <Field label="Data">
+                      <Input type="date" value={data} min={hoje} onChange={(e) => { setData(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
+                    </Field>
+                    <div className="pc-pp__atalhos" role="group" aria-label="Atalhos de data">
+                      {atalhosDeData(hoje).map((a) => (
+                        <button key={a.valor} type="button" className="pc-pp__atalho" aria-pressed={data === a.valor} onClick={() => { setData(a.valor); limpar('saida') }}>{a.rotulo}</button>
+                      ))}
+                    </div>
                   </div>
+                  <Field label="Hora">
+                    <Input type="time" value={hora} onChange={(e) => { setHora(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
+                  </Field>
                 </div>
-                <button type="button" className="pc-pp__inverter" aria-label="Inverter saída e destino" onClick={() => { setOrigem(destino); setDestino(origem); limpar('origem'); limpar('destino') }}><ArrowDownUp size={16} aria-hidden /></button>
-              </div>
+                {erros.saida && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erros.saida}</p>}
+              </Bloco>
 
-              <div className="pc-pp__quando">
-                <div className="pc-pp__atalhos" role="group" aria-label="Atalhos de data">
-                  {atalhosDeData(hoje).map((a) => (
-                    <button key={a.valor} type="button" className="pc-pp__atalho" aria-pressed={data === a.valor} onClick={() => { setData(a.valor); limpar('saida') }}>{a.rotulo}</button>
-                  ))}
-                </div>
-                <Field label="Data">
-                  <Input type="date" value={data} min={hoje} onChange={(e) => { setData(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
-                </Field>
-                <Field label={<>Hora <span className="pc-pp__tz">· Brasília</span></>}>
-                  <Input type="time" value={hora} onChange={(e) => { setHora(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
-                </Field>
-              </div>
-              {erros.saida && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erros.saida}</p>}
+              <Bloco icone={Car} titulo="Veículo" dica="É uma preferência; a Betinhos confirma o veículo.">
+                <fieldset className="pc-pp__veiculos">
+                  <legend className="pc-pp__sr">Veículo</legend>
+                  <div className="pc-pp__grade">
+                    <OpcaoVeiculo valor={SEM_PREFERENCIA} nome="A Betinhos escolhe" detalhe="Pelo nº de passageiros" marcado={veiculo === SEM_PREFERENCIA} onEscolher={escolherVeiculo} />
+                    {TIPOS_VEICULO.map((t) => {
+                      const cap = capacidadeVeiculo(t.valor)
+                      const naoCabe = cap !== undefined && passageiros.length > cap
+                      return <OpcaoVeiculo key={t.valor} valor={String(t.valor)} nome={t.rotulo} detalhe={cap ? `até ${cap} pax` : ''} aviso={naoCabe ? `Não cabe ${passageiros.length} pessoas` : undefined} marcado={veiculo === String(t.valor)} onEscolher={escolherVeiculo} />
+                    })}
+                  </div>
+                  {erros.tipoVeiculo && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erros.tipoVeiculo}</p>}
+                </fieldset>
+              </Bloco>
 
-              <fieldset className="pc-pp__veiculos">
-                <legend>Veículo <span className="pc-pp__opcional">opcional</span></legend>
-                <div className="pc-pp__grade">
-                  <OpcaoVeiculo valor={SEM_PREFERENCIA} nome="A Betinhos escolhe" detalhe="Pelo nº de passageiros" marcado={veiculo === SEM_PREFERENCIA} onEscolher={escolherVeiculo} />
-                  {TIPOS_VEICULO.map((t) => {
-                    const cap = capacidadeVeiculo(t.valor)
-                    const naoCabe = cap !== undefined && passageiros.length > cap
-                    return <OpcaoVeiculo key={t.valor} valor={String(t.valor)} nome={t.rotulo} detalhe={cap ? `até ${cap} pax` : ''} aviso={naoCabe ? `Não cabe ${passageiros.length} pessoas` : undefined} marcado={veiculo === String(t.valor)} onEscolher={escolherVeiculo} />
-                  })}
-                </div>
-                {erros.tipoVeiculo && <p className="pc-pp__erro" role="alert" tabIndex={-1}>{erros.tipoVeiculo}</p>}
-                <p className="pc-pp__dica">É uma preferência; a Betinhos confirma o veículo.</p>
-              </fieldset>
-
-              <div className="pc-pp__largo">
-                <Field label={<>Observação <span className="pc-pp__opcional">opcional</span></>} hint="Voo, bagagem, parada, centro de custo" error={erros.observacao}>
-                  <Textarea rows={3} value={observacao} onChange={(e) => { setObservacao(e.target.value); limpar('observacao') }} maxLength={MAX_TEXTO} invalid={!!erros.observacao} />
-                </Field>
-              </div>
+              <Bloco icone={FileText} titulo="Observação" dica="opcional">
+                <Textarea aria-label="Observação" rows={3} value={observacao} onChange={(e) => { setObservacao(e.target.value); limpar('observacao') }} maxLength={MAX_TEXTO} invalid={!!erros.observacao} placeholder="Voo, bagagem, parada, centro de custo" />
+                {erros.observacao && <p className="pc-pp__erro" role="alert">{erros.observacao}</p>}
+              </Bloco>
             </div>
           )}
 
           {passo === 3 && pedido && (
             <div className="pc-pp__corpo">
               <dl className="pc-pp__resumo">
-                <Secao nome="Passageiros" onAlterar={() => ir(1)}>
+                <Secao icone={Users} nome="Passageiros" onAlterar={() => ir(1)}>
                   {pedido.passageiros.map((x) => (
                     <span key={x.id ?? x.nome} className="pc-pp__linha-resumo">{x.nome}{contatoDe(x) && <small> · {contatoDe(x)}</small>}</span>
                   ))}
                 </Secao>
-                <Secao nome="Trajeto" onAlterar={() => ir(2)}>
-                  <span className="pc-pp__linha-resumo"><small>Saída de</small> {pedido.origem}</span>
+                <Secao icone={Route} nome="Trajeto" onAlterar={() => ir(2)}>
+                  <span className="pc-pp__linha-resumo"><small>Saída</small> {pedido.origem}</span>
                   <span className="pc-pp__linha-resumo"><small>Destino</small> {pedido.destino}</span>
                 </Secao>
-                <Secao nome="Quando" onAlterar={() => ir(2)}>
+                <Secao icone={CalendarDays} nome="Quando" onAlterar={() => ir(2)}>
                   <span className="pc-pp__linha-resumo">{diaSemanaDataHora(pedido.saida)} <small>· Brasília</small></span>
                 </Secao>
-                <Secao nome="Veículo" onAlterar={() => ir(2)}>
+                <Secao icone={Car} nome="Veículo" onAlterar={() => ir(2)}>
                   <span className="pc-pp__linha-resumo">{rotuloVeiculo(pedido.tipoVeiculo) ?? 'A Betinhos escolhe'}</span>
                 </Secao>
-                <Secao nome="Observação" onAlterar={() => ir(2)}>
+                <Secao icone={FileText} nome="Observação" onAlterar={() => ir(2)}>
                   <span className="pc-pp__linha-resumo">{pedido.observacao ?? <small>Sem observação</small>}</span>
                 </Secao>
               </dl>
@@ -421,7 +433,7 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
           )}
 
           <div className="pc-pp__rodape">
-            {passo > 1 && <Button type="button" variant="secondary" size="touch" onClick={() => ir((passo - 1) as Passo)} icon={<ArrowLeft size={18} aria-hidden />}>Voltar</Button>}
+            {passo > 1 && <Button type="button" variant="secondary" size="touch" className="pc-pp__voltar" onClick={() => ir((passo - 1) as Passo)} icon={<ArrowLeft size={18} aria-hidden />}>Voltar</Button>}
             {passo < 3
               ? <Button type="button" size="touch" className="pc-pp__prox" onClick={continuar}>Continuar <ArrowRight size={18} aria-hidden /></Button>
               : <Button type="button" size="touch" className="pc-pp__prox" loading={enviando} onClick={enviar} icon={<Send size={18} aria-hidden />}>Enviar pedido</Button>}
@@ -432,13 +444,13 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
           <aside className="pc-pp__lateral" aria-label="Seu pedido">
             <h2>Seu pedido</h2>
             <div className="pc-pp__progresso">
-              <div className="pc-pp__trilha" role="progressbar" aria-label="Pedido preenchido" aria-valuemin={0} aria-valuemax={4} aria-valuenow={preenchidos}><span style={{ width: `${preenchidos * 25}%` }} /></div>
-              <span>{preenchidos} de 4</span>
+              <div className="pc-pp__trilha" role="progressbar" aria-label="Etapa do pedido" aria-valuemin={1} aria-valuemax={3} aria-valuenow={passo}>{PASSOS.map((st) => <span key={st.n} className={st.n <= passo ? 'pc-pp__trilha--feita' : undefined} />)}</div>
+              <span>Passo {passo} de 3</span>
             </div>
             <dl>
               <ItemPedido icone={Users} nome="Passageiros" valor={nomes.join(', ')} />
-              <ItemPedido icone={MapPin} nome="Saída de" valor={origem.trim()} />
-              <ItemPedido icone={Flag} nome="Destino" valor={destino.trim()} destaque />
+              <ItemPedido icone={MapPin} nome="Saída" valor={resumoEnd(origem)} />
+              <ItemPedido icone={Flag} nome="Destino" valor={resumoEnd(destino)} destaque />
               <ItemPedido icone={CalendarDays} nome="Quando" valor={quando} />
               <ItemPedido icone={Car} nome="Veículo" valor={veiculo === SEM_PREFERENCIA ? 'A Betinhos escolhe' : rotuloVeiculo(Number(veiculo)) ?? ''} />
               <ItemPedido icone={FileText} nome="Observação" valor={observacao.trim()} />
@@ -463,12 +475,27 @@ function ItemPedido({ icone: Icone, nome, valor, destaque }: { icone: LucideIcon
   )
 }
 
-function Secao({ nome, onAlterar, children }: { nome: string; onAlterar: () => void; children: ReactNode }) {
+/** Bloco de formulário: mesmo cabeçalho (ícone, título, dica) em todos os passos. Sem aria-labelledby, para não duplicar rótulos dos campos. */
+function Bloco({ icone: Icone, titulo, dica, children }: { icone: LucideIcon; titulo: string; dica?: string; children: ReactNode }) {
   return (
-    <div className="pc-pp__secao">
-      <div className="pc-pp__secao-topo">
-        <dt>{nome}</dt>
-        <button type="button" className="pc-pp__link" onClick={onAlterar} aria-label={`Alterar ${nome.toLowerCase()}`}>Alterar</button>
+    <section className="pc-pp__bloco">
+      <div className="pc-pp__bloco-cab">
+        <span className="pc-pp__bloco-icone" aria-hidden><Icone size={16} /></span>
+        <h3 className="pc-pp__bloco-titulo">{titulo}</h3>
+        {dica && <span className="pc-pp__bloco-dica">{dica}</span>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Secao({ icone: Icone, nome, onAlterar, children }: { icone: LucideIcon; nome: string; onAlterar: () => void; children: ReactNode }) {
+  return (
+    <div className="pc-pp__bloco pc-pp__secao">
+      <div className="pc-pp__bloco-cab">
+        <span className="pc-pp__bloco-icone" aria-hidden><Icone size={16} /></span>
+        <dt className="pc-pp__bloco-titulo">{nome}</dt>
+        <button type="button" className="pc-pp__link pc-pp__bloco-acao" onClick={onAlterar} aria-label={`Alterar ${nome.toLowerCase()}`}>Alterar</button>
       </div>
       <dd>{children}</dd>
     </div>
@@ -482,13 +509,13 @@ function OpcaoVeiculo({ valor, nome, detalhe, aviso, marcado, onEscolher }: { va
     <label className="pc-pp__veiculo">
       <input type="radio" name="pc-veiculo" value={valor} checked={marcado} onChange={() => onEscolher(valor)} />
       <span className="pc-pp__veiculo-corpo">
-        <span className="pc-pp__veiculo-topo">
-          <span className="pc-pp__veiculo-icone" aria-hidden><Icone size={18} /></span>
-          <span className="pc-pp__veiculo-check" aria-hidden><Check size={12} strokeWidth={3} /></span>
+        <span className="pc-pp__veiculo-icone" aria-hidden><Icone size={18} /></span>
+        <span className="pc-pp__veiculo-texto">
+          <span className="pc-pp__veiculo-nome">{nome}</span>
+          {detalhe && <span className="pc-pp__veiculo-det">{detalhe}</span>}
+          {aviso && <span className="pc-pp__veiculo-aviso"><TriangleAlert size={12} aria-hidden /> {aviso}</span>}
         </span>
-        <span className="pc-pp__veiculo-nome">{nome}</span>
-        {detalhe && <span className="pc-pp__veiculo-det">{detalhe}</span>}
-        {aviso && <span className="pc-pp__veiculo-aviso"><TriangleAlert size={12} aria-hidden /> {aviso}</span>}
+        <span className="pc-pp__veiculo-check" aria-hidden><Check size={12} strokeWidth={3} /></span>
       </span>
     </label>
   )
