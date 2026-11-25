@@ -53,7 +53,7 @@ export function useInicio(source: Source, now: () => Date = agora, visoes: reado
         ;[comp, vis] = await buscar()
       }
       if (id !== pedido.current) return
-      if (!vis.erro) cachePorVisao.current.set(alvo, vis)
+      if (!vis.erro && temVisao) cachePorVisao.current.set(alvo, vis)
       setCompartilhados(comp)
       setDados(vis)
     } catch (error) {

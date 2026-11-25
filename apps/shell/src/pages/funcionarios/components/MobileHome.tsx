@@ -22,6 +22,8 @@ type Props = {
   counts: Record<AlertKind, number>
   /** Chips de alerta que o perfil lê. */
   alertas: readonly AlertKind[]
+  /** Mostra o filtro de vínculo (grupo rh); sem leitura ele não aparece nem conta como ativo. */
+  vinculo: boolean
   filters: Filters
   update: (patch: Partial<Filters>) => void
   reset: () => void
@@ -56,10 +58,10 @@ function filtrosExtras(filters: Filters) {
 }
 
 export function MobileHome(props: Props) {
-  const { views, visible, shown = visible, footer, words, counts, alertas, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
+  const { views, visible, shown = visible, footer, words, counts, alertas, vinculo, filters, update, reset, ativos, loading, error, envLabel, onReload, onOpen, onNew, onAcessosSemFicha } = props
   // A folha de filtros aberta vive na URL (`filtros=1`).
   const [sheet, setSheet] = useQueryBandeira('filtros')
-  const extras = filtrosExtras(filters)
+  const extras = filtrosExtras(vinculo ? filters : { ...filters, vinculo: null })
   const toggleStatus = (value: number) => update({ status: filters.status.includes(value) ? filters.status.filter((item) => item !== value) : [...filters.status, value] })
 
   return (
@@ -133,7 +135,7 @@ export function MobileHome(props: Props) {
 
       <Button size="touch" className="m-fab" icon={<Plus size={20} />} onClick={onNew}>Novo</Button>
 
-      {sheet && <FiltrosSheet filters={filters} update={update} reset={reset} total={visible.length} onClose={() => setSheet(false)} />}
+      {sheet && <FiltrosSheet filters={filters} vinculo={vinculo} update={update} reset={reset} total={visible.length} onClose={() => setSheet(false)} />}
     </div>
   )
 }
@@ -152,7 +154,7 @@ function OptionGroup({ label, options, value, onChange }: { label: string; optio
   )
 }
 
-function FiltrosSheet({ filters, update, reset, total, onClose }: { filters: Filters; update: (patch: Partial<Filters>) => void; reset: () => void; total: number; onClose: () => void }) {
+function FiltrosSheet({ filters, vinculo, update, reset, total, onClose }: { filters: Filters; vinculo: boolean; update: (patch: Partial<Filters>) => void; reset: () => void; total: number; onClose: () => void }) {
   const panel = useRef<HTMLDivElement>(null)
   useEffect(() => { panel.current?.focus() }, [])
 
@@ -167,7 +169,7 @@ function FiltrosSheet({ filters, update, reset, total, onClose }: { filters: Fil
         <div className="m-sheet-body">
           <OptionGroup label="Função" options={FUNCAO} value={filters.funcao} onChange={(funcao) => update({ funcao })} />
           <OptionGroup label="Empresa" options={EMPRESA_CURTA} value={filters.empresa} onChange={(empresa) => update({ empresa })} />
-          <OptionGroup label="Vínculo" options={VINCULO} value={filters.vinculo} onChange={(vinculo) => update({ vinculo })} />
+          {vinculo ? <OptionGroup label="Vínculo" options={VINCULO} value={filters.vinculo} onChange={(vinculo) => update({ vinculo })} /> : null}
           <fieldset className="m-sheet-group">
             <legend>Ordenar por</legend>
             <div className="m-pills">

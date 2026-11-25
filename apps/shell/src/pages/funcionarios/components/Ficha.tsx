@@ -291,10 +291,10 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                       />
                     ))}
                     {group === 'assinatura' && (
-                      <AditivoAssinatura id={original?.id ?? null} atual={original?.aditivo ?? null} assinadoEm={typeof original?.values.new_aditivoassinaturaem === 'string' ? original.values.new_aditivoassinaturaem : null} source={source} disabled={saving} onRegistrado={recarregarAposAditivo} />
+                      <AditivoAssinatura id={original?.id ?? null} atual={original?.aditivo ?? null} assinadoEm={typeof original?.values.new_aditivoassinaturaem === 'string' ? original.values.new_aditivoassinaturaem : null} source={source} disabled={saving || !coluna('cr40f_assinatura').editar} onRegistrado={recarregarAposAditivo} />
                     )}
-                    {group === 'vinculo' && (
-                      <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
+                    {group === 'vinculo' && coluna('cr40f_veiculoatual').ler && (
+                      <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} disabled={!coluna('cr40f_veiculoatual').editar} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
                     )}
                   </div>
                 </fieldset>

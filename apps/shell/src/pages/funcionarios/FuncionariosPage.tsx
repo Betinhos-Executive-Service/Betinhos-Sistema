@@ -98,7 +98,9 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // A busca filtra 200 ms depois da última tecla (celular e desktop); o texto de cada colaborador já vem normalizado.
   const buscaCelular = useDebouncedText(filters.search)
   const palavrasCelular = useMemo(() => searchWords(buscaCelular), [buscaCelular])
-  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular, alerta: filters.alerta && alertasPermitidos.includes(filters.alerta) ? filters.alerta : null }), [filters, buscaCelular, alertasPermitidos])
+  // Sem leitura do grupo rh o vínculo volta vazio: o filtro salvo no celular deixaria a lista vazia.
+  const leVinculo = campos.some((f) => f.key === 'vinculo')
+  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular, alerta: filters.alerta && alertasPermitidos.includes(filters.alerta) ? filters.alerta : null, vinculo: leVinculo ? filters.vinculo : null }), [filters, buscaCelular, alertasPermitidos, leVinculo])
   const views = useMemo(() => withAlertas(rows, today), [rows, today])
   const base = useMemo(() => applyBaseFilters(views, filtrosCelular), [views, filtrosCelular])
   const visible = useMemo(() => applyFilters(views, filtrosCelular), [views, filtrosCelular])
@@ -190,6 +192,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           footer={<LazyFooter loaded={mobileSlice.slice.length} more={mobileSlice.more} onLoadMore={mobileSlice.loadMore} pending={pending} />}
           counts={counts}
           alertas={alertasPermitidos}
+          vinculo={leVinculo}
           filters={filters}
           update={update}
           reset={() => setFilters(DEFAULT_FILTERS)}
