@@ -46,6 +46,20 @@ export function CardMotorista({ dados, cfg, oculto, abrirTela }: Props) {
   const nome = m.nome || t("m.motorista");
   const c = contatoMotorista(dados, cfg);
   const semContato = !c.ligar && !c.whats;
+  if (dados?.emDefinicao) return (
+    <section className="card c-motorista motorista" id="cartao" aria-labelledby="m-rotulo" hidden={oculto}>
+      <h2 id="m-rotulo">{t("card.motorista")}</h2>
+      <div className="m-topo">
+        <Avatar className="avatar" id="m-avatar" inicial="?" />
+        <span className="m-info"><b id="m-nome">{t("m.emDefinicao")}</b><small className="m-papel">{t("m.emDefinicaoAviso")}</small></span>
+        <div className="m-acoes" id="m-contato" hidden={semContato}>
+          <a className="btn btn-secundario btn-icone" id="m-ligar" href={c.ligar} hidden={!c.ligar} aria-label={t("m.ligarCentral")}><Telefone /><span className="sr">{t("m.ligar")}</span></a>
+          <a className="btn btn-primario btn-icone" id="m-whats" href={c.whats} hidden={!c.whats} target="_blank" rel="noopener" aria-label={t("m.whatsCentral")}><Mensagem /><span className="sr">WhatsApp</span></a>
+        </div>
+      </div>
+      {cfg.vapid ? <Sino vapid={cfg.vapid} emDefinicao abrirTela={abrirTela} /> : null}
+    </section>
+  );
   return (
     <section className="card c-motorista motorista" id="cartao" aria-labelledby="m-rotulo" hidden={oculto}>
       <h2 id="m-rotulo">{t("card.motorista")}</h2>

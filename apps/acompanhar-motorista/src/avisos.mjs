@@ -58,12 +58,19 @@ function horaPrevista(dados, idioma, agora) {
   return new Intl.DateTimeFormat(local, { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(agora + min * 60000));
 }
 
+// Fora da ordem da viagem: sai quando a escala define ou troca o motorista (tirar não avisa).
+export const MOTORISTA_DEFINIDO = "motorista_definido";
+
 /** `{ titulo, corpo }` do evento no idioma da inscrição (pt quando não reconhecido). */
 export function textoAviso(evento, dados, idioma = "pt", agora = Date.now()) {
   const i = Math.max(0, IDS.indexOf(idioma)), lang = IDS[i];
   const txt = (chave, vars = {}) => (AVISOS[`${evento}.${chave}`] ? preencher(AVISOS[`${evento}.${chave}`][i], vars) : "");
   const v = dados?.veiculo ?? {}, motorista = dados?.motorista?.nome ?? null;
   const veiculo = [v.modelo, corNoIdioma(v.cor, lang)].filter(Boolean).join(" ");
+  if (evento === MOTORISTA_DEFINIDO) {
+    const carro = [veiculo, v.placa].filter(Boolean).join(" · ");
+    return { titulo: txt("titulo", { motorista: motorista?.split(" ")[0] }), corpo: carro || txt("semCarro") };
+  }
   if (evento === "chegando_embarque") {
     return { titulo: motorista ? txt("titulo", { motorista }) : txt("semNome"), corpo: txt("corpo", { veiculo, placa: v.placa }) };
   }

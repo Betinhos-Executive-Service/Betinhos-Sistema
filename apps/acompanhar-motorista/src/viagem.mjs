@@ -3,7 +3,7 @@
 // (chegou, saiu, concluiu, chegando), para o conector e o Dataverse. O Worker fala com ele por `stub.fetch`
 // (host `https://viagem`); sem `extends DurableObject` porque `cloudflare:workers` não carrega nos testes (Node).
 import { jaAvaliado } from "./avaliacao.mjs";
-import { EVENTOS, eventosNovos, guardarInscricao, payloadAviso, validarInscricao } from "./avisos.mjs";
+import { EVENTOS, eventosNovos, guardarInscricao, MOTORISTA_DEFINIDO, payloadAviso, validarInscricao } from "./avisos.mjs";
 import { calcularDados, gravarNoKv, marcosChave, publicarDados } from "./dados.mjs";
 import { mesclarEtapas } from "./etapas.mjs";
 import { distanciaMetros } from "./infleet.mjs";
@@ -254,7 +254,10 @@ export class Viagem {
       try { dados = await this.ler(); } catch (e) { console.warn(`Leitura da inscrição falhou: ${e?.message}`); }
       if (this.s.encerrado) return json({ expirado: true }, 404);
       falhou = !dados || Boolean(dados.fonteIndisponivel);
-      if (!falhou) for (const e of eventosNovos(dados, s.enviados)) s.enviados[e] = true;
+      if (!falhou) {
+        for (const e of eventosNovos(dados, s.enviados)) s.enviados[e] = true;
+        s.motorista = dados.motorista?.nome ?? null;
+      } else delete s.motorista; // sem leitura de agora, a próxima vira a base (não avisa o que a pessoa já vê)
     }
     s.inscricoes = guardarInscricao(s.inscricoes, inscricao);
     await this.salvar();
@@ -270,24 +273,37 @@ export class Viagem {
     return new Response(null, { status: 204 });
   }
 
-  // Um aviso por leitura: o evento novo mais adiantado; os anteriores ficam marcados. Inscrição que o serviço
-  // de push deu como encerrada (404/410) sai; sem nenhuma entrega, tenta no alarm seguinte, até 3 vezes.
+  // Um aviso de fase por leitura: o evento novo mais adiantado; os anteriores ficam marcados. Antes dele, o do
+  // motorista (definido ou trocado antes da viagem começar). Sem nenhuma entrega, tenta no alarm seguinte, até 3 vezes.
   async avisar(dados) {
     const s = this.s, vapid = vapidDoEnv(this.env);
     if (!dados || !vapid || !s?.inscricoes?.length) return;
+    const nome = dados.motorista?.nome ?? null; // em definição não há nome
+    const saiu = s.enviados.viagem_iniciada || eventosNovos(dados).some((e) => e === "viagem_iniciada" || e === "concluido");
+    // Sem nome fora de "em definição" (ex.: motorista da Infleet sumiu numa leitura): mantém a base, senão a volta
+    // do mesmo nome avisaria de novo. undefined = Viagem de antes deste aviso: o motorista de agora vira a base.
+    const nomeSumiu = !nome && !dados.emDefinicao && !saiu && s.motorista !== undefined;
+    if (s.motorista === undefined || !nome || saiu) {
+      if (!nomeSumiu) { s.motorista = nome; delete s.falhas[MOTORISTA_DEFINIDO]; }
+    } else if (nome !== s.motorista && await this.enviar(MOTORISTA_DEFINIDO, dados, vapid)) s.motorista = nome;
     const evento = eventosNovos(dados, s.enviados).at(-1);
-    if (!evento) return;
+    if (evento && await this.enviar(evento, dados, vapid)) for (const e of EVENTOS.slice(0, EVENTOS.indexOf(evento) + 1)) s.enviados[e] = true;
+    await this.salvar();
+  }
+
+  // Manda o evento a todas as inscrições; a que o serviço de push deu como encerrada (404/410) sai.
+  // true = resolvido (entregue, sem inscrições ou 3 falhas): quem chamou marca como enviado.
+  async enviar(evento, dados, vapid) {
+    const s = this.s;
     const resultados = await Promise.all(s.inscricoes.map((i) =>
       sendPush(i, payloadAviso(s.id, evento, dados, i.idioma), vapid).catch(() => ({ endpoint: i.endpoint, status: 0, gone: false }))));
     const saem = new Set(resultados.filter((r) => r.gone).map((r) => r.endpoint));
     s.inscricoes = s.inscricoes.filter((i) => !saem.has(i.endpoint));
     const entregue = resultados.some((r) => r.status >= 200 && r.status < 300);
     if (!entregue && s.inscricoes.length) s.falhas[evento] = (s.falhas[evento] ?? 0) + 1;
-    if (entregue || !s.inscricoes.length || s.falhas[evento] >= MAX_FALHAS_AVISO) {
-      for (const e of EVENTOS.slice(0, EVENTOS.indexOf(evento) + 1)) s.enviados[e] = true;
-      delete s.falhas[evento];
-    }
-    await this.salvar();
+    const resolvido = entregue || !s.inscricoes.length || s.falhas[evento] >= MAX_FALHAS_AVISO;
+    if (resolvido) delete s.falhas[evento];
+    return resolvido;
   }
 
   webSocketMessage() { /* a página não manda nada; só recebe */ }

@@ -5,6 +5,7 @@ import { ToastProvider } from '@betinhos/ui'
 import { createMockDocsSource, type DocsSource } from '../data/source'
 import type { Arquivo, DocEmitido } from '../domain/types'
 import { Checklist } from './Checklist'
+import { ComAcessos } from '../../../app/ComAcessos'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -22,10 +23,50 @@ async function comArquivoNaCnh(nome = 'cnh.pdf') {
   return { source, doc, arq }
 }
 
+/** Mock com um arquivo já enviado no CRLV vigente do veículo v1. */
+async function comArquivoNoCrlv(nome = 'crlv.pdf') {
+  const source = createMockDocsSource()
+  const data = await source.carregar()
+  const doc = data.docs.find((d) => d.donoId === 'v1' && d.tipoId === 't-crlv' && d.situacao === 'vigente')!
+  await source.enviarArquivo(doc, pdf(nome))
+  return source
+}
+
 const renderChecklist = (source: DocsSource, donoId = 'm1') => render(<ToastProvider><Checklist source={source} donoId={donoId} /></ToastProvider>)
 const itemCnh = () => screen.findByRole('listitem', { name: 'CNH' })
+const itemCrlv = () => screen.findByRole('listitem', { name: 'CRLV / Licenciamento' })
 
 describe('Checklist', () => {
+  it('RH Operador vê o arquivo sem Excluir; RH Gestor vê Excluir', async () => {
+    for (const [perfis, ve] of [['rh:operador', false], ['rh:gestor', true]] as const) {
+      const { source } = await comArquivoNaCnh()
+      render(<ComAcessos perfis={perfis}><ToastProvider><Checklist source={source} donoId="m1" /></ToastProvider></ComAcessos>)
+      const cnh = await itemCnh()
+      await within(cnh).findByText('cnh.pdf')
+      expect(Boolean(within(cnh).queryByRole('button', { name: 'Excluir cnh.pdf' }))).toBe(ve)
+      cleanup()
+    }
+  })
+
+  it('lixeira em documento de veículo segue o nível na Frota', async () => {
+    for (const [perfis, ve] of [['frota:gestor', true], ['frota:operador', false], ['rh:gestor', false]] as const) {
+      const source = await comArquivoNoCrlv()
+      render(<ComAcessos perfis={perfis}><ToastProvider><Checklist source={source} donoId="v1" /></ToastProvider></ComAcessos>)
+      const crlv = await itemCrlv()
+      await within(crlv).findByText('crlv.pdf')
+      expect(Boolean(within(crlv).queryByRole('button', { name: 'Excluir crlv.pdf' })), perfis).toBe(ve)
+      cleanup()
+    }
+  })
+
+  it('Frota Gestor sem RH Gestor não vê lixeira em documento de funcionário', async () => {
+    const { source } = await comArquivoNaCnh()
+    render(<ComAcessos perfis="frota:gestor,rh:operador"><ToastProvider><Checklist source={source} donoId="m1" /></ToastProvider></ComAcessos>)
+    const cnh = await itemCnh()
+    await within(cnh).findByText('cnh.pdf')
+    expect(within(cnh).queryByRole('button', { name: 'Excluir cnh.pdf' })).toBeNull()
+  })
+
   it('lista os tipos com estado, abre o histórico pelo ícone e abre a renovação', async () => {
     renderChecklist(createMockDocsSource())
     const cnh = await itemCnh()

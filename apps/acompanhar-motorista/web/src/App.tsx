@@ -32,6 +32,7 @@ export function App() {
 
   const concluido = dados?.fase === "concluido";
   const noLocal = dados?.fase === "no_local" && !!dados.posicao;
+  const semMapa = dados?.rastreio === false;
   const idade = idadePosicao(dados, desvio, agora);
   const vivo = estadoVivo(dados, t, idade, falhandoDesde, agora);
   const os = String(dados?.titulo ?? "").match(/OS[-\s]*(\d+)/i);
@@ -52,9 +53,9 @@ export function App() {
   // Sem mapa (biblioteca lenta ou ausente), o card final não fica escondido: aparece em 600 ms.
   useEffect(() => {
     if (!concluido || mapaPronto || fimCard) return;
-    const id = setTimeout(() => setFimCard(true), 600);
+    const id = setTimeout(() => setFimCard(true), semMapa ? 0 : 600);
     return () => clearTimeout(id);
-  }, [concluido, mapaPronto, fimCard]);
+  }, [concluido, mapaPronto, fimCard, semMapa]);
 
   const mostrarCard = useCallback(() => setFimCard(true), []);
   const abrirTela = useCallback((q: Exclude<Tela, null>) => { origemTela.current = document.activeElement; setTela(q); }, []);
@@ -77,16 +78,18 @@ export function App() {
       <div id="app" className={(concluido ? "fim" : "") + (fimCard ? " fim-card" : "")}>
         <Cabecalho reserva={reserva} />
         <div className="diag" id="diag" hidden={!diag}>{diag}</div>
-        <main className="portal">
+        <main className={"portal" + (semMapa ? " sem-mapa" : "")}>
           <div className="col-a">
             <CardStatus dados={dados} cfg={BT.cfg} eta={eta} idade={idade} desvio={desvio} agora={agora} titulo={titulo} />
             <CardMotorista dados={dados} cfg={BT.cfg} oculto={concluido} abrirTela={abrirTela} />
             <CardTrajeto dados={dados} chegada={eta.chegada} oculto={concluido} />
             <CardPassageiros lista={pax.lista} aberto={pax.aberto} visivel={pax.existe} versaoFoto={pax.versaoFoto} salvo={pax.salvo} limparSalvo={pax.limparSalvo} editar={editar} />
           </div>
-          <div className="col-b">
-            <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />
-          </div>
+          {semMapa ? null : (
+            <div className="col-b">
+              <CardMapa dados={dados} retomada={retomada} vivo={{ ...vivo, oculto: vivo.oculto || concluido }} aoMostrarCard={mostrarCard} aoMapaPronto={setMapaPronto} aoDiagnostico={setDiag} />
+            </div>
+          )}
         </main>
         <span className="versao" aria-hidden="true">{BT.versao}</span>
       </div>

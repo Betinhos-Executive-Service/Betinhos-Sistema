@@ -8,6 +8,7 @@ test('só a tela publica a tela e nenhum plugin', () => {
 
 test('script de publicação da tela também republica a tela', () => {
   assert.equal(mudancasDev(['packages/deploy/push-dev.ps1']).tela, true)
+  assert.equal(mudancasDev(['packages/deploy/chunk-cleanup.ps1']).tela, true)
   assert.equal(mudancasDev(['packages/deploy/bump-version.mjs']).tela, true)
 })
 

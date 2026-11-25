@@ -132,4 +132,11 @@ describe('mapa de acessos', () => {
     const semMotivo = Object.entries(mapa.rotas).flatMap(([id, r]) => (r.ignorar ?? []).filter((i) => !i.motivo?.trim()).map((i) => `${id}: ${i.tabela}`))
     expect(semMotivo).toEqual([])
   })
+
+  it('local só lista tabela dona ou filha do próprio módulo', () => {
+    for (const [nome, modulo] of Object.entries(mapa.modulos) as [string, Record<string, string[] | undefined>][]) {
+      const suas = new Set([...(modulo.donas ?? []), ...(modulo.filhas ?? [])])
+      for (const tabela of modulo.local ?? []) expect(suas.has(tabela), `${nome}: ${tabela}`).toBe(true)
+    }
+  })
 })

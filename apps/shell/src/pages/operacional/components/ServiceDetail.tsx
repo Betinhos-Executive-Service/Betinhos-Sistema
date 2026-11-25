@@ -130,11 +130,10 @@ export function ServiceDetail({ reserva, filhos, motoristas, reservas, now, stat
         {linkAtual
           ? <LinkAcompanhamento link={linkAtual} expiraEm={expiraEm} now={now} mensagem={mensagemCliente({ motorista: reserva.motorista, carro, link: linkAtual })}
               onCopied={(what) => toast({ tone: 'success', message: what === 'link' ? 'Link copiado.' : 'Mensagem copiada.' })} onCopyFailed={copyFailed} />
-          : <p className="op-detail__nophone">{motorista?.terceiro ? 'Motorista terceiro sem rastreador: não há link de acompanhamento.' : 'Gere um link para o cliente acompanhar o carro ao vivo.'}</p>}
+          : <p className="op-detail__nophone">Gere um link para o cliente acompanhar o serviço.</p>}
         <div className="op-detail__contact">
           <Button variant="secondary" onClick={() => void copiar(linkAtual, 'Mensagem copiada.')}><Copy size={16} aria-hidden="true" />Copiar para o cliente</Button>
-          <Button variant="secondary" onClick={() => void gerar()} disabled={motorista?.terceiro || gerando} aria-busy={gerando}
-            title={motorista?.terceiro ? 'Motorista terceiro sem rastreador' : undefined}><MapPin size={16} aria-hidden="true" />{gerando ? 'Gerando…' : linkAtual ? 'Gerar novo link' : 'Gerar link'}</Button>
+          <Button variant="secondary" onClick={() => void gerar()} disabled={gerando} aria-busy={gerando}><MapPin size={16} aria-hidden="true" />{gerando ? 'Gerando…' : linkAtual ? 'Gerar novo link' : 'Gerar link'}</Button>
         </div>
       </section>
 

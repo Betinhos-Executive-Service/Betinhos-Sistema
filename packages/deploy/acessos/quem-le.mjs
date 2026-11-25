@@ -6,48 +6,19 @@
 // Uso: DV_URL=https://<org>.crm2.dynamics.com DV_ACCESS_TOKEN=<token> node packages/deploy/acessos/quem-le.mjs
 // Imprime so nomes de papeis e equipes e contagens; nunca nomes de pessoas.
 
-const BASE = (process.env.DV_URL ?? '').replace(/\/+$/, '')
-const TOKEN = process.env.DV_ACCESS_TOKEN
-if (!BASE || !TOKEN) {
-  console.error('Defina DV_URL e DV_ACCESS_TOKEN.')
+import { criarCliente, limpo, tokenDoAmbiente } from './dv.mjs'
+
+// Local: DV_URL + DV_ACCESS_TOKEN (DEV ou PROD, so GET). No CI (job acessos): DV_ENVIRONMENT_URL e conta de servico.
+let sessao
+try {
+  sessao = await tokenDoAmbiente({ somenteDevLocal: false })
+} catch (e) {
+  console.error(limpo(e.message))
   process.exit(2)
 }
-const API = `${BASE}/api/data/v9.2`
+const { todos, um, ligacao } = criarCliente(sessao)
 const TABELA = 'cr40f_bancodedados'
 const ADMIN = ['Administrador do Sistema', 'System Administrator']
-
-async function todos(caminho) {
-  const linhas = []
-  let url = `${API}/${caminho}`
-  while (url) {
-    const r = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${TOKEN}`,
-        Accept: 'application/json',
-        'OData-MaxVersion': '4.0',
-        'OData-Version': '4.0',
-        Prefer: 'odata.maxpagesize=500',
-      },
-    })
-    if (!r.ok) throw new Error(`GET ${caminho.split('?')[0]} falhou: ${r.status} ${(await r.text()).slice(0, 300)}`)
-    const j = await r.json()
-    linhas.push(...(j.value ?? []))
-    url = j['@odata.nextLink'] ?? null
-  }
-  return linhas
-}
-
-async function um(caminho) {
-  const r = await fetch(`${API}/${caminho}`, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' } })
-  if (!r.ok) throw new Error(`GET ${caminho.split('?')[0]} falhou: ${r.status} ${(await r.text()).slice(0, 300)}`)
-  return r.json()
-}
-
-// Tabelas de ligacao: o nome do conjunto vem da metadata, nunca adivinhado.
-async function ligacao(logico, campos) {
-  const meta = await um(`EntityDefinitions(LogicalName='${logico}')?$select=EntitySetName`)
-  return todos(`${meta.EntitySetName}?$select=${campos}`)
-}
 
 function agrupar(linhas, chave, valor) {
   const mapa = new Map()
@@ -123,7 +94,7 @@ const equipesExpostas = [...papeisDe.entries()]
   .filter(([t, ids]) => [...ids].some((id) => papeisQueLeem.has(id)) && !ehAdmin(nomes(ids, nomeDoPapel)) && !ehAdmin(nomes(perfisDe.get(t) ?? [], nomeDoPerfil)))
   .map(([t]) => nomeDaEquipe.get(t))
 
-console.log(`${BASE}: ${usuarios.length} usuarios ativos`)
+console.log(`${sessao.url}: ${usuarios.length} usuarios ativos`)
 console.log(`  administradores (leem tudo): ${admins}`)
 console.log(`  nao leem ${TABELA}: ${semLeitura}`)
 console.log(`  cobertos pelo perfil de coluna do administrador: ${cobertos}`)

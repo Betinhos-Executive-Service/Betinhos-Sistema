@@ -1,4 +1,5 @@
-import type { EnderecoSugerido, EstimativaRota, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { Marca } from '../domain/marca'
+import type { DecisaoAprovacao, EnderecoSugerido, EstimativaRota, Motivo, NovoPedido, PassageiroPedido, Pedido, PedidoParaAprovar, Servico, Sessao } from '../domain/types'
 
 export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
@@ -9,6 +10,9 @@ export class ErroPortal extends Error {
   }
 }
 
+/** Texto do erro para o usuário: a mensagem do Worker quando ela diz algo, senão o padrão da tela. */
+export const mensagemDoErro = (e: unknown, padrao: string) => (e instanceof ErroPortal && e.message !== e.codigo ? e.message : padrao)
+
 /** Regra da senha, usada pela tela, pelo mock e pelo Worker. */
 export const SENHA_MIN = 8
 /** Intervalo mínimo entre dois códigos para o mesmo e-mail: o Worker recusa antes disso e a tela mostra a contagem. */
@@ -17,6 +21,11 @@ export const senhaFraca = (senha: string) => senha.length < SENHA_MIN || !senha.
 
 /** Contrato das telas com o servidor. O protótipo usa o mock; o portal real, o Worker (`/api/*`). */
 export interface PortalApi {
+  /**
+   * Identidade do cliente na tela de entrada: pelo link (`chave` de `?c=`) ou pelo domínio do e-mail digitado.
+   * `null` quando não há marca (domínio público, cliente sem logo ou sem acesso): a tela fica só com a Betinhos.
+   */
+  marca(consulta: { chave?: string; email?: string }, sinal?: AbortSignal): Promise<Marca | null>
   /** Sessão ainda válida (cookie de 30 dias) ou `null`: o portal abre já logado. */
   sessao(): Promise<Sessao | null>
   /** E-mail liberado + senha criada pela pessoa. Sem cadastro ou sem senha: `senha_invalida`, igual a senha errada. */
@@ -46,4 +55,8 @@ export interface PortalApi {
   meusServicos(): Promise<Pedido[]>
   /** Cancela um pedido do próprio usuário ainda em Solicitado; senão `nao_permitido` com a mensagem para a tela. */
   cancelarPedido(id: string): Promise<Pedido>
+  /** Aprovador: pedidos do cliente esperando decisão, exceto os próprios. Quem não é aprovador recebe `nao_permitido`. */
+  aprovacoes(): Promise<PedidoParaAprovar[]>
+  /** Aprovador: aprova (o pedido segue para a Betinhos) ou recusa com motivo (o pedido é cancelado). `nao_permitido` traz a mensagem para a tela. */
+  decidirAprovacao(id: string, decisao: DecisaoAprovacao): Promise<void>
 }

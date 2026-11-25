@@ -1,5 +1,5 @@
 ﻿# Cria (ou atualiza) no DEV o flow "Portal cliente – e-mails" (gatilho HTTP chamado pelo Worker do portal de validação),
-# na solução AppBetinhos e na BetinhosAutomacao. Envia os e-mails de código, resumo diário e resposta da Betinhos
+# na solução AppBetinhos e na BetinhosAutomacao. Envia os e-mails de código, resumo diário, resposta, pedido confirmado, aprovação e aviso à operação da Betinhos
 # com remetente fixo (Office 365 Outlook, SendEmailV2 com "De"; a conta da conexão precisa poder enviar como esse endereço).
 # A definição vem de flows/portal-cliente-emails.json; os modelos HTML de flows/portal-cliente-emails/*.html entram
 # no lugar dos tokens __TPL_*__; o endereço da caixa entra por parâmetro (nunca no repo).
@@ -69,6 +69,8 @@ $raw = [IO.File]::ReadAllText((Join-Path $pasta 'portal-cliente-emails.json'), [
 $modelos = [ordered]@{
   __TPL_CODIGO__ = 'codigo.html'; __TPL_RESUMO__ = 'resumo-diario.html'; __TPL_LINHA_LIBERADO__ = 'resumo-linha-liberado.html'
   __TPL_LINHA_VENCENDO__ = 'resumo-linha-vencendo.html'; __TPL_RESPOSTA__ = 'resposta-betinhos.html'
+  __TPL_CONFIRMADO__ = 'pedido-confirmado.html'; __TPL_APROV_PENDENTE__ = 'aprovacao-pendente.html'; __TPL_APROV_LEMBRETE__ = 'aprovacao-lembrete.html'
+  __TPL_APROV_RESULTADO__ = 'aprovacao-resultado.html'; __TPL_AVISO_OPERACAO__ = 'aviso-operacao.html'; __TPL_CANCELAMENTO_OPERACAO__ = 'cancelamento-operacao.html'
 }
 foreach ($tok in $modelos.Keys) {
   $html = [IO.File]::ReadAllText((Join-Path $pasta "portal-cliente-emails\$($modelos[$tok])"), [Text.Encoding]::UTF8)

@@ -106,6 +106,8 @@ test('só documentação, CI e scripts de publicação: nada', () => {
     'packages/deploy/solucoes/conferir.mjs',
     'packages/deploy/push-front-prod.ps1',
     'packages/deploy/push-flows-dev.ps1',
+    'packages/deploy/chunk-cleanup.ps1',
+    'packages/deploy/testa-chunk-cleanup.ps1',
     'packages/deploy/flows-dev.mjs',
     'packages/deploy/flows-dev.test.mjs',
     'packages/deploy/backup/exportar-dataverse.mjs',
@@ -195,4 +197,27 @@ test('Portal sozinho: caminho portal, sem soluções; misturado, o portal public
   assert.equal(caminhoDaPublicacao(['packages/deploy/provision-equipamentos.ps1', 'apps/portal-cliente/worker/index.ts']).portal, true)
   assert.equal(caminhoDaPublicacao(['apps/shell/src/App.tsx']).portal, false)
   assert.equal(caminhoDaPublicacao(null).portal, true)
+})
+
+test('corte dos acessos não muda o caminho do PROD (roda no job acessos)', () => {
+  for (const a of [
+    'packages/deploy/acessos/corte.json',
+    'packages/deploy/acessos/corte.mjs',
+    'packages/deploy/acessos/corte-regras.mjs',
+    'packages/deploy/acessos/corte-regras.test.mjs',
+    'packages/deploy/acessos/corte-estado.mjs',
+    'packages/deploy/acessos/corte-unidade.mjs',
+    'packages/deploy/acessos/corte-unidade.test.mjs',
+    'packages/deploy/acessos/corte-ci.mjs',
+    'packages/deploy/acessos/relatorio-corte.mjs',
+    'packages/deploy/acessos/dv.mjs',
+    'packages/deploy/acessos/dv.test.mjs',
+    'packages/deploy/acessos/quem-le.mjs',
+    'packages/deploy/acessos/prova.mjs',
+    '.github/workflows/acessos-corte.yml',
+  ]) assert.equal(caminhoDoArquivo(a), 'nada', a)
+  assert.equal(caminhoDaPublicacao(['packages/deploy/acessos/corte.json']).caminho, 'nada')
+  assert.equal(caminhoDoArquivo('packages/deploy/acessos/aplicar-perfis.ps1'), 'solucoes')
+  assert.equal(caminhoDoArquivo('packages/deploy/acessos/perfis.gerado.json'), 'solucoes')
+  assert.equal(caminhoDoArquivo('packages/deploy/acessos/corte-extra.ps1'), 'solucoes')
 })

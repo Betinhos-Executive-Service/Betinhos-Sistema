@@ -137,3 +137,9 @@ test('o hash do perfis.gerado.json esta numa migration', () => {
     'Regenerou os perfis? Crie uma migration nova chamando Invoke-PerfisDeAcesso com o hash novo (node packages/deploy/acessos/gerar.mjs --hash).',
   )
 })
+
+test('local com tabela fora do modulo e recusado', () => {
+  const outro = JSON.parse(readFileSync(CAMINHO_MAPA, 'utf8'))
+  outro.modulos.frota.local = ['cr40f_avisodestinatario']
+  assert.throws(() => gerarPerfis(outro, colunas), /local/)
+})

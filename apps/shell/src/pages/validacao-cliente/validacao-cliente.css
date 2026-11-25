@@ -83,3 +83,23 @@
 .vc-cfg__dado small { font-size: var(--bt-font-size-11); font-weight: var(--bt-font-weight-bold); color: var(--bt-color-text-secondary); }
 @media (max-width: 820px) { .vc-cfg { grid-template-columns: minmax(0, 1fr) auto; } .vc-cfg__dado { grid-column: 1 / -1; } }
 .vc-aba { margin-top: var(--bt-space-4); }
+
+.vc-previa { display: grid; gap: var(--bt-space-3); }
+.vc-previa__peca { margin: 0; display: grid; gap: var(--bt-space-2); }
+.vc-previa__peca figcaption { font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.vc-previa__login, .vc-previa__topo { border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface); }
+.vc-previa__login { display: grid; gap: var(--bt-space-3); justify-items: start; padding: var(--bt-space-4); }
+.vc-previa__marcas, .vc-previa__topo { display: flex; align-items: center; gap: var(--bt-space-3); }
+.vc-previa__topo { padding: var(--bt-space-2) var(--bt-space-3); }
+.vc-previa__betinhos { font-weight: var(--bt-font-weight-extrabold); }
+.vc-previa__logo { max-width: 120px; max-height: 36px; object-fit: contain; }
+.vc-previa__logo--topo { max-height: 24px; }
+.vc-previa__nome { margin-left: auto; font-size: var(--bt-font-size-12); color: var(--bt-color-text-secondary); }
+.vc-previa__campo { width: 100%; padding: var(--bt-space-2) var(--bt-space-3); border: var(--bt-border-width-default) solid var(--bt-color-border); border-radius: var(--bt-radius-md); color: var(--bt-color-text-secondary); font-size: var(--bt-font-size-13); }
+.vc-previa__botao { padding: var(--bt-space-2) var(--bt-space-4); border-radius: var(--bt-radius-md); background-color: var(--bt-color-brand); color: #fff; font-weight: var(--bt-font-weight-bold); font-size: var(--bt-font-size-13); }
+.vc-identidade { display: grid; gap: var(--bt-space-3); }
+.vc-identidade__logo { display: flex; gap: var(--bt-space-3); align-items: center; flex-wrap: wrap; }
+.vc-identidade__logo img { max-width: 140px; max-height: 48px; object-fit: contain; }
+.vc-identidade__arquivo { display: none; }
+.vc-previa-prazos { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.vc-previa-prazos ul { margin: 0; padding-left: var(--bt-space-4); font-size: var(--bt-font-size-13); }

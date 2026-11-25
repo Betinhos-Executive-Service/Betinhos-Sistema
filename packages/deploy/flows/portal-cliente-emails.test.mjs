@@ -9,6 +9,12 @@ const modelos = {
   __TPL_LINHA_LIBERADO__: 'resumo-linha-liberado.html',
   __TPL_LINHA_VENCENDO__: 'resumo-linha-vencendo.html',
   __TPL_RESPOSTA__: 'resposta-betinhos.html',
+  __TPL_CONFIRMADO__: 'pedido-confirmado.html',
+  __TPL_APROV_PENDENTE__: 'aprovacao-pendente.html',
+  __TPL_APROV_LEMBRETE__: 'aprovacao-lembrete.html',
+  __TPL_APROV_RESULTADO__: 'aprovacao-resultado.html',
+  __TPL_AVISO_OPERACAO__: 'aviso-operacao.html',
+  __TPL_CANCELAMENTO_OPERACAO__: 'cancelamento-operacao.html',
 }
 const ler = (f) => readFileSync(new URL(f, import.meta.url), 'utf8')
 const raw = ler('./portal-cliente-emails.json')
@@ -53,7 +59,7 @@ const avaliar = (expr, ctx) => {
     empty: (x) => x == null || x.length === 0, length: (x) => x.length, json: (s) => JSON.parse(s), join: (a, sep) => a.join(sep),
     and: (...a) => a.every(Boolean), or: (...a) => a.some(Boolean), not: (a) => !a, greater: (a, b) => a > b,
     lessOrEquals: (a, b) => a <= b, contains: (s, p) => s.includes(p), startsWith: (s, p) => s.startsWith(p),
-    concat: (...a) => a.join(''), float: (s) => { const n = Number(s); if (Number.isNaN(n)) throw new Error('float'); return n },
+    equals: (a, b) => a === b, concat: (...a) => a.join(''), float: (s) => { const n = Number(s); if (Number.isNaN(n)) throw new Error('float'); return n },
     formatNumber: (n, f, l) => new Intl.NumberFormat(l, { style: 'currency', currency: 'BRL' }).format(n),
   }
   return new Function(...Object.keys(fns), `return ${paraJs(expr.slice(1))}`)(...Object.values(fns))
@@ -99,26 +105,40 @@ const exemplos = {
     vencendo: [{ numero: 'RV-10102', prazo: '29/10/2026' }] } },
   resposta_betinhos: { tipo: 'resposta_betinhos', para: ['ana.souza@tenaris.com'], dados: {
     nome: 'Ana Souza', numero: 'RV-10234', trecho: 'O valor inclui 2 horas de espera no aeroporto por atraso do voo.', linkPortal: 'https://portal.betinhos.com.br/' } },
+  pedido_confirmado: { tipo: 'pedido_confirmado', para: ['paula@latasa.com.br', 'hiroshi@exemplo.com'], dados: {
+    numero: 'RV-10300', data: '01/12/2026 06:30', origem: 'Latasa, Pindamonhangaba', destino: 'GRU Guarulhos', passageiros: 'Paula Lima, Hiroshi Tanaka' } },
+  aprovacao_pendente: { tipo: 'aprovacao_pendente', para: ['aline@latasa.com.br'], dados: {
+    nome: 'Aline', solicitante: 'Paula Lima', numero: 'RV-10301', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka', linkPortal: 'https://cliente.betinhos.com.br/' } },
+  aprovacao_lembrete: { tipo: 'aprovacao_lembrete', para: ['aline@latasa.com.br'], dados: {
+    nome: 'Aline', solicitante: 'Paula Lima', numero: 'RV-10301', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka', linkPortal: 'https://cliente.betinhos.com.br/' } },
+  aprovacao_resultado: { tipo: 'aprovacao_resultado', para: ['paula@latasa.com.br'], dados: {
+    nome: 'Paula', resultado: 'recusado', aprovador: 'Aline', numero: 'RV-10301', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', motivo: 'Fora do orçamento do mês.', linkPortal: 'https://cliente.betinhos.com.br/' } },
+  aviso_operacao: { tipo: 'aviso_operacao', para: [], dados: {
+    numero: 'RV-10301', solicitante: 'Paula Lima', cliente: 'Latasa', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka' } },
+  cancelamento_operacao: { tipo: 'cancelamento_operacao', para: [], dados: {
+    numero: 'RV-10301', solicitante: 'Paula Lima', cliente: 'Latasa', data: '02/12/2026 08:00', trajeto: 'Latasa, Pindamonhangaba → GRU Guarulhos', passageiros: 'Hiroshi Tanaka', situacao: 'Confirmado' } },
 }
+
+const TIPOS = ['codigo', 'resumo_diario', 'resposta_betinhos', 'pedido_confirmado', 'aprovacao_pendente', 'aprovacao_lembrete', 'aprovacao_resultado', 'aviso_operacao', 'cancelamento_operacao']
 
 test('gatilho HTTP POST com schema de tipo, para e dados', () => {
   const g = flow.triggers.manual
   assert.equal(g.type, 'Request'); assert.equal(g.kind, 'Http'); assert.equal(g.inputs.method, 'POST')
   assert.deepEqual(g.inputs.schema.required, ['tipo', 'para', 'dados'])
-  assert.deepEqual(g.inputs.schema.properties.tipo.enum, ['codigo', 'resumo_diario', 'resposta_betinhos'])
+  assert.deepEqual(g.inputs.schema.properties.tipo.enum, TIPOS)
   assert.equal(g.inputs.schema.properties.para.type, 'array')
 })
 
-test('Switch por tipo com os três casos e default 400', () => {
+test('Switch por tipo com os nove casos e default 400', () => {
   const sw = todas.get('Por_tipo')
   assert.equal(sw.type, 'Switch')
-  assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), ['codigo', 'resposta_betinhos', 'resumo_diario'])
+  assert.deepEqual(Object.values(sw.cases).map((c) => c.case).sort(), [...TIPOS].sort())
   assert.equal(sw.default.actions.Responder_400_tipo.inputs.statusCode, 400)
 })
 
 test('envio com remetente fixo (De), um por caso, com os assuntos combinados', () => {
   const envios = porTipo('OpenApiConnection')
-  assert.equal(envios.length, 3)
+  assert.equal(envios.length, 9)
   for (const e of envios) {
     assert.equal(e.inputs.host.operationId, 'SendEmailV2')
     assert.equal(e.inputs.host.connectionName, 'shared_office365')
@@ -127,6 +147,12 @@ test('envio com remetente fixo (De), um por caso, com os assuntos combinados', (
   assert.equal(executar(exemplos.codigo).email.Subject, 'Seu código de acesso: 482913')
   assert.equal(executar(exemplos.resumo_diario).email.Subject, 'Serviços para validar hoje · Betinhos')
   assert.equal(executar(exemplos.resposta_betinhos).email.Subject, 'A Betinhos respondeu sua dúvida sobre RV-10234')
+  assert.equal(executar(exemplos.pedido_confirmado).email.Subject, 'Serviço confirmado: RV-10300')
+  assert.equal(executar(exemplos.aprovacao_pendente).email.Subject, 'Aprovação pendente: pedido RV-10301')
+  assert.equal(executar(exemplos.aprovacao_lembrete).email.Subject, 'Lembrete: pedido RV-10301 aguarda aprovação')
+  assert.equal(executar(exemplos.aprovacao_resultado).email.Subject, 'Pedido RV-10301 recusado')
+  assert.equal(executar(exemplos.aviso_operacao).email.Subject, 'Pedido do portal sai em até 12 h: RV-10301')
+  assert.equal(executar(exemplos.cancelamento_operacao).email.Subject, 'Pedido do portal cancelado pelo cliente: RV-10301')
 })
 
 test('respostas só 202, 400 e 502, com corpo genérico que nunca ecoa dados', () => {
@@ -145,12 +171,14 @@ test('exemplos válidos respondem 202 e enviam para todos os destinatários', ()
     const r = executar(ex)
     assert.equal(r.status, 202, ex.tipo)
     assert.deepEqual(r.corpo, { ok: true })
-    assert.equal(r.email.To, ex.para.join(';'))
+    assert.equal(r.email.To, ex.para.length === 0 ? 'caixa@exemplo.com' : ex.para.join(';'))
   }
 })
 
 test('campos obrigatórios por tipo: faltou um, 400 sem envio', () => {
-  const obrig = { codigo: ['nome', 'codigo', 'validadeMinutos'], resumo_diario: ['nome', 'cliente', 'linkPortal'], resposta_betinhos: ['nome', 'numero', 'trecho', 'linkPortal'] }
+  const obrig = { codigo: ['nome', 'codigo', 'validadeMinutos'], resumo_diario: ['nome', 'cliente', 'linkPortal'], resposta_betinhos: ['nome', 'numero', 'trecho', 'linkPortal'],
+    pedido_confirmado: ['numero', 'data'], aprovacao_pendente: ['nome', 'solicitante', 'numero', 'linkPortal'], aprovacao_lembrete: ['nome', 'solicitante', 'numero', 'linkPortal'],
+    aprovacao_resultado: ['nome', 'numero', 'aprovador', 'linkPortal'], aviso_operacao: ['numero', 'solicitante', 'cliente', 'data'], cancelamento_operacao: ['numero', 'solicitante', 'cliente', 'data'] }
   for (const [tipo, campos] of Object.entries(obrig)) {
     for (const c of campos) {
       for (const valor of [undefined, '   ']) {
@@ -167,7 +195,7 @@ test('campos obrigatórios por tipo: faltou um, 400 sem envio', () => {
 test('tipo, destinatários ou corpo inválidos respondem 400 sem envio', () => {
   const casos = [
     { ...exemplos.codigo, tipo: 'outro' }, { ...exemplos.codigo, tipo: undefined },
-    { ...exemplos.codigo, para: [] }, { ...exemplos.codigo, para: undefined }, { ...exemplos.codigo, para: 'a@b.com' },
+    { ...exemplos.codigo, para: [] }, { ...exemplos.pedido_confirmado, para: [] }, { ...exemplos.aprovacao_pendente, para: [] }, { ...exemplos.codigo, para: undefined }, { ...exemplos.codigo, para: 'a@b.com' },
     { ...exemplos.codigo, para: ['a@b.com;c@d.com'] }, { ...exemplos.codigo, para: ['sem-arroba'] },
     { ...exemplos.codigo, para: Array.from({ length: 11 }, (_, i) => `p${i}@b.com`) },
     { ...exemplos.codigo, dados: undefined },
@@ -209,7 +237,8 @@ test('código: diz quanto tempo vale e "se não foi você, ignore este e-mail"',
 test('escape de HTML: nome com <script> não vira tag, nem em campos da tabela', () => {
   const mal = '<script>alert("x")</script> & O\'Neil {{codigo}}'
   for (const ex of Object.values(exemplos)) {
-    const c = structuredClone(ex); c.dados.nome = mal
+    const c = structuredClone(ex)
+    for (const k of ['nome', 'solicitante', 'passageiros', 'trajeto', 'origem', 'destino', 'cliente', 'aprovador', 'numero', 'data']) if (k in c.dados) c.dados[k] = mal
     if (c.dados.liberadosHoje) c.dados.liberadosHoje[0].trajeto = '<img src=x onerror=alert(1)>'
     if (c.dados.trecho) c.dados.trecho = '"><a href="https://mal">x</a>'
     const html = executar(c).email.Body
@@ -226,12 +255,12 @@ test('modelos no padrão do e-mail (§14.5): 640 px, fundo #F0F0F0, CTA navy 44 
     assert.deepEqual(h.match(/<img[^>]*>/g) ?? [], /resumo-linha/.test(arq) ? [] : [h.match(/<img src="\{\{logoUrl\}\}" width="143" height="80" alt="Betinhos Executive Service"[^>]*>/)?.[0]], arq)
     assert.ok(!h.startsWith('@'))
   }
-  for (const arq of ['codigo.html', 'resumo-diario.html', 'resposta-betinhos.html']) {
+  for (const arq of Object.values(modelos).filter((a) => !/resumo-linha/.test(a))) {
     const h = ler(`./portal-cliente-emails/${arq}`)
     assert.match(h, /max-width:640px/); assert.match(h, /background-color:#F0F0F0/); assert.match(h, /Betinhos Executive Service/)
     assert.match(h, /Segoe UI,Arial/)
   }
-  for (const arq of ['resumo-diario.html', 'resposta-betinhos.html']) {
+  for (const arq of ['resumo-diario.html', 'resposta-betinhos.html', 'aprovacao-pendente.html', 'aprovacao-lembrete.html', 'aprovacao-resultado.html']) {
     assert.match(ler(`./portal-cliente-emails/${arq}`), /bgcolor="#001A3D"[^>]*>.*height:44px;[^>]*color:#FFFFFF;[^>]*>Abrir o portal/s)
   }
 })
@@ -249,7 +278,59 @@ test('toda ação citada em expressões existe, nomes únicos e nenhum dado de a
   assert.doesNotMatch(montado, /__[A-Z_]+__/)
 })
 
-// PORTAL_EMAILS_EXEMPLOS=<pasta> grava os três e-mails renderizados para conferência no navegador.
+test('pedido confirmado: vai a todos os destinatários, sem botão, com os dados do serviço', () => {
+  const r = executar(exemplos.pedido_confirmado)
+  assert.equal(r.email.To, 'paula@latasa.com.br;hiroshi@exemplo.com')
+  for (const t of ['RV-10300', '01/12/2026 06:30', 'Latasa, Pindamonhangaba', 'GRU Guarulhos', 'Paula Lima, Hiroshi Tanaka']) assert.ok(r.email.Body.includes(t), t)
+  assert.doesNotMatch(r.email.Body, /Abrir o portal|\{\{\w+\}\}/)
+})
+
+test('aprovação pendente e lembrete: link do portal e dados do pedido', () => {
+  for (const tipo of ['aprovacao_pendente', 'aprovacao_lembrete']) {
+    const html = executar(exemplos[tipo]).email.Body
+    for (const t of ['Aline', 'Paula Lima', 'RV-10301', '02/12/2026 08:00', 'Hiroshi Tanaka']) assert.ok(html.includes(t), `${tipo} ${t}`)
+    assert.match(html, /<a href="https:\/\/cliente\.betinhos\.com\.br\/"[^>]*>Abrir o portal<\/a>/)
+    assert.doesNotMatch(html, /\{\{\w+\}\}/)
+  }
+})
+
+test('aprovação resultado: aprovado sem bloco de motivo, recusado com o motivo', () => {
+  const recusado = executar(exemplos.aprovacao_resultado).email.Body
+  assert.match(recusado, /Seu pedido foi recusado/); assert.match(recusado, /Aline recusou o seu pedido/); assert.match(recusado, /Fora do orçamento do mês\./)
+  const ok = structuredClone(exemplos.aprovacao_resultado); ok.dados.resultado = 'aprovado'; ok.dados.motivo = ''
+  const r = executar(ok)
+  assert.equal(r.email.Subject, 'Pedido RV-10301 aprovado')
+  assert.match(r.email.Body, /Seu pedido foi aprovado/); assert.match(r.email.Body, /Aline aprovou o seu pedido/); assert.doesNotMatch(r.email.Body, /Motivo:|\{\{\w+\}\}/)
+  const mal = structuredClone(exemplos.aprovacao_resultado); mal.dados.motivo = '<b>x</b> & "y"'
+  assert.match(executar(mal).email.Body, /&lt;b&gt;x&lt;\/b&gt; &amp; &quot;y&quot;/)
+})
+
+test('aviso à operação: ignora destinatários do corpo e vai só à caixa compartilhada', () => {
+  const com = structuredClone(exemplos.aviso_operacao); com.para = ['intruso@exemplo.com']
+  for (const ex of [exemplos.aviso_operacao, com]) {
+    const r = executar(ex)
+    assert.equal(r.status, 202); assert.equal(r.email.To, 'caixa@exemplo.com')
+    for (const t of ['RV-10301', 'Paula Lima', 'Latasa', '02/12/2026 08:00']) assert.ok(r.email.Body.includes(t), t)
+  }
+  const ruim = structuredClone(exemplos.aviso_operacao); ruim.para = ['sem-arroba']
+  assert.equal(executar(ruim).status, 400)
+})
+
+test('cancelamento à operação: vai só à caixa compartilhada, com a situação que o pedido tinha e o texto escapado', () => {
+  const com = structuredClone(exemplos.cancelamento_operacao); com.para = ['intruso@exemplo.com']
+  for (const ex of [exemplos.cancelamento_operacao, com]) {
+    const r = executar(ex)
+    assert.equal(r.status, 202); assert.equal(r.email.To, 'caixa@exemplo.com')
+    for (const t of ['RV-10301', 'Paula Lima', 'Latasa', '02/12/2026 08:00', 'Confirmado']) assert.ok(r.email.Body.includes(t), t)
+    assert.doesNotMatch(r.email.Body, /\{\{\w+\}\}/)
+  }
+  const mal = structuredClone(exemplos.cancelamento_operacao); mal.dados.situacao = '<b>x</b>'
+  assert.match(executar(mal).email.Body, /&lt;b&gt;x&lt;\/b&gt;/)
+  const ruim = structuredClone(exemplos.cancelamento_operacao); ruim.para = ['sem-arroba']
+  assert.equal(executar(ruim).status, 400)
+})
+
+// PORTAL_EMAILS_EXEMPLOS=<pasta> grava os e-mails renderizados para conferência no navegador.
 if (process.env.PORTAL_EMAILS_EXEMPLOS) {
   mkdirSync(process.env.PORTAL_EMAILS_EXEMPLOS, { recursive: true })
   for (const [tipo, ex] of Object.entries(exemplos)) writeFileSync(`${process.env.PORTAL_EMAILS_EXEMPLOS}/${tipo}.html`, executar(ex).email.Body)

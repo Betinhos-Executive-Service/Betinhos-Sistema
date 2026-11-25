@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { Funcionarios } from '../FuncionariosPage'
 import { createMockSource } from '../data/mock'
+import { ComAcessos } from '../../../app/ComAcessos'
 
 beforeAll(() => {
   window.matchMedia = ((query: string) => ({ matches: query.includes('max-width: 820px'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
@@ -32,5 +33,13 @@ describe('layout mobile', () => {
     await act(async () => { fireEvent.click(cta) })
     expect(screen.queryByRole('dialog', { name: 'Filtros' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Carlos Alberto Teste/ })).toBeNull()
+  })
+
+  it('sem o grupo rh: sem filtro de vínculo e o vínculo salvo não esvazia a lista', async () => {
+    localStorage.setItem('tela-funcionarios:filtros:v1', JSON.stringify({ vinculo: 1 }))
+    render(<ComAcessos perfis="operacional:operador"><ToastProvider><Funcionarios source={createMockSource()} /></ToastProvider></ComAcessos>)
+    expect(await screen.findByRole('button', { name: /Carlos Alberto Teste/ }, { timeout: 4000 })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Filtros/ })) })
+    expect(screen.queryByText('Vínculo')).toBeNull()
   })
 })

@@ -20,6 +20,7 @@
 4. Flows ligados: trava se o dono perde privilégio numa tabela do flow; se as tabelas do flow não forem conhecidas com segurança, trava em todo flow ligado cujo dono não seja a conta de serviço nem admin mantido. Referências de conexão de quem perde acesso: informativo.
 5. Passageiro: `cr40f_telefone`, `cr40f_email`, `cr40f_datadenascimento` (DateTime) e `cr40f_enderecodesaida` protegidas por migration, coluna antes da permissão; Operacional edita, Financeiro lê, `Motoristas` lê telefone e endereço de saída, perfil novo `Passageiros - automação` para conta de serviço e donos de flow.
 6. Motor `aplicar-perfis.ps1` não muda; código novo em Node; `dv.mjs` extraído com testes.
+7. Documentos segmentados (decisão de 25/11/2026): a Frota lê, cria e edita só os documentos de veículo (`cr40f_documento` com `cr40f_veiculo` preenchido); o Gestor da Frota também os exclui. O RH continua vendo e mantendo todos. Separação pela unidade de negócio do registro (unidade `Frota`, recurso de propriedade entre unidades, Tarefa 15), sem tabela nova, sem trocar o dono e sem compartilhamento por registro.
 
 ## Restrições globais
 
@@ -1917,7 +1918,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 - [ ] **Passo 4: rodar e ver passar.** `node --test packages/deploy/acessos/corte-ci.test.mjs` → `fail 0`. E a CLI: `printf 'A\tpackages/deploy/migrations/20261201-0900-acessos-passageiro.ps1\n' | node packages/deploy/acessos/corte-ci.mjs --tag-prod 0; echo $?` → `::error::...` e `1`.
 
-- [ ] **Passo 5: passo no CI.** Em `.github/workflows/ci.yml`, no job `schema`, depois do passo `Migrations`:
+- [ ] **Passo 5: passo no CI.** Em `.github/workflows/ci.yml`, no job `basico` (o antigo job `schema` virou o passo `Migrations` dele, PR #731), depois do passo `Migrations`:
 
 ```yaml
       - name: Proteção do passageiro só depois do corte do PROD
@@ -2145,6 +2146,30 @@ EOF
 Esperado: `teste (Base)` com as 4 `vazio`; `alvo (Operacional)` com `cr40f_telefone=cheio` e `cr40f_enderecodesaida=cheio` (e-mail e nascimento `cheio` quando o registro tiver). Nenhum valor é impresso.
 
 ---
+
+### Tarefa 15: documentos de veículo só para a Frota (unidade de negócio própria)
+
+Detalhar em passos com código antes de executar; esta seção fixa o desenho decidido em 25/11/2026 (equipe dona trocada por unidade de negócio depois do spike no DEV).
+
+**Fatos conferidos (25/11/2026, leitura no DEV e no PROD):** não existe equipe do Dataverse para a Frota (a "Frota" das multas é equipe do Planner, `cr40f_plannerequipe`); `cr40f_documento` tem os lookups `cr40f_funcionario` e `cr40f_veiculo`, e o shell decide a categoria por eles (`pages/documentos/data/queries.ts`); o DEV tem 1 documento de veículo; DEV e PROD têm uma unidade de negócio só (a raiz); hoje o RH Operador lê `cr40f_documento` com profundidade Global e o Frota Operador não tem privilégio nela.
+
+**Spike no DEV (25/11/2026, tudo desfeito no mesmo dia):**
+- O recurso "propriedade entre unidades de negócio" (`EnableOwnershipAcrossBusinessUnits` em `organization.orgdborgsettings`) só ligou depois da migration `20261125-0942-jornada-datas-userlocal.ps1` (PR #722): coluna DateTime com `DateTimeBehavior` nulo derruba a ativação com 0x80040216. O PROD não tem esse defeito (varredura de 25/11/2026).
+- Liga e desliga por PATCH; para desligar, mandar a chave com `false` (omitir a chave mantém `true`).
+- Com o recurso ligado, `owningbusinessunit` muda sem trocar o dono, e um usuário da raiz recebe o papel copiado de outra unidade.
+- Papel com leitura Local na unidade `Teste-Frota`: o usuário viu só o documento de veículo (1 de 32). RH com Global viu os 32; com Local na raiz viu 31 e levou 403 no documento da unidade filha.
+- Privilégio mudado no papel raiz propaga para a cópia da unidade filha. `RemovePrivilegeRole` pela Web API deu 400; `DELETE roles(<id>)/roleprivileges_association(<privilegeid>)/$ref` funciona.
+- Segundo spike no DEV (25/11/2026, desfeito): usuário da raiz só com a cópia de `Perfil - Frota - Operador` na unidade filha (Create/Read/Write/Append Local em `cr40f_documento`) cria o documento quando o corpo traz `owningbusinessunit@odata.bind` da unidade filha (204); sem a unidade o documento cai na unidade do usuário (raiz) e dá 403. Lista só o documento da unidade filha e leva 403 no de funcionário. Trocar só o `ownerid` devolve o documento à unidade do novo dono (`AlwaysMoveRecordToOwnerBusinessUnit` ausente = `true`); trocar `ownerid` e `owningbusinessunit` no mesmo pedido mantém a unidade filha. Não dá para tirar membro da equipe padrão da unidade (400).
+
+**Desenho.**
+- Ligar o recurso e criar a unidade `Frota` (filha da raiz) não são componentes de solução: entram no corte (Tarefa 8, `corte.mjs`), com desfazer (recurso de volta a `false`, unidade desativada e apagada depois de devolver os documentos à raiz). Antes de ligar, o corte varre colunas DateTime sem `DateTimeBehavior` e para se achar alguma. O DEV liga pelo job `acessos` do Deploy (Tarefa 10), o PROD pelo job `acessos` da Produção (Tarefa 11).
+- O corte move os documentos de veículo existentes para a unidade `Frota` (`owningbusinessunit@odata.bind`), sem trocar o dono. Idempotente.
+- `nav/acessosMapa.json` e `gerar.mjs`: o perfil Frota recebe `cr40f_documento` com profundidade Local (Read, Create, Write, Append, AppendTo; Delete Local só no Gestor) e leitura Global em `cr40f_tipodocumento`. RH segue Global (decisão 7). Precisa de campo novo no mapa para profundidade por tabela (ex.: `"local": ["cr40f_documento"]`), com teste no `acessosMapa.test.ts`.
+- `Cr40f.Acesso.Plugin` (`cr40f_AcessoDefinirPerfis`): o perfil Frota (qualquer nível) é atribuído pela cópia do papel na unidade `Frota` (`roles` com `_parentrootroleid_value` = papel raiz e `_businessunitid_value` = unidade Frota), não pelo papel raiz; a pessoa continua na unidade raiz. O histórico registra. O corte (Tarefa 8) troca uma vez as atribuições existentes do papel raiz pela cópia.
+- Shell: ao criar documento de veículo, o corpo leva `owningbusinessunit@odata.bind` da unidade `Frota` (lida por nome); sem a unidade, quem só tem Frota leva 403 (segundo spike).
+- Plugin (pre-operation, Create e Update de `cr40f_veiculo`, `cr40f_funcionario` e `ownerid` em `cr40f_documento`): com veículo, `owningbusinessunit` = unidade Frota; com funcionário, volta à raiz. Na troca de dono o plugin repõe a unidade no mesmo pedido (o segundo spike provou que dono + unidade juntos mantêm a unidade filha); não muda `AlwaysMoveRecordToOwnerBusinessUnit` da organização.
+- Shell: sem mudança de tela; a lixeira da ficha do veículo passa a usar a decisão do Gestor da Frota (rever o revert dac1c56b do plano 3: `Checklist` recebe a tabela/área da ficha).
+- Verificação: Frota Operador vê só documentos de veículo, cria e edita, sem lixeira; Frota Gestor exclui; RH vê todos; quem só tem Frota não vê documento de funcionário em `#/documentos` nem pela Web API (403 no GET direto); desfazer do corte devolve os documentos à raiz e desliga o recurso.
 
 ### Tarefa 14: documentação e skill de verificação
 

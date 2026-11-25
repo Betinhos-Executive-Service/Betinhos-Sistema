@@ -31,10 +31,16 @@ function juntar(alvo, tabela, acoes, profundidade = 'Global') {
 const ordenar = (obj) => Object.fromEntries(Object.keys(obj).sort().map((k) => [k, obj[k]]))
 const ordenarTabelas = (tabelas) => Object.fromEntries(Object.keys(tabelas).sort().map((t) => [t, ordenar(tabelas[t])]))
 
-function tabelasDoModulo(modulo, gestor) {
+function tabelasDoModulo(modulo, gestor, nome = '') {
+  const local = new Set(modulo.local ?? [])
+  const suas = new Set([...(modulo.donas ?? []), ...(modulo.filhas ?? [])])
+  for (const tabela of local) {
+    if (!suas.has(tabela)) throw new Error(`Modulo ${nome}: local so aceita tabela dona ou filha do modulo (${tabela})`)
+  }
+  const prof = (tabela) => (local.has(tabela) ? 'Local' : 'Global')
   const tabelas = {}
-  for (const classe of Object.keys(ACOES)) for (const tabela of modulo[classe] ?? []) juntar(tabelas, tabela, ACOES[classe])
-  if (gestor) for (const tabela of modulo.donas ?? []) juntar(tabelas, tabela, ['Delete'])
+  for (const classe of Object.keys(ACOES)) for (const tabela of modulo[classe] ?? []) juntar(tabelas, tabela, ACOES[classe], prof(tabela))
+  if (gestor) for (const tabela of modulo.donas ?? []) juntar(tabelas, tabela, ['Delete'], prof(tabela))
   return ordenarTabelas(tabelas)
 }
 
@@ -81,7 +87,7 @@ const NIVEIS = { operador: 'Operador', gestor: 'Gestor' }
 const LEITURA_DE_ACESSOS = { prvReadRole: 'Global', prvReadTeam: 'Global', prvReadUser: 'Global' }
 
 export function gerarPerfis(mapa, colunas) {
-  const doAdministrador = tabelasDoModulo(mapa.modulos.acessos, false)
+  const doAdministrador = tabelasDoModulo(mapa.modulos.acessos, false, 'acessos')
   juntar(doAdministrador, 'cr40f_acessohistorico', ['Read'])
   const papeis = {
     'Perfil - Base': { copiarDe: ['App Opener', 'Basic User'], app: 'cr40f_ModelDrivenBetinhos', tabelas: tabelasDaBase(mapa.base), privilegios: LEITURA_DE_ACESSOS },
@@ -97,7 +103,7 @@ export function gerarPerfis(mapa, colunas) {
   for (const [area, rotuloArea] of Object.entries(AREAS))
     for (const [nivel, rotuloNivel] of Object.entries(NIVEIS)) {
       const nome = `Perfil - ${rotuloArea} - ${rotuloNivel}`
-      papeis[nome] = { copiarDe: [], app: null, tabelas: tabelasDoModulo(mapa.modulos[area], nivel === 'gestor'), privilegios: {} }
+      papeis[nome] = { copiarDe: [], app: null, tabelas: tabelasDoModulo(mapa.modulos[area], nivel === 'gestor', area), privilegios: {} }
       perfisDeColuna[nome] = permissoes(colunas, area, nivel === 'gestor')
     }
   return { proibido: PROIBIDO, copiarSem: COPIAR_SEM, papeis: ordenar(papeis), colunas: ordenar(perfisDeColuna) }

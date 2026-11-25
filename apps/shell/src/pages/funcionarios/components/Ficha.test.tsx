@@ -13,6 +13,8 @@ import { ToastProvider } from '@betinhos/ui'
 import type { Host } from '../../../host'
 import { AcessosContext } from '../../../app/AcessosProvider'
 import { createSource as createAcessosSource } from '../../acessos/data/source'
+import { ComAcessos } from '../../../app/ComAcessos'
+import { FIELDS } from '../data/schema'
 
 const record: Funcionario = {
   id: 'f1',
@@ -39,6 +41,34 @@ async function renderFicha(source: DataSource) {
 afterEach(() => { cleanup(); window.location.hash = ''; vi.unstubAllGlobals() })
 
 describe('Ficha', () => {
+
+  const rotulo = (key: string) => FIELDS.find((f) => f.key === key)!.label
+
+  async function renderFichaCom(perfis: string, values: Funcionario['values'] = {}) {
+    const comDados: Funcionario = { ...record, values: { ...record.values, cr40f_numerodocpf: '00000000000', cr40f_datadeadmissao: '2024-01-02', ...values } }
+    const source = { ...fakeSource(vi.fn(async () => 'f1')), get: async () => structuredClone(comDados) }
+    render(<ComAcessos perfis={perfis}><ToastProvider><Ficha source={source} id="f1" onClose={() => {}} onSaved={() => {}} /></ToastProvider></ComAcessos>)
+    return screen.findByDisplayValue('Ana Souza')
+  }
+
+  it('RH Operador não vê dados pessoais e edita vínculo', async () => {
+    await renderFichaCom('rh:operador')
+    expect(screen.queryByLabelText(rotulo('cr40f_numerodocpf'))).toBeNull()
+    expect(screen.queryByLabelText(rotulo('cr40f_enderecocompleto'))).toBeNull()
+    expect((screen.getByLabelText(rotulo('cr40f_datadeadmissao')) as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('RH Gestor vê e edita dados pessoais', async () => {
+    await renderFichaCom('rh:gestor')
+    expect((screen.getByLabelText(rotulo('cr40f_numerodocpf')) as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('Administrador de acessos só lê o básico: apelido desabilitado, vínculo e CNH somem', async () => {
+    await renderFichaCom('acessos')
+    expect((screen.getByLabelText(/Apelido/) as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByLabelText(rotulo('cr40f_datadeadmissao'))).toBeNull()
+    expect(screen.queryByLabelText(rotulo('cr40f_validadedacnh'))).toBeNull()
+  })
   it('salva somente o campo alterado', async () => {
     const save = vi.fn(async () => 'f1')
     await renderFicha(fakeSource(save))

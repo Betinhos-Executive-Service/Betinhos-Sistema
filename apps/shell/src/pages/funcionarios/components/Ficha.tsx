@@ -30,6 +30,7 @@ import { SecretText } from './SecretText'
 import { useNotify } from './Toasts'
 import { VeiculoPicker } from './VeiculoPicker'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { useAcessoColunas } from '../../../app/useNivel'
 
 type Tab = 'dados' | 'documentos' | 'acesso' | 'multas' | 'veiculos' | 'equipamentos' | 'comunicados' | 'anotacoes'
 const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
@@ -67,6 +68,8 @@ type Props = {
 
 export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, versao, acesso, comunicados, acessosSistema, onCadastrarAcesso, emailPendente, onLiberacaoConcluida }: Props) {
   const notify = useNotify()
+  // Grupos de colunas do perfil (acessosColunas.json): sem leitura o campo some; sem edição fica só leitura.
+  const coluna = useAcessoColunas('cr40f_funcionarios')
   const [original, setOriginal] = useState<Funcionario | null>(null)
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -277,10 +280,10 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                 <fieldset key={group} className="group">
                   <legend>{GROUP_LABELS[group]}</legend>
                   <div className="fields">
-                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly) && !(acesso && field.key === 'cr40f_emailmicrosoft') && field.key !== 'new_aditivoassinaturaem').map((field) => (
+                    {FIELDS.filter((field) => field.group === group && !(isNew && field.readonly) && !(acesso && field.key === 'cr40f_emailmicrosoft') && field.key !== 'new_aditivoassinaturaem' && coluna(field.key).ler).map((field) => (
                       <FieldInput
                         key={field.key}
-                        field={field}
+                        field={coluna(field.key).editar ? field : { ...field, readonly: true }}
                         value={draft.values[field.key]}
                         error={errors[field.key]}
                         changed={!isNew && dirty.includes(field.key)}
@@ -288,10 +291,10 @@ export function Ficha({ source, docs, id, onClose, onSaved, onAditivoSalvo, vers
                       />
                     ))}
                     {group === 'assinatura' && (
-                      <AditivoAssinatura id={original?.id ?? null} atual={original?.aditivo ?? null} assinadoEm={typeof original?.values.new_aditivoassinaturaem === 'string' ? original.values.new_aditivoassinaturaem : null} source={source} disabled={saving} onRegistrado={recarregarAposAditivo} />
+                      <AditivoAssinatura id={original?.id ?? null} atual={original?.aditivo ?? null} assinadoEm={typeof original?.values.new_aditivoassinaturaem === 'string' ? original.values.new_aditivoassinaturaem : null} source={source} disabled={saving || !coluna('cr40f_assinatura').editar} onRegistrado={recarregarAposAditivo} />
                     )}
-                    {group === 'vinculo' && (
-                      <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
+                    {group === 'vinculo' && coluna('cr40f_veiculoatual').ler && (
+                      <VeiculoPicker source={source} value={draft.veiculo} changed={!isNew && dirty.includes('cr40f_veiculoatual')} disabled={!coluna('cr40f_veiculoatual').editar} onChange={(veiculo) => setDraft((current) => ({ ...current, veiculo }))} />
                     )}
                   </div>
                 </fieldset>

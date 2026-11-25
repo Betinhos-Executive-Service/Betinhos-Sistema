@@ -259,30 +259,53 @@ export function parseNativeFilters(fetchXml: string, catalog: CatalogField[]): P
   const entity = document.querySelector('fetch > entity')
   if (!entity || document.querySelector('parsererror')) return null
   const aliases = fetchAliasPaths(entity)
+  const linkTables = new Map([...entity.querySelectorAll('link-entity[alias]')].map((link) => [link.getAttribute('alias')!, link.getAttribute('name') ?? '']))
   const condition = (node: Element, link?: Element): ViewFilter | null => {
     const alias = node.getAttribute('entityname')
     const attribute = node.getAttribute('attribute')
-    const field = catalog.find((item) => item.available && item.attribute === attribute && (link ? item.table === link.getAttribute('name') : pathSignature(item.path, item.relationships) === (alias ? aliases.get(alias) : '')))
+    const signature = link ? aliases.get(link.getAttribute('alias') ?? '') : alias ? aliases.get(alias) : ''
+    const samePath = catalog.find((item) => item.available && item.attribute === attribute && pathSignature(item.path, item.relationships) === signature)
+    // Vínculo da visão com o mesmo caminho do catálogo: o filtro vale igual sem o alias dela (some a duplicata do mesmo filtro em r1).
+    // Vínculo por outra relação (ex.: `aa`, reserva → composição): campo da mesma tabela, consultado pelo alias da visão.
+    const linkName = link ? link.getAttribute('name') : alias ? linkTables.get(alias) : undefined
+    const field = samePath ?? (linkName ? catalog.find((item) => item.available && item.attribute === attribute && item.table === linkName) : undefined)
+    const nativeAlias = samePath ? undefined : link ? link.getAttribute('alias') ?? undefined : alias ?? undefined
     const rawOperator = node.getAttribute('operator')
     const operator = ({ on: 'eq', 'on-or-after': 'ge', 'on-or-before': 'le' } as Record<string, string>)[rawOperator ?? ''] ?? rawOperator
     if (!field || !operator || !['eq', 'ne', 'in', 'not-in', 'like', 'not-like', 'begins-with', 'not-begins-with', 'ends-with', 'not-ends-with', 'gt', 'ge', 'lt', 'le', 'null', 'not-null', ...DATE_ONLY_OPERATORS].includes(operator)) return null
     if (DATE_ONLY_OPERATORS.has(operator as ViewFilter['operator']) && field.type !== 'DateTime') return null
     const rawValue = node.getAttribute('value') ?? ''
     const value = field.type === 'Boolean' && (rawValue === '0' || rawValue === '1') ? rawValue === '1' ? 'true' : 'false' : field.type === 'Lookup' ? rawValue.replace(/^\{([0-9a-f-]{36})\}$/i, '$1') : rawValue
-    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' || operator === 'not-in' ? { values: [...node.querySelectorAll('value')].map((item) => item.textContent ?? '') } : {}), ...(link ? { nativeAlias: link.getAttribute('alias') ?? undefined } : {}) }
+    return { id: field.id, operator: operator as ViewFilter['operator'], value: operator === 'like' || operator === 'not-like' ? value.replace(/^%|%$/g, '') : operator === 'begins-with' || operator === 'not-begins-with' ? value.replace(/%$/g, '') : operator === 'ends-with' || operator === 'not-ends-with' ? value.replace(/^%/g, '') : value, ...(operator === 'in' || operator === 'not-in' ? { values: [...new Set([...node.querySelectorAll('value')].map((item) => item.textContent ?? ''))] } : {}), ...(nativeAlias ? { nativeAlias } : {}) }
   }
+  /** Condições de um filtro E, atravessando os filtros E aninhados (o Dynamics aninha um nível a cada edição); o resto (OU) volta em `groups`. */
+  const andParts = (filter: Element): { conditions: Element[]; groups: Element[] } => {
+    const conditions: Element[] = []
+    const groups: Element[] = []
+    for (const child of filter.children) {
+      if (child.tagName === 'filter' && child.getAttribute('type') !== 'or') {
+        const inner = andParts(child)
+        conditions.push(...inner.conditions)
+        groups.push(...inner.groups)
+      } else if (child.tagName === 'condition') conditions.push(child)
+      else groups.push(child)
+    }
+    return { conditions, groups }
+  }
+  const key = (filter: ViewFilter) => JSON.stringify([filter.id, filter.operator, filter.value, filter.values, filter.nativeAlias])
+  const seen = new Set<string>()
+  const unique = (items: ViewFilter[]) => items.filter((item) => !seen.has(key(item)) && Boolean(seen.add(key(item))))
   const filters: ViewFilter[] = []
   const filterGroups: ViewFilterGroup[] = []
   let groupOperator: 'and' | 'or' = 'and'
   const roots = [...entity.children].filter((child) => child.tagName === 'filter')
   for (const [rootIndex, root] of roots.entries()) {
     const rootOperator = root.getAttribute('type') === 'or' ? 'or' : 'and'
-    const direct = [...root.children].filter((child) => child.tagName === 'condition')
-    const nested = [...root.children].filter((child) => child.tagName === 'filter')
-    if (direct.length + nested.length !== root.children.length || (rootOperator === 'or' && (roots.length > 1 || filters.length))) return null
+    const { conditions: direct, groups: nested } = rootOperator === 'and' ? andParts(root) : { conditions: [...root.children].filter((child) => child.tagName === 'condition'), groups: [...root.children].filter((child) => child.tagName !== 'condition') }
+    if (nested.some((child) => child.tagName !== 'filter') || (rootOperator === 'or' && (roots.length > 1 || filters.length))) return null
     const parsedDirect = direct.map((child) => condition(child))
     if (parsedDirect.some((item) => !item)) return null
-    if (rootOperator === 'and') filters.push(...parsedDirect as ViewFilter[])
+    if (rootOperator === 'and') filters.push(...unique(parsedDirect as ViewFilter[]))
     else if (parsedDirect.length) filterGroups.push({ id: `native-${rootIndex}-direct`, operator: 'or', filters: parsedDirect as ViewFilter[] })
     for (const [index, group] of nested.entries()) {
       if ([...group.children].some((child) => child.tagName !== 'condition')) return null
@@ -297,10 +320,12 @@ export function parseNativeFilters(fetchXml: string, catalog: CatalogField[]): P
     if (!linkFilters.length) continue
     if (link.getAttribute('link-type') !== 'inner' || !link.getAttribute('alias')) return null
     for (const filter of linkFilters) {
-      if (filter.getAttribute('type') !== 'and' || [...filter.children].some((child) => child.tagName !== 'condition')) return null
-      const parsed = [...filter.children].map((child) => condition(child, link))
+      if (filter.getAttribute('type') === 'or') return null
+      const { conditions, groups } = andParts(filter)
+      if (groups.length) return null
+      const parsed = conditions.map((child) => condition(child, link))
       if (parsed.some((item) => !item)) return null
-      filters.push(...parsed as ViewFilter[])
+      filters.push(...unique(parsed as ViewFilter[]))
     }
   }
   return { filters, ...(filterGroups.length ? { filterGroups, groupOperator } : {}) }

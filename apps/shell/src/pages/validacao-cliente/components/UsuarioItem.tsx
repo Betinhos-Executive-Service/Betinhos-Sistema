@@ -26,6 +26,19 @@ export function useAcoesUsuario(source: Source, onSaved: (v: Validador) => void)
     }
   }
 
+  async function alternarAprovador(v: Validador) {
+    setOcupado(v.id)
+    try {
+      await source.setValidadorAprovador(v.id, !v.aprovador)
+      onSaved({ ...v, aprovador: !v.aprovador })
+      toast({ tone: 'success', message: v.aprovador ? `${v.nome} não aprova mais pedidos.` : `${v.nome} agora aprova os pedidos do cliente.` })
+    } catch (reason) {
+      toast({ tone: 'danger', message: `Não foi possível alterar. ${reasonText(reason)}` })
+    } finally {
+      setOcupado(null)
+    }
+  }
+
   async function confirmarZerar() {
     if (!zerar) return
     const v = zerar
@@ -51,12 +64,12 @@ export function useAcoesUsuario(source: Source, onSaved: (v: Validador) => void)
       A senha de {zerar?.nome} para de funcionar e as sessões abertas caem. Para voltar, a pessoa usa "Primeiro acesso ou esqueci a senha" e cria outra pelo código do e-mail. O portal não avisa: avise a pessoa.
     </Dialog>
   )
-  return { ocupado, alternar, pedirZerar: setZerar, dialogo }
+  return { ocupado, alternar, alternarAprovador, pedirZerar: setZerar, dialogo }
 }
 
-type ItemProps = { v: Validador; mostrarCliente: boolean; ocupado: boolean; onAlternar: (v: Validador) => void; onZerar: (v: Validador) => void }
+type ItemProps = { v: Validador; mostrarCliente: boolean; ocupado: boolean; onAlternar: (v: Validador) => void; onAprovador: (v: Validador) => void; onZerar: (v: Validador) => void }
 
-export function UsuarioItem({ v, mostrarCliente, ocupado, onAlternar, onZerar }: ItemProps) {
+export function UsuarioItem({ v, mostrarCliente, ocupado, onAlternar, onAprovador, onZerar }: ItemProps) {
   return (
     <li className="vc-val">
       <div className="vc-val__info">
@@ -69,6 +82,7 @@ export function UsuarioItem({ v, mostrarCliente, ocupado, onAlternar, onZerar }:
       </div>
       <div className="vc-val__acoes">
         <Switch label={v.ativo ? 'Ativo' : 'Inativo'} checked={v.ativo} disabled={ocupado} onChange={() => onAlternar(v)} />
+        <Switch label="Aprovador" checked={v.aprovador} disabled={ocupado} onChange={() => onAprovador(v)} />
         <Button variant="secondary" size="compact" icon={<KeyRound size={14} />} disabled={ocupado || !v.senhaDefinidaEm} title={v.senhaDefinidaEm ? undefined : 'A pessoa ainda não criou a senha.'} onClick={() => onZerar(v)}>Zerar senha</Button>
       </div>
     </li>

@@ -5,9 +5,9 @@ import type { DataSource } from '../data/source'
 import type { Lookup } from '../data/types'
 import { errorMessage } from '../data/xrm'
 
-type Props = { source: DataSource; value: Lookup | null; changed: boolean; onChange: (value: Lookup | null) => void }
+type Props = { source: DataSource; value: Lookup | null; changed: boolean; disabled?: boolean; onChange: (value: Lookup | null) => void }
 
-export function VeiculoPicker({ source, value, changed, onChange }: Props) {
+export function VeiculoPicker({ source, value, changed, disabled = false, onChange }: Props) {
   const id = useId()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -34,8 +34,10 @@ export function VeiculoPicker({ source, value, changed, onChange }: Props) {
         <div className="bt-control lookup-value">
           <Car size={16} aria-hidden />
           <button type="button" className="link" onClick={() => source.openForm('cr40f_veiculos', value.id)}>{value.label}</button>
-          <Button variant="ghost" size="compact" aria-label="Trocar veículo" onClick={() => setOpen(true)}>Trocar</Button>
-          <Button variant="ghost" size="compact" icon={<X size={16} />} aria-label="Remover veículo" onClick={() => onChange(null)} />
+          {disabled ? null : <>
+            <Button variant="ghost" size="compact" aria-label="Trocar veículo" onClick={() => setOpen(true)}>Trocar</Button>
+            <Button variant="ghost" size="compact" icon={<X size={16} />} aria-label="Remover veículo" onClick={() => onChange(null)} />
+          </>}
         </div>
       ) : (
         <div className="bt-control bt-control--input combo">
@@ -46,6 +48,7 @@ export function VeiculoPicker({ source, value, changed, onChange }: Props) {
             aria-expanded={open}
             aria-controls={`${id}-list`}
             placeholder="Buscar placa ou modelo"
+            disabled={disabled}
             value={query}
             onFocus={() => setOpen(true)}
             onChange={(event) => setQuery(event.target.value)}

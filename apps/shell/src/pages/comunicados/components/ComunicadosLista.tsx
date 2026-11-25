@@ -8,6 +8,7 @@ import { PdfMotoristaDialog } from './PdfMotoristaDialog'
 import { BrandLoader } from '../../../app/BrandLoader'
 import { SearchHits } from '../../../app/SearchHits'
 import { keywordIndex, searchWords, useDebouncedText } from '../../../app/search'
+import { usePodeExcluir } from '../../../app/useNivel'
 
 type Props = {
   data: ReturnType<typeof useComunicados>
@@ -25,6 +26,7 @@ const FILTROS: { value: ListaFiltro; label: string }[] = [
 
 export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Props) {
   const toast = useToast()
+  const podeExcluir = usePodeExcluir('new_comunicadomotorista')
   const [filtro, setFiltro] = useState<ListaFiltro>('todos')
   const [busca, setBusca] = useState('')
   const [excluir, setExcluir] = useState<Comunicado | null>(null)
@@ -109,7 +111,7 @@ export function ComunicadosLista({ data, source, onNew, onOpen, onRefresh }: Pro
                   </span>
                   <ChevronRight size={16} className="cm-list__chevron" aria-hidden="true" />
                 </button>
-                {enviado ? null : (
+                {enviado || !podeExcluir ? null : (
                   <Button variant="ghost" size="compact" className="cm-list__delete" icon={<Trash2 size={16} />} aria-label={`Excluir rascunho ${item.titulo}`} title="Excluir rascunho" onClick={() => setExcluir(item)} />
                 )}
               </li>

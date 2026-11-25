@@ -22,6 +22,10 @@ export const MODULO_DV = { validar: 100000000, pedir: 100000001, meus_servicos: 
 /** cr40f_status da reserva (metadata DEV 08/10/2026) → situação vista pelo solicitante. */
 export const RESERVA_SOLICITADO = 202410004
 export const RESERVA_CANCELADO = 202410002
+export const RESERVA_CONFIRMADO = 202410001
+
+/** `cr40f_portalaprovacao` da reserva (migration 20261125-1800-portal-avisos-aprovacao.ps1). Só os pedidos de cliente com aprovação ligada têm valor. */
+export const APROVACAO = { pendente: 100000000, aprovado: 100000001, recusado: 100000002 } as const
 export const PEDIDO_STATUS: Record<number, StatusPedido> = {
   [RESERVA_SOLICITADO]: 'solicitado',
   202410000: 'em_analise', // Pré-reserva
@@ -40,6 +44,9 @@ export const PESSOA_CAMPOS = ['cr40f_bancodedadosid', 'cr40f_nomedopassageiro', 
 
 export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portaldominios']
 
+/** Logo do cliente (migration 20261125-1600-portal-identidade-cliente.ps1). `_timestamp` da coluna de imagem versiona a URL do logo; o binário vem por `$value`. */
+export const MARCA_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portallogo_timestamp']
+
 /**
  * Colunas da reserva lidas pelos módulos Pedir e Meus serviços. O que o cliente digitou fica em `cr40f_portalpedido` (JSON),
  * coluna só do portal: passageiros e observação internas são da operação (plugins e shell as reescrevem).
@@ -49,6 +56,10 @@ export const PEDIDO_CAMPOS = [
   'cr40f_portalpedido', 'new_linkdovoucher', 'cr40f_tipodeveiculo', 'createdon',
   // Lookups lidos pelo rótulo: nome primário do funcionário (cr40f_nomecompleto) e do veículo (cr40f_placa), metadata DEV 23/11/2026.
   '_cr40f_motorista_value', '_cr40f_veiculo_value',
+  // Quem pediu: quem não pediu (só é passageiro) vê o pedido sem poder cancelar.
+  '_cr40f_portalusuario_value',
+  // Aprovação do cliente (aprovado/recusado/pendente) e o motivo da recusa.
+  'cr40f_portalaprovacao', 'cr40f_portalmotivorecusa',
 ]
 
 /** Choice cr40f_status da validação (ordem do provision). */

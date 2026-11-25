@@ -1,6 +1,6 @@
 // Montagem das consultas OData. Toda consulta de serviço leva o cliente da sessão no $filter:
 // o isolamento entre clientes é aqui, não na tela.
-import { CLIENTE_CAMPOS, COMPOSICAO_LINHAS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
+import { APROVACAO, RESERVA_CONFIRMADO, RESERVA_SOLICITADO, CLIENTE_CAMPOS, COMPOSICAO_LINHAS, MARCA_CAMPOS, NAV, PEDIDO_CAMPOS, PESSOA_CAMPOS, RESERVA_CAMPOS, SET, STATUS_DV, VALIDACAO_CAMPOS } from './schema'
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -74,12 +74,26 @@ export const validadoresAtivos = () =>
 export const clientesPorDominio = (dominio: string) =>
   `${SET.cliente}?$select=${CLIENTE_CAMPOS.join(',')}&$filter=${encodeURIComponent(`cr40f_portalhabilitado eq true and contains(cr40f_portaldominios,${texto(dominio)})`)}`
 
+/** Identidade de um cliente (nunca no login: coluna ausente não pode derrubar a entrada). */
+export const marcaDoCliente = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=${MARCA_CAMPOS.join(',')}`
+
+/** Clientes com portal, para achar o da chave `?c=` (poucos; a chave é o nome normalizado, conferido no código). */
+export const clientesComPortal = () =>
+  `${SET.cliente}?$select=${MARCA_CAMPOS.join(',')}&$filter=${encodeURIComponent('cr40f_portalhabilitado eq true')}`
+
+/** Clientes com portal e domínio parecido, com os campos da identidade. */
+export const marcasPorDominio = (dominio: string) =>
+  `${SET.cliente}?$select=${MARCA_CAMPOS.join(',')},cr40f_portaldominios&$filter=${encodeURIComponent(`cr40f_portalhabilitado eq true and contains(cr40f_portaldominios,${texto(dominio)})`)}`
+
+/** Logo em tamanho cheio (`$value`). */
+export const logoDoCliente = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})/cr40f_portallogo/$value?size=full`
+
 /** Passageiros do pedido: vínculo (ordem) mais a pessoa com o contato. Lido pelo vínculo, nunca por `cr40f_passageirosetelefonedecontato`. */
 const expandPassageiros = `${NAV.passageiros}($select=_cr40f_bancodedados_value,cr40f_ordemdeselecao;$expand=${NAV.vinculoPessoa}($select=${PESSOA_CAMPOS.join(',')}))`
 
-/** Reservas pedidas pelo portal por este usuário (e do cliente da sessão, por garantia). */
-export const pedidosDe = (validadorId: string, clienteId: string) =>
-  `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$expand=${expandPassageiros}&$filter=${encodeURIComponent(`_cr40f_portalusuario_value eq ${guid(validadorId)} and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
+/** Reservas do cliente da sessão pedidas por este usuário ou em que o e-mail dele está entre os passageiros. */
+export const pedidosDe = (validadorId: string, clienteId: string, email: string) =>
+  `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}&$expand=${expandPassageiros}&$filter=${encodeURIComponent(`(_cr40f_portalusuario_value eq ${guid(validadorId)} or ${NAV.passageiros}/any(v:v/${NAV.vinculoPessoa}/cr40f_email eq ${texto(email)})) and ${doCliente(clienteId)}`)}&$orderby=cr40f_dataehorriodesada desc`
 
 /** Um pedido do usuário (e do cliente da sessão), com a observação interna para o cancelamento acrescentar a nota. */
 export const pedidoDe = (id: string, validadorId: string, clienteId: string) =>
@@ -103,3 +117,36 @@ export const criarPessoa = () => `${SET.pessoa}?$select=${PESSOA_CAMPOS.join(','
 
 /** Caminho do POST da reserva: o `$select` define o que volta no `return=representation`. */
 export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',')}`
+
+// Aprovação e avisos (migration 20261125-1800-portal-avisos-aprovacao.ps1). Leituras isoladas das de login e Meus serviços.
+
+/** O cliente exige aprovação? Lido à parte: se a coluna ainda não existir, o chamador trata como "não". */
+export const clienteExigeAprovacao = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=cr40f_portalexigeaprovacao`
+
+/** Prazos do cliente (pedir, cancelar, contato). Lidos à parte: coluna ainda não criada vale o padrão. */
+export const clientePrazos = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=cr40f_portalantecedenciapedido,cr40f_portalprazocancelar,cr40f_portalcontato`
+
+/** O usuário é aprovador? Idem. */
+export const usuarioAprovador = (validadorId: string) => `${SET.validador}(${guid(validadorId)})?$select=cr40f_aprovador`
+
+/** Aprovadores ativos do cliente. */
+export const aprovadoresDoCliente = (clienteId: string) =>
+  `${SET.validador}?$select=cr40f_validadorclienteid,cr40f_name,cr40f_email&$filter=${encodeURIComponent(`${doCliente(clienteId)} and cr40f_ativo eq true and cr40f_aprovador eq true`)}`
+
+const expandSolicitante = `${NAV.portalUsuario}($select=cr40f_name,cr40f_email)`
+const camposAprovacao = [...PEDIDO_CAMPOS, 'cr40f_observaointerna', '_cr40f_cliente_value'].join(',')
+const comPassageiros = `$expand=${expandPassageiros},${expandSolicitante}`
+
+/** Pedidos pendentes de um cliente (aba "Para aprovar") ou, sem cliente, de todos (cron de lembrete e aviso à operação). */
+export const pendentesDeAprovacao = (clienteId?: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$orderby=cr40f_dataehorriodesada asc&$top=200` +
+  `&$filter=${encodeURIComponent(`cr40f_portalaprovacao eq ${APROVACAO.pendente} and cr40f_status eq ${RESERVA_SOLICITADO}${clienteId ? ` and ${doCliente(clienteId)}` : ''}`)}`
+
+/** Um pedido com aprovação, do cliente da sessão, para decidir (o chamador confere pendência e autoria). */
+export const pedidoParaDecidir = (id: string, clienteId: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$filter=${encodeURIComponent(`cr40f_reservadeveculosid eq ${guid(id)} and ${doCliente(clienteId)} and cr40f_portalaprovacao ne null`)}`
+
+/** Pedidos do portal confirmados pela operação desde `desdeIso` (o cron avisa uma vez por pedido). */
+export const confirmadosDesde = (desdeIso: string) =>
+  `${SET.reserva}?$select=${camposAprovacao}&${comPassageiros}&$top=200` +
+  `&$filter=${encodeURIComponent(`cr40f_status eq ${RESERVA_CONFIRMADO} and _cr40f_portalusuario_value ne null and modifiedon ge ${desdeIso}`)}`

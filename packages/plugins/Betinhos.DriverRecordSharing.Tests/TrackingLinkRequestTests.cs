@@ -29,6 +29,7 @@ namespace Betinhos.DriverRecordSharing.Tests
 
             Assert.Null(result.Error);
             Assert.Equal("RUH7G45", result.Payload["placa"]);
+            Assert.Equal(true, result.Payload["rastreio"]);
             Assert.Equal("Av. Paulista, 1000 - São Paulo", result.Payload["embarque"]);
             Assert.Equal("Aeroporto de Guarulhos", result.Payload["destinoFinal"]);
             Assert.Equal("Jacareí → Guarulhos", result.Payload["trajeto"]);
@@ -53,21 +54,48 @@ namespace Betinhos.DriverRecordSharing.Tests
         }
 
         [Theory]
-        [InlineData("terceiro", "Motorista terceiro sem rastreador.")]
-        [InlineData("semCarro", "Motorista sem carro atual.")]
-        [InlineData("semInfleet", "Carro sem rastreador na Infleet.")]
-        [InlineData("semEmbarque", "Serviço sem endereço de embarque.")]
-        public void InvalidRequest_ReturnsReason(string caso, string erro)
+        [InlineData("semMotorista", null)]
+        [InlineData("terceiro", "RUH7G45")]
+        [InlineData("semInfleet", "RUH7G45")]
+        public void WithoutTracking_BuildsLinkWithoutMap(string caso, string placa)
         {
             var input = Valid();
+            if (caso == "semMotorista") { input.VehiclePlate = null; input.VehicleModel = null; input.VehicleBrand = null; input.VehicleColor = null; input.VehicleHasInfleet = false; }
             if (caso == "terceiro") input.IsThirdParty = true;
-            if (caso == "semCarro") input.VehiclePlate = null;
             if (caso == "semInfleet") input.VehicleHasInfleet = false;
-            if (caso == "semEmbarque") input.DepartureAddress = " ";
 
             var result = TrackingLinkRequest.Build(input, Now);
 
-            Assert.Equal(erro, result.Error);
+            Assert.Null(result.Error);
+            Assert.Equal(placa, result.Payload["placa"]);
+            Assert.Equal(false, result.Payload["rastreio"]);
+        }
+
+        [Theory]
+        [InlineData(202410004, false)] // Solicitado
+        [InlineData(202410002, false)] // Cancelado
+        [InlineData(202410010, false)] // Cancelado com Ressalvas
+        [InlineData(202410000, true)] // Pré-reserva
+        [InlineData(202410001, true)] // Confirmado
+        [InlineData(202410005, true)] // Programado
+        [InlineData(202410008, true)] // Concluído
+        public void Status_DecidesIfLinkIsAllowed(int status, bool allowed)
+        {
+            var input = Valid(); input.Status = status;
+
+            var result = TrackingLinkRequest.Build(input, Now);
+
+            Assert.Equal(allowed, result.Error == null);
+        }
+
+        [Fact]
+        public void MissingDeparture_ReturnsReason()
+        {
+            var input = Valid(); input.DepartureAddress = " ";
+
+            var result = TrackingLinkRequest.Build(input, Now);
+
+            Assert.Equal("Serviço sem endereço de embarque.", result.Error);
             Assert.Null(result.Payload);
         }
     }

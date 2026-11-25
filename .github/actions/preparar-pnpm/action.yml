@@ -1,0 +1,31 @@
+name: Preparar pnpm
+description: >-
+  Node 24, pnpm (versão do packageManager, pelo corepack) e pnpm install com a store em cache. O corepack põe o pnpm no
+  PATH em ~1 s; o pnpm/action-setup levava 6 a 10 s em cada job do CI. A chave do cache é a do setup-node (hash do
+  pnpm-lock.yaml), a mesma dos outros workflows, então o PR aproveita a store que a develop já salvou.
+  Precisa do checkout antes.
+inputs:
+  filtro:
+    description: Argumentos extras do pnpm install (ex. "--filter @betinhos/shell..."). Vazio instala o workspace todo.
+    default: ''
+runs:
+  using: composite
+  steps:
+    # Antes do setup-node: o cache do pnpm pergunta a pasta da store ao próprio pnpm.
+    - shell: bash
+      run: |
+        command -v corepack >/dev/null || npm install -g corepack
+        corepack enable
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+        # @betinhos/ui vem do GitHub Packages (repo design-system-betinhos). O GITHUB_TOKEN lê porque cada pacote
+        # (ui e tokens) lista este repo em Package settings → Manage Actions access (Read).
+        registry-url: https://npm.pkg.github.com
+        scope: '@betinhos-executive-service'
+    - shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
+        FILTRO: ${{ inputs.filtro }}
+      run: pnpm install --frozen-lockfile $FILTRO

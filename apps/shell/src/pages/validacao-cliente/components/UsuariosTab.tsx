@@ -18,7 +18,7 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
   const [form, setForm] = useState({ ...VAZIO, clienteId: clientes.length === 1 ? clientes[0].id : '' })
   const [erros, setErros] = useState<Erros>({})
   const [salvando, setSalvando] = useState(false)
-  const { ocupado, alternar, pedirZerar, dialogo } = useAcoesUsuario(source, onSaved)
+  const { ocupado, alternar, alternarAprovador, pedirZerar, dialogo } = useAcoesUsuario(source, onSaved)
 
   const set = (patch: Partial<typeof VAZIO>) => setForm((f) => ({ ...f, ...patch }))
 
@@ -30,7 +30,7 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
     try {
       const id = await source.criarValidador(form)
       const cliente = clientes.find((c) => c.id === form.clienteId)!
-      onSaved({ id, nome: form.nome.trim(), email: form.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null })
+      onSaved({ id, nome: form.nome.trim(), email: form.email.trim().toLowerCase(), cliente, ativo: true, ultimoAcesso: null, senhaDefinidaEm: null, aprovador: false })
       toast({ tone: 'success', message: `${form.nome.trim()} cadastrado. No primeiro acesso, a pessoa cria a senha pelo código enviado ao e-mail.` })
       setForm((f) => ({ ...VAZIO, clienteId: f.clienteId }))
     } catch (reason) {
@@ -56,7 +56,7 @@ export function UsuariosTab({ validadores, clientes, source, onSaved }: Props) {
         <section className="vc-secao" aria-labelledby="vc-val-lista">
           <h3 id="vc-val-lista" className="vc-secao__titulo">Usuários ({lista.length})</h3>
           <ul className="vc-val-lista">
-            {lista.map((v) => <UsuarioItem key={v.id} v={v} mostrarCliente ocupado={ocupado === v.id} onAlternar={(x) => void alternar(x)} onZerar={pedirZerar} />)}
+            {lista.map((v) => <UsuarioItem key={v.id} v={v} mostrarCliente ocupado={ocupado === v.id} onAlternar={(x) => void alternar(x)} onAprovador={(x) => void alternarAprovador(x)} onZerar={pedirZerar} />)}
           </ul>
         </section>
       </div>
