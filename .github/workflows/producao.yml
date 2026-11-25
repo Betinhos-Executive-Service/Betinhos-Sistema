@@ -20,6 +20,9 @@ name: Produção
 #    Piloto: o binding API do Pages aponta para portal-cliente-dev até a variável do repositório PORTAL_API_SERVICE valer `portal-cliente`;
 #  - nada: só documentação, CI, skills → só move a tag.
 # A tag só anda quando a publicação passa: o que falhou ou foi recusado volta a contar no próximo push.
+# Depois do marcar, em todo caminho (inclusive nada), o job acessos roda o corte dos acessos (acessos-corte.yml) no
+# modo de packages/deploy/acessos/corte.json. A tag prod-publicado não espera o corte; corte travado deixa a execução
+# vermelha e é reavaliado na próxima publicação.
 on:
   push:
     branches: [main]
@@ -360,3 +363,16 @@ jobs:
         env:
           BASE: ${{ needs.caminho.outputs.base }}
         run: node packages/deploy/projetos/publicados.mjs --base "$BASE" --head "$GITHUB_SHA"
+
+  # Corte dos acessos no PROD (plano 4). Aprovação = merge do PR develop → main que levou "prod": "cortar" ou "desfazer".
+  acessos:
+    needs: [caminho, marcar]
+    if: ${{ !cancelled() && needs.marcar.result == 'success' }}
+    uses: ./.github/workflows/acessos-corte.yml
+    with:
+      ambiente: prod
+      environment: prod-front
+    secrets: inherit
+    permissions:
+      contents: write
+      actions: read
