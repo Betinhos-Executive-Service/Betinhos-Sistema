@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Checkbox, Dialog, Drawer, Field, Input, Radio, Sheet, Switch, Textarea, useToast } from '@betinhos/ui'
 import { ImagePlus, Trash2, UserPlus } from 'lucide-react'
 import type { Source } from '../data/source'
-import { MODULOS, NOME_EXIBICAO_MAX, configIgual, ehCor, formDaConfig, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
+import { MODULOS, configIgual, formDaConfig, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
 import { validarValidador } from '../domain/regras'
 import type { Cliente, ModuloPortal, PortalConfig, Validador } from '../domain/types'
 import { PrevisaoMarca } from './PrevisaoMarca'
@@ -16,7 +16,7 @@ type Props = {
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
-const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', nomeExibicao: '', cor: '', logo: null, logoMudou: false }
+const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', logo: null, logoMudou: false }
 const inicial = (config: PortalConfig | null, logo: string | null = null) => (config ? formDaConfig(config, logo) : { ...NOVA, logo })
 const lerArquivo = (arquivo: File) => new Promise<string>((ok, falha) => {
   const leitor = new FileReader()
@@ -126,17 +126,8 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
       </section>
       <section className="vc-secao" aria-labelledby="vc-identidade-titulo">
         <h3 id="vc-identidade-titulo" className="vc-secao__titulo">Identidade no portal</h3>
-        {editarIdentidade ? null : <p className="vc-muted">Só o administrador do ambiente altera logo, cor e nome.</p>}
+        {editarIdentidade ? null : <p className="vc-muted">Só o administrador do ambiente altera o logo.</p>}
         <div className="vc-identidade">
-          <Field label="Nome de exibição" hint="Aparece no topo do portal. Vazio usa o nome do cadastro." error={erros.nomeExibicao}>
-            <Input name="nome-exibicao" value={form.nomeExibicao} maxLength={NOME_EXIBICAO_MAX + 20} disabled={salvando || !editarIdentidade} onChange={(e) => set({ nomeExibicao: e.target.value })} />
-          </Field>
-          <Field label="Cor" hint="Faixa do topo e botão principal. Formato #RRGGBB." error={erros.cor}>
-            <div className="vc-identidade__cor">
-              <input type="color" aria-label="Escolher cor" value={ehCor(form.cor.trim()) ? form.cor.trim() : '#000000'} disabled={salvando || !editarIdentidade} onChange={(e) => set({ cor: e.target.value })} />
-              <Input name="cor" value={form.cor} placeholder="#0a7d4a" disabled={salvando || !editarIdentidade} onChange={(e) => set({ cor: e.target.value })} />
-            </div>
-          </Field>
           <Field label="Logo" hint="PNG ou JPG, até 1 MB." error={erroLogo ?? undefined}>
             <div className="vc-identidade__logo">
               {form.logo ? <img src={form.logo} alt={`Logo de ${cliente?.nome ?? 'cliente'}`} /> : <span className="vc-muted">Sem logo: o portal mostra só a marca Betinhos.</span>}
@@ -150,7 +141,7 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
               ) : null}
             </div>
           </Field>
-          <PrevisaoMarca nome={form.nomeExibicao || cliente?.nome || ''} cor={form.cor} logo={form.logo} />
+          <PrevisaoMarca nome={cliente?.nome ?? ''} logo={form.logo} />
         </div>
       </section>
       <section className="vc-secao" aria-labelledby="vc-emails-titulo">

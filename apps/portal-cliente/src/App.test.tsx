@@ -46,11 +46,10 @@ describe('Portal do cliente', () => {
     const comLink = (c: string) => window.history.replaceState(null, '', `/?c=${c}`)
     afterEach(() => window.history.replaceState(null, '', '/'))
 
-    it('?c=latasa mostra o logo e a cor do cliente já na entrada', async () => {
+    it('?c=latasa mostra o logo do cliente já na entrada', async () => {
       comLink('latasa')
       abrir()
-      await waitFor(() => expect(logo()?.alt).toBe('ReciclaBR Latasa'))
-      expect((document.querySelector('.pc-entrar') as HTMLElement).style.getPropertyValue('--bt-color-brand')).toBe('#0a7d4a')
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'))
     })
 
     it('chave desconhecida fica só com a Betinhos', async () => {
@@ -68,23 +67,21 @@ describe('Portal do cliente', () => {
       await new Promise((r) => setTimeout(r, 700))
       expect(logo()).toBeNull()
       fireEvent.change(campo, { target: { value: 'x@reciclabr.com.br' } })
-      await waitFor(() => expect(logo()?.alt).toBe('ReciclaBR Latasa'), { timeout: 3000 })
+      await waitFor(() => expect(logo()?.alt).toBe('Latasa'), { timeout: 3000 })
     })
 
     it('depois do login o topo mostra o logo e o nome do cliente', async () => {
       abrir()
       await entrarCompleto('compras@latasa.com.br')
-      expect(await screen.findByText('Compras · ReciclaBR Latasa')).toBeTruthy()
-      expect(logo()?.alt).toBe('ReciclaBR Latasa')
-      expect((document.querySelector('.pc-pagina') as HTMLElement).style.getPropertyValue('--pc-marca')).toBe('#0a7d4a')
+      expect(await screen.findByText('Compras · Latasa')).toBeTruthy()
+      expect(logo()?.alt).toBe('Latasa')
     })
 
-    it('cliente sem identidade (Tenaris): topo só com a Betinhos e sem cor', async () => {
+    it('cliente sem logo (Tenaris): topo só com a Betinhos', async () => {
       abrir()
       await entrarCompleto()
       await screen.findByText(/Marcos Albuquerque · Tenaris/)
       expect(logo()).toBeNull()
-      expect((document.querySelector('.pc-pagina') as HTMLElement).style.getPropertyValue('--pc-marca')).toBe('')
     })
   })
 
@@ -242,7 +239,7 @@ describe('Portal do cliente', () => {
       const areas = screen.getByRole('radiogroup', { name: 'Área do portal' })
       expect(within(areas).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Pedir serviço', 'Meus serviços'])
       expect(screen.queryByText(/A validar/)).toBeNull()
-      expect(screen.getByText('Compras · ReciclaBR Latasa')).toBeTruthy()
+      expect(screen.getByText('Compras · Latasa')).toBeTruthy()
     })
 
     /** Abre a busca de passageiros e escolhe o cadastrado pelo nome. */

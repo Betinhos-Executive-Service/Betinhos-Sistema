@@ -17,9 +17,9 @@ const CLIENTES: Record<string, { modulos: Modulo[]; dominios: string[] }> = {
 /** Logo de mentira (SVG embutido): o repositório é público e não leva logo de cliente. */
 const logoMock = (cor: string, sigla: string) =>
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60"><rect width="260" height="60" rx="12" fill="${cor}"/><text x="130" y="39" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#fff" text-anchor="middle">${sigla}</text></svg>`)}`
-/** Identidade cadastrada por cliente (no real, colunas de `cr40f_clientes1`). Latasa tem logo e cor; o resto fica só com a Betinhos. */
+/** Identidade cadastrada por cliente (no real, colunas de `cr40f_clientes1`). Latasa tem logo; o resto fica só com a Betinhos. */
 const MARCAS: Record<string, Marca> = {
-  Latasa: { nome: 'ReciclaBR Latasa', cor: '#0a7d4a', logoUrl: logoMock('#0a7d4a', 'ReciclaBR') },
+  Latasa: { nome: 'Latasa', logoUrl: logoMock('#0a7d4a', 'ReciclaBR') },
 }
 /** Validadores cadastrados pela Betinhos (Tenaris). Quem entra pelo domínio não precisa de cadastro. */
 const VALIDADORES: Record<string, Usuario> = {

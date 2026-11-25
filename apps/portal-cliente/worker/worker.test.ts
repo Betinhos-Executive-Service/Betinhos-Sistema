@@ -512,25 +512,20 @@ describe('cron', () => {
 describe('identidade do cliente', () => {
   const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
   const latasa = () => banco.clientes1s.find((c) => c.cr40f_clientes1id === LATASA)!
-  const comMarca = () => Object.assign(latasa(), { cr40f_portalnomeexibicao: 'ReciclaBR Latasa', cr40f_portalcor: '#0A7D4A', cr40f_portallogo_timestamp: '639000', logoBytes: PNG })
+  const comMarca = () => Object.assign(latasa(), { cr40f_portallogo_timestamp: '639000', logoBytes: PNG })
 
-  it('?c=<nome normalizado> devolve nome, cor e endereço do logo; nada além disso', async () => {
+  it('?c=<nome normalizado> devolve nome do cadastro e endereço do logo; nada além disso', async () => {
     comMarca()
     const r = await chamar('GET', '/marca?c=Latasa')
     expect(r.status).toBe(200)
-    expect(await r.json()).toEqual({ nome: 'ReciclaBR Latasa', cor: '#0a7d4a', logoUrl: `/api/marca/logo/${LATASA}?v=639000` })
-  })
-
-  it('só o nome de exibição já basta para ter marca (sem logo nem cor)', async () => {
-    Object.assign(latasa(), { cr40f_portalnomeexibicao: 'Latasa Reciclagem' })
-    expect(await (await chamar('GET', '/marca?c=latasa')).json()).toEqual({ nome: 'Latasa Reciclagem' })
+    expect(await r.json()).toEqual({ nome: 'Latasa', logoUrl: `/api/marca/logo/${LATASA}?v=639000` })
   })
 
   it('e-mail de domínio cadastrado devolve a marca, sem exigir sessão', async () => {
     comMarca()
     const r = await chamar('GET', '/marca?email=x%40LATASA.com.br')
     expect(r.status).toBe(200)
-    expect(await r.json()).toMatchObject({ nome: 'ReciclaBR Latasa' })
+    expect(await r.json()).toMatchObject({ nome: 'Latasa' })
   })
 
   it.each([
@@ -544,7 +539,7 @@ describe('identidade do cliente', () => {
     expect((await chamar('GET', `/marca?email=${encodeURIComponent(email)}`)).status).toBe(404)
   })
 
-  it('cliente sem logo nem cor, sem módulo, desabilitado ou chave desconhecida: 404 igual', async () => {
+  it('cliente sem logo, sem módulo, desabilitado ou chave desconhecida: 404 igual', async () => {
     expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
     comMarca()
     latasa().cr40f_portalhabilitado = false
@@ -555,13 +550,6 @@ describe('identidade do cliente', () => {
     expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
     expect((await chamar('GET', '/marca?c=nao-existe')).status).toBe(404)
     expect((await chamar('GET', '/marca')).status).toBe(404)
-  })
-
-  it('só cor, sem logo: devolve nome e cor, sem logoUrl; cor fora do formato é ignorada', async () => {
-    Object.assign(latasa(), { cr40f_portalcor: '#123456' })
-    expect(await (await chamar('GET', '/marca?c=latasa')).json()).toEqual({ nome: 'Latasa', cor: '#123456' })
-    latasa().cr40f_portalcor = 'vermelho'
-    expect((await chamar('GET', '/marca?c=latasa')).status).toBe(404)
   })
 
   it('logo: baixa a imagem com o tipo pelo conteúdo e cache; recusa conteúdo desconhecido, id inválido e cliente barrado', async () => {
@@ -594,11 +582,11 @@ describe('identidade do cliente', () => {
     expect(r.headers.get('Content-Security-Policy')).toBe("default-src 'none'")
   })
 
-  it('a sessão leva a marca do cliente; sem identidade cadastrada, vem sem marca', async () => {
+  it('a sessão leva a marca do cliente; sem logo cadastrado, vem sem marca', async () => {
     const semMarca = await logar('compras@latasa.com.br')
     expect(await (await chamar('GET', '/auth/sessao', undefined, semMarca)).json()).not.toHaveProperty('marca')
     comMarca()
     const r = await chamar('GET', '/auth/sessao', undefined, semMarca)
-    expect(await r.json()).toMatchObject({ marca: { nome: 'ReciclaBR Latasa', cor: '#0a7d4a' } })
+    expect(await r.json()).toMatchObject({ marca: { nome: 'Latasa' } })
   })
 })

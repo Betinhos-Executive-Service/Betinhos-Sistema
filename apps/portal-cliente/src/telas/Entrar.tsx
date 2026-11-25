@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Alert, Button, Field, Input } from '@betinhos/ui'
 import { ArrowLeft, Eye, EyeOff, LogIn, Mail, RotateCw } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal, REENVIO_S, SENHA_MIN, senhaFraca, type CodigoErro } from '../api/PortalApi'
-import { estiloDaMarca } from '../domain/marca'
 import type { Sessao } from '../domain/types'
 import { Parceria } from './Parceria'
 import { useMarcaEntrada } from './useMarcaEntrada'
@@ -165,7 +164,7 @@ export function Entrar({ onEntrar, dicaCodigo }: { onEntrar: (s: Sessao) => void
   const tipoSenha = verSenha ? 'text' : 'password'
 
   return (
-    <main className="pc-entrar" style={estiloDaMarca(parceira?.cor) as CSSProperties}>
+    <main className="pc-entrar">
       <section className="pc-entrar__card" aria-labelledby="pc-entrar-titulo">
         <Parceria parceira={parceira} tamanho="entrar" />
         <h1 id="pc-entrar-titulo" className="pc-entrar__titulo">Portal do cliente</h1>

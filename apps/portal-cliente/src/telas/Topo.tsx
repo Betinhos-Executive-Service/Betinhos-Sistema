@@ -23,7 +23,7 @@ export function Topo({ sessao, onSair, ativo, onModulo }: Props) {
         )}
       </div>
       <div className="pc-topo__usuario">
-        <span className="pc-topo__nome">{sessao.nome} · {sessao.marca?.nome ?? sessao.cliente}</span>
+        <span className="pc-topo__nome">{sessao.nome} · {sessao.cliente}</span>
         <Button variant="ghost" size="compact" onClick={onSair} icon={<LogOut size={16} aria-hidden />}>Sair</Button>
       </div>
     </header>

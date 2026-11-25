@@ -1,5 +1,4 @@
-import { useState, type CSSProperties } from 'react'
-import { estiloDaMarca } from '../domain/marca'
+import { useState } from 'react'
 import type { Modulo, Pedido, Sessao } from '../domain/types'
 import { MeusServicos } from './MeusServicos'
 import { Pedir } from './Pedir'
@@ -29,7 +28,7 @@ export function Portal({ sessao, onSair }: { sessao: Sessao; onSair: () => void 
     setAtivo('pedir')
   }
   return (
-    <div className="pc-pagina" style={estiloDaMarca(sessao.marca?.cor) as CSSProperties}>
+    <div className="pc-pagina">
       <Topo sessao={sessao} onSair={onSair} ativo={ativo} onModulo={setAtivo} />
       {tem('validar') && <div hidden={ativo !== 'validar'}><Servicos sessao={sessao} /></div>}
       {tem('pedir') && <div key={`pedir-${versao}-${repeticoes}`} hidden={ativo !== 'pedir'}><Pedir onPedido={pedido} modelo={modelo} onRepetirAnterior={tem('meus_servicos') ? () => setAtivo('meus_servicos') : undefined} /></div>}

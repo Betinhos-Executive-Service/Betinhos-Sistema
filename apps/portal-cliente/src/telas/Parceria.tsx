@@ -6,7 +6,7 @@ export function Parceria({ parceira, tamanho }: { parceira: Marca | null; tamanh
   return (
     <div className={`pc-parceria pc-parceria--${tamanho}`}>
       <img className="pc-parceria__betinhos" src={logoBetinhos} alt="Betinhos Executive Service" />
-      {parceira?.logoUrl ? (
+      {parceira ? (
         <>
           <span className="pc-parceria__divisor" aria-hidden />
           <img key={parceira.logoUrl} className="pc-parceria__cliente" src={parceira.logoUrl} alt={parceira.nome} />

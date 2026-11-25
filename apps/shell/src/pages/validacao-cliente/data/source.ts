@@ -34,7 +34,7 @@ export type Source = {
   zerarSenha: (id: string) => Promise<void>
   /** Grava portal ligado, módulos e domínios no cadastro do cliente; devolve a configuração gravada. */
   salvarConfig: (cliente: Cliente, form: ConfigForm) => Promise<PortalConfig>
-  /** Só o Renan (administrador do ambiente) edita logo, cor e nome; para os outros a identidade é só leitura. */
+  /** Só o Renan (administrador do ambiente) edita o logo; para os outros a identidade é só leitura. */
   podeEditarIdentidade: () => Promise<boolean>
   /** Logo atual do cliente como data URL; `null` quando não há. */
   logoDoCliente: (clienteId: string) => Promise<string | null>
@@ -95,7 +95,7 @@ function createMockSource(): Source {
     async zerarSenha(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
     async salvarConfig(cliente, form) {
       await wait(350)
-      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form), nomeExibicao: form.nomeExibicao.trim(), cor: form.cor.trim().toLowerCase() }
+      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form) }
       if (form.logoMudou) { if (form.logo) logos.set(cliente.id, form.logo); else logos.delete(cliente.id) }
       configs = configs.some((c) => c.cliente.id === cliente.id) ? configs.map((c) => (c.cliente.id === cliente.id ? salva : c)) : [...configs, salva]
       return salva
@@ -230,15 +230,12 @@ export function createSource(host: Host): Source {
     zerarSenha: async (id) => host.client.update((await entitySets()).validador, id, { cr40f_senhadefinidaem: null }),
     async salvarConfig(cliente, form) {
       const dominios = dominiosDoForm(form)
-      const nomeExibicao = form.nomeExibicao.trim()
-      const cor = form.cor.trim().toLowerCase()
       await host.client.update((await entitySets()).cliente, cliente.id, {
         cr40f_portalhabilitado: form.ligado, cr40f_portalmodulos: gravarModulos(form.modulos), cr40f_portaldominios: dominios.length ? dominios.join('; ') : null,
-        cr40f_portalnomeexibicao: nomeExibicao || null, cr40f_portalcor: cor || null,
         // Imagem só vai quando mudou: base64 puro (sem o prefixo data:), ou null para remover.
         ...(form.logoMudou ? { cr40f_portallogo: form.logo ? form.logo.slice(form.logo.indexOf(',') + 1) : null } : {}),
       })
-      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios, nomeExibicao, cor }
+      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios }
     },
     async podeEditarIdentidade() {
       const me = await host.client.request<{ UserId: string }>('WhoAmI')

@@ -1,6 +1,6 @@
-// Identidade do cliente (logo, cor e nome) para o login e o topo do portal. As rotas são públicas e devolvem só isso:
-// cliente sem portal, sem módulo, sem identidade, domínio público ou ambíguo = 404 igual para todos (não revela nada).
-import { chaveDaMarca, DOMINIOS_PUBLICOS_MARCA, ehCor, type Marca } from '../src/domain/marca'
+// Identidade do cliente (o logo) para o login e o topo do portal. As rotas são públicas e devolvem só isso:
+// cliente sem portal, sem módulo, sem logo, domínio público ou ambíguo = 404 igual para todos (não revela nada).
+import { chaveDaMarca, DOMINIOS_PUBLICOS_MARCA, type Marca } from '../src/domain/marca'
 import { dominioDe } from '../src/domain/pedidos'
 import { ErroDataverse, type Dv } from './dataverse'
 import { erro, json } from './http'
@@ -11,19 +11,11 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const dominiosDe = (c: Registro) => String(c.cr40f_portaldominios ?? '').toLowerCase().split(/[\s,;]+/).filter(Boolean)
 const aberto = (c: Registro) => c.cr40f_portalhabilitado === true && mapearModulos(c.cr40f_portalmodulos).length > 0
 
-/** Marca do registro do cliente, ou `null` quando não há logo, cor nem nome de exibição cadastrados. */
+/** Marca do registro do cliente (nome do cadastro e logo), ou `null` quando não há logo. */
 export function marcaDe(c: Registro): Marca | null {
   const logo = c.cr40f_portallogo_timestamp
-  const cor = ehCor(c.cr40f_portalcor) ? c.cr40f_portalcor.toLowerCase() : undefined
-  const temLogo = Boolean(logo) && logo !== '0'
-  const exibicao = String(c.cr40f_portalnomeexibicao ?? '').trim()
-  if (!temLogo && !cor && !exibicao) return null
-  const nome = exibicao || String(c.cr40f_nomedocliente ?? '').trim()
-  return {
-    nome,
-    ...(cor ? { cor } : {}),
-    ...(temLogo ? { logoUrl: `/api/marca/logo/${c.cr40f_clientes1id}?v=${encodeURIComponent(String(logo))}` } : {}),
-  }
+  if (!logo || logo === '0') return null
+  return { nome: String(c.cr40f_nomedocliente ?? '').trim(), logoUrl: `/api/marca/logo/${c.cr40f_clientes1id}?v=${encodeURIComponent(String(logo))}` }
 }
 
 /** Marca do cliente da sessão. Falha de leitura (ex.: coluna ainda não publicada) = sem marca; o login não depende dela. */
@@ -74,7 +66,7 @@ export async function baixarLogo(dv: Dv, clienteId: string): Promise<Response> {
   if (!ehGuid(clienteId)) return erro(404, 'nao_permitido')
   try {
     const cliente = await dv.get(marcaDoCliente(clienteId))
-    if (!aberto(cliente) || !marcaDe(cliente)?.logoUrl) return erro(404, 'nao_permitido')
+    if (!aberto(cliente) || !marcaDe(cliente)) return erro(404, 'nao_permitido')
     const { bytes } = await dv.binario(logoDoCliente(clienteId))
     const formato = FORMATOS.find((f) => f.confere(bytes))
     if (!formato) return erro(404, 'nao_permitido')

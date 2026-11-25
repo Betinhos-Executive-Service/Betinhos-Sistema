@@ -11,7 +11,7 @@ afterEach(cleanup)
 
 const configs = createMockConfigs()
 const validadores = createMockValidadores()
-const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], nomeExibicao: form.nomeExibicao, cor: form.cor }))
+const salvarConfig = (): Source['salvarConfig'] => vi.fn(async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [] }))
 
 function abrir(cliente = EMBRAER, config: PortalConfig | null = configs.find((c) => c.cliente.id === cliente.id) ?? null, over: Partial<Source> = {}, editarIdentidade = true) {
   const source = { salvarConfig: salvarConfig(), logoDoCliente: vi.fn(async () => null), criarValidador: vi.fn(async () => 'e1000000-0000-4000-8000-000000000999'), ...over } as Source
@@ -104,17 +104,15 @@ describe('ConfigDrawer', () => {
   const png = (tamanho = 100, type = 'image/png') => new File([new Uint8Array(tamanho)], 'logo.png', { type })
   const enviar = (arquivo: File) => fireEvent.change(within(drawer()).getByLabelText('Arquivo do logo'), { target: { files: [arquivo] } })
 
-  it('envia logo, cor e nome: a prévia mostra antes de salvar e o Salvar leva tudo', async () => {
+  it('envia o logo: a prévia mostra antes de salvar e o Salvar leva a imagem', async () => {
     const { source, onSaved } = abrir(EMBRAER)
-    fireEvent.change(within(drawer()).getByLabelText('Nome de exibição'), { target: { value: 'Embraer SJC' } })
-    fireEvent.change(within(drawer()).getByLabelText('Cor', { selector: 'input[name="cor"]' }), { target: { value: '#0a7d4a' } })
     enviar(png())
-    expect(await within(drawer()).findByAltText('Logo de Embraer SJC')).toBeTruthy()
+    expect((await within(drawer()).findAllByAltText('Logo de Embraer')).length).toBeGreaterThan(0)
     expect(within(drawer()).getByLabelText('Prévia da identidade no portal')).toBeTruthy()
-    expect(within(drawer()).getAllByText('Embraer SJC').length).toBeGreaterThan(0)
+    expect(within(drawer()).getAllByText('Embraer').length).toBeGreaterThan(0)
     salvar()
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
-    expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ nomeExibicao: 'Embraer SJC', cor: '#0a7d4a', logoMudou: true, logo: expect.stringMatching(/^data:image\/png;base64,/) }))
+    expect(source.salvarConfig).toHaveBeenCalledWith(EMBRAER, expect.objectContaining({ logoMudou: true, logo: expect.stringMatching(/^data:image\/png;base64,/) }))
   })
 
   it('arquivo grande ou de tipo inválido é recusado com mensagem clara', async () => {
@@ -124,22 +122,6 @@ describe('ConfigDrawer', () => {
     enviar(png(10, 'application/pdf'))
     expect(await within(drawer()).findByText(/Formato não aceito/)).toBeTruthy()
     expect(within(drawer()).queryByAltText(/Logo de/)).toBeNull()
-  })
-
-  it('cor inválida bloqueia o Salvar', () => {
-    const { source } = abrir(EMBRAER)
-    fireEvent.change(within(drawer()).getByLabelText('Cor', { selector: 'input[name="cor"]' }), { target: { value: 'azul' } })
-    expect(within(drawer()).getByText(/Cor inválida/)).toBeTruthy()
-    salvar()
-    expect(source.salvarConfig).not.toHaveBeenCalled()
-  })
-
-  it('cor de baixo contraste avisa e deixa salvar', async () => {
-    const { onSaved } = abrir(EMBRAER)
-    fireEvent.change(within(drawer()).getByLabelText('Cor', { selector: 'input[name="cor"]' }), { target: { value: '#ffff00' } })
-    expect(within(drawer()).getAllByText(/pouco contraste/).length).toBeGreaterThan(0)
-    salvar()
-    await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
 
   it('mostra o logo atual do cliente e remove sem trocar', async () => {
@@ -154,7 +136,6 @@ describe('ConfigDrawer', () => {
   it('sem ser o Renan a identidade é só leitura', () => {
     abrir(EMBRAER, undefined, {}, false)
     expect(within(drawer()).getByText(/Só o administrador do ambiente/)).toBeTruthy()
-    expect((within(drawer()).getByLabelText('Nome de exibição') as HTMLInputElement).disabled).toBe(true)
     expect(within(drawer()).queryByLabelText('Arquivo do logo')).toBeNull()
     expect(within(drawer()).queryByRole('button', { name: /Enviar logo/ })).toBeNull()
   })

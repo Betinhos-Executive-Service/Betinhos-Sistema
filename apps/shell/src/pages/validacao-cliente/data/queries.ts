@@ -74,14 +74,14 @@ function composicaoDe(row: Row | undefined): ItemComposicao[] {
 }
 
 const CLIENTE_SELECT = 'cr40f_clientes1id,cr40f_nomedocliente'
-const CONFIG_SELECT = `${CLIENTE_SELECT},cr40f_portalhabilitado,cr40f_portalmodulos,cr40f_portaldominios,cr40f_portalnomeexibicao,cr40f_portalcor`
+const CONFIG_SELECT = `${CLIENTE_SELECT},cr40f_portalhabilitado,cr40f_portalmodulos,cr40f_portaldominios`
 /** Todos os clientes ativos: a aba Configurações lista os que têm portal e os que ainda não têm. */
 const FILTRO_CONFIG = encodeURIComponent('statecode eq 0')
 
 export const clienteDe = (r: Row): Cliente => ({ id: cleanId(str(r.cr40f_clientes1id)), nome: str(r.cr40f_nomedocliente) || 'Cliente' })
 
 export function mapConfig(r: Row): PortalConfig {
-  return { cliente: clienteDe(r), ligado: r.cr40f_portalhabilitado === true, modulos: lerModulos(r.cr40f_portalmodulos), dominios: normalizarDominios(str(r.cr40f_portaldominios)).dominios, nomeExibicao: str(r.cr40f_portalnomeexibicao), cor: str(r.cr40f_portalcor) }
+  return { cliente: clienteDe(r), ligado: r.cr40f_portalhabilitado === true, modulos: lerModulos(r.cr40f_portalmodulos), dominios: normalizarDominios(str(r.cr40f_portaldominios)).dominios }
 }
 
 /** Configurações de todos os clientes ativos, validações, reservas, composições e mensagens; só os clientes com portal ligado entram nas linhas. */

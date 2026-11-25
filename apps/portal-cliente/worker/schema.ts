@@ -40,8 +40,8 @@ export const PESSOA_CAMPOS = ['cr40f_bancodedadosid', 'cr40f_nomedopassageiro', 
 
 export const CLIENTE_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portaldominios']
 
-/** Identidade do cliente (migration 20261125-1600-portal-identidade-cliente.ps1). `_timestamp` da coluna de imagem versiona a URL do logo; o binário vem por `$value`. */
-export const MARCA_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portalnomeexibicao', 'cr40f_portalcor', 'cr40f_portallogo_timestamp']
+/** Logo do cliente (migration 20261125-1600-portal-identidade-cliente.ps1). `_timestamp` da coluna de imagem versiona a URL do logo; o binário vem por `$value`. */
+export const MARCA_CAMPOS = ['cr40f_clientes1id', 'cr40f_nomedocliente', 'cr40f_portalhabilitado', 'cr40f_portalmodulos', 'cr40f_portallogo_timestamp']
 
 /**
  * Colunas da reserva lidas pelos módulos Pedir e Meus serviços. O que o cliente digitou fica em `cr40f_portalpedido` (JSON),
