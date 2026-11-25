@@ -36,6 +36,35 @@ it('converte filtro de cliente em link interno da view TenarisConfab', () => {
   ])
 })
 
+it('visão pessoal com filtros E aninhados em vários níveis (Dynamics) fica editável, sem duplicata', () => {
+  const rel = [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }]
+  const nested: CatalogField[] = [
+    { id: 'new_status', label: 'Status', table: 'cr40f_composicaodeprecos', attribute: 'new_status', path: [], type: 'Picklist', available: true },
+    { id: 'res.cliente', label: 'Cliente', table: 'cr40f_reservadeveculos', attribute: 'cr40f_cliente', path: ['cr40f_reservadeveculos'], relationships: rel, type: 'Lookup', available: true },
+    { id: 'res.saida', label: 'Saída', table: 'cr40f_reservadeveculos', attribute: 'cr40f_dataehorriodesada', path: ['cr40f_reservadeveculos'], relationships: rel, type: 'DateTime', available: true },
+    { id: 'res.categoria', label: 'Categoria', table: 'cr40f_reservadeveculos', attribute: 'new_categoriadoitem', path: ['cr40f_reservadeveculos'], relationships: rel, type: 'Picklist', available: true },
+  ]
+  const guid = '11111111-2222-4333-8444-555555555555'
+  const reserva = (alias: string, type: string, inner = '') => `<link-entity name="cr40f_reservadeveculos" from="cr40f_reservadeveculosid" to="cr40f_servicorelacionadogeral" link-type="${type}" alias="${alias}">${inner}</link-entity>`
+  const xml = `<fetch distinct="true"><entity name="cr40f_composicaodeprecos"><filter type="and"><filter type="and"><filter type="and"><condition attribute="new_status" operator="in"><value>100000000</value><value>100000001</value></condition></filter><filter type="and"><condition attribute="cr40f_cliente" operator="in" entityname="r1"><value>${guid}</value></condition></filter></filter><filter type="and"><condition attribute="cr40f_cliente" operator="in" entityname="ui_r1"><value>${guid}</value></condition></filter></filter>`
+    + reserva('a_5bce', 'inner', `<filter type="and"><condition attribute="cr40f_cliente" operator="eq" value="{${guid}}" /><filter type="and"><condition attribute="cr40f_dataehorriodesada" operator="this-month" /></filter></filter>`)
+    + `<link-entity name="cr40f_reservadeveculos" alias="aa" link-type="inner" from="new_composicaodepreco" to="cr40f_composicaodeprecosid"><filter type="and"><condition attribute="new_categoriadoitem" operator="in"><value>100000000</value><value>100000000</value></condition></filter></link-entity>`
+    + reserva('r1', 'outer') + reserva('ui_r1', 'outer') + '</entity></fetch>'
+  expect(parseNativeFilters(xml, nested)).toEqual({ filters: [
+    { id: 'new_status', operator: 'in', value: '', values: ['100000000', '100000001'] },
+    { id: 'res.cliente', operator: 'in', value: '', values: [guid] },
+    { id: 'res.cliente', operator: 'eq', value: guid },
+    { id: 'res.saida', operator: 'this-month', value: '' },
+    { id: 'res.categoria', operator: 'in', value: '', values: ['100000000'], nativeAlias: 'aa' },
+  ] })
+})
+
+it('condição na raiz pelo alias de um vínculo por outra relação vira filtro com esse alias', () => {
+  const statusCatalog: CatalogField[] = [{ id: 'res.status', label: 'Status da reserva', table: 'cr40f_reservadeveculos', attribute: 'cr40f_status', path: ['cr40f_reservadeveculos'], relationships: [{ from: 'cr40f_reservadeveculosid', to: 'cr40f_servicorelacionadogeral' }], type: 'Picklist', available: true }]
+  const xml = '<fetch><entity name="cr40f_composicaodeprecos"><filter type="and"><filter type="and"><condition attribute="cr40f_status" operator="ne" entityname="aa" value="100000001" /></filter></filter><link-entity name="cr40f_reservadeveculos" alias="aa" link-type="inner" from="new_composicaodepreco" to="cr40f_composicaodeprecosid" /></entity></fetch>'
+  expect(parseNativeFilters(xml, statusCatalog)?.filters).toEqual([{ id: 'res.status', operator: 'ne', value: '100000001', nativeAlias: 'aa' }])
+})
+
 describe('views nativas', () => {
   it('filtra um campo adicionado de tabela ligada pelo lookup direto', () => {
     const relatedId = 'reserva@cr40f_servicorelacionadogeral.cr40f_tipo'
