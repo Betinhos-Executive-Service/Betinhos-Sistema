@@ -26,6 +26,8 @@ export interface Env {
   EMAIL_FLOW_URL: string
   /** 32 bytes em base64: cifra os cookies de sessão e da etapa de criar a senha. */
   CHAVE_SESSAO: string
+  /** Chave da TomTom Search (sugestão de endereço no Pedir). Opcional: sem ela o campo segue texto livre. */
+  TOMTOM_KEY?: string
   /** Link do portal nos e-mails (var do wrangler.jsonc). */
   PORTAL_URL: string
 }

@@ -1,15 +1,16 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, Field, Input, PageHeader, Select, Textarea, useToast } from '@betinhos/ui'
-import { ArrowDownUp, ArrowLeft, ArrowRight, Pencil, RotateCcw, Send, TriangleAlert, UserPlus, X } from 'lucide-react'
+import { ArrowDownUp, ArrowLeft, ArrowRight, Bus, CalendarDays, Car, Check, ClipboardCheck, FileText, Flag, Info, MapPin, Pencil, Route, RotateCcw, Send, ShieldCheck, Sparkles, TriangleAlert, UserPlus, Users, Van, X, type LucideIcon } from 'lucide-react'
 import { useApi } from '../api/ApiContext'
 import { ErroPortal } from '../api/PortalApi'
 import {
   MAX_EMAIL, MAX_ENDERECO, MAX_NOME, MAX_PASSAGEIROS, MAX_TELEFONE, MAX_TEXTO, TIPOS_VEICULO,
   capacidadeVeiculo, erroPassageiro, errosPassageiros, normalizarPedido, rotuloVeiculo, validarPedido, type ErrosPedido,
 } from '../domain/pedidos'
-import { diaSemanaDataHora } from '../domain/formato'
+import { atalhosDeData, diaSemanaDataHora } from '../domain/formato'
 import { deLocalSaoPaulo, paraLocalSaoPaulo } from '../domain/regras'
 import type { NovoPedido, PassageiroPedido, Pedido } from '../domain/types'
+import { EnderecoCampo } from './EnderecoCampo'
 import './Pedir.css'
 
 const GENERICO = 'Não foi possível enviar o pedido agora. Seus dados continuam aqui; tente de novo em instantes.'
@@ -23,11 +24,12 @@ function mensagemDoErro(err: unknown): string {
 
 const SEM_PREFERENCIA = 'auto'
 type Passo = 1 | 2 | 3
-const PASSOS: { n: Passo; nome: string }[] = [
-  { n: 1, nome: 'Quem viaja' },
-  { n: 2, nome: 'Trajeto e horário' },
-  { n: 3, nome: 'Conferir e enviar' },
+const PASSOS: { n: Passo; nome: string; icone: LucideIcon }[] = [
+  { n: 1, nome: 'Quem viaja', icone: Users },
+  { n: 2, nome: 'Trajeto e horário', icone: Route },
+  { n: 3, nome: 'Conferir e enviar', icone: ClipboardCheck },
 ]
+const ICONE_VEICULO: Record<string, LucideIcon> = { auto: Sparkles, 202410001: Car, 202410002: ShieldCheck, 100000002: Bus, 202410003: Van, 202410004: ShieldCheck }
 
 /** Cartão em edição: `indice` null = passageiro novo; `id` guarda o cadastrado cujo contato está sendo completado. */
 type Rascunho = { indice: number | null; id?: string; nome: string; telefone: string; email: string }
@@ -241,31 +243,34 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   const atual = PASSOS[passo - 1]
   const pedido = passo === 3 ? montar() : null
   const nomes = passageiros.map((p) => p.nome.trim()).filter(Boolean)
+  const preenchidos = [nomes.length > 0, !!origem.trim(), !!destino.trim(), !!(data && hora)].filter(Boolean).length
   const quando = data && hora ? diaSemanaDataHora(deLocalSaoPaulo(`${data}T${hora}`)) : ''
 
   return (
-    <main className="pc-conteudo">
+    <main className="pc-conteudo pc-pp-pagina">
       <div className={`pc-pp${passo === 3 ? ' pc-pp--conferir' : ''}`}>
-        <div className="pc-pp__cab"><PageHeader title="Pedir serviço" description={`Passo ${passo} de 3 · ${atual.nome}`} /></div>
-
-        <nav className="pc-pp__passos" aria-label="Etapas do pedido">
-          <ol>
-            {PASSOS.map((s) => {
-              const feito = s.n < passo
-              const conteudo = (<><span className="pc-pp__barra" aria-hidden /><span className="pc-pp__rotulo"><b>{s.n}</b> {s.nome}</span></>)
-              return (
-                <li key={s.n} className={`pc-pp__passo${s.n <= passo ? ' pc-pp__passo--on' : ''}`} aria-current={s.n === passo ? 'step' : undefined}>
-                  {feito
-                    ? <button type="button" className="pc-pp__passo-botao" onClick={() => ir(s.n)} aria-label={`Voltar para o passo ${s.n}: ${s.nome}`}>{conteudo}</button>
-                    : <span className="pc-pp__passo-botao">{conteudo}</span>}
-                </li>
-              )
-            })}
-          </ol>
-        </nav>
+        <div className="pc-pp__cab">
+          <PageHeader title="Pedir serviço" description="Leva menos de um minuto. A gente cuida do resto." />
+          <p className="pc-pp__sr">Passo {passo} de 3 · {atual.nome}</p>
+          <nav className="pc-pp__passos" aria-label="Etapas do pedido">
+            <ol>
+              {PASSOS.map((st) => {
+                const feito = st.n < passo
+                const conteudo = (<><span className="pc-pp__bolinha" aria-hidden>{feito ? <Check size={14} strokeWidth={3} /> : st.n}</span><span className="pc-pp__rotulo">{st.nome}</span></>)
+                return (
+                  <li key={st.n} className={`pc-pp__passo${feito ? ' pc-pp__passo--feito' : ''}`} aria-current={st.n === passo ? 'step' : undefined}>
+                    {feito
+                      ? <button type="button" className="pc-pp__passo-botao" onClick={() => ir(st.n)} aria-label={`Voltar para o passo ${st.n}: ${st.nome}`}>{conteudo}</button>
+                      : <span className="pc-pp__passo-botao">{conteudo}</span>}
+                  </li>
+                )
+              })}
+            </ol>
+          </nav>
+        </div>
 
         <div ref={corpo} className="pc-pp__card">
-          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo">{atual.nome}</h2>
+          <h2 ref={titulo} tabIndex={-1} className="pc-pp__titulo"><span className="pc-pp__titulo-icone" aria-hidden><atual.icone size={18} /></span>{atual.nome}</h2>
 
           {passo === 1 && (
             <div className="pc-pp__corpo">
@@ -334,18 +339,17 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
                 <button type="button" className="pc-pp__link" onClick={() => ir(1)} aria-label="Alterar passageiros">Alterar</button>
               </p>
 
-              <datalist id="pc-enderecos">{enderecos.map((e) => <option key={e} value={e} />)}</datalist>
               <div className="pc-pp__rota">
                 <div className="pc-pp__trilho" aria-hidden><span className="pc-pp__ponto" /><span className="pc-pp__linha" /><span className="pc-pp__quadrado" /></div>
                 <div className="pc-pp__rota-campos">
                   <div className="pc-pp__rota-linha">
                     <label htmlFor={`${idRota}-o`}>Saída de</label>
-                    <input id={`${idRota}-o`} list="pc-enderecos" value={origem} onChange={(e) => { setOrigem(e.target.value); limpar('origem') }} placeholder="Endereço, empresa ou aeroporto" maxLength={MAX_ENDERECO} aria-required aria-invalid={erros.origem ? true : undefined} aria-describedby={erros.origem ? `${idRota}-oe` : undefined} autoComplete="off" />
+                    <EnderecoCampo id={`${idRota}-o`} value={origem} onChange={(v) => { setOrigem(v); limpar('origem') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.origem} describedBy={erros.origem ? `${idRota}-oe` : undefined} />
                     {erros.origem && <p className="pc-pp__erro" id={`${idRota}-oe`} role="alert">{erros.origem}</p>}
                   </div>
                   <div className="pc-pp__rota-linha">
                     <label htmlFor={`${idRota}-d`}>Destino</label>
-                    <input id={`${idRota}-d`} list="pc-enderecos" value={destino} onChange={(e) => { setDestino(e.target.value); limpar('destino') }} placeholder="Endereço, empresa ou aeroporto" maxLength={MAX_ENDERECO} aria-required aria-invalid={erros.destino ? true : undefined} aria-describedby={erros.destino ? `${idRota}-de` : undefined} autoComplete="off" />
+                    <EnderecoCampo id={`${idRota}-d`} value={destino} onChange={(v) => { setDestino(v); limpar('destino') }} recentes={enderecos} placeholder="Endereço, empresa ou aeroporto" invalid={!!erros.destino} describedBy={erros.destino ? `${idRota}-de` : undefined} />
                     {erros.destino && <p className="pc-pp__erro" id={`${idRota}-de`} role="alert">{erros.destino}</p>}
                   </div>
                 </div>
@@ -353,6 +357,11 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
               </div>
 
               <div className="pc-pp__quando">
+                <div className="pc-pp__atalhos" role="group" aria-label="Atalhos de data">
+                  {atalhosDeData(hoje).map((a) => (
+                    <button key={a.valor} type="button" className="pc-pp__atalho" aria-pressed={data === a.valor} onClick={() => { setData(a.valor); limpar('saida') }}>{a.rotulo}</button>
+                  ))}
+                </div>
                 <Field label="Data">
                   <Input type="date" value={data} min={hoje} onChange={(e) => { setData(e.target.value); limpar('saida') }} size="touch" invalid={!!erros.saida} />
                 </Field>
@@ -422,14 +431,19 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
         {passo < 3 && (
           <aside className="pc-pp__lateral" aria-label="Seu pedido">
             <h2>Seu pedido</h2>
+            <div className="pc-pp__progresso">
+              <div className="pc-pp__trilha" role="progressbar" aria-label="Pedido preenchido" aria-valuemin={0} aria-valuemax={4} aria-valuenow={preenchidos}><span style={{ width: `${preenchidos * 25}%` }} /></div>
+              <span>{preenchidos} de 4</span>
+            </div>
             <dl>
-              <ItemPedido nome="Passageiros" valor={nomes.join(', ')} />
-              <ItemPedido nome="Saída de" valor={origem.trim()} />
-              <ItemPedido nome="Destino" valor={destino.trim()} />
-              <ItemPedido nome="Quando" valor={quando} />
-              <ItemPedido nome="Veículo" valor={veiculo === SEM_PREFERENCIA ? 'A Betinhos escolhe' : rotuloVeiculo(Number(veiculo)) ?? ''} />
-              <ItemPedido nome="Observação" valor={observacao.trim()} />
+              <ItemPedido icone={Users} nome="Passageiros" valor={nomes.join(', ')} />
+              <ItemPedido icone={MapPin} nome="Saída de" valor={origem.trim()} />
+              <ItemPedido icone={Flag} nome="Destino" valor={destino.trim()} destaque />
+              <ItemPedido icone={CalendarDays} nome="Quando" valor={quando} />
+              <ItemPedido icone={Car} nome="Veículo" valor={veiculo === SEM_PREFERENCIA ? 'A Betinhos escolhe' : rotuloVeiculo(Number(veiculo)) ?? ''} />
+              <ItemPedido icone={FileText} nome="Observação" valor={observacao.trim()} />
             </dl>
+            <p className="pc-pp__aviso"><Info size={16} aria-hidden /> Confirmamos por e-mail e o voucher aparece em Meus serviços.</p>
           </aside>
         )}
       </div>
@@ -437,11 +451,14 @@ export function Pedir({ onPedido, modelo, onRepetirAnterior }: Props) {
   )
 }
 
-function ItemPedido({ nome, valor }: { nome: string; valor: string }) {
+function ItemPedido({ icone: Icone, nome, valor, destaque }: { icone: LucideIcon; nome: string; valor: string; destaque?: boolean }) {
   return (
-    <div className="pc-pp__item">
-      <dt>{nome}</dt>
-      <dd className={valor ? undefined : 'pc-pp__item--vazio'}>{valor || '—'}</dd>
+    <div className={`pc-pp__item${destaque ? ' pc-pp__item--destaque' : ''}`}>
+      <span className="pc-pp__item-icone" aria-hidden><Icone size={15} /></span>
+      <div>
+        <dt>{nome}</dt>
+        <dd className={valor ? undefined : 'pc-pp__item--vazio'}>{valor || '—'}</dd>
+      </div>
     </div>
   )
 }
@@ -460,10 +477,15 @@ function Secao({ nome, onAlterar, children }: { nome: string; onAlterar: () => v
 
 /** Cartão de rádio: o input nativo fica escondido mas focável, então setas e espaço funcionam como num radio comum. */
 function OpcaoVeiculo({ valor, nome, detalhe, aviso, marcado, onEscolher }: { valor: string; nome: string; detalhe: string; aviso?: string; marcado: boolean; onEscolher: (v: string) => void }) {
+  const Icone = ICONE_VEICULO[valor] ?? Car
   return (
     <label className="pc-pp__veiculo">
       <input type="radio" name="pc-veiculo" value={valor} checked={marcado} onChange={() => onEscolher(valor)} />
       <span className="pc-pp__veiculo-corpo">
+        <span className="pc-pp__veiculo-topo">
+          <span className="pc-pp__veiculo-icone" aria-hidden><Icone size={18} /></span>
+          <span className="pc-pp__veiculo-check" aria-hidden><Check size={12} strokeWidth={3} /></span>
+        </span>
         <span className="pc-pp__veiculo-nome">{nome}</span>
         {detalhe && <span className="pc-pp__veiculo-det">{detalhe}</span>}
         {aviso && <span className="pc-pp__veiculo-aviso"><TriangleAlert size={12} aria-hidden /> {aviso}</span>}

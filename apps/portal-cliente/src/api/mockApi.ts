@@ -1,6 +1,6 @@
 import { chaveDuplicado, chaveNome, dominioDe, JANELA_DUPLICADO_MS, MSG_NAO_CANCELA, nomeDoEmail, normalizarPedido, podeCancelar, primeiroErroPedido, soDigitos } from '../domain/pedidos'
 import { podeAprovar } from '../domain/regras'
-import type { Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { EnderecoSugerido, Modulo, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 import { gerarPedidos, gerarServicos, PESSOAS_LATASA, type PedidoMock } from './mockDados'
 import { ErroPortal, senhaFraca, type PortalApi } from './PortalApi'
 
@@ -20,6 +20,17 @@ const VALIDADORES: Record<string, Usuario> = {
 }
 
 /** Cadastro por e-mail ou, sem cadastro, pelo domínio do cliente; cliente sem módulo não autoriza. */
+/** Locais públicos fictícios para o dev server sugerir endereço sem TomTom. */
+const ENDERECOS_MOCK: EnderecoSugerido[] = [
+  { rotulo: 'Aeroporto Internacional de Guarulhos', endereco: 'Rodovia Hélio Smidt, s/n, Guarulhos - SP' },
+  { rotulo: 'Aeroporto de Congonhas', endereco: 'Avenida Washington Luís, Vila Congonhas, São Paulo - SP' },
+  { rotulo: 'Aeroporto de Viracopos', endereco: 'Rodovia Santos Dumont, Campinas - SP' },
+  { rotulo: 'Avenida Paulista, 1000', endereco: 'Avenida Paulista, 1000, Bela Vista, São Paulo - SP' },
+  { rotulo: 'Avenida Brigadeiro Faria Lima, 3477', endereco: 'Avenida Brigadeiro Faria Lima, 3477, Itaim Bibi, São Paulo - SP' },
+  { rotulo: 'Rodoviária do Tietê', endereco: 'Avenida Cruzeiro do Sul, 1800, Santana, São Paulo - SP' },
+  { rotulo: 'Praça da Sé', endereco: 'Praça da Sé, Sé, São Paulo - SP' },
+]
+
 export function usuarioMock(email: string): Usuario | null {
   const direto = VALIDADORES[email]
   if (direto) return direto
@@ -193,6 +204,13 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       const { nome } = exigirSessao('validar')
       if (!texto.trim()) throw new ErroPortal('nao_permitido', 'Escreva a resposta.')
       return atualizar(id, (s) => ({ ...s, status: 'em_duvida', mensagens: [...s.mensagens, mensagem(s, nome, texto.trim())] }))
+    },
+    async buscarEnderecos(q) {
+      await espera()
+      exigirSessao('pedir')
+      const busca = chaveNome(q.trim())
+      if (busca.length < 3) return []
+      return ENDERECOS_MOCK.filter((e) => chaveNome(`${e.rotulo} ${e.endereco}`).includes(busca)).slice(0, 6)
     },
     async buscarPassageiros(q) {
       await espera()

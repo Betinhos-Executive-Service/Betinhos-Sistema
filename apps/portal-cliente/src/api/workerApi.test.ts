@@ -21,6 +21,16 @@ describe('workerApi', () => {
     expect(url).toBe('/api/passageiros?q=ana%20s')
   })
 
+  it('buscarEnderecos chama GET /enderecos com a busca codificada e repassa o sinal de cancelamento', async () => {
+    let url = ''
+    let sinal: AbortSignal | null | undefined
+    const api = createWorkerApi('/api', async (u, i) => ((url = String(u)), (sinal = i?.signal), new Response(JSON.stringify([{ rotulo: 'A', endereco: 'B' }]), { status: 200 })))
+    const controle = new AbortController()
+    expect(await api.buscarEnderecos('av paulista', controle.signal)).toEqual([{ rotulo: 'A', endereco: 'B' }])
+    expect(url).toBe('/api/enderecos?q=av%20paulista')
+    expect(sinal).toBe(controle.signal)
+  })
+
   it('sessão: 401 nao_permitido vira null (sem login), outro erro sobe', async () => {
     expect(await createWorkerApi('/api', resposta(401, { erro: 'nao_permitido' })).sessao()).toBeNull()
     await expect(createWorkerApi('/api', resposta(500)).sessao()).rejects.toMatchObject({ codigo: 'falha' })

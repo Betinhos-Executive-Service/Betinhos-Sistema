@@ -317,6 +317,14 @@ describe('passageiros do pedido', () => {
     expect((await chamar('GET', '/passageiros?q=a', undefined, await logar())).status).toBe(403)
   })
 
+  it('endereços: exige sessão e módulo Pedir; sem TOMTOM_KEY responde [] sem erro', async () => {
+    expect((await chamar('GET', '/enderecos?q=paulista')).status).toBe(401)
+    expect((await chamar('GET', '/enderecos?q=paulista', undefined, await logar())).status).toBe(403)
+    const r = await chamar('GET', '/enderecos?q=avenida paulista', undefined, await logar('compras@latasa.com.br'))
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual([])
+  })
+
   it('passageiro novo vira pessoa do cliente e vínculo com ordem; a leitura volta por Serviços por Passageiro', async () => {
     const sessao = await logar('compras@latasa.com.br')
     const r = await chamar('POST', '/pedidos', pedido([{ nome: 'Ana Souza', telefone: '(12) 99999-0001' }, { nome: 'Bia Lima', email: 'bia@exemplo.com' }], { tipoVeiculo: 202410003 }), sessao)

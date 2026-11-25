@@ -31,4 +31,6 @@
     }
   }
   // Secrets (wrangler secret put): DV_TENANT, DV_CLIENT_ID, DV_CLIENT_SECRET, DV_URL, EMAIL_FLOW_URL, CHAVE_SESSAO.
+  // Opcional: TOMTOM_KEY (chave da TomTom Search para sugerir endereço no Pedir; sem ela o campo segue texto livre).
+  // Um por ambiente: `wrangler secret put TOMTOM_KEY [--env dev]`, valor pelo stdin.
 }

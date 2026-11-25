@@ -6,6 +6,7 @@ import { aplicarTacita, enviarResumos } from './cron'
 import { sha256Hex } from './cripto'
 import { criarDv } from './dataverse'
 import type { Env } from './env'
+import { sugerirEnderecos } from './enderecos'
 import { erro } from './http'
 import { cancelarPedido, criarPedido, listarPassageiros, listarPedidos } from './pedidos'
 import { abrirDuvida, aprovar, listar, responder } from './servicos'
@@ -68,6 +69,7 @@ async function api(req: Request, env: Env, url: URL, exec: ExecCtx): Promise<Res
   const com = (modulo: Modulo, rodar: () => Promise<Response>) => (sessao.modulos.includes(modulo) ? rodar() : Promise.resolve(erro(403, 'nao_permitido')))
   if (rota === 'POST /pedidos') return com('pedir', () => criarPedido(req, c, sessao))
   if (rota === 'GET /passageiros') return com('pedir', () => listarPassageiros(c, sessao, url.searchParams.get('q') ?? ''))
+  if (rota === 'GET /enderecos') return com('pedir', () => sugerirEnderecos(env, url.searchParams.get('q') ?? ''))
   if (rota === 'GET /pedidos') return com('meus_servicos', () => listarPedidos(c, sessao))
   const cancelar = /^POST \/pedidos\/([^/]+)\/cancelar$/.exec(rota)
   if (cancelar) return com('meus_servicos', () => cancelarPedido(c, sessao, cancelar[1]))

@@ -177,6 +177,17 @@ describe('mockApi multi-cliente', () => {
     await expect((await logado()).buscarPassageiros('a')).rejects.toMatchObject({ codigo: 'nao_permitido' })
   })
 
+  it('sugestão de endereço: mínimo de 3 letras, sem acento nem caixa, no máximo 6, só com sessão', async () => {
+    const { api } = await latasa()
+    expect(await api.buscarEnderecos('av')).toEqual([])
+    const r = await api.buscarEnderecos('AEROPORTO')
+    expect(r.length).toBeGreaterThan(0)
+    expect(r.length).toBeLessThanOrEqual(6)
+    expect(r.every((e) => e.rotulo && e.endereco)).toBe(true)
+    expect(await api.buscarEnderecos('zzzzzz')).toEqual([])
+    await expect((await logado()).buscarEnderecos('aeroporto')).rejects.toMatchObject({ codigo: 'nao_permitido' })
+  })
+
   it('pedido com pessoa nova cadastra; repetir nome e contato reaproveita; id existente corrige o contato; id alheio é recusado', async () => {
     const { api, relogio } = await latasa()
     const saida = new Date(T0 + 86400_000).toISOString()

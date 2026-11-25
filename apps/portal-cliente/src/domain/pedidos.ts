@@ -1,5 +1,5 @@
 import type { StatusTone } from '@betinhos/ui'
-import type { Modulo, NovoPedido, PassageiroPedido, StatusPedido } from './types'
+import type { EnderecoSugerido, Modulo, NovoPedido, PassageiroPedido, StatusPedido } from './types'
 
 export const MODULO_LABEL: Record<Modulo, string> = { validar: 'Validar', pedir: 'Pedir serviço', meus_servicos: 'Meus serviços' }
 
@@ -138,3 +138,9 @@ export const dominioDe = (email: string) => email.split('@')[1] ?? ''
 /** Só pedido ainda em Solicitado (antes de a operação mexer) pode ser cancelado pelo portal. */
 export const podeCancelar = (status: StatusPedido) => status === 'solicitado'
 export const MSG_NAO_CANCELA = 'Este pedido já está com a operação. Para cancelar, fale com a Betinhos.'
+
+/** Texto que vai para o campo ao escolher uma sugestão: "rótulo, endereço", sem repetir o rótulo quando o endereço já o traz. */
+export function textoDoEndereco({ rotulo, endereco }: EnderecoSugerido): string {
+  const texto = endereco.toLowerCase().includes(rotulo.toLowerCase()) ? endereco : `${rotulo}, ${endereco}`
+  return texto.slice(0, MAX_ENDERECO)
+}

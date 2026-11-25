@@ -51,6 +51,9 @@ export type Sessao = { nome: string; email: string; cliente: string; modulos: Mo
 export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'
 
 /** Pessoa do pedido (`cr40f_bancodedados`). Sem `id` = cadastro novo. */
+/** Sugestão de endereço (TomTom): `rotulo` é o nome do lugar ou da rua; `endereco` o endereço formatado. */
+export type EnderecoSugerido = { rotulo: string; endereco: string }
+
 export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string }
 
 export type NovoPedido = {

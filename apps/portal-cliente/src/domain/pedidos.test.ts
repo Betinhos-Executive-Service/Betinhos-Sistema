@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { celularValido, chaveNome, emailValido, errosPassageiros, normalizarPedido, textoCortesia, validarPedido } from './pedidos'
+import { celularValido, chaveNome, emailValido, errosPassageiros, normalizarPedido, textoCortesia, textoDoEndereco, validarPedido } from './pedidos'
 
 const T0 = Date.parse('2026-11-01T12:00:00Z')
 const pedido = (passageiros: Parameters<typeof normalizarPedido>[0]['passageiros']) =>
@@ -62,5 +62,13 @@ describe('data, hora e veículo', () => {
     expect(validarPedido({ ...pedido(ok), tipoVeiculo: 202410003 }, T0)).toEqual({})
     expect(validarPedido({ ...pedido(ok), tipoVeiculo: 5 }, T0).tipoVeiculo).toMatch(/inválido/)
     expect(validarPedido(pedido(ok), T0)).toEqual({})
+  })
+})
+
+describe('texto do endereço sugerido', () => {
+  it('junta rótulo e endereço; não repete o rótulo quando o endereço já o traz; respeita o limite', () => {
+    expect(textoDoEndereco({ rotulo: 'Aeroporto de Congonhas', endereco: 'Av. Washington Luís, São Paulo' })).toBe('Aeroporto de Congonhas, Av. Washington Luís, São Paulo')
+    expect(textoDoEndereco({ rotulo: 'Avenida Paulista, 1000', endereco: 'Avenida Paulista, 1000, São Paulo' })).toBe('Avenida Paulista, 1000, São Paulo')
+    expect(textoDoEndereco({ rotulo: 'x', endereco: 'y'.repeat(500) }).length).toBe(300)
   })
 })
