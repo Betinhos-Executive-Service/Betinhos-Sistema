@@ -1,5 +1,7 @@
 import type { Row } from '@betinhos/dataverse'
-import { PROGRAMADO } from './commands'
+import { CANCELADOS } from './linkCadastro'
+
+const SOLICITADO = 202410004
 
 export type LinkResult = { ok: boolean; link?: string; expiraEm?: string; erro?: string }
 
@@ -8,9 +10,8 @@ export const LINK_FALHA = 'Não foi possível gerar o link agora.'
 /** Motivo pelo qual "Gerar link" não vale para a seleção; `null` quando pode gerar. */
 export function gerarLinkBlock(rows: Row[], selectedCount: number): string | null {
   if (selectedCount !== 1 || rows.length !== 1) return 'Selecione exatamente um serviço.'
-  const [row] = rows
-  if (Number(row.cr40f_status) !== PROGRAMADO) return 'O serviço precisa estar Programado.'
-  if (!row._cr40f_motorista_value && !row.cr40f_motorista) return 'O serviço precisa ter motorista.'
+  const status = Number(rows[0].cr40f_status)
+  if (status === SOLICITADO || CANCELADOS.includes(status)) return 'Serviço solicitado ou cancelado não tem link de acompanhamento.'
   return null
 }
 
