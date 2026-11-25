@@ -38,17 +38,6 @@ describe('Checklist', () => {
     }
   })
 
-  it('no veículo decide pela tabela da Frota: Frota Gestor vê Excluir, RH Gestor não', async () => {
-    for (const [perfis, ve] of [['frota:gestor', true], ['rh:gestor', false]] as const) {
-      const { source } = await comArquivoNaCnh()
-      render(<ComAcessos perfis={perfis}><ToastProvider><Checklist source={source} donoId="m1" tabela="cr40f_veiculos" /></ToastProvider></ComAcessos>)
-      const cnh = await itemCnh()
-      await within(cnh).findByText('cnh.pdf')
-      expect(Boolean(within(cnh).queryByRole('button', { name: 'Excluir cnh.pdf' }))).toBe(ve)
-      cleanup()
-    }
-  })
-
   it('lista os tipos com estado, abre o histórico pelo ícone e abre a renovação', async () => {
     renderChecklist(createMockDocsSource())
     const cnh = await itemCnh()

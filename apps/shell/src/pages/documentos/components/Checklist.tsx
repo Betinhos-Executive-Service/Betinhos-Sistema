@@ -17,10 +17,9 @@ import { BrandLoader } from '../../../app/BrandLoader'
 import { usePodeExcluir } from '../../../app/useNivel'
 import '../documentos.css'
 
-// Tabela dona dos documentos para decidir quem exclui: RH (funcionário) ou Frota (veículo).
-type Props = { source: DocsSource; donoId: string; titulo?: string; tabela?: string }
+type Props = { source: DocsSource; donoId: string; titulo?: string }
 
-export function Checklist({ source, donoId, titulo = 'Documentos controlados', tabela = 'cr40f_documento' }: Props) {
+export function Checklist({ source, donoId, titulo = 'Documentos controlados' }: Props) {
   const { data, loading, error, reload } = useDocumentos(source)
   const toast = useToast()
   const [alvo, setAlvo] = useState<AlvoRenovar | null>(null)
@@ -46,7 +45,7 @@ export function Checklist({ source, donoId, titulo = 'Documentos controlados', t
       {titulo ? <h3 id={`${donoId}-docs`} className="doc-checklist__title">{titulo}</h3> : null}
       {error ? <Alert tone="danger" title="Não foi possível atualizar os documentos" action={<Button variant="secondary" onClick={() => void reload()}>Tentar de novo</Button>}>{error}</Alert> : null}
       <ul className="doc-checklist__list">
-        {itens.map((item) => <ItemLinha key={`${item.tipo.id}:${item.vigente?.id ?? 'novo'}`} item={item} tabela={tabela} source={source} limite={limite} onRenovar={() => setAlvo({ tipo: item.tipo, dono, anterior: item.vigente })} />)}
+        {itens.map((item) => <ItemLinha key={`${item.tipo.id}:${item.vigente?.id ?? 'novo'}`} item={item} source={source} limite={limite} onRenovar={() => setAlvo({ tipo: item.tipo, dono, anterior: item.vigente })} />)}
       </ul>
       <RenovarDrawer alvo={alvo} source={source} onClose={() => setAlvo(null)} onSaved={onSaved} />
     </section>
@@ -70,8 +69,8 @@ const iconeArquivo = (arq: Arquivo) => {
   return <FileIcon size={14} aria-hidden />
 }
 
-function ItemLinha({ item, tabela, source, limite, onRenovar }: { item: ItemChecklist; tabela: string; source: DocsSource; limite: Limite; onRenovar: () => void }) {
-  const podeExcluir = usePodeExcluir(tabela)
+function ItemLinha({ item, source, limite, onRenovar }: { item: ItemChecklist; source: DocsSource; limite: Limite; onRenovar: () => void }) {
+  const podeExcluir = usePodeExcluir('cr40f_documento')
   const toast = useToast()
   const [verHistorico, setVerHistorico] = useState(false)
   const [arquivos, setArquivos] = useState<Arquivo[] | null>(null)

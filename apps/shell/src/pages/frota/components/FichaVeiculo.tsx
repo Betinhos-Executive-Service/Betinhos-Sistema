@@ -204,7 +204,7 @@ export function FichaVeiculo({ source, docs, id, data, errors, today, secao = nu
               <h3 id={`${id}-docs`} className="frota-group__title">Documentos</h3>
               {/* Diálogos do checklist (excluir, renovar) são <dialog> dentro deste Drawer. */}
               <ContemEsc>
-                <Checklist source={docs} donoId={id} titulo="" tabela="cr40f_veiculos" />
+                <Checklist source={docs} donoId={id} titulo="" />
               </ContemEsc>
             </section>
           ) : null}
