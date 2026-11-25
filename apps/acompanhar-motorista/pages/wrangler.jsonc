@@ -1,0 +1,16 @@
+{
+  // Projeto Pages do link de acompanhamento (acompanhe.betinhos.com.br por CNAME na Locaweb; a zona não está na Cloudflare,
+  // então o Worker não aceita domínio próprio direto). Só repassa tudo ao Worker por service binding (functions/[[path]].ts):
+  // mesma URL, então o Worker monta os links novos com o domínio de quem o chamou.
+  // Decisão do Renan, 25/11/2026: por enquanto o domínio aponta ao acompanhar-motorista-dev (Dataverse DEV).
+  // Publicação à mão: `cd pages && npx wrangler pages deploy --branch main`.
+  "name": "acompanhe",
+  "pages_build_output_dir": "estatico",
+  "compatibility_date": "2026-09-01",
+  "services": [{ "binding": "WORKER", "service": "acompanhar-motorista-dev" }],
+  "env": {
+    "preview": {
+      "services": [{ "binding": "WORKER", "service": "acompanhar-motorista-dev" }]
+    }
+  }
+}
