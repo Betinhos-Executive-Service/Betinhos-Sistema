@@ -1,62 +1,25 @@
-import { CalendarClock, Car, CircleDollarSign, Repeat, Siren, CheckCircle2, ChevronRight, CircleAlert, FileWarning, Gauge, ListTodo, Wrench } from 'lucide-react'
-import { useMemo } from 'react'
-import { Alert, EmptyState, MetricCard, StatusBadge, Surface } from '@betinhos/ui'
+import { CalendarClock, CheckCircle2, CircleAlert, Kanban, List, ListTodo } from 'lucide-react'
+import { useMemo, type ReactNode } from 'react'
+import { Alert, EmptyState, MetricCard, SegmentedControl } from '@betinhos/ui'
 import { useQueryTexto } from '../../../nav/queryState'
-import { formatBR } from '../data/dates'
 import type { LoadResult } from '../data/source'
 import type { FrotaData, Kind } from '../data/types'
-import { ROTULO_ETAPA } from '../domain/multaEtapas'
-import { buildPendencias, PENDENCIA_LABEL, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
+import { buildPendencias, PENDENCIA_ORDEM, type Pendencia, type PendenciaTipo } from '../domain/pendencias'
+import { PendenciasLista, PendenciasQuadro } from './PendenciasModos'
+import { CURTO, ordenar, urgencia } from './pendenciasComum'
 
-const CURTO: Record<PendenciaTipo, string> = {
-  prioridade: 'Prioridade alta parada',
-  reincidencia: 'Manutenção reincidente',
-  custo: 'Custo fora da curva',
-  hodometro: 'Hodômetro desatualizado',
-  encaixar: 'A encaixar',
-  preventiva: 'Preventiva do plano',
-  atrasada: 'Manutenção atrasada',
-  notificar: ROTULO_ETAPA.identificar,
-  indicar: ROTULO_ETAPA.indicar,
-  colisao: 'Colisão em aberto',
-}
+type Area = { id: string; titulo: string; tipos: PendenciaTipo[] }
+const AREAS: Area[] = [
+  { id: 'manutencao', titulo: 'Manutenção', tipos: ['prioridade', 'atrasada', 'preventiva', 'encaixar', 'reincidencia', 'custo', 'hodometro'] },
+  { id: 'multas', titulo: 'Multas', tipos: ['notificar', 'indicar'] },
+  { id: 'colisoes', titulo: 'Colisões', tipos: ['colisao'] },
+]
 
-const ICONE: Record<Kind | 'preventiva' | 'veiculo', typeof Wrench> = { manutencao: Wrench, preventiva: Gauge, multa: FileWarning, colisao: Car, veiculo: Car }
-const ICONE_TIPO: Partial<Record<PendenciaTipo, typeof Wrench>> = { prioridade: Siren, reincidencia: Repeat, custo: CircleDollarSign }
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-
-type Urgencia = 'atrasado' | 'hoje' | 'breve'
-
-function urgencia(item: Pendencia): Urgencia | null {
-  if (item.kind === 'preventiva') {
-    if (item.estado === 'vencido') return 'atrasado'
-    if (item.criterio !== 'data') return null
-  }
-  if (item.dias === null || !item.prazo) return null
-  return item.dias < 0 ? 'atrasado' : item.dias === 0 ? 'hoje' : 'breve'
-}
-
-const TOM: Record<Urgencia, 'danger' | 'warning' | 'info'> = { atrasado: 'danger', hoje: 'warning', breve: 'info' }
-
-function Prazo({ item }: { item: Pendencia }) {
-  const nivel = urgencia(item)
-  if (!nivel || item.dias === null || !item.prazo) return null
-  const texto = nivel === 'atrasado' ? `Atrasado ${-item.dias} d` : nivel === 'hoje' ? 'Vence hoje' : `Vence em ${item.dias} d`
-  return <StatusBadge tone={TOM[nivel]} icon={<CalendarClock size={12} />} title={formatBR(item.prazo)}>{texto}</StatusBadge>
-}
-
-function Km({ item }: { item: Pendencia }) {
-  if (item.faltamKm === null) return null
-  const vencido = item.faltamKm < 0
-  const texto = vencido ? `Vencido há ${Math.abs(item.faltamKm).toLocaleString('pt-BR')} km` : `Em ${item.faltamKm.toLocaleString('pt-BR')} km`
-  return <StatusBadge tone={vencido ? 'danger' : item.estado === 'a_vencer' ? 'warning' : 'info'} icon={<Gauge size={12} />}>{texto}</StatusBadge>
-}
-
-/** Um badge só: na preventiva, o da regra que decide (km ou data); nos demais, o prazo. */
-function Badge({ item }: { item: Pendencia }) {
-  if (item.kind === 'preventiva' && item.criterio === 'km') return <Km item={item} />
-  return <Prazo item={item} />
-}
+type Modo = 'lista' | 'quadro'
+const MODOS: { value: Modo; label: ReactNode }[] = [
+  { value: 'lista', label: <span className="frota-pend__modo"><List size={14} aria-hidden />Lista</span> },
+  { value: 'quadro', label: <span className="frota-pend__modo"><Kanban size={14} aria-hidden />Quadro</span> },
+]
 
 const TABELAS_PREVENTIVA = ['planoPreventivo', 'baselines', 'veiculos'] as const
 
@@ -68,16 +31,26 @@ export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: 
     [data, today, erroPreventiva],
   )
   const [filtroUrl, setFiltro] = useQueryTexto('filtro')
-  const filtro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl) ?? ''
+  const [modoUrl, setModo] = useQueryTexto('modo')
+  const modo: Modo = modoUrl === 'quadro' ? 'quadro' : 'lista'
 
   const aviso = erroPreventiva ? <Alert tone="warning">Preventivas indisponíveis: {erroPreventiva}</Alert> : null
   if (!itens.length) return <>{aviso}<EmptyState align="start" icon={<CheckCircle2 size={36} />} title="Nenhuma pendência de frota no momento">Encaixes, manutenções atrasadas, multas e colisões em aberto aparecem aqui.</EmptyState></>
 
-  const contagem = (tipo: PendenciaTipo) => itens.filter((item) => item.tipo === tipo).length
+  const abrir = (item: Pendencia) => {
+    if (item.kind === 'preventiva' || item.kind === 'veiculo') { if (item.veiculoId) onOpenVeiculo(item.veiculoId, item.kind === 'preventiva' ? 'preventivas' : undefined) }
+    else onOpen(item.kind, item.id)
+  }
   const atrasadas = itens.filter((item) => urgencia(item) === 'atrasado').length
   const hoje = itens.filter((item) => urgencia(item) === 'hoje').length
-  const presentes = PENDENCIA_ORDEM.filter((tipo) => contagem(tipo) > 0)
-  const visiveis = presentes.filter((tipo) => !filtro || filtro === tipo)
+  // Links antigos filtram por tipo (`filtro=preventiva`); os chips filtram por área.
+  const tipoFiltro = PENDENCIA_ORDEM.find((tipo) => tipo === filtroUrl)
+  const areaFiltro = AREAS.find((area) => area.id === filtroUrl)
+  const daArea = (area: Area) => itens.filter((item) => area.tipos.includes(item.tipo))
+  const presentes = AREAS.filter((area) => daArea(area).length > 0)
+  const visiveis = ordenar(itens.filter((item) => (!areaFiltro || areaFiltro.tipos.includes(item.tipo)) && (!tipoFiltro || item.tipo === tipoFiltro)))
+  const filtroAtivo = areaFiltro?.id ?? tipoFiltro ?? ''
+  const props = { itens: visiveis, abrir }
 
   return (
     <div className="frota-pend">
@@ -88,59 +61,20 @@ export function Pendencias({ data, errors = {}, today, onOpen, onOpenVeiculo }: 
         <MetricCard icon={<CalendarClock size={20} />} tone={hoje ? 'warning' : 'info'} label="Vencem hoje" value={hoje} />
       </div>
 
-      <div className="frota-chips" role="group" aria-label="Filtrar pendências">
-        <button type="button" className="frota-chip" aria-pressed={!filtro} onClick={() => setFiltro('')}>Todas <b>{itens.length}</b></button>
-        {presentes.map((tipo) => (
-          <button key={tipo} type="button" className="frota-chip" aria-pressed={filtro === tipo} onClick={() => setFiltro(filtro === tipo ? '' : tipo)}>
-            {CURTO[tipo]} <b>{contagem(tipo)}</b>
-          </button>
-        ))}
+      <div className="frota-pend__barra">
+        <div className="frota-chips" role="group" aria-label="Filtrar pendências">
+          <button type="button" className="frota-chip" aria-pressed={!filtroAtivo} onClick={() => setFiltro('')}>Todas <b>{itens.length}</b></button>
+          {presentes.map((area) => (
+            <button key={area.id} type="button" className="frota-chip" aria-pressed={filtroAtivo === area.id} onClick={() => setFiltro(filtroAtivo === area.id ? '' : area.id)}>
+              {area.titulo} <b>{daArea(area).length}</b>
+            </button>
+          ))}
+          {tipoFiltro ? <button type="button" className="frota-chip" aria-pressed aria-label={`Remover filtro ${CURTO[tipoFiltro]}`} onClick={() => setFiltro('')}>{CURTO[tipoFiltro]} <b aria-hidden>×</b></button> : null}
+        </div>
+        <SegmentedControl aria-label="Ver pendências como" size="compact" value={modo} onChange={(v) => setModo(v === 'lista' ? '' : v)} options={MODOS} />
       </div>
 
-      {visiveis.map((tipo) => {
-        const grupo = itens.filter((item) => item.tipo === tipo)
-        return (
-          <Surface key={tipo} flush aria-label={PENDENCIA_LABEL[tipo]} className="frota-pend__grupo">
-            <header className="frota-pend__head">
-              <h2>{CURTO[tipo]}</h2>
-              <StatusBadge tone="neutral">{grupo.length}</StatusBadge>
-              <p>{PENDENCIA_LABEL[tipo]}</p>
-            </header>
-            <ul>
-              {grupo.map((item) => {
-                const Icone = ICONE_TIPO[item.tipo] ?? ICONE[item.kind]
-                const nivel = urgencia(item)
-                return (
-                  <li key={`${item.kind}-${item.id}`}>
-                    <button type="button" className="frota-pend__item" data-urgencia={nivel ?? undefined} onClick={() => { if (item.kind === 'preventiva' || item.kind === 'veiculo') { if (item.veiculoId) onOpenVeiculo(item.veiculoId, item.kind === 'preventiva' ? 'preventivas' : undefined) } else onOpen(item.kind, item.id) }}>
-                      <span className="frota-pend__icone" aria-hidden><Icone size={16} /></span>
-                      <span className="frota-pend__texto">
-                        <strong>{item.titulo}</strong>
-                        <span>{[item.veiculo?.label, item.pessoa?.label].filter(Boolean).join(' · ') || 'Sem veículo informado'}</span>
-                        {item.detalhe ? <span className="frota-pend__detalhe">{item.detalhe}</span> : null}
-                      </span>
-                      <Badge item={item} />
-                      <ChevronRight size={16} className="frota-pend__seta" aria-hidden />
-                    </button>
-                    {item.ocorrencias?.length ? (
-                      <details className="frota-pend__ocorrencias">
-                        <summary>Ver as {item.ocorrencias.length} ocorrências</summary>
-                        <ul>
-                          {item.ocorrencias.map((o) => (
-                            <li key={o.id}>
-                              <button type="button" onClick={() => onOpen('manutencao', o.id)}>{formatBR(o.dia)} · {o.estabelecimento ?? 'Oficina não informada'} · {o.valor ? brl(o.valor) : 'sem valor'}</button>
-                            </li>
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-          </Surface>
-        )
-      })}
+      {modo === 'quadro' ? <PendenciasQuadro {...props} /> : <PendenciasLista {...props} />}
     </div>
   )
 }

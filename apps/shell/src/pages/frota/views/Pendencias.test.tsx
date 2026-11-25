@@ -24,7 +24,7 @@ describe('Pendencias - preventiva do plano', () => {
     const onOpen = vi.fn()
     const onOpenVeiculo = vi.fn()
     render(<Pendencias data={dados(169150)} today={today} onOpen={onOpen} onOpenVeiculo={onOpenVeiculo} />)
-    expect(screen.getByRole('heading', { name: 'Preventiva do plano' })).toBeTruthy()
+    expect(screen.getByText('Preventiva do plano')).toBeTruthy()
     expect(screen.getByText('Em 850 km')).toBeTruthy()
     fireEvent.click(screen.getByText(/Troca de óleo/).closest('button')!)
     expect(onOpenVeiculo).toHaveBeenCalledWith('v1', 'preventivas')

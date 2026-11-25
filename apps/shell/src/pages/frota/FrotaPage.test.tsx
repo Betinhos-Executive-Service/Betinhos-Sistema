@@ -98,7 +98,7 @@ describe('Frota', () => {
     }, errors: {} }))
     history.replaceState(null, '', '#/frota')
     renderFrota(source)
-    expect(await screen.findByRole('heading', { name: 'Preventiva do plano' })).toBeTruthy()
+    expect(await screen.findByText('Preventiva do plano')).toBeTruthy()
     fireEvent.click(screen.getByText(/Troca de óleo/).closest('button')!)
     expect(await screen.findByRole('dialog', { name: 'TST1A11' })).toBeTruthy()
     expect(location.hash).toContain('ficha=v1')
