@@ -222,6 +222,17 @@ export function createMockApi(opts: { atrasoMs?: number; agora?: () => Date; arm
       await espera()
       return ENDERECOS_MOCK.filter((e) => chaveNome(`${e.rotulo} ${e.endereco}`).includes(busca)).slice(0, 6)
     },
+    async estimarRota(origem, destino) {
+      exigirSessao('pedir')
+      const o = chaveNome(origem.trim()), d = chaveNome(destino.trim())
+      if (o.length < 3 || d.length < 3 || o === d) return null
+      await espera()
+      // Fictícia e estável: o mesmo par dá sempre a mesma distância (5 a 45 km).
+      let h = 0
+      for (const c of `${o}>${d}`) h = (h * 31 + c.charCodeAt(0)) >>> 0
+      const distanciaKm = 5 + (h % 400) / 10
+      return { distanciaKm, minutos: Math.round(distanciaKm * 2.2 + 6) }
+    },
     async buscarPassageiros(q) {
       await espera()
       const { cliente } = exigirSessao('pedir')

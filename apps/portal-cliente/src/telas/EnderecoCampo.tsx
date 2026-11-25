@@ -11,7 +11,7 @@ const MAX_OPCOES = 6
 
 type Opcao = { chave: string; texto: string; tipo: 'recente' | 'poi' | 'rua' | TipoLocal; rotulo?: string }
 
-const ICONES = { recente: History, poi: Building2, rua: MapPin, aeroporto: Plane, hotel: BedDouble, rodoviaria: Bus, estacao: TrainFront }
+export const ICONES = { recente: History, poi: Building2, rua: MapPin, aeroporto: Plane, hotel: BedDouble, rodoviaria: Bus, estacao: TrainFront }
 
 type Escolha = { texto: string; titulo: string; resto: string; tipo: Opcao['tipo'] }
 

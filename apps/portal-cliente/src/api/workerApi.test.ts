@@ -31,6 +31,16 @@ describe('workerApi', () => {
     expect(sinal).toBe(controle.signal)
   })
 
+  it('estimarRota chama GET /rota com os dois pontos codificados e repassa o sinal', async () => {
+    let url = ''
+    let sinal: AbortSignal | null | undefined
+    const api = createWorkerApi('/api', async (u, i) => ((url = String(u)), (sinal = i?.signal), new Response(JSON.stringify({ distanciaKm: 12.3, minutos: 25 }), { status: 200 })))
+    const controle = new AbortController()
+    expect(await api.estimarRota('Av. Paulista, 1000', 'GRU & cia', controle.signal)).toEqual({ distanciaKm: 12.3, minutos: 25 })
+    expect(url).toBe('/api/rota?o=Av.%20Paulista%2C%201000&d=GRU%20%26%20cia')
+    expect(sinal).toBe(controle.signal)
+  })
+
   it('sessão: 401 nao_permitido vira null (sem login), outro erro sobe', async () => {
     expect(await createWorkerApi('/api', resposta(401, { erro: 'nao_permitido' })).sessao()).toBeNull()
     await expect(createWorkerApi('/api', resposta(500)).sessao()).rejects.toMatchObject({ codigo: 'falha' })

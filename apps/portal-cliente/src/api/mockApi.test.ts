@@ -188,6 +188,17 @@ describe('mockApi multi-cliente', () => {
     await expect((await logado()).buscarEnderecos('aeroporto')).rejects.toMatchObject({ codigo: 'nao_permitido' })
   })
 
+  it('prévia da rota: estável para os mesmos pontos, null com texto curto ou pontos iguais, só com o módulo Pedir', async () => {
+    const { api } = await latasa()
+    const r = await api.estimarRota('Av. Paulista, 1000', 'Aeroporto de Guarulhos')
+    expect(r).toEqual(await api.estimarRota('Av. Paulista, 1000', 'Aeroporto de Guarulhos'))
+    expect(r!.distanciaKm).toBeGreaterThan(0)
+    expect(r!.minutos).toBeGreaterThan(0)
+    expect(await api.estimarRota('Av', 'Aeroporto de Guarulhos')).toBeNull()
+    expect(await api.estimarRota('Guarulhos', 'guarulhos')).toBeNull()
+    await expect((await logado()).estimarRota('Av. Paulista', 'Guarulhos')).rejects.toMatchObject({ codigo: 'nao_permitido' })
+  })
+
   it('pedido com pessoa nova cadastra; repetir nome e contato reaproveita; id existente corrige o contato; id alheio é recusado', async () => {
     const { api, relogio } = await latasa()
     const saida = new Date(T0 + 86400_000).toISOString()

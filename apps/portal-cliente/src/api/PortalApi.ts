@@ -1,4 +1,4 @@
-import type { EnderecoSugerido, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
+import type { EnderecoSugerido, EstimativaRota, Motivo, NovoPedido, PassageiroPedido, Pedido, Servico, Sessao } from '../domain/types'
 
 export type CodigoErro = 'codigo_invalido' | 'codigo_expirado' | 'senha_invalida' | 'senha_fraca' | 'bloqueado' | 'aguarde' | 'sem_acesso' | 'nao_permitido' | 'duplicado' | 'falha'
 
@@ -38,6 +38,8 @@ export interface PortalApi {
   buscarPassageiros(q: string): Promise<PassageiroPedido[]>
   /** Módulo Pedir: sugestões de endereço (até 6). Lista vazia = sem sugestão; o campo segue texto livre. `sinal` cancela a chamada anterior. */
   buscarEnderecos(q: string, sinal?: AbortSignal): Promise<EnderecoSugerido[]>
+  /** Módulo Pedir: distância e tempo entre a saída e o destino; null = sem estimativa (o pedido segue igual). */
+  estimarRota(origem: string, destino: string, sinal?: AbortSignal): Promise<EstimativaRota | null>
   /** Módulo Pedir: cria a reserva em Solicitado. `duplicado` = mesmo pedido há menos de 1 minuto. */
   pedir(novo: NovoPedido): Promise<Pedido>
   /** Módulo Meus serviços: pedidos feitos pelo e-mail da sessão, do mais recente para o mais antigo. */

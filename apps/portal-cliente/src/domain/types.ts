@@ -57,6 +57,9 @@ export type TipoLocal = 'aeroporto' | 'hotel' | 'rodoviaria' | 'estacao'
 
 export type EnderecoSugerido = { rotulo: string; endereco: string; tipo?: TipoLocal }
 
+/** Prévia do trajeto no Pedir: distância e tempo de carro, com trânsito quando a fonte tem. */
+export type EstimativaRota = { distanciaKm: number; minutos: number }
+
 export type PassageiroPedido = { id?: string; nome: string; telefone?: string; email?: string }
 
 export type NovoPedido = {
