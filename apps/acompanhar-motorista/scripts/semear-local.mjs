@@ -13,6 +13,7 @@ const base = { vehicleId: "veic-mock", placa: "MOCK123", corVeiculo: "Preto", mo
 
 // Portal de passageiros: o hash casa com o flow falso do mock (CADASTRO_FLOW_URL_DEV no .dev.vars). Valores fictícios.
 const cadastro = { cadastroHash: "d".repeat(64), cadastroAmbiente: "dev" };
+const aeroporto = { lat: -23.4356, lon: -46.4731, label: "Aeroporto Internacional de Guarulhos · Terminal 2", rotuloLimpo: true, area: null };
 const agendado = new Date(Date.now() + 6 * 3600e3).toISOString();
 
 const links = {
@@ -28,6 +29,8 @@ const links = {
   DevFluxo0001: { ...base, modo: "completo", titulo: "Embarque OS-10007", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
   // Fase 2: sem motorista (em definição) e terceiro sem rastreador (sem mapa).
   DevDefinica1: { ...base, ...cadastro, vehicleId: null, placa: null, corVeiculo: null, modeloVeiculo: null, motorista: null, modo: "completo", titulo: "Embarque OS-10011", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
+  // Embarque em aeroporto (fictício): faixa com "Welcome to Brazil" e título de desembarque quando o motorista chega.
+  DevAeroport1: { ...base, ...cadastro, modo: "completo", titulo: "Embarque OS-10013", destino: aeroporto, destinoFinal: destino, etapas: [etapa("saida", aeroporto), etapa("destino", destino)] },
   DevSemRastr1: { ...base, ...cadastro, vehicleId: null, placa: "TER1A23", modo: "completo", titulo: "Embarque OS-10012", destino: saida, destinoFinal: destino, etapas: [etapa("saida", saida), etapa("destino", destino)] },
   ["a".repeat(64)]: { vehicleId: "veic-mock", placa: "MOCK123", titulo: "Link antigo", destino: { ...saida, label: "13:40 - FULANO - Av. Paulista, 1000 - Bela Vista" }, destinoFinal: destino, destinoTentadoEm: "x", horarioAgendado, expiraEm },
 };

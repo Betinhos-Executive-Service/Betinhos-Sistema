@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { estadoVivo, idadePosicao, seloStatus } from "../status";
+import { estadoVivo, idadePosicao, sinalVelho } from "../status";
 import { fazTraduz } from "../i18n";
 import { decimal, km } from "../formato";
 
@@ -40,11 +40,11 @@ describe("useViagem", () => {
 
 describe("status e formato", () => {
   const t = fazTraduz("pt");
-  it("selo: posição velha vira aviso; em viagem e a caminho são informativos", () => {
+  it("sinal velho: posição antiga ou sem sinal vira aviso; em viagem recente não", () => {
     const base = { posicao: { lat: 1, lon: 1 }, comSinal: true };
-    expect(seloStatus({ ...base, fase: "em_viagem" }, t, 0).tipo).toBe("info");
-    expect(seloStatus({ ...base, fase: "a_caminho" }, t, 20 * 60000).tipo).toBe("warn");
-    expect(seloStatus({ fase: "a_caminho" }, t, 0).tipo).toBe("warn");
+    expect(sinalVelho({ ...base, fase: "em_viagem" }, 0)).toBe(false);
+    expect(sinalVelho({ ...base, fase: "a_caminho" }, 20 * 60000)).toBe(true);
+    expect(sinalVelho({ fase: "a_caminho" }, 0)).toBe(true);
   });
   it("ao vivo: sem posição fica oculto; com rastreador sem sinal avisa", () => {
     expect(estadoVivo(null, t, 0, 0, Date.now()).oculto).toBe(true);

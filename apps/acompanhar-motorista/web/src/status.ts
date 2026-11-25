@@ -4,22 +4,15 @@ import type { Traduz } from "./i18n";
 import type { Dados } from "./tipos";
 import { nomesCarro } from "./util";
 
-// Regras de status, como funções puras de (dados, relógio do servidor): o selo, o aviso de chegada e o "ao vivo".
-export type TipoSelo = "load" | "info" | "ok" | "warn";
-export interface Selo { tipo: TipoSelo; texto: string }
-
+// Regras de status, como funções puras de (dados, relógio do servidor): o sinal velho, o aviso de chegada e o "ao vivo".
 export const agoraServidor = (desvio: number, agora: number) => agora + desvio;
 export function idadePosicao(d: Dados | null, desvio: number, agora: number) {
   return d && d.posicao && d.posicao.atualizadoEm ? agoraServidor(desvio, agora) - new Date(d.posicao.atualizadoEm).getTime() : NaN;
 }
 
-export function seloStatus(d: Dados, t: Traduz, idade: number): Selo {
-  const velha = typeof d.sinalAtrasadoMin === "number" || !d.comSinal || idade > POSICAO_VELHA_MIN * 60000;
-  if (!d.posicao) return { tipo: "warn", texto: t("status.aguardando") };
-  if (d.fase === "no_local") return { tipo: "ok", texto: t("status.noLocal") };
-  if (velha) return { tipo: "warn", texto: t("status.desatualizada") };
-  if (d.fase === "em_viagem") return { tipo: "info", texto: t(d.chegando ? "status.chegandoDestino" : "passo.em_viagem") };
-  return { tipo: "info", texto: t(d.chegando ? "passo.chegando" : "passo.a_caminho") };
+// Sinal velho: o rastreador avisou atraso, ficou sem sinal ou a última posição passou do limite.
+export function sinalVelho(d: Dados, idade: number) {
+  return typeof d.sinalAtrasadoMin === "number" || !d.comSinal || idade > POSICAO_VELHA_MIN * 60000;
 }
 
 export function textoAvisoCarro(d: Dados, t: Traduz, cor: (c?: string) => string) {

@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BT, DEBUG, reduzMovimento } from "../bt";
 import { useIdioma } from "../i18n";
-import { Ampliar, Centro, Fechar } from "../icones";
+import { km } from "../formato";
+import type { EtaMostrado } from "../hooks/useEta";
+import { Ampliar, Aviso, Centro, Fechar } from "../icones";
 import { MapaViagem } from "../mapa/MapaViagem";
 import type { Vivo } from "../status";
 import type { Dados } from "../tipos";
@@ -14,15 +16,15 @@ interface Props {
   dados: Dados | null;
   retomada: number;
   vivo: Vivo;
-  oculto?: boolean;
+  eta: EtaMostrado;
   aoMostrarCard: () => void;
   aoMapaPronto: (pronto: boolean) => void;
   aoDiagnostico: (texto: string) => void;
 }
 
 // Mapa único: a miniatura e a tela cheia são o mesmo MapLibre (resize), e a morfose card -> tela cheia é um layout animation do motion.
-export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, aoDiagnostico }: Props) {
-  const { t } = useIdioma();
+export function CardMapa({ dados, retomada, vivo, eta, aoMostrarCard, aoMapaPronto, aoDiagnostico }: Props) {
+  const { t, id } = useIdioma();
   const caixa = useRef<HTMLDivElement>(null);
   const alvo = useRef<HTMLDivElement>(null);
   const cartao = useRef<HTMLElement>(null);
@@ -108,11 +110,12 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
   const dialogo = ampliado ? { role: "dialog", "aria-modal": true, "aria-label": t("mapa") } : {};
   return (
     <section className="card c-mapa" id="c-mapa" aria-labelledby="mapa-titulo" ref={cartao}>
-      <h2 id="mapa-titulo">{t("card.mapa")}</h2>
+      <h2 id="mapa-titulo" className="sr">{t("card.mapa")}</h2>
       <div className="mapa-moldura">
         <motion.div layout className={"mapa-caixa" + (ampliado ? " ampliado" : "")} id="mapa-caixa" ref={caixa} style={{ borderRadius: raio }} transition={transicao}
           onLayoutAnimationComplete={() => ctrl.current?.redimensionar()} {...dialogo}>
           <div id="mapa" ref={alvo} role="region" aria-label={t("mapa")} />
+          <span className={"selo-mapa" + (vivo.velha ? " velho" : "")} id="selo-mapa" hidden={vivo.oculto}>{vivo.velha ? <><Aviso /><span>{vivo.texto || t("conexao.reconectando")}</span></> : <><i aria-hidden="true" /><span>{t("mapa.aoVivo")}</span></>}</span>
           <button type="button" ref={centrarRef} className="qd btn-centro" id="centrar" aria-label={t("centrar")} data-oculto={seguindo ? "1" : "0"}
             onClick={() => { ctrl.current?.centrar(); setSeguindo(true); }}><Centro /></button>
           <button type="button" className="btn btn-secundario mapa-btn" id="ampliar" hidden={ampliado} onClick={() => ampliar(true)}><Ampliar /><span>{t("mapa.ampliar")}</span></button>
@@ -123,12 +126,15 @@ export function CardMapa({ dados, retomada, vivo, aoMostrarCard, aoMapaPronto, a
         {ampliado ? <motion.div key="fundo" className="mapa-fundo" id="mapa-fundo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={reduzMovimento() ? { duration: 0 } : { duration: ampliado ? 0.35 : 0.25, ease: EASE }} onClick={() => ampliar(false)} /> : null}
       </AnimatePresence>
-      <p key={pulsos.current.n} className={"vivo pulso" + (vivo.velha ? " velha" : "")} id="vivo" hidden={vivo.oculto}>
-        <span id="atualizado">{vivo.texto}</span>
-        <span className={"conexao" + (vivo.conexao === "off" ? " off" : "")} id="conexao" role="status" hidden={vivo.conexao === ""}>
-          {vivo.conexao === "off" ? t("conexao.off") : vivo.conexao === "rastreador" ? t("conexao.rastreador") : vivo.conexao === "reconectando" ? t("conexao.reconectando") : ""}
-        </span>
-      </p>
+      <div className="mapa-pe">
+        <span id="mapa-km">{eta.eta && typeof eta.eta.km === "number" ? t(dados?.fase === "em_viagem" ? "mapa.kmDestino" : "mapa.km", { km: km(id, eta.eta.km) }) : t("mapa.semPrevisao")}</span>
+        <p key={pulsos.current.n} className={"vivo pulso" + (vivo.velha ? " velha" : "")} id="vivo" hidden={vivo.oculto}>
+          <span id="atualizado">{vivo.texto}</span>
+          <span className={"conexao" + (vivo.conexao === "off" ? " off" : "")} id="conexao" role="status" hidden={vivo.conexao === ""}>
+            {vivo.conexao === "off" ? t("conexao.off") : vivo.conexao === "rastreador" ? t("conexao.rastreador") : vivo.conexao === "reconectando" ? t("conexao.reconectando") : ""}
+          </span>
+        </p>
+      </div>
     </section>
   );
 }
