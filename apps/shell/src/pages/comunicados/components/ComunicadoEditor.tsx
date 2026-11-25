@@ -8,6 +8,7 @@ import {
   COMUNICADO_ESCOPO, COMUNICADO_TIPO, CORPO_MAX, TITULO_MAX, duplicateComunicado, plural, validateDraft,
   type Comunicado, type ComunicadoEscopo, type ComunicadoTipo, type Motorista,
 } from '../domain/comunicados'
+import { usePodeExcluir } from '../../../app/useNivel'
 
 type Props = {
   initial: Comunicado
@@ -27,6 +28,7 @@ const sameDraft = (a: Comunicado, b: Comunicado) =>
 
 export function ComunicadoEditor({ initial, motoristas, source, onBack, onSaved, onDuplicate, onDeleted }: Props) {
   const toast = useToast()
+  const podeExcluir = usePodeExcluir('new_comunicadomotorista')
   const [draft, setDraft] = useState(initial)
   const [busy, setBusy] = useState<'save' | 'dispatch' | 'delete' | null>(null)
   const [confirm, setConfirm] = useState<Confirm>(null)
@@ -176,7 +178,7 @@ export function ComunicadoEditor({ initial, motoristas, source, onBack, onSaved,
             {erro ? <p className="cm-error" role="alert"><AlertTriangle size={16} aria-hidden="true" />{erro}</p> : null}
           </div>
           <div className="cm-form__actions">
-            {draft.id ? <Button variant="danger" className="cm-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
+            {draft.id && podeExcluir ? <Button variant="danger" className="cm-form__start" icon={<Trash2 size={16} />} disabled={lock} loading={busy === 'delete'} onClick={() => setConfirm('delete')}>Excluir rascunho</Button> : null}
             {draft.id ? <Button variant="secondary" icon={<Copy size={16} />} disabled={lock} onClick={() => onDuplicate(duplicateComunicado(draft))}>Duplicar</Button> : null}
             <Button variant="secondary" icon={<Save size={16} />} disabled={lock} loading={busy === 'save'} onClick={() => void salvar()}>Salvar rascunho</Button>
             <Button icon={<Send size={16} />} disabled={lock} loading={busy === 'dispatch'} onClick={pedirDisparo}>Disparar comunicado</Button>

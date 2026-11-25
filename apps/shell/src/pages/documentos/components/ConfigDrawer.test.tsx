@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@betinhos/ui'
 import { createMockDocsSource } from '../data/source'
 import { ConfigDrawer } from './ConfigDrawer'
+import { ComAcessos } from '../../../app/ComAcessos'
 
 configure({ asyncUtilTimeout: 8000 })
 beforeEach(() => vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: () => undefined, removeEventListener: () => undefined })))
@@ -135,6 +136,15 @@ describe('ConfigDrawer', () => {
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Inativar' }))
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect((await source.carregar()).tipos.find((t) => t.id === tipo.id)?.ativo).toBe(false)
+  })
+
+  it('RH Operador não vê Excluir tipo', async () => {
+    const source = createMockDocsSource('2026-10-13')
+    const data = await source.carregar()
+    render(<ComAcessos perfis="rh:operador"><ToastProvider><ConfigDrawer source={source} data={data} onClose={vi.fn()} onChanged={vi.fn()} /></ToastProvider></ComAcessos>)
+    const dialog = await screen.findByRole('dialog', { name: 'Configurações de documentos' })
+    expect(within(dialog).getAllByRole('button', { name: 'Editar' }).length).toBeGreaterThan(0)
+    expect(within(dialog).queryByRole('button', { name: `Excluir ${data.tipos[0]!.nome}` })).toBeNull()
   })
 
   it('excluir fica bloqueado para tipo com documento e apaga tipo sem documento', async () => {

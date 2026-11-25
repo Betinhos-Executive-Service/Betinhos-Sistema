@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { Host } from '../../host'
 import { PageLayout } from '../../app/PageLayout'
 import { temAlgum } from '../../app/acessos'
-import { acessosDe, useAcessos } from '../../app/AcessosProvider'
+import { useAcessosProntos } from '../../app/useNivel'
 import { SearchHits } from '../../app/SearchHits'
 import { LazyFooter, useLazySlice } from '../../app/LazyList'
 import { ListaAgrupada, useRowGroups } from '../../app/ListaAgrupada'
@@ -19,7 +19,7 @@ import { destinoDeVolta } from './lib/voltar'
 import type { AlertKind } from './data/alerts'
 import { todaySP } from './data/dates'
 import { applyBaseFilters, applyFilters, countAlertas, DEFAULT_FILTERS, loadFilters, matchesWords, saveFilters, withAlertas, type Filters } from './data/filters'
-import { FUNCIONARIO_COLUMNS, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_FIELDS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, readFuncionario, sortFuncionarios } from './data/lista'
+import { alertasDoPerfil, camposDoPerfil, colunasDoPerfil, FUNCIONARIO_DEFAULT_FILTERS, FUNCIONARIO_SORT, TELA, builtinViews, fromLegacyFilters, matchesAlerta, readFuncionario, sortFuncionarios } from './data/lista'
 import { type AcessoInicial, createAcessoSource } from './data/acesso'
 import { createFuncionariosSource } from './data/hostSource'
 import { createSource as createComunicadosSource } from '../comunicados/data/source'
@@ -79,6 +79,11 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const reload = carga.reload
   // Celular: filtros próprios na URL (#/funcionarios?q=…&funcao=…); sem filtro na abertura, entram os últimos usados neste navegador.
   const mobile = useIsMobile()
+  const acessos = useAcessosProntos()
+  const colunas = useMemo(() => colunasDoPerfil(acessos), [acessos])
+  const campos = useMemo(() => camposDoPerfil(acessos), [acessos])
+  const alertasPermitidos = useMemo(() => alertasDoPerfil(acessos), [acessos])
+  const chips = useMemo(() => CHIPS.filter((c) => alertasPermitidos.includes(c.kind)), [alertasPermitidos])
   // A semente (últimos filtros deste navegador) só vale no celular: no desktop ela viraria um link antigo e trocaria a visão.
   const [filters, setFiltersUrl] = useQueryFilters(funcionariosQuery, mobile ? loadFilters : undefined)
   const setFilters = (next: Filters) => setFiltersUrl(next)
@@ -93,7 +98,9 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   // A busca filtra 200 ms depois da última tecla (celular e desktop); o texto de cada colaborador já vem normalizado.
   const buscaCelular = useDebouncedText(filters.search)
   const palavrasCelular = useMemo(() => searchWords(buscaCelular), [buscaCelular])
-  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular }), [filters, buscaCelular])
+  // Sem leitura do grupo rh o vínculo volta vazio: o filtro salvo no celular deixaria a lista vazia.
+  const leVinculo = campos.some((f) => f.key === 'vinculo')
+  const filtrosCelular = useMemo(() => ({ ...filters, search: buscaCelular, alerta: filters.alerta && alertasPermitidos.includes(filters.alerta) ? filters.alerta : null, vinculo: leVinculo ? filters.vinculo : null }), [filters, buscaCelular, alertasPermitidos, leVinculo])
   const views = useMemo(() => withAlertas(rows, today), [rows, today])
   const base = useMemo(() => applyBaseFilters(views, filtrosCelular), [views, filtrosCelular])
   const visible = useMemo(() => applyFilters(views, filtrosCelular), [views, filtrosCelular])
@@ -106,10 +113,10 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     extra: { entity: 'cr40f_funcionarios', ids: views.map((row) => row.id) },
     defaultName: 'Funcionários',
     tela: TELA,
-    columns: FUNCIONARIO_COLUMNS,
+    columns: colunas,
     defaultSort: FUNCIONARIO_SORT,
     defaultFilters: FUNCIONARIO_DEFAULT_FILTERS,
-    fields: FUNCIONARIO_FIELDS,
+    fields: campos,
     ready: true,
     builtins: builtinViews,
     // No celular os parâmetros antigos continuam sendo o filtro da tela: só o desktop converte e retira.
@@ -119,7 +126,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const termo = useDebouncedText(busca)
   const palavras = useMemo(() => searchWords(termo), [termo])
   const [alertaUrl, setAlerta] = useQueryTexto('alerta')
-  const alerta = ALERTAS.find((kind) => kind === alertaUrl) ?? null
+  const alerta = ALERTAS.find((kind) => kind === alertaUrl && alertasPermitidos.includes(kind)) ?? null
   const desktopRead = useMemo(() => lista.extra.read(readFuncionario, (row: FuncionarioView) => row.id), [lista.extra])
   const desktopFiltrados = useMemo(() => filterRows(views, lista.filters, lista.fields, desktopRead), [views, lista.filters, lista.fields, desktopRead])
   const desktopBase = useMemo(() => desktopFiltrados.filter((row) => matchesWords(row, palavras)), [desktopFiltrados, palavras])
@@ -153,7 +160,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
   const [fichaVersao, setFichaVersao] = useState(0)
   const acesso = useMemo(() => createAcessoSource(host), [host])
   const comunicados = useMemo(() => createComunicadosSource(host), [host])
-  const verAcessosSemFicha = temAlgum(acessosDe(useAcessos()), ['acessos'])
+  const verAcessosSemFicha = temAlgum(acessos, ['acessos'])
   const irParaAcessos = useCallback(() => { location.hash = hrefFor('acessos') }, [])
   const acessosSistema = useMemo(() => createAcessosSource(host), [host])
   const onAcessoCadastrado = useCallback((id: string, emailPendente?: string) => {
@@ -184,6 +191,8 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           words={palavrasCelular}
           footer={<LazyFooter loaded={mobileSlice.slice.length} more={mobileSlice.more} onLoadMore={mobileSlice.loadMore} pending={pending} />}
           counts={counts}
+          alertas={alertasPermitidos}
+          vinculo={leVinculo}
           filters={filters}
           update={update}
           reset={() => setFilters(DEFAULT_FILTERS)}
@@ -225,7 +234,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
     <div className="page func">
     <div className="app">
       <div role="toolbar" aria-label="Comandos de funcionários" className="toolbar">
-        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={FUNCIONARIO_COLUMNS} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}
+        <ViewBar pinnable onAudit={() => auditoria({ entity: 'cr40f_funcionarios', onOpenRecord: (id) => setSelection({ mode: 'open', id }) })} view={view} columns={colunas} catalog={lista.extra.catalog} filters={{ fields: lista.fields }}
           search={<SearchBox aria-label="Buscar colaborador" placeholder="Buscar nome, CPF, telefone, e-mail, função ou placa" value={busca} onChange={setBusca} />}
           more={moreActions}
           primary={<>
@@ -235,7 +244,7 @@ export function Funcionarios({ source, docs, host = MOCK_HOST }: { source: DataS
           </>}>
           <EnvBadge env={source.envLabel} />
           <div className="chips" role="group" aria-label="Alertas de vencimento">
-            {CHIPS.map(({ kind, label, icon: Icon }) => (
+            {chips.map(({ kind, label, icon: Icon }) => (
               <button key={kind} type="button" className={`chip chip--${kind}`} aria-pressed={alerta === kind} disabled={!desktopCounts[kind] && alerta !== kind} title={kind === 'aniversario' ? 'Aniversários nos próximos 7 dias' : `${label} vencida ou vencendo em até 60 dias`} onClick={() => setAlerta(alerta === kind ? '' : kind)}>
                 <Icon size={14} aria-hidden />
                 {label}

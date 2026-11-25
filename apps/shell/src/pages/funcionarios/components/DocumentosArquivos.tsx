@@ -7,6 +7,7 @@ import type { Documento } from '../data/types'
 import { errorMessage } from '../data/xrm'
 import { useNotify } from './Toasts'
 import { BrandLoader } from '../../../app/BrandLoader'
+import { usePodeExcluir } from '../../../app/useNivel'
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })
 const PREVIEWABLE = /^(application\/pdf|image\/|text\/plain)/
@@ -36,6 +37,7 @@ function saveBlob(blob: Blob, nome: string) {
 }
 
 export function DocumentosArquivos({ source, id }: { source: DataSource; id: string }) {
+  const podeExcluir = usePodeExcluir('cr40f_funcionarios')
   const store = source.documentos
   const notify = useNotify()
   const input = useRef<HTMLInputElement>(null)
@@ -188,7 +190,7 @@ export function DocumentosArquivos({ source, id }: { source: DataSource; id: str
                   <>
                     <Button variant="ghost" size="compact" icon={<ExternalLink size={16} />} aria-label={`Abrir ${doc.nome}`} title="Abrir" onClick={() => void abrir(doc, false)} />
                     <Button variant="ghost" size="compact" icon={<Download size={16} />} aria-label={`Baixar ${doc.nome}`} title="Baixar" onClick={() => void abrir(doc, true)} />
-                    <Button variant="ghost" size="compact" className="icon-danger" icon={<Trash2 size={16} />} aria-label={`Excluir ${doc.nome}`} title="Excluir" onClick={() => setConfirmar(doc.id)} />
+                    {podeExcluir ? <Button variant="ghost" size="compact" className="icon-danger" icon={<Trash2 size={16} />} aria-label={`Excluir ${doc.nome}`} title="Excluir" onClick={() => setConfirmar(doc.id)} /> : null}
                   </>
                 )}
               </span>

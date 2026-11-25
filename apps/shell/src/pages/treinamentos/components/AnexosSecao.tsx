@@ -17,6 +17,8 @@ type Props = {
   disabled: boolean
   /** Publicado: só leitura além de abrir. */
   somenteLeitura?: boolean
+  /** Excluir anexo segue o Delete do treinamento (Gestor do RH); enviar continua para todos que editam. */
+  podeExcluir?: boolean
 }
 
 const TEXTO_LIMITES = 'Fotos, PDF, Word e PowerPoint até 25 MB; vídeo (MP4, MOV, WEBM) até 50 MB. Ficam no SharePoint BetinhosGestoInterna.'
@@ -33,7 +35,7 @@ function baixar(nome: string, blob: Blob) {
 }
 
 /** Fotos e arquivos do treinamento no SharePoint (`Treinamentos/<id>`); a lista fica no registro e é salva com o rascunho. */
-export function AnexosSecao({ treinamentoId, anexos, source, onChange, garantirId, aposCriar, disabled, somenteLeitura }: Props) {
+export function AnexosSecao({ treinamentoId, anexos, source, onChange, garantirId, aposCriar, disabled, somenteLeitura, podeExcluir = true }: Props) {
   const toast = useToast()
   const input = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState<string | null>(null)
@@ -97,7 +99,7 @@ export function AnexosSecao({ treinamentoId, anexos, source, onChange, garantirI
             <span className="tr-anexos__icone" aria-hidden="true">{isImagem(a) ? <ImageIcon size={16} /> : isVideo(a) ? <Video size={16} /> : <FileText size={16} />}</span>
             <span className="tr-anexos__nome"><strong>{a.nome}</strong><small>{isImagem(a) ? 'Foto' : isVideo(a) ? 'Vídeo' : 'Arquivo'} · {formatFileSize(a.tamanho)}</small></span>
             <Button variant="ghost" size="compact" icon={<Download size={14} />} aria-label={`Abrir ${a.nome}`} loading={ocupado === a.caminho} disabled={Boolean(ocupado)} onClick={() => void abrir(a)} />
-            {somenteLeitura ? null : <Button variant="ghost" size="compact" icon={<Trash2 size={14} />} aria-label={`Excluir ${a.nome}`} disabled={bloqueado || Boolean(ocupado)} onClick={() => void excluir(a)} />}
+            {somenteLeitura || !podeExcluir ? null : <Button variant="ghost" size="compact" icon={<Trash2 size={14} />} aria-label={`Excluir ${a.nome}`} disabled={bloqueado || Boolean(ocupado)} onClick={() => void excluir(a)} />}
           </li>
         ))}
         {!anexos.length ? <li className="tr-anexos__vazio">{somenteLeitura ? 'Sem anexos.' : 'Nenhum anexo ainda.'}</li> : null}

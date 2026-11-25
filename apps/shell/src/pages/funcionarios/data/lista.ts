@@ -1,4 +1,6 @@
 import { CONFIG_VERSION, emptyFilters, type FilterCondition, type FilterField, type FilterOption, type StoredView, type TableFilters, type ViewColumnDef, type ViewConfig, type ViewSort } from '@betinhos/ui'
+import type { Acessos } from '../../../app/acessos'
+import { acessoGrupo } from '../../../app/nivel'
 import { sortRows } from '../../../app/listSort'
 import type { AlertKind } from './alerts'
 import { searchWords } from '../../../app/search'
@@ -128,3 +130,17 @@ export function builtinViews(): StoredView[] {
     view('desligados', 'Desligados', 3, withQuick([quick('status', STATUS, [1])])),
   ]
 }
+
+/** Grupo de colunas (acessosColunas.json) que cada coluna, filtro ou chip lê; o que não está aqui é básico ou sem segurança. */
+const GRUPO_DA_CHAVE: Record<string, string> = {
+  cnh: 'cr40f_funcionarios.cnh',
+  aso: 'cr40f_funcionarios.rh',
+  admissao: 'cr40f_funcionarios.rh',
+  vinculo: 'cr40f_funcionarios.rh',
+  aniversario: 'cr40f_funcionarios.pessoal',
+}
+const le = (a: Acessos, chave: string) => !GRUPO_DA_CHAVE[chave] || acessoGrupo(a, GRUPO_DA_CHAVE[chave]).ler
+
+export const colunasDoPerfil = (a: Acessos) => FUNCIONARIO_COLUMNS.filter((c) => le(a, c.key))
+export const camposDoPerfil = (a: Acessos) => FUNCIONARIO_FIELDS.filter((f) => le(a, f.key))
+export const alertasDoPerfil = (a: Acessos): AlertKind[] => (['cnh', 'aso', 'aniversario'] as const).filter((k) => le(a, k))

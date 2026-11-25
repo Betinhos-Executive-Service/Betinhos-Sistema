@@ -5,6 +5,7 @@ import { ToastProvider } from '@betinhos/ui'
 import { createMockDocsSource, type DocsSource } from '../data/source'
 import type { Arquivo, DocEmitido } from '../domain/types'
 import { Checklist } from './Checklist'
+import { ComAcessos } from '../../../app/ComAcessos'
 
 configure({ asyncUtilTimeout: 8000 })
 vi.setConfig({ testTimeout: 30_000 })
@@ -26,6 +27,17 @@ const renderChecklist = (source: DocsSource, donoId = 'm1') => render(<ToastProv
 const itemCnh = () => screen.findByRole('listitem', { name: 'CNH' })
 
 describe('Checklist', () => {
+  it('RH Operador vê o arquivo sem Excluir; RH Gestor vê Excluir', async () => {
+    for (const [perfis, ve] of [['rh:operador', false], ['rh:gestor', true]] as const) {
+      const { source } = await comArquivoNaCnh()
+      render(<ComAcessos perfis={perfis}><ToastProvider><Checklist source={source} donoId="m1" /></ToastProvider></ComAcessos>)
+      const cnh = await itemCnh()
+      await within(cnh).findByText('cnh.pdf')
+      expect(Boolean(within(cnh).queryByRole('button', { name: 'Excluir cnh.pdf' }))).toBe(ve)
+      cleanup()
+    }
+  })
+
   it('lista os tipos com estado, abre o histórico pelo ícone e abre a renovação', async () => {
     renderChecklist(createMockDocsSource())
     const cnh = await itemCnh()
