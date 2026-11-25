@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Decide o que o CI precisa rodar a partir dos arquivos do PR. Grava em $GITHUB_OUTPUT:
+#   node=true|false        typecheck e testes dos pacotes Node (job "checagens"); false = PR só de documentação
 #   shell=true|false       testes e typecheck do shell
 #   plugins=<lista>|todos  plugins tocados, em minúsculas (frota,acesso,driverrecordsharing,autonumberguard); vazio = nenhum
 #   acompanhar=true|false  Worker acompanhar-motorista
-# Fora de PR (manual ou workflow_call, sem $PR) roda tudo. Usado pelo job "mudancas" e por cada job "shell" do ci.yml
-# (o shell decide sozinho para não esperar outro job antes de começar).
+# Fora de PR (manual ou workflow_call, sem $PR) roda tudo. Usado pelo job "mudancas" do ci.yml.
 # Teste local: ARQUIVOS=$'apps/shell/x.ts\nREADME.md' GITHUB_OUTPUT=/dev/stdout bash .github/scripts/ci-mudancas.sh
 set -euo pipefail
 
@@ -13,7 +13,7 @@ resumo="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 if [ -z "${ARQUIVOS+x}" ]; then
   if [ -z "${PR:-}" ]; then
-    { echo "shell=true"; echo "plugins=todos"; echo "acompanhar=true"; } >> "$saida"
+    { echo "node=true"; echo "shell=true"; echo "plugins=todos"; echo "acompanhar=true"; } >> "$saida"
     exit 0
   fi
   ARQUIVOS=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')
@@ -23,6 +23,17 @@ fi
 ci='^\.github/(workflows/ci\.yml|scripts/ci-mudancas\.sh|actions/preparar-pnpm/)'
 # Dependências e configuração da raiz: valem para todo pacote Node.
 raiz='^(pnpm-lock\.yaml|pnpm-workspace\.yaml|package\.json|tsconfig\.base\.json|\.npmrc)$'
+
+# Documentação (.md, docs/, .claude/, legacy/) não conta: nenhum teste nem build lê esses arquivos, então instalar,
+# compilar e testar por causa deles não prova nada. PR só de documentação pula tudo; as travas do job "basico"
+# (dados pessoais, segredos, .ps1, migrations) rodam sempre.
+ARQUIVOS=$(echo "$ARQUIVOS" | grep -vE '(\.md$|^docs/|^\.claude/|^legacy/)' || true)
+if [ -n "$ARQUIVOS" ]; then
+  echo "node=true" >> "$saida"
+else
+  echo "node=false" >> "$saida"
+  echo "PR só de documentação: typecheck, testes e builds pulados." >> "$resumo"
+fi
 
 # Plugins tocados (código, testes, registrador ou script de publicação). O AutoNumberGuard mora em
 # apps/formulario-geral/power-platform/plugins; PlannerNotifications e QuoteAutoNumberGuard, em packages/planner/power-platform/plugins.

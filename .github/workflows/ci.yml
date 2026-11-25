@@ -6,17 +6,18 @@ on:
   # Rodar à mão (Actions › CI › Run workflow) para conferir a main sem abrir PR.
   workflow_dispatch:
 
-# Push novo no mesmo PR cancela o run anterior (repo privado: minuto de CI é cobrado). Fora de PR nada é cancelado.
+# Push novo no mesmo PR cancela o run anterior (não gasta runner com commit que já foi substituído). Fora de PR nada é cancelado.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Tudo roda em paralelo e o job "CI ok" junta num resultado só. O que manda no tempo do CI é o job mais lento:
+# O job "mudancas" olha os arquivos do PR (.github/scripts/ci-mudancas.sh) e só sobe o que o PR pode quebrar; job pulado
+# não ocupa runner. O job "CI ok" junta tudo num resultado só. O que manda no tempo do CI é o job mais lento:
+# - basico: travas baratas, sem instalar nada (dados pessoais, segredos, sintaxe dos .ps1, migrations). Roda sempre.
+# - checagens: typecheck e testes dos pacotes Node, menos o shell. Pulado em PR só de documentação.
 # - shell: testes em fatias paralelas (vitest --shard), equilibradas pelo tempo de cada arquivo
-#   (apps/shell/tempos-testes.json), mais o typecheck do shell numa parte própria. Só quando o PR mexe em algo que o
-#   shell usa; cada parte decide sozinha (.github/scripts/ci-mudancas.sh) para não esperar outro job antes de começar.
-# - checagens: typecheck e testes dos outros pacotes, dados pessoais, segredos e sintaxe dos .ps1.
-# - plugins (Windows) e acompanhar-motorista: só quando o PR os toca (job "mudancas").
+#   (apps/shell/tempos-testes.json), mais o typecheck do shell numa parte própria. Só quando o PR mexe no que o shell usa.
+# - plugins (Windows) e acompanhar-motorista: só quando o PR os toca.
 jobs:
   # Fora de PR (manual ou workflow_call) roda tudo.
   mudancas:
@@ -26,6 +27,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      node: ${{ steps.filtro.outputs.node }}
       shell: ${{ steps.filtro.outputs.shell }}
       plugins: ${{ steps.filtro.outputs.plugins }}
       acompanhar: ${{ steps.filtro.outputs.acompanhar }}
@@ -40,14 +42,18 @@ jobs:
           REPO: ${{ github.repository }}
         run: bash .github/scripts/ci-mudancas.sh
 
-  checagens:
+  # Travas que valem para qualquer arquivo, inclusive documentação. Só Node e pwsh do runner, sem pnpm install.
+  basico:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/preparar-pnpm
+        with:
+          fetch-depth: 0
       # Sem dado pessoal real (CPF válido, e-mail de pessoa, backup de flow) no repositório.
       - run: node --test scripts/dados-pessoais.test.mjs && node scripts/dados-pessoais.mjs
+      - name: Varredura de segredos na solução
+        run: node packages/deploy/scan-secrets.mjs solution
       # Os .ps1 de publicação só rodam no Deploy e no Produção: erro de sintaxe apareceria tarde, no meio de uma publicação.
       - name: Sintaxe dos scripts PowerShell
         shell: pwsh
@@ -64,8 +70,22 @@ jobs:
           }
           Write-Host "$($arquivos.Count) arquivos, $falhas erro(s)"
           if ($falhas) { exit 1 }
-      - name: Varredura de segredos na solução
-        run: node packages/deploy/scan-secrets.mjs solution
+      # Schema por migration (packages/deploy/migrations/README.md): migration publicada é imutável e schema novo não entra por provision-*.
+      - name: Migrations
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.base_ref }}
+        run: git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/migrations-ci.mjs
+
+  # Pulado em PR só de documentação (.md, docs/, .claude/, legacy/): nenhum teste nem build lê esses arquivos.
+  checagens:
+    needs: mudancas
+    if: needs.mudancas.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar-pnpm
       # Todo pacote com script typecheck, menos o shell (escala-fds, gerar-pagantes, motoristas, portal-cliente e worker,
       # agentes-ia, app-config, despesas-ia). O do shell é o mais lento (~30 s) e roda no job "shell (tipos)", só quando
       # o PR mexe no shell.
@@ -81,29 +101,12 @@ jobs:
       - name: Build do App Motoristas
         run: pnpm --filter @betinhos/motoristas exec node scripts/build-react-singlefile.cjs --no-version
 
-  # Schema por migration (packages/deploy/migrations/README.md): migration publicada é imutável e schema novo não entra por provision-*.
-  schema:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Migrations
-        env:
-          BASE: ${{ github.base_ref }}
-        run: git diff --name-status -M "origin/$BASE...HEAD" | node packages/deploy/migrations-ci.mjs
-
-  # PR que não toca o shell nem o que ele lê (dataverse, app-config, fixtures dos plugins, catálogo de acessos,
-  # dependências) termina no filtro, sem instalar nada.
+  # Só quando o PR toca o shell ou o que ele lê (dataverse, app-config, fixtures dos plugins, catálogo de acessos, dependências).
   shell:
+    needs: mudancas
+    if: needs.mudancas.outputs.shell == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: read
-      pull-requests: read
     strategy:
       fail-fast: false
       matrix:
@@ -111,20 +114,13 @@ jobs:
     name: shell (${{ matrix.parte }})
     steps:
       - uses: actions/checkout@v4
-      - id: filtro
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: bash .github/scripts/ci-mudancas.sh
       # Só o shell e o que ele usa do workspace (@betinhos/dataverse e @betinhos/app-config).
-      - if: steps.filtro.outputs.shell == 'true'
-        uses: ./.github/actions/preparar-pnpm
+      - uses: ./.github/actions/preparar-pnpm
         with:
           filtro: --filter @betinhos/shell...
-      - if: steps.filtro.outputs.shell == 'true' && matrix.parte == 'tipos'
+      - if: matrix.parte == 'tipos'
         run: pnpm --filter @betinhos/shell typecheck
-      - if: steps.filtro.outputs.shell == 'true' && matrix.parte != 'tipos'
+      - if: matrix.parte != 'tipos'
         run: pnpm --filter @betinhos/shell exec vitest run --shard=${{ matrix.parte }}
 
   # Worker acompanhar-motorista (apps/acompanhar-motorista): check (node --check + tsc), testes (node:test + vitest) e build do front.
@@ -189,16 +185,16 @@ jobs:
   ok:
     name: CI ok
     if: always()
-    needs: [mudancas, checagens, schema, shell, plugins, acompanhar-motorista]
+    needs: [mudancas, basico, checagens, shell, plugins, acompanhar-motorista]
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      # O shell sempre roda (quando o PR não o toca, cada parte termina no próprio filtro), então tem de dar success.
-      # plugins e acompanhar-motorista "skipped" só valem quando o filtro decidiu pular; se o filtro falhou, o CI falha.
+      # Job "skipped" só vale quando o filtro decidiu pular; se o filtro falhou, o CI falha.
       - run: |
-          echo "mudancas: ${{ needs.mudancas.result }} (shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}) | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }} | acompanhar-motorista: ${{ needs.acompanhar-motorista.result }} (${{ needs.mudancas.outputs.acompanhar }})"
+          echo "mudancas: ${{ needs.mudancas.result }} (node=${{ needs.mudancas.outputs.node }}, shell=${{ needs.mudancas.outputs.shell }}, plugins=${{ needs.mudancas.outputs.plugins }}, acompanhar=${{ needs.mudancas.outputs.acompanhar }}) | basico: ${{ needs.basico.result }} | checagens: ${{ needs.checagens.result }} | shell: ${{ needs.shell.result }} | plugins: ${{ needs.plugins.result }} | acompanhar-motorista: ${{ needs.acompanhar-motorista.result }}"
           test "${{ needs.mudancas.result }}" = success
-          test "${{ needs.checagens.result }}" = success
-          test "${{ needs.shell.result }}" = success
-          if [ "${{ github.event_name }}" = pull_request ]; then test "${{ needs.schema.result }}" = success; fi
+          test "${{ needs.basico.result }}" = success
+          if [ "${{ needs.mudancas.outputs.node }}" = true ]; then test "${{ needs.checagens.result }}" = success; fi
+          if [ "${{ needs.mudancas.outputs.shell }}" = true ]; then test "${{ needs.shell.result }}" = success; fi
           if [ -n "${{ needs.mudancas.outputs.plugins }}" ]; then test "${{ needs.plugins.result }}" = success; fi
           if [ "${{ needs.mudancas.outputs.acompanhar }}" = true ]; then test "${{ needs.acompanhar-motorista.result }}" = success; fi
