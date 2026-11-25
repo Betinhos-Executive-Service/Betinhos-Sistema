@@ -176,12 +176,23 @@ if (Test-Path -LiteralPath $assetsDir) {
   }
 }
 
-function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type, [string] $Description) {
+# Chunk novo (nome com hash que o ambiente ainda nao tem) e criado com uma chamada so: o cabecalho
+# MSCRM.SolutionUniqueName (em $headers) ja o poe na solucao e o Prefer devolve o id. Eram 5 chamadas por chunk,
+# e um push da tela cria ~80 deles. A validacao pos-publicacao confere conteudo e solucao de todos.
+function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, [int] $Type, [string] $Description, [bool] $Novo) {
   $escapedName = Escape-OData $Name
   $lookupUri = "$apiBaseUrl/webresourceset?`$select=webresourceid,name,webresourcetype,content&`$filter=name eq '$escapedName'"
+  $content = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
+  if ($Novo) {
+    Write-Step "criando $Name na solucao $solutionUniqueName"
+    $body = @{ name = $Name; displayname = $Display; webresourcetype = $Type; content = $content; isenabledformobileclient = $true } | ConvertTo-Json -Depth 4
+    $created = Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/webresourceset?`$select=webresourceid" -Headers ($headers + @{ Prefer = "return=representation" }) -ContentType "application/json; charset=utf-8" -Body $body
+    $id = $created.webresourceid
+    if (-not $id) { throw "Criacao de $Name nao devolveu o id. Deploy abortado." }
+    return @{ Id = $id; Name = $Name; Type = $Type; Content = $content }
+  }
   $found = @((Invoke-RestMethod -Method Get -Uri $lookupUri -Headers $headers).value)
   if ($found.Count -gt 1) { throw "Mais de um WebResource encontrado para $Name. Deploy abortado." }
-  $content = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Path))
   if ($found.Count -eq 0) {
     Write-Step "criando $Name na solucao $solutionUniqueName"
     $fields = @{ name = $Name; displayname = $Display; webresourcetype = $Type; content = $content; isenabledformobileclient = $true }
@@ -208,7 +219,19 @@ function Publish-WebResource([string] $Name, [string] $Display, [string] $Path, 
     $action = @{ ComponentId = $id; ComponentType = 61; SolutionUniqueName = $solutionUniqueName; AddRequiredComponents = $false } | ConvertTo-Json -Depth 4
     Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/AddSolutionComponent" -Headers $headers -ContentType "application/json; charset=utf-8" -Body $action | Out-Null
   }
-  return @{ Id = $id; Name = $Name; Type = $Type; Content = $content; ComponentUri = $componentUri }
+  return @{ Id = $id; Name = $Name; Type = $Type; Content = $content }
+}
+
+# Todas as paginas de uma consulta (a ultima nao traz @odata.nextLink; com StrictMode, ler a propriedade ausente lanca erro).
+function Get-AllPages([string] $Url) {
+  $all = @()
+  while ($Url) {
+    $page = Invoke-RestMethod -Method Get -Uri $Url -Headers $headers
+    $all += @($page.value)
+    $next = $page.PSObject.Properties['@odata.nextLink']
+    $Url = if ($next) { $next.Value } else { $null }
+  }
+  return $all
 }
 
 $previousChunks = @()
@@ -218,15 +241,24 @@ if ($chunkNames.Count) {
   Write-Step "build publicado antes deste push: $($previousChunks.Count) chunks"
 }
 
-$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type $_['Description'] })
+# Chunks que o ambiente ja tem, numa consulta so: os que faltam sao criados sem a busca individual.
+$existingChunks = @{}
+if ($chunkNames.Count) {
+  foreach ($e in Get-AllPages "$apiBaseUrl/webresourceset?`$select=name&`$filter=startswith(name,'$(Escape-OData $chunkPrefix)')") { $existingChunks[$e.name] = $true }
+}
+
+$resources = @($targets | ForEach-Object { Publish-WebResource $_.Name $_.Display $_.Path $_.Type $_['Description'] ($chunkNames -contains $_.Name -and -not $existingChunks.ContainsKey($_.Name)) })
 $publishXml = "<importexportxml><webresources>" + (($resources | ForEach-Object { "<webresource>$($_.Id)</webresource>" }) -join "") + "</webresources></importexportxml>"
 Write-Step "publicando WebResources"
 Invoke-RestMethod -Method Post -Uri "$apiBaseUrl/PublishXml" -Headers $headers -ContentType "application/json; charset=utf-8" -Body (@{ ParameterXml = $publishXml } | ConvertTo-Json) | Out-Null
 
+# Quem esta na solucao vem numa consulta so (era uma por recurso).
+$inSolution = @{}
+foreach ($c in Get-AllPages "$apiBaseUrl/solutioncomponents?`$select=objectid&`$filter=_solutionid_value eq $solutionId and componenttype eq 61") { $inSolution[[string] $c.objectid] = $true }
 foreach ($r in $resources) {
   $published = Invoke-RestMethod -Method Get -Uri "$apiBaseUrl/webresourceset($($r.Id))?`$select=name,content,webresourcetype" -Headers $headers
   if ($published.name -ne $r.Name -or $published.webresourcetype -ne $r.Type -or $published.content -ne $r.Content) { throw "Validacao pos-publicacao falhou em $($r.Name)." }
-  if (@((Invoke-RestMethod -Method Get -Uri $r.ComponentUri -Headers $headers).value).Count -eq 0) { throw "$($r.Name) nao esta na solucao $solutionUniqueName apos a publicacao." }
+  if (-not $inSolution.ContainsKey([string] $r.Id)) { throw "$($r.Name) nao esta na solucao $solutionUniqueName apos a publicacao." }
 }
 
 if ($chunkNames.Count) {
