@@ -43,13 +43,19 @@ jobs:
           node-version: 22
       - name: Modo do corte
         id: modo
-        run: echo "modo=$(node packages/deploy/acessos/corte.mjs --etapa modo --ambiente "$AMB")" >> "$GITHUB_OUTPUT"
+        run: |
+          modo=$(node packages/deploy/acessos/corte.mjs --etapa modo --ambiente "$AMB")
+          echo "modo=$modo" >> "$GITHUB_OUTPUT"
       - name: Membros do perfil de automação
         run: node packages/deploy/acessos/corte.mjs --etapa automacao --ambiente "$AMB" --aplicar
+      # Nomes de papéis e equipes ficam só no relatório cifrado.
       - name: Quem lê o passageiro (informativo)
-        if: steps.modo.outputs.modo != 'esperar'
+        if: steps.modo.outputs.modo == 'cortar'
         continue-on-error: true
-        run: node packages/deploy/acessos/quem-le.mjs
+        run: |
+          mkdir -p "$RUNNER_TEMP/corte/relatorio"
+          node packages/deploy/acessos/quem-le.mjs > "$RUNNER_TEMP/corte/relatorio/quem-le.txt"
+          echo "Quem lê: $(wc -l < "$RUNNER_TEMP/corte/relatorio/quem-le.txt") linha(s) no relatório cifrado."
       - name: Avaliar o corte
         id: avaliar
         if: steps.modo.outputs.modo == 'cortar'

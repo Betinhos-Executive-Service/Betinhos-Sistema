@@ -367,7 +367,7 @@ jobs:
   # Corte dos acessos no PROD (plano 4). Aprovação = merge do PR develop → main que levou "prod": "cortar" ou "desfazer".
   acessos:
     needs: [caminho, marcar]
-    if: ${{ !cancelled() && needs.marcar.result == 'success' }}
+    if: ${{ !cancelled() && needs.marcar.result == 'success' && github.ref == 'refs/heads/main' }}
     uses: ./.github/workflows/acessos-corte.yml
     with:
       ambiente: prod
