@@ -104,7 +104,7 @@ Respostas novas do Worker: nenhuma. `validarPedido` passa a exigir só `embarque
 
 ### 6.3 Worker → página (`/dados`, `/ao-vivo`)
 
-- Novo campo público `modo`: `definicao` | `sem-rastreio` | `rastreio`.
+- Novos campos públicos `rastreio` (há veículo da Infleet) e `emDefinicao` (sem motorista, veículo e placa); `modo` já existe no `/dados` (`simples`/`completo`) e não muda. Link sem rastreio fica na fase `agendado` até o Dataverse concluir (limite conhecido).
 - Em `definicao` e `sem-rastreio`, `posicao`, `eta` e `trilha` vêm nulos; a página não monta o mapa.
 - `descricaoPrevia` (`pagina.mjs:15-19`) em `definicao`: horário + "Motorista em definição".
 - Textos novos em `web/src/i18n.tsx` e `src/idiomas.mjs` (pt, en, es): `m.emDefinicao`, `m.emDefinicaoAviso`, `m.semRastreio`.
@@ -130,12 +130,12 @@ Respostas novas do Worker: nenhuma. `validarPedido` passa a exigir só `embarque
   troca de modo, `calcularDados` sem `vehicleId` não chama a Infleet), página (card nos 3 modos), shell (`gerarLinkBlock`).
 - DEV, pelo Deploy da `develop`: roteiro do critério de pronto (seção 1) em `acompanhe.dev.betinhos.com.br`, com print
   dos três modos; conferir no trace do Update que não houve DELETE ao tirar o motorista.
-- Atualizar `verificar-link-acompanhamento` e `verificar-portal-worker` com os três modos.
+- Atualizar `verificar-link-acompanhamento` e `verificar-acompanhamento` com os três modos.
 - PROD: Worker pelo job `worker` do `producao.yml`; plugin e shell pelos caminhos rápidos do develop→main.
 
 ## 10. Tarefas
 
-1. Worker: placa opcional, `rastreio`, `calcularDados`/`lerTrajeto` sem `vehicleId`, `modo` no `/dados` (com testes).
+1. Worker: placa opcional, `rastreio`, `calcularDados`/`lerTrajeto` sem `vehicleId`, `rastreio`/`emDefinicao` no `/dados` (com testes; PR #728).
 2. Página: CardMotorista em `definicao` e `sem-rastreio`, mapa condicionado, i18n, prévia.
 3. Plugin: Build e LoadPayload sem recusas de modo, status, Concluído → `/concluir`, Update sem revogar (com testes).
 4. Shell: regra de status no Geral e no Operacional (com testes).
