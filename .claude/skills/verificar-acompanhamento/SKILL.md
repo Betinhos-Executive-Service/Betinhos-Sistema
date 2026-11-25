@@ -87,5 +87,9 @@ description: "Verifica o link público de acompanhamento (página /r/<id>, /dado
 - `resultado.json` com todos `ok: true`, PNGs dos 7 cenários + bordas, `# fail 0` do `pnpm test`, console sem erros (o próprio e2e checa).
 - Lighthouse: versione só um `lighthouse.md` com as métricas; `lighthouse.report.json/html` ficam fora do commit (grandes). PNGs: reduza antes de commitar (ex.: `quantize(128)` no Pillow).
 
+## Botão "Gerar link" no shell (fase 2)
+- Regra igual à `TrackingLinkRequest.StatusAllowsLink` do plugin: bloqueia só Solicitado (202410004), Cancelado (202410002) e Cancelado com Ressalvas (202410010); sem exigência de motorista (`apps/shell/src/pages/geral/domain/link.ts`). No Operacional o botão vale também para motorista terceiro (página sem mapa).
+- Provar: `pnpm exec vitest run src/pages/geral/domain/link.test.ts src/pages/geral/GeralPage.correcoes.test.tsx src/pages/operacional` em `apps/shell`; no mock, `#/operacional` → serviço da Rita Fernandes (terceiro) mostra "Gerar link" ativo.
+
 ## Limites
 - Infleet, TomTom e OSRM reais não são chamados: declare "não verificado com Infleet real". Push real (FCM/Mozilla/Apple) não é enviado no local: a entrega no Android se testa depois do deploy com os segredos VAPID (passo no README). Publicação (`wrangler deploy`) e segredos são do Renan.
