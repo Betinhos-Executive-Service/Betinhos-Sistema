@@ -5,7 +5,7 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
 # Verificar acessos por perfil
 
 ## Cobre
-- Código: `apps/shell/src/nav/acessosMapa.json`, `apps/shell/src/nav/acessosColunas.json`, `packages/deploy/acessos/**`, migrations `*-acessos-*.ps1`, `packages/plugins/Cr40f.Acesso.Plugin/{DefinirPerfis*,AcessoCatalogo*,PapeisDoUsuario*,PerfisDoUsuario*}.cs`.
+- Código: `apps/shell/src/nav/acessosMapa.json`, `apps/shell/src/nav/acessosColunas.json`, `packages/deploy/acessos/**`, migrations `*-acessos-*.ps1`, `packages/plugins/Cr40f.Acesso.Plugin/{DefinirPerfis*,AcessoCatalogo*,PapeisDoUsuario*,PerfisDoUsuario*}.cs`; corte: `packages/deploy/acessos/{corte.json,corte*.mjs,relatorio-corte.mjs,dv.mjs}`, `.github/workflows/acessos-corte.yml`, jobs `acessos` do `deploy.yml` e do `producao.yml`, migration `*-acessos-passageiro.ps1`, `packages/plugins/Cr40f.Documentos.Plugin/DocumentoUnidadePlugin.cs`.
 - Comportamento: papéis `Perfil - <Área> - <Operador|Gestor>`, `Perfil - Base` e `Perfil - Administrador de acessos` com os perfis de coluna de mesmo nome; quem só tem o Base abre a tela e não lê Financeiro, Funcionários nem Veículos; Operador lê, cria e edita, Gestor também exclui e vê as colunas sensíveis; a Custom API troca os perfis de uma pessoa, recusa `SEM_PERMISSAO`, `PROPRIO_ACESSO`, `USUARIO_INVALIDO`, `PERFIL_INVALIDO` (inclui `Perfis` ausente, vazio ou só espaços; `"[]"` explícito = só o Base) e `PERFIL_INDISPONIVEL` e grava `cr40f_acessohistorico`.
 
 ## Preparar ambiente
@@ -62,6 +62,17 @@ description: "Verifica os acessos por perfil do Sistema Betinhos: mapas de tabel
   7. Repetir 1, 3 e 4 em 375 px. Console sem erro nem aviso.
 - Prova no DEV (o shell não é a fronteira, então a prova é que o Dataverse e a tela concordam): com o usuário de teste do Renan (`DV_TESTE_ID`, nunca id real em arquivo) em `Perfil - Financeiro - Operador`, `RetrieveUserPrivileges` não lista `prvDeletecr40f_composicaodeprecos`; em `Perfil - Financeiro - Gestor`, lista. Abrir o shell no DEV como esse usuário (sessão do Renan) e repetir os passos 1 e 2. Voltar o usuário ao Base no fim.
 - Não verificável em mock: a recusa real do Dataverse para quem força a URL ou a API; o erro de permissão que a tela já mostra cobre esse caso.
+
+## Corte (plano 4)
+1. Regras e leitura: `node --test packages/deploy/acessos/corte-regras.test.mjs packages/deploy/acessos/corte-estado.test.mjs packages/deploy/acessos/corte-unidade.test.mjs packages/deploy/acessos/dv.test.mjs packages/deploy/acessos/corte-ci.test.mjs packages/deploy/caminho-publicacao.test.mjs` → `fail 0`.
+2. Relatório no DEV (só GET; pasta fora do repo; `ACESSOS_ADMINS_MANTER` por variável de shell, nunca em arquivo): `DV_URL=https://org23b93544.crm2.dynamics.com DV_ACCESS_TOKEN="$(az account get-access-token --resource https://org23b93544.crm2.dynamics.com --query accessToken -o tsv)" node packages/deploy/acessos/relatorio-corte.mjs --pasta "$(mktemp -d)"` → saída 0 (zero) ou 1 (travado), stdout sem GUID.
+3. Dry-run do corte no DEV: mesmo ambiente, `corte.json` com `"dev": "cortar"` só na cópia local, `corte.mjs --etapa avaliar` e `--etapa aplicar` sem `--aplicar` → `Dry-run: o plano bate com a foto`. Desfaça a mudança do `corte.json`.
+4. Depois de um Deploy/Produção com `cortar`: resumo do job `acessos` com `ZERO` e `Corte aplicado`; artefatos `acessos-relatorio-<amb>` e `acessos-foto-<amb>` presentes; tag `acessos-corte-<amb>` no commit. Rodar de novo → `Nada a cortar`.
+5. Unidade Frota (tarefa 15), depois do corte: recurso `EnableOwnershipAcrossBusinessUnits` ligado em `orgdborgsettings`; uma unidade `Frota` ativa, filha da raiz; quem tinha `Perfil - Frota - Operador/Gestor` raiz passa a ter a cópia da unidade Frota (e não a raiz); documentos de veículo (sem funcionário) com `_owningbusinessunit_value` = Frota; documento de veículo novo nasce na Frota pelo `DocumentoUnidadePlugin` (stage 10). Antes de ligar o recurso o corte trava se houver coluna DateTime com `DateTimeBehavior` nulo (corrigir por migration, como a 20261125-0942). Atribuir Frota pela ficha com a unidade criada usa a cópia; sem a cópia, `PERFIL_INDISPONIVEL`.
+6. Antes do primeiro `cortar` no PROD: o ciclo `cortar` → prova → `desfazer` no DEV pelo `acessos-corte.yml` tem de passar inteiro (o desfazer da unidade devolve papéis e documentos à raiz, desativa e apaga a unidade e desliga o recurso).
+7. `prova.mjs` com os usuários de teste (roteiro acima) continua passando depois do corte.
+8. Passageiro (depois da migration): roteiro da Tarefa 13, passo 11, do plano `docs/superpowers/plans/2026-11-24-acessos-por-perfil-4-corte.md`.
+9. Nunca rodar `relatorio-corte.mjs` nem `corte.mjs` contra o PROD à mão (o `dv.mjs` recusa token local no PROD); o PROD só pelo job `acessos` da Produção.
 
 ## Casos de borda
 - Papel novo demora alguns segundos para valer: a prova repete cada cenário até 5 vezes; falha só depois disso.
