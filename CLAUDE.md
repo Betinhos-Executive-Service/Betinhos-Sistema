@@ -81,4 +81,4 @@ Módulo `#/projetos` (Back-End, depois dos Logs dos apps; saiu do Operacional em
 ## Testes locais (decisão do Renan, 23/11/2026)
 
 - A máquina local é compartilhada por várias sessões ao mesmo tempo; suíte grande em paralelo satura CPU e RAM. Localmente, rode só os testes dos arquivos alterados (`pnpm --filter @betinhos/shell exec vitest run --maxWorkers=2 <arquivos ou pastas tocados>`), nunca mais que 2 workers e nunca a suíte inteira do shell.
-- A suíte completa roda no CI do PR (`ci.yml`, 5 fatias `--shard`) ou numa sessão cloud do Claude Code (`pnpm test` na VM, ver "Ambiente cloud"). Para provar antes do PR, abra o PR e use o resultado do CI, ou delegue a uma sessão cloud.
+- A suíte completa roda no CI do PR (`ci.yml`, 8 fatias `--shard`) ou numa sessão cloud do Claude Code (`pnpm test` na VM, ver "Ambiente cloud"). Para provar antes do PR, abra o PR e use o resultado do CI, ou delegue a uma sessão cloud.
