@@ -105,7 +105,7 @@ describe('login', () => {
     expect(curta.status).toBe(400)
     expect(await curta.json()).toMatchObject({ erro: 'senha_fraca' })
     const ok = await chamar('POST', '/auth/senha', { senha: SENHA }, etapa)
-    expect(await ok.json()).toEqual({ nome: 'Marcos', email: 'fiscal@tenaris.com', cliente: 'Tenaris', modulos: ['validar'] })
+    expect(await ok.json()).toEqual({ nome: 'Marcos', email: 'fiscal@tenaris.com', cliente: 'Tenaris', modulos: ['validar'], prazos: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '' } })
     expect(ok.headers.getSetCookie().join('\n')).toMatch(/__Host-portal_sessao=[^;]+; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict/)
     const gravado = String(banco.validadorclientes[0].cr40f_senhahash)
     expect(gravado).toMatch(/^pbkdf2\$100000\$/)
@@ -221,7 +221,7 @@ describe('multi-cliente', () => {
 })
 
 describe('pedidos', () => {
-  const amanha = () => new Date(Date.now() + 24 * 3600_000).toISOString()
+  const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
   const pedido = () => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), observacao: 'Voo LA3421' })
 
   it('campo inválido: 400 com a mensagem do campo e nada criado', async () => {
@@ -292,16 +292,64 @@ describe('pedidos', () => {
     const reg = banco.reservadeveculoses[0]
     expect(reg.cr40f_status).toBe(202410002)
     expect(String(reg.cr40f_observaointerna)).toMatch(/^Pedido pelo portal por .*\nCancelado pelo cliente no portal por .* \(paula@latasa\.com\.br\) em \d\d\/\d\d\/\d{4}/)
-    // Já com a operação: recusa com a mensagem para a tela.
-    reg.cr40f_status = 202410001
+    // Em execução (já com a operação): recusa com a mensagem para a tela.
+    reg.cr40f_status = 202410006
     const tarde = await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, paula)
     expect(tarde.status).toBe(409)
-    expect(await tarde.json()).toMatchObject({ mensagem: expect.stringContaining('fale com a Betinhos') })
+    expect(await tarde.json()).toMatchObject({ mensagem: expect.stringContaining('Fale com a Betinhos.') })
+  })
+
+  it('prazos do cliente: a sessão leva a regra, pedir fora do prazo é 400 e 0 libera', async () => {
+    const latasa = banco.clientes1s.find((c) => c.cr40f_clientes1id === LATASA)!
+    Object.assign(latasa, { cr40f_portalantecedenciapedido: 48, cr40f_portalcontato: '(12) 90000-0000' })
+    const sessao = await logar('paula@latasa.com.br')
+    expect(await (await chamar('GET', '/auth/sessao', undefined, sessao)).json()).toMatchObject({ prazos: { antecedenciaPedidoH: 48, prazoCancelarH: 12, contato: '(12) 90000-0000' } })
+    const cedo = await chamar('POST', '/pedidos', { ...pedido(), saida: new Date(Date.now() + 30 * 3600_000).toISOString() }, sessao)
+    expect(cedo.status).toBe(400)
+    expect(await cedo.json()).toMatchObject({ mensagem: expect.stringContaining('(12) 90000-0000') })
+    expect(banco.reservadeveculoses).toHaveLength(0)
+    latasa.cr40f_portalantecedenciapedido = 0
+    expect((await chamar('POST', '/pedidos', { ...pedido(), saida: new Date(Date.now() + 3600_000).toISOString() }, sessao)).status).toBe(201)
+  })
+
+  it('cancelar: Confirmado dentro do prazo cancela e avisa a operação; fora do prazo 409 com o contato', async () => {
+    Object.assign(banco.clientes1s.find((c) => c.cr40f_clientes1id === LATASA)!, { cr40f_portalprazocancelar: 6, cr40f_portalcontato: '(12) 90000-0000' })
+    const sessao = await logar('paula@latasa.com.br')
+    const criado = (await (await chamar('POST', '/pedidos', pedido(), sessao)).json()) as { id: string }
+    const reg = banco.reservadeveculoses[0]
+    reg.cr40f_status = 202410005 // Programado
+    reg.cr40f_dataehorriodesada = new Date(Date.now() + 5 * 3600_000).toISOString()
+    const fora = await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, sessao)
+    expect(fora.status).toBe(409)
+    expect(await fora.json()).toMatchObject({ mensagem: expect.stringMatching(/6 h antes da saída.*\(12\) 90000-0000/) })
+    expect(reg.cr40f_status).toBe(202410005)
+    reg.cr40f_dataehorriodesada = new Date(Date.now() + 8 * 3600_000).toISOString()
+    expect((await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, sessao)).status).toBe(200)
+    await Promise.all(pendentes)
+    expect(reg.cr40f_status).toBe(202410002)
+    expect(emails.filter((e) => e.tipo === 'cancelamento_operacao')).toEqual([{ tipo: 'cancelamento_operacao', para: [], dados: expect.objectContaining({ numero: 'RV-48500', solicitante: 'Paula', cliente: 'Latasa', situacao: 'Programado', passageiros: 'Hiroshi Tanaka' }) }])
+  })
+
+  it('cancelar em Solicitado dentro do prazo não avisa a operação (ela ainda não viu o pedido)', async () => {
+    const sessao = await logar('paula@latasa.com.br')
+    const criado = (await (await chamar('POST', '/pedidos', pedido(), sessao)).json()) as { id: string }
+    expect((await chamar('POST', `/pedidos/${criado.id}/cancelar`, {}, sessao)).status).toBe(200)
+    await Promise.all(pendentes)
+    expect(emails.some((e) => e.tipo === 'cancelamento_operacao')).toBe(false)
+  })
+
+  it('coluna de prazo ainda não criada (400) vale o padrão; outra falha na leitura barra o pedido', async () => {
+    const sessao = await logar('paula@latasa.com.br')
+    const real = fetch
+    vi.stubGlobal('fetch', async (e: RequestInfo | URL, i?: RequestInit) => (String(e).includes('cr40f_portalprazocancelar') ? new Response('coluna', { status: 400 }) : real(e, i)))
+    expect((await chamar('POST', '/pedidos', pedido(), sessao)).status).toBe(201)
+    vi.stubGlobal('fetch', async (e: RequestInfo | URL, i?: RequestInit) => (String(e).includes('cr40f_portalprazocancelar') ? new Response('fora', { status: 503 }) : real(e, i)))
+    expect((await chamar('POST', '/pedidos', { ...pedido(), destino: 'Outro' }, sessao)).status).toBeGreaterThanOrEqual(500)
   })
 })
 
 describe('passageiros do pedido', () => {
-  const amanha = () => new Date(Date.now() + 24 * 3600_000).toISOString()
+  const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
   const pedido = (passageiros: unknown[], extra: Record<string, unknown> = {}) => ({ passageiros, origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), ...extra })
   const pessoa = (nome: string, cliente = LATASA, extra: Record<string, unknown> = {}) => {
     const reg = { cr40f_bancodedadosid: `bbbbbbbb-0000-0000-0000-${String(banco.bancodedadoses.length + 1).padStart(12, '0')}`, cr40f_nomedopassageiro: nome, cr40f_telefone: '12999990001', cr40f_email: null, _cr40f_cliente_value: cliente, ...extra }

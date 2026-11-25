@@ -44,7 +44,7 @@ async function logar(email: string) {
   return cookies(await chamar('POST', '/auth/senha', { senha: SENHA }, etapa))
 }
 
-const amanha = () => new Date(Date.now() + 24 * 3600_000).toISOString()
+const amanha = () => new Date(Date.now() + 48 * 3600_000).toISOString()
 const pedido = (extra: object = {}) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001', email: 'hiroshi@exemplo.com' }], origem: 'Latasa, Pinda', destino: 'GRU', saida: amanha(), ...extra })
 const tiposDe = () => emails.map((e) => e.tipo)
 

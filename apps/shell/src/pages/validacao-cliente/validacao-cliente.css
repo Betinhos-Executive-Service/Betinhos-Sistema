@@ -101,3 +101,5 @@
 .vc-identidade__logo { display: flex; gap: var(--bt-space-3); align-items: center; flex-wrap: wrap; }
 .vc-identidade__logo img { max-width: 140px; max-height: 48px; object-fit: contain; }
 .vc-identidade__arquivo { display: none; }
+.vc-previa-prazos { display: grid; gap: var(--bt-space-1); padding: var(--bt-space-2) var(--bt-space-3); border-radius: var(--bt-radius-md); background-color: var(--bt-color-surface-neutral); }
+.vc-previa-prazos ul { margin: 0; padding-left: var(--bt-space-4); font-size: var(--bt-font-size-13); }

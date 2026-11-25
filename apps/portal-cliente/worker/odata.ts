@@ -123,6 +123,9 @@ export const criarPedido = () => `${SET.reserva}?$select=${PEDIDO_CAMPOS.join(',
 /** O cliente exige aprovação? Lido à parte: se a coluna ainda não existir, o chamador trata como "não". */
 export const clienteExigeAprovacao = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=cr40f_portalexigeaprovacao`
 
+/** Prazos do cliente (pedir, cancelar, contato). Lidos à parte: coluna ainda não criada vale o padrão. */
+export const clientePrazos = (clienteId: string) => `${SET.cliente}(${guid(clienteId)})?$select=cr40f_portalantecedenciapedido,cr40f_portalprazocancelar,cr40f_portalcontato`
+
 /** O usuário é aprovador? Idem. */
 export const usuarioAprovador = (validadorId: string) => `${SET.validador}(${guid(validadorId)})?$select=cr40f_aprovador`
 

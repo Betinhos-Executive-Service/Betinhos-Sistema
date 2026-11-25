@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, ChoiceGroup, Checkbox, Dialog, Drawer, Field, Input, Radio, Sheet, Switch, Textarea, useToast } from '@betinhos/ui'
 import { ImagePlus, Trash2, UserPlus } from 'lucide-react'
 import type { Source } from '../data/source'
-import { MODULOS, configIgual, formDaConfig, semAprovador, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
+import { MODULOS, configIgual, formDaConfig, prazosDoForm, semAprovador, validarConfig, validarLogo, type ConfigForm } from '../domain/config'
+import { MAX_CONTATO, MAX_PRAZO_H, PADRAO_ANTECEDENCIA_H, PADRAO_CANCELAR_H, previaPrazos } from '../domain/prazos'
 import { validarValidador } from '../domain/regras'
 import type { Cliente, ModuloPortal, PortalConfig, Validador } from '../domain/types'
 import { PrevisaoMarca } from './PrevisaoMarca'
@@ -16,7 +17,7 @@ type Props = {
 }
 
 const reasonText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
-const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', exigeAprovacao: false, logo: null, logoMudou: false }
+const NOVA: ConfigForm = { ligado: false, modulos: [], restringir: false, dominiosTexto: '', exigeAprovacao: false, antecedenciaTexto: '', prazoCancelarTexto: '', contato: '', logo: null, logoMudou: false }
 const inicial = (config: PortalConfig | null, logo: string | null = null) => (config ? formDaConfig(config, logo) : { ...NOVA, logo })
 const lerArquivo = (arquivo: File) => new Promise<string>((ok, falha) => {
   const leitor = new FileReader()
@@ -127,6 +128,22 @@ export function ConfigDrawer({ cliente, config, outros, validadores, source, mob
       <section className="vc-secao">
         <Switch label="Pedidos precisam de aprovação" description="O pedido só chega à Betinhos depois que um aprovador do cliente aprova no portal. Marque os aprovadores em E-mails liberados." checked={form.exigeAprovacao} disabled={salvando} onChange={(e) => set({ exigeAprovacao: e.target.checked })} />
         {semAprovador(form, doCliente) ? <Alert tone="warning" title="Nenhum aprovador ativo">Sem aprovador, os pedidos entram direto, sem aprovação. Marque ao menos um usuário como Aprovador em E-mails liberados.</Alert> : null}
+      </section>
+      <section className="vc-secao" aria-labelledby="vc-prazos-titulo">
+        <h3 id="vc-prazos-titulo" className="vc-secao__titulo">Prazos do portal</h3>
+        <Field label="Antecedência mínima para pedir (horas)" error={mostrarErros ? erros.antecedencia : undefined} hint="0 = sem limite, basta a saída ser futura.">
+          <Input name="antecedencia" inputMode="numeric" placeholder={`${PADRAO_ANTECEDENCIA_H} h (padrão)`} maxLength={String(MAX_PRAZO_H).length} value={form.antecedenciaTexto} disabled={salvando} onChange={(e) => set({ antecedenciaTexto: e.target.value })} />
+        </Field>
+        <Field label="Prazo para cancelar (horas antes da saída)" error={mostrarErros ? erros.prazoCancelar : undefined} hint="0 = cancela até a hora da saída. Em execução, concluído ou cancelado o cliente nunca cancela.">
+          <Input name="prazo-cancelar" inputMode="numeric" placeholder={`${PADRAO_CANCELAR_H} h (padrão)`} maxLength={String(MAX_PRAZO_H).length} value={form.prazoCancelarTexto} disabled={salvando} onChange={(e) => set({ prazoCancelarTexto: e.target.value })} />
+        </Field>
+        <Field label="Contato da operação" error={mostrarErros ? erros.contato : undefined} hint={'Aparece quando o prazo passou. Vazio mostra só "Fale com a Betinhos.".'}>
+          <Input name="contato" placeholder="(12) 99999-0000 (WhatsApp)" maxLength={MAX_CONTATO} value={form.contato} disabled={salvando} onChange={(e) => set({ contato: e.target.value })} />
+        </Field>
+        <div className="vc-previa-prazos" data-testid="previa-prazos">
+          <p className="vc-muted">O cliente vai ler:</p>
+          <ul>{previaPrazos(prazosDoForm(form)).map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
       </section>
       <section className="vc-secao" aria-labelledby="vc-identidade-titulo">
         <h3 id="vc-identidade-titulo" className="vc-secao__titulo">Identidade no portal</h3>

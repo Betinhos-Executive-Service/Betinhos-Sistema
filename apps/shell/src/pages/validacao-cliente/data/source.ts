@@ -2,7 +2,7 @@ import { cleanId } from '@betinhos/dataverse'
 import { PAPEIS_RENAN, papeisPath } from '../../../app/papeisUsuario'
 import type { Host } from '../../../host'
 import { FECHAMENTO_VALOR, LADO_VALOR, STATUS_VALOR, aplicarLiberacao, aplicarResposta } from '../domain/regras'
-import { dominiosDoForm, gravarModulos, type ConfigForm } from '../domain/config'
+import { dominiosDoForm, gravarModulos, prazosDoForm, type ConfigForm } from '../domain/config'
 import type { Cliente, Fechamento, Linha, Mensagem, NovoValidador, PortalConfig, Validador } from '../domain/types'
 import { createMockConfigs, createMockLinhas, createMockMensagens, createMockValidadores } from './mock'
 import { ENTITIES, loadAll, mapMensagem, mensagensPath, type EntitySets } from './queries'
@@ -98,7 +98,7 @@ function createMockSource(): Source {
     async setValidadorAprovador(id) { await wait(250); if (!validadores.has(id)) throw new Error('Validador não encontrado.') },
     async salvarConfig(cliente, form) {
       await wait(350)
-      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form), exigeAprovacao: form.exigeAprovacao }
+      const salva: PortalConfig = { cliente, ligado: form.ligado, modulos: form.modulos, dominios: dominiosDoForm(form), exigeAprovacao: form.exigeAprovacao, ...prazosDoForm(form) }
       if (form.logoMudou) { if (form.logo) logos.set(cliente.id, form.logo); else logos.delete(cliente.id) }
       configs = configs.some((c) => c.cliente.id === cliente.id) ? configs.map((c) => (c.cliente.id === cliente.id ? salva : c)) : [...configs, salva]
       return salva
@@ -234,12 +234,14 @@ export function createSource(host: Host): Source {
     setValidadorAprovador: async (id, aprovador) => host.client.update((await entitySets()).validador, id, { cr40f_aprovador: aprovador }),
     async salvarConfig(cliente, form) {
       const dominios = dominiosDoForm(form)
+      const prazos = prazosDoForm(form)
       await host.client.update((await entitySets()).cliente, cliente.id, {
         cr40f_portalhabilitado: form.ligado, cr40f_portalmodulos: gravarModulos(form.modulos), cr40f_portaldominios: dominios.length ? dominios.join('; ') : null, cr40f_portalexigeaprovacao: form.exigeAprovacao,
+        cr40f_portalantecedenciapedido: prazos.antecedenciaPedidoH, cr40f_portalprazocancelar: prazos.prazoCancelarH, cr40f_portalcontato: prazos.contato || null,
         // Imagem só vai quando mudou: base64 puro (sem o prefixo data:), ou null para remover.
         ...(form.logoMudou ? { cr40f_portallogo: form.logo ? form.logo.slice(form.logo.indexOf(',') + 1) : null } : {}),
       })
-      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios, exigeAprovacao: form.exigeAprovacao }
+      return { cliente, ligado: form.ligado, modulos: form.modulos, dominios, exigeAprovacao: form.exigeAprovacao, ...prazos }
     },
     async podeEditarIdentidade() {
       const me = await host.client.request<{ UserId: string }>('WhoAmI')

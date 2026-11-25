@@ -1,7 +1,8 @@
 import { Button, Drawer, Sheet, Stack, StatusBadge, buttonClassName, useMediaQuery } from '@betinhos/ui'
 import { FileText, X, Repeat } from 'lucide-react'
 import { dataHora } from '../domain/formato'
-import { aguardandoAprovacao, podeCancelar, situacaoDoPedido } from '../domain/pedidos'
+import { aguardandoAprovacao, situacaoDoPedido } from '../domain/pedidos'
+import { motivoNaoCancela, textoPrazoCancelar, type Prazos } from '../domain/prazos'
 import type { Pedido, StatusPedido } from '../domain/types'
 import './Detalhe.css'
 import './MeusServicos.css'
@@ -28,22 +29,26 @@ export function historico(p: Pedido): Passo[] {
 }
 
 const AVISO: Partial<Record<StatusPedido, string>> = {
-  solicitado: 'A Betinhos recebeu o pedido e vai programar o motorista. Enquanto isso, você pode cancelar por aqui.',
+  solicitado: 'A Betinhos recebeu o pedido e vai programar o motorista.',
   em_analise: 'A Betinhos está analisando o pedido.',
   confirmado: 'Pedido confirmado. O motorista aparece aqui quando for programado.',
 }
 
-type Props = { pedido: Pedido; onFechar: () => void; onCancelar: (p: Pedido) => void; onRepetir?: (p: Pedido) => void }
+type Props = { pedido: Pedido; onFechar: () => void; prazos: Prazos; onCancelar: (p: Pedido) => void; onRepetir?: (p: Pedido) => void }
 
-/** Detalhe do pedido: painel lateral no desktop, sheet no mobile. Só leitura; a única ação é cancelar em Solicitado. */
-export function PedidoDetalhe({ pedido: p, onFechar, onCancelar, onRepetir }: Props) {
+/** Detalhe do pedido: painel lateral no desktop, sheet no mobile. Só leitura; a ação é cancelar, dentro do prazo do cliente. */
+export function PedidoDetalhe({ pedido: p, prazos, onFechar, onCancelar, onRepetir }: Props) {
   const mobile = useMediaQuery('(max-width: 820px)')
   const info = situacaoDoPedido(p)
   const aviso = aguardandoAprovacao(p)
-    ? 'Aguardando a aprovação de alguém da sua empresa. Depois disso o pedido segue para a Betinhos. Você pode cancelar por aqui.'
+    ? 'Aguardando a aprovação de alguém da sua empresa. Depois disso o pedido segue para a Betinhos.'
     : AVISO[p.status]
   const Painel = mobile ? Sheet : Drawer
-  const cancelavel = podeCancelar(p.status) && !p.comoPassageiro
+  const motivo = motivoNaoCancela(p, Date.now(), prazos)
+  const cancelavel = !motivo && !p.comoPassageiro
+  // Pedido encerrado não precisa explicar por que não cancela; quem é só passageiro não cancela e não vê a regra.
+  const semRegra = p.comoPassageiro || p.status === 'concluido' || p.status === 'cancelado'
+  const regraDeCancelar = semRegra ? null : motivo ?? textoPrazoCancelar(prazos)
   const rodape = (p.voucherUrl || cancelavel || onRepetir) && (
     <div className="pc-det__acoes">
       {onRepetir && <Button variant="secondary" onClick={() => onRepetir(p)} icon={<Repeat size={16} aria-hidden />}>Repetir pedido</Button>}
@@ -62,6 +67,7 @@ export function PedidoDetalhe({ pedido: p, onFechar, onCancelar, onRepetir }: Pr
         <div className="pc-ped__situacao">
           <StatusBadge tone={info.tom} dot>{info.rotulo}</StatusBadge>
           {aviso && <p className="pc-det__nota">{aviso}</p>}
+          {regraDeCancelar && <p className="pc-det__nota" data-testid="regra-cancelar">{regraDeCancelar}</p>}
         </div>
 
         <dl className="pc-det__dados">

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMockLinhas, createMockMensagens } from '../data/mock'
 import type { Source } from '../data/source'
 import type { Linha } from '../domain/types'
+import { prazosDoForm } from '../domain/config'
 import { ValidacaoDrawer } from './ValidacaoDrawer'
 
 afterEach(cleanup)
@@ -32,7 +33,7 @@ function source(over: Partial<Source> = {}): Source {
     setValidadorAprovador: async () => undefined,
     setValidadorAtivo: async () => undefined,
     zerarSenha: async () => undefined,
-    salvarConfig: async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], exigeAprovacao: form.exigeAprovacao }),
+    salvarConfig: async (cliente, form) => ({ cliente, ligado: form.ligado, modulos: form.modulos, dominios: [], exigeAprovacao: form.exigeAprovacao, ...prazosDoForm(form) }),
     podeEditarIdentidade: async () => true,
     logoDoCliente: async () => null,
     ...over,

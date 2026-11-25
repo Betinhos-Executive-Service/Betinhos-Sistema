@@ -9,6 +9,7 @@ import { exportarPedidos } from '../excel/exportar'
 import { situacaoDoPedido } from '../domain/pedidos'
 import type { Pedido } from '../domain/types'
 import { agruparPorDia, daAbaPedidos, filtrarPedidos, SITUACOES, type AbaPedidos, type Situacao } from './meusFiltros'
+import type { Prazos } from '../domain/prazos'
 import { PedidoDetalhe } from './PedidoDetalhe'
 import './MeusServicos.css'
 
@@ -55,7 +56,7 @@ const COLUNAS: TableColumn<Pedido>[] = [
   },
 ]
 
-export function MeusServicos({ onPedir, onRepetir }: { onPedir?: () => void; onRepetir?: (p: Pedido) => void }) {
+export function MeusServicos({ prazos, onPedir, onRepetir }: { prazos: Prazos; onPedir?: () => void; onRepetir?: (p: Pedido) => void }) {
   const api = useApi()
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [carga, setCarga] = useState<'carregando' | 'erro' | 'ok'>('carregando')
@@ -174,7 +175,7 @@ export function MeusServicos({ onPedir, onRepetir }: { onPedir?: () => void; onR
         </div>
       )}
 
-      {aberto && <PedidoDetalhe key={aberto.id} pedido={aberto} onFechar={() => setAbertoId(null)} onCancelar={setCancelando} onRepetir={onRepetir} />}
+      {aberto && <PedidoDetalhe key={aberto.id} pedido={aberto} prazos={prazos} onFechar={() => setAbertoId(null)} onCancelar={setCancelando} onRepetir={onRepetir} />}
 
       <Dialog
         open={cancelando !== null}

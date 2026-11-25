@@ -47,7 +47,10 @@ export type Servico = {
 /** Módulos do portal habilitados por cliente (`cr40f_clientes1.cr40f_portalmodulos`). */
 export type Modulo = 'validar' | 'pedir' | 'meus_servicos'
 
-export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[]; marca?: Marca; /** Aprova os pedidos do cliente (aba "Para aprovar"). */ aprovador?: boolean }
+/** Prazos do cliente para pedir e cancelar (ver `prazos.ts`). */
+export type PrazosSessao = { antecedenciaPedidoH: number; prazoCancelarH: number; contato: string }
+
+export type Sessao = { nome: string; email: string; cliente: string; modulos: Modulo[]; prazos?: PrazosSessao; marca?: Marca; /** Aprova os pedidos do cliente (aba "Para aprovar"). */ aprovador?: boolean }
 
 /** `cr40f_status` da reserva visto pelo solicitante. */
 export type StatusPedido = 'solicitado' | 'em_analise' | 'confirmado' | 'programado' | 'em_execucao' | 'concluido' | 'cancelado'

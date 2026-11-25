@@ -156,7 +156,7 @@ describe('mockApi multi-cliente', () => {
   it('pedido entra como Solicitado em Meus serviços; o mesmo pedido em 1 minuto é duplicado; depois passa', async () => {
     const { api, relogio } = await latasa()
     const antes = (await api.meusServicos()).length
-    const novo = { passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 86400_000).toISOString() }
+    const novo = { passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + 2 * 86400_000).toISOString() }
     const criado = await api.pedir(novo)
     expect(criado).toMatchObject({ status: 'solicitado', numero: /^RV-/ })
     expect((await api.meusServicos())[0]).toEqual(criado)
@@ -166,7 +166,17 @@ describe('mockApi multi-cliente', () => {
     await expect(api.pedir(novo)).resolves.toMatchObject({ status: 'solicitado' })
     await expect(api.pedir({ ...novo, origem: '' })).rejects.toMatchObject({ message: 'Informe o endereço de saída.' })
     await expect(api.cancelarPedido(criado.id)).resolves.toMatchObject({ id: criado.id, status: 'cancelado' })
-    await expect(api.cancelarPedido(criado.id)).rejects.toMatchObject({ message: expect.stringContaining('fale com a Betinhos') })
+    await expect(api.cancelarPedido(criado.id)).rejects.toMatchObject({ message: expect.stringContaining('Fale com a Betinhos: (12) 99999-0000') })
+  })
+
+  it('prazos: a sessão traz a regra do cliente; pedir com pouca antecedência é recusado e cancelar fora do prazo também', async () => {
+    const { api, relogio } = await latasa()
+    expect(await api.sessao()).toMatchObject({ prazos: { antecedenciaPedidoH: 24, prazoCancelarH: 12, contato: '(12) 99999-0000 (WhatsApp)' } })
+    const pedido = (h: number) => ({ passageiros: [{ nome: 'Hiroshi Tanaka', telefone: '(12) 99999-0001' }], origem: 'Latasa', destino: 'GRU', saida: new Date(T0 + h * 3600_000).toISOString() })
+    await expect(api.pedir(pedido(23))).rejects.toMatchObject({ message: expect.stringMatching(/menos de 24 h.*Fale com a Betinhos: \(12\) 99999-0000/) })
+    const criado = await api.pedir(pedido(30))
+    relogio.t += 19 * 3600_000 // faltam 11 h para a saída: passou do prazo de cancelar (12 h)
+    await expect(api.cancelarPedido(criado.id)).rejects.toMatchObject({ message: expect.stringMatching(/12 h antes da saída e já passou/) })
   })
 
   it('busca de passageiros: só pessoas do cliente, por parte do nome, sem acento nem caixa', async () => {
@@ -190,7 +200,7 @@ describe('mockApi multi-cliente', () => {
 
   it('pedido com pessoa nova cadastra; repetir nome e contato reaproveita; id existente corrige o contato; id alheio é recusado', async () => {
     const { api, relogio } = await latasa()
-    const saida = new Date(T0 + 86400_000).toISOString()
+    const saida = new Date(T0 + 2 * 86400_000).toISOString()
     const pedido = (passageiros: PassageiroPedido[], origem = 'Latasa') => ({ passageiros, origem, destino: 'GRU', saida })
     const criado = await api.pedir(pedido([{ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' }]))
     expect(criado.pessoas).toEqual([expect.objectContaining({ nome: 'Nilza Prado', email: 'nilza@exemplo.com.br' })])

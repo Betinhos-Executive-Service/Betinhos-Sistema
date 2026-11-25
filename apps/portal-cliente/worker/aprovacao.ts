@@ -31,12 +31,12 @@ export async function alterarPendente(dv: Dv, alvo: string, corpo: Registro, vol
 }
 
 /** Coluna ainda não criada (Worker antes da migration) vale o padrão; qualquer outra falha sobe, para o pedido não entrar sem aprovação por um erro passageiro. */
-async function tolerante<T>(rodar: () => Promise<T>, padrao: T): Promise<T> {
+export async function tolerante<T>(rodar: () => Promise<T>, padrao: T, rotulo = 'aprovação'): Promise<T> {
   try {
     return await rodar()
   } catch (e) {
     if (!(e instanceof ErroDataverse && e.status === 400)) throw e
-    console.error('aprovação: coluna ausente', e.message)
+    console.error(`${rotulo}: coluna ausente`, e.message)
     return padrao
   }
 }
