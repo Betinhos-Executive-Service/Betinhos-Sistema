@@ -37,14 +37,15 @@ const rotas = () => [
     { systemuserid: SERV, applicationid: ID(500), accessmode: 4 },
     { systemuserid: ANA, applicationid: null, accessmode: 0 },
     { systemuserid: ID(300), applicationid: null, accessmode: 3 },
+    { systemuserid: ID(301), applicationid: null, accessmode: 5 },
   ]],
   ['EntityDefinitions?', { value: [
     { LogicalName: 'cr40f_financeiro', EntitySetName: 'cr40f_financeiros', IsCustomEntity: true, TableType: 'Standard', Privileges: [{ PrivilegeId: ID(600), PrivilegeType: 'Write' }] },
     { LogicalName: 'systemuser', EntitySetName: 'systemusers', IsCustomEntity: false, TableType: 'Standard', Privileges: [] },
     { LogicalName: 'cr40f_virtual', EntitySetName: 'cr40f_virtuais', IsCustomEntity: true, TableType: 'Virtual', Privileges: [] },
   ] }],
-  [`roles(${P.antigo})/`, { RolePrivileges: [{ PrivilegeId: ID(600), Depth: 'Global' }, { PrivilegeId: ID(999), Depth: 'Global' }] }],
-  [`roles(${P.base})/`, { RolePrivileges: [] }],
+  [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.antigo}`, { RolePrivileges: [{ PrivilegeId: ID(600), Depth: 'Global' }, { PrivilegeId: ID(999), Depth: 'Global' }] }],
+  [`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${P.base}`, { RolePrivileges: [] }],
 ]
 
 test('lerEstado monta equipe, pessoas, papéis e catálogo', async () => {
@@ -60,11 +61,17 @@ test('lerEstado monta equipe, pessoas, papéis e catálogo', async () => {
   assert.deepEqual(e.papeis.get(P.antigo).privilegios, [{ tabela: 'cr40f_financeiro', tipo: 'Write', nivel: 8 }])
   assert.equal(e.papeis.get(P.admin).admin, true)
   assert.deepEqual(e.papeis.get(P.solto).privilegios, [])
-  assert.ok(!dv.chamadas.some((c) => c.startsWith(`roles(${P.admin})`)), 'admin não lê privilégios')
-  assert.ok(!dv.chamadas.some((c) => c.startsWith(`roles(${P.solto})`)), 'papel sem ninguém não lê privilégios')
+  assert.ok(!dv.chamadas.some((c) => c.includes(`@p=${P.admin}`)), 'admin não lê privilégios')
+  assert.ok(!dv.chamadas.some((c) => c.includes(`@p=${P.solto}`)), 'papel sem ninguém não lê privilégios')
   assert.deepEqual(e.tabelas, ['cr40f_financeiro'])
   assert.equal(e.catalogo.get('cr40f_financeiros'), 'cr40f_financeiro')
   assert.equal(e.conjuntoDe.get('cr40f_financeiro'), 'cr40f_financeiros')
+  assert.ok(dv.chamadas.some((c) => c.startsWith('systemusers?') && c.includes('isdisabled eq false')), 'só usuários ativos')
+})
+
+test('lerEstado recusa profundidade desconhecida', async () => {
+  const r = rotas().map(([k, v]) => (k.endsWith(`@p=${P.antigo}`) ? [k, { RolePrivileges: [{ PrivilegeId: ID(600), Depth: 7 }] }] : [k, v]))
+  await assert.rejects(lerEstado(falso(r)), /profundidade desconhecida/)
 })
 
 test('lerEstado recusa equipe ausente ou Base fora da unidade da equipe', async () => {
@@ -76,15 +83,16 @@ test('lerEstado recusa equipe ausente ou Base fora da unidade da equipe', async 
 
 test('lerUso junta criou e alterou; tabela que falha fica incerta', async () => {
   const dv = falso([
-    ['cr40f_financeiros?$apply=filter(createdon', [{ _createdby_value: ANA }]],
-    ['cr40f_financeiros?$apply=filter(modifiedon', [{ _modifiedby_value: SERV }, { _modifiedby_value: null }]],
+    ['cr40f_financeiros?fetchXml=', (c) => ({ value: decodeURIComponent(c).includes('"createdby"') ? [{ u: ANA }] : [{ u: SERV }, { u: null }] })],
     ['cr40f_outros?', () => { throw new Error('400') }],
   ])
   const conjuntoDe = new Map([['cr40f_financeiro', 'cr40f_financeiros'], ['cr40f_outro', 'cr40f_outros']])
   const { uso, incertas } = await lerUso(dv, ['cr40f_financeiro', 'cr40f_outro'], conjuntoDe, '2026-08-26T00:00:00Z')
   assert.deepEqual([...uso.get('cr40f_financeiro')].sort(), [ANA, SERV].sort())
   assert.deepEqual([...incertas], ['cr40f_outro'])
-  assert.ok(dv.chamadas[0].includes('filter(createdon ge 2026-08-26T00:00:00Z)/groupby((_createdby_value))'))
+  const xml = decodeURIComponent(dv.chamadas[0])
+  assert.ok(xml.includes('<entity name="cr40f_financeiro"><attribute name="createdby" groupby="true" alias="u"/>'))
+  assert.ok(xml.includes('<condition attribute="createdon" operator="ge" value="2026-08-26T00:00:00Z"/>'))
 })
 
 test('lerFlows separa dono usuário e equipe', async () => {

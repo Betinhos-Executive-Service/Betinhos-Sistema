@@ -55,10 +55,14 @@ export async function lerEstado(dv) {
     const admin = ADMIN.includes(r.name)
     let privilegios = []
     if (!admin && usados.has(r.roleid)) {
-      const resp = await dv.um(`roles(${r.roleid})/Microsoft.Dynamics.CRM.RetrieveRolePrivilegesRole()`)
+      // A forma ligada (roles(id)/...RetrieveRolePrivilegesRole) dá 404; só a solta funciona.
+      const resp = await dv.um(`RetrieveRolePrivilegesRole(RoleId=@p)?@p=${r.roleid}`)
       privilegios = (resp.RolePrivileges ?? []).flatMap((p) => {
         const i = indice.get(p.PrivilegeId)
-        return i ? [{ ...i, nivel: NIVEL[p.Depth] ?? 0 }] : []
+        if (!i) return []
+        // Nível desconhecido zeraria a perda e o relatório sairia limpo por engano.
+        if (!(p.Depth in NIVEL)) throw new Error(`profundidade desconhecida: ${p.Depth}`)
+        return [{ ...i, nivel: NIVEL[p.Depth] }]
       })
     }
     papeis.set(r.roleid, { id: r.roleid, nome: r.name, admin, privilegios })
@@ -73,8 +77,12 @@ export async function lerUso(dv, tabelas, conjuntoDe, desdeIso) {
       const conjunto = conjuntoDe.get(t)
       if (!conjunto) throw new Error('sem conjunto')
       const ids = new Set()
-      for (const [data, campo] of [['createdon', '_createdby_value'], ['modifiedon', '_modifiedby_value']]) {
-        for (const l of await dv.todos(`${conjunto}?$apply=filter(${data} ge ${desdeIso})/groupby((${campo}))`)) if (l[campo]) ids.add(l[campo])
+      // $apply/groupby em lookup dá 400 no Dataverse; FetchXML agregado devolve um usuário por linha.
+      // Acima de 50 mil linhas o agregado falha e a tabela fica incerta.
+      for (const [data, campo] of [['createdon', 'createdby'], ['modifiedon', 'modifiedby']]) {
+        const xml = `<fetch aggregate="true"><entity name="${t}"><attribute name="${campo}" groupby="true" alias="u"/>`
+          + `<filter><condition attribute="${data}" operator="ge" value="${desdeIso}"/></filter></entity></fetch>`
+        for (const l of (await dv.um(`${conjunto}?fetchXml=${encodeURIComponent(xml)}`)).value) if (l.u) ids.add(l.u)
       }
       uso.set(t, ids)
     } catch {
