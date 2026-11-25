@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        parte: [tipos, 1/4, 2/4, 3/4, 4/4]
+        parte: [tipos, 1/5, 2/5, 3/5, 4/5, 5/5]
     name: shell (${{ matrix.parte }})
     steps:
       - uses: actions/checkout@v4
