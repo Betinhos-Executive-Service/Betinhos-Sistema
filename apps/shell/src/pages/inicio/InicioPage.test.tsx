@@ -38,6 +38,8 @@ describe('Página Inicial (mock)', () => {
     expect(screen.getByRole('heading', { name: /Planner/ })).toBeTruthy()
     expect(screen.queryByLabelText('Escolher visão')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Serviços hoje: 06. Abrir' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Novo serviço/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Gerenciar/ })).toBeNull()
     expect(screen.queryByText(/indisponível/)).toBeNull()
     expect(screen.queryByText('Erro parcial')).toBeNull()
   })

@@ -49,7 +49,7 @@ export function FraseDoDia() {
 
 const TOM_COMUNICADO = { info: 'info', attention: 'warning', critical: 'danger' } as const
 
-export function FaixaComunicado({ comunicado, carregando, onGerenciar }: { comunicado: Comunicado | null; carregando: boolean; onGerenciar: () => void }) {
+export function FaixaComunicado({ comunicado, carregando, onGerenciar }: { comunicado: Comunicado | null; carregando: boolean; onGerenciar?: () => void }) {
   return (
     <section className="ini-comunicado bt-surface" aria-label="Comunicado mais recente">
       <Bell size={18} aria-hidden="true" />
@@ -60,7 +60,7 @@ export function FaixaComunicado({ comunicado, carregando, onGerenciar }: { comun
           <span className="ini-comunicado__corpo">{comunicado.corpo}</span>
         </>
       ) : <span className="ini-comunicado__corpo">{carregando ? 'Carregando comunicado…' : 'Nenhum comunicado ativo'}</span>}
-      <Button variant="ghost" size="compact" onClick={onGerenciar}>Gerenciar<ChevronRight size={15} aria-hidden="true" /></Button>
+      {onGerenciar ? <Button variant="ghost" size="compact" onClick={onGerenciar}>Gerenciar<ChevronRight size={15} aria-hidden="true" /></Button> : null}
     </section>
   )
 }
