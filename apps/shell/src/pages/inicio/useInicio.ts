@@ -14,9 +14,12 @@ export type Escopo = 'todas' | 'minhas'
 
 const agora = () => new Date()
 
-export function useInicio(source: Source, now: () => Date = agora) {
+/** `visoes`: as que o perfil lê (`visoesPermitidas`); a padrão é a primeira. Sem nenhuma, só o comum (comunicado, Planner, Radar). */
+export function useInicio(source: Source, now: () => Date = agora, visoes: readonly Visao[] = VISOES) {
   const query = useHashQuery()
-  const visao = lerOpcao<Visao>(query, 'visao', VISOES, 'operacao')
+  const padrao = visoes[0] ?? 'operacao'
+  const visao = lerOpcao<Visao>(query, 'visao', visoes, padrao)
+  const temVisao = visoes.length > 0
   const escopo = lerOpcao<Escopo>(query, 'tarefas', ['minhas', 'todas'], 'minhas')
 
   const [nome, setNome] = useState('')
@@ -41,7 +44,8 @@ export function useInicio(source: Source, now: () => Date = agora) {
     const emCache = cachePorVisao.current.get(alvo)
     setCarregando(true)
     try {
-      const buscar = () => Promise.all([source.compartilhados(now()), emCache ? Promise.resolve(emCache) : source.visao(alvo, now())])
+      const semVisao: DadosVisao = { visao: alvo, indicadores: [], aReceber: [], erro: null }
+      const buscar = () => Promise.all([source.compartilhados(now()), emCache ? Promise.resolve(emCache) : temVisao ? source.visao(alvo, now()) : Promise.resolve(semVisao)])
       let [comp, vis] = await buscar()
       if (comp.erro || vis.erro) {
         await new Promise((r) => setTimeout(r, ESPERA_NOVA_TENTATIVA))
@@ -61,7 +65,7 @@ export function useInicio(source: Source, now: () => Date = agora) {
     } finally {
       if (id === pedido.current) setCarregando(false)
     }
-  }, [source, now])
+  }, [source, now, temVisao])
 
   const pedidoNoticias = useRef(0)
   const carregarNoticias = useCallback(async () => {
@@ -103,7 +107,9 @@ export function useInicio(source: Source, now: () => Date = agora) {
   return {
     mock: source.mock,
     visao,
-    setVisao: (v: Visao) => patchHashQuery({ visao: v === 'operacao' ? null : v }),
+    visoes,
+    temVisao,
+    setVisao: (v: Visao) => patchHashQuery({ visao: v === padrao ? null : v }),
     escopo,
     setEscopo: (e: Escopo) => patchHashQuery({ tarefas: e === 'minhas' ? null : e }),
     nome,

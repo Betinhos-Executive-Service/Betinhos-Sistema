@@ -3,11 +3,13 @@ import { Alert, Button, SegmentedControl, useShellHeader } from '@betinhos/ui'
 import { CalendarPlus, ChevronRight, RefreshCw } from 'lucide-react'
 import type { Host } from '../../host'
 import { useAcessos } from '../../app/AcessosProvider'
+import { useAcessosProntos } from '../../app/useNivel'
 import { semModulos } from '../../app/acessos'
 import { PageFallback } from '../../app/routes'
 import { hrefFor } from '../../nav/useHashRoute'
 import { createSource } from './data/source'
-import { VISOES, VISAO_LABEL, type Destino, type Indicador } from './domain/types'
+import { VISAO_LABEL, type Destino, type Indicador } from './domain/types'
+import { visoesPermitidas } from './domain/visoes'
 import { InicioSemAcesso } from './InicioSemAcesso'
 import { useInicio } from './useInicio'
 import { FaixaComunicado, FraseDoDia, Indicadores, PainelPlanner, Radar, ServicosAReceber } from './components/Paineis'
@@ -33,7 +35,9 @@ export function InicioPage({ host }: { host: Host }) {
 
 function InicioCompleto({ host }: { host: Host }) {
   const source = useMemo(() => createSource(host), [host])
-  const inicio = useInicio(source)
+  const acessos = useAcessosProntos()
+  const visoes = useMemo(() => visoesPermitidas(acessos), [acessos])
+  const inicio = useInicio(source, undefined, visoes)
 
   const headerActions = useMemo(() => (
     <Button variant="secondary" icon={<RefreshCw size={18} />} aria-label="Atualizar dados" onClick={inicio.atualizar} disabled={inicio.carregando} />
@@ -57,20 +61,22 @@ function InicioCompleto({ host }: { host: Host }) {
       <section className="ini-hero">
         <div className="ini-hero__texto">
           <h1>Olá{inicio.nome ? `, ${inicio.nome}` : ''}.</h1>
-          <p>Bom trabalho. Sua visão de {VISAO_LABEL[inicio.visao].toLowerCase()} está atualizada.</p>
+          <p>{inicio.temVisao ? `Bom trabalho. Sua visão de ${VISAO_LABEL[inicio.visao].toLowerCase()} está atualizada.` : 'Bom trabalho.'}</p>
         </div>
         <FraseDoDia />
       </section>
 
       <div className="ini-barra">
-        <SegmentedControl aria-label="Escolher visão" value={inicio.visao} onChange={inicio.setVisao}
-          options={VISOES.map((v) => ({ value: v, label: VISAO_LABEL[v] }))} />
+        {inicio.visoes.length > 1 ? (
+          <SegmentedControl aria-label="Escolher visão" value={inicio.visao} onChange={inicio.setVisao}
+            options={inicio.visoes.map((v) => ({ value: v, label: VISAO_LABEL[v] }))} />
+        ) : null}
         <Button variant="action" icon={<CalendarPlus size={18} />} onClick={() => irPara('geral', { novo: '1' })}>Novo serviço<ChevronRight size={16} aria-hidden="true" /></Button>
       </div>
 
       {inicio.erro ? <Alert tone="warning" title="Erro parcial" action={<Button variant="secondary" size="compact" onClick={inicio.atualizar}>Tentar de novo</Button>}>{inicio.erro}</Alert> : null}
 
-      <Indicadores itens={dados?.indicadores ?? null} carregando={inicio.carregando} quantos={QUANTOS[inicio.visao] ?? 4} onAbrir={(i: Indicador) => abrirDestino(i.destino)} />
+      {inicio.temVisao ? <Indicadores itens={dados?.indicadores ?? null} carregando={inicio.carregando} quantos={QUANTOS[inicio.visao] ?? 4} onAbrir={(i: Indicador) => abrirDestino(i.destino)} /> : null}
 
       <FaixaComunicado comunicado={inicio.comunicado} carregando={inicio.carregando} onGerenciar={() => irPara(ROTA_GERENCIAR_COMUNICADOS)} />
 

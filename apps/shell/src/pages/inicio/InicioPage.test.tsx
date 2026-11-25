@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ComAcessos } from '../../app/ComAcessos'
 import { InicioPage } from './InicioPage'
 
 configure({ asyncUtilTimeout: 8000 })
@@ -16,6 +17,31 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('Página Inicial (mock)', () => {
+  it('Financeiro Operador: seletor sem TI', async () => {
+    render(<ComAcessos perfis="financeiro:operador"><InicioPage host={{ mode: 'mock' }} /></ComAcessos>)
+    const seletor = await screen.findByLabelText('Escolher visão')
+    expect(within(seletor).queryByText('TI')).toBeNull()
+    expect(within(seletor).getByText('Gestão')).toBeTruthy()
+  })
+
+  it('Operacional: abre na Operação mesmo com visao=financeiro na URL e sem seletor', async () => {
+    window.location.hash = '#/inicio?visao=financeiro'
+    render(<ComAcessos perfis="operacional:operador"><InicioPage host={{ mode: 'mock' }} /></ComAcessos>)
+    expect(await screen.findByRole('button', { name: 'Serviços hoje: 06. Abrir' })).toBeTruthy()
+    expect(screen.queryByLabelText('Escolher visão')).toBeNull()
+  })
+
+  it('RH Operador: comunicado, Planner e Radar, sem indicadores e sem erro', async () => {
+    render(<ComAcessos perfis="rh:operador"><InicioPage host={{ mode: 'mock' }} /></ComAcessos>)
+    expect(await screen.findByRole('heading', { name: 'Olá, Renan.' })).toBeTruthy()
+    expect(await screen.findByText('Janela de operação especial')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /Planner/ })).toBeTruthy()
+    expect(screen.queryByLabelText('Escolher visão')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Serviços hoje: 06. Abrir' })).toBeNull()
+    expect(screen.queryByText(/indisponível/)).toBeNull()
+    expect(screen.queryByText('Erro parcial')).toBeNull()
+  })
+
   it('saúda, mostra os indicadores da Operação, o comunicado e as minhas tarefas', async () => {
     render(<InicioPage host={{ mode: 'mock' }} />)
     expect(await screen.findByRole('heading', { name: 'Olá, Renan.' })).toBeTruthy()
