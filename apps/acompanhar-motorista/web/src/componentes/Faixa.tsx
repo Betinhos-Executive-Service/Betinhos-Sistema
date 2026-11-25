@@ -1,5 +1,4 @@
 import { useIdioma } from "../i18n";
-import { diaMes, hora } from "../formato";
 import type { EtaMostrado } from "../hooks/useEta";
 import { aeroportoNoEmbarque, estadoViagem, fraseFase, SEGMENTOS, segmentosAcesos, tituloFase } from "../portal";
 import type { Dados } from "../tipos";
@@ -43,14 +42,8 @@ function BotaoCompartilhar() {
 }
 
 // Herói da fase: título, selo com os minutos, barra de 5 segmentos e a frase de previsão.
-export function Heroi({ dados, eta, reserva, espera, desktop = false }: Props & { desktop?: boolean }) {
+export function Heroi({ dados, eta, espera, desktop = false }: Props & { desktop?: boolean }) {
   const { t, id, cor } = useIdioma();
-  const ag = Date.parse(dados?.horarioAgendado ?? "");
-  const linha = [
-    desktop ? null : reserva,
-    isNaN(ag) ? null : diaMes(id, ag),
-    isNaN(ag) ? null : t("faixa.saida", { h: hora(id, ag) }),
-  ].filter(Boolean).join(" · ");
   const e = dados ? estadoViagem(dados) : null;
   const acesos = dados ? segmentosAcesos(dados) : 0;
   const frase = dados ? fraseFase(dados, { t, id, cor, eta, espera }) : "";
@@ -58,7 +51,6 @@ export function Heroi({ dados, eta, reserva, espera, desktop = false }: Props & 
   return (
     <div className={desktop ? "card faixa-heroi heroi-card" : "faixa-heroi"}>
       {dados && aeroportoNoEmbarque(dados) && e !== "concluido" ? <p className="boasvindas" id="boasvindas">{t("boasvindas")}</p> : null}
-      <p className="reserva" id={desktop ? "agenda" : "reserva"} hidden={!linha}>{linha}</p>
       <div className="titulo-linha">
         <h1 id="status" aria-live="polite" className={dados ? undefined : "esqueleto"}>{dados ? tituloFase(dados, t) : t("status.localizando")}</h1>
         {minutos !== null ? <span className="selo-eta" id="eta"><b>{minutos}</b> min</span> : null}

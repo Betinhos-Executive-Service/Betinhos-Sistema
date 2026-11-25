@@ -241,7 +241,6 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .idioma-seg .idioma-op{min-height:30px;padding:0 11px;font-size:12px;font-weight:800;color:#c4d2ea;background:transparent}
 .idioma-seg .idioma-op[aria-pressed="true"]{background:var(--bt-color-surface);color:var(--bt-color-brand)}
 .boasvindas{margin:0 0 18px;font-size:22px;line-height:28px;font-weight:800;color:var(--bt-color-gold)}
-.reserva{margin:0 0 12px;font-size:13px;line-height:18px;font-weight:600;color:#c4d2ea}
 .titulo-linha{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .faixa h1{margin:0;font-size:28px;line-height:34px;font-weight:800;letter-spacing:-.01em;overflow-wrap:anywhere}
 .faixa .esqueleto{background:rgba(255,255,255,.18)!important;width:60%;min-height:34px}
@@ -333,7 +332,6 @@ a,button,[role=button],label,summary,input,textarea{-webkit-tap-highlight-color:
 .corpo.duas>.rodape{grid-column:1/-1;text-align:left}
 .corpo.duas .mapa-moldura{height:300px}
 .heroi-card .boasvindas{margin:0 0 4px;font-size:18px;line-height:24px;color:var(--bt-color-brand)}
-.heroi-card .reserva{margin:0 0 4px;color:var(--bt-color-text-secondary)}
 .heroi-card h1{margin:0;font-size:26px;line-height:32px;font-weight:800;letter-spacing:-.01em;color:var(--bt-color-brand);overflow-wrap:anywhere}
 .heroi-card .esqueleto{width:60%;min-height:32px}
 .heroi-card .barra{margin-top:20px}

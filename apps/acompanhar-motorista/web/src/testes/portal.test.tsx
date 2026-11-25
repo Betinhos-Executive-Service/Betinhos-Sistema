@@ -88,7 +88,7 @@ describe("Faixa e LinhaDoTempo renderizadas", () => {
     expect(container.querySelectorAll("#passos li")).toHaveLength(5);
     expect(container.querySelectorAll("#passos li.feita, #passos li.atual")).toHaveLength(3);
     expect(container.querySelector("#eta")).toHaveTextContent("7");
-    expect(container.querySelector("#reserva")).toHaveTextContent("Reserva OS-12");
+    expect(container.querySelector("#reserva")).toBeNull();
     expect(container.querySelector("#boasvindas")).toBeNull();
   });
   it("faixa: aeroporto mostra o boas-vindas e agendado não tem selo", () => {
@@ -108,7 +108,7 @@ describe("Faixa e LinhaDoTempo renderizadas", () => {
     const card = renderiza(<Heroi desktop dados={d} eta={eta} reserva="Reserva OS-12" espera={0} />).container;
     expect(card.querySelector(".heroi-card #status")).toHaveTextContent("Seu motorista está a caminho");
     expect(card.querySelector("#eta")).toHaveTextContent("7");
-    expect(card.querySelector("#agenda")).not.toHaveTextContent("OS-12");
+    expect(card.textContent).not.toContain("OS-12");
   });
   it("linha do tempo: etapa atual marcada, sem sino sem VAPID", () => {
     const { container } = renderiza(<LinhaDoTempo dados={{ fase: "a_caminho" }} cfg={{ tomtom: false, telefone: null, whatsapp: null, aoVivo: false, vapid: null, completo: false }} chegada={null} abrirTela={() => {}} />);
